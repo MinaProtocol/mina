@@ -4,7 +4,7 @@
 
 ![Mina and Lucy](https://user-images.githubusercontent.com/3465290/213062809-f4bb13a7-9620-464d-9f8a-708126d37393.png)
 | :--: | 
-*My dearest Mina, we have told all our secrets to each other since we were children; we have slept together and eaten together, and laughed and cried together; and now, though I have spoken, I would like to speak more.* ~excerpt from Dracula, by Bram Stoker; Chapter V, LETTER, LUCY WESTENRA TO MINA MURRAY
+*My dearest Mina, we have told all our secrets to each other since we were children; we have slept together and eaten together, and laughed and cried together; and now, though I have spoken, I would like to speak more.* ~excerpt from Dracula, by Bram Stoker; Chapter V: LETTER, LUCY WESTENRA TO MINA MURRAY
 
 
 **Lucy** is the name of Mina Protocol's fully end-to-end integration testing framework, developed in-house by O(1) Labs.  This piece of software is a standalone testing tool, and was previously known as simply "the integration testing framework" and sometimes as "the test executive".
@@ -19,7 +19,7 @@ Given this, the solution, therefore, is quite clear: we must spin up from scratc
 
 ![we are all good christian victorian women here](https://user-images.githubusercontent.com/3465290/213062888-6fd82ec4-7e96-4b5a-bbc4-926f8b9cde79.png)
 |:--:|
-*Leave these others and come to me. My arms are hungry for you. Come, and we can rest together. Come, my husband, come!* ~excerpt from Dracula, by Bram Stoker; Chapter XVI, DR SEWARD’S DIARY
+*Leave these others and come to me. My arms are hungry for you. Come, and we can rest together. Come, my husband, come!* ~excerpt from Dracula, by Bram Stoker; Chapter XVI: DR SEWARD’S DIARY *(continued)*
 
 Lucy is of course named after the character Lucy Westerna from Bram Stoker's Dracula.  Lucy is Mina Harker née Murray's ["best friend"](https://www.youtube.com/watch?v=VbbRQj8Oi2k), who sapphically and figuratively [tests Mina's virtues](https://archiveofourown.org/tags/Mina%20Murray%20Harker*s*Lucy%20Westenra/works) (and the virtues of the other characters in the novel but no one cares about them), so naturally we thought this would be an appropriate name for an integration testing framework which tests the Mina Protocol.
 
@@ -92,11 +92,11 @@ Make sure you have the following critical tools installed on the machine which y
 
 ### GCP credentials and infrastructure related env vars
 
-Lucy at the current moment runs the testnet on GCP, and therefore you'll need the right credentials to run.  There is also a small dependency on AWS which we hope to eliminate in future but for now, you'll also need AWS credentials.
+Lucy at the current moment runs the testnet on GCP, and therefore you'll need the right credentials to run.
 
 Note: this environment setup assumes that one is a member of o(1) labs and has access to organization infrastructure.  You will need an o(1) labs GCP account and AWS account.
 
-You will need the following environment variables to be set correctly on the machine running the test_executive in order to run Lucy: `GOOGLE_APPLICATION_CREDENTIALS`, `GCLOUD_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, `KUBE_CONFIG_PATH`.  Each of these environment variables needs to be `export`'ed before running Lucy.  It's recommended that the `export` commands be put into one's `.bashrc` or `.profile`.  Each env var will be explained in detail.
+You will need the following environment variables to be set correctly on the machine running the test_executive in order to run Lucy: `GOOGLE_APPLICATION_CREDENTIALS`, `GCLOUD_API_KEY`, `KUBE_CONFIG_PATH`.  Each of these environment variables needs to be `export`'ed before running Lucy.  It's recommended that the `export` commands be put into one's `.bashrc` or `.profile`.  Each env var will be explained in detail.
 
 - `GOOGLE_APPLICATION_CREDENTIALS` is the path to the json-formatted keyfile of the GCP service account that you will be using.  The service account is most likely going to be the `automated-validation` service account, although other service accounts may work as well.  
 	1. First, you'll need to obtain the keyfile itself.  Ideally, this means creating a new one just for yourself.  To do so, go to the [GCP IAM Service Accounts page](https://console.cloud.google.com/iam-admin/serviceaccounts), click into the `automated-validation@<email domain>` page, click into the "Keys" section in the topbar, and create a new key (see picture).  Each individual user should ideally have their own unique key.  Download this key as a json file and save it to your computer in whatever directory is most convenient.
@@ -105,10 +105,6 @@ You will need the following environment variables to be set correctly on the mac
 	(Note: before you run this export command or set this environment variable, you may want to check if `GOOGLE_APPLICATION_CREDENTIALS` is already in your path-- if it is then what you already have may work without further changes.)	
 
 - `GCLOUD_API_KEY` is a string which is your access key to the gcloud api.  To obtain this key, go to the [GCP API Credentials page](https://console.cloud.google.com/apis/credentials), find the key called "Integration-tests log-engine" and copy the key for that onto your clipboard.  Run `export GCLOUD_API_KEY=<key>` and/or put the export command into your .bashrc or .profile.  This API key is shared by everyone, there is no need to create your own.
-
-- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` are all the AWS access credential env vars.  Just talk to the O(1) Labs Velocity Team to obtain these creds
-
-- `AWS_DEFAULT_REGION=us-west-2` is the region env var for AWS.  It's always going to be `us-west-2` so just set that and don't worry about it.
 
 - `KUBE_CONFIG_PATH` should usually be `~/.kube/config`.  If you're doing something unorthodox with kubernetes then it may be different, in which case you probably know what you're doing.
  
@@ -120,7 +116,7 @@ If you were to run Lucy's test executive directly in the terminal, the command l
 mina-test-executive cloud $TEST_NAME --mina-image $MINA_IMAGE --archive-image $ARCHIVE_IMAGE --debug | tee test.log | mina-logproc -i inline -f '!(.level in ["Spam", "Debug"])'
 ```
 
-Running it directly in the terminal is not the most recommended method, but it is the simplest and all the other methods are based on it eventually, and so before moving on, it's worth breaking down the command line arguments and options for `mina-test-executive`.
+Running it directly in the terminal is not the most recommended method, but it is technologically speaking the simplest method (even if not practically the most streamlined) and all the other methods are based on it eventually, and so before moving on, it's worth breaking down the command line arguments and options for `mina-test-executive`.
 
 - `cloud` : the first argument specifies if you'd like to run the testnet in the cloud (ie GCP) or locally in virtual machines.  only the `cloud` option works at the moment, the local implementation has yet to be implemented
 - `$TEST_NAME`: the second argument is the name of the pre-written test which you wish to run.
@@ -209,16 +205,13 @@ docker run \
 --mount "type=bind,source=/<path to service account keyfile>/o1labs-gcp-192920-cd2c1759278d.json,dst=/keys/o1labs-gcp-192920-cd2c1759278d.json,readonly" \
 --env GOOGLE_APPLICATION_CREDENTIALS=/keys/o1labs-gcp-192920-cd2c1759278d.json \
 --env GCLOUD_API_KEY \
---env AWS_ACCESS_KEY_ID \
---env AWS_SECRET_ACCESS_KEY \
---env AWS_DEFAULT_REGION=us-west-2 \
 gcr.io/o1labs-192920/mina-test-executive@sha256:92c8f0315b53edfba0d885fdc12928e2a91811928ce751b65f943811c0c84463
 
 ```
 
 As you'll notice, the env vars `TEST_NAME`, `MINA_IMAGE`, `ARCHIVE_IMAGE`, `DEBUG_BOOL` are the same as the flags and arguments that you'd put into the idiomatic command that you'd be using if you were directly running mina-test-executive in your terminal.  Refer to the section [`mina-test-executive` command line breakdown](README.md#mina-test-executive-command-line-breakdown) for a detailed explaination of the arguments and flags.
 
-The env vars `GOOGLE_APPLICATION_CREDENTIALS`, `GCLOUD_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` are the same env vars that you set up in the earlier section of this readme [GCP credentials and infrastructure related env vars](README.md#gcp-credentials-and-infrastructure-related-env-vars).  The `--mount` argument tells docker to put the keyfile of the service account onto the file system inside of the container, so that processes running inside the container can access the keyfile.  The env var `GOOGLE_APPLICATION_CREDENTIALS` is to be set to the path to the keyfile inside the container, not the path to the keyfile on the host machine, so unless you've modified other things there's no need to modify it.
+The env vars `GOOGLE_APPLICATION_CREDENTIALS`, `GCLOUD_API_KEY`, are the same GCP access credentials environment variables that you set up in the earlier section of this readme [GCP credentials and infrastructure related env vars](README.md#gcp-credentials-and-infrastructure-related-env-vars).  The `--mount` argument simply tells docker to put the keyfile of the service account onto the file system inside of the container, so that processes running inside the container can access the keyfile.  The env var `GOOGLE_APPLICATION_CREDENTIALS` is to be set to the path to the keyfile inside the container, not the path to the keyfile on the host machine, so unless you've modified other things there's no need to modify it.
 
 
 #### Compile Lucy from source
@@ -321,5 +314,9 @@ alias logproc=./_build/default/src/app/logproc/logproc.exe
 - Exit code `13` will be returned if `kubectl` exited with a non-zero code or a signal while attempting to retrieve logs.
 - Exit code `20` will be returned if any testnet nodes hard timed-out on initialization
 
-![](https://user-images.githubusercontent.com/3465290/213062986-35ab48cc-d57f-4348-bda2-a8a504944cb5.png)
+![totally heterosexual and entirely becoming of good christian victorian woman behavior](https://user-images.githubusercontent.com/3465290/213062986-35ab48cc-d57f-4348-bda2-a8a504944cb5.png)
 |:--:|
+...and so, as you love me, and he loves me, and I love you with all the moods and tenses of the verb... Goodbye, my dearest Lucy, and all blessings on you.
+Yours,
+Mina Harker
+~excerpt from Dracula, by Bram Stoker; Chapter XII: LETTER, MINA HARKER TO LUCY WESTENRA *(Unopened by her)*
