@@ -9,6 +9,7 @@ type catchup_config =
   { max_download_time_per_block_sec : float
   ; max_download_jobs : int
   ; max_verifier_jobs : int
+  ; max_proofs_per_batch : int
   ; max_retrieve_hash_chain_jobs : int
   ; building_breadcrumb_timeout : Time.Span.t
   ; bitwap_download_timeout : Time.Span.t

@@ -267,6 +267,7 @@ module Generator = struct
                              { Mina_intf.max_download_time_per_block_sec = 1.
                              ; max_download_jobs = 20
                              ; max_verifier_jobs = 1
+                             ; max_proofs_per_batch = 100
                              ; max_retrieve_hash_chain_jobs = 5
                              ; building_breadcrumb_timeout = Time.Span.of_min 2.
                              ; bitwap_download_timeout = Time.Span.of_sec 2.

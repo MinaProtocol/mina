@@ -23,9 +23,10 @@ let pubsub_v1 = Gossip_net.Libp2p.RW
 let pubsub_v0 = Gossip_net.Libp2p.RW
 
 let catchup_config =
-  { Mina_intf.max_download_time_per_block_sec = 15.
+  { Mina_intf.max_download_time_per_block_sec = 30.
   ; max_download_jobs = 20
   ; max_verifier_jobs = 1
+  ; max_proofs_per_batch = 1000
   ; max_retrieve_hash_chain_jobs = 5
   ; building_breadcrumb_timeout = Time.Span.of_min 2.
   ; bitwap_download_timeout = Time.Span.of_min 2.

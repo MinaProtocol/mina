@@ -1318,6 +1318,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                     ~default:def.max_download_time_per_block_sec
               ; max_download_jobs =
                   int_opt "max-download-jobs" ~default:def.max_download_jobs
+              ; max_proofs_per_batch =
+                  int_opt "max-verifier-jobs" ~default:def.max_proofs_per_batch
               ; max_verifier_jobs =
                   int_opt "max-verifier-jobs" ~default:def.max_verifier_jobs
               ; max_retrieve_hash_chain_jobs =

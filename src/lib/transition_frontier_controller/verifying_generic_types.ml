@@ -22,7 +22,8 @@ module type F = sig
   val data_name : string
 
   val split_to_batches :
-       Transition_state.t Non_empty_list.t
+       context:(module Context.CONTEXT)
+    -> Transition_state.t Non_empty_list.t
     -> Transition_state.t Non_empty_list.t Non_empty_list.t
 
   (** Launch processing and return the deferred action launched along

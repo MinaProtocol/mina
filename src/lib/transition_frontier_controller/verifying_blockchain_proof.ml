@@ -53,7 +53,8 @@ module F = struct
   let data_name = "blockchain proof"
 
   (* TODO consider limiting amount of proofs per batch *)
-  let split_to_batches = Non_empty_list.singleton
+  let split_to_batches ~context:(module Context : CONTEXT) =
+    Non_empty_list.singleton
 end
 
 include Verifying_generic.Make (F)
