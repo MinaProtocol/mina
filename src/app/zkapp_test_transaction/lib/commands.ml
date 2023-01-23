@@ -74,19 +74,25 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
     in
     compile_time_genesis.data |> Mina_state.Protocol_state.body
   in
+  let global_slot =
+    Mina_state.Protocol_state.Body.consensus_state state_body
+    |> Consensus.Data.Consensus_state.global_slot_since_genesis
+    |> Mina_numbers.Global_slot.succ
+  in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   let pending_coinbase_init_stack = Pending_coinbase.Stack.empty in
   let pending_coinbase_state_stack =
     { Transaction_snark.Pending_coinbase_stack_state.source =
         pending_coinbase_init_stack
     ; target =
-        Pending_coinbase.Stack.push_state state_body_hash
+        Pending_coinbase.Stack.push_state state_body_hash global_slot
           pending_coinbase_init_stack
     }
   in
   let witnesses, _final_ledger =
     Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
-      ~state_body ~fee_excess:Currency.Amount.Signed.zero (`Ledger ledger)
+      ~global_slot ~state_body ~fee_excess:Currency.Amount.Signed.zero
+      (`Ledger ledger)
       [ ( `Pending_coinbase_init_stack pending_coinbase_init_stack
         , `Pending_coinbase_of_statement pending_coinbase_state_stack
         , zkapp_command )
@@ -165,19 +171,25 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   let state_body =
     compile_time_genesis.data |> Mina_state.Protocol_state.body
   in
+  let global_slot =
+    Mina_state.Protocol_state.Body.consensus_state state_body
+    |> Consensus.Data.Consensus_state.global_slot_since_genesis
+    |> Mina_numbers.Global_slot.succ
+  in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   let pending_coinbase_init_stack = Pending_coinbase.Stack.empty in
   let pending_coinbase_state_stack =
     { Transaction_snark.Pending_coinbase_stack_state.source =
         pending_coinbase_init_stack
     ; target =
-        Pending_coinbase.Stack.push_state state_body_hash
+        Pending_coinbase.Stack.push_state state_body_hash global_slot
           pending_coinbase_init_stack
     }
   in
   let witnesses, _final_ledger =
     Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
-      ~state_body ~fee_excess:Currency.Amount.Signed.zero (`Ledger ledger)
+      ~global_slot ~state_body ~fee_excess:Currency.Amount.Signed.zero
+      (`Ledger ledger)
       [ ( `Pending_coinbase_init_stack pending_coinbase_init_stack
         , `Pending_coinbase_of_statement pending_coinbase_state_stack
         , zkapp_command )

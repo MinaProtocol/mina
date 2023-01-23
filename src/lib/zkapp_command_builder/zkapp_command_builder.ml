@@ -29,6 +29,7 @@ let mk_account_update_body authorization_kind may_use_token kp token_id
   ; preconditions =
       { network = Zkapp_precondition.Protocol_state.accept
       ; account = Account_update.Account_precondition.Accept
+      ; valid_while = Ignore
       }
   ; use_full_commitment = true
   ; implicit_account_creation_fee = false

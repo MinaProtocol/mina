@@ -1740,7 +1740,9 @@ let%test_module _ =
       | User_command.Zkapp_command p -> (
           let applied, _ =
             Mina_ledger.Ledger.apply_zkapp_command_unchecked
-              ~constraint_constants ~state_view:dummy_state_view ledger p
+              ~constraint_constants
+              ~global_slot:dummy_state_view.global_slot_since_genesis
+              ~state_view:dummy_state_view ledger p
             |> Or_error.ok_exn
           in
           match With_status.status applied.command with
@@ -1819,6 +1821,7 @@ let%test_module _ =
                         ; account =
                             Account_update.Account_precondition.Nonce
                               (Account.Nonce.succ nonce)
+                        ; valid_while = Ignore
                         }
                     ; may_use_token = No
                     ; use_full_commitment = not double_increment_sender
@@ -1840,6 +1843,7 @@ let%test_module _ =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
                         ; account = Account_update.Account_precondition.Accept
+                        ; valid_while = Ignore
                         }
                     ; may_use_token = No
                     ; implicit_account_creation_fee = false
