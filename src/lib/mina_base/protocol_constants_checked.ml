@@ -67,49 +67,44 @@ let t_of_value (v : value) : Genesis_constants.Protocol.t =
   }
 
 let to_input (t : value) =
-  Random_oracle.Input.bitstrings
-    [| T.to_bits t.k
-     ; T.to_bits t.delta
-     ; T.to_bits t.slots_per_epoch
-     ; T.to_bits t.slots_per_sub_window
-     ; Block_time.Bits.to_bits t.genesis_state_timestamp
+  Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
+    [| T.to_input t.k
+     ; T.to_input t.delta
+     ; T.to_input t.slots_per_epoch
+     ; T.to_input t.slots_per_sub_window
+     ; Block_time.to_input t.genesis_state_timestamp
     |]
 
 [%%if defined consensus_mechanism]
 
-type var = (T.Checked.t, T.Checked.t, Block_time.Unpacked.var) Poly.t
+type var = (T.Checked.t, T.Checked.t, Block_time.Checked.t) Poly.t
 
-let data_spec =
-  Data_spec.
+let typ =
+  Typ.of_hlistable
     [ T.Checked.typ
     ; T.Checked.typ
     ; T.Checked.typ
     ; T.Checked.typ
-    ; Block_time.Unpacked.typ
+    ; Block_time.Checked.typ
     ]
-
-let typ =
-  Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
-    ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
-    ~value_of_hlist:Poly.of_hlist
+    ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+    ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
 let var_to_input (var : var) =
-  let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
-  let%map k = T.Checked.to_bits var.k
-  and delta = T.Checked.to_bits var.delta
-  and slots_per_epoch = T.Checked.to_bits var.slots_per_epoch
-  and slots_per_sub_window = T.Checked.to_bits var.slots_per_sub_window in
+  let k = T.Checked.to_input var.k
+  and delta = T.Checked.to_input var.delta
+  and slots_per_epoch = T.Checked.to_input var.slots_per_epoch
+  and slots_per_sub_window = T.Checked.to_input var.slots_per_sub_window in
   let genesis_state_timestamp =
-    Block_time.Unpacked.var_to_bits var.genesis_state_timestamp
+    Block_time.Checked.to_input var.genesis_state_timestamp
   in
-  Random_oracle.Input.bitstrings
-    (Array.map ~f:s
-       [| k
-        ; delta
-        ; slots_per_epoch
-        ; slots_per_sub_window
-        ; genesis_state_timestamp
-       |] )
+  Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
+    [| k
+     ; delta
+     ; slots_per_epoch
+     ; slots_per_sub_window
+     ; genesis_state_timestamp
+    |]
 
 let%test_unit "value = var" =
   let compiled = Genesis_constants.for_unit_tests.protocol in
@@ -119,7 +114,7 @@ let%test_unit "value = var" =
       let%map p = exists typ ~compute:(As_prover.return protocol_constants) in
       As_prover.read typ p
     in
-    let _, res = Or_error.ok_exn (run_and_check p_var ()) in
+    let res = Or_error.ok_exn (run_and_check p_var) in
     [%test_eq: Value.t] res protocol_constants ;
     [%test_eq: Value.t] protocol_constants
       (t_of_value protocol_constants |> value_of_t)

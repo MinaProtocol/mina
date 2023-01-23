@@ -1,0 +1,47 @@
+(library
+ (name snarky_js_bindings_tests)
+ (inline_tests)
+ (libraries
+   ;; opam libraries ;;
+   core_kernel
+   base
+   base.caml
+   integers
+   sexplib0
+   yojson
+   ;; local libraries ;;
+   mina_base
+   mina_base.import
+   snarky.backendless
+   snarky_curve
+   h_list
+   pickles
+   pickles.backend
+   pickles.limb_vector
+   pickles_types
+   kimchi_backend
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   kimchi_backend.common
+   kimchi_pasta_constraint_system
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
+   block_time
+   currency
+   data_hash_lib
+   fields_derivers
+   fields_derivers_zkapps
+   genesis_constants
+   mina_numbers
+   random_oracle
+   sgn
+   signature_lib
+   snark_keys_header
+   snark_params
+   tuple_lib
+   with_hash
+   ppx_inline_test
+   ppx_inline_test.config)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_custom_printf ppx_version ppx_inline_test)))

@@ -10,7 +10,7 @@
 
     Stack operations are done for transaction snarks and tree operations are done for the blockchain snark*)
 
-open Core
+open Core_kernel
 open Snark_params
 open Snarky_backendless
 open Tick
@@ -21,11 +21,11 @@ module type S = sig
   type t [@@deriving sexp, to_yojson]
 
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type nonrec t = t [@@deriving bin_io, sexp, to_yojson, version]
     end
 
-    module Latest = V1
+    module Latest = V2
   end
 
   module Coinbase_data : sig
@@ -64,11 +64,15 @@ module type S = sig
 
     val var_to_hash_packed : var -> Field.Var.t
 
-    val equal_var : var -> var -> (Boolean.var, _) Tick.Checked.t
+    val equal_var : var -> var -> Boolean.var Tick.Checked.t
 
     val to_bytes : t -> string
 
     val to_bits : t -> bool list
+
+    val to_base58_check : t -> string
+
+    val of_base58_check_exn : string -> t
 
     val gen : t Quickcheck.Generator.t
   end
@@ -114,15 +118,15 @@ module type S = sig
 
     val gen : t Quickcheck.Generator.t
 
-    val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+    val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 
     val to_bits : t -> bool list
 
     val to_bytes : t -> string
 
-    val equal_var : var -> var -> (Boolean.var, _) Tick.Checked.t
+    val equal_var : var -> var -> Boolean.var Tick.Checked.t
 
-    val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
+    val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
 
     val empty : t
 
@@ -133,6 +137,10 @@ module type S = sig
 
     val equal_state_hash : t -> t -> bool
 
+    (** The two stacks are connected. This should be used instead of `equal` to
+    check one transaction snark statement follow the other.*)
+    val connected : ?prev:t option -> first:t -> second:t -> unit -> bool
+
     val push_coinbase : Coinbase.t -> t -> t
 
     val push_state : State_body_hash.t -> t -> t
@@ -140,16 +148,14 @@ module type S = sig
     module Checked : sig
       type t = var
 
-      val push_coinbase : Coinbase_data.var -> t -> (t, 'a) Tick.Checked.t
+      val push_coinbase : Coinbase_data.var -> t -> t Tick.Checked.t
 
-      val push_state : State_body_hash.var -> t -> (t, 'a) Tick.Checked.t
+      val push_state : State_body_hash.var -> t -> t Tick.Checked.t
 
-      val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Tick.Checked.t
+      val if_ : Boolean.var -> then_:t -> else_:t -> t Tick.Checked.t
 
       val check_merge :
-           transition1:t * t
-        -> transition2:t * t
-        -> (Boolean.var, _) Tick.Checked.t
+        transition1:t * t -> transition2:t * t -> Boolean.var Tick.Checked.t
 
       val empty : t
 
@@ -158,7 +164,12 @@ module type S = sig
   end
 
   module State_stack : sig
-    type t
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t
+      end
+    end]
   end
 
   module Update : sig
@@ -258,7 +269,7 @@ module type S = sig
       | Find_index_of_oldest_stack : Address.value Request.t
       | Get_previous_stack : State_stack.t Request.t
 
-    val get : depth:int -> var -> Address.var -> (Stack.var, _) Tick.Checked.t
+    val get : depth:int -> var -> Address.var -> Stack.var Tick.Checked.t
 
     (**
        [update_stack t ~is_new_stack updated_stack] implements the following spec:
@@ -273,7 +284,7 @@ module type S = sig
       -> coinbase_receiver:Public_key.Compressed.var
       -> supercharge_coinbase:Boolean.var
       -> State_body_hash.var
-      -> (var, 's) Tick.Checked.t
+      -> var Tick.Checked.t
 
     (**
        [pop_coinbases t pk updated_stack] implements the following spec:
@@ -286,6 +297,6 @@ module type S = sig
          constraint_constants:Genesis_constants.Constraint_constants.t
       -> var
       -> proof_emitted:Boolean.var
-      -> (var * Stack.var, 's) Tick.Checked.t
+      -> (var * Stack.var) Tick.Checked.t
   end
 end

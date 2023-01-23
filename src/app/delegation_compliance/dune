@@ -28,14 +28,17 @@
    logger
    signature_lib
    genesis_constants
+   mina_caqti
    mina_base
+   mina_ledger
    mina_state
    genesis_ledger_helper
    coda_runtime_config
    currency
    coda_genesis_ledger
+   mina_base.import
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_let ppx_sexp_conv ppx_deriving.show
+ (preprocess (pps ppx_mina ppx_version ppx_let ppx_sexp_conv ppx_deriving.show
                   ppx_hash ppx_compare ppx_deriving_yojson h_list.ppx)))

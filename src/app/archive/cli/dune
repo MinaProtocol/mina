@@ -19,4 +19,4 @@
    block_time
  )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane ppx_coda)))
+ (preprocess (pps ppx_version ppx_jane ppx_mina)))
