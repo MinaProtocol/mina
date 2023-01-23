@@ -136,7 +136,6 @@ let () =
                Option.value_exn
                  (add_amount zero (Currency.Amount.of_nanomina_int_exn 500))) )
       in
-      let thing _ =
-        check_zkapp_command_with_merges_exn ledger [ zkapp_command ]
-      in
-      Async.Thread_safe.block_on_async_exn thing )
+
+      Async.Thread_safe.block_on_async_exn (fun _ ->
+          check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) )
