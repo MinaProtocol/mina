@@ -72,6 +72,12 @@ module Features : sig
     end
   end]
 
+  (** {2 Type aliases} *)
+
+  type options = Opt.Flag.t t
+
+  type flags = bool t
+
   val to_vector : 'a t -> ('a, Nat.N8.n) Vector.t
 
   val of_vector : ('a, Nat.N8.n) Vector.t -> 'a t
@@ -80,9 +86,9 @@ module Features : sig
        ('var, 'value, 'f) Snarky_backendless.Typ.t
     -> ('var t, 'value t, 'f) Snarky_backendless.Typ.t
 
-  val none : Opt.Flag.t t
+  val none : options
 
-  val none_bool : bool t
+  val none_bool : flags
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
 

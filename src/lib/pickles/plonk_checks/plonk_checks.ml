@@ -170,7 +170,10 @@ let expand_feature_flags (type boolean)
     (* Lookup has max_lookups_per_row = 3 *)
     lazy (B.( ||| ) (Lazy.force lookups_per_row_4) lookup)
   in
-  let lookups_per_row_2 = lookups_per_row_3 in
+  let lookups_per_row_2 =
+    (* ForeignFieldMul has max_lookups_per_row = 2 *)
+    lazy (B.( ||| ) (Lazy.force lookups_per_row_3) foreign_field_mul)
+  in
   { lookup_tables
   ; table_width_1
   ; table_width_2
@@ -290,7 +293,11 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     | LookupTable ->
         get_eval (Opt.value_exn e.lookup).table
     | LookupSorted i ->
-        get_eval (Opt.value_exn e.lookup).sorted.(i)
+        let sorted = (Opt.value_exn e.lookup).sorted in
+        if i < Array.length sorted then get_eval sorted.(i)
+        else
+          (* Return zero padding when the index is larger than sorted *)
+          F.zero
     | LookupAggreg ->
         get_eval (Opt.value_exn e.lookup).aggreg
     | LookupRuntimeTable ->
