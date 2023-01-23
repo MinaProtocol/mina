@@ -1193,9 +1193,9 @@ var caml_pasta_fp_plonk_gate_vector_digest = function (public_input_size, gate_v
 }
 
 // Provides: caml_pasta_fp_plonk_circuit_serialize
-// Requires: plonk_wasm
+// Requires: plonk_wasm, caml_string_of_jsstring
 var caml_pasta_fp_plonk_circuit_serialize = function (public_input_size, gate_vector) {
-    return plonk_wasm.caml_pasta_fp_plonk_circuit_serialize(public_input_size, gate_vector);
+    return caml_string_of_jsstring(plonk_wasm.caml_pasta_fp_plonk_circuit_serialize(public_input_size, gate_vector));
 }
 
 
@@ -1233,9 +1233,9 @@ var caml_pasta_fq_plonk_gate_vector_digest = function (public_input_size, gate_v
 }
 
 // Provides: caml_pasta_fq_plonk_circuit_serialize
-// Requires: plonk_wasm
+// Requires: plonk_wasm, caml_string_of_jsstring
 var caml_pasta_fq_plonk_circuit_serialize = function (public_input_size, gate_vector) {
-    return plonk_wasm.caml_pasta_fq_plonk_circuit_serialize(public_input_size, gate_vector);
+    return caml_string_of_jsstring(plonk_wasm.caml_pasta_fq_plonk_circuit_serialize(public_input_size, gate_vector));
 }
 
 

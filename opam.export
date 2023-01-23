@@ -1,5 +1,4 @@
 opam-version: "2.0"
-compiler: ["ocaml-base-compiler.4.14.0"]
 roots: [
   "alcotest.1.1.0"
   "angstrom.0.15.0"
@@ -33,6 +32,8 @@ roots: [
   "ppx_deriving.5.2.1"
   "ppx_deriving_yojson.3.6.1"
   "prometheus.1.1"
+  "qcheck.0.20"
+  "qcheck-alcotest.0.20"
   "re2.v0.14.0"
   "rpc_parallel.v0.14.0"
   "sexp_diff_kernel.v0.14.0"
@@ -173,6 +174,7 @@ installed: [
   "opam-depext.1.2.1"
   "opam-file-format.2.1.4"
   "opam-format.2.1.2"
+  "ounit2.2.2.6"
   "parsexp.v0.14.2"
   "postgresql.5.0.0"
   "ppx_assert.v0.14.0"
@@ -213,6 +215,10 @@ installed: [
   "prometheus.1.1"
   "protocol_version_header.v0.14.0"
   "ptime.0.8.5"
+  "qcheck.0.20"
+  "qcheck-alcotest.0.20"
+  "qcheck-core.0.20"
+  "qcheck-ounit.0.20"
   "re.1.9.0"
   "re2.v0.14.0"
   "react.1.2.1"

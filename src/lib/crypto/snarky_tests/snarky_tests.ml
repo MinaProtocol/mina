@@ -66,41 +66,6 @@ module MonadicAPI = struct
     assert (String.(digest = expected))
 end
 
-(* monadic API tests *)
-
-(** Both the monadic and imperative API will produce the same circuit hash. *)
-let expected = "5357346d161dcccaa547c7999b8148db"
-
-module MonadicAPI = struct
-  module Impl = Snarky_backendless.Snark.Make (struct
-    include Kimchi_backend.Pasta.Vesta_based_plonk
-    module Inner_curve = Kimchi_backend.Pasta.Pasta.Pallas
-  end)
-
-  let main ((b1, b2) : Impl.Boolean.var * Impl.Boolean.var) =
-    let open Impl in
-    let%bind x = exists Boolean.typ ~compute:(As_prover.return true) in
-    let%bind y = exists Boolean.typ ~compute:(As_prover.return true) in
-    let%bind z = Boolean.(x &&& y) in
-    let%bind b3 = Boolean.(b1 && b2) in
-
-    let%bind () = Boolean.Assert.is_true z in
-    let%bind () = Boolean.Assert.is_true b3 in
-
-    Checked.return ()
-
-  let get_hash_of_circuit () =
-    let input_typ = Impl.Typ.tuple2 Impl.Boolean.typ Impl.Boolean.typ in
-    let return_typ = Impl.Typ.unit in
-    let cs : Impl.R1CS_constraint_system.t =
-      Impl.constraint_system ~input_typ ~return_typ main
-    in
-    let digest = Md5.to_hex (Impl.R1CS_constraint_system.digest cs) in
-    Format.printf "expected:\n%s\n\n" expected ;
-    Format.printf "obtained:\n%s\n" digest ;
-    assert (String.(digest = expected))
-end
-
 (* circuit-focused tests *)
 
 module BooleanCircuit = struct
@@ -168,6 +133,62 @@ module RangeCircuits = struct
   let lt (x : Impl.Field.t) () =
     Impl.Field.Assert.lt ~bit_length:2 x (Impl.Field.of_int 3) ;
     ()
+
+  (** This function tests all the possible combinations for the range gates. *)
+  let range_circuit ~(should_succeed : bool) (a : int) (b : int) =
+    let bit_length = Impl.Field.size_in_bits - 2 in
+
+    let circuit _ _ =
+      let var_a =
+        Impl.exists Impl.Field.typ ~compute:(fun _ ->
+            Impl.Field.Constant.of_int a )
+      in
+      let var_b =
+        Impl.exists Impl.Field.typ ~compute:(fun _ ->
+            Impl.Field.Constant.of_int b )
+      in
+
+      match Int.compare a b with
+      | 0 when should_succeed ->
+          Impl.Field.Assert.gte ~bit_length var_a var_b ;
+          Impl.Field.Assert.lte ~bit_length var_a var_b
+      | 0 ->
+          Impl.Field.Assert.gt ~bit_length var_a var_b ;
+          Impl.Field.Assert.lt ~bit_length var_a var_b
+      | x when (x > 0 && should_succeed) || (x < 0 && not should_succeed) ->
+          Impl.Field.Assert.gte ~bit_length var_a var_b ;
+          Impl.Field.Assert.gt ~bit_length var_a var_b
+      | _ ->
+          Impl.Field.Assert.lte ~bit_length var_a var_b ;
+          Impl.Field.Assert.lt ~bit_length var_a var_b
+    in
+    (* try to generate witness *)
+    let compiled =
+      Impl.generate_witness ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit
+        circuit
+    in
+    match compiled () with
+    | exception err when should_succeed ->
+        Format.eprintf "[debug] exception when should_succeed: %s"
+          (Exn.to_string err) ;
+        false
+    | exception _ when not should_succeed ->
+        true
+    | _ when not should_succeed ->
+        false
+    | _ ->
+        true
+
+  let test_range_gates =
+    QCheck.Test.make ~count:10
+      ~name:"test range gates during witness generation"
+      (* TODO: it'd be nicer to generate actual fields directly, since that domain is most likely smaller *)
+      QCheck.(tup3 bool pos_int pos_int)
+      (fun (should_succeed, a, b) -> range_circuit ~should_succeed a b)
+
+  let () =
+    let res = range_circuit ~should_succeed:true 0 1 in
+    assert res
 end
 
 module TernaryCircuit = struct
@@ -190,6 +211,33 @@ module PublicOutput = struct
     Impl.Boolean.(x && Impl.Boolean.true_)
 end
 
+module InvalidWitness = struct
+  open Impl
+
+  (** A bit of a contrived circuit. 
+      Here only a single constraint will be generated (due to constant unification),
+      but we still want all [compute] closures to be checked when generating the witness. 
+      Thus, this circuit should fail due to an invalid witness. *)
+  let circuit _ =
+    let one = constant Field.typ Field.Constant.one in
+    for i = 0 to 2 do
+      let b =
+        exists Field.typ ~compute:(fun () -> Field.Constant.of_int (i + 1))
+      in
+      Field.Assert.equal b one
+    done
+
+  let negative_test_valid_witnesses () =
+    let input_typ = Typ.unit in
+    let return_typ = Typ.unit in
+    let circuit _ _ = circuit () in
+    match generate_witness ~input_typ ~return_typ circuit () with
+    | exception _ ->
+        ()
+    | _ ->
+        failwith "should have failed to generate a valid witness"
+end
+
 let circuit_tests =
   [ ( "boolean circuit"
     , `Quick
@@ -201,6 +249,16 @@ let circuit_tests =
     , check_json ~input_typ:FieldCircuit.input_typ
         ~return_typ:FieldCircuit.return_typ ~circuit:FieldCircuit.main
         "field.json" )
+  ; ( "circuit with ternary operator"
+    , `Quick
+    , check_json ~input_typ:TernaryCircuit.input_typ
+        ~return_typ:TernaryCircuit.return_typ ~circuit:TernaryCircuit.main
+        "ternary.json" )
+  ; ( "circuit with public output"
+    , `Quick
+    , check_json ~input_typ:PublicOutput.input_typ
+        ~return_typ:PublicOutput.return_typ ~circuit:PublicOutput.main
+        "output.json" )
   ; ( "circuit with range check (less than equal)"
     , `Quick
     , check_json ~input_typ:RangeCircuits.input_typ
@@ -221,16 +279,9 @@ let circuit_tests =
     , check_json ~input_typ:RangeCircuits.input_typ
         ~return_typ:RangeCircuits.return_typ ~circuit:RangeCircuits.gt
         "range_gt.json" )
-  ; ( "circuit with ternary operator"
+  ; ( "circuit with invalid witness"
     , `Quick
-    , check_json ~input_typ:TernaryCircuit.input_typ
-        ~return_typ:TernaryCircuit.return_typ ~circuit:TernaryCircuit.main
-        "ternary.json" )
-  ; ( "circuit with public output"
-    , `Quick
-    , check_json ~input_typ:PublicOutput.input_typ
-        ~return_typ:PublicOutput.return_typ ~circuit:PublicOutput.main
-        "output.json" )
+    , InvalidWitness.negative_test_valid_witnesses )
   ]
 
 (* API tests *)
@@ -386,9 +437,13 @@ let api_tests =
 (* run tests *)
 
 let () =
+  let range_checks =
+    List.map ~f:QCheck_alcotest.to_alcotest [ RangeCircuits.test_range_gates ]
+  in
   Alcotest.run "Simple snarky tests"
     [ ("outside of circuit tests", outside_circuit_tests)
     ; ("API tests", api_tests)
     ; ("circuit tests", circuit_tests)
     ; ("As_prover tests", As_prover_circuits.as_prover_tests)
+    ; ("range checks", range_checks)
     ]
