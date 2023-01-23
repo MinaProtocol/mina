@@ -301,25 +301,8 @@ module Network_config = struct
               { path =
                   "terraform-" ^ network_config.terraform.testnet_name
                   ^ ".tfstate"
-                  (* bucket = "lucy-tf-state"
-                     ; prefix = "terraform/state" *)
-
-                  (* Backend.GCS.key =
-                         "terraform-" ^ network_config.terraform.testnet_name
-                         ^ ".tfstate"
-                     ; encrypt = true
-                     ; region = aws_region
-                     ; bucket = "o1labs-terraform-state"
-                     ; acl = "bucket-owner-full-control"*)
               }
         }
-      (* ; Block.Provider
-          { Block.Provider.provider = "aws"
-          ; region = aws_region
-          ; zone = None
-          ; project = None
-          ; alias = None
-          } *)
     ; Block.Provider
         { Block.Provider.provider = "google"
         ; region = cluster_region
