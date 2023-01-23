@@ -26,7 +26,7 @@ let () =
   in
   let _witness = generate_witness ~input_typ ~return_typ circuit () in
   if num_constraints < expected_constraints then (
-    Format.eprintf "constraints: %d, wanted: %d\n" num_constraints
+    Format.eprintf "constraints: %d, wanted: %d@." num_constraints
       expected_constraints ;
     failwith "big_circuit doesn't work as expected anymore" )
 
