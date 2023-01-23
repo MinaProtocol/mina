@@ -110,7 +110,6 @@ let txn_statement_ledger_hashes_equal
         !(Currency.Amount.Signed.Checked.equal s1.supply_increase
             s2.supply_increase )
       in
-      (*TODO: should we check sok digest as well?*)
       Impl.Boolean.all
         [ source_eq
         ; target_eq

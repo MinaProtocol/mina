@@ -279,7 +279,6 @@ module T = struct
       ~constraint_constants ~pending_coinbase_collection =
     { ledger; scan_state; constraint_constants; pending_coinbase_collection }
 
-  (* TODO: Confirm if the first pass and second pass ledgers in register_end is correct *)
   let of_scan_state_and_ledger ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~verifier ~last_proof_statement ~ledger ~scan_state
@@ -310,7 +309,6 @@ module T = struct
     in
     return t
 
-  (* TODO: Confirm if the first pass and second pass ledgers in register_end is correct *)
   let of_scan_state_and_ledger_unchecked
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~last_proof_statement ~ledger ~scan_state ~pending_coinbase_collection

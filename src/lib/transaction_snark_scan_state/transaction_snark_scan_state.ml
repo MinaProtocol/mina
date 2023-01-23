@@ -191,7 +191,6 @@ end]
 
 (**********Helpers*************)
 
-(* TODO *)
 let create_expected_statement ~constraint_constants
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
     ~connecting_merkle_root
@@ -1106,7 +1105,6 @@ let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
              | Some stmt ->
                  stmt ) ) )
 
-(* TODO *)
 let all_work_pairs t
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t) :
     (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t

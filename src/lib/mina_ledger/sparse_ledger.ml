@@ -81,36 +81,6 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
 
 module T = Mina_transaction_logic.Make (L)
 
-let apply_zkapp_command_unchecked_with_states ~constraint_constants ~state_view
-    ~fee_excess ~supply_increase ledger c =
-  let open T in
-  (* TODO *)
-  apply_zkapp_command_unchecked_aux ~constraint_constants ~state_view
-    ~fee_excess ~supply_increase (ref ledger) c ~init:[]
-    ~f:(fun
-         acc
-         ( { first_pass_ledger
-           ; second_pass_ledger
-           ; fee_excess
-           ; supply_increase
-           ; protocol_state
-           }
-         , local_state )
-       ->
-      ( { GS.first_pass_ledger = !first_pass_ledger
-        ; second_pass_ledger = !second_pass_ledger
-        ; fee_excess
-        ; supply_increase
-        ; protocol_state
-        }
-      , { local_state with ledger = !(local_state.ledger) } )
-      :: acc )
-  |> Result.map ~f:(fun (account_update_applied, states) ->
-         (* We perform a [List.rev] here to ensure that the states are in order
-            wrt. the zkapp_command that generated the states.
-         *)
-         (account_update_applied, List.rev states) )
-
 let apply_transaction_logic f t x =
   let open Or_error.Let_syntax in
   let t' = ref t in

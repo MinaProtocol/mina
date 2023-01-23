@@ -1033,7 +1033,6 @@ module Make (Inputs : Inputs_intf) = struct
           is_start'
     in
     let local_state =
-      (* TODO *)
       { local_state with
         ledger =
           Inputs.Ledger.if_ is_start'
