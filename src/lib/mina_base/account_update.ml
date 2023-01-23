@@ -128,8 +128,7 @@ module Call_type = struct
     module V1 = struct
       type t = Mina_wire_types.Mina_base.Account_update.Call_type.V1.t =
         | Call
-            (** A plain call, conveying permission to the child (and
-                potentially it's children, via delegate call) to use the
+            (** A plain call, conveying permission from the parent to use the
                 token_id derived from the caller's account ID.
             *)
         | Delegate_call
@@ -423,10 +422,15 @@ module Call_type = struct
         (equal is_delegate_call1 is_delegate_call2)
         (equal is_blind_call1 is_blind_call2)
 
-    let to_variant { is_delegate_call; is_blind_call } =
-      if is_delegate_call then Delegate_call
-      else if is_blind_call then Blind_call
-      else Call
+    let to_variant = function
+      | { is_delegate_call = false; is_blind_call = false } ->
+          Call
+      | { is_delegate_call = true; is_blind_call = false } ->
+          Delegate_call
+      | { is_delegate_call = false; is_blind_call = true } ->
+          Blind_call
+      | _ ->
+          failwith "Call_type.to_variant: More than one boolean flag is set"
 
     let of_variant = function
       | Call ->
