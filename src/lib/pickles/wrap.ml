@@ -471,7 +471,8 @@ let%test_module "gate finalization" =
               ~sponge ~prev_challenges:[] deferred_values evals
           in
 
-          (* Actually do the above as the prover *)
+          (* Read the boolean result from the circuit and make it available
+             to the OCaml world. *)
           Impls.Step.(As_prover.(fun () -> read Boolean.typ res)) )
       |> Or_error.ok_exn
 
