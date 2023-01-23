@@ -1505,19 +1505,12 @@ module Tick : S = struct
                                  ( LookupPattern ForeignFieldMul
                                  , (fun () ->
                                      if_feature
-                                       ( LookupsPerRow 2
+                                       ( LookupsPerRow 3
                                        , (fun () -> gamma)
                                        , fun () ->
                                            field
                                              "0x0000000000000000000000000000000000000000000000000000000000000001"
                                        )
-                                     * if_feature
-                                         ( LookupsPerRow 3
-                                         , (fun () -> gamma)
-                                         , fun () ->
-                                             field
-                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
-                                         )
                                      * if_feature
                                          ( LookupsPerRow 4
                                          , (fun () -> gamma)
@@ -1558,6 +1551,23 @@ module Tick : S = struct
                                                field
                                                  "0x0000000000000000000000000000000000000000000000000000000000000001"
                                            ) )
+                                     * ( gamma
+                                       + ( cell (var (Witness 7, Curr))
+                                         + joint_combiner
+                                           * if_feature
+                                               ( TableWidth 2
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * if_feature
+                                               ( TableWidth 3
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               ) ) )
                                      * ( gamma
                                        + ( field
                                              "0x0000000000000000000000000000000000000000000000000000000000000200"
@@ -5902,19 +5912,12 @@ module Tock : S = struct
                                  ( LookupPattern ForeignFieldMul
                                  , (fun () ->
                                      if_feature
-                                       ( LookupsPerRow 2
+                                       ( LookupsPerRow 3
                                        , (fun () -> gamma)
                                        , fun () ->
                                            field
                                              "0x0000000000000000000000000000000000000000000000000000000000000001"
                                        )
-                                     * if_feature
-                                         ( LookupsPerRow 3
-                                         , (fun () -> gamma)
-                                         , fun () ->
-                                             field
-                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
-                                         )
                                      * if_feature
                                          ( LookupsPerRow 4
                                          , (fun () -> gamma)
@@ -5955,6 +5958,23 @@ module Tock : S = struct
                                                field
                                                  "0x0000000000000000000000000000000000000000000000000000000000000001"
                                            ) )
+                                     * ( gamma
+                                       + ( cell (var (Witness 7, Curr))
+                                         + joint_combiner
+                                           * if_feature
+                                               ( TableWidth 2
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * if_feature
+                                               ( TableWidth 3
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               ) ) )
                                      * ( gamma
                                        + ( field
                                              "0x0000000000000000000000000000000000000000000000000000000000000200"
