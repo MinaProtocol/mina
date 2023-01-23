@@ -63,8 +63,9 @@ let%test_module "Zkapp payments tests" =
                   ; balance_change =
                       Amount.Signed.(of_unsigned receiver_amount |> negate)
                   ; increment_nonce = true
+                  ; implicit_account_creation_fee = true
                   ; events = []
-                  ; sequence_events = []
+                  ; actions = []
                   ; call_data = Field.zero
                   ; call_depth = 0
                   ; preconditions =
@@ -73,7 +74,7 @@ let%test_module "Zkapp payments tests" =
                       ; account = Accept
                       }
                   ; use_full_commitment = false
-                  ; caller = Call
+                  ; call_type = Call
                   ; authorization_kind = Signature
                   }
               ; authorization = Signature Signature.dummy
@@ -84,8 +85,9 @@ let%test_module "Zkapp payments tests" =
                   ; token_id = Token_id.default
                   ; balance_change = Amount.Signed.(of_unsigned receiver_amount)
                   ; increment_nonce = false
+                  ; implicit_account_creation_fee = true
                   ; events = []
-                  ; sequence_events = []
+                  ; actions = []
                   ; call_data = Field.zero
                   ; call_depth = 0
                   ; preconditions =
@@ -94,7 +96,7 @@ let%test_module "Zkapp payments tests" =
                       ; account = Accept
                       }
                   ; use_full_commitment = false
-                  ; caller = Call
+                  ; call_type = Call
                   ; authorization_kind = None_given
                   }
               ; authorization = None_given
@@ -136,9 +138,7 @@ let%test_module "Zkapp payments tests" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-              let zkapp_command =
-                account_update_send ~constraint_constants (List.hd_exn specs)
-              in
+              let zkapp_command = account_update_send (List.hd_exn specs) in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
               ignore
                 ( U.apply_zkapp_command ledger [ zkapp_command ]
@@ -154,8 +154,7 @@ let%test_module "Zkapp payments tests" =
                     let use_full_commitment =
                       Quickcheck.random_value Bool.quickcheck_generator
                     in
-                    account_update_send ~constraint_constants
-                      ~use_full_commitment s )
+                    account_update_send ~use_full_commitment s )
                   specs
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
@@ -199,7 +198,7 @@ let%test_module "Zkapp payments tests" =
                     ; snapp_update = Account_update.Update.dummy
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; preconditions = None
                     }
                   in
@@ -265,7 +264,7 @@ let%test_module "Zkapp payments tests" =
                     ; snapp_update = Account_update.Update.dummy
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; preconditions = None
                     }
                   in

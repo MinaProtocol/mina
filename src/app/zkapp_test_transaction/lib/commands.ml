@@ -125,7 +125,6 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
     ; fee = Currency.Fee.of_mina_int_exn 10
     ; receiver
     ; amount = Currency.Amount.of_mina_int_exn 10 (*10 Mina*)
-    ; receiver_is_new = false
     }
   in
   let consensus_constants =
@@ -361,7 +360,7 @@ let upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     ; current_auth = auth
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
-    ; sequence_events = []
+    ; actions = []
     ; preconditions = None
     }
   in
@@ -404,7 +403,7 @@ let transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer ~fee_payer_nonce
     ; snapp_update = Account_update.Update.dummy
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
-    ; sequence_events = []
+    ; actions = []
     ; preconditions = None
     }
   in
@@ -432,7 +431,7 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state =
     ; current_auth = Permissions.Auth_required.Signature
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
-    ; sequence_events = []
+    ; actions = []
     ; preconditions = None
     }
   in
@@ -469,7 +468,7 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
     ; current_auth = auth
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
-    ; sequence_events = []
+    ; actions = []
     ; preconditions = None
     }
   in
@@ -494,7 +493,7 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
   let open Deferred.Let_syntax in
   let%bind keypair = Util.keypair_of_file keyfile in
   let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
-  let sequence_events = Util.sequence_state_of_list sequence_state in
+  let actions = Util.sequence_state_of_list sequence_state in
   let spec =
     { Transaction_snark.For_tests.Update_states_spec.sender = (keypair, nonce)
     ; fee
@@ -508,7 +507,7 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     ; current_auth = Permissions.Auth_required.Signature
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
-    ; sequence_events
+    ; actions
     ; preconditions = None
     }
   in
@@ -545,7 +544,7 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; current_auth = auth
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
-    ; sequence_events = []
+    ; actions = []
     ; preconditions = None
     }
   in
@@ -583,7 +582,7 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     ; current_auth
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
-    ; sequence_events = []
+    ; actions = []
     ; preconditions = None
     }
   in

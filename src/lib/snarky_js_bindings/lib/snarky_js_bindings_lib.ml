@@ -1200,7 +1200,7 @@ let poseidon =
 
         val events = Js.string (zkapp_events :> string)
 
-        val sequenceEvents = Js.string (zkapp_sequence_events :> string)
+        val sequenceEvents = Js.string (zkapp_actions :> string)
 
         val body = Js.string (zkapp_body :> string)
 
@@ -1559,15 +1559,11 @@ module Circuit = struct
     let digest =
       Backend.R1CS_constraint_system.digest cs |> Md5.to_hex |> Js.string
     in
-    (* TODO: to_json doesn't return anything; call into kimchi instead *)
     let json =
       Js.Unsafe.(
         fun_call
           global ##. JSON##.parse
-          [| inject
-               ( Backend.R1CS_constraint_system.to_json cs
-               |> Yojson.Safe.to_string |> Js.string )
-          |])
+          [| inject (Backend.R1CS_constraint_system.to_json cs |> Js.string) |])
     in
     object%js
       val rows = rows
@@ -2231,6 +2227,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
     Pickles.compile_promise () ~choices
       ~public_input:(Input (public_input_typ public_input_size))
       ~auxiliary_typ:Typ.unit
+      ~override_wrap_domain:Pickles_base.Proofs_verified.N1
       ~branches:(module Branches)
       ~max_proofs_verified:(module Max_proofs_verified)
       ~name ~constraint_constants
@@ -2460,6 +2457,7 @@ module Ledger = struct
     { edit_state = None
     ; send = None
     ; receive = None
+    ; access = None
     ; set_delegate = None
     ; set_permissions = None
     ; set_verification_key = None

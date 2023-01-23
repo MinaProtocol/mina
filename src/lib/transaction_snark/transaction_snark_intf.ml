@@ -412,7 +412,6 @@ module type Full = sig
       -> timed_balance_check:(Tick.Boolean.var -> unit Tick.Checked.t)
       -> account:
            ( 'b
-           , 'c
            , 'd
            , 'e
            , Currency.Balance.var
@@ -488,7 +487,7 @@ module type Full = sig
         ; snapp_update : Account_update.Update.t
               (* Authorization for the update being performed *)
         ; current_auth : Permissions.Auth_required.t
-        ; sequence_events : Tick.Field.t array list
+        ; actions : Tick.Field.t array list
         ; events : Tick.Field.t array list
         ; call_data : Tick.Field.t
         ; preconditions : Account_update.Preconditions.t option
@@ -559,7 +558,7 @@ module type Full = sig
         ; new_zkapp_account : bool
         ; snapp_update : Account_update.Update.t
               (* Authorization for the update being performed *)
-        ; sequence_events : Tick.Field.t array list
+        ; actions : Tick.Field.t array list
         ; events : Tick.Field.t array list
         ; call_data : Tick.Field.t
         ; preconditions : Account_update.Preconditions.t option

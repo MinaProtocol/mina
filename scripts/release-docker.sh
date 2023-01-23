@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain')
+VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-test-executive' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain')
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -49,7 +49,7 @@ case "${DEB_CODENAME##*=}" in
   bionic|focal|impish|jammy)
     IMAGE="ubuntu:${DEB_CODENAME##*=}"
   ;;
-  stretch|buster|bullseye|sid)
+  stretch|buster|bullseye|bookworm|sid)
     IMAGE="debian:${DEB_CODENAME##*=}-slim"
   ;;
 esac
@@ -84,6 +84,11 @@ mina-daemon)
 mina-toolchain)
   DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain"
   ;;
+mina-test-executive)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-test-executive"
+  DOCKER_CONTEXT="dockerfiles/"
+  VERSION="${VERSION}-${NETWORK##*=}"
+  ;;
 mina-rosetta)
   DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-builder dockerfiles/stages/4-production"
   ;;
@@ -110,12 +115,11 @@ if [[ -z "${BUILDKITE_PULL_REQUEST_REPO}" ]]; then
   REPO="--build-arg MINA_REPO=https://github.com/MinaProtocol/mina"
 fi
 
-MINAPROTOCOL="minaprotocol"
-TAG="$MINAPROTOCOL/$SERVICE:$VERSION"
-
+DOCKER_REGISTRY="gcr.io/o1labs-192920"
+TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}"
 # friendly, predictable tag
 GITHASH=$(git rev-parse --short=7 HEAD)
-HASHTAG="$MINAPROTOCOL/$SERVICE:$GITHASH-${DEB_CODENAME##*=}-${NETWORK##*=}"
+HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}"
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo ${EXTRA} | tr -d '"')
@@ -125,14 +129,19 @@ else
   docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t "$TAG" -f $DOCKERFILE_PATH
 fi
 
-tag-and-push() {
-  docker tag "${TAG}" "$1"
-  docker tag "${TAG}" "${HASHTAG}"
-  docker push "$1"
-  docker push "${HASHTAG}"
-}
-
-if [ -z "$NOUPLOAD" ] || [ "$NOUPLOAD" -eq 0 ]; then
+if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
+  
+  # push to GCR
   docker push "${TAG}"
-  tag-and-push "gcr.io/o1labs-192920/$SERVICE:$VERSION"
+
+  # retag and push again to GCR
+  docker tag "${TAG}" "${HASHTAG}"
+  docker push "${HASHTAG}"
+
+  if [[ "${DEB_RELEASE##*=}" = 'stable' ]]; then
+
+    # tag and push to dockerhub
+    docker tag "${TAG}" "minaprotocol/${SERVICE}:${VERSION}"
+    docker push "minaprotocol/${SERVICE}:${VERSION}"
+  fi
 fi

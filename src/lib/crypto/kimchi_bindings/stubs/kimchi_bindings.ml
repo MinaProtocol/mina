@@ -53,6 +53,9 @@ module Protocol = struct
 
         external digest : int -> t -> bytes
           = "caml_pasta_fp_plonk_gate_vector_digest"
+
+        external to_json : int -> t -> string
+          = "caml_pasta_fp_plonk_circuit_serialize"
       end
 
       module Fq = struct
@@ -71,6 +74,9 @@ module Protocol = struct
 
         external digest : int -> t -> bytes
           = "caml_pasta_fq_plonk_gate_vector_digest"
+
+        external to_json : int -> t -> string
+          = "caml_pasta_fq_plonk_circuit_serialize"
       end
     end
   end

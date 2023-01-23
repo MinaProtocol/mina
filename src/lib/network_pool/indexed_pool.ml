@@ -1803,7 +1803,7 @@ let%test_module _ =
         ; account_updates =
             Zkapp_command.Call_forest.of_account_updates
               ~account_update_depth:(Fn.const 0)
-              [ { Account_update.Wire.body =
+              [ { Account_update.body =
                     { public_key = sender_pk
                     ; update = Account_update.Update.noop
                     ; token_id = Token_id.default
@@ -1811,7 +1811,7 @@ let%test_module _ =
                         Amount.Signed.(negate @@ of_unsigned amount)
                     ; increment_nonce = double_increment_sender
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; preconditions =
                         { Account_update.Preconditions.network =
@@ -1820,27 +1820,29 @@ let%test_module _ =
                             Account_update.Account_precondition.Nonce
                               (Account.Nonce.succ nonce)
                         }
-                    ; caller = Call
+                    ; call_type = Call
                     ; use_full_commitment = not double_increment_sender
+                    ; implicit_account_creation_fee = false
                     ; authorization_kind = None_given
                     }
                 ; authorization = None_given
                 }
-              ; { Account_update.Wire.body =
+              ; { Account_update.body =
                     { public_key = receiver_pk
                     ; update = Account_update.Update.noop
                     ; token_id = Token_id.default
                     ; balance_change = Amount.Signed.of_unsigned amount
                     ; increment_nonce = increment_receiver
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; preconditions =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
                         ; account = Account_update.Account_precondition.Accept
                         }
-                    ; caller = Call
+                    ; call_type = Call
+                    ; implicit_account_creation_fee = false
                     ; use_full_commitment = not increment_receiver
                     ; authorization_kind = None_given
                     }

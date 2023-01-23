@@ -73,7 +73,7 @@ let%test_module "Protocol state precondition tests" =
             ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions =
                 Some
                   { Account_update.Preconditions.network =
@@ -116,7 +116,7 @@ let%test_module "Protocol state precondition tests" =
             ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions =
                 Some
                   { Account_update.Preconditions.network = network_precondition
@@ -185,8 +185,9 @@ let%test_module "Protocol state precondition tests" =
                         ; balance_change =
                             Amount.(Signed.(negate (of_unsigned amount)))
                         ; increment_nonce = true
+                        ; implicit_account_creation_fee = true
                         ; events = []
-                        ; sequence_events = []
+                        ; actions = []
                         ; call_data = Snark_params.Tick.Field.zero
                         ; call_depth = 0
                         ; preconditions =
@@ -195,7 +196,7 @@ let%test_module "Protocol state precondition tests" =
                             ; account = Nonce (Account.Nonce.succ sender_nonce)
                             }
                         ; use_full_commitment = false
-                        ; caller = Call
+                        ; call_type = Call
                         ; authorization_kind = Signature
                         }
                         (*To be updated later*)
@@ -216,8 +217,9 @@ let%test_module "Protocol state precondition tests" =
                                          constraint_constants
                                            .account_creation_fee ) ) ))
                         ; increment_nonce = false
+                        ; implicit_account_creation_fee = true
                         ; events = []
-                        ; sequence_events = []
+                        ; actions = []
                         ; call_data = Snark_params.Tick.Field.zero
                         ; call_depth = 0
                         ; preconditions =
@@ -227,7 +229,7 @@ let%test_module "Protocol state precondition tests" =
                                 Account_update.Account_precondition.Accept
                             }
                         ; use_full_commitment = true
-                        ; caller = Call
+                        ; call_type = Call
                         ; authorization_kind = Signature
                         }
                     ; authorization =
@@ -411,7 +413,7 @@ let%test_module "Account precondition tests" =
                     ; current_auth = Permissions.Auth_required.Signature
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; preconditions =
                         Some
                           { Account_update.Preconditions.network =
@@ -479,7 +481,7 @@ let%test_module "Account precondition tests" =
                     ; current_auth = Permissions.Auth_required.Signature
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; preconditions =
                         Some
                           { Account_update.Preconditions.network =
@@ -531,7 +533,7 @@ let%test_module "Account precondition tests" =
                     ; current_auth = Permissions.Auth_required.Signature
                     ; call_data = Snark_params.Tick.Field.zero
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; preconditions =
                         Some
                           { Account_update.Preconditions.network =
@@ -595,8 +597,9 @@ let%test_module "Account precondition tests" =
                     ; balance_change =
                         Amount.(Signed.(negate (of_unsigned amount)))
                     ; increment_nonce = true
+                    ; implicit_account_creation_fee = true
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; call_depth = 0
                     ; preconditions =
@@ -605,7 +608,7 @@ let%test_module "Account precondition tests" =
                         ; account = Nonce (Account.Nonce.succ sender_nonce)
                         }
                     ; use_full_commitment = false
-                    ; caller = Call
+                    ; call_type = Call
                     ; authorization_kind = Signature
                     }
                     (*To be updated later*)
@@ -624,8 +627,9 @@ let%test_module "Account precondition tests" =
                                 constraint_constants.account_creation_fee ) )
                         |> Amount.Signed.of_unsigned
                     ; increment_nonce = false
+                    ; implicit_account_creation_fee = true
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; call_data = Snark_params.Tick.Field.zero
                     ; call_depth = 0
                     ; preconditions =
@@ -634,7 +638,7 @@ let%test_module "Account precondition tests" =
                         ; account = Account_update.Account_precondition.Accept
                         }
                     ; use_full_commitment = true
-                    ; caller = Call
+                    ; call_type = Call
                     ; authorization_kind = Signature
                     }
                 ; authorization =

@@ -217,7 +217,7 @@ val apply_transaction :
 *)
 val update_sequence_state :
      Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
-  -> Zkapp_account.Sequence_events.t
+  -> Zkapp_account.Actions.t
   -> txn_global_slot:Mina_numbers.Global_slot.t
   -> last_sequence_slot:Mina_numbers.Global_slot.t
   -> Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t

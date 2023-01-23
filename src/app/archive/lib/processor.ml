@@ -514,6 +514,7 @@ module Zkapp_permissions = struct
     { edit_state : Permissions.Auth_required.t
     ; send : Permissions.Auth_required.t
     ; receive : Permissions.Auth_required.t
+    ; access : Permissions.Auth_required.t
     ; set_delegate : Permissions.Auth_required.t
     ; set_permissions : Permissions.Auth_required.t
     ; set_verification_key : Permissions.Auth_required.t
@@ -538,6 +539,7 @@ module Zkapp_permissions = struct
       ; auth_required_typ
       ; auth_required_typ
       ; auth_required_typ
+      ; auth_required_typ
       ]
 
   let table_name = "zkapp_permissions"
@@ -547,6 +549,7 @@ module Zkapp_permissions = struct
       { edit_state = perms.edit_state
       ; send = perms.send
       ; receive = perms.receive
+      ; access = perms.access
       ; set_delegate = perms.set_delegate
       ; set_permissions = perms.set_permissions
       ; set_verification_key = perms.set_verification_key
@@ -1444,13 +1447,14 @@ module Zkapp_account_update_body = struct
     ; balance_change : string
     ; increment_nonce : bool
     ; events_id : int
-    ; sequence_events_id : int
+    ; actions_id : int
     ; call_data_id : int
     ; call_depth : int
     ; zkapp_network_precondition_id : int
     ; zkapp_account_precondition_id : int
     ; use_full_commitment : bool
-    ; caller : string
+    ; implicit_account_creation_fee : bool
+    ; call_type : string
     ; authorization_kind : string
     }
   [@@deriving fields, hlist]
@@ -1468,6 +1472,7 @@ module Zkapp_account_update_body = struct
         ; int
         ; int
         ; int
+        ; bool
         ; bool
         ; string
         ; string
@@ -1489,8 +1494,8 @@ module Zkapp_account_update_body = struct
     let%bind events_id =
       Zkapp_events.add_if_doesn't_exist (module Conn) body.events
     in
-    let%bind sequence_events_id =
-      Zkapp_events.add_if_doesn't_exist (module Conn) body.sequence_events
+    let%bind actions_id =
+      Zkapp_events.add_if_doesn't_exist (module Conn) body.actions
     in
     let%bind call_data_id =
       Zkapp_state_data.add_if_doesn't_exist (module Conn) body.call_data
@@ -1515,7 +1520,8 @@ module Zkapp_account_update_body = struct
     in
     let call_depth = body.call_depth in
     let use_full_commitment = body.use_full_commitment in
-    let caller = Account_update.Call_type.to_string body.caller in
+    let implicit_account_creation_fee = body.implicit_account_creation_fee in
+    let call_type = Account_update.Call_type.to_string body.call_type in
     let authorization_kind =
       Account_update.Authorization_kind.to_string body.authorization_kind
     in
@@ -1525,22 +1531,23 @@ module Zkapp_account_update_body = struct
       ; balance_change
       ; increment_nonce
       ; events_id
-      ; sequence_events_id
+      ; actions_id
       ; call_data_id
       ; call_depth
       ; zkapp_network_precondition_id
       ; zkapp_account_precondition_id
       ; use_full_commitment
-      ; caller
+      ; implicit_account_creation_fee
+      ; call_type
       ; authorization_kind
       }
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       ~tannot:(function
-        | "events_ids" | "sequence_events_ids" ->
+        | "events_ids" | "actions_ids" ->
             Some "int[]"
-        | "caller" ->
+        | "call_type" ->
             Some "call_type"
         | "authorization_kind" ->
             Some "authorization_kind_type"
