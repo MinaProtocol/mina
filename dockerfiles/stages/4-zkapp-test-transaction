@@ -21,12 +21,17 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get --quiet --yes update \
         jq \
         dumb-init \
         libssl1.1 \
+        libgomp1 \
+        'libjemalloc.$' \
+        libpq-dev \
         apt-transport-https \
         ca-certificates \
         dnsutils \
 	      apt-utils \
         man \
     && rm -rf /var/lib/apt/lists/*
+
+
 
 # Mina zkapp test transaction tool package, copied from the builder container
 COPY --from=prebuilt-stage /tmp/artifacts/mina-zkapp-test-transaction_${deb_version}.deb /root/mina-zkapp-test-package.deb
