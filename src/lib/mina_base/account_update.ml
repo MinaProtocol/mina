@@ -453,7 +453,7 @@ module May_use_token = struct
       let ( !. ) = ( !. ) ~t_fields_annots in
       Fields.make_creator obj ~parents_own_token:!.bool
         ~inherit_from_parent:!.bool
-      |> finish "CallType" ~t_toplevel_annots
+      |> finish "MayUseToken" ~t_toplevel_annots
   end
 
   let quickcheck_generator = gen

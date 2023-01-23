@@ -2676,7 +2676,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "CallTypeInput",
+          "name": "MayUseTokenInput",
           "description": null,
           "fields": [
             {
@@ -2980,7 +2980,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "CallTypeInput",
+                  "name": "MayUseTokenInput",
                   "ofType": null
                 }
               },
@@ -3209,7 +3209,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "CallTypeInput",
+                  "name": "MayUseTokenInput",
                   "ofType": null
                 }
               },
@@ -6718,7 +6718,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "CallType",
+          "name": "MayUseToken",
           "description": null,
           "fields": [
             {
@@ -8088,7 +8088,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "CallType",
+                  "name": "MayUseToken",
                   "ofType": null
                 }
               },
