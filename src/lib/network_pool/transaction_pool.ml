@@ -1058,14 +1058,10 @@ struct
                   Envelope.Incoming.map diff
                     ~f:
                       (List.map ~f:(fun cmd ->
-                           (*Verifying assuming the transaction will be successfully applied; Thsi involves checking all the proofs*)
                            User_command.to_verifiable ~ledger
                              ~get:Base_ledger.get
                              ~location_of_account:
-                               Base_ledger.location_of_account
-                             { With_status.data = cmd
-                             ; status = Transaction_status.Applied
-                             }
+                               Base_ledger.location_of_account cmd
                            |> Or_error.ok_exn ) ) ) )
           |> Result.map_error ~f:(Error.tag ~tag:"Verification_failed")
           |> Deferred.return

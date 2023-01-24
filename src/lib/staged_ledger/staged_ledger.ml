@@ -1097,7 +1097,7 @@ module T = struct
       =
     (List.map ~f:(With_status.map ~f:Transaction.forget) a, b, c, d)
 
-  let check_commands ledger ~verifier (cs : User_command.t With_status.t list) =
+  let check_commands ledger ~verifier (cs : User_command.t list) =
     let open Deferred.Or_error.Let_syntax in
     let%bind cs =
       Or_error.try_with (fun () ->

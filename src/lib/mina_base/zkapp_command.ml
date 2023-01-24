@@ -1338,31 +1338,19 @@ let check_authorization (p : Account_update.t) : unit Or_error.t =
       Error err
 
 module Verifiable : sig
-  module Zkapp_command_with_vks : sig
-    [%%versioned:
-    module Stable : sig
-      module V1 : sig
-        type t = private
-          { fee_payer : Account_update.Fee_payer.Stable.V1.t
-          ; account_updates :
-              ( Side_loaded_verification_key.Stable.V2.t
-              , Zkapp_basic.F.Stable.V1.t )
-              With_hash.Stable.V1.t
-              option
-              Call_forest.With_hashes_and_data.Stable.V1.t
-          ; memo : Signed_command_memo.Stable.V1.t
-          }
-        [@@deriving sexp, compare, equal, hash, yojson]
-
-        val to_latest : t -> t
-      end
-    end]
-  end
-
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t = Zkapp_command_with_vks.Stable.V1.t With_status.Stable.V2.t
+      type t = private
+        { fee_payer : Account_update.Fee_payer.Stable.V1.t
+        ; account_updates :
+            ( Side_loaded_verification_key.Stable.V2.t
+            , Zkapp_basic.F.Stable.V1.t )
+            With_hash.Stable.V1.t
+            option
+            Call_forest.With_hashes_and_data.Stable.V1.t
+        ; memo : Signed_command_memo.Stable.V1.t
+        }
       [@@deriving sexp, compare, equal, hash, yojson]
 
       val to_latest : t -> t
@@ -1370,39 +1358,25 @@ module Verifiable : sig
   end]
 
   val create :
-       T.t With_status.t
+       T.t
     -> ledger:'a
     -> get:('a -> 'b -> Account.t option)
     -> location_of_account:('a -> Account_id.t -> 'b option)
     -> t Or_error.t
-
-  val fee_payer : t -> Account_update.Fee_payer.t
 end = struct
-  module Zkapp_command_with_vks = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          { fee_payer : Account_update.Fee_payer.Stable.V1.t
-          ; account_updates :
-              ( Side_loaded_verification_key.Stable.V2.t
-              , Zkapp_basic.F.Stable.V1.t )
-              With_hash.Stable.V1.t
-              option
-              Call_forest.With_hashes_and_data.Stable.V1.t
-          ; memo : Signed_command_memo.Stable.V1.t
-          }
-        [@@deriving sexp, compare, equal, hash, yojson]
-
-        let to_latest = Fn.id
-      end
-    end]
-  end
-
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Zkapp_command_with_vks.Stable.V1.t With_status.Stable.V2.t
+      type t =
+        { fee_payer : Account_update.Fee_payer.Stable.V1.t
+        ; account_updates :
+            ( Side_loaded_verification_key.Stable.V2.t
+            , Zkapp_basic.F.Stable.V1.t )
+            With_hash.Stable.V1.t
+            option
+            Call_forest.With_hashes_and_data.Stable.V1.t
+        ; memo : Signed_command_memo.Stable.V1.t
+        }
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
@@ -1417,9 +1391,8 @@ end = struct
    * subsequent account_updates use the replaced key instead of looking in the
    * ledger for the key (ie set by a previous transaction).
    *)
-  let create
-      ({ With_status.data = { fee_payer; account_updates; memo }; status } :
-        T.t With_status.t ) ~ledger ~get ~location_of_account : t Or_error.t =
+  let create ({ fee_payer; account_updates; memo } : T.t) ~ledger ~get
+      ~location_of_account : t Or_error.t =
     With_return.with_return (fun { return } ->
         let find_vk account_id =
           match
@@ -1446,17 +1419,9 @@ end = struct
           *)
           ref Account_id.Map.empty
         in
-        let verify_proofs = match status with Applied -> true | _ -> false in
         let account_updates =
           Call_forest.map account_updates ~f:(fun p ->
               let account_id = Account_update.account_id p in
-              let () =
-                match check_authorization p with
-                | Ok () ->
-                    ()
-                | Error _ as err ->
-                    return err
-              in
               let vks_overriden' =
                 match Account_update.verification_key_update_to_option p with
                 | Zkapp_basic.Set_or_keep.Set vk_next ->
@@ -1465,9 +1430,14 @@ end = struct
                 | Zkapp_basic.Set_or_keep.Keep ->
                     !vks_overridden
               in
-              if
-                Control.(Tag.equal Tag.Proof (Control.tag p.authorization))
-                && verify_proofs
+              let () =
+                match check_authorization p with
+                | Ok () ->
+                    ()
+                | Error _ as err ->
+                    return err
+              in
+              if Control.(Tag.equal Tag.Proof (Control.tag p.authorization))
               then (
                 let prioritized_vk =
                   (* only lookup _past_ vk setting, ie exclude the new one we
@@ -1500,19 +1470,13 @@ end = struct
                 vks_overridden := vks_overriden' ;
                 (p, None) ) )
         in
-        Ok
-          { With_status.data =
-              { Zkapp_command_with_vks.fee_payer; account_updates; memo }
-          ; status
-          } )
-
-  let fee_payer (t : t) = t.data.fee_payer
+        Ok { fee_payer; account_updates; memo } )
 end
 
 let of_verifiable (t : Verifiable.t) : t =
-  { fee_payer = t.With_status.data.fee_payer
-  ; account_updates = Call_forest.map t.data.account_updates ~f:fst
-  ; memo = t.data.memo
+  { fee_payer = t.fee_payer
+  ; account_updates = Call_forest.map t.account_updates ~f:fst
+  ; memo = t.memo
   }
 
 module Transaction_commitment = struct
@@ -1653,7 +1617,7 @@ struct
     let open Or_error.Let_syntax in
     let tbl = Account_id.Table.create () in
     let%map () =
-      Call_forest.fold t.data.account_updates ~init:(Ok ())
+      Call_forest.fold t.account_updates ~init:(Ok ())
         ~f:(fun acc (p, vk_opt) ->
           let%bind _ok = acc in
           let account_id = Account_update.account_id p in
@@ -1682,9 +1646,7 @@ struct
   let forget (t : t) : T.t = t.zkapp_command
 
   let to_valid (t : T.t) ~ledger ~get ~location_of_account : t Or_error.t =
-    Verifiable.create
-      { With_status.data = t; status = Transaction_status.Applied }
-      ~ledger ~get ~location_of_account
+    Verifiable.create t ~ledger ~get ~location_of_account
     |> Or_error.bind ~f:of_verifiable
 end
 

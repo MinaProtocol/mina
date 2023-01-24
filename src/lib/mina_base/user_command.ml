@@ -156,18 +156,16 @@ module Verifiable = struct
     | Signed_command x ->
         Signed_command.fee_payer x
     | Zkapp_command p ->
-        Account_update.Fee_payer.account_id
-          (Zkapp_command.Verifiable.fee_payer p)
+        Account_update.Fee_payer.account_id p.fee_payer
 end
 
-let to_verifiable (t : t With_status.t) ~ledger ~get ~location_of_account :
+let to_verifiable (t : t) ~ledger ~get ~location_of_account :
     Verifiable.t Or_error.t =
-  match t.data with
+  match t with
   | Signed_command c ->
       Ok (Signed_command c)
   | Zkapp_command cmd ->
-      Zkapp_command.Verifiable.create ~ledger ~get ~location_of_account
-        { t with data = cmd }
+      Zkapp_command.Verifiable.create ~ledger ~get ~location_of_account cmd
       |> Or_error.map ~f:(fun cmd -> Zkapp_command cmd)
 
 let of_verifiable (t : Verifiable.t) : t =
@@ -256,6 +254,19 @@ module Valid = struct
 
   module Gen = Gen_make (Signed_command.With_valid_signature)
 end
+
+let check ~ledger ~get ~location_of_account (t : t) : Valid.t Or_error.t =
+  match t with
+  | Signed_command x -> (
+      match Signed_command.check x with
+      | Some c ->
+          Ok (Signed_command c)
+      | None ->
+          Or_error.error_string "Invalid signature" )
+  | Zkapp_command p ->
+      Or_error.map
+        (Zkapp_command.Valid.to_valid ~ledger ~get ~location_of_account p)
+        ~f:(fun p -> Zkapp_command p)
 
 let forget_check (t : Valid.t) : t =
   match t with
