@@ -73,13 +73,6 @@ module Transaction_applied = struct
         let to_latest = Fn.id
       end
     end]
-
-    let zkapp_updates_applied (t : t) =
-      match t.command.status with
-      | Transaction_status.Applied ->
-          true
-      | _ ->
-          false
   end
 
   module Command_applied = struct
@@ -257,8 +250,12 @@ module Transaction_applied = struct
   let zkapp_updates_applied : t -> bool =
    fun { varying; _ } ->
     match varying with
-    | Command (Zkapp_command c) ->
-        Zkapp_command_applied.zkapp_updates_applied c
+    | Command (Zkapp_command c) -> (
+        match c.command.status with
+        | Transaction_status.Applied ->
+            true
+        | _ ->
+            false )
     | _ ->
         false
 end
@@ -297,8 +294,6 @@ module type S = sig
         ; new_accounts : Account_id.t list
         }
       [@@deriving sexp]
-
-      val zkapp_updates_applied : t -> bool
     end
 
     module Command_applied : sig

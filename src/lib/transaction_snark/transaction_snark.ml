@@ -1934,6 +1934,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             ~else_:statement.target.local_state.stack_frame
         in
         with_label __LOC__ (fun () ->
+            Boolean.Assert.(
+              local.success = statement.target.local_state.success) ) ;
+        with_label __LOC__ (fun () ->
             Local_state.Checked.assert_equal statement.target.local_state
               { local with
                 stack_frame = local_state_ledger
@@ -2011,7 +2014,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   in
                   let proof_must_verify =
                     Run.run_checked
-                      (Boolean.all [ b; stmt.zkapp_updates_applied ])
+                      (Boolean.all [ b; stmt.target.local_state.success ])
                   in
                   let proof =
                     Run.exists (Typ.Internal.ref ()) ~request:(fun () ->
@@ -3151,12 +3154,9 @@ module Make_str (A : Wire_types.Concrete) = struct
               s2.target.local_state )
       in
       (*Ignore [zkapp_updates_applied] in merge statements since we don't care
-        whether or not account updates were applied, just that they were computed correctly.
-        If one of the updates fail, then none are applied*)
-      let%bind updates_applied =
-        Boolean.( && ) s1.target.local_state.success
-          s2.target.local_state.success
-      in
+        whether or not account updates were applied, just that the proofs are
+        valid and state transition is correct. Set to true always*)
+      let%bind () = Boolean.Assert.is_true s.zkapp_updates_applied in
       let valid_ledger =
         Statement.valid_ledgers_at_merge_checked
           (Statement.Statement_ledgers.of_statement s1)
@@ -3189,8 +3189,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                   s.connecting_ledger_right )
           ; [%with_label_ "Ledger transitions are correct"] (fun () ->
                 Boolean.Assert.is_true valid_ledger )
-          ; [%with_label_ "zkapp_updates_applied computed correctly"] (fun () ->
-                Boolean.Assert.(s.zkapp_updates_applied = updates_applied) )
           ]
       in
       (s1, s2)
@@ -3539,7 +3537,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           let second_pass_ledger =
             sparse_second_pass_ledger zkapp_command second_pass_ledger
           in
-          let applied_txn, states =
+          let _, states =
             let partial_txn, states =
               Sparse_ledger.apply_zkapp_first_pass_unchecked_with_states
                 ~first_pass_ledger ~second_pass_ledger ~constraint_constants
@@ -3550,15 +3548,8 @@ module Make_str (A : Wire_types.Concrete) = struct
               ~init:states second_pass_ledger partial_txn
             |> Or_error.ok_exn
           in
-          let zkapp_updates_applied =
-            Ledger.Transaction_applied.Zkapp_command_applied
-            .zkapp_updates_applied applied_txn
-          in
-          let states =
-            List.map ~f:(fun (g, l) -> (g, l, zkapp_updates_applied)) states
-          in
           let final_state =
-            let global_state, _local_state, _ = List.last_exn states in
+            let global_state, _local_state = List.last_exn states in
             global_state
           in
           ( final_state.fee_excess
@@ -3609,7 +3600,6 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; spec
             ; state_before = { global = source_global; local = source_local }
             ; state_after = { global = target_global; local = target_local }
-            ; zkapp_updates_applied
             } :
              Account_update_group.Zkapp_command_intermediate_state.t )
            witnesses
@@ -3841,7 +3831,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; supply_increase
           ; fee_excess
           ; sok_digest = Sok_message.Digest.default
-          ; zkapp_updates_applied
+          ; zkapp_updates_applied = true
           }
         in
         (w, spec, statement) :: witnesses )

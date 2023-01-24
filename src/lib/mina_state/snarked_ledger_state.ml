@@ -634,11 +634,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       |> option "Error adding supply_increase"
     in
     (*Ignore [zkapp_updates_applied] in merge statements since we don't care
-      whether or not account updates were applied, just that they were computed correctly.
-      If one of the updates fail, then none are applied*)
-    let zkapp_updates_applied =
-      s1.target.local_state.success && s2.target.local_state.success
-    in
+       whether or not account updates were applied, just that the proofs are
+       valid and state transition is correct*)
+    let zkapp_updates_applied = true in
     ( { source = s1.source
       ; target = s2.target
       ; connecting_ledger_left
