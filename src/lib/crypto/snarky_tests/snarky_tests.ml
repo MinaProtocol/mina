@@ -350,6 +350,156 @@ let api_tests =
   ; ("compile monadic API", `Quick, MonadicAPI.get_hash_of_circuit)
   ]
 
+module Improper_calls = struct
+  let input_typ = Impl.Typ.tuple2 Impl.Field.typ Impl.Field.typ
+
+  let return_typ = Impl.Typ.unit
+
+  (* let get_id = *)
+  (* Snarky_backendless.Cvar.( *)
+  (* function Var v -> v | _ -> failwith "should have been a var") *)
+
+  let use_circuit_functions a b : unit =
+    let ab = Impl.Field.(a + b) in
+    Impl.Field.Assert.non_zero ab ;
+    ()
+
+  let use_prover_functions a b : unit =
+    let a = Impl.As_prover.read_var a in
+    let b = Impl.As_prover.read_var b in
+    let ab = Impl.Field.Constant.(a + b) in
+    assert (not (Impl.Field.Constant.(compare ab one) = 0)) ;
+    ()
+
+  let random_input = Impl.Field.Constant.(random (), random ())
+
+  let run_circuit_as_prover circuit : unit =
+    let f (inputs : Impl.Proof_inputs.t) _ = inputs in
+    let compiled =
+      Impl.generate_witness_conv ~f ~input_typ ~return_typ circuit
+    in
+    let input = random_input in
+    let _b = compiled input in
+    ()
+
+  let run_circuit_as_circuit circuit : unit =
+    let cs : Impl.R1CS_constraint_system.t =
+      Impl.constraint_system ~input_typ ~return_typ circuit
+    in
+    let _digest = Md5.to_hex (Impl.R1CS_constraint_system.digest cs) in
+    ()
+
+  (* let main as_prover vars
+       ((b1, b2, b3) : Impl.Field.t * Impl.Field.t * Impl.Field.t) () =
+     let abc = Impl.Field.(b1 + b2 + b3) in
+     assert (get_id b1 = 1) ;
+     if as_prover then
+       Impl.as_prover (fun _ ->
+           let f acc e =
+             let var = Snarky_backendless.Cvar.Unsafe.of_index e in
+             let v = Impl.As_prover.read_var var in
+             Impl.Field.Constant.(acc + v)
+           in
+           let l = List.range 1 (vars + 1) in
+           let total : Impl.field =
+             List.fold l ~init:Impl.Field.Constant.one ~f
+           in
+           assert (not (Impl.Field.(Constant.compare total Constant.one) = 0)) ;
+           assert (not Impl.Field.Constant.(equal total one)) ;
+           () ) ;
+     Impl.Field.Assert.non_zero abc ;
+
+      () *)
+
+  (* let random_input = Impl.Field.Constant.(random (), random (), random ()) *)
+
+  module Tests = struct
+    let circuit_function_inside_circuit_inside_prover () =
+      let inner_circuit ((a, b) : Impl.Field.t * Impl.Field.t) () : unit =
+        use_circuit_functions a b ; ()
+      in
+      let circuit ((_a, _b) : Impl.Field.t * Impl.Field.t) () =
+        Impl.as_prover (fun _ ->
+            run_circuit_as_circuit inner_circuit ;
+            () )
+      in
+      run_circuit_as_prover circuit ;
+      ()
+
+    let circuit_functions_with_global_outside_outside_circuit () : unit =
+      let a, b = random_input in
+      let a, b =
+        Impl.Field.(
+          let a = constant a in
+          let b = constant b in
+          (a, b))
+      in
+      Impl.Field.Assert.not_equal a b ;
+      ()
+
+    let circuit_functions_inside_prover () : unit =
+      let circuit ((a, b) : Impl.Field.t * Impl.Field.t) () =
+        Impl.as_prover (fun _ -> use_circuit_functions a b ; ()) ;
+        ()
+      in
+      run_circuit_as_prover circuit ;
+      ()
+
+    let prover_functions_outside_prover_block () : unit =
+      let circuit ((a, b) : Impl.Field.t * Impl.Field.t) () =
+        use_prover_functions a b ; ()
+      in
+      run_circuit_as_circuit circuit ;
+      ()
+
+    let prover_function_inside_circuit_inside_circuit () : unit =
+      let inner_circuit ((a, b) : Impl.Field.t * Impl.Field.t) () : unit =
+        Impl.as_prover (fun _ -> use_prover_functions a b ; ()) ;
+        ()
+      in
+      let circuit ((_a, _b) : Impl.Field.t * Impl.Field.t) () =
+        Impl.as_prover (fun _ ->
+            run_circuit_as_prover inner_circuit ;
+            () )
+      in
+      run_circuit_as_prover circuit ;
+      ()
+
+    let prover_function_inside_prover_block_of_other_circuit () : unit =
+      let inner_circuit ((a, b) : Impl.Field.t * Impl.Field.t) () =
+        use_prover_functions a b ; ()
+      in
+      let circuit ((_a, _b) : Impl.Field.t * Impl.Field.t) () =
+        Impl.as_prover (fun _ ->
+            run_circuit_as_circuit inner_circuit ;
+            () )
+      in
+      run_circuit_as_prover circuit ;
+      ()
+
+    (* test that accessing non existent vars fails*)
+    (* let generate_witness_fails () = *)
+    (* Alcotest.( *)
+    (* check_raises "should fail accesing non existent var" *)
+    (* (Failure "vector_get") generate_witness_fails) *)
+
+    (* test that as_prover doesn't affect constraints *)
+  end
+
+  let tests =
+    [ ("test1", `Quick, Tests.circuit_function_inside_circuit_inside_prover)
+    ; ( "test2"
+      , `Quick
+      , Tests.circuit_functions_with_global_outside_outside_circuit )
+    ; ("test3", `Quick, Tests.circuit_functions_inside_prover)
+    ; ("test4", `Quick, Tests.prover_functions_outside_prover_block)
+    ; ("test5", `Quick, Tests.prover_function_inside_circuit_inside_circuit)
+    ; ( "test6"
+      , `Quick
+      , Tests.prover_function_inside_prover_block_of_other_circuit )
+    ]
+end
+
 (* run tests *)
 
 let () =
@@ -361,4 +511,5 @@ let () =
     ; ("API tests", api_tests)
     ; ("circuit tests", circuit_tests)
     ; ("range checks", range_checks)
+    ; ("improper calls", Improper_calls.tests)
     ]
