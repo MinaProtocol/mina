@@ -1069,7 +1069,10 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                 Deferred.List.mapi txns ~f:(fun n txn ->
                     match
                       Ledger.apply_transaction_first_pass ~constraint_constants
-                        ~global_slot:last_global_slot_since_genesis
+                        ~global_slot:
+                          (Mina_numbers.Global_slot.of_uint32
+                             (Unsigned.UInt32.of_int64
+                                last_global_slot_since_genesis ) )
                         ~txn_state_view ledger txn
                     with
                     | Ok partially_applied ->
