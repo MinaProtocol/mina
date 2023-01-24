@@ -1,0 +1,1 @@
+../../lib/mina_base/signed_command.mli
