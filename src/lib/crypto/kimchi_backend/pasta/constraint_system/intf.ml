@@ -21,6 +21,8 @@ module type With_accessors = sig
 
   val get_rows_len : t -> int
 
+  val num_constraints : t -> int
+
   val next_row : t -> int
 end
 

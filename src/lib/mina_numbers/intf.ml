@@ -52,6 +52,8 @@ module type S_unchecked = sig
 
   val of_bits : bool list -> t
 
+  val to_field : t -> Field.t
+
   val to_input : t -> Field.t Random_oracle.Input.Chunked.t
 
   val to_input_legacy : t -> (_, bool) Random_oracle.Legacy.Input.t

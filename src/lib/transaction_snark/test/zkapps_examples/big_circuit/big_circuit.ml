@@ -16,37 +16,31 @@ let pk_compressed = Public_key.compress pk
 
 let account_id = Account_id.create pk_compressed Token_id.default
 
-let tag, _, p_module, Pickles.Provers.[ prover ] =
+(* we want to create a circuit with a domain of size 2^16 *)
+let num_constraints = 1 lsl 15
+
+let tag, _cache, _p_module, Pickles.Provers.[ prover ] =
   Zkapps_examples.compile () ~cache:Cache_dir.cache ~auxiliary_typ:Impl.Typ.unit
     ~branches:(module Nat.N1)
     ~max_proofs_verified:(module Nat.N0)
-    ~name:"empty_update"
+    ~name:"big_circuit"
     ~constraint_constants:
       (Genesis_constants.Constraint_constants.to_snark_keys_header
          constraint_constants )
-    ~choices:(fun ~self:_ -> [ Zkapps_empty_update.rule pk_compressed ])
+    ~choices:(fun ~self:_ ->
+      [ Zkapps_big_circuit.rule ~num_constraints pk_compressed ] )
 
-module P = (val p_module)
-
-let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
+let vk : Side_loaded_verification_key.t =
+  Pickles.Side_loaded.Verification_key.of_compiled tag
 
 let account_update, () = Async.Thread_safe.block_on_async_exn prover
 
 let deploy_account_update_body : Account_update.Body.t =
-  (* TODO: This is a pain. *)
   { Account_update.Body.dummy with
     public_key = pk_compressed
   ; update =
       { Account_update.Update.dummy with
-        verification_key =
-          Set
-            { data = vk
-            ; hash =
-                (* TODO: This function should live in
-                   [Side_loaded_verification_key].
-                *)
-                Zkapp_account.digest_vk vk
-            }
+        verification_key = Set { data = vk; hash = Zkapp_account.digest_vk vk }
       }
   ; preconditions =
       { Account_update.Preconditions.network =
@@ -60,7 +54,6 @@ let deploy_account_update_body : Account_update.Body.t =
   }
 
 let deploy_account_update : Account_update.t =
-  (* TODO: This is a pain. *)
   { body = deploy_account_update_body
   ; authorization = Signature Signature.dummy
   }
@@ -73,12 +66,10 @@ let account_updates =
 let memo = Signed_command_memo.empty
 
 let transaction_commitment : Zkapp_command.Transaction_commitment.t =
-  (* TODO: This is a pain. *)
   let account_updates_hash = Zkapp_command.Call_forest.hash account_updates in
   Zkapp_command.Transaction_commitment.create ~account_updates_hash
 
 let fee_payer =
-  (* TODO: This is a pain. *)
   { Account_update.Fee_payer.body =
       { Account_update.Body.Fee_payer.dummy with
         public_key = pk_compressed
@@ -88,14 +79,12 @@ let fee_payer =
   }
 
 let full_commitment =
-  (* TODO: This is a pain. *)
   Zkapp_command.Transaction_commitment.create_complete transaction_commitment
     ~memo_hash:(Signed_command_memo.hash memo)
     ~fee_payer_hash:
       (Zkapp_command.Digest.Account_update.create
          (Account_update.of_fee_payer fee_payer) )
 
-(* TODO: Make this better. *)
 let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
     Zkapp_command.t =
   let fee_payer =
@@ -148,4 +137,6 @@ let () =
                Option.value_exn
                  (add_amount zero (Currency.Amount.of_nanomina_int_exn 500))) )
       in
-      ignore (apply_zkapp_command ledger [ zkapp_command ] : Sparse_ledger.t) )
+
+      Async.Thread_safe.block_on_async_exn (fun _ ->
+          check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) )
