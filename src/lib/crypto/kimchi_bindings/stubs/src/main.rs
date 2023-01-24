@@ -321,6 +321,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                     decl_func!(w, env, caml_pasta_fp_plonk_gate_vector_create => "create");
                     decl_func!(w, env, caml_pasta_fp_plonk_gate_vector_add => "add");
                     decl_func!(w, env, caml_pasta_fp_plonk_gate_vector_get => "get");
+                    decl_func!(w, env, caml_pasta_fp_plonk_gate_vector_len => "len");
                     decl_func!(w, env, caml_pasta_fp_plonk_gate_vector_wrap => "wrap");
                     decl_func!(w, env, caml_pasta_fp_plonk_gate_vector_digest => "digest");
                     decl_func!(w, env, caml_pasta_fp_plonk_circuit_serialize => "to_json");
@@ -332,6 +333,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                     decl_func!(w, env, caml_pasta_fq_plonk_gate_vector_create => "create");
                     decl_func!(w, env, caml_pasta_fq_plonk_gate_vector_add => "add");
                     decl_func!(w, env, caml_pasta_fq_plonk_gate_vector_get => "get");
+                    decl_func!(w, env, caml_pasta_fq_plonk_gate_vector_len => "len");
                     decl_func!(w, env, caml_pasta_fq_plonk_gate_vector_wrap => "wrap");
                     decl_func!(w, env, caml_pasta_fq_plonk_gate_vector_digest => "digest");
                     decl_func!(w, env, caml_pasta_fq_plonk_circuit_serialize => "to_json");

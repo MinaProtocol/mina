@@ -60,6 +60,7 @@ module Preconditions = struct
     type t =
       { network : Mina_base_zkapp_precondition.Protocol_state.V1.t
       ; account : Account_precondition.V1.t
+      ; valid_while : Mina_base_zkapp_precondition.Valid_while.V1.t
       }
   end
 end

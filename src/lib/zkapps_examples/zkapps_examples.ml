@@ -257,6 +257,7 @@ module Account_update_under_construction = struct
                       }
                   }
             ; account = Account_condition.to_predicate t.account_condition
+            ; valid_while = var_of_t Zkapp_precondition.Valid_while.typ Ignore
             }
         ; use_full_commitment = Boolean.false_
         ; implicit_account_creation_fee =

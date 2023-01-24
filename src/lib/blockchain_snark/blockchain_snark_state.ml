@@ -145,6 +145,9 @@ let%snarkydef_ step ~(logger : Logger.t)
           ~prev_state:previous_state ~prev_state_hash:previous_state_hash
           transition txn_snark.supply_increase )
   in
+  let global_slot =
+    Consensus.Data.Consensus_state.global_slot_since_genesis_var consensus_state
+  in
   let supercharge_coinbase =
     Consensus.Data.Consensus_state.supercharge_coinbase_var consensus_state
   in
@@ -215,7 +218,8 @@ let%snarkydef_ step ~(logger : Logger.t)
             Pending_coinbase.Checked.add_coinbase ~constraint_constants
               root_after_delete
               (Snark_transition.pending_coinbase_update transition)
-              ~coinbase_receiver ~supercharge_coinbase previous_state_body_hash )
+              ~coinbase_receiver ~supercharge_coinbase previous_state_body_hash
+              global_slot )
       in
       (new_root, deleted_stack, no_coinbases_popped)
     in
