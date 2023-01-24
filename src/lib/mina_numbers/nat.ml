@@ -207,6 +207,8 @@ struct
 
   let sub x y = if x < y then None else Some (N.sub x y)
 
+  let to_field n = Bigint.to_field (Bigint.of_bignum_bigint (N.to_bigint n))
+
   [%%ifdef consensus_mechanism]
 
   module Checked = Make_checked (N) (Bits)
@@ -223,8 +225,7 @@ struct
   let of_bits = Bits.of_bits
 
   let to_input (t : t) =
-    Random_oracle.Input.Chunked.packed
-      (Field.project (to_bits t), N.length_in_bits)
+    Random_oracle.Input.Chunked.packed (to_field t, N.length_in_bits)
 
   let to_input_legacy t = Random_oracle.Input.Legacy.bitstring (to_bits t)
 
