@@ -140,176 +140,253 @@ module Controller = struct
 end
 
 module Account = struct
-      include Account
+  include Account
 
-      module Permissions = struct
-        let access : t -> Controller.t = fun a -> a.permissions.access
+  module Permissions = struct
+    let access : t -> Controller.t = fun a -> a.permissions.access
 
-        let edit_state : t -> Controller.t = fun a -> a.permissions.edit_state
+    let edit_state : t -> Controller.t = fun a -> a.permissions.edit_state
 
-        let send : t -> Controller.t = fun a -> a.permissions.send
+    let send : t -> Controller.t = fun a -> a.permissions.send
 
-        let receive : t -> Controller.t = fun a -> a.permissions.receive
+    let receive : t -> Controller.t = fun a -> a.permissions.receive
 
-        let set_delegate : t -> Controller.t =
-         fun a -> a.permissions.set_delegate
+    let set_delegate : t -> Controller.t = fun a -> a.permissions.set_delegate
 
-        let set_permissions : t -> Controller.t =
-         fun a -> a.permissions.set_permissions
+    let set_permissions : t -> Controller.t =
+     fun a -> a.permissions.set_permissions
 
-        let set_verification_key : t -> Controller.t =
-         fun a -> a.permissions.set_verification_key
+    let set_verification_key : t -> Controller.t =
+     fun a -> a.permissions.set_verification_key
 
-        let set_zkapp_uri : t -> Controller.t =
-         fun a -> a.permissions.set_zkapp_uri
+    let set_zkapp_uri : t -> Controller.t = fun a -> a.permissions.set_zkapp_uri
 
-        let edit_sequence_state : t -> Controller.t =
-         fun a -> a.permissions.edit_sequence_state
+    let edit_sequence_state : t -> Controller.t =
+     fun a -> a.permissions.edit_sequence_state
 
-        let set_token_symbol : t -> Controller.t =
-         fun a -> a.permissions.set_token_symbol
+    let set_token_symbol : t -> Controller.t =
+     fun a -> a.permissions.set_token_symbol
 
-        let increment_nonce : t -> Controller.t =
-        fun a -> a.permissions.increment_nonce
+    let increment_nonce : t -> Controller.t =
+     fun a -> a.permissions.increment_nonce
 
-        let set_voting_for : t -> Controller.t =
-         fun a -> a.permissions.set_voting_for
+    let set_voting_for : t -> Controller.t =
+     fun a -> a.permissions.set_voting_for
 
-        let set_timing : t -> Controller.t = fun a -> a.permissions.set_timing
+    let set_timing : t -> Controller.t = fun a -> a.permissions.set_timing
 
-        type t = Permissions.t
+    type t = Permissions.t
 
-        let if_ = value_if
-      end
+    let if_ = value_if
+  end
 
-      type timing = Account_update.Update.Timing_info.t option
+  type timing = Account_update.Update.Timing_info.t option
 
-      let timing (a : t) : timing =
-        Account_update.Update.Timing_info.of_account_timing a.timing
+  let timing (a : t) : timing =
+    Account_update.Update.Timing_info.of_account_timing a.timing
 
-      let set_timing (a : t) (timing : timing) : t =
-        { a with
-          timing =
-            Option.value_map ~default:Account_timing.Untimed
-              ~f:Account_update.Update.Timing_info.to_account_timing timing
-        }
+  let set_timing (a : t) (timing : timing) : t =
+    { a with
+      timing =
+        Option.value_map ~default:Account_timing.Untimed
+          ~f:Account_update.Update.Timing_info.to_account_timing timing
+    }
 
-      let is_timed (a : t) =
-        match a.timing with Account_timing.Untimed -> false | _ -> true
+  let is_timed (a : t) =
+    match a.timing with Account_timing.Untimed -> false | _ -> true
 
-      let set_token_id (a : t) (id : Token_id.t) : t = { a with token_id = id }
+  let set_token_id (a : t) (id : Token_id.t) : t = { a with token_id = id }
 
-      let balance (a : t) : Balance.t = a.balance
+  let balance (a : t) : Balance.t = a.balance
 
-      let set_balance (balance : Balance.t) (a : t) : t = { a with balance }
+  let set_balance (balance : Balance.t) (a : t) : t = { a with balance }
 
-      let check_timing ~txn_global_slot account =
-        let invalid_timing, timing, _ =
-          validate_timing_with_min_balance' ~txn_amount:Amount.zero
-            ~txn_global_slot ~account
-        in
-        ( invalid_timing
-        , Account_update.Update.Timing_info.of_account_timing timing )
+  let check_timing ~txn_global_slot account =
+    let invalid_timing, timing, _ =
+      validate_timing_with_min_balance' ~txn_amount:Amount.zero ~txn_global_slot
+        ~account
+    in
+    (invalid_timing, Account_update.Update.Timing_info.of_account_timing timing)
 
-      let receipt_chain_hash (a : t) : Receipt.Chain_hash.t =
-        a.receipt_chain_hash
+  let receipt_chain_hash (a : t) : Receipt.Chain_hash.t = a.receipt_chain_hash
 
-      let set_receipt_chain_hash (a : t) hash =
-        { a with receipt_chain_hash = hash }
+  let set_receipt_chain_hash (a : t) hash = { a with receipt_chain_hash = hash }
 
-      let make_zkapp (a : t) =
-        let zkapp =
-          match a.zkapp with
-          | None ->
-              Some Zkapp_account.default
-          | Some _ as zkapp ->
-              zkapp
-        in
-        { a with zkapp }
+  let make_zkapp (a : t) =
+    let zkapp =
+      match a.zkapp with
+      | None ->
+          Some Zkapp_account.default
+      | Some _ as zkapp ->
+          zkapp
+    in
+    { a with zkapp }
 
-      let unmake_zkapp (a : t) : t =
-        let zkapp =
-          match a.zkapp with
-          | None ->
-              None
-          | Some zkapp ->
-              if Zkapp_account.(equal default zkapp) then None else Some zkapp
-        in
-        { a with zkapp }
+  let unmake_zkapp (a : t) : t =
+    let zkapp =
+      match a.zkapp with
+      | None ->
+          None
+      | Some zkapp ->
+          if Zkapp_account.(equal default zkapp) then None else Some zkapp
+    in
+    { a with zkapp }
 
-      let get_zkapp (a : t) = Option.value_exn a.zkapp
+  let get_zkapp (a : t) = Option.value_exn a.zkapp
 
-      let set_zkapp (a : t) ~f : t = { a with zkapp = Option.map a.zkapp ~f }
+  let set_zkapp (a : t) ~f : t = { a with zkapp = Option.map a.zkapp ~f }
 
-      let proved_state (a : t) = (get_zkapp a).proved_state
+  let proved_state (a : t) = (get_zkapp a).proved_state
 
-      let set_proved_state proved_state (a : t) =
-        set_zkapp a ~f:(fun zkapp -> { zkapp with proved_state })
+  let set_proved_state proved_state (a : t) =
+    set_zkapp a ~f:(fun zkapp -> { zkapp with proved_state })
 
-      let app_state (a : t) = (get_zkapp a).app_state
+  let app_state (a : t) = (get_zkapp a).app_state
 
-      let set_app_state app_state (a : t) =
-        set_zkapp a ~f:(fun zkapp -> { zkapp with app_state })
+  let set_app_state app_state (a : t) =
+    set_zkapp a ~f:(fun zkapp -> { zkapp with app_state })
 
-      let register_verification_key (_ : t) = ()
+  let register_verification_key (_ : t) = ()
 
-      let verification_key (a : t) = (get_zkapp a).verification_key
+  let verification_key (a : t) = (get_zkapp a).verification_key
 
-      let set_verification_key verification_key (a : t) =
-        set_zkapp a ~f:(fun zkapp -> { zkapp with verification_key })
+  let set_verification_key verification_key (a : t) =
+    set_zkapp a ~f:(fun zkapp -> { zkapp with verification_key })
 
-      let verification_key_hash (a : t) =
-        match a.zkapp with
-        | None ->
-            None
-        | Some zkapp ->
-            Option.map zkapp.verification_key ~f:With_hash.hash
+  let verification_key_hash (a : t) =
+    match a.zkapp with
+    | None ->
+        None
+    | Some zkapp ->
+        Option.map zkapp.verification_key ~f:With_hash.hash
 
-      let last_sequence_slot (a : t) = (get_zkapp a).last_sequence_slot
+  let last_sequence_slot (a : t) = (get_zkapp a).last_sequence_slot
 
-      let set_last_sequence_slot last_sequence_slot (a : t) =
-        set_zkapp a ~f:(fun zkapp -> { zkapp with last_sequence_slot })
+  let set_last_sequence_slot last_sequence_slot (a : t) =
+    set_zkapp a ~f:(fun zkapp -> { zkapp with last_sequence_slot })
 
-      let sequence_state (a : t) = (get_zkapp a).sequence_state
+  let sequence_state (a : t) = (get_zkapp a).sequence_state
 
-      let set_sequence_state sequence_state (a : t) =
-        set_zkapp a ~f:(fun zkapp -> { zkapp with sequence_state })
+  let set_sequence_state sequence_state (a : t) =
+    set_zkapp a ~f:(fun zkapp -> { zkapp with sequence_state })
 
-      let zkapp_uri (a : t) =
-        Option.value_map a.zkapp ~default:"" ~f:(fun zkapp -> zkapp.zkapp_uri)
+  let zkapp_uri (a : t) =
+    Option.value_map a.zkapp ~default:"" ~f:(fun zkapp -> zkapp.zkapp_uri)
 
-      let set_zkapp_uri zkapp_uri (a : t) : t =
-        { a with
-          zkapp = Option.map a.zkapp ~f:(fun zkapp -> { zkapp with zkapp_uri })
-        }
+  let set_zkapp_uri zkapp_uri (a : t) : t =
+    { a with
+      zkapp = Option.map a.zkapp ~f:(fun zkapp -> { zkapp with zkapp_uri })
+    }
 
-      let token_symbol (a : t) = a.token_symbol
+  let token_symbol (a : t) = a.token_symbol
 
-      let set_token_symbol token_symbol (a : t) = { a with token_symbol }
+  let set_token_symbol token_symbol (a : t) = { a with token_symbol }
 
-      let public_key (a : t) = a.public_key
+  let public_key (a : t) = a.public_key
 
-      let set_public_key public_key (a : t) = { a with public_key }
+  let set_public_key public_key (a : t) = { a with public_key }
 
-      let delegate (a : t) = Account.delegate_opt a.delegate
+  let delegate (a : t) = Account.delegate_opt a.delegate
 
-      let set_delegate delegate (a : t) =
-        let delegate =
-          if Signature_lib.Public_key.Compressed.(equal empty) delegate then
-            None
-          else Some delegate
-        in
-        { a with delegate }
+  let set_delegate delegate (a : t) =
+    let delegate =
+      if Signature_lib.Public_key.Compressed.(equal empty) delegate then None
+      else Some delegate
+    in
+    { a with delegate }
 
-      let nonce (a : t) = a.nonce
+  let nonce (a : t) = a.nonce
 
-      let set_nonce nonce (a : t) = { a with nonce }
+  let set_nonce nonce (a : t) = { a with nonce }
 
-      let voting_for (a : t) = a.voting_for
+  let voting_for (a : t) = a.voting_for
 
-      let set_voting_for voting_for (a : t) = { a with voting_for }
+  let set_voting_for voting_for (a : t) = { a with voting_for }
 
-      let permissions (a : t) = a.permissions
+  let permissions (a : t) = a.permissions
 
-      let set_permissions permissions (a : t) = { a with permissions }
+  let set_permissions permissions (a : t) = { a with permissions }
+end
+
+module Update = struct
+  include Account_update
+
+  module Account_precondition = struct
+    include Account_update.Account_precondition
+
+    let nonce (t : Account_update.t) = nonce t.body.preconditions.account
+  end
+
+  type 'a or_ignore = 'a Zkapp_basic.Or_ignore.t
+
+  type call_forest = Zkapp_call_forest.t
+
+  let may_use_parents_own_token (p : t) =
+    May_use_token.parents_own_token p.body.may_use_token
+
+  let may_use_token_inherited_from_parent (p : t) =
+    May_use_token.inherit_from_parent p.body.may_use_token
+
+  let check_authorization ~will_succeed:_ ~commitment:_ ~calls:_
+      (account_update : t) =
+    (* The transaction's validity should already have been checked before
+       this point.
+    *)
+    match account_update.authorization with
+    | Signature _ ->
+        (`Proof_verifies false, `Signature_verifies true)
+    | Proof _ ->
+        (`Proof_verifies true, `Signature_verifies false)
+    | None_given ->
+        (`Proof_verifies false, `Signature_verifies false)
+
+  let is_proved (account_update : t) =
+    match account_update.body.authorization_kind with
+    | Proof _ ->
+        true
+    | Signature | None_given ->
+        false
+
+  let is_signed (account_update : t) =
+    match account_update.body.authorization_kind with
+    | Signature ->
+        true
+    | Proof _ | None_given ->
+        false
+
+  let verification_key_hash (p : t) =
+    match p.body.authorization_kind with
+    | Proof vk_hash ->
+        Some vk_hash
+    | _ ->
+        None
+
+  module Update = struct
+    open Zkapp_basic
+
+    type 'a set_or_keep = 'a Zkapp_basic.Set_or_keep.t
+
+    let timing (account_update : t) : Account.timing set_or_keep =
+      Set_or_keep.map ~f:Option.some account_update.body.update.timing
+
+    let app_state (account_update : t) = account_update.body.update.app_state
+
+    let verification_key (account_update : t) =
+      Zkapp_basic.Set_or_keep.map ~f:Option.some
+        account_update.body.update.verification_key
+
+    let actions (account_update : t) = account_update.body.actions
+
+    let zkapp_uri (account_update : t) = account_update.body.update.zkapp_uri
+
+    let token_symbol (account_update : t) =
+      account_update.body.update.token_symbol
+
+    let delegate (account_update : t) = account_update.body.update.delegate
+
+    let voting_for (account_update : t) = account_update.body.update.voting_for
+
+    let permissions (account_update : t) =
+      account_update.body.update.permissions
+  end
 end

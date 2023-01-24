@@ -669,91 +669,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     end
 
     module Account_update = struct
-      include Account_update
-
-      module Account_precondition = struct
-        include Account_update.Account_precondition
-
-        let nonce (t : Account_update.t) = nonce t.body.preconditions.account
-      end
-
-      type 'a or_ignore = 'a Zkapp_basic.Or_ignore.t
-
-      type call_forest = Zkapp_call_forest.t
+      include Mina_account.Update
 
       type transaction_commitment = Transaction_commitment.t
-
-      let may_use_parents_own_token (p : t) =
-        May_use_token.parents_own_token p.body.may_use_token
-
-      let may_use_token_inherited_from_parent (p : t) =
-        May_use_token.inherit_from_parent p.body.may_use_token
-
-      let check_authorization ~will_succeed:_ ~commitment:_ ~calls:_
-          (account_update : t) =
-        (* The transaction's validity should already have been checked before
-           this point.
-        *)
-        match account_update.authorization with
-        | Signature _ ->
-            (`Proof_verifies false, `Signature_verifies true)
-        | Proof _ ->
-            (`Proof_verifies true, `Signature_verifies false)
-        | None_given ->
-            (`Proof_verifies false, `Signature_verifies false)
-
-      let is_proved (account_update : t) =
-        match account_update.body.authorization_kind with
-        | Proof _ ->
-            true
-        | Signature | None_given ->
-            false
-
-      let is_signed (account_update : t) =
-        match account_update.body.authorization_kind with
-        | Signature ->
-            true
-        | Proof _ | None_given ->
-            false
-
-      let verification_key_hash (p : t) =
-        match p.body.authorization_kind with
-        | Proof vk_hash ->
-            Some vk_hash
-        | _ ->
-            None
-
-      module Update = struct
-        open Zkapp_basic
-
-        type 'a set_or_keep = 'a Zkapp_basic.Set_or_keep.t
-
-        let timing (account_update : t) : Account.timing set_or_keep =
-          Set_or_keep.map ~f:Option.some account_update.body.update.timing
-
-        let app_state (account_update : t) =
-          account_update.body.update.app_state
-
-        let verification_key (account_update : t) =
-          Zkapp_basic.Set_or_keep.map ~f:Option.some
-            account_update.body.update.verification_key
-
-        let actions (account_update : t) = account_update.body.actions
-
-        let zkapp_uri (account_update : t) =
-          account_update.body.update.zkapp_uri
-
-        let token_symbol (account_update : t) =
-          account_update.body.update.token_symbol
-
-        let delegate (account_update : t) = account_update.body.update.delegate
-
-        let voting_for (account_update : t) =
-          account_update.body.update.voting_for
-
-        let permissions (account_update : t) =
-          account_update.body.update.permissions
-      end
     end
 
     module Set_or_keep = struct
