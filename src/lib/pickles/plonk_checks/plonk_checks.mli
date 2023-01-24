@@ -109,7 +109,7 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (Sc : Scalars.S) : s
     -> (module Field_intf with type t = 't)
     -> env:'t Scalars.Env.t
     -> shift:'t Shifted_value.Shift.t
-    -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    -> feature_flags:Plonk_types.Features.options
     -> ( 't
        , 't
        , 'b )
