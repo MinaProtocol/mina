@@ -185,6 +185,44 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
           in
           match applied with
           | Command (Zkapp_command { command; _ }) -> (
+              let run_in_snark () =
+                let%map p =
+                  match List.rev witnesses with
+                  | [] ->
+                      failwith "no witnesses generated"
+                  | (witness, spec, stmt) :: rest ->
+                      let open Async.Deferred.Or_error.Let_syntax in
+                      let%bind p1 =
+                        Async.Deferred.Or_error.try_with (fun () ->
+                            T.of_zkapp_command_segment_exn ~statement:stmt
+                              ~witness ~spec )
+                      in
+                      Async.Deferred.List.fold ~init:(Ok p1) rest
+                        ~f:(fun acc (witness, spec, stmt) ->
+                          let%bind prev = Async.Deferred.return acc in
+                          let%bind curr =
+                            Async.Deferred.Or_error.try_with (fun () ->
+                                T.of_zkapp_command_segment_exn ~statement:stmt
+                                  ~witness ~spec )
+                          in
+                          let sok_digest =
+                            Sok_message.create ~fee:Fee.zero
+                              ~prover:
+                                (Quickcheck.random_value
+                                   Public_key.Compressed.gen )
+                            |> Sok_message.digest
+                          in
+                          T.merge ~sok_digest prev curr )
+                in
+                let p = Or_error.ok_exn p in
+                if not ignore_outside_snark then
+                  let target_ledger_root_snark =
+                    (Transaction_snark.statement p).target.ledger
+                  in
+                  let target_ledger_root = Ledger.merkle_root ledger in
+                  [%test_eq: Ledger_hash.t] target_ledger_root
+                    target_ledger_root_snark
+              in
               match command.status with
               | Applied -> (
                   match expected_failure with
@@ -196,42 +234,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                              %{sexp:Mina_base.Transaction_status.Failure.t}"
                            failure )
                   | None ->
-                      let%map p =
-                        match List.rev witnesses with
-                        | [] ->
-                            failwith "no witnesses generated"
-                        | (witness, spec, stmt) :: rest ->
-                            let open Async.Deferred.Or_error.Let_syntax in
-                            let%bind p1 =
-                              Async.Deferred.Or_error.try_with (fun () ->
-                                  T.of_zkapp_command_segment_exn ~statement:stmt
-                                    ~witness ~spec )
-                            in
-                            Async.Deferred.List.fold ~init:(Ok p1) rest
-                              ~f:(fun acc (witness, spec, stmt) ->
-                                let%bind prev = Async.Deferred.return acc in
-                                let%bind curr =
-                                  Async.Deferred.Or_error.try_with (fun () ->
-                                      T.of_zkapp_command_segment_exn
-                                        ~statement:stmt ~witness ~spec )
-                                in
-                                let sok_digest =
-                                  Sok_message.create ~fee:Fee.zero
-                                    ~prover:
-                                      (Quickcheck.random_value
-                                         Public_key.Compressed.gen )
-                                  |> Sok_message.digest
-                                in
-                                T.merge ~sok_digest prev curr )
-                      in
-                      let p = Or_error.ok_exn p in
-                      if not ignore_outside_snark then
-                        let target_ledger_root_snark =
-                          (Transaction_snark.statement p).target.ledger
-                        in
-                        let target_ledger_root = Ledger.merkle_root ledger in
-                        [%test_eq: Ledger_hash.t] target_ledger_root
-                          target_ledger_root_snark )
+                      run_in_snark () )
               | Failed failure_tbl -> (
                   match expected_failure with
                   | None ->
@@ -259,7 +262,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                                Failure statuses: %{sexp: \
                                Mina_base.Transaction_status.Failure.Collection.t}"
                              failure failure_tbl )
-                      else Async.Deferred.unit ) )
+                      else run_in_snark () ) )
           | _ ->
               failwith "zkapp_command expected" ) )
 
