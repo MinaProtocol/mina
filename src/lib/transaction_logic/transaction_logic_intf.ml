@@ -538,3 +538,6 @@ module type Account_intf = sig
   val set_permissions : Permissions.t -> t -> t
 end
 
+module type Valid_while_precondition_intf = sig
+  type t
+end

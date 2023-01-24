@@ -7,6 +7,7 @@ module Zkapp_command_logic = Zkapp_command_logic
 module Global_slot = Mina_numbers.Global_slot
 include Transaction_logic_intf
 module Boolean = Boolean
+module Transaction_applied = Transaction_applied
 
 module type S = Mina_transaction_logic_sig.S
 
