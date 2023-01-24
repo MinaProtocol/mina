@@ -287,7 +287,6 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                           (validate_single_proof ~verifier ~genesis_state_hash)
                     >>= Fn.compose Intr.return validate_delta_block_chain
                     >>= Fn.compose Intr.return validate_protocol_versions)
-                  (* >>| Fn.flip with_body body) *)
                 with
                 | Ok verified_transition ->
                     let b_or_h' =
