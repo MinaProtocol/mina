@@ -225,6 +225,20 @@ let transaction_with_status : t -> Transaction.t With_status.t =
   | Coinbase c ->
       With_status.map c.coinbase ~f:(fun c -> Transaction.Coinbase c)
 
+let transaction : t -> Transaction.t With_status.t =
+ fun { varying; _ } ->
+  match varying with
+  | Command (Signed_command uc) ->
+      With_status.map uc.common.user_command ~f:(fun cmd ->
+          Transaction.Command (User_command.Signed_command cmd) )
+  | Command (Zkapp_command s) ->
+      With_status.map s.command ~f:(fun c ->
+          Transaction.Command (User_command.Zkapp_command c) )
+  | Fee_transfer f ->
+      With_status.map f.fee_transfer ~f:(fun f -> Transaction.Fee_transfer f)
+  | Coinbase c ->
+      With_status.map c.coinbase ~f:(fun c -> Transaction.Coinbase c)
+
 let transaction_status : t -> Transaction_status.t =
  fun { varying; _ } ->
   match varying with

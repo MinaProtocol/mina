@@ -5,7 +5,6 @@ open Signature_lib
 open Mina_transaction
 module Zkapp_command_logic = Zkapp_command_logic
 module Global_slot = Mina_numbers.Global_slot
-module Transaction_applied = Transaction_applied
 include Transaction_logic_intf
 module Boolean = Boolean
 
@@ -127,14 +126,62 @@ let validate_timing ~account ~txn_amount ~txn_global_slot =
   in
   timing
 
+let error s = Or_error.errorf "Ledger.apply_transaction: %s" s
+
+let error_opt e = Option.value_map ~default:(error e) ~f:Or_error.return
+
+let add_amount balance amount =
+  error_opt "overflow" (Balance.add_amount balance amount)
+
+let sub_amount balance amount =
+  error_opt "insufficient funds" (Balance.sub_amount balance amount)
+
+let sub_account_creation_fee
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) action
+    amount =
+  let fee = constraint_constants.account_creation_fee in
+  if Ledger_intf.equal_account_state action `Added then
+    error_opt
+      (sprintf
+         !"Error subtracting account creation fee %{sexp: Currency.Fee.t}; \
+           transaction amount %{sexp: Currency.Amount.t} insufficient"
+         fee amount )
+      Amount.(sub amount (of_fee fee))
+  else Ok amount
+
+let check b = ksprintf (fun s -> if b then Ok () else Or_error.error_string s)
+
+let validate_nonces txn_nonce account_nonce =
+  check
+    (Account.Nonce.equal account_nonce txn_nonce)
+    !"Nonce in account %{sexp: Account.Nonce.t} different from nonce in \
+      transaction %{sexp: Account.Nonce.t}"
+    account_nonce txn_nonce
+
+let validate_time ~valid_until ~current_global_slot =
+  check
+    Global_slot.(current_global_slot <= valid_until)
+    !"Current global slot %{sexp: Global_slot.t} greater than transaction \
+      expiry slot %{sexp: Global_slot.t}"
+    current_global_slot valid_until
+
+let get_new_accounts action pk =
+  if Ledger_intf.equal_account_state action `Added then [ pk ] else []
+
+let failure (e : Transaction_status.Failure.t) = e
+
+let incr_balance (acct : Account.t) amt =
+  match add_amount acct.balance amt with
+  | Ok balance ->
+      Ok { acct with balance }
+  | Error _ ->
+      Result.fail (failure Overflow)
+
 module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
-  open L
-
-  let error s = Or_error.errorf "Ledger.apply_transaction: %s" s
-
-  let error_opt e = Option.value_map ~default:(error e) ~f:Or_error.return
+  module Transaction_applied = Transaction_applied
 
   let get_with_location ledger account_id =
+    let open L in
     match location_of_account ledger account_id with
     | Some location -> (
         match get ledger location with
@@ -146,96 +193,17 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         Ok (`New, Account.create account_id Balance.zero)
 
   let set_with_location ledger location account =
+    let open L in
     match location with
     | `Existing location ->
         Ok (set ledger location account)
     | `New ->
         create_new_account ledger (Account.identifier account) account
 
-  let add_amount balance amount =
-    error_opt "overflow" (Balance.add_amount balance amount)
-
-  let sub_amount balance amount =
-    error_opt "insufficient funds" (Balance.sub_amount balance amount)
-
-  let sub_account_creation_fee
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t) action
-      amount =
-    let fee = constraint_constants.account_creation_fee in
-    if Ledger_intf.equal_account_state action `Added then
-      error_opt
-        (sprintf
-           !"Error subtracting account creation fee %{sexp: Currency.Fee.t}; \
-             transaction amount %{sexp: Currency.Amount.t} insufficient"
-           fee amount )
-        Amount.(sub amount (of_fee fee))
-    else Ok amount
-
-  let check b = ksprintf (fun s -> if b then Ok () else Or_error.error_string s)
-
-  let validate_nonces txn_nonce account_nonce =
-    check
-      (Account.Nonce.equal account_nonce txn_nonce)
-      !"Nonce in account %{sexp: Account.Nonce.t} different from nonce in \
-        transaction %{sexp: Account.Nonce.t}"
-      account_nonce txn_nonce
-
-  let validate_time ~valid_until ~current_global_slot =
-    check
-      Global_slot.(current_global_slot <= valid_until)
-      !"Current global slot %{sexp: Global_slot.t} greater than transaction \
-        expiry slot %{sexp: Global_slot.t}"
-      current_global_slot valid_until
-
-  module Transaction_applied = struct
-    include Transaction_applied
-
-    let transaction : t -> Transaction.t With_status.t =
-     fun { varying; _ } ->
-      match varying with
-      | Command (Signed_command uc) ->
-          With_status.map uc.common.user_command ~f:(fun cmd ->
-              Transaction.Command (User_command.Signed_command cmd) )
-      | Command (Zkapp_command s) ->
-          With_status.map s.command ~f:(fun c ->
-              Transaction.Command (User_command.Zkapp_command c) )
-      | Fee_transfer f ->
-          With_status.map f.fee_transfer ~f:(fun f ->
-              Transaction.Fee_transfer f )
-      | Coinbase c ->
-          With_status.map c.coinbase ~f:(fun c -> Transaction.Coinbase c)
-
-    let transaction_status : t -> Transaction_status.t =
-     fun { varying; _ } ->
-      match varying with
-      | Command
-          (Signed_command { common = { user_command = { status; _ }; _ }; _ })
-        ->
-          status
-      | Command (Zkapp_command c) ->
-          c.command.status
-      | Fee_transfer f ->
-          f.fee_transfer.status
-      | Coinbase c ->
-          c.coinbase.status
-  end
-
-  let get_new_accounts action pk =
-    if Ledger_intf.equal_account_state action `Added then [ pk ] else []
-
   let has_locked_tokens ~global_slot ~account_id ledger =
     let open Or_error.Let_syntax in
     let%map _, account = get_with_location ledger account_id in
     Account.has_locked_tokens ~global_slot account
-
-  let failure (e : Transaction_status.Failure.t) = e
-
-  let incr_balance (acct : Account.t) amt =
-    match add_amount acct.balance amt with
-    | Ok balance ->
-        Ok { acct with balance }
-    | Error _ ->
-        Result.fail (failure Overflow)
 
   (* Helper function for [apply_user_command_unchecked] *)
   let pay_fee' ~command ~nonce ~fee_payer ~fee ~ledger ~current_global_slot =
@@ -573,12 +541,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
   module Inputs = struct
     module Bool = Boolean
+    module Global_state = Global_state
 
     let with_label ~label:_ f = f ()
 
     let value_if b ~then_ ~else_ = if b then then_ else else_
-
-    module Global_state = Global_state
 
     module Field = struct
       type t = Snark_params.Tick.Field.t
@@ -601,7 +568,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       let empty = L.empty
 
-      type inclusion_proof = [ `Existing of location | `New ]
+      type inclusion_proof = [ `Existing of L.location | `New ]
 
       let get_account p l =
         let loc, acct =
@@ -1197,7 +1164,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       ; bool : Bool.t
       ; token_id : Token_id.t
       ; global_state : Global_state.t
-      ; inclusion_proof : [ `Existing of location | `New ]
+      ; inclusion_proof : [ `Existing of L.location | `New ]
       ; local_state :
           ( Stack_frame.t
           , Call_stack.t
@@ -1435,6 +1402,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       Account.t
       * Ledger_intf.account_state
       * [> `Has_permission_to_receive of bool ] =
+    let open L in
     let init_account = Account.initialize receiver_account_id in
     match location_of_account ledger receiver_account_id with
     | None ->
@@ -1502,9 +1470,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let%bind timing = modify_timing a in
         let%bind balance = modify_balance action account_id a.balance ft.fee in
         if can_receive then (
-          let%map _action, a, loc = get_or_create t account_id in
+          let%map _action, a, loc = L.get_or_create t account_id in
           let new_accounts = get_new_accounts action account_id in
-          set t loc { a with balance; timing } ;
+          L.set t loc { a with balance; timing } ;
           (new_accounts, empty, Currency.Amount.zero) )
         else Ok ([], single_failure, Currency.Amount.of_fee ft.fee)
     | `Two (ft1, ft2) ->
@@ -1520,9 +1488,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             modify_balance action1 account_id1 a1.balance fee
           in
           if can_receive1 then (
-            let%map _action1, a1, l1 = get_or_create t account_id1 in
+            let%map _action1, a1, l1 = L.get_or_create t account_id1 in
             let new_accounts1 = get_new_accounts action1 account_id1 in
-            set t l1 { a1 with balance; timing } ;
+            L.set t l1 { a1 with balance; timing } ;
             (new_accounts1, empty, Currency.Amount.zero) )
           else
             (*failure for each fee transfer single*)
@@ -1544,9 +1512,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           in
           let%bind new_accounts1, failures, burned_tokens1 =
             if can_receive1 then (
-              let%map _action1, a1, l1 = get_or_create t account_id1 in
+              let%map _action1, a1, l1 = L.get_or_create t account_id1 in
               let new_accounts1 = get_new_accounts action1 account_id1 in
-              set t l1 { a1 with balance = balance1 } ;
+              L.set t l1 { a1 with balance = balance1 } ;
               ( new_accounts1
               , append_entry no_failure empty
               , Currency.Amount.zero ) )
@@ -1554,9 +1522,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           in
           let%bind new_accounts2, failures', burned_tokens2 =
             if can_receive2 then (
-              let%map _action2, a2, l2 = get_or_create t account_id2 in
+              let%map _action2, a2, l2 = L.get_or_create t account_id2 in
               let new_accounts2 = get_new_accounts action2 account_id2 in
-              set t l2 { a2 with balance = balance2; timing = timing2 } ;
+              L.set t l2 { a2 with balance = balance2; timing = timing2 } ;
               ( new_accounts2
               , append_entry no_failure failures
               , Currency.Amount.zero ) )
@@ -1641,7 +1609,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           in
           if can_receive then
             let%map _action, transferee_account, transferee_location =
-              get_or_create t transferee_id
+              L.get_or_create t transferee_id
             in
             ( receiver_reward
             , new_accounts
@@ -1683,9 +1651,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let%bind failures, burned_tokens2 =
       if can_receive then (
         let%map _action2, receiver_account, receiver_location =
-          get_or_create t receiver_id
+          L.get_or_create t receiver_id
         in
-        set t receiver_location
+        L.set t receiver_location
           { receiver_account with
             balance = receiver_balance
           ; timing = coinbase_receiver_timing
@@ -1693,7 +1661,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         (append_entry no_failure failures1, Currency.Amount.zero) )
       else return (append_entry update_failed failures1, receiver_reward)
     in
-    Option.iter transferee_update ~f:(fun (l, a) -> set t l a) ;
+    Option.iter transferee_update ~f:(fun (l, a) -> L.set t l a) ;
     let%map burned_tokens =
       error_opt "burned tokens overflow"
         (Amount.add burned_tokens1 burned_tokens2)
@@ -1712,6 +1680,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
   let apply_transaction ~constraint_constants ~global_slot
       ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t) ledger
       (t : Transaction.t) =
+    let open L in
     let previous_hash = merkle_root ledger in
     let txn_global_slot = global_slot in
     Or_error.map
