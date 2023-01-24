@@ -550,6 +550,7 @@ struct
                   [| `Field (x, n) |] )
           in
           let constant_part, non_constant_part =
+            (* TODO: Use Array.fold to avoid using mapi |> to_list |> partition_map *)
             List.partition_map
               Array.(to_list (mapi public_input ~f:(fun i t -> (i, t))))
               ~f:(fun (i, t) ->
@@ -584,6 +585,7 @@ struct
               in
               let correction =
                 with_label __LOC__ (fun () ->
+                    (* TODO: Avoid double iteration *)
                     List.reduce_exn
                       (List.filter_map terms ~f:(function
                         | `Cond_add _ ->
@@ -594,6 +596,7 @@ struct
               in
               with_label __LOC__ (fun () ->
                   let init =
+                    (* TODO: Avoid double iteration *)
                     List.fold
                       (List.filter_map ~f:Fn.id constant_part)
                       ~init:correction ~f:Ops.add_fast
