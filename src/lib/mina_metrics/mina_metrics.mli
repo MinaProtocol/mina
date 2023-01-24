@@ -450,14 +450,26 @@ module Transition_frontier : sig
 end
 
 module Catchup : sig
+  (** Latency to retrieve block body.
+      
+      Note that this time may represent time for a batch of blocks,
+      not for a single block. *)
   val download_time : Gauge.t
 
+  (** Time to run verification of block proof on a block
+      received via catchup (and some more auxiliary checks in case
+      of super/normal catchup) *)
   val initial_validation_time : Gauge.t
 
+  (** Time to verify complete snark works of a block  *)
   val verification_time : Gauge.t
 
+  (** Time to build breadcrumb *)
   val build_breadcrumb_time : Gauge.t
 
+  (** Time between beginning of catchup and accepting first
+      fresh block into frontier (fresh block is defined as a block
+      created after start of catchup) *)
   val initial_catchup_time : Gauge.t
 end
 

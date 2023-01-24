@@ -42,19 +42,21 @@ let cached_transform_deferred_result ~transform_cached ~transform_result cached
   >>= Fn.compose transform_result Cached.sequence_result
 
 let record_block_inclusion_time ~time_controller ~consensus_constants block =
-  let transition_time =
+  let transition_block_time =
     block |> Mina_block.Validated.header |> Mina_block.Header.protocol_state
     |> Protocol_state.consensus_state
     |> Consensus.Data.Consensus_state.consensus_time
   in
+  let transition_time =
+    Consensus.Data.Consensus_time.to_time ~constants:consensus_constants
+      transition_block_time
+  in
   let time_elapsed =
-    Block_time.diff
-      (Block_time.now time_controller)
-      (Consensus.Data.Consensus_time.to_time ~constants:consensus_constants
-         transition_time )
+    Block_time.diff (Block_time.now time_controller) transition_time
   in
   Mina_metrics.Block_latency.Inclusion_time.update
-    (Block_time.Span.to_time_span time_elapsed)
+    (Block_time.Span.to_time_span time_elapsed) ;
+  transition_time
 
 type broadcast_actions =
   { broadcast : Mina_block.Validated.t -> unit
@@ -170,8 +172,9 @@ let add_and_finalize ~broadcast_actions ~logger ~frontier ~catchup_scheduler
   | `Internal ->
       ()
   | _ ->
-      record_block_inclusion_time transition ~time_controller
-        ~consensus_constants ) ;
+      ignore
+      @@ record_block_inclusion_time transition ~time_controller
+           ~consensus_constants ) ;
   [%log internal] "Add_and_finalize_done" ;
   handle_broadcasts ~logger ~time_controller ~consensus_constants
     ~broadcast_actions transition source valid_cbs ;

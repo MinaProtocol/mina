@@ -620,7 +620,7 @@ let initial_validate ~context:(module Context : CONTEXT) ~trust_system
           | Remote peer ->
               Trust_system.(
                 record trust_system logger peer
-                  Actions.(Sent_invalid_proof, None))
+                  (Actions.Sent_invalid_proof, None))
         in
         let err =
           Error.tag err

@@ -497,6 +497,23 @@ let rec promote_to_higher_state ~context ~write_actions ~state ~actions
   >>| promote_to_higher_state ~context ~write_actions ~state ~actions
   |> value ~default:()
 
+let report_time_used_for type_ span =
+  let gauge =
+    let open Mina_metrics.Catchup in
+    match type_ with
+    | `Download ->
+        download_time
+    | `Initial_catchup ->
+        initial_catchup_time
+    | `Block_proof ->
+        initial_validation_time
+    | `Complete_work_proof ->
+        verification_time
+    | `Breadcrumb_build ->
+        build_breadcrumb_time
+  in
+  Mina_metrics.Gauge.set gauge (Time.Span.to_ms span)
+
 (** 
 Returns [Misc.actions] object with [mark_invalid] and [mark_processed_and_promote] fields.
 
@@ -573,6 +590,7 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
     let check_body_in_storage = Block_storage.read_body block_storage
 
     let download_body ~header ~preferred_peers (module I : Interruptible.F) =
+      let start_time = Time.now () in
       let body_reference =
         With_hash.data header |> Mina_block.Header.protocol_state
         |> Mina_state.(
@@ -607,6 +625,7 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
           (Mina_stdlib.Nonempty_list.singleton meta)
           (module I)
       in
+      report_time_used_for `Download Time.(diff (now ()) start_time) ;
       match Mina_stdlib.Nonempty_list.head res with
       | `Block bh, _ ->
           let body = Mina_block.body (With_hash.data bh) in
@@ -625,12 +644,17 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
 
     let build_breadcrumb ~received_at ~parent ~transition
         (module I : Interruptible.F) =
-      I.lift
-        ( Frontier_base.Breadcrumb.build_no_reporting
-            ~skip_staged_ledger_verification:`Proofs ~logger ~precomputed_values
-            ~get_completed_work ~verifier ~parent ~transition
-            ~transition_receipt_time:(Some received_at) ()
-        |> Deferred.Result.map_error ~f:convert_breadcrumb_error )
+      let start_time = Time.now () in
+      let%map.I.Result res =
+        I.lift
+          ( Frontier_base.Breadcrumb.build_no_reporting
+              ~skip_staged_ledger_verification:`Proofs ~logger
+              ~precomputed_values ~verifier ~get_completed_work ~parent
+              ~transition ~transition_receipt_time:(Some received_at) ()
+          |> Deferred.Result.map_error ~f:convert_breadcrumb_error )
+      in
+      report_time_used_for `Breadcrumb_build Time.(diff (now ()) start_time) ;
+      res
 
     let retrieve_chain ~some_ancestors ~canopy ~target_hash ~target_length
         ~preferred_peers ~lookup_transition (module I : Interruptible.F) =
@@ -651,11 +675,13 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
           let preferred_peers =
             preferred_peers @ Mina_stdlib.Nonempty_list.to_list senders
           in
+          let start_time = Time.now () in
           let%map.I.Result res =
             download_ancestors ~preferred_peers ~lookup_transition ~network
               ~config:catchup_config metas
               (module I)
           in
+          report_time_used_for `Download Time.(diff (now ()) start_time) ;
           (* Invariant: |metas| = |senders| = |res| *)
           let f default = Tuple2.map_snd ~f:(Option.value ~default) in
           match Mina_stdlib.Nonempty_list.map2 ~f senders res with
@@ -693,11 +719,13 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
           in
           match lookup_transition (Mina_stdlib.Nonempty_list.head hashes) with
           | `Present when List.is_empty headers ->
+              let start_time = Time.now () in
               let%map.I.Result res =
                 download_ancestors ~preferred_peers:(peer :: preferred_peers)
                   ~lookup_transition ~network ~config:catchup_config hash_metas
                   (module I)
               in
+              report_time_used_for `Download Time.(diff (now ()) start_time) ;
               Mina_stdlib.Nonempty_list.map res
                 ~f:(Tuple2.map_snd ~f:(Option.value ~default:peer))
           | _ ->
@@ -709,12 +737,23 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
       in
       State_hash.With_state_hashes.state_hash genesis_protocol_state
 
-    let verify_blockchain_proofs (module I : Interruptible.F) =
-      Fn.compose I.lift
-      @@ Mina_block.Validation.validate_proofs ~verifier ~genesis_state_hash
+    let verify_blockchain_proofs (module I : Interruptible.F) headers =
+      let start_time = Time.now () in
+      let%map.I.Result res =
+        I.lift
+        @@ Mina_block.Validation.validate_proofs ~verifier ~genesis_state_hash
+             headers
+      in
+      report_time_used_for `Block_proof Time.(diff (now ()) start_time) ;
+      res
 
-    let verify_transaction_proofs (module I : Interruptible.F) =
-      Fn.compose I.lift @@ Verifier.verify_transaction_snarks verifier
+    let verify_transaction_proofs (module I : Interruptible.F) works =
+      let start_time = Time.now () in
+      let%map.I.Result res =
+        I.lift @@ Verifier.verify_transaction_snarks verifier works
+      in
+      report_time_used_for `Complete_work_proof Time.(diff (now ()) start_time) ;
+      res
 
     let processed_dsu = Processed_skipping.Dsu.create ()
 
@@ -905,6 +944,7 @@ let run ~frontier ~(on_bitswap_update_ref : Mina_net2.on_bitswap_update_t ref)
   on_bitswap_update_ref :=
     on_bitswap_update ~context ~actions ~body_reference_to_state_hash
       ~transition_states ;
+  let initial_catchup_trigger = ref (Some (Block_time.now time_controller)) in
   List.iter collected_transitions ~f:(fun transition_tuple ->
       Received.handle_collected_transition ~context ~actions ~state
         transition_tuple
@@ -1009,10 +1049,19 @@ let run ~frontier ~(on_bitswap_update_ref : Mina_net2.on_bitswap_update_t ref)
            | `Internal ->
                ()
            | _ ->
-               Transition_handler.Processor.record_block_inclusion_time
-                 (Frontier_base.Breadcrumb.validated_transition b)
-                 ~time_controller
-                 ~consensus_constants:Context.consensus_constants ) ;
+               let transition_time =
+                 Transition_handler.Processor.record_block_inclusion_time
+                   (Frontier_base.Breadcrumb.validated_transition b)
+                   ~time_controller
+                   ~consensus_constants:Context.consensus_constants
+               in
+               Option.iter !initial_catchup_trigger ~f:(fun start_time ->
+                   if Block_time.(start_time < transition_time) then (
+                     initial_catchup_trigger := None ;
+                     let now_ = Block_time.now time_controller in
+                     report_time_used_for `Initial_catchup
+                       Block_time.(Span.to_time_span @@ diff now_ start_time) ) )
+           ) ;
            let state_hash = Frontier_base.Breadcrumb.state_hash b in
            Transition_states.find transition_states state_hash
            |> Option.value_exn
