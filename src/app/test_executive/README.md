@@ -4,7 +4,7 @@
 
 ![Mina and Lucy](https://user-images.githubusercontent.com/3465290/213062809-f4bb13a7-9620-464d-9f8a-708126d37393.png)
 | :--: | 
-*My dearest Mina, we have told all our secrets to each other since we were children; we have slept together and eaten together, and laughed and cried together; and now, though I have spoken, I would like to speak more.* ~excerpt from Dracula, by Bram Stoker; Chapter V: LETTER, LUCY WESTENRA TO MINA MURRAY
+*My dearest Mina, we have told all our secrets to each other since we were children; we have slept together and eaten together, and laughed and cried together; and now, though I have spoken, I would like to speak more.* ~excerpt from *Dracula*, by Bram Stoker; Chapter V: LETTER, LUCY WESTENRA TO MINA MURRAY
 
 
 **Lucy** is the name of Mina Protocol's fully end-to-end integration testing framework, developed in-house by O(1) Labs.  This piece of software is a standalone testing tool, and was previously known as simply "the integration testing framework" and sometimes as "the test executive".
@@ -19,7 +19,7 @@ Given this, the solution, therefore, is quite clear: we must spin up from scratc
 
 ![we are all good christian victorian women here](https://user-images.githubusercontent.com/3465290/213062888-6fd82ec4-7e96-4b5a-bbc4-926f8b9cde79.png)
 |:--:|
-*Leave these others and come to me. My arms are hungry for you. Come, and we can rest together. Come, my husband, come!* ~excerpt from Dracula, by Bram Stoker; Chapter XVI: DR SEWARD’S DIARY *(continued)*
+*Leave these others and come to me. My arms are hungry for you. Come, and we can rest together. Come, my husband, come!* ~excerpt from *Dracula*, by Bram Stoker; Chapter XVI: DR SEWARD’S DIARY *(continued)*
 
 Lucy is of course named after the character Lucy Westerna from Bram Stoker's Dracula.  Lucy is Mina Harker née Murray's ["best friend"](https://www.youtube.com/watch?v=VbbRQj8Oi2k), who sapphically and figuratively [tests Mina's virtues](https://archiveofourown.org/tags/Mina%20Murray%20Harker*s*Lucy%20Westenra/works) (and the virtues of the other characters in the novel but no one cares about them), so naturally we thought this would be an appropriate name for an integration testing framework which tests the Mina Protocol.
 
@@ -315,8 +315,5 @@ alias logproc=./_build/default/src/app/logproc/logproc.exe
 - Exit code `20` will be returned if any testnet nodes hard timed-out on initialization
 
 ![totally heterosexual and entirely becoming of good christian victorian woman behavior](https://user-images.githubusercontent.com/3465290/213062986-35ab48cc-d57f-4348-bda2-a8a504944cb5.png)
-|:--:|
-...and so, as you love me, and he loves me, and I love you with all the moods and tenses of the verb... Goodbye, my dearest Lucy, and all blessings on you.
-Yours,
-Mina Harker
-~excerpt from Dracula, by Bram Stoker; Chapter XII: LETTER, MINA HARKER TO LUCY WESTENRA *(Unopened by her)*
+|---|
+*...and so, as you love me, and he loves me, and I love you with all the moods and tenses of the verb... Goodbye, my dearest Lucy, and all blessings on you.<br/>Yours,<br/>Mina Harker* <br/>~excerpt from *Dracula*, by Bram Stoker; Chapter XII: LETTER, MINA HARKER TO LUCY WESTENRA *(Unopened by her)*
