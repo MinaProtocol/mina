@@ -646,7 +646,7 @@ let get_snarked_ledger t state_hash_opt =
                   match
                     List.fold_until ~init:(Ok ())
                       (Mina_stdlib.Nonempty_list.to_list txns)
-                      ~f:(fun _acc (txn, state_hash) ->
+                      ~f:(fun _acc (txn, state_hash, global_slot) ->
                         (*Validate transactions against the protocol state associated with the transaction*)
                         match
                           Transition_frontier.find_protocol_state frontier
@@ -658,7 +658,7 @@ let get_snarked_ledger t state_hash_opt =
                               |> Mina_state.Protocol_state.Body.view
                             in
                             match
-                              Ledger.apply_transaction
+                              Ledger.apply_transaction ~global_slot
                                 ~constraint_constants:
                                   t.config.precomputed_values
                                     .constraint_constants ~txn_state_view ledger

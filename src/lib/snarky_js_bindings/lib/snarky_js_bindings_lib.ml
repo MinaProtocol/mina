@@ -1559,15 +1559,11 @@ module Circuit = struct
     let digest =
       Backend.R1CS_constraint_system.digest cs |> Md5.to_hex |> Js.string
     in
-    (* TODO: to_json doesn't return anything; call into kimchi instead *)
     let json =
       Js.Unsafe.(
         fun_call
           global ##. JSON##.parse
-          [| inject
-               ( Backend.R1CS_constraint_system.to_json cs
-               |> Yojson.Safe.to_string |> Js.string )
-          |])
+          [| inject (Backend.R1CS_constraint_system.to_json cs |> Js.string) |])
     in
     object%js
       val rows = rows
@@ -2461,6 +2457,7 @@ module Ledger = struct
     { edit_state = None
     ; send = None
     ; receive = None
+    ; access = None
     ; set_delegate = None
     ; set_permissions = None
     ; set_verification_key = None
@@ -3104,7 +3101,9 @@ module Ledger = struct
     check_account_update_signatures txn ;
     let ledger = l##.value in
     let application_result =
-      T.apply_zkapp_command_unchecked ~state_view:network_state
+      T.apply_zkapp_command_unchecked
+        ~global_slot:network_state.global_slot_since_genesis
+        ~state_view:network_state
         ~constraint_constants:
           { Genesis_constants.Constraint_constants.compiled with
             account_creation_fee = Currency.Fee.of_string account_creation_fee

@@ -1167,8 +1167,13 @@ struct
             | None ->
                 Error Diff_error.Fee_payer_account_not_found
             | Some account ->
-                if not (Account.has_permission ~to_:`Send account) then
-                  Error Diff_error.Fee_payer_not_permitted_to_send
+                if
+                  not
+                    ( Account.has_permission ~to_:`Access
+                        ~control:Control.Tag.Signature account
+                    && Account.has_permission ~to_:`Send
+                         ~control:Control.Tag.Signature account )
+                then Error Diff_error.Fee_payer_not_permitted_to_send
                 else Ok ()
         in
         let pool, add_results =
@@ -1785,6 +1790,7 @@ let%test_module _ =
                     ( if Option.is_none fee_payer then
                       Account.Nonce.succ sender_nonce
                     else sender_nonce )
+              ; valid_while = Ignore
               }
         }
       in
@@ -1992,7 +1998,9 @@ let%test_module _ =
               let applied, _ =
                 Or_error.ok_exn
                 @@ Mina_ledger.Ledger.apply_zkapp_command_unchecked
-                     ~constraint_constants ~state_view:dummy_state_view ledger p
+                     ~constraint_constants
+                     ~global_slot:dummy_state_view.global_slot_since_genesis
+                     ~state_view:dummy_state_view ledger p
               in
               match With_status.status applied.command with
               | Failed failures ->
