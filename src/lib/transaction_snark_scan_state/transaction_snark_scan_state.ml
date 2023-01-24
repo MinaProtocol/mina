@@ -213,9 +213,6 @@ let create_expected_statement ~constraint_constants
   let { With_status.data = transaction; status = _ } =
     Ledger.Transaction_applied.transaction transaction_with_info
   in
-  let zkapp_updates_applied =
-    Ledger.Transaction_applied.zkapp_updates_applied transaction_with_info
-  in
   let%bind protocol_state = get_state (fst state_hash) in
   let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
   let empty_local_state = Mina_state.Local_state.empty () in
@@ -283,7 +280,6 @@ let create_expected_statement ~constraint_constants
   ; fee_excess
   ; supply_increase
   ; sok_digest = ()
-  ; zkapp_updates_applied
   }
 
 let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
@@ -604,7 +600,6 @@ struct
           ; connecting_ledger_right = _
           ; supply_increase = _
           ; sok_digest = ()
-          ; zkapp_updates_applied = _
           } as t ) ->
         let open Or_error.Let_syntax in
         let%map () =

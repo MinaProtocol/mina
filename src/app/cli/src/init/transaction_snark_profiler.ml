@@ -618,9 +618,6 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
                       let sgn = Sgn.Pos in
                       Currency.Amount.Signed.create ~magnitude ~sgn )
                  ; fee_excess = Transaction.fee_excess txn |> Or_error.ok_exn
-                 ; zkapp_updates_applied =
-                     Mina_ledger.Ledger.Transaction_applied
-                     .zkapp_updates_applied applied
                  }
                ~init_stack:coinbase_stack_source
                { Transaction_protocol_state.Poly.transaction = valid_txn

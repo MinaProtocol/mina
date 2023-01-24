@@ -8,8 +8,7 @@ module Poly = struct
          , 'signed_amount
          , 'pending_coinbase_stack
          , 'fee_excess
-         , 'sok_digest
-         , 'bool )
+         , 'sok_digest )
          t =
       { staged_ledger_hash : 'staged_ledger_hash
       ; genesis_ledger_hash : 'snarked_ledger_hash
@@ -19,8 +18,7 @@ module Poly = struct
           , 'pending_coinbase_stack
           , 'fee_excess
           , 'sok_digest
-          , 'local_state
-          , 'bool )
+          , 'local_state )
           Mina_state_snarked_ledger_state.Poly.V2.t
       ; timestamp : 'time
       ; body_reference : 'body_reference
@@ -39,8 +37,7 @@ module Value = struct
       , (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
       , Mina_base.Pending_coinbase.Stack_versioned.V1.t
       , Mina_base.Fee_excess.V1.t
-      , Mina_base.Sok_message.Digest.V1.t
-      , bool )
+      , Mina_base.Sok_message.Digest.V1.t )
       Poly.V2.t
   end
 end

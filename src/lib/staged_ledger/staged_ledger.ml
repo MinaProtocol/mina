@@ -631,8 +631,6 @@ module T = struct
       ; fee_excess = pre_stmt.fee_excess
       ; supply_increase
       ; sok_digest = ()
-      ; zkapp_updates_applied =
-          Ledger.Transaction_applied.zkapp_updates_applied applied_txn
       }
     in
     { Scan_state.Transaction_with_witness.transaction_with_info = applied_txn

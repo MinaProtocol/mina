@@ -15,8 +15,7 @@ module Poly : sig
            , 'signed_amount
            , 'pending_coinbase_stack
            , 'fee_excess
-           , 'sok_digest
-           , 'bool )
+           , 'sok_digest )
            t =
             ( 'staged_ledger_hash
             , 'snarked_ledger_hash
@@ -26,8 +25,7 @@ module Poly : sig
             , 'signed_amount
             , 'pending_coinbase_stack
             , 'fee_excess
-            , 'sok_digest
-            , 'bool )
+            , 'sok_digest )
             Mina_wire_types.Mina_state.Blockchain_state.Poly.V2.t =
         { staged_ledger_hash : 'staged_ledger_hash
         ; genesis_ledger_hash : 'snarked_ledger_hash
@@ -37,8 +35,7 @@ module Poly : sig
             , 'pending_coinbase_stack
             , 'fee_excess
             , 'sok_digest
-            , 'local_state
-            , 'bool )
+            , 'local_state )
             Snarked_ledger_state.Poly.Stable.V2.t
         ; timestamp : 'time
         ; body_reference : 'body_reference
@@ -61,8 +58,7 @@ module Value : sig
         , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
         , Pending_coinbase.Stack_versioned.Stable.V1.t
         , Fee_excess.Stable.V1.t
-        , Sok_message.Digest.Stable.V1.t
-        , bool )
+        , Sok_message.Digest.Stable.V1.t )
         Poly.Stable.V2.t
       [@@deriving sexp, equal, compare, hash, yojson]
 
@@ -82,24 +78,21 @@ include
       , Currency.Amount.Signed.var
       , Pending_coinbase.Stack.var
       , Fee_excess.var
-      , Sok_message.Digest.Checked.t
-      , Boolean.var )
+      , Sok_message.Digest.Checked.t )
       Poly.t
      and type value := Value.t
 
 val staged_ledger_hash :
-  ('staged_ledger_hash, _, _, _, _, _, _, _, _, _) Poly.t -> 'staged_ledger_hash
+  ('staged_ledger_hash, _, _, _, _, _, _, _, _) Poly.t -> 'staged_ledger_hash
 
 val snarked_ledger_hash :
-     (_, 'snarked_ledger_hash, _, _, _, _, _, _, _, _) Poly.t
-  -> 'snarked_ledger_hash
+  (_, 'snarked_ledger_hash, _, _, _, _, _, _, _) Poly.t -> 'snarked_ledger_hash
 
 val snarked_local_state :
-  (_, _, 'local_state, _, _, _, _, _, _, _) Poly.t -> 'local_state
+  (_, _, 'local_state, _, _, _, _, _, _) Poly.t -> 'local_state
 
 val genesis_ledger_hash :
-     (_, 'snarked_ledger_hash, _, _, _, _, _, _, _, _) Poly.t
-  -> 'snarked_ledger_hash
+  (_, 'snarked_ledger_hash, _, _, _, _, _, _, _) Poly.t -> 'snarked_ledger_hash
 
 val ledger_proof_statement :
      ( _
@@ -110,21 +103,19 @@ val ledger_proof_statement :
      , 'signed_amount
      , 'pending_coinbase_stack
      , 'fee_excess
-     , 'sok_digest
-     , 'bool )
+     , 'sok_digest )
      Poly.t
   -> ( 'snarked_ledger_hash
      , 'signed_amount
      , 'pending_coinbase_stack
      , 'fee_excess
      , 'sok_digest
-     , 'local_state
-     , 'bool )
+     , 'local_state )
      Snarked_ledger_state.Poly.t
 
-val timestamp : (_, _, _, 'time, _, _, _, _, _, _) Poly.t -> 'time
+val timestamp : (_, _, _, 'time, _, _, _, _, _) Poly.t -> 'time
 
-val body_reference : (_, _, _, _, 'ref, _, _, _, _, _) Poly.t -> 'ref
+val body_reference : (_, _, _, _, 'ref, _, _, _, _) Poly.t -> 'ref
 
 val create_value :
      staged_ledger_hash:Staged_ledger_hash.t
@@ -157,8 +148,7 @@ val set_timestamp :
      , 'signed_amount
      , 'pending_coinbase_stack
      , 'fee_excess
-     , 'sok_digest
-     , 'bool )
+     , 'sok_digest )
      Poly.t
   -> 'time
   -> ( 'staged_ledger_hash
@@ -169,8 +159,7 @@ val set_timestamp :
      , 'signed_amount
      , 'pending_coinbase_stack
      , 'fee_excess
-     , 'sok_digest
-     , 'bool )
+     , 'sok_digest )
      Poly.t
 
 val to_input : Value.t -> Field.t Random_oracle.Input.Chunked.t
@@ -186,8 +175,7 @@ type display =
   , string
   , string
   , string
-  , string
-  , bool )
+  , string )
   Poly.t
 [@@deriving yojson]
 

@@ -69,8 +69,7 @@ module type Full = sig
              , 'pending_coinbase
              , 'fee_excess
              , 'sok_digest
-             , 'local_state
-             , 'bool )
+             , 'local_state )
              t =
           { source :
               ( 'ledger_hash
@@ -86,7 +85,6 @@ module type Full = sig
           ; connecting_ledger_right : 'ledger_hash
           ; supply_increase : 'amount
           ; fee_excess : 'fee_excess
-          ; zkapp_updates_applied : 'bool
           ; sok_digest : 'sok_digest
           }
         [@@deriving compare, equal, hash, sexp, yojson]
@@ -105,14 +103,12 @@ module type Full = sig
       -> connecting_ledger_right:'ledger_hash
       -> pending_coinbase_stack_state:
            'pending_coinbase Pending_coinbase_stack_state.poly
-      -> zkapp_updates_applied:'bool
       -> ( 'ledger_hash
          , 'amount
          , 'pending_coinbase
          , 'fee_excess
          , 'sok_digest
-         , Mina_transaction_logic.Zkapp_command_logic.Local_state.Value.t
-         , 'bool )
+         , Mina_transaction_logic.Zkapp_command_logic.Local_state.Value.t )
          t
   end
 
@@ -127,7 +123,7 @@ module type Full = sig
       }
     [@@deriving compare, equal, hash, sexp, yojson]
 
-    val of_statement : ('a, _, _, _, _, _, _) Poly.t -> 'a t
+    val of_statement : ('a, _, _, _, _, _) Poly.t -> 'a t
   end
 
   [%%versioned:
@@ -139,8 +135,7 @@ module type Full = sig
         , Pending_coinbase.Stack_versioned.Stable.V1.t
         , Fee_excess.Stable.V1.t
         , unit
-        , Local_state.Stable.V1.t
-        , bool )
+        , Local_state.Stable.V1.t )
         Poly.Stable.V2.t
       [@@deriving compare, equal, hash, sexp, yojson]
     end
@@ -152,8 +147,7 @@ module type Full = sig
     , Pending_coinbase.Stack.var
     , Fee_excess.var
     , unit
-    , Local_state.Checked.t
-    , Tick.Boolean.var )
+    , Local_state.Checked.t )
     Poly.t
 
   val typ : (var, t) Tick.Typ.t
@@ -168,15 +162,14 @@ module type Full = sig
           , Pending_coinbase.Stack_versioned.Stable.V1.t
           , Fee_excess.Stable.V1.t
           , Sok_message.Digest.Stable.V1.t
-          , Local_state.Stable.V1.t
-          , bool )
+          , Local_state.Stable.V1.t )
           Poly.Stable.V2.t
         [@@deriving compare, equal, hash, sexp, yojson]
       end
     end]
 
     type display =
-      (string, string, string, string, string, Local_state.display, bool) Poly.t
+      (string, string, string, string, string, Local_state.display) Poly.t
 
     val display : Stable.Latest.t -> display
 
@@ -188,8 +181,7 @@ module type Full = sig
       , Pending_coinbase.Stack.var
       , Fee_excess.var
       , Sok_message.Digest.Checked.t
-      , Local_state.Checked.t
-      , Tick.Boolean.var )
+      , Local_state.Checked.t )
       Poly.t
 
     open Tick

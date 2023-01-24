@@ -42,8 +42,7 @@ module type Blockchain_state = sig
          , 'signed_amount
          , 'pending_coinbase_stack
          , 'fee_excess
-         , 'sok_digest
-         , 'bool )
+         , 'sok_digest )
          t
     [@@deriving sexp]
   end
@@ -58,8 +57,7 @@ module type Blockchain_state = sig
       , Amount.Signed.t
       , Pending_coinbase.Stack_versioned.Stable.V1.t
       , Fee_excess.Stable.V1.t
-      , Sok_message.Digest.Stable.V1.t
-      , bool )
+      , Sok_message.Digest.Stable.V1.t )
       Poly.t
     [@@deriving sexp]
   end
@@ -73,26 +71,22 @@ module type Blockchain_state = sig
     , Currency.Amount.Signed.var
     , Pending_coinbase.Stack.var
     , Fee_excess.var
-    , Sok_message.Digest.Checked.t
-    , Snark_params.Tick.Boolean.var )
+    , Sok_message.Digest.Checked.t )
     Poly.t
 
   val staged_ledger_hash :
-       ('staged_ledger_hash, _, _, _, _, _, _, _, _, _) Poly.t
-    -> 'staged_ledger_hash
+    ('staged_ledger_hash, _, _, _, _, _, _, _, _) Poly.t -> 'staged_ledger_hash
 
   val snarked_ledger_hash :
-       (_, 'frozen_ledger_hash, _, _, _, _, _, _, _, _) Poly.t
-    -> 'frozen_ledger_hash
+    (_, 'frozen_ledger_hash, _, _, _, _, _, _, _) Poly.t -> 'frozen_ledger_hash
 
   val genesis_ledger_hash :
-       (_, 'frozen_ledger_hash, _, _, _, _, _, _, _, _) Poly.t
-    -> 'frozen_ledger_hash
+    (_, 'frozen_ledger_hash, _, _, _, _, _, _, _) Poly.t -> 'frozen_ledger_hash
 
-  val timestamp : (_, _, _, 'time, _, _, _, _, _, _) Poly.t -> 'time
+  val timestamp : (_, _, _, 'time, _, _, _, _, _) Poly.t -> 'time
 
   val body_reference :
-    (_, _, _, _, 'body_reference, _, _, _, _, _) Poly.t -> 'body_reference
+    (_, _, _, _, 'body_reference, _, _, _, _) Poly.t -> 'body_reference
 end
 
 module type Protocol_state = sig
