@@ -2,7 +2,6 @@
 open Core_kernel
 open Mina_base
 open Transaction_logic_intf
-
 module Local_state = Local_state
 
 module Eff = struct
