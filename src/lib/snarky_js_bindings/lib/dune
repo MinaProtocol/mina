@@ -16,6 +16,7 @@
   h_list
   pickles
   pickles.backend
+  pickles_base
   pickles.limb_vector
   pickles_types
   kimchi_backend

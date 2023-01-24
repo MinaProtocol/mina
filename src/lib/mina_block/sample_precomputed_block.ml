@@ -905,12 +905,6 @@ let sample_block_json =
         {
           "public_key": "B62qpkCEM5N5ddVsYNbFtwWV4bsT9AwuUJXoehFhHUbYYvZ6j3fXt93",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "1000000000000",
           "nonce": "1",
@@ -928,6 +922,9 @@ let sample_block_json =
               "Signature"
             ],
             "receive": [
+              "None"
+            ],
+            "access": [
               "None"
             ],
             "set_delegate": [
@@ -963,12 +960,6 @@ let sample_block_json =
         {
           "public_key": "B62qrA2eWb592uRLtH5ohzQnx7WTLYp2jGirCw5M7Fb9gTf1RrvTPqX",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "98999999999",
           "nonce": "1",
@@ -981,6 +972,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1021,12 +1015,6 @@ let sample_block_json =
         {
           "public_key": "B62qpaA93gHfmvNoH9DLGgxreGnijhh5aui4duxiV3foX4p5ay5RNis",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "1001000000001",
           "nonce": "0",
@@ -1039,6 +1027,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1079,12 +1070,6 @@ let sample_block_json =
         {
           "public_key": "B62qp5sdhH48MurWgtHNkXUTphEmUfcKVmZFspYAqxcKZ7YxaPF1pyF",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "998999999999",
           "nonce": "1",
@@ -1097,6 +1082,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1137,12 +1125,6 @@ let sample_block_json =
         {
           "public_key": "B62qqMGFkBEtgGs2Gi6AWd1Abn9yzXdj5HRMzm95uwbJ8Wa88C7urCD",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "1001000000001",
           "nonce": "0",
@@ -1155,6 +1137,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1195,12 +1180,6 @@ let sample_block_json =
         {
           "public_key": "B62qpgjtMzVpodthL3kMfXAAzzv1kgGZRMEeLv592u4hSVQKCzTGLvA",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "998999999999",
           "nonce": "1",
@@ -1213,6 +1192,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1253,12 +1235,6 @@ let sample_block_json =
         {
           "public_key": "B62qkYgXYkzT5fuPNhMEHk8ouiThjNNDSTMnpBAuaf6q7pNnCFkUqtz",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "1001000000001",
           "nonce": "0",
@@ -1271,6 +1247,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1311,12 +1290,6 @@ let sample_block_json =
         {
           "public_key": "B62qr4GMdg4ZVk1Y6BXaDHxgFRtCsZm2sZiyn7PCmubTZnAi3iZDDxq",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "998999999999",
           "nonce": "1",
@@ -1329,6 +1302,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1369,12 +1345,6 @@ let sample_block_json =
         {
           "public_key": "B62qji8zLZEuMUpZnRN3FHgsgnybYhhMFBBMcLAwGGLR3hTdfkhmM4X",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "1001000000001",
           "nonce": "0",
@@ -1387,6 +1357,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1427,12 +1400,6 @@ let sample_block_json =
         {
           "public_key": "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "10000000000000000",
           "nonce": "1",
@@ -1445,6 +1412,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1485,12 +1455,6 @@ let sample_block_json =
         {
           "public_key": "B62qqR5XfP9CoC5DALUJX2jBoY6aaoLrN46YpM2NQTSV14qgpoWibL7",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "1000000000000",
           "nonce": "1",
@@ -1503,6 +1467,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1543,12 +1510,6 @@ let sample_block_json =
         {
           "public_key": "B62qpPjYco6oESJyGjdFNjmBnwEyzsujJ785aMAzygzSF4X9g4g1uEo",
           "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
-          "token_permissions": [
-            "Not_owned",
-            {
-              "account_disabled": false
-            }
-          ],
           "token_symbol": "",
           "balance": "1040000000000",
           "nonce": "0",
@@ -1561,6 +1522,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"

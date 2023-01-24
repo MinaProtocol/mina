@@ -56,6 +56,7 @@ let%test_module "Transaction union tests" =
       let user_command_in_block =
         { Transaction_protocol_state.Poly.transaction = user_command
         ; block_data = state_body
+        ; global_slot = current_global_slot
         }
       in
       let user_command_supply_increase = Currency.Amount.Signed.zero in
@@ -82,6 +83,10 @@ let%test_module "Transaction union tests" =
         Public_key.(compress (of_private_key_exn (Private_key.create ())))
       in
       let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
+      let global_slot =
+        Mina_state.Protocol_state.Body.consensus_state state_body
+        |> Consensus.Data.Consensus_state.global_slot_since_genesis
+      in
       let producer = mk_pubkey () in
       let producer_id = Account_id.create producer Token_id.default in
       let receiver = mk_pubkey () in
@@ -103,15 +108,18 @@ let%test_module "Transaction union tests" =
       let source_stack =
         if carryforward then
           Pending_coinbase.Stack.(
-            push_state state_body_hash pending_coinbase_init)
+            push_state state_body_hash global_slot pending_coinbase_init)
         else pending_coinbase_init
       in
       let pending_coinbase_stack_target =
         U.pending_coinbase_stack_target transaction U.genesis_state_body_hash
-          pending_coinbase_init
+          Mina_numbers.Global_slot.zero pending_coinbase_init
       in
       let txn_in_block =
-        { Transaction_protocol_state.Poly.transaction; block_data = state_body }
+        { Transaction_protocol_state.Poly.transaction
+        ; block_data = state_body
+        ; global_slot
+        }
       in
       Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
           Ledger.create_new_account_exn ledger producer_id
@@ -123,7 +131,8 @@ let%test_module "Transaction union tests" =
           let sparse_ledger_after, applied_transaction =
             Result.( >>= )
               (Sparse_ledger.apply_transaction_first_pass
-                 ~constraint_constants:U.constraint_constants sparse_ledger
+                 ~constraint_constants:U.constraint_constants ~global_slot
+                 sparse_ledger
                  ~txn_state_view:
                    ( txn_in_block.block_data
                    |> Mina_state.Protocol_state.Body.view )
@@ -201,7 +210,7 @@ let%test_module "Transaction union tests" =
               let pending_coinbase_stack = Pending_coinbase.Stack.empty in
               let pending_coinbase_stack_target =
                 U.pending_coinbase_stack_target (Command (Signed_command t1))
-                  state_body_hash pending_coinbase_stack
+                  state_body_hash current_global_slot pending_coinbase_stack
               in
               let pending_coinbase_stack_state =
                 { Transaction_snark.Pending_coinbase_stack_state.source =
@@ -223,7 +232,10 @@ let%test_module "Transaction union tests" =
                 ~target_first_pass_ledger ~init_stack:pending_coinbase_stack
                 ~pending_coinbase_stack_state
                 ~supply_increase:user_command_supply_increase
-                { transaction = t1; block_data = state_body }
+                { transaction = t1
+                ; block_data = state_body
+                ; global_slot = current_global_slot
+                }
                 (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
     let account_fee =
@@ -378,7 +390,15 @@ let%test_module "Transaction union tests" =
           (*let state_body = Lazy.force state_body in
             let state_body_hash = Lazy.force state_body_hash in*)
           let state_body_hash1, state_body1 = state_hash_and_body1 in
+          let global_slot1 =
+            Mina_state.Protocol_state.Body.consensus_state state_body1
+            |> Consensus.Data.Consensus_state.global_slot_since_genesis
+          in
           let state_body_hash2, state_body2 = state_hash_and_body2 in
+          let global_slot2 =
+            Mina_state.Protocol_state.Body.consensus_state state_body2
+            |> Consensus.Data.Consensus_state.global_slot_since_genesis
+          in
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               Array.iter wallets ~f:(fun { account; private_key = _ } ->
                   Ledger.create_new_account_exn ledger
@@ -422,7 +442,8 @@ let%test_module "Transaction union tests" =
               let pending_coinbase_stack_state1 =
                 (* No coinbase to add to the stack. *)
                 let stack_with_state =
-                  Pending_coinbase.Stack.push_state state_body_hash1 init_stack1
+                  Pending_coinbase.Stack.push_state state_body_hash1
+                    global_slot1 init_stack1
                 in
                 (* Since protocol state body is added once per block, the
                    source would already have the state if [carryforward=true]
@@ -458,7 +479,7 @@ let%test_module "Transaction union tests" =
                 let previous_stack = pending_coinbase_stack_state1.pc.target in
                 let stack_with_state2 =
                   Pending_coinbase.Stack.(
-                    push_state state_body_hash2 previous_stack)
+                    push_state state_body_hash2 global_slot2 previous_stack)
                 in
                 (* No coinbase to add. *)
                 let source_stack, target_stack, init_stack, state_body2 =

@@ -91,22 +91,24 @@ let apply_user_command ~constraint_constants ~txn_global_slot =
   apply_transaction_logic
     (T.apply_user_command ~constraint_constants ~txn_global_slot)
 
-let apply_transaction_first_pass ~constraint_constants ~txn_state_view =
+let apply_transaction_first_pass ~constraint_constants ~global_slot
+    ~txn_state_view =
   apply_transaction_logic
-    (T.apply_transaction_first_pass ~constraint_constants ~txn_state_view)
+    (T.apply_transaction_first_pass ~constraint_constants ~global_slot
+       ~txn_state_view )
 
 let apply_transaction_second_pass =
   apply_transaction_logic T.apply_transaction_second_pass
 
-let apply_transactions ~constraint_constants ~txn_state_view =
+let apply_transactions ~constraint_constants ~global_slot ~txn_state_view =
   apply_transaction_logic
-    (T.apply_transactions ~constraint_constants ~txn_state_view)
+    (T.apply_transactions ~constraint_constants ~global_slot ~txn_state_view)
 
 let apply_zkapp_first_pass_unchecked_with_states ~constraint_constants
-    ~state_view ~fee_excess ~supply_increase ~first_pass_ledger
+    ~global_slot ~state_view ~fee_excess ~supply_increase ~first_pass_ledger
     ~second_pass_ledger c =
-  T.apply_zkapp_command_first_pass_aux ~constraint_constants ~state_view
-    ~fee_excess ~supply_increase (ref first_pass_ledger) c ~init:[]
+  T.apply_zkapp_command_first_pass_aux ~constraint_constants ~global_slot
+    ~state_view ~fee_excess ~supply_increase (ref first_pass_ledger) c ~init:[]
     ~f:(fun
          acc
          ( { first_pass_ledger
@@ -114,6 +116,7 @@ let apply_zkapp_first_pass_unchecked_with_states ~constraint_constants
            ; fee_excess
            ; supply_increase
            ; protocol_state
+           ; block_global_slot
            }
          , local_state )
        ->
@@ -122,6 +125,7 @@ let apply_zkapp_first_pass_unchecked_with_states ~constraint_constants
         ; fee_excess
         ; supply_increase
         ; protocol_state
+        ; block_global_slot
         }
       , { local_state with ledger = !(local_state.ledger) } )
       :: acc )
@@ -135,6 +139,7 @@ let apply_zkapp_second_pass_unchecked_with_states ~init ledger c =
            ; fee_excess
            ; supply_increase
            ; protocol_state
+           ; block_global_slot
            }
          , local_state )
        ->
@@ -143,6 +148,7 @@ let apply_zkapp_second_pass_unchecked_with_states ~init ledger c =
         ; fee_excess
         ; supply_increase
         ; protocol_state
+        ; block_global_slot
         }
       , { local_state with ledger = !(local_state.ledger) } )
       :: acc )

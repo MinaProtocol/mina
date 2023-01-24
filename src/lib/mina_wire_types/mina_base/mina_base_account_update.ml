@@ -4,6 +4,12 @@ module Authorization_kind = struct
   end
 end
 
+module Call_type = struct
+  module V1 = struct
+    type t = Call | Delegate_call
+  end
+end
+
 module Update = struct
   module Timing_info = struct
     module V1 = struct
@@ -54,6 +60,7 @@ module Preconditions = struct
     type t =
       { network : Mina_base_zkapp_precondition.Protocol_state.V1.t
       ; account : Account_precondition.V1.t
+      ; valid_while : Mina_base_zkapp_precondition.Valid_while.V1.t
       }
   end
 end
@@ -85,11 +92,12 @@ module Body = struct
           (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
       ; increment_nonce : bool
       ; events : Events'.V1.t
-      ; sequence_events : Events'.V1.t
+      ; actions : Events'.V1.t
       ; call_data : Pickles.Backend.Tick.Field.V1.t
       ; preconditions : Preconditions.V1.t
       ; use_full_commitment : bool
-      ; caller : Mina_base_token_id.V2.t
+      ; implicit_account_creation_fee : bool
+      ; call_type : Call_type.V1.t
       ; authorization_kind : Authorization_kind.V1.t
       }
   end
