@@ -649,45 +649,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let or_exn x = Option.value_exn x
     end
 
-    module Stack (Elt : sig
-      type t
-    end) =
-    struct
-      type t = Elt.t list
-
-      let if_ = value_if
-
-      let empty () = []
-
-      let is_empty = List.is_empty
-
-      let pop_exn : t -> Elt.t * t = function
-        | [] ->
-            failwith "pop_exn"
-        | x :: xs ->
-            (x, xs)
-
-      let pop : t -> (Elt.t * t) option = function
-        | x :: xs ->
-            Some (x, xs)
-        | _ ->
-            None
-
-      let push x ~onto : t = x :: onto
-    end
-
     module Call_forest = Zkapp_call_forest
-
-    module Stack_frame = struct
-      include Stack_frame
-
-      type t = value
-
-      let if_ = Zkapp_command.value_if
-
-      let make = Stack_frame.make
-    end
-
+    module Stack = Mina_stack.Make
+    module Stack_frame = Mina_stack.Frame
     module Call_stack = Stack (Stack_frame)
 
     module Local_state = struct
