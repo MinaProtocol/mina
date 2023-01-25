@@ -2519,10 +2519,26 @@ module For_tests = struct
                  Token_id.default )
             |> Or_error.ok_exn
           in
+          let permissions : Permissions.t =
+            { edit_state = Either
+            ; send = Either
+            ; receive = None
+            ; set_delegate = Either
+            ; set_permissions = Either
+            ; set_verification_key = Either
+            ; set_zkapp_uri = Either
+            ; edit_sequence_state = Either
+            ; set_token_symbol = Either
+            ; increment_nonce = Either
+            ; set_voting_for = Either
+            ; access = None
+            }
+          in
           L.set l loc
             { account with
               balance =
                 Currency.Balance.of_uint64 (Unsigned.UInt64.of_int64 amount)
+            ; permissions
             } )
 
     let gen () : t Quickcheck.Generator.t =
@@ -2676,7 +2692,7 @@ module For_tests = struct
                 ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
                 ; balance_change = Amount.Signed.(negate (of_unsigned amount))
-                ; increment_nonce = not use_full_commitment
+                ; increment_nonce = double_sender_nonce
                 ; events = []
                 ; actions = []
                 ; call_data = Snark_params.Tick.Field.zero
@@ -2684,15 +2700,18 @@ module For_tests = struct
                 ; preconditions =
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
-                    ; account = Nonce (Account.Nonce.succ actual_nonce)
+                    ; account = Accept
                     ; valid_while = Ignore
                     }
                 ; call_type = Call
                 ; use_full_commitment
                 ; implicit_account_creation_fee = true
-                ; authorization_kind = Signature
+                ; authorization_kind =
+                    (if use_full_commitment then Signature else Proof)
                 }
-            ; authorization = None_given
+            ; authorization =
+                ( if use_full_commitment then Signature Signature.dummy
+                else Proof Mina_base.Proof.transaction_dummy )
             }
           ; { body =
                 { public_key = receiver
@@ -2738,8 +2757,8 @@ module For_tests = struct
     let account_updates =
       Zkapp_command.Call_forest.map zkapp_command.account_updates
         ~f:(fun (account_update : Account_update.t) ->
-          match account_update.body.preconditions.account with
-          | Nonce _ ->
+          match account_update.body.authorization_kind with
+          | Signature ->
               { account_update with
                 authorization = Control.Signature account_updates_signature
               }

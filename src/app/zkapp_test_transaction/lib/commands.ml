@@ -352,7 +352,7 @@ let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
 let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
     ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo =
   let open Deferred.Let_syntax in
-  let%bind sender_keypair = Util.keypair_of_file sender in
+  let%bind sender_keypair = Util.keypair_of_file sender ~which:"Sender" in
   let%bind fee_payer_keypair = Util.keypair_of_file fee_payer in
   let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
   let spec =

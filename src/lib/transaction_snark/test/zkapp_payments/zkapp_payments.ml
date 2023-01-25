@@ -162,10 +162,7 @@ let%test_module "Zkapp payments tests" =
                   let zkapp_commands =
                     List.map
                       ~f:(fun s ->
-                        let use_full_commitment =
-                          Quickcheck.random_value Bool.quickcheck_generator
-                        in
-                        account_update_send ~use_full_commitment s )
+                        account_update_send ~double_sender_nonce:false s )
                       specs
                   in
                   Init_ledger.init
@@ -195,6 +192,7 @@ let%test_module "Zkapp payments tests" =
                          (Amount.of_fee
                             constraint_constants.account_creation_fee ) )
                   in
+                  (*Make payments to two existing accounts (senders from the spec) and a new account*)
                   let test_spec : Spec.t =
                     { sender = spec.sender
                     ; fee
@@ -202,7 +200,10 @@ let%test_module "Zkapp payments tests" =
                     ; receivers =
                         (new_receiver, new_receiver_amount)
                         :: ( List.take specs (receiver_count - 1)
-                           |> List.map ~f:(fun s -> (s.receiver, amount)) )
+                           |> List.map ~f:(fun s ->
+                                  ( Signature_lib.Public_key.compress
+                                      (fst s.sender).public_key
+                                  , amount ) ) )
                     ; amount = total_amount
                     ; zkapp_account_keypairs = []
                     ; memo

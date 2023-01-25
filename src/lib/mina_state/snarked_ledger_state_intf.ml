@@ -120,10 +120,29 @@ module type Full = sig
       ; second_pass_ledger_target : 'a
       ; connecting_ledger_left : 'a
       ; connecting_ledger_right : 'a
+      ; local_state_ledger_source : 'a
+      ; local_state_ledger_target : 'a
       }
     [@@deriving compare, equal, hash, sexp, yojson]
 
-    val of_statement : ('a, _, _, _, _, _) Poly.t -> 'a t
+    val of_statement :
+         ( 'a
+         , _
+         , _
+         , _
+         , _
+         , ( _
+           , _
+           , _
+           , _
+           , 'a
+           , _
+           , _
+           , _
+           , _ )
+           Mina_transaction_logic.Zkapp_command_logic.Local_state.t )
+         Poly.t
+      -> 'a t
   end
 
   [%%versioned:

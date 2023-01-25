@@ -706,7 +706,8 @@ let%test_unit "zkapp_command application on masked ledger" =
             let use_full_commitment =
               Quickcheck.random_value Bool.quickcheck_generator
             in
-            account_update_send ~use_full_commitment spec )
+            account_update_send ~use_full_commitment ~double_sender_nonce:false
+              spec )
       in
       L.with_ledger ~depth ~f:(fun l ->
           Init_ledger.init (module L) init_ledger l ;

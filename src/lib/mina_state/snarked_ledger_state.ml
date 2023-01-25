@@ -390,6 +390,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     val all : bool list -> bool
 
+    val ( || ) : bool -> bool -> bool
+
     val equal : t -> t -> bool
 
     val accumulate_failures : (bool * string) list -> error
@@ -413,6 +415,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let all bs = Tick.(Run.run_checked (Boolean.all bs))
 
+    let ( || ) b1 b2 = Tick.(Run.run_checked Boolean.(b1 || b2))
+
     let equal t t' = Tick.Run.run_checked (Frozen_ledger_hash.equal_var t t')
 
     let accumulate_failures _bs = Tick.Checked.return ()
@@ -433,6 +437,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     let if_ b ~then_ ~else_ = if b then then_ else else_
 
     let all = List.fold ~init:true ~f:( && )
+
+    let ( || ) = ( || )
 
     let equal = Frozen_ledger_hash.equal
 
@@ -455,46 +461,24 @@ module Make_str (A : Wire_types.Concrete) = struct
       ; second_pass_ledger_target : 'a
       ; connecting_ledger_left : 'a
       ; connecting_ledger_right : 'a
+      ; local_state_ledger_source : 'a
+      ; local_state_ledger_target : 'a
       }
     [@@deriving compare, equal, hash, sexp, yojson, hlist]
 
-    (*
-    let typ ledger_hash s =
-      Tick.Typ.of_hlistable
-        [ ledger_hash s.first_pass_ledger_source
-        ; ledger_hash s.first_pass_ledger_target
-        ; ledger_hash s.second_pass_ledger_source
-        ; ledger_hash s.second_pass_ledger_target
-        ; ledger_hash s.connecting_ledger_left
-        ; ledger_hash s.connecting_ledger_right ]
-        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-    *)
-
-    (*
-    let read ledger_hash s =
-      let open Tick.As_prover in
-      let%map first_pass_ledger_source = ledger_hash s.first_pass_ledger_source
-      and first_pass_ledger_target = ledger_hash s.first_pass_ledger_target
-      and second_pass_ledger_source = ledger_hash s.second_pass_ledger_source
-      and second_pass_ledger_target = ledger_hash s.second_pass_ledger_target
-      and connecting_ledger_left = ledger_hash s.connecting_ledger_left
-      and connecting_ledger_right = ledger_hash s.connecting_ledger_right
-      in
-      { first_pass_ledger_source
-      ; first_pass_ledger_target
-      ; second_pass_ledger_source
-      ; second_pass_ledger_target
-      ; connecting_ledger_left
-      ; connecting_ledger_right }
-    *)
-
     let of_statement (s : _ Poly.t) : _ t =
+      let local_state_ledger
+          (l : _ Mina_transaction_logic.Zkapp_command_logic.Local_state.t) =
+        l.ledger
+      in
       { first_pass_ledger_source = s.source.first_pass_ledger
       ; first_pass_ledger_target = s.target.first_pass_ledger
       ; second_pass_ledger_source = s.source.second_pass_ledger
       ; second_pass_ledger_target = s.target.second_pass_ledger
       ; connecting_ledger_left = s.connecting_ledger_left
       ; connecting_ledger_right = s.connecting_ledger_right
+      ; local_state_ledger_source = local_state_ledger s.source.local_state
+      ; local_state_ledger_target = local_state_ledger s.target.local_state
       }
   end
 
@@ -558,10 +542,28 @@ module Make_str (A : Wire_types.Concrete) = struct
        pass ledger of the statement on the left"
     in
     let res3 = L.equal s1.second_pass_ledger_target l3 in
-    let failures =
-      L.accumulate_failures [ (res1, rule1); (res2, rule2); (res3, rule3) ]
+    let rule4 =
+      "local state ledgers are equal or transition correctly from first pass \
+       to second pass"
     in
-    let res = L.all [ res1; res2; res3 ] in
+    let res4 =
+      let local_state_ledger_equal =
+        L.equal s2.local_state_ledger_source s1.local_state_ledger_target
+      in
+      let local_state_ledger_transitions =
+        L.all
+          [ L.equal s2.local_state_ledger_source s2.second_pass_ledger_source
+          ; L.equal s1.local_state_ledger_target s1.first_pass_ledger_target
+          ]
+      in
+      L.( || ) local_state_ledger_equal local_state_ledger_transitions
+    in
+    let failures =
+      L.accumulate_failures
+        [ (res1, rule1); (res2, rule2); (res3, rule3); (res4, rule4) ]
+    in
+
+    let res = L.all [ res1; res2; res3; res4 ] in
     (res, failures)
 
   let valid_ledgers_at_merge_checked
@@ -601,10 +603,13 @@ module Make_str (A : Wire_types.Concrete) = struct
            ~first:s1.target.pending_coinbase_stack
            ~second:s2.source.pending_coinbase_stack () )
     in
-    (*Check local states are equal*)
+    (*Check local states sans ledger are equal. Local state ledgers are checked
+       in [valid_ledgers_at_merge_uncheckeds]*)
     let%bind () =
       or_error_of_bool ~error:"Local states are not connected"
-        (Local_state.equal s1.target.local_state s2.source.local_state)
+        (Local_state.equal
+           { s1.target.local_state with ledger = Ledger_hash.empty_hash }
+           { s2.source.local_state with ledger = Ledger_hash.empty_hash } )
     in
     let connecting_ledger_left = s1.connecting_ledger_left in
     let connecting_ledger_right = s2.connecting_ledger_right in
