@@ -26,6 +26,8 @@ module type Bool_intf = sig
 
   val ( ||| ) : t -> t -> t
 
+  val ( |||| ) : t -> t -> t -> t
+
   val any : t list -> t
 end
 
@@ -106,8 +108,8 @@ open Composition_types.Wrap.Proof_state.Deferred_values.Plonk
 
 type 'bool all_feature_flags =
   { lookup_tables : 'bool Lazy.t
-  ; table_width_1 : 'bool Lazy.t
-  ; table_width_2 : 'bool Lazy.t
+  ; table_width_at_least_1 : 'bool Lazy.t
+  ; table_width_at_least_2 : 'bool Lazy.t
   ; table_width_3 : 'bool Lazy.t
   ; lookups_per_row_2 : 'bool Lazy.t
   ; lookups_per_row_3 : 'bool Lazy.t
@@ -122,7 +124,7 @@ let expand_feature_flags (type boolean)
     ({ chacha
      ; range_check0
      ; range_check1
-     ; foreign_field_add
+     ; foreign_field_add = _
      ; foreign_field_mul
      ; xor
      ; rot
@@ -133,17 +135,11 @@ let expand_feature_flags (type boolean)
   let lookup_tables =
     lazy
       (B.any
-         [ chacha
-         ; range_check0
-         ; range_check1
-         ; foreign_field_add
-         ; foreign_field_mul
-         ; rot
-         ] )
+         [ chacha; range_check0; range_check1; foreign_field_mul; xor; rot ] )
   in
   let lookup_pattern_range_check =
     (* RangeCheck, Rot gates use RangeCheck lookup pattern *)
-    lazy (B.( ||| ) range_check0 range_check1 rot)
+    lazy (B.( |||| ) range_check0 range_check1 rot)
   in
   let lookup_pattern_xor =
     (* Xor, ChaCha gates use Xor lookup pattern *)
@@ -154,15 +150,15 @@ let expand_feature_flags (type boolean)
     (* Xor, ChaChaFinal have max_joint_size = 3 *)
     lookup_pattern_xor
   in
-  let table_width_2 =
+  let table_width_at_least_2 =
     (* Lookup has max_joint_size = 2 *)
     lazy (B.( ||| ) (Lazy.force table_width_3) lookup)
   in
-  let table_width_1 =
+  let table_width_at_least_1 =
     (* RangeCheck, ForeignFieldMul have max_joint_size = 2 *)
     lazy
       (B.any
-         [ Lazy.force table_width_2
+         [ Lazy.force table_width_at_least_2
          ; Lazy.force lookup_pattern_range_check
          ; foreign_field_mul
          ] )
@@ -183,8 +179,8 @@ let expand_feature_flags (type boolean)
     lazy (B.( ||| ) (Lazy.force lookups_per_row_3) foreign_field_mul)
   in
   { lookup_tables
-  ; table_width_1
-  ; table_width_2
+  ; table_width_at_least_1
+  ; table_width_at_least_2
   ; table_width_3
   ; lookups_per_row_2
   ; lookups_per_row_3
@@ -220,6 +216,15 @@ let lookup_tables_used feature_flags =
       | No, No ->
           No
 
+    let ( |||| ) (x : t) (y : t) (z : t) : t =
+      match (x, y, z) with
+      | Yes, _, _ | _, Yes, _ | _, _, Yes ->
+          Yes
+      | Maybe, _, _ | _, Maybe, _ | _, _, Maybe ->
+          Maybe
+      | No, No, No ->
+          No
+
     let any = List.fold_left ~f:( ||| ) ~init:false_
   end in
   let all_feature_flags = expand_feature_flags (module Bool) feature_flags in
@@ -249,9 +254,9 @@ let get_feature_flag (feature_flags : _ all_feature_flags)
   | TableWidth 3 ->
       Some (Lazy.force feature_flags.table_width_3)
   | TableWidth 2 ->
-      Some (Lazy.force feature_flags.table_width_2)
+      Some (Lazy.force feature_flags.table_width_at_least_2)
   | TableWidth i when i <= 1 ->
-      Some (Lazy.force feature_flags.table_width_1)
+      Some (Lazy.force feature_flags.table_width_at_least_1)
   | TableWidth _ ->
       None
   | LookupsPerRow 4 ->

@@ -895,7 +895,7 @@ module Wrap = struct
           ; Vector (B Digest, Nat.N3.n)
           ; Vector (B Bulletproof_challenge, Backend.Tick.Rounds.n)
           ; Vector (B Branch_data, Nat.N1.n)
-          ; Vector (B Bool, Nat.N8.n)
+          ; Vector (B Bool, Nat.N9.n)
           ; Lookup_parameters.opt_spec impl lookup
           ; Proof_state.Deferred_values.Plonk.In_circuit.Optional_column_scalars
             .spec impl lookup.zero feature_flags
@@ -1233,7 +1233,7 @@ module Step = struct
             ; Vector (Scalar Challenge, Nat.N3.n)
             ; Vector (B Bulletproof_challenge, bp_log2)
             ; Vector (B Bool, Nat.N1.n)
-            ; Vector (B Bool, Nat.N8.n)
+            ; Vector (B Bool, Nat.N9.n)
             ; Wrap.Lookup_parameters.opt_spec impl lookup
             ; Wrap.Proof_state.Deferred_values.Plonk.In_circuit
               .Optional_column_scalars
