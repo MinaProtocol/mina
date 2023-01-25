@@ -18,8 +18,7 @@ mina daemon \
 & # -background
 
 # Attempt to connect to the GraphQL client every 10s for up to 4 minutes
-num_status_retries=24
-for ((i=1;i<=$num_status_retries;i++)); do
+for i in {0..24}; do
   sleep 10s
   set +e
   mina client status
@@ -27,7 +26,7 @@ for ((i=1;i<=$num_status_retries;i++)); do
   set -e
   if [ $status_exit_code -eq 0 ]; then
     break
-  elif [ $i -eq $num_status_retries ]; then
+  elif [ $i -eq 24 ]; then
     exit $status_exit_code
   fi
 done
