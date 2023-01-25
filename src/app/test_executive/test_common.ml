@@ -79,6 +79,28 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let priv_key_of_node = make_get_key ~f:(fun nk -> nk.keypair.private_key)
 
+  (* Call [f] [n] times in sequence *)
+  let repeat_seq ~n ~f =
+    let open Malleable_error.Let_syntax in
+    let rec go n =
+      if n = 0 then return ()
+      else
+        let%bind () = f () in
+        go (n - 1)
+    in
+    go n
+
+  let send_padding_transactions ~fee ~logger ~n nodes =
+    let sender = List.nth_exn nodes 0 in
+    let receiver = List.nth_exn nodes 1 in
+    let open Malleable_error.Let_syntax in
+    let%bind sender_pub_key = pub_key_of_node sender in
+    let%bind receiver_pub_key = pub_key_of_node receiver in
+    repeat_seq ~n ~f:(fun () ->
+        Engine.Network.Node.must_send_payment ~logger sender ~sender_pub_key
+          ~receiver_pub_key ~amount:Currency.Amount.one ~fee
+        >>| ignore )
+
   let check_common_prefixes ~tolerance ~logger chains =
     assert (List.length chains > 1) ;
     let hashset_chains =

@@ -1654,13 +1654,17 @@ struct
   let of_verifiable (t : Verifiable.t) : t Or_error.t =
     let open Or_error.Let_syntax in
     let tbl = Account_id.Table.create () in
+    let verify_proofs = match t.status with Applied -> true | _ -> false in
     let%map () =
       Call_forest.fold t.data.account_updates ~init:(Ok ())
         ~f:(fun acc (p, vk_opt) ->
           let%bind _ok = acc in
           let account_id = Account_update.account_id p in
           let%bind () = check_authorization p in
-          if Control.(Tag.equal Tag.Proof (Control.tag p.authorization)) then
+          if
+            Control.(Tag.equal Tag.Proof (Control.tag p.authorization))
+            && verify_proofs
+          then
             let%map { With_hash.hash; _ } =
               match vk_opt with
               | Some vk ->

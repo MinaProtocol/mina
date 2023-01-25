@@ -28,6 +28,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; num_snark_workers = 0
     }
 
+  let transactions_sent = ref 0
+
+  let send_zkapp ~logger node zkapp_command =
+    incr transactions_sent ;
+    send_zkapp ~logger node zkapp_command
+
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
@@ -256,6 +262,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~zkapp_command
       in
       [%log info] "zkApp transaction included in transition frontier"
+    in
+    let snark_work_event_subscription =
+      Event_router.on (event_router t) Snark_work_gossip ~f:(fun _ _ ->
+          [%log info] "Received new snark work" ;
+          Deferred.return `Continue )
+    in
+    let snark_work_failure_subscription =
+      Event_router.on (event_router t) Snark_work_failed ~f:(fun _ _ ->
+          [%log error]
+            "A snark worker encountered an error while creating a proof" ;
+          Deferred.return `Continue )
     in
     let%bind () =
       section "Send a zkApp to create a zkApp account with timing"
@@ -492,6 +509,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Malleable_error.hard_error
              (Error.of_string "Ledger update contains a timing update") ) )
     in
+    let%bind () =
+      let padding_payments =
+        (* for work_delay=1 and transaction_capacity=4 per block*)
+        let needed = 36 in
+        if !transactions_sent >= needed then 0 else needed - !transactions_sent
+      in
+      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      send_padding_transactions block_producer_nodes ~fee ~logger
+        ~n:padding_payments
+    in
+    let%bind () =
+      section_hard "Wait for proof to be emitted"
+        (wait_for t
+           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
+    in
+    Event_router.cancel (event_router t) snark_work_event_subscription () ;
+    Event_router.cancel (event_router t) snark_work_failure_subscription () ;
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
