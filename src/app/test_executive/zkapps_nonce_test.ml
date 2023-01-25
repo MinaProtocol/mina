@@ -113,8 +113,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let account_updates =
           mk_forest
             [ mk_node
-                (mk_account_update_body Signature Call fish1_kp Token_id.default
-                   0
+                (mk_account_update_body Signature Parents_own_token fish1_kp
+                   Token_id.default 0
                    ~preconditions:
                      { Account_update.Preconditions.network =
                          Zkapp_precondition.Protocol_state.accept
@@ -136,8 +136,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let account_updates =
           mk_forest
             [ mk_node
-                (mk_account_update_body Signature Call fish1_kp Token_id.default
-                   0
+                (mk_account_update_body Signature Parents_own_token fish1_kp
+                   Token_id.default 0
                    ~preconditions:
                      { Account_update.Preconditions.network =
                          Zkapp_precondition.Protocol_state.accept
@@ -159,8 +159,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let account_updates =
           mk_forest
             [ mk_node
-                (mk_account_update_body Signature Call fish1_kp Token_id.default
-                   0
+                (mk_account_update_body Signature Parents_own_token fish1_kp
+                   Token_id.default 0
                    ~update:
                      { Account_update.Update.dummy with
                        permissions =
@@ -182,8 +182,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let account_updates =
           mk_forest
             [ mk_node
-                (mk_account_update_body Signature Call fish1_kp Token_id.default
-                   0 )
+                (mk_account_update_body Signature Parents_own_token fish1_kp
+                   Token_id.default 0 )
                 []
             ]
         in
