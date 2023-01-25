@@ -41,6 +41,7 @@ in Pipeline.build Pipeline.Config::{
     TestExecutive.execute "medium-bootstrap" dependsOn,
     TestExecutive.execute "zkapps" dependsOn,
     TestExecutive.execute "zkapps-timing" dependsOn,
+    TestExecutive.execute "zkapps-nonce" dependsOn,
     TestExecutive.executeWithJs "snarkyjs" dependsOnJs
   ]
 }
