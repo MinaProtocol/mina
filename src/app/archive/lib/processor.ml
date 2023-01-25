@@ -1477,6 +1477,7 @@ module Zkapp_account_update_body = struct
     ; call_depth : int
     ; zkapp_network_precondition_id : int
     ; zkapp_account_precondition_id : int
+    ; zkapp_valid_while_precondition_id : int option
     ; use_full_commitment : bool
     ; implicit_account_creation_fee : bool
     ; call_type : string
@@ -1498,6 +1499,7 @@ module Zkapp_account_update_body = struct
         ; int
         ; int
         ; int
+        ; option int
         ; bool
         ; bool
         ; string
@@ -1536,6 +1538,11 @@ module Zkapp_account_update_body = struct
       Zkapp_account_precondition.add_if_doesn't_exist
         (module Conn)
         body.preconditions.account
+    in
+    let%bind zkapp_valid_while_precondition_id =
+      Mina_caqti.add_if_zkapp_check
+        (Zkapp_global_slot_bounds.add_if_doesn't_exist (module Conn))
+        body.preconditions.valid_while
     in
     let balance_change =
       let magnitude = Currency.Amount.to_string body.balance_change.magnitude in
@@ -1576,6 +1583,7 @@ module Zkapp_account_update_body = struct
       ; call_depth
       ; zkapp_network_precondition_id
       ; zkapp_account_precondition_id
+      ; zkapp_valid_while_precondition_id
       ; use_full_commitment
       ; implicit_account_creation_fee
       ; call_type

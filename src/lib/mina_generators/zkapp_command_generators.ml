@@ -20,14 +20,16 @@ type failure =
 type role =
   [ `Fee_payer | `New_account | `Ordinary_participant | `New_token_account ]
 
-let gen_account_precondition_from_account ?failure ~first_use_of_account account
-    =
+let gen_account_precondition_from_account ?failure
+    ?(is_nonce_precondition = false) ~first_use_of_account account =
   let open Quickcheck.Let_syntax in
   let { Account.Poly.balance; nonce; delegate; receipt_chain_hash; zkapp; _ } =
     account
   in
   (* choose constructor *)
-  let%bind b = Quickcheck.Generator.bool in
+  let%bind b =
+    if is_nonce_precondition then return false else Quickcheck.Generator.bool
+  in
   if b then
     (* Full *)
     let open Zkapp_basic in
@@ -550,6 +552,7 @@ module Account_update_body_components = struct
        , 'bool
        , 'protocol_state_precondition
        , 'account_precondition
+       , 'valid_while_precondition
        , 'call_type
        , 'authorization_kind )
        t =
@@ -564,6 +567,7 @@ module Account_update_body_components = struct
     ; call_depth : 'int
     ; protocol_state_precondition : 'protocol_state_precondition
     ; account_precondition : 'account_precondition
+    ; valid_while_precondition : 'valid_while_precondition
     ; use_full_commitment : 'bool
     ; call_type : 'call_type
     ; authorization_kind : 'authorization_kind
@@ -598,6 +602,7 @@ module Account_update_body_components = struct
     ; preconditions =
         { Account_update.Preconditions.network = t.protocol_state_precondition
         ; account = t.account_precondition
+        ; valid_while = t.valid_while_precondition
         }
     ; use_full_commitment = t.use_full_commitment
     ; implicit_account_creation_fee = false
@@ -631,7 +636,7 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
        first_use_of_account:bool -> Account.t -> d Quickcheck.Generator.t )
     ~(f_account_update_account_precondition :
        d -> Account_update.Account_precondition.t ) ~authorization_tag () :
-    (_, _, _, a, _, _, _, b, _, d, _, _) Account_update_body_components.t
+    (_, _, _, a, _, _, _, b, _, d, _, _, _) Account_update_body_components.t
     Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   (* fee payers have to be in the ledger *)
@@ -803,6 +808,25 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
         | _ ->
             gen_protocol_state_precondition )
       ~default:(return Zkapp_precondition.Protocol_state.accept)
+  and valid_while_precondition =
+    match protocol_state_view with
+    | None ->
+        return Zkapp_basic.Or_ignore.Ignore
+    | Some psv ->
+        let open Mina_numbers in
+        let%bind epsilon1 =
+          Global_slot.gen_incl (Global_slot.of_int 0) (Global_slot.of_int 10)
+        in
+        let%bind epsilon2 =
+          Global_slot.gen_incl (Global_slot.of_int 0) (Global_slot.of_int 10)
+        in
+        Zkapp_precondition.Closed_interval.
+          { lower =
+              Global_slot.sub psv.global_slot_since_genesis epsilon1
+              |> Option.value ~default:Global_slot.zero
+          ; upper = Global_slot.add psv.global_slot_since_genesis epsilon2
+          }
+        |> return |> Zkapp_basic.Or_ignore.gen
   and call_type =
     match call_type with
     | None ->
@@ -941,6 +965,7 @@ let gen_account_update_body_components (type a b c d) ?(update = None)
   ; call_depth
   ; protocol_state_precondition
   ; account_precondition
+  ; valid_while_precondition
   ; use_full_commitment
   ; call_type
   ; authorization_kind

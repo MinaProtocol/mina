@@ -78,6 +78,7 @@ let%test_module "Initialize state test" =
             { Account_update.Preconditions.network =
                 Zkapp_precondition.Protocol_state.accept
             ; account = Accept
+            ; valid_while = Ignore
             }
         ; authorization_kind = Signature
         }

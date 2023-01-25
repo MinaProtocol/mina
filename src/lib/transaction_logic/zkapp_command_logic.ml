@@ -175,6 +175,10 @@ module type Protocol_state_precondition_intf = sig
   type t
 end
 
+module type Valid_while_precondition_intf = sig
+  type t
+end
+
 module Local_state = struct
   open Core_kernel
 
@@ -304,6 +308,8 @@ module type Account_update_intf = sig
 
   type protocol_state_precondition
 
+  type valid_while_precondition
+
   type public_key
 
   type token_id
@@ -321,6 +327,8 @@ module type Account_update_intf = sig
   val balance_change : t -> signed_amount
 
   val protocol_state_precondition : t -> protocol_state_precondition
+
+  val valid_while_precondition : t -> valid_while_precondition
 
   val public_key : t -> public_key
 
@@ -638,6 +646,14 @@ end
 
 module Eff = struct
   type (_, _) t =
+    | Check_valid_while_precondition :
+        'valid_while_precondition * 'global_state
+        -> ( 'bool
+           , < bool : 'bool
+             ; valid_while_precondition : 'valid_while_precondition
+             ; global_state : 'global_state
+             ; .. > )
+           t
     | Check_account_precondition :
         (* the bool input is a new_account flag *)
         'account_update
@@ -697,6 +713,8 @@ module type Inputs_intf = sig
 
   module Protocol_state_precondition : Protocol_state_precondition_intf
 
+  module Valid_while_precondition : Valid_while_precondition_intf
+
   module Controller : Controller_intf with type bool := Bool.t
 
   module Global_slot : Global_slot_intf with type bool := Bool.t
@@ -754,6 +772,7 @@ module type Inputs_intf = sig
     (Account_update_intf
       with type signed_amount := Amount.Signed.t
        and type protocol_state_precondition := Protocol_state_precondition.t
+       and type valid_while_precondition := Valid_while_precondition.t
        and type token_id := Token_id.t
        and type bool := Bool.t
        and type account := Account.t
@@ -861,7 +880,7 @@ module type Inputs_intf = sig
 
     val set_supply_increase : t -> Amount.Signed.t -> t
 
-    val global_slot_since_genesis : t -> Global_slot.t
+    val block_global_slot : t -> Global_slot.t
   end
 end
 
@@ -1193,6 +1212,16 @@ module Make (Inputs : Inputs_intf) = struct
       Local_state.add_check local_state Protocol_state_precondition_unsatisfied
         protocol_state_predicate_satisfied
     in
+    let local_state =
+      let valid_while_satisfied =
+        h.perform
+          (Check_valid_while_precondition
+             ( Account_update.valid_while_precondition account_update
+             , global_state ) )
+      in
+      Local_state.add_check local_state Valid_while_precondition_unsatisfied
+        valid_while_satisfied
+    in
     let `Proof_verifies proof_verifies, `Signature_verifies signature_verifies =
       let commitment =
         Inputs.Transaction_commitment.if_
@@ -1374,7 +1403,7 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_balance balance a in
       (a, local_state)
     in
-    let txn_global_slot = Global_state.global_slot_since_genesis global_state in
+    let txn_global_slot = Global_state.block_global_slot global_state in
     (* Check timing with current balance *)
     let a, local_state =
       let `Invalid_timing invalid_timing, timing =

@@ -41,6 +41,7 @@ module Failure = struct
       | Account_proved_state_precondition_unsatisfied
       | Account_is_new_precondition_unsatisfied
       | Protocol_state_precondition_unsatisfied
+      | Valid_while_precondition_unsatisfied
       | Unexpected_verification_key_hash
       | Incorrect_nonce
       | Invalid_fee_excess
