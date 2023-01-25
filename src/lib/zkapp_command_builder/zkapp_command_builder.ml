@@ -10,7 +10,7 @@ let mk_forest ps :
 let mk_node account_update calls : _ Zkapp_command.Call_forest.Tree.t =
   { account_update; account_update_digest = (); calls = mk_forest calls }
 
-let mk_account_update_body ?precondition ?increment_nonce ?update
+let mk_account_update_body ?preconditions ?increment_nonce ?update
     authorization_kind call_type kp token_id balance_change :
     Account_update.Body.Simple.t =
   let open Signature_lib in

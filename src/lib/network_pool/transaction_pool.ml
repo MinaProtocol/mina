@@ -2638,6 +2638,7 @@ let%test_module _ =
             Account_update.Preconditions.
               { network = Zkapp_precondition.Protocol_state.accept
               ; account = Account_update.Account_precondition.Accept
+              ; valid_while = Ignore
               }
       in
       let account_updates =
