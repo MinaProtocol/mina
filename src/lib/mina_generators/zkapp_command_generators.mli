@@ -23,6 +23,7 @@ val max_token_updates : int
 
 val gen_account_precondition_from_account :
      ?failure:failure
+  -> ?is_nonce_precondition:bool
   -> first_use_of_account:bool
   -> Account.t
   -> Account_update.Account_precondition.t Quickcheck.Generator.t

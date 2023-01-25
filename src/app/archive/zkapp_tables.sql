@@ -94,6 +94,7 @@ CREATE TABLE zkapp_permissions
 , edit_state               zkapp_auth_required_type    NOT NULL
 , send                     zkapp_auth_required_type    NOT NULL
 , receive                  zkapp_auth_required_type    NOT NULL
+, access                   zkapp_auth_required_type    NOT NULL
 , set_delegate             zkapp_auth_required_type    NOT NULL
 , set_permissions          zkapp_auth_required_type    NOT NULL
 , set_verification_key     zkapp_auth_required_type    NOT NULL
@@ -261,10 +262,12 @@ CREATE TABLE zkapp_account_update_body
 , actions_id                            int             NOT NULL  REFERENCES zkapp_events(id)
 , call_data_id                          int             NOT NULL  REFERENCES zkapp_state_data(id)
 , call_depth                            int             NOT NULL
-, zkapp_network_precondition_id  int             NOT NULL  REFERENCES zkapp_network_precondition(id)
+, zkapp_network_precondition_id         int             NOT NULL  REFERENCES zkapp_network_precondition(id)
 , zkapp_account_precondition_id         int             NOT NULL  REFERENCES zkapp_account_precondition(id)
+, zkapp_valid_while_precondition_id     int                       REFERENCES zkapp_global_slot_bounds(id)
 , use_full_commitment                   boolean         NOT NULL
-, caller                                call_type  NOT NULL
+, implicit_account_creation_fee         boolean         NOT NULL
+, call_type                             call_type       NOT NULL
 , authorization_kind                    authorization_kind_type NOT NULL
 );
 

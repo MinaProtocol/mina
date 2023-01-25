@@ -57,9 +57,10 @@ let genesis_state_body_hash =
 
 let init_stack = Pending_coinbase.Stack.empty
 
-let pending_coinbase_state_stack ~state_body_hash =
+let pending_coinbase_state_stack ~state_body_hash ~global_slot =
   { Transaction_snark.Pending_coinbase_stack_state.source = init_stack
-  ; target = Pending_coinbase.Stack.push_state state_body_hash init_stack
+  ; target =
+      Pending_coinbase.Stack.push_state state_body_hash global_slot init_stack
   }
 
 let apply_zkapp_command ledger zkapp_command =
@@ -71,7 +72,8 @@ let apply_zkapp_command ledger zkapp_command =
         [ ( `Pending_coinbase_init_stack init_stack
           , `Pending_coinbase_of_statement
               (pending_coinbase_state_stack
-                 ~state_body_hash:genesis_state_body_hash )
+                 ~state_body_hash:genesis_state_body_hash
+                 ~global_slot:Mina_numbers.Global_slot.(succ zero) )
           , ps )
         ]
     | ps1 :: ps2 :: rest ->
@@ -79,11 +81,13 @@ let apply_zkapp_command ledger zkapp_command =
           ( `Pending_coinbase_init_stack init_stack
           , `Pending_coinbase_of_statement
               (pending_coinbase_state_stack
-                 ~state_body_hash:genesis_state_body_hash )
+                 ~state_body_hash:genesis_state_body_hash
+                 ~global_slot:Mina_numbers.Global_slot.(succ zero) )
           , ps1 )
         in
         let pending_coinbase_state_stack =
           pending_coinbase_state_stack ~state_body_hash:genesis_state_body_hash
+            ~global_slot:Mina_numbers.Global_slot.(succ zero)
         in
         let unchanged_stack_state ps =
           ( `Pending_coinbase_init_stack init_stack
@@ -96,9 +100,13 @@ let apply_zkapp_command ledger zkapp_command =
         let ps2 = unchanged_stack_state ps2 in
         ps1 :: ps2 :: List.map rest ~f:unchanged_stack_state
   in
+  let state_view = Mina_state.Protocol_state.Body.view genesis_state_body in
+  let global_slot =
+    Mina_numbers.Global_slot.succ state_view.global_slot_since_genesis
+  in
   let witnesses, final_ledger =
     Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
-      ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
+      ~global_slot ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
       (`Ledger ledger) zkapp_command
   in
   let open Impl in
@@ -122,20 +130,26 @@ let trivial_zkapp =
     (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
 
 let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
-    ?(state_body = genesis_state_body) ledger zkapp_commands =
+    ?global_slot ?(state_body = genesis_state_body) ledger zkapp_commands =
   let module T = (val Lazy.force snark_module) in
   (*TODO: merge multiple zkApp transactions*)
   let ignore_outside_snark = Option.value ~default:false ignore_outside_snark in
   let state_view = Mina_state.Protocol_state.Body.view state_body in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
+  let global_slot =
+    Option.value global_slot
+      ~default:
+        (Mina_numbers.Global_slot.succ state_view.global_slot_since_genesis)
+  in
   Async.Deferred.List.iter zkapp_commands ~f:(fun zkapp_command ->
       match
         Or_error.try_with (fun () ->
             Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
-              ~state_body ~fee_excess:Amount.Signed.zero (`Ledger ledger)
+              ~global_slot ~state_body ~fee_excess:Amount.Signed.zero
+              (`Ledger ledger)
               [ ( `Pending_coinbase_init_stack init_stack
                 , `Pending_coinbase_of_statement
-                    (pending_coinbase_state_stack ~state_body_hash)
+                    (pending_coinbase_state_stack ~state_body_hash ~global_slot)
                 , zkapp_command )
               ] )
       with
@@ -162,7 +176,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                    ; new_accounts = []
                    } )
             else
-              ( Ledger.apply_transaction ~constraint_constants
+              ( Ledger.apply_transaction ~constraint_constants ~global_slot
                   ~txn_state_view:state_view ledger
                   (Mina_transaction.Transaction.Command
                      (Zkapp_command zkapp_command) )
@@ -171,6 +185,44 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
           in
           match applied with
           | Command (Zkapp_command { command; _ }) -> (
+              let run_in_snark () =
+                let%map p =
+                  match List.rev witnesses with
+                  | [] ->
+                      failwith "no witnesses generated"
+                  | (witness, spec, stmt) :: rest ->
+                      let open Async.Deferred.Or_error.Let_syntax in
+                      let%bind p1 =
+                        Async.Deferred.Or_error.try_with (fun () ->
+                            T.of_zkapp_command_segment_exn ~statement:stmt
+                              ~witness ~spec )
+                      in
+                      Async.Deferred.List.fold ~init:(Ok p1) rest
+                        ~f:(fun acc (witness, spec, stmt) ->
+                          let%bind prev = Async.Deferred.return acc in
+                          let%bind curr =
+                            Async.Deferred.Or_error.try_with (fun () ->
+                                T.of_zkapp_command_segment_exn ~statement:stmt
+                                  ~witness ~spec )
+                          in
+                          let sok_digest =
+                            Sok_message.create ~fee:Fee.zero
+                              ~prover:
+                                (Quickcheck.random_value
+                                   Public_key.Compressed.gen )
+                            |> Sok_message.digest
+                          in
+                          T.merge ~sok_digest prev curr )
+                in
+                let p = Or_error.ok_exn p in
+                if not ignore_outside_snark then
+                  let target_ledger_root_snark =
+                    (Transaction_snark.statement p).target.ledger
+                  in
+                  let target_ledger_root = Ledger.merkle_root ledger in
+                  [%test_eq: Ledger_hash.t] target_ledger_root
+                    target_ledger_root_snark
+              in
               match command.status with
               | Applied -> (
                   match expected_failure with
@@ -182,42 +234,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                              %{sexp:Mina_base.Transaction_status.Failure.t}"
                            failure )
                   | None ->
-                      let%map p =
-                        match List.rev witnesses with
-                        | [] ->
-                            failwith "no witnesses generated"
-                        | (witness, spec, stmt) :: rest ->
-                            let open Async.Deferred.Or_error.Let_syntax in
-                            let%bind p1 =
-                              Async.Deferred.Or_error.try_with (fun () ->
-                                  T.of_zkapp_command_segment_exn ~statement:stmt
-                                    ~witness ~spec )
-                            in
-                            Async.Deferred.List.fold ~init:(Ok p1) rest
-                              ~f:(fun acc (witness, spec, stmt) ->
-                                let%bind prev = Async.Deferred.return acc in
-                                let%bind curr =
-                                  Async.Deferred.Or_error.try_with (fun () ->
-                                      T.of_zkapp_command_segment_exn
-                                        ~statement:stmt ~witness ~spec )
-                                in
-                                let sok_digest =
-                                  Sok_message.create ~fee:Fee.zero
-                                    ~prover:
-                                      (Quickcheck.random_value
-                                         Public_key.Compressed.gen )
-                                  |> Sok_message.digest
-                                in
-                                T.merge ~sok_digest prev curr )
-                      in
-                      let p = Or_error.ok_exn p in
-                      if not ignore_outside_snark then
-                        let target_ledger_root_snark =
-                          (Transaction_snark.statement p).target.ledger
-                        in
-                        let target_ledger_root = Ledger.merkle_root ledger in
-                        [%test_eq: Ledger_hash.t] target_ledger_root
-                          target_ledger_root_snark )
+                      run_in_snark () )
               | Failed failure_tbl -> (
                   match expected_failure with
                   | None ->
@@ -245,7 +262,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                                Failure statuses: %{sexp: \
                                Mina_base.Transaction_status.Failure.Collection.t}"
                              failure failure_tbl )
-                      else Async.Deferred.unit ) )
+                      else run_in_snark () ) )
           | _ ->
               failwith "zkapp_command expected" ) )
 
@@ -415,14 +432,16 @@ end
 
 (** Each transaction pushes the previous protocol state (used to validate
     the transaction) to the pending coinbase stack of protocol states*)
-let pending_coinbase_state_update state_body_hash stack =
-  Pending_coinbase.Stack.(push_state state_body_hash stack)
+let pending_coinbase_state_update state_body_hash global_slot stack =
+  Pending_coinbase.Stack.(push_state state_body_hash global_slot stack)
 
 (** Push protocol state and coinbase if it is a coinbase transaction to the
       pending coinbase stacks (coinbase stack and state stack)*)
 let pending_coinbase_stack_target (t : Mina_transaction.Transaction.Valid.t)
-    state_body_hash stack =
-  let stack_with_state = pending_coinbase_state_update state_body_hash stack in
+    state_body_hash global_slot stack =
+  let stack_with_state =
+    pending_coinbase_state_update state_body_hash global_slot stack
+  in
   match t with
   | Coinbase c ->
       Pending_coinbase.(Stack.push_coinbase c stack_with_state)
@@ -487,8 +506,12 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
     Mina_state.Protocol_state.Body.view state_body
   in
   let mentioned_keys, pending_coinbase_stack_target =
+    let global_slot =
+      Option.value txn_global_slot ~default:Mina_numbers.Global_slot.zero
+    in
     let pending_coinbase_stack =
-      Pending_coinbase.Stack.push_state state_body_hash pending_coinbase_stack
+      Pending_coinbase.Stack.push_state state_body_hash global_slot
+        pending_coinbase_stack
     in
     match txn_unchecked with
     | Command (Signed_command uc) ->
@@ -499,7 +522,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
     | Fee_transfer ft ->
         (Fee_transfer.receivers ft, pending_coinbase_stack)
     | Coinbase cb ->
-        ( Coinbase.accounts_accessed cb
+        ( Coinbase.accounts_referenced cb
         , Pending_coinbase.Stack.push_coinbase cb pending_coinbase_stack )
   in
   let sok_signer =
@@ -514,7 +537,8 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
   in
   let expect_snark_failure, applied_transaction =
     match
-      Ledger.apply_transaction ledger ~constraint_constants ~txn_state_view
+      Ledger.apply_transaction ledger ~constraint_constants
+        ~global_slot:txn_state_view.global_slot_since_genesis ~txn_state_view
         txn_unchecked
     with
     | Ok res ->
@@ -558,6 +582,13 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
       ~f:(fun txn ->
         Ledger.Transaction_applied.supply_increase txn |> Or_error.ok_exn )
   in
+  let global_slot =
+    match txn_global_slot with
+    | None ->
+        Mina_numbers.Global_slot.zero
+    | Some global_slot ->
+        global_slot
+  in
   match
     Or_error.try_with (fun () ->
         Transaction_snark.check_transaction ~constraint_constants ~sok_message
@@ -568,7 +599,7 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
             ; target = pending_coinbase_stack_target
             }
           ~zkapp_account1:None ~zkapp_account2:None ~supply_increase
-          { transaction = txn; block_data = state_body }
+          { transaction = txn; block_data = state_body; global_slot }
           (unstage @@ Sparse_ledger.handler sparse_ledger) )
   with
   | Error _e ->

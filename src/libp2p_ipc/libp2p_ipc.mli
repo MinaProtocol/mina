@@ -71,6 +71,7 @@ val create_libp2p_config :
   -> validation_queue_size:int
   -> gating_config:gating_config
   -> topic_config:string list list
+  -> unit
   -> libp2p_config
 
 val create_gating_config :

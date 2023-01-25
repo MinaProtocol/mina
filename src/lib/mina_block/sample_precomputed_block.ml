@@ -259,7 +259,7 @@ let sample_block_sexp =
      (delegate (B62qpkCEM5N5ddVsYNbFtwWV4bsT9AwuUJXoehFhHUbYYvZ6j3fXt93))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -275,7 +275,7 @@ let sample_block_sexp =
      (delegate (B62qrA2eWb592uRLtH5ohzQnx7WTLYp2jGirCw5M7Fb9gTf1RrvTPqX))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -291,7 +291,7 @@ let sample_block_sexp =
      (delegate (B62qpaA93gHfmvNoH9DLGgxreGnijhh5aui4duxiV3foX4p5ay5RNis))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -307,7 +307,7 @@ let sample_block_sexp =
      (delegate (B62qp5sdhH48MurWgtHNkXUTphEmUfcKVmZFspYAqxcKZ7YxaPF1pyF))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -323,7 +323,7 @@ let sample_block_sexp =
      (delegate (B62qqMGFkBEtgGs2Gi6AWd1Abn9yzXdj5HRMzm95uwbJ8Wa88C7urCD))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -339,7 +339,7 @@ let sample_block_sexp =
      (delegate (B62qpgjtMzVpodthL3kMfXAAzzv1kgGZRMEeLv592u4hSVQKCzTGLvA))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -355,7 +355,7 @@ let sample_block_sexp =
      (delegate (B62qkYgXYkzT5fuPNhMEHk8ouiThjNNDSTMnpBAuaf6q7pNnCFkUqtz))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -371,7 +371,7 @@ let sample_block_sexp =
      (delegate (B62qr4GMdg4ZVk1Y6BXaDHxgFRtCsZm2sZiyn7PCmubTZnAi3iZDDxq))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -387,7 +387,7 @@ let sample_block_sexp =
      (delegate (B62qji8zLZEuMUpZnRN3FHgsgnybYhhMFBBMcLAwGGLR3hTdfkhmM4X))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -403,7 +403,7 @@ let sample_block_sexp =
      (delegate (B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -419,7 +419,7 @@ let sample_block_sexp =
      (delegate (B62qqR5XfP9CoC5DALUJX2jBoY6aaoLrN46YpM2NQTSV14qgpoWibL7))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -435,7 +435,7 @@ let sample_block_sexp =
      (delegate (B62qpPjYco6oESJyGjdFNjmBnwEyzsujJ785aMAzygzSF4X9g4g1uEo))
      (voting_for 0) (timing Untimed)
      (permissions
-      ((edit_state Signature) (send Signature) (receive None)
+      ((edit_state Signature) (access None) (send Signature) (receive None)
        (set_delegate Signature) (set_permissions Signature)
        (set_verification_key Signature) (set_zkapp_uri Signature)
        (edit_sequence_state Signature) (set_token_symbol Signature)
@@ -799,6 +799,9 @@ let sample_block_json =
             "receive": [
               "None"
             ],
+            "access": [
+              "None"
+            ],
             "set_delegate": [
               "Signature"
             ],
@@ -844,6 +847,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -897,6 +903,9 @@ let sample_block_json =
             "edit_state": [
               "Signature"
             ],
+            "access": [
+              "None"
+            ],
             "send": [
               "Signature"
             ],
@@ -948,6 +957,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1001,6 +1013,9 @@ let sample_block_json =
             "edit_state": [
               "Signature"
             ],
+            "access": [
+              "None"
+            ],
             "send": [
               "Signature"
             ],
@@ -1052,6 +1067,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1105,6 +1123,9 @@ let sample_block_json =
             "edit_state": [
               "Signature"
             ],
+            "access": [
+              "None"
+            ],
             "send": [
               "Signature"
             ],
@@ -1156,6 +1177,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1209,6 +1233,9 @@ let sample_block_json =
             "edit_state": [
               "Signature"
             ],
+            "access": [
+              "None"
+            ],
             "send": [
               "Signature"
             ],
@@ -1260,6 +1287,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"
@@ -1313,6 +1343,9 @@ let sample_block_json =
             "edit_state": [
               "Signature"
             ],
+            "access": [
+              "None"
+            ],
             "send": [
               "Signature"
             ],
@@ -1364,6 +1397,9 @@ let sample_block_json =
           "permissions": {
             "edit_state": [
               "Signature"
+            ],
+            "access": [
+              "None"
             ],
             "send": [
               "Signature"

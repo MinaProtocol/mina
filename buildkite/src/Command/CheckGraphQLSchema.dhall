@@ -8,7 +8,7 @@ let RunInToolchain = ./RunInToolchain.dhall in
     Command.build
       Command.Config::{
         commands =
-          RunInToolchain.runInToolchainStretch ([] : List Text)
+          RunInToolchain.runInToolchainBullseye ([] : List Text)
             "./buildkite/scripts/check-graphql-schema.sh",
         label = "Check GraphQL Schema",
         key = "check-graphql-schema",
