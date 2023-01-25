@@ -1268,12 +1268,25 @@ struct
             ~f:(fun _ ->
               Counter.inc_one Transaction_pool.transactions_added_to_pool )) ;
         (* partition the results *)
-        let accepted, rejected =
-          List.partition_map add_results ~f:(function
+        let all_drops =
+          List.fold add_results ~init:Sequence.empty ~f:(fun acc result ->
+              match result with
+              | Ok (_cmd, dropped) ->
+                  Sequence.append acc dropped
+              | Error _ ->
+                  acc )
+        in
+        let accepted, rejected, _dropped =
+          List.partition3_map add_results ~f:(function
             | Ok (cmd, _dropped) ->
-                Either.First cmd
+                if
+                  Sequence.mem all_drops cmd
+                    ~equal:
+                      Transaction_hash.User_command_with_valid_signature.( = )
+                then `Trd cmd
+                else `Fst cmd
             | Error (cmd, error) ->
-                Either.Second (cmd, error) )
+                `Snd (cmd, error) )
         in
         (* determine if we should re-broadcast this diff *)
         let decision =
