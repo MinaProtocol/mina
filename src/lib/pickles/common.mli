@@ -53,7 +53,7 @@ val ft_comm :
        , _ )
        Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
   -> t_comm:'a array
-  -> flags:Plonk_types.Features.flags
+  -> options:Plonk_types.Features.options
   -> 'a
 
 val dlog_pcs_batch :

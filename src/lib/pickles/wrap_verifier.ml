@@ -664,18 +664,10 @@ struct
           scale_fast ~num_bits:Other_field.Packed.Constant.size_in_bits
         in
         let ft_comm =
-          let flags =
-            let open Plonk_types in
-            Features.map options ~f:(function
-              | Opt.Flag.Maybe | Opt.Flag.Yes ->
-                  true
-              | Opt.Flag.No ->
-                  false )
-          in
           with_label __LOC__ (fun () ->
               Common.ft_comm ~add:Ops.add_fast ~scale:scale_fast
                 ~negate:Inner_curve.negate ~endoscale:Scalar_challenge.endo
-                ~verification_key:m ~plonk ~alpha ~t_comm ~flags )
+                ~verification_key:m ~plonk ~alpha ~t_comm ~options *)
         in
         let bulletproof_challenges =
           (* This sponge needs to be initialized with (some derivative of)

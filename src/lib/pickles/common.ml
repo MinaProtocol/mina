@@ -241,8 +241,8 @@ let maybe_scale ~scale g x l =
 let ft_comm ~add:( + ) ~scale ~endoscale ~negate
     ~verification_key:(m : _ Plonk_verification_key_evals.t) ~alpha
     ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t)
-    ~t_comm ~flags =
-  let _ = flags in
+    ~t_comm ~options =
+  let _ = options in
 
   (* ignore flags for now *)
   let _, [ sigma_comm_last ] =
