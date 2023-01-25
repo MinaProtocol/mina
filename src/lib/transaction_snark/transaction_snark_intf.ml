@@ -194,6 +194,7 @@ module type Full = sig
          | `Sparse_ledger of Mina_ledger.Sparse_ledger.t ]
        * [ `Ledger of Mina_ledger.Ledger.t
          | `Sparse_ledger of Mina_ledger.Sparse_ledger.t ]
+       * [ `Connecting_ledger_hash of Ledger_hash.t ]
        * Zkapp_command.t )
        list
     -> ( Zkapp_command_segment.Witness.t

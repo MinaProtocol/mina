@@ -152,6 +152,8 @@ module Transaction_key = struct
               }
           , `Ledger ledger
           , `Ledger second_pass_ledger
+          , `Connecting_ledger_hash
+              (Mina_ledger.Ledger.merkle_root second_pass_ledger)
           , p )
         ]
     in

@@ -3464,6 +3464,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     type global_state = Sparse_ledger.Global_state.t
 
+    type connecting_ledger_hash = Ledger_hash.t
+
     type spec = Zkapp_command_segment.Basic.t
 
     let zkapp_segment_of_controls = Zkapp_command_segment.Basic.of_controls
@@ -3492,6 +3494,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           | `Sparse_ledger of Mina_ledger.Sparse_ledger.t ]
         * [ `Ledger of Mina_ledger.Ledger.t
           | `Sparse_ledger of Mina_ledger.Sparse_ledger.t ]
+        * [ `Connecting_ledger_hash of Ledger_hash.t ]
         * Zkapp_command.t )
         list ) =
     let sparse_first_pass_ledger zkapp_command = function
@@ -3515,7 +3518,12 @@ module Make_str (A : Wire_types.Concrete) = struct
         zkapp_commands_with_context
         ~f:(fun
              (fee_excess, supply_increase, statess_rev)
-             (_, _, first_pass_ledger, second_pass_ledger, zkapp_command)
+             ( _
+             , _
+             , first_pass_ledger
+             , second_pass_ledger
+             , `Connecting_ledger_hash connecting_ledger
+             , zkapp_command )
            ->
           let first_pass_ledger =
             sparse_first_pass_ledger zkapp_command first_pass_ledger
@@ -3535,19 +3543,25 @@ module Make_str (A : Wire_types.Concrete) = struct
               ~init:states second_pass_ledger partial_txn
             |> Or_error.ok_exn
           in
+          let states_with_connecting_ledger =
+            List.map states ~f:(fun (global, local) ->
+                (global, local, connecting_ledger) )
+          in
           let final_state =
-            let global_state, _local_state = List.last_exn states in
+            let global_state, _local_state, _connecting_ledger =
+              List.last_exn states_with_connecting_ledger
+            in
             global_state
           in
           ( final_state.fee_excess
           , final_state.supply_increase
-          , states :: statess_rev ) )
+          , states_with_connecting_ledger :: statess_rev ) )
     in
     let states = List.rev states_rev in
     let states_rev =
       Account_update_group.group_by_zkapp_command_rev
         (List.map
-           ~f:(fun (_, _, _, _, zkapp_command) -> zkapp_command)
+           ~f:(fun (_, _, _, _, _, zkapp_command) -> zkapp_command)
            zkapp_commands_with_context )
         ([ List.hd_exn (List.hd_exn states) ] :: states)
     in
@@ -3561,6 +3575,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~f:(fun
                ( pending_coinbase_init_stack
                , pending_coinbase_stack_state
+               , _
                , _
                , _
                , account_updates )
@@ -3587,6 +3602,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; spec
             ; state_before = { global = source_global; local = source_local }
             ; state_after = { global = target_global; local = target_local }
+            ; connecting_ledger
             } :
              Account_update_group.Zkapp_command_intermediate_state.t )
            witnesses
@@ -3817,8 +3833,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ; ledger = target_local_ledger
                   }
               }
-          ; connecting_ledger_left = target_first_pass_ledger_root
-          ; connecting_ledger_right = target_first_pass_ledger_root
+          ; connecting_ledger_left = connecting_ledger
+          ; connecting_ledger_right = connecting_ledger
           ; supply_increase
           ; fee_excess
           ; sok_digest = Sok_message.Digest.default

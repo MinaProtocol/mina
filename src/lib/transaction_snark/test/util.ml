@@ -91,10 +91,16 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
             (Mina_transaction.Transaction.Command (Zkapp_command zkapp_command))
           |> Or_error.ok_exn
         in
-        (partial_stmt, first_pass_ledger_witness) )
+        (partial_stmt, first_pass_ledger_witness, Ledger.merkle_root ledger) )
   in
+  let connecting_ledger = Ledger.merkle_root ledger in
   Async.Deferred.List.iter (List.zip_exn zkapp_commands partial_stmts)
-    ~f:(fun (zkapp_command, (partial_stmt, first_pass_ledger_witness)) ->
+    ~f:(fun
+         ( zkapp_command
+         , ( partial_stmt
+           , first_pass_ledger_witness
+           , first_pass_ledger_target_hash ) )
+       ->
       match
         Or_error.try_with (fun () ->
             Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
@@ -104,6 +110,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                     (pending_coinbase_state_stack ~state_body_hash ~global_slot)
                 , `Sparse_ledger first_pass_ledger_witness
                 , `Ledger ledger
+                , `Connecting_ledger_hash connecting_ledger
                 , zkapp_command )
               ] )
       with
@@ -124,19 +131,49 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                    (Error.to_string_hum e) ) )
       | Ok witnesses -> (
           let open Async.Deferred.Let_syntax in
-          let applied =
+          let applied, statement_opt =
             if ignore_outside_snark then
-              Ledger.Transaction_applied.Varying.Command
-                (Zkapp_command
-                   { command =
-                       { With_status.status = Applied; data = zkapp_command }
-                   ; accounts = []
-                   ; new_accounts = []
-                   } )
+              ( Ledger.Transaction_applied.Varying.Command
+                  (Zkapp_command
+                     { command =
+                         { With_status.status = Applied; data = zkapp_command }
+                     ; accounts = []
+                     ; new_accounts = []
+                     } )
+              , None )
             else
-              ( Ledger.apply_transaction_second_pass ledger partial_stmt
-              |> Or_error.ok_exn )
-                .varying
+              let second_pass_ledger_source_hash = Ledger.merkle_root ledger in
+              let applied_txn =
+                Ledger.apply_transaction_second_pass ledger partial_stmt
+                |> Or_error.ok_exn
+              in
+              (*Expected transaction statement*)
+              let stmt : Transaction_snark.Statement.t =
+                { Mina_wire_types.Mina_state_snarked_ledger_state.Poly.V2.source =
+                    { first_pass_ledger =
+                        Sparse_ledger.merkle_root first_pass_ledger_witness
+                    ; second_pass_ledger = second_pass_ledger_source_hash
+                    ; pending_coinbase_stack = init_stack
+                    ; local_state = Mina_state.Local_state.empty ()
+                    }
+                ; target =
+                    { first_pass_ledger = first_pass_ledger_target_hash
+                    ; second_pass_ledger = Ledger.merkle_root ledger
+                    ; pending_coinbase_stack =
+                        Pending_coinbase.Stack.push_state state_body_hash
+                          global_slot init_stack
+                    ; local_state = Mina_state.Local_state.empty ()
+                    }
+                ; connecting_ledger_left = connecting_ledger
+                ; connecting_ledger_right = connecting_ledger
+                ; fee_excess = Zkapp_command.fee_excess zkapp_command
+                ; supply_increase =
+                    Ledger.Transaction_applied.supply_increase applied_txn
+                    |> Or_error.ok_exn
+                ; sok_digest = ()
+                }
+              in
+              (applied_txn.varying, Some stmt)
           in
           match applied with
           | Command (Zkapp_command { command; _ }) -> (
@@ -180,6 +217,13 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                                 T.merge ~sok_digest prev curr )
                       in
                       let p = Or_error.ok_exn p in
+                      ( match statement_opt with
+                      | Some expected_stmt ->
+                          [%test_eq: Transaction_snark.Statement.t]
+                            expected_stmt
+                            (Transaction_snark.statement p)
+                      | None ->
+                          () ) ;
                       if not ignore_outside_snark then
                         let target_ledger_root_snark =
                           (Transaction_snark.statement p).target

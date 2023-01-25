@@ -122,6 +122,8 @@ module Inputs = struct
                                         }
                                     , `Sparse_ledger w.first_pass_ledger
                                     , `Sparse_ledger w.second_pass_ledger
+                                    , `Connecting_ledger_hash
+                                        input.connecting_ledger_left
                                     , zkapp_command )
                                   ]
                                 |> List.rev )

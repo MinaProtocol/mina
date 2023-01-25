@@ -112,6 +112,7 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
         , `Pending_coinbase_of_statement pending_coinbase_state_stack
         , `Ledger ledger
         , `Ledger second_pass_ledger
+        , `Connecting_ledger_hash (Ledger.merkle_root second_pass_ledger)
         , zkapp_command )
       ]
   in
@@ -226,6 +227,7 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
         , `Pending_coinbase_of_statement pending_coinbase_state_stack
         , `Ledger ledger
         , `Ledger second_pass_ledger
+        , `Connecting_ledger_hash (Ledger.merkle_root second_pass_ledger)
         , zkapp_command )
       ]
   in

@@ -1476,6 +1476,8 @@ module Make_update_group (Input : sig
 
   type spec
 
+  type connecting_ledger_hash
+
   val zkapp_segment_of_controls : Control.t list -> spec
 end) : sig
   module Zkapp_command_intermediate_state : sig
@@ -1486,12 +1488,15 @@ end) : sig
       ; spec : Input.spec
       ; state_before : state
       ; state_after : state
+      ; connecting_ledger : Input.connecting_ledger_hash
       }
   end
 
   val group_by_zkapp_command_rev :
        t list
-    -> (Input.global_state * Input.local_state) list list
+    -> (Input.global_state * Input.local_state * Input.connecting_ledger_hash)
+       list
+       list
     -> Zkapp_command_intermediate_state.t list
 end = struct
   open Input
@@ -1504,6 +1509,7 @@ end = struct
       ; spec : spec
       ; state_before : state
       ; state_after : state
+      ; connecting_ledger : connecting_ledger_hash
       }
   end
 
@@ -1529,13 +1535,16 @@ end = struct
       pair.
   *)
   let group_by_zkapp_command_rev (zkapp_commands : t list)
-      (stmtss : (global_state * local_state) list list) :
-      Zkapp_command_intermediate_state.t list =
+      (stmtss : (global_state * local_state * connecting_ledger_hash) list list)
+      : Zkapp_command_intermediate_state.t list =
     let intermediate_state ~kind ~spec ~before ~after =
+      let global_before, local_before, _ = before in
+      let global_after, local_after, connecting_ledger = after in
       { Zkapp_command_intermediate_state.kind
       ; spec
-      ; state_before = { global = fst before; local = snd before }
-      ; state_after = { global = fst after; local = snd after }
+      ; state_before = { global = global_before; local = local_before }
+      ; state_after = { global = global_after; local = local_after }
+      ; connecting_ledger
       }
     in
     let zkapp_account_updatess =
@@ -1842,6 +1851,8 @@ module Update_group = Make_update_group (struct
 
   type global_state = unit
 
+  type connecting_ledger_hash = unit
+
   type spec = possible_segments
 
   let zkapp_segment_of_controls controls : spec =
@@ -1884,8 +1895,8 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
   in
   let groups =
     Update_group.group_by_zkapp_command_rev [ t ]
-      ( [ ((), ()) ]
-      :: [ ((), ()) :: List.map all_updates ~f:(fun _ -> ((), ())) ] )
+      ( [ ((), (), ()) ]
+      :: [ ((), (), ()) :: List.map all_updates ~f:(fun _ -> ((), (), ())) ] )
   in
   let proof_segments, signed_singles, signed_pairs =
     List.fold ~init:(0, 0, 0) groups
