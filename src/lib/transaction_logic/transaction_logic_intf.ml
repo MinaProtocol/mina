@@ -541,3 +541,203 @@ end
 module type Valid_while_precondition_intf = sig
   type t
 end
+
+module type Inputs_intf = sig
+  val with_label : label:string -> (unit -> 'a) -> 'a
+
+  module Bool : Bool_intf
+
+  module Field : Iffable with type bool := Bool.t
+
+  module Amount : Amount_intf with type bool := Bool.t
+
+  module Balance :
+    Balance_intf
+      with type bool := Bool.t
+       and type amount := Amount.t
+       and type signed_amount := Amount.Signed.t
+
+  module Public_key : Iffable with type bool := Bool.t
+
+  module Token_id : Token_id_intf with type bool := Bool.t
+
+  module Account_id :
+    Account_id_intf
+      with type bool := Bool.t
+       and type public_key := Public_key.t
+       and type token_id := Token_id.t
+
+  module Set_or_keep : Set_or_keep_intf with type bool := Bool.t
+
+  module Protocol_state_precondition : Protocol_state_precondition_intf
+
+  module Valid_while_precondition : Valid_while_precondition_intf
+
+  module Controller : Controller_intf with type bool := Bool.t
+
+  module Global_slot : Global_slot_intf with type bool := Bool.t
+
+  module Nonce : sig
+    include Iffable with type bool := Bool.t
+
+    val succ : t -> t
+  end
+
+  module State_hash : Iffable with type bool := Bool.t
+
+  module Timing :
+    Timing_intf with type bool := Bool.t and type global_slot := Global_slot.t
+
+  module Zkapp_uri : Iffable with type bool := Bool.t
+
+  module Token_symbol : Iffable with type bool := Bool.t
+
+  module Opt : Opt_intf with type bool := Bool.t
+
+  module rec Receipt_chain_hash :
+    (Receipt_chain_hash_intf
+      with type bool := Bool.t
+       and type transaction_commitment := Transaction_commitment.t
+       and type index := Index.t)
+
+  and Verification_key : (Iffable with type bool := Bool.t)
+  and Verification_key_hash :
+    (Verification_key_hash_intf with type bool := Bool.t)
+
+  and Account :
+    (Account_intf
+      with type Permissions.controller := Controller.t
+       and type timing := Timing.t
+       and type balance := Balance.t
+       and type receipt_chain_hash := Receipt_chain_hash.t
+       and type bool := Bool.t
+       and type global_slot := Global_slot.t
+       and type field := Field.t
+       and type verification_key := Verification_key.t
+       and type verification_key_hash := Verification_key_hash.t
+       and type zkapp_uri := Zkapp_uri.t
+       and type token_symbol := Token_symbol.t
+       and type public_key := Public_key.t
+       and type nonce := Nonce.t
+       and type state_hash := State_hash.t
+       and type token_id := Token_id.t
+       and type account_id := Account_id.t)
+
+  and Actions :
+    (Actions_intf with type bool := Bool.t and type field := Field.t)
+
+  and Account_update :
+    (Account_update_intf
+      with type signed_amount := Amount.Signed.t
+       and type protocol_state_precondition := Protocol_state_precondition.t
+       and type valid_while_precondition := Valid_while_precondition.t
+       and type token_id := Token_id.t
+       and type bool := Bool.t
+       and type account := Account.t
+       and type public_key := Public_key.t
+       and type nonce := Nonce.t
+       and type account_id := Account_id.t
+       and type verification_key_hash := Verification_key_hash.t
+       and type Update.timing := Timing.t
+       and type 'a Update.set_or_keep := 'a Set_or_keep.t
+       and type Update.field := Field.t
+       and type Update.verification_key := Verification_key.t
+       and type Update.actions := Actions.t
+       and type Update.zkapp_uri := Zkapp_uri.t
+       and type Update.token_symbol := Token_symbol.t
+       and type Update.state_hash := State_hash.t
+       and type Update.permissions := Account.Permissions.t)
+
+  and Nonce_precondition : sig
+    val is_constant :
+         Nonce.t Zkapp_precondition.Closed_interval.t Account_update.or_ignore
+      -> Bool.t
+  end
+
+  and Ledger :
+    (Ledger_intf
+      with type bool := Bool.t
+       and type account := Account.t
+       and type account_update := Account_update.t
+       and type token_id := Token_id.t
+       and type public_key := Public_key.t)
+
+  and Call_forest :
+    (Call_forest_intf
+      with type t = Account_update.call_forest
+       and type bool := Bool.t
+       and type account_update := Account_update.t
+       and module Opt := Opt)
+
+  and Stack_frame :
+    (Stack_frame_intf
+      with type bool := Bool.t
+       and type call_forest := Call_forest.t
+       and type caller := Token_id.t)
+
+  and Call_stack :
+    (Call_stack_intf
+      with type stack_frame := Stack_frame.t
+       and type bool := Bool.t
+       and module Opt := Opt)
+
+  and Transaction_commitment : sig
+    include
+      Iffable
+        with type bool := Bool.t
+         and type t = Account_update.transaction_commitment
+
+    val empty : t
+
+    val commitment : account_updates:Call_forest.t -> t
+
+    val full_commitment :
+      account_update:Account_update.t -> memo_hash:Field.t -> commitment:t -> t
+  end
+
+  and Index : sig
+    include Iffable with type bool := Bool.t
+
+    val zero : t
+
+    val succ : t -> t
+  end
+
+  module Local_state : sig
+    type t =
+      ( Stack_frame.t
+      , Call_stack.t
+      , Token_id.t
+      , Amount.Signed.t
+      , Ledger.t
+      , Bool.t
+      , Transaction_commitment.t
+      , Index.t
+      , Bool.failure_status_tbl )
+      Local_state.t
+
+    val add_check : t -> Transaction_status.Failure.t -> Bool.t -> t
+
+    val update_failure_status_tbl : t -> Bool.failure_status -> Bool.t -> t
+
+    val add_new_failure_status_bucket : t -> t
+  end
+
+  module Global_state : sig
+    type t
+
+    val ledger : t -> Ledger.t
+
+    val set_ledger : should_update:Bool.t -> t -> Ledger.t -> t
+
+    val fee_excess : t -> Amount.Signed.t
+
+    val set_fee_excess : t -> Amount.Signed.t -> t
+
+    val supply_increase : t -> Amount.Signed.t
+
+    val set_supply_increase : t -> Amount.Signed.t -> t
+
+    val block_global_slot : t -> Global_slot.t
+  end
+end
