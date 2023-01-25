@@ -234,8 +234,8 @@ module Wrap = struct
                 ; opt_spec feature_flags.chacha
                 ; opt_spec feature_flags.chacha
                 ; opt_spec feature_flags.chacha
-                ; opt_spec feature_flags.range_check
-                ; opt_spec feature_flags.range_check
+                ; opt_spec feature_flags.range_check0
+                ; opt_spec feature_flags.range_check1
                 ; opt_spec feature_flags.foreign_field_add
                 ; opt_spec feature_flags.foreign_field_mul
                 ; opt_spec feature_flags.xor
@@ -257,8 +257,8 @@ module Wrap = struct
                 ; opt_typ feature_flags.chacha
                 ; opt_typ feature_flags.chacha
                 ; opt_typ feature_flags.chacha
-                ; opt_typ feature_flags.range_check
-                ; opt_typ feature_flags.range_check
+                ; opt_typ feature_flags.range_check0
+                ; opt_typ feature_flags.range_check1
                 ; opt_typ feature_flags.foreign_field_add
                 ; opt_typ feature_flags.foreign_field_mul
                 ; opt_typ feature_flags.xor

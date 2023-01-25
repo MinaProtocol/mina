@@ -120,7 +120,8 @@ type 'bool all_feature_flags =
 let expand_feature_flags (type boolean)
     (module B : Bool_intf with type t = boolean)
     ({ chacha
-     ; range_check
+     ; range_check0
+     ; range_check1
      ; foreign_field_add
      ; foreign_field_mul
      ; xor
@@ -131,11 +132,18 @@ let expand_feature_flags (type boolean)
       boolean Plonk_types.Features.t ) : boolean all_feature_flags =
   let lookup_tables =
     lazy
-      (B.any [ chacha; range_check; foreign_field_add; foreign_field_mul; rot ])
+      (B.any
+         [ chacha
+         ; range_check0
+         ; range_check1
+         ; foreign_field_add
+         ; foreign_field_mul
+         ; rot
+         ] )
   in
   let lookup_pattern_range_check =
     (* RangeCheck, Rot gates use RangeCheck lookup pattern *)
-    lazy (B.( ||| ) range_check rot)
+    lazy (B.( ||| ) range_check0 range_check1 rot)
   in
   let lookup_pattern_xor =
     (* Xor, ChaCha gates use Xor lookup pattern *)
@@ -222,8 +230,10 @@ let get_feature_flag (feature_flags : _ all_feature_flags)
   match feature with
   | ChaCha ->
       Some feature_flags.features.chacha
-  | RangeCheck ->
-      Some feature_flags.features.range_check
+  | RangeCheck0 ->
+      Some feature_flags.features.range_check0
+  | RangeCheck1 ->
+      Some feature_flags.features.range_check1
   | ForeignFieldAdd ->
       Some feature_flags.features.foreign_field_add
   | ForeignFieldMul ->
@@ -524,11 +534,11 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
                 compute_feature (Index ChaChaFinal) feature_flags.chacha
                   actual_feature_flags.chacha
             ; range_check0 =
-                compute_feature (Index RangeCheck0) feature_flags.range_check
-                  actual_feature_flags.range_check
+                compute_feature (Index RangeCheck0) feature_flags.range_check0
+                  actual_feature_flags.range_check0
             ; range_check1 =
-                compute_feature (Index RangeCheck1) feature_flags.range_check
-                  actual_feature_flags.range_check
+                compute_feature (Index RangeCheck1) feature_flags.range_check1
+                  actual_feature_flags.range_check1
             ; foreign_field_add =
                 compute_feature (Index ForeignFieldAdd)
                   feature_flags.foreign_field_add

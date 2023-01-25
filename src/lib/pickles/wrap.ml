@@ -566,7 +566,8 @@ let%test_module "gate finalization" =
 
         let actual_feature_flags =
           { Plonk_types.Features.none_bool with
-            range_check = true
+            range_check0 = true
+          ; range_check1 = true
           ; foreign_field_add = true
           ; foreign_field_mul = true
           ; lookup = true
@@ -581,7 +582,8 @@ let%test_module "gate finalization" =
 
         let actual_feature_flags =
           { Plonk_types.Features.none_bool with
-            range_check = true
+            range_check0 = true
+          ; range_check1 = true
           ; lookup = true
           }
       end) )
@@ -611,7 +613,7 @@ let%test_module "gate finalization" =
 
         let actual_feature_flags =
           { Plonk_types.Features.none_bool with
-            range_check = true
+            range_check0 = true
           ; rot = true
           ; lookup = true
           }
@@ -624,7 +626,8 @@ let%test_module "gate finalization" =
 
         let actual_feature_flags =
           { Plonk_types.Features.none_bool with
-            range_check = true
+            range_check0 = true
+          ; range_check1 = true
           ; foreign_field_add = true
           ; lookup = true
           }

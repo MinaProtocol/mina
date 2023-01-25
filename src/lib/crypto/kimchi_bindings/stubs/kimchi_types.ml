@@ -167,7 +167,8 @@ type nonrec lookup_features =
 
 type nonrec feature_flag =
   | ChaCha
-  | RangeCheck
+  | RangeCheck0
+  | RangeCheck1
   | ForeignFieldAdd
   | ForeignFieldMul
   | Xor

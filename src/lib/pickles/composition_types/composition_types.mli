@@ -912,7 +912,7 @@ module Wrap : sig
             * ( ('d, Nat.N3.n) Vector.t
               * ( 'e
                 * ( ('f, Nat.N1.n) Vector.t
-                  * (('bool, Nat.N8.n) Vector.t * ('g * ('fp_opt vec12 * unit)))
+                  * (('bool, Nat.N9.n) Vector.t * ('g * ('fp_opt vec12 * unit)))
                   ) ) ) ) ) )
         Hlist.HlistId.t
 
@@ -1198,7 +1198,7 @@ module Step : sig
                     , 'num_bulletproof_challenges )
                     Vector.t
                   * ( ('bool, Nat.N1.n) Vector.t
-                    * ( ('bool, Nat.N8.n) Vector.t
+                    * ( ('bool, Nat.N9.n) Vector.t
                       * ('optional * ('fp_opt vec12 * unit)) ) ) ) ) ) ) )
           Hlist.HlistId.t
 
@@ -1262,7 +1262,7 @@ module Step : sig
                  * ( ('b, Nat.N3.n) Vector.t
                    * ( 'e
                      * ( ('g, Nat.N1.n) Vector.t
-                       * ( ('g, Nat.N8.n) Vector.t
+                       * ( ('g, Nat.N9.n) Vector.t
                          * ('j * ('fp_opt vec12 * unit)) ) ) ) ) ) ) )
              Hlist.HlistId.t
 
@@ -1273,7 +1273,7 @@ module Step : sig
                  * ( ('d, Nat.N3.n) Vector.t
                    * ( 'e
                      * ( ('f, Nat.N1.n) Vector.t
-                       * ( ('f, Nat.N8.n) Vector.t
+                       * ( ('f, Nat.N9.n) Vector.t
                          * ('g * ('fp_opt vec12 * unit)) ) ) ) ) ) ) )
              Hlist.HlistId.t
           -> option_map:
@@ -1390,7 +1390,7 @@ module Step : sig
                     * ( ('b, Nat.N3.n) Vector.t
                       * ( 'e
                         * ( ('g, Nat.N1.n) Vector.t
-                          * ( ('g, Nat.N8.n) Vector.t
+                          * ( ('g, Nat.N9.n) Vector.t
                             * ('l * ('fp_opt vec12 * unit)) ) ) ) ) ) ) )
                 Hlist.HlistId.t
            , 'h )
@@ -1405,7 +1405,7 @@ module Step : sig
                  * ( ('d, Nat.N3.n) Vector.t
                    * ( 'e
                      * ( ('f, Nat.N1.n) Vector.t
-                       * ( ('f, Nat.N8.n) Vector.t
+                       * ( ('f, Nat.N9.n) Vector.t
                          * ('g * ('fp_opt vec12 * unit)) ) ) ) ) ) ) )
              Hlist.HlistId.t
            , 'h )
@@ -1541,7 +1541,7 @@ module Step : sig
                  * ( ('b, Nat.N3.n) Vector.t
                    * ( 'e
                      * ( ('g, Nat.N1.n) Vector.t
-                       * ( ('g, Nat.N8.n) Vector.t
+                       * ( ('g, Nat.N9.n) Vector.t
                          * ('m * ('fp_opt vec12 * unit)) ) ) ) ) ) ) )
              Hlist.HlistId.t
            , 'h )
@@ -1556,7 +1556,7 @@ module Step : sig
                  * ( ('d, Nat.N3.n) Vector.t
                    * ( 'e
                      * ( ('f, Nat.N1.n) Vector.t
-                       * ( ('f, Nat.N8.n) Vector.t
+                       * ( ('f, Nat.N9.n) Vector.t
                          * ('g * ('fp_opt vec12 * unit)) ) ) ) ) ) ) )
              Hlist.HlistId.t
            , 'h )
@@ -1596,7 +1596,7 @@ module Step : sig
                    * ( ('d Scalar_challenge.t, Nat.N3.n) Vector.t
                      * ( ('i, 'c) Vector.t
                        * ( (bool, Nat.N1.n) Vector.t
-                         * ( (bool, Nat.N8.n) Vector.t
+                         * ( (bool, Nat.N9.n) Vector.t
                            * ( ('d Scalar_challenge.t * unit) Hlist.HlistId.t
                                option
                              * ('f option vec12 * unit) ) ) ) ) ) ) ) )
@@ -1616,7 +1616,7 @@ module Step : sig
                            Vector.t
                          * ( ( 'a Snarky_backendless.Cvar.t
                                Snarky_backendless__Snark_intf.Boolean0.t
-                             , Nat.N8.n )
+                             , Nat.N9.n )
                              Vector.t
                            * ( ( ('e Scalar_challenge.t * unit) Hlist.HlistId.t
                                , 'a Snarky_backendless.Cvar.t
