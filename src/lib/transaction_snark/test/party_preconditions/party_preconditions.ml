@@ -60,7 +60,8 @@ let%test_module "Valid_while precondition tests" =
                     (Signature_lib.Public_key.compress new_kp.public_key) ;
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states ~zkapp_prover
+                    Transaction_snark.For_tests.update_states
+                      ~zkapp_prover_and_vk:(zkapp_prover, vk)
                       ~constraint_constants
                       (create_spec specs new_kp global_slot)
                   in
@@ -81,7 +82,8 @@ let%test_module "Valid_while precondition tests" =
                     (Signature_lib.Public_key.compress new_kp.public_key) ;
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states ~zkapp_prover
+                    Transaction_snark.For_tests.update_states
+                      ~zkapp_prover_and_vk:(zkapp_prover, vk)
                       ~constraint_constants
                       (create_spec specs new_kp global_slot)
                   in
