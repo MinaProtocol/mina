@@ -866,7 +866,7 @@ current:   B1, B2, B3, B4              (ye olde minimum window density = 43) Stu
 canonical: B1, B2, B3, B4, B5, ..., Bk (current minimum window density = 42)
 ```
 
-The inversion problem occurs because the calculation of the minimum window density does not take into account the relationship between the current best chain and the canonical chain with respect to time.  In Samasika, time is captured and secured through the concepts of slots and the VRF.  Our calculation of the minimum window density must also take this into account.
+This problem occurs because the calculation of the minimum window density does not take into account the relationship between the current best chain and the canonical chain with respect to time.  In Samasika, time is captured and secured through the concepts of slots and the VRF.  Our calculation of the minimum window density must also take this into account.
 
 The relative minimum window density solves this problem by projecting the joining peer's current block's window to the global slot of the candidate block. (N.b. As described in [Section 6.2](#62-select-chain), this happens whenever the candidate block's global slot is ahead of the current block's or vice versa.)  In this way, the projection allows a fair comparison.
 
@@ -911,7 +911,15 @@ fn relativeMinWindowDensity(B1, B2) -> u32
 
 This description was adopted to aid understanding, providing explanations where possible of why strategies have been adopted and what conditions are important.  In a production implementation consideration must be given to performance implications and another implementation may be desirable.
 
-**Security note:**  It is important that implementations verify blocks correctly to prevent attacks on the sliding window.  An adversary may attempt to increase the min window density of an adversarial chain relative to the canonical chain, either by increasing the min window density of the adversarial chain or by causing the relative window density of the canonical chain to be decreased by ring-shifting.  The prior is thwarted by only accepting blocks with valid proofs (a valid proof attests to the verification of checked computations on the sliding window during block production).  The latter is thwarted by rejecting blocks whose timestamps are ahead of the current time of the peer verifying the block.  We describe more details in the verification section.
+> **Security notes:**  Implementations MUST verify blocks correctly to prevent attacks on the sliding window.  An adversary may attempt to increase the min window density of an adversarial chain relative to the canonical chain, either by increasing the min window density of the adversarial chain (e.g. by introducing invalid densities or windows) or by causing the relative window density of the canonical chain to be decreased by ring-shifting.
+>
+> * All implementations MUST thwart the prior by having all peers only accept blocks with valid proofs (a valid proof attests to the verification of checked computations on the sliding window during block production).
+>
+> * All implementations MUST thwart the latter by having all peers only accept blocks for the current slot or earlier.  Peers MUST NOT accept blocks for future slots.  This also implies that peers MUST use the correct time and should use a secure time synchronization protocol.
+>
+> The use of projected windows implies something else interesting.  If block producers are unable to fill slots and slots go unfilled, then all peers will wait and as time elapses the slot number will continue to increase.  If `sub_windows_per_window` consecutive empty slots occur then the canonical chain’s min window density will be ring-shifted to zero, meaning that an adversarial chain would then be able to long-fork the canonical chain without actually having a better chain density.
+>
+> Therefore, if an adversary is able to cause the chain to halt or perform a denial of service attack on a peer so that it doesn’t see filled slots for `sub_windows_per_window slots`, then the adversary can perform an attack either on the chain or on the targeted peer.  Similarly, if for whatever reason the minimum window density drops too low, this could impact chain quality because it makes it easier for an adversary to produce a better chain.
 
 # 6 Protocol
 

@@ -72,4 +72,4 @@ let zkapp_transaction_cost_limit = 69.45
 
 let max_event_elements = 16
 
-let max_sequence_event_elements = 16
+let max_action_elements = 16

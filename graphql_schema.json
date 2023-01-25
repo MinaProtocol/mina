@@ -948,6 +948,22 @@
               "deprecationReason": null
             },
             {
+              "name": "access",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "send",
               "description": null,
               "args": [],
@@ -1111,6 +1127,20 @@
           "inputFields": [
             {
               "name": "editState",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "access",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -1680,78 +1710,6 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Sign",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "GlobalSlotIntervalInput",
-          "description": null,
-          "fields": [
-            {
-              "name": "lower",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt32",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "upper",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt32",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "lower",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt32",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "upper",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt32",
                   "ofType": null
                 }
               },
@@ -2552,6 +2510,78 @@
         },
         {
           "kind": "INPUT_OBJECT",
+          "name": "GlobalSlotIntervalInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "lower",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "upper",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "lower",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "upper",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
           "name": "PreconditionsInput",
           "description": null,
           "fields": [
@@ -2586,6 +2616,18 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "validWhile",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "GlobalSlotIntervalInput",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": [
@@ -2612,6 +2654,58 @@
                 "ofType": {
                   "kind": "INPUT_OBJECT",
                   "name": "AccountPreconditionInput",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "validWhile",
+              "description": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "GlobalSlotIntervalInput",
+                "ofType": null
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "CallTypeInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "isDelegateCall",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "isDelegateCall",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
                   "ofType": null
                 }
               },
@@ -2740,7 +2834,7 @@
               "deprecationReason": null
             },
             {
-              "name": "sequenceEvents",
+              "name": "actions",
               "description": null,
               "args": [],
               "type": {
@@ -2832,7 +2926,7 @@
               "deprecationReason": null
             },
             {
-              "name": "caller",
+              "name": "implicitAccountCreationFee",
               "description": null,
               "args": [],
               "type": {
@@ -2840,7 +2934,23 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "TokenId",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "callType",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "CallTypeInput",
                   "ofType": null
                 }
               },
@@ -2966,7 +3076,7 @@
               "defaultValue": null
             },
             {
-              "name": "sequenceEvents",
+              "name": "actions",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -3048,14 +3158,28 @@
               "defaultValue": null
             },
             {
-              "name": "caller",
+              "name": "implicitAccountCreationFee",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "TokenId",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "callType",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "CallTypeInput",
                   "ofType": null
                 }
               },
@@ -6564,6 +6688,33 @@
         },
         {
           "kind": "OBJECT",
+          "name": "CallType",
+          "description": null,
+          "fields": [
+            {
+              "name": "isDelegateCall",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
           "name": "NonceInterval",
           "description": null,
           "fields": [
@@ -7105,6 +7256,18 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "validWhile",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "GlobalSlotInterval",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -7293,6 +7456,22 @@
           "fields": [
             {
               "name": "editState",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "access",
               "description": null,
               "args": [],
               "type": {
@@ -7747,7 +7926,7 @@
               "deprecationReason": null
             },
             {
-              "name": "sequenceEvents",
+              "name": "actions",
               "description": null,
               "args": [],
               "type": {
@@ -7839,7 +8018,7 @@
               "deprecationReason": null
             },
             {
-              "name": "caller",
+              "name": "implicitAccountCreationFee",
               "description": null,
               "args": [],
               "type": {
@@ -7847,7 +8026,23 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "TokenId",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "callType",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "CallType",
                   "ofType": null
                 }
               },
@@ -10793,6 +10988,22 @@
               "deprecationReason": null
             },
             {
+              "name": "access",
+              "description": "Authorization required to access the account",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "AccountAuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "setDelegate",
               "description": "Authorization required to set the delegate",
               "args": [],
@@ -11254,6 +11465,19 @@
               "deprecationReason": null
             },
             {
+              "name": "genesis_balance",
+              "description":
+                "The amount of MINA owned by the account at Genesis",
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "AnnotatedBalance",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "nonce",
               "description":
                 "A natural number that increases with each transaction (stringified uint32)",
@@ -11424,7 +11648,7 @@
               "description": "True if this account owns its associated token",
               "args": [],
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "isDeprecated": false,
+              "isDeprecated": true,
               "deprecationReason": null
             },
             {
@@ -11433,7 +11657,7 @@
                 "True if this account has been disabled by the owner of the associated token",
               "args": [],
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "isDeprecated": false,
+              "isDeprecated": true,
               "deprecationReason": null
             },
             {

@@ -7,7 +7,7 @@ let prefixes =
   `Assoc
     [ ("event", `String (zkapp_event :> string))
     ; ("events", `String (zkapp_events :> string))
-    ; ("sequenceEvents", `String (zkapp_sequence_events :> string))
+    ; ("sequenceEvents", `String (zkapp_actions :> string))
     ; ("body", `String (zkapp_body :> string))
     ; ("accountUpdateCons", `String (account_update_cons :> string))
     ; ("accountUpdateNode", `String (account_update_node :> string))

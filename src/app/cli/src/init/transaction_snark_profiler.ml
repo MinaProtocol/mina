@@ -122,6 +122,7 @@ module Transaction_key = struct
   let of_zkapp_command ~ledger (p : Zkapp_command.t) =
     let segments, _ =
       Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
+        ~global_slot:Mina_numbers.Global_slot.zero
         ~state_body:Transaction_snark_tests.Util.genesis_state_body
         ~fee_excess:Currency.Amount.Signed.zero (`Ledger ledger)
         [ ( `Pending_coinbase_init_stack Pending_coinbase.Stack.empty
@@ -131,7 +132,7 @@ module Transaction_key = struct
               ; target =
                   Pending_coinbase.Stack.push_state
                     Transaction_snark_tests.Util.genesis_state_body_hash
-                    Pending_coinbase.Stack.empty
+                    Mina_numbers.Global_slot.zero Pending_coinbase.Stack.empty
               }
           , p )
         ]
@@ -262,7 +263,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ~max_num_updates :
     Quickcheck.Generator.list_with_length list_len array_gen
   in
   let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
-  let sequence_events =
+  let actions =
     Quickcheck.random_value (field_array_list_gen ~array_len:1 ~list_len:2)
   in
   let snapp_update =
@@ -299,7 +300,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ~max_num_updates :
       ; current_auth = Permissions.Auth_required.Proof
       ; call_data = Snark_params.Tick.Field.zero
       ; events = []
-      ; sequence_events
+      ; actions
       ; preconditions = None
       } )
   in
@@ -494,7 +495,10 @@ let state_body_hash = Lazy.map ~f:Mina_state.Protocol_state.Body.hash state_body
 
 let pending_coinbase_stack_target (t : Transaction.t) stack =
   let stack_with_state =
-    Pending_coinbase.Stack.(push_state (Lazy.force state_body_hash) stack)
+    Pending_coinbase.Stack.(
+      push_state
+        (Lazy.force state_body_hash)
+        (Lazy.force curr_state_view).global_slot_since_genesis stack)
   in
   let target =
     match t with
@@ -520,8 +524,9 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
       ~init:((Time.Span.zero, sparse_ledger0, Pending_coinbase.Stack.empty), [])
       ~f:(fun ((max_span, sparse_ledger, coinbase_stack_source), proofs) t ->
         let sparse_ledger', _applied =
-          Sparse_ledger.apply_transaction ~constraint_constants ~txn_state_view
-            sparse_ledger (Transaction.forget t)
+          Sparse_ledger.apply_transaction ~constraint_constants
+            ~global_slot:txn_state_view.global_slot_since_genesis
+            ~txn_state_view sparse_ledger (Transaction.forget t)
           |> Or_error.ok_exn
         in
         let coinbase_stack_target =
@@ -556,6 +561,7 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
             ~init_stack:coinbase_stack_source
             { Transaction_protocol_state.Poly.transaction = t
             ; block_data = Lazy.force state_body
+            ; global_slot = txn_state_view.global_slot_since_genesis
             }
             (unstage (Sparse_ledger.handler sparse_ledger))
         in
@@ -709,6 +715,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
       List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
           let sparse_ledger', applied_transaction =
             Sparse_ledger.apply_transaction ~constraint_constants
+              ~global_slot:txn_state_view.global_slot_since_genesis
               ~txn_state_view sparse_ledger (Transaction.forget t)
             |> Or_error.ok_exn
           in
@@ -735,6 +742,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
               { Transaction_protocol_state.Poly.block_data =
                   Lazy.force state_body
               ; transaction = t
+              ; global_slot = txn_state_view.global_slot_since_genesis
               }
               (unstage (Sparse_ledger.handler sparse_ledger))
           in
@@ -755,6 +763,7 @@ let generate_base_snarks_witness sparse_ledger0
       List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
           let sparse_ledger', applied_transaction =
             Sparse_ledger.apply_transaction ~constraint_constants
+              ~global_slot:txn_state_view.global_slot_since_genesis
               ~txn_state_view sparse_ledger (Transaction.forget t)
             |> Or_error.ok_exn
           in
@@ -781,6 +790,7 @@ let generate_base_snarks_witness sparse_ledger0
               ~zkapp_account1:None ~zkapp_account2:None ~supply_increase
               { Transaction_protocol_state.Poly.transaction = t
               ; block_data = Lazy.force state_body
+              ; global_slot = txn_state_view.global_slot_since_genesis
               }
               (unstage (Sparse_ledger.handler sparse_ledger))
           in

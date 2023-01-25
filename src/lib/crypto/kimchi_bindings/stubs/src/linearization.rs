@@ -18,6 +18,7 @@ pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
         Some(lookup_configuration) => Some(FeatureFlags {
             chacha: false,
             range_check: false,
+            rot: false,
             foreign_field_add: false,
             foreign_field_mul: false,
             xor: false,
@@ -49,7 +50,7 @@ pub fn lookup_gate_config<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
     LookupConfiguration {
         lookup_used: LookupsUsed::Joint,
 
-        lookup_info: LookupInfo::create([LookupPattern::LookupGate].into_iter().collect(), true),
+        lookup_info: LookupInfo::create([LookupPattern::Lookup].into_iter().collect(), true),
 
         dummy_lookup: JointLookup {
             table_id: F::zero(),

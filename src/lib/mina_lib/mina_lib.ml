@@ -646,7 +646,7 @@ let get_snarked_ledger t state_hash_opt =
                   match
                     List.fold_until ~init:(Ok ())
                       (Mina_stdlib.Nonempty_list.to_list txns)
-                      ~f:(fun _acc (txn, state_hash) ->
+                      ~f:(fun _acc (txn, state_hash, global_slot) ->
                         (*Validate transactions against the protocol state associated with the transaction*)
                         match
                           Transition_frontier.find_protocol_state frontier
@@ -658,7 +658,7 @@ let get_snarked_ledger t state_hash_opt =
                               |> Mina_state.Protocol_state.Body.view
                             in
                             match
-                              Ledger.apply_transaction
+                              Ledger.apply_transaction ~global_slot
                                 ~constraint_constants:
                                   t.config.precomputed_values
                                     .constraint_constants ~txn_state_view ledger
@@ -1481,13 +1481,13 @@ let create ?wallets (config : Config.t) =
                       (fun exn ->
                         let err = Error.of_exn ~backtrace:`Get exn in
                         [%log' fatal config.logger]
-                          "unhandled exception from uptime service SNARK \
-                           worker: $exn, terminating daemon"
+                          "unhandled exception when creating uptime service \
+                           SNARK worker: $exn, terminating daemon"
                           ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ;
                         (* make sure Async shutdown handlers are called *)
                         don't_wait_for (Async.exit 1) ) )
                   (fun () ->
-                    O1trace.thread "manage_uptimer_snark_worker_subprocess"
+                    O1trace.thread "manage_uptime_snark_worker_subprocess"
                       (fun () ->
                         Uptime_service.Uptime_snark_worker.create
                           ~logger:config.logger ~pids:config.pids ) )
@@ -2172,3 +2172,5 @@ let runtime_config { config = { precomputed_values; _ }; _ } =
   Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values
 
 let verifier { processes = { verifier; _ }; _ } = verifier
+
+let genesis_ledger t = Genesis_proof.genesis_ledger t.config.precomputed_values
