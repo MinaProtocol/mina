@@ -70,6 +70,17 @@ val build_no_reporting :
      Result.t
      Deferred.t
 
+val simplify_breadcrumb_building_error :
+     [< `Invalid_body_reference
+     | `Invalid_staged_ledger_diff of
+       [ `Incorrect_target_snarked_ledger_hash
+       | `Incorrect_target_staged_and_snarked_ledger_hashes
+       | `Incorrect_target_staged_ledger_hash ]
+     | `Staged_ledger_application_failed of Staged_ledger.Staged_ledger_error.t
+     ]
+  -> [> `Invalid of Error.t * [ `Other | `Proof | `Signature_or_proof ]
+     | `Verifier_error of Error.t ]
+
 val validated_transition : t -> Mina_block.Validated.t
 
 val block_with_hash : t -> Mina_block.with_hash

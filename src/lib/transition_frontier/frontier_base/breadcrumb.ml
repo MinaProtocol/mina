@@ -124,6 +124,34 @@ let build_no_reporting ?skip_staged_ledger_verification ~logger
   [%log internal] "@block_metadata" ~metadata ;
   O1trace.thread "build_breadcrumb" build_do
 
+let simplify_breadcrumb_building_error =
+  let invalid str = `Invalid (Error.of_string @@ "invalid " ^ str, `Other) in
+  let open Staged_ledger.Staged_ledger_error in
+  function
+  | `Invalid_body_reference ->
+      invalid "body reference"
+  | `Invalid_staged_ledger_diff `Incorrect_target_snarked_ledger_hash ->
+      invalid "snarked ledger hash"
+  | `Invalid_staged_ledger_diff
+      `Incorrect_target_staged_and_snarked_ledger_hashes ->
+      invalid "snarked ledger hash && staged ledger hash"
+  | `Invalid_staged_ledger_diff `Incorrect_target_staged_ledger_hash ->
+      invalid "staged ledger hash"
+  | `Staged_ledger_application_failed (Couldn't_reach_verifier _ as e)
+  | `Staged_ledger_application_failed (Pre_diff (Unexpected _) as e) ->
+      `Verifier_error (to_error e)
+  | `Staged_ledger_application_failed (Invalid_proofs _ as e) ->
+      `Invalid (to_error e, `Proof)
+  | `Staged_ledger_application_failed (Pre_diff (Verification_failed _) as e) ->
+      `Invalid (to_error e, `Signature_or_proof)
+  | `Staged_ledger_application_failed (Pre_diff _ as e)
+  | `Staged_ledger_application_failed (Non_zero_fee_excess _ as e)
+  | `Staged_ledger_application_failed (Insufficient_work _ as e)
+  | `Staged_ledger_application_failed (Mismatched_statuses _ as e)
+  | `Staged_ledger_application_failed (Invalid_public_key _ as e)
+  | `Staged_ledger_application_failed (Unexpected _ as e) ->
+      `Invalid (to_error e, `Other)
+
 let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
     ~trust_system ~parent ~transition ~get_completed_work ~senders
     ~transition_receipt_time () =

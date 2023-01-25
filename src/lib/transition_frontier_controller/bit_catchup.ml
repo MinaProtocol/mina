@@ -13,34 +13,6 @@ type write_actions =
         (** Callback to write built breadcrumbs so that they can be added to frontier *)
   }
 
-let convert_breadcrumb_error =
-  let invalid str = `Invalid (Error.of_string @@ "invalid " ^ str, `Other) in
-  let open Staged_ledger.Staged_ledger_error in
-  function
-  | `Invalid_body_reference ->
-      invalid "body reference"
-  | `Invalid_staged_ledger_diff `Incorrect_target_snarked_ledger_hash ->
-      invalid "snarked ledger hash"
-  | `Invalid_staged_ledger_diff
-      `Incorrect_target_staged_and_snarked_ledger_hashes ->
-      invalid "snarked ledger hash && staged ledger hash"
-  | `Invalid_staged_ledger_diff `Incorrect_target_staged_ledger_hash ->
-      invalid "staged ledger hash"
-  | `Staged_ledger_application_failed (Couldn't_reach_verifier _ as e)
-  | `Staged_ledger_application_failed (Pre_diff (Unexpected _) as e) ->
-      `Verifier_error (to_error e)
-  | `Staged_ledger_application_failed (Invalid_proofs _ as e) ->
-      `Invalid (to_error e, `Proof)
-  | `Staged_ledger_application_failed (Pre_diff (Verification_failed _) as e) ->
-      `Invalid (to_error e, `Signature_or_proof)
-  | `Staged_ledger_application_failed (Pre_diff _ as e)
-  | `Staged_ledger_application_failed (Non_zero_fee_excess _ as e)
-  | `Staged_ledger_application_failed (Insufficient_work _ as e)
-  | `Staged_ledger_application_failed (Mismatched_statuses _ as e)
-  | `Staged_ledger_application_failed (Invalid_public_key _ as e)
-  | `Staged_ledger_application_failed (Unexpected _ as e) ->
-      `Invalid (to_error e, `Other)
-
 (** Take non-empty list of ancestors, target hash and target length
     and return the non-empty list (of the same size as list of ancestors)
     of [Substate.transition_meta] values.  *)
@@ -651,7 +623,8 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
               ~skip_staged_ledger_verification:`Proofs ~logger
               ~precomputed_values ~verifier ~get_completed_work ~parent
               ~transition ~transition_receipt_time:(Some received_at) ()
-          |> Deferred.Result.map_error ~f:convert_breadcrumb_error )
+          |> Deferred.Result.map_error
+               ~f:Frontier_base.Breadcrumb.simplify_breadcrumb_building_error )
       in
       report_time_used_for `Breadcrumb_build Time.(diff (now ()) start_time) ;
       res

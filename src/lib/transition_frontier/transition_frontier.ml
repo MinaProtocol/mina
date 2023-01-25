@@ -213,8 +213,7 @@ let rec load_with_max_length :
       Persistent_root.load_from_disk_exn persistent_root ~snarked_ledger_hash
         ~logger
     with
-    | Error _err as err_result ->
-        (* _err has type [> `Snarked_ledger_mismatch ] *)
+    | Error (_err : [> `Snarked_ledger_mismatch ]) as err_result ->
         [%log warn] "Persisted frontier failed to load"
           ~metadata:
             [ ("error", `String "SNARKed ledger mismatch on load from disk")

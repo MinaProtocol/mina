@@ -192,18 +192,15 @@ module Instance = struct
       ~consensus_local_state ~max_length ~ignore_consensus_local_state
       ~persistent_root_instance =
     let open Context in
-    let open Deferred.Result.Let_syntax in
     let validate genesis_state_hash (b, v) =
+      let f h = Validation.with_body h (Mina_block.body @@ With_hash.data b) in
       Validation.validate_genesis_protocol_state ~genesis_state_hash
         (With_hash.map ~f:Mina_block.header b, v)
-      |> Result.map
-           ~f:
-             (Fn.flip Validation.with_body
-                (Mina_block.body @@ With_hash.data b) )
+      |> Result.map ~f
     in
     let downgrade_transition transition genesis_state_hash :
         ( Mina_block.almost_valid_block
-        , [ `Invalid_genesis_protocol_state ] )
+        , [> `Invalid_genesis_protocol_state ] )
         Result.t =
       (* we explicitly re-validate the genesis protocol state here to prevent X-version bugs *)
       transition |> Mina_block.Validated.remember
@@ -211,9 +208,16 @@ module Instance = struct
       |> Validation.reset_genesis_protocol_state_validation
       |> validate genesis_state_hash
     in
-    let%bind () = Deferred.return (assert_no_sync t) in
+    let%bind.Deferred.Result () = Deferred.return (assert_no_sync t) in
+    let not_found_failure err =
+      `Failure (Database.Error.not_found_message err)
+    in
     (* read basic information from the database *)
-    let%bind root, root_transition, best_tip, protocol_states, root_hash =
+    let%bind.Deferred.Result ( root
+                             , root_transition
+                             , best_tip
+                             , protocol_states
+                             , root_hash ) =
       (let open Result.Let_syntax in
       let%bind root = Database.get_root t.db in
       let root_hash = Root_data.Minimal.hash root in
@@ -223,8 +227,7 @@ module Instance = struct
         Database.get_protocol_states_for_root_scan_state t.db
       in
       (root, root_transition, best_tip, protocol_states, root_hash))
-      |> Result.map_error ~f:(fun err ->
-             `Failure (Database.Error.not_found_message err) )
+      |> Result.map_error ~f:not_found_failure
       |> Deferred.return
     in
     let root_genesis_state_hash =
@@ -232,17 +235,12 @@ module Instance = struct
       |> Mina_block.header |> Mina_block.Header.protocol_state
       |> Protocol_state.genesis_state_hash
     in
+    let failure_of_error err = `Failure (Error.to_string_hum err) in
     (* construct the root staged ledger in memory *)
-    let%bind root_staged_ledger =
-      let open Deferred.Let_syntax in
-      match%map
-        construct_staged_ledger_at_root ~precomputed_values ~root_ledger
-          ~root_transition ~root ~protocol_states ~logger:t.factory.logger
-      with
-      | Error err ->
-          Error (`Failure (Error.to_string_hum err))
-      | Ok staged_ledger ->
-          Ok staged_ledger
+    let%bind.Deferred.Result root_staged_ledger =
+      construct_staged_ledger_at_root ~precomputed_values ~root_ledger
+        ~root_transition ~root ~protocol_states ~logger:t.factory.logger
+      >>| Result.map_error ~f:failure_of_error
     in
     (* initialize the new in memory frontier and extensions *)
     let frontier =
@@ -262,10 +260,8 @@ module Instance = struct
              root_ledger )
         ~consensus_local_state ~max_length ~persistent_root_instance
     in
-    let%bind extensions =
-      Deferred.map
-        (Extensions.create ~logger:t.factory.logger frontier)
-        ~f:Result.return
+    let%bind.Deferred.Result extensions =
+      Extensions.create ~logger:t.factory.logger frontier >>| Result.return
     in
     let apply_diff diff =
       [%log internal] "Apply_full_frontier_diffs" ;
@@ -284,69 +280,66 @@ module Instance = struct
       [%log internal] "Notify_frontier_extensions_done" ;
       Result.return result
     in
-    (* crawl through persistent frontier and load transitions into in memory frontier *)
-    let%bind () =
-      Deferred.map
-        (Database.crawl_successors t.db root_hash
-           ~init:(Full_frontier.root frontier) ~f:(fun parent transition ->
-             let%bind transition =
-               match
-                 downgrade_transition transition root_genesis_state_hash
-               with
-               | Ok t ->
-                   Deferred.Result.return t
-               | Error `Invalid_genesis_protocol_state ->
-                   Error (`Fatal_error (Invalid_genesis_state_hash transition))
-                   |> Deferred.return
-             in
-             let state_hash =
-               ( With_hash.hash
-               @@ Mina_block.Validation.block_with_hash transition )
-                 .state_hash
-             in
-             Internal_tracing.with_state_hash state_hash
-             @@ fun () ->
-             [%log internal] "@block_metadata"
-               ~metadata:
-                 [ ( "blockchain_length"
-                   , Mina_numbers.Length.to_yojson
-                     @@ Mina_block.(
-                          blockchain_length (Validation.block transition)) )
-                 ] ;
-             [%log internal] "Loaded_transition_from_storage" ;
-             (* we're loading transitions from persistent storage,
-                don't assign a timestamp
-             *)
-             let%bind breadcrumb =
-               Breadcrumb.build ~skip_staged_ledger_verification:`All
-                 ~logger:t.factory.logger ~precomputed_values
-                 ~verifier:t.factory.verifier
-                 ~trust_system:(Trust_system.null ()) ~parent ~transition
-                 ~get_completed_work:(Fn.const None) ~senders:[]
-                 ~transition_receipt_time:None ()
-             in
-             let%map () = apply_diff Diff.(E (New_node (Full breadcrumb))) in
-             [%log internal] "Breadcrumb_integrated" ;
-             breadcrumb ) )
-        ~f:
-          (Result.map_error ~f:(function
-            | `Crawl_error err ->
-                let msg =
-                  match err with
-                  | `Fatal_error exn ->
-                      "fatal error -- " ^ Exn.to_string exn
-                  | `Invalid_staged_ledger_diff err
-                  | `Invalid_staged_ledger_hash err ->
-                      "staged ledger diff application failed -- "
-                      ^ Error.to_string_hum err
-                in
-                `Failure
-                  ( "error rebuilding transition frontier from persistence: "
-                  ^ msg )
-            | `Not_found _ as err ->
-                `Failure (Database.Error.not_found_message err) ) )
+    let map_crawl_error = function
+      | `Crawl_error `Invalid_genesis_protocol_state ->
+          `Failure "invalid genesis protocol state"
+      | `Crawl_error (`Invalid_body_reference as err)
+      | `Crawl_error (`Invalid_staged_ledger_diff _ as err)
+      | `Crawl_error (`Staged_ledger_application_failed _ as err) ->
+          let msg =
+            match Breadcrumb.simplify_breadcrumb_building_error err with
+            | `Verifier_error e ->
+                "verifier error: " ^ Error.to_string_hum e
+            | `Invalid (e, _) ->
+                "invalid: " ^ Error.to_string_hum e
+          in
+          `Failure
+            ("error rebuilding transition frontier from persistence: " ^ msg)
+      | `Not_found _ as err ->
+          not_found_failure err
     in
-    let%map () = apply_diff Diff.(E (Best_tip_changed best_tip)) in
+    let crawl_do parent transition =
+      let%bind.Deferred.Result transition =
+        Deferred.return
+          (downgrade_transition transition root_genesis_state_hash)
+      in
+      let state_hash =
+        (With_hash.hash @@ Mina_block.Validation.block_with_hash transition)
+          .state_hash
+      in
+      Internal_tracing.with_state_hash state_hash
+      @@ fun () ->
+      [%log internal] "@block_metadata"
+        ~metadata:
+          [ ( "blockchain_length"
+            , Mina_numbers.Length.to_yojson
+              @@ Mina_block.(blockchain_length (Validation.block transition)) )
+          ] ;
+      [%log internal] "Loaded_transition_from_storage" ;
+      (* we're loading transitions from persistent storage,
+         don't assign a timestamp
+      *)
+      let%bind.Deferred.Result breadcrumb =
+        Breadcrumb.build_no_reporting ~skip_staged_ledger_verification:`All
+          ~logger:t.factory.logger ~precomputed_values
+          ~verifier:t.factory.verifier ~parent ~transition
+          ~get_completed_work:(Fn.const None) ~transition_receipt_time:None ()
+      in
+      let%map.Deferred.Result () =
+        apply_diff Diff.(E (New_node (Full breadcrumb)))
+      in
+      [%log internal] "Breadcrumb_integrated" ;
+      breadcrumb
+    in
+    (* crawl through persistent frontier and load transitions into in memory frontier *)
+    let%bind.Deferred.Result res =
+      Database.crawl_successors t.db root_hash ~f:crawl_do
+        ~init:(Full_frontier.root frontier)
+      >>| Result.map_error ~f:map_crawl_error
+    in
+    let%map.Deferred.Result () =
+      apply_diff Diff.(E (Best_tip_changed best_tip))
+    in
     (frontier, extensions)
 end
 
