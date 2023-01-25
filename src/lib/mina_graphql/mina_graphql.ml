@@ -1100,6 +1100,10 @@ module Types = struct
               ~doc:"Authorization required to receive tokens"
               ~args:Arg.[]
               ~resolve:(fun _ permission -> permission.Permissions.Poly.receive)
+          ; field "access" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to access the account"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission -> permission.Permissions.Poly.access)
           ; field "setDelegate" ~typ:(non_null auth_required)
               ~doc:"Authorization required to set the delegate"
               ~args:Arg.[]
@@ -3480,6 +3484,9 @@ module Mutations = struct
                 in
                 let applied =
                   Ledger.apply_zkapp_command_unchecked ~constraint_constants
+                    ~global_slot:
+                      ( Transition_frontier.Breadcrumb.consensus_state breadcrumb
+                      |> Consensus.Data.Consensus_state.curr_global_slot )
                     ~state_view ledger zkapp_command
                 in
                 (* rearrange data to match result type of `send_zkapp_command` *)

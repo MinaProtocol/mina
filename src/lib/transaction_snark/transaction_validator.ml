@@ -126,10 +126,10 @@ let apply_user_command ~constraint_constants ~txn_global_slot l uc =
         .status )
     (apply_user_command l ~constraint_constants ~txn_global_slot uc)
 
-let apply_transaction' ~constraint_constants ~txn_state_view l t =
+let apply_transaction' ~constraint_constants ~global_slot ~txn_state_view l t =
   O1trace.sync_thread "apply_transaction" (fun () ->
-      apply_transaction ~constraint_constants ~txn_state_view l t )
+      apply_transaction ~constraint_constants ~global_slot ~txn_state_view l t )
 
-let apply_transaction ~constraint_constants ~txn_state_view l txn =
+let apply_transaction ~constraint_constants ~global_slot ~txn_state_view l txn =
   Result.map ~f:Transaction_applied.transaction_status
-    (apply_transaction' l ~constraint_constants ~txn_state_view txn)
+    (apply_transaction' l ~constraint_constants ~global_slot ~txn_state_view txn)

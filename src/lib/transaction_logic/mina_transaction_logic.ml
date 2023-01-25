@@ -334,6 +334,8 @@ module type S = sig
       ; fee_excess : Amount.Signed.t
       ; supply_increase : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
+      ; block_global_slot : Mina_numbers.Global_slot.t
+            (* Slot of block when the transaction is applied. NOTE: This is at least 1 slot after the protocol_state's view, which is for the *previous* slot. *)
       }
   end
 
@@ -360,6 +362,7 @@ module type S = sig
 
   val apply_zkapp_command_unchecked :
        constraint_constants:Genesis_constants.Constraint_constants.t
+    -> global_slot:Mina_numbers.Global_slot.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
     -> ledger
     -> Zkapp_command.t
@@ -393,6 +396,7 @@ module type S = sig
   *)
   val apply_zkapp_command_unchecked_aux :
        constraint_constants:Genesis_constants.Constraint_constants.t
+    -> global_slot:Mina_numbers.Global_slot.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
     -> init:'acc
     -> f:
@@ -431,6 +435,7 @@ module type S = sig
 
   val apply_transaction :
        constraint_constants:Genesis_constants.Constraint_constants.t
+    -> global_slot:Global_slot.t
     -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
     -> ledger
     -> Transaction.t
@@ -773,7 +778,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       pay_fee ~user_command ~signer_pk ~ledger ~current_global_slot
     in
     let%bind () =
-      if Account.has_permission ~to_:`Send fee_payer_account then Ok ()
+      if
+        Account.has_permission ~control:Control.Tag.Signature ~to_:`Access
+          fee_payer_account
+        && Account.has_permission ~control:Control.Tag.Signature ~to_:`Send
+             fee_payer_account
+      then Ok ()
       else
         Or_error.error_string
           Transaction_status.Failure.(describe Update_not_permitted_balance)
@@ -804,8 +814,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             get_with_location ledger source |> ok_or_reject
           in
           let%bind () =
-            if Account.has_permission ~to_:`Set_delegate source_account then
-              Ok ()
+            if
+              Account.has_permission ~control:Control.Tag.Signature ~to_:`Access
+                source_account
+              && Account.has_permission ~control:Control.Tag.Signature
+                   ~to_:`Set_delegate source_account
+            then Ok ()
             else Error Transaction_status.Failure.Update_not_permitted_delegate
           in
           let%bind () =
@@ -840,7 +854,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             get_with_location ledger receiver |> ok_or_reject
           in
           let%bind () =
-            if Account.has_permission ~to_:`Receive receiver_account then Ok ()
+            if
+              Account.has_permission ~control:Control.Tag.None_given
+                ~to_:`Access receiver_account
+              && Account.has_permission ~control:Control.Tag.None_given
+                   ~to_:`Receive receiver_account
+            then Ok ()
             else Error Transaction_status.Failure.Update_not_permitted_balance
           in
           let%bind source_location, source_account =
@@ -898,7 +917,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             else ret
           in
           let%bind () =
-            if Account.has_permission ~to_:`Send source_account then Ok ()
+            if
+              Account.has_permission ~control:Control.Tag.Signature ~to_:`Access
+                source_account
+              && Account.has_permission ~control:Control.Tag.Signature
+                   ~to_:`Send source_account
+            then Ok ()
             else Error Transaction_status.Failure.Update_not_permitted_balance
           in
           (* Charge the account creation fee. *)
@@ -978,6 +1002,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       ; fee_excess : Amount.Signed.t
       ; supply_increase : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
+      ; block_global_slot : Global_slot.t
       }
 
     let ledger { ledger; _ } = L.create_masked ledger
@@ -994,8 +1019,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
     let set_supply_increase t supply_increase = { t with supply_increase }
 
-    let global_slot_since_genesis { protocol_state; _ } =
-      protocol_state.global_slot_since_genesis
+    let block_global_slot { block_global_slot; _ } = block_global_slot
   end
 
   module Inputs = struct
@@ -1238,6 +1262,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       include Account
 
       module Permissions = struct
+        let access : t -> Controller.t = fun a -> a.permissions.access
+
         let edit_state : t -> Controller.t = fun a -> a.permissions.edit_state
 
         let send : t -> Controller.t = fun a -> a.permissions.send
@@ -1413,6 +1439,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let if_ = value_if
 
         let is_pos (t : t) = Sgn.equal t.sgn Pos
+
+        let is_neg (t : t) = Sgn.equal t.sgn Neg
       end
 
       let zero = zero
@@ -1451,6 +1479,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       include Zkapp_precondition.Protocol_state
     end
 
+    module Valid_while_precondition = struct
+      include Zkapp_precondition.Valid_while
+    end
+
     module Account_update = struct
       include Account_update
 
@@ -1466,7 +1498,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       type transaction_commitment = Transaction_commitment.t
 
-      let caller (p : t) = p.body.caller
+      let is_delegate_call (p : t) = Call_type.is_delegate_call p.body.call_type
 
       let check_authorization ~will_succeed:_ ~commitment:_ ~calls:_
           (account_update : t) =
@@ -1655,6 +1687,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           , Transaction_status.Failure.Collection.t )
           Zkapp_command_logic.Local_state.t
       ; protocol_state_precondition : Zkapp_precondition.Protocol_state.t
+      ; valid_while_precondition : Zkapp_precondition.Valid_while.t
       ; transaction_commitment : Transaction_commitment.t
       ; full_transaction_commitment : Transaction_commitment.t
       ; field : Snark_params.Tick.Field.t
@@ -1663,6 +1696,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let perform ~constraint_constants:_ (type r)
         (eff : (r, t) Zkapp_command_logic.Eff.t) : r =
       match eff with
+      | Check_valid_while_precondition (valid_while, global_state) ->
+          Zkapp_precondition.Valid_while.check valid_while
+            global_state.block_global_slot
+          |> Or_error.is_ok
       | Check_protocol_state_precondition (pred, global_state) -> (
           Zkapp_precondition.Protocol_state.check pred
             global_state.protocol_state
@@ -1708,6 +1745,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
   *)
   let apply_zkapp_command_unchecked_aux (type user_acc)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~(global_slot : Global_slot.t)
       ~(state_view : Zkapp_precondition.Protocol_state.View.t)
       ~(init : user_acc) ~(f : user_acc -> _ -> user_acc)
       ?(fee_excess = Amount.Signed.zero) ?(supply_increase = Amount.Signed.zero)
@@ -1738,7 +1776,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     in
     let initial_state :
         Inputs.Global_state.t * _ Zkapp_command_logic.Local_state.t =
-      ( { protocol_state = state_view; ledger; fee_excess; supply_increase }
+      ( { protocol_state = state_view
+        ; ledger
+        ; fee_excess
+        ; supply_increase
+        ; block_global_slot = global_slot
+        }
       , { stack_frame =
             ({ calls = []
              ; caller = Token_id.default
@@ -1854,9 +1897,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               "Zkapp_command application failed but new accounts created or \
                some of the other account_update updates applied"
 
-  let apply_zkapp_command_unchecked ~constraint_constants ~state_view ledger c =
-    apply_zkapp_command_unchecked_aux ~constraint_constants ~state_view ledger c
-      ~init:None ~f:(fun _acc (global_state, local_state) ->
+  let apply_zkapp_command_unchecked ~constraint_constants ~global_slot
+      ~state_view ledger c =
+    apply_zkapp_command_unchecked_aux ~constraint_constants ~global_slot
+      ~state_view ledger c ~init:None
+      ~f:(fun _acc (global_state, local_state) ->
         Some (local_state, global_state.fee_excess) )
     |> Result.map ~f:(fun (account_update_applied, state_res) ->
            (account_update_applied, Option.value_exn state_res) )
@@ -1875,7 +1920,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         ( init_account
         , `Added
         , `Has_permission_to_receive
-            (Account.has_permission ~to_:`Receive init_account) )
+            (Account.has_permission ~control:Control.Tag.None_given
+               ~to_:`Receive init_account ) )
     | Some loc -> (
         match get ledger loc with
         | None ->
@@ -1884,7 +1930,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
             ( receiver_account
             , `Existed
             , `Has_permission_to_receive
-                (Account.has_permission ~to_:`Receive receiver_account) ) )
+                (Account.has_permission ~control:Control.Tag.None_given
+                   ~to_:`Receive receiver_account ) ) )
 
   let no_failure = []
 
@@ -2140,11 +2187,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       ; burned_tokens
       }
 
-  let apply_transaction ~constraint_constants
+  let apply_transaction ~constraint_constants ~global_slot
       ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t) ledger
       (t : Transaction.t) =
     let previous_hash = merkle_root ledger in
-    let txn_global_slot = txn_state_view.global_slot_since_genesis in
+    let txn_global_slot = global_slot in
     Or_error.map
       ( match t with
       | Command (Signed_command txn) ->
@@ -2154,8 +2201,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               Transaction_applied.Varying.Command (Signed_command applied) )
       | Command (Zkapp_command txn) ->
           Or_error.map
-            (apply_zkapp_command_unchecked ~state_view:txn_state_view
-               ~constraint_constants ledger txn ) ~f:(fun (applied, _) ->
+            (apply_zkapp_command_unchecked ~global_slot
+               ~state_view:txn_state_view ~constraint_constants ledger txn )
+            ~f:(fun (applied, _) ->
               Transaction_applied.Varying.Command (Zkapp_command applied) )
       | Fee_transfer t ->
           Or_error.map
@@ -2247,7 +2295,6 @@ module For_tests = struct
       ; sender : Keypair.t * Account_nonce.t
       ; receiver : Public_key.Compressed.t
       ; amount : Currency.Amount.t
-      ; receiver_is_new : bool
       }
     [@@deriving sexp]
 
@@ -2294,9 +2341,7 @@ module For_tests = struct
       let nonces =
         Map.set nonces ~key:sender ~data:(Account_nonce.succ nonce)
       in
-      let spec =
-        { fee; amount; receiver; receiver_is_new; sender = (sender, nonce) }
-      in
+      let spec = { fee; amount; receiver; sender = (sender, nonce) } in
       return (spec, nonces)
   end
 
@@ -2325,12 +2370,8 @@ module For_tests = struct
   end
 
   let command_send
-      { Transaction_spec.fee
-      ; sender = sender, sender_nonce
-      ; receiver
-      ; amount
-      ; receiver_is_new = _
-      } : Signed_command.t =
+      { Transaction_spec.fee; sender = sender, sender_nonce; receiver; amount }
+      : Signed_command.t =
     let sender_pk = Public_key.compress sender.public_key in
     Signed_command.sign sender
       { common =
@@ -2346,13 +2387,8 @@ module For_tests = struct
 
   let account_update_send ?(use_full_commitment = true)
       ?(double_sender_nonce = true)
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      { Transaction_spec.fee
-      ; sender = sender, sender_nonce
-      ; receiver
-      ; amount
-      ; receiver_is_new
-      } : Zkapp_command.t =
+      { Transaction_spec.fee; sender = sender, sender_nonce; receiver; amount }
+      : Zkapp_command.t =
     let sender_pk = Public_key.compress sender.public_key in
     let actual_nonce =
       (* Here, we double the spec'd nonce, because we bump the nonce a second
@@ -2396,9 +2432,11 @@ module For_tests = struct
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Nonce (Account.Nonce.succ actual_nonce)
+                    ; valid_while = Ignore
                     }
-                ; caller = Call
+                ; call_type = Call
                 ; use_full_commitment
+                ; implicit_account_creation_fee = true
                 ; authorization_kind = Signature
                 }
             ; authorization = None_given
@@ -2407,14 +2445,7 @@ module For_tests = struct
                 { public_key = receiver
                 ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
-                ; balance_change =
-                    Amount.Signed.of_unsigned
-                      ( if receiver_is_new then
-                        Option.value_exn
-                          (Amount.sub amount
-                             (Amount.of_fee
-                                constraint_constants.account_creation_fee ) )
-                      else amount )
+                ; balance_change = Amount.Signed.of_unsigned amount
                 ; increment_nonce = false
                 ; events = []
                 ; actions = []
@@ -2424,9 +2455,11 @@ module For_tests = struct
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Accept
+                    ; valid_while = Ignore
                     }
-                ; caller = Call
+                ; call_type = Call
                 ; use_full_commitment = false
+                ; implicit_account_creation_fee = true
                 ; authorization_kind = None_given
                 }
             ; authorization = None_given
@@ -2471,8 +2504,8 @@ module For_tests = struct
 
   let test_eq (type l) (module L : Ledger_intf.S with type t = l) accounts
       (l1 : L.t) (l2 : L.t) =
-    Or_error.try_with (fun () ->
-        List.iter accounts ~f:(fun a ->
+    List.map accounts ~f:(fun a ->
+        Or_error.try_with (fun () ->
             let mismatch () =
               failwithf
                 !"One ledger had the account %{sexp:Account_id.t} but the \
@@ -2496,6 +2529,7 @@ module For_tests = struct
                 | Some a1, Some a2 ->
                     [%test_eq: Account_without_receipt_chain_hash.t]
                       (hide_rc a1) (hide_rc a2) ) ) )
+    |> Or_error.combine_errors_unit
 
   let txn_global_slot = Global_slot.zero
 

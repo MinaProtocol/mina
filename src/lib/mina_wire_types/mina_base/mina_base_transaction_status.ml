@@ -18,6 +18,7 @@ module Failure = struct
       | Signed_command_on_zkapp_account
       | Zkapp_account_not_present
       | Update_not_permitted_balance
+      | Update_not_permitted_access
       | Update_not_permitted_timing_existing_account
       | Update_not_permitted_delegate
       | Update_not_permitted_app_state
@@ -40,6 +41,7 @@ module Failure = struct
       | Account_proved_state_precondition_unsatisfied
       | Account_is_new_precondition_unsatisfied
       | Protocol_state_precondition_unsatisfied
+      | Valid_while_precondition_unsatisfied
       | Incorrect_nonce
       | Invalid_fee_excess
       | Cancelled

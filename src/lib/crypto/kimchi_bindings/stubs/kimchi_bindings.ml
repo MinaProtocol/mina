@@ -48,11 +48,16 @@ module Protocol = struct
 
         external get : t -> int -> elt = "caml_pasta_fp_plonk_gate_vector_get"
 
+        external len : t -> int = "caml_pasta_fp_plonk_gate_vector_len"
+
         external wrap : t -> Kimchi_types.wire -> Kimchi_types.wire -> unit
           = "caml_pasta_fp_plonk_gate_vector_wrap"
 
         external digest : int -> t -> bytes
           = "caml_pasta_fp_plonk_gate_vector_digest"
+
+        external to_json : int -> t -> string
+          = "caml_pasta_fp_plonk_circuit_serialize"
       end
 
       module Fq = struct
@@ -66,11 +71,16 @@ module Protocol = struct
 
         external get : t -> int -> elt = "caml_pasta_fq_plonk_gate_vector_get"
 
+        external len : t -> int = "caml_pasta_fq_plonk_gate_vector_len"
+
         external wrap : t -> Kimchi_types.wire -> Kimchi_types.wire -> unit
           = "caml_pasta_fq_plonk_gate_vector_wrap"
 
         external digest : int -> t -> bytes
           = "caml_pasta_fq_plonk_gate_vector_digest"
+
+        external to_json : int -> t -> string
+          = "caml_pasta_fq_plonk_circuit_serialize"
       end
     end
   end
