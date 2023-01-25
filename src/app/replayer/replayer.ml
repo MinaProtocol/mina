@@ -303,9 +303,15 @@ module User_command_helpers = struct
         failwithf "Invalid user command type: %s" typ ()
 end
 
+(* internal commands in result are remaining internal commands to process
+
+   in most cases, those are the input list `ics`
+   when we combine fee transfers, it's the tail of `ics`
+*)
 let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
     (ics : Sql.Internal_command.t list) :
-    Mina_transaction.Transaction.t option Deferred.t =
+    (Mina_transaction.Transaction.t option * Sql.Internal_command.t list)
+    Deferred.t =
   [%log info]
     "Converting internal command (%s) with global slot since genesis %Ld, \
      sequence number %d, and secondary sequence number %d to transaction"
@@ -323,7 +329,7 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
     Fee_transfer.Single.create ~receiver_pk ~fee ~fee_token
   in
   match ics with
-  | ic2 :: _
+  | ic2 :: ics2
     when Int64.equal ic.global_slot_since_genesis ic2.global_slot_since_genesis
          && Int.equal ic.sequence_no ic2.sequence_no
          && String.equal ic.typ "fee_transfer"
@@ -331,11 +337,15 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
       (* combining situation 2
          two fee transfer commands with same global slot since genesis, sequence number
       *)
+      [%log info]
+        "Combining two fee transfers at global slot since genesis %Ld with \
+         sequence number %d"
+        ic.global_slot_since_genesis ic.sequence_no ;
       let%bind fee_transfer1 = fee_transfer_of_cmd ic in
       let%map fee_transfer2 = fee_transfer_of_cmd ic2 in
       match Fee_transfer.create fee_transfer1 (Some fee_transfer2) with
       | Ok ft ->
-          Some (Mina_transaction.Transaction.Fee_transfer ft)
+          (Some (Mina_transaction.Transaction.Fee_transfer ft), ics2)
       | Error err ->
           Error.tag err ~tag:"Could not create combined fee transfer"
           |> Error.raise )
@@ -345,7 +355,7 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
           let%map fee_transfer = fee_transfer_of_cmd ic in
           match Fee_transfer.create fee_transfer None with
           | Ok ft ->
-              Some (Mina_transaction.Transaction.Fee_transfer ft)
+              (Some (Mina_transaction.Transaction.Fee_transfer ft), ics)
           | Error err ->
               Error.tag err ~tag:"Could not create fee transfer" |> Error.raise
           )
@@ -363,8 +373,7 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
           in
           if Option.is_some fee_transfer then
             [%log info]
-              "Coinbase transaction at global slot since genesis %Ld, \
-               sequence                                                                                                                                                                              \
+              "Coinbase transaction at global slot since genesis %Ld, sequence \
                number %d, and secondary sequence number %d contains a fee \
                transfer"
               ic.global_slot_since_genesis ic.sequence_no
@@ -375,12 +384,12 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
           let receiver_pk = Account_id.public_key receiver_account_id in
           match Coinbase.create ~amount ~receiver:receiver_pk ~fee_transfer with
           | Ok cb ->
-              Some (Mina_transaction.Transaction.Coinbase cb)
+              (Some (Mina_transaction.Transaction.Coinbase cb), ics)
           | Error err ->
               Error.tag err ~tag:"Could not create coinbase" |> Error.raise )
       | "fee_transfer_via_coinbase" ->
           (* handled in the coinbase case *)
-          return None
+          return (None, ics)
       | ty ->
           failwithf "Unknown internal command type: %s" ty () )
 
@@ -680,7 +689,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
             "Block chain leading to target state hash does not include genesis \
              block" ;
           Core_kernel.exit 1 ) ;
-      (* some global state, less painful than passing these throughout *)
+      (* some mutable state, less painful than passing epoch ledgers throughout *)
       let staking_epoch_ledger = ref ledger in
       let next_epoch_ledger = ref ledger in
       let%bind staking_seed, next_seed =
@@ -707,7 +716,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
         in
         (ref staking_seed, ref next_seed)
       in
-      (* end global state *)
+      (* end mutable state *)
       let get_command_ids (module Command_ids : Get_command_ids) name =
         match%bind
           Caqti_async.Pool.use
@@ -1191,16 +1200,17 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
               check_for_complete_block
                 ~cmd_global_slot_since_genesis:ic.global_slot_since_genesis
             in
-            let%bind block_txns =
-              match%map internal_cmds_to_transaction ~logger ~pool ic ics with
-              | Some txn ->
-                  txn :: block_txns0
-              | None ->
-                  block_txns0
+            let%bind block_txns, ics' =
+              let%map txn, ics' =
+                internal_cmds_to_transaction ~logger ~pool ic ics
+              in
+              ( Option.value_map txn ~default:block_txns0 ~f:(fun txn ->
+                    txn :: block_txns0 )
+              , ics' )
             in
             apply_commands ~block_txns
               ~last_global_slot_since_genesis:ic.global_slot_since_genesis
-              ~last_block_id:ic.block_id ics user_cmds zkapp_cmds
+              ~last_block_id:ic.block_id ics' user_cmds zkapp_cmds
         | [], uc :: ucs, [] ->
             (* only user commands *)
             let%bind block_txns =
@@ -1260,18 +1270,17 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                   check_for_complete_block
                     ~cmd_global_slot_since_genesis:ic.global_slot_since_genesis
                 in
-                let%bind block_txns =
-                  match%map
+                let%bind block_txns, ics' =
+                  let%map txn, ics' =
                     internal_cmds_to_transaction ~logger ~pool ic ics
-                  with
-                  | Some txn ->
-                      txn :: block_txns0
-                  | None ->
-                      block_txns0
+                  in
+                  ( Option.value_map txn ~default:block_txns0 ~f:(fun txn ->
+                        txn :: block_txns0 )
+                  , ics' )
                 in
                 apply_commands ~block_txns
                   ~last_global_slot_since_genesis:ic.global_slot_since_genesis
-                  ~last_block_id:ic.block_id ics user_cmds zkapp_cmds
+                  ~last_block_id:ic.block_id ics' user_cmds zkapp_cmds
             | `Zkapp_command ->
                 let%bind block_txns =
                   check_for_complete_block
@@ -1292,18 +1301,17 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                   check_for_complete_block
                     ~cmd_global_slot_since_genesis:ic.global_slot_since_genesis
                 in
-                let%bind block_txns =
-                  match%map
+                let%bind block_txns, ics' =
+                  let%map txn, ics' =
                     internal_cmds_to_transaction ~logger ~pool ic ics
-                  with
-                  | Some txn ->
-                      txn :: block_txns0
-                  | None ->
-                      block_txns0
+                  in
+                  ( Option.value_map txn ~default:block_txns0 ~f:(fun txn ->
+                        txn :: block_txns0 )
+                  , ics' )
                 in
                 apply_commands ~block_txns
                   ~last_global_slot_since_genesis:ic.global_slot_since_genesis
-                  ~last_block_id:ic.block_id ics user_cmds zkapp_cmds
+                  ~last_block_id:ic.block_id ics' user_cmds zkapp_cmds
             | `User_command ->
                 let%bind block_txns =
                   check_for_complete_block
@@ -1329,18 +1337,17 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                   check_for_complete_block
                     ~cmd_global_slot_since_genesis:ic.global_slot_since_genesis
                 in
-                let%bind block_txns =
-                  match%map
+                let%bind block_txns, ics' =
+                  let%map txn, ics' =
                     internal_cmds_to_transaction ~logger ~pool ic ics
-                  with
-                  | Some txn ->
-                      txn :: block_txns0
-                  | None ->
-                      block_txns0
+                  in
+                  ( Option.value_map txn ~default:block_txns0 ~f:(fun txn ->
+                        txn :: block_txns0 )
+                  , ics' )
                 in
                 apply_commands ~block_txns
                   ~last_global_slot_since_genesis:ic.global_slot_since_genesis
-                  ~last_block_id:ic.block_id ics user_cmds zkapp_cmds
+                  ~last_block_id:ic.block_id ics' user_cmds zkapp_cmds
             | `User_command ->
                 let%bind block_txns =
                   check_for_complete_block
