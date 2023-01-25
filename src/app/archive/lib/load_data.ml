@@ -422,7 +422,7 @@ let get_account_update_body ~pool body_id =
            ; zkapp_valid_while_precondition_id
            ; use_full_commitment
            ; implicit_account_creation_fee
-           ; call_type
+           ; may_use_token
            ; authorization_kind
            } =
     query_db ~f:(fun db -> Processor.Zkapp_account_update_body.load db body_id)
@@ -593,7 +593,7 @@ let get_account_update_body ~pool body_id =
   let%bind valid_while_precondition =
     get_global_slot_bounds pool zkapp_valid_while_precondition_id
   in
-  let call_type = Account_update.Call_type.of_string call_type in
+  let may_use_token = Account_update.May_use_token.of_string may_use_token in
   let authorization_kind =
     Account_update.Authorization_kind.of_string_exn authorization_kind
   in
@@ -614,7 +614,7 @@ let get_account_update_body ~pool body_id =
           }
       ; use_full_commitment
       ; implicit_account_creation_fee
-      ; call_type
+      ; may_use_token
       ; authorization_kind
       }
       : Account_update.Body.Simple.t )

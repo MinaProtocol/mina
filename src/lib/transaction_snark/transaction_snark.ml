@@ -1867,9 +1867,13 @@ module Make_str (A : Wire_types.Concrete) = struct
 
             let public_key (t : t) = t.account_update.data.public_key
 
-            let is_delegate_call (t : t) =
-              Account_update.Call_type.Checked.is_delegate_call
-                t.account_update.data.call_type
+            let may_use_parents_own_token (t : t) =
+              Account_update.May_use_token.Checked.parents_own_token
+                t.account_update.data.may_use_token
+
+            let may_use_token_inherited_from_parent (t : t) =
+              Account_update.May_use_token.Checked.inherit_from_parent
+                t.account_update.data.may_use_token
 
             let account_id (t : t) =
               Account_id.create (public_key t) (token_id t)
@@ -4414,7 +4418,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; preconditions = preconditions'
           ; use_full_commitment = false
           ; implicit_account_creation_fee = false
-          ; call_type = Call
+          ; may_use_token = No
           ; authorization_kind = Signature
           }
         in
@@ -4481,7 +4485,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                       }
                   ; use_full_commitment = true
                   ; implicit_account_creation_fee = false
-                  ; call_type = Call
+                  ; may_use_token = No
                   ; authorization_kind
                   }
               ; authorization =
@@ -4524,7 +4528,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; preconditions = { preconditions' with account = Accept }
                 ; use_full_commitment
                 ; implicit_account_creation_fee = false
-                ; call_type = Call
+                ; may_use_token = No
                 ; authorization_kind
                 }
             ; authorization = receiver_auth
@@ -5053,7 +5057,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 }
             ; use_full_commitment = false
             ; implicit_account_creation_fee = false
-            ; call_type = Call
+            ; may_use_token = No
             ; authorization_kind = Signature
             }
         ; authorization = Signature Signature.dummy
@@ -5077,7 +5081,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 }
             ; use_full_commitment = false
             ; implicit_account_creation_fee = false
-            ; call_type = Call
+            ; may_use_token = No
             ; authorization_kind = Proof
             }
         ; authorization = Proof Mina_base.Proof.blockchain_dummy

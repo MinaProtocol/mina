@@ -326,7 +326,9 @@ module type Account_update_intf = sig
 
   val account_id : t -> account_id
 
-  val is_delegate_call : t -> bool
+  val may_use_parents_own_token : t -> bool
+
+  val may_use_token_inherited_from_parent : t -> bool
 
   val use_full_commitment : t -> bool
 
@@ -933,11 +935,19 @@ module Make (Inputs : Inputs_intf) = struct
     let (account_update, account_update_forest), remainder_of_current_forest =
       Call_forest.pop_exn (Stack_frame.calls current_forest)
     in
-    let is_delegate_call = Account_update.is_delegate_call account_update in
+    let may_use_parents_own_token =
+      Account_update.may_use_parents_own_token account_update
+    in
+    let may_use_token_inherited_from_parent =
+      Account_update.may_use_token_inherited_from_parent account_update
+    in
     let caller_id =
-      Token_id.if_ is_delegate_call
+      Token_id.if_ may_use_token_inherited_from_parent
         ~then_:(Stack_frame.caller_caller current_forest)
-        ~else_:(Stack_frame.caller current_forest)
+        ~else_:
+          (Token_id.if_ may_use_parents_own_token
+             ~then_:(Stack_frame.caller current_forest)
+             ~else_:Token_id.default )
     in
     (* Cases:
        - [account_update_forest] is empty, [remainder_of_current_forest] is empty.
@@ -983,11 +993,8 @@ module Make (Inputs : Inputs_intf) = struct
              ~then_:newly_popped_frame ~else_:remainder_of_current_forest_frame )
         ~else_:
           (let caller =
-             Token_id.if_ is_delegate_call
-               ~then_:(Stack_frame.caller current_forest)
-               ~else_:
-                 (Account_id.derive_token_id
-                    ~owner:(Account_update.account_id account_update) )
+             Account_id.derive_token_id
+               ~owner:(Account_update.account_id account_update)
            and caller_caller = caller_id in
            Stack_frame.make ~calls:account_update_forest ~caller ~caller_caller
           )

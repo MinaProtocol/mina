@@ -2676,11 +2676,27 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "CallTypeInput",
+          "name": "MayUseTokenInput",
           "description": null,
           "fields": [
             {
-              "name": "isDelegateCall",
+              "name": "parentsOwnToken",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "inheritFromParent",
               "description": null,
               "args": [],
               "type": {
@@ -2698,7 +2714,21 @@
           ],
           "inputFields": [
             {
-              "name": "isDelegateCall",
+              "name": "parentsOwnToken",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "inheritFromParent",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -2942,7 +2972,7 @@
               "deprecationReason": null
             },
             {
-              "name": "callType",
+              "name": "mayUseToken",
               "description": null,
               "args": [],
               "type": {
@@ -2950,7 +2980,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "CallTypeInput",
+                  "name": "MayUseTokenInput",
                   "ofType": null
                 }
               },
@@ -3172,14 +3202,14 @@
               "defaultValue": null
             },
             {
-              "name": "callType",
+              "name": "mayUseToken",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "CallTypeInput",
+                  "name": "MayUseTokenInput",
                   "ofType": null
                 }
               },
@@ -6688,11 +6718,27 @@
         },
         {
           "kind": "OBJECT",
-          "name": "CallType",
+          "name": "MayUseToken",
           "description": null,
           "fields": [
             {
-              "name": "isDelegateCall",
+              "name": "parentsOwnToken",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "inheritFromParent",
               "description": null,
               "args": [],
               "type": {
@@ -8034,7 +8080,7 @@
               "deprecationReason": null
             },
             {
-              "name": "callType",
+              "name": "mayUseToken",
               "description": null,
               "args": [],
               "type": {
@@ -8042,7 +8088,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "CallType",
+                  "name": "MayUseToken",
                   "ofType": null
                 }
               },
