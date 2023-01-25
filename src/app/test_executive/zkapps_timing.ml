@@ -22,10 +22,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; block_producers =
         [ { balance = "8000000000"; timing = Untimed }
         ; { balance = "1000000000"; timing = Untimed }
-        ; { balance = "1000000000"; timing = Untimed }
         ]
     ; num_archive_nodes = 1
-    ; num_snark_workers = 0
+    ; num_snark_workers = 2
+    ; snark_worker_fee = "0.0001"
+    ; proof_config =
+        { proof_config_default with
+          work_delay = Some 1
+        ; transaction_capacity =
+            Some Runtime_config.Proof_keys.Transaction_capacity.small
+        }
     }
 
   let transactions_sent = ref 0
