@@ -608,51 +608,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     end
 
     module Account = Mina_account.Account
-
-    module Amount = struct
-      open Currency.Amount
-
-      type unsigned = t
-
-      type t = unsigned
-
-      let if_ = value_if
-
-      module Signed = struct
-        include Signed
-
-        let if_ = value_if
-
-        let is_pos (t : t) = Sgn.equal t.sgn Pos
-
-        let is_neg (t : t) = Sgn.equal t.sgn Neg
-      end
-
-      let zero = zero
-
-      let equal = equal
-
-      let add_flagged = add_flagged
-
-      let add_signed_flagged (x1 : t) (x2 : Signed.t) : t * [ `Overflow of bool ]
-          =
-        let y, `Overflow b = Signed.(add_flagged (of_unsigned x1) x2) in
-        match y.sgn with
-        | Pos ->
-            (y.magnitude, `Overflow b)
-        | Neg ->
-            (* We want to capture the accurate value so that this will match
-               with the values in the snarked logic.
-            *)
-            let magnitude =
-              Amount.to_uint64 y.magnitude
-              |> Unsigned.UInt64.(mul (sub zero one))
-              |> Amount.of_uint64
-            in
-            (magnitude, `Overflow true)
-
-      let of_constant_fee = of_fee
-    end
+    module Amount = Currency_amount
 
     module Token_id = struct
       include Token_id
