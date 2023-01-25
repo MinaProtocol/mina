@@ -42,7 +42,7 @@ Pipeline.build
           label = "Rosetta integration tests Bullseye"
           , key = "rosetta-integration-tests-bullseye"
           , target = Size.Small
-          , depends_on = [ { name = "MinaArtifactBullseye", key = "rosetta-bullseye-docker-image" } ]
+          , depends_on = [ { name = "MinaArtifactBullseye", key = "rosetta-bullseye" } ]
           , soft_fail = Some (B/SoftFail.Boolean True)
         }
     ]

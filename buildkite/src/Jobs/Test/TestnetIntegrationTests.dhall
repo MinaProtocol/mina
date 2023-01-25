@@ -13,8 +13,8 @@ let dependsOn = [
 let dependsOnJs = [
     { name = "TestnetIntegrationTests", key = "build-test-executive" },
     { name = "TestnetIntegrationTests", key = "build-js-tests" },
-    { name = "MinaArtifactBullseye", key = "daemon-devnet-bullseye-docker-image" },
-    { name = "MinaArtifactBullseye", key = "archive-bullseye-docker-image" }
+    { name = "MinaArtifactBullseye", key = "daemon-devnet-bullseye" },
+    { name = "MinaArtifactBullseye", key = "archive-bullseye" }
 ]
 
 in Pipeline.build Pipeline.Config::{
