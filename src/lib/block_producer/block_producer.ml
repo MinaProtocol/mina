@@ -291,9 +291,13 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       , pending_coinbase_update ) ->
       let%bind protocol_state, consensus_transition_data =
         lift_sync (fun () ->
-            let previous_ledger_hash =
+            let first_pass_previous_ledger_hash =
               previous_protocol_state |> Protocol_state.blockchain_state
-              |> Blockchain_state.snarked_ledger_hash
+              |> Blockchain_state.first_pass_snarked_ledger_hash
+            in
+            let second_pass_previous_ledger_hash =
+              previous_protocol_state |> Protocol_state.blockchain_state
+              |> Blockchain_state.second_pass_snarked_ledger_hash
             in
             let next_registers =
               match ledger_proof_opt with
@@ -342,7 +346,10 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                 Consensus_state_hooks.generate_transition
                   ~previous_protocol_state ~blockchain_state ~current_time
                   ~block_data ~supercharge_coinbase
-                  ~snarked_ledger_hash:previous_ledger_hash ~genesis_ledger_hash
+                  ~first_pass_snarked_ledger_hash:
+                    first_pass_previous_ledger_hash
+                  ~second_pass_snarked_ledger_hash:
+                    second_pass_previous_ledger_hash ~genesis_ledger_hash
                   ~supply_increase ~logger ~constraint_constants ) )
       in
       lift_sync (fun () ->

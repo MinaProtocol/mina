@@ -158,7 +158,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         Zkapp_precondition.Protocol_state.View.Checked.t =
       let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
       let cs : Consensus.Data.Consensus_state.var = t.consensus_state in
-      { snarked_ledger_hash = t.blockchain_state.registers.ledger
+      { snarked_ledger_hash =
+          t.blockchain_state.registers.first_pass_ledger (* TODO *)
       ; blockchain_length = C.blockchain_length_var cs
       ; min_window_density = C.min_window_density_var cs
       ; last_vrf_output = ()
@@ -178,7 +179,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     let view (t : Value.t) : Zkapp_precondition.Protocol_state.View.t =
       let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
       let cs = t.consensus_state in
-      { snarked_ledger_hash = t.blockchain_state.registers.ledger
+      { snarked_ledger_hash =
+          t.blockchain_state.registers.first_pass_ledger (* TODO *)
       ; blockchain_length = C.blockchain_length cs
       ; min_window_density = C.min_window_density cs
       ; last_vrf_output = ()

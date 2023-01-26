@@ -45,7 +45,10 @@ module Transaction_with_witness = struct
         ; init_stack :
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
             .t
-        ; ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t [@sexp.opaque]
+        ; first_pass_ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t
+              [@sexp.opaque]
+        ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t
+              [@sexp.opaque]
         ; block_global_slot : Mina_numbers.Global_slot.Stable.V1.t
         }
       [@@deriving sexp]
@@ -177,15 +180,20 @@ let create_expected_statement ~constraint_constants
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
     { Transaction_with_witness.transaction_with_info
     ; state_hash
-    ; ledger_witness
+    ; first_pass_ledger_witness
+    ; second_pass_ledger_witness
     ; init_stack
     ; statement
     ; block_global_slot
     } =
   let open Or_error.Let_syntax in
-  let source_merkle_root =
+  let first_pass_source_merkle_root =
     Frozen_ledger_hash.of_ledger_hash
-    @@ Sparse_ledger.merkle_root ledger_witness
+    @@ Sparse_ledger.merkle_root first_pass_ledger_witness
+  in
+  let second_pass_source_merkle_root =
+    Frozen_ledger_hash.of_ledger_hash
+    @@ Sparse_ledger.merkle_root second_pass_ledger_witness
   in
   let { With_status.data = transaction; status = _ } =
     Ledger.Transaction_applied.transaction transaction_with_info
@@ -197,12 +205,13 @@ let create_expected_statement ~constraint_constants
     Or_error.try_with (fun () ->
         Sparse_ledger.apply_transaction ~constraint_constants
           ~global_slot:block_global_slot ~txn_state_view:state_view
-          ledger_witness transaction )
+          first_pass_ledger_witness transaction )
     |> Or_error.join
   in
-  let target_merkle_root =
+  let first_pass_target_merkle_root =
     Sparse_ledger.merkle_root after |> Frozen_ledger_hash.of_ledger_hash
   in
+  let second_pass_target_merkle_root = second_pass_source_merkle_root in
   let%bind pending_coinbase_before =
     match init_stack with
     | Base source ->
@@ -229,12 +238,14 @@ let create_expected_statement ~constraint_constants
     Ledger.Transaction_applied.supply_increase applied_transaction
   in
   { Transaction_snark.Statement.source =
-      { ledger = source_merkle_root
+      { first_pass_ledger = first_pass_source_merkle_root
+      ; second_pass_ledger = second_pass_source_merkle_root
       ; pending_coinbase_stack = statement.source.pending_coinbase_stack
       ; local_state = empty_local_state
       }
   ; target =
-      { ledger = target_merkle_root
+      { first_pass_ledger = first_pass_target_merkle_root
+      ; second_pass_ledger = second_pass_target_merkle_root
       ; pending_coinbase_stack = pending_coinbase_after
       ; local_state = empty_local_state
       }
@@ -542,8 +553,14 @@ struct
       let open Or_error.Let_syntax in
       let%map () =
         clarify_error
-          (Frozen_ledger_hash.equal reg1.ledger reg2.ledger)
-          "did not connect with snarked ledger hash"
+          (Frozen_ledger_hash.equal reg1.first_pass_ledger
+             reg2.first_pass_ledger )
+          "did not connect with first pass snarked ledger hash"
+      and () =
+        clarify_error
+          (Frozen_ledger_hash.equal reg1.second_pass_ledger
+             reg2.second_pass_ledger )
+          "did not connect with second pass snarked ledger hash"
       and () =
         clarify_error
           (Pending_coinbase.Stack.connected ~first:reg1.pending_coinbase_stack
@@ -692,7 +709,8 @@ let extract_from_job (job : job) =
         ( d.transaction_with_info
         , d.statement
         , d.state_hash
-        , d.ledger_witness
+        , d.first_pass_ledger_witness
+        , d.second_pass_ledger_witness
         , d.init_stack
         , d.block_global_slot )
   | Merge ((p1, _), (p2, _)) ->
@@ -759,7 +777,8 @@ let all_work_pairs t
         ( transaction_with_info
         , statement
         , state_hash
-        , ledger_witness
+        , first_pass_ledger_witness
+        , second_pass_ledger_witness
         , init_stack
         , block_global_slot ) ->
         let%map witness =
@@ -778,7 +797,8 @@ let all_work_pairs t
             | Merge ->
                 Or_error.error_string "init_stack was Merge"
           in
-          { Transaction_witness.ledger = ledger_witness
+          { Transaction_witness.first_pass_ledger = first_pass_ledger_witness
+          ; second_pass_ledger = second_pass_ledger_witness
           ; transaction
           ; protocol_state_body
           ; init_stack

@@ -132,7 +132,8 @@ let trivial_zkapp =
     (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
 
 let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
-    ?global_slot ?(state_body = genesis_state_body) ledger zkapp_commands =
+    ?global_slot ?(state_body = genesis_state_body) first_pass_ledger
+    second_pass_ledger zkapp_commands =
   let module T = (val Lazy.force snark_module) in
   (*TODO: merge multiple zkApp transactions*)
   let ignore_outside_snark = Option.value ~default:false ignore_outside_snark in
@@ -148,7 +149,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
         Or_error.try_with (fun () ->
             Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
               ~global_slot ~state_body ~fee_excess:Amount.Signed.zero
-              (`Ledger ledger)
+              (`Ledger first_pass_ledger) (`Ledger second_pass_ledger)
               [ ( `Pending_coinbase_init_stack init_stack
                 , `Pending_coinbase_of_statement
                     (pending_coinbase_state_stack ~state_body_hash ~global_slot)

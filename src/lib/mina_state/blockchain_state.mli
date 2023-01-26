@@ -62,7 +62,10 @@ include
 val staged_ledger_hash :
   ('staged_ledger_hash, _, _, _, _) Poly.t -> 'staged_ledger_hash
 
-val snarked_ledger_hash :
+val first_pass_snarked_ledger_hash :
+  (_, 'snarked_ledger_hash, _, _, _) Poly.t -> 'snarked_ledger_hash
+
+val second_pass_snarked_ledger_hash :
   (_, 'snarked_ledger_hash, _, _, _) Poly.t -> 'snarked_ledger_hash
 
 val genesis_ledger_hash :

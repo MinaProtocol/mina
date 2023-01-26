@@ -184,18 +184,21 @@ module Make_str (A : Wire_types.Concrete) = struct
       end]
 
       let with_empty_local_state ~supply_increase ~fee_excess ~sok_digest
-          ~source ~target ~pending_coinbase_stack_state : _ t =
+          ~first_pass_source ~first_pass_target ~second_pass_source
+          ~second_pass_target ~pending_coinbase_stack_state : _ t =
         { supply_increase
         ; fee_excess
         ; sok_digest
         ; source =
-            { ledger = source
+            { first_pass_ledger = first_pass_source
+            ; second_pass_ledger = second_pass_source
             ; pending_coinbase_stack =
                 pending_coinbase_stack_state.Pending_coinbase_stack_state.source
             ; local_state = Local_state.empty ()
             }
         ; target =
-            { ledger = target
+            { first_pass_ledger = first_pass_target
+            ; second_pass_ledger = second_pass_target
             ; pending_coinbase_stack = pending_coinbase_stack_state.target
             ; local_state = Local_state.empty ()
             }
@@ -206,7 +209,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let registers =
           let open Registers in
           Tick.Typ.of_hlistable
-            [ ledger_hash; pending_coinbase; local_state_typ ]
+            [ ledger_hash; ledger_hash; pending_coinbase; local_state_typ ]
             ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
             ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         in
@@ -381,7 +384,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             Pending_coinbase.Stack.connected ~first:t1 ~second:t2 ()
         end in
         Registers.Fields.to_list
-          ~ledger:(check (module Ledger_hash))
+          ~first_pass_ledger:(check (module Ledger_hash))
+          ~second_pass_ledger:(check (module Ledger_hash))
           ~pending_coinbase_stack:(check (module PC))
           ~local_state:(check (module Local_state))
         |> Or_error.combine_errors_unit
@@ -2166,10 +2170,11 @@ module Make_str (A : Wire_types.Concrete) = struct
             * _ Mina_transaction_logic.Zkapp_command_logic.Local_state.t =
           let g : Global_state.t =
             { first_pass_ledger =
-                ( statement.source.ledger
-                , V.create (fun () -> !witness.global_ledger) )
+                ( statement.source.first_pass_ledger
+                , V.create (fun () -> !witness.first_pass_global_ledger) )
             ; second_pass_ledger =
-                empty_ledger ~depth:constraint_constants.ledger_depth ()
+                ( statement.source.first_pass_ledger
+                , V.create (fun () -> !witness.second_pass_global_ledger) )
             ; fee_excess = Amount.Signed.(Checked.constant zero)
             ; supply_increase = Amount.Signed.(Checked.constant zero)
             ; protocol_state =
@@ -2333,7 +2338,12 @@ module Make_str (A : Wire_types.Concrete) = struct
             run_checked
               (Frozen_ledger_hash.assert_equal
                  (fst global.first_pass_ledger)
-                 statement.target.ledger ) ) ;
+                 statement.target.first_pass_ledger ) ) ;
+        with_label __LOC__ (fun () ->
+            run_checked
+              (Frozen_ledger_hash.assert_equal
+                 (fst global.second_pass_ledger)
+                 statement.target.second_pass_ledger ) ) ;
         with_label __LOC__ (fun () ->
             run_checked
               (Amount.Signed.Checked.assert_equal statement.supply_increase
@@ -3332,7 +3342,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%bind root_after, fee_excess, supply_increase =
         apply_tagged_transaction ~constraint_constants
           (module Shifted)
-          global_slot statement.source.ledger pending_coinbase_init
+          global_slot statement.source.first_pass_ledger pending_coinbase_init
           statement.source.pending_coinbase_stack
           statement.target.pending_coinbase_stack state_body t
       in
@@ -3365,8 +3375,13 @@ module Make_str (A : Wire_types.Concrete) = struct
                   statement.target.local_state ) )
       in
       Checked.all_unit
-        [ [%with_label_ "equal roots"] (fun () ->
-              Frozen_ledger_hash.assert_equal root_after statement.target.ledger )
+        [ [%with_label_ "equal first-pass roots"] (fun () ->
+              Frozen_ledger_hash.assert_equal root_after
+                statement.target.first_pass_ledger )
+        ; [%with_label_ "equal second-pass roots"] (fun () ->
+              Frozen_ledger_hash.assert_equal
+                statement.source.second_pass_ledger
+                statement.target.second_pass_ledger )
         ; [%with_label_ "equal supply_increases"] (fun () ->
               Currency.Amount.Signed.Checked.assert_equal supply_increase
                 statement.supply_increase )
@@ -3488,13 +3503,26 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; [%with_label_ "equal supply increases"] (fun () ->
                 Amount.Signed.Checked.assert_equal supply_increase
                   s.supply_increase )
-          ; [%with_label_ "equal source ledger hashes"] (fun () ->
-                Frozen_ledger_hash.assert_equal s.source.ledger s1.source.ledger )
-          ; [%with_label_ "equal target, source ledger hashes"] (fun () ->
-                Frozen_ledger_hash.assert_equal s1.target.ledger
-                  s2.source.ledger )
-          ; [%with_label_ "equal target ledger hashes"] (fun () ->
-                Frozen_ledger_hash.assert_equal s2.target.ledger s.target.ledger )
+          ; [%with_label_ "equal source first-pass ledger hashes"] (fun () ->
+                Frozen_ledger_hash.assert_equal s.source.first_pass_ledger
+                  s1.source.first_pass_ledger )
+          ; [%with_label_ "equal source second-pass ledger hashes"] (fun () ->
+                Frozen_ledger_hash.assert_equal s.source.second_pass_ledger
+                  s1.source.second_pass_ledger )
+          ; [%with_label_ "equal target, source first-pass ledger hashes"]
+              (fun () ->
+                Frozen_ledger_hash.assert_equal s1.target.first_pass_ledger
+                  s2.source.first_pass_ledger )
+          ; [%with_label_ "equal target, source second-pass ledger hashes"]
+              (fun () ->
+                Frozen_ledger_hash.assert_equal s1.target.second_pass_ledger
+                  s2.source.second_pass_ledger )
+          ; [%with_label_ "equal first-pass target ledger hashes"] (fun () ->
+                Frozen_ledger_hash.assert_equal s2.target.first_pass_ledger
+                  s.target.first_pass_ledger )
+          ; [%with_label_ "equal second-pass target ledger hashes"] (fun () ->
+                Frozen_ledger_hash.assert_equal s2.target.second_pass_ledger
+                  s.target.second_pass_ledger )
           ]
       in
       (s1, s2)
@@ -3629,8 +3657,16 @@ module Make_str (A : Wire_types.Concrete) = struct
       Base.transaction_union_handler handler transaction state_body global_slot
         init_stack
     in
+    let empty_ledger =
+      Sparse_ledger.empty
+        ~depth:
+          constraint_constants
+            .Genesis_constants.Constraint_constants.ledger_depth
+    in
     let statement : Statement.With_sok.t =
-      Statement.Poly.with_empty_local_state ~source ~target ~supply_increase
+      Statement.Poly.with_empty_local_state ~first_pass_source:source
+        ~first_pass_target:target ~second_pass_source:empty_ledger
+        ~second_pass_target:empty_ledger ~supply_increase
         ~pending_coinbase_stack_state
         ~fee_excess:(Transaction_union.fee_excess transaction)
         ~sok_digest
@@ -3701,8 +3737,16 @@ module Make_str (A : Wire_types.Concrete) = struct
       Base.transaction_union_handler handler transaction state_body global_slot
         init_stack
     in
+    let empty_ledger =
+      Sparse_ledger.empty
+        ~depth:
+          constraint_constants
+            .Genesis_constants.Constraint_constants.ledger_depth
+    in
     let statement : Statement.With_sok.t =
-      Statement.Poly.with_empty_local_state ~source ~target ~supply_increase
+      Statement.Poly.with_empty_local_state ~first_pass_source:source
+        ~first_pass_target:target ~second_pass_source:empty_ledger
+        ~second_pass_target:empty_ledger ~supply_increase
         ~pending_coinbase_stack_state
         ~fee_excess:(Transaction_union.fee_excess transaction)
         ~sok_digest
@@ -3800,13 +3844,13 @@ module Make_str (A : Wire_types.Concrete) = struct
         { stack_hash = Call_stack_digest.cons h_f h_tl; elt = f } :: tl
 
   let zkapp_command_witnesses_exn ~constraint_constants ~global_slot ~state_body
-      ~fee_excess ledger
+      ~fee_excess ~first_pass_ledger ~second_pass_ledger
       (zkapp_commands :
         ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
         * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
         * Zkapp_command.t )
         list ) =
-    let sparse_ledger =
+    let get_ledger ledger =
       match ledger with
       | `Ledger ledger ->
           Sparse_ledger.of_ledger_subset_exn ledger
@@ -3817,18 +3861,19 @@ module Make_str (A : Wire_types.Concrete) = struct
       | `Sparse_ledger sparse_ledger ->
           sparse_ledger
     in
-    let empty_ledger =
-      Sparse_ledger.empty
-        ~depth:
-          constraint_constants
-            .Genesis_constants.Constraint_constants.ledger_depth ()
-    in
+    let first_pass_sparse_ledger = get_ledger first_pass_ledger in
+    let second_pass_sparse_ledger = get_ledger second_pass_ledger in
     let supply_increase = Amount.(Signed.of_unsigned zero) in
     let state_view = Mina_state.Protocol_state.Body.view state_body in
     let _, _, _, _, will_succeeds_rev, states_rev =
       List.fold_left
-        ~init:(fee_excess, supply_increase, sparse_ledger, empty_ledger, [], [])
-        zkapp_commands
+        ~init:
+          ( fee_excess
+          , supply_increase
+          , first_pass_sparse_ledger
+          , second_pass_sparse_ledger
+          , []
+          , [] ) zkapp_commands
         ~f:(fun
              ( fee_excess
              , supply_increase
@@ -4061,7 +4106,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             }
           in
           let w : Zkapp_command_segment.Witness.t =
-            { global_ledger = source_global.first_pass_ledger (* TODO *)
+            { first_pass_global_ledger = source_global.first_pass_ledger
+            ; second_pass_global_ledger = source_global.second_pass_ledger
             ; local_state_init = source_local
             ; start_zkapp_command
             ; state_body
@@ -4124,9 +4170,10 @@ module Make_str (A : Wire_types.Concrete) = struct
               else Sparse_ledger.merkle_root source_local.ledger
             in
             { source =
-                { ledger =
+                { first_pass_ledger =
                     Sparse_ledger.merkle_root source_global.first_pass_ledger
-                    (* TODO *)
+                ; second_pass_ledger =
+                    Sparse_ledger.merkle_root source_global.second_pass_ledger
                 ; pending_coinbase_stack = pending_coinbase_stack_state.source
                 ; local_state =
                     { source_local with
@@ -4137,9 +4184,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                     }
                 }
             ; target =
-                { ledger =
+                { first_pass_ledger =
                     Sparse_ledger.merkle_root target_global.first_pass_ledger
-                    (* TODO *)
+                ; second_pass_ledger =
+                    Sparse_ledger.merkle_root target_global.second_pass_ledger
                 ; pending_coinbase_stack = pending_coinbase_stack_state.target
                 ; local_state =
                     { target_local with

@@ -238,12 +238,14 @@ module T = struct
     target
 
   let verify_scan_state_after_apply ~constraint_constants
-      ~pending_coinbase_stack ledger (scan_state : Scan_state.t) =
+      ~pending_coinbase_stack first_pass_ledger second_pass_ledger
+      (scan_state : Scan_state.t) =
     let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
     in
     let registers_end : _ Mina_state.Registers.t =
-      { ledger
+      { first_pass_ledger
+      ; second_pass_ledger
       ; local_state = Mina_state.Local_state.empty ()
       ; pending_coinbase_stack
       }
@@ -262,12 +264,12 @@ module T = struct
 
   let of_scan_state_and_ledger ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~verifier ~snarked_registers ~ledger ~scan_state
-      ~pending_coinbase_collection ~get_state =
+      ~verifier ~snarked_registers ~first_pass_ledger ~second_pass_ledger
+      ~scan_state ~pending_coinbase_collection ~get_state =
     let open Deferred.Or_error.Let_syntax in
     let t =
-      of_scan_state_and_ledger_unchecked ~ledger ~scan_state
-        ~constraint_constants ~pending_coinbase_collection
+      of_scan_state_and_ledger_unchecked ~ledger:first_pass_ledger (* TODO *)
+        ~scan_state ~constraint_constants ~pending_coinbase_collection
     in
     let%bind pending_coinbase_stack =
       Pending_coinbase.latest_stack ~is_new_stack:false
@@ -282,8 +284,12 @@ module T = struct
         ~registers_begin:(Some snarked_registers)
         ~registers_end:
           { local_state = Mina_state.Local_state.empty ()
-          ; ledger =
-              Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
+          ; first_pass_ledger =
+              Frozen_ledger_hash.of_ledger_hash
+                (Ledger.merkle_root first_pass_ledger)
+          ; second_pass_ledger =
+              Frozen_ledger_hash.of_ledger_hash
+                (Ledger.merkle_root second_pass_ledger)
           ; pending_coinbase_stack
           }
     in
@@ -291,10 +297,15 @@ module T = struct
 
   let of_scan_state_and_ledger_unchecked
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~snarked_registers ~ledger ~scan_state ~pending_coinbase_collection =
+      ~snarked_registers ~first_pass_ledger ~second_pass_ledger ~scan_state
+      ~pending_coinbase_collection =
     let open Deferred.Or_error.Let_syntax in
     let t =
-      { ledger; scan_state; constraint_constants; pending_coinbase_collection }
+      { ledger = first_pass_ledger (* TODO *)
+      ; scan_state
+      ; constraint_constants
+      ; pending_coinbase_collection
+      }
     in
     let%bind pending_coinbase_stack =
       Pending_coinbase.latest_stack ~is_new_stack:false
@@ -308,20 +319,33 @@ module T = struct
         ~registers_begin:(Some snarked_registers)
         ~registers_end:
           { local_state = Mina_state.Local_state.empty ()
-          ; ledger =
-              Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger)
+          ; first_pass_ledger =
+              Frozen_ledger_hash.of_ledger_hash
+                (Ledger.merkle_root first_pass_ledger)
+          ; second_pass_ledger =
+              Frozen_ledger_hash.of_ledger_hash
+                (Ledger.merkle_root second_pass_ledger)
           ; pending_coinbase_stack
           }
     in
     return t
 
   let of_scan_state_pending_coinbases_and_snarked_ledger' ~constraint_constants
-      ~pending_coinbases ~scan_state ~snarked_ledger ~snarked_local_state
-      ~expected_merkle_root ~get_state f =
+      ~pending_coinbases ~scan_state ~first_pass_snarked_ledger
+      ~second_pass_snarked_ledger ~snarked_local_state ~expected_merkle_root
+      ~get_state f =
     let open Deferred.Or_error.Let_syntax in
-    let snarked_ledger_hash = Ledger.merkle_root snarked_ledger in
-    let snarked_frozen_ledger_hash =
-      Frozen_ledger_hash.of_ledger_hash snarked_ledger_hash
+    let first_pass_snarked_ledger_hash =
+      Ledger.merkle_root first_pass_snarked_ledger
+    in
+    let first_pass_snarked_frozen_ledger_hash =
+      Frozen_ledger_hash.of_ledger_hash first_pass_snarked_ledger_hash
+    in
+    let second_pass_snarked_ledger_hash =
+      Ledger.merkle_root second_pass_snarked_ledger
+    in
+    let second_pass_snarked_frozen_ledger_hash =
+      Frozen_ledger_hash.of_ledger_hash second_pass_snarked_ledger_hash
     in
     let%bind txs_with_protocol_state =
       Scan_state.staged_transactions_with_protocol_states scan_state ~get_state
@@ -367,28 +391,34 @@ module T = struct
     in
     f ~constraint_constants
       ~snarked_registers:
-        ( { ledger = snarked_frozen_ledger_hash
+        ( { first_pass_ledger = first_pass_snarked_frozen_ledger_hash
+          ; second_pass_ledger = second_pass_snarked_frozen_ledger_hash
           ; local_state = snarked_local_state
           ; pending_coinbase_stack
           }
           : Mina_state.Registers.Value.t )
-      ~ledger:snarked_ledger ~scan_state
+      ~first_pass_ledger:first_pass_snarked_ledger
+      ~second_pass_ledger:second_pass_snarked_ledger ~scan_state
       ~pending_coinbase_collection:pending_coinbases
 
   let of_scan_state_pending_coinbases_and_snarked_ledger ~logger
-      ~constraint_constants ~verifier ~scan_state ~snarked_ledger
-      ~snarked_local_state ~expected_merkle_root ~pending_coinbases ~get_state =
+      ~constraint_constants ~verifier ~scan_state ~first_pass_snarked_ledger
+      ~second_pass_snarked_ledger ~snarked_local_state ~expected_merkle_root
+      ~pending_coinbases ~get_state =
     of_scan_state_pending_coinbases_and_snarked_ledger' ~constraint_constants
-      ~pending_coinbases ~scan_state ~snarked_ledger ~snarked_local_state
-      ~expected_merkle_root ~get_state
+      ~pending_coinbases ~scan_state ~first_pass_snarked_ledger
+      ~second_pass_snarked_ledger ~snarked_local_state ~expected_merkle_root
+      ~get_state
       (of_scan_state_and_ledger ~logger ~get_state ~verifier)
 
   let of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
-      ~constraint_constants ~scan_state ~snarked_ledger ~snarked_local_state
-      ~expected_merkle_root ~pending_coinbases ~get_state =
+      ~constraint_constants ~scan_state ~first_pass_snarked_ledger
+      ~second_pass_snarked_ledger ~snarked_local_state ~expected_merkle_root
+      ~pending_coinbases ~get_state =
     of_scan_state_pending_coinbases_and_snarked_ledger' ~constraint_constants
-      ~pending_coinbases ~scan_state ~snarked_ledger ~snarked_local_state
-      ~expected_merkle_root ~get_state of_scan_state_and_ledger_unchecked
+      ~pending_coinbases ~scan_state ~first_pass_snarked_ledger
+      ~second_pass_snarked_ledger ~snarked_local_state ~expected_merkle_root
+      ~get_state of_scan_state_and_ledger_unchecked
 
   let copy
       { scan_state; ledger; constraint_constants; pending_coinbase_collection }

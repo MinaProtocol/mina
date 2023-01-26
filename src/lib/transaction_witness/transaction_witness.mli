@@ -9,7 +9,8 @@ module Zkapp_command_segment_witness : sig
   module Stable : sig
     module V1 : sig
       type t =
-        { global_ledger : Sparse_ledger.Stable.V2.t
+        { first_pass_global_ledger : Sparse_ledger.Stable.V2.t
+        ; second_pass_global_ledger : Sparse_ledger.Stable.V2.t
         ; local_state_init :
             ( ( Token_id.Stable.V2.t
               , Zkapp_command.Call_forest.With_hashes.Stable.V1.t )

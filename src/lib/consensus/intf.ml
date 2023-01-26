@@ -201,7 +201,8 @@ module type State_hooks = sig
     -> current_time:Unix_timestamp.t
     -> block_data:block_data
     -> supercharge_coinbase:bool
-    -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
+    -> first_pass_snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
+    -> second_pass_snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
     -> genesis_ledger_hash:Mina_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.Signed.t
     -> logger:Logger.t
