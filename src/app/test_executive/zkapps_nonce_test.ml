@@ -41,6 +41,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let transactions_sent = ref 0
 
+  let padding_payments () =
+    let needed_for_padding = 48 in
+    (* for work_delay=1 and transaction_capacity=4 per block*)
+    if !transactions_sent >= needed_for_padding then 0
+    else needed_for_padding - !transactions_sent
+
   let send_zkapp ~logger node zkapp_command =
     incr transactions_sent ;
     send_zkapp ~logger node zkapp_command
@@ -228,14 +234,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (wait_for_zkapp ~has_failures:false valid_zkapp_cmd_from_fish1)
     in
     let%bind () =
-      let padding_payments =
-        (* for work_delay=1 and transaction_capacity=4 per block*)
-        let needed = 36 in
-        if !transactions_sent >= needed then 0 else needed - !transactions_sent
-      in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       send_padding_transactions block_producer_nodes ~fee ~logger
-        ~n:padding_payments
+        ~n:(padding_payments ())
     in
     let%bind () =
       section_hard "wait for 1 block to be produced"
@@ -282,13 +283,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            valid_precondition_zkapp_cmd_from_fish1 )
     in
     let%bind () =
-      let padding_payments =
-        let needed = 36 in
-        if !transactions_sent >= needed then 0 else needed - !transactions_sent
-      in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       send_padding_transactions block_producer_nodes ~fee ~logger
-        ~n:padding_payments
+        ~n:(padding_payments ())
     in
     let%bind () =
       section_hard "wait for 1 block to be produced"
@@ -330,7 +327,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "Wait for proof to be emitted"
         (wait_for t
-           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
+           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:2) )
     in
     Event_router.cancel (event_router t) snark_work_event_subscription () ;
     Event_router.cancel (event_router t) snark_work_failure_subscription () ;
