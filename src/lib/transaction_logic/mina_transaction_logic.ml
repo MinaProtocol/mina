@@ -1744,8 +1744,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       accumulation function over the state for each account update.
 
       CAUTION: If you use the intermediate local states, you MUST update the
-      [will_succeed] field to reflect the value of the [success] field in the
-      final local state.
+      [will_succeed] field to [false] if the [status] is [Failed].
   *)
   let apply_zkapp_command_unchecked_aux (type user_acc)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
