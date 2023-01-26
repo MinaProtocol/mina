@@ -56,6 +56,6 @@ module Stable : sig
       ; status : Mina_base.Transaction_status.Stable.V2.t
       ; block_global_slot : Mina_numbers.Global_slot.Stable.V1.t
       }
-    [@@deriving sexp, to_yojson]
+    [@@deriving sexp, yojson]
   end
 end]

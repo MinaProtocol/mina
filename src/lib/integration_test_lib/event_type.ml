@@ -343,7 +343,12 @@ module Gossip = struct
 end
 
 module Snark_work_failed = struct
-  type t = unit [@@deriving yojson]
+  type t =
+    { error : Yojson.Safe.t
+    ; work_spec : Snark_worker.Work.Spec.t
+    ; prover_public_key : Signature_lib.Public_key.Compressed.t
+    }
+  [@@deriving yojson]
 
   let name = "Snark_work_failed"
 
@@ -352,8 +357,9 @@ module Snark_work_failed = struct
   let parse_func message =
     let open Or_error.Let_syntax in
     match%bind parse id message with
-    | Snark_worker.Generating_snark_work_failed ->
-        Ok ()
+    | Snark_worker.Generating_snark_work_failed
+        { error; work_spec; prover_public_key } ->
+        Ok { error; work_spec; prover_public_key }
     | _ ->
         bad_parse
 
