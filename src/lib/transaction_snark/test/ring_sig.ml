@@ -204,7 +204,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
                     ; account = Nonce (Account.Nonce.succ sender_nonce)
                     ; valid_while = Ignore
                     }
-                ; call_type = Call
+                ; may_use_token = No
                 ; use_full_commitment = false
                 ; authorization_kind = Signature
                 }
@@ -229,7 +229,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
                     ; account = Full Zkapp_precondition.Account.accept
                     ; valid_while = Ignore
                     }
-                ; call_type = Call
+                ; may_use_token = No
                 ; use_full_commitment = false
                 ; authorization_kind = Proof (With_hash.hash vk)
                 }

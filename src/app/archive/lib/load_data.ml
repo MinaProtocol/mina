@@ -194,6 +194,7 @@ let update_of_id pool update_id =
                   ; set_token_symbol
                   ; increment_nonce
                   ; set_voting_for
+                  ; set_timing
                   } =
             query_db ~f:(fun db -> Processor.Zkapp_permissions.load db id)
           in
@@ -211,6 +212,7 @@ let update_of_id pool update_id =
               ; set_token_symbol
               ; increment_nonce
               ; set_voting_for
+              ; set_timing
               }
               : Permissions.t ) )
     in
@@ -430,7 +432,7 @@ let get_account_update_body ~pool body_id =
            ; zkapp_valid_while_precondition_id
            ; use_full_commitment
            ; implicit_account_creation_fee
-           ; call_type
+           ; may_use_token
            ; authorization_kind
            ; verification_key_hash_id
            } =
@@ -602,7 +604,7 @@ let get_account_update_body ~pool body_id =
   let%bind valid_while_precondition =
     get_global_slot_bounds pool zkapp_valid_while_precondition_id
   in
-  let call_type = Account_update.Call_type.of_string call_type in
+  let may_use_token = Account_update.May_use_token.of_string may_use_token in
   let%bind authorization_kind =
     match Control.Tag.of_string_exn authorization_kind with
     | Proof -> (
@@ -642,7 +644,7 @@ let get_account_update_body ~pool body_id =
           }
       ; use_full_commitment
       ; implicit_account_creation_fee
-      ; call_type
+      ; may_use_token
       ; authorization_kind
       }
       : Account_update.Body.Simple.t )
@@ -760,6 +762,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
             ; set_token_symbol
             ; increment_nonce
             ; set_voting_for
+            ; set_timing
             } =
       query_db ~f:(fun db -> Processor.Zkapp_permissions.load db permissions_id)
     in
@@ -775,6 +778,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
       ; set_token_symbol
       ; increment_nonce
       ; set_voting_for
+      ; set_timing
       }
       : Permissions.t )
   in

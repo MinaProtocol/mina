@@ -109,6 +109,7 @@ CREATE TABLE zkapp_permissions
 , set_token_symbol         zkapp_auth_required_type    NOT NULL
 , increment_nonce          zkapp_auth_required_type    NOT NULL
 , set_voting_for           zkapp_auth_required_type    NOT NULL
+, set_timing               zkapp_auth_required_type    NOT NULL
 );
 
 CREATE TABLE zkapp_timing_info
@@ -251,7 +252,7 @@ CREATE TABLE zkapp_fee_payer_body
 , nonce                                 bigint    NOT NULL
 );
 
-CREATE TYPE call_type AS ENUM ('call', 'delegate_call');
+CREATE TYPE may_use_token AS ENUM ('No', 'ParentsOwnToken', 'InheritFromParent');
 
 CREATE TYPE authorization_kind_type AS ENUM ('None_given', 'Signature', 'Proof');
 
@@ -277,7 +278,7 @@ CREATE TABLE zkapp_account_update_body
 , zkapp_valid_while_precondition_id     int                       REFERENCES zkapp_global_slot_bounds(id)
 , use_full_commitment                   boolean         NOT NULL
 , implicit_account_creation_fee         boolean         NOT NULL
-, call_type                             call_type       NOT NULL
+, may_use_token                         may_use_token  NOT NULL
 , authorization_kind                    authorization_kind_type NOT NULL
 , verification_key_hash_id              int                       REFERENCES zkapp_verification_key_hashes(id)
 );

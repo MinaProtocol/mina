@@ -285,7 +285,7 @@ let%test_module "Protocol state precondition tests" =
                             ; valid_while = Ignore
                             }
                         ; use_full_commitment = false
-                        ; call_type = Call
+                        ; may_use_token = No
                         ; authorization_kind = Signature
                         }
                         (*To be updated later*)
@@ -319,7 +319,7 @@ let%test_module "Protocol state precondition tests" =
                             ; valid_while = Ignore
                             }
                         ; use_full_commitment = true
-                        ; call_type = Call
+                        ; may_use_token = No
                         ; authorization_kind = Signature
                         }
                     ; authorization =
@@ -705,7 +705,7 @@ let%test_module "Account precondition tests" =
                         ; valid_while = Ignore
                         }
                     ; use_full_commitment = false
-                    ; call_type = Call
+                    ; may_use_token = No
                     ; authorization_kind = Signature
                     }
                     (*To be updated later*)
@@ -736,7 +736,7 @@ let%test_module "Account precondition tests" =
                         ; valid_while = Ignore
                         }
                     ; use_full_commitment = true
-                    ; call_type = Call
+                    ; may_use_token = No
                     ; authorization_kind = Signature
                     }
                 ; authorization =

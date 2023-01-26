@@ -342,7 +342,7 @@ let%test_module "multisig_account" =
                         ; valid_while = Ignore
                         }
                     ; use_full_commitment = false
-                    ; call_type = Call
+                    ; may_use_token = No
                     ; authorization_kind = Signature
                     }
                 ; authorization = Signature Signature.dummy
@@ -368,7 +368,7 @@ let%test_module "multisig_account" =
                         ; valid_while = Ignore
                         }
                     ; use_full_commitment = false
-                    ; call_type = Call
+                    ; may_use_token = No
                     ; authorization_kind = Proof (With_hash.hash vk)
                     }
                 ; authorization = Proof Mina_base.Proof.transaction_dummy

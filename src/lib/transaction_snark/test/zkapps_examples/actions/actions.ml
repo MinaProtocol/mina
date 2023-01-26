@@ -60,6 +60,7 @@ let%test_module "Sequence events test" =
                   ; set_token_symbol = Proof
                   ; increment_nonce = Signature
                   ; set_voting_for = Proof
+                  ; set_timing = Proof
                   }
             }
         ; use_full_commitment = true

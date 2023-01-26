@@ -552,11 +552,11 @@ let%test_unit "tokens test" =
         [ mk_node
             (mk_account_update_body
                (Proof (Zkapp_account.dummy_vk_hash ()))
-               Call token_funder Token_id.default
+               No token_funder Token_id.default
                (-(4 * account_creation_fee)) )
             []
         ; mk_node
-            (mk_account_update_body Signature Call token_owner Token_id.default
+            (mk_account_update_body Signature No token_owner Token_id.default
                (3 * account_creation_fee) )
             []
         ]
@@ -568,11 +568,11 @@ let%test_unit "tokens test" =
     let token_minting =
       mk_forest
         [ mk_node
-            (mk_account_update_body Signature Call token_owner Token_id.default
+            (mk_account_update_body Signature No token_owner Token_id.default
                (-account_creation_fee) )
             [ mk_node
-                (mk_account_update_body None_given Call token_account1
-                   custom_token_id 100 )
+                (mk_account_update_body None_given Parents_own_token
+                   token_account1 custom_token_id 100 )
                 []
             ]
         ]
@@ -580,31 +580,31 @@ let%test_unit "tokens test" =
     let token_transfers =
       mk_forest
         [ mk_node
-            (mk_account_update_body Signature Call token_owner Token_id.default
+            (mk_account_update_body Signature No token_owner Token_id.default
                (-account_creation_fee) )
             [ mk_node
-                (mk_account_update_body Signature Call token_account1
-                   custom_token_id (-30) )
+                (mk_account_update_body Signature Parents_own_token
+                   token_account1 custom_token_id (-30) )
                 []
             ; mk_node
-                (mk_account_update_body None_given Call token_account2
-                   custom_token_id 30 )
+                (mk_account_update_body None_given Parents_own_token
+                   token_account2 custom_token_id 30 )
                 []
             ; mk_node
-                (mk_account_update_body Signature Call token_account1
-                   custom_token_id (-10) )
+                (mk_account_update_body Signature Parents_own_token
+                   token_account1 custom_token_id (-10) )
                 []
             ; mk_node
-                (mk_account_update_body None_given Call token_account2
-                   custom_token_id 10 )
+                (mk_account_update_body None_given Parents_own_token
+                   token_account2 custom_token_id 10 )
                 []
             ; mk_node
-                (mk_account_update_body Signature Call token_account2
-                   custom_token_id (-5) )
+                (mk_account_update_body Signature Parents_own_token
+                   token_account2 custom_token_id (-5) )
                 []
             ; mk_node
-                (mk_account_update_body None_given Call token_account1
-                   custom_token_id 5 )
+                (mk_account_update_body None_given Parents_own_token
+                   token_account1 custom_token_id 5 )
                 []
             ]
         ]

@@ -97,6 +97,7 @@ let zkapp_command_with_ledger ?num_keypairs ?max_account_updates
       ; set_token_symbol = Either
       ; increment_nonce = Either
       ; set_voting_for = Either
+      ; set_timing = Either
       }
     in
     let verification_key = Some verification_key in

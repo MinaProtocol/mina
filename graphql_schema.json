@@ -948,6 +948,22 @@
               "deprecationReason": null
             },
             {
+              "name": "access",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "send",
               "description": null,
               "args": [],
@@ -1093,6 +1109,22 @@
             },
             {
               "name": "setVotingFor",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setTiming",
               "description": null,
               "args": [],
               "type": {
@@ -1124,6 +1156,20 @@
               "defaultValue": null
             },
             {
+              "name": "access",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
               "name": "send",
               "description": null,
               "type": {
@@ -1251,6 +1297,20 @@
             },
             {
               "name": "setVotingFor",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "setTiming",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -2646,11 +2706,11 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "AuthorizationKindStructuredInput",
+          "name": "MayUseTokenInput",
           "description": null,
           "fields": [
             {
-              "name": "isSigned",
+              "name": "parentsOwnToken",
               "description": null,
               "args": [],
               "type": {
@@ -2666,7 +2726,7 @@
               "deprecationReason": null
             },
             {
-              "name": "isProved",
+              "name": "inheritFromParent",
               "description": null,
               "args": [],
               "type": {
@@ -2675,22 +2735,6 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "verificationKeyHash",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Field",
                   "ofType": null
                 }
               },
@@ -2700,7 +2744,7 @@
           ],
           "inputFields": [
             {
-              "name": "isSigned",
+              "name": "parentsOwnToken",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -2714,7 +2758,7 @@
               "defaultValue": null
             },
             {
-              "name": "isProved",
+              "name": "inheritFromParent",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -2722,20 +2766,6 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "verificationKeyHash",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Field",
                   "ofType": null
                 }
               },
@@ -2956,7 +2986,7 @@
               "deprecationReason": null
             },
             {
-              "name": "caller",
+              "name": "implicitAccountCreationFee",
               "description": null,
               "args": [],
               "type": {
@@ -2964,7 +2994,23 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "TokenId",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "mayUseToken",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "MayUseTokenInput",
                   "ofType": null
                 }
               },
@@ -2979,8 +3025,8 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "AuthorizationKindStructuredInput",
+                  "kind": "SCALAR",
+                  "name": "AuthorizationKind",
                   "ofType": null
                 }
               },
@@ -3172,14 +3218,28 @@
               "defaultValue": null
             },
             {
-              "name": "caller",
+              "name": "implicitAccountCreationFee",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "TokenId",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "mayUseToken",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "MayUseTokenInput",
                   "ofType": null
                 }
               },
@@ -3192,8 +3252,8 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "INPUT_OBJECT",
-                  "name": "AuthorizationKindStructuredInput",
+                  "kind": "SCALAR",
+                  "name": "AuthorizationKind",
                   "ofType": null
                 }
               },
@@ -3215,7 +3275,7 @@
               "args": [],
               "type": {
                 "kind": "SCALAR",
-                "name": "ZkappProof",
+                "name": "SnappProof",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -3240,7 +3300,7 @@
               "description": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "ZkappProof",
+                "name": "SnappProof",
                 "ofType": null
               },
               "defaultValue": null
@@ -6633,7 +6693,7 @@
         },
         {
           "kind": "SCALAR",
-          "name": "ZkappProof",
+          "name": "SnappProof",
           "description": null,
           "fields": null,
           "inputFields": null,
@@ -6652,7 +6712,7 @@
               "args": [],
               "type": {
                 "kind": "SCALAR",
-                "name": "ZkappProof",
+                "name": "SnappProof",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -6677,12 +6737,22 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "AuthorizationKind",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
-          "name": "AuthorizationKindStructured",
+          "name": "MayUseToken",
           "description": null,
           "fields": [
             {
-              "name": "isSigned",
+              "name": "parentsOwnToken",
               "description": null,
               "args": [],
               "type": {
@@ -6698,7 +6768,7 @@
               "deprecationReason": null
             },
             {
-              "name": "isProved",
+              "name": "inheritFromParent",
               "description": null,
               "args": [],
               "type": {
@@ -6707,22 +6777,6 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "verificationKeyHash",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Field",
                   "ofType": null
                 }
               },
@@ -7493,6 +7547,22 @@
               "deprecationReason": null
             },
             {
+              "name": "access",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "send",
               "description": null,
               "args": [],
@@ -7638,6 +7708,22 @@
             },
             {
               "name": "setVotingFor",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setTiming",
               "description": null,
               "args": [],
               "type": {
@@ -8024,7 +8110,7 @@
               "deprecationReason": null
             },
             {
-              "name": "caller",
+              "name": "implicitAccountCreationFee",
               "description": null,
               "args": [],
               "type": {
@@ -8032,7 +8118,23 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "TokenId",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "mayUseToken",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "MayUseToken",
                   "ofType": null
                 }
               },
@@ -8047,8 +8149,8 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "OBJECT",
-                  "name": "AuthorizationKindStructured",
+                  "kind": "SCALAR",
+                  "name": "AuthorizationKind",
                   "ofType": null
                 }
               },
@@ -10978,6 +11080,22 @@
               "deprecationReason": null
             },
             {
+              "name": "access",
+              "description": "Authorization required to access the account",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "AccountAuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "setDelegate",
               "description": "Authorization required to set the delegate",
               "args": [],
@@ -11096,6 +11214,23 @@
               "name": "setVotingFor",
               "description":
                 "Authorization required to set the state hash the account is voting for",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "AccountAuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setTiming",
+              "description":
+                "Authorization required to set the timing of the account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -11622,7 +11757,7 @@
               "description": "True if this account owns its associated token",
               "args": [],
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "isDeprecated": false,
+              "isDeprecated": true,
               "deprecationReason": null
             },
             {
@@ -11631,7 +11766,7 @@
                 "True if this account has been disabled by the owner of the associated token",
               "args": [],
               "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "isDeprecated": false,
+              "isDeprecated": true,
               "deprecationReason": null
             },
             {
