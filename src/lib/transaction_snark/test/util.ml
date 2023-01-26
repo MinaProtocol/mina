@@ -104,7 +104,7 @@ let apply_zkapp_command ledger zkapp_command =
   let global_slot =
     Mina_numbers.Global_slot.succ state_view.global_slot_since_genesis
   in
-  let witnesses, final_ledger =
+  let witnesses, final_first_pass_ledger, final_second_pass_ledger =
     Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
       ~global_slot ~state_body:genesis_state_body ~fee_excess:Amount.Signed.zero
       (`Ledger ledger) zkapp_command
@@ -123,7 +123,9 @@ let apply_zkapp_command ledger zkapp_command =
           in
           fun () -> () )
       |> Or_error.ok_exn ) ;
-  final_ledger
+  ignore (final_second_pass_ledger : Sparse_ledger.t) ;
+  (* TODO *)
+  final_first_pass_ledger
 
 let trivial_zkapp =
   lazy
@@ -164,7 +166,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
               failwith
                 (sprintf "apply_transaction failed with %s"
                    (Error.to_string_hum e) ) )
-      | Ok (witnesses, _) -> (
+      | Ok (witnesses, _, _) -> (
           let open Async.Deferred.Let_syntax in
           let applied =
             if ignore_outside_snark then

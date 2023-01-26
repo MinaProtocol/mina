@@ -123,7 +123,8 @@ module Inputs = struct
                                         }
                                     , zkapp_command )
                                   ]
-                                |> fst |> List.rev )
+                                |> (fun (stmt, _, _) -> stmt)
+                                |> List.rev )
                             |> Result.map_error ~f:(fun e ->
                                    Error.createf
                                      !"Failed to generate inputs for \

@@ -35,6 +35,11 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Sparse_ledger = Mina_ledger.Sparse_ledger
   module Transaction_validator = Transaction_validator
 
+  let empty_ledger ~depth () =
+    let t = Sparse_ledger.empty ~depth () in
+    ( Ledger_hash.var_of_t (Sparse_ledger.merkle_root t)
+    , Prover_value.create (fun () -> t) )
+
   let top_hash_logging_enabled = ref false
 
   let to_preunion (t : Transaction.t) =
@@ -970,7 +975,9 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       module Global_state = struct
         type t =
-          { ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t
+          { first_pass_ledger : Ledger_hash.var * Sparse_ledger.t Prover_value.t
+          ; second_pass_ledger :
+              Ledger_hash.var * Sparse_ledger.t Prover_value.t
           ; fee_excess : Amount.Signed.var
           ; supply_increase : Amount.Signed.var
           ; protocol_state : Zkapp_precondition.Protocol_state.View.Checked.t
@@ -1768,10 +1775,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               ( run_checked (Ledger_hash.if_ b ~then_:xt ~else_:xe)
               , V.if_ b ~then_:rt ~else_:re )
 
-            let empty ~depth () : t =
-              let t = Sparse_ledger.empty ~depth () in
-              ( Ledger_hash.var_of_t (Sparse_ledger.merkle_root t)
-              , V.create (fun () -> t) )
+            let empty ~depth () : t = empty_ledger ~depth ()
 
             let idx ledger id = Sparse_ledger.find_index_exn ledger id
 
@@ -1995,18 +1999,24 @@ module Make_str (A : Wire_types.Concrete) = struct
             let set_supply_increase t supply_increase =
               { t with supply_increase }
 
-            let first_pass_ledger { ledger; _ } = ledger
+            let first_pass_ledger { first_pass_ledger; _ } = first_pass_ledger
 
-            let second_pass_ledger { ledger; _ } = ledger
+            let second_pass_ledger { first_pass_ledger; _ } = first_pass_ledger
+            (* TODO *)
 
             let set_first_pass_ledger ~should_update t ledger =
               { t with
-                ledger = Ledger.if_ should_update ~then_:ledger ~else_:t.ledger
+                first_pass_ledger =
+                  Ledger.if_ should_update ~then_:ledger
+                    ~else_:t.first_pass_ledger
               }
 
             let set_second_pass_ledger ~should_update t ledger =
               { t with
-                ledger = Ledger.if_ should_update ~then_:ledger ~else_:t.ledger
+                first_pass_ledger =
+                  Ledger.if_ should_update ~then_:ledger
+                    ~else_:t.first_pass_ledger
+                  (* TODO *)
               }
 
             let block_global_slot { block_global_slot; _ } = block_global_slot
@@ -2155,9 +2165,11 @@ module Make_str (A : Wire_types.Concrete) = struct
             Global_state.t
             * _ Mina_transaction_logic.Zkapp_command_logic.Local_state.t =
           let g : Global_state.t =
-            { ledger =
+            { first_pass_ledger =
                 ( statement.source.ledger
                 , V.create (fun () -> !witness.global_ledger) )
+            ; second_pass_ledger =
+                empty_ledger ~depth:constraint_constants.ledger_depth ()
             ; fee_excess = Amount.Signed.(Checked.constant zero)
             ; supply_increase = Amount.Signed.(Checked.constant zero)
             ; protocol_state =
@@ -2319,7 +2331,8 @@ module Make_str (A : Wire_types.Concrete) = struct
               } ) ;
         with_label __LOC__ (fun () ->
             run_checked
-              (Frozen_ledger_hash.assert_equal (fst global.ledger)
+              (Frozen_ledger_hash.assert_equal
+                 (fst global.first_pass_ledger)
                  statement.target.ledger ) ) ;
         with_label __LOC__ (fun () ->
             run_checked
@@ -3804,15 +3817,23 @@ module Make_str (A : Wire_types.Concrete) = struct
       | `Sparse_ledger sparse_ledger ->
           sparse_ledger
     in
+    let empty_ledger =
+      Sparse_ledger.empty
+        ~depth:
+          constraint_constants
+            .Genesis_constants.Constraint_constants.ledger_depth ()
+    in
     let supply_increase = Amount.(Signed.of_unsigned zero) in
     let state_view = Mina_state.Protocol_state.Body.view state_body in
-    let _, _, _, will_succeeds_rev, states_rev =
-      List.fold_left ~init:(fee_excess, supply_increase, sparse_ledger, [], [])
+    let _, _, _, _, will_succeeds_rev, states_rev =
+      List.fold_left
+        ~init:(fee_excess, supply_increase, sparse_ledger, empty_ledger, [], [])
         zkapp_commands
         ~f:(fun
              ( fee_excess
              , supply_increase
              , sparse_ledger
+             , _empty_ledger
              , will_succeeds_rev
              , statess_rev )
              (_, _, zkapp_command)
@@ -3836,7 +3857,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           in
           ( final_state.fee_excess
           , final_state.supply_increase
-          , final_state.ledger
+          , final_state.first_pass_ledger
+          , final_state.second_pass_ledger
           , will_succeed :: will_succeeds_rev
           , states :: statess_rev ) )
     in
@@ -3881,16 +3903,16 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; target = Pending_coinbase.Stack.empty
         }
     in
-    let final_ledger =
+    let final_first_pass_ledger, final_second_pass_ledger =
       match states_rev with
       | [] ->
-          sparse_ledger
+          (sparse_ledger, empty_ledger)
       | { Account_update_group.Zkapp_command_intermediate_state.state_after =
-            { global = { ledger; _ }; _ }
+            { global = { first_pass_ledger; second_pass_ledger; _ }; _ }
         ; _
         }
         :: _ ->
-          ledger
+          (first_pass_ledger, second_pass_ledger)
     in
     ( List.fold_right states_rev ~init:[]
         ~f:(fun
@@ -4039,7 +4061,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             }
           in
           let w : Zkapp_command_segment.Witness.t =
-            { global_ledger = source_global.ledger
+            { global_ledger = source_global.first_pass_ledger (* TODO *)
             ; local_state_init = source_local
             ; start_zkapp_command
             ; state_body
@@ -4102,7 +4124,9 @@ module Make_str (A : Wire_types.Concrete) = struct
               else Sparse_ledger.merkle_root source_local.ledger
             in
             { source =
-                { ledger = Sparse_ledger.merkle_root source_global.ledger
+                { ledger =
+                    Sparse_ledger.merkle_root source_global.first_pass_ledger
+                    (* TODO *)
                 ; pending_coinbase_stack = pending_coinbase_stack_state.source
                 ; local_state =
                     { source_local with
@@ -4113,7 +4137,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                     }
                 }
             ; target =
-                { ledger = Sparse_ledger.merkle_root target_global.ledger
+                { ledger =
+                    Sparse_ledger.merkle_root target_global.first_pass_ledger
+                    (* TODO *)
                 ; pending_coinbase_stack = pending_coinbase_stack_state.target
                 ; local_state =
                     { target_local with
@@ -4129,7 +4155,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             }
           in
           (w, spec, statement) :: witnesses )
-    , final_ledger )
+    , final_first_pass_ledger
+    , final_second_pass_ledger )
 
   module Make (Inputs : sig
     val constraint_constants : Genesis_constants.Constraint_constants.t

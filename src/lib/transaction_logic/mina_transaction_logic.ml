@@ -330,7 +330,8 @@ module type S = sig
 
   module Global_state : sig
     type t =
-      { ledger : ledger
+      { first_pass_ledger : ledger
+      ; second_pass_ledger : ledger
       ; fee_excess : Amount.Signed.t
       ; supply_increase : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
@@ -998,23 +999,28 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
   module Global_state = struct
     type t =
-      { ledger : L.t
+      { first_pass_ledger : L.t
+      ; second_pass_ledger : L.t
       ; fee_excess : Amount.Signed.t
       ; supply_increase : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
       ; block_global_slot : Global_slot.t
       }
 
-    let first_pass_ledger { ledger; _ } = L.create_masked ledger
+    let first_pass_ledger { first_pass_ledger; _ } =
+      L.create_masked first_pass_ledger
 
-    let second_pass_ledger { ledger; _ } = L.create_masked ledger
+    let second_pass_ledger { first_pass_ledger; _ } =
+      L.create_masked first_pass_ledger
+    (* TODO *)
 
     let set_first_pass_ledger ~should_update t ledger =
-      if should_update then L.apply_mask t.ledger ~masked:ledger ;
+      if should_update then L.apply_mask t.first_pass_ledger ~masked:ledger ;
       t
 
     let set_second_pass_ledger ~should_update t ledger =
-      if should_update then L.apply_mask t.ledger ~masked:ledger ;
+      if should_update then L.apply_mask t.first_pass_ledger ~masked:ledger ;
+      (* TODO *)
       t
 
     let fee_excess { fee_excess; _ } = fee_excess
@@ -1787,7 +1793,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let initial_state :
         Inputs.Global_state.t * _ Zkapp_command_logic.Local_state.t =
       ( { protocol_state = state_view
-        ; ledger
+        ; first_pass_ledger = ledger
+        ; second_pass_ledger =
+            L.empty ~depth:constraint_constants.ledger_depth ()
         ; fee_excess
         ; supply_increase
         ; block_global_slot = global_slot

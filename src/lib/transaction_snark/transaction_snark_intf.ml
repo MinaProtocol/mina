@@ -390,6 +390,7 @@ module type Full = sig
        * Statement.With_sok.t )
        list
        * Mina_ledger.Sparse_ledger.t
+       * Mina_ledger.Sparse_ledger.t
 
   module Make (Inputs : sig
     val constraint_constants : Genesis_constants.Constraint_constants.t

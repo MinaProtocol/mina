@@ -120,7 +120,7 @@ module Transaction_key = struct
   include Hashable.Make (T)
 
   let of_zkapp_command ~ledger (p : Zkapp_command.t) =
-    let segments, _ =
+    let segments, _, _ =
       Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
         ~global_slot:Mina_numbers.Global_slot.zero
         ~state_body:Transaction_snark_tests.Util.genesis_state_body

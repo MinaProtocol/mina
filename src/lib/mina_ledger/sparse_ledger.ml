@@ -88,7 +88,8 @@ let apply_zkapp_command_unchecked_with_states ~constraint_constants ~global_slot
     ~state_view ~fee_excess ~supply_increase (ref ledger) c ~init:[]
     ~f:(fun
          acc
-         ( { ledger
+         ( { first_pass_ledger
+           ; second_pass_ledger
            ; fee_excess
            ; supply_increase
            ; protocol_state
@@ -96,7 +97,8 @@ let apply_zkapp_command_unchecked_with_states ~constraint_constants ~global_slot
            }
          , local_state )
        ->
-      ( { GS.ledger = !ledger
+      ( { GS.first_pass_ledger = !first_pass_ledger
+        ; second_pass_ledger = !second_pass_ledger
         ; fee_excess
         ; supply_increase
         ; protocol_state
