@@ -48,7 +48,7 @@ let deploy_account_update_body : Account_update.Body.t =
       ; account = Accept
       ; valid_while = Ignore
       }
-  ; may_use_token = Parents_own_token
+  ; may_use_token = No
   ; use_full_commitment = true
   ; authorization_kind = Signature
   }

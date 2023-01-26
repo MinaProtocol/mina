@@ -1294,6 +1294,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let set_voting_for : t -> Controller.t =
          fun a -> a.permissions.set_voting_for
 
+        let set_timing : t -> Controller.t = fun a -> a.permissions.set_timing
+
         type t = Permissions.t
 
         let if_ = value_if
@@ -1504,7 +1506,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let may_use_token_inherited_from_parent (p : t) =
         May_use_token.inherit_from_parent p.body.may_use_token
 
-      let check_authorization ~commitment:_ ~calls:_ (account_update : t) =
+      let check_authorization ~will_succeed:_ ~commitment:_ ~calls:_
+          (account_update : t) =
         (* The transaction's validity should already have been checked before
            this point.
         *)
@@ -1739,6 +1742,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     in
     (sequence_state', last_sequence_slot')
 
+  (** Apply a single zkApp transaction from beginning to end, applying an
+      accumulation function over the state for each account update.
+
+      CAUTION: If you use the intermediate local states, you MUST update the
+      [will_succeed] field to [false] if the [status] is [Failed].
+  *)
   let apply_zkapp_command_unchecked_aux (type user_acc)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(global_slot : Global_slot.t)
@@ -1793,6 +1802,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         ; success = true
         ; account_update_index = Inputs.Index.zero
         ; failure_status_tbl = []
+        ; will_succeed = true
         } )
     in
     let user_acc = f init initial_state in
@@ -1800,7 +1810,14 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       let zkapp_command = Zkapp_command.zkapp_command c in
       Or_error.try_with (fun () ->
           M.start ~constraint_constants
-            { zkapp_command; memo_hash = Signed_command_memo.hash c.memo }
+            { zkapp_command
+            ; memo_hash = Signed_command_memo.hash c.memo
+            ; will_succeed =
+                (* It's always valid to set this value to true, and it will
+                   have no effect outside of the snark.
+                *)
+                true
+            }
             { perform } initial_state )
     in
     let account_states_after_fee_payer =

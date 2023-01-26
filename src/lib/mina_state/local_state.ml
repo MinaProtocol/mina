@@ -30,6 +30,7 @@ let display
      ; success
      ; account_update_index
      ; failure_status_tbl
+     ; will_succeed
      } :
       t ) : display =
   let open Kimchi_backend.Pasta.Basic in
@@ -58,6 +59,7 @@ let display
       Transaction_status.Failure.Collection.to_display failure_status_tbl
       |> Transaction_status.Failure.Collection.Display.to_yojson
       |> Yojson.Safe.to_string
+  ; will_succeed
   }
 
 let dummy : unit -> t =
@@ -73,6 +75,7 @@ let dummy : unit -> t =
       ; success = true
       ; account_update_index = Mina_numbers.Index.zero
       ; failure_status_tbl = []
+      ; will_succeed = true
       } )
 
 let empty = dummy
@@ -87,8 +90,9 @@ let gen : t Quickcheck.Generator.t =
   and call_stack = Call_stack_digest.gen
   and token_id = Token_id.gen
   and success = Bool.quickcheck_generator
-  and account_update_index =
-    Mina_numbers.Index.gen
+  and account_update_index = Mina_numbers.Index.gen
+  and will_succeed =
+    Bool.quickcheck_generator
     (*
   and failure_status =
     let%bind failure = Transaction_status.Failure.gen in
@@ -106,6 +110,7 @@ let gen : t Quickcheck.Generator.t =
   ; success
   ; account_update_index
   ; failure_status_tbl = []
+  ; will_succeed
   }
 
 let to_input
@@ -120,6 +125,7 @@ let to_input
      ; success
      ; account_update_index
      ; failure_status_tbl = _
+     ; will_succeed
      } :
       t ) =
   let open Random_oracle.Input.Chunked in
@@ -135,6 +141,7 @@ let to_input
      ; Ledger_hash.to_input ledger
      ; Mina_numbers.Index.to_input account_update_index
      ; packed (Mina_base.Util.field_of_bool success, 1)
+     ; packed (Mina_base.Util.field_of_bool will_succeed, 1)
     |]
 
 module Checked = struct
@@ -160,6 +167,7 @@ module Checked = struct
       ~success:(f Impl.Boolean.Assert.( = ))
       ~account_update_index:(f !Mina_numbers.Index.Checked.Assert.equal)
       ~failure_status_tbl:(f (fun () () -> ()))
+      ~will_succeed:(f Impl.Boolean.Assert.( = ))
 
   let equal' (t1 : t) (t2 : t) =
     let ( ! ) f x y = Impl.run_checked (f x y) in
@@ -175,6 +183,7 @@ module Checked = struct
       ~ledger:(f !Ledger_hash.equal_var) ~success:(f Impl.Boolean.equal)
       ~account_update_index:(f !Mina_numbers.Index.Checked.equal)
       ~failure_status_tbl:(f (fun () () -> Impl.Boolean.true_))
+      ~will_succeed:(f Impl.Boolean.equal)
 
   let to_input
       ({ stack_frame
@@ -188,6 +197,7 @@ module Checked = struct
        ; success
        ; account_update_index
        ; failure_status_tbl = _
+       ; will_succeed
        } :
         t ) =
     (* failure_status is the unit value, no need to represent it *)
@@ -204,6 +214,7 @@ module Checked = struct
        ; Ledger_hash.var_to_input ledger
        ; Mina_numbers.Index.Checked.to_input account_update_index
        ; packed ((success :> t), 1)
+       ; packed ((will_succeed :> t), 1)
       |]
 end
 
@@ -233,6 +244,7 @@ let typ : (Checked.t, t) Impl.Typ.t =
     ; Boolean.typ
     ; Mina_numbers.Index.typ
     ; failure_status_tbl_typ
+    ; Boolean.typ
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
