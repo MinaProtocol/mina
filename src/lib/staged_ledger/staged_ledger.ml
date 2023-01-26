@@ -11,10 +11,18 @@ open Signature_lib
 module Ledger = Mina_ledger.Ledger
 module Sparse_ledger = Mina_ledger.Sparse_ledger
 
+(* TODO: measure these operations and tune accordingly *)
+let transaction_application_scheduler_batch_size = 10
+
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
 
-let yield_result () = Deferred.map (Scheduler.yield ()) ~f:Result.return
+let yield_result = Fn.compose (Deferred.map ~f:Result.return) Scheduler.yield
+
+let yield_result_every ~n =
+  Fn.compose
+    (Deferred.map ~f:Result.return)
+    (Staged.unstage @@ Scheduler.yield_every ~n)
 
 module Pre_statement = struct
   type t =
@@ -337,7 +345,6 @@ module T = struct
     in
     return t
 
-  (* TODO *)
   let of_scan_state_pending_coinbases_and_snarked_ledger' ~constraint_constants
       ~pending_coinbases ~scan_state ~snarked_ledger ~snarked_local_state:_
       ~expected_merkle_root ~get_state f =
@@ -355,34 +362,11 @@ module T = struct
       partial_txn
     in
     let%bind first_pass_ledger_target =
-      Scan_state.apply_staged_transactions ~ledger:snarked_ledger
-        ~get_protocol_state:get_state ~apply_first_pass ~apply_second_pass
-        ~apply_first_pass_sparse_ledger scan_state
-      |> Deferred.return
+      Scan_state.apply_staged_transactions_async
+        ~async_batch_size:transaction_application_scheduler_batch_size
+        ~ledger:snarked_ledger ~get_protocol_state:get_state ~apply_first_pass
+        ~apply_second_pass ~apply_first_pass_sparse_ledger scan_state
     in
-    (*TODO: Reviewer : Before I fully replace the code below
-       1. do we want to yield after every transaction especially when the first pass has only fee payer updates
-       2. Do we need to check the transaction status if we are checking the ledger hash below*)
-    (*let%bind _ =
-        Deferred.Or_error.List.iter txs_with_protocol_state
-          ~f:(fun (tx, protocol_state) ->
-            let%map.Deferred () = Scheduler.yield () in
-            let%bind.Or_error txn_with_info =
-              Ledger.apply_transaction ~constraint_constants
-                ~txn_state_view:
-                  (Mina_state.Protocol_state.Body.view protocol_state.body)
-                snarked_ledger tx.data
-            in
-            let computed_status =
-              Ledger.Transaction_applied.transaction_status txn_with_info
-            in
-            if Transaction_status.equal tx.status computed_status then Ok ()
-            else
-              Or_error.errorf
-                !"Mismatched user command status. Expected: %{sexp: \
-                  Transaction_status.t} Got: %{sexp: Transaction_status.t}"
-                tx.status computed_status )
-      in*)
     let staged_ledger_hash = Ledger.merkle_root snarked_ledger in
     let%bind () =
       Deferred.return
@@ -698,10 +682,7 @@ module T = struct
         init_pending_coinbase_stack_state ts current_state_view
     in
     let yield =
-      (* TODO: measure these operations and tune `n` accordingly *)
-      Fn.compose
-        (Deferred.map ~f:Result.return)
-        (Staged.unstage @@ Scheduler.yield_every ~n:10)
+      yield_result_every ~n:transaction_application_scheduler_batch_size
     in
     let%bind pre_stmts1, updated_stack1 =
       apply_first_pass ~yield current_stack ts

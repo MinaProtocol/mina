@@ -117,7 +117,7 @@ val latest_ledger_proof :
     tree corresponding to a proof. Set this to true when applying transactions
     to get the snarked ledger corresponding to a proof.
     *)
-val apply_last_proof_transactions :
+val apply_last_proof_transactions_sync :
      ledger:Ledger.t
   -> get_protocol_state:
        (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)
@@ -139,17 +139,9 @@ val apply_last_proof_transactions :
   -> t
   -> unit Or_error.t
 
-(** Apply all the currently staged transaction to snarked ledger based on the 
-    two-pass system- first pass includes legacy transactions and zkapp payments
-    and the second pass includes account updates. [ignore_incomplete] is to
-    ignore the account updates that were not completed in a single scan state
-    tree corresponding to a proof. Set this to true when applying transactions
-    to get the snarked ledger corresponding to a proof.
-    Returns the target first pass ledger after all the transactions have been
-    applied
-    *)
-val apply_staged_transactions :
-     ledger:Ledger.t
+val apply_last_proof_transactions_async :
+     ?async_batch_size:int
+  -> ledger:Ledger.t
   -> get_protocol_state:
        (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)
   -> apply_first_pass:
@@ -168,7 +160,39 @@ val apply_staged_transactions :
         -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
            Or_error.t )
   -> t
-  -> Ledger_hash.t Or_error.t
+  -> unit Deferred.Or_error.t
+
+(** Apply all the currently staged transaction to snarked ledger based on the 
+    two-pass system- first pass includes legacy transactions and zkapp payments
+    and the second pass includes account updates. [ignore_incomplete] is to
+    ignore the account updates that were not completed in a single scan state
+    tree corresponding to a proof. Set this to true when applying transactions
+    to get the snarked ledger corresponding to a proof.
+    Returns the target first pass ledger after all the transactions have been
+    applied
+    *)
+val apply_staged_transactions_async :
+     ?async_batch_size:int
+  -> ledger:Ledger.t
+  -> get_protocol_state:
+       (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)
+  -> apply_first_pass:
+       (   txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
+        -> Ledger.t
+        -> Transaction.t
+        -> Ledger.Transaction_partially_applied.t Or_error.t )
+  -> apply_second_pass:
+       (   Ledger.t
+        -> Ledger.Transaction_partially_applied.t
+        -> Ledger.Transaction_applied.t Or_error.t )
+  -> apply_first_pass_sparse_ledger:
+       (   txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
+        -> Mina_ledger.Sparse_ledger.t
+        -> Mina_transaction.Transaction.t
+        -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
+           Or_error.t )
+  -> t
+  -> Ledger_hash.t Deferred.Or_error.t
 
 val free_space : t -> int
 

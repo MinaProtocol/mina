@@ -339,7 +339,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           *)
           Async.In_thread.run (fun () -> Mina_lib.get_ledger coda lh) )
     ; implement Daemon_rpcs.Get_snarked_ledger.rpc (fun () lh ->
-          Mina_lib.get_snarked_ledger coda lh |> return )
+          Mina_lib.get_snarked_ledger coda lh )
     ; implement Daemon_rpcs.Get_staking_ledger.rpc (fun () which ->
           ( match which with
           | Next ->

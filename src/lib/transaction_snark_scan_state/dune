@@ -18,6 +18,7 @@
    bin_prot.shape
    async_unix
    ;; local libraries
+   mina_stdlib
    mina_base.import
    data_hash_lib
    mina_state
