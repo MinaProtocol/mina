@@ -21,8 +21,6 @@ module type Bool_intf = sig
 
   val ( ||| ) : t -> t -> t
 
-  val ( |||| ) : t -> t -> t -> t
-
   val any : t list -> t
 end
 

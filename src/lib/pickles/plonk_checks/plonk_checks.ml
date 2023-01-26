@@ -26,8 +26,6 @@ module type Bool_intf = sig
 
   val ( ||| ) : t -> t -> t
 
-  val ( |||| ) : t -> t -> t -> t
-
   val any : t list -> t
 end
 
@@ -139,7 +137,7 @@ let expand_feature_flags (type boolean)
   in
   let lookup_pattern_range_check =
     (* RangeCheck, Rot gates use RangeCheck lookup pattern *)
-    lazy (B.( |||| ) range_check0 range_check1 rot)
+    lazy B.(range_check0 ||| range_check1 ||| rot)
   in
   let lookup_pattern_xor =
     (* Xor, ChaCha gates use Xor lookup pattern *)
@@ -214,15 +212,6 @@ let lookup_tables_used feature_flags =
       | Maybe, _ | _, Maybe ->
           Maybe
       | No, No ->
-          No
-
-    let ( |||| ) (x : t) (y : t) (z : t) : t =
-      match (x, y, z) with
-      | Yes, _, _ | _, Yes, _ | _, _, Yes ->
-          Yes
-      | Maybe, _, _ | _, Maybe, _ | _, _, Maybe ->
-          Maybe
-      | No, No, No ->
           No
 
     let any = List.fold_left ~f:( ||| ) ~init:false_
