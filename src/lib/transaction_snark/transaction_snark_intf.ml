@@ -376,6 +376,7 @@ module type Full = sig
    *)
   val zkapp_command_witnesses_exn :
        constraint_constants:Genesis_constants.Constraint_constants.t
+    -> global_slot:Mina_numbers.Global_slot.t
     -> state_body:Transaction_protocol_state.Block_data.t
     -> fee_excess:Currency.Amount.Signed.t
     -> [ `Ledger of Mina_ledger.Ledger.t

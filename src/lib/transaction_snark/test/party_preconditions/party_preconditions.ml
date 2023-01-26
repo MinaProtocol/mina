@@ -5,6 +5,92 @@ module U = Transaction_snark_tests.Util
 module Spec = Transaction_snark.For_tests.Update_states_spec
 open Mina_base
 
+let%test_module "Valid_while precondition tests" =
+  ( module struct
+    let constraint_constants = U.constraint_constants
+
+    let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
+
+    let snapp_update : Account_update.Update.t =
+      { Account_update.Update.dummy with
+        app_state =
+          Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
+              Zkapp_basic.Set_or_keep.Set (Pickles.Backend.Tick.Field.of_int i) )
+      }
+
+    let create_spec
+        (specs : Mina_transaction_logic.For_tests.Transaction_spec.t list)
+        new_kp global_slot : Spec.t =
+      let fee = Fee.of_nanomina_int_exn 1_000_000 in
+      let spec = List.hd_exn specs in
+
+      { sender = spec.sender
+      ; fee
+      ; fee_payer = None
+      ; receivers = []
+      ; amount = Amount.zero
+      ; zkapp_account_keypairs = [ new_kp ]
+      ; memo = Signed_command_memo.create_from_string_exn "valid_while precond"
+      ; new_zkapp_account = false
+      ; snapp_update
+      ; current_auth = Permissions.Auth_required.Signature
+      ; call_data = Snark_params.Tick.Field.zero
+      ; events = []
+      ; actions = []
+      ; preconditions =
+          Some
+            { Account_update.Preconditions.network =
+                Zkapp_precondition.Protocol_state.accept
+            ; account = Account_update.Account_precondition.Accept
+            ; valid_while = Check { lower = global_slot; upper = global_slot }
+            }
+      }
+
+    let%test_unit "exact valid_while precondition" =
+      Quickcheck.test ~trials:1 U.gen_snapp_ledger
+        ~f:(fun ({ init_ledger; specs }, new_kp) ->
+          Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  let global_slot = Mina_numbers.Global_slot.of_int 5 in
+                  Mina_transaction_logic.For_tests.Init_ledger.init
+                    (module Mina_ledger.Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  Transaction_snark.For_tests.create_trivial_zkapp_account ~vk
+                    ~ledger
+                    (Signature_lib.Public_key.compress new_kp.public_key) ;
+                  let open Async.Deferred.Let_syntax in
+                  let%bind zkapp_command =
+                    Transaction_snark.For_tests.update_states ~zkapp_prover
+                      ~constraint_constants
+                      (create_spec specs new_kp global_slot)
+                  in
+                  U.check_zkapp_command_with_merges_exn ~global_slot ledger
+                    [ zkapp_command ] ) ) )
+
+    let%test_unit "invalid valid_while precondition" =
+      Quickcheck.test ~trials:1 U.gen_snapp_ledger
+        ~f:(fun ({ init_ledger; specs }, new_kp) ->
+          Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  let global_slot = Mina_numbers.Global_slot.of_int 5 in
+                  Mina_transaction_logic.For_tests.Init_ledger.init
+                    (module Mina_ledger.Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  Transaction_snark.For_tests.create_trivial_zkapp_account ~vk
+                    ~ledger
+                    (Signature_lib.Public_key.compress new_kp.public_key) ;
+                  let open Async.Deferred.Let_syntax in
+                  let%bind zkapp_command =
+                    Transaction_snark.For_tests.update_states ~zkapp_prover
+                      ~constraint_constants
+                      (create_spec specs new_kp global_slot)
+                  in
+                  U.check_zkapp_command_with_merges_exn
+                    ~expected_failure:Valid_while_precondition_unsatisfied
+                    ~global_slot:Mina_numbers.Global_slot.zero ledger
+                    [ zkapp_command ] ) ) )
+  end )
+
 let%test_module "Protocol state precondition tests" =
   ( module struct
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
@@ -80,6 +166,7 @@ let%test_module "Protocol state precondition tests" =
                       precondition_exact
                         (Mina_state.Protocol_state.Body.view state_body)
                   ; account = Account_update.Account_precondition.Accept
+                  ; valid_while = Ignore
                   }
             }
           in
@@ -121,6 +208,7 @@ let%test_module "Protocol state precondition tests" =
                 Some
                   { Account_update.Preconditions.network = network_precondition
                   ; account = Account_update.Account_precondition.Accept
+                  ; valid_while = Ignore
                   }
             }
           in
@@ -185,6 +273,7 @@ let%test_module "Protocol state precondition tests" =
                         ; balance_change =
                             Amount.(Signed.(negate (of_unsigned amount)))
                         ; increment_nonce = true
+                        ; implicit_account_creation_fee = true
                         ; events = []
                         ; actions = []
                         ; call_data = Snark_params.Tick.Field.zero
@@ -193,9 +282,10 @@ let%test_module "Protocol state precondition tests" =
                             { Account_update.Preconditions.network =
                                 invalid_network_precondition
                             ; account = Nonce (Account.Nonce.succ sender_nonce)
+                            ; valid_while = Ignore
                             }
                         ; use_full_commitment = false
-                        ; caller = Call
+                        ; may_use_token = No
                         ; authorization_kind = Signature
                         }
                         (*To be updated later*)
@@ -216,6 +306,7 @@ let%test_module "Protocol state precondition tests" =
                                          constraint_constants
                                            .account_creation_fee ) ) ))
                         ; increment_nonce = false
+                        ; implicit_account_creation_fee = true
                         ; events = []
                         ; actions = []
                         ; call_data = Snark_params.Tick.Field.zero
@@ -225,9 +316,10 @@ let%test_module "Protocol state precondition tests" =
                                 invalid_network_precondition
                             ; account =
                                 Account_update.Account_precondition.Accept
+                            ; valid_while = Ignore
                             }
                         ; use_full_commitment = true
-                        ; caller = Call
+                        ; may_use_token = No
                         ; authorization_kind = Signature
                         }
                     ; authorization =
@@ -417,6 +509,7 @@ let%test_module "Account precondition tests" =
                           { Account_update.Preconditions.network =
                               Zkapp_precondition.Protocol_state.accept
                           ; account = precondition_exact snapp_account
+                          ; valid_while = Ignore
                           }
                     }
                   in
@@ -485,6 +578,7 @@ let%test_module "Account precondition tests" =
                           { Account_update.Preconditions.network =
                               Zkapp_precondition.Protocol_state.accept
                           ; account = account_precondition
+                          ; valid_while = Ignore
                           }
                     }
                   in
@@ -507,7 +601,8 @@ let%test_module "Account precondition tests" =
         let%map account_precondition =
           Mina_generators.Zkapp_command_generators.(
             gen_account_precondition_from_account ~first_use_of_account:true
-              ~failure:Invalid_account_precondition snapp_account)
+              ~is_nonce_precondition:true ~failure:Invalid_account_precondition
+              snapp_account)
         in
         (l, account_precondition)
       in
@@ -537,6 +632,7 @@ let%test_module "Account precondition tests" =
                           { Account_update.Preconditions.network =
                               Zkapp_precondition.Protocol_state.accept
                           ; account = account_precondition
+                          ; valid_while = Ignore
                           }
                     }
                   in
@@ -595,6 +691,7 @@ let%test_module "Account precondition tests" =
                     ; balance_change =
                         Amount.(Signed.(negate (of_unsigned amount)))
                     ; increment_nonce = true
+                    ; implicit_account_creation_fee = true
                     ; events = []
                     ; actions = []
                     ; call_data = Snark_params.Tick.Field.zero
@@ -603,9 +700,10 @@ let%test_module "Account precondition tests" =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
                         ; account = Nonce (Account.Nonce.succ sender_nonce)
+                        ; valid_while = Ignore
                         }
                     ; use_full_commitment = false
-                    ; caller = Call
+                    ; may_use_token = No
                     ; authorization_kind = Signature
                     }
                     (*To be updated later*)
@@ -624,6 +722,7 @@ let%test_module "Account precondition tests" =
                                 constraint_constants.account_creation_fee ) )
                         |> Amount.Signed.of_unsigned
                     ; increment_nonce = false
+                    ; implicit_account_creation_fee = true
                     ; events = []
                     ; actions = []
                     ; call_data = Snark_params.Tick.Field.zero
@@ -632,9 +731,10 @@ let%test_module "Account precondition tests" =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
                         ; account = Account_update.Account_precondition.Accept
+                        ; valid_while = Ignore
                         }
                     ; use_full_commitment = true
-                    ; caller = Call
+                    ; may_use_token = No
                     ; authorization_kind = Signature
                     }
                 ; authorization =
@@ -698,8 +798,9 @@ let%test_module "Account precondition tests" =
                 init_ledger ledger ;
               match
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
-                  ~constraint_constants ~state_view:psv ledger
-                  zkapp_command_with_invalid_fee_payer
+                  ~constraint_constants
+                  ~global_slot:psv.global_slot_since_genesis ~state_view:psv
+                  ledger zkapp_command_with_invalid_fee_payer
               with
               | Error e ->
                   assert (

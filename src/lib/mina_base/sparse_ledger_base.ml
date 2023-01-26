@@ -36,6 +36,7 @@ module Global_state = struct
     ; fee_excess : Currency.Amount.Signed.t
     ; supply_increase : Currency.Amount.Signed.t
     ; protocol_state : Zkapp_precondition.Protocol_state.View.t
+    ; block_global_slot : Mina_numbers.Global_slot.t
     }
   [@@deriving sexp, to_yojson]
 end

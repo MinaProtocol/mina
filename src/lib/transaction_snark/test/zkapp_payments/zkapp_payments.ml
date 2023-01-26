@@ -15,10 +15,13 @@ let%test_module "Zkapp payments tests" =
 
     let constraint_constants = U.constraint_constants
 
-    let merkle_root_after_zkapp_command_exn t ~txn_state_view txn =
+    let merkle_root_after_zkapp_command_exn t
+        ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t)
+        ~global_slot txn =
       let hash =
         Ledger.merkle_root_after_zkapp_command_exn
-          ~constraint_constants:U.constraint_constants ~txn_state_view t txn
+          ~constraint_constants:U.constraint_constants ~global_slot
+          ~txn_state_view t txn
       in
       Frozen_ledger_hash.of_ledger_hash hash
 
@@ -63,6 +66,7 @@ let%test_module "Zkapp payments tests" =
                   ; balance_change =
                       Amount.Signed.(of_unsigned receiver_amount |> negate)
                   ; increment_nonce = true
+                  ; implicit_account_creation_fee = true
                   ; events = []
                   ; actions = []
                   ; call_data = Field.zero
@@ -71,9 +75,10 @@ let%test_module "Zkapp payments tests" =
                       { Account_update.Preconditions.network =
                           Zkapp_precondition.Protocol_state.accept
                       ; account = Accept
+                      ; valid_while = Ignore
                       }
                   ; use_full_commitment = false
-                  ; caller = Call
+                  ; may_use_token = No
                   ; authorization_kind = Signature
                   }
               ; authorization = Signature Signature.dummy
@@ -84,6 +89,7 @@ let%test_module "Zkapp payments tests" =
                   ; token_id = Token_id.default
                   ; balance_change = Amount.Signed.(of_unsigned receiver_amount)
                   ; increment_nonce = false
+                  ; implicit_account_creation_fee = true
                   ; events = []
                   ; actions = []
                   ; call_data = Field.zero
@@ -92,9 +98,10 @@ let%test_module "Zkapp payments tests" =
                       { Account_update.Preconditions.network =
                           Zkapp_precondition.Protocol_state.accept
                       ; account = Accept
+                      ; valid_while = Ignore
                       }
                   ; use_full_commitment = false
-                  ; caller = Call
+                  ; may_use_token = No
                   ; authorization_kind = None_given
                   }
               ; authorization = None_given
@@ -127,7 +134,11 @@ let%test_module "Zkapp payments tests" =
                     =
                   Zkapp_command.Valid.to_valid_unsafe t1
                 in
-                merkle_root_after_zkapp_command_exn ledger ~txn_state_view t1
+                merkle_root_after_zkapp_command_exn ledger ~txn_state_view
+                  ~global_slot:
+                    Mina_numbers.Global_slot.(
+                      succ txn_state_view.global_slot_since_genesis)
+                  t1
               in
               let hash_post = Ledger.merkle_root ledger in
               [%test_eq: Field.t] hash_pre hash_post ) )
@@ -136,9 +147,7 @@ let%test_module "Zkapp payments tests" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-              let zkapp_command =
-                account_update_send ~constraint_constants (List.hd_exn specs)
-              in
+              let zkapp_command = account_update_send (List.hd_exn specs) in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
               ignore
                 ( U.apply_zkapp_command ledger [ zkapp_command ]
@@ -154,8 +163,7 @@ let%test_module "Zkapp payments tests" =
                     let use_full_commitment =
                       Quickcheck.random_value Bool.quickcheck_generator
                     in
-                    account_update_send ~constraint_constants
-                      ~use_full_commitment s )
+                    account_update_send ~use_full_commitment s )
                   specs
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;

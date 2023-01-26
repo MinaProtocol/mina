@@ -177,6 +177,7 @@ let update_of_id pool update_id =
           let%map { edit_state
                   ; send
                   ; receive
+                  ; access
                   ; set_delegate
                   ; set_permissions
                   ; set_verification_key
@@ -193,6 +194,7 @@ let update_of_id pool update_id =
             ( { edit_state
               ; send
               ; receive
+              ; access
               ; set_delegate
               ; set_permissions
               ; set_verification_key
@@ -417,8 +419,10 @@ let get_account_update_body ~pool body_id =
            ; call_depth
            ; zkapp_network_precondition_id
            ; zkapp_account_precondition_id
+           ; zkapp_valid_while_precondition_id
            ; use_full_commitment
-           ; caller
+           ; implicit_account_creation_fee
+           ; may_use_token
            ; authorization_kind
            } =
     query_db ~f:(fun db -> Processor.Zkapp_account_update_body.load db body_id)
@@ -586,7 +590,10 @@ let get_account_update_body ~pool body_id =
              ; is_new
              } )
   in
-  let caller = Account_update.Call_type.of_string caller in
+  let%bind valid_while_precondition =
+    get_global_slot_bounds pool zkapp_valid_while_precondition_id
+  in
+  let may_use_token = Account_update.May_use_token.of_string may_use_token in
   let authorization_kind =
     Account_update.Authorization_kind.of_string_exn authorization_kind
   in
@@ -603,9 +610,11 @@ let get_account_update_body ~pool body_id =
       ; preconditions =
           { Account_update.Preconditions.network = protocol_state_precondition
           ; account = account_precondition
+          ; valid_while = valid_while_precondition
           }
       ; use_full_commitment
-      ; caller
+      ; implicit_account_creation_fee
+      ; may_use_token
       ; authorization_kind
       }
       : Account_update.Body.Simple.t )
@@ -714,6 +723,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
     let%map { edit_state
             ; send
             ; receive
+            ; access
             ; set_delegate
             ; set_permissions
             ; set_verification_key
@@ -728,6 +738,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
     ( { edit_state
       ; send
       ; receive
+      ; access
       ; set_delegate
       ; set_permissions
       ; set_verification_key

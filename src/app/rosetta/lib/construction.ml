@@ -691,6 +691,11 @@ module Parse = struct
   end
 
   module Impl (M : Monad_fail.S) = struct
+    let check_sufficient_fee (type a) (payment : a -> Transaction.Unsigned.Rendered.Payment.t option) (transaction : a) : (unit, Errors.t) Result.t = 
+      match payment transaction with
+    | Some pay -> if Transaction.Unsigned.Rendered.Payment.is_fee_sufficient pay then Ok () else  Result.fail @@ Errors.create `Transaction_submit_fee_small
+    | None -> Ok ()
+
     let handle ~(env : Env.T(M).t) (req : Construction_parse_request.t) =
       let open M.Let_syntax in
       let%bind json =
@@ -709,6 +714,10 @@ module Parse = struct
               Transaction.Signed.Rendered.of_yojson json
               |> Result.map_error ~f:(fun e ->
                      Errors.create (`Json_parse (Some e)))
+              |> env.lift
+            in
+            let%bind () =
+              check_sufficient_fee Transaction.Signed.Rendered.(fun a -> a.payment) signed_rendered_transaction
               |> env.lift
             in
             let%bind signed_transaction =
@@ -736,11 +745,18 @@ module Parse = struct
               ]
             , meta_of_command signed_transaction.command)
         | false ->
-            let%map unsigned_transaction =
+            let%bind unsigned_rendered_transaction =
               Transaction.Unsigned.Rendered.of_yojson json
               |> Result.map_error ~f:(fun e ->
-                     Errors.create (`Json_parse (Some e)))
-              |> Result.bind ~f:Transaction.Unsigned.of_rendered
+                    Errors.create (`Json_parse (Some e)))
+              |> env.lift
+            in
+            let%bind () =
+              check_sufficient_fee Transaction.Unsigned.Rendered.(fun a -> a.payment) unsigned_rendered_transaction
+              |> env.lift
+            in
+            let%map unsigned_transaction =
+             Transaction.Unsigned.of_rendered unsigned_rendered_transaction
               |> env.lift
             in
             ( User_command_info.to_operations ~failure_status:None
