@@ -211,6 +211,7 @@ module Local_state = struct
         ; success : 'bool
         ; account_update_index : 'length
         ; failure_status_tbl : 'failure_status_tbl
+        ; will_succeed : 'bool
         }
       [@@deriving compare, equal, hash, sexp, yojson, fields, hlist]
     end
@@ -230,6 +231,7 @@ module Local_state = struct
       ; bool
       ; length
       ; failure_status_tbl
+      ; bool
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -337,7 +339,8 @@ module type Account_update_intf = sig
   val implicit_account_creation_fee : t -> bool
 
   val check_authorization :
-       commitment:transaction_commitment
+       will_succeed:bool
+    -> commitment:transaction_commitment
     -> calls:call_forest
     -> t
     -> [ `Proof_verifies of bool ] * [ `Signature_verifies of bool ]
@@ -874,8 +877,11 @@ module Start_data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('zkapp_command, 'field) t =
-        { zkapp_command : 'zkapp_command; memo_hash : 'field }
+      type ('zkapp_command, 'field, 'bool) t =
+        { zkapp_command : 'zkapp_command
+        ; memo_hash : 'field
+        ; will_succeed : 'bool
+        }
       [@@deriving sexp, yojson]
     end
   end]
@@ -1061,12 +1067,23 @@ module Make (Inputs : Inputs_intf) = struct
       | `Compute _ ->
           is_start'
     in
+    let will_succeed =
+      match is_start with
+      | `Compute start_data ->
+          Bool.if_ is_start' ~then_:start_data.will_succeed
+            ~else_:local_state.will_succeed
+      | `Yes start_data ->
+          start_data.will_succeed
+      | `No ->
+          local_state.will_succeed
+    in
     let local_state =
       { local_state with
         ledger =
           Inputs.Ledger.if_ is_start'
             ~then_:(Inputs.Global_state.ledger global_state)
             ~else_:local_state.ledger
+      ; will_succeed
       }
     in
     let ( (account_update, remaining, call_stack)
@@ -1207,7 +1224,8 @@ module Make (Inputs : Inputs_intf) = struct
           ~then_:local_state.full_transaction_commitment
           ~else_:local_state.transaction_commitment
       in
-      Inputs.Account_update.check_authorization ~commitment
+      Inputs.Account_update.check_authorization
+        ~will_succeed:local_state.will_succeed ~commitment
         ~calls:account_update_forest account_update
     in
     assert_ ~pos:__POS__
@@ -1801,6 +1819,15 @@ module Make (Inputs : Inputs_intf) = struct
       assert_with_failure_status_tbl ~pos:__POS__
         ((not is_start') ||| local_state.success)
         local_state.failure_status_tbl) ;
+    (* If this is the last account update, and [will_succeed] is false, then
+       [success] must also be false.
+    *)
+    Bool.(
+      Assert.any ~pos:__POS__
+        [ not is_last_account_update
+        ; local_state.will_succeed
+        ; not local_state.success
+        ]) ;
     let global_state =
       Global_state.set_ledger ~should_update:update_global_state global_state
         local_state.ledger
@@ -1838,6 +1865,9 @@ module Make (Inputs : Inputs_intf) = struct
           Amount.Signed.if_ is_last_account_update
             ~then_:Amount.(Signed.of_unsigned zero)
             ~else_:local_state.supply_increase
+      ; will_succeed =
+          Bool.if_ is_last_account_update ~then_:Bool.true_
+            ~else_:local_state.will_succeed
       }
     in
     (global_state, local_state)

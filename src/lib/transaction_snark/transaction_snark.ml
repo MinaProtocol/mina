@@ -994,6 +994,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         val spec : single
 
         val set_zkapp_input : Zkapp_statement.Checked.t -> unit
+
+        val set_must_verify : Boolean.var -> unit
       end
 
       type account_update = Zkapp_call_forest.Checked.account_update =
@@ -1889,7 +1891,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
             let increment_nonce (t : t) = t.account_update.data.increment_nonce
 
-            let check_authorization ~commitment
+            let check_authorization ~will_succeed ~commitment
                 ~calls:({ hash = calls; _ } : Call_forest.t)
                 ({ account_update; control; _ } : t) =
               let proof_verifies =
@@ -1899,6 +1901,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                       { account_update = (account_update.hash :> Field.t)
                       ; calls = (calls :> Field.t)
                       } ;
+                    set_must_verify will_succeed ;
                     Boolean.true_
                 | Signature | None_given ->
                     Boolean.false_
@@ -2182,6 +2185,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; account_update_index =
                 statement.source.local_state.account_update_index
             ; failure_status_tbl = ()
+            ; will_succeed = statement.source.local_state.will_succeed
             }
           in
           (g, l)
@@ -2190,6 +2194,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           As_prover.Ref.create (fun () -> !witness.start_zkapp_command)
         in
         let zkapp_input = ref None in
+        let must_verify = ref Boolean.true_ in
         let global, local =
           List.fold_left spec ~init
             ~f:(fun ((_, local) as acc) account_update_spec ->
@@ -2199,6 +2204,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                 let spec = account_update_spec
 
                 let set_zkapp_input x = zkapp_input := Some x
+
+                let set_must_verify x = must_verify := x
               end) in
               let finish v =
                 let open Mina_transaction_logic.Zkapp_command_logic.Start_data in
@@ -2223,6 +2230,13 @@ module Make_str (A : Wire_types.Concrete) = struct
                               Field.Constant.zero
                           | `Start p ->
                               p.memo_hash )
+                  ; will_succeed =
+                      exists Boolean.typ ~compute:(fun () ->
+                          match V.get v with
+                          | `Skip ->
+                              false
+                          | `Start p ->
+                              p.will_succeed )
                   }
                 in
                 let global_state, local_state =
@@ -2319,7 +2333,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                  }
                in
                Fee_excess.assert_equal_checked expected got ) ) ;
-        Stdlib.( ! ) zkapp_input
+        (Stdlib.( ! ) zkapp_input, `Must_verify (Stdlib.( ! ) must_verify))
 
       (* Horrible hack :( *)
       let witness : Witness.t option ref = ref None
@@ -2355,7 +2369,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; prevs = M.[ side_loaded 0 ]
             ; main =
                 (fun { public_input = stmt } ->
-                  let zkapp_input =
+                  let zkapp_input, `Must_verify must_verify =
                     main ?witness:!witness s ~constraint_constants stmt
                   in
                   let proof =
@@ -2365,7 +2379,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   { previous_proof_statements =
                       [ { public_input = Option.value_exn zkapp_input
                         ; proof
-                        ; proof_must_verify = b
+                        ; proof_must_verify = Run.Boolean.( &&& ) b must_verify
                         }
                       ]
                   ; public_output = ()
@@ -2378,7 +2392,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; prevs = M.[]
             ; main =
                 (fun { public_input = stmt } ->
-                  let zkapp_input_opt =
+                  let zkapp_input_opt, _ =
                     main ?witness:!witness s ~constraint_constants stmt
                   in
                   assert (Option.is_none zkapp_input_opt) ;
@@ -2393,7 +2407,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; prevs = M.[]
             ; main =
                 (fun { public_input = stmt } ->
-                  let zkapp_input_opt =
+                  let zkapp_input_opt, _ =
                     main ?witness:!witness s ~constraint_constants stmt
                   in
                   assert (Option.is_none zkapp_input_opt) ;
@@ -3788,18 +3802,29 @@ module Make_str (A : Wire_types.Concrete) = struct
     in
     let supply_increase = Amount.(Signed.of_unsigned zero) in
     let state_view = Mina_state.Protocol_state.Body.view state_body in
-    let _, _, _, states_rev =
-      List.fold_left ~init:(fee_excess, supply_increase, sparse_ledger, [])
+    let _, _, _, will_succeeds_rev, states_rev =
+      List.fold_left ~init:(fee_excess, supply_increase, sparse_ledger, [], [])
         zkapp_commands
         ~f:(fun
-             (fee_excess, supply_increase, sparse_ledger, statess_rev)
+             ( fee_excess
+             , supply_increase
+             , sparse_ledger
+             , will_succeeds_rev
+             , statess_rev )
              (_, _, zkapp_command)
            ->
-          let _, states =
+          let txn_applied, states =
             Sparse_ledger.apply_zkapp_command_unchecked_with_states
               sparse_ledger ~constraint_constants ~global_slot ~state_view
               ~fee_excess ~supply_increase zkapp_command
             |> Or_error.ok_exn
+          in
+          let will_succeed =
+            match txn_applied.command.status with
+            | Applied ->
+                true
+            | Failed _ ->
+                false
           in
           let final_state =
             let global_state, _local_state = List.last_exn states in
@@ -3808,8 +3833,10 @@ module Make_str (A : Wire_types.Concrete) = struct
           ( final_state.fee_excess
           , final_state.supply_increase
           , final_state.ledger
+          , will_succeed :: will_succeeds_rev
           , states :: statess_rev ) )
     in
+    let will_succeeds = List.rev will_succeeds_rev in
     let states = List.rev states_rev in
     let states_rev =
       Account_update_group.group_by_zkapp_command_rev
@@ -3826,17 +3853,19 @@ module Make_str (A : Wire_types.Concrete) = struct
     in
     let remaining_zkapp_command =
       let zkapp_commands =
-        List.map zkapp_commands
+        List.map2_exn zkapp_commands will_succeeds
           ~f:(fun
                ( pending_coinbase_init_stack
                , pending_coinbase_stack_state
                , zkapp_command )
+               will_succeed
              ->
             ( pending_coinbase_init_stack
             , pending_coinbase_stack_state
             , { Mina_transaction_logic.Zkapp_command_logic.Start_data
                 .zkapp_command
               ; memo_hash = Signed_command_memo.hash zkapp_command.memo
+              ; will_succeed
               } ) )
       in
       ref zkapp_commands
