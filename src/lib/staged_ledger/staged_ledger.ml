@@ -1029,7 +1029,18 @@ module T = struct
           List.map cs ~f:(fun { With_status.data = cmd; status } ->
               let open Ledger in
               let cmd =
-                User_command.to_verifiable ~ledger ~get ~location_of_account cmd
+                let allow_missing_vk =
+                  match status with
+                  | Applied ->
+                      false
+                  | Failed _ ->
+                      (* We allow the vk to be invalid / missing if the command
+                         fails.
+                      *)
+                      true
+                in
+                User_command.to_verifiable ~allow_missing_vk ~ledger ~get
+                  ~location_of_account cmd
                 |> Or_error.ok_exn
               in
               { With_status.data = cmd; status } ) )

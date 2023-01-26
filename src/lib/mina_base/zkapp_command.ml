@@ -1105,7 +1105,8 @@ module Verifiable : sig
   end]
 
   val create :
-       T.t
+       ?allow_missing_vk:bool
+    -> T.t
     -> ledger:'a
     -> get:('a -> 'b -> Account.t option)
     -> location_of_account:('a -> Account_id.t -> 'b option)
@@ -1138,7 +1139,8 @@ end = struct
    * subsequent account_updates use the replaced key instead of looking in the
    * ledger for the key (ie set by a previous transaction).
    *)
-  let create ({ fee_payer; account_updates; memo } : T.t) ~ledger ~get
+  let create ?(allow_missing_vk = false)
+      ({ fee_payer; account_updates; memo } : T.t) ~ledger ~get
       ~location_of_account : t Or_error.t =
     With_return.with_return (fun { return } ->
         let find_vk account_id =
@@ -1150,14 +1152,16 @@ end = struct
             zkapp.verification_key
           with
           | Some vk ->
-              vk
+              Some vk
           | None ->
-              let err =
-                Error.create
-                  "No verification key found for proved account update"
-                  ("account_id", account_id) [%sexp_of: string * Account_id.t]
-              in
-              return (Error err)
+              if allow_missing_vk then None
+              else
+                let err =
+                  Error.create
+                    "No verification key found for proved account update"
+                    ("account_id", account_id) [%sexp_of: string * Account_id.t]
+                in
+                return (Error err)
         in
         let tbl = Account_id.Table.create () in
         let vks_overridden =
@@ -1185,34 +1189,41 @@ end = struct
                     return err
               in
               if Control.(Tag.equal Tag.Proof (Control.tag p.authorization))
-              then (
+              then
                 let prioritized_vk =
                   (* only lookup _past_ vk setting, ie exclude the new one we
                    * potentially set in this account_update (use the non-'
                    * vks_overrided) . *)
                   match Account_id.Map.find !vks_overridden account_id with
                   | Some (Some vk) ->
-                      vk
+                      Some vk
                   | Some None ->
-                      (* we explicitly have erased the key *)
-                      let err =
-                        Error.create
-                          "No verification key found for proved account \
-                           update: the verification key was removed by a \
-                           previous account update"
-                          ("account_id", account_id)
-                          [%sexp_of: string * Account_id.t]
-                      in
-                      return (Error err)
+                      if allow_missing_vk then
+                        (* we explicitly have erased the key *)
+                        let err =
+                          Error.create
+                            "No verification key found for proved account \
+                             update: the verification key was removed by a \
+                             previous account update"
+                            ("account_id", account_id)
+                            [%sexp_of: string * Account_id.t]
+                        in
+                        return (Error err)
+                      else None
                   | None ->
                       (* we haven't set anything; lookup the vk in the ledger *)
                       find_vk account_id
                 in
-                Account_id.Table.update tbl account_id ~f:(fun _ ->
-                    With_hash.hash prioritized_vk ) ;
-                (* return the updated overrides *)
-                vks_overridden := vks_overriden' ;
-                (p, Some prioritized_vk) )
+                match prioritized_vk with
+                | Some prioritized_vk ->
+                    Account_id.Table.update tbl account_id ~f:(fun _ ->
+                        With_hash.hash prioritized_vk ) ;
+                    (* return the updated overrides *)
+                    vks_overridden := vks_overriden' ;
+                    (p, Some prioritized_vk)
+                | None ->
+                    (* We explicitly allow the vk to be missing. *)
+                    (p, None)
               else (
                 vks_overridden := vks_overriden' ;
                 (p, None) ) )
