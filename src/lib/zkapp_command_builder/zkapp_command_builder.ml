@@ -11,7 +11,7 @@ let mk_node account_update calls : _ Zkapp_command.Call_forest.Tree.t =
   { account_update; account_update_digest = (); calls = mk_forest calls }
 
 let mk_account_update_body ?preconditions ?increment_nonce ?update
-    authorization_kind call_type kp token_id balance_change :
+    authorization_kind may_use_token kp token_id balance_change :
     Account_update.Body.Simple.t =
   let open Signature_lib in
   let preconditions =
@@ -41,7 +41,7 @@ let mk_account_update_body ?preconditions ?increment_nonce ?update
   ; preconditions
   ; use_full_commitment = true
   ; implicit_account_creation_fee = false
-  ; call_type
+  ; may_use_token
   ; authorization_kind
   }
 
