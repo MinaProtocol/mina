@@ -171,7 +171,7 @@ CREATE TABLE zkapp_account_precondition
 CREATE TABLE zkapp_accounts
 ( id                   serial  PRIMARY KEY
 , app_state_id         int     NOT NULL  REFERENCES zkapp_states(id)
-, verification_key_id  int     NOT NULL  REFERENCES zkapp_verification_keys(id)
+, verification_key_id  int               REFERENCES zkapp_verification_keys(id)
 , zkapp_version        bigint  NOT NULL
 , sequence_state_id    int     NOT NULL  REFERENCES zkapp_sequence_states(id)
 , last_sequence_slot   bigint  NOT NULL
