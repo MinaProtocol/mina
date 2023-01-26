@@ -1,7 +1,15 @@
+open Core_kernel
+
 [@@@warning "-4"]
 
 type ('a, 'bool) t = Some of 'a | None | Maybe of 'bool * 'a
 [@@deriving sexp, compare, yojson, hash, equal]
+
+let some a = Some a
+
+let none = None
+
+let maybe b x = Maybe (b, x)
 
 let to_option : ('a, _) t -> 'a option = function
   | Some x ->

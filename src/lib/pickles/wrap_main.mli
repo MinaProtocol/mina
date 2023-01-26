@@ -3,7 +3,7 @@ open Pickles_types
 (** [wrap_main] is the SNARK function for wrapping any proof coming from the given set of
     keys **)
 val wrap_main :
-     feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+     feature_flags:Opt.Flag.t Plonk_types.Features.t
   -> ( 'max_proofs_verified
      , 'branches
      , 'max_local_max_proofs_verifieds )
@@ -25,7 +25,7 @@ val wrap_main :
            , ( Wrap_verifier.Other_field.Packed.t
                Pickles_types.Shifted_value.Type1.t
              , Wrap_main_inputs.Impl.Boolean.var )
-             Pickles_types.Plonk_types.Opt.t
+             Pickles_types.Opt.t
            , 'a
            , Impls.Wrap.Boolean.var
            , Impls.Wrap.Field.t

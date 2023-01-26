@@ -4,7 +4,7 @@ module Bulletproof_challenge = Bulletproof_challenge
 module Branch_data = Branch_data
 module Digest = Digest
 module Spec = Spec
-module Opt = Plonk_types.Opt
+module Opt = Pickles_types.Opt
 open Core_kernel
 
 type 'f impl = 'f Spec.impl
@@ -218,8 +218,7 @@ module Wrap = struct
               }
 
             let spec (type f) ((module Impl) : f impl) (zero : _ Zero_values.t)
-                (feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
-                =
+                (feature_flags : Opt.Flag.t Plonk_types.Features.t) =
               let opt_spec flag =
                 Spec.T.Opt
                   { inner = B Field
@@ -247,10 +246,9 @@ module Wrap = struct
             let typ (type f fp)
                 (module Impl : Snarky_backendless.Snark_intf.Run
                   with type field = f ) (fp : (fp, _) Impl.Typ.t) ~dummy_scalar
-                (feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
-                =
+                (feature_flags : Opt.Flag.t Plonk_types.Features.t) =
               let opt_typ flag =
-                Plonk_types.Opt.typ Impl.Boolean.typ flag fp ~dummy:dummy_scalar
+                Opt.typ Impl.Boolean.typ flag fp ~dummy:dummy_scalar
               in
               Snarky_backendless.Typ.of_hlistable
                 [ opt_typ feature_flags.chacha
@@ -349,7 +347,7 @@ module Wrap = struct
               ; fp
               ; fp
               ; Plonk_types.Features.typ bool
-              ; Plonk_types.Opt.typ Impl.Boolean.typ
+              ; Opt.typ Impl.Boolean.typ
                   feature_flags.Plonk_types.Features.lookup
                   ~dummy:{ joint_combiner = dummy_scalar_challenge }
                   (Lookup.typ (Scalar_challenge.typ scalar_challenge))
@@ -1415,8 +1413,7 @@ module Step = struct
     let typ (type n f)
         ( (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
         as impl ) zero ~assert_16_bits
-        (proofs_verified :
-          (Plonk_types.Opt.Flag.t Plonk_types.Features.t, n) Vector.t ) fq :
+        (proofs_verified : (Opt.Flag.t Plonk_types.Features.t, n) Vector.t) fq :
         ( ((_, _) Vector.t, _) t
         , ((_, _) Vector.t, _) t
         , _ )

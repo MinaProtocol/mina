@@ -509,7 +509,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let rec go :
             type a b c d.
                (a, b, c, d) H4.T(IR).t
-            -> Plonk_types.Opt.Flag.t Plonk_types.Features.t =
+            -> Opt.Flag.t Plonk_types.Features.t =
          fun rules ->
           match rules with
           | [] ->
@@ -517,16 +517,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
           | [ r ] ->
               Plonk_types.Features.map r.feature_flags ~f:(function
                 | true ->
-                    Plonk_types.Opt.Flag.Yes
+                    Opt.Flag.Yes
                 | false ->
-                    Plonk_types.Opt.Flag.No )
+                    Opt.Flag.No )
           | r :: rules ->
               let feature_flags = go rules in
               Plonk_types.Features.map2 r.feature_flags feature_flags
                 ~f:(fun enabled flag ->
                   match (enabled, flag) with
                   | true, Yes ->
-                      Plonk_types.Opt.Flag.Yes
+                      Opt.Flag.Yes
                   | false, No ->
                       No
                   | _, Maybe | true, No | false, Yes ->
@@ -2638,7 +2638,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                   ; alpha = plonk0.alpha
                                   ; beta = chal plonk0.beta
                                   ; gamma = chal plonk0.gamma
-                                  ; lookup = Plonk_types.Opt.None
+                                  ; lookup = Opt.None
                                   }
                               }
                           ; sponge_digest_before_evaluations =
@@ -2724,7 +2724,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     ( { proof = next_proof
                       ; statement =
                           Types.Wrap.Statement.to_minimal
-                            ~to_option:Plonk_types.Opt.to_option next_statement
+                            ~to_option:Opt.to_option next_statement
                       ; prev_evals =
                           { Plonk_types.All_evals.evals =
                               { public_input = x_hat
@@ -3573,7 +3573,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                   ; alpha = plonk0.alpha
                                   ; beta = chal plonk0.beta
                                   ; gamma = chal plonk0.gamma
-                                  ; lookup = Plonk_types.Opt.None
+                                  ; lookup = Opt.None
                                   }
                               }
                           ; sponge_digest_before_evaluations =
@@ -3659,7 +3659,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     ( { proof = next_proof
                       ; statement =
                           Types.Wrap.Statement.to_minimal
-                            ~to_option:Plonk_types.Opt.to_option next_statement
+                            ~to_option:Opt.to_option next_statement
                       ; prev_evals =
                           { Plonk_types.All_evals.evals =
                               { public_input = x_hat

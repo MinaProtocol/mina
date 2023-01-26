@@ -43,7 +43,7 @@ let pack_statement max_proofs_verified ~lookup ~feature_flags t =
     (Statement.spec
        (module Impl)
        max_proofs_verified Backend.Tock.Rounds.n lookup feature_flags )
-    (Statement.to_data t ~option_map:Plonk_types.Opt.map)
+    (Statement.to_data t ~option_map:Opt.map)
 
 let shifts ~log2_size = Common.tock_shifts ~log2_size
 
@@ -84,7 +84,7 @@ let split_field (x : Field.t) : Field.t * Boolean.var =
 
 let lookup_config_for_pack =
   { Types.Wrap.Lookup_parameters.zero = Common.Lookup_parameters.tock_zero
-  ; use = Plonk_types.Opt.Flag.No
+  ; use = Opt.Flag.No
   }
 
 (* The SNARK function for wrapping any proof coming from the given set of keys *)

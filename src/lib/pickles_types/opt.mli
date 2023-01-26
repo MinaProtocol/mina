@@ -1,7 +1,21 @@
 (* Implementation of an extended nullable type *)
 
-type ('a, 'bool) t = Some of 'a | None | Maybe of 'bool * 'a
+(** {1 Type} *)
+
+type ('a, 'bool) t =
+  | Some of 'a
+  | None
+  | Maybe of 'bool * 'a
+      (** Representation of a value that can either be [None] or [Some]
+                            depending on the actual value of its first parameter. *)
 [@@deriving sexp, compare, yojson, hash, equal]
+
+(** {1 Constructors} *)
+val some : 'a -> ('a, 'bool) t
+
+val none : ('a, 'bool) t
+
+val maybe : 'bool -> 'a -> ('a, 'bool) t
 
 val map : ('a, 'bool) t -> f:('a -> 'b) -> ('b, 'bool) t
 
@@ -11,9 +25,17 @@ val map : ('a, 'bool) t -> f:('a -> 'b) -> ('b, 'bool) t
   **)
 val value_exn : ('a, 'bool) t -> 'a
 
-(** [value_exn o] is [Some v] when [o] if [Some v] or [Maybe (_, v)], [None]
-      otherwise *)
+(** [to_option opt] is [Some v] when [opt] if [Some v] or [Maybe (_, v)], [None]
+    otherwise *)
 val to_option : ('a, 'bool) t -> 'a option
+
+(** [of_option o] is a straightforward injection of a regular option type [o]
+    into type {!type:t}.
+
+    {!const:Option.Some} maps to {!const:Some} and {!const:Option.None} to
+    {!const:None}.
+*)
+val of_option : 'a option -> ('a, 'bool) t
 
 module Flag : sig
   type t = Yes | No | Maybe [@@deriving sexp, compare, yojson, hash, equal]

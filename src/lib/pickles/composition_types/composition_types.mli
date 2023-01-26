@@ -1,5 +1,5 @@
 open Pickles_types
-module Opt = Plonk_types.Opt
+module Opt = Opt
 
 type ('a, 'b) opt := ('a, 'b) Opt.t
 
@@ -186,13 +186,13 @@ module Wrap : sig
                  , bool
                  , 'f )
                  Snarky_backendless.Typ.t
-            -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+            -> feature_flags:Opt.Flag.t Plonk_types.Features.t
             -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
             -> ( ( 'c
                  , 'e Scalar_challenge.t
                  , 'fp
-                 , ('fp, 'boolean) Plonk_types.Opt.t
-                 , ('e Scalar_challenge.t Lookup.t, 'boolean) Plonk_types.Opt.t
+                 , ('fp, 'boolean) Opt.t
+                 , ('e Scalar_challenge.t Lookup.t, 'boolean) Opt.t
                  , 'boolean )
                  t
                , ( 'd
@@ -356,7 +356,7 @@ module Wrap : sig
                  Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
                snarky_typ
           -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
-          -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+          -> feature_flags:Opt.Flag.t Plonk_types.Features.t
           -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
           -> ( 'g
              , 'h
@@ -371,11 +371,11 @@ module Wrap : sig
                  , ( 'fp
                    , 'f Snarky_backendless.Cvar.t
                      Snarky_backendless__Snark_intf.Boolean0.t )
-                   Plonk_types.Opt.t
+                   Opt.t
                  , ( 'e Scalar_challenge.t Plonk.In_circuit.Lookup.t
                    , 'f Snarky_backendless.Cvar.t
                      Snarky_backendless__Snark_intf.Boolean0.t )
-                   Plonk_types.Opt.t
+                   Opt.t
                  , 'f Snarky_backendless.Cvar.t
                    Snarky_backendless__Snark_intf.Boolean0.t )
                  Plonk.In_circuit.t
@@ -586,7 +586,7 @@ module Wrap : sig
                Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
              snarky_typ
         -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
-        -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+        -> feature_flags:Opt.Flag.t Plonk_types.Features.t
         -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
         -> ( 'g
            , 'h
@@ -609,11 +609,11 @@ module Wrap : sig
         -> ( ( ( 'c
                , 'e Scalar_challenge.t
                , 'fp
-               , ('fp, 'boolean) Plonk_types.Opt.t
+               , ('fp, 'boolean) Opt.t
                , ( 'e Scalar_challenge.t
                    Deferred_values.Plonk.In_circuit.Lookup.t
                  , 'boolean )
-                 Plonk_types.Opt.t
+                 Opt.t
                , ('f Snarky_backendless.Cvar.t
                   Snarky_backendless__Snark_intf.Boolean0.t
                   as
@@ -712,7 +712,7 @@ module Wrap : sig
   module Lookup_parameters : sig
     type ('chal, 'chal_var, 'fp, 'fp_var) t =
       { zero : ('chal, 'chal_var, 'fp, 'fp_var) Zero_values.t
-      ; use : Plonk_types.Opt.Flag.t
+      ; use : Opt.Flag.t
       }
 
     val opt_spec :
@@ -925,7 +925,7 @@ module Wrap : sig
            , 'field1 Hlist0.Id.t
            , 'field2 Hlist0.Id.t )
            Lookup_parameters.t
-        -> Plonk_types.Opt.Flag.t Plonk_types.Features.t
+        -> Opt.Flag.t Plonk_types.Features.t
         -> ( ( 'field1
              , 'challenge1
              , 'challenge1 Scalar_challenge.t
@@ -1212,7 +1212,7 @@ module Step : sig
              , 'field1 Hlist0.Id.t
              , 'field2 Hlist0.Id.t )
              Wrap.Lookup_parameters.t
-          -> Plonk_types.Opt.Flag.t Plonk_types.Features.t
+          -> Opt.Flag.t Plonk_types.Features.t
           -> ( ( 'field1
                , 'digest1
                , 'challenge1
@@ -1229,10 +1229,10 @@ module Step : sig
                , 'field2 Snarky_backendless__Snark_intf.Boolean0.t
                , ( ('challenge2 Scalar_challenge.t * unit) Hlist.HlistId.t
                  , 'field2 Snarky_backendless__Snark_intf.Boolean0.t )
-                 Plonk_types.Opt.t
+                 Opt.t
                , ( 'field2
                  , 'field2 Snarky_backendless__Snark_intf.Boolean0.t )
-                 Plonk_types.Opt.t
+                 Opt.t
                , 'num_bulletproof_challenges )
                flat_repr
              , < bool1 : bool
@@ -1305,7 +1305,7 @@ module Step : sig
              , 'c Hlist0.Id.t
              , 'b Hlist0.Id.t )
              Zero_values.t
-        -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+        -> feature_flags:Opt.Flag.t Plonk_types.Features.t
         -> ( ( 'a Limb_vector.Challenge.t
              , 'a Limb_vector.Challenge.t Scalar_challenge.t
              , 'b
@@ -1440,7 +1440,7 @@ module Step : sig
          , 'b Hlist0.Id.t )
          Zero_values.t
       -> assert_16_bits:('f Snarky_backendless.Cvar.t -> unit)
-      -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, 'n) Vector.t
+      -> (Opt.Flag.t Plonk_types.Features.t, 'n) Vector.t
       -> ( 'b
          , 'a
          , 'f
@@ -1589,7 +1589,7 @@ module Step : sig
       -> 'b Nat.t
       -> 'c Nat.t
       -> ('d, 'e, 'f Hlist0.Id.t, 'g Hlist0.Id.t) Wrap.Lookup_parameters.t
-      -> Plonk_types.Opt.Flag.t Plonk_types.Features.t
+      -> Opt.Flag.t Plonk_types.Features.t
       -> ( ( ( ( ('f, Nat.N9.n) Vector.t
                * ( ('h, Nat.N1.n) Vector.t
                  * ( ('d, Nat.N2.n) Vector.t
@@ -1621,11 +1621,11 @@ module Step : sig
                            * ( ( ('e Scalar_challenge.t * unit) Hlist.HlistId.t
                                , 'a Snarky_backendless.Cvar.t
                                  Snarky_backendless__Snark_intf.Boolean0.t )
-                               Plonk_types.Opt.t
+                               Opt.t
                              * ( ( 'g
                                  , 'a Snarky_backendless.Cvar.t
                                    Snarky_backendless__Snark_intf.Boolean0.t )
-                                 Plonk_types.Opt.t
+                                 Opt.t
                                  vec12
                                * unit ) ) ) ) ) ) ) ) )
                Hlist.HlistId.t

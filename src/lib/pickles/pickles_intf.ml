@@ -333,7 +333,7 @@ module type S = sig
     val create :
          name:string
       -> max_proofs_verified:(module Nat.Add.Intf with type n = 'n1)
-      -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+      -> feature_flags:Opt.Flag.t Plonk_types.Features.t
       -> typ:('var, 'value) Impls.Step.Typ.t
       -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
 

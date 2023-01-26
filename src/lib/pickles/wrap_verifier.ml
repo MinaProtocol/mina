@@ -667,7 +667,7 @@ struct
           with_label __LOC__ (fun () ->
               Common.ft_comm ~add:Ops.add_fast ~scale:scale_fast
                 ~negate:Inner_curve.negate ~endoscale:Scalar_challenge.endo
-                ~verification_key:m ~plonk ~alpha ~t_comm ~options *)
+                ~verification_key:m ~plonk ~alpha ~t_comm ~options )
         in
         let bulletproof_challenges =
           (* This sponge needs to be initialized with (some derivative of)
@@ -859,7 +859,7 @@ struct
       Sponge.absorb sponge (fst evals.public_input) ;
       Sponge.absorb sponge (snd evals.public_input) ;
       let xs = Evals.In_circuit.to_absorption_sequence evals.evals in
-      Plonk_types.Opt.Early_stop_sequence.fold field_array_if xs ~init:()
+      Pickles_types.Opt.Early_stop_sequence.fold field_array_if xs ~init:()
         ~f:(fun () (x1, x2) ->
           let absorb = Array.iter ~f:(Sponge.absorb sponge) in
           absorb x1 ; absorb x2 )
@@ -879,7 +879,7 @@ struct
     (* TODO: r actually does not need to be a scalar challenge. *)
     let r = scalar_to_field (Import.Scalar_challenge.create r_actual) in
     let plonk_minimal =
-      Plonk.to_minimal plonk ~to_option:Plonk_types.Opt.to_option
+      Plonk.to_minimal plonk ~to_option:Pickles_types.Opt.to_option
     in
     let combined_evals =
       let n = Common.Max_degree.wrap_log2 in
@@ -941,12 +941,13 @@ struct
                      | None ->
                          [||]
                      | Some a ->
-                         Array.map a ~f:(fun x -> Plonk_types.Opt.Some x)
+                         Array.map a ~f:(fun x -> Pickles_types.Opt.Some x)
                      | Maybe (b, a) ->
-                         Array.map a ~f:(fun x -> Plonk_types.Opt.Maybe (b, x)) )
+                         Array.map a ~f:(fun x ->
+                             Pickles_types.Opt.Maybe (b, x) ) )
               in
               let sg_evals =
-                Vector.map sg_evals ~f:(fun x -> [| Plonk_types.Opt.Some x |])
+                Vector.map sg_evals ~f:(fun x -> [| Pickles_types.Opt.Some x |])
                 |> Vector.to_list
                 (* TODO: This was the code before the wrap hack was put in
                    match actual_proofs_verified with

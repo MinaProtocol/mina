@@ -231,7 +231,7 @@ let step_main :
         type e pvars pvals ns1 ns2 br.
            (pvars, pvals, ns1, ns2) H4.T(Tag).t
         -> (pvars, br) Length.t
-        -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, br) Vector.t =
+        -> (Opt.Flag.t Plonk_types.Features.t, br) Vector.t =
      fun ds ld ->
       match (ds, ld) with
       | [], Z ->
@@ -254,7 +254,7 @@ let step_main :
         -> (pvars, br) Length.t
         -> (ns1, br) Length.t
         -> (ns2, br) Length.t
-        -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, br) Vector.t
+        -> (Opt.Flag.t Plonk_types.Features.t, br) Vector.t
         -> (pvars, pvals, ns1, ns2) H4.T(Typ_with_max_proofs_verified).t =
      fun ds ns1 ns2 ld ln1 ln2 feature_flagss ->
       match (ds, ns1, ns2, ld, ln1, ln2, feature_flagss) with

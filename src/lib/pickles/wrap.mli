@@ -14,14 +14,14 @@ val wrap :
          , ( Impls.Wrap.Impl.Field.t Pickles_types.Shifted_value.Type1.t
            , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
              Snarky_backendless.Snark_intf.Boolean0.t )
-           Pickles_types.Plonk_types.Opt.t
+           Pickles_types.Opt.t
          , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
              Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
              .Lookup
              .t
            , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
              Snarky_backendless.Snark_intf.Boolean0.t )
-           Pickles_types.Plonk_types.Opt.t
+           Pickles_types.Opt.t
          , Impls.Wrap.Impl.Boolean.var
          , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
          , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
@@ -39,7 +39,7 @@ val wrap :
   -> step_vk:Kimchi_bindings.Protocol.VerifierIndex.Fp.t
   -> actual_wrap_domains:(Core_kernel.Int.t, 'c) Pickles_types.Vector.t
   -> step_plonk_indices:'d
-  -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+  -> feature_flags:Opt.Flag.t Plonk_types.Features.t
   -> actual_feature_flags:bool Plonk_types.Features.t
   -> Kimchi_pasta.Pallas_based_plonk.Keypair.t
   -> ( 'b

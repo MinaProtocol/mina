@@ -167,8 +167,8 @@ module Step = struct
     in
     Spec.ETyp.T
       ( typ
-      , (fun x -> of_data ~option_map:Plonk_types.Opt.map (f x))
-      , fun x -> f_inv (to_data ~option_map:Plonk_types.Opt.map x) )
+      , (fun x -> of_data ~option_map:Opt.map (f x))
+      , fun x -> f_inv (to_data ~option_map:Opt.map x) )
 end
 
 module Wrap = struct
@@ -283,6 +283,6 @@ module Wrap = struct
     in
     Spec.ETyp.T
       ( typ
-      , (fun x -> In_circuit.of_data ~option_map:Plonk_types.Opt.map (f x))
-      , fun x -> f_inv (In_circuit.to_data ~option_map:Plonk_types.Opt.map x) )
+      , (fun x -> In_circuit.of_data ~option_map:Opt.map (f x))
+      , fun x -> f_inv (In_circuit.to_data ~option_map:Opt.map x) )
 end
