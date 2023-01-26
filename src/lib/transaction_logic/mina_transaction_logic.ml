@@ -1005,9 +1005,15 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       ; block_global_slot : Global_slot.t
       }
 
-    let ledger { ledger; _ } = L.create_masked ledger
+    let first_pass_ledger { ledger; _ } = L.create_masked ledger
 
-    let set_ledger ~should_update t ledger =
+    let second_pass_ledger { ledger; _ } = L.create_masked ledger
+
+    let set_first_pass_ledger ~should_update t ledger =
+      if should_update then L.apply_mask t.ledger ~masked:ledger ;
+      t
+
+    let set_second_pass_ledger ~should_update t ledger =
       if should_update then L.apply_mask t.ledger ~masked:ledger ;
       t
 

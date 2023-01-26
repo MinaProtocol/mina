@@ -1995,9 +1995,16 @@ module Make_str (A : Wire_types.Concrete) = struct
             let set_supply_increase t supply_increase =
               { t with supply_increase }
 
-            let ledger { ledger; _ } = ledger
+            let first_pass_ledger { ledger; _ } = ledger
 
-            let set_ledger ~should_update t ledger =
+            let second_pass_ledger { ledger; _ } = ledger
+
+            let set_first_pass_ledger ~should_update t ledger =
+              { t with
+                ledger = Ledger.if_ should_update ~then_:ledger ~else_:t.ledger
+              }
+
+            let set_second_pass_ledger ~should_update t ledger =
               { t with
                 ledger = Ledger.if_ should_update ~then_:ledger ~else_:t.ledger
               }
