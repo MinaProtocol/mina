@@ -66,12 +66,12 @@ module type Work_S = sig
   module Single : sig
     module Spec : sig
       type t = (Transaction_witness.t, ledger_proof) Work.Single.Spec.t
-      [@@deriving sexp, to_yojson]
+      [@@deriving sexp, yojson]
     end
   end
 
   module Spec : sig
-    type t = Single.Spec.t Work.Spec.t [@@deriving sexp, to_yojson]
+    type t = Single.Spec.t Work.Spec.t [@@deriving sexp, yojson]
   end
 
   module Result : sig
@@ -113,7 +113,7 @@ module type Rpcs_versioned_S = sig
 
   module Failed_to_generate_snark : sig
     module V2 : sig
-      type query = Work.Spec.t * Signature_lib.Public_key.Compressed.t
+      type query = Error.t * Work.Spec.t * Signature_lib.Public_key.Compressed.t
       [@@deriving bin_io]
 
       type response = unit [@@deriving bin_io]
@@ -146,7 +146,7 @@ module type S0 = sig
     module Failed_to_generate_snark :
       Rpc_master
         with type Master.T.query =
-          Work.Spec.t * Signature_lib.Public_key.Compressed.t
+          Error.t * Work.Spec.t * Signature_lib.Public_key.Compressed.t
          and type Master.T.response = unit
   end
 
