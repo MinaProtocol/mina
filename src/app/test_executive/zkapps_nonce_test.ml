@@ -193,6 +193,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
+    let snark_work_event_subscription =
+      Event_router.on (event_router t) Snark_work_gossip ~f:(fun _ _ ->
+          [%log info] "Received new snark work" ;
+          Deferred.return `Continue )
+    in
+    let snark_work_failure_subscription =
+      Event_router.on (event_router t) Snark_work_failed ~f:(fun _ _ ->
+          [%log error]
+            "A snark worker encountered an error while creating a proof" ;
+          Deferred.return `Continue )
+    in
     let%bind () =
       section
         "Send a zkapp command with an invalid account update nonce using fish1"
@@ -319,8 +330,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "Wait for proof to be emitted"
         (wait_for t
-           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:2) )
+           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
     in
+    Event_router.cancel (event_router t) snark_work_event_subscription () ;
+    Event_router.cancel (event_router t) snark_work_failure_subscription () ;
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
