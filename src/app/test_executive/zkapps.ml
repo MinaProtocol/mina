@@ -183,6 +183,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; set_zkapp_uri = Proof
         ; set_token_symbol = Proof
         ; set_voting_for = Proof
+        ; set_timing = Proof
         ; send = Proof
         }
       in
