@@ -33,6 +33,8 @@ let%test_module "Access permission tests" =
 
     let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
 
+    let vk_hash = Mina_base.Verification_key_wire.digest_vk vk
+
     let ({ account_update; _ } : _ Zkapp_command.Call_forest.tree), () =
       Async.Thread_safe.block_on_async_exn prover
 
@@ -186,21 +188,21 @@ let%test_module "Access permission tests" =
 
     let%test_unit "None_given with None" = run_test None_given None
 
-    let%test_unit "Proof with None" = run_test Proof None
+    let%test_unit "Proof with None" = run_test (Proof vk_hash) None
 
     let%test_unit "Signature with None" = run_test Signature None
 
     let%test_unit "None_given with Either" =
       run_test ~expected_failure:Update_not_permitted_access None_given Either
 
-    let%test_unit "Proof with Either" = run_test Proof Either
+    let%test_unit "Proof with Either" = run_test (Proof vk_hash) Either
 
     let%test_unit "Signature with Either" = run_test Signature Either
 
     let%test_unit "None_given with Proof" =
       run_test ~expected_failure:Update_not_permitted_access None_given Proof
 
-    let%test_unit "Proof with Proof" = run_test Proof Proof
+    let%test_unit "Proof with Proof" = run_test (Proof vk_hash) Proof
 
     let%test_unit "Signature with Proof" =
       run_test ~expected_failure:Update_not_permitted_access Signature Proof
@@ -210,7 +212,8 @@ let%test_module "Access permission tests" =
         Signature
 
     let%test_unit "Proof with Signature" =
-      run_test ~expected_failure:Update_not_permitted_access Proof Signature
+      run_test ~expected_failure:Update_not_permitted_access (Proof vk_hash)
+        Signature
 
     let%test_unit "Signature with Signature" = run_test Signature Signature
   end )
