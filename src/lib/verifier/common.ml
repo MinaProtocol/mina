@@ -27,11 +27,11 @@ let invalid_to_string (invalid : invalid) =
       "Invalid_proof"
 
 let check :
-       User_command.Verifiable.t
+       User_command.Verifiable.t With_status.t
     -> [ `Valid of User_command.Valid.t
        | `Valid_assuming of User_command.Valid.t * _ list
        | invalid ] = function
-  | User_command.Signed_command c -> (
+  | { With_status.data = User_command.Signed_command c; status = _ } -> (
       if not (Signed_command.check_valid_keys c) then
         `Invalid_keys (Signed_command.public_keys c)
       else
@@ -40,8 +40,11 @@ let check :
             `Valid (User_command.Signed_command c)
         | None ->
             `Invalid_signature (Signed_command.public_keys c) )
-  | Zkapp_command ({ fee_payer; account_updates; memo } as zkapp_command_with_vk)
-    ->
+  | { With_status.data =
+        Zkapp_command
+          ({ fee_payer; account_updates; memo } as zkapp_command_with_vk)
+    ; status
+    } ->
       with_return (fun { return } ->
           let account_updates_hash =
             Zkapp_command.Call_forest.hash account_updates
@@ -99,8 +102,13 @@ let check :
                             [ Account_id.public_key
                               @@ Account_update.account_id p
                             ] )
-                    | Some (vk : _ With_hash.t) ->
-                        Some (vk.data, stmt, pi) ) )
+                    | Some (vk : _ With_hash.t) -> (
+                        match status with
+                        | Applied ->
+                            Some (vk.data, stmt, pi)
+                        | Failed _ ->
+                            (* Don't verify the proof if it has failed. *)
+                            None ) ) )
           in
           let v : User_command.Valid.t =
             (*Verification keys should be present if it reaches here*)
