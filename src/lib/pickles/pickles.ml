@@ -1904,7 +1904,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
     end )
 
-  let%test_module "test uncorrelated bulletproof_challenges" =
+  let%test_module "test uncorrelated" =
     ( module struct
       let () = Backtrace.elide := false
 
@@ -2020,8 +2020,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
           (* TODO Think this is right.. *)
         end
 
+        type 'a modifier = { f : 'a -> 'a }
+
         let compile :
-            (   unit
+            (   modifier:'a modifier
+             -> unit
              -> (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t Promise.t
             )
             * _
@@ -2212,7 +2215,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           let wrap_vk = Lazy.map wrap_vk ~f:fst in
           let module S = Step.Make (A) (A_value) (Max_proofs_verified) in
-          let prover =
+          let prover ~(modifier : 'a modifier) =
             let module Z = H4.Zip (Branch_data) (E04 (Impls.Step.Keypair)) in
             let f :
                    ( unit * (unit * unit)
@@ -2619,6 +2622,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
                             .messages_for_next_step_proof
                       }
                     in
+
+                    (* Inject malicious behavior in the public input of the wrap circuit here. *)
+                    let next_statement = modifier.f next_statement in
+
                     let messages_for_next_wrap_proof_prepared =
                       P.Base.Messages_for_next_proof_over_same_field.Wrap
                       .prepare
@@ -2753,7 +2760,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
 
       let proof_with_stmt =
-        let p = Promise.block_on_async_exn (fun () -> step ()) in
+        let p =
+          Promise.block_on_async_exn (fun () -> step ~modifier:(fun a -> a) ())
+        in
         ((), p)
 
       let%test "should not be able to verify invalid proof" =
