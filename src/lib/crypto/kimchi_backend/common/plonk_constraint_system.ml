@@ -18,6 +18,8 @@ module type Gate_vector_intf = sig
 
   val get : t -> int -> field Kimchi_types.circuit_gate
 
+  val len : t -> int
+
   val digest : int -> t -> bytes
 
   val to_json : int -> t -> string
@@ -361,6 +363,8 @@ module Make
 
   val finalize_and_get_gates : t -> Gates.t
 
+  val num_constraints : t -> int
+
   val digest : t -> Md5.t
 
   val to_json : t -> string
@@ -633,6 +637,8 @@ end = struct
 
   (** Calls [finalize_and_get_gates] and ignores the result. *)
   let finalize t = ignore (finalize_and_get_gates t : Gates.t)
+
+  let num_constraints sys = finalize_and_get_gates sys |> Gates.len
 
   let to_json (sys : t) : string =
     let gates = finalize_and_get_gates sys in

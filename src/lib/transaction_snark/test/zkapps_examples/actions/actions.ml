@@ -68,6 +68,7 @@ let%test_module "Sequence events test" =
             { Account_update.Preconditions.network =
                 Zkapp_precondition.Protocol_state.accept
             ; account = Accept
+            ; valid_while = Ignore
             }
         ; authorization_kind = Signature
         }
@@ -96,8 +97,8 @@ let%test_module "Sequence events test" =
              ~handler:(Zkapps_actions.update_actions_handler actions) )
     end
 
-    let test_zkapp_command ?expected_failure ?state_body ?(fee_payer_nonce = 0)
-        ~ledger zkapp_command =
+    let test_zkapp_command ?expected_failure ?state_body ?global_slot
+        ?(fee_payer_nonce = 0) ~ledger zkapp_command =
       let memo = Signed_command_memo.empty in
       let transaction_commitment : Zkapp_command.Transaction_commitment.t =
         let account_updates_hash =
@@ -170,8 +171,8 @@ let%test_module "Sequence events test" =
         |> Or_error.ok_exn
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
-          check_zkapp_command_with_merges_exn ?state_body ?expected_failure
-            ledger [ zkapp_command ] ) ;
+          check_zkapp_command_with_merges_exn ?state_body ?global_slot
+            ?expected_failure ledger [ zkapp_command ] ) ;
       (zkapp_command, Ledger.get ledger loc)
 
     let create_ledger () = Ledger.create ~depth:ledger_depth ()
@@ -206,7 +207,7 @@ let%test_module "Sequence events test" =
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
         |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
-        |> test_zkapp_command ~ledger
+        |> test_zkapp_command ~ledger ~global_slot:Mina_numbers.Global_slot.zero
       in
       let account_updates0 =
         Zkapp_command.Call_forest.to_list zkapp_command0.account_updates
@@ -231,7 +232,7 @@ let%test_module "Sequence events test" =
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
         |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
-        |> test_zkapp_command ~ledger
+        |> test_zkapp_command ~ledger ~global_slot:Mina_numbers.Global_slot.zero
       in
       assert (Option.is_some account1) ;
       let account_updates1 =
@@ -258,25 +259,15 @@ let%test_module "Sequence events test" =
       assert (Mina_numbers.Global_slot.(equal zero) last_seq_slot1)
 
     let%test_unit "Add sequence events in different slots" =
-      let make_state_body slot =
-        let open Mina_state.Protocol_state.Body in
-        let genesis_consensus_state = consensus_state genesis_state_body in
-        let consensus_state_block =
-          Consensus.Data.Consensus_state.Value.For_tests
-          .with_global_slot_since_genesis genesis_consensus_state slot
-        in
-        For_tests.with_consensus_state genesis_state_body consensus_state_block
-      in
       let ledger = create_ledger () in
       let slot1 = Mina_numbers.Global_slot.of_int 1 in
       let _zkapp_command0, account0 =
-        let state_body = make_state_body slot1 in
         []
         |> Zkapp_command.Call_forest.cons_tree Add_actions.account_update
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
         |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
-        |> test_zkapp_command ~state_body ~ledger
+        |> test_zkapp_command ~global_slot:slot1 ~ledger
       in
       assert (Option.is_some account0) ;
       let seq_state_elts0, last_seq_slot0 =
@@ -301,10 +292,9 @@ let%test_module "Sequence events test" =
       assert (Mina_numbers.Global_slot.equal slot1 last_seq_slot0) ;
       let slot2 = Mina_numbers.Global_slot.of_int 2 in
       let _zkapp_command1, account1 =
-        let state_body = make_state_body slot2 in
         []
         |> Zkapp_command.Call_forest.cons_tree Add_actions.account_update
-        |> test_zkapp_command ~state_body ~fee_payer_nonce:1 ~ledger
+        |> test_zkapp_command ~global_slot:slot2 ~fee_payer_nonce:1 ~ledger
       in
       assert (Option.is_some account1) ;
       let seq_state_elts1, last_seq_slot1 =
@@ -333,10 +323,9 @@ let%test_module "Sequence events test" =
       assert (Mina_numbers.Global_slot.equal slot2 last_seq_slot1) ;
       let slot3 = Mina_numbers.Global_slot.of_int 3 in
       let _zkapp_command2, account2 =
-        let state_body = make_state_body slot3 in
         []
         |> Zkapp_command.Call_forest.cons_tree Add_actions.account_update
-        |> test_zkapp_command ~state_body ~fee_payer_nonce:2 ~ledger
+        |> test_zkapp_command ~global_slot:slot3 ~fee_payer_nonce:2 ~ledger
       in
       assert (Option.is_some account2) ;
       let seq_state_elts2, last_seq_slot2 =

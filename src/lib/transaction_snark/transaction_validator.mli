@@ -15,6 +15,7 @@ val apply_user_command :
 
 val apply_transaction :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> global_slot:Mina_numbers.Global_slot.t
   -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
   -> Hashless_ledger.t
   -> Transaction.t

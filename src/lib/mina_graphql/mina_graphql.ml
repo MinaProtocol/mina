@@ -3489,6 +3489,9 @@ module Mutations = struct
                 in
                 let applied =
                   Ledger.apply_zkapp_command_unchecked ~constraint_constants
+                    ~global_slot:
+                      ( Transition_frontier.Breadcrumb.consensus_state breadcrumb
+                      |> Consensus.Data.Consensus_state.curr_global_slot )
                     ~state_view ledger zkapp_command
                 in
                 (* rearrange data to match result type of `send_zkapp_command` *)

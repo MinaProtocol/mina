@@ -479,7 +479,7 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
         (Option.value_exn
            (Staged_ledger.proof_txns_with_state_hashes
               (Breadcrumb.staged_ledger new_root_node.breadcrumb) ) )
-        ~f:(fun (txn, state_hash) ->
+        ~f:(fun (txn, state_hash, global_slot) ->
           (*Validate transactions against the protocol state associated with the transaction*)
           let txn_state_view =
             find_protocol_state t state_hash
@@ -488,8 +488,8 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
           in
           ignore
             ( Or_error.ok_exn
-                (Ledger.apply_transaction ~constraint_constants ~txn_state_view
-                   mt txn.data )
+                (Ledger.apply_transaction ~constraint_constants ~global_slot
+                   ~txn_state_view mt txn.data )
               : Ledger.Transaction_applied.t ) ) ;
       (* STEP 6 *)
       Ledger.commit mt ;

@@ -4,9 +4,9 @@ module Authorization_kind = struct
   end
 end
 
-module Call_type = struct
+module May_use_token = struct
   module V1 = struct
-    type t = Call | Delegate_call
+    type t = No | Parents_own_token | Inherit_from_parent
   end
 end
 
@@ -60,6 +60,7 @@ module Preconditions = struct
     type t =
       { network : Mina_base_zkapp_precondition.Protocol_state.V1.t
       ; account : Account_precondition.V1.t
+      ; valid_while : Mina_base_zkapp_precondition.Valid_while.V1.t
       }
   end
 end
@@ -96,7 +97,7 @@ module Body = struct
       ; preconditions : Preconditions.V1.t
       ; use_full_commitment : bool
       ; implicit_account_creation_fee : bool
-      ; call_type : Call_type.V1.t
+      ; may_use_token : May_use_token.V1.t
       ; authorization_kind : Authorization_kind.V1.t
       }
   end

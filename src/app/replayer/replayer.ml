@@ -320,7 +320,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
   let%bind receiver_account_id = account_identifier_of_id cmd.receiver_id in
   let fee = Currency.Fee.of_uint64 (Unsigned.UInt64.of_int64 cmd.fee) in
   let txn_global_slot =
-    cmd.txn_global_slot_since_genesis |> Unsigned.UInt32.of_int64
+    cmd.global_slot_since_genesis |> Unsigned.UInt32.of_int64
     |> Mina_numbers.Global_slot.of_uint32
   in
   let fail_on_error err =
@@ -412,7 +412,7 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger
         |> Error.raise
   in
   let txn_global_slot =
-    cmd2.txn_global_slot_since_genesis |> Unsigned.UInt32.of_int64
+    cmd2.global_slot_since_genesis |> Unsigned.UInt32.of_int64
     |> Mina_numbers.Global_slot.of_uint32
   in
   let applied_or_error =
@@ -496,7 +496,7 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
     Signed_command.to_valid_unsafe signed_cmd
   in
   let txn_global_slot =
-    Unsigned.UInt32.of_int64 cmd.txn_global_slot_since_genesis
+    Unsigned.UInt32.of_int64 cmd.global_slot_since_genesis
   in
   match
     Ledger.apply_user_command ~constraint_constants ~txn_global_slot ledger
@@ -666,9 +666,13 @@ let run_zkapp_command ~logger ~pool ~ledger (cmd : Sql.Zkapp_command.t) =
     Zkapp_helpers.get_parent_state_view ~pool cmd.block_id
   in
   let%bind zkapp_command = zkapp_command_of_zkapp_command ~pool cmd in
+  let global_slot =
+    Mina_numbers.Global_slot.of_uint32
+    @@ Unsigned.UInt32.of_int64 cmd.global_slot_since_genesis
+  in
   match
-    Ledger.apply_zkapp_command_unchecked ~constraint_constants ~state_view
-      ledger zkapp_command
+    Ledger.apply_zkapp_command_unchecked ~constraint_constants ~global_slot
+      ~state_view ledger zkapp_command
   with
   | Ok _ ->
       Deferred.unit

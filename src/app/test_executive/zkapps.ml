@@ -422,12 +422,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let with_dummy_signatures =
           mk_forest
             [ mk_node
-                (mk_account_update_body Signature Call token_owner
+                (mk_account_update_body Signature No token_owner
                    Token_id.default
                    (-account_creation_fee_int) )
                 [ mk_node
-                    (mk_account_update_body Signature Call token_accounts.(0)
-                       custom_token_id 10000 )
+                    (mk_account_update_body Signature Parents_own_token
+                       token_accounts.(0) custom_token_id 10000 )
                     []
                 ]
             ]
@@ -441,14 +441,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let with_dummy_signatures =
           mk_forest
             [ mk_node
-                (mk_account_update_body Signature Call token_owner
+                (mk_account_update_body Signature No token_owner
                    Token_id.default
                    (-2 * account_creation_fee_int) )
                 [ mk_node
-                    (mk_account_update_body Signature Call token_owner
-                       custom_token_id 0 )
+                    (mk_account_update_body Signature Parents_own_token
+                       token_owner custom_token_id 0 )
                     [ mk_node
-                        (mk_account_update_body Signature Call
+                        (mk_account_update_body Signature Parents_own_token
                            token_accounts.(2) custom_token_id2 500 )
                         []
                     ]
@@ -465,23 +465,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let with_dummy_signatures =
           mk_forest
             [ mk_node
-                (mk_account_update_body Signature Call token_owner
+                (mk_account_update_body Signature No token_owner
                    Token_id.default
                    (-account_creation_fee_int) )
                 [ mk_node
-                    (mk_account_update_body Signature Call token_accounts.(0)
-                       custom_token_id (-30) )
+                    (mk_account_update_body Signature Parents_own_token
+                       token_accounts.(0) custom_token_id (-30) )
                     []
                 ; mk_node
-                    (mk_account_update_body Signature Call token_accounts.(1)
-                       custom_token_id 30 )
+                    (mk_account_update_body Signature Parents_own_token
+                       token_accounts.(1) custom_token_id 30 )
                     []
                 ; mk_node
-                    (mk_account_update_body Signature Call token_funder
+                    (mk_account_update_body Signature No token_funder
                        Token_id.default (-50) )
                     []
                 ; mk_node
-                    (mk_account_update_body Signature Call token_funder
+                    (mk_account_update_body Signature No token_funder
                        Token_id.default 50 )
                     []
                 ]
@@ -497,26 +497,26 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let with_dummy_signatures =
           mk_forest
             [ mk_node
-                (mk_account_update_body Signature Call token_owner
+                (mk_account_update_body Signature No token_owner
                    Token_id.default
                    (-account_creation_fee_int) )
                 [ mk_node
-                    (mk_account_update_body Signature Call token_accounts.(1)
-                       custom_token_id (-5) )
+                    (mk_account_update_body Signature Parents_own_token
+                       token_accounts.(1) custom_token_id (-5) )
                     []
                 ; mk_node
-                    (mk_account_update_body Signature Call token_accounts.(0)
-                       custom_token_id 5 )
+                    (mk_account_update_body Signature Parents_own_token
+                       token_accounts.(0) custom_token_id 5 )
                     []
                 ; mk_node
-                    (mk_account_update_body Signature Call token_owner
-                       custom_token_id 0 )
+                    (mk_account_update_body Signature Parents_own_token
+                       token_owner custom_token_id 0 )
                     [ mk_node
-                        (mk_account_update_body Signature Call
+                        (mk_account_update_body Signature Parents_own_token
                            token_accounts.(2) custom_token_id2 (-210) )
                         []
                     ; mk_node
-                        (mk_account_update_body Signature Call
+                        (mk_account_update_body Signature Parents_own_token
                            token_accounts.(3) custom_token_id2 210 )
                         []
                     ]

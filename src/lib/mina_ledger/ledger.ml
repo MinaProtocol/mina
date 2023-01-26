@@ -363,18 +363,18 @@ end
 include Ledger_inner
 include Mina_transaction_logic.Make (Ledger_inner)
 
-let apply_transaction ~constraint_constants ~txn_state_view l t =
+let apply_transaction ~constraint_constants ~global_slot ~txn_state_view l t =
   O1trace.sync_thread "apply_transaction" (fun () ->
-      apply_transaction ~constraint_constants ~txn_state_view l t )
+      apply_transaction ~constraint_constants ~global_slot ~txn_state_view l t )
 
 (* use mask to restore ledger after application *)
-let merkle_root_after_zkapp_command_exn ~constraint_constants ~txn_state_view
-    ledger zkapp_command =
+let merkle_root_after_zkapp_command_exn ~constraint_constants ~global_slot
+    ~txn_state_view ledger zkapp_command =
   let mask = Mask.create ~depth:(depth ledger) () in
   let masked_ledger = register_mask ledger mask in
   let _applied =
     Or_error.ok_exn
-      (apply_zkapp_command_unchecked ~constraint_constants
+      (apply_zkapp_command_unchecked ~constraint_constants ~global_slot
          ~state_view:txn_state_view masked_ledger
          (Zkapp_command.Valid.forget zkapp_command) )
   in
@@ -481,8 +481,10 @@ let%test_unit "tokens test" =
         |> Or_error.ok_exn
       in
       match
-        apply_zkapp_command_unchecked ~constraint_constants ~state_view:view
-          ledger
+        apply_zkapp_command_unchecked ~constraint_constants
+          ~global_slot:
+            (Mina_numbers.Global_slot.succ view.global_slot_since_genesis)
+          ~state_view:view ledger
           (mk_zkapp_command ~fee:7 ~fee_payer_pk:pk ~fee_payer_nonce:nonce
              zkapp_command )
       with
@@ -518,11 +520,11 @@ let%test_unit "tokens test" =
         (Account_update.Body.Simple.t, unit, unit) Zkapp_command.Call_forest.t =
       mk_forest
         [ mk_node
-            (mk_account_update_body Signature Call token_funder Token_id.default
+            (mk_account_update_body Signature No token_funder Token_id.default
                (-(4 * account_creation_fee)) )
             []
         ; mk_node
-            (mk_account_update_body Proof Call token_owner Token_id.default
+            (mk_account_update_body Proof No token_owner Token_id.default
                (3 * account_creation_fee) )
             []
         ]
@@ -537,11 +539,11 @@ let%test_unit "tokens test" =
     let token_minting =
       mk_forest
         [ mk_node
-            (mk_account_update_body Signature Call token_owner Token_id.default
+            (mk_account_update_body Signature No token_owner Token_id.default
                (-account_creation_fee) )
             [ mk_node
-                (mk_account_update_body None_given Call token_account1
-                   custom_token_id 100 )
+                (mk_account_update_body None_given Parents_own_token
+                   token_account1 custom_token_id 100 )
                 []
             ]
         ]
@@ -549,31 +551,31 @@ let%test_unit "tokens test" =
     let token_transfers =
       mk_forest
         [ mk_node
-            (mk_account_update_body Signature Call token_owner Token_id.default
+            (mk_account_update_body Signature No token_owner Token_id.default
                (-account_creation_fee) )
             [ mk_node
-                (mk_account_update_body Signature Call token_account1
-                   custom_token_id (-30) )
+                (mk_account_update_body Signature Parents_own_token
+                   token_account1 custom_token_id (-30) )
                 []
             ; mk_node
-                (mk_account_update_body None_given Call token_account2
-                   custom_token_id 30 )
+                (mk_account_update_body None_given Parents_own_token
+                   token_account2 custom_token_id 30 )
                 []
             ; mk_node
-                (mk_account_update_body Signature Call token_account1
-                   custom_token_id (-10) )
+                (mk_account_update_body Signature Parents_own_token
+                   token_account1 custom_token_id (-10) )
                 []
             ; mk_node
-                (mk_account_update_body None_given Call token_account2
-                   custom_token_id 10 )
+                (mk_account_update_body None_given Parents_own_token
+                   token_account2 custom_token_id 10 )
                 []
             ; mk_node
-                (mk_account_update_body Signature Call token_account2
-                   custom_token_id (-5) )
+                (mk_account_update_body Signature Parents_own_token
+                   token_account2 custom_token_id (-5) )
                 []
             ; mk_node
-                (mk_account_update_body None_given Call token_account1
-                   custom_token_id 5 )
+                (mk_account_update_body None_given Parents_own_token
+                   token_account1 custom_token_id 5 )
                 []
             ]
         ]
@@ -636,7 +638,7 @@ let%test_unit "zkapp_command payment test" =
                 iter_err ts2 ~f:(fun t ->
                     let%bind res, _ =
                       apply_zkapp_command_unchecked l2 t ~constraint_constants
-                        ~state_view:view
+                        ~global_slot:txn_global_slot ~state_view:view
                     in
                     match res.command.status with
                     | Transaction_status.Applied ->
