@@ -3795,16 +3795,9 @@ module Make_str (A : Wire_types.Concrete) = struct
           let target_first_pass_ledger_root =
             Sparse_ledger.merkle_root target_global.first_pass_ledger
           in
-          (* 1. empty ledger hash in the local state at the beginning of each
-             transaction
-             `zkapp_command` in local state is empty for the first segment
-             2. Target ledger for the first segment (fee payer segment) gets replaced with second pass ledger and so use the target global first pass ledger*)
           let source_local_ledger, target_local_ledger =
-            if Zkapp_command.Call_forest.is_empty source_local.stack_frame.calls
-            then (Frozen_ledger_hash.empty_hash, target_first_pass_ledger_root)
-            else
-              ( Sparse_ledger.merkle_root source_local.ledger
-              , Sparse_ledger.merkle_root target_local.ledger )
+            ( Sparse_ledger.merkle_root source_local.ledger
+            , Sparse_ledger.merkle_root target_local.ledger )
           in
           { source =
               { first_pass_ledger =
