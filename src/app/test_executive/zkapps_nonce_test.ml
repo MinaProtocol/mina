@@ -42,7 +42,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let transactions_sent = ref 0
 
   let padding_payments () =
-    let needed_for_padding = 40 in
+    let needed_for_padding = 42 in
     (* for work_delay=1 and transaction_capacity=4 per block*)
     if !transactions_sent >= needed_for_padding then 0
     else needed_for_padding - !transactions_sent
@@ -327,7 +327,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "Wait for proof to be emitted"
         ( wait_for t
-        @@ Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1 )
+        @@ Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:2 )
     in
     Event_router.cancel (event_router t) snark_work_event_subscription () ;
     Event_router.cancel (event_router t) snark_work_failure_subscription () ;
