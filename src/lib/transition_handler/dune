@@ -52,6 +52,8 @@
    pickles
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
+   mina_networking
+   unix_timestamp
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_jane)))

@@ -268,13 +268,12 @@ struct
         let open Signature_lib in
         Throttle.enqueue t.snark_table_lock (fun () ->
             let%map _ =
-              let open Interruptible.Deferred_let_syntax in
-              Interruptible.force
-                (let%bind.Interruptible () =
-                   Interruptible.lift (Deferred.return ())
-                     (Base_ledger.detached_signal ledger)
-                 in
-                 let%bind prover_account_ids =
+              let open Interruptible.Make () in
+              Deferred.upon
+                (Base_ledger.detached_signal ledger)
+                (Ivar.fill_if_empty interrupt_ivar) ;
+              force
+                (let%bind.Deferred_let_syntax prover_account_ids =
                    let account_ids =
                      t.snark_tables.all |> Statement_table.data
                      |> List.map
@@ -289,7 +288,7 @@ struct
                    Deferred.map (Scheduler.yield ()) ~f:(Fn.const account_ids)
                  in
                  (* if this is still starving the scheduler, we can make `location_of_account_batch` yield while it traverses the masks *)
-                 let%bind prover_account_locations =
+                 let%bind.Deferred_let_syntax prover_account_locations =
                    let account_locations =
                      prover_account_ids |> Map.data
                      |> Base_ledger.location_of_account_batch ledger
@@ -299,12 +298,11 @@ struct
                      ~f:(Fn.const account_locations)
                  in
                  let yield = Staged.unstage (Scheduler.yield_every ~n:50) in
-                 let%map () =
-                   let open Deferred.Let_syntax in
+                 let%map.Deferred_let_syntax () =
                    Statement_table.fold ~init:Deferred.unit t.snark_tables.all
                      ~f:(fun ~key ~data:{ fee = { fee; prover }; _ } acc ->
-                       let%bind () = acc in
-                       let%map () = yield () in
+                       let%bind.Deferred () = acc in
+                       let%map.Deferred () = yield () in
                        let prover_account_exists =
                          prover
                          |> Map.find_exn prover_account_ids

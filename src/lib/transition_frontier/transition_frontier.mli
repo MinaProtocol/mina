@@ -14,9 +14,10 @@ module Extensions = Extensions
 module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
 module Root_data = Root_data
-module Catchup_tree = Catchup_tree
+module Catchup_state = Catchup_state
 module Full_catchup_tree = Full_catchup_tree
 module Catchup_hash_tree = Catchup_hash_tree
+module Gossip = Gossip
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -41,7 +42,7 @@ type Structured_log_events.t += Persisted_frontier_loaded
 
 val max_catchup_chunk_length : int
 
-val catchup_tree : t -> Catchup_tree.t
+val catchup_state : t -> Catchup_state.t
 
 (* This is the max length which is used when the transition frontier is initialized
  * via `load`. In other words, this will always be the max length of the transition
@@ -55,7 +56,8 @@ val load :
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> persistent_root:Persistent_root.t
   -> persistent_frontier:Persistent_frontier.t
-  -> catchup_mode:[ `Normal | `Super ]
+  -> catchup_mode:
+       [ `Bit of Bit_catchup_state.Transition_states.t | `Normal | `Super ]
   -> unit
   -> ( t
      , [ `Failure of string
@@ -69,6 +71,8 @@ val close : loc:string -> t -> unit Deferred.t
 val closed : t -> unit Deferred.t
 
 val add_breadcrumb_exn : t -> Breadcrumb.t -> unit Deferred.t
+
+val add_breadcrumbs_exn : t -> Breadcrumb.t list -> unit Deferred.t
 
 val persistent_root : t -> Persistent_root.t
 
@@ -110,7 +114,8 @@ module For_tests : sig
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
-    -> catchup_mode:[ `Normal | `Super ]
+    -> catchup_mode:
+         [ `Bit of Bit_catchup_state.Transition_states.t | `Normal | `Super ]
     -> unit
     -> ( t
        , [ `Failure of string

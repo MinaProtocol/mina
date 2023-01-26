@@ -22,7 +22,8 @@ end]
 
 type t = Stable.Latest.t
 
-[%%define_locally Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson, of_yojson)]
+[%%define_locally
+Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson, of_yojson, hash)]
 
 type var = Boolean.var list
 
@@ -55,3 +56,5 @@ let to_hex = Blake2.to_hex
 let of_hex_exn = Blake2.of_hex
 
 let to_raw_string = Blake2.to_raw_string
+
+let of_blake2 = Fn.id

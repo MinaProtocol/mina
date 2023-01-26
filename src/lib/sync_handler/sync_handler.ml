@@ -14,6 +14,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val conf_dir : string
 end
 
 module type Inputs_intf = sig
@@ -171,7 +173,10 @@ module Make (Inputs : Inputs_intf) :
       in
       With_hash.data @@ Mina_block.Validated.forget validated_transition
     in
-    match Transition_frontier.catchup_tree frontier with
+    match Transition_frontier.catchup_state frontier with
+    | Bit _
+    (* TODO Consider serving blocks that are in transition_states
+       (and have body) or in block storage *)
     | Full _ ->
         (* Super catchup *)
         Option.return @@ List.filter_map hashes ~f:get

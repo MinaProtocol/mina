@@ -60,8 +60,12 @@ type peer_state =
   ; get_transition_knowledge :
       unit Envelope.Incoming.t -> Pasta_bindings.Fp.t list Deferred.t
   ; get_transition_chain_proof :
-         Pasta_bindings.Fp.t Envelope.Incoming.t
-      -> (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t list) option Deferred.t
+         (State_hash.t * State_hash.t list) Envelope.Incoming.t
+      -> ( State_hash.t
+         * State_body_hash.t list
+         * Mina_block.Header.with_hash list )
+         option
+         Deferred.t
   ; get_transition_chain :
          Pasta_bindings.Fp.t list Envelope.Incoming.t
       -> Mina_block.t list option Deferred.t
@@ -143,8 +147,9 @@ let setup (type n) ~context:(module Context : CONTEXT)
               (* TODO: merge implementations with mina_lib *)
               Mina_networking.create
                 (config peer state.consensus_local_state)
+                ~on_bitswap_update:(fun ~tag:_ _ _ -> ())
                 ~sinks:
-                  ( Transition_handler.Block_sink.void
+                  ( Network_pool.Block_sink.void
                   , Network_pool.Transaction_pool.Remote_sink.void
                   , Network_pool.Snark_pool.Remote_sink.void )
                 ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
@@ -161,6 +166,11 @@ let setup (type n) ~context:(module Context : CONTEXT)
         { peer; state; network } )
   in
   { fake_gossip_network; peer_networks }
+
+let with_temp_dir f =
+  File_system.with_temp_dir
+    (Filename.temp_dir_name ^/ "fake_network_get_ancestry")
+    ~f
 
 module Generator = struct
   open Quickcheck
@@ -244,15 +254,21 @@ module Generator = struct
             f
         | None ->
             fun query_env ->
-              Deferred.return
-                (Sync_handler.Root.prove
-                   ~context:(module Context)
-                   ~frontier
-                   ( Envelope.Incoming.data query_env
-                   |> With_hash.map_hash ~f:(fun state_hash ->
-                          { State_hash.State_hashes.state_hash
-                          ; state_body_hash = None
-                          } ) ) ) )
+              with_temp_dir (fun conf_dir ->
+                  Deferred.return
+                    (Sync_handler.Root.prove
+                       ~context:
+                         ( module struct
+                           include Context
+
+                           let conf_dir = conf_dir
+                         end )
+                       ~frontier
+                       ( Envelope.Incoming.data query_env
+                       |> With_hash.map_hash ~f:(fun state_hash ->
+                              { State_hash.State_hashes.state_hash
+                              ; state_body_hash = None
+                              } ) ) ) ) )
     ; get_best_tip =
         ( match get_best_tip with
         | Some f ->
@@ -278,9 +294,11 @@ module Generator = struct
             f
         | None ->
             fun query_env ->
+              let state_hash, canopy = Envelope.Incoming.data query_env in
               Deferred.return
-                (Transition_chain_prover.prove ~frontier
-                   (Envelope.Incoming.data query_env) ) )
+                (Transition_chain_prover.prove_with_headers ~frontier
+                   ~canopy:(State_hash.Set.of_list canopy)
+                   state_hash ) )
     ; get_transition_chain =
         ( match get_transition_chain with
         | Some f ->

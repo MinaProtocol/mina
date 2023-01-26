@@ -173,7 +173,7 @@ let
         '';
 
         buildPhase = ''
-          dune build --display=short \
+          dune build --profile=devnet --display=short \
             src/app/logproc/logproc.exe \
             src/app/cli/src/mina.exe \
             src/app/batch_txn_tool/batch_txn_tool.exe \

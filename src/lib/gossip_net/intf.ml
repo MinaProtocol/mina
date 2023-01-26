@@ -67,21 +67,36 @@ module type Gossip_net_intf = sig
     -> 'q
     -> 'r rpc_response Deferred.t List.t Deferred.t
 
-  val broadcast_state :
-    ?origin_topic:string -> t -> Message.state_msg -> unit Deferred.t
+  val broadcast_transition :
+       ?origin_topics:string list
+    -> t
+    -> [ `Block of Mina_block.t | `Header of Mina_block.Header.t ]
+    -> unit Deferred.t
 
   val broadcast_transaction_pool_diff :
-       ?origin_topic:string
+       ?origin_topics:string list
     -> t
     -> Message.transaction_pool_diff_msg
     -> unit Deferred.t
 
   val broadcast_snark_pool_diff :
-    ?origin_topic:string -> t -> Message.snark_pool_diff_msg -> unit Deferred.t
+       ?origin_topics:string list
+    -> t
+    -> Message.snark_pool_diff_msg
+    -> unit Deferred.t
 
   val on_first_connect : t -> f:(unit -> 'a) -> 'a Deferred.t
 
   val on_first_high_connectivity : t -> f:(unit -> 'a) -> 'a Deferred.t
 
   val ban_notification_reader : t -> ban_notification Linear_pipe.Reader.t
+
+  val add_bitswap_resource :
+    t -> tag:Staged_ledger_diff.Body.Tag.t -> data:string -> unit Deferred.t
+
+  val download_bitswap_resource :
+       t
+    -> tag:Staged_ledger_diff.Body.Tag.t
+    -> ids:Consensus.Body_reference.t list
+    -> unit Deferred.t
 end

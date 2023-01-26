@@ -1,14 +1,11 @@
-open Mina_base
-open Network_peer
-
 type t
 
 val create : unit -> t
 
 val add :
      t
-  -> parent:State_hash.t
-  -> Mina_block.initial_valid_block Envelope.Incoming.t
+  -> Transition_frontier.Gossip.initial_valid_block_or_header
+  -> Transition_frontier.Gossip.gossip_map
   -> unit
 
-val data : t -> Mina_block.initial_valid_block Envelope.Incoming.t list
+val data : t -> Transition_frontier.Gossip.element list

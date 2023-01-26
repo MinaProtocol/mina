@@ -138,7 +138,7 @@ let create_libp2p_config ~private_key ~statedir ~listen_on ?metrics_port
     ~external_multiaddr ~network_id ~unsafe_no_trust_ip ~flood ~direct_peers
     ~seed_peers ~known_private_ip_nets ~peer_exchange ~peer_protection_ratio
     ~min_connections ~max_connections ~validation_queue_size ~gating_config
-    ~topic_config =
+    ~topic_config () =
   build
     (module Builder.Libp2pConfig)
     Builder.Libp2pConfig.(
@@ -263,6 +263,23 @@ let push_message_to_outgoing_message request =
     (module Builder.Libp2pHelperInterface.Message)
     Builder.Libp2pHelperInterface.Message.(
       builder_op push_message_set_builder request)
+
+let create_download_resource_push_message ~tag ~ids =
+  let ids =
+    List.map ids ~f:(fun id ->
+        build'
+          (module Builder.RootBlockId)
+          Builder.RootBlockId.(op blake2b_hash_set id) )
+  in
+  build'
+    (module Builder.Libp2pHelperInterface.PushMessage)
+    Builder.Libp2pHelperInterface.PushMessage.(
+      builder_op header_set_builder (create_push_message_header ())
+      *> reader_op download_resource_set_reader
+           (build
+              (module Builder.Libp2pHelperInterface.DownloadResource)
+              Builder.Libp2pHelperInterface.DownloadResource.(
+                op tag_set_exn tag *> list_op ids_set_list ids) ))
 
 let create_add_resource_push_message ~tag ~data =
   build'

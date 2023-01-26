@@ -55,6 +55,25 @@ end
     After building the breadcrumb path, [Ledger_catchup] will then send it to
     the [Processor] via writing them to catchup_breadcrumbs_writer. *)
 
+let validate_block ~genesis_state_hash (b, v) =
+  let open Mina_block.Validation in
+  let open Result.Let_syntax in
+  let h = (With_hash.map ~f:Mina_block.header b, v) in
+  validate_genesis_protocol_state ~genesis_state_hash h
+  >>= validate_protocol_versions >>= validate_delta_block_chain
+  >>| Fn.flip with_body (Mina_block.body @@ With_hash.data b)
+
+let validate_proofs_block ~verifier ~genesis_state_hash blocks =
+  let open Mina_block.Validation in
+  let open Deferred.Result.Let_syntax in
+  let f ((b, _), h) = with_body h (Mina_block.body @@ With_hash.data b) in
+  let hs =
+    List.map blocks ~f:(fun (b, v) ->
+        (With_hash.map ~f:Mina_block.header b, v) )
+  in
+  validate_proofs ~verifier ~genesis_state_hash hs
+  >>| List.zip_exn blocks >>| List.map ~f
+
 let verify_transition ~context:(module Context : CONTEXT) ~trust_system
     ~frontier ~unprocessed_transition_cache enveloped_transition =
   let open Context in
@@ -67,16 +86,13 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
       transition_with_hash
       |> Mina_block.Validation.skip_time_received_validation
            `This_block_was_not_received_via_gossip
-      |> Mina_block.Validation.validate_genesis_protocol_state
-           ~genesis_state_hash
-      >>= Mina_block.Validation.validate_protocol_versions
-      >>= Mina_block.Validation.validate_delta_block_chain
+      |> validate_block ~genesis_state_hash
     in
     let enveloped_initially_validated_transition =
       Envelope.Incoming.map enveloped_transition
         ~f:(Fn.const initially_validated_transition)
     in
-    Transition_handler.Validator.validate_transition
+    Transition_handler.Validator.verify_transition_is_relevant
       ~context:(module Context)
       ~frontier ~unprocessed_transition_cache
       enveloped_initially_validated_transition
@@ -236,22 +252,23 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
   [%log debug]
     ~metadata:[ ("target_hash", State_hash.to_yojson target_hash) ]
     "Doing a catchup job with target $target_hash" ;
+  let root = Transition_frontier.root frontier in
   let blockchain_length_of_root =
-    Transition_frontier.root frontier
-    |> Transition_frontier.Breadcrumb.consensus_state
+    Transition_frontier.Breadcrumb.consensus_state root
     |> Consensus.Data.Consensus_state.blockchain_length
   in
   let open Deferred.Result.Let_syntax in
   find_map_ok peers ~f:(fun peer ->
-      let%bind transition_chain_proof =
-        let open Deferred.Let_syntax in
-        match%map
-          Mina_networking.get_transition_chain_proof network peer target_hash
-        with
-        | Error err ->
-            Result.fail @@ `Failed_to_download_transition_chain_proof err
-        | Ok transition_chain_proof ->
-            Result.return transition_chain_proof
+      let%bind transition_chain_proof' =
+        Mina_networking.get_transition_chain_proof network peer
+          (target_hash, [ Frontier_base.Breadcrumb.state_hash root ])
+        |> Deferred.map
+             ~f:
+               (Result.map_error ~f:(fun e ->
+                    `Failed_to_download_transition_chain_proof e ) )
+      in
+      let transition_chain_proof =
+        Mina_block.strip_headers_from_chain_proof transition_chain_proof'
       in
       (* a list of state_hashes from new to old *)
       let%bind hashes =
@@ -488,7 +505,7 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
         |> State_hash.With_state_hashes.state_hash
       in
       match%bind
-        Mina_block.Validation.validate_proofs ~verifier ~genesis_state_hash
+        validate_proofs_block ~verifier ~genesis_state_hash
           (List.map transitions ~f:(fun t ->
                Mina_block.Validation.wrap (Envelope.Incoming.data t) ) )
       with
@@ -532,22 +549,33 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
             ~trust_system ~frontier ~unprocessed_transition_cache transition
         with
         | Error e ->
-            List.iter acc ~f:(fun (node, vc) ->
+            List.iter acc ~f:(fun (node, gm) ->
                 (* TODO consider rejecting the callback in some cases,
                    see https://github.com/MinaProtocol/mina/issues/11087 *)
-                Option.value_map vc ~default:ignore
-                  ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
-                  `Ignore ;
+                Transition_frontier.Gossip.fire_ignore_to_validation_callbacks
+                  gm ;
                 ignore @@ Cached.invalidate_with_failure node ) ;
             Deferred.Or_error.fail e
         | Ok (`In_frontier initial_hash) ->
             Deferred.Or_error.return @@ Continue_or_stop.Stop (acc, initial_hash)
         | Ok (`Building_path transition_with_initial_validation) ->
+            let transition_env =
+              Cached.peek transition_with_initial_validation
+            in
+            let gossip_data =
+              Transition_frontier.Gossip.gossip_data_of_transition_envelope
+                transition_env
+            in
+            let el =
+              ( Cached.transform transition_with_initial_validation
+                  ~f:(const transition_env.data)
+              , String.Map.singleton "" gossip_data )
+            in
             Deferred.Or_error.return
             @@ Continue_or_stop.Continue
                  (* It's fine to pass None as validation callback here because
                     this function is called only for downloaded transitions *)
-                 ((transition_with_initial_validation, None) :: acc) )
+                 (el :: acc) )
       ~finish:(fun acc ->
         let validation_end_time = Core.Time.now () in
         [%log debug]
@@ -606,12 +634,10 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
           ]
         "build of breadcrumbs failed with $error" ;
       ( try
-          List.iter transitions_with_initial_validation ~f:(fun (node, vc) ->
+          List.iter transitions_with_initial_validation ~f:(fun (node, gm) ->
               (* TODO consider rejecting the callback in some cases,
                  see https://github.com/MinaProtocol/mina/issues/11087 *)
-              Option.value_map vc ~default:ignore
-                ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
-                `Ignore ;
+              Transition_frontier.Gossip.fire_ignore_to_validation_callbacks gm ;
               ignore @@ Cached.invalidate_with_failure node )
         with e ->
           [%log error]
@@ -621,11 +647,10 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
 
 let garbage_collect_subtrees ~logger ~subtrees =
   List.iter subtrees ~f:(fun subtree ->
-      Rose_tree.iter subtree ~f:(fun (node, vc) ->
+      Rose_tree.iter subtree ~f:(fun (node, gm) ->
           (* TODO consider rejecting the callback in some cases,
              see https://github.com/MinaProtocol/mina/issues/11087 *)
-          Option.value_map vc ~default:ignore
-            ~f:Mina_net2.Validation_callback.fire_if_not_already_fired `Ignore ;
+          Transition_frontier.Gossip.fire_ignore_to_validation_callbacks gm ;
           ignore @@ Cached.invalidate_with_failure node ) ) ;
   [%log trace] "garbage collected failed cached transitions"
 
@@ -634,13 +659,12 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~unprocessed_transition_cache : unit =
   let open Context in
   let hash_tree =
-    match Transition_frontier.catchup_tree frontier with
+    match Transition_frontier.catchup_state frontier with
     | Hash t ->
         t
-    | Full _ ->
+    | _ ->
         failwith
-          "If normal catchup is running, the frontier should have a hash tree, \
-           got a full one."
+          "If normal catchup is running, the frontier should have a hash tree"
   in
   O1trace.background_thread "perform_normal_catchup" (fun () ->
       Strict_pipe.Reader.iter_without_pushback catchup_job_reader
@@ -659,8 +683,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
              let blockchain_length_of_target_hash =
                let blockchain_length_of_dangling_block =
                  List.hd_exn subtrees |> Rose_tree.root |> Tuple2.get1
-                 |> Cached.peek |> Envelope.Incoming.data
-                 |> Mina_block.Validation.block |> Mina_block.blockchain_length
+                 |> Cached.peek |> Mina_block.Validation.block
+                 |> Mina_block.blockchain_length
                in
                Unsigned.UInt32.pred blockchain_length_of_dangling_block
              in
@@ -669,13 +693,11 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                    let cacheds = Rose_tree.flatten tree in
                    let cached_peers =
                      List.fold cacheds ~init:[]
-                       ~f:(fun acc_inner (cached, _vc) ->
-                         let envelope = Cached.peek cached in
-                         match Envelope.Incoming.sender envelope with
-                         | Local ->
-                             acc_inner
-                         | Remote peer ->
-                             peer :: acc_inner )
+                       ~f:(fun acc_inner (_cached, gm) ->
+                         List.filter_map
+                           ~f:(function Remote peer -> Some peer | _ -> None)
+                           (Transition_frontier.Gossip.senders gm)
+                         @ acc_inner )
                    in
                    cached_peers @ acc_outer )
                |> List.dedup_and_sort ~compare:Peer.compare
@@ -725,7 +747,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                            List.iter subtrees ~f:(fun subtree ->
                                let transition =
                                  Rose_tree.root subtree |> Tuple2.get1
-                                 |> Cached.peek |> Envelope.Incoming.data
+                                 |> Cached.peek
                                in
                                let children_transitions =
                                  List.concat_map
@@ -736,7 +758,6 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                                  List.map children_transitions
                                    ~f:(fun (cached_transition, _vc) ->
                                      Cached.peek cached_transition
-                                     |> Envelope.Incoming.data
                                      |> Mina_block.Validation.block_with_hash
                                      |> State_hash.With_state_hashes.state_hash )
                                in
@@ -906,10 +927,8 @@ let%test_module "Ledger_catchup tests" =
       { cache : Transition_handler.Unprocessed_transition_cache.t
       ; job_writer :
           ( State_hash.t
-            * ( ( Mina_block.initial_valid_block Envelope.Incoming.t
-                , State_hash.t )
-                Cached.t
-              * Mina_net2.Validation_callback.t option )
+            * ( (Mina_block.initial_valid_block, State_hash.t) Cached.t
+              * Transition_frontier.Gossip.gossip_map )
               Rose_tree.t
               list
           , Strict_pipe.crash Strict_pipe.buffered
@@ -917,7 +936,7 @@ let%test_module "Ledger_catchup tests" =
           Strict_pipe.Writer.t
       ; breadcrumbs_reader :
           ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
-            * Mina_net2.Validation_callback.t option )
+            * Transition_frontier.Gossip.gossip_map )
             Rose_tree.t
             list
           * [ `Catchup_scheduler | `Ledger_catchup of unit Ivar.t ] )
@@ -953,9 +972,11 @@ let%test_module "Ledger_catchup tests" =
       let target_transition =
         Transition_handler.Unprocessed_transition_cache.register_exn test.cache
           (downcast_breadcrumb target_breadcrumb)
+        |> Cached.transform ~f:Envelope.Incoming.data
       in
       Strict_pipe.Writer.write test.job_writer
-        (parent_hash, [ Rose_tree.T ((target_transition, None), []) ]) ;
+        ( parent_hash
+        , [ Rose_tree.T ((target_transition, String.Map.empty), []) ] ) ;
       (`Test test, `Cached_transition target_transition)
 
     let test_successful_catchup ~my_net ~target_best_tip_path =

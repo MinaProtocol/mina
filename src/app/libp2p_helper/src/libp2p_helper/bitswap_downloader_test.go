@@ -670,7 +670,7 @@ func (bs *testBitswapState) RegisterDeadlineTracker(root_ root, downloadTimeout 
 		downloadTimeout time.Duration
 	}{root: root_, downloadTimeout: downloadTimeout})
 }
-func (bs *testBitswapState) SendResourceUpdate(type_ ipc.ResourceUpdateType, root root) {
+func (bs *testBitswapState) SendResourceUpdate(type_ ipc.ResourceUpdateType, tag BitswapDataTag, root root) {
 	type1, has := bs.resourceUpdates[root]
 	if has && type1 != type_ {
 		panic("duplicate resource update")

@@ -27,6 +27,10 @@ type Structured_log_events.t +=
   [@@deriving
     register_event { msg = "Broadcasting snark pool diff over gossip net" }]
 
+type Structured_log_events.t +=
+  | Rebroadcast_transition of { state_hash : State_hash.t }
+  [@@deriving register_event { msg = "Rebroadcasting $state_hash" }]
+
 (* INSTRUCTIONS FOR ADDING A NEW RPC:
  *   - define a new module under the Rpcs module
  *   - add an entry to the Rpcs.rpc GADT definition for the new module (type ('query, 'response) rpc, below)
@@ -326,9 +330,15 @@ module Rpcs = struct
       let name = "get_transition_chain_proof"
 
       module T = struct
-        type query = State_hash.t [@@deriving sexp, to_yojson]
+        (* Target hash and "canopy" of known transitions *)
+        type query = State_hash.t * State_hash.t list
+        [@@deriving sexp, to_yojson]
 
-        type response = (State_hash.t * State_body_hash.t list) option
+        type response =
+          ( State_hash.t
+          * State_body_hash.t list
+          * Mina_block.Header.with_hash list )
+          option
       end
 
       module Caller = T
@@ -356,6 +366,47 @@ module Rpcs = struct
       include Master
     end)
 
+    let compute_hashes =
+      Fn.compose Mina_state.Protocol_state.hashes
+        Mina_block.Header.protocol_state
+
+    module V2 = struct
+      module T = struct
+        type query = State_hash.Stable.V1.t * State_hash.Stable.V1.t list
+        [@@deriving sexp]
+
+        type response =
+          ( State_hash.Stable.V1.t
+          * State_body_hash.Stable.V1.t list
+          * Mina_block.Header.Stable.V2.t list )
+          option
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model =
+          Option.map ~f:(Tuple3.map_trd ~f:(List.map ~f:With_hash.data))
+
+        let caller_model_of_response =
+          Option.map
+            ~f:
+              (Tuple3.map_trd
+                 ~f:(List.map ~f:(With_hash.of_data ~hash_data:compute_hashes)) )
+      end
+
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io
+          (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
+    end
+
     module V1 = struct
       module T = struct
         type query = State_hash.Stable.V1.t [@@deriving sexp]
@@ -363,13 +414,21 @@ module Rpcs = struct
         type response =
           (State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list) option
 
-        let query_of_caller_model = Fn.id
+        let query_of_caller_model (target, _) = target
 
-        let callee_model_of_query = Fn.id
+        let callee_model_of_query target = (target, [])
 
-        let response_of_callee_model = Fn.id
+        let response_of_callee_model =
+          Option.map ~f:(fun (init_st, body_hashes, headers) ->
+              let body_hashes' =
+                List.map headers
+                  ~f:
+                    (State_hash.With_state_hashes.state_body_hash
+                       ~compute_hashes )
+              in
+              (init_st, body_hashes @ body_hashes') )
 
-        let caller_model_of_response = Fn.id
+        let caller_model_of_response = Option.map ~f:(fun (a, b) -> (a, b, []))
       end
 
       module T' =
@@ -1037,7 +1096,7 @@ let protocol_version_status t =
   in
   { valid_current; valid_next; matches_daemon }
 
-let create (config : Config.t) ~sinks
+let create (config : Config.t) ~on_bitswap_update ~sinks
     ~(get_some_initial_peers :
           Rpcs.Get_some_initial_peers.query Envelope.Incoming.t
        -> Rpcs.Get_some_initial_peers.response Deferred.t )
@@ -1403,6 +1462,7 @@ let create (config : Config.t) ~sinks
   let%map gossip_net =
     O1trace.thread "gossip_net" (fun () ->
         Gossip_net.Any.create config.creatable_gossip_net rpc_handlers
+          ~on_bitswap_update
           (Gossip_net.Message.Any_sinks ((module Sinks), sinks)) )
   in
   (* The node status RPC is implemented directly in go, serving a string which
@@ -1491,23 +1551,35 @@ end
 
 (* TODO: Have better pushback behavior *)
 let log_gossip logger ~log_msg msg =
-  [%str_log' trace logger]
+  [%str_log trace]
     ~metadata:[ ("message", Gossip_net.Message.msg_to_yojson msg) ]
     log_msg
 
-let broadcast_state t state =
-  let msg = With_hash.data state in
-  log_gossip t.logger (Gossip_net.Message.New_state msg)
+let rebroadcast_transition ~origin_topics t b_or_h =
+  let state_hash, b_or_h' =
+    match b_or_h with
+    | `Header h ->
+        (State_hash.With_state_hashes.state_hash h, `Header (With_hash.data h))
+    | `Block b ->
+        (State_hash.With_state_hashes.state_hash b, `Block (With_hash.data b))
+  in
+  [%str_log' trace t.logger] (Rebroadcast_transition { state_hash }) ;
+  Gossip_net.Any.broadcast_transition ~origin_topics t.gossip_net b_or_h'
+
+let broadcast_transition t transition =
+  Mina_metrics.(Gauge.inc_one Network.new_state_broadcasted) ;
+  let block = With_hash.data transition in
+  log_gossip t.logger (Gossip_net.Message.New_state block)
     ~log_msg:
       (Gossip_new_state
-         { state_hash = State_hash.With_state_hashes.state_hash state } ) ;
-  Mina_metrics.(Gauge.inc_one Network.new_state_broadcasted) ;
-  Gossip_net.Any.broadcast_state t.gossip_net msg
+         { state_hash = State_hash.With_state_hashes.state_hash transition } ) ;
+  Gossip_net.Any.broadcast_transition t.gossip_net (`Block block)
 
 let broadcast_transaction_pool_diff t diff =
   log_gossip t.logger (Gossip_net.Message.Transaction_pool_diff diff)
     ~log_msg:(Gossip_transaction_pool_diff { txns = diff }) ;
   Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_broadcasted) ;
+  (* TODO handle origin topics and avoid unncecessary broadcast *)
   Gossip_net.Any.broadcast_transaction_pool_diff t.gossip_net diff
 
 let broadcast_snark_pool_diff t diff =
@@ -1518,6 +1590,7 @@ let broadcast_snark_pool_diff t diff =
          { work =
              Option.value_exn (Snark_pool.Resource_pool.Diff.to_compact diff)
          } ) ;
+  (* TODO handle origin topics and avoid unncecessary broadcast *)
   Gossip_net.Any.broadcast_snark_pool_diff t.gossip_net diff
 
 (* TODO: Don't copy and paste *)
@@ -1559,6 +1632,12 @@ let get_transition_chain_proof ?heartbeat_timeout ?timeout t =
 let get_transition_chain ?heartbeat_timeout ?timeout t =
   make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_transition_chain
     ~label:"chain of transitions" t
+
+let add_bitswap_resource { gossip_net; _ } =
+  Gossip_net.Any.add_bitswap_resource gossip_net
+
+let download_bitswap_resource { gossip_net; _ } =
+  Gossip_net.Any.download_bitswap_resource gossip_net
 
 let get_best_tip ?heartbeat_timeout ?timeout t peer =
   make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_best_tip

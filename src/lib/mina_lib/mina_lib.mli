@@ -17,7 +17,6 @@ type Structured_log_events.t +=
   | Bootstrapping
   | Ledger_catchup
   | Synced
-  | Rebroadcast_transition of { state_hash : State_hash.t }
   [@@deriving register_event]
 
 exception Snark_worker_error of int
@@ -193,7 +192,7 @@ val wallets : t -> Secrets.Wallets.t
 val subscriptions : t -> Mina_subscriptions.t
 
 val most_recent_valid_transition :
-  t -> Mina_block.initial_valid_block Broadcast_pipe.Reader.t
+  t -> Mina_block.initial_valid_header Broadcast_pipe.Reader.t
 
 val block_produced_bvar :
   t -> (Transition_frontier.Breadcrumb.t, read_write) Bvar.t

@@ -63,6 +63,7 @@ module type S = sig
        Config.t
     -> pids:Child_processes.Termination.t
     -> Rpc_intf.rpc_handler list
+    -> on_bitswap_update:Mina_net2.on_bitswap_update_t
     -> Message.sinks
     -> t Deferred.t
 end
@@ -76,7 +77,7 @@ let download_seed_peer_list uri =
 
 type publish_functions =
   { publish_v0 : Message.msg -> unit Deferred.t
-  ; publish_v1_block : Message.state_msg -> unit Deferred.t
+  ; publish_v1_block : Mina_block.Header.t -> unit Deferred.t
   ; publish_v1_tx : Message.transaction_pool_diff_msg -> unit Deferred.t
   ; publish_v1_snark_work : Message.snark_pool_diff_msg -> unit Deferred.t
   }
@@ -201,7 +202,8 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
     let create_libp2p (config : Config.t) rpc_handlers first_peer_ivar
         high_connectivity_ivar ~added_seeds ~pids ~on_unexpected_termination
         ~sinks:
-          (Message.Any_sinks (sinksM, (sink_block, sink_tx, sink_snark_work))) =
+          (Message.Any_sinks (sinksM, (sink_block, sink_tx, sink_snark_work)))
+        ~on_bitswap_update =
       let module Sinks = (val sinksM) in
       let ctr = ref 0 in
       let record_peer_connection () =
@@ -238,7 +240,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                   ~all_peers_seen_metric:config.all_peers_seen_metric
                   ~on_peer_connected:(fun _ -> record_peer_connection ())
                   ~on_peer_disconnected:ignore ~logger:config.logger ~conf_dir
-                  ~pids ) )
+                  ~on_bitswap_update ~pids ) )
       with
       | Ok (Ok net2) -> (
           let open Mina_net2 in
@@ -411,7 +413,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
             let snark_bin_prot =
               Network_pool.Snark_pool.Diff_versioned.Stable.Latest.bin_t
             in
-            let block_bin_prot = Mina_block.Stable.Latest.bin_t in
+            let header_bin_prot = Mina_block.Header.Stable.Latest.bin_t in
             let unit_f _ = Deferred.unit in
             let publish_v1_impl push_impl bin_prot topic =
               match config.pubsub_v1 with
@@ -436,10 +438,10 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
               publish_v1_impl
                 (fun (env, vc) ->
                   Sinks.Block_sink.push sink_block
-                    ( `Transition env
+                    ( `Header env
                     , `Time_received (Block_time.now config.time_controller)
-                    , `Valid_cb vc ) )
-                block_bin_prot v1_topic_block
+                    , `Topic_and_vc (v1_topic_block, vc) ) )
+                header_bin_prot v1_topic_block
             in
             let map_v0_msg msg =
               match msg with
@@ -456,10 +458,9 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                   match Envelope.Incoming.data env with
                   | Message.Latest.T.New_state state ->
                       Sinks.Block_sink.push sink_block
-                        ( `Transition
-                            (Envelope.Incoming.map ~f:(const state) env)
+                        ( `Block (Envelope.Incoming.map ~f:(const state) env)
                         , `Time_received (Block_time.now config.time_controller)
-                        , `Valid_cb vc )
+                        , `Topic_and_vc (v0_topic, vc) )
                   | Message.Latest.T.Transaction_pool_diff diff ->
                       Sinks.Tx_sink.push sink_tx
                         (Envelope.Incoming.map ~f:(fun _ -> diff) env, vc)
@@ -537,7 +538,8 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
     let bandwidth_info t = !(t.net2) >>= Mina_net2.bandwidth_info
 
-    let create (config : Config.t) ~pids rpc_handlers (sinks : Message.sinks) =
+    let create (config : Config.t) ~pids rpc_handlers ~on_bitswap_update
+        (sinks : Message.sinks) =
       let first_peer_ivar = Ivar.create () in
       let high_connectivity_ivar = Ivar.create () in
       let net2_ref = ref (Deferred.never ()) in
@@ -595,6 +597,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
             create_libp2p config rpc_handlers first_peer_ivar
               high_connectivity_ivar ~added_seeds ~pids
               ~on_unexpected_termination:restart_libp2p ~sinks
+              ~on_bitswap_update
           in
           on_libp2p_create libp2p ; Deferred.ignore_m libp2p
         and restart_libp2p () = don't_wait_for (start_libp2p ()) in
@@ -908,33 +911,42 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       List.map peers ~f:(fun peer -> query_peer t peer.peer_id rpc query)
 
     (* Do not broadcast to the topic from which message was originally received *)
-    let guard_topic ?origin_topic topic f msg =
-      if Option.equal String.equal origin_topic (Some topic) then Deferred.unit
+    let guard_topic ~origin_topics topic f msg =
+      if List.mem ~equal:String.equal origin_topics topic then Deferred.unit
       else f msg
 
     (* broadcast to new topics  *)
-    let broadcast_state ?origin_topic t state =
+    let broadcast_transition ?(origin_topics = []) t b_or_h =
+      let header, block_opt =
+        match b_or_h with
+        | `Block b ->
+            (Mina_block.header b, Some b)
+        | `Header h ->
+            (h, None)
+      in
       let pfs = !(t.publish_functions) in
       let%bind () =
-        guard_topic ?origin_topic v1_topic_block pfs.publish_v1_block state
+        guard_topic ~origin_topics v1_topic_block pfs.publish_v1_block header
       in
-      guard_topic ?origin_topic v0_topic pfs.publish_v0 (Message.New_state state)
+      Option.value_map block_opt ~default:Deferred.unit ~f:(fun block ->
+          guard_topic ~origin_topics v0_topic pfs.publish_v0
+            (Message.New_state block) )
 
-    let broadcast_transaction_pool_diff ?origin_topic t diff =
+    let broadcast_transaction_pool_diff ?(origin_topics = []) t diff =
       let pfs = !(t.publish_functions) in
       let%bind () =
-        guard_topic ?origin_topic v1_topic_tx pfs.publish_v1_tx diff
+        guard_topic ~origin_topics v1_topic_tx pfs.publish_v1_tx diff
       in
-      guard_topic ?origin_topic v0_topic pfs.publish_v0
+      guard_topic ~origin_topics v0_topic pfs.publish_v0
         (Message.Transaction_pool_diff diff)
 
-    let broadcast_snark_pool_diff ?origin_topic t diff =
+    let broadcast_snark_pool_diff ?(origin_topics = []) t diff =
       let pfs = !(t.publish_functions) in
       let%bind () =
-        guard_topic ?origin_topic v1_topic_snark_work pfs.publish_v1_snark_work
+        guard_topic ~origin_topics v1_topic_snark_work pfs.publish_v1_snark_work
           diff
       in
-      guard_topic ?origin_topic v0_topic pfs.publish_v0
+      guard_topic ~origin_topics v0_topic pfs.publish_v0
         (Message.Snark_pool_diff diff)
 
     let on_first_connect t ~f = Deferred.map (Ivar.read t.first_peer_ivar) ~f
@@ -953,6 +965,14 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       Mina_net2.set_connection_gating_config net2 config
 
     let restart_helper t = t.restart_helper ()
+
+    let add_bitswap_resource t ~tag ~data =
+      let%map net2 = !(t.net2) in
+      Mina_net2.add_bitswap_resource net2 ~tag ~data
+
+    let download_bitswap_resource t ~tag ~ids =
+      let%map net2 = !(t.net2) in
+      Mina_net2.download_bitswap_resource net2 ~tag ~ids
   end
 
   include T

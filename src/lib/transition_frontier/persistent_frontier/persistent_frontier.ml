@@ -195,6 +195,14 @@ module Instance = struct
       ~persistent_root_instance =
     let open Context in
     let open Deferred.Result.Let_syntax in
+    let validate genesis_state_hash (b, v) =
+      Validation.validate_genesis_protocol_state ~genesis_state_hash
+        (With_hash.map ~f:Mina_block.header b, v)
+      |> Result.map
+           ~f:
+             (Fn.flip Validation.with_body
+                (Mina_block.body @@ With_hash.data b) )
+    in
     let downgrade_transition transition genesis_state_hash :
         ( Mina_block.almost_valid_block
         , [ `Invalid_genesis_protocol_state ] )
@@ -203,7 +211,7 @@ module Instance = struct
       transition |> Mina_block.Validated.remember
       |> Validation.reset_staged_ledger_diff_validation
       |> Validation.reset_genesis_protocol_state_validation
-      |> Validation.validate_genesis_protocol_state ~genesis_state_hash
+      |> validate genesis_state_hash
     in
     let%bind () = Deferred.return (assert_no_sync t) in
     (* read basic information from the database *)
@@ -263,7 +271,8 @@ module Instance = struct
     in
     let apply_diff diff =
       let (`New_root_and_diffs_with_mutants (_, diffs_with_mutants)) =
-        Full_frontier.apply_diffs frontier [ diff ] ~has_long_catchup_job:false
+        Full_frontier.apply_diffs frontier [ diff ]
+          ~has_long_catchup_job:(lazy false)
           ~enable_epoch_ledger_sync:
             ( if ignore_consensus_local_state then `Disabled
             else `Enabled root_ledger )
@@ -289,13 +298,12 @@ module Instance = struct
              (* we're loading transitions from persistent storage,
                 don't assign a timestamp
              *)
-             let transition_receipt_time = None in
              let%bind breadcrumb =
                Breadcrumb.build ~skip_staged_ledger_verification:`All
                  ~logger:t.factory.logger ~precomputed_values
                  ~verifier:t.factory.verifier
                  ~trust_system:(Trust_system.null ()) ~parent ~transition
-                 ~sender:None ~transition_receipt_time ()
+                 ~senders:[] ~transition_receipt_time:None ()
              in
              let%map () = apply_diff Diff.(E (New_node (Full breadcrumb))) in
              breadcrumb ) )
