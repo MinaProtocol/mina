@@ -780,8 +780,8 @@ module T = struct
         let check (t : t) : unit =
           List.iter t.account_updates ~f:(fun p ->
               assert (
-                Account_update.Call_type.equal
-                  p.elt.account_update.body.call_type Blind_call ) )
+                Account_update.May_use_token.equal
+                  p.elt.account_update.body.may_use_token No ) )
 
         let of_graphql_repr (t : Graphql_repr.t) : t =
           { fee_payer = t.fee_payer
@@ -924,7 +924,7 @@ let to_simple (t : t) : Simple.t =
                  ; use_full_commitment = b.use_full_commitment
                  ; implicit_account_creation_fee =
                      b.implicit_account_creation_fee
-                 ; call_type = b.call_type
+                 ; may_use_token = b.may_use_token
                  ; call_depth = depth
                  ; authorization_kind = b.authorization_kind
                  }

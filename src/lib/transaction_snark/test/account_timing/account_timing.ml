@@ -64,7 +64,7 @@ let%test_module "account timing check" =
           Balance.Checked.equal checked_min_balance
             (Balance.var_of_t unchecked_min_balance)
         in
-        Snarky_backendless.As_prover.read Tick.Boolean.typ
+        Snarky_backendless.As_prover0.read Tick.Boolean.typ
           equal_balances_checked
       in
       Or_error.ok_exn @@ Tick.run_and_check equal_balances_computation
@@ -309,30 +309,6 @@ let%test_module "account timing check" =
       in
       validated_uc
 
-    let state_body_and_view_at_slot txn_global_slot =
-      let precomputed_values = Lazy.force Precomputed_values.compiled_inputs in
-      let state_body0 =
-        Mina_state.(
-          With_hash.data precomputed_values.protocol_state_with_hashes
-          |> Protocol_state.body)
-      in
-      let consensus_state0 =
-        Mina_state.Protocol_state.Body.consensus_state state_body0
-      in
-      let txn_state_view0 = Mina_state.Protocol_state.Body.view state_body0 in
-      let consensus_state =
-        Consensus.Data.Consensus_state.Value.For_tests
-        .with_global_slot_since_genesis consensus_state0 txn_global_slot
-      in
-      let state_body =
-        Mina_state.Protocol_state.Body.For_tests.with_consensus_state
-          state_body0 consensus_state
-      in
-      let txn_state_view =
-        { txn_state_view0 with global_slot_since_genesis = txn_global_slot }
-      in
-      (state_body, txn_state_view)
-
     let check_transaction_snark ~(txn_global_slot : Mina_numbers.Global_slot.t)
         (sparse_ledger_before : Mina_ledger.Sparse_ledger.t)
         (transaction : Mina_transaction.Transaction.t) =
@@ -341,9 +317,8 @@ let%test_module "account timing check" =
           ~prover:
             Public_key.(compress (of_private_key_exn (Private_key.create ())))
       in
-      let state_body, txn_state_view =
-        state_body_and_view_at_slot txn_global_slot
-      in
+      let state_body = Transaction_snark_tests.Util.genesis_state_body in
+      let txn_state_view = Transaction_snark_tests.Util.genesis_state_view in
       let validated_transaction : Mina_transaction.Transaction.Valid.t =
         match transaction with
         | Command (Signed_command uc) ->
@@ -355,13 +330,15 @@ let%test_module "account timing check" =
       let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
       let sparse_ledger_after, txn_applied =
         Mina_ledger.Sparse_ledger.apply_transaction ~constraint_constants
-          ~txn_state_view sparse_ledger_before transaction
+          ~global_slot:txn_global_slot ~txn_state_view sparse_ledger_before
+          transaction
         |> Or_error.ok_exn
       in
       let coinbase_stack_target =
         let stack_with_state =
           Pending_coinbase.Stack.(
-            push_state state_body_hash Pending_coinbase.Stack.empty)
+            push_state state_body_hash txn_global_slot
+              Pending_coinbase.Stack.empty)
         in
         match transaction with
         | Coinbase c ->
@@ -384,6 +361,7 @@ let%test_module "account timing check" =
         ~zkapp_account1:None ~zkapp_account2:None ~supply_increase
         { Transaction_protocol_state.Poly.block_data = state_body
         ; transaction = validated_transaction
+        ; global_slot = txn_global_slot
         }
         (unstage (Mina_ledger.Sparse_ledger.handler sparse_ledger_before))
 
@@ -1103,11 +1081,11 @@ let%test_module "account timing check" =
     (* zkApps with timings *)
     let apply_zkapp_commands_at_slot ledger slot
         (zkapp_commands : Zkapp_command.t list) =
-      let state_body, _state_view = state_body_and_view_at_slot slot in
+      Async.Thread_safe.block_on_async_exn
+      @@ fun () ->
       Async.Deferred.List.iter zkapp_commands ~f:(fun zkapp_command ->
           Transaction_snark_tests.Util.check_zkapp_command_with_merges_exn
-            ~state_body ledger [ zkapp_command ] )
-      |> Fn.flip Async.upon (fun () -> ())
+            ~global_slot:slot ledger [ zkapp_command ] )
 
     let check_zkapp_failure expected_failure = function
       | Ok
@@ -1287,12 +1265,12 @@ let%test_module "account timing check" =
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
-              let _state_body, state_view =
-                state_body_and_view_at_slot Mina_numbers.Global_slot.(succ zero)
-              in
               let result =
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
-                  ~constraint_constants ~state_view ledger zkapp_command
+                  ~constraint_constants
+                  ~global_slot:Mina_numbers.Global_slot.(succ zero)
+                  ~state_view:Transaction_snark_tests.Util.genesis_state_view
+                  ledger zkapp_command
               in
               check_zkapp_failure
                 Transaction_status.Failure.Source_minimum_balance_violation
@@ -1366,12 +1344,12 @@ let%test_module "account timing check" =
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
-              let _state_body, state_view =
-                state_body_and_view_at_slot Mina_numbers.Global_slot.(succ zero)
-              in
               match
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
-                  ~constraint_constants ~state_view ledger zkapp_command
+                  ~constraint_constants
+                  ~global_slot:Mina_numbers.Global_slot.(succ zero)
+                  ~state_view:Transaction_snark_tests.Util.genesis_state_view
+                  ledger zkapp_command
               with
               | Ok _txn_applied ->
                   failwith "Should have failed with min balance violation"
@@ -1463,12 +1441,12 @@ let%test_module "account timing check" =
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
-              let _state_body, state_view =
-                state_body_and_view_at_slot Mina_numbers.Global_slot.(succ zero)
-              in
               let result =
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
-                  ~constraint_constants ~state_view ledger zkapp_command
+                  ~constraint_constants
+                  ~global_slot:Mina_numbers.Global_slot.(succ zero)
+                  ~state_view:Transaction_snark_tests.Util.genesis_state_view
+                  ledger zkapp_command
               in
               check_zkapp_failure
                 Transaction_status.Failure.Source_minimum_balance_violation
@@ -1575,13 +1553,12 @@ let%test_module "account timing check" =
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
-              let _state_body, state_view =
-                state_body_and_view_at_slot
-                  Mina_numbers.Global_slot.(of_int 9999)
-              in
               match
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
-                  ~constraint_constants ~state_view ledger zkapp_command
+                  ~constraint_constants
+                  ~global_slot:Mina_numbers.Global_slot.(of_int 9999)
+                  ~state_view:Transaction_snark_tests.Util.genesis_state_view
+                  ledger zkapp_command
               with
               | Ok _txn_applied ->
                   failwith "Should have failed with min balance violation"
@@ -1811,13 +1788,12 @@ let%test_module "account timing check" =
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
-              let _state_body, state_view =
-                state_body_and_view_at_slot
-                  Mina_numbers.Global_slot.(of_int 10_100)
-              in
               let result =
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
-                  ~constraint_constants ~state_view ledger zkapp_command
+                  ~constraint_constants
+                  ~global_slot:Mina_numbers.Global_slot.(of_int 10_100)
+                  ~state_view:Transaction_snark_tests.Util.genesis_state_view
+                  ledger zkapp_command
               in
               check_zkapp_failure
                 Transaction_status.Failure.Source_minimum_balance_violation
@@ -1963,14 +1939,12 @@ let%test_module "account timing check" =
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
-              (* slot is cliff + 100,000 slots *)
-              let _state_body, state_view =
-                state_body_and_view_at_slot
-                  Mina_numbers.Global_slot.(of_int (100_000 + 10_000))
-              in
               let result =
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
-                  ~constraint_constants ~state_view ledger zkapp_command
+                  ~constraint_constants
+                  ~global_slot:Mina_numbers.Global_slot.(of_int 110_000)
+                  ~state_view:Transaction_snark_tests.Util.genesis_state_view
+                  ledger zkapp_command
               in
               check_zkapp_failure Transaction_status.Failure.Overflow result ) )
 

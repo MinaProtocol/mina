@@ -8,7 +8,7 @@ open Pickles_types
 type _ Snarky_backendless.Request.t +=
   | Public_key : Public_key.Compressed.t Snarky_backendless.Request.t
   | Token_id : Token_id.t Snarky_backendless.Request.t
-  | Call_type : Account_update.Call_type.t Snarky_backendless.Request.t
+  | May_use_token : Account_update.May_use_token.t Snarky_backendless.Request.t
   | Amount_to_mint : Currency.Amount.t Snarky_backendless.Request.t
   | Mint_to_public_key : Public_key.Compressed.t Snarky_backendless.Request.t
   | Call_forest : Zkapp_call_forest.t Snarky_backendless.Request.t
@@ -25,15 +25,15 @@ module Rules = struct
     let initial_state = lazy (List.init 8 ~f:(fun _ -> Field.Constant.zero))
 
     let handler (public_key : Public_key.Compressed.t) (token_id : Token_id.t)
-        (call_type : Account_update.Call_type.t)
+        (may_use_token : Account_update.May_use_token.t)
         (Snarky_backendless.Request.With { request; respond }) =
       match request with
       | Public_key ->
           respond (Provide public_key)
       | Token_id ->
           respond (Provide token_id)
-      | Call_type ->
-          respond (Provide call_type)
+      | May_use_token ->
+          respond (Provide may_use_token)
       | _ ->
           respond Unhandled
 
@@ -42,10 +42,11 @@ module Rules = struct
         exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
       in
       let token_id = exists Token_id.typ ~request:(fun () -> Token_id) in
-      let call_type =
-        exists Account_update.Call_type.typ ~request:(fun () -> Call_type)
+      let may_use_token =
+        exists Account_update.May_use_token.typ ~request:(fun () ->
+            May_use_token )
       in
-      Zkapps_examples.wrap_main ~public_key ~token_id ~call_type
+      Zkapps_examples.wrap_main ~public_key ~token_id ~may_use_token
         (fun account_update ->
           let initial_state =
             List.map ~f:Field.constant (Lazy.force initial_state)
@@ -63,7 +64,7 @@ module Rules = struct
     let handler ~(owner_public_key : Public_key.Compressed.t)
         ~(owner_token_id : Token_id.t) ~(amount : Currency.Amount.t)
         ~(mint_to_public_key : Public_key.Compressed.t)
-        ~(call_type : Account_update.Call_type.t)
+        ~(may_use_token : Account_update.May_use_token.t)
         (Snarky_backendless.Request.With { request; respond }) =
       match request with
       | Public_key ->
@@ -74,8 +75,8 @@ module Rules = struct
           respond (Provide amount)
       | Mint_to_public_key ->
           respond (Provide mint_to_public_key)
-      | Call_type ->
-          respond (Provide call_type)
+      | May_use_token ->
+          respond (Provide may_use_token)
       | _ ->
           respond Unhandled
 
@@ -84,10 +85,11 @@ module Rules = struct
         exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
       in
       let token_id = exists Token_id.typ ~request:(fun () -> Token_id) in
-      let call_type =
-        exists Account_update.Call_type.typ ~request:(fun () -> Call_type)
+      let may_use_token =
+        exists Account_update.May_use_token.typ ~request:(fun () ->
+            May_use_token )
       in
-      Zkapps_examples.wrap_main ~public_key ~token_id ~call_type
+      Zkapps_examples.wrap_main ~public_key ~token_id ~may_use_token
         (fun account_update ->
           let amount_to_mint =
             exists Currency.Amount.typ ~request:(fun () -> Amount_to_mint)
@@ -104,7 +106,9 @@ module Rules = struct
             let account_update =
               new Zkapps_examples.account_update
                 ~public_key:destination_pk ~token_id:self_token
-                ~call_type:Account_update.Call_type.Checked.call
+                ~may_use_token:
+                  (Account_update.May_use_token.Checked.constant
+                     Parents_own_token )
             in
             account_update#set_balance_change
               Currency.Amount.Signed.Checked.(of_unsigned amount_to_mint) ;
@@ -158,34 +162,34 @@ module Rules = struct
         module Value = struct
           type t =
             { forest : Zkapp_call_forest.t
-            ; call_type : Account_update.Call_type.t
+            ; may_use_token : Account_update.May_use_token.t
             }
           [@@deriving hlist]
 
           let empty =
             lazy
               { forest = Zkapp_call_forest.empty ()
-              ; call_type = Account_update.Call_type.Call
+              ; may_use_token = Account_update.May_use_token.Parents_own_token
               }
         end
 
         module Circuit = struct
           type t =
             { forest : Zkapp_call_forest.Checked.t
-            ; call_type : Account_update.Call_type.Checked.t
+            ; may_use_token : Account_update.May_use_token.Checked.t
             }
           [@@deriving hlist]
 
-          let to_roinput { forest; call_type } =
+          let to_roinput { forest; may_use_token } =
             Array.reduce_exn ~f:Random_oracle_input.Chunked.append
               [| Random_oracle_input.Chunked.field (forest.hash :> Field.t)
-               ; Account_update.Call_type.Checked.to_input call_type
+               ; Account_update.May_use_token.Checked.to_input may_use_token
               |]
         end
 
         let typ =
           Typ.of_hlistable
-            [ Zkapp_call_forest.typ; Account_update.Call_type.typ ]
+            [ Zkapp_call_forest.typ; Account_update.May_use_token.typ ]
             ~var_to_hlist:Circuit.to_hlist ~var_of_hlist:Circuit.of_hlist
             ~value_to_hlist:Value.to_hlist ~value_of_hlist:Value.of_hlist
       end
@@ -265,7 +269,7 @@ module Rules = struct
         type t =
           { forest : Zkapp_call_forest.t
           ; pending_forests : Merkle_list.Value.t
-          ; check_call_type : Account_update.Call_type.t
+          ; check_may_use_token : Account_update.May_use_token.t
           }
         [@@deriving hlist]
       end
@@ -274,16 +278,16 @@ module Rules = struct
         type t =
           { forest : Zkapp_call_forest.Checked.t
           ; pending_forests : Merkle_list.Circuit.t
-          ; check_call_type : Account_update.Call_type.Checked.t
+          ; check_may_use_token : Account_update.May_use_token.Checked.t
           }
         [@@deriving hlist]
 
-        let create forest check_call_type =
+        let create forest check_may_use_token =
           { forest
           ; pending_forests =
               ( Field.constant Merkle_list.empty_hash
               , Prover_value.create (fun () -> []) )
-          ; check_call_type
+          ; check_may_use_token
           }
       end
 
@@ -291,7 +295,7 @@ module Rules = struct
         Typ.of_hlistable
           [ Zkapp_call_forest.typ
           ; Merkle_list.typ
-          ; Account_update.Call_type.typ
+          ; Account_update.May_use_token.typ
           ]
           ~var_to_hlist:Circuit.to_hlist ~var_of_hlist:Circuit.of_hlist
           ~value_to_hlist:Value.to_hlist ~value_of_hlist:Value.of_hlist
@@ -301,10 +305,10 @@ module Rules = struct
       lazy (Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15)
 
     let next_account_update
-        ({ forest; pending_forests; check_call_type } : State.Circuit.t) :
+        ({ forest; pending_forests; check_may_use_token } : State.Circuit.t) :
         State.Circuit.t
         * Zkapp_call_forest.Checked.account_update
-        * Account_update.Call_type.Checked.t =
+        * Account_update.May_use_token.Checked.t =
       let dummy_account_update_body = Lazy.force dummy_account_update_body in
       let dummy : _ Zkapp_command.Call_forest.Tree.t =
         { account_update =
@@ -327,7 +331,7 @@ module Rules = struct
       let pending_forests =
         let new_pending_forests =
           Merkle_list.push
-            { forest = rest_of_forest; call_type = check_call_type }
+            { forest = rest_of_forest; may_use_token = check_may_use_token }
             pending_forests
         in
         Merkle_list.if_ rest_of_forest_is_empty ~then_:pending_forests
@@ -335,22 +339,23 @@ module Rules = struct
       in
       ( { forest
         ; pending_forests
-        ; check_call_type = Account_update.Call_type.Checked.delegate_call
+        ; check_may_use_token =
+            Account_update.May_use_token.Checked.constant Inherit_from_parent
         }
       , account_update
-      , check_call_type )
+      , check_may_use_token )
 
     let skip_subtree_if skip
-        ({ forest; pending_forests; check_call_type } : State.Circuit.t) :
+        ({ forest; pending_forests; check_may_use_token } : State.Circuit.t) :
         State.Circuit.t =
       let forest =
         Zkapp_call_forest.Checked.if_ skip
           ~then_:(Zkapp_call_forest.Checked.empty ())
           ~else_:forest
       in
-      let forest, pending_forests, check_call_type =
+      let forest, pending_forests, check_may_use_token =
         let ( { Merkle_list.Elt.Circuit.forest = next_forest
-              ; call_type = next_check_call_type
+              ; may_use_token = next_check_may_use_token
               }
             , new_pending_forests ) =
           Merkle_list.pop pending_forests
@@ -360,22 +365,22 @@ module Rules = struct
             ~else_:forest
         , Merkle_list.if_ current_is_empty ~then_:new_pending_forests
             ~else_:pending_forests
-        , if_ ~typ:Account_update.Call_type.typ current_is_empty
-            ~then_:next_check_call_type ~else_:check_call_type )
+        , if_ ~typ:Account_update.May_use_token.typ current_is_empty
+            ~then_:next_check_may_use_token ~else_:check_may_use_token )
       in
-      { forest; pending_forests; check_call_type }
+      { forest; pending_forests; check_may_use_token }
 
     let check_children ~self_token ~running_total ~state n =
       let state = ref state in
       let running_total = ref running_total in
       let consume_account_update () =
-        let next_state, account_update, check_call_type =
+        let next_state, account_update, check_may_use_token =
           next_account_update !state
         in
         state := next_state ;
         let can_access_this_token =
-          Account_update.Call_type.Checked.equal check_call_type
-            account_update.account_update.data.call_type
+          Account_update.May_use_token.Checked.equal check_may_use_token
+            account_update.account_update.data.may_use_token
         in
         let is_self =
           Account_id.Checked.derive_token_id
@@ -508,14 +513,15 @@ module Rules = struct
         exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
       in
       let token_id = exists Token_id.typ ~request:(fun () -> Token_id) in
-      let call_type =
-        exists Account_update.Call_type.typ ~request:(fun () -> Call_type)
+      let may_use_token =
+        exists Account_update.May_use_token.typ ~request:(fun () ->
+            May_use_token )
       in
       let { Pickles.Inductive_rule.previous_proof_statements = _
           ; public_output = account_update
           ; auxiliary_output = recursive_input
           } =
-        Zkapps_examples.wrap_main ~public_key ~token_id ~call_type
+        Zkapps_examples.wrap_main ~public_key ~token_id ~may_use_token
           (fun account_update ->
             let self_token =
               Account_id.Checked.derive_token_id
@@ -528,7 +534,7 @@ module Rules = struct
             account_update#set_calls call_forest ;
             let state =
               State.Circuit.create call_forest
-                Account_update.Call_type.Checked.call
+              @@ Account_update.May_use_token.Checked.constant Parents_own_token
             in
             let state, running_total =
               check_children ~self_token ~running_total:Field.zero ~state 3
@@ -578,7 +584,7 @@ module Rules = struct
 
     let handler (public_key : Public_key.Compressed.t) (token_id : Token_id.t)
         (call_forest : Zkapp_call_forest.t)
-        (call_type : Account_update.Call_type.t)
+        (may_use_token : Account_update.May_use_token.t)
         (prove :
           Recursive.Statement.Value.t -> (Nat.N2.n, Nat.N2.n) Pickles.Proof.t )
         (Snarky_backendless.Request.With { request; respond }) =
@@ -589,8 +595,8 @@ module Rules = struct
           respond (Provide token_id)
       | Call_forest ->
           respond (Provide call_forest)
-      | Call_type ->
-          respond (Provide call_type)
+      | May_use_token ->
+          respond (Provide may_use_token)
       | Recursive.Prove (should_prove, statement) ->
           let proof =
             if should_prove then prove statement else Lazy.force dummy_proof
@@ -684,35 +690,35 @@ let initialize_prover =
     ~f:(fun (_, _, _, Pickles.Provers.[ initialize_prover; _; _ ]) ->
       initialize_prover )
 
-let initialize ?(call_type = Account_update.Call_type.Blind_call) public_key
+let initialize ?(may_use_token = Account_update.May_use_token.No) public_key
     token_id =
   let initialize_prover = Lazy.force initialize_prover in
   initialize_prover
-    ~handler:(Rules.Initialize_state.handler public_key token_id call_type)
+    ~handler:(Rules.Initialize_state.handler public_key token_id may_use_token)
 
 let mint_prover =
   Lazy.map lazy_compiled
     ~f:(fun (_, _, _, Pickles.Provers.[ _; mint_prover; _ ]) -> mint_prover)
 
 let mint ~owner_public_key ~owner_token_id ~amount ~mint_to_public_key
-    ?(call_type = Account_update.Call_type.Blind_call) =
+    ?(may_use_token = Account_update.May_use_token.No) =
   let mint_prover = Lazy.force mint_prover in
   mint_prover
     ~handler:
       (Rules.Mint.handler ~owner_public_key ~owner_token_id ~amount
-         ~mint_to_public_key ~call_type )
+         ~mint_to_public_key ~may_use_token )
 
 let child_forest_prover =
   Lazy.map lazy_compiled
     ~f:(fun (_, _, _, Pickles.Provers.[ _; _; child_forest_prover ]) ->
       child_forest_prover )
 
-let child_forest ?(call_type = Account_update.Call_type.Blind_call) public_key
+let child_forest ?(may_use_token = Account_update.May_use_token.No) public_key
     token_id call_forest =
   let child_forest_prover = Lazy.force child_forest_prover in
   child_forest_prover
     ~handler:
-      (Rules.Transfer.handler public_key token_id call_forest call_type
+      (Rules.Transfer.handler public_key token_id call_forest may_use_token
          (fun stmt ->
            Async.Thread_safe.block_on_async_exn (fun () ->
                Transfer_recursive.prove stmt ) ) )

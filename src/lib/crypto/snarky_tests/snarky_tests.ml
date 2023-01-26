@@ -314,6 +314,90 @@ let generate_witness () =
 
   ()
 
+module As_prover_circuits = struct
+  let input_typ = Impl.Typ.tuple3 Impl.Field.typ Impl.Field.typ Impl.Field.typ
+
+  let return_typ = Impl.Typ.unit
+
+  let get_id =
+    Snarky_backendless.Cvar.(
+      function Var v -> v | _ -> failwith "should have been a var")
+
+  let main as_prover vars
+      ((b1, b2, b3) : Impl.Field.t * Impl.Field.t * Impl.Field.t) () =
+    let abc = Impl.Field.(b1 + b2 + b3) in
+    assert (get_id b1 = 1) ;
+    if as_prover then
+      Impl.as_prover (fun _ ->
+          let f acc e =
+            let var = Snarky_backendless.Cvar.Unsafe.of_index e in
+            let v = Impl.As_prover.read_var var in
+            Impl.Field.Constant.(acc + v)
+          in
+          let l = List.range 1 (vars + 1) in
+          let total : Impl.field =
+            List.fold l ~init:Impl.Field.Constant.one ~f
+          in
+          assert (not (Impl.Field.(Constant.compare total Constant.one) = 0)) ;
+          assert (not Impl.Field.Constant.(equal total one)) ;
+          () ) ;
+    Impl.Field.Assert.non_zero abc ;
+
+    ()
+
+  let random_input = Impl.Field.Constant.(random (), random (), random ())
+
+  module Tests = struct
+    let generate_witness () =
+      let f (inputs : Impl.Proof_inputs.t) _ = inputs in
+      let compiled =
+        Impl.generate_witness_conv ~f ~input_typ ~return_typ (main true 3)
+      in
+
+      let input = random_input in
+      let _b = compiled input in
+
+      ()
+
+    (* test that all variables can be accessed*)
+    let generate_witness_fails () =
+      let f (inputs : Impl.Proof_inputs.t) _ = inputs in
+      let compiled =
+        Impl.generate_witness_conv ~f ~input_typ ~return_typ (main true 4)
+      in
+
+      let input = random_input in
+      let _b = compiled input in
+
+      ()
+
+    (* test that accessing non existent vars fails*)
+    let generate_witness_fails () =
+      Alcotest.(
+        check_raises "should fail accesing non existent var"
+          (Failure "vector_get") generate_witness_fails)
+
+    (* test that as_prover doesn't affect constraints *)
+    let as_prover_does_nothing () =
+      let get_hash as_prov =
+        let cs : Impl.R1CS_constraint_system.t =
+          Impl.constraint_system ~input_typ ~return_typ (main as_prov 3)
+        in
+        Md5.to_hex (Impl.R1CS_constraint_system.digest cs)
+      in
+
+      let digest1 = get_hash true in
+      let digest2 = get_hash false in
+      assert (String.(digest1 = digest2))
+  end
+
+  let as_prover_tests =
+    [ ("access vars", `Quick, Tests.generate_witness)
+    ; ("access non-existent vars", `Quick, Tests.generate_witness_fails)
+    ; ("as_prover makes no constraints", `Quick, Tests.as_prover_does_nothing)
+    ]
+end
+
 (****************************
  * outside-of-circuit tests *
  ****************************)
@@ -360,5 +444,6 @@ let () =
     [ ("outside of circuit tests", outside_circuit_tests)
     ; ("API tests", api_tests)
     ; ("circuit tests", circuit_tests)
+    ; ("As_prover tests", As_prover_circuits.as_prover_tests)
     ; ("range checks", range_checks)
     ]

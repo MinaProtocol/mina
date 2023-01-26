@@ -81,16 +81,27 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
 
 module T = Mina_transaction_logic.Make (L)
 
-let apply_zkapp_command_unchecked_with_states ~constraint_constants ~state_view
-    ~fee_excess ~supply_increase ledger c =
+let apply_zkapp_command_unchecked_with_states ~constraint_constants ~global_slot
+    ~state_view ~fee_excess ~supply_increase ledger c =
   let open T in
-  apply_zkapp_command_unchecked_aux ~constraint_constants ~state_view
-    ~fee_excess ~supply_increase (ref ledger) c ~init:[]
+  apply_zkapp_command_unchecked_aux ~constraint_constants ~global_slot
+    ~state_view ~fee_excess ~supply_increase (ref ledger) c ~init:[]
     ~f:(fun
          acc
-         ({ ledger; fee_excess; supply_increase; protocol_state }, local_state)
+         ( { ledger
+           ; fee_excess
+           ; supply_increase
+           ; protocol_state
+           ; block_global_slot
+           }
+         , local_state )
        ->
-      ( { GS.ledger = !ledger; fee_excess; supply_increase; protocol_state }
+      ( { GS.ledger = !ledger
+        ; fee_excess
+        ; supply_increase
+        ; protocol_state
+        ; block_global_slot
+        }
       , { local_state with ledger = !(local_state.ledger) } )
       :: acc )
   |> Result.map ~f:(fun (account_update_applied, states) ->
@@ -109,10 +120,10 @@ let apply_user_command ~constraint_constants ~txn_global_slot =
   apply_transaction_logic
     (T.apply_user_command ~constraint_constants ~txn_global_slot)
 
-let apply_transaction' ~constraint_constants ~txn_state_view l t =
+let apply_transaction' ~constraint_constants ~global_slot ~txn_state_view l t =
   O1trace.sync_thread "apply_transaction" (fun () ->
-      T.apply_transaction ~constraint_constants ~txn_state_view l t )
+      T.apply_transaction ~constraint_constants ~global_slot ~txn_state_view l t )
 
-let apply_transaction ~constraint_constants ~txn_state_view =
+let apply_transaction ~constraint_constants ~global_slot ~txn_state_view =
   apply_transaction_logic
-    (apply_transaction' ~constraint_constants ~txn_state_view)
+    (apply_transaction' ~constraint_constants ~global_slot ~txn_state_view)

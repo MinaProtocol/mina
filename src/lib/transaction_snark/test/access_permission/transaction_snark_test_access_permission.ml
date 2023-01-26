@@ -51,6 +51,7 @@ let%test_module "Access permission tests" =
                 ; preconditions =
                     { account = Nonce Mina_numbers.Account_nonce.(succ zero)
                     ; network = account_update.body.preconditions.network
+                    ; valid_while = Ignore
                     }
                 }
             ; authorization = Signature Signature.dummy
@@ -82,8 +83,9 @@ let%test_module "Access permission tests" =
             { Account_update.Preconditions.network =
                 Zkapp_precondition.Protocol_state.accept
             ; account = Accept
+            ; valid_while = Ignore
             }
-        ; call_type = Blind_call
+        ; may_use_token = No
         ; use_full_commitment = true
         ; authorization_kind = Signature
         }

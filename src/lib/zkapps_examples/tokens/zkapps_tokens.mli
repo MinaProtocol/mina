@@ -20,7 +20,7 @@ module P :
      and type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
 
 val initialize :
-     ?call_type:Account_update.Call_type.t
+     ?may_use_token:Account_update.May_use_token.t
   -> Public_key.Compressed.t
   -> Token_id.t
   -> unit
@@ -36,7 +36,7 @@ val mint :
   -> owner_token_id:Token_id.t
   -> amount:Currency.Amount.t
   -> mint_to_public_key:Public_key.Compressed.t
-  -> ?call_type:Account_update.Call_type.t
+  -> ?may_use_token:Account_update.May_use_token.t
   -> unit
   -> ( ( Account_update.t
        , Zkapp_command.Digest.Account_update.t
@@ -46,7 +46,7 @@ val mint :
      Async_kernel.Deferred.t
 
 val child_forest :
-     ?call_type:Account_update.Call_type.t
+     ?may_use_token:Account_update.May_use_token.t
   -> Public_key.Compressed.t
   -> Token_id.t
   -> Zkapp_call_forest.t

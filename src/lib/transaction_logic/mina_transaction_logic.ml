@@ -334,6 +334,8 @@ module type S = sig
       ; fee_excess : Amount.Signed.t
       ; supply_increase : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
+      ; block_global_slot : Mina_numbers.Global_slot.t
+            (* Slot of block when the transaction is applied. NOTE: This is at least 1 slot after the protocol_state's view, which is for the *previous* slot. *)
       }
   end
 
@@ -360,6 +362,7 @@ module type S = sig
 
   val apply_zkapp_command_unchecked :
        constraint_constants:Genesis_constants.Constraint_constants.t
+    -> global_slot:Mina_numbers.Global_slot.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
     -> ledger
     -> Zkapp_command.t
@@ -393,6 +396,7 @@ module type S = sig
   *)
   val apply_zkapp_command_unchecked_aux :
        constraint_constants:Genesis_constants.Constraint_constants.t
+    -> global_slot:Mina_numbers.Global_slot.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
     -> init:'acc
     -> f:
@@ -431,6 +435,7 @@ module type S = sig
 
   val apply_transaction :
        constraint_constants:Genesis_constants.Constraint_constants.t
+    -> global_slot:Global_slot.t
     -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
     -> ledger
     -> Transaction.t
@@ -997,6 +1002,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       ; fee_excess : Amount.Signed.t
       ; supply_increase : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
+      ; block_global_slot : Global_slot.t
       }
 
     let ledger { ledger; _ } = L.create_masked ledger
@@ -1013,8 +1019,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
     let set_supply_increase t supply_increase = { t with supply_increase }
 
-    let global_slot_since_genesis { protocol_state; _ } =
-      protocol_state.global_slot_since_genesis
+    let block_global_slot { block_global_slot; _ } = block_global_slot
   end
 
   module Inputs = struct
@@ -1474,6 +1479,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       include Zkapp_precondition.Protocol_state
     end
 
+    module Valid_while_precondition = struct
+      include Zkapp_precondition.Valid_while
+    end
+
     module Account_update = struct
       include Account_update
 
@@ -1489,9 +1498,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
       type transaction_commitment = Transaction_commitment.t
 
-      let is_delegate_call (p : t) = Call_type.is_delegate_call p.body.call_type
+      let may_use_parents_own_token (p : t) =
+        May_use_token.parents_own_token p.body.may_use_token
 
-      let is_blind_call (p : t) = Call_type.is_blind_call p.body.call_type
+      let may_use_token_inherited_from_parent (p : t) =
+        May_use_token.inherit_from_parent p.body.may_use_token
 
       let check_authorization ~commitment:_ ~calls:_ (account_update : t) =
         (* The transaction's validity should already have been checked before
@@ -1679,6 +1690,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
           , Transaction_status.Failure.Collection.t )
           Zkapp_command_logic.Local_state.t
       ; protocol_state_precondition : Zkapp_precondition.Protocol_state.t
+      ; valid_while_precondition : Zkapp_precondition.Valid_while.t
       ; transaction_commitment : Transaction_commitment.t
       ; full_transaction_commitment : Transaction_commitment.t
       ; field : Snark_params.Tick.Field.t
@@ -1687,6 +1699,10 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     let perform ~constraint_constants:_ (type r)
         (eff : (r, t) Zkapp_command_logic.Eff.t) : r =
       match eff with
+      | Check_valid_while_precondition (valid_while, global_state) ->
+          Zkapp_precondition.Valid_while.check valid_while
+            global_state.block_global_slot
+          |> Or_error.is_ok
       | Check_protocol_state_precondition (pred, global_state) -> (
           Zkapp_precondition.Protocol_state.check pred
             global_state.protocol_state
@@ -1725,6 +1741,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
 
   let apply_zkapp_command_unchecked_aux (type user_acc)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~(global_slot : Global_slot.t)
       ~(state_view : Zkapp_precondition.Protocol_state.View.t)
       ~(init : user_acc) ~(f : user_acc -> _ -> user_acc)
       ?(fee_excess = Amount.Signed.zero) ?(supply_increase = Amount.Signed.zero)
@@ -1755,7 +1772,12 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
     in
     let initial_state :
         Inputs.Global_state.t * _ Zkapp_command_logic.Local_state.t =
-      ( { protocol_state = state_view; ledger; fee_excess; supply_increase }
+      ( { protocol_state = state_view
+        ; ledger
+        ; fee_excess
+        ; supply_increase
+        ; block_global_slot = global_slot
+        }
       , { stack_frame =
             ({ calls = []
              ; caller = Token_id.default
@@ -1863,9 +1885,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               "Zkapp_command application failed but new accounts created or \
                some of the other account_update updates applied"
 
-  let apply_zkapp_command_unchecked ~constraint_constants ~state_view ledger c =
-    apply_zkapp_command_unchecked_aux ~constraint_constants ~state_view ledger c
-      ~init:None ~f:(fun _acc (global_state, local_state) ->
+  let apply_zkapp_command_unchecked ~constraint_constants ~global_slot
+      ~state_view ledger c =
+    apply_zkapp_command_unchecked_aux ~constraint_constants ~global_slot
+      ~state_view ledger c ~init:None
+      ~f:(fun _acc (global_state, local_state) ->
         Some (local_state, global_state.fee_excess) )
     |> Result.map ~f:(fun (account_update_applied, state_res) ->
            (account_update_applied, Option.value_exn state_res) )
@@ -2151,11 +2175,11 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       ; burned_tokens
       }
 
-  let apply_transaction ~constraint_constants
+  let apply_transaction ~constraint_constants ~global_slot
       ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t) ledger
       (t : Transaction.t) =
     let previous_hash = merkle_root ledger in
-    let txn_global_slot = txn_state_view.global_slot_since_genesis in
+    let txn_global_slot = global_slot in
     Or_error.map
       ( match t with
       | Command (Signed_command txn) ->
@@ -2165,8 +2189,9 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
               Transaction_applied.Varying.Command (Signed_command applied) )
       | Command (Zkapp_command txn) ->
           Or_error.map
-            (apply_zkapp_command_unchecked ~state_view:txn_state_view
-               ~constraint_constants ledger txn ) ~f:(fun (applied, _) ->
+            (apply_zkapp_command_unchecked ~global_slot
+               ~state_view:txn_state_view ~constraint_constants ledger txn )
+            ~f:(fun (applied, _) ->
               Transaction_applied.Varying.Command (Zkapp_command applied) )
       | Fee_transfer t ->
           Or_error.map
@@ -2395,8 +2420,9 @@ module For_tests = struct
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Nonce (Account.Nonce.succ actual_nonce)
+                    ; valid_while = Ignore
                     }
-                ; call_type = Blind_call
+                ; may_use_token = No
                 ; use_full_commitment
                 ; implicit_account_creation_fee = true
                 ; authorization_kind = Signature
@@ -2417,8 +2443,9 @@ module For_tests = struct
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Accept
+                    ; valid_while = Ignore
                     }
-                ; call_type = Blind_call
+                ; may_use_token = No
                 ; use_full_commitment = false
                 ; implicit_account_creation_fee = true
                 ; authorization_kind = None_given

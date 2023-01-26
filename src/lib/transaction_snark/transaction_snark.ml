@@ -974,6 +974,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; fee_excess : Amount.Signed.var
           ; supply_increase : Amount.Signed.var
           ; protocol_state : Zkapp_precondition.Protocol_state.View.Checked.t
+          ; block_global_slot : Global_slot.Checked.var
           }
       end
 
@@ -1663,6 +1664,10 @@ module Make_str (A : Wire_types.Concrete) = struct
           type t = Zkapp_precondition.Protocol_state.Checked.t
         end
 
+        module Valid_while_precondition = struct
+          type t = Zkapp_precondition.Valid_while.Checked.t
+        end
+
         module Field = Impl.Field
 
         module Local_state = struct
@@ -1855,17 +1860,20 @@ module Make_str (A : Wire_types.Concrete) = struct
             let protocol_state_precondition (t : t) =
               t.account_update.data.preconditions.network
 
+            let valid_while_precondition (t : t) =
+              t.account_update.data.preconditions.valid_while
+
             let token_id (t : t) = t.account_update.data.token_id
 
             let public_key (t : t) = t.account_update.data.public_key
 
-            let is_delegate_call (t : t) =
-              Account_update.Call_type.Checked.is_delegate_call
-                t.account_update.data.call_type
+            let may_use_parents_own_token (t : t) =
+              Account_update.May_use_token.Checked.parents_own_token
+                t.account_update.data.may_use_token
 
-            let is_blind_call (t : t) =
-              Account_update.Call_type.Checked.is_blind_call
-                t.account_update.data.call_type
+            let may_use_token_inherited_from_parent (t : t) =
+              Account_update.May_use_token.Checked.inherit_from_parent
+                t.account_update.data.may_use_token
 
             let account_id (t : t) =
               Account_id.create (public_key t) (token_id t)
@@ -1991,8 +1999,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ledger = Ledger.if_ should_update ~then_:ledger ~else_:t.ledger
               }
 
-            let global_slot_since_genesis { protocol_state; _ } =
-              protocol_state.global_slot_since_genesis
+            let block_global_slot { block_global_slot; _ } = block_global_slot
           end
 
           module Nonce_precondition = struct
@@ -2031,6 +2038,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                 Mina_transaction_logic.Zkapp_command_logic.Local_state.t
             ; protocol_state_precondition :
                 Zkapp_precondition.Protocol_state.Checked.t
+            ; valid_while_precondition :
+                Zkapp_precondition.Valid_while.Checked.t
             ; transaction_commitment : Transaction_commitment.t
             ; full_transaction_commitment : Transaction_commitment.t
             ; field : Field.t
@@ -2043,6 +2052,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             (eff : (r, Env.t) Mina_transaction_logic.Zkapp_command_logic.Eff.t)
             : r =
           match eff with
+          | Check_valid_while_precondition (valid_while, global_state) ->
+              Zkapp_precondition.Valid_while.Checked.check valid_while
+                global_state.block_global_slot
           | Check_protocol_state_precondition
               (protocol_state_predicate, global_state) ->
               Zkapp_precondition.Protocol_state.Checked.check
@@ -2069,14 +2081,15 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let check_protocol_state ~pending_coinbase_stack_init
           ~pending_coinbase_stack_before ~pending_coinbase_stack_after
-          state_body =
+          ~block_global_slot state_body =
         [%with_label_ "Compute pending coinbase stack"] (fun () ->
             let%bind state_body_hash =
               Mina_state.Protocol_state.Body.hash_checked state_body
             in
+            let global_slot = block_global_slot in
             let%bind computed_pending_coinbase_stack_after =
               Pending_coinbase.Stack.Checked.push_state state_body_hash
-                pending_coinbase_stack_init
+                global_slot pending_coinbase_stack_init
             in
             [%with_label_ "Check pending coinbase stack"] (fun () ->
                 let%bind correct_coinbase_target_stack =
@@ -2112,6 +2125,10 @@ module Make_str (A : Wire_types.Concrete) = struct
           exists (Mina_state.Protocol_state.Body.typ ~constraint_constants)
             ~compute:(fun () -> !witness.state_body)
         in
+        let block_global_slot =
+          exists Mina_numbers.Global_slot.typ ~compute:(fun () ->
+              !witness.block_global_slot )
+        in
         let pending_coinbase_stack_init =
           exists Pending_coinbase.Stack.typ ~compute:(fun () ->
               !witness.init_stack )
@@ -2122,7 +2139,8 @@ module Make_str (A : Wire_types.Concrete) = struct
              ~pending_coinbase_stack_before:
                statement.source.pending_coinbase_stack
              ~pending_coinbase_stack_after:
-               statement.target.pending_coinbase_stack state_body ) ;
+               statement.target.pending_coinbase_stack ~block_global_slot
+             state_body ) ;
         let init :
             Global_state.t
             * _ Mina_transaction_logic.Zkapp_command_logic.Local_state.t =
@@ -2134,6 +2152,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; supply_increase = Amount.Signed.(Checked.constant zero)
             ; protocol_state =
                 Mina_state.Protocol_state.Body.view_checked state_body
+            ; block_global_slot
             }
           in
           let l : _ Mina_transaction_logic.Zkapp_command_logic.Local_state.t =
@@ -2388,6 +2407,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       | State_body :
           Mina_state.Protocol_state.Body.Value.t Snarky_backendless.Request.t
       | Init_stack : Pending_coinbase.Stack.t Snarky_backendless.Request.t
+      | Global_slot : Mina_numbers.Global_slot.t Snarky_backendless.Request.t
 
     let%snarkydef_ add_burned_tokens acc_burned_tokens amount
         ~is_coinbase_or_fee_transfer ~update_account =
@@ -2407,8 +2427,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
         (type shifted)
         (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
-        root pending_coinbase_stack_init pending_coinbase_stack_before
-        pending_coinbase_after state_body
+        global_slot root pending_coinbase_stack_init
+        pending_coinbase_stack_before pending_coinbase_after state_body
         ({ signer; signature; payload } as txn : Transaction_union.var) =
       let tag = payload.body.tag in
       let is_user_command =
@@ -2473,10 +2493,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                         ])
               ] )
       in
-      let current_global_slot =
-        Mina_state.Protocol_state.Body.consensus_state state_body
-        |> Consensus.Data.Consensus_state.global_slot_since_genesis_var
-      in
+      let current_global_slot = global_slot in
       (* Query predicted failure/success. *)
       let%bind user_command_failure =
         User_command_failure.compute_as_prover ~constraint_constants
@@ -2536,7 +2553,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             in
             let%bind pending_coinbase_stack_with_state =
               Pending_coinbase.Stack.Checked.push_state state_body_hash
-                pending_coinbase_stack_init
+                current_global_slot pending_coinbase_stack_init
             in
             let%bind computed_pending_coinbase_stack_after =
               let coinbase =
@@ -3274,10 +3291,14 @@ module Make_str (A : Wire_types.Concrete) = struct
           (Mina_state.Protocol_state.Body.typ ~constraint_constants)
           ~request:(As_prover.return State_body)
       in
+      let%bind global_slot =
+        exists Mina_numbers.Global_slot.typ
+          ~request:(As_prover.return Global_slot)
+      in
       let%bind root_after, fee_excess, supply_increase =
         apply_tagged_transaction ~constraint_constants
           (module Shifted)
-          statement.source.ledger pending_coinbase_init
+          global_slot statement.source.ledger pending_coinbase_init
           statement.source.pending_coinbase_stack
           statement.target.pending_coinbase_stack state_body t
       in
@@ -3334,6 +3355,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let transaction_union_handler handler (transaction : Transaction_union.t)
         (state_body : Mina_state.Protocol_state.Body.Value.t)
+        (global_slot : Mina_numbers.Global_slot.t)
         (init_stack : Pending_coinbase.Stack.t) :
         Snarky_backendless.Request.request -> _ =
      fun (With { request; respond } as r) ->
@@ -3344,6 +3366,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           respond (Provide state_body)
       | Init_stack ->
           respond (Provide init_stack)
+      | Global_slot ->
+          respond (Provide global_slot)
       | _ ->
           handler r
   end
@@ -3564,11 +3588,12 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let check_transaction_union ?(preeval = false) ~constraint_constants
       ~supply_increase sok_message source target init_stack
-      pending_coinbase_stack_state transaction state_body handler =
+      pending_coinbase_stack_state transaction state_body global_slot handler =
     if preeval then failwith "preeval currently disabled" ;
     let sok_digest = Sok_message.digest sok_message in
     let handler =
-      Base.transaction_union_handler handler transaction state_body init_stack
+      Base.transaction_union_handler handler transaction state_body global_slot
+        init_stack
     in
     let statement : Statement.With_sok.t =
       Statement.Poly.with_empty_local_state ~source ~target ~supply_increase
@@ -3601,6 +3626,9 @@ module Make_str (A : Wire_types.Concrete) = struct
     let state_body =
       Transaction_protocol_state.block_data transaction_in_block
     in
+    let global_slot =
+      Transaction_protocol_state.global_slot transaction_in_block
+    in
     match to_preunion (Transaction.forget transaction) with
     | `Zkapp_command _ ->
         failwith
@@ -3609,7 +3637,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         check_transaction_union ?preeval ~constraint_constants ~supply_increase
           sok_message source target init_stack pending_coinbase_stack_state
           (Transaction_union.of_transaction t)
-          state_body handler
+          state_body global_slot handler
 
   let check_user_command ~constraint_constants ~sok_message ~source ~target
       ~init_stack ~pending_coinbase_stack_state ~supply_increase t_in_block
@@ -3631,9 +3659,13 @@ module Make_str (A : Wire_types.Concrete) = struct
     let state_body =
       Transaction_protocol_state.block_data transaction_in_block
     in
+    let global_slot =
+      Transaction_protocol_state.global_slot transaction_in_block
+    in
     let sok_digest = Sok_message.digest sok_message in
     let handler =
-      Base.transaction_union_handler handler transaction state_body init_stack
+      Base.transaction_union_handler handler transaction state_body global_slot
+        init_stack
     in
     let statement : Statement.With_sok.t =
       Statement.Poly.with_empty_local_state ~source ~target ~supply_increase
@@ -3733,8 +3765,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         { stack_hash = Call_stack_digest.cons h_f h_tl; elt = f } :: tl
 
-  let zkapp_command_witnesses_exn ~constraint_constants ~state_body ~fee_excess
-      ledger
+  let zkapp_command_witnesses_exn ~constraint_constants ~global_slot ~state_body
+      ~fee_excess ledger
       (zkapp_commands :
         ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
         * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
@@ -3762,8 +3794,8 @@ module Make_str (A : Wire_types.Concrete) = struct
            ->
           let _, states =
             Sparse_ledger.apply_zkapp_command_unchecked_with_states
-              sparse_ledger ~constraint_constants ~state_view ~fee_excess
-              ~supply_increase zkapp_command
+              sparse_ledger ~constraint_constants ~global_slot ~state_view
+              ~fee_excess ~supply_increase zkapp_command
             |> Or_error.ok_exn
           in
           let final_state =
@@ -3976,6 +4008,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; start_zkapp_command
             ; state_body
             ; init_stack = pending_coinbase_init_stack
+            ; block_global_slot = global_slot
             }
           in
           let fee_excess =
@@ -4166,13 +4199,13 @@ module Make_str (A : Wire_types.Concrete) = struct
       { proof; statement }
 
     let of_transaction_union ~statement ~init_stack transaction state_body
-        handler =
+        global_slot handler =
       let open Async in
       let%map (), (), proof =
         base
           ~handler:
             (Base.transaction_union_handler handler transaction state_body
-               init_stack )
+               global_slot init_stack )
           statement
       in
       { statement; proof }
@@ -4186,6 +4219,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       let state_body =
         Transaction_protocol_state.block_data transaction_in_block
       in
+      let global_slot =
+        Transaction_protocol_state.global_slot transaction_in_block
+      in
       match to_preunion transaction with
       | `Zkapp_command _ ->
           failwith
@@ -4194,7 +4230,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       | `Transaction t ->
           of_transaction_union ~statement ~init_stack
             (Transaction_union.of_transaction t)
-            state_body handler
+            state_body global_slot handler
 
     let of_user_command ~statement ~init_stack user_command_in_block handler =
       of_non_zkapp_command_transaction ~statement ~init_stack
@@ -4355,6 +4391,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ( if Option.is_none fee_payer_opt then
                   Nonce (Account.Nonce.succ sender_nonce)
                 else Nonce sender_nonce )
+            ; valid_while =
+                Option.value_map preconditions
+                  ~f:(fun { valid_while; _ } -> valid_while)
+                  ~default:Zkapp_basic.Or_ignore.Ignore
             }
       in
 
@@ -4378,7 +4418,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; preconditions = preconditions'
           ; use_full_commitment = false
           ; implicit_account_creation_fee = false
-          ; call_type = Blind_call
+          ; may_use_token = No
           ; authorization_kind = Signature
           }
         in
@@ -4445,7 +4485,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                       }
                   ; use_full_commitment = true
                   ; implicit_account_creation_fee = false
-                  ; call_type = Blind_call
+                  ; may_use_token = No
                   ; authorization_kind
                   }
               ; authorization =
@@ -4488,7 +4528,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; preconditions = { preconditions' with account = Accept }
                 ; use_full_commitment
                 ; implicit_account_creation_fee = false
-                ; call_type = Blind_call
+                ; may_use_token = No
                 ; authorization_kind
                 }
             ; authorization = receiver_auth
@@ -5013,10 +5053,11 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; preconditions =
                 { network = protocol_state_predicate
                 ; account = Nonce (Account.Nonce.succ sender_nonce)
+                ; valid_while = Ignore
                 }
             ; use_full_commitment = false
             ; implicit_account_creation_fee = false
-            ; call_type = Blind_call
+            ; may_use_token = No
             ; authorization_kind = Signature
             }
         ; authorization = Signature Signature.dummy
@@ -5036,10 +5077,11 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; preconditions =
                 { network = protocol_state_predicate
                 ; account = Full Zkapp_precondition.Account.accept
+                ; valid_while = Ignore
                 }
             ; use_full_commitment = false
             ; implicit_account_creation_fee = false
-            ; call_type = Blind_call
+            ; may_use_token = No
             ; authorization_kind = Proof
             }
         ; authorization = Proof Mina_base.Proof.blockchain_dummy

@@ -191,7 +191,7 @@ module Account_update_under_construction = struct
       { public_key : Public_key.Compressed.var
       ; token_id : Token_id.Checked.t
       ; balance_change : Currency.Amount.Signed.Checked.t
-      ; call_type : Account_update.Call_type.Checked.t
+      ; may_use_token : Account_update.May_use_token.Checked.t
       ; account_condition : Account_condition.t
       ; update : Update.t
       ; calls : Calls_kind.t
@@ -202,12 +202,12 @@ module Account_update_under_construction = struct
       }
 
     let create ~public_key ?(token_id = Token_id.(Checked.constant default))
-        ?(call_type = Account_update.Call_type.Checked.call) () =
+        ?(may_use_token = Account_update.May_use_token.Checked.constant No) () =
       { public_key
       ; token_id
       ; balance_change =
           Amount.Signed.Checked.constant { magnitude = Amount.zero; sgn = Pos }
-      ; call_type
+      ; may_use_token
       ; account_condition = Account_condition.create ()
       ; update = Update.create ()
       ; calls = No_calls
@@ -269,6 +269,7 @@ module Account_update_under_construction = struct
                       }
                   }
             ; account = Account_condition.to_predicate t.account_condition
+            ; valid_while = var_of_t Zkapp_precondition.Valid_while.typ Ignore
             }
         ; use_full_commitment = Boolean.false_
         ; implicit_account_creation_fee =
@@ -276,7 +277,7 @@ module Account_update_under_construction = struct
                reasonable test.
             *)
             Token_id.(Checked.equal t.token_id (Checked.constant default))
-        ; call_type = t.call_type
+        ; may_use_token = t.may_use_token
         ; authorization_kind = t.authorization_kind
         }
       in
@@ -349,11 +350,11 @@ module Account_update_under_construction = struct
   end
 end
 
-class account_update ~public_key ?token_id ?call_type =
+class account_update ~public_key ?token_id ?may_use_token =
   object
     val mutable account_update =
       Account_update_under_construction.In_circuit.create ~public_key ?token_id
-        ?call_type ()
+        ?may_use_token ()
 
     method assert_state_proved =
       account_update <-
@@ -480,9 +481,11 @@ let to_account_update (account_update : account_update) :
 open Pickles_types
 open Hlist
 
-let wrap_main ~public_key ?token_id ?call_type f
+let wrap_main ~public_key ?token_id ?may_use_token f
     { Pickles.Inductive_rule.public_input = () } =
-  let account_update = new account_update ~public_key ?token_id ?call_type in
+  let account_update =
+    new account_update ~public_key ?token_id ?may_use_token
+  in
   let auxiliary_output = f account_update in
   { Pickles.Inductive_rule.previous_proof_statements = []
   ; public_output = account_update
@@ -662,7 +665,7 @@ let mk_update_body ?(token_id = Token_id.default)
     ?(events = []) ?(actions = []) ?(call_data = Field.Constant.zero)
     ?(preconditions = Account_update.Preconditions.accept)
     ?(use_full_commitment = false)
-    ?(call_type = Account_update.Call_type.Blind_call)
+    ?(may_use_token = Account_update.May_use_token.No)
     ?(authorization_kind = Account_update.Authorization_kind.Signature)
     ?(implicit_account_creation_fee = false) public_key =
   { Account_update.Body.public_key
@@ -675,7 +678,7 @@ let mk_update_body ?(token_id = Token_id.default)
   ; call_data
   ; preconditions
   ; use_full_commitment
-  ; call_type
+  ; may_use_token
   ; authorization_kind
   ; implicit_account_creation_fee
   }
@@ -720,6 +723,7 @@ module Deploy_account_update = struct
         { Account_update.Preconditions.network =
             Zkapp_precondition.Protocol_state.accept
         ; account = Accept
+        ; valid_while = Ignore
         }
     ; authorization_kind = Signature
     }

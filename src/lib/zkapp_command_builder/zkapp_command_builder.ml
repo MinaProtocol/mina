@@ -10,7 +10,7 @@ let mk_forest ps :
 let mk_node account_update calls : _ Zkapp_command.Call_forest.Tree.t =
   { account_update; account_update_digest = (); calls = mk_forest calls }
 
-let mk_account_update_body authorization_kind call_type kp token_id
+let mk_account_update_body authorization_kind may_use_token kp token_id
     balance_change : Account_update.Body.Simple.t =
   let open Signature_lib in
   { update = Account_update.Update.noop
@@ -29,10 +29,11 @@ let mk_account_update_body authorization_kind call_type kp token_id
   ; preconditions =
       { network = Zkapp_precondition.Protocol_state.accept
       ; account = Account_update.Account_precondition.Accept
+      ; valid_while = Ignore
       }
   ; use_full_commitment = true
   ; implicit_account_creation_fee = false
-  ; call_type
+  ; may_use_token
   ; authorization_kind
   }
 
