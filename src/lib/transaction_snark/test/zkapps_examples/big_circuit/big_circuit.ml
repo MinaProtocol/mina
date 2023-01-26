@@ -48,7 +48,7 @@ let deploy_account_update_body : Account_update.Body.t =
       ; account = Accept
       ; valid_while = Ignore
       }
-  ; call_type = Call
+  ; may_use_token = No
   ; use_full_commitment = true
   ; authorization_kind = Signature
   }
