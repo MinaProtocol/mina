@@ -528,6 +528,8 @@ module type Account_intf = sig
 
     val set_voting_for : t -> controller
 
+    val set_timing : t -> controller
+
     include Iffable with type bool := bool
   end
 
@@ -1268,15 +1270,18 @@ module Make (Inputs : Inputs_intf) = struct
       Token_id.(equal default) account_update_token
     in
     let account_is_untimed = Bool.not (Account.is_timed a) in
-    (* Set account timing for new accounts, if specified. *)
+    (* Set account timing. *)
     let a, local_state =
       let timing = Account_update.Update.timing account_update in
+      let has_permission =
+        Controller.check ~proof_verifies ~signature_verifies
+          (Account.Permissions.set_timing a)
+      in
       let local_state =
-        Local_state.add_check local_state
-          Update_not_permitted_timing_existing_account
+        Local_state.add_check local_state Update_not_permitted_timing
           Bool.(
             Set_or_keep.is_keep timing
-            ||| (account_is_untimed &&& signature_verifies))
+            ||| (account_is_untimed &&& has_permission))
       in
       let timing =
         Set_or_keep.set_or_keep ~if_:Timing.if_ timing (Account.timing a)

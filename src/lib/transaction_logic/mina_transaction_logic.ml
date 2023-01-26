@@ -1294,6 +1294,8 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
         let set_voting_for : t -> Controller.t =
          fun a -> a.permissions.set_voting_for
 
+        let set_timing : t -> Controller.t = fun a -> a.permissions.set_timing
+
         type t = Permissions.t
 
         let if_ = value_if
@@ -1744,8 +1746,7 @@ module Make (L : Ledger_intf.S) : S with type ledger := L.t = struct
       accumulation function over the state for each account update.
 
       CAUTION: If you use the intermediate local states, you MUST update the
-      [will_succeed] field to reflect the value of the [success] field in the
-      final local state.
+      [will_succeed] field to [false] if the [status] is [Failed].
   *)
   let apply_zkapp_command_unchecked_aux (type user_acc)
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
