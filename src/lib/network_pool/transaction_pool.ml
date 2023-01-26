@@ -1222,10 +1222,19 @@ struct
         in
         (* handle drops of locally generated commands *)
         let all_dropped_cmds = dropped_for_add @ dropped_for_size in
-        let all_dropped_cmd_hashes =
-          List.map all_dropped_cmds
+        let dropped_for_add_hashes =
+          List.map dropped_for_add
             ~f:Transaction_hash.User_command_with_valid_signature.hash
           |> Transaction_hash.Set.of_list
+        in
+        let dropped_for_size_hashes =
+          List.map dropped_for_size
+            ~f:Transaction_hash.User_command_with_valid_signature.hash
+          |> Transaction_hash.Set.of_list
+        in
+        let all_dropped_cmd_hashes =
+          Transaction_hash.Set.union dropped_for_add_hashes
+            dropped_for_size_hashes
         in
         [%log' debug t.logger]
           "Dropping $num_for_add commands from pool while adding new commands, \
@@ -1273,21 +1282,12 @@ struct
             ~f:(fun _ ->
               Counter.inc_one Transaction_pool.transactions_added_to_pool )) ;
         (* partition the results *)
-        let all_drops =
-          List.fold add_results ~init:Sequence.empty ~f:(fun acc result ->
-              match result with
-              | Ok (_cmd, dropped) ->
-                  Sequence.append acc dropped
-              | Error _ ->
-                  acc )
-        in
         let accepted, rejected, _dropped =
           List.partition3_map add_results ~f:(function
             | Ok (cmd, _dropped) ->
                 if
-                  Sequence.mem all_drops cmd
-                    ~equal:
-                      Transaction_hash.User_command_with_valid_signature.( = )
+                  Set.mem all_dropped_cmd_hashes
+                    (Transaction_hash.User_command_with_valid_signature.hash cmd)
                 then `Trd cmd
                 else `Fst cmd
             | Error (cmd, error) ->
