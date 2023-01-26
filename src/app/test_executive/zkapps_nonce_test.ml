@@ -325,9 +325,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  block was produced" ) )
     in
     let%bind () =
+      let with_timeout =
+        let soft_slots = 22 in
+        let soft_timeout = Network_time_span.Slots soft_slots in
+        let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
+        Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
+      in
       section_hard "Wait for proof to be emitted"
-        (wait_for t
-           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:2) )
+        ( wait_for t @@ with_timeout
+        @@ Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:2 )
     in
     Event_router.cancel (event_router t) snark_work_event_subscription () ;
     Event_router.cancel (event_router t) snark_work_failure_subscription () ;
