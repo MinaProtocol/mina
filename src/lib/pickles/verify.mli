@@ -1,3 +1,5 @@
+open Core_kernel
+
 module Instance : sig
   type t =
     | T :
@@ -14,6 +16,6 @@ val verify :
   -> (module Intf.Statement_value with type t = 'a)
   -> Verification_key.t
   -> ('a * ('n, 'n) Proof.t) list
-  -> bool Promise.t
+  -> unit Or_error.t Promise.t
 
-val verify_heterogenous : Instance.t list -> bool Promise.t
+val verify_heterogenous : Instance.t list -> unit Or_error.t Promise.t

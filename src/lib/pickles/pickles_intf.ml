@@ -68,9 +68,9 @@ module type S = sig
 
     val id : Verification_key.Id.t Lazy.t
 
-    val verify : (statement * t) list -> bool Deferred.t
+    val verify : (statement * t) list -> unit Or_error.t Deferred.t
 
-    val verify_promise : (statement * t) list -> bool Promise.t
+    val verify_promise : (statement * t) list -> unit Or_error.t Promise.t
   end
 
   module Proof : sig
@@ -242,14 +242,14 @@ module type S = sig
     -> (module Statement_value_intf with type t = 'a)
     -> Verification_key.t
     -> ('a * ('n, 'n) Proof.t) list
-    -> bool Promise.t
+    -> unit Or_error.t Promise.t
 
   val verify :
        (module Nat.Intf with type n = 'n)
     -> (module Statement_value_intf with type t = 'a)
     -> Verification_key.t
     -> ('a * ('n, 'n) Proof.t) list
-    -> bool Deferred.t
+    -> unit Or_error.t Deferred.t
 
   module Prover : sig
     type ('prev_values, 'local_widths, 'local_heights, 'a_value, 'proof) t =
@@ -340,12 +340,12 @@ module type S = sig
     val verify_promise :
          typ:('var, 'value) Impls.Step.Typ.t
       -> (Verification_key.t * 'value * Proof.t) list
-      -> bool Promise.t
+      -> unit Or_error.t Promise.t
 
     val verify :
          typ:('var, 'value) Impls.Step.Typ.t
       -> (Verification_key.t * 'value * Proof.t) list
-      -> bool Deferred.t
+      -> unit Or_error.t Deferred.t
 
     (* Must be called in the inductive rule snarky function defining a
        rule for which this tag is used as a predecessor. *)
