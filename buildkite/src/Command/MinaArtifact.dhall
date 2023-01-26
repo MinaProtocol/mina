@@ -61,19 +61,6 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
               } ] -- libp2p error
           },
 
-        -- daemon devnet image
-        let daemonDevnetSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion,
-          service="mina-daemon",
-          network="devnet",
-          deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="daemon-devnet-${DebianVersions.lowerName debVersion}-docker-image"
-        }
-
-        in
-
-        DockerImage.generateStep daemonDevnetSpec,
-
         -- daemon berkeley image
         let daemonBerkeleySpec = DockerImage.ReleaseSpec::{
           deps=DebianVersions.dependsOn debVersion,
@@ -87,19 +74,6 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         DockerImage.generateStep daemonBerkeleySpec,
 
-        -- daemon mainnet image
-        let daemonMainnetSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion,
-          service="mina-daemon",
-          network="mainnet",
-          deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="daemon-mainnet-${DebianVersions.lowerName debVersion}-docker-image"
-        }
-
-        in
-
-        DockerImage.generateStep daemonMainnetSpec,
-
         -- archive image
         let archiveSpec = DockerImage.ReleaseSpec::{
           deps=DebianVersions.dependsOn debVersion,
@@ -111,18 +85,6 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
         in
 
         DockerImage.generateStep archiveSpec,
-
-        -- rosetta image
-        let rosettaSpec = DockerImage.ReleaseSpec::{
-          service="mina-rosetta",
-          extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --no-cache",
-          deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image"
-        }
-
-        in
-
-        DockerImage.generateStep rosettaSpec,
 
         -- ZkApp test transaction image
         let zkappTestTxnSpec = DockerImage.ReleaseSpec::{
