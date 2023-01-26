@@ -2020,8 +2020,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
           (* TODO Think this is right.. *)
         end
 
-        type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) modifier =
+        type modifier =
           { f :
+              'a 'b 'c 'd 'e 'f 'g 'h 'i.
                  ( 'a
                  , 'b
                  , 'c
@@ -2045,7 +2046,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           }
 
         let compile :
-            (   modifier:_ modifier
+            (   modifier:modifier
              -> unit
              -> (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t Promise.t
             )
@@ -2237,7 +2238,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           let wrap_vk = Lazy.map wrap_vk ~f:fst in
           let module S = Step.Make (A) (A_value) (Max_proofs_verified) in
-          let prover ~(modifier : _ modifier) =
+          let prover ~(modifier : modifier) =
             let module Z = H4.Zip (Branch_data) (E04 (Impls.Step.Keypair)) in
             let f :
                    ( unit * (unit * unit)
@@ -2783,7 +2784,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       let proof_with_stmt =
         let p =
-          Promise.block_on_async_exn (fun () -> step ~modifier:(fun a -> a) ())
+          Promise.block_on_async_exn (fun () ->
+              step ~modifier:{ f = (fun a -> a) } () )
         in
         ((), p)
 
