@@ -184,6 +184,7 @@ module Network_config = struct
               { edit_state = None
               ; send = None
               ; receive = None
+              ; access = None
               ; set_delegate = None
               ; set_permissions = None
               ; set_verification_key = None
@@ -221,7 +222,7 @@ module Network_config = struct
             ; zkapp_signed_pair_update_cost = None
             ; zkapp_transaction_cost_limit = None
             ; max_event_elements = None
-            ; max_sequence_event_elements = None
+            ; max_action_elements = None
             }
       ; genesis =
           Some
@@ -328,22 +329,11 @@ module Network_config = struct
     [ Block.Terraform
         { Block.Terraform.required_version = ">= 0.12.0"
         ; backend =
-            Backend.S3
-              { Backend.S3.key =
+            Backend.Local
+              { path =
                   "terraform-" ^ network_config.terraform.testnet_name
                   ^ ".tfstate"
-              ; encrypt = true
-              ; region = aws_region
-              ; bucket = "o1labs-terraform-state"
-              ; acl = "bucket-owner-full-control"
               }
-        }
-    ; Block.Provider
-        { Block.Provider.provider = "aws"
-        ; region = aws_region
-        ; zone = None
-        ; project = None
-        ; alias = None
         }
     ; Block.Provider
         { Block.Provider.provider = "google"

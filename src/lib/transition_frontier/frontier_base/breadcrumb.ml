@@ -349,6 +349,7 @@ module For_tests = struct
       let coinbase_receiver = largest_account_public_key in
       let staged_ledger_diff, _invalid_txns =
         Staged_ledger.create_diff parent_staged_ledger ~logger
+          ~global_slot:current_state_view.global_slot_since_genesis
           ~constraint_constants:precomputed_values.constraint_constants
           ~coinbase_receiver ~current_state_view ~supercharge_coinbase
           ~transactions_by_fee:transactions ~get_completed_work
@@ -364,6 +365,7 @@ module For_tests = struct
                , `Pending_coinbase_update _ ) =
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger
+            ~global_slot:current_state_view.global_slot_since_genesis
             ~coinbase_receiver ~logger staged_ledger_diff
             ~constraint_constants:precomputed_values.constraint_constants
             ~current_state_view ~state_and_body_hash ~supercharge_coinbase

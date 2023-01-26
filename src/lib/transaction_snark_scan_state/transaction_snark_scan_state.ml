@@ -49,6 +49,7 @@ module Transaction_with_witness = struct
               [@sexp.opaque]
         ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t
               [@sexp.opaque]
+        ; block_global_slot : Mina_numbers.Global_slot.Stable.V1.t
         }
       [@@deriving sexp, to_yojson]
 
@@ -200,6 +201,7 @@ let create_expected_statement ~constraint_constants
     ; second_pass_ledger_witness
     ; init_stack
     ; statement
+    ; block_global_slot
     } =
   let open Or_error.Let_syntax in
   let source_first_pass_merkle_root =
@@ -213,9 +215,6 @@ let create_expected_statement ~constraint_constants
   let { With_status.data = transaction; status = _ } =
     Ledger.Transaction_applied.transaction transaction_with_info
   in
-  let zkapp_updates_applied =
-    Ledger.Transaction_applied.zkapp_updates_applied transaction_with_info
-  in
   let%bind protocol_state = get_state (fst state_hash) in
   let state_view = Mina_state.Protocol_state.Body.view protocol_state.body in
   let empty_local_state = Mina_state.Local_state.empty () in
@@ -224,7 +223,8 @@ let create_expected_statement ~constraint_constants
            , supply_increase ) =
     let%bind first_pass_ledger_after_apply, partially_applied_transaction =
       Sparse_ledger.apply_transaction_first_pass ~constraint_constants
-        ~txn_state_view:state_view first_pass_ledger_witness transaction
+        ~global_slot:block_global_slot ~txn_state_view:state_view
+        first_pass_ledger_witness transaction
     in
     let%bind second_pass_ledger_after_apply, applied_transaction =
       Sparse_ledger.apply_transaction_second_pass second_pass_ledger_witness
@@ -257,7 +257,8 @@ let create_expected_statement ~constraint_constants
   let pending_coinbase_after =
     let state_body_hash = snd state_hash in
     let pending_coinbase_with_state =
-      Pending_coinbase.Stack.push_state state_body_hash pending_coinbase_before
+      Pending_coinbase.Stack.push_state state_body_hash block_global_slot
+        pending_coinbase_before
     in
     match transaction with
     | Coinbase c ->
@@ -283,7 +284,6 @@ let create_expected_statement ~constraint_constants
   ; fee_excess
   ; supply_increase
   ; sok_digest = ()
-  ; zkapp_updates_applied
   }
 
 let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
@@ -604,7 +604,6 @@ struct
           ; connecting_ledger_right = _
           ; supply_increase = _
           ; sok_digest = ()
-          ; zkapp_updates_applied = _
           } as t ) ->
         let open Or_error.Let_syntax in
         let%map () =
@@ -761,13 +760,15 @@ module Transactions_ordered = struct
       ~f:(first_and_second_pass_transactions_per_tree ~previous_incomplete)
 end
 
-let extract_txn (txn_with_witness : Transaction_with_witness.t) =
+let extract_txn_and_global_slot (txn_with_witness : Transaction_with_witness.t)
+    =
   let txn =
     Ledger.Transaction_applied.transaction
       txn_with_witness.transaction_with_info
   in
   let state_hash = fst txn_with_witness.state_hash in
-  (txn, state_hash)
+  let global_slot = txn_with_witness.block_global_slot in
+  (txn, state_hash, global_slot)
 
 let latest_ledger_proof' t =
   let open Option.Let_syntax in
@@ -780,11 +781,12 @@ let latest_ledger_proof' t =
       ~previous_incomplete:t.previous_incomplete_zkapp_updates
   in
   (proof, txns)
-(*List.map txns ~f:(Transactions_ordered.map ~f:extract_txn))*)
 
 let latest_ledger_proof t =
   Option.map (latest_ledger_proof' t) ~f:(fun (p, txns) ->
-      (p, List.map txns ~f:(Transactions_ordered.map ~f:extract_txn)) )
+      ( p
+      , List.map txns
+          ~f:(Transactions_ordered.map ~f:extract_txn_and_global_slot) ) )
 
 let incomplete_txns_from_recent_proof_tree t =
   let open Option.Let_syntax in
@@ -820,20 +822,20 @@ let staged_transactions t =
 let staged_transactions_with_state_hash t =
   let pending_transactions_per_block = staged_transactions t in
   List.map pending_transactions_per_block
-    ~f:(Transactions_ordered.map ~f:extract_txn)
+    ~f:(Transactions_ordered.map ~f:extract_txn_and_global_slot)
 
 (* written in continuation passing style so that implementation can be used both sync and async *)
 let apply_ordered_txns_stepwise ordered_txns ~ledger ~get_protocol_state
     ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger =
   let open Or_error.Let_syntax in
-  let apply ~apply ~ledger t state_hash =
+  let apply ~apply ~ledger t state_hash block_global_slot =
     match get_protocol_state state_hash with
     | Ok state ->
         let txn_state_view =
           Mina_state.Protocol_state.body state
           |> Mina_state.Protocol_state.Body.view
         in
-        apply ~txn_state_view ledger t
+        apply ~global_slot:block_global_slot ~txn_state_view ledger t
     | Error e ->
         Or_error.errorf
           !"Coudln't find protocol state with hash %s: %s"
@@ -845,10 +847,13 @@ let apply_ordered_txns_stepwise ordered_txns ~ledger ~get_protocol_state
     | [] ->
         k (List.rev acc)
     | txn :: txns' ->
-        let transaction, state_hash = extract_txn txn in
+        let transaction, state_hash, block_global_slot =
+          extract_txn_and_global_slot txn
+        in
         let expected_status = transaction.status in
         let%map partially_applied_txn =
           apply ~apply:apply_first_pass ~ledger transaction.data state_hash
+            block_global_slot
         in
         `Continue
           (fun () ->
@@ -883,8 +888,8 @@ let apply_ordered_txns_stepwise ordered_txns ~ledger ~get_protocol_state
       let open Sparse_ledger.T.Transaction_partially_applied in
       match partially_applied_txn with
       | Zkapp_command t ->
-          let%map original_account_states =
-            Mina_stdlib.Result.List.map t.original_account_states
+          let%map original_first_pass_account_states =
+            Mina_stdlib.Result.List.map t.original_first_pass_account_states
               ~f:(fun (id, loc_opt) ->
                 match loc_opt with
                 | None ->
@@ -904,6 +909,7 @@ let apply_ordered_txns_stepwise ordered_txns ~ledger ~get_protocol_state
             ; fee_excess = t.global_state.fee_excess
             ; supply_increase = t.global_state.supply_increase
             ; protocol_state = t.global_state.protocol_state
+            ; block_global_slot = t.global_state.block_global_slot
             }
           in
           let local_state =
@@ -925,7 +931,7 @@ let apply_ordered_txns_stepwise ordered_txns ~ledger ~get_protocol_state
           Ledger.Transaction_partially_applied.Zkapp_command
             { command = t.command
             ; previous_hash = t.previous_hash
-            ; original_account_states
+            ; original_first_pass_account_states
             ; constraint_constants = t.constraint_constants
             ; state_view = t.state_view
             ; global_state
@@ -949,11 +955,14 @@ let apply_ordered_txns_stepwise ordered_txns ~ledger ~get_protocol_state
       | [] ->
           k (List.rev acc)
       | txn :: txns' ->
-          let transaction, state_hash = extract_txn txn in
+          let transaction, state_hash, block_global_slot =
+            extract_txn_and_global_slot txn
+          in
           let expected_status = transaction.status in
           let%bind partially_applied_txn =
             apply ~apply:apply_first_pass_sparse_ledger
               ~ledger:txn.first_pass_ledger_witness transaction.data state_hash
+              block_global_slot
           in
           let%map partially_applied_txn' =
             inject_ledger_info partially_applied_txn
@@ -1080,7 +1089,8 @@ let extract_from_job (job : job) =
         , d.state_hash
         , d.first_pass_ledger_witness
         , d.second_pass_ledger_witness
-        , d.init_stack )
+        , d.init_stack
+        , d.block_global_slot )
   | Merge ((p1, _), (p2, _)) ->
       Second (p1, p2)
 
@@ -1147,7 +1157,8 @@ let all_work_pairs t
         , state_hash
         , first_pass_ledger_witness
         , second_pass_ledger_witness
-        , init_stack ) ->
+        , init_stack
+        , block_global_slot ) ->
         let%map witness =
           let { With_status.data = transaction; status } =
             Mina_transaction_logic.Transaction_applied.transaction_with_status
@@ -1170,6 +1181,7 @@ let all_work_pairs t
           ; protocol_state_body
           ; init_stack
           ; status
+          ; block_global_slot
           }
         in
         Snark_work_lib.Work.Single.Spec.Transition (statement, witness)
@@ -1258,7 +1270,9 @@ let fill_work_and_enqueue_transactions t transactions work =
             Ok
               ( Some
                   ( proof
-                  , List.map txns ~f:(Transactions_ordered.map ~f:extract_txn)
+                  , List.map txns
+                      ~f:
+                        (Transactions_ordered.map ~f:extract_txn_and_global_slot)
                   )
               , incomplete_zkapp_updates_from_old_proof )
         | Error e ->

@@ -40,10 +40,8 @@ let check :
             `Valid (User_command.Signed_command c)
         | None ->
             `Invalid_signature (Signed_command.public_keys c) )
-  | Zkapp_command
-      ( { With_status.data = { fee_payer; account_updates; memo }; status } as
-      zkapp_command_with_vk ) ->
-      let verify_proofs = match status with Applied -> true | _ -> false in
+  | Zkapp_command ({ fee_payer; account_updates; memo } as zkapp_command_with_vk)
+    ->
       with_return (fun { return } ->
           let account_updates_hash =
             Zkapp_command.Call_forest.hash account_updates
@@ -93,18 +91,16 @@ let check :
                     None
                 | None_given ->
                     None
-                | Proof pi ->
-                    if verify_proofs then
-                      match vk_opt with
-                      | None ->
-                          return
-                            (`Missing_verification_key
-                              [ Account_id.public_key
-                                @@ Account_update.account_id p
-                              ] )
-                      | Some (vk : _ With_hash.t) ->
-                          Some (vk.data, stmt, pi)
-                    else None )
+                | Proof pi -> (
+                    match vk_opt with
+                    | None ->
+                        return
+                          (`Missing_verification_key
+                            [ Account_id.public_key
+                              @@ Account_update.account_id p
+                            ] )
+                    | Some (vk : _ With_hash.t) ->
+                        Some (vk.data, stmt, pi) ) )
           in
           let v : User_command.Valid.t =
             (*Verification keys should be present if it reaches here*)

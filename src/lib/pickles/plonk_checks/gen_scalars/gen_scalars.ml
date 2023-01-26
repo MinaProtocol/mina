@@ -36,6 +36,7 @@ module Gate_type = struct
       | ForeignFieldAdd
       | ForeignFieldMul
       | Xor16
+      | Rot64
     [@@deriving hash, eq, compare, sexp]
   end
 
@@ -45,7 +46,7 @@ end
 
 module Lookup_pattern = struct
   module T = struct
-    type t = LookupGate [@@deriving hash, eq, compare, sexp]
+    type t = Lookup [@@deriving hash, eq, compare, sexp]
   end
 
   include Core_kernel.Hashable.Make (T)

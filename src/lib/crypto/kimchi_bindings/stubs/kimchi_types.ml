@@ -142,6 +142,7 @@ type nonrec gate_type =
   | ForeignFieldAdd
   | ForeignFieldMul
   | Xor16
+  | Rot64
 
 type nonrec feature_flag =
   | ChaCha
@@ -149,6 +150,7 @@ type nonrec feature_flag =
   | ForeignFieldAdd
   | ForeignFieldMul
   | Xor
+  | Rot
 
 type nonrec 'f circuit_gate =
   { typ : gate_type
@@ -172,9 +174,9 @@ module VerifierIndex = struct
     type nonrec lookup_pattern =
       | Xor
       | ChaChaFinal
-      | LookupGate
-      | RangeCheckGate
-      | ForeignFieldMulGate
+      | Lookup
+      | RangeCheck
+      | ForeignFieldMul
 
     type nonrec lookup_info =
       { kinds : lookup_pattern array
@@ -183,7 +185,7 @@ module VerifierIndex = struct
       ; uses_runtime_tables : bool
       }
 
-    type nonrec 't lookup_selectors = { lookup_gate : 't option } [@@boxed]
+    type nonrec 't lookup_selectors = { lookup : 't option } [@@boxed]
 
     type nonrec 'poly_comm t =
       { lookup_used : lookups_used
@@ -212,7 +214,6 @@ module VerifierIndex = struct
   type nonrec ('fr, 'srs, 'poly_comm) verifier_index =
     { domain : 'fr domain
     ; max_poly_size : int
-    ; max_quot_size : int
     ; public : int
     ; prev_challenges : int
     ; srs : 'srs

@@ -130,6 +130,7 @@ module Transaction_key = struct
     in
     let _partial_stmt =
       Mina_ledger.Ledger.apply_transaction_first_pass ~constraint_constants
+        ~global_slot:Mina_numbers.Global_slot.zero
         ~txn_state_view:Transaction_snark_tests.Util.genesis_state_view
         second_pass_ledger
         (Mina_transaction.Transaction.Command (Zkapp_command p))
@@ -137,6 +138,7 @@ module Transaction_key = struct
     in
     let segments =
       Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
+        ~global_slot:Mina_numbers.Global_slot.zero
         ~state_body:Transaction_snark_tests.Util.genesis_state_body
         ~fee_excess:Currency.Amount.Signed.zero
         [ ( `Pending_coinbase_init_stack Pending_coinbase.Stack.empty
@@ -146,10 +148,12 @@ module Transaction_key = struct
               ; target =
                   Pending_coinbase.Stack.push_state
                     Transaction_snark_tests.Util.genesis_state_body_hash
-                    Pending_coinbase.Stack.empty
+                    Mina_numbers.Global_slot.zero Pending_coinbase.Stack.empty
               }
           , `Ledger ledger
           , `Ledger second_pass_ledger
+          , `Connecting_ledger_hash
+              (Mina_ledger.Ledger.merkle_root second_pass_ledger)
           , p )
         ]
     in
@@ -282,7 +286,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ~max_num_updates :
     Quickcheck.Generator.list_with_length list_len array_gen
   in
   let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
-  let sequence_events =
+  let actions =
     Quickcheck.random_value (field_array_list_gen ~array_len:1 ~list_len:2)
   in
   let snapp_update =
@@ -319,7 +323,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ~max_num_updates :
       ; current_auth = Permissions.Auth_required.Proof
       ; call_data = Snark_params.Tick.Field.zero
       ; events = []
-      ; sequence_events
+      ; actions
       ; preconditions = None
       } )
   in
@@ -514,7 +518,10 @@ let state_body_hash = Lazy.map ~f:Mina_state.Protocol_state.Body.hash state_body
 
 let pending_coinbase_stack_target (t : Transaction.t) stack =
   let stack_with_state =
-    Pending_coinbase.Stack.(push_state (Lazy.force state_body_hash) stack)
+    Pending_coinbase.Stack.(
+      push_state
+        (Lazy.force state_body_hash)
+        (Lazy.force curr_state_view).global_slot_since_genesis stack)
   in
   let target =
     match t with
@@ -528,13 +535,15 @@ let pending_coinbase_stack_target (t : Transaction.t) stack =
 let format_time_span ts =
   sprintf !"Total time was: %{Time.Span.to_string_hum}" ts
 
-let apply_transactions_and_keep_intermediate_ledgers ~txn_state_view
+let apply_transactions_and_keep_intermediate_ledgers
+    ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t)
     first_pass_ledger txns =
   let first_pass_target_ledgers, partially_applied_txns =
     List.fold_map txns ~init:first_pass_ledger ~f:(fun l txn ->
         let l', txn' =
           Transaction.forget txn
           |> Sparse_ledger.apply_transaction_first_pass ~constraint_constants
+               ~global_slot:txn_state_view.global_slot_since_genesis
                ~txn_state_view l
           |> Or_error.ok_exn
         in
@@ -618,13 +627,11 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
                       let sgn = Sgn.Pos in
                       Currency.Amount.Signed.create ~magnitude ~sgn )
                  ; fee_excess = Transaction.fee_excess txn |> Or_error.ok_exn
-                 ; zkapp_updates_applied =
-                     Mina_ledger.Ledger.Transaction_applied
-                     .zkapp_updates_applied applied
                  }
                ~init_stack:coinbase_stack_source
                { Transaction_protocol_state.Poly.transaction = valid_txn
                ; block_data = Lazy.force state_body
+               ; global_slot = txn_state_view.global_slot_since_genesis
                }
                (unstage (Sparse_ledger.handler source_ledger))
            in
@@ -679,9 +686,7 @@ let profile_zkapps ~verifier ledger zkapp_commands =
           Verifier.verify_commands verifier
             [ User_command.to_verifiable ~ledger ~get:Mina_ledger.Ledger.get
                 ~location_of_account:Mina_ledger.Ledger.location_of_account
-                { With_status.data = Zkapp_command zkapp_command
-                ; status = Transaction_status.Applied
-                }
+                (Zkapp_command zkapp_command)
               |> Or_error.ok_exn
             ]
         in
@@ -817,6 +822,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
                  { Transaction_protocol_state.Poly.block_data =
                      Lazy.force state_body
                  ; transaction = valid_txn
+                 ; global_slot = txn_state_view.global_slot_since_genesis
                  }
                  (unstage (Sparse_ledger.handler source_ledger))
              in
@@ -874,6 +880,7 @@ let generate_base_snarks_witness sparse_ledger0
                  ~supply_increase
                  { Transaction_protocol_state.Poly.transaction = valid_txn
                  ; block_data = Lazy.force state_body
+                 ; global_slot = txn_state_view.global_slot_since_genesis
                  }
                  (unstage (Sparse_ledger.handler source_ledger))
              in

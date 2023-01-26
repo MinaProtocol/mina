@@ -114,7 +114,7 @@ val create_new_account_exn : t -> Account_id.t -> Account.t -> unit
 *)
 val update_sequence_state :
      Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
-  -> Zkapp_account.Sequence_events.t
+  -> Zkapp_account.Actions.t
   -> txn_global_slot:Mina_numbers.Global_slot.t
   -> last_sequence_slot:Mina_numbers.Global_slot.t
   -> Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
@@ -128,6 +128,7 @@ val has_locked_tokens :
 
 val merkle_root_after_zkapp_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> global_slot:Mina_numbers.Global_slot.t
   -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
   -> t
   -> Zkapp_command.Valid.t

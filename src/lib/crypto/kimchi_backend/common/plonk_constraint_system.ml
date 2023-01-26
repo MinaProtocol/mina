@@ -19,6 +19,8 @@ module type Gate_vector_intf = sig
   val get : t -> int -> field Kimchi_types.circuit_gate
 
   val digest : int -> t -> bytes
+
+  val to_json : int -> t -> string
 end
 
 (** A row indexing in a constraint system. *)
@@ -361,20 +363,7 @@ module Make
 
   val digest : t -> Md5.t
 
-  val to_json :
-       t
-    -> ([ `Null
-        | `Bool of bool
-        | `Int of int
-        | `Intlit of string
-        | `Float of float
-        | `String of string
-        | `Assoc of (string * 'json) list
-        | `List of 'json list
-        | `Tuple of 'json list
-        | `Variant of string * 'json option ]
-        as
-        'json )
+  val to_json : t -> string
 end = struct
   open Core_kernel
   open Pickles_types
@@ -492,9 +481,6 @@ end = struct
     ; cached_constants = Hashtbl.create (module Fp)
     ; union_finds = V.Table.create ()
     }
-
-  (* TODO *)
-  let to_json _ = `List []
 
   (** Returns the number of auxiliary inputs. *)
   let get_auxiliary_input_size t = t.auxiliary_input_size
@@ -647,6 +633,11 @@ end = struct
 
   (** Calls [finalize_and_get_gates] and ignores the result. *)
   let finalize t = ignore (finalize_and_get_gates t : Gates.t)
+
+  let to_json (sys : t) : string =
+    let gates = finalize_and_get_gates sys in
+    let public_input_size = Set_once.get_exn sys.public_input_size [%here] in
+    Gates.to_json public_input_size gates
 
   (* Returns a hash of the circuit. *)
   let rec digest (sys : t) =

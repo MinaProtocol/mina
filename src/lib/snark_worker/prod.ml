@@ -108,6 +108,7 @@ module Inputs = struct
                             Or_error.try_with (fun () ->
                                 Transaction_snark.zkapp_command_witnesses_exn
                                   ~constraint_constants:M.constraint_constants
+                                  ~global_slot:w.block_global_slot
                                   ~state_body:w.protocol_state_body
                                   ~fee_excess:Currency.Amount.Signed.zero
                                   [ ( `Pending_coinbase_init_stack w.init_stack
@@ -121,6 +122,8 @@ module Inputs = struct
                                         }
                                     , `Sparse_ledger w.first_pass_ledger
                                     , `Sparse_ledger w.second_pass_ledger
+                                    , `Connecting_ledger_hash
+                                        input.connecting_ledger_left
                                     , zkapp_command )
                                   ]
                                 |> List.rev )
@@ -262,6 +265,7 @@ module Inputs = struct
                                 { Transaction_protocol_state.Poly.transaction =
                                     t
                                 ; block_data = w.protocol_state_body
+                                ; global_slot = w.block_global_slot
                                 }
                                 ~init_stack:w.init_stack
                                 (unstage

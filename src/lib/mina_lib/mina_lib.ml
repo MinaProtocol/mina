@@ -648,14 +648,14 @@ let get_snarked_ledger t state_hash_opt =
                     t.config.precomputed_values.constraint_constants
               in
               let apply_second_pass = Ledger.apply_transaction_second_pass in
-              let apply_first_pass_sparse_ledger ~txn_state_view sparse_ledger
-                  txn =
+              let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
+                  sparse_ledger txn =
                 let open Or_error.Let_syntax in
                 let%map _ledger, partial_txn =
                   Mina_ledger.Sparse_ledger.apply_transaction_first_pass
                     ~constraint_constants:
                       t.config.precomputed_values.constraint_constants
-                    ~txn_state_view sparse_ledger txn
+                    ~global_slot ~txn_state_view sparse_ledger txn
                 in
                 partial_txn
               in
@@ -1472,13 +1472,13 @@ let create ?wallets (config : Config.t) =
                       (fun exn ->
                         let err = Error.of_exn ~backtrace:`Get exn in
                         [%log' fatal config.logger]
-                          "unhandled exception from uptime service SNARK \
-                           worker: $exn, terminating daemon"
+                          "unhandled exception when creating uptime service \
+                           SNARK worker: $exn, terminating daemon"
                           ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ;
                         (* make sure Async shutdown handlers are called *)
                         don't_wait_for (Async.exit 1) ) )
                   (fun () ->
-                    O1trace.thread "manage_uptimer_snark_worker_subprocess"
+                    O1trace.thread "manage_uptime_snark_worker_subprocess"
                       (fun () ->
                         Uptime_service.Uptime_snark_worker.create
                           ~logger:config.logger ~pids:config.pids ) )
@@ -2163,3 +2163,5 @@ let runtime_config { config = { precomputed_values; _ }; _ } =
   Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values
 
 let verifier { processes = { verifier; _ }; _ } = verifier
+
+let genesis_ledger t = Genesis_proof.genesis_ledger t.config.precomputed_values

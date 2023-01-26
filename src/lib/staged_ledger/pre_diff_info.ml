@@ -329,7 +329,7 @@ let check_coinbase (diff : _ Pre_diff_two.t * _ Pre_diff_one.t option) =
 
 let compute_statuses
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~diff
-    ~coinbase_receiver ~coinbase_amount ~txn_state_view ~ledger =
+    ~coinbase_receiver ~coinbase_amount ~global_slot ~txn_state_view ~ledger =
   let open Result.Let_syntax in
   (* project transactions into a sequence of transactions *)
   let project_transactions ~coinbase_parts ~commands ~completed_works =
@@ -384,7 +384,7 @@ let compute_statuses
   in
   let%map txns_with_statuses =
     Transaction_snark.Transaction_validator.apply_transactions
-      ~constraint_constants ~txn_state_view ledger txns
+      ~constraint_constants ~global_slot ~txn_state_view ledger txns
     |> Result.map_error ~f:(fun err -> Error.Unexpected err)
   in
   let p1_txns_with_statuses, p2_txns_with_statuses =

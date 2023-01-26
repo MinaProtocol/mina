@@ -65,12 +65,21 @@ Note: the database name `archive` should be identical to
 
 ```shell
 $ "_build/default/src/app/archive/archive.exe" run \
+    --config-file daemon.json \
     --postgres-uri "postgres://localhost:5432/archive" \
     --server-port 3086
 ```
 Note that the `--server-port` param should be equal to the one we set
 previously for the node. As the node starts producing blocks, we
 should see those blocks appear in archive's logs too.
+
+`daemon.json` should be replaced with the path to the daemon's
+(see above) configuration file. When provided with this file,
+the archive will load the genesis ledger from it into its own
+database. This is strictly necessary for Rosetta – without the
+genesis ledger it will return wrong balances for genesis accounts
+when asked for blocks before the first transaction involving
+such an account was made.
 
 Also note that archive can only know about the blocks that were
 produced when it was running. This limitation also applies to
@@ -161,3 +170,13 @@ This command investigates block after block checks:
 is specified in the `config.json`, in `data` section (see the
 example mentioned above). For example an end condition:
 `"index": 50` will make `rosetta-cli to check first 50 blocks. 
+
+**IMPORTANT** as of version 0.8.2 of `rosetta-sdk-go`, rosetta-cli
+is unable to run the `mina.ros` file, which will only work with
+[Mina Foundation's fork](https://github.com/MinaProtocol/rosetta-sdk-go/tree/pallas_signer_stake_delegation).
+Therefore, whenever it is required to run the Construction API
+tests against v.0.8.2 of `rosetta-sdk-go`, `mina-no-delegation-tests.ros`
+config should be used for that instead of `mina.ros`, which is used
+in the CI. `mina-no-delegation-tests.ros` should be deleted once
+[PR #464](https://github.com/coinbase/rosetta-sdk-go/pull/464) to
+`rosetta-sdk-go` is merged.

@@ -30,6 +30,7 @@ val init_stack : Pending_coinbase.Stack_versioned.t
 
 val pending_coinbase_state_stack :
      state_body_hash:State_hash.t
+  -> global_slot:Mina_numbers.Global_slot.t
   -> Transaction_snark.Pending_coinbase_stack_state.t
 
 val dummy_rule :
@@ -53,6 +54,7 @@ val dummy_rule :
 val check_zkapp_command_with_merges_exn :
      ?expected_failure:Mina_base.Transaction_status.Failure.t
   -> ?ignore_outside_snark:bool
+  -> ?global_slot:Mina_numbers.Global_slot.t
   -> ?state_body:Transaction_protocol_state.Block_data.t
   -> Ledger.t
   -> Zkapp_command.t list
@@ -105,6 +107,7 @@ val permissions_from_update :
 val pending_coinbase_stack_target :
      Mina_transaction.Transaction.Valid.t
   -> State_hash.t
+  -> Mina_numbers.Global_slot.t
   -> Pending_coinbase.Stack.t
   -> Pending_coinbase.Stack.t
 

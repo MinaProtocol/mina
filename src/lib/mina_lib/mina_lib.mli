@@ -218,3 +218,5 @@ val net : t -> Mina_networking.t
 val runtime_config : t -> Runtime_config.t
 
 val verifier : t -> Verifier.t
+
+val genesis_ledger : t -> Mina_ledger.Ledger.t Lazy.t

@@ -15,8 +15,7 @@ module Poly = struct
            , 'signed_amount
            , 'pending_coinbase_stack
            , 'fee_excess
-           , 'sok_digest
-           , 'bool )
+           , 'sok_digest )
            t =
             ( 'staged_ledger_hash
             , 'snarked_ledger_hash
@@ -26,8 +25,7 @@ module Poly = struct
             , 'signed_amount
             , 'pending_coinbase_stack
             , 'fee_excess
-            , 'sok_digest
-            , 'bool )
+            , 'sok_digest )
             Mina_wire_types.Mina_state.Blockchain_state.Poly.V2.t =
         { staged_ledger_hash : 'staged_ledger_hash
         ; genesis_ledger_hash : 'snarked_ledger_hash
@@ -37,8 +35,7 @@ module Poly = struct
             , 'pending_coinbase_stack
             , 'fee_excess
             , 'sok_digest
-            , 'local_state
-            , 'bool )
+            , 'local_state )
             Snarked_ledger_state.Poly.Stable.V2.t
         ; timestamp : 'time
         ; body_reference : 'body_reference
@@ -77,8 +74,7 @@ module Value = struct
         , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
         , Pending_coinbase.Stack_versioned.Stable.V1.t
         , Fee_excess.Stable.V1.t
-        , Sok_message.Digest.Stable.V1.t
-        , bool )
+        , Sok_message.Digest.Stable.V1.t )
         Poly.Stable.V2.t
       [@@deriving sexp, equal, compare, hash, yojson]
 
@@ -96,8 +92,7 @@ type var =
   , Currency.Amount.Signed.var
   , Pending_coinbase.Stack.var
   , Fee_excess.var
-  , Sok_message.Digest.Checked.t
-  , Boolean.var )
+  , Sok_message.Digest.Checked.t )
   Poly.t
 
 let create_value ~staged_ledger_hash ~genesis_ledger_hash ~timestamp
@@ -187,8 +182,7 @@ type display =
   , string
   , string
   , string
-  , string
-  , bool )
+  , string )
   Poly.t
 [@@deriving yojson]
 

@@ -8,6 +8,7 @@
    base64
    async_rpc_kernel
    base.caml
+   base.base_internalhash_types
    bin_prot.shape
    async_kernel
    caqti-driver-postgresql
@@ -69,6 +70,7 @@
    protocol_version
    mina_version
    staged_ledger_diff
+   error_json
    ppx_version.runtime
  )
  (inline_tests)

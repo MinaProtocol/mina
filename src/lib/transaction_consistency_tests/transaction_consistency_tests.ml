@@ -48,7 +48,7 @@ let%test_module "transaction logic consistency" =
 
     let pending_coinbase_stack_target (t : Transaction.t) stack =
       let stack_with_state =
-        Pending_coinbase.Stack.(push_state state_body_hash stack)
+        Pending_coinbase.Stack.(push_state state_body_hash current_slot stack)
       in
       let target =
         match t with

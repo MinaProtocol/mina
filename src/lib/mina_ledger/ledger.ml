@@ -76,13 +76,6 @@ module Ledger_inner = struct
         let empty = Account.empty
 
         let token = Account.Poly.token_id
-
-        let token_owner ({ token_permissions; _ } : t) =
-          match token_permissions with
-          | Token_owned _ ->
-              true
-          | Not_owned _ ->
-              false
       end
     end]
 
@@ -371,13 +364,13 @@ include Ledger_inner
 include Mina_transaction_logic.Make (Ledger_inner)
 
 (* use mask to restore ledger after application *)
-let merkle_root_after_zkapp_command_exn ~constraint_constants ~txn_state_view
-    ledger zkapp_command =
+let merkle_root_after_zkapp_command_exn ~constraint_constants ~global_slot
+    ~txn_state_view ledger zkapp_command =
   let mask = Mask.create ~depth:(depth ledger) () in
   let masked_ledger = register_mask ledger mask in
   let _applied =
     Or_error.ok_exn
-      (apply_zkapp_command_unchecked ~constraint_constants
+      (apply_zkapp_command_unchecked ~constraint_constants ~global_slot
          ~state_view:txn_state_view masked_ledger
          (Zkapp_command.Valid.forget zkapp_command) )
   in
@@ -484,8 +477,10 @@ let%test_unit "tokens test" =
         |> Or_error.ok_exn
       in
       match
-        apply_zkapp_command_unchecked ~constraint_constants ~state_view:view
-          ledger
+        apply_zkapp_command_unchecked ~constraint_constants
+          ~global_slot:
+            (Mina_numbers.Global_slot.succ view.global_slot_since_genesis)
+          ~state_view:view ledger
           (mk_zkapp_command ~fee:7 ~fee_payer_pk:pk ~fee_payer_nonce:nonce
              zkapp_command )
       with
@@ -623,7 +618,7 @@ let%test_unit "zkapp_command payment test" =
             let use_full_commitment =
               Quickcheck.random_value Bool.quickcheck_generator
             in
-            account_update_send ~constraint_constants ~use_full_commitment s )
+            account_update_send ~use_full_commitment s )
       in
       L.with_ledger ~depth ~f:(fun l1 ->
           L.with_ledger ~depth ~f:(fun l2 ->
@@ -637,8 +632,18 @@ let%test_unit "zkapp_command payment test" =
               in
               let%bind () =
                 iter_err ts2 ~f:(fun t ->
-                    apply_zkapp_command_unchecked l2 t ~constraint_constants
-                      ~state_view:view )
+                    let%bind res, _ =
+                      apply_zkapp_command_unchecked l2 t ~constraint_constants
+                        ~global_slot:txn_global_slot ~state_view:view
+                    in
+                    match res.command.status with
+                    | Transaction_status.Applied ->
+                        Ok ()
+                    | Transaction_status.Failed failure ->
+                        Or_error.error_string
+                          (Yojson.Safe.pretty_to_string
+                             (Transaction_status.Failure.Collection.to_yojson
+                                failure ) ) )
               in
               let accounts =
                 List.concat_map ~f:Zkapp_command.accounts_referenced ts2
@@ -701,7 +706,8 @@ let%test_unit "zkapp_command application on masked ledger" =
             let use_full_commitment =
               Quickcheck.random_value Bool.quickcheck_generator
             in
-            account_update_send ~constraint_constants ~use_full_commitment spec )
+            account_update_send ~use_full_commitment ~double_sender_nonce:false
+              spec )
       in
       L.with_ledger ~depth ~f:(fun l ->
           Init_ledger.init (module L) init_ledger l ;
@@ -715,7 +721,7 @@ let%test_unit "zkapp_command application on masked ledger" =
             iter_err cmds
               ~f:
                 (apply_zkapp_command_unchecked ~constraint_constants
-                   ~state_view:view l )
+                   ~global_slot:txn_global_slot ~state_view:view l )
             |> Or_error.ok_exn
           in
           assert (not (Ledger_hash.equal init_merkle_root (L.merkle_root l))) ;
