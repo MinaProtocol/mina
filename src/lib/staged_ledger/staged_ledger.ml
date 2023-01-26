@@ -1029,17 +1029,7 @@ module T = struct
           List.map cs ~f:(fun { With_status.data = cmd; status } ->
               let open Ledger in
               let cmd =
-                let allow_missing_vk =
-                  match status with
-                  | Applied ->
-                      false
-                  | Failed _ ->
-                      (* We allow the vk to be invalid / missing if the command
-                         fails.
-                      *)
-                      true
-                in
-                User_command.to_verifiable ~allow_missing_vk ~ledger ~get
+                User_command.to_verifiable ~status ~ledger ~get
                   ~location_of_account cmd
                 |> Or_error.ok_exn
               in
@@ -2565,8 +2555,8 @@ let%test_module "staged ledger tests" =
               in
               let valid_zkapp_command_with_auths : Zkapp_command.Valid.t =
                 match
-                  Zkapp_command.Valid.to_valid zkapp_command_with_auths ~ledger
-                    ~get:Ledger.get
+                  Zkapp_command.Valid.to_valid ~status:Applied
+                    zkapp_command_with_auths ~ledger ~get:Ledger.get
                     ~location_of_account:Ledger.location_of_account
                 with
                 | Ok ps ->
@@ -3971,8 +3961,8 @@ let%test_module "staged ledger tests" =
                   in
                   let valid_zkapp_command =
                     Or_error.ok_exn
-                      (Zkapp_command.Valid.to_valid ~ledger:valid_against_ledger
-                         ~get:Ledger.get
+                      (Zkapp_command.Valid.to_valid ~status:Applied
+                         ~ledger:valid_against_ledger ~get:Ledger.get
                          ~location_of_account:Ledger.location_of_account
                          zkapp_command )
                   in

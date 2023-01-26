@@ -137,7 +137,7 @@ let zkapp_command_with_ledger ?num_keypairs ?max_account_updates
   in
   let zkapp_command =
     Or_error.ok_exn
-      (Zkapp_command.Valid.to_valid ~ledger ~get:Ledger.get
+      (Zkapp_command.Valid.to_valid ~status:Applied ~ledger ~get:Ledger.get
          ~location_of_account:Ledger.location_of_account zkapp_command )
   in
   (* include generated ledger in result *)
@@ -183,7 +183,7 @@ let sequence_zkapp_command_with_ledger ?max_account_updates ?max_token_updates
       in
       let valid_zkapp_command =
         Or_error.ok_exn
-          (Zkapp_command.Valid.to_valid ~ledger ~get:Ledger.get
+          (Zkapp_command.Valid.to_valid ~status:Applied ~ledger ~get:Ledger.get
              ~location_of_account:Ledger.location_of_account zkapp_command )
       in
       let zkapp_command_and_fee_payer_keypairs' =

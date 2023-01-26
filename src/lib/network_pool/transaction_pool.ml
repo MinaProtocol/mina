@@ -1058,7 +1058,7 @@ struct
                   Envelope.Incoming.map diff
                     ~f:
                       (List.map ~f:(fun cmd ->
-                           User_command.to_verifiable ~ledger
+                           User_command.to_verifiable ~status:Applied ~ledger
                              ~get:Base_ledger.get
                              ~location_of_account:
                                Base_ledger.location_of_account cmd
@@ -1611,8 +1611,8 @@ let%test_module _ =
               let valid_zkapp_command =
                 let open Mina_ledger.Ledger in
                 match
-                  Zkapp_command.Valid.to_valid ~ledger ~get ~location_of_account
-                    zkapp_command
+                  Zkapp_command.Valid.to_valid ~status:Applied ~ledger ~get
+                    ~location_of_account zkapp_command
                 with
                 | Ok ps ->
                     ps
@@ -1799,7 +1799,7 @@ let%test_module _ =
       in
       let zkapp_command =
         Or_error.ok_exn
-          (Zkapp_command.Valid.to_valid ~ledger:()
+          (Zkapp_command.Valid.to_valid ~status:Applied ~ledger:()
              ~get:(fun _ _ -> failwith "Not expecting proof zkapp_command")
              ~location_of_account:(fun _ _ ->
                failwith "Not expecting proof zkapp_command" )
@@ -1886,8 +1886,8 @@ let%test_module _ =
             in
             let zkapp_command =
               Or_error.ok_exn
-                (Zkapp_command.Valid.to_valid ~ledger:best_tip_ledger
-                   ~get:Mina_ledger.Ledger.get
+                (Zkapp_command.Valid.to_valid ~status:Applied
+                   ~ledger:best_tip_ledger ~get:Mina_ledger.Ledger.get
                    ~location_of_account:Mina_ledger.Ledger.location_of_account
                    zkapp_command )
             in

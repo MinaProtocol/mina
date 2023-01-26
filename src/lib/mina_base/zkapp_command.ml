@@ -1105,8 +1105,8 @@ module Verifiable : sig
   end]
 
   val create :
-       ?allow_missing_vk:bool
-    -> T.t
+       T.t
+    -> status:Transaction_status.t
     -> ledger:'a
     -> get:('a -> 'b -> Account.t option)
     -> location_of_account:('a -> Account_id.t -> 'b option)
@@ -1139,8 +1139,7 @@ end = struct
    * subsequent account_updates use the replaced key instead of looking in the
    * ledger for the key (ie set by a previous transaction).
    *)
-  let create ?(allow_missing_vk = false)
-      ({ fee_payer; account_updates; memo } : T.t) ~ledger ~get
+  let create ({ fee_payer; account_updates; memo } : T.t) ~status ~ledger ~get
       ~location_of_account : t Or_error.t =
     With_return.with_return (fun { return } ->
         let find_vk account_id =
@@ -1153,15 +1152,18 @@ end = struct
           with
           | Some vk ->
               Some vk
-          | None ->
-              if allow_missing_vk then None
-              else
-                let err =
-                  Error.create
-                    "No verification key found for proved account update"
-                    ("account_id", account_id) [%sexp_of: string * Account_id.t]
-                in
-                return (Error err)
+          | None -> (
+              match status with
+              | Transaction_status.Applied ->
+                  let err =
+                    Error.create
+                      "No verification key found for proved account update"
+                      ("account_id", account_id)
+                      [%sexp_of: string * Account_id.t]
+                  in
+                  return (Error err)
+              | Transaction_status.Failed _ ->
+                  None )
         in
         let tbl = Account_id.Table.create () in
         let vks_overridden =
@@ -1197,19 +1199,21 @@ end = struct
                   match Account_id.Map.find !vks_overridden account_id with
                   | Some (Some vk) ->
                       Some vk
-                  | Some None ->
-                      if allow_missing_vk then
-                        (* we explicitly have erased the key *)
-                        let err =
-                          Error.create
-                            "No verification key found for proved account \
-                             update: the verification key was removed by a \
-                             previous account update"
-                            ("account_id", account_id)
-                            [%sexp_of: string * Account_id.t]
-                        in
-                        return (Error err)
-                      else None
+                  | Some None -> (
+                      match status with
+                      | Applied ->
+                          (* we explicitly have erased the key *)
+                          let err =
+                            Error.create
+                              "No verification key found for proved account \
+                               update: the verification key was removed by a \
+                               previous account update"
+                              ("account_id", account_id)
+                              [%sexp_of: string * Account_id.t]
+                          in
+                          return (Error err)
+                      | Failed _ ->
+                          None )
                   | None ->
                       (* we haven't set anything; lookup the vk in the ledger *)
                       find_vk account_id
@@ -1222,7 +1226,7 @@ end = struct
                     vks_overridden := vks_overriden' ;
                     (p, Some prioritized_vk)
                 | None ->
-                    (* We explicitly allow the vk to be missing. *)
+                    (* The transaction failed, so we allow the vk to be missing. *)
                     (p, None)
               else (
                 vks_overridden := vks_overriden' ;
@@ -1326,12 +1330,14 @@ module type Valid_intf = sig
 
   val to_valid :
        T.t
+    -> status:Transaction_status.t
     -> ledger:'a
     -> get:('a -> 'b -> Account.t option)
     -> location_of_account:('a -> Account_id.t -> 'b option)
     -> t Or_error.t
 
-  val of_verifiable : Verifiable.t -> t Or_error.t
+  val of_verifiable :
+    Verifiable.t -> status:Transaction_status.t -> t Or_error.t
 
   val forget : t -> T.t
 end
@@ -1371,7 +1377,7 @@ struct
   let create ~verification_keys zkapp_command : t =
     { zkapp_command; verification_keys }
 
-  let of_verifiable (t : Verifiable.t) : t Or_error.t =
+  let of_verifiable (t : Verifiable.t) ~status : t Or_error.t =
     let open Or_error.Let_syntax in
     let tbl = Account_id.Table.create () in
     let%map () =
@@ -1381,16 +1387,16 @@ struct
           let account_id = Account_update.account_id p in
           let%bind () = check_authorization p in
           if Control.(Tag.equal Tag.Proof (Control.tag p.authorization)) then
-            let%map { With_hash.hash; _ } =
-              match vk_opt with
-              | Some vk ->
-                  Ok vk
-              | None ->
-                  Or_error.errorf
-                    "Verification key required for proof, but was not given"
-            in
-            Account_id.Table.update tbl account_id ~f:(fun _ -> hash)
-          else acc )
+            match (vk_opt, status) with
+            | Some { With_hash.hash; _ }, _ ->
+                Account_id.Table.update tbl account_id ~f:(fun _ -> hash) ;
+                Ok ()
+            | None, Transaction_status.Applied ->
+                Or_error.errorf
+                  "Verification key required for proof, but was not given"
+            | None, Transaction_status.Failed _ ->
+                Ok ()
+          else Ok () )
     in
     { zkapp_command = of_verifiable t
     ; verification_keys = Account_id.Table.to_alist tbl
@@ -1403,9 +1409,10 @@ struct
 
   let forget (t : t) : T.t = t.zkapp_command
 
-  let to_valid (t : T.t) ~ledger ~get ~location_of_account : t Or_error.t =
-    Verifiable.create t ~ledger ~get ~location_of_account
-    |> Or_error.bind ~f:of_verifiable
+  let to_valid (t : T.t) ~status ~ledger ~get ~location_of_account :
+      t Or_error.t =
+    Verifiable.create t ~status ~ledger ~get ~location_of_account
+    |> Or_error.bind ~f:(of_verifiable ~status)
 end
 
 [%%define_locally Stable.Latest.(of_yojson, to_yojson)]
