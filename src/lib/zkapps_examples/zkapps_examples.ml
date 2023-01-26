@@ -715,6 +715,7 @@ module Deploy_account_update = struct
               ; set_token_symbol = Proof
               ; increment_nonce = Proof
               ; set_voting_for = Proof
+              ; set_timing = Proof
               ; access
               }
         }
