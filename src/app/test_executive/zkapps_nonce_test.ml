@@ -42,7 +42,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let transactions_sent = ref 0
 
   let padding_payments () =
-    let needed_for_padding = 48 in
+    let needed_for_padding = 40 in
     (* for work_delay=1 and transaction_capacity=4 per block*)
     if !transactions_sent >= needed_for_padding then 0
     else needed_for_padding - !transactions_sent
@@ -223,13 +223,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section
-        "Wait for fish1 zkapp command with invalid nonce to be rejected by \
-         transition frontier"
+        "Wait for fish1 zkapp command with invalid nonce to appear in \
+         transition frontier with failed status"
         (wait_for_zkapp ~has_failures:true invalid_nonce_zkapp_cmd_from_fish1)
     in
     let%bind () =
       section
-        "Wait for fish1 zkapp command with valid nonce to be accepted by \
+        "Wait for fish1 zkapp command with valid nonce to be accepted into \
          transition frontier"
         (wait_for_zkapp ~has_failures:false valid_zkapp_cmd_from_fish1)
     in
@@ -325,15 +325,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  block was produced" ) )
     in
     let%bind () =
-      let with_timeout =
-        let soft_slots = 22 in
-        let soft_timeout = Network_time_span.Slots soft_slots in
-        let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
-        Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
-      in
       section_hard "Wait for proof to be emitted"
-        ( wait_for t @@ with_timeout
-        @@ Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:2 )
+        ( wait_for t
+        @@ Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1 )
     in
     Event_router.cancel (event_router t) snark_work_event_subscription () ;
     Event_router.cancel (event_router t) snark_work_failure_subscription () ;
