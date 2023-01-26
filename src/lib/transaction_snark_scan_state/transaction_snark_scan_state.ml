@@ -911,8 +911,9 @@ let apply_ordered_txns ordered_txns ~ledger ~get_protocol_state
           let t =
             match t with
             | Zkapp_command t ->
-                let%map original_account_states =
-                  List.fold_until ~init:(Ok []) t.original_account_states
+                let%map original_first_pass_account_states =
+                  List.fold_until ~init:(Ok [])
+                    t.original_first_pass_account_states
                     ~f:(fun acc (id, loc_opt) ->
                       let loc_opt =
                         match loc_opt with
@@ -964,7 +965,7 @@ let apply_ordered_txns ordered_txns ~ledger ~get_protocol_state
                 Ledger.Transaction_partially_applied.Zkapp_command
                   { command = t.command
                   ; previous_hash = t.previous_hash
-                  ; original_account_states
+                  ; original_first_pass_account_states
                   ; constraint_constants = t.constraint_constants
                   ; state_view = t.state_view
                   ; global_state

@@ -347,7 +347,7 @@ module type S = sig
       type t =
         { command : Zkapp_command.t
         ; previous_hash : Ledger_hash.t
-        ; original_account_states :
+        ; original_first_pass_account_states :
             (Account_id.t * (location * Account.t) option) list
         ; constraint_constants : Genesis_constants.Constraint_constants.t
         ; state_view : Zkapp_precondition.Protocol_state.View.t
@@ -1136,7 +1136,7 @@ module Make (L : Ledger_intf.S) :
       type t =
         { command : Zkapp_command.t
         ; previous_hash : Ledger_hash.t
-        ; original_account_states :
+        ; original_first_pass_account_states :
             (Account_id.t * (location * Account.t) option) list
         ; constraint_constants : Genesis_constants.Constraint_constants.t
         ; state_view : Zkapp_precondition.Protocol_state.View.t
@@ -1906,13 +1906,14 @@ module Make (L : Ledger_intf.S) :
       Or_error.t =
     let open Or_error.Let_syntax in
     let previous_hash = merkle_root ledger in
-    let original_account_states =
-      List.map (Zkapp_command.accounts_referenced command) ~f:(fun id ->
-          ( id
-          , Option.Let_syntax.(
-              let%bind loc = L.location_of_account ledger id in
-              let%map a = L.get ledger loc in
-              (loc, a)) ) )
+    let original_first_pass_account_states =
+      let id = Zkapp_command.fee_payer command in
+      [ ( id
+        , Option.Let_syntax.(
+            let%bind loc = L.location_of_account ledger id in
+            let%map a = L.get ledger loc in
+            (loc, a)) )
+      ]
     in
     let perform eff = Env.perform ~constraint_constants eff in
     let initial_state :
@@ -1957,7 +1958,7 @@ module Make (L : Ledger_intf.S) :
     in
     ( { Transaction_partially_applied.Zkapp_command_partially_applied.command
       ; previous_hash
-      ; original_account_states
+      ; original_first_pass_account_states
       ; constraint_constants
       ; state_view
       ; global_state
@@ -1990,6 +1991,24 @@ module Make (L : Ledger_intf.S) :
     let perform eff =
       Env.perform ~constraint_constants:c.constraint_constants eff
     in
+    let original_account_states =
+      (*get the original states of all the accounts in each pass.
+        If an account updated in the first pass is referenced in account
+        updates, then retain the value before first pass application*)
+      let account_states = Account_id.Table.create () in
+      List.iter
+        ~f:(fun (id, acc_opt) ->
+          Account_id.Table.update account_states id
+            ~f:(Option.value ~default:acc_opt) )
+        ( c.original_first_pass_account_states
+        @ List.map (Zkapp_command.accounts_referenced c.command) ~f:(fun id ->
+              ( id
+              , Option.Let_syntax.(
+                  let%bind loc = L.location_of_account ledger id in
+                  let%map a = L.get ledger loc in
+                  (loc, a)) ) ) ) ;
+      Account_id.Table.to_alist account_states
+    in
     let rec step_all (user_acc : user_acc)
         ( (g_state : Inputs.Global_state.t)
         , (l_state : _ Zkapp_command_logic.Local_state.t) ) :
@@ -2009,6 +2028,9 @@ module Make (L : Ledger_intf.S) :
         step_all (f user_acc states) states
     in
     let account_states_after_fee_payer =
+      (*To check if the accounts remain unchanged in the event the transaction
+         fails. First pass updates will remain even if the transaction fails to
+         apply zkapp account updates*)
       List.map (Zkapp_command.accounts_referenced c.command) ~f:(fun id ->
           ( id
           , Option.Let_syntax.(
@@ -2017,7 +2039,7 @@ module Make (L : Ledger_intf.S) :
               (loc, a)) ) )
     in
     let accounts () =
-      List.map c.original_account_states
+      List.map original_account_states
         ~f:(Tuple2.map_snd ~f:(Option.map ~f:snd))
     in
     (*update local and global state ledger to second pass ledger*)
@@ -2034,7 +2056,7 @@ module Make (L : Ledger_intf.S) :
     | Ok (user_acc, reversed_failure_status_tbl) ->
         let failure_status_tbl = List.rev reversed_failure_status_tbl in
         let account_ids_originally_not_in_ledger =
-          List.filter_map c.original_account_states
+          List.filter_map original_account_states
             ~f:(fun (acct_id, loc_and_acct) ->
               if Option.is_none loc_and_acct then Some acct_id else None )
         in
