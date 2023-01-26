@@ -104,11 +104,45 @@ let apply_zkapp_command_unchecked_with_states ~constraint_constants ~global_slot
         }
       , { local_state with ledger = !(local_state.ledger) } )
       :: acc )
-  |> Result.map ~f:(fun (account_update_applied, states) ->
-         (* We perform a [List.rev] here to ensure that the states are in order
-            wrt. the zkapp_command that generated the states.
-         *)
-         (account_update_applied, List.rev states) )
+  |> Result.map ~f:(fun (account_update_applied, rev_states) ->
+         let module LS = Mina_transaction_logic.Zkapp_command_logic.Local_state
+         in
+         let module Applied = Transaction_applied.Zkapp_command_applied in
+         let states =
+           match rev_states with
+           | [] ->
+               []
+           | final_state :: rev_states ->
+               (* Update the [will_succeed] of all *intermediate* states.
+                  Note that the first and final states will always have
+                  [will_succeed = true], so we must leave them unchanged.
+               *)
+               let will_succeed =
+                 match account_update_applied.Applied.command.status with
+                 | Applied ->
+                     true
+                 | Failed _ ->
+                     false
+               in
+               (* We perform a manual [List.rev] here to ensure that the states
+                  are in order wrt. the zkapp_command that generated the states.
+               *)
+               let rec go states rev_states =
+                 match rev_states with
+                 | [] ->
+                     states
+                 | [ initial_state ] ->
+                     (* Skip the initial state *)
+                     initial_state :: states
+                 | (global_state, local_state) :: rev_states ->
+                     go
+                       ( (global_state, { local_state with LS.will_succeed })
+                       :: states )
+                       rev_states
+               in
+               go [ final_state ] rev_states
+         in
+         (account_update_applied, states) )
 
 let apply_transaction_logic f t x =
   let open Or_error.Let_syntax in

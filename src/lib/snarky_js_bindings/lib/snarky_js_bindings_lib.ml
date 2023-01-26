@@ -2426,7 +2426,8 @@ module Ledger = struct
     ; editSequenceState : Js.js_string Js.t Js.readonly_prop
     ; setTokenSymbol : Js.js_string Js.t Js.readonly_prop
     ; incrementNonce : Js.js_string Js.t Js.readonly_prop
-    ; setVotingFor : Js.js_string Js.t Js.readonly_prop >
+    ; setVotingFor : Js.js_string Js.t Js.readonly_prop
+    ; setTiming : Js.js_string Js.t Js.readonly_prop >
     Js.t
 
   type timing =
@@ -2468,6 +2469,7 @@ module Ledger = struct
     ; set_token_symbol = None
     ; increment_nonce = None
     ; set_voting_for = None
+    ; set_timing = None
     }
 
   module L : Mina_base.Ledger_intf.S = struct
@@ -2754,6 +2756,9 @@ module Ledger = struct
         val setVotingFor =
           Js.string
             (Mina_base.Permissions.Auth_required.to_string p.set_voting_for)
+
+        val setTiming =
+          Js.string (Mina_base.Permissions.Auth_required.to_string p.set_timing)
       end
 
     let timing (t : Mina_base.Account_timing.t) : timing =
