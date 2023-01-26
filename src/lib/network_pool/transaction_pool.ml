@@ -2646,7 +2646,7 @@ let%test_module _ =
         else
           mk_forest
             [ mk_node
-                (mk_account_update_body Signature Call fee_payer_kp
+                (mk_account_update_body Signature No fee_payer_kp
                    Token_id.default 0 ~preconditions )
                 []
             ]
