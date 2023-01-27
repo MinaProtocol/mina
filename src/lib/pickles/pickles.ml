@@ -312,6 +312,56 @@ module Make_str (_ : Wire_types.Concrete) = struct
       -> 'proof
   end
 
+  type wrap_main_generic =
+    { wrap_main :
+        'max_proofs_verified 'branches 'max_local_max_proofs_verifieds
+        'prev_varss 'branches.
+           Domains.t
+        -> ( 'max_proofs_verified
+           , 'branches
+           , 'max_local_max_proofs_verifieds )
+           Full_signature.t
+        -> ('prev_varss, 'branches) Hlist.Length.t
+        -> ( Wrap_main_inputs.Inner_curve.Constant.t Wrap_verifier.index'
+           , 'branches )
+           Vector.t
+           Lazy.t
+        -> (int, 'branches) Pickles_types.Vector.t
+        -> (Import.Domains.t, 'branches) Pickles_types.Vector.t
+        -> (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
+        -> ( 'max_proofs_verified
+           , 'max_local_max_proofs_verifieds )
+           Requests.Wrap.t
+           * (   ( ( Impls.Wrap.Field.t
+                   , Wrap_verifier.Challenge.t Kimchi_types.scalar_challenge
+                   , Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
+                   , ( ( Impls.Wrap.Impl.Field.t
+                         Composition_types.Scalar_challenge.t
+                       , Impls.Wrap.Impl.Field.t Shifted_value.Type1.t )
+                       Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+                       .In_circuit
+                       .Lookup
+                       .t
+                     , Impls.Wrap.Boolean.var )
+                     Pickles_types__Plonk_types.Opt.t )
+                   Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+                   .In_circuit
+                   .t
+                 , Wrap_verifier.Challenge.t Kimchi_types.scalar_challenge
+                 , Wrap_verifier.Other_field.Packed.t
+                   Pickles_types__Shifted_value.Type1.t
+                 , Impls.Wrap.Field.t
+                 , Impls.Wrap.Field.t
+                 , Impls.Wrap.Field.t
+                 , ( Impls.Wrap.Field.t Import.Scalar_challenge.t
+                     Import.Types.Bulletproof_challenge.t
+                   , Backend.Tick.Rounds.n )
+                   Vector.T.t
+                 , Impls.Wrap.Field.t )
+                 Composition_types.Wrap.Statement.t
+              -> unit )
+    }
+
   module Make
       (Arg_var : Statement_var_intf)
       (Arg_value : Statement_value_intf)
@@ -439,6 +489,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
              * Cache.Wrap.Key.Verification.t
         -> ?return_early_digest_exception:bool
         -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
+        -> ?override_wrap_main:wrap_main_generic
         -> branches:(module Nat.Intf with type n = branches)
         -> max_proofs_verified:
              (module Nat.Add.Intf with type n = max_proofs_verified)
@@ -470,8 +521,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
            * _
            * _ =
      fun ~self ~cache ?disk_keys ?(return_early_digest_exception = false)
-         ?override_wrap_domain ~branches:(module Branches) ~max_proofs_verified
-         ~name ~constraint_constants ~public_input ~auxiliary_typ ~choices () ->
+         ?override_wrap_domain ?override_wrap_main ~branches:(module Branches)
+         ~max_proofs_verified ~name ~constraint_constants ~public_input
+         ~auxiliary_typ ~choices () ->
       let snark_keys_header kind constraint_system_hash =
         { Snark_keys_header.header_version = Snark_keys_header.header_version
         ; kind
@@ -705,8 +757,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
       in
       Timer.clock __LOC__ ;
       let wrap_requests, wrap_main =
-        Wrap_main.wrap_main full_signature prev_varss_length step_vks
-          proofs_verifieds step_domains max_proofs_verified
+        match override_wrap_main with
+        | None ->
+            Wrap_main.wrap_main full_signature prev_varss_length step_vks
+              proofs_verifieds step_domains max_proofs_verified
+        | Some { wrap_main } ->
+            wrap_main wrap_domains full_signature prev_varss_length step_vks
+              proofs_verifieds step_domains max_proofs_verified
       in
       Timer.clock __LOC__ ;
       let (wrap_pk, wrap_vk), disk_key =
