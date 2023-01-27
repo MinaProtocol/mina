@@ -308,7 +308,7 @@ module Gossip = struct
           { work; sender = _ } ->
           Ok ({ work }, Direction.Received)
       | Mina_networking.Gossip_snark_pool_diff { work } ->
-          Ok ({ work }, Direction.Received)
+          Ok ({ work }, Direction.Sent)
       | _ ->
           bad_parse
 
