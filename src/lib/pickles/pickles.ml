@@ -359,6 +359,70 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  , Impls.Wrap.Field.t )
                  Composition_types.Wrap.Statement.t
               -> unit )
+    ; tweak_statement :
+        'actual_proofs_verified 'b 'e.
+           ( Import.Challenge.Constant.t
+           , Import.Challenge.Constant.t Import.Scalar_challenge.t
+           , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+           , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
+               , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t )
+               Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+               .In_circuit
+               .Lookup
+               .t
+             , bool )
+             Import.Types.Opt.t
+           , 'max_proofs_verified
+             Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
+           , (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.vec
+           , ( 'b
+             , ( Kimchi_pasta__Pallas_based_plonk.Proof.G.Affine.t
+               , 'actual_proofs_verified )
+               Pickles_types.Vector.t
+             , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
+                   Import.Bulletproof_challenge.t
+                 , 'e )
+                 Pickles_types.Vector.t
+               , 'actual_proofs_verified )
+               Pickles_types.Vector.t )
+             Pickles__Proof.Base.Messages_for_next_proof_over_same_field.Step.t
+           , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
+             Import.Types.Bulletproof_challenge.t
+             Import.Types.Step_bp_vec.t
+           , Import.Types.Branch_data.t )
+           Import.Types.Wrap.Statement.In_circuit.t
+        -> ( Import.Challenge.Constant.t
+           , Import.Challenge.Constant.t Import.Scalar_challenge.t
+           , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+           , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
+               , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t )
+               Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+               .In_circuit
+               .Lookup
+               .t
+             , bool )
+             Import.Types.Opt.t
+           , 'max_proofs_verified
+             Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
+           , ( Limb_vector.Constant.Hex64.t
+             , Composition_types.Digest.Limbs.n )
+             Pickles_types.Vector.vec
+           , ( 'b
+             , ( Kimchi_pasta__Pallas_based_plonk.Proof.G.Affine.t
+               , 'actual_proofs_verified )
+               Pickles_types.Vector.t
+             , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
+                   Import.Bulletproof_challenge.t
+                 , 'e )
+                 Pickles_types.Vector.t
+               , 'actual_proofs_verified )
+               Pickles_types.Vector.t )
+             Pickles__Proof.Base.Messages_for_next_proof_over_same_field.Step.t
+           , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
+             Import.Types.Bulletproof_challenge.t
+             Import.Types.Step_bp_vec.t
+           , Import.Types.Branch_data.t )
+           Import.Types.Wrap.Statement.In_circuit.t
     }
 
   module Make
@@ -761,7 +825,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         | None ->
             Wrap_main.wrap_main full_signature prev_varss_length step_vks
               proofs_verifieds step_domains max_proofs_verified
-        | Some { wrap_main } ->
+        | Some { wrap_main; tweak_statement = _ } ->
             wrap_main wrap_domains full_signature prev_varss_length step_vks
               proofs_verifieds step_domains max_proofs_verified
       in
@@ -879,8 +943,15 @@ module Make_str (_ : Wire_types.Concrete) = struct
               }
             in
             let%map.Promise proof =
+              let tweak_statement =
+                match override_wrap_main with
+                | None ->
+                    None
+                | Some { tweak_statement; wrap_main = _ } ->
+                    Some tweak_statement
+              in
               Wrap.wrap ~max_proofs_verified:Max_proofs_verified.n
-                full_signature.maxes wrap_requests
+                full_signature.maxes wrap_requests ?tweak_statement
                 ~dlog_plonk_index:wrap_vk.commitments wrap_main ~typ ~step_vk
                 ~step_plonk_indices:(Lazy.force step_vks) ~actual_wrap_domains
                 (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
