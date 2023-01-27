@@ -1033,7 +1033,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             (Domain.log2_size (Common.wrap_domains ~proofs_verified:i).h) )
   end
 
-  let compile_promise :
+  let compile_with_wrap_main_override_promise :
       type var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value prev_varss prev_valuess prev_ret_varss prev_ret_valuess widthss heightss max_proofs_verified branches.
          ?self:(var, value, max_proofs_verified, branches) Tag.t
       -> ?cache:Key_cache.Spec.t list
@@ -1042,6 +1042,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
            * Cache.Wrap.Key.Verification.t
       -> ?return_early_digest_exception:bool
       -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
+      -> ?override_wrap_main:
+           (max_proofs_verified, branches, prev_varss) wrap_main_generic
       -> public_input:
            ( var
            , value
@@ -1088,8 +1090,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
       and the underlying Make(_).compile function which builds the circuits.
    *)
    fun ?self ?(cache = []) ?disk_keys ?(return_early_digest_exception = false)
-       ?override_wrap_domain ~public_input ~auxiliary_typ ~branches
-       ~max_proofs_verified ~name ~constraint_constants ~choices () ->
+       ?override_wrap_domain ?override_wrap_main ~public_input ~auxiliary_typ
+       ~branches ~max_proofs_verified ~name ~constraint_constants ~choices () ->
     let self =
       match self with
       | None ->
@@ -1156,8 +1158,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
     in
     let provers, wrap_vk, wrap_disk_key, cache_handle =
       M.compile ~return_early_digest_exception ~self ~cache ?disk_keys
-        ?override_wrap_domain ~branches ~max_proofs_verified ~name ~public_input
-        ~auxiliary_typ ~constraint_constants
+        ?override_wrap_domain ?override_wrap_main ~branches ~max_proofs_verified
+        ~name ~public_input ~auxiliary_typ ~constraint_constants
         ~choices:(fun ~self -> conv_irs (choices ~self))
         ()
     in
@@ -1218,6 +1220,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
         p.statement.messages_for_next_step_proof.app_state
     end in
     (self, cache_handle, (module P), provers)
+
+  let compile_promise ?self ?cache ?disk_keys ?return_early_digest_exception
+      ?override_wrap_domain ~public_input ~auxiliary_typ ~branches
+      ~max_proofs_verified ~name ~constraint_constants ~choices () =
+    compile_with_wrap_main_override_promise ?self ?cache ?disk_keys
+      ?return_early_digest_exception ?override_wrap_domain ~public_input
+      ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
+      ~choices ()
 
   let compile ?self ?cache ?disk_keys ?override_wrap_domain ~public_input
       ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
