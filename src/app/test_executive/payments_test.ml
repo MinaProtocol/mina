@@ -437,13 +437,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
             2 successful txn are sent in the prior course of this test,
             so spamming out at least 10 more here will trigger a ledger proof to be emitted *)
-           repeat_seq ~n:10 ~f:(fun () ->
+           repeat_seq ~n:30 ~f:(fun () ->
                Network.Node.must_send_payment ~logger sender ~sender_pub_key
                  ~receiver_pub_key ~amount:Currency.Amount.one ~fee
                >>| ignore )
          in
          wait_for t
-           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
+           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:3) )
     in
     section_hard "running replayer"
       (let%bind logs =
