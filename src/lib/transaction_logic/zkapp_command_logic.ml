@@ -1842,8 +1842,7 @@ module Make (Inputs : Inputs_intf) = struct
             ~else_:local_state.token_id
       ; ledger =
           Inputs.Ledger.if_ is_last_account_update
-            ~then_:
-              (Inputs.Ledger.empty ~depth:0 ())
+            ~then_:(Inputs.Ledger.empty ~depth:0 ())
             ~else_:local_state.ledger
       ; success =
           Bool.if_ is_last_account_update ~then_:Bool.true_
