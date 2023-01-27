@@ -69,6 +69,7 @@ module Staged_ledger_error : sig
         * Transaction_snark.Statement.t
         * Mina_base.Sok_message.t )
         list
+        * Error.t
     | Couldn't_reach_verifier of Error.t
     | Pre_diff of Pre_diff_info.Error.t
     | Insufficient_work of string

@@ -1081,10 +1081,10 @@ struct
                 ] ;
             Deferred.return (Error (Error.tag e ~tag:"Internal_error"))
         | Ok (Error invalid) ->
-            let msg = Verifier.invalid_to_string invalid in
+            let err = Verifier.invalid_to_error invalid in
             [%log' error t.logger]
               "Batch verification failed when adding from gossip"
-              ~metadata:[ ("error", `String msg) ] ;
+              ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
             let%map.Deferred () =
               Trust_system.record_envelope_sender t.config.trust_system t.logger
                 (Envelope.Incoming.sender diff)
@@ -1093,7 +1093,7 @@ struct
                     ( "rejecting command because had invalid signature or proof"
                     , [] ) )
             in
-            Error Error.(tag (of_string msg) ~tag:"Verification_failed")
+            Error (Error.tag err ~tag:"Verification_failed")
         | Ok (Ok commands) ->
             (* TODO: avoid duplicate hashing (#11706) *)
             O1trace.sync_thread "hashing_transactions_after_verification"
