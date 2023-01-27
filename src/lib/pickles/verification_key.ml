@@ -5,17 +5,12 @@ open Kimchi_pasta.Pasta
 
 module Verifier_index_json = struct
   module Lookup = struct
-    type lookups_used = Kimchi_types.VerifierIndex.Lookup.lookups_used =
-      | Single
-      | Joint
-    [@@deriving yojson]
-
     type 't lookup_selectors =
           't Kimchi_types.VerifierIndex.Lookup.lookup_selectors =
       { lookup : 't option }
     [@@deriving yojson]
 
-    type lookup_pattern = Kimchi_types.VerifierIndex.Lookup.lookup_pattern =
+    type lookup_pattern = Kimchi_types.lookup_pattern =
       | Xor
       | ChaChaFinal
       | Lookup
@@ -32,7 +27,7 @@ module Verifier_index_json = struct
     [@@deriving yojson]
 
     type 'polyComm t = 'polyComm Kimchi_types.VerifierIndex.Lookup.t =
-      { lookup_used : lookups_used
+      { joint_lookup_used : bool
       ; lookup_table : 'polyComm array
       ; lookup_selectors : 'polyComm lookup_selectors
       ; table_ids : 'polyComm option
