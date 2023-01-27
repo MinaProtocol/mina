@@ -625,12 +625,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let snark_work_event_subscription =
       Event_router.on (event_router t) Snark_work_gossip
-        ~f:(fun _ (_, direction) ->
+        ~f:(fun node (work, direction) ->
           ( match direction with
           | Sent ->
               ()
           | Received ->
-              [%log info] "Received new snark work" ) ;
+              let yojson_hash hash =
+                `String (Frozen_ledger_hash.to_base58_check hash)
+              in
+              let yojson_hash_of_stmt (stmt : Transaction_snark.Statement.t) =
+                `List
+                  [ yojson_hash stmt.source.ledger
+                  ; yojson_hash stmt.target.ledger
+                  ]
+              in
+              [%log info]
+                "$id: Received new snark work for ledger hashes $ledger_hashes"
+                ~metadata:
+                  [ ("id", `String (Network.Node.id node))
+                  ; ( "ledger_hashes"
+                    , One_or_two.to_yojson yojson_hash_of_stmt work.work.work )
+                  ] ) ;
           Deferred.return `Continue )
     in
     let snark_work_failure_subscription =
