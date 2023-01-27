@@ -1921,10 +1921,10 @@ module Make (L : Ledger_intf.S) :
       ( { protocol_state = state_view
         ; first_pass_ledger = ledger
         ; second_pass_ledger =
-            (* We stub out the second_pass_ledger initially, and then poke the correct value in
-               place after the first pass is ifnished
+            (* We stub out the second_pass_ledger initially, and then poke the
+               correct value in place after the first pass is finished.
             *)
-            L.empty ~depth:0 ()
+            L.empty ~depth:constraint_constants.ledger_depth ()
         ; fee_excess
         ; supply_increase
         ; block_global_slot = global_slot
