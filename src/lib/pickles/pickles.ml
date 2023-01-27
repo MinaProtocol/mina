@@ -312,10 +312,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
       -> 'proof
   end
 
-  type wrap_main_generic =
+  type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
     { wrap_main :
-        'max_proofs_verified 'branches 'max_local_max_proofs_verifieds
-        'prev_varss 'branches.
+        'max_local_max_proofs_verifieds.
            Domains.t
         -> ( 'max_proofs_verified
            , 'branches
@@ -489,7 +488,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
              * Cache.Wrap.Key.Verification.t
         -> ?return_early_digest_exception:bool
         -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
-        -> ?override_wrap_main:wrap_main_generic
+        -> ?override_wrap_main:
+             (max_proofs_verified, branches, prev_varss) wrap_main_generic
         -> branches:(module Nat.Intf with type n = branches)
         -> max_proofs_verified:
              (module Nat.Add.Intf with type n = max_proofs_verified)
