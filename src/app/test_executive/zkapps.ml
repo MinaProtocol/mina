@@ -626,27 +626,28 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let snark_work_event_subscription =
       let node_id = Network.Node.id node in
+      let module Ledger_hash_tuple = struct
+        type t = Frozen_ledger_hash.t * Frozen_ledger_hash.t
+        [@@deriving hash, compare, sexp]
+      end in
+      let hashset = Hash_set.create (module Ledger_hash_tuple) in
       Event_router.on (event_router t) Snark_work_gossip
         ~f:(fun node (work, direction) ->
           ( match direction with
-          | Sent ->
-              ()
-          | Received when String.equal node_id (Network.Node.id node) ->
-              let yojson_hash hash =
-                `String (Frozen_ledger_hash.to_base58_check hash)
+          | Received when String.equal node_id (Network.Node.id node) -> (
+              let stmt =
+                match work.work.work with `One stmt | `Two (stmt, _) -> stmt
               in
-              let yojson_hash_of_stmt (stmt : Transaction_snark.Statement.t) =
-                `List
-                  [ yojson_hash stmt.source.ledger
-                  ; yojson_hash stmt.target.ledger
-                  ]
-              in
-              [%log info]
-                "Received new snark work for ledger hashes $ledger_hashes"
-                ~metadata:
-                  [ ( "ledger_hashes"
-                    , One_or_two.to_yojson yojson_hash_of_stmt work.work.work )
-                  ] ) ;
+              match
+                Hash_set.strict_add hashset
+                  (stmt.source.ledger, stmt.target.ledger)
+              with
+              | Ok () ->
+                  [%log info] "Received new snark work"
+              | Error _ ->
+                  [%log info] "Received duplicate snark work" )
+          | Received | Sent ->
+              () ) ;
           Deferred.return `Continue )
     in
     let snark_work_failure_subscription =
