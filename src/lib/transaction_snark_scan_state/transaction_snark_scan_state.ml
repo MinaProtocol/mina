@@ -372,7 +372,7 @@ struct
 
   (*TODO: fold over the pending_coinbase tree and validate the statements?*)
   let scan_statement ~constraint_constants
-      ({ scan_state = tree; previous_incomplete_zkapp_updates } : t)
+      ({ scan_state = tree; previous_incomplete_zkapp_updates = _ } : t)
       ~statement_check ~verifier :
       ( Transaction_snark.Statement.t
       , [ `Error of Error.t | `Empty ] )
@@ -514,11 +514,7 @@ struct
           check_base (acc_statement, acc_pc) transaction
     in
     let%bind.Deferred res =
-      let%bind previous_zkapp_updates =
-        Deferred.Or_error.List.fold ~init:(None, None)
-          previous_incomplete_zkapp_updates ~f:check_base
-      in
-      Fold.fold_chronological_until tree ~init:previous_zkapp_updates
+      Fold.fold_chronological_until tree ~init:(None, None)
         ~f_merge:(fun acc (_weight, job) ->
           let open Container.Continue_or_stop in
           match%map.Deferred fold_step_a acc job with

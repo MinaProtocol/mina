@@ -1032,6 +1032,12 @@ module T = struct
     in
     let%bind () = yield_result () in
     let%map () =
+      [%log debug] "scan state before verify $scan_state"
+        ~metadata:
+          [ ( "scan_state"
+            , `String (Scan_state.sexp_of_t scan_state' |> Sexp.to_string_hum)
+            )
+          ] ;
       if skip_verification || List.is_empty data then Deferred.return (Ok ())
       else
         O1trace.thread "verify_scan_state_after_apply" (fun () ->

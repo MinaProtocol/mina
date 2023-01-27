@@ -804,7 +804,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       let padding_payments =
         (* for work_delay=1 and transaction_capacity=4 per block*)
-        let needed = 36 in
+        let needed = 56 in
         if !transactions_sent >= needed then 0 else needed - !transactions_sent
       in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
@@ -814,7 +814,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "Wait for proof to be emitted"
         (wait_for t
-           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
+           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:3) )
     in
     Event_router.cancel (event_router t) snark_work_event_subscription () ;
     Event_router.cancel (event_router t) snark_work_failure_subscription () ;
