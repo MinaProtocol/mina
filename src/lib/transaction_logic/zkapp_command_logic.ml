@@ -1843,7 +1843,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; ledger =
           Inputs.Ledger.if_ is_last_account_update
             ~then_:
-              (Inputs.Ledger.empty ~depth:constraint_constants.ledger_depth ())
+              (Inputs.Ledger.empty ~depth:0 ())
             ~else_:local_state.ledger
       ; success =
           Bool.if_ is_last_account_update ~then_:Bool.true_

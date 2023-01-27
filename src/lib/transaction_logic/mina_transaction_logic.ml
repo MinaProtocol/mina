@@ -1924,7 +1924,7 @@ module Make (L : Ledger_intf.S) :
             (* We stub out the second_pass_ledger initially, and then poke the
                correct value in place after the first pass is finished.
             *)
-            L.empty ~depth:constraint_constants.ledger_depth ()
+            L.empty ~depth:0 ()
         ; fee_excess
         ; supply_increase
         ; block_global_slot = global_slot
@@ -1940,7 +1940,7 @@ module Make (L : Ledger_intf.S) :
         ; token_id = Token_id.default
         ; excess = Currency.Amount.(Signed.of_unsigned zero)
         ; supply_increase = Currency.Amount.(Signed.of_unsigned zero)
-        ; ledger
+        ; ledger = L.empty ~depth:0 ()
         ; success = true
         ; account_update_index = Inputs.Index.zero
         ; failure_status_tbl = []
