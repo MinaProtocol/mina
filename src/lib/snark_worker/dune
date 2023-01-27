@@ -18,6 +18,7 @@
    async.async_command
    base.base_internalhash_types
    ppx_hash.runtime-lib
+   result
    async_unix
    bin_prot.shape
    ;; local libraries
