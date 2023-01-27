@@ -1967,6 +1967,59 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ; uses_lookup = false
         }
 
+      type modifier =
+        { f :
+            'a 'b 'c 'd 'actual_branching.
+               ( Challenge.Constant.t
+               , Challenge.Constant.t Kimchi_types.scalar_challenge
+               , Pasta_bindings.Fp.t Shifted_value.Type1.t
+               , ('a, 'b) Plonk_types.Opt.t
+               , Max_proofs_verified.n
+                 Reduced_messages_for_next_proof_over_same_field.Wrap.t
+               , (int64, Pickles_types.Nat.N4.n) Vector.vec
+               , ( 'c
+                 , ( Pasta_bindings.Fp.t * Pasta_bindings.Fp.t
+                   , 'actual_branching )
+                   Vector.vec
+                 , ( ( Challenge.Constant.t Kimchi_types.scalar_challenge
+                       Bulletproof_challenge.t
+                     , 'd )
+                     Vector.vec
+                   , 'actual_branching )
+                   Vector.vec )
+                 Reduced_messages_for_next_proof_over_same_field.Step.t
+               , ( Challenge.Constant.t Kimchi_types.scalar_challenge
+                   Bulletproof_challenge.t
+                 , Pickles_types.Nat.z Tick.Rounds.plus_n )
+                 Vector.vec
+               , Types.Branch_data.t )
+               Types.Wrap.Statement.In_circuit.t
+            -> ( Challenge.Constant.t
+               , Challenge.Constant.t Kimchi_types.scalar_challenge
+               , Pasta_bindings.Fp.t Shifted_value.Type1.t
+               , ('a, 'b) Plonk_types.Opt.t
+               , Max_proofs_verified.n
+                 Reduced_messages_for_next_proof_over_same_field.Wrap.t
+               , (int64, Pickles_types.Nat.N4.n) Vector.vec
+               , ( 'c
+                 , ( Pasta_bindings.Fp.t * Pasta_bindings.Fp.t
+                   , 'actual_branching )
+                   Vector.vec
+                 , ( ( Challenge.Constant.t Kimchi_types.scalar_challenge
+                       Bulletproof_challenge.t
+                     , 'd )
+                     Vector.vec
+                   , 'actual_branching )
+                   Vector.vec )
+                 Reduced_messages_for_next_proof_over_same_field.Step.t
+               , ( Challenge.Constant.t Kimchi_types.scalar_challenge
+                   Bulletproof_challenge.t
+                 , Pickles_types.Nat.z Tick.Rounds.plus_n )
+                 Vector.vec
+               , Types.Branch_data.t )
+               Types.Wrap.Statement.In_circuit.t
+        }
+
       module M = struct
         module IR = Inductive_rule.T (A) (A_value) (A) (A_value) (A) (A_value)
         module HIR = H4.T (IR)
@@ -2019,31 +2072,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
           (* TODO Think this is right.. *)
         end
-
-        type modifier =
-          { f :
-              'a 'b 'c 'd 'e 'f 'g 'h 'i.
-                 ( 'a
-                 , 'b
-                 , 'c
-                 , 'd
-                 , 'e
-                 , 'f
-                 , 'g
-                 , 'h
-                 , 'i )
-                 Types.Wrap.Statement.In_circuit.t
-              -> ( 'a
-                 , 'b
-                 , 'c
-                 , 'd
-                 , 'e
-                 , 'f
-                 , 'g
-                 , 'h
-                 , 'i )
-                 Types.Wrap.Statement.In_circuit.t
-          }
 
         let compile :
             (   modifier:modifier
@@ -2782,84 +2810,123 @@ module Make_str (_ : Wire_types.Concrete) = struct
           p.statement.messages_for_next_step_proof.app_state
       end
 
-      let proof_with_stmt =
-        let p =
-          Promise.block_on_async_exn (fun () ->
-              step ~modifier:{ f = (fun a -> a) } () )
-        in
-        ((), p)
-
-      let%test "should not be able to verify invalid proof" =
-        not
-        @@ Promise.block_on_async_exn (fun () ->
-               Proof.verify [ proof_with_stmt ] )
-
-      module Recurse_on_bad_proof = struct
-        open Impls.Step
-
-        let dummy_proof =
-          Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15
-
-        type _ Snarky_backendless.Request.t +=
-          | Proof : (Nat.N2.n, Nat.N2.n) Proof0.t Snarky_backendless.Request.t
-
-        let handler (proof : _ Proof0.t)
-            (Snarky_backendless.Request.With { request; respond }) =
-          match request with
-          | Proof ->
-              respond (Provide proof)
-          | _ ->
-              respond Unhandled
-
-        let tag, _, p, Provers.[ step ] =
-          Common.time "compile" (fun () ->
-              compile_promise () ~public_input:(Input Typ.unit)
-                ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
-                ~max_proofs_verified:(module Nat.N2)
-                ~name:"recurse-on-bad" ~constraint_constants
-                ~choices:(fun ~self ->
-                  [ { identifier = "main"
-                    ; uses_lookup = false
-                    ; prevs = [ tag; tag ]
-                    ; main =
-                        (fun { public_input = () } ->
-                          let proof =
-                            exists (Typ.Internal.ref ()) ~request:(fun () ->
-                                Proof )
-                          in
-                          { previous_proof_statements =
-                              [ { public_input = ()
-                                ; proof
-                                ; proof_must_verify = Boolean.true_
-                                }
-                              ; { public_input = ()
-                                ; proof
-                                ; proof_must_verify = Boolean.true_
-                                }
-                              ]
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
-                    }
-                  ] ) )
-
-        module Proof = (val p)
-      end
-
-      let%test "should not be able to create a recursive proof from an invalid \
-                proof" =
-        try
-          let (), (), proof =
+      module MakeTest (Modifier : sig
+        val modifier : modifier
+      end) =
+      struct
+        let proof_with_stmt =
+          let p =
             Promise.block_on_async_exn (fun () ->
-                Recurse_on_bad_proof.step
-                  ~handler:(Recurse_on_bad_proof.handler (snd proof_with_stmt))
-                  () )
+                step ~modifier:Modifier.modifier () )
           in
+          ((), p)
+
+        let%test "should not be able to verify invalid proof" =
           not
           @@ Promise.block_on_async_exn (fun () ->
-                 Recurse_on_bad_proof.Proof.verify_promise [ ((), proof) ] )
-        with _ -> true
+                 Proof.verify [ proof_with_stmt ] )
+
+        module Recurse_on_bad_proof = struct
+          open Impls.Step
+
+          let dummy_proof =
+            Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15
+
+          type _ Snarky_backendless.Request.t +=
+            | Proof : (Nat.N2.n, Nat.N2.n) Proof0.t Snarky_backendless.Request.t
+
+          let handler (proof : _ Proof0.t)
+              (Snarky_backendless.Request.With { request; respond }) =
+            match request with
+            | Proof ->
+                respond (Provide proof)
+            | _ ->
+                respond Unhandled
+
+          let tag, _, p, Provers.[ step ] =
+            Common.time "compile" (fun () ->
+                compile_promise () ~public_input:(Input Typ.unit)
+                  ~auxiliary_typ:Typ.unit
+                  ~branches:(module Nat.N1)
+                  ~max_proofs_verified:(module Nat.N2)
+                  ~name:"recurse-on-bad" ~constraint_constants
+                  ~choices:(fun ~self ->
+                    [ { identifier = "main"
+                      ; uses_lookup = false
+                      ; prevs = [ tag; tag ]
+                      ; main =
+                          (fun { public_input = () } ->
+                            let proof =
+                              exists (Typ.Internal.ref ()) ~request:(fun () ->
+                                  Proof )
+                            in
+                            { previous_proof_statements =
+                                [ { public_input = ()
+                                  ; proof
+                                  ; proof_must_verify = Boolean.true_
+                                  }
+                                ; { public_input = ()
+                                  ; proof
+                                  ; proof_must_verify = Boolean.true_
+                                  }
+                                ]
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
+                      }
+                    ] ) )
+
+          module Proof = (val p)
+        end
+
+        let%test "should not be able to create a recursive proof from an \
+                  invalid proof" =
+          try
+            let (), (), proof =
+              Promise.block_on_async_exn (fun () ->
+                  Recurse_on_bad_proof.step
+                    ~handler:
+                      (Recurse_on_bad_proof.handler (snd proof_with_stmt))
+                    () )
+            in
+            not
+            @@ Promise.block_on_async_exn (fun () ->
+                   Recurse_on_bad_proof.Proof.verify_promise [ ((), proof) ] )
+          with _ -> true
+      end
+
+      module TestA = MakeTest (struct
+        let f (stmt : _ Types.Wrap.Statement.In_circuit.t) =
+          let Mina_wire_types.Pickles_composition_types.Wrap.Statement.V1.
+                { proof_state; messages_for_next_step_proof } =
+            stmt
+          in
+          let Composition_types.Wrap.Proof_state.Stable.V1.
+                { deferred_values
+                ; sponge_digest_before_evaluations
+                ; messages_for_next_wrap_proof
+                } =
+            proof_state
+          in
+          (*          let Composition_types.Wrap.Proof_state.Deferred_values.Stable.V1.{ plonk, combined_inner_product, b, xi, bulletproof_challenges, branch_data } = deferred_values in *)
+          let shift_value =
+            Shifted_value.Type1.of_field (module Tick.Field) ~shift:Shifts.tick1
+          in
+          let evil_b = shift_value (Tick.Field.random ()) in
+          let deferred_values = { deferred_values with b = evil_b } in
+          let proof_state =
+            Composition_types.Wrap.Proof_state.Stable.V1.
+              { proof_state with deferred_values }
+          in
+          Mina_wire_types.Pickles_composition_types.Wrap.Statement.V1.
+            { stmt with proof_state }
+
+        let modifier = { f }
+      end)
+
+      module TestB = MakeTest (struct
+        let modifier = { f = (fun a -> a) }
+      end)
     end )
 
   let%test_module "domain too small" =
