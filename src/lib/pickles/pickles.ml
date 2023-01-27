@@ -298,9 +298,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
     val id : Verification_key.Id.t Lazy.t
 
-    val verify : (statement * t) list -> bool Deferred.t
+    val verify : (statement * t) list -> unit Or_error.t Deferred.t
 
-    val verify_promise : (statement * t) list -> bool Promise.t
+    val verify_promise : (statement * t) list -> unit Or_error.t Promise.t
   end
 
   module Prover = struct
@@ -953,7 +953,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ; index =
                     ( match vk.wrap_vk with
                     | None ->
-                        return (Promise.return false)
+                        return
+                          (Promise.return
+                             (Or_error.errorf
+                                "Pickles.verify: wrap_vk not found" ) )
                     | Some x ->
                         x )
                 ; data =
@@ -1317,9 +1320,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
             Common.time "b0" (fun () ->
                 Promise.block_on_async_exn (fun () -> step Field.Constant.zero) )
           in
-          assert (
-            Promise.block_on_async_exn (fun () ->
-                Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
           (Field.Constant.zero, b0)
 
         let example_input, example_proof = example
@@ -1380,9 +1383,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 Promise.block_on_async_exn (fun () -> step ()) )
           in
           assert (Field.Constant.(equal zero) res) ;
-          assert (
-            Promise.block_on_async_exn (fun () ->
-                Proof.verify_promise [ (res, b0) ] ) ) ;
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ (res, b0) ] ) ) ;
           (res, b0)
 
         let example_input, example_proof = example
@@ -1468,9 +1471,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       ~handler:(handler s_neg_one b_neg_one)
                       Field.Constant.zero ) )
           in
-          assert (
-            Promise.block_on_async_exn (fun () ->
-                Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
           let (), (), b1 =
             Common.time "b1" (fun () ->
                 Promise.block_on_async_exn (fun () ->
@@ -1478,9 +1481,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       ~handler:(handler Field.Constant.zero b0)
                       Field.Constant.one ) )
           in
-          assert (
-            Promise.block_on_async_exn (fun () ->
-                Proof.verify_promise [ (Field.Constant.one, b1) ] ) ) ;
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ (Field.Constant.one, b1) ] ) ) ;
           (Field.Constant.one, b1)
 
         let example_input, example_proof = example
@@ -1590,9 +1593,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         (handler No_recursion.example (s_neg_one, b_neg_one))
                       Field.Constant.zero ) )
           in
-          assert (
-            Promise.block_on_async_exn (fun () ->
-                Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
           let (), (), b1 =
             Common.time "tree b1" (fun () ->
                 Promise.block_on_async_exn (fun () ->
@@ -1611,9 +1614,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
 
       let%test_unit "verify" =
-        assert (
-          Promise.block_on_async_exn (fun () ->
-              Tree_proof.Proof.verify_promise Tree_proof.examples ) )
+        Or_error.ok_exn
+          (Promise.block_on_async_exn (fun () ->
+               Tree_proof.Proof.verify_promise Tree_proof.examples ) )
 
       module Tree_proof_return = struct
         module Statement = No_recursion_return.Statement
@@ -1730,9 +1733,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       () ) )
           in
           assert (Field.Constant.(equal zero) s0) ;
-          assert (
-            Promise.block_on_async_exn (fun () ->
-                Proof.verify_promise [ (s0, b0) ] ) ) ;
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ (s0, b0) ] ) ) ;
           let s1, (), b1 =
             Common.time "tree b1" (fun () ->
                 Promise.block_on_async_exn (fun () ->
@@ -1752,9 +1755,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
 
       let%test_unit "verify" =
-        assert (
-          Promise.block_on_async_exn (fun () ->
-              Tree_proof_return.Proof.verify_promise Tree_proof_return.examples ) )
+        Or_error.ok_exn
+          (Promise.block_on_async_exn (fun () ->
+               Tree_proof_return.Proof.verify_promise Tree_proof_return.examples )
+          )
 
       module Add_one_return = struct
         module Statement = struct
@@ -1813,9 +1817,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 Promise.block_on_async_exn (fun () -> step input) )
           in
           assert (Field.Constant.(equal (of_int 43)) res) ;
-          assert (
-            Promise.block_on_async_exn (fun () ->
-                Proof.verify_promise [ ((input, res), b0) ] ) ) ;
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ ((input, res), b0) ] ) ) ;
           ((input, res), b0)
 
         let example_input, example_proof = example
@@ -1895,9 +1899,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
           Tick_field_sponge.Field.absorb sponge blinding_value ;
           let result' = Tick_field_sponge.Field.squeeze sponge in
           assert (Field.Constant.equal result result') ;
-          assert (
-            Promise.block_on_async_exn (fun () ->
-                Proof.verify_promise [ ((input, result), b0) ] ) ) ;
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ ((input, result), b0) ] ) ) ;
           ((input, result), b0)
 
         let example_input, example_proof = example
@@ -2757,7 +2761,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ((), p)
 
       let%test "should not be able to verify invalid proof" =
-        not
+        Or_error.is_error
         @@ Promise.block_on_async_exn (fun () ->
                Proof.verify [ proof_with_stmt ] )
 
@@ -2823,7 +2827,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ~handler:(Recurse_on_bad_proof.handler (snd proof_with_stmt))
                   () )
           in
-          not
+          Or_error.is_error
           @@ Promise.block_on_async_exn (fun () ->
                  Recurse_on_bad_proof.Proof.verify_promise [ ((), proof) ] )
         with _ -> true
@@ -3647,7 +3651,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ((), p)
 
       let%test "should not be able to verify invalid proof" =
-        not
+        Or_error.is_error
         @@ Promise.block_on_async_exn (fun () ->
                Proof.verify [ proof_with_stmt ] )
 
@@ -3713,7 +3717,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ~handler:(Recurse_on_bad_proof.handler (snd proof_with_stmt))
                   () )
           in
-          not
+          Or_error.is_error
           @@ Promise.block_on_async_exn (fun () ->
                  Recurse_on_bad_proof.Proof.verify_promise [ ((), proof) ] )
         with _ -> true
@@ -3807,9 +3811,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
             Common.time "b0" (fun () ->
                 Promise.block_on_async_exn (fun () -> step Field.Constant.zero) )
           in
-          assert (
-            Promise.block_on_async_exn (fun () ->
-                Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
           (Field.Constant.zero, b0)
 
         let example_input, example_proof = example
@@ -3860,9 +3864,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
             Common.time "b0" (fun () ->
                 Promise.block_on_async_exn (fun () -> step Field.Constant.zero) )
           in
-          assert (
-            Promise.block_on_async_exn (fun () ->
-                Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
           (Field.Constant.zero, b0)
 
         let example_input, example_proof = example
@@ -3913,9 +3917,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
             Common.time "b0" (fun () ->
                 Promise.block_on_async_exn (fun () -> step Field.Constant.zero) )
           in
-          assert (
-            Promise.block_on_async_exn (fun () ->
-                Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
           (Field.Constant.zero, b0)
 
         let example_input, example_proof = example
@@ -4023,9 +4027,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               No_recursion.tag ) )
                       Field.Constant.one ) )
           in
-          assert (
-            Promise.block_on_async_exn (fun () ->
-                Proof.verify_promise [ (Field.Constant.one, b1) ] ) ) ;
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ (Field.Constant.one, b1) ] ) ) ;
           (Field.Constant.one, b1)
 
         let example2 =
@@ -4041,9 +4045,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               Fake_1_recursion.tag ) )
                       Field.Constant.one ) )
           in
-          assert (
-            Promise.block_on_async_exn (fun () ->
-                Proof.verify_promise [ (Field.Constant.one, b2) ] ) ) ;
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ (Field.Constant.one, b2) ] ) ) ;
           (Field.Constant.one, b2)
 
         let example3 =
@@ -4059,9 +4063,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               Fake_2_recursion.tag ) )
                       Field.Constant.one ) )
           in
-          assert (
-            Promise.block_on_async_exn (fun () ->
-                Proof.verify_promise [ (Field.Constant.one, b3) ] ) ) ;
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ (Field.Constant.one, b3) ] ) ) ;
           (Field.Constant.one, b3)
       end
     end )

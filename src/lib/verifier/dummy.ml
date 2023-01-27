@@ -9,7 +9,7 @@ type t =
 
 type invalid = Common.invalid [@@deriving bin_io_unversioned, to_yojson]
 
-let invalid_to_string = Common.invalid_to_string
+let invalid_to_error = Common.invalid_to_error
 
 type ledger_proof = Ledger_proof.t
 
@@ -20,7 +20,7 @@ let create ~logger:_ ~proof_level ~constraint_constants ~pids:_ ~conf_dir:_ =
   | Check | None ->
       Deferred.return { proof_level; constraint_constants }
 
-let verify_blockchain_snarks _ _ = Deferred.Or_error.return true
+let verify_blockchain_snarks _ _ = Deferred.Or_error.return (Ok ())
 
 (* N.B.: Valid_assuming is never returned, in fact; we assert a return type
    containing Valid_assuming to match the expected type
@@ -45,8 +45,8 @@ let verify_commands _ (cs : User_command.Verifiable.t list) :
           `Invalid_keys keys
       | `Invalid_signature keys ->
           `Invalid_signature keys
-      | `Invalid_proof ->
-          `Invalid_proof
+      | `Invalid_proof err ->
+          `Invalid_proof err
       | `Missing_verification_key keys ->
           `Missing_verification_key keys
       | `Unexpected_verification_key keys ->
@@ -62,12 +62,16 @@ let verify_transaction_snarks _ ts =
      This is particularly used to test that invalid proofs are not added to the
      snark pool
   *)
-  List.for_all ts ~f:(fun (proof, message) ->
-      let msg_digest = Sok_message.digest message in
-      let sok_digest = Transaction_snark.sok_digest proof in
-      Sok_message.Digest.(equal sok_digest default)
-      || Mina_base.Sok_message.Digest.equal sok_digest msg_digest )
-  |> Deferred.Or_error.return
+  if
+    List.for_all ts ~f:(fun (proof, message) ->
+        let msg_digest = Sok_message.digest message in
+        let sok_digest = Transaction_snark.sok_digest proof in
+        Sok_message.Digest.(equal sok_digest default)
+        || Mina_base.Sok_message.Digest.equal sok_digest msg_digest )
+  then Deferred.Or_error.return (Ok ())
+  else
+    Deferred.Or_error.return
+      (Or_error.error_string "Transaction_snark.verify: Mismatched sok_message")
 
 let get_blockchain_verification_key { proof_level; constraint_constants } =
   Deferred.Or_error.try_with (fun () ->

@@ -37,7 +37,7 @@ type ('init, 'partially_validated, 'result) t =
          [ `Init of 'init | `Partially_validated of 'partially_validated ] list
       -> [ `Valid of 'result
          | Verifier.invalid
-         | `Potentially_invalid of 'partially_validated ]
+         | `Potentially_invalid of 'partially_validated * Error.t ]
          list
          Deferred.Or_error.t
         [@sexp.opaque]
@@ -66,7 +66,10 @@ let call_verifier t (ps : 'proof list) = t.verifier ps
 let rec determine_outcome :
     type p r partial.
        (p, r) elt list
-    -> [ `Valid of r | `Potentially_invalid of partial | Verifier.invalid ] list
+    -> [ `Valid of r
+       | `Potentially_invalid of partial * Error.t
+       | Verifier.invalid ]
+       list
     -> (p, partial, r) t
     -> unit Deferred.Or_error.t =
  fun ps res v ->
@@ -93,10 +96,10 @@ let rec determine_outcome :
                   [%log error] "Ivar.fill bug is here!" ;
                 Ivar.fill elt.res (Ok (Error (`Invalid_signature keys))) ;
                 None
-            | `Invalid_proof ->
+            | `Invalid_proof err ->
                 if Ivar.is_full elt.res then
                   [%log error] "Ivar.fill bug is here!" ;
-                Ivar.fill elt.res (Ok (Error `Invalid_proof)) ;
+                Ivar.fill elt.res (Ok (Error (`Invalid_proof err))) ;
                 None
             | `Missing_verification_key keys ->
                 if Ivar.is_full elt.res then
@@ -115,17 +118,17 @@ let rec determine_outcome :
                 Ivar.fill elt.res
                   (Ok (Error (`Mismatched_authorization_kind keys))) ;
                 None
-            | `Potentially_invalid new_hint ->
-                Some (elt, new_hint) )
+            | `Potentially_invalid (new_hint, err) ->
+                Some (elt, new_hint, err) )
       in
       let open Deferred.Or_error.Let_syntax in
       match potentially_invalid with
       | [] ->
           (* All results are known *)
           return ()
-      | [ ({ res; _ }, _) ] ->
+      | [ ({ res; _ }, _, err) ] ->
           if Ivar.is_full res then [%log error] "Ivar.fill bug is here!" ;
-          Ivar.fill res (Ok (Error `Invalid_proof)) ;
+          Ivar.fill res (Ok (Error (`Invalid_proof err))) ;
           (* If there is a potentially invalid proof in this batch of size 1, then
              that proof is itself invalid. *)
           return ()
@@ -133,10 +136,10 @@ let rec determine_outcome :
           let outcome xs =
             let%bind res_xs =
               call_verifier v
-                (List.map xs ~f:(fun (_e, new_hint) ->
+                (List.map xs ~f:(fun (_e, new_hint, _) ->
                      `Partially_validated new_hint ) )
             in
-            determine_outcome (List.map xs ~f:fst) res_xs v
+            determine_outcome (List.map xs ~f:(fun (e, _, _) -> e)) res_xs v
           in
           let length = List.length potentially_invalid in
           let left, right = List.split_n potentially_invalid (length / 2) in
@@ -349,14 +352,14 @@ module Transaction_pool = struct
                 | `Mismatched_authorization_kind keys ->
                     (* Invalidate the whole diff *)
                     result.(i) <- `Mismatched_authorization_kind keys
-                | `Invalid_proof ->
+                | `Invalid_proof err ->
                     (* Invalidate the whole diff *)
-                    result.(i) <- `Invalid_proof
+                    result.(i) <- `Invalid_proof err
                 | `Valid_assuming xs -> (
                     match result.(i) with
                     | `Invalid_keys _
                     | `Invalid_signature _
-                    | `Invalid_proof
+                    | `Invalid_proof _
                     | `Missing_verification_key _
                     | `Unexpected_verification_key _
                     | `Mismatched_authorization_kind _ ->
@@ -371,7 +374,7 @@ module Transaction_pool = struct
                     match result.(i) with
                     | `Invalid_keys _
                     | `Invalid_signature _
-                    | `Invalid_proof
+                    | `Invalid_proof _
                     | `Missing_verification_key _
                     | `Unexpected_verification_key _
                     | `Mismatched_authorization_kind _ ->
@@ -383,8 +386,8 @@ module Transaction_pool = struct
                   `Invalid_keys keys
               | `Invalid_signature keys ->
                   `Invalid_signature keys
-              | `Invalid_proof ->
-                  `Invalid_proof
+              | `Invalid_proof err ->
+                  `Invalid_proof err
               | `Missing_verification_key keys ->
                   `Missing_verification_key keys
               | `Unexpected_verification_key keys ->
@@ -399,13 +402,14 @@ module Transaction_pool = struct
                       `Valid res
                   | None ->
                       `Potentially_invalid
-                        (list_of_array_map a ~f:(function
-                          | `Unknown ->
-                              assert false
-                          | `Valid c ->
-                              `Valid c
-                          | `Valid_assuming (v, xs) ->
-                              `Valid_assuming (v, xs) ) ) ) ) ) )
+                        ( list_of_array_map a ~f:(function
+                            | `Unknown ->
+                                assert false
+                            | `Valid c ->
+                                `Valid c
+                            | `Valid_assuming (v, xs) ->
+                                `Valid_assuming (v, xs) )
+                        , Error.of_string "In progress" ) ) ) ) )
 
   let verify (t : t) = verify t
 end
@@ -446,11 +450,11 @@ module Snark_pool = struct
         let open Deferred.Or_error.Let_syntax in
         let%map result = Verifier.verify_transaction_snarks verifier ps in
         match result with
-        | true ->
+        | Ok () ->
             List.map ps0 ~f:(fun _ -> `Valid ())
-        | false ->
+        | Error err ->
             List.map ps0 ~f:(function `Partially_validated env | `Init env ->
-                `Potentially_invalid env ) )
+                `Potentially_invalid (env, err) ) )
 
   module Work_key = struct
     module T = struct

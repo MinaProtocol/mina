@@ -4,10 +4,18 @@ set -eo pipefail
 set +x
 echo "Exporting Variables: "
 
+function find_most_recent_numeric_tag() {
+    TAG=$(git describe --always --abbrev=0 $1 | sed 's!/!-!g; s!_!-!g')
+    if [[ $TAG != [0-9]* ]]; then
+        TAG=$(find_most_recent_numeric_tag $TAG~)
+    fi
+    echo $TAG
+}
+
 export GITHASH=$(git rev-parse --short=7 HEAD)
 export GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!g; s!_!-!g' )
 # GITTAG is the closest tagged commit to this commit, while THIS_COMMIT_TAG only has a value when the current commit is tagged
-export GITTAG=$(git describe --always --abbrev=0 | sed 's!/!-!g; s!_!-!g')
+export GITTAG=$(find_most_recent_numeric_tag HEAD)
 export THIS_COMMIT_TAG=$(git tag --points-at HEAD)
 export PROJECT="mina"
 
