@@ -559,7 +559,26 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
 
     let trust_system = trust_system
 
-    let check_body_in_storage = Block_storage.read_body block_storage
+    let check_body_in_storage body_ref =
+      let res = Lmdb_storage.Block.read_body block_storage body_ref in
+      Result.iter_error res ~f:(function
+        | `Non_full ->
+            ()
+        | `Tx_failed ->
+            [%log error]
+              "LMDB transaction failed unexpectedly while reading block \
+               $body_reference"
+              ~metadata:
+                [ ("body_reference", Consensus.Body_reference.to_yojson body_ref)
+                ]
+        | `Invalid_structure e ->
+            [%log error]
+              "Couldn't read body for $body_reference with Full status: $error"
+              ~metadata:
+                [ ("body_reference", Consensus.Body_reference.to_yojson body_ref)
+                ; ("error", `String (Error.to_string_hum e))
+                ] ) ;
+      Result.ok res
 
     let download_body ~header ~preferred_peers (module I : Interruptible.F) =
       let start_time = Time.now () in
@@ -886,9 +905,7 @@ let run ~frontier ~(on_bitswap_update_ref : Mina_net2.on_bitswap_update_t ref)
   let (module Context_ : Context.MINI_CONTEXT) = context in
   (* TODO is "block-db" the right path ? *)
   let block_db_path = Core.(Context_.conf_dir ^/ "mina_net2" ^/ "block-db") in
-  let block_storage =
-    Block_storage.open_ ~logger:Context_.logger block_db_path
-  in
+  let block_storage = Lmdb_storage.Block.create block_db_path in
   let write_verified_transition (`Transition t, `Source _) : unit =
     Pipe_lib.Strict_pipe.Writer.write verified_transition_writer t
   in

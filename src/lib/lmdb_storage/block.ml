@@ -2,14 +2,24 @@
 open Inline_test_quiet_logs
 open Core_kernel
 
-type opened_db_t =
-  { (* statuses is a map from 32-byte key to a 1-byte value representing the status of a root bitswap block *)
-    statuses : (Consensus.Body_reference.t, int, [ `Uni ]) Lmdb.Map.t
-  ; blocks : (Blake2.t, Bigstring.t, [ `Uni ]) Lmdb.Map.t
-  ; env : Lmdb.Env.t
-  }
+module F (Db : Generic.Db) = struct
+  type holder =
+    { statuses : (Consensus.Body_reference.t, int) Db.t
+    ; blocks : (Blake2.t, Bigstring.t) Db.t
+    }
 
-type t = { logger : Logger.t; dir : string; db : opened_db_t option ref }
+  let mk_maps { Db.create } =
+    let open Conv in
+    let blocks = create blake2 Lmdb.Conv.bigstring in
+    let statuses = create blake2 uint8 ~name:"status" in
+    { statuses; blocks }
+
+  let config = { Generic.default_config with initial_mmap_size = 256 lsl 20 }
+end
+
+module Storage = Generic.Read_only (F)
+
+type t = Storage.t * Storage.holder
 
 module Root_block_status = struct
   type t = Partial | Full | Deleting [@@deriving enum]
@@ -19,83 +29,20 @@ let body_tag = Staged_ledger_diff.Body.Tag.(to_enum Body)
 
 let full_status = Root_block_status.to_enum Full
 
-let uint8_conv =
-  Lmdb.Conv.make
-    ~flags:Lmdb.Conv.Flags.(integer_key + integer_dup + dup_fixed)
-    ~serialise:(fun alloc x ->
-      let a = alloc 1 in
-      Bigstring.set_uint8_exn a ~pos:0 x ;
-      a )
-    ~deserialise:(Bigstring.get_uint8 ~pos:0)
-    ()
+let create = Storage.create
 
-let blake2_conv =
-  Lmdb.Conv.(
-    make
-      ~serialise:(fun alloc x ->
-        let str = Blake2.to_raw_string x in
-        serialise string alloc str )
-      ~deserialise:(fun s -> deserialise string s |> Blake2.of_raw_string)
-      ())
+let get_status ~logger ((env, { statuses; _ }) : t) body_ref =
+  let%bind.Option raw_status = Storage.get ~env statuses body_ref in
+  let res = Root_block_status.of_enum raw_status in
+  if Option.is_none res then
+    [%log error] "Unexpected status $status for $body_reference"
+      ~metadata:
+        [ ("status", `Int raw_status)
+        ; ("body_reference", Consensus.Body_reference.to_yojson body_ref)
+        ] ;
+  res
 
-let open_db dir =
-  if Sys.file_exists dir then
-    try
-      let env = Lmdb.Env.create ~max_maps:1 Ro dir in
-      (* Env. *)
-      let blocks =
-        Lmdb.Map.open_existing ~key:blake2_conv ~value:Lmdb.Conv.bigstring Nodup
-          env
-      in
-      let statuses =
-        Lmdb.Map.open_existing ~key:blake2_conv ~value:uint8_conv ~name:"status"
-          Nodup env
-      in
-      Some { blocks; statuses; env }
-    with Lmdb.Error _ -> None
-  else None
-
-let mdb_map_resized = -30785
-
-let with_db ~default ~f:unwrapped_f t =
-  let rec f ({ env; _ } as db) =
-    try unwrapped_f db
-    with Lmdb.Error err_int as e ->
-      if err_int = mdb_map_resized then (
-        Lmdb.Env.set_map_size env 0 ;
-        f db )
-      else raise e
-  in
-  match !(t.db) with
-  | Some db ->
-      f db
-  | None ->
-      let db_opt = open_db t.dir in
-      t.db := db_opt ;
-      Option.value_map ~f ~default db_opt
-
-let open_ ~logger dir = { logger; dir; db = ref None }
-
-let get_status ({ logger; _ } as t) body_ref =
-  with_db t ~default:None ~f:(fun { statuses; _ } ->
-      try
-        let raw_status = Lmdb.Map.get statuses body_ref in
-        match Root_block_status.of_enum raw_status with
-        | None ->
-            [%log error] "Unexpected status $status for $body_reference"
-              ~metadata:
-                [ ("status", `Int raw_status)
-                ; ("body_reference", Consensus.Body_reference.to_yojson body_ref)
-                ] ;
-            None
-        | Some x ->
-            Some x
-      with Lmdb.Not_found -> None )
-
-let read_body_impl blocks txn root_ref =
-  let find_block ref =
-    try Lmdb.Map.get ~txn blocks ref |> Some with Lmdb.Not_found -> None
-  in
+let read_body_impl find_block root_ref =
   let%bind.Or_error raw_root_block =
     Option.value_map
       ~f:(fun x -> Ok x)
@@ -138,38 +85,13 @@ let read_body_impl blocks txn root_ref =
   in
   Staged_ledger_diff.Body.Stable.Latest.bin_read_t buf ~pos_ref:(ref 0)
 
-let read_body ({ logger; _ } as t) body_ref =
-  with_db t ~default:None ~f:(fun { statuses; blocks; env } ->
-      let impl txn =
-        try
-          if Lmdb.Map.get ~txn statuses body_ref = full_status then (
-            match read_body_impl blocks txn body_ref with
-            | Ok r ->
-                Some r
-            | Error e ->
-                [%log error]
-                  "Couldn't read body for $body_reference with Full status: \
-                   $error"
-                  ~metadata:
-                    [ ( "body_reference"
-                      , Consensus.Body_reference.to_yojson body_ref )
-                    ; ("error", `String (Error.to_string_hum e))
-                    ] ;
-                None )
-          else None
-        with Lmdb.Not_found -> None
-      in
-      match Lmdb.Txn.go Ro env impl with
-      | None ->
-          [%log error]
-            "LMDB transaction failed unexpectedly while reading block \
-             $body_reference"
-            ~metadata:
-              [ ("body_reference", Consensus.Body_reference.to_yojson body_ref)
-              ] ;
-          None
-      | Some x ->
-          x )
+let read_body ((env, { statuses; blocks }) : t) body_ref =
+  Storage.with_txn env ~f:(fun { get; _ } ->
+      if Option.equal Int.equal (get statuses body_ref) (Some full_status) then
+        read_body_impl (get blocks) body_ref
+        |> Result.map_error ~f:(fun e -> `Invalid_structure e)
+      else Error `Non_full )
+  |> function None -> Error `Tx_failed | Some res -> res
 
 let%test_module "Block storage tests" =
   ( module struct
@@ -241,10 +163,12 @@ let%test_module "Block storage tests" =
       let id = match id_ with `Ok a -> a | _ -> failwith "unexpected" in
       [%log info] "Push message received" ;
       [%test_eq: String.t] (Consensus.Body_reference.to_raw_string body_ref) id ;
-      [%test_eq: Staged_ledger_diff.Body.t option] (Some body)
-        (read_body db body_ref)
+      [%test_eq:
+        ( Mina_block.Body.t
+        , [ `Invalid_structure of Error.t | `Non_full | `Tx_failed ] )
+        Result.t] (Ok body) (read_body db body_ref)
 
-    let%test_unit "Write many blocks to reach mmap resize" =
+    let%test_unit "Write many blocks" =
       let n = 300 in
       Quickcheck.test (gen_breadcrumb ~verifier ()) ~trials:1
         ~f:(fun make_breadcrumb ->
@@ -253,13 +177,14 @@ let%test_module "Block storage tests" =
           let reader, writer = Pipe.create () in
           with_helper ~writer (fun conf_dir helper ->
               let db =
-                open_ ~logger (String.concat ~sep:"/" [ conf_dir; "block-db" ])
+                create (String.concat ~sep:"/" [ conf_dir; "block-db" ])
               in
               let%bind () =
                 make_breadcrumb root >>= send_and_receive ~db ~helper ~reader
               in
               Quickcheck.test
-                (String.gen_with_length 1000000
+                (String.gen_with_length 1000
+                   (* increase to 1000000 to reach past mmap size of 256 MiB*)
                    Base_quickcheck.quickcheck_generator_char ) ~trials:n
                 ~f:(fun data ->
                   Mina_net2.For_tests.Helper.send_add_resource
@@ -279,7 +204,7 @@ let%test_module "Block storage tests" =
           let reader, writer = Pipe.create () in
           with_helper ~writer (fun conf_dir helper ->
               let db =
-                open_ ~logger (String.concat ~sep:"/" [ conf_dir; "block-db" ])
+                create (String.concat ~sep:"/" [ conf_dir; "block-db" ])
               in
               make_breadcrumb root >>= send_and_receive ~db ~helper ~reader ) ;
           clean_up_persistent_root ~frontier )

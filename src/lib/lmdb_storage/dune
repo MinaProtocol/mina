@@ -1,6 +1,6 @@
 (library
- (name block_storage)
- (public_name block_storage)
+ (name lmdb_storage)
+ (public_name lmdb_storage)
  (libraries
    ;; opam libraries
    async

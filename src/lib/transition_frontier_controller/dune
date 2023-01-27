@@ -14,7 +14,7 @@
    sexplib0
    base.base_internalhash_types
    ;; local libraries
-   block_storage
+   lmdb_storage
    unix_timestamp
    transition_frontier
    data_hash_lib
