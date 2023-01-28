@@ -2369,6 +2369,67 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 } )
           }
       end)
+
+      (** This creates a wrap proof that advertises a step domain size >. *)
+      module Test_domain_size_too_large = Make_test (struct
+        let wrapper =
+          { wrap_main =
+              (fun _ _ _ _ _ _ _ ->
+                ( Requests.Wrap.create ()
+                , fun _ ->
+                    let module SC' = SC in
+                    let open Impls.Wrap in
+                    let open Wrap_main_inputs in
+                    let open Wrap_main in
+                    let x =
+                      exists Field.typ ~compute:(fun () ->
+                          Field.Constant.of_int 3 )
+                    in
+                    let y =
+                      exists Field.typ ~compute:(fun () ->
+                          Field.Constant.of_int 0 )
+                    in
+                    let z =
+                      exists Field.typ ~compute:(fun () ->
+                          Field.Constant.of_int 0 )
+                    in
+                    let g = Inner_curve.one in
+                    let sponge = Sponge.create sponge_params in
+                    Sponge.absorb sponge x ;
+                    ignore (Sponge.squeeze_field sponge : Field.t) ;
+                    ignore
+                      ( SC'.to_field_checked'
+                          (module Impl)
+                          ~num_bits:16
+                          (Kimchi_backend_common.Scalar_challenge.create x)
+                        : Field.t * Field.t * Field.t ) ;
+                    ignore
+                      ( Ops.scale_fast g ~num_bits:5 (Shifted_value x)
+                        : Inner_curve.t ) ;
+                    ignore
+                      ( Wrap_verifier.Scalar_challenge.endo g ~num_bits:4
+                          (Kimchi_backend_common.Scalar_challenge.create x)
+                        : Field.t * Field.t ) ;
+                    for i = 0 to 64000 do
+                      assert_r1cs x y z
+                    done ) )
+          ; tweak_statement =
+              (fun stmt ->
+                { stmt with
+                  proof_state =
+                    { stmt.proof_state with
+                      deferred_values =
+                        { stmt.proof_state.deferred_values with
+                          branch_data =
+                            { stmt.proof_state.deferred_values.branch_data with
+                              domain_log2 =
+                                Branch_data.Domain_log2.of_int_exn 17
+                            }
+                        }
+                    }
+                } )
+          }
+      end)
     end )
 
   let%test_module "domain too small" =
