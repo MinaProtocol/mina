@@ -13,6 +13,7 @@
    async_unix
    unsigned_extended
    stdio
+   sexplib0
    ;; local libraries
    mina_wire_types
    with_hash
@@ -53,6 +54,9 @@
    sgn
    zkapp_command_builder
    network_pool
+   one_or_two
+   mina_state
+   transaction_snark_work
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_jane ppx_deriving_yojson ppx_mina ppx_version)))

@@ -113,7 +113,7 @@ val validate_proofs :
   -> genesis_state_hash:State_hash.t
   -> ('a, 'b, [ `Proof ] * unit Truth.false_t, 'c, 'd, 'e, 'f) with_block list
   -> ( ('a, 'b, [ `Proof ] * unit Truth.true_t, 'c, 'd, 'e, 'f) with_block list
-     , [> `Invalid_proof | `Verifier_error of Error.t ] )
+     , [> `Invalid_proof of Error.t | `Verifier_error of Error.t ] )
      Deferred.Result.t
 
 val validate_single_proof :
@@ -121,7 +121,7 @@ val validate_single_proof :
   -> genesis_state_hash:State_hash.t
   -> ('a, 'b, [ `Proof ] * unit Truth.false_t, 'c, 'd, 'e, 'f) with_block
   -> ( ('a, 'b, [ `Proof ] * unit Truth.true_t, 'c, 'd, 'e, 'f) with_block
-     , [> `Invalid_proof | `Verifier_error of Error.t ] )
+     , [> `Invalid_proof of Error.t | `Verifier_error of Error.t ] )
      Deferred.Result.t
 
 val skip_proof_validation :

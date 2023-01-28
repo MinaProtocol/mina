@@ -230,19 +230,19 @@ module type Full = sig
   val verify :
        (t * Sok_message.t) list
     -> key:Pickles.Verification_key.t
-    -> bool Async.Deferred.t
+    -> unit Or_error.t Async.Deferred.t
 
   module Verification : sig
     module type S = sig
       val tag : tag
 
-      val verify : (t * Sok_message.t) list -> bool Async.Deferred.t
+      val verify : (t * Sok_message.t) list -> unit Or_error.t Async.Deferred.t
 
       val id : Pickles.Verification_key.Id.t Lazy.t
 
       val verification_key : Pickles.Verification_key.t Lazy.t
 
-      val verify_against_digest : t -> bool Async.Deferred.t
+      val verify_against_digest : t -> unit Or_error.t Async.Deferred.t
 
       val constraint_system_digests : (string * Md5_lib.t) list Lazy.t
     end
@@ -445,6 +445,7 @@ module type Full = sig
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> Statement.With_sok.var
         -> Zkapp_statement.Checked.t option
+           * [> `Must_verify of Tick.Boolean.var ]
     end
   end
 

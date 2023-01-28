@@ -2291,7 +2291,8 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
   let verify (public_input_js : public_input_js) (proof : _ Pickles.Proof.t) =
     let public_input = Public_input.(public_input_js |> of_js |> to_constant) in
     Proof.verify_promise [ (public_input, proof) ]
-    |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
+    |> Promise.map ~f:(fun x -> Js.bool (Or_error.is_ok x))
+    |> Promise_js_helpers.to_js
   in
   object%js
     val provers = Obj.magic provers
@@ -2359,7 +2360,8 @@ let verify (public_input : public_input_js) (proof : proof)
           (Error.to_string_hum err) ()
   in
   Pickles.Side_loaded.verify_promise ~typ [ (vk, public_input, proof) ]
-  |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
+  |> Promise.map ~f:(fun x -> Js.bool (Or_error.is_ok x))
+  |> Promise_js_helpers.to_js
 
 let dummy_base64_proof () =
   let n2 = Pickles_types.Nat.N2.n in
@@ -2423,7 +2425,8 @@ module Ledger = struct
     ; editSequenceState : Js.js_string Js.t Js.readonly_prop
     ; setTokenSymbol : Js.js_string Js.t Js.readonly_prop
     ; incrementNonce : Js.js_string Js.t Js.readonly_prop
-    ; setVotingFor : Js.js_string Js.t Js.readonly_prop >
+    ; setVotingFor : Js.js_string Js.t Js.readonly_prop
+    ; setTiming : Js.js_string Js.t Js.readonly_prop >
     Js.t
 
   type timing =
@@ -2465,6 +2468,7 @@ module Ledger = struct
     ; set_token_symbol = None
     ; increment_nonce = None
     ; set_voting_for = None
+    ; set_timing = None
     }
 
   module L : Mina_base.Ledger_intf.S = struct
@@ -2751,6 +2755,9 @@ module Ledger = struct
         val setVotingFor =
           Js.string
             (Mina_base.Permissions.Auth_required.to_string p.set_voting_for)
+
+        val setTiming =
+          Js.string (Mina_base.Permissions.Auth_required.to_string p.set_timing)
       end
 
     let timing (t : Mina_base.Account_timing.t) : timing =

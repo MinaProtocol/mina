@@ -39,8 +39,9 @@ let verify_heterogenous (ts : Instance.t list) =
           Ok ()
       | _ ->
           Error
-            (String.concat ~sep:"\n"
-               (List.map !r ~f:(fun lab -> Lazy.force lab)) )
+            ( Error.tag ~tag:"Pickles.verify"
+            @@ Error.of_list
+            @@ List.map !r ~f:(fun lab -> Error.of_string (Lazy.force lab)) )
     in
     ((fun (lab, b) -> if not b then r := lab :: !r), result)
   in
@@ -363,12 +364,7 @@ let verify_heterogenous (ts : Instance.t list) =
                        .old_bulletproof_challenges ) ) ) ) )
   in
   Common.time "dlog_check" (fun () -> check (lazy "dlog_check", dlog_check)) ;
-  match result () with
-  | Ok () ->
-      true
-  | Error e ->
-      eprintf !"bad verify: %s\n%!" e ;
-      false
+  result ()
 
 let verify (type a return_typ n)
     (max_proofs_verified : (module Nat.Intf with type n = n))
