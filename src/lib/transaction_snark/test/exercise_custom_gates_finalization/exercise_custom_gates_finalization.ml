@@ -160,10 +160,10 @@ let mk_cmds () =
     ]
 
 (* NOTE: THIS TEST ONLY FAILS WITH THE `develop` DUNE PROFILE
-Run with
-```
-dune runtest --profile=devnet --no-buffer src/lib/transaction_snark/test/exercise_custom_gates_finalization/
-```
+   Run with
+   ```
+   dune runtest --profile=devnet --no-buffer src/lib/transaction_snark/test/exercise_custom_gates_finalization/
+   ```
 *)
 let%test_unit "Prove transaction" =
   let open Async in
