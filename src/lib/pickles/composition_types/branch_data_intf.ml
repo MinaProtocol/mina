@@ -11,6 +11,8 @@ module type S = sig
     end]
 
     val of_int_exn : int -> t
+
+    val to_int : t -> int
   end
 
   [%%versioned:

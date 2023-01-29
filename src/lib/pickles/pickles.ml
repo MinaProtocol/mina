@@ -2415,19 +2415,29 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     done ) )
           ; tweak_statement =
               (fun stmt ->
-                { stmt with
-                  proof_state =
-                    { stmt.proof_state with
-                      deferred_values =
-                        { stmt.proof_state.deferred_values with
-                          branch_data =
-                            { stmt.proof_state.deferred_values.branch_data with
-                              domain_log2 =
-                                Branch_data.Domain_log2.of_int_exn 17
-                            }
-                        }
-                    }
-                } )
+                Format.printf "[DEBUG: %d]@."
+                  (Branch_data.Domain_log2.to_int
+                     stmt.proof_state.deferred_values.branch_data.domain_log2 ) ;
+                let res =
+                  { stmt with
+                    proof_state =
+                      { stmt.proof_state with
+                        deferred_values =
+                          { stmt.proof_state.deferred_values with
+                            branch_data =
+                              { stmt.proof_state.deferred_values.branch_data with
+                                domain_log2 =
+                                  Branch_data.Domain_log2.of_int_exn
+                                    (Nat.to_int Backend.Tick.Rounds.n)
+                              }
+                          }
+                      }
+                  }
+                in
+                Format.printf "[DEBUG: %d]@."
+                  (Branch_data.Domain_log2.to_int
+                     res.proof_state.deferred_values.branch_data.domain_log2 ) ;
+                res )
           }
       end)
     end )

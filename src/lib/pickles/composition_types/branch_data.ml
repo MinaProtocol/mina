@@ -29,6 +29,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let of_int_exn : int -> t = Char.of_int_exn
 
+    let to_int : t -> int = Char.to_int
+
     let of_bits_msb (bs : bool list) : t =
       List.fold bs ~init:0 ~f:(fun acc b ->
           let acc = acc lsl 1 in
