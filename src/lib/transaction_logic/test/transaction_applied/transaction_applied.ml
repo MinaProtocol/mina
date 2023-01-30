@@ -27,7 +27,6 @@ let%test_module "transaction_applied" =
                   { Signature_lib.Public_key.Compressed.Poly.x = 1
                   ; is_odd = false
                   }
-                  (* ; token_id = 1 *)
               ; amount = Currency.Amount.zero
               }
         }
