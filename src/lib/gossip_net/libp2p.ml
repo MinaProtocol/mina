@@ -649,7 +649,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
         -> r
         -> q Deferred.Or_error.t =
      fun ?heartbeat_timeout ?timeout ~rpc_counter ~rpc_failed_counter ~rpc_name
-         t _peer transport dispatch query ->
+         t peer transport dispatch query ->
       let call () =
         Monitor.try_with ~here:[%here] (fun () ->
             (* Async_rpc_kernel takes a transport instead of a Reader.t *)
@@ -683,7 +683,10 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                 (`Call
                   (fun exn ->
                     [%log' error t.config.logger] "Handshake error: $exn"
-                      ~metadata:[ ("exn", `String (Exn.to_string exn)) ] ;
+                      ~metadata:
+                        [ ("peer", Peer.to_yojson peer)
+                        ; ("exn", `String (Exn.to_string exn))
+                        ] ;
                     Deferred.Or_error.error_string "handshake error" ) ) )
         >>= function
         | Ok (Ok result) ->
@@ -693,7 +696,8 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
             (* call succeeded, result is an error *)
             [%log' warn t.config.logger] "RPC call error for $rpc"
               ~metadata:
-                [ ("rpc", `String rpc_name)
+                [ ("peer", Peer.to_yojson peer)
+                ; ("rpc", `String rpc_name)
                 ; ("error", Error_json.error_to_yojson err)
                 ] ;
             Mina_metrics.(Counter.inc_one rpc_failed_counter) ;
@@ -726,14 +730,16 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                   [%log' debug t.config.logger]
                     "RPC call for $rpc raised an exception"
                     ~metadata:
-                      [ ("rpc", `String rpc_name)
+                      [ ("peer", Peer.to_yojson peer)
+                      ; ("rpc", `String rpc_name)
                       ; ("exn", `String (Exn.to_string exn))
                       ]
               | _ ->
                   [%log' warn t.config.logger]
                     "RPC call for $rpc raised an exception"
                     ~metadata:
-                      [ ("rpc", `String rpc_name)
+                      [ ("peer", Peer.to_yojson peer)
+                      ; ("rpc", `String rpc_name)
                       ; ("exn", `String (Exn.to_string exn))
                       ]
             in
