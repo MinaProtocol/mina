@@ -3998,7 +3998,7 @@ let%test_module "staged ledger tests" =
                   Mina_transaction_logic.For_tests.Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  (*create a snapp account*)
+                  (* create a zkApp account *)
                   let snapp_permissions =
                     let default = Permissions.user_default in
                     { default with
