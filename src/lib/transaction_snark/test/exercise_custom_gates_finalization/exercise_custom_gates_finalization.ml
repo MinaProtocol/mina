@@ -177,6 +177,9 @@ let%test_unit "Prove transaction" =
       Init_ledger.init
         (module Mina_ledger.Ledger.Ledger_inner)
         keypair_and_amounts ledger ;
+      Format.eprintf
+        !"Merkel root: %{sexp: Ledger_hash.t}@."
+        (Mina_ledger.Ledger.merkle_root ledger) ;
       let%map () =
         Transaction_snark_tests.Util.check_zkapp_command_with_merges_exn ledger
           txns
