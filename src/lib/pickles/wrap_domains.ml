@@ -34,8 +34,9 @@ struct
              Verification_key.dummy_commitments g ) )
     in
     Timer.clock __LOC__ ;
+    let srs = Backend.Tick.Keypair.load_urs () in
     let _, main =
-      Wrap_main.wrap_main full_signature choices_length dummy_step_keys
+      Wrap_main.wrap_main ~srs full_signature choices_length dummy_step_keys
         dummy_step_widths dummy_step_domains max_proofs_verified
     in
     Timer.clock __LOC__ ;

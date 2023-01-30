@@ -122,11 +122,7 @@ module Gossip : sig
 end
 
 module Snark_work_failed : sig
-  type t =
-    { error : Yojson.Safe.t
-    ; work_spec : Snark_worker.Work.Spec.t
-    ; prover_public_key : Signature_lib.Public_key.Compressed.t
-    }
+  type t = { error : Yojson.Safe.t }
 
   include Event_type_intf with type t := t
 end

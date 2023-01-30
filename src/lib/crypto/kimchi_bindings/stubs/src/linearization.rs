@@ -2,29 +2,28 @@ use kimchi::{
     circuits::{
         constraints::FeatureFlags,
         expr::Linearization,
-        lookup::constraints::LookupConfiguration,
-        lookup::lookups::{JointLookup, LookupInfo, LookupPattern, LookupsUsed},
+        lookup::lookups::{LookupFeatures, LookupPatterns},
     },
     linearization::{constraints_expr, linearization_columns},
 };
 
 /// Converts the linearization of the kimchi circuit polynomial into a printable string.
 pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
-    lookup_configuration: Option<LookupConfiguration<F>>,
+    lookup_features: Option<LookupFeatures>,
 ) -> (String, Vec<(String, String)>) {
-    let evaluated_cols = linearization_columns::<F>(lookup_configuration.as_ref());
-    let feature_flags = match lookup_configuration {
+    let feature_flags = match lookup_features {
         None => None,
-        Some(lookup_configuration) => Some(FeatureFlags {
+        Some(lookup_features) => Some(FeatureFlags {
             chacha: false,
             range_check: false,
             rot: false,
             foreign_field_add: false,
             foreign_field_mul: false,
             xor: false,
-            lookup_configuration: Some(lookup_configuration),
+            lookup_features,
         }),
     };
+    let evaluated_cols = linearization_columns::<F>(feature_flags.as_ref());
     let (linearization, _powers_of_alpha) = constraints_expr::<F>(feature_flags.as_ref(), true);
 
     let Linearization {
@@ -39,23 +38,24 @@ pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
     let constant = constant_term.ocaml_str();
     let other_terms = index_terms
         .iter()
-        .map(|(col, expr)| (format!("{:?}", col), format!("{}", expr.ocaml_str())))
+        .map(|(col, expr)| (format!("{:?}", col), expr.ocaml_str()))
         .collect();
 
     (constant, other_terms)
 }
 
-pub fn lookup_gate_config<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
-) -> LookupConfiguration<F> {
-    LookupConfiguration {
-        lookup_used: LookupsUsed::Joint,
-
-        lookup_info: LookupInfo::create([LookupPattern::Lookup].into_iter().collect(), true),
-
-        dummy_lookup: JointLookup {
-            table_id: F::zero(),
-            entry: vec![],
+pub fn lookup_gate_config(
+) -> LookupFeatures {
+    LookupFeatures {
+        patterns: LookupPatterns {
+            xor: false,
+            chacha_final: false,
+            lookup: true,
+            range_check: false,
+            foreign_field_mul: false,
         },
+        joint_lookup_used: true,
+        uses_runtime_tables: true,
     }
 }
 
