@@ -61,8 +61,8 @@ let validate_transition ~context:(module Context : CONTEXT) ~frontier
   Unprocessed_transition_cache.register_exn unprocessed_transition_cache
     enveloped_transition
 
-let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
-    ~frontier ~transition_reader
+let run ~context:(module Context : CONTEXT) ~time_controller ~frontier
+    ~transition_reader
     ~(valid_transition_writer :
        ( [ `Block of
            ( Mina_block.initial_valid_block Envelope.Incoming.t
@@ -89,15 +89,11 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
               ~frontier ~unprocessed_transition_cache transition_env
           with
           | Ok cached_transition ->
-              let%map () =
-                Trust_system.record_envelope_sender trust_system logger sender
-                  ( Trust_system.Actions.Sent_useful_gossip
-                  , Some
-                      ( "external transition $state_hash"
-                      , [ ("state_hash", State_hash.to_yojson transition_hash)
-                        ; ("transition", Mina_block.to_yojson transition)
-                        ] ) )
-              in
+              [%log info] "Sent useful gossip"
+                ~metadata:
+                  [ ("state_hash", State_hash.to_yojson transition_hash)
+                  ; ("transition", Mina_block.to_yojson transition)
+                  ] ;
               let transition_time =
                 Mina_block.header transition
                 |> Header.protocol_state |> Protocol_state.blockchain_state
@@ -108,35 +104,28 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
                 (Core_kernel.Time.diff
                    Block_time.(now time_controller |> to_time_exn)
                    transition_time ) ;
-              Writer.write valid_transition_writer
-                (`Block cached_transition, `Valid_cb vc)
+              return
+              @@ Writer.write valid_transition_writer
+                   (`Block cached_transition, `Valid_cb vc)
           | Error (`In_frontier _) | Error (`In_process _) ->
-              Trust_system.record_envelope_sender trust_system logger sender
-                ( Trust_system.Actions.Sent_old_gossip
-                , Some
-                    ( "external transition with state hash $state_hash"
-                    , [ ("state_hash", State_hash.to_yojson transition_hash)
-                      ; ("transition", Mina_block.to_yojson transition)
-                      ] ) )
+              [%log info] "Sent old gossip"
+                ~metadata:
+                  [ ("state_hash", State_hash.to_yojson transition_hash)
+                  ; ("transition", Mina_block.to_yojson transition)
+                  ] ;
+              Deferred.unit
           | Error `Disconnected ->
               Mina_metrics.(Counter.inc_one Rejected_blocks.worse_than_root) ;
               [%log error]
+                "Rejected block with state hash $state_hash from $sender, not \
+                 connected to our chain"
                 ~metadata:
                   [ ("state_hash", State_hash.to_yojson transition_hash)
                   ; ("reason", `String "not selected over current root")
                   ; ( "protocol_state"
                     , Header.protocol_state (Mina_block.header transition)
                       |> Protocol_state.value_to_yojson )
-                  ]
-                "Validation error: external transition with state hash \
-                 $state_hash was rejected for reason $reason" ;
-              Trust_system.record_envelope_sender trust_system logger sender
-                ( Trust_system.Actions.Disconnected_chain
-                , Some
-                    ( "received transition that was not connected to our chain \
-                       from $sender"
-                    , [ ( "sender"
-                        , Envelope.Sender.to_yojson
-                            (Envelope.Incoming.sender transition_env) )
-                      ; ("transition", Mina_block.to_yojson transition)
-                      ] ) ) ) )
+                  ; ("sender", Envelope.Sender.to_yojson sender)
+                  ; ("transition", Mina_block.to_yojson transition)
+                  ] ;
+              Deferred.unit ) )

@@ -5,7 +5,7 @@ open Cache_lib
 open Network_peer
 
 let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
-    ~trust_system ~frontier ~initial_hash subtrees_of_enveloped_transitions =
+    ~ban_peer ~frontier ~initial_hash subtrees_of_enveloped_transitions =
   let missing_parent_msg =
     Printf.sprintf
       "Transition frontier already garbage-collected the parent of %s"
@@ -97,7 +97,7 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                 match%bind
                   Deferred.Or_error.try_with ~here:[%here] (fun () ->
                       Transition_frontier.Breadcrumb.build ~logger
-                        ~precomputed_values ~verifier ~trust_system ~parent
+                        ~precomputed_values ~verifier ~ban_peer ~parent
                         ~transition:mostly_validated_transition
                         ~sender:(Some sender) ~transition_receipt_time () )
                 with
@@ -139,23 +139,25 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                                   Set.add inet_addrs peer )
                         in
                         let ip_addresses = Set.to_list ip_address_set in
-                        let trust_system_record_invalid msg error =
+                        let log_invalid staged_ledger_error error =
                           let%map () =
                             Deferred.List.iter ip_addresses ~f:(fun ip_addr ->
-                                Trust_system.record trust_system logger ip_addr
-                                  ( Trust_system.Actions
-                                    .Gossiped_invalid_transition
-                                  , Some (msg, []) ) )
+                                [%log error] "Gossiped invalid transition"
+                                  ~metadata:
+                                    [ ("address", Peer.to_yojson ip_addr)
+                                    ; ( "staged_ledger_error"
+                                      , `String staged_ledger_error )
+                                    ; ("error", Error_json.error_to_yojson error)
+                                    ] ;
+                                ban_peer ip_addr )
                           in
                           Error error
                         in
                         match err with
                         | `Invalid_staged_ledger_hash error ->
-                            trust_system_record_invalid
-                              "invalid staged ledger hash" error
+                            log_invalid "invalid staged ledger hash" error
                         | `Invalid_staged_ledger_diff error ->
-                            trust_system_record_invalid
-                              "invalid staged ledger diff" error
+                            log_invalid "invalid staged ledger diff" error
                         | `Fatal_error exn ->
                             Deferred.return (Or_error.of_exn exn) ) ) )
             |> Cached.sequence_deferred

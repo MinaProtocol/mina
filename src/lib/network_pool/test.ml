@@ -8,8 +8,6 @@ open Inline_test_quiet_logs
 
 let%test_module "network pool test" =
   ( module struct
-    let trust_system = Mocks.trust_system
-
     let logger = Logger.null ()
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
@@ -33,7 +31,7 @@ let%test_module "network pool test" =
         (Mocks.Transition_frontier)
 
     let config =
-      Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
+      Mock_snark_pool.Resource_pool.make_config ~verifier
         ~disk_location:"/tmp/snark-pool"
 
     let%test_unit "Work that gets fed into apply_and_broadcast will be \

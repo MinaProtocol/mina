@@ -21,7 +21,6 @@
    verifier
    precomputed_values
    block_time
-   trust_system
    logger
    consensus
    transition_frontier

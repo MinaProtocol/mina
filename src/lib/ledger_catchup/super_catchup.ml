@@ -129,8 +129,14 @@ let write_graph (_ : t) =
   let _ = G.output_graph in
   ()
 
-let verify_transition ~context:(module Context : CONTEXT) ~trust_system
-    ~frontier ~unprocessed_transition_cache enveloped_transition =
+let ban_sender ~network = function
+  | Envelope.Sender.Remote peer ->
+      Mina_networking.ban_peer network peer
+  | Local ->
+      Deferred.unit
+
+let verify_transition ~context:(module Context : CONTEXT) ~frontier ~network
+    ~unprocessed_transition_cache enveloped_transition =
   let open Context in
   let sender = Envelope.Incoming.sender enveloped_transition in
   let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
@@ -198,83 +204,69 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
          queried during ledger catchup: $error" ;
       Deferred.Or_error.fail (Error.tag ~tag:"verifier threw an error" error)
   | Error `Invalid_proof ->
-      let%map () =
-        Trust_system.record_envelope_sender trust_system logger sender
-          ( Trust_system.Actions.Gossiped_invalid_transition
-          , Some ("invalid proof", []) )
-      in
       [%log warn]
-        ~metadata:[ ("state_hash", state_hash) ]
+        ~metadata:
+          [ ("state_hash", state_hash)
+          ; ("sender", Envelope.Sender.to_yojson sender)
+          ]
         "initial_validate: invalid proof" ;
-      Error (Error.of_string "invalid proof")
+      let%bind () = ban_sender ~network sender in
+      return @@ Error (Error.of_string "invalid proof")
   | Error `Invalid_genesis_protocol_state ->
-      let%map () =
-        Trust_system.record_envelope_sender trust_system logger sender
-          ( Trust_system.Actions.Gossiped_invalid_transition
-          , Some ("invalid genesis protocol state", []) )
-      in
       [%log warn]
-        ~metadata:[ ("state_hash", state_hash) ]
+        ~metadata:
+          [ ("state_hash", state_hash)
+          ; ("sender", Envelope.Sender.to_yojson sender)
+          ]
         "initial_validate: invalid genesis protocol state" ;
-      Error (Error.of_string "invalid genesis protocol state")
+      let%bind () = ban_sender ~network sender in
+      return @@ Error (Error.of_string "invalid genesis protocol state")
   | Error `Invalid_delta_block_chain_proof ->
       [%log warn]
-        ~metadata:[ ("state_hash", state_hash) ]
+        ~metadata:
+          [ ("state_hash", state_hash)
+          ; ("sender", Envelope.Sender.to_yojson sender)
+          ]
         "initial_validate: invalid delta transition chain proof" ;
-      let%map () =
-        Trust_system.record_envelope_sender trust_system logger sender
-          ( Trust_system.Actions.Gossiped_invalid_transition
-          , Some ("invalid delta transition chain witness", []) )
-      in
-      Error (Error.of_string "invalid delta transition chain witness")
+      let%bind () = ban_sender ~network sender in
+      return @@ Error (Error.of_string "invalid delta transition chain witness")
   | Error `Invalid_protocol_version ->
+      let transition = Validation.block transition_with_hash in
       [%log warn]
-        ~metadata:[ ("state_hash", state_hash) ]
+        ~metadata:
+          [ ("state_hash", state_hash)
+          ; ( "block_current_protocol_version"
+            , `String
+                ( Header.current_protocol_version (Mina_block.header transition)
+                |> Protocol_version.to_string ) )
+          ; ( "daemon_current_protocol_version"
+            , `String Protocol_version.(get_current () |> to_string) )
+          ; ("sender", Envelope.Sender.to_yojson sender)
+          ]
         "initial_validate: invalid protocol version" ;
-      let transition = Validation.block transition_with_hash in
-      let%map () =
-        Trust_system.record_envelope_sender trust_system logger sender
-          ( Trust_system.Actions.Sent_invalid_protocol_version
-          , Some
-              ( "Invalid current or proposed protocol version in catchup block"
-              , [ ( "current_protocol_version"
-                  , `String
-                      ( Header.current_protocol_version
-                          (Mina_block.header transition)
-                      |> Protocol_version.to_string ) )
-                ; ( "proposed_protocol_version"
-                  , `String
-                      ( Header.proposed_protocol_version_opt
-                          (Mina_block.header transition)
-                      |> Option.value_map ~default:"<None>"
-                           ~f:Protocol_version.to_string ) )
-                ] ) )
-      in
-      Error (Error.of_string "invalid protocol version")
+      let%bind () = ban_sender ~network sender in
+      return @@ Error (Error.of_string "invalid protocol version")
   | Error `Mismatched_protocol_version ->
-      [%log warn]
-        ~metadata:[ ("state_hash", state_hash) ]
-        "initial_validate: mismatch protocol version" ;
       let transition = Validation.block transition_with_hash in
-      let%map () =
-        Trust_system.record_envelope_sender trust_system logger sender
-          ( Trust_system.Actions.Sent_mismatched_protocol_version
-          , Some
-              ( "Current protocol version in catchup block does not match \
-                 daemon protocol version"
-              , [ ( "block_current_protocol_version"
-                  , `String
-                      ( Header.current_protocol_version
-                          (Mina_block.header transition)
-                      |> Protocol_version.to_string ) )
-                ; ( "daemon_current_protocol_version"
-                  , `String Protocol_version.(get_current () |> to_string) )
-                ] ) )
-      in
-      Error (Error.of_string "mismatched protocol version")
+      [%log warn]
+        ~metadata:
+          [ ("state_hash", state_hash)
+          ; ( "block_current_protocol_version"
+            , `String
+                ( Header.current_protocol_version (Mina_block.header transition)
+                |> Protocol_version.to_string ) )
+          ; ( "daemon_current_protocol_version"
+            , `String Protocol_version.(get_current () |> to_string) )
+          ; ("sender", Envelope.Sender.to_yojson sender)
+          ]
+        "initial_validate: mismatch protocol version" ;
+      return @@ Error (Error.of_string "mismatched protocol version")
   | Error `Disconnected ->
       [%log warn]
-        ~metadata:[ ("state_hash", state_hash) ]
+        ~metadata:
+          [ ("state_hash", state_hash)
+          ; ("sender", Envelope.Sender.to_yojson sender)
+          ]
         "initial_validate: disconnected chain" ;
       Deferred.Or_error.fail @@ Error.of_string "disconnected chain"
 
@@ -407,8 +399,8 @@ let with_lengths hs ~target_length =
       (x, x_len) )
 
 (* returns a list of state-hashes with the older ones at the front *)
-let download_state_hashes t ~logger ~trust_system ~network ~frontier
-    ~target_hash ~target_length ~downloader ~blockchain_length_of_target_hash
+let download_state_hashes t ~logger ~network ~frontier ~target_hash
+    ~target_length ~downloader ~blockchain_length_of_target_hash
     ~preferred_peers =
   [%log debug]
     ~metadata:[ ("target_hash", State_hash.to_yojson target_hash) ]
@@ -445,15 +437,11 @@ let download_state_hashes t ~logger ~trust_system ~network ~frontier
             Deferred.Result.return hs
         | None ->
             let error_msg =
-              sprintf !"Peer %{sexp:Network_peer.Peer.t} sent us bad proof" peer
+              sprintf !"Peer %{sexp:Peer.t} sent a bad proof" peer
             in
-            let%bind.Deferred () =
-              Trust_system.(
-                record trust_system logger peer
-                  Actions.
-                    ( Sent_invalid_transition_chain_merkle_proof
-                    , Some (error_msg, []) ))
-            in
+            [%log error] "%s" error_msg
+              ~metadata:[ ("peer", Peer.to_yojson peer) ] ;
+            let%bind.Deferred () = Mina_networking.ban_peer network peer in
             Deferred.Result.fail `Invalid_transition_chain_proof
       in
       Deferred.return
@@ -568,8 +556,8 @@ module Verify_work_batcher = struct
   let verify (t : _ t) = verify t
 end
 
-let initial_validate ~context:(module Context : CONTEXT) ~trust_system
-    ~(batcher : _ Initial_validate_batcher.t) ~frontier
+let initial_validate ~context:(module Context : CONTEXT)
+    ~(batcher : _ Initial_validate_batcher.t) ~frontier ~network
     ~unprocessed_transition_cache transition =
   let open Context in
   let verification_start_time = Core.Time.now () in
@@ -586,27 +574,14 @@ let initial_validate ~context:(module Context : CONTEXT) ~trust_system
     | Ok (Ok tv) ->
         return (Ok { transition with data = tv })
     | Ok (Error invalid) ->
-        let err = Verifier.invalid_to_error invalid in
-        [%log warn]
+        let s = "initial_validate: block failed to verify, invalid proof" in
+        [%log warn] "%s" s
           ~metadata:
             [ ("state_hash", state_hash)
-            ; ("err", Error_json.error_to_yojson err)
-            ]
-          "initial_validate: block failed to verify due to $err." ;
-        let%map () =
-          match transition.sender with
-          | Local ->
-              Deferred.unit
-          | Remote peer ->
-              Trust_system.(
-                record trust_system logger peer
-                  Actions.(Sent_invalid_proof, None))
-        in
-        let err =
-          Error.tag err
-            ~tag:"initial_validate: block failed to verify, invalid proof"
-        in
-        Error (`Error err)
+            ; ("error", Verifier.invalid_to_yojson invalid)
+            ] ;
+        let%bind () = ban_sender ~network transition.sender in
+        return @@ Error (`Error (Error.of_string s))
     | Error e ->
         [%log warn]
           ~metadata:
@@ -630,7 +605,7 @@ let initial_validate ~context:(module Context : CONTEXT) ~trust_system
     "initial_validate: verification of proofs complete" ;
   verify_transition
     ~context:(module Context)
-    ~trust_system ~frontier ~unprocessed_transition_cache tv
+    ~frontier ~network ~unprocessed_transition_cache tv
   |> Deferred.map ~f:(Result.map_error ~f:(fun e -> `Error e))
 
 open Frontier_base
@@ -714,14 +689,14 @@ let forest_pick forest =
       assert false )
 
 let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
-    ~downloader ~trust_system ~frontier ~unprocessed_transition_cache
+    ~network ~downloader ~frontier ~unprocessed_transition_cache
     ~catchup_breadcrumbs_writer
     ~(build_func :
           ?skip_staged_ledger_verification:[ `All | `Proofs ]
        -> logger:Logger.t
        -> precomputed_values:Precomputed_values.t
        -> verifier:Verifier.t
-       -> trust_system:Trust_system.t
+       -> ban_peer:(Peer.t -> unit Deferred.t)
        -> parent:Breadcrumb.t
        -> transition:Mina_block.almost_valid_block
        -> sender:Envelope.Sender.t option
@@ -822,7 +797,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
           step
             ( initial_validate
                 ~context:(module Context)
-                ~trust_system ~batcher:initial_validation_batcher ~frontier
+                ~batcher:initial_validation_batcher ~frontier ~network
                 ~unprocessed_transition_cache
                 { external_block with
                   data =
@@ -881,14 +856,6 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
                       , Error_json.error_to_yojson
                           (Verifier.invalid_to_error err) )
                     ] ;
-                ( match iv.sender with
-                | Local ->
-                    ()
-                | Remote peer ->
-                    Trust_system.(
-                      record trust_system logger peer
-                        Actions.(Sent_invalid_proof, None))
-                    |> don't_wait_for ) ;
                 Option.value_map valid_cb ~default:ignore
                   ~f:Mina_net2.Validation_callback.fire_if_not_already_fired
                   `Reject ;
@@ -949,8 +916,9 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
                 | Some breadcrumb ->
                     Ok breadcrumb )
             in
+            let ban_peer = Mina_networking.ban_peer network in
             build_func ~logger ~skip_staged_ledger_verification:`Proofs
-              ~precomputed_values ~verifier ~trust_system ~parent
+              ~precomputed_values ~verifier ~ban_peer ~parent
               ~transition:av.data ~sender:(Some av.sender)
               ~transition_receipt_time ()
           in
@@ -1005,8 +973,8 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
   run_node
 
 (* TODO: In the future, this could take over scheduling bootstraps too. *)
-let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
-    ~network ~frontier ~build_func
+let run_catchup ~context:(module Context : CONTEXT) ~verifier ~network ~frontier
+    ~build_func
     ~(catchup_job_reader :
        ( State_hash.t
        * ( ( Mina_block.initial_valid_block Envelope.Incoming.t
@@ -1082,7 +1050,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
               | None ->
                   `Some [] ) )
     in
-    Downloader.create ~stop ~trust_system ~preferred:[] ~max_batch_size:5
+    Downloader.create ~stop ~preferred:[] ~max_batch_size:5
       ~get:(fun peer hs ->
         let sec =
           let sec_per_block =
@@ -1117,10 +1085,10 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
         "Catchup states $states") ;
   *)
   let run_state_machine =
-    setup_state_machine_runner ~t ~verifier ~downloader
+    setup_state_machine_runner ~t ~verifier ~downloader ~network
       ~context:(module Context)
-      ~trust_system ~frontier ~unprocessed_transition_cache
-      ~catchup_breadcrumbs_writer ~build_func
+      ~frontier ~unprocessed_transition_cache ~catchup_breadcrumbs_writer
+      ~build_func
   in
   (* TODO: Maybe add everything from transition frontier at the beginning? *)
   (* TODO: Print out the hashes you're adding *)
@@ -1203,9 +1171,8 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                           | Remote peer ->
                               Peer.Set.add acc peer )
                     in
-                    download_state_hashes t ~logger ~trust_system ~network
-                      ~frontier ~downloader ~target_length
-                      ~target_hash:target_parent_hash
+                    download_state_hashes t ~logger ~network ~frontier
+                      ~downloader ~target_length ~target_hash:target_parent_hash
                       ~blockchain_length_of_target_hash ~preferred_peers
                 | Some res ->
                     [%log debug] "Succeeded in using cache." ;
@@ -1326,22 +1293,22 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                           (h, l) )
                       : State_hash.t * Length.t ) ) ) )
 
-let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
-    ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
+let run ~context:(module Context : CONTEXT) ~verifier ~network ~frontier
+    ~catchup_job_reader ~catchup_breadcrumbs_writer
     ~unprocessed_transition_cache : unit =
   O1trace.background_thread "perform_super_catchup" (fun () ->
       run_catchup
         ~context:(module Context)
-        ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
+        ~verifier ~network ~frontier ~catchup_job_reader
         ~unprocessed_transition_cache ~catchup_breadcrumbs_writer
         ~build_func:Transition_frontier.Breadcrumb.build )
 
 (* Unit tests *)
 
-(* let run_test_only ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
+(* let run_test_only ~logger ~precomputed_values  ~verifier ~network ~frontier
      ~catchup_job_reader ~catchup_breadcrumbs_writer
      ~unprocessed_transition_cache : unit =
-   run_catchup ~logger ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
+   run_catchup ~logger  ~verifier ~network ~frontier ~catchup_job_reader
      ~precomputed_values ~unprocessed_transition_cache
      ~catchup_breadcrumbs_writer ~build_func:(Transition_frontier.Breadcrumb.For_tests.build_fail)
    |> don't_wait_for *)
@@ -1361,8 +1328,6 @@ let%test_module "Ledger_catchup tests" =
     let proof_level = precomputed_values.proof_level
 
     let constraint_constants = precomputed_values.constraint_constants
-
-    let trust_system = Trust_system.null ()
 
     (* let time_controller = Block_time.Controller.basic ~logger *)
 
@@ -1438,7 +1403,7 @@ let%test_module "Ledger_catchup tests" =
       in
       run
         ~context:(module Context)
-        ~verifier ~trust_system ~network ~frontier ~catchup_breadcrumbs_writer
+        ~verifier ~network ~frontier ~catchup_breadcrumbs_writer
         ~catchup_job_reader ~unprocessed_transition_cache ;
       { cache = unprocessed_transition_cache
       ; job_writer = catchup_job_writer
@@ -1457,7 +1422,7 @@ let%test_module "Ledger_catchup tests" =
        let unprocessed_transition_cache =
          Transition_handler.Unprocessed_transition_cache.create ~logger
        in
-       run_test_only ~logger ~precomputed_values ~verifier ~trust_system ~network ~frontier
+       run_test_only ~logger ~precomputed_values ~verifier  ~network ~frontier
          ~catchup_breadcrumbs_writer ~catchup_job_reader
          ~unprocessed_transition_cache ;
        { cache = unprocessed_transition_cache

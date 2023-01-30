@@ -19,7 +19,6 @@
    data_hash_lib
    inline_test_quiet_logs
    block_time
-   trust_system
    o1trace
    transition_frontier_base
    cache_lib

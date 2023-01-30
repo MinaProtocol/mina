@@ -2731,8 +2731,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                    ; staking = staking.expected_root
                    } ) )
 
-    let sync_local_state ~context:(module Context : CONTEXT) ~trust_system
-        ~local_state ~glue_sync_ledger requested_syncs =
+    let sync_local_state ~context:(module Context : CONTEXT) ~local_state
+        ~glue_sync_ledger requested_syncs =
       let open Context in
       let open Local_state in
       let open Snapshot in
@@ -2811,7 +2811,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 return @@ db_ledger_of_snapshot !local_state.next_epoch_snapshot
           in
           let sync_ledger =
-            Mina_ledger.Sync_ledger.Db.create ~logger ~trust_system db_ledger
+            Mina_ledger.Sync_ledger.Db.create ~logger db_ledger
           in
           let query_reader =
             Mina_ledger.Sync_ledger.Db.query_reader sync_ledger

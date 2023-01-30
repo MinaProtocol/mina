@@ -747,6 +747,10 @@ let transaction_pool t = t.components.transaction_pool
 
 let snark_pool t = t.components.snark_pool
 
+let net t = t.components.net
+
+let verifier t = t.processes.verifier
+
 let peers t = Mina_networking.peers t.components.net
 
 let initial_peers t = Mina_networking.initial_peers t.components.net
@@ -1308,8 +1312,8 @@ let start t =
   then
     Block_producer.run ~context:(context t.config)
       ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
+      ~ban_peer:(Mina_networking.ban_peer (net t))
       ~set_next_producer_timing ~prover:t.processes.prover
-      ~trust_system:t.config.trust_system
       ~transaction_resource_pool:
         (Network_pool.Transaction_pool.resource_pool
            t.components.transaction_pool )
@@ -1354,7 +1358,8 @@ let start t =
 let start_with_precomputed_blocks t blocks =
   let%bind () =
     Block_producer.run_precomputed ~context:(context t.config)
-      ~verifier:t.processes.verifier ~trust_system:t.config.trust_system
+      ~verifier:t.processes.verifier
+      ~ban_peer:(Mina_networking.ban_peer (net t))
       ~time_controller:t.config.time_controller
       ~frontier_reader:t.components.transition_frontier
       ~transition_writer:t.pipes.producer_transition_writer
@@ -1616,10 +1621,6 @@ let create ?wallets (config : Config.t) =
                         |> Public_key.Compressed.Set.map ~f:snd
                         |> Set.to_list
                       in
-                      let ban_statuses =
-                        Trust_system.Peer_trust.peer_statuses
-                          config.trust_system
-                      in
                       let git_commit = Mina_version.commit_id_short in
                       let uptime_minutes =
                         let now = Time.now () in
@@ -1655,7 +1656,6 @@ let create ?wallets (config : Config.t) =
                         ; peers
                         ; block_producers
                         ; protocol_state_hash
-                        ; ban_statuses
                         ; k_block_hashes_and_timestamps
                         ; git_commit
                         ; uptime_minutes
@@ -1675,7 +1675,6 @@ let create ?wallets (config : Config.t) =
           in
           let txn_pool_config =
             Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
-              ~trust_system:config.trust_system
               ~pool_max_size:
                 config.precomputed_values.genesis_constants.txpool_max_size
               ~genesis_constants:config.precomputed_values.genesis_constants
@@ -1709,7 +1708,6 @@ let create ?wallets (config : Config.t) =
           in
           let snark_pool_config =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
-              ~trust_system:config.trust_system
               ~disk_location:config.snark_pool_disk_location
           in
           let%bind snark_pool, snark_remote_sink, snark_local_sink =
@@ -1783,21 +1781,41 @@ let create ?wallets (config : Config.t) =
                           Deferred.return
                           @@ peek_frontier frontier_broadcast_pipe_r
                         in
-                        Sync_handler.answer_query ~frontier ledger_hash
-                          (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
-                          ~logger:config.logger
-                          ~trust_system:config.trust_system
-                        |> Deferred.map
-                           (* begin error string prefix so we can pattern-match *)
-                             ~f:
-                               (Result.of_option
-                                  ~error:
-                                    (Error.createf
-                                       !"%s for ledger_hash: \
-                                         %{sexp:Ledger_hash.t}"
-                                       Mina_networking
-                                       .refused_answer_query_string ledger_hash ) ) )
-                    )
+                        let%bind.Deferred res =
+                          Sync_handler.answer_query ~frontier ledger_hash
+                            (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
+                            ~logger:config.logger
+                        in
+                        match res with
+                        | Some (Either.First answer) ->
+                            Deferred.return (Ok answer)
+                        | Some (Either.Second sender) ->
+                            let%bind.Deferred () =
+                              match sender with
+                              | Local ->
+                                  Deferred.unit
+                              | Remote peer -> (
+                                  match !net_ref with
+                                  | None ->
+                                      (* should never occur *)
+                                      Deferred.unit
+                                  | Some network ->
+                                      Mina_networking.ban_peer network peer )
+                            in
+                            Deferred.return
+                              (Error
+                                 (Error.createf
+                                    !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
+                                    Mina_networking
+                                    .protocol_violation_answer_query_string
+                                    ledger_hash ) )
+                        | None ->
+                            Deferred.return
+                            @@ Error
+                                 (Error.createf
+                                    !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
+                                    Mina_networking.refused_answer_query_string
+                                    ledger_hash ) ) )
                   ~get_ancestry:
                     (handle_request "get_ancestry" ~f:(fun ~frontier s ->
                          s
@@ -1895,8 +1913,8 @@ let create ?wallets (config : Config.t) =
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
               ~context:(module Context)
-              ~trust_system:config.trust_system ~verifier ~network:net
-              ~is_seed:config.is_seed ~is_demo_mode:config.demo_mode
+              ~verifier ~network:net ~is_seed:config.is_seed
+              ~is_demo_mode:config.demo_mode
               ~time_controller:config.time_controller
               ~consensus_local_state:config.consensus_local_state
               ~persistent_root_location:config.persistent_root_location
@@ -2031,22 +2049,6 @@ let create ?wallets (config : Config.t) =
                           [%log' warn config.logger] ~metadata
                             "Not rebroadcasting block $state_hash because it \
                              was received $timing" ) ) ) ;
-          (* FIXME #4093: augment ban_notifications with a Peer.ID so we can implement ban_notify
-             trace_task "ban notification loop" (fun () ->
-              Linear_pipe.iter (Mina_networking.ban_notification_reader net)
-                ~f:(fun notification ->
-                  let open Gossip_net in
-                  let peer = notification.banned_peer in
-                  let banned_until = notification.banned_until in
-                  (* if RPC call fails, will be logged in gossip net code *)
-                  let%map _ =
-                    Mina_networking.ban_notify net peer banned_until
-                  in
-                  () ) ) ; *)
-          don't_wait_for
-            (Linear_pipe.iter
-               (Mina_networking.ban_notification_reader net)
-               ~f:(Fn.const Deferred.unit) ) ;
           let snark_jobs_state =
             Work_selector.State.init
               ~reassignment_wait:config.work_reassignment_wait
@@ -2166,11 +2168,7 @@ let create ?wallets (config : Config.t) =
             ; block_production_status = ref `Free
             } ) )
 
-let net { components = { net; _ }; _ } = net
-
 let runtime_config { config = { precomputed_values; _ }; _ } =
   Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values
-
-let verifier { processes = { verifier; _ }; _ } = verifier
 
 let genesis_ledger t = Genesis_proof.genesis_ledger t.config.precomputed_values

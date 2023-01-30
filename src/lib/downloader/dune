@@ -14,10 +14,8 @@
    ;; local libraries
    network_peer
    pipe_lib
-   trust_system
    logger
    o1trace
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_mina ppx_version ppx_deriving.std ppx_deriving_yojson)))
-

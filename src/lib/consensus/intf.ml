@@ -731,7 +731,6 @@ module type S = sig
      *)
     val sync_local_state :
          context:(module CONTEXT)
-      -> trust_system:Trust_system.t
       -> local_state:Local_state.t
       -> glue_sync_ledger:
            (   preferred:Network_peer.Peer.t list

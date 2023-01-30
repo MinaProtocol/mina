@@ -50,7 +50,6 @@
    cache_lib
    network_peer
    logger
-   trust_system
    truth
    error_json
    rose_tree

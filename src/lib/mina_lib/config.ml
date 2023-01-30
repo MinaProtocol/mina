@@ -18,7 +18,6 @@ type t =
   ; chain_id : string
   ; logger : Logger.t
   ; pids : Child_processes.Termination.t
-  ; trust_system : Trust_system.t
   ; monitor : Monitor.t option
   ; is_seed : bool
   ; disable_node_status : bool

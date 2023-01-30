@@ -16,7 +16,6 @@ type Structured_log_events.t += Bootstrap_complete [@@deriving register_event]
 
 val run :
      context:(module CONTEXT)
-  -> trust_system:Trust_system.t
   -> verifier:Verifier.t
   -> network:Mina_networking.t
   -> consensus_local_state:Consensus.Data.Local_state.t

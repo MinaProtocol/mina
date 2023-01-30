@@ -28,7 +28,6 @@
    network_pool
    transition_frontier_base
    coda_genesis_ledger
-   trust_system
    genesis_constants
    mina_stdlib
    inline_test_quiet_logs

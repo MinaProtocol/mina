@@ -38,7 +38,6 @@
    logger
    network_pool
    data_hash_lib
-   trust_system
    ppx_version.runtime
  )
  (preprocess

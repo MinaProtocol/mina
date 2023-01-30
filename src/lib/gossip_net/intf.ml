@@ -1,7 +1,6 @@
 open Async
 open Core_kernel
 open Network_peer
-open Pipe_lib
 open Network_peer.Rpc_intf
 
 type ban_creator = { banned_peer : Peer.t; banned_until : Time.t }
@@ -35,6 +34,8 @@ module type Gossip_net_intf = sig
 
   val set_connection_gating :
     t -> Mina_net2.connection_gating -> Mina_net2.connection_gating Deferred.t
+
+  val ban_peer : t -> Peer.t -> unit Deferred.t
 
   val random_peers : t -> int -> Peer.t list Deferred.t
 
@@ -82,6 +83,4 @@ module type Gossip_net_intf = sig
   val on_first_connect : t -> f:(unit -> 'a) -> 'a Deferred.t
 
   val on_first_high_connectivity : t -> f:(unit -> 'a) -> 'a Deferred.t
-
-  val ban_notification_reader : t -> ban_notification Linear_pipe.Reader.t
 end

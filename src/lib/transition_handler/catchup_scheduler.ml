@@ -64,7 +64,7 @@ type t =
       Capped_supervisor.t
   }
 
-let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
+let create ~logger ~precomputed_values ~verifier ~ban_peer ~frontier
     ~time_controller ~catchup_job_writer
     ~(catchup_breadcrumbs_writer :
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
@@ -102,7 +102,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
               (Logger.extend logger
                  [ ("catchup_scheduler", `String "Called from catchup scheduler")
                  ] )
-            ~precomputed_values ~verifier ~trust_system ~frontier ~initial_hash
+            ~precomputed_values ~verifier ~ban_peer ~frontier ~initial_hash
             transition_branches
         with
         | Ok trees_of_breadcrumbs ->
@@ -316,15 +316,13 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let constraint_constants = precomputed_values.constraint_constants
 
-    let trust_system = Trust_system.null ()
-
     let pids = Child_processes.Termination.create_pid_table ()
 
     let time_controller = Block_time.Controller.basic ~logger
 
     let max_length = 10
 
-    let create = create ~logger ~trust_system ~time_controller
+    let create = create ~logger ~time_controller
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -357,9 +355,11 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               (Buffered (`Capacity 10, `Overflow Crash))
           in
           let disjoint_breadcrumb = List.last_exn branch in
+          let ban_peer _ = Deferred.unit in
           let scheduler =
-            create ~frontier ~precomputed_values ~verifier ~catchup_job_writer
-              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+            create ~frontier ~precomputed_values ~verifier ~ban_peer
+              ~catchup_job_writer ~catchup_breadcrumbs_writer
+              ~clean_up_signal:(Ivar.create ())
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
@@ -415,9 +415,11 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let[@warning "-8"] [ breadcrumb_1; breadcrumb_2 ] =
             List.map ~f:register_breadcrumb branch
           in
+          let ban_peer _ = Deferred.unit in
           let scheduler =
-            create ~precomputed_values ~frontier ~verifier ~catchup_job_writer
-              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+            create ~precomputed_values ~frontier ~verifier ~ban_peer
+              ~catchup_job_writer ~catchup_breadcrumbs_writer
+              ~clean_up_signal:(Ivar.create ())
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
@@ -491,9 +493,11 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
               (Buffered (`Capacity 10, `Overflow Crash))
           in
+          let ban_peer _ = Deferred.unit in
           let scheduler =
-            create ~precomputed_values ~frontier ~verifier ~catchup_job_writer
-              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+            create ~precomputed_values ~frontier ~verifier ~ban_peer
+              ~catchup_job_writer ~catchup_breadcrumbs_writer
+              ~clean_up_signal:(Ivar.create ())
           in
           let[@warning "-8"] (oldest_breadcrumb :: dependent_breadcrumbs) =
             List.rev branch

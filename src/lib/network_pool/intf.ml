@@ -222,11 +222,7 @@ end
 module type Snark_resource_pool_intf = sig
   include Resource_pool_base_intf
 
-  val make_config :
-       trust_system:Trust_system.t
-    -> verifier:Verifier.t
-    -> disk_location:string
-    -> Config.t
+  val make_config : verifier:Verifier.t -> disk_location:string -> Config.t
 
   val add_snark :
        ?is_local:bool
@@ -342,8 +338,7 @@ module type Transaction_resource_pool_intf = sig
   include Resource_pool_base_intf with type t := t
 
   val make_config :
-       trust_system:Trust_system.t
-    -> pool_max_size:int
+       pool_max_size:int
     -> verifier:Verifier.t
     -> genesis_constants:Genesis_constants.t
     -> Config.t

@@ -104,19 +104,15 @@ module type S = sig
   module Responder : sig
     type t
 
-    val create :
-         merkle_tree
-      -> (query -> unit)
-      -> logger:Logger.t
-      -> trust_system:Trust_system.t
-      -> t
+    val create : merkle_tree -> (query -> unit) -> logger:Logger.t -> t
 
     val answer_query :
-      t -> query Envelope.Incoming.t -> answer option Deferred.t
+         t
+      -> query Envelope.Incoming.t
+      -> (answer, Envelope.Sender.t) Either.t Deferred.t
   end
 
-  val create :
-    merkle_tree -> logger:Logger.t -> trust_system:Trust_system.t -> 'a t
+  val create : merkle_tree -> logger:Logger.t -> 'a t
 
   val answer_writer :
        'a t
@@ -222,30 +218,21 @@ end = struct
   type query = Addr.t Query.t
 
   module Responder = struct
-    type t =
-      { mt : MT.t
-      ; f : query -> unit
-      ; logger : Logger.t
-      ; trust_system : Trust_system.t
-      }
+    type t = { mt : MT.t; f : query -> unit; logger : Logger.t }
 
-    let create :
-           MT.t
-        -> (query -> unit)
-        -> logger:Logger.t
-        -> trust_system:Trust_system.t
-        -> t =
-     fun mt f ~logger ~trust_system -> { mt; f; logger; trust_system }
+    let create : MT.t -> (query -> unit) -> logger:Logger.t -> t =
+     fun mt f ~logger -> { mt; f; logger }
 
     let answer_query :
-        t -> query Envelope.Incoming.t -> answer option Deferred.t =
-     fun { mt; f; logger; trust_system } query_envelope ->
-      let open Trust_system in
+           t
+        -> query Envelope.Incoming.t
+        -> (answer, Envelope.Sender.t) Either.t Deferred.t =
+     fun { mt; f; logger } query_envelope ->
       let ledger_depth = MT.depth mt in
       let sender = Envelope.Incoming.sender query_envelope in
       let query = Envelope.Incoming.data query_envelope in
       f query ;
-      let response_or_punish =
+      let response_or_sender_to_ban =
         match query with
         | What_child_hashes a -> (
             match
@@ -260,23 +247,19 @@ end = struct
             | Ok answer ->
                 Either.First answer
             | Error e ->
-                let logger = Logger.create () in
                 [%log error]
-                  ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-                  "When handling What_child_hashes request, the following \
-                   error happended: $error" ;
-                Either.Second
-                  ( Actions.Violated_protocol
-                  , Some
-                      ( "invalid address $addr in What_child_hashes request"
-                      , [ ("addr", Addr.to_yojson a) ] ) ) )
+                  "When handling What_child_hashes request, got invalid \
+                   address: $error"
+                  ~metadata:
+                    [ ("address", Addr.to_yojson a)
+                    ; ("error", Error_json.error_to_yojson e)
+                    ] ;
+                Either.Second sender )
         | What_contents a ->
-            if Addr.height ~ledger_depth a > account_subtree_height then
-              Either.Second
-                ( Actions.Violated_protocol
-                , Some
-                    ( "requested too big of a subtree at once: $addr"
-                    , [ ("addr", Addr.to_yojson a) ] ) )
+            if Addr.height ~ledger_depth a > account_subtree_height then (
+              [%log error] "Requested too big a subtree: $address"
+                ~metadata:[ ("address", Addr.to_yojson a) ] ;
+              Either.Second sender )
             else
               let addresses_and_accounts =
                 List.sort ~compare:(fun (addr1, _) (addr2, _) ->
@@ -285,14 +268,12 @@ end = struct
                 (* can't actually throw *)
               in
               let addresses, accounts = List.unzip addresses_and_accounts in
-              if List.is_empty addresses then
+              if List.is_empty addresses then (
                 (* Peer should know what portions of the tree are full from the
                    Num_accounts query. *)
-                Either.Second
-                  ( Actions.Violated_protocol
-                  , Some
-                      ( "Requested empty subtree: $addr"
-                      , [ ("addr", Addr.to_yojson a) ] ) )
+                [%log error] "Requested empty subtree: $address"
+                  ~metadata:[ ("address", Addr.to_yojson a) ] ;
+                Either.Second sender )
               else
                 let first_address, rest_address =
                   (List.hd_exn addresses, List.tl_exn addresses)
@@ -341,14 +322,7 @@ end = struct
               (Num_accounts
                  (len, MT.get_inner_hash_at_addr_exn mt content_root_addr) )
       in
-      match response_or_punish with
-      | Either.First answer ->
-          Deferred.return @@ Some answer
-      | Either.Second action ->
-          let%map _ =
-            record_envelope_sender trust_system logger sender action
-          in
-          None
+      Deferred.return response_or_sender_to_ban
   end
 
   type 'a t =
@@ -356,7 +330,6 @@ end = struct
     ; mutable auxiliary_data : 'a option
     ; tree : MT.t
     ; logger : Logger.t
-    ; trust_system : Trust_system.t
     ; answers :
         (Root_hash.t * query * answer Envelope.Incoming.t) Linear_pipe.Reader.t
     ; answer_writer :
@@ -547,7 +520,6 @@ end = struct
       let already_done =
         match Ivar.peek t.validity_listener with Some `Ok -> true | _ -> false
       in
-      let sender = Envelope.Incoming.sender env in
       let answer = Envelope.Incoming.data env in
       [%log' trace t.logger]
         ~metadata:
@@ -570,37 +542,32 @@ end = struct
           "Got sync response when we're already finished syncing" ;
         Deferred.unit )
       else
-        let open Trust_system in
         (* If a peer misbehaves we still need the information we asked them for,
            so requeue in that case. *)
         let requeue_query () =
-          Linear_pipe.write_without_pushback_if_open t.queries (root_hash, query)
+          Linear_pipe.write_without_pushback_if_open t.queries (root_hash, query) ;
+          return ()
         in
         let credit_fulfilled_request () =
-          record_envelope_sender t.trust_system t.logger sender
-            ( Actions.Fulfilled_request
-            , Some
-                ( "sync ledger query $query"
-                , [ ("query", Query.to_yojson Addr.to_yojson query) ] ) )
+          [%log' info t.logger] "Fulfilled request: sync ledger query $query"
+            ~metadata:[ ("query", Query.to_yojson Addr.to_yojson query) ] ;
+          return ()
         in
         let%bind _ =
           match (query, answer) with
           | Query.What_child_hashes addr, Answer.Child_hashes_are (lh, rh) -> (
               match add_child_hashes_to t addr lh rh with
               | `Hash_mismatch (expected, actual) ->
-                  let%map () =
-                    record_envelope_sender t.trust_system t.logger sender
-                      ( Actions.Sent_bad_hash
-                      , Some
-                          ( "sent child hashes $lhash and $rhash for address \
-                             $addr, they merge hash to $actualmerge but we \
-                             expected $expectedmerge"
-                          , [ ("lhash", Hash.to_yojson lh)
-                            ; ("rhash", Hash.to_yojson rh)
-                            ; ("actualmerge", Hash.to_yojson actual)
-                            ; ("expectedmerge", Hash.to_yojson expected)
-                            ] ) )
-                  in
+                  [%log' error t.logger]
+                    "Sent child hashes $lhash and $rhash for address $addr, \
+                     they merge hash to $actualmerge but we expected \
+                     $expectedmerge"
+                    ~metadata:
+                      [ ("lhash", Hash.to_yojson lh)
+                      ; ("rhash", Hash.to_yojson rh)
+                      ; ("actualmerge", Hash.to_yojson actual)
+                      ; ("expectedmerge", Hash.to_yojson expected)
+                      ] ;
                   requeue_query ()
               | `Good children_to_verify ->
                   (* TODO #312: Make sure we don't write too much *)
@@ -612,52 +579,43 @@ end = struct
               | `Success ->
                   credit_fulfilled_request ()
               | `Hash_mismatch (expected, actual) ->
-                  let%map () =
-                    record_envelope_sender t.trust_system t.logger sender
-                      ( Actions.Sent_bad_hash
-                      , Some
-                          ( "sent accounts $accounts for address $addr, they \
-                             hash to $actual but we expected $expected"
-                          , [ ( "accounts"
-                              , `List (List.map ~f:Account.to_yojson leaves) )
-                            ; ("addr", Addr.to_yojson addr)
-                            ; ("actual", Hash.to_yojson actual)
-                            ; ("expected", Hash.to_yojson expected)
-                            ] ) )
-                  in
+                  [%log' error t.logger]
+                    "Sent accounts $accounts for address $addr, they hash to \
+                     $actual but we expected $expected"
+                    ~metadata:
+                      [ ( "accounts"
+                        , `List (List.map ~f:Account.to_yojson leaves) )
+                      ; ("addr", Addr.to_yojson addr)
+                      ; ("actual", Hash.to_yojson actual)
+                      ; ("expected", Hash.to_yojson expected)
+                      ] ;
                   requeue_query () )
           | Query.Num_accounts, Answer.Num_accounts (count, content_root) -> (
               match handle_num_accounts t count content_root with
               | `Success ->
                   credit_fulfilled_request ()
               | `Hash_mismatch (expected, actual) ->
-                  let%map () =
-                    record_envelope_sender t.trust_system t.logger sender
-                      ( Actions.Sent_bad_hash
-                      , Some
-                          ( "Claimed num_accounts $count, content root hash \
-                             $content_root_hash, that implies a root hash of \
-                             $actual, we expected $expected"
-                          , [ ("count", `Int count)
-                            ; ("content_root_hash", Hash.to_yojson content_root)
-                            ; ("actual", Hash.to_yojson actual)
-                            ; ("expected", Hash.to_yojson expected)
-                            ] ) )
-                  in
+                  [%log' error t.logger]
+                    "Claimed num_accounts $count, content root hash \
+                     $content_root_hash, that implies a root hash of $actual, \
+                     we expected $expected"
+                    ~metadata:
+                      [ ("count", `Int count)
+                      ; ("content_root_hash", Hash.to_yojson content_root)
+                      ; ("actual", Hash.to_yojson actual)
+                      ; ("expected", Hash.to_yojson expected)
+                      ] ;
                   requeue_query () )
           | query, answer ->
-              let%map () =
-                record_envelope_sender t.trust_system t.logger sender
-                  ( Actions.Violated_protocol
-                  , Some
-                      ( "Answered question we didn't ask! Query was $query \
-                         answer was $answer"
-                      , [ ("query", Query.to_yojson Addr.to_yojson query)
-                        ; ( "answer"
-                          , Answer.to_yojson Hash.to_yojson Account.to_yojson
-                              answer )
-                        ] ) )
-              in
+              [%log' error t.logger]
+                "Answered question we didn't ask! Query was $query answer was \
+                 $answer"
+                ~metadata:
+                  [ ("query", Query.to_yojson Addr.to_yojson query)
+                  ; ( "answer"
+                    , Answer.to_yojson Hash.to_yojson Account.to_yojson answer
+                    )
+                  ] ;
               requeue_query ()
         in
         if
@@ -732,7 +690,7 @@ end = struct
     ignore (new_goal t rh ~data ~equal : [ `New | `Repeat | `Update_data ]) ;
     wait_until_valid t rh
 
-  let create mt ~logger ~trust_system =
+  let create mt ~logger =
     let qr, qw = Linear_pipe.create () in
     let ar, aw = Linear_pipe.create () in
     let t =
@@ -740,7 +698,6 @@ end = struct
       ; auxiliary_data = None
       ; tree = mt
       ; logger
-      ; trust_system
       ; answers = ar
       ; answer_writer = aw
       ; queries = qw

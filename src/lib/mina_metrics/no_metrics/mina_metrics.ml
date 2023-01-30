@@ -381,10 +381,6 @@ module Scan_state_metrics = struct
   let snark_work_required : Gauge.t = ()
 end
 
-module Trust_system = struct
-  let banned_peers : Gauge.t = ()
-end
-
 module Consensus = struct
   let vrf_evaluations : Counter.t = ()
 

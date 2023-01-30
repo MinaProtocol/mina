@@ -22,7 +22,6 @@ module type Transition_handler_validator_intf = sig
 
   val run :
        logger:Logger.t
-    -> trust_system:Trust_system.t
     -> time_controller:Block_time.Controller.t
     -> frontier:transition_frontier
     -> transition_reader:
@@ -59,7 +58,6 @@ module type Breadcrumb_builder_intf = sig
   val build_subtrees_of_breadcrumbs :
        logger:Logger.t
     -> verifier:Verifier.t
-    -> trust_system:Trust_system.t
     -> frontier:transition_frontier
     -> initial_hash:State_hash.t
     -> ( Mina_block.initial_valid_block Envelope.Incoming.t
@@ -80,7 +78,6 @@ module type Transition_handler_processor_intf = sig
   val run :
        logger:Logger.t
     -> verifier:Verifier.t
-    -> trust_system:Trust_system.t
     -> time_controller:Block_time.Controller.t
     -> frontier:transition_frontier
     -> primary_transition_reader:
@@ -218,13 +215,14 @@ end
 module type Sync_handler_intf = sig
   type transition_frontier
 
+  (* the response, if Some, is either a query answer or a sender to ban *)
   val answer_query :
        frontier:transition_frontier
     -> Ledger_hash.t
     -> Mina_ledger.Sync_ledger.Query.t Envelope.Incoming.t
     -> logger:Logger.t
-    -> trust_system:Trust_system.t
-    -> Mina_ledger.Sync_ledger.Answer.t option Deferred.t
+    -> (Mina_ledger.Sync_ledger.Answer.t, Envelope.Sender.t) Either.t option
+       Deferred.t
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        frontier:transition_frontier
@@ -270,7 +268,6 @@ module type Bootstrap_controller_intf = sig
 
   val run :
        logger:Logger.t
-    -> trust_system:Trust_system.t
     -> verifier:Verifier.t
     -> network:network
     -> consensus_local_state:Consensus.Data.Local_state.t
@@ -296,7 +293,6 @@ module type Transition_frontier_controller_intf = sig
 
   val run :
        logger:Logger.t
-    -> trust_system:Trust_system.t
     -> verifier:Verifier.t
     -> network:network
     -> time_controller:Block_time.Controller.t
@@ -326,7 +322,6 @@ module type Transition_router_intf = sig
   val run :
        ?sync_local_state:bool
     -> context:(module CONTEXT)
-    -> trust_system:Trust_system.t
     -> verifier:Verifier.t
     -> network:network
     -> is_seed:bool

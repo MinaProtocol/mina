@@ -24,7 +24,6 @@
    network_peer
    logger
    pipe_lib
-   trust_system
    network_pool
    mina_net2
    mina_block

@@ -10,8 +10,6 @@ let%test_module "Epoch ledger sync tests" =
 
     module type CONTEXT = sig
       include Mina_lib.CONTEXT
-
-      val trust_system : Trust_system.t
     end
 
     type network_info =
@@ -91,7 +89,6 @@ let%test_module "Epoch ledger sync tests" =
       let _transaction_pool, tx_remote_sink, _tx_local_sink =
         let config =
           Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
-            ~trust_system
             ~pool_max_size:precomputed_values.genesis_constants.txpool_max_size
             ~genesis_constants:precomputed_values.genesis_constants
         in
@@ -103,7 +100,6 @@ let%test_module "Epoch ledger sync tests" =
       let%bind snark_remote_sink =
         let config =
           Network_pool.Snark_pool.Resource_pool.make_config ~verifier
-            ~trust_system
             ~disk_location:(make_dirname "snark_pool_config")
         in
         let%map _snark_pool, snark_remote_sink, _snark_local_sink =
@@ -171,7 +167,6 @@ let%test_module "Epoch ledger sync tests" =
           ; initial_peers
           ; addrs_and_ports
           ; metrics_port = None
-          ; trust_system
           ; flooding = false
           ; direct_peers = []
           ; peer_protection_ratio = 0.2
@@ -202,7 +197,6 @@ let%test_module "Epoch ledger sync tests" =
       in
       let config : Mina_networking.Config.t =
         { logger
-        ; trust_system
         ; time_controller
         ; consensus_constants
         ; consensus_local_state
@@ -223,7 +217,7 @@ let%test_module "Epoch ledger sync tests" =
         in
         Sync_handler.answer_query ~frontier ledger_hash
           (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
-          ~logger ~trust_system
+          ~logger
         |> Deferred.map ~f:(function
              | Some answer ->
                  Ok answer
@@ -268,9 +262,8 @@ let%test_module "Epoch ledger sync tests" =
         *)
         Transition_router.run ~sync_local_state:false
           ~context:(module Context)
-          ~trust_system:config.trust_system ~verifier ~network:mina_networking
-          ~is_seed:config.is_seed ~is_demo_mode:false
-          ~time_controller:config.time_controller
+          ~verifier ~network:mina_networking ~is_seed:config.is_seed
+          ~is_demo_mode:false ~time_controller:config.time_controller
           ~consensus_local_state:config.consensus_local_state
           ~persistent_root_location:(make_dirname "persistent_root_location")
           ~persistent_frontier_location:
@@ -319,7 +312,6 @@ let%test_module "Epoch ledger sync tests" =
         Consensus.Constants.create ~constraint_constants
           ~protocol_constants:genesis_constants.protocol
       in
-      let trust_system = Trust_system.create (make_dirname "trust_system") in
       let module Context = struct
         let logger = logger
 
@@ -328,8 +320,6 @@ let%test_module "Epoch ledger sync tests" =
         let consensus_constants = consensus_constants
 
         let precomputed_values = precomputed_values
-
-        let trust_system = trust_system
       end in
       return (module Context : CONTEXT)
 
@@ -337,8 +327,6 @@ let%test_module "Epoch ledger sync tests" =
         ~next_epoch_ledger ~starting_accounts ~test_number =
       let module Context2 = struct
         include Context
-
-        let trust_system = Trust_system.create (make_dirname "trust_system")
       end in
       let test_finished = ref false in
       let cleanup () = test_finished := true in
@@ -408,10 +396,7 @@ let%test_module "Epoch ledger sync tests" =
                 ()
             | Error _ ->
                 failwith "Could not add starting account" ) ;
-        let sync_ledger =
-          Mina_ledger.Sync_ledger.Db.create ~logger
-            ~trust_system:Context.trust_system db_ledger
-        in
+        let sync_ledger = Mina_ledger.Sync_ledger.Db.create ~logger db_ledger in
         let query_reader =
           Mina_ledger.Sync_ledger.Db.query_reader sync_ledger
         in

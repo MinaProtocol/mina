@@ -9,6 +9,9 @@ open Pipe_lib
 
 let refused_answer_query_string = "Refused to answer_query"
 
+let protocol_violation_answer_query_string =
+  "Sync protocol violation on answer_query"
+
 exception No_initial_peers
 
 type Structured_log_events.t +=
@@ -687,10 +690,6 @@ module Rpcs = struct
             ; block_producers :
                 Signature_lib.Public_key.Compressed.Stable.V1.t list
             ; protocol_state_hash : State_hash.Stable.V1.t
-            ; ban_statuses :
-                ( Network_peer.Peer.Stable.V1.t
-                * Trust_system.Peer_status.Stable.V1.t )
-                list
             ; k_block_hashes_and_timestamps :
                 (State_hash.Stable.V1.t * string) list
             ; git_commit : string
@@ -722,10 +721,6 @@ module Rpcs = struct
             ; block_producers :
                 Signature_lib.Public_key.Compressed.Stable.V1.t list
             ; protocol_state_hash : State_hash.Stable.V1.t
-            ; ban_statuses :
-                ( Network_peer.Peer.Stable.V1.t
-                * Trust_system.Peer_status.Stable.V1.t )
-                list
             ; k_block_hashes_and_timestamps :
                 (State_hash.Stable.V1.t * string) list
             ; git_commit : string
@@ -740,7 +735,6 @@ module Rpcs = struct
             ; peers = status.peers
             ; block_producers = status.block_producers
             ; protocol_state_hash = status.protocol_state_hash
-            ; ban_statuses = status.ban_statuses
             ; k_block_hashes_and_timestamps =
                 status.k_block_hashes_and_timestamps
             ; git_commit = status.git_commit
@@ -839,7 +833,6 @@ module Rpcs = struct
                 ; peers = status.peers
                 ; block_producers = status.block_producers
                 ; protocol_state_hash = status.protocol_state_hash
-                ; ban_statuses = status.ban_statuses
                 ; k_block_hashes_and_timestamps =
                     status.k_block_hashes_and_timestamps
                 ; git_commit = status.git_commit
@@ -985,7 +978,6 @@ module Config = struct
 
   type t =
     { logger : Logger.t
-    ; trust_system : Trust_system.t
     ; time_controller : Block_time.Controller.t
     ; consensus_constants : Consensus.Constants.t
     ; consensus_local_state : Consensus.Data.Local_state.t
@@ -999,11 +991,7 @@ module Config = struct
   [@@deriving make]
 end
 
-type t =
-  { logger : Logger.t
-  ; trust_system : Trust_system.t
-  ; gossip_net : Gossip_net.Any.t
-  }
+type t = { logger : Logger.t; gossip_net : Gossip_net.Any.t }
 [@@deriving fields]
 
 let wrap_rpc_data_in_envelope conn data =
@@ -1062,95 +1050,84 @@ let create (config : Config.t) ~sinks
     let logger = config.logger
   end in
   let open Context in
-  let run_for_rpc_result conn data ~f action_msg msg_args =
+  let run_for_rpc_result conn data ~f action_msg metadata =
     let data_in_envelope = wrap_rpc_data_in_envelope conn data in
     let sender = Envelope.Incoming.sender data_in_envelope in
-    let%bind () =
-      Trust_system.(
-        record_envelope_sender config.trust_system config.logger sender
-          Actions.(Made_request, Some (action_msg, msg_args)))
-    in
-    let%bind result = f data_in_envelope in
-    return (result, sender)
+    [%log info] "Made RPC request: %s" action_msg ~metadata ;
+    let%map result = f data_in_envelope in
+    (result, sender)
   in
   let incr_failed_response = Mina_metrics.Counter.inc_one in
-  let record_unknown_item result sender action_msg msg_args
+  let record_unknown_item result sender action_msg metadata
       failed_response_counter =
-    let%map () =
-      if Option.is_none result then (
-        incr_failed_response failed_response_counter ;
-        Trust_system.(
-          record_envelope_sender config.trust_system config.logger sender
-            Actions.(Requested_unknown_item, Some (action_msg, msg_args))) )
-      else return ()
-    in
+    if Option.is_none result then (
+      let metadata =
+        metadata @ [ ("sender", Envelope.Sender.to_yojson sender) ]
+      in
+      [%log error] "No result available for RPC request: %s" action_msg
+        ~metadata ;
+      incr_failed_response failed_response_counter ) ;
     result
   in
+  (* once we have gossip net, we can ban senders *)
+  let gossip_net_ref = ref None in
+  let ban_sender sender =
+    don't_wait_for
+      ( match sender with
+      | Envelope.Sender.Local ->
+          Deferred.unit
+      | Remote peer -> (
+          match !gossip_net_ref with
+          | None ->
+              Deferred.unit
+          | Some gossip_net ->
+              Gossip_net.Any.ban_peer gossip_net peer ) )
+  in
   let validate_protocol_versions ~rpc_name sender external_transition =
-    let open Trust_system.Actions in
     let { valid_current; valid_next; matches_daemon } =
       protocol_version_status external_transition
     in
-    let%bind () =
-      if valid_current then return ()
-      else
-        let actions =
-          ( Sent_invalid_protocol_version
-          , Some
-              ( "$rpc_name: external transition with invalid current protocol \
-                 version"
-              , [ ("rpc_name", `String rpc_name)
-                ; ( "current_protocol_version"
-                  , `String
-                      (Protocol_version.to_string
-                         (Header.current_protocol_version
-                            (Mina_block.header external_transition) ) ) )
-                ] ) )
-        in
-        Trust_system.record_envelope_sender config.trust_system config.logger
-          sender actions
-    in
-    let%bind () =
-      if valid_next then return ()
-      else
-        let actions =
-          ( Sent_invalid_protocol_version
-          , Some
-              ( "$rpc_name: external transition with invalid proposed protocol \
-                 version"
-              , [ ("rpc_name", `String rpc_name)
-                ; ( "proposed_protocol_version"
-                  , `String
-                      (Protocol_version.to_string
-                         (Option.value_exn
-                            (Header.proposed_protocol_version_opt
-                               (Mina_block.header external_transition) ) ) ) )
-                ] ) )
-        in
-        Trust_system.record_envelope_sender config.trust_system config.logger
-          sender actions
-    in
-    let%map () =
-      if matches_daemon then return ()
-      else
-        let actions =
-          ( Sent_mismatched_protocol_version
-          , Some
-              ( "$rpc_name: current protocol version in external transition \
-                 does not match daemon current protocol version"
-              , [ ("rpc_name", `String rpc_name)
-                ; ( "current_protocol_version"
-                  , `String
-                      (Protocol_version.to_string
-                         (Header.current_protocol_version
-                            (Mina_block.header external_transition) ) ) )
-                ; ( "daemon_current_protocol_version"
-                  , `String Protocol_version.(to_string @@ get_current ()) )
-                ] ) )
-        in
-        Trust_system.record_envelope_sender config.trust_system config.logger
-          sender actions
-    in
+    if not valid_current then (
+      [%log error] "$rpc_name: block with invalid current protocol version"
+        ~metadata:
+          [ ("rpc_name", `String rpc_name)
+          ; ( "current_protocol_version"
+            , `String
+                (Protocol_version.to_string
+                   (Header.current_protocol_version
+                      (Mina_block.header external_transition) ) ) )
+          ; ("sender", Envelope.Sender.to_yojson sender)
+          ] ;
+      ban_sender sender ) ;
+    if not valid_next then (
+      [%log error] "$rpc_name: block with invalid proposed protocol version"
+        ~metadata:
+          [ ("rpc_name", `String rpc_name)
+          ; ( "proposed_protocol_version"
+            , `String
+                (Protocol_version.to_string
+                   (Option.value_exn
+                      (Header.proposed_protocol_version_opt
+                         (Mina_block.header external_transition) ) ) ) )
+          ; ("sender", Envelope.Sender.to_yojson sender)
+          ] ;
+      ban_sender sender ) ;
+    if not matches_daemon then (
+      [%log error]
+        "$rpc_name: current protocol version in external transition does not \
+         match daemon current protocol version"
+        ~metadata:
+          [ ("rpc_name", `String rpc_name)
+          ; ( "current_protocol_version"
+            , `String
+                (Protocol_version.to_string
+                   (Header.current_protocol_version
+                      (Mina_block.header external_transition) ) ) )
+          ; ( "daemon_current_protocol_version"
+            , `String Protocol_version.(to_string @@ get_current ()) )
+          ; ("sender", Envelope.Sender.to_yojson sender)
+          ] ;
+      ban_sender sender ) ;
     valid_current && valid_next && matches_daemon
   in
   (* each of the passed-in procedures expects an enveloped input, so
@@ -1159,7 +1136,7 @@ let create (config : Config.t) ~sinks
       hash =
     let action_msg = "Staged ledger and pending coinbases at hash: $hash" in
     let msg_args = [ ("hash", State_hash.to_yojson hash) ] in
-    let%bind result, sender =
+    let%map result, sender =
       run_for_rpc_result conn hash
         ~f:get_staged_ledger_aux_and_pending_coinbases_at_hash action_msg
         msg_args
@@ -1170,36 +1147,27 @@ let create (config : Config.t) ~sinks
   in
   let answer_sync_ledger_query_rpc conn ~version:_ ((hash, query) as sync_query)
       =
-    let%bind result, sender =
+    let%bind result, _sender =
       run_for_rpc_result conn sync_query ~f:answer_sync_ledger_query
         "Answer_sync_ledger_query: $query"
         [ ("query", Sync_ledger.Query.to_yojson query) ]
     in
-    let%bind () =
-      match result with
-      | Ok _ ->
-          return ()
-      | Error err ->
-          (* N.B.: to_string_mach double-quotes the string, don't want that *)
-          incr_failed_response
-            Rpcs.Answer_sync_ledger_query.failed_response_counter ;
-          let err_msg = Error.to_string_hum err in
-          if String.is_prefix err_msg ~prefix:refused_answer_query_string then
-            Trust_system.(
-              record_envelope_sender config.trust_system config.logger sender
-                Actions.
-                  ( Requested_unknown_item
-                  , Some
-                      ( "Sync ledger query with hash: $hash, query: $query, \
-                         with error: $error"
-                      , [ ("hash", Ledger_hash.to_yojson hash)
-                        ; ( "query"
-                          , Syncable_ledger.Query.to_yojson
-                              Mina_ledger.Ledger.Addr.to_yojson query )
-                        ; ("error", Error_json.error_to_yojson err)
-                        ] ) ))
-          else return ()
-    in
+    Result.iter_error result ~f:(fun err ->
+        (* N.B.: to_string_mach double-quotes the string, don't want that *)
+        incr_failed_response
+          Rpcs.Answer_sync_ledger_query.failed_response_counter ;
+        let err_msg = Error.to_string_hum err in
+        if String.is_prefix err_msg ~prefix:refused_answer_query_string then
+          [%log error]
+            "Error when processing sync ledger query with hash: $hash, query: \
+             $query, error: $error"
+            ~metadata:
+              [ ("hash", Ledger_hash.to_yojson hash)
+              ; ( "query"
+                , Syncable_ledger.Query.to_yojson
+                    Mina_ledger.Ledger.Addr.to_yojson query )
+              ; ("error", Error_json.error_to_yojson err)
+              ] ) ;
     return result
   in
   let md p = [ ("peer", Peer.to_yojson p) ] in
@@ -1207,7 +1175,7 @@ let create (config : Config.t) ~sinks
     [%log debug] "Sending root proof to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_ancestry query: $query" in
     let msg_args = [ ("query", Rpcs.Get_ancestry.query_to_yojson query) ] in
-    let%bind result, sender =
+    let%map result, sender =
       run_for_rpc_result conn query ~f:get_ancestry action_msg msg_args
     in
     match result with
@@ -1215,7 +1183,7 @@ let create (config : Config.t) ~sinks
         record_unknown_item result sender action_msg msg_args
           Rpcs.Get_ancestry.failed_response_counter
     | Some { proof = _, ext_trans; _ } ->
-        let%map valid_protocol_versions =
+        let valid_protocol_versions =
           validate_protocol_versions ~rpc_name:"Get_ancestry" sender ext_trans
         in
         if valid_protocol_versions then result else None
@@ -1240,17 +1208,20 @@ let create (config : Config.t) ~sinks
     in
     match result with
     | None ->
-        record_unknown_item result sender action_msg msg_args
-          Rpcs.Get_best_tip.failed_response_counter
+        return
+        @@ record_unknown_item result sender action_msg msg_args
+             Rpcs.Get_best_tip.failed_response_counter
     | Some { data = data_ext_trans; proof = _, proof_ext_trans } ->
-        let%bind valid_data_protocol_versions =
+        let valid_data_protocol_versions =
           validate_protocol_versions ~rpc_name:"Get_best_tip (data)" sender
             data_ext_trans
         in
-        let%map valid_proof_protocol_versions =
+        let valid_proof_protocol_versions =
           validate_protocol_versions ~rpc_name:"Get_best_tip (proof)" sender
             proof_ext_trans
         in
+        return
+        @@
         if valid_data_protocol_versions && valid_proof_protocol_versions then
           result
         else None
@@ -1261,7 +1232,7 @@ let create (config : Config.t) ~sinks
     let msg_args =
       [ ("query", Rpcs.Get_transition_chain_proof.query_to_yojson query) ]
     in
-    let%bind result, sender =
+    let%map result, sender =
       run_for_rpc_result conn query ~f:get_transition_chain_proof action_msg
         msg_args
     in
@@ -1289,7 +1260,7 @@ let create (config : Config.t) ~sinks
     let msg_args =
       [ ("query", Rpcs.Get_transition_chain.query_to_yojson query) ]
     in
-    let%bind result, sender =
+    let%map result, sender =
       run_for_rpc_result conn query ~f:get_transition_chain action_msg msg_args
     in
     match result with
@@ -1297,8 +1268,8 @@ let create (config : Config.t) ~sinks
         record_unknown_item result sender action_msg msg_args
           Rpcs.Get_transition_chain.failed_response_counter
     | Some ext_trans ->
-        let%map valid_protocol_versions =
-          Deferred.List.map ext_trans
+        let valid_protocol_versions =
+          List.map ext_trans
             ~f:
               (validate_protocol_versions ~rpc_name:"Get_transition_chain"
                  sender )
@@ -1383,6 +1354,8 @@ let create (config : Config.t) ~sinks
         Gossip_net.Any.create config.creatable_gossip_net rpc_handlers
           (Gossip_net.Message.Any_sinks ((module Sinks), sinks)) )
   in
+  (* tie knot, so we can do bans *)
+  gossip_net_ref := Some gossip_net ;
   (* The node status RPC is implemented directly in go, serving a string which
      is periodically updated. This is so that one can make this RPC on a node even
      if that node is at its connection limit. *)
@@ -1415,7 +1388,7 @@ let create (config : Config.t) ~sinks
         For example, some things you really want to not drop (like your outgoing
         block announcment).
   *)
-  { gossip_net; logger = config.logger; trust_system = config.trust_system }
+  { gossip_net; logger = config.logger }
 
 (* lift and expose select gossip net functions *)
 include struct
@@ -1444,8 +1417,6 @@ include struct
 
   let initial_peers = lift initial_peers
 
-  let ban_notification_reader = lift ban_notification_reader
-
   let random_peers = lift random_peers
 
   let query_peer ?heartbeat_timeout ?timeout { gossip_net; _ } =
@@ -1465,6 +1436,8 @@ include struct
 
   let set_connection_gating_config t config =
     lift set_connection_gating t config
+
+  let ban_peer t peer = lift ban_peer t peer
 end
 
 (* TODO: Have better pushback behavior *)
@@ -1560,15 +1533,9 @@ let try_non_preferred_peers (type b) t input peers ~rpc :
             query_peer t peer.Peer.peer_id rpc input
           in
           match response_or_error with
-          | Connected ({ data = Ok (Some data); _ } as envelope) ->
-              let%bind () =
-                Trust_system.(
-                  record t.trust_system t.logger peer
-                    Actions.
-                      ( Fulfilled_request
-                      , Some ("Nonpreferred peer returned valid response", [])
-                      ))
-              in
+          | Connected ({ data = Ok (Some data); sender; _ } as envelope) ->
+              [%log' debug t.logger] "Nonpreferred peer returned valid response"
+                ~metadata:[ ("peer", Envelope.Sender.to_yojson sender) ] ;
               return (Ok (Envelope.Incoming.map envelope ~f:(Fn.const data)))
           | Connected { data = Ok None; _ } ->
               loop remaining_peers (2 * num_peers)
@@ -1585,47 +1552,32 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
   in
   match%bind query_peer t peer_id rpc input with
   | Connected { data = Ok (Some response); sender; _ } ->
-      let%bind () =
-        match sender with
-        | Local ->
-            return ()
-        | Remote peer ->
-            Trust_system.(
-              record t.trust_system t.logger peer
-                Actions.
-                  ( Fulfilled_request
-                  , Some ("Preferred peer returned valid response", []) ))
-      in
+      ( match sender with
+      | Local ->
+          ()
+      | Remote _peer ->
+          [%log' debug t.logger] "Preferred peer returned valid response"
+            ~metadata:[ ("peer", Envelope.Sender.to_yojson sender) ] ) ;
       return (Ok (Envelope.Incoming.wrap ~data:response ~sender))
   | Connected { data = Ok None; sender; _ } ->
-      let%bind () =
-        match sender with
-        | Remote peer ->
-            Trust_system.(
-              record t.trust_system t.logger peer
-                Actions.
-                  ( No_reply_from_preferred_peer
-                  , Some ("When querying preferred peer, got no response", [])
-                  ))
-        | Local ->
-            return ()
-      in
+      ( match sender with
+      | Remote peer ->
+          [%log' error t.logger] "When querying preferred peer, got no response"
+            ~metadata:[ ("peer", Peer.to_yojson peer) ]
+      | Local ->
+          () ) ;
       retry ()
   | Connected { data = Error e; sender; _ } ->
       (* FIXME #4094: determine if more specific actions apply here *)
-      let%bind () =
-        match sender with
-        | Remote peer ->
-            Trust_system.(
-              record t.trust_system t.logger peer
-                Actions.
-                  ( Outgoing_connection_error
-                  , Some
-                      ( "Error while doing RPC"
-                      , [ ("error", Error_json.error_to_yojson e) ] ) ))
-        | Local ->
-            return ()
-      in
+      ( match sender with
+      | Remote peer ->
+          [%log' error t.logger] "Error while performing RPC"
+            ~metadata:
+              [ ("error", Error_json.error_to_yojson e)
+              ; ("peer", Peer.to_yojson peer)
+              ]
+      | Local ->
+          () ) ;
       retry ()
   | Failed_to_connect _ ->
       (* Since we couldn't connect, we have no IP to ban. *)
@@ -1703,7 +1655,6 @@ let glue_sync_ledger :
     Sl_downloader.create ~preferred ~max_batch_size:100
       ~peers:(fun () -> peers t)
       ~knowledge_context:root_hash_r ~knowledge ~stop:global_stop
-      ~trust_system:t.trust_system
       ~get:(fun (peer : Peer.t) qs ->
         List.iter qs ~f:(fun (h, _) ->
             if

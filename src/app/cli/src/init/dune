@@ -87,7 +87,6 @@
    test_util
    file_system
    daemon_rpcs
-   trust_system
    secrets
    participating_state
    staged_ledger

@@ -125,134 +125,6 @@ let get_time_offset_graphql =
             export MINA_TIME_OFFSET=%i\n"
            time_offset time_offset ) )
 
-let print_trust_statuses statuses json =
-  if json then
-    printf "%s\n"
-      (Yojson.Safe.to_string
-         (`List
-           (List.map
-              ~f:(fun (peer, status) ->
-                `List
-                  [ Network_peer.Peer.to_yojson peer
-                  ; Trust_system.Peer_status.to_yojson status
-                  ] )
-              statuses ) ) )
-  else
-    let ban_status status =
-      match status.Trust_system.Peer_status.banned with
-      | Unbanned ->
-          "Unbanned"
-      | Banned_until tm ->
-          sprintf "Banned_until %s" (Time.to_string_abs tm ~zone:Time.Zone.utc)
-    in
-    List.fold ~init:()
-      ~f:(fun () (peer, status) ->
-        printf "%s, %0.04f, %s\n"
-          (Network_peer.Peer.to_multiaddr_string peer)
-          status.trust (ban_status status) )
-      statuses
-
-let round_trust_score trust_status =
-  let open Trust_system.Peer_status in
-  let trust = Float.round_decimal trust_status.trust ~decimal_digits:4 in
-  { trust_status with trust }
-
-let get_trust_status =
-  let open Command.Param in
-  let open Deferred.Let_syntax in
-  let address_flag =
-    flag "--ip-address" ~aliases:[ "ip-address" ]
-      ~doc:
-        "IP An IPv4 or IPv6 address for which you want to query the trust \
-         status"
-      (required Cli_lib.Arg_type.ip_address)
-  in
-  let json_flag = Cli_lib.Flag.json in
-  let flags = Args.zip2 address_flag json_flag in
-  Command.async ~summary:"Get the trust status associated with an IP address"
-    (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (ip_address, json) ->
-         match%map
-           Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_trust_status.rpc
-             ip_address port
-         with
-         | Ok statuses ->
-             print_trust_statuses
-               (List.map
-                  ~f:(fun (peer, status) -> (peer, round_trust_score status))
-                  statuses )
-               json
-         | Error e ->
-             printf "Failed to get trust status %s\n" (Error.to_string_hum e) )
-    )
-
-let ip_trust_statuses_to_yojson ip_trust_statuses =
-  let items =
-    List.map ip_trust_statuses ~f:(fun (ip_addr, status) ->
-        `Assoc
-          [ ("ip", `String (Unix.Inet_addr.to_string ip_addr))
-          ; ("status", Trust_system.Peer_status.to_yojson status)
-          ] )
-  in
-  `List items
-
-let get_trust_status_all =
-  let open Command.Param in
-  let open Deferred.Let_syntax in
-  let nonzero_flag =
-    flag "--nonzero-only" ~aliases:[ "nonzero-only" ] no_arg
-      ~doc:"Only show trust statuses whose trust score is nonzero"
-  in
-  let json_flag = Cli_lib.Flag.json in
-  let flags = Args.zip2 nonzero_flag json_flag in
-  Command.async
-    ~summary:"Get trust statuses for all peers known to the trust system"
-    (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (nonzero, json) ->
-         match%map
-           Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_trust_status_all.rpc ()
-             port
-         with
-         | Ok ip_trust_statuses ->
-             (* always round the trust scores for display *)
-             let ip_rounded_trust_statuses =
-               List.map ip_trust_statuses ~f:(fun (ip_addr, status) ->
-                   (ip_addr, round_trust_score status) )
-             in
-             let filtered_ip_trust_statuses =
-               if nonzero then
-                 List.filter ip_rounded_trust_statuses
-                   ~f:(fun (_ip_addr, status) ->
-                     not Float.(equal status.trust zero) )
-               else ip_rounded_trust_statuses
-             in
-             print_trust_statuses filtered_ip_trust_statuses json
-         | Error e ->
-             printf "Failed to get trust statuses %s\n" (Error.to_string_hum e) )
-    )
-
-let reset_trust_status =
-  let open Command.Param in
-  let open Deferred.Let_syntax in
-  let address_flag =
-    flag "--ip-address" ~aliases:[ "ip-address" ]
-      ~doc:
-        "IP An IPv4 or IPv6 address for which you want to reset the trust \
-         status"
-      (required Cli_lib.Arg_type.ip_address)
-  in
-  let json_flag = Cli_lib.Flag.json in
-  let flags = Args.zip2 address_flag json_flag in
-  Command.async ~summary:"Reset the trust status associated with an IP address"
-    (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (ip_address, json) ->
-         match%map
-           Daemon_rpcs.Client.dispatch Daemon_rpcs.Reset_trust_status.rpc
-             ip_address port
-         with
-         | Ok status ->
-             print_trust_statuses status json
-         | Error e ->
-             printf "Failed to reset trust status %s\n" (Error.to_string_hum e) )
-    )
-
 let get_public_keys =
   let open Daemon_rpcs in
   let open Command.Param in
@@ -2230,10 +2102,7 @@ let advanced =
   Command.group ~summary:"Advanced client commands"
     [ ("get-nonce", get_nonce_cmd)
     ; ("client-trustlist", client_trustlist_group)
-    ; ("get-trust-status", get_trust_status)
-    ; ("get-trust-status-all", get_trust_status_all)
     ; ("get-public-keys", get_public_keys)
-    ; ("reset-trust-status", reset_trust_status)
     ; ("batch-send-payments", batch_send_payments)
     ; ("status-clear-hist", status_clear_hist)
     ; ("wrap-key", wrap_key)

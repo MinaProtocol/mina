@@ -40,7 +40,6 @@
    block_time
    coda_genesis_proof
    participating_state
-   trust_system
    protocol_version
    child_processes
    mina_block

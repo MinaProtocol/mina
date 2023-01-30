@@ -1,9 +1,6 @@
 open Core_kernel
 open Async_kernel
 open Pipe_lib
-
-let trust_system = Trust_system.null ()
-
 module Transaction_snark_work = Transaction_snark_work
 module Base_ledger = Mina_ledger.Ledger
 

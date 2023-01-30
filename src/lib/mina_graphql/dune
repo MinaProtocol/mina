@@ -35,7 +35,6 @@
    error_json
    mina_networking
    consensus.vrf
-   trust_system
    with_hash
    data_hash_lib
    data_hash_lib_unix

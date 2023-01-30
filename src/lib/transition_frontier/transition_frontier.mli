@@ -136,7 +136,6 @@ module For_tests : sig
   val gen :
        ?logger:Logger.t
     -> verifier:Verifier.t
-    -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
     -> ?root_ledger_and_accounts:
@@ -156,7 +155,6 @@ module For_tests : sig
   val gen_with_branch :
        ?logger:Logger.t
     -> verifier:Verifier.t
-    -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
     -> ?root_ledger_and_accounts:

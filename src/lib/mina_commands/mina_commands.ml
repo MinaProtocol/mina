@@ -47,21 +47,6 @@ let get_balance t (addr : Account_id.t) =
   let%map account = get_account t addr in
   account.Account.Poly.balance
 
-let get_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
-  let config = Mina_lib.config t in
-  let trust_system = config.trust_system in
-  Trust_system.lookup_ip trust_system ip_address
-
-let get_trust_status_all t =
-  let config = Mina_lib.config t in
-  let trust_system = config.trust_system in
-  Trust_system.peer_statuses trust_system
-
-let reset_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
-  let config = Mina_lib.config t in
-  let trust_system = config.trust_system in
-  Trust_system.reset_ip trust_system ip_address
-
 let setup_and_submit_user_command t (user_command_input : User_command_input.t)
     =
   let open Participating_state.Let_syntax in

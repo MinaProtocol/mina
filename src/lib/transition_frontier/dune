@@ -44,7 +44,6 @@
    verifier
    precomputed_values
    block_time
-   trust_system
    with_hash
    rose_tree
    quickcheck_lib

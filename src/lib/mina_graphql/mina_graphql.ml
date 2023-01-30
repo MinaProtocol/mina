@@ -2042,33 +2042,6 @@ module Types = struct
               ~resolve:(fun _ _ -> true)
           ] )
 
-    let time_of_banned_status = function
-      | Trust_system.Banned_status.Unbanned ->
-          None
-      | Banned_until tm ->
-          Some tm
-
-    let trust_status =
-      obj "TrustStatusPayload" ~fields:(fun _ ->
-          let open Trust_system.Peer_status in
-          [ field "ipAddr"
-              ~typ:(non_null @@ Graphql_basic_scalars.InetAddr.typ ())
-              ~doc:"IP address"
-              ~args:Arg.[]
-              ~resolve:(fun _ (peer, _) -> peer.Network_peer.Peer.host)
-          ; field "peerId" ~typ:(non_null string) ~doc:"libp2p Peer ID"
-              ~args:Arg.[]
-              ~resolve:(fun _ (peer, __) -> peer.Network_peer.Peer.peer_id)
-          ; field "trust" ~typ:(non_null float) ~doc:"Trust score"
-              ~args:Arg.[]
-              ~resolve:(fun _ (_, { trust; _ }) -> trust)
-          ; field "bannedStatus"
-              ~typ:(Graphql_basic_scalars.Time.typ ())
-              ~doc:"Banned status"
-              ~args:Arg.[]
-              ~resolve:(fun _ (_, { banned; _ }) -> time_of_banned_status banned)
-          ] )
-
     let send_payment =
       obj "SendPaymentPayload" ~fields:(fun _ ->
           [ field "payment"
@@ -3360,23 +3333,6 @@ module Mutations = struct
             in
             Ok (pk, false) )
 
-  let reset_trust_status =
-    io_field "resetTrustStatus"
-      ~doc:"Reset trust status for all peers at a given IP address"
-      ~typ:(list (non_null Types.Payload.trust_status))
-      ~args:
-        Arg.
-          [ arg "input"
-              ~typ:(non_null Types.Input.ResetTrustStatusInput.arg_typ)
-          ]
-      ~resolve:(fun { ctx = mina; _ } () ip_address_input ->
-        let open Deferred.Result.Let_syntax in
-        let%map ip_address =
-          Deferred.return
-          @@ Types.Arguments.ip_address ~name:"ip_address" ip_address_input
-        in
-        Some (Mina_commands.reset_trust_status mina ip_address) )
-
   let send_user_command mina user_command_input =
     match
       Mina_commands.setup_and_submit_user_command mina user_command_input
@@ -4171,26 +4127,6 @@ module Queries = struct
       ~typ:(non_null Types.DaemonStatus.t) ~resolve:(fun { ctx = mina; _ } () ->
         Mina_commands.get_status ~flag:`Performance mina >>| Result.return )
 
-  let trust_status =
-    field "trustStatus"
-      ~typ:(list (non_null Types.Payload.trust_status))
-      ~args:Arg.[ arg "ipAddress" ~typ:(non_null string) ]
-      ~doc:"Trust status for an IPv4 or IPv6 address"
-      ~resolve:(fun { ctx = mina; _ } () (ip_addr_string : string) ->
-        match Types.Arguments.ip_address ~name:"ipAddress" ip_addr_string with
-        | Ok ip_addr ->
-            Some (Mina_commands.get_trust_status mina ip_addr)
-        | Error _ ->
-            None )
-
-  let trust_status_all =
-    field "trustStatusAll"
-      ~typ:(non_null @@ list @@ non_null Types.Payload.trust_status)
-      ~args:Arg.[]
-      ~doc:"IP address and trust status for all peers"
-      ~resolve:(fun { ctx = mina; _ } () ->
-        Mina_commands.get_trust_status_all mina )
-
   let version =
     field "version" ~typ:string
       ~args:Arg.[]
@@ -4803,8 +4739,6 @@ module Queries = struct
     ; pooled_user_commands
     ; pooled_zkapp_commands
     ; transaction_status
-    ; trust_status
-    ; trust_status_all
     ; snark_pool
     ; pending_snark_work
     ; genesis_constants

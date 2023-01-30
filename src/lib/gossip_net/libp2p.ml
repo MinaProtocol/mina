@@ -37,7 +37,6 @@ module Config = struct
     ; logger : Logger.t
     ; unsafe_no_trust_ip : bool
     ; isolate : bool
-    ; trust_system : Trust_system.t
     ; flooding : bool
     ; direct_peers : Mina_net2.Multiaddr.t list
     ; peer_exchange : bool
@@ -109,17 +108,11 @@ let validate_gossip_base ~fn my_peer_id envelope validation_callback =
 
 let on_gossip_decode_failure (config : Config.t) envelope (err : Error.t) =
   let peer = Envelope.Incoming.sender envelope |> Envelope.Sender.remote_exn in
-  let metadata =
-    [ ("sender_peer_id", `String peer.peer_id)
-    ; ("error", Error_json.error_to_yojson err)
-    ]
-  in
-  Trust_system.(
-    record config.trust_system config.logger peer
-      Actions.
-        (Decoding_failed, Some ("failed to decode gossip message", metadata)))
-  |> don't_wait_for ;
-  ()
+  [%log' error config.logger] "Failed to decode gossip message"
+    ~metadata:
+      [ ("sender_peer_id", `String peer.peer_id)
+      ; ("error", Error_json.error_to_yojson err)
+      ]
 
 module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
   S with module Rpc_intf := Rpc_intf = struct
@@ -132,7 +125,6 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       ; net2 : Mina_net2.t Deferred.t ref
       ; first_peer_ivar : unit Ivar.t
       ; high_connectivity_ivar : unit Ivar.t
-      ; ban_reader : Intf.ban_notification Linear_pipe.Reader.t
       ; publish_functions : publish_functions ref
       ; restart_helper : unit -> unit
       }
@@ -196,6 +188,8 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
     let peers_snapshot = ref []
 
     let peers_snapshot_max_staleness = Time.Span.of_sec 30.
+
+    let banned_peers = Peer.Hash_set.create ()
 
     (* Creates just the helper, making sure to register everything
        BEFORE we start listening/advertise ourselves for discovery. *)
@@ -307,14 +301,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                 ~known_private_ip_nets:config.known_private_ip_nets
                 ~initial_gating_config:
                   Mina_net2.
-                    { banned_peers =
-                        Trust_system.peer_statuses config.trust_system
-                        |> List.filter_map ~f:(fun (peer, status) ->
-                               match status.banned with
-                               | Banned_until _ ->
-                                   Some peer
-                               | _ ->
-                                   None )
+                    { banned_peers = Hash_set.to_list banned_peers
                     ; trusted_peers =
                         List.filter_map ~f:Mina_net2.Multiaddr.to_peer
                           config.initial_peers
@@ -326,18 +313,12 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
               List.bind rpc_handlers ~f:create_rpc_implementations
             in
             let implementations =
-              let handle_unknown_rpc conn_state ~rpc_tag ~version =
-                Deferred.don't_wait_for
-                  Trust_system.(
-                    record config.trust_system config.logger conn_state
-                      Actions.
-                        ( Unknown_rpc
-                        , Some
-                            ( "Attempt to make unknown (fixed-version) RPC \
-                               call \"$rpc\" with version $version"
-                            , [ ("rpc", `String rpc_tag)
-                              ; ("version", `Int version)
-                              ] ) )) ;
+              let handle_unknown_rpc _conn_state ~rpc_tag ~version =
+                [%log' error config.logger]
+                  "Attempt to make unknown (fixed-version) RPC call \"$rpc\" \
+                   with version $version"
+                  ~metadata:
+                    [ ("rpc", `String rpc_tag); ("version", `Int version) ] ;
                 `Close_connection
               in
               Rpc.Implementations.create_exn
@@ -360,21 +341,15 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                           transport
                       with
                       | Error handshake_error ->
-                          let%bind () =
+                          let%map () =
                             Async_rpc_kernel.Rpc.Transport.close transport
                           in
                           don't_wait_for
                             (Mina_net2.reset_stream net2 stream >>| ignore) ;
-                          Trust_system.(
-                            record config.trust_system config.logger peer
-                              Actions.
-                                ( Incoming_connection_error
-                                , Some
-                                    ( "Handshake error: $exn"
-                                    , [ ( "exn"
-                                        , `String
-                                            (Exn.to_string handshake_error) )
-                                      ] ) ))
+                          [%log' error config.logger] "Handshake error: $exn"
+                            ~metadata:
+                              [ ("exn", `String (Exn.to_string handshake_error))
+                              ]
                       | Ok rpc_connection -> (
                           let%bind () =
                             Async_rpc_kernel.Rpc.Connection.close_finished
@@ -551,7 +526,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
              (`Capacity 0, `Overflow (Strict_pipe.Drop_head ignore)) )
       in
       let added_seeds = Peer.Hash_set.create () in
-      let%bind () =
+      let%map () =
         let rec on_libp2p_create res =
           net2_ref :=
             Deferred.map res ~f:(fun (n, _) ->
@@ -608,64 +583,6 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                restart_libp2p () ; !net2_ref >>| ignore ) ) ;
         start_libp2p ()
       in
-      let ban_configuration =
-        ref { Mina_net2.banned_peers = []; trusted_peers = []; isolate = false }
-      in
-      let send_heartbeat peer =
-        O1trace.thread "execute_heartbeat" (fun () ->
-            let n_def = !net2_ref in
-            if Deferred.is_determined n_def then
-              let%map net2 = n_def in
-              Mina_net2.send_heartbeat net2 peer.Network_peer.Peer.peer_id
-            else Deferred.unit )
-      in
-      let do_ban (banned_peer, expiration) =
-        O1trace.thread "execute_gossip_net_bans" (fun () ->
-            don't_wait_for
-              ( Clock.at expiration
-              >>= fun () ->
-              let%bind net2 = !net2_ref in
-              ban_configuration :=
-                { !ban_configuration with
-                  banned_peers =
-                    List.filter !ban_configuration.banned_peers ~f:(fun p ->
-                        not (Peer.equal p banned_peer) )
-                } ;
-              Mina_net2.set_connection_gating_config net2 !ban_configuration
-              |> Deferred.ignore_m ) ;
-            (let%bind net2 = !net2_ref in
-             ban_configuration :=
-               { !ban_configuration with
-                 banned_peers = banned_peer :: !ban_configuration.banned_peers
-               } ;
-             Mina_net2.set_connection_gating_config net2 !ban_configuration )
-            |> Deferred.ignore_m )
-      in
-      let%map () =
-        Deferred.List.iter (Trust_system.peer_statuses config.trust_system)
-          ~f:(function
-          | ( addr
-            , { banned = Trust_system.Banned_status.Banned_until expiration; _ }
-            ) ->
-              do_ban (addr, expiration)
-          | _ ->
-              Deferred.unit )
-      in
-      let handle_trust_system_upcall upcall =
-        match upcall with
-        | `Ban u ->
-            do_ban u
-        | `Heartbeat peer ->
-            send_heartbeat peer
-      in
-      let ban_reader, ban_writer = Linear_pipe.create () in
-      don't_wait_for
-        (let%map () =
-           Strict_pipe.Reader.iter
-             (Trust_system.upcall_pipe config.trust_system)
-             ~f:handle_trust_system_upcall
-         in
-         Linear_pipe.close ban_writer ) ;
       let t =
         { config
         ; added_seeds
@@ -673,7 +590,6 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
         ; first_peer_ivar
         ; high_connectivity_ivar
         ; publish_functions = pfs_ref
-        ; ban_reader
         ; restart_helper = (fun () -> Strict_pipe.Writer.write restarts_w ())
         }
       in
@@ -733,7 +649,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
         -> r
         -> q Deferred.Or_error.t =
      fun ?heartbeat_timeout ?timeout ~rpc_counter ~rpc_failed_counter ~rpc_name
-         t peer transport dispatch query ->
+         t _peer transport dispatch query ->
       let call () =
         Monitor.try_with ~here:[%here] (fun () ->
             (* Async_rpc_kernel takes a transport instead of a Reader.t *)
@@ -766,16 +682,9 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
               ~on_handshake_error:
                 (`Call
                   (fun exn ->
-                    let%map () =
-                      Trust_system.(
-                        record t.config.trust_system t.config.logger peer
-                          Actions.
-                            ( Outgoing_connection_error
-                            , Some
-                                ( "Handshake error: $exn"
-                                , [ ("exn", `String (Exn.to_string exn)) ] ) ))
-                    in
-                    Or_error.error_string "handshake error" ) ) )
+                    [%log' error t.config.logger] "Handshake error: $exn"
+                      ~metadata:[ ("exn", `String (Exn.to_string exn)) ] ;
+                    Deferred.Or_error.error_string "handshake error" ) ) )
         >>= function
         | Ok (Ok result) ->
             (* call succeeded, result is valid *)
@@ -800,25 +709,12 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                   ; _rpc_version
                   ] ) ->
                 Mina_metrics.(Counter.inc_one Network.rpc_connections_failed) ;
-                let%map () =
-                  Trust_system.(
-                    record t.config.trust_system t.config.logger peer
-                      Actions.
-                        ( Outgoing_connection_error
-                        , Some ("Closed connection", []) ))
-                in
-                Error err
+                [%log' error t.config.logger] "Closed connection" ;
+                return @@ Error err
             | _ ->
-                let%map () =
-                  Trust_system.(
-                    record t.config.trust_system t.config.logger peer
-                      Actions.
-                        ( Outgoing_connection_error
-                        , Some
-                            ( "RPC call failed, reason: $exn"
-                            , [ ("exn", Error_json.error_to_yojson err) ] ) ))
-                in
-                Error err )
+                [%log' error t.config.logger] "RPC call failed, reason: $exn"
+                  ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ;
+                return @@ Error err )
         | Error monitor_exn ->
             (* call itself failed *)
             (* TODO: learn what other exceptions are raised here *)
@@ -945,8 +841,6 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
     let on_first_high_connectivity t ~f =
       Deferred.map (Ivar.read t.high_connectivity_ivar) ~f
 
-    let ban_notification_reader t = t.ban_reader
-
     let connection_gating t =
       let%map net2 = !(t.net2) in
       Mina_net2.connection_gating_config net2
@@ -954,6 +848,17 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
     let set_connection_gating t config =
       let%bind net2 = !(t.net2) in
       Mina_net2.set_connection_gating_config net2 config
+
+    let ban_peer t peer =
+      let%bind net2 = !(t.net2) in
+      Hash_set.add banned_peers peer ;
+      let%map _gating = Mina_net2.set_banned_peers net2 banned_peers in
+      don't_wait_for
+        ( let%bind () = after @@ Time.Span.of_day 1.0 in
+          Hash_set.remove banned_peers peer ;
+          let%bind _gating = Mina_net2.set_banned_peers net2 banned_peers in
+          Deferred.unit
+          : unit Deferred.t )
 
     let restart_helper t = t.restart_helper ()
   end

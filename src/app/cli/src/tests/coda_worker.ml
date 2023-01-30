@@ -381,14 +381,6 @@ module T = struct
       in
       let%bind () = File_system.create_dir conf_dir in
       O1trace.thread "worker_main" (fun () ->
-          let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
-          let trace_database_initialization typ location =
-            (* can't use %log because location is passed-in *)
-            Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
-              ~location typ
-          in
-          let trust_system = Trust_system.create trust_dir in
-          trace_database_initialization "trust_system" __LOC__ trust_dir ;
           let time_controller =
             Block_time.Controller.create (Block_time.Controller.basic ~logger)
           in
@@ -430,7 +422,6 @@ module T = struct
               ; seed_peer_list_url = None
               ; unsafe_no_trust_ip = true
               ; isolate = false
-              ; trust_system
               ; flooding = false
               ; direct_peers = []
               ; min_connections = 20
@@ -448,7 +439,6 @@ module T = struct
           in
           let net_config =
             { Mina_networking.Config.logger
-            ; trust_system
             ; time_controller
             ; consensus_local_state
             ; is_seed = List.is_empty peers
@@ -475,10 +465,9 @@ module T = struct
           let start_time = Time.now () in
           let coda_deferred () =
             Mina_lib.create
-              (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~chain_id ~is_seed ~disable_node_status:true
-                 ~super_catchup:true ~coinbase_receiver:`Producer ~net_config
-                 ~gossip_net_params
+              (Mina_lib.Config.make ~logger ~pids ~conf_dir ~chain_id ~is_seed
+                 ~disable_node_status:true ~super_catchup:true
+                 ~coinbase_receiver:`Producer ~net_config ~gossip_net_params
                  ~initial_protocol_version:Protocol_version.zero
                  ~proposed_protocol_version_opt:None
                  ~work_selection_method:

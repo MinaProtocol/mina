@@ -16,7 +16,6 @@
    data_hash_lib
    precomputed_values
    genesis_constants
-   trust_system
    transition_frontier_extensions
    transition_frontier_base
    consensus
@@ -26,6 +25,7 @@
    transition_frontier
    best_tip_prover
    mina_block
+   mina_networking
    network_peer
    logger
    merkle_ledger

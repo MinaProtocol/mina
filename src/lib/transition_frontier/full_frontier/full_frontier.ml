@@ -945,11 +945,11 @@ module For_tests = struct
 
   let gen_breadcrumb ~verifier =
     Breadcrumb.For_tests.gen ~logger ~precomputed_values ~verifier
-      ?trust_system:None ~accounts_with_secret_keys
+      ~accounts_with_secret_keys
 
   let gen_breadcrumb_seq ~verifier =
     Breadcrumb.For_tests.gen_seq ~logger ~precomputed_values ~verifier
-      ?trust_system:None ~accounts_with_secret_keys
+      ~accounts_with_secret_keys
 
   module Transfer =
     Mina_ledger.Ledger_transfer.Make (Mina_ledger.Ledger) (Mina_ledger.Ledger)

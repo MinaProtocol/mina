@@ -34,7 +34,6 @@
    node_addrs_and_ports
    mina_numbers
    participating_state
-   trust_system
    network_pool
    merkle_list_verifier
    mina_stdlib

@@ -16,7 +16,6 @@
    ;;local libraries
    o1trace
    mina_metrics
-   trust_system
    truth
    staged_ledger
    precomputed_values

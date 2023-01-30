@@ -14,7 +14,6 @@
    core
    async
    ;; local libraries
-   trust_system
    logger
    merkle_ledger
    pipe_lib
@@ -56,7 +55,6 @@
    merkle_ledger
    syncable_ledger
    network_peer
-   trust_system
    currency
    data_hash_lib
    mina_base.import

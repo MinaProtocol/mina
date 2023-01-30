@@ -16,6 +16,7 @@
    network_peer
    cache_lib
    mina_block
+   mina_networking
    o1trace
    pipe_lib
    mina_base

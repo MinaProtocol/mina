@@ -81,7 +81,6 @@ end) : sig
   val create :
        max_batch_size:int
     -> stop:unit Deferred.t
-    -> trust_system:Trust_system.t
     -> get:(Peer.t -> Key.t list -> Result.t list Deferred.Or_error.t)
     -> knowledge_context:Knowledge_context.t Broadcast_pipe.Reader.t
     -> knowledge:
@@ -621,7 +620,6 @@ end = struct
           (* buffer of length 0 *)
     ; got_new_peers_r : unit Strict_pipe.Reader.t
     ; logger : Logger.t
-    ; trust_system : Trust_system.t
     ; stop : unit Deferred.t
     }
 
@@ -726,7 +724,6 @@ end = struct
         ; downloading
         ; max_batch_size = _
         ; logger = _
-        ; trust_system = _
         ; stop = _
         } as t ) =
     let rec clear_queue q =
@@ -827,11 +824,7 @@ end = struct
                 List.iter rs ~f:(fun r ->
                     match Hashtbl.find jobs (Result.key r) with
                     | None ->
-                        (* Got something we didn't ask for. *)
-                        Trust_system.(
-                          record t.trust_system t.logger peer
-                            Actions.(Violated_protocol, None))
-                        |> don't_wait_for
+                        ()
                     | Some j ->
                         Hashtbl.remove jobs j.key ;
                         job_finished t j
@@ -950,8 +943,8 @@ end = struct
   let mark_preferred t peer ~now =
     Useful_peers.Preferred_heap.add t.useful_peers.all_preferred (peer, now)
 
-  let create ~max_batch_size ~stop ~trust_system ~get ~knowledge_context
-      ~knowledge ~peers ~preferred =
+  let create ~max_batch_size ~stop ~get ~knowledge_context ~knowledge ~peers
+      ~preferred =
     let%map all_peers = peers () in
     let pipe ~name c =
       Strict_pipe.create ~warn_on_drop:false ~name
@@ -972,7 +965,6 @@ end = struct
       ; get
       ; max_batch_size
       ; logger = Logger.create ()
-      ; trust_system
       ; downloading = Key.Table.create ()
       ; stop
       }

@@ -50,7 +50,6 @@
    consensus
    network_peer
    currency
-   trust_system
    block_time
    transition_frontier_extensions
    signature_lib

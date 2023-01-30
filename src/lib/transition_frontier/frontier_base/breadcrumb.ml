@@ -66,7 +66,7 @@ T.
 include Allocation_functor.Make.Sexp (T)
 
 let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
-    ~trust_system ~parent
+    ~ban_peer ~parent
     ~transition:(transition_with_validation : Mina_block.almost_valid_block)
     ~sender ~transition_receipt_time () =
   O1trace.thread "build_breadcrumb" (fun () ->
@@ -97,9 +97,9 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
             | None | Some Envelope.Sender.Local ->
                 return ()
             | Some (Envelope.Sender.Remote peer) ->
-                Trust_system.(
-                  record trust_system logger peer
-                    Actions.(Gossiped_invalid_transition, Some (message, [])))
+                [%log error] "Gossiped invalid transaction"
+                  ~metadata:[ ("error", `String message) ] ;
+                ban_peer peer
           in
           Error (`Invalid_staged_ledger_diff (Error.of_string message))
       | Error (`Invalid_staged_ledger_diff errors) ->
@@ -112,53 +112,42 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
                     "snarked ledger hash" ) )
           in
           let message = "invalid staged ledger diff: incorrect " ^ reasons in
-          let%map () =
+          let%bind () =
             match sender with
             | None | Some Envelope.Sender.Local ->
-                return ()
+                Deferred.unit
             | Some (Envelope.Sender.Remote peer) ->
-                Trust_system.(
-                  record trust_system logger peer
-                    Actions.(Gossiped_invalid_transition, Some (message, [])))
+                [%log error] "Gossiped invalid transaction"
+                  ~metadata:[ ("error", `String message) ] ;
+                ban_peer peer
           in
-          Error (`Invalid_staged_ledger_hash (Error.of_string message))
+          return @@ Error (`Invalid_staged_ledger_hash (Error.of_string message))
       | Error (`Staged_ledger_application_failed staged_ledger_error) ->
           let%map () =
             match sender with
             | None | Some Envelope.Sender.Local ->
-                return ()
-            | Some (Envelope.Sender.Remote peer) ->
+                Deferred.unit
+            | Some (Envelope.Sender.Remote peer) -> (
                 let error_string =
                   Staged_ledger.Staged_ledger_error.to_string
                     staged_ledger_error
                 in
-                let make_actions action =
-                  ( action
-                  , Some
-                      ( "Staged_ledger error: $error"
-                      , [ ("error", `String error_string) ] ) )
-                in
-                let open Trust_system.Actions in
+                [%log info] "Staged ledger error"
+                  ~metadata:[ ("error", `String error_string) ] ;
                 (* TODO : refine these actions (#2375) *)
                 let open Staged_ledger.Pre_diff_info.Error in
-                with_return (fun { return } ->
-                    let action =
-                      match staged_ledger_error with
-                      | Couldn't_reach_verifier _ ->
-                          return Deferred.unit
-                      | Invalid_proofs _ ->
-                          make_actions Sent_invalid_proof
-                      | Pre_diff (Verification_failed _) ->
-                          make_actions Sent_invalid_signature_or_proof
-                      | Pre_diff _
-                      | Non_zero_fee_excess _
-                      | Insufficient_work _
-                      | Mismatched_statuses _
-                      | Invalid_public_key _
-                      | Unexpected _ ->
-                          make_actions Gossiped_invalid_transition
-                    in
-                    Trust_system.record trust_system logger peer action )
+                match staged_ledger_error with
+                | Couldn't_reach_verifier _ ->
+                    Deferred.unit
+                | Invalid_proofs _
+                | Pre_diff (Verification_failed _)
+                | Pre_diff _
+                | Non_zero_fee_excess _
+                | Insufficient_work _
+                | Mismatched_statuses _
+                | Invalid_public_key _
+                | Unexpected _ ->
+                    ban_peer peer )
           in
           Error
             (`Invalid_staged_ledger_diff
@@ -294,8 +283,8 @@ module For_tests = struct
 
   let gen ?(logger = Logger.null ()) ?(send_to_random_pk = false)
       ~(precomputed_values : Precomputed_values.t) ~verifier
-      ?(trust_system = Trust_system.null ()) ~accounts_with_secret_keys () :
-      (t -> t Deferred.t) Quickcheck.Generator.t =
+      ~accounts_with_secret_keys () : (t -> t Deferred.t) Quickcheck.Generator.t
+      =
     let open Quickcheck.Let_syntax in
     let gen_slot_advancement = Int.gen_incl 1 10 in
     let%bind make_next_consensus_state =
@@ -445,7 +434,8 @@ module For_tests = struct
       in
       let transition_receipt_time = Some (Time.now ()) in
       match%map
-        build ~logger ~precomputed_values ~trust_system ~verifier
+        build ~logger ~precomputed_values ~verifier
+          ~ban_peer:(fun _ -> Deferred.unit)
           ~parent:parent_breadcrumb
           ~transition:
             ( next_block |> Mina_block.Validated.remember
@@ -467,22 +457,20 @@ module For_tests = struct
       | Error (`Invalid_staged_ledger_hash e) ->
           failwithf !"Invalid staged ledger hash: %{sexp:Error.t}" e ()
 
-  let gen_non_deferred ?logger ~precomputed_values ~verifier ?trust_system
+  let gen_non_deferred ?logger ~precomputed_values ~verifier
       ~accounts_with_secret_keys () =
     let open Quickcheck.Generator.Let_syntax in
     let%map make_deferred =
-      gen ?logger ~verifier ~precomputed_values ?trust_system
-        ~accounts_with_secret_keys ()
+      gen ?logger ~verifier ~precomputed_values ~accounts_with_secret_keys ()
     in
     fun x -> Async.Thread_safe.block_on_async_exn (fun () -> make_deferred x)
 
-  let gen_seq ?logger ~precomputed_values ~verifier ?trust_system
-      ~accounts_with_secret_keys n =
+  let gen_seq ?logger ~precomputed_values ~verifier ~accounts_with_secret_keys n
+      =
     let open Quickcheck.Generator.Let_syntax in
     let gen_list =
       List.gen_with_length n
-        (gen ?logger ~precomputed_values ~verifier ?trust_system
-           ~accounts_with_secret_keys () )
+        (gen ?logger ~precomputed_values ~verifier ~accounts_with_secret_keys ())
     in
     let%map breadcrumbs_constructors = gen_list in
     fun root ->
@@ -496,8 +484,8 @@ module For_tests = struct
       List.rev ls
 
   let build_fail ?skip_staged_ledger_verification:_ ~logger:_
-      ~precomputed_values:_ ~verifier:_ ~trust_system:_ ~parent:_ ~transition:_
-      ~sender:_ ~transition_receipt_time:_ () :
+      ~precomputed_values:_ ~verifier:_ ~parent:_ ~transition:_ ~sender:_
+      ~transition_receipt_time:_ () :
       ( t
       , [> `Fatal_error of exn
         | `Invalid_staged_ledger_diff of Core_kernel.Error.t

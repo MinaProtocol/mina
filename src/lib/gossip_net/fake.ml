@@ -231,9 +231,6 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
     let on_first_high_connectivity _ ~f:_ = Deferred.never ()
 
-    let ban_notification_reader { ban_notification_reader; _ } =
-      ban_notification_reader
-
     let query_peer ?heartbeat_timeout:_ ?timeout:_ t peer rpc query =
       Network.call_rpc t.network t.peer_table ~sender_id:t.me.peer_id
         ~responder_id:peer rpc query
@@ -289,6 +286,8 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
     let set_connection_gating t config =
       t.connection_gating := config ;
       Deferred.return config
+
+    let ban_peer _t _peer = Deferred.unit
   end
 
   type network = Network.t

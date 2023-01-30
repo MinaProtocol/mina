@@ -1012,10 +1012,6 @@ let setup_daemon logger =
             Logger.trace logger ~module_:__MODULE__ "Creating %s at %s"
               ~location typ
           in
-          let trust_dir = conf_dir ^/ "trust" in
-          let%bind () = Async.Unix.mkdir ~p:() trust_dir in
-          let trust_system = Trust_system.create trust_dir in
-          trace_database_initialization "trust_system" __LOC__ trust_dir ;
           let genesis_state_hash =
             (Precomputed_values.genesis_state_hashes precomputed_values)
               .state_hash
@@ -1165,7 +1161,6 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               ; initial_peers
               ; addrs_and_ports
               ; metrics_port = libp2p_metrics_port
-              ; trust_system
               ; flooding = Option.value ~default:false enable_flooding
               ; direct_peers
               ; peer_protection_ratio
@@ -1185,7 +1180,6 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           in
           let net_config =
             { Mina_networking.Config.logger
-            ; trust_system
             ; time_controller
             ; consensus_constants = precomputed_values.consensus_constants
             ; consensus_local_state
@@ -1272,10 +1266,9 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           let start_time = Time.now () in
           let%map mina =
             Mina_lib.create ~wallets
-              (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~chain_id ~is_seed ~super_catchup:(not no_super_catchup)
-                 ~disable_node_status ~demo_mode ~coinbase_receiver ~net_config
-                 ~gossip_net_params
+              (Mina_lib.Config.make ~logger ~pids ~conf_dir ~chain_id ~is_seed
+                 ~super_catchup:(not no_super_catchup) ~disable_node_status
+                 ~demo_mode ~coinbase_receiver ~net_config ~gossip_net_params
                  ~initial_protocol_version:current_protocol_version
                  ~proposed_protocol_version_opt
                  ~work_selection_method:

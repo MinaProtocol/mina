@@ -290,12 +290,13 @@ module Instance = struct
                 don't assign a timestamp
              *)
              let transition_receipt_time = None in
+             (* we don't yet have a network to ban from *)
              let%bind breadcrumb =
                Breadcrumb.build ~skip_staged_ledger_verification:`All
                  ~logger:t.factory.logger ~precomputed_values
                  ~verifier:t.factory.verifier
-                 ~trust_system:(Trust_system.null ()) ~parent ~transition
-                 ~sender:None ~transition_receipt_time ()
+                 ~ban_peer:(fun _ -> Deferred.unit)
+                 ~parent ~transition ~sender:None ~transition_receipt_time ()
              in
              let%map () = apply_diff Diff.(E (New_node (Full breadcrumb))) in
              breadcrumb ) )

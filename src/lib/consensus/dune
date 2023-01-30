@@ -77,7 +77,6 @@
    snark_bits
    sparse_ledger_lib
    syncable_ledger
-   trust_system
    mina_base.import
    ppx_version.runtime
    graphql_basic_scalars

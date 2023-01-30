@@ -13,7 +13,6 @@
    ;; local libraries
    mina_wire_types
    mina_metrics
-   mina_net2
    debug_assert
    blockchain_snark
    with_hash

@@ -41,7 +41,6 @@
    consensus
    mina_networking
    fake_network
-   trust_system
    transition_frontier_persistent_root
    precomputed_values
    truth

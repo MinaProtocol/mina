@@ -650,8 +650,8 @@ module For_tests = struct
     let protocol_states = [] in
     (root, protocol_states)
 
-  let gen ?(logger = Logger.null ()) ~verifier ?trust_system
-      ?consensus_local_state ~precomputed_values
+  let gen ?(logger = Logger.null ()) ~verifier ?consensus_local_state
+      ~precomputed_values
       ?(root_ledger_and_accounts =
         ( Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
@@ -671,9 +671,6 @@ module For_tests = struct
     end in
     let open Context in
     let open Quickcheck.Generator.Let_syntax in
-    let trust_system =
-      Option.value trust_system ~default:(Trust_system.null ())
-    in
     let epoch_ledger_location =
       Filename.temp_dir_name ^/ "epoch_ledger"
       ^ (Uuid_unix.create () |> Uuid.to_string)
@@ -700,8 +697,7 @@ module For_tests = struct
           (Quickcheck_lib.gen_imperative_rose_tree
              (Quickcheck.Generator.return root)
              (Breadcrumb.For_tests.gen_non_deferred ~logger ~precomputed_values
-                ~verifier ~trust_system
-                ~accounts_with_secret_keys:root_ledger_accounts () ) )
+                ~verifier ~accounts_with_secret_keys:root_ledger_accounts () ) )
       in
       (root, branches, protocol_states)
     in
@@ -771,7 +767,7 @@ module For_tests = struct
           @@ next_epoch_ledger consensus_local_state) ) ;
     frontier
 
-  let gen_with_branch ?logger ~verifier ?trust_system ?consensus_local_state
+  let gen_with_branch ?logger ~verifier ?consensus_local_state
       ~precomputed_values
       ?(root_ledger_and_accounts =
         ( Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
@@ -780,13 +776,12 @@ module For_tests = struct
       ~branch_size ?(use_super_catchup : bool option) () =
     let open Quickcheck.Generator.Let_syntax in
     let%bind frontier =
-      gen ?logger ~verifier ?trust_system ?use_super_catchup
-        ?consensus_local_state ~precomputed_values ?gen_root_breadcrumb
-        ~root_ledger_and_accounts ~max_length ~size:frontier_size ()
+      gen ?logger ~verifier ?use_super_catchup ?consensus_local_state
+        ~precomputed_values ?gen_root_breadcrumb ~root_ledger_and_accounts
+        ~max_length ~size:frontier_size ()
     in
     let%map make_branch =
       Breadcrumb.For_tests.gen_seq ?logger ~precomputed_values ~verifier
-        ?trust_system
         ~accounts_with_secret_keys:(snd root_ledger_and_accounts)
         branch_size
     in

@@ -39,7 +39,6 @@
    mina_user_error
    gossip_net
    transition_frontier
-   trust_system
    node_status_service
    vrf_evaluator
    uptime_service
