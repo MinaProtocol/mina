@@ -173,7 +173,8 @@ module Features = struct
     module V1 = struct
       type 'bool t =
         { chacha : 'bool
-        ; range_check : 'bool
+        ; range_check0 : 'bool
+        ; range_check1 : 'bool
         ; foreign_field_add : 'bool
         ; foreign_field_mul : 'bool
         ; xor : 'bool
@@ -191,7 +192,8 @@ module Features = struct
 
   let to_vector
       { chacha
-      ; range_check
+      ; range_check0
+      ; range_check1
       ; foreign_field_add
       ; foreign_field_mul
       ; xor
@@ -200,7 +202,8 @@ module Features = struct
       ; runtime_tables
       } : _ Vector.t =
     [ chacha
-    ; range_check
+    ; range_check0
+    ; range_check1
     ; foreign_field_add
     ; foreign_field_mul
     ; xor
@@ -211,7 +214,8 @@ module Features = struct
 
   let of_vector
       ([ chacha
-       ; range_check
+       ; range_check0
+       ; range_check1
        ; foreign_field_add
        ; foreign_field_mul
        ; xor
@@ -221,7 +225,8 @@ module Features = struct
        ] :
         _ Vector.t ) =
     { chacha
-    ; range_check
+    ; range_check0
+    ; range_check1
     ; foreign_field_add
     ; foreign_field_mul
     ; xor
@@ -231,13 +236,14 @@ module Features = struct
     }
 
   let typ bool =
-    Vector.typ bool Nat.N8.n
+    Vector.typ bool Nat.N9.n
     |> Snarky_backendless.Typ.transport ~there:to_vector ~back:of_vector
     |> Snarky_backendless.Typ.transport_var ~there:to_vector ~back:of_vector
 
   let none =
     { chacha = Opt.Flag.No
-    ; range_check = Opt.Flag.No
+    ; range_check0 = Opt.Flag.No
+    ; range_check1 = Opt.Flag.No
     ; foreign_field_add = Opt.Flag.No
     ; foreign_field_mul = Opt.Flag.No
     ; xor = Opt.Flag.No
@@ -248,7 +254,8 @@ module Features = struct
 
   let none_bool =
     { chacha = false
-    ; range_check = false
+    ; range_check0 = false
+    ; range_check1 = false
     ; foreign_field_add = false
     ; foreign_field_mul = false
     ; xor = false
@@ -259,7 +266,8 @@ module Features = struct
 
   let map
       { chacha
-      ; range_check
+      ; range_check0
+      ; range_check1
       ; foreign_field_add
       ; foreign_field_mul
       ; rot
@@ -268,7 +276,8 @@ module Features = struct
       ; runtime_tables
       } ~f =
     { chacha = f chacha
-    ; range_check = f range_check
+    ; range_check0 = f range_check0
+    ; range_check1 = f range_check1
     ; foreign_field_add = f foreign_field_add
     ; foreign_field_mul = f foreign_field_mul
     ; xor = f xor
@@ -279,7 +288,8 @@ module Features = struct
 
   let map2 x1 x2 ~f =
     { chacha = f x1.chacha x2.chacha
-    ; range_check = f x1.range_check x2.range_check
+    ; range_check0 = f x1.range_check0 x2.range_check0
+    ; range_check1 = f x1.range_check1 x2.range_check1
     ; foreign_field_add = f x1.foreign_field_add x2.foreign_field_add
     ; foreign_field_mul = f x1.foreign_field_mul x2.foreign_field_mul
     ; xor = f x1.xor x2.xor
