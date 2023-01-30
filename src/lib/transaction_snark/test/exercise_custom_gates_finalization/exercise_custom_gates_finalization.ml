@@ -3,7 +3,8 @@ open Core_kernel
 open Mina_base
 module Init_ledger = Mina_transaction_logic.For_tests.Init_ledger
 
-let keypair_and_amounts = Quickcheck.random_value ~seed:(`Deterministic "") (Init_ledger.gen ())
+let keypair_and_amounts =
+  Quickcheck.random_value ~seed:(`Deterministic "") (Init_ledger.gen ())
 
 let fish1_kp = fst keypair_and_amounts.(0)
 
@@ -160,10 +161,10 @@ let mk_cmds () =
     ]
 
 (* NOTE: THIS TEST ONLY FAILS WITH THE `develop` DUNE PROFILE
-Run with
-```
-dune runtest --profile=devnet --no-buffer src/lib/transaction_snark/test/exercise_custom_gates_finalization/
-```
+   Run with
+   ```
+   dune runtest --profile=devnet --no-buffer src/lib/transaction_snark/test/exercise_custom_gates_finalization/
+   ```
 *)
 let%test_unit "Prove transaction" =
   let open Async in
@@ -176,7 +177,6 @@ let%test_unit "Prove transaction" =
       Init_ledger.init
         (module Mina_ledger.Ledger.Ledger_inner)
         keypair_and_amounts ledger ;
-      Format.eprintf !"Merkel root: %{sexp: Ledger_hash.t}@." (Mina_ledger.Ledger.merkle_root ledger);
       let%map () =
         Transaction_snark_tests.Util.check_zkapp_command_with_merges_exn ledger
           txns
