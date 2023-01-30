@@ -122,11 +122,22 @@ module Authorization_kind = struct
   [%%endif]
 end
 
-module Call_type = struct
+module May_use_token = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Call | Delegate_call
+      type t = Mina_wire_types.Mina_base.Account_update.May_use_token.V1.t =
+        | No
+            (** No permission to use any token other than the default Mina
+                token.
+            *)
+        | Parents_own_token
+            (** Has permission to use the token owned by the direct parent of
+                this account update, which may be inherited by child account
+                updates.
+            *)
+        | Inherit_from_parent
+            (** Inherit the token permission available to the parent. *)
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
@@ -134,28 +145,351 @@ module Call_type = struct
   end]
 
   let gen =
-    Quickcheck.Generator.(map bool) ~f:(function
-      | true ->
-          Call
-      | false ->
-          Delegate_call )
+    Quickcheck.Generator.of_list [ No; Parents_own_token; Inherit_from_parent ]
 
-  let to_string = function Call -> "call" | Delegate_call -> "delegate_call"
+  let to_string = function
+    | No ->
+        "No"
+    | Parents_own_token ->
+        "ParentsOwnToken"
+    | Inherit_from_parent ->
+        "InheritFromParent"
 
   let of_string = function
-    | "call" ->
-        Call
-    | "delegate_call" ->
-        Delegate_call
+    | "No" ->
+        No
+    | "ParentsOwnToken" ->
+        Parents_own_token
+    | "InheritFromParent" ->
+        Inherit_from_parent
     | s ->
         failwithf "Invalid call type: %s" s ()
 
-  let quickcheck_generator =
-    Quickcheck.Generator.map Bool.quickcheck_generator ~f:(function
-      | false ->
-          Call
-      | true ->
-          Delegate_call )
+  let parents_own_token = function Parents_own_token -> true | _ -> false
+
+  let inherit_from_parent = function Inherit_from_parent -> true | _ -> false
+
+  module As_record : sig
+    type variant = t
+
+    type 'bool t
+
+    val parents_own_token : 'bool t -> 'bool
+
+    val inherit_from_parent : 'bool t -> 'bool
+
+    val map : f:('a -> 'b) -> 'a t -> 'b t
+
+    val to_hlist : 'bool t -> (unit, 'bool -> 'bool -> unit) H_list.t
+
+    val of_hlist : (unit, 'bool -> 'bool -> unit) H_list.t -> 'bool t
+
+    val to_input :
+      field_of_bool:('a -> 'b) -> 'a t -> 'b Random_oracle_input.Chunked.t
+
+    val typ : (Snark_params.Tick.Boolean.var t, bool t) Snark_params.Tick.Typ.t
+
+    val equal :
+         and_:('bool -> 'bool -> 'bool)
+      -> equal:('a -> 'a -> 'bool)
+      -> 'a t
+      -> 'a t
+      -> 'bool
+
+    val to_variant : bool t -> variant
+
+    val of_variant : variant -> bool t
+
+    (* TODO: Create an alias for this type *)
+    val deriver :
+         ( bool t
+         , ( ( ( bool t
+               , ( bool t
+                 , ( bool t
+                   , ( ( bool t
+                       , ( bool t
+                         , ( bool t
+                           , ( (< contramap : (bool t -> bool t) Core_kernel.ref
+                                ; graphql_arg :
+                                    (   unit
+                                     -> bool t
+                                        Fields_derivers_graphql.Schema.Arg
+                                        .arg_typ )
+                                    Core_kernel.ref
+                                ; graphql_arg_accumulator :
+                                    bool t
+                                    Fields_derivers_zkapps.Derivers.Graphql.Args
+                                    .Acc
+                                    .T
+                                    .t
+                                    Core_kernel.ref
+                                ; graphql_creator :
+                                    (   ( ( 'a
+                                          , bool t
+                                          , bool t
+                                          , 'b )
+                                          Fields_derivers_zkapps.Derivers
+                                          .Graphql
+                                          .Args
+                                          .Output
+                                          .t
+                                        , bool t
+                                        , bool t
+                                        , 'b )
+                                        Fields_derivers_zkapps.Derivers.Graphql
+                                        .Args
+                                        .Input
+                                        .t
+                                     -> bool t )
+                                    Core_kernel.ref
+                                ; graphql_fields :
+                                    bool t
+                                    Fields_derivers_zkapps.Derivers.Graphql
+                                    .Fields
+                                    .Input
+                                    .T
+                                    .t
+                                    Core_kernel.ref
+                                ; graphql_fields_accumulator :
+                                    bool t
+                                    Fields_derivers_zkapps.Derivers.Graphql
+                                    .Fields
+                                    .Accumulator
+                                    .T
+                                    .t
+                                    list
+                                    Core_kernel.ref
+                                ; graphql_query : string option Core_kernel.ref
+                                ; graphql_query_accumulator :
+                                    (Core_kernel.String.t * string option)
+                                    option
+                                    list
+                                    Core_kernel.ref
+                                ; js_layout :
+                                    [> `Assoc of (string * Yojson.Safe.t) list ]
+                                    Core_kernel.ref
+                                ; js_layout_accumulator :
+                                    Fields_derivers_zkapps__.Fields_derivers_js
+                                    .Js_layout
+                                    .Accumulator
+                                    .field
+                                    option
+                                    list
+                                    Core_kernel.ref
+                                ; map : (bool t -> bool t) Core_kernel.ref
+                                ; nullable_graphql_arg :
+                                    (   unit
+                                     -> 'b
+                                        Fields_derivers_graphql.Schema.Arg
+                                        .arg_typ )
+                                    Core_kernel.ref
+                                ; nullable_graphql_fields :
+                                    bool t option
+                                    Fields_derivers_zkapps.Derivers.Graphql
+                                    .Fields
+                                    .Input
+                                    .T
+                                    .t
+                                    Core_kernel.ref
+                                ; of_json :
+                                    (Yojson.Safe.t -> bool t) Core_kernel.ref
+                                ; of_json_creator :
+                                    Yojson.Safe.t Core_kernel.String.Map.t
+                                    Core_kernel.ref
+                                ; skip : bool Core_kernel.ref
+                                ; to_json :
+                                    (bool t -> Yojson.Safe.t) Core_kernel.ref
+                                ; to_json_accumulator :
+                                    ( Core_kernel.String.t
+                                    * (bool t -> Yojson.Safe.t) )
+                                    option
+                                    list
+                                    Core_kernel.ref
+                                ; .. >
+                                as
+                                'a )
+                               Fields_derivers_zkapps__.Fields_derivers_js
+                               .Js_layout
+                               .Input
+                               .t
+                               Fields_derivers_graphql.Graphql_query.Input.t
+                             , bool t
+                             , bool t
+                             , 'b )
+                             Fields_derivers_zkapps.Derivers.Graphql.Args.Input
+                             .t
+                           , bool t
+                           , bool t option )
+                           Fields_derivers_zkapps.Derivers.Graphql.Fields.Input
+                           .t
+                         , bool t )
+                         Fields_derivers_json.Of_yojson.Input.t
+                       , bool t )
+                       Fields_derivers_json.To_yojson.Input.t
+                       Fields_derivers_zkapps.Unified_input.t
+                       Fields_derivers_zkapps__.Fields_derivers_js.Js_layout
+                       .Input
+                       .t
+                       Fields_derivers_graphql.Graphql_query.Input.t
+                     , bool t
+                     , bool t
+                     , 'b )
+                     Fields_derivers_zkapps.Derivers.Graphql.Args.Input.t
+                   , bool t
+                   , bool t option )
+                   Fields_derivers_zkapps.Derivers.Graphql.Fields.Input.t
+                 , bool t )
+                 Fields_derivers_json.Of_yojson.Input.t
+               , bool t )
+               Fields_derivers_json.To_yojson.Input.t
+               Fields_derivers_zkapps.Unified_input.t
+             , bool t
+             , bool t
+             , 'b )
+             Fields_derivers_zkapps.Derivers.Graphql.Args.Input.t
+           , bool t
+           , bool t
+           , 'b )
+           Fields_derivers_zkapps.Derivers.Graphql.Args.Acc.t
+         , bool t
+         , bool t option )
+         Fields_derivers_zkapps.Derivers.Graphql.Fields.Accumulator.t
+      -> ( bool t
+         , ( bool t
+           , ( bool t
+             , ( 'a Fields_derivers_zkapps__.Fields_derivers_js.Js_layout.Input.t
+                 Fields_derivers_graphql.Graphql_query.Input.t
+               , bool t
+               , bool t
+               , 'b )
+               Fields_derivers_zkapps.Derivers.Graphql.Args.Input.t
+             , bool t
+             , bool t option )
+             Fields_derivers_zkapps.Derivers.Graphql.Fields.Input.t
+           , bool t )
+           Fields_derivers_json.Of_yojson.Input.t
+         , bool t )
+         Fields_derivers_json.To_yojson.Input.t
+         Fields_derivers_zkapps.Unified_input.t
+  end = struct
+    type variant = t
+
+    type 'bool t =
+      { (* NB: call is implicit. *)
+        parents_own_token : 'bool
+      ; inherit_from_parent : 'bool
+      }
+    [@@deriving annot, hlist, fields]
+
+    let map ~f { parents_own_token; inherit_from_parent } =
+      { parents_own_token = f parents_own_token
+      ; inherit_from_parent = f inherit_from_parent
+      }
+
+    let typ : _ Typ.t =
+      let open Snark_params.Tick in
+      let (Typ typ) =
+        Typ.of_hlistable
+          [ Boolean.typ; Boolean.typ ]
+          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+          ~value_of_hlist:of_hlist
+      in
+      Typ
+        { typ with
+          check =
+            (fun ({ parents_own_token; inherit_from_parent } as x) ->
+              let open Checked in
+              let%bind () = typ.check x in
+              let sum =
+                Field.Var.(
+                  add (parents_own_token :> t) (inherit_from_parent :> t))
+              in
+              (* Assert boolean; we should really have a helper for this
+                 somewhere.
+              *)
+              let%bind sum_squared = Field.Checked.mul sum sum in
+              Field.Checked.Assert.equal sum sum_squared )
+        }
+
+    let to_input ~field_of_bool { parents_own_token; inherit_from_parent } =
+      Array.reduce_exn ~f:Random_oracle_input.Chunked.append
+        [| Random_oracle_input.Chunked.packed
+             (field_of_bool parents_own_token, 1)
+         ; Random_oracle_input.Chunked.packed
+             (field_of_bool inherit_from_parent, 1)
+        |]
+
+    let equal ~and_ ~equal
+        { parents_own_token = parents_own_token1
+        ; inherit_from_parent = inherit_from_parent1
+        }
+        { parents_own_token = parents_own_token2
+        ; inherit_from_parent = inherit_from_parent2
+        } =
+      and_
+        (equal parents_own_token1 parents_own_token2)
+        (equal inherit_from_parent1 inherit_from_parent2)
+
+    let to_variant = function
+      | { parents_own_token = false; inherit_from_parent = false } ->
+          No
+      | { parents_own_token = true; inherit_from_parent = false } ->
+          Parents_own_token
+      | { parents_own_token = false; inherit_from_parent = true } ->
+          Inherit_from_parent
+      | _ ->
+          failwith "May_use_token.to_variant: More than one boolean flag is set"
+
+    let of_variant = function
+      | No ->
+          { parents_own_token = false; inherit_from_parent = false }
+      | Parents_own_token ->
+          { parents_own_token = true; inherit_from_parent = false }
+      | Inherit_from_parent ->
+          { parents_own_token = false; inherit_from_parent = true }
+
+    let deriver obj : _ Fields_derivers_zkapps.Unified_input.t =
+      let open Fields_derivers_zkapps.Derivers in
+      let ( !. ) = ( !. ) ~t_fields_annots in
+      Fields.make_creator obj ~parents_own_token:!.bool
+        ~inherit_from_parent:!.bool
+      |> finish "MayUseToken" ~t_toplevel_annots
+  end
+
+  let quickcheck_generator = gen
+
+  let deriver obj =
+    let open Fields_derivers_zkapps in
+    iso_record ~of_record:As_record.to_variant ~to_record:As_record.of_variant
+      As_record.deriver obj
+
+  module Checked = struct
+    type t = Boolean.var As_record.t
+
+    let parents_own_token = As_record.parents_own_token
+
+    let inherit_from_parent = As_record.inherit_from_parent
+
+    let constant x =
+      As_record.map ~f:Boolean.var_of_value @@ As_record.of_variant x
+
+    let to_input (x : t) =
+      As_record.to_input
+        ~field_of_bool:(fun (x : Boolean.var) -> (x :> Field.Var.t))
+        x
+
+    let equal x y =
+      As_record.equal ~equal:Run.Boolean.equal ~and_:Run.Boolean.( &&& ) x y
+
+    let assert_equal x y =
+      As_record.equal ~equal:Run.Boolean.Assert.( = ) ~and_:(fun _ _ -> ()) x y
+  end
+
+  let to_input x = As_record.to_input ~field_of_bool (As_record.of_variant x)
+
+  let typ : (Checked.t, t) Typ.t =
+    As_record.typ
+    |> Typ.transport ~there:As_record.of_variant ~back:As_record.to_variant
 end
 
 module Update = struct
@@ -607,7 +941,7 @@ module Update = struct
 end
 
 module Events = Zkapp_account.Events
-module Sequence_events = Zkapp_account.Sequence_events
+module Actions = Zkapp_account.Actions
 
 module Account_precondition = struct
   [%%versioned
@@ -761,6 +1095,9 @@ module Preconditions = struct
       type t = Mina_wire_types.Mina_base.Account_update.Preconditions.V1.t =
         { network : Zkapp_precondition.Protocol_state.Stable.V1.t
         ; account : Account_precondition.Stable.V1.t
+        ; valid_while :
+            Mina_numbers.Global_slot.Stable.V1.t
+            Zkapp_precondition.Numeric.Stable.V1.t
         }
       [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
 
@@ -774,20 +1111,23 @@ module Preconditions = struct
     Fields.make_creator obj
       ~network:!.Zkapp_precondition.Protocol_state.deriver
       ~account:!.Account_precondition.deriver
+      ~valid_while:!.Zkapp_precondition.Valid_while.deriver
     |> finish "Preconditions" ~t_toplevel_annots
 
-  let to_input ({ network; account } : t) =
+  let to_input ({ network; account; valid_while } : t) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
       [ Zkapp_precondition.Protocol_state.to_input network
       ; Zkapp_precondition.Account.to_input
           (Account_precondition.to_full account)
+      ; Zkapp_precondition.Valid_while.to_input valid_while
       ]
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
     let%map network = Zkapp_precondition.Protocol_state.gen
-    and account = Account_precondition.gen in
-    { network; account }
+    and account = Account_precondition.gen
+    and valid_while = Zkapp_precondition.Valid_while.gen in
+    { network; account; valid_while }
 
   module Checked = struct
     module Type_of_var (V : sig
@@ -804,25 +1144,31 @@ module Preconditions = struct
     type t =
       { network : Zkapp_precondition.Protocol_state.Checked.t
       ; account : Account_precondition.Checked.t
+      ; valid_while : Zkapp_precondition.Valid_while.Checked.t
       }
     [@@deriving annot, hlist, fields]
 
-    let to_input ({ network; account } : t) =
+    let to_input ({ network; account; valid_while } : t) =
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Zkapp_precondition.Protocol_state.Checked.to_input network
         ; Zkapp_precondition.Account.Checked.to_input account
+        ; Zkapp_precondition.Valid_while.Checked.to_input valid_while
         ]
   end
 
   let typ () : (Checked.t, t) Typ.t =
     Typ.of_hlistable
-      [ Zkapp_precondition.Protocol_state.typ; Account_precondition.typ () ]
+      [ Zkapp_precondition.Protocol_state.typ
+      ; Account_precondition.typ ()
+      ; Zkapp_precondition.Valid_while.typ
+      ]
       ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   let accept =
     { network = Zkapp_precondition.Protocol_state.accept
     ; account = Account_precondition.Accept
+    ; valid_while = Ignore
     }
 end
 
@@ -842,60 +1188,6 @@ module Body = struct
     end]
   end
 
-  module Wire = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          { public_key : Public_key.Compressed.Stable.V1.t
-          ; token_id : Token_id.Stable.V2.t
-          ; update : Update.Stable.V1.t
-          ; balance_change :
-              (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
-          ; increment_nonce : bool
-          ; events : Events'.Stable.V1.t
-          ; sequence_events : Events'.Stable.V1.t
-          ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
-          ; preconditions : Preconditions.Stable.V1.t
-          ; use_full_commitment : bool
-          ; caller : Call_type.Stable.V1.t
-          ; authorization_kind : Authorization_kind.Stable.V1.t
-          }
-        [@@deriving sexp, equal, yojson, hash, compare]
-
-        let to_latest = Fn.id
-      end
-    end]
-
-    let gen =
-      let open Quickcheck.Generator.Let_syntax in
-      let%map public_key = Public_key.Compressed.gen
-      and token_id = Token_id.gen
-      and update = Update.gen ()
-      and balance_change = Currency.Amount.Signed.gen
-      and increment_nonce = Quickcheck.Generator.bool
-      and events = return []
-      and sequence_events = return []
-      and call_data = Field.gen
-      and preconditions = Preconditions.gen
-      and use_full_commitment = Quickcheck.Generator.bool
-      and caller = Call_type.gen
-      and authorization_kind = Authorization_kind.gen in
-      { public_key
-      ; token_id
-      ; update
-      ; balance_change
-      ; increment_nonce
-      ; events
-      ; sequence_events
-      ; call_data
-      ; preconditions
-      ; use_full_commitment
-      ; caller
-      ; authorization_kind
-      }
-  end
-
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
@@ -908,12 +1200,13 @@ module Body = struct
               (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
           ; increment_nonce : bool
           ; events : Events'.Stable.V1.t
-          ; sequence_events : Events'.Stable.V1.t
+          ; actions : Events'.Stable.V1.t
           ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
           ; call_depth : int
           ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
-          ; caller : Token_id.Stable.V2.t
+          ; implicit_account_creation_fee : bool
+          ; may_use_token : May_use_token.Stable.V1.t
           ; authorization_kind : Authorization_kind.Stable.V1.t
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
@@ -928,9 +1221,10 @@ module Body = struct
       Fields.make_creator obj ~public_key:!.public_key ~update:!.Update.deriver
         ~token_id:!.Token_id.deriver ~balance_change:!.balance_change
         ~increment_nonce:!.bool ~events:!.Events.deriver
-        ~sequence_events:!.Sequence_events.deriver ~call_data:!.field
+        ~actions:!.Actions.deriver ~call_data:!.field
         ~preconditions:!.Preconditions.deriver ~use_full_commitment:!.bool
-        ~caller:!.Token_id.deriver ~call_depth:!.int
+        ~implicit_account_creation_fee:!.bool
+        ~may_use_token:!.May_use_token.deriver ~call_depth:!.int
         ~authorization_kind:!.Authorization_kind.deriver
       |> finish "AccountUpdateBody" ~t_toplevel_annots
 
@@ -941,12 +1235,13 @@ module Body = struct
       ; balance_change = Amount.Signed.zero
       ; increment_nonce = false
       ; events = []
-      ; sequence_events = []
+      ; actions = []
       ; call_data = Field.zero
       ; call_depth = 0
       ; preconditions = Preconditions.accept
       ; use_full_commitment = false
-      ; caller = Token_id.default
+      ; implicit_account_creation_fee = false
+      ; may_use_token = No
       ; authorization_kind = None_given
       }
   end
@@ -963,12 +1258,13 @@ module Body = struct
               (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
           ; increment_nonce : bool
           ; events : Events'.Stable.V1.t
-          ; sequence_events : Events'.Stable.V1.t
+          ; actions : Events'.Stable.V1.t
           ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
           ; call_depth : int
           ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
-          ; caller : Call_type.Stable.V1.t
+          ; implicit_account_creation_fee : bool
+          ; may_use_token : May_use_token.Stable.V1.t
           ; authorization_kind : Authorization_kind.Stable.V1.t
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
@@ -989,11 +1285,12 @@ module Body = struct
             (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
         ; increment_nonce : bool
         ; events : Events'.Stable.V1.t
-        ; sequence_events : Events'.Stable.V1.t
+        ; actions : Events'.Stable.V1.t
         ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
         ; preconditions : Preconditions.Stable.V1.t
         ; use_full_commitment : bool
-        ; caller : Token_id.Stable.V2.t
+        ; implicit_account_creation_fee : bool
+        ; may_use_token : May_use_token.Stable.V1.t
         ; authorization_kind : Authorization_kind.Stable.V1.t
         }
       [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
@@ -1002,18 +1299,19 @@ module Body = struct
     end
   end]
 
-  let to_wire (p : t) caller : Wire.t =
+  let of_simple (p : Simple.t) : t =
     { public_key = p.public_key
     ; token_id = p.token_id
     ; update = p.update
     ; balance_change = p.balance_change
     ; increment_nonce = p.increment_nonce
     ; events = p.events
-    ; sequence_events = p.sequence_events
+    ; actions = p.actions
     ; call_data = p.call_data
     ; preconditions = p.preconditions
     ; use_full_commitment = p.use_full_commitment
-    ; caller
+    ; implicit_account_creation_fee = p.implicit_account_creation_fee
+    ; may_use_token = p.may_use_token
     ; authorization_kind = p.authorization_kind
     }
 
@@ -1024,11 +1322,12 @@ module Body = struct
        ; balance_change
        ; increment_nonce
        ; events
-       ; sequence_events
+       ; actions
        ; call_data
        ; preconditions
        ; use_full_commitment
-       ; caller
+       ; implicit_account_creation_fee
+       ; may_use_token
        ; call_depth = _
        ; authorization_kind
        } :
@@ -1039,11 +1338,12 @@ module Body = struct
     ; balance_change
     ; increment_nonce
     ; events
-    ; sequence_events
+    ; actions
     ; call_data
     ; preconditions
     ; use_full_commitment
-    ; caller
+    ; implicit_account_creation_fee
+    ; may_use_token
     ; authorization_kind
     }
 
@@ -1054,11 +1354,12 @@ module Body = struct
        ; balance_change
        ; increment_nonce
        ; events
-       ; sequence_events
+       ; actions
        ; call_data
        ; preconditions
        ; use_full_commitment
-       ; caller
+       ; implicit_account_creation_fee
+       ; may_use_token
        ; authorization_kind
        } :
         t ) ~call_depth : Graphql_repr.t =
@@ -1068,11 +1369,12 @@ module Body = struct
     ; balance_change
     ; increment_nonce
     ; events
-    ; sequence_events
+    ; actions
     ; call_data
     ; preconditions
     ; use_full_commitment
-    ; caller
+    ; implicit_account_creation_fee
+    ; may_use_token
     ; call_depth
     ; authorization_kind
     }
@@ -1137,7 +1439,7 @@ module Body = struct
         { Signed_poly.sgn = Sgn.Neg; magnitude = Amount.of_fee t.fee }
     ; increment_nonce = true
     ; events = []
-    ; sequence_events = []
+    ; actions = []
     ; call_data = Field.zero
     ; preconditions =
         { Preconditions.network =
@@ -1149,9 +1451,11 @@ module Body = struct
                  Check { lower = Global_slot.zero; upper = valid_until }
              } )
         ; account = Account_precondition.Nonce t.nonce
+        ; valid_while = Ignore
         }
     ; use_full_commitment = true
-    ; caller = Token_id.default
+    ; implicit_account_creation_fee = true
+    ; may_use_token = No
     ; authorization_kind = Signature
     }
 
@@ -1163,7 +1467,7 @@ module Body = struct
         { Signed_poly.sgn = Sgn.Neg; magnitude = Amount.of_fee t.fee }
     ; increment_nonce = true
     ; events = []
-    ; sequence_events = []
+    ; actions = []
     ; call_data = Field.zero
     ; preconditions =
         { Preconditions.network =
@@ -1175,9 +1479,11 @@ module Body = struct
                  Check { lower = Global_slot.zero; upper = valid_until }
              } )
         ; account = Account_precondition.Nonce t.nonce
+        ; valid_while = Ignore
         }
     ; use_full_commitment = true
-    ; caller = Call
+    ; implicit_account_creation_fee = true
+    ; may_use_token = No
     ; call_depth = 0
     ; authorization_kind = Signature
     }
@@ -1189,11 +1495,11 @@ module Body = struct
         ; balance_change
         ; increment_nonce = _
         ; events = _
-        ; sequence_events = _
+        ; actions = _
         ; call_data = _
         ; preconditions
         ; use_full_commitment = _
-        ; caller = _
+        ; may_use_token = _
         ; authorization_kind = _
         } =
       t
@@ -1237,11 +1543,12 @@ module Body = struct
       ; balance_change : Amount.Signed.var
       ; increment_nonce : Boolean.var
       ; events : Events.var
-      ; sequence_events : Sequence_events.var
+      ; actions : Actions.var
       ; call_data : Field.Var.t
       ; preconditions : Preconditions.Checked.t
       ; use_full_commitment : Boolean.var
-      ; caller : Token_id.Checked.t
+      ; implicit_account_creation_fee : Boolean.var
+      ; may_use_token : May_use_token.Checked.t
       ; authorization_kind : Authorization_kind.Checked.t
       }
     [@@deriving annot, hlist, fields]
@@ -1253,11 +1560,12 @@ module Body = struct
          ; balance_change
          ; increment_nonce
          ; events
-         ; sequence_events
+         ; actions
          ; call_data
          ; preconditions
          ; use_full_commitment
-         ; caller
+         ; implicit_account_creation_fee
+         ; may_use_token
          ; authorization_kind
          } :
           t ) =
@@ -1270,12 +1578,14 @@ module Body = struct
         ; Random_oracle_input.Chunked.packed
             ((increment_nonce :> Field.Var.t), 1)
         ; Events.var_to_input events
-        ; Sequence_events.var_to_input sequence_events
+        ; Actions.var_to_input actions
         ; Random_oracle_input.Chunked.field call_data
         ; Preconditions.Checked.to_input preconditions
         ; Random_oracle_input.Chunked.packed
             ((use_full_commitment :> Field.Var.t), 1)
-        ; Token_id.Checked.to_input caller
+        ; Random_oracle_input.Chunked.packed
+            ((implicit_account_creation_fee :> Field.Var.t), 1)
+        ; May_use_token.Checked.to_input may_use_token
         ; Authorization_kind.Checked.to_input authorization_kind
         ]
 
@@ -1292,11 +1602,12 @@ module Body = struct
       ; Amount.Signed.typ
       ; Boolean.typ
       ; Events.typ
-      ; Sequence_events.typ
+      ; Actions.typ
       ; Field.typ
       ; Preconditions.typ ()
       ; Impl.Boolean.typ
-      ; Token_id.typ
+      ; Impl.Boolean.typ
+      ; May_use_token.typ
       ; Authorization_kind.typ
       ]
       ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
@@ -1309,11 +1620,12 @@ module Body = struct
     ; balance_change = Amount.Signed.zero
     ; increment_nonce = false
     ; events = []
-    ; sequence_events = []
+    ; actions = []
     ; call_data = Field.zero
     ; preconditions = Preconditions.accept
     ; use_full_commitment = false
-    ; caller = Token_id.default
+    ; implicit_account_creation_fee = true
+    ; may_use_token = No
     ; authorization_kind = None_given
     }
 
@@ -1331,11 +1643,12 @@ module Body = struct
        ; balance_change
        ; increment_nonce
        ; events
-       ; sequence_events
+       ; actions
        ; call_data
        ; preconditions
        ; use_full_commitment
-       ; caller
+       ; implicit_account_creation_fee
+       ; may_use_token
        ; authorization_kind
        } :
         t ) =
@@ -1346,11 +1659,13 @@ module Body = struct
       ; Amount.Signed.to_input balance_change
       ; Random_oracle_input.Chunked.packed (field_of_bool increment_nonce, 1)
       ; Events.to_input events
-      ; Sequence_events.to_input sequence_events
+      ; Actions.to_input actions
       ; Random_oracle_input.Chunked.field call_data
       ; Preconditions.to_input preconditions
       ; Random_oracle_input.Chunked.packed (field_of_bool use_full_commitment, 1)
-      ; Token_id.to_input caller
+      ; Random_oracle_input.Chunked.packed
+          (field_of_bool implicit_account_creation_fee, 1)
+      ; May_use_token.to_input may_use_token
       ; Authorization_kind.to_input authorization_kind
       ]
 
@@ -1365,7 +1680,7 @@ module Body = struct
     end
   end
 
-  let gen caller =
+  let gen =
     let open Quickcheck.Generator.Let_syntax in
     let%map public_key = Public_key.Compressed.gen
     and token_id = Token_id.gen
@@ -1373,10 +1688,12 @@ module Body = struct
     and balance_change = Currency.Amount.Signed.gen
     and increment_nonce = Quickcheck.Generator.bool
     and events = return []
-    and sequence_events = return []
+    and actions = return []
     and call_data = Field.gen
     and preconditions = Preconditions.gen
     and use_full_commitment = Quickcheck.Generator.bool
+    and implicit_account_creation_fee = Quickcheck.Generator.bool
+    and may_use_token = May_use_token.gen
     and authorization_kind = Authorization_kind.gen in
     { public_key
     ; token_id
@@ -1384,11 +1701,12 @@ module Body = struct
     ; balance_change
     ; increment_nonce
     ; events
-    ; sequence_events
+    ; actions
     ; call_data
     ; preconditions
     ; use_full_commitment
-    ; caller
+    ; implicit_account_creation_fee
+    ; may_use_token
     ; authorization_kind
     }
 end
@@ -1433,33 +1751,6 @@ module T = struct
     end]
   end
 
-  module Wire = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          { body : Body.Wire.Stable.V1.t; authorization : Control.Stable.V2.t }
-        [@@deriving sexp, equal, yojson, hash, compare]
-
-        let to_latest = Fn.id
-      end
-    end]
-
-    let gen : t Quickcheck.Generator.t =
-      let open Quickcheck.Generator.Let_syntax in
-      let%map body = Body.Wire.gen
-      and authorization = Control.gen_with_dummies in
-      { body; authorization }
-
-    let quickcheck_generator : t Quickcheck.Generator.t = gen
-
-    let quickcheck_observer : t Quickcheck.Observer.t =
-      Quickcheck.Observer.of_hash (module Stable.Latest)
-
-    let quickcheck_shrinker : t Quickcheck.Shrinker.t =
-      Quickcheck.Shrinker.empty ()
-  end
-
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -1479,14 +1770,21 @@ module T = struct
       =
     { authorization; body = Body.to_graphql_repr ~call_depth body }
 
-  let gen caller : t Quickcheck.Generator.t =
+  let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
-    let%map body = Body.gen caller
-    and authorization = Control.gen_with_dummies in
+    let%map body = Body.gen and authorization = Control.gen_with_dummies in
     { body; authorization }
 
-  let to_wire (p : t) caller : Wire.t =
-    { body = Body.to_wire p.body caller; authorization = p.authorization }
+  let quickcheck_generator : t Quickcheck.Generator.t = gen
+
+  let quickcheck_observer : t Quickcheck.Observer.t =
+    Quickcheck.Observer.of_hash (module Stable.Latest)
+
+  let quickcheck_shrinker : t Quickcheck.Shrinker.t =
+    Quickcheck.Shrinker.empty ()
+
+  let of_simple (p : Simple.t) : t =
+    { body = Body.of_simple p.body; authorization = p.authorization }
 
   let digest (t : t) = Body.digest t.body
 
@@ -1583,10 +1881,17 @@ let balance_change (t : t) : Amount.Signed.t = t.body.balance_change
 let protocol_state_precondition (t : t) : Zkapp_precondition.Protocol_state.t =
   t.body.preconditions.network
 
+let valid_while_precondition (t : t) :
+    Mina_numbers.Global_slot.t Zkapp_precondition.Numeric.t =
+  t.body.preconditions.valid_while
+
 let public_key (t : t) : Public_key.Compressed.t = t.body.public_key
 
 let token_id (t : t) : Token_id.t = t.body.token_id
 
 let use_full_commitment (t : t) : bool = t.body.use_full_commitment
+
+let implicit_account_creation_fee (t : t) : bool =
+  t.body.implicit_account_creation_fee
 
 let increment_nonce (t : t) : bool = t.body.increment_nonce

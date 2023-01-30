@@ -216,7 +216,6 @@ module Stable = struct
             .h
         in
         let log2_size = Import.Domain.log2_size d in
-        let max_quot_size = Common.max_quot_size_int (Import.Domain.size d) in
         let public =
           let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
           let (Typ typ) = input in
@@ -233,7 +232,6 @@ module Stable = struct
                   ; group_gen = Backend.Tock.Field.domain_generator ~log2_size
                   }
               ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
-              ; max_quot_size
               ; public
               ; prev_challenges = 2 (* Due to Wrap_hack *)
               ; srs

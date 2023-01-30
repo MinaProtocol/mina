@@ -24,7 +24,8 @@ module Failure = struct
         | Signed_command_on_zkapp_account
         | Zkapp_account_not_present
         | Update_not_permitted_balance
-        | Update_not_permitted_timing_existing_account
+        | Update_not_permitted_access
+        | Update_not_permitted_timing
         | Update_not_permitted_delegate
         | Update_not_permitted_app_state
         | Update_not_permitted_verification_key
@@ -46,6 +47,7 @@ module Failure = struct
         | Account_proved_state_precondition_unsatisfied
         | Account_is_new_precondition_unsatisfied
         | Protocol_state_precondition_unsatisfied
+        | Valid_while_precondition_unsatisfied
         | Incorrect_nonce
         | Invalid_fee_excess
         | Cancelled
@@ -109,7 +111,7 @@ module Failure = struct
       ~local_excess_overflow:add ~local_supply_increase_overflow:add
       ~global_supply_increase_overflow:add ~signed_command_on_zkapp_account:add
       ~zkapp_account_not_present:add ~update_not_permitted_balance:add
-      ~update_not_permitted_timing_existing_account:add
+      ~update_not_permitted_timing:add ~update_not_permitted_access:add
       ~update_not_permitted_delegate:add ~update_not_permitted_app_state:add
       ~update_not_permitted_verification_key:add
       ~update_not_permitted_sequence_state:add
@@ -127,7 +129,8 @@ module Failure = struct
         List.init 8 ~f:var.constructor @ acc )
       ~account_proved_state_precondition_unsatisfied:add
       ~account_is_new_precondition_unsatisfied:add
-      ~protocol_state_precondition_unsatisfied:add ~incorrect_nonce:add
+      ~protocol_state_precondition_unsatisfied:add
+      ~valid_while_precondition_unsatisfied:add ~incorrect_nonce:add
       ~invalid_fee_excess:add ~cancelled:add
 
   let gen = Quickcheck.Generator.of_list all
@@ -167,8 +170,10 @@ module Failure = struct
         "Zkapp_account_not_present"
     | Update_not_permitted_balance ->
         "Update_not_permitted_balance"
-    | Update_not_permitted_timing_existing_account ->
-        "Update_not_permitted_timing_existing_account"
+    | Update_not_permitted_access ->
+        "Update_not_permitted_access"
+    | Update_not_permitted_timing ->
+        "Update_not_permitted_timing"
     | Update_not_permitted_delegate ->
         "update_not_permitted_delegate"
     | Update_not_permitted_app_state ->
@@ -211,6 +216,8 @@ module Failure = struct
         "Account_is_new_precondition_unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
         "Protocol_state_precondition_unsatisfied"
+    | Valid_while_precondition_unsatisfied ->
+        "Valid_while_precondition_unsatisfied"
     | Incorrect_nonce ->
         "Incorrect_nonce"
     | Invalid_fee_excess ->
@@ -253,8 +260,10 @@ module Failure = struct
         Ok Zkapp_account_not_present
     | "Update_not_permitted_balance" ->
         Ok Update_not_permitted_balance
-    | "Update_not_permitted_timing_existing_account" ->
-        Ok Update_not_permitted_timing_existing_account
+    | "Update_not_permitted_access" ->
+        Ok Update_not_permitted_access
+    | "Update_not_permitted_timing" ->
+        Ok Update_not_permitted_timing
     | "update_not_permitted_delegate" ->
         Ok Update_not_permitted_delegate
     | "Update_not_permitted_app_state" ->
@@ -295,6 +304,8 @@ module Failure = struct
         Ok Account_is_new_precondition_unsatisfied
     | "Protocol_state_precondition_unsatisfied" ->
         Ok Protocol_state_precondition_unsatisfied
+    | "Valid_while_precondition_unsatisfied" ->
+        Ok Valid_while_precondition_unsatisfied
     | "Incorrect_nonce" ->
         Ok Incorrect_nonce
     | "Invalid_fee_excess" ->
@@ -377,8 +388,11 @@ module Failure = struct
     | Update_not_permitted_balance ->
         "The authentication for an account didn't allow the requested update \
          to its balance"
-    | Update_not_permitted_timing_existing_account ->
-        "The timing of an existing account cannot be updated"
+    | Update_not_permitted_access ->
+        "The authentication for an account didn't allow it to be accessed"
+    | Update_not_permitted_timing ->
+        "The authentication for an account didn't allow the requested update \
+         to its timing"
     | Update_not_permitted_delegate ->
         "The authentication for an account didn't allow the requested update \
          to its delegate"
@@ -436,6 +450,8 @@ module Failure = struct
         "The account update's account is-new state precondition was unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
         "The account update's protocol state precondition unsatisfied"
+    | Valid_while_precondition_unsatisfied ->
+        "The account update's valid-until precondition was unsatisfied"
     | Incorrect_nonce ->
         "Incorrect nonce"
     | Invalid_fee_excess ->

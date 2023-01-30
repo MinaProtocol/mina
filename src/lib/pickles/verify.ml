@@ -39,8 +39,9 @@ let verify_heterogenous (ts : Instance.t list) =
           Ok ()
       | _ ->
           Error
-            (String.concat ~sep:"\n"
-               (List.map !r ~f:(fun lab -> Lazy.force lab)) )
+            ( Error.tag ~tag:"Pickles.verify"
+            @@ Error.of_list
+            @@ List.map !r ~f:(fun lab -> Error.of_string (Lazy.force lab)) )
     in
     ((fun (lab, b) -> if not b then r := lab :: !r), result)
   in
@@ -85,6 +86,9 @@ let verify_heterogenous (ts : Instance.t list) =
         let zeta = sc plonk0.zeta in
         let alpha = sc plonk0.alpha in
         let step_domain = Branch_data.domain branch_data in
+        check
+          ( lazy "domain size is small enough"
+          , Domain.log2_size step_domain <= Nat.to_int Backend.Tick.Rounds.n ) ;
         let w =
           Tick.Field.domain_generator ~log2_size:(Domain.log2_size step_domain)
         in
@@ -320,12 +324,7 @@ let verify_heterogenous (ts : Instance.t list) =
                        .old_bulletproof_challenges ) ) ) ) )
   in
   Common.time "dlog_check" (fun () -> check (lazy "dlog_check", dlog_check)) ;
-  match result () with
-  | Ok () ->
-      true
-  | Error e ->
-      eprintf !"bad verify: %s\n%!" e ;
-      false
+  result ()
 
 let verify (type a return_typ n)
     (max_proofs_verified : (module Nat.Intf with type n = n))

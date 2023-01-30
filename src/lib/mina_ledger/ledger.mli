@@ -207,6 +207,7 @@ val apply_coinbase :
 
 val apply_transaction :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> global_slot:Mina_numbers.Global_slot.t
   -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
   -> t
   -> Transaction.t
@@ -217,7 +218,7 @@ val apply_transaction :
 *)
 val update_sequence_state :
      Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
-  -> Zkapp_account.Sequence_events.t
+  -> Zkapp_account.Actions.t
   -> txn_global_slot:Mina_numbers.Global_slot.t
   -> last_sequence_slot:Mina_numbers.Global_slot.t
   -> Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
@@ -225,6 +226,7 @@ val update_sequence_state :
 
 val apply_zkapp_command_unchecked :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> global_slot:Mina_numbers.Global_slot.t
   -> state_view:Zkapp_precondition.Protocol_state.View.t
   -> t
   -> Zkapp_command.t
@@ -250,6 +252,7 @@ val has_locked_tokens :
 
 val merkle_root_after_zkapp_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> global_slot:Mina_numbers.Global_slot.t
   -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
   -> t
   -> Zkapp_command.Valid.t

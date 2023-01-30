@@ -2,10 +2,7 @@ use crate::wasm_flat_vector::WasmFlatVector;
 use crate::wasm_vector::WasmVector;
 use ark_poly::UVPolynomial;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Evaluations};
-use commitment_dlog::{
-    commitment::b_poly_coefficients,
-    srs::{endos, SRS},
-};
+use commitment_dlog::{commitment::b_poly_coefficients, srs::SRS};
 use paste::paste;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
@@ -119,14 +116,10 @@ macro_rules! impl_srs {
                 }
 
                 // TODO: shouldn't we just error instead of returning None?
-                let mut srs = match SRS::<$G>::deserialize(&mut rmp_serde::Deserializer::new(reader)) {
+                let srs = match SRS::<$G>::deserialize(&mut rmp_serde::Deserializer::new(reader)) {
                     Ok(srs) => srs,
                     Err(_) => return Ok(None),
                 };
-
-                let (endo_q, endo_r) = endos::<$G>();
-                srs.endo_q = endo_q;
-                srs.endo_r = endo_r;
 
                 Ok(Some(Arc::new(srs).into()))
             }
@@ -141,11 +134,15 @@ macro_rules! impl_srs {
                     JsValue::from_str("caml_pasta_fp_urs_lagrange_commitment")
                 })?;
 
-                let evals = (0..domain_size)
-                    .map(|j| if i == j { <$F as ark_ff::One>::one() } else { <$F as ark_ff::Zero>::zero() })
-                    .collect();
-                let p = Evaluations::<$F>::from_vec_and_domain(evals, x_domain).interpolate();
-                Ok(srs.commit_non_hiding(&p, None).into())
+                {
+                    // We're single-threaded, so it's safe to grab this pointer as mutable.
+                    // Do not try this at home.
+                    let ptr: &mut commitment_dlog::srs::SRS<$G> =
+                        unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
+                    ptr.add_lagrange_basis(x_domain);
+                }
+
+                Ok(srs.lagrange_bases[&x_domain.size()][i as usize].clone().into())
             }
 
             #[wasm_bindgen]

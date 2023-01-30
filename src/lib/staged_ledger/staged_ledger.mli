@@ -38,7 +38,10 @@ module Scan_state : sig
   val staged_transactions_with_protocol_states :
        t
     -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-    -> (Transaction.t With_status.t * Mina_state.Protocol_state.value) list
+    -> ( Transaction.t With_status.t
+       * Mina_state.Protocol_state.value
+       * Mina_numbers.Global_slot.t )
+       list
        Or_error.t
 
   val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
@@ -66,6 +69,7 @@ module Staged_ledger_error : sig
         * Transaction_snark.Statement.t
         * Mina_base.Sok_message.t )
         list
+        * Error.t
     | Couldn't_reach_verifier of Error.t
     | Pre_diff of Pre_diff_info.Error.t
     | Insufficient_work of string
@@ -113,7 +117,8 @@ val replace_ledger_exn : t -> Ledger.t -> t
 
 val proof_txns_with_state_hashes :
      t
-  -> (Transaction.t With_status.t * State_hash.t) Mina_stdlib.Nonempty_list.t
+  -> (Transaction.t With_status.t * State_hash.t * Mina_numbers.Global_slot.t)
+     Mina_stdlib.Nonempty_list.t
      option
 
 val copy : t -> t
@@ -123,6 +128,7 @@ val hash : t -> Staged_ledger_hash.t
 val apply :
      ?skip_verification:[ `Proofs | `All ]
   -> constraint_constants:Genesis_constants.Constraint_constants.t
+  -> global_slot:Mina_numbers.Global_slot.t
   -> t
   -> Staged_ledger_diff.t
   -> logger:Logger.t
@@ -142,6 +148,7 @@ val apply :
 
 val apply_diff_unchecked :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> global_slot:Mina_numbers.Global_slot.t
   -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
   -> logger:Logger.t
@@ -164,6 +171,7 @@ val current_ledger_proof : t -> Ledger_proof.t option
 
 val create_diff :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> global_slot:Mina_numbers.Global_slot.t
   -> ?log_block_creation:bool
   -> t
   -> coinbase_receiver:Public_key.Compressed.t

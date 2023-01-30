@@ -10,7 +10,7 @@ open Network_peer
 type validation_error =
   [ `Invalid_time_received of [ `Too_early | `Too_late of int64 ]
   | `Invalid_genesis_protocol_state
-  | `Invalid_proof
+  | `Invalid_proof of Error.t
   | `Invalid_delta_block_chain_proof
   | `Verifier_error of Error.t
   | `Mismatched_protocol_version
@@ -50,7 +50,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
         ]
     | `Invalid_genesis_protocol_state ->
         [ ("reason", `String "invalid genesis state") ]
-    | `Invalid_proof ->
+    | `Invalid_proof err ->
         [ ("reason", `String "invalid proof")
         ; ( "protocol_state"
           , Header.protocol_state (Mina_block.header transition)
@@ -58,6 +58,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
         ; ( "proof"
           , Header.protocol_state_proof @@ Mina_block.header transition
             |> Proof.to_yojson )
+        ; ("error", Error_json.error_to_yojson err)
         ]
     | `Invalid_delta_block_chain_proof ->
         [ ("reason", `String "invalid delta transition chain proof") ]
@@ -99,7 +100,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
           (error_metadata @ [ ("state_hash", State_hash.to_yojson state_hash) ])
         "Error in verifier verifying blockchain proof for $state_hash: $error" ;
       Deferred.unit
-  | `Invalid_proof ->
+  | `Invalid_proof _ ->
       Mina_metrics.(Counter.inc_one Rejected_blocks.invalid_proof) ;
       Queue.enqueue Transition_frontier.rejected_blocks
         (state_hash, sender, time_received, `Invalid_proof) ;

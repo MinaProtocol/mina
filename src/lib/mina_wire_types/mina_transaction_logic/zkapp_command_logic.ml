@@ -21,6 +21,7 @@ module Local_state = struct
       ; success : 'bool
       ; account_update_index : 'length
       ; failure_status_tbl : 'failure_status_tbl
+      ; will_succeed : 'bool
       }
   end
 

@@ -267,7 +267,6 @@ let%test_module "multisig_account" =
                   ; sender = sender, sender_nonce
                   ; receiver = multisig_account_pk
                   ; amount
-                  ; receiver_is_new = _
                   } =
                 spec
               in
@@ -331,17 +330,19 @@ let%test_module "multisig_account" =
                     ; balance_change =
                         Currency.Amount.(Signed.(negate (of_unsigned amount)))
                     ; increment_nonce = true
+                    ; implicit_account_creation_fee = true
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; call_data = Field.zero
                     ; call_depth = 0
                     ; preconditions =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
                         ; account = Nonce (Account.Nonce.succ sender_nonce)
+                        ; valid_while = Ignore
                         }
                     ; use_full_commitment = false
-                    ; caller = Call
+                    ; may_use_token = No
                     ; authorization_kind = Signature
                     }
                 ; authorization = Signature Signature.dummy
@@ -355,17 +356,19 @@ let%test_module "multisig_account" =
                     ; balance_change =
                         Currency.Amount.Signed.(of_unsigned amount)
                     ; increment_nonce = false
+                    ; implicit_account_creation_fee = true
                     ; events = []
-                    ; sequence_events = []
+                    ; actions = []
                     ; call_data = Field.zero
                     ; call_depth = 0
                     ; preconditions =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
                         ; account = Full Zkapp_precondition.Account.accept
+                        ; valid_while = Ignore
                         }
                     ; use_full_commitment = false
-                    ; caller = Call
+                    ; may_use_token = No
                     ; authorization_kind = Proof
                     }
                 ; authorization = Proof Mina_base.Proof.transaction_dummy
@@ -377,7 +380,7 @@ let%test_module "multisig_account" =
                   ~account_update_depth:(fun (p : Account_update.Simple.t) ->
                     p.body.call_depth )
                   [ sender_account_update_data; snapp_account_update_data ]
-                |> Zkapp_command.Call_forest.add_callers_simple
+                |> Zkapp_command.Call_forest.map ~f:Account_update.of_simple
                 |> Zkapp_command.Call_forest.accumulate_hashes_predicated
               in
               let account_updates_hash = Zkapp_command.Call_forest.hash ps in
@@ -389,9 +392,7 @@ let%test_module "multisig_account" =
               let tx_statement : Zkapp_statement.t =
                 { account_update =
                     Account_update.Body.digest
-                      (Zkapp_command.add_caller_simple snapp_account_update_data
-                         Token_id.default )
-                        .body
+                      (Account_update.of_simple snapp_account_update_data).body
                 ; calls = (Zkapp_command.Digest.Forest.empty :> field)
                 }
               in

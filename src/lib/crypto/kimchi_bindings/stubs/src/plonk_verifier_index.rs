@@ -1,7 +1,7 @@
 use ark_ec::AffineCurve;
 use commitment_dlog::{commitment::CommitmentCurve, PolyComm};
 use kimchi::circuits::lookup::index::LookupSelectors;
-use kimchi::circuits::lookup::lookups::{LookupInfo, LookupPattern, LookupsUsed};
+use kimchi::circuits::lookup::lookups::{LookupFeatures, LookupInfo, LookupPattern, LookupPatterns};
 use kimchi::verifier_index::LookupVerifierIndex;
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
@@ -31,7 +31,7 @@ pub enum CamlLookupsUsed {
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlLookupSelectors<T> {
-    pub lookup_gate: Option<T>,
+    pub lookup: Option<T>,
 }
 
 impl<G, CamlPolyComm> From<LookupSelectors<PolyComm<G>>> for CamlLookupSelectors<CamlPolyComm>
@@ -43,12 +43,12 @@ where
         let LookupSelectors {
             xor: _,
             chacha_final: _,
-            lookup_gate,
-            range_check_gate: _,
-            ffmul_gate: _,
+            lookup,
+            range_check: _,
+            ffmul: _,
         } = val;
         CamlLookupSelectors {
-            lookup_gate: lookup_gate.map(From::from),
+            lookup: lookup.map(From::from),
         }
     }
 }
@@ -59,13 +59,13 @@ where
     PolyComm<G>: From<CamlPolyComm>,
 {
     fn from(val: CamlLookupSelectors<CamlPolyComm>) -> Self {
-        let CamlLookupSelectors { lookup_gate } = val;
+        let CamlLookupSelectors { lookup } = val;
         LookupSelectors {
             xor: None,
             chacha_final: None,
-            lookup_gate: lookup_gate.map(From::from),
-            range_check_gate: None,
-            ffmul_gate: None,
+            lookup: lookup.map(From::from),
+            range_check: None,
+            ffmul: None,
         }
     }
 }
@@ -86,16 +86,15 @@ pub struct CamlLookupInfo {
 impl From<LookupInfo> for CamlLookupInfo {
     fn from(li: LookupInfo) -> CamlLookupInfo {
         let LookupInfo {
-            kinds,
+            features,
             max_per_row,
             max_joint_size,
-            uses_runtime_tables,
         } = li;
         CamlLookupInfo {
-            kinds,
+            kinds: features.patterns.into_iter().collect(),
             max_per_row: max_per_row as ocaml::Int,
             max_joint_size: max_joint_size as ocaml::Int,
-            uses_runtime_tables,
+            uses_runtime_tables: features.uses_runtime_tables,
         }
     }
 }
@@ -108,18 +107,28 @@ impl From<CamlLookupInfo> for LookupInfo {
             max_joint_size,
             uses_runtime_tables,
         } = li;
+        let features = {
+            let mut patterns = LookupPatterns::default();
+            for kind in kinds {
+                patterns[kind] = true;
+            }
+            LookupFeatures {
+                patterns,
+                joint_lookup_used: max_joint_size > 1,
+                uses_runtime_tables
+            }
+        };
         LookupInfo {
-            kinds,
+            features,
             max_per_row: max_per_row as usize,
             max_joint_size: max_joint_size as u32,
-            uses_runtime_tables,
         }
     }
 }
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlLookupVerifierIndex<PolyComm> {
-    pub lookup_used: CamlLookupsUsed,
+    pub joint_lookup_used: bool,
     pub lookup_table: Vec<PolyComm>,
     pub lookup_selectors: CamlLookupSelectors<PolyComm>,
     pub table_ids: Option<PolyComm>,
@@ -134,7 +143,7 @@ where
 {
     fn from(li: LookupVerifierIndex<G>) -> Self {
         let LookupVerifierIndex {
-            lookup_used,
+            joint_lookup_used,
             lookup_table,
             lookup_selectors,
             table_ids,
@@ -142,12 +151,7 @@ where
             runtime_tables_selector,
         } = li;
         CamlLookupVerifierIndex {
-            lookup_used: {
-                match lookup_used {
-                    LookupsUsed::Single => CamlLookupsUsed::Single,
-                    LookupsUsed::Joint => CamlLookupsUsed::Joint,
-                }
-            },
+            joint_lookup_used,
             lookup_table: lookup_table.into_iter().map(From::from).collect(),
 
             lookup_selectors: lookup_selectors.into(),
@@ -165,7 +169,7 @@ where
 {
     fn from(li: CamlLookupVerifierIndex<CamlPolyComm>) -> Self {
         let CamlLookupVerifierIndex {
-            lookup_used,
+            joint_lookup_used,
             lookup_table,
             lookup_selectors,
             table_ids,
@@ -173,12 +177,7 @@ where
             runtime_tables_selector,
         } = li;
         LookupVerifierIndex {
-            lookup_used: {
-                match lookup_used {
-                    CamlLookupsUsed::Single => LookupsUsed::Single,
-                    CamlLookupsUsed::Joint => LookupsUsed::Joint,
-                }
-            },
+            joint_lookup_used,
             lookup_table: lookup_table.into_iter().map(From::from).collect(),
             lookup_selectors: lookup_selectors.into(),
             table_ids: table_ids.map(From::from),
@@ -192,7 +191,6 @@ where
 pub struct CamlPlonkVerifierIndex<Fr, SRS, PolyComm> {
     pub domain: CamlPlonkDomain<Fr>,
     pub max_poly_size: ocaml::Int,
-    pub max_quot_size: ocaml::Int,
     pub public: ocaml::Int,
     pub prev_challenges: ocaml::Int,
     pub srs: SRS,

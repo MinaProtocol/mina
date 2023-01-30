@@ -338,16 +338,16 @@ let validate_proofs ~verifier ~genesis_state_hash tvs =
     match to_verify with
     | [] ->
         (* Skip calling the verifier, nothing here to verify. *)
-        return (Ok true)
+        return (Ok (Ok ()))
     | _ ->
         Verifier.verify_blockchain_snarks verifier to_verify
   with
-  | Ok verified ->
-      if verified then
-        Ok
-          (List.map tvs ~f:(fun (t, validation) ->
-               (t, Unsafe.set_valid_proof validation) ) )
-      else Error `Invalid_proof
+  | Ok (Ok ()) ->
+      Ok
+        (List.map tvs ~f:(fun (t, validation) ->
+             (t, Unsafe.set_valid_proof validation) ) )
+  | Ok (Error err) ->
+      Error (`Invalid_proof err)
   | Error e ->
       Error (`Verifier_error e)
 
@@ -470,6 +470,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
   let protocol_state = Header.protocol_state header in
   let blockchain_state = Protocol_state.blockchain_state protocol_state in
   let consensus_state = Protocol_state.consensus_state protocol_state in
+  let global_slot = Consensus_state.global_slot_since_genesis consensus_state in
   let body = Block.body block in
   let apply_start_time = Core.Time.now () in
   let body_ref_from_header = Blockchain_state.body_reference blockchain_state in
@@ -485,8 +486,8 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
                            , `Pending_coinbase_update _ ) =
     Staged_ledger.apply ?skip_verification:skip_staged_ledger_verification
       ~constraint_constants:
-        precomputed_values.Precomputed_values.constraint_constants ~logger
-      ~verifier parent_staged_ledger
+        precomputed_values.Precomputed_values.constraint_constants ~global_slot
+      ~logger ~verifier parent_staged_ledger
       (Staged_ledger_diff.Body.staged_ledger_diff body)
       ~current_state_view:
         Mina_state.Protocol_state.(Body.view @@ body parent_protocol_state)

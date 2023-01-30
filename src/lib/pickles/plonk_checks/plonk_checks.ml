@@ -114,7 +114,8 @@ let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
         get_eval (Opt.value_exn e.lookup).aggreg
     | LookupRuntimeTable ->
         get_eval (Opt.value_exn (Opt.value_exn e.lookup).runtime)
-    | LookupKindIndex LookupGate ->
+    | LookupKindIndex (Lookup | Xor | ChaChaFinal | RangeCheck | ForeignFieldMul)
+      ->
         failwith "Lookup kind index should have been linearized away"
     | LookupRuntimeSelector ->
         failwith "Lookup runtime selector should have been linearized away"
@@ -199,12 +200,7 @@ let scalars_env (type t) (module F : Field_intf with type t = t) ~endo ~mds
               failwith "TODO"
         in
         Lazy.force zeta_to_n_minus_1 / (zeta - w_to_i) )
-  ; enabled_if =
-      (fun (_feature, _f) ->
-        (* TODO *)
-        F.zero )
-  ; foreign_field_modulus = (fun _ -> failwith "TODO")
-  ; neg_foreign_field_modulus = (fun _ -> failwith "TODO")
+  ; if_feature = (fun (_feature, _then_, else_) -> else_ ())
   }
 
 (* TODO: not true anymore if lookup is used *)
@@ -235,9 +231,7 @@ let tick_lookup_constant_term_part (type a)
      ; beta
      ; gamma
      ; unnormalized_lagrange_basis
-     ; enabled_if = _
-     ; foreign_field_modulus = _
-     ; neg_foreign_field_modulus = _
+     ; if_feature = _
      } :
       a Scalars.Env.t ) =
   alpha_pow 24
@@ -421,8 +415,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
                   { joint_combiner
                   ; lookup_gate =
                       Lazy.force
-                        (Hashtbl.find_exn index_terms
-                           (LookupKindIndex LookupGate) )
+                        (Hashtbl.find_exn index_terms (LookupKindIndex Lookup))
                   } )
         }
 

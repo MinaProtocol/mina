@@ -46,6 +46,7 @@ module Transaction_with_witness = struct
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
             .t
         ; ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t [@sexp.opaque]
+        ; block_global_slot : Mina_numbers.Global_slot.Stable.V1.t
         }
       [@@deriving sexp]
 
@@ -179,6 +180,7 @@ let create_expected_statement ~constraint_constants
     ; ledger_witness
     ; init_stack
     ; statement
+    ; block_global_slot
     } =
   let open Or_error.Let_syntax in
   let source_merkle_root =
@@ -194,7 +196,8 @@ let create_expected_statement ~constraint_constants
   let%bind after, applied_transaction =
     Or_error.try_with (fun () ->
         Sparse_ledger.apply_transaction ~constraint_constants
-          ~txn_state_view:state_view ledger_witness transaction )
+          ~global_slot:block_global_slot ~txn_state_view:state_view
+          ledger_witness transaction )
     |> Or_error.join
   in
   let target_merkle_root =
@@ -212,7 +215,8 @@ let create_expected_statement ~constraint_constants
   let pending_coinbase_after =
     let state_body_hash = snd state_hash in
     let pending_coinbase_with_state =
-      Pending_coinbase.Stack.push_state state_body_hash pending_coinbase_before
+      Pending_coinbase.Stack.push_state state_body_hash block_global_slot
+        pending_coinbase_before
     in
     match transaction with
     | Coinbase c ->
@@ -292,7 +296,7 @@ end
 module Make_statement_scanner (Verifier : sig
   type t
 
-  val verify : verifier:t -> P.t list -> bool Deferred.Or_error.t
+  val verify : verifier:t -> P.t list -> unit Or_error.t Deferred.Or_error.t
 end) =
 struct
   module Fold = Parallel_scan.State.Make_foldable (Deferred)
@@ -508,10 +512,10 @@ struct
         Deferred.return (Error `Empty)
     | Ok (Some (res, proofs), _) -> (
         match%map.Deferred Verifier.verify ~verifier proofs with
-        | Ok true ->
+        | Ok (Ok ()) ->
             Ok res
-        | Ok false ->
-            Error (`Error (Error.of_string "Bad proofs"))
+        | Ok (Error err) ->
+            Error (`Error (Error.tag ~tag:"Verifier issue" err))
         | Error e ->
             Error (`Error e) )
     | Error e ->
@@ -624,10 +628,21 @@ let extract_txns txns_with_witnesses =
       let state_hash = fst txn_with_witness.state_hash in
       (txn, state_hash) )
 
+let extract_txns_and_global_slots txns_with_witness =
+  List.map txns_with_witness
+    ~f:(fun (txn_with_witness : Transaction_with_witness.t) ->
+      let txn =
+        Ledger.Transaction_applied.transaction
+          txn_with_witness.transaction_with_info
+      in
+      let state_hash = fst txn_with_witness.state_hash in
+      let global_slot = txn_with_witness.block_global_slot in
+      (txn, state_hash, global_slot) )
+
 let latest_ledger_proof t =
   let open Option.Let_syntax in
   let%map proof, txns_with_witnesses = Parallel_scan.last_emitted_value t in
-  (proof, extract_txns txns_with_witnesses)
+  (proof, extract_txns_and_global_slots txns_with_witnesses)
 
 let free_space = Parallel_scan.free_space
 
@@ -654,7 +669,8 @@ let staged_transactions_with_protocol_states t
         t.transaction_with_info |> Ledger.Transaction_applied.transaction
       in
       let%map protocol_state = get_state (fst t.state_hash) in
-      (txn, protocol_state) )
+      let global_slot = t.block_global_slot in
+      (txn, protocol_state, global_slot) )
   @@ Parallel_scan.pending_data t
   |> Or_error.all
 
@@ -677,7 +693,8 @@ let extract_from_job (job : job) =
         , d.statement
         , d.state_hash
         , d.ledger_witness
-        , d.init_stack )
+        , d.init_stack
+        , d.block_global_slot )
   | Merge ((p1, _), (p2, _)) ->
       Second (p1, p2)
 
@@ -743,7 +760,8 @@ let all_work_pairs t
         , statement
         , state_hash
         , ledger_witness
-        , init_stack ) ->
+        , init_stack
+        , block_global_slot ) ->
         let%map witness =
           let { With_status.data = transaction; status } =
             Mina_transaction_logic.Transaction_applied.transaction_with_status
@@ -765,6 +783,7 @@ let all_work_pairs t
           ; protocol_state_body
           ; init_stack
           ; status
+          ; block_global_slot
           }
         in
         Snark_work_lib.Work.Single.Spec.Transition (statement, witness)

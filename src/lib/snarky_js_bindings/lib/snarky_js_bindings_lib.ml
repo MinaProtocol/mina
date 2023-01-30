@@ -1200,7 +1200,7 @@ let poseidon =
 
         val events = Js.string (zkapp_events :> string)
 
-        val sequenceEvents = Js.string (zkapp_sequence_events :> string)
+        val sequenceEvents = Js.string (zkapp_actions :> string)
 
         val body = Js.string (zkapp_body :> string)
 
@@ -1559,15 +1559,11 @@ module Circuit = struct
     let digest =
       Backend.R1CS_constraint_system.digest cs |> Md5.to_hex |> Js.string
     in
-    (* TODO: to_json doesn't return anything; call into kimchi instead *)
     let json =
       Js.Unsafe.(
         fun_call
           global ##. JSON##.parse
-          [| inject
-               ( Backend.R1CS_constraint_system.to_json cs
-               |> Yojson.Safe.to_string |> Js.string )
-          |])
+          [| inject (Backend.R1CS_constraint_system.to_json cs |> Js.string) |])
     in
     object%js
       val rows = rows
@@ -2231,6 +2227,7 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
     Pickles.compile_promise () ~choices
       ~public_input:(Input (public_input_typ public_input_size))
       ~auxiliary_typ:Typ.unit
+      ~override_wrap_domain:Pickles_base.Proofs_verified.N1
       ~branches:(module Branches)
       ~max_proofs_verified:(module Max_proofs_verified)
       ~name ~constraint_constants
@@ -2295,7 +2292,8 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
   let verify (public_input_js : public_input_js) (proof : _ Pickles.Proof.t) =
     let public_input = Public_input.(public_input_js |> of_js |> to_constant) in
     Proof.verify_promise [ (public_input, proof) ]
-    |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
+    |> Promise.map ~f:(fun x -> Js.bool (Or_error.is_ok x))
+    |> Promise_js_helpers.to_js
   in
   object%js
     val provers = Obj.magic provers
@@ -2363,7 +2361,8 @@ let verify (public_input : public_input_js) (proof : proof)
           (Error.to_string_hum err) ()
   in
   Pickles.Side_loaded.verify_promise ~typ [ (vk, public_input, proof) ]
-  |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
+  |> Promise.map ~f:(fun x -> Js.bool (Or_error.is_ok x))
+  |> Promise_js_helpers.to_js
 
 let dummy_base64_proof () =
   let n2 = Pickles_types.Nat.N2.n in
@@ -2427,7 +2426,8 @@ module Ledger = struct
     ; editSequenceState : Js.js_string Js.t Js.readonly_prop
     ; setTokenSymbol : Js.js_string Js.t Js.readonly_prop
     ; incrementNonce : Js.js_string Js.t Js.readonly_prop
-    ; setVotingFor : Js.js_string Js.t Js.readonly_prop >
+    ; setVotingFor : Js.js_string Js.t Js.readonly_prop
+    ; setTiming : Js.js_string Js.t Js.readonly_prop >
     Js.t
 
   type timing =
@@ -2460,6 +2460,7 @@ module Ledger = struct
     { edit_state = None
     ; send = None
     ; receive = None
+    ; access = None
     ; set_delegate = None
     ; set_permissions = None
     ; set_verification_key = None
@@ -2468,6 +2469,7 @@ module Ledger = struct
     ; set_token_symbol = None
     ; increment_nonce = None
     ; set_voting_for = None
+    ; set_timing = None
     }
 
   module L : Mina_base.Ledger_intf.S = struct
@@ -2754,6 +2756,9 @@ module Ledger = struct
         val setVotingFor =
           Js.string
             (Mina_base.Permissions.Auth_required.to_string p.set_voting_for)
+
+        val setTiming =
+          Js.string (Mina_base.Permissions.Auth_required.to_string p.set_timing)
       end
 
     let timing (t : Mina_base.Account_timing.t) : timing =
@@ -2912,8 +2917,13 @@ module Ledger = struct
           (Zkapp_command.Call_forest.hash account_update.elt.calls :> Impl.field)
     end
 
-  let sign_field_element (x : field_class Js.t) (key : private_key) =
-    Signature_lib.Schnorr.Chunked.sign (private_key key)
+  let sign_field_element (x : field_class Js.t) (key : private_key)
+      (is_mainnet : bool Js.t) =
+    let network_id =
+      Mina_signature_kind.(if Js.to_bool is_mainnet then Mainnet else Testnet)
+    in
+    Signature_lib.Schnorr.Chunked.sign ~signature_kind:network_id
+      (private_key key)
       (Random_oracle.Input.Chunked.field (x |> of_js_field |> to_unchecked))
     |> Mina_base.Signature.to_base58_check |> Js.string
 
@@ -3098,7 +3108,9 @@ module Ledger = struct
     check_account_update_signatures txn ;
     let ledger = l##.value in
     let application_result =
-      T.apply_zkapp_command_unchecked ~state_view:network_state
+      T.apply_zkapp_command_unchecked
+        ~global_slot:network_state.global_slot_since_genesis
+        ~state_view:network_state
         ~constraint_constants:
           { Genesis_constants.Constraint_constants.compiled with
             account_creation_fee = Currency.Fee.of_string account_creation_fee
