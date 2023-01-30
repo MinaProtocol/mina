@@ -3,7 +3,7 @@ open Core_kernel
 open Mina_base
 module Init_ledger = Mina_transaction_logic.For_tests.Init_ledger
 
-let keypair_and_amounts = Quickcheck.random_value (Init_ledger.gen ())
+let keypair_and_amounts = Quickcheck.random_value ~seed:(`Deterministic "") (Init_ledger.gen ())
 
 let fish1_kp = fst keypair_and_amounts.(0)
 
