@@ -1,9 +1,9 @@
 open Core_kernel
 open Currency.Amount
 
-type unsigned = t
+type unsigned = t [@@deriving compare, sexp]
 
-type t = unsigned
+type t = unsigned [@@deriving compare, sexp]
 
 let if_ b ~then_ ~else_ = if b then then_ else else_
 
@@ -12,9 +12,11 @@ module Signed = struct
 
   let if_ = if_
 
-  let is_pos (t : t) = Sgn.equal t.sgn Pos
+  (* TODO: Remove those from the interface and call is_positive
+     and is_negative directly instead. *)
+  let is_pos = is_positive
 
-  let is_neg (t : t) = Sgn.equal t.sgn Neg
+  let is_neg = is_negative
 end
 
 let zero = zero

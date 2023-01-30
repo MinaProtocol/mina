@@ -3,6 +3,7 @@ open Mina_base
 open Currency
 open Signature_lib
 open Mina_transaction
+module Currency_amount = Currency_amount
 module Zkapp_command_logic = Zkapp_command_logic
 module Global_slot = Mina_numbers.Global_slot
 include Transaction_logic_intf
