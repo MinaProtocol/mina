@@ -5,12 +5,12 @@ type invalid =
   [ `Invalid_keys of Signature_lib.Public_key.Compressed.Stable.Latest.t list
   | `Invalid_signature of
     Signature_lib.Public_key.Compressed.Stable.Latest.t list
-  | `Invalid_proof
+  | `Invalid_proof of (Error.t[@to_yojson Error_json.error_to_yojson])
   | `Missing_verification_key of
     Signature_lib.Public_key.Compressed.Stable.Latest.t list ]
 [@@deriving bin_io_unversioned, to_yojson]
 
-let invalid_to_string (invalid : invalid) =
+let invalid_to_error (invalid : invalid) : Error.t =
   let keys_to_string keys =
     List.map keys ~f:(fun key ->
         Signature_lib.Public_key.Compressed.to_base58_check key )
@@ -18,13 +18,13 @@ let invalid_to_string (invalid : invalid) =
   in
   match invalid with
   | `Invalid_keys keys ->
-      sprintf "Invalid_keys: [%s]" (keys_to_string keys)
+      Error.createf "Invalid_keys: [%s]" (keys_to_string keys)
   | `Invalid_signature keys ->
-      sprintf "Invalid_signature: [%s]" (keys_to_string keys)
+      Error.createf "Invalid_signature: [%s]" (keys_to_string keys)
   | `Missing_verification_key keys ->
-      sprintf "Missing_verification_key: [%s]" (keys_to_string keys)
-  | `Invalid_proof ->
-      "Invalid_proof"
+      Error.createf "Missing_verification_key: [%s]" (keys_to_string keys)
+  | `Invalid_proof err ->
+      Error.tag ~tag:"Invalid_proof" err
 
 let check :
        User_command.Verifiable.t

@@ -244,6 +244,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ~max_num_updates :
       ; set_token_symbol = Either
       ; increment_nonce = Either
       ; set_voting_for = Either
+      ; set_timing = Either
       }
     in
     let verification_key = Some verification_key in
