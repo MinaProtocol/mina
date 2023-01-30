@@ -36,6 +36,7 @@
   snark_params
   snarky.backendless
   transaction_protocol_state
+  integers
   with_hash
   zkapps_empty_update
   zkapps_examples)
