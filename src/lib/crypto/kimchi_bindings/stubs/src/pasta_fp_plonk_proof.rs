@@ -617,7 +617,6 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
         polynomial::COLUMNS,
         polynomials::{
             generic::GenericGateSpec,
-            range_check,
             rot::{self, RotMode},
         },
         wires::Wire,
