@@ -189,7 +189,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
     let peers_snapshot_max_staleness = Time.Span.of_sec 30.
 
-    let banned_peers = Peer.Hash_set.create ()
+    let banned_peer_set = Peer.Hash_set.create ()
 
     (* Creates just the helper, making sure to register everything
        BEFORE we start listening/advertise ourselves for discovery. *)
@@ -301,7 +301,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                 ~known_private_ip_nets:config.known_private_ip_nets
                 ~initial_gating_config:
                   Mina_net2.
-                    { banned_peers = Hash_set.to_list banned_peers
+                    { banned_peers = Hash_set.to_list banned_peer_set
                     ; trusted_peers =
                         List.filter_map ~f:Mina_net2.Multiaddr.to_peer
                           config.initial_peers
@@ -857,14 +857,16 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
     let ban_peer t peer =
       let%bind net2 = !(t.net2) in
-      Hash_set.add banned_peers peer ;
-      let%map _gating = Mina_net2.set_banned_peers net2 banned_peers in
+      Hash_set.add banned_peer_set peer ;
+      let%map _gating = Mina_net2.set_banned_peers net2 banned_peer_set in
       don't_wait_for
         ( let%bind () = after @@ Time.Span.of_day 1.0 in
-          Hash_set.remove banned_peers peer ;
-          let%bind _gating = Mina_net2.set_banned_peers net2 banned_peers in
+          Hash_set.remove banned_peer_set peer ;
+          let%bind _gating = Mina_net2.set_banned_peers net2 banned_peer_set in
           Deferred.unit
           : unit Deferred.t )
+
+    let banned_peers _t : Peer.t list = Hash_set.to_list banned_peer_set
 
     let restart_helper t = t.restart_helper ()
   end

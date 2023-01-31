@@ -83,5 +83,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
   let ban_peer (Any ((module M), t)) peer = M.ban_peer t peer
 
+  let banned_peers (Any ((module M), t)) = M.banned_peers t
+
   let restart_helper (Any ((module M), t)) = M.restart_helper t
 end

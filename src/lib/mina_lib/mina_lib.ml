@@ -1633,6 +1633,7 @@ let create ?wallets (config : Config.t) =
                           ~f:Fn.id
                           ~default:(Float.to_int minutes_float)
                       in
+                      let banned_peers = Mina_networking.banned_peers net in
                       let block_height_opt =
                         match best_tip_opt with
                         | None ->
@@ -1659,6 +1660,7 @@ let create ?wallets (config : Config.t) =
                         ; k_block_hashes_and_timestamps
                         ; git_commit
                         ; uptime_minutes
+                        ; banned_peers
                         ; block_height_opt
                         } )
           in

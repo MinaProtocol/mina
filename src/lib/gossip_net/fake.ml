@@ -288,6 +288,8 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       Deferred.return config
 
     let ban_peer _t _peer = Deferred.unit
+
+    let banned_peers _t = []
   end
 
   type network = Network.t

@@ -37,6 +37,8 @@ module type Gossip_net_intf = sig
 
   val ban_peer : t -> Peer.t -> unit Deferred.t
 
+  val banned_peers : t -> Peer.t list
+
   val random_peers : t -> int -> Peer.t list Deferred.t
 
   val random_peers_except :

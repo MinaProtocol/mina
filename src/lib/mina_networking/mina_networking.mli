@@ -85,7 +85,7 @@ module Rpcs : sig
     module Node_status : sig
       [%%versioned:
       module Stable : sig
-        module V2 : sig
+        module V3 : sig
           type t =
             { node_ip_addr : Core.Unix.Inet_addr.Stable.V1.t
             ; node_peer_id : Peer.Id.Stable.V1.t
@@ -98,6 +98,7 @@ module Rpcs : sig
                 (State_hash.Stable.V1.t * string) list
             ; git_commit : string
             ; uptime_minutes : int
+            ; banned_peers : Peer.Stable.V1.t list
             ; block_height_opt : int option
             }
         end
@@ -273,6 +274,8 @@ val set_connection_gating_config :
   t -> Mina_net2.connection_gating -> Mina_net2.connection_gating Deferred.t
 
 val ban_peer : t -> Peer.t -> unit Deferred.t
+
+val banned_peers : t -> Peer.t list
 
 val create :
      Config.t
