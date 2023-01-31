@@ -330,9 +330,9 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
       in
       let parties =
         Async.Thread_safe.block_on_async_exn (fun () ->
-            Transaction_snark.For_tests.update_states ~zkapp_prover:prover
-              ~constraint_constants ~empty_sender spec
-              ~receiver_auth:Control.Tag.Signature )
+            Transaction_snark.For_tests.update_states
+              ~zkapp_prover_and_vk:(prover, vk) ~constraint_constants
+              ~empty_sender spec ~receiver_auth:Control.Tag.Signature )
       in
       let simple_parties = Zkapp_command.to_simple parties in
       let other_parties = simple_parties.account_updates in
