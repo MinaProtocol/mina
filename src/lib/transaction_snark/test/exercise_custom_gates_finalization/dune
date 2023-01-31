@@ -29,6 +29,7 @@
    pickles_types
    random_oracle
    random_oracle_input
+   sexplib0
    sgn
    signature_lib
    snark_params
@@ -40,5 +41,5 @@
   (library_flags -linkall)
   (inline_tests)
   (preprocess
-    (pps ppx_snarky ppx_version ppx_jane))
+    (pps ppx_custom_printf ppx_snarky ppx_version ppx_jane))
   (instrumentation (backend bisect_ppx)))

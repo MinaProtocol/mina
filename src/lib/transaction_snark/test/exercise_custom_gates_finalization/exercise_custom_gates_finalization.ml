@@ -3,7 +3,8 @@ open Core_kernel
 open Mina_base
 module Init_ledger = Mina_transaction_logic.For_tests.Init_ledger
 
-let keypair_and_amounts = Quickcheck.random_value (Init_ledger.gen ())
+let keypair_and_amounts =
+  Quickcheck.random_value ~seed:(`Deterministic "") (Init_ledger.gen ())
 
 let fish1_kp = fst keypair_and_amounts.(0)
 
@@ -176,6 +177,9 @@ let%test_unit "Prove transaction" =
       Init_ledger.init
         (module Mina_ledger.Ledger.Ledger_inner)
         keypair_and_amounts ledger ;
+      Format.eprintf
+        !"Merkel root: %{sexp: Ledger_hash.t}@."
+        (Mina_ledger.Ledger.merkle_root ledger) ;
       let%map () =
         Transaction_snark_tests.Util.check_zkapp_command_with_merges_exn ledger
           txns
