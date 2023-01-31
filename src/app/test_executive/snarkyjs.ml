@@ -59,22 +59,21 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       [%log info] "Waiting for nodes to be initialized" ;
       let%bind () = wait_for t (Wait_condition.node_to_initialize node) in
       [%log info] "Running test script" ;
-      let%bind.Deferred _result =
-        Deferred.return
-          (let%bind.Deferred process =
-             Async_unix.Process.create_exn
-               ~prog:"./src/lib/snarky_js_bindings/test_module/node"
-               ~args:
-                 [ "src/lib/snarky_js_bindings/test_module/simple-zkapp.js"
-                 ; Signature_lib.Private_key.to_base58_check zkapp_sk
-                 ; Signature_lib.Private_key.to_base58_check my_sk
-                 ; graphql_uri
-                 ]
-               ()
-           in
-           check_and_print_stout_stderr ~logger process )
+      let%bind.Deferred result =
+        let%bind.Deferred process =
+          Async_unix.Process.create_exn
+            ~prog:"./src/lib/snarky_js_bindings/test_module/node"
+            ~args:
+              [ "src/lib/snarky_js_bindings/test_module/simple-zkapp.js"
+              ; Signature_lib.Private_key.to_base58_check zkapp_sk
+              ; Signature_lib.Private_key.to_base58_check my_sk
+              ; graphql_uri
+              ]
+            ()
+        in
+        check_and_print_stout_stderr ~logger process
       in
-      return ()
+      section "Waiting for script to run and complete" result
     in
     return ()
 end
