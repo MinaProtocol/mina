@@ -29,6 +29,7 @@ module T = struct
           * Transaction_snark.Statement.t
           * Mina_base.Sok_message.t )
           list
+          * Error.t
       | Couldn't_reach_verifier of Error.t
       | Pre_diff of Pre_diff_info.Error.t
       | Insufficient_work of string
@@ -53,16 +54,19 @@ module T = struct
           Format.asprintf
             !"Pre_diff_info.Error error: %{sexp:Pre_diff_info.Error.t}"
             pre_diff_error
-      | Invalid_proofs ts ->
+      | Invalid_proofs (ts, err) ->
           Format.asprintf
             !"Verification failed for proofs with (statement, work_id, \
               prover): %{sexp: (Transaction_snark.Statement.t * int * string) \
-              list}\n"
+              list}\n\
+              Error:\n\
+              %s"
             (List.map ts ~f:(fun (_p, s, m) ->
                  ( s
                  , Transaction_snark.Statement.hash s
                  , Yojson.Safe.to_string
                    @@ Public_key.Compressed.to_yojson m.prover ) ) )
+            (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err))
       | Insufficient_work str ->
           str
       | Mismatched_statuses (transaction, status) ->
@@ -176,10 +180,11 @@ module T = struct
           |> to_staged_ledger_or_error )
     | Some proof_statement_msgs -> (
         match%map verify_proofs ~logger ~verifier proof_statement_msgs with
-        | Ok true ->
+        | Ok (Ok ()) ->
             Ok ()
-        | Ok false ->
-            Error (Staged_ledger_error.Invalid_proofs proof_statement_msgs)
+        | Ok (Error err) ->
+            Error
+              (Staged_ledger_error.Invalid_proofs (proof_statement_msgs, err))
         | Error e ->
             Error (Couldn't_reach_verifier e) )
 
@@ -187,7 +192,7 @@ module T = struct
     include Scan_state.Make_statement_scanner (struct
       type t = unit
 
-      let verify ~verifier:() _proofs = Deferred.Or_error.return true
+      let verify ~verifier:() _proofs = Deferred.Or_error.return (Ok ())
     end)
   end
 
@@ -1043,13 +1048,12 @@ module T = struct
             Ok x
         | ( `Invalid_keys _
           | `Invalid_signature _
-          | `Invalid_proof
+          | `Invalid_proof _
           | `Missing_verification_key _ ) as invalid ->
             Error
               (Verifier.Failure.Verification_failed
-                 (Error.of_string
-                    (sprintf "verification failed on command, %s"
-                       (Verifier.invalid_to_string invalid) ) ) )
+                 (Error.tag ~tag:"verification failed on command"
+                    (Verifier.invalid_to_error invalid) ) )
         | `Valid_assuming _ ->
             Error
               (Verifier.Failure.Verification_failed
@@ -3931,7 +3935,7 @@ let%test_module "staged ledger tests" =
                   Mina_transaction_logic.For_tests.Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  (*create a snapp account*)
+                  (* create a zkApp account *)
                   let snapp_permissions =
                     let default = Permissions.user_default in
                     { default with

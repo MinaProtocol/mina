@@ -3553,13 +3553,13 @@ module Make_str (A : Wire_types.Concrete) = struct
     module type S = sig
       val tag : tag
 
-      val verify : (t * Sok_message.t) list -> bool Async.Deferred.t
+      val verify : (t * Sok_message.t) list -> unit Or_error.t Async.Deferred.t
 
       val id : Pickles.Verification_key.Id.t Lazy.t
 
       val verification_key : Pickles.Verification_key.t Lazy.t
 
-      val verify_against_digest : t -> bool Async.Deferred.t
+      val verify_against_digest : t -> unit Or_error.t Async.Deferred.t
 
       val constraint_system_digests : (string * Md5_lib.t) list Lazy.t
     end
@@ -3729,7 +3729,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         (module Statement.With_sok)
         key
         (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
-    else Async.return false
+    else
+      Async.return
+        (Or_error.error_string
+           "Transaction_snark.verify: Mismatched sok_message" )
 
   let constraint_system_digests ~constraint_constants () =
     let digest = Tick.R1CS_constraint_system.digest in
@@ -4161,7 +4164,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       then
         Proof.verify
           (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
-      else Async.return false
+      else
+        Async.return
+          (Or_error.error_string
+             "Transaction_snark.verify: Mismatched sok_message" )
 
     let first_account_update
         (witness : Transaction_witness.Zkapp_command_segment_witness.t) =

@@ -624,14 +624,22 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~f:Fn.id
     in
     let snark_work_event_subscription =
-      Event_router.on (event_router t) Snark_work_gossip ~f:(fun _ _ ->
-          [%log info] "Received new snark work" ;
+      Event_router.on (event_router t) Snark_work_gossip
+        ~f:(fun _ (_, direction) ->
+          ( match direction with
+          | Sent ->
+              ()
+          | Received ->
+              [%log info] "Received new snark work" ) ;
           Deferred.return `Continue )
     in
     let snark_work_failure_subscription =
-      Event_router.on (event_router t) Snark_work_failed ~f:(fun _ _ ->
+      Event_router.on (event_router t) Snark_work_failed ~f:(fun _ failure ->
           [%log error]
-            "A snark worker encountered an error while creating a proof" ;
+            "A snark worker encountered an error while creating a proof: \
+             $failure"
+            ~metadata:
+              [ ("failure", Event_type.Snark_work_failed.to_yojson failure) ] ;
           Deferred.return `Continue )
     in
     let%bind () =
