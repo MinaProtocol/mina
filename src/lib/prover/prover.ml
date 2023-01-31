@@ -51,7 +51,7 @@ module Worker_state = struct
       -> Pending_coinbase_witness.t
       -> Blockchain.t Async.Deferred.Or_error.t
 
-    val verify : Protocol_state.Value.t -> Proof.t -> bool Deferred.t
+    val verify : Protocol_state.Value.t -> Proof.t -> unit Or_error.t Deferred.t
   end
 
   (* bin_io required by rpc_parallel *)
@@ -165,7 +165,7 @@ module Worker_state = struct
                        "Prover threw an error while extending block: $error" ) ;
                  Async.Deferred.return res
 
-               let verify _state _proof = Deferred.return true
+               let verify _state _proof = Deferred.return (Ok ())
              end : S )
          | None ->
              ( module struct
@@ -179,7 +179,7 @@ module Worker_state = struct
                          ~proof:Mina_base.Proof.blockchain_dummy
                          ~state:next_state )
 
-               let verify _ _ = Deferred.return true
+               let verify _ _ = Deferred.return (Ok ())
              end : S )
        in
        Memory_stats.log_memory_stats logger ~process:"prover" ;
@@ -219,7 +219,8 @@ module Functions = struct
           pending_coinbase )
 
   let verify_blockchain =
-    create Blockchain.Stable.Latest.bin_t bin_bool (fun w chain ->
+    create Blockchain.Stable.Latest.bin_t
+      [%bin_type_class: unit Core_kernel.Or_error.Stable.V2.t] (fun w chain ->
         let (module W) = Worker_state.get w in
         W.verify
           (Blockchain_snark.Blockchain.state chain)
@@ -234,7 +235,7 @@ module Worker = struct
       { initialized : ('w, unit, [ `Initialized ]) F.t
       ; extend_blockchain :
           ('w, Extend_blockchain_input.t, Blockchain.t Or_error.t) F.t
-      ; verify_blockchain : ('w, Blockchain.t, bool) F.t
+      ; verify_blockchain : ('w, Blockchain.t, unit Or_error.t) F.t
       }
 
     module Worker_state = Worker_state

@@ -1451,6 +1451,8 @@ module Make (L : Ledger_intf.S) :
         let set_voting_for : t -> Controller.t =
          fun a -> a.permissions.set_voting_for
 
+        let set_timing : t -> Controller.t = fun a -> a.permissions.set_timing
+
         type t = Permissions.t
 
         let if_ = value_if
@@ -1655,9 +1657,14 @@ module Make (L : Ledger_intf.S) :
 
       type transaction_commitment = Transaction_commitment.t
 
-      let is_delegate_call (p : t) = Call_type.is_delegate_call p.body.call_type
+      let may_use_parents_own_token (p : t) =
+        May_use_token.parents_own_token p.body.may_use_token
 
-      let check_authorization ~commitment:_ ~calls:_ (account_update : t) =
+      let may_use_token_inherited_from_parent (p : t) =
+        May_use_token.inherit_from_parent p.body.may_use_token
+
+      let check_authorization ~will_succeed:_ ~commitment:_ ~calls:_
+          (account_update : t) =
         (* The transaction's validity should already have been checked before
            this point.
         *)
@@ -1892,7 +1899,9 @@ module Make (L : Ledger_intf.S) :
     in
     (sequence_state', last_sequence_slot')
 
-  (* apply zkapp command fee payer's while stubbing out the second pass ledger *)
+  (* apply zkapp command fee payer's while stubbing out the second pass ledger
+     CAUTION: If you use the intermediate local states, you MUST update the
+       [will_succeed] field to [false] if the [status] is [Failed].*)
   let apply_zkapp_command_first_pass_aux (type user_acc) ~constraint_constants
       ~global_slot ~(state_view : Zkapp_precondition.Protocol_state.View.t)
       ~(init : user_acc) ~f
@@ -1944,6 +1953,7 @@ module Make (L : Ledger_intf.S) :
         ; success = true
         ; account_update_index = Inputs.Index.zero
         ; failure_status_tbl = []
+        ; will_succeed = true
         } )
     in
     let user_acc = f init initial_state in
@@ -1953,6 +1963,11 @@ module Make (L : Ledger_intf.S) :
           M.start ~constraint_constants
             { account_updates
             ; memo_hash = Signed_command_memo.hash command.memo
+            ; will_succeed =
+                (* It's always valid to set this value to true, and it will
+                   have no effect outside of the snark.
+                *)
+                true
             }
             { perform } initial_state )
     in
@@ -2554,6 +2569,7 @@ module For_tests = struct
             ; increment_nonce = Either
             ; set_voting_for = Either
             ; access = None
+            ; set_timing = Either
             }
           in
           L.set l loc
@@ -2725,7 +2741,7 @@ module For_tests = struct
                     ; account = Accept
                     ; valid_while = Ignore
                     }
-                ; call_type = Call
+                ; may_use_token = No
                 ; use_full_commitment
                 ; implicit_account_creation_fee = true
                 ; authorization_kind =
@@ -2751,7 +2767,7 @@ module For_tests = struct
                     ; account = Accept
                     ; valid_while = Ignore
                     }
-                ; call_type = Call
+                ; may_use_token = No
                 ; use_full_commitment = false
                 ; implicit_account_creation_fee = true
                 ; authorization_kind = None_given

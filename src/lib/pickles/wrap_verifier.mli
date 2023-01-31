@@ -61,6 +61,7 @@ val incrementally_verify_proof :
        , 'b )
        Pickles_types.Vector.t
   -> step_domains:(Import.Domains.t, 'a) Pickles_types.Vector.t
+  -> srs:Kimchi_bindings.Protocol.SRS.Fp.t
   -> verification_key:
        Wrap_main_inputs.Inner_curve.t
        Pickles_types.Plonk_verification_key_evals.t
