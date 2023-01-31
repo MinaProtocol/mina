@@ -17,7 +17,7 @@ spec:
         testnet: {{ $.Values.deployment.testnet }}
         role: {{ default "undefined" $node.role }}
         class: {{ default "undefined" $node.class }}
-        version: {{ trunc 6 (split ":" $.Values.deployment.image)._1 | trimSuffix "-" }}
+        version: {{ trunc 8 (split ":" $.Values.deployment.image)._1 | trimSuffix "-" }}
         syncStatus: INIT
       annotations:
         prometheus.io/scrape: 'true'
@@ -63,32 +63,36 @@ spec:
         command: [{{ $.Values.deployment.customEntrypoint.entrypoint }}]
         {{- end }}
         args: [ "daemon",
-          "-log-level", "Debug",
-          "-log-json",
-          "-client-port", "$(DAEMON_CLIENT_PORT)",
-          "-rest-port", "$(DAEMON_REST_PORT)",
-          "-external-port", "$(DAEMON_EXTERNAL_PORT)",
-          "-metrics-port", "$(DAEMON_METRICS_PORT)",
+          {{- if $node.fileLogLevel }}
+          "--file-log-level", {{ $node.fileLogLevel | quote }},
+          {{- end -}}
+          {{- if $node.logLevel }}
+          "--log-level", {{ $node.logLevel | quote }},
+          {{- end -}}
+          "--client-port", "$(DAEMON_CLIENT_PORT)",
+          "--rest-port", "$(DAEMON_REST_PORT)",
+          "--external-port", "$(DAEMON_EXTERNAL_PORT)",
+          "--metrics-port", "$(DAEMON_METRICS_PORT)",
           {{- if $node.exposeGraphql }}
-          "-insecure-rest-server",
+          "--insecure-rest-server",
           {{- end -}}
           {{- if $node.maxConnections }}
           "--max-connections", {{ $node.maxConnections | quote }},
           {{- end -}}
           {{- if $.Values.deployment.peerListURL }}
-          "-peer-list-url", {{ $.Values.deployment.peerListURL | quote }},
+          "--peer-list-url", {{ $.Values.deployment.peerListURL | quote }},
           {{- end -}}
           {{- if $.Values.deployment.runtimeConfig }}
-          "-config-file", "/config/daemon.json",
+          "--config-file", "/config/daemon.json",
           {{- end }}
           {{- if $node.libp2pKeys.enabled }}
-          "-discovery-keypair", "/root/libp2p-keys/${HOSTNAME}-key",
+          "--discovery-keypair", "/root/libp2p-keys/{{ $node.name }}-libp2p",
           {{- end -}}
           {{- if and $node.minaKeys.enabled $node.minaKeys.produceBlocks }}
-          "-discovery-keypair", "/root/mina-keys/${HOSTNAME}-key",
+          "--block-producer-key", "/root/mina-keys/{{ $node.name }}-key",
           {{- end -}}
           {{- range $.Values.deployment.seedPeers }}
-          "-peer", {{ . | quote }},
+          "--peer", {{ . | quote }},
           {{- end }}
           {{- if $.Values.deployment.uploadBlocksToGCloud }}
           "-upload-blocks-to-gcloud", "true",
@@ -97,8 +101,9 @@ spec:
           "-archive-address", {{ $node.archive.address }},
           {{- end }}
           {{- if $node.seedFlags }}
-          "-enable-peer-exchange", "true", "-seed"
+          "-enable-peer-exchange", "true", "-seed",
           {{- end}}
+          "--log-json"
         ]
         env:
         - name: NETWORK_NAME
@@ -168,6 +173,11 @@ spec:
         secret:
           secretName: {{ $node.minaKeys.secret }}
           defaultMode: 0600
+          items:
+          - key: {{ $node.name }}-key
+            path: {{ $node.name }}-key
+          - key: {{ $node.name }}-key.pub
+            path: {{ $node.name }}-key.pub
       - name: fixed-mina-keys
         emptyDir: {}
       {{- end }}
@@ -176,6 +186,11 @@ spec:
         secret:
           secretName: {{ $node.libp2pKeys.secret }}
           defaultMode: 0600
+          items:
+          - key: {{ $node.name }}-libp2p
+            path: {{ $node.name }}-libp2p
+          - key: {{ $node.name }}-libp2p.peerid
+            path: {{ $node.name }}-libp2p.peerid
       - name: fixed-libp2p-keys
         emptyDir: {}
       {{- end }}
