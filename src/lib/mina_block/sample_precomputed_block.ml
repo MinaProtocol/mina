@@ -541,7 +541,8 @@ let sample_block_json =
                 "ledger": "jw6bz2wud1N6itRUHZ5ypo3267stk4UgzkiuWtAMPRZo9g4Udyd",
                 "success": true,
                 "account_update_index": "0",
-                "failure_status_tbl": []
+                "failure_status_tbl": [],
+                "will_succeed": true
               }
             },
             "target": {
