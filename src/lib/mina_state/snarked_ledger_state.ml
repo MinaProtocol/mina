@@ -488,15 +488,6 @@ module Make_str (A : Wire_types.Concrete) = struct
          and type error = error
          and type bool = bool ) (s1 : a Statement_ledgers.t)
       (s2 : a Statement_ledgers.t) =
-    (*
-    Tick.Run.run_checked (
-      let open Tick in
-      as_prover
-        As_prover.(
-          let%bind s1' = Statement_ledgers.read L.read s1 in
-          let%map s2' = Statement_ledgers.read L.read s2 in
-          Format.eprintf !"Merging statements: @.%{sexp:Ledger_hash.t Statement_ledgers.t}@.%{sexp:Ledger_hash.t Statement_ledgers.t}@." s1' s2') ) ;
-    *)
     (*Check ledgers are valid based on the rules descibed in https://github.com/MinaProtocol/mina/discussions/12000*)
     let is_same_block_at_shared_boundary =
       (*First statement ends and the second statement starts in the same block. It could be within a single scan state tree or across two scan state trees*)
@@ -574,11 +565,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   let valid_ledgers_at_merge_unchecked
       (s1 : Frozen_ledger_hash.t Statement_ledgers.t)
       (s2 : Frozen_ledger_hash.t Statement_ledgers.t) =
-    Format.eprintf
-      !"Merging statements: @.%{sexp:Frozen_ledger_hash.t \
-        Statement_ledgers.t}@.%{sexp:Frozen_ledger_hash.t \
-        Statement_ledgers.t}@."
-      s1 s2 ;
     validate_ledgers_at_merge (module Ledger_hash_unchecked) s1 s2
 
   let merge (s1 : _ Poly.t) (s2 : _ Poly.t) =

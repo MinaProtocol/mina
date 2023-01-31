@@ -6,6 +6,7 @@ use array_init::array_init;
 use commitment_dlog::srs::SRS;
 use kimchi::circuits::{
     constraints::FeatureFlags,
+    lookup::lookups::{LookupFeatures, LookupPatterns},
     polynomials::permutation::Shifts,
     polynomials::permutation::{zk_polynomial, zk_w3},
     wires::{COLUMNS, PERMUTS},
@@ -388,7 +389,17 @@ macro_rules! impl_verification_key {
                         foreign_field_mul: false,
                         rot: false,
                         xor: false,
-                        lookup_configuration: None,
+                        lookup_features:
+                        LookupFeatures {
+                            patterns: LookupPatterns {
+                                xor: false,
+                                chacha_final: false,
+                                lookup: false,
+                                range_check: false,
+                                foreign_field_mul: false, },
+                            joint_lookup_used:false,
+                            uses_runtime_tables: false,
+                        },
                     };
 
                 let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true);
@@ -416,7 +427,6 @@ macro_rules! impl_verification_key {
                         rot_comm: None,
                         xor_comm: None,
 
-                        foreign_field_modulus: None,
                         w: {
                             let res = once_cell::sync::OnceCell::new();
                             res.set(zk_w3(domain)).unwrap();

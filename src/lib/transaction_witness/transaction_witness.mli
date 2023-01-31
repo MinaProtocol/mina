@@ -34,7 +34,8 @@ module Zkapp_command_segment_witness : sig
             Mina_transaction_logic.Zkapp_command_logic.Local_state.Stable.V1.t
         ; start_zkapp_command :
             ( Zkapp_command.Stable.V1.t
-            , Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t )
+            , Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
+            , bool )
             Mina_transaction_logic.Zkapp_command_logic.Start_data.Stable.V1.t
             list
         ; state_body : Mina_state.Protocol_state.Body.Value.Stable.V2.t
@@ -58,6 +59,6 @@ module Stable : sig
       ; status : Mina_base.Transaction_status.Stable.V2.t
       ; block_global_slot : Mina_numbers.Global_slot.Stable.V1.t
       }
-    [@@deriving sexp, to_yojson]
+    [@@deriving sexp, yojson]
   end
 end]

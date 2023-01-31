@@ -276,6 +276,7 @@ module Node = struct
                         setTokenSymbol
                         setVerificationKey
                         setVotingFor
+                        setTiming
                       }
           sequenceEvents
           zkappState
@@ -497,6 +498,7 @@ module Node = struct
     ; set_verification_key =
         to_auth_required account_permissions.setVerificationKey
     ; set_voting_for = to_auth_required account_permissions.setVotingFor
+    ; set_timing = to_auth_required account_permissions.setTiming
     }
 
   let graphql_uri node = Graphql.ingress_uri node |> Uri.to_string

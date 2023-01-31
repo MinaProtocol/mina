@@ -1122,6 +1122,22 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "setTiming",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": [
@@ -1281,6 +1297,20 @@
             },
             {
               "name": "setVotingFor",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "setTiming",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -2676,11 +2706,27 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "CallTypeInput",
+          "name": "MayUseTokenInput",
           "description": null,
           "fields": [
             {
-              "name": "isDelegateCall",
+              "name": "parentsOwnToken",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "inheritFromParent",
               "description": null,
               "args": [],
               "type": {
@@ -2698,7 +2744,21 @@
           ],
           "inputFields": [
             {
-              "name": "isDelegateCall",
+              "name": "parentsOwnToken",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "inheritFromParent",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -2942,7 +3002,7 @@
               "deprecationReason": null
             },
             {
-              "name": "callType",
+              "name": "mayUseToken",
               "description": null,
               "args": [],
               "type": {
@@ -2950,7 +3010,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "CallTypeInput",
+                  "name": "MayUseTokenInput",
                   "ofType": null
                 }
               },
@@ -3172,14 +3232,14 @@
               "defaultValue": null
             },
             {
-              "name": "callType",
+              "name": "mayUseToken",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "CallTypeInput",
+                  "name": "MayUseTokenInput",
                   "ofType": null
                 }
               },
@@ -6187,7 +6247,7 @@
             {
               "name": "sourceFirstPassLedgerHash",
               "description":
-                "Base58Check-encoded hash of the source first pass ledger",
+                "Base58Check-encoded hash of the source first-pass ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6204,7 +6264,7 @@
             {
               "name": "targetFirstPassLedgerHash",
               "description":
-                "Base58Check-encoded hash of the target first pass ledger",
+                "Base58Check-encoded hash of the target first-pass ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6221,7 +6281,7 @@
             {
               "name": "sourceSecondPassLedgerHash",
               "description":
-                "Base58Check-encoded hash of the source second pass ledger",
+                "Base58Check-encoded hash of the source second-pass ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6238,7 +6298,7 @@
             {
               "name": "targetSecondPassLedgerHash",
               "description":
-                "Base58Check-encoded hash of the target second pass ledger",
+                "Base58Check-encoded hash of the target second-pass ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6724,11 +6784,27 @@
         },
         {
           "kind": "OBJECT",
-          "name": "CallType",
+          "name": "MayUseToken",
           "description": null,
           "fields": [
             {
-              "name": "isDelegateCall",
+              "name": "parentsOwnToken",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "inheritFromParent",
               "description": null,
               "args": [],
               "type": {
@@ -7681,6 +7757,22 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "setTiming",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -8070,7 +8162,7 @@
               "deprecationReason": null
             },
             {
-              "name": "callType",
+              "name": "mayUseToken",
               "description": null,
               "args": [],
               "type": {
@@ -8078,7 +8170,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "CallType",
+                  "name": "MayUseToken",
                   "ofType": null
                 }
               },
@@ -11158,6 +11250,23 @@
               "name": "setVotingFor",
               "description":
                 "Authorization required to set the state hash the account is voting for",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "AccountAuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setTiming",
+              "description":
+                "Authorization required to set the timing of the account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",

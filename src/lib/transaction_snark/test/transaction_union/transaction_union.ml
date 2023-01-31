@@ -546,10 +546,11 @@ let%test_module "Transaction union tests" =
               in
               Async.Thread_safe.block_on_async (fun () ->
                   T.verify_against_digest proof13 )
-              |> Result.ok_exn ) )
+              |> Result.ok_exn |> Or_error.ok_exn ) )
 
-    let%test "base_and_merge: transactions in one block (t1,t2 in b1), \
-              carryforward the state from a previous transaction t0 in b1" =
+    let%test_unit "base_and_merge: transactions in one block (t1,t2 in b1), \
+                   carryforward the state from a previous transaction t0 in b1"
+        =
       let state_hash_and_body1 = (state_body_hash, state_body) in
       test_base_and_merge ~state_hash_and_body1
         ~state_hash_and_body2:state_hash_and_body1 ~carryforward1:true
@@ -557,16 +558,17 @@ let%test_module "Transaction union tests" =
 
     (* No new state body, carryforward the stack from the previous transaction*)
 
-    let%test "base_and_merge: transactions in one block (t1,t2 in b1), don't \
-              carryforward the state from a previous transaction t0 in b1" =
+    let%test_unit "base_and_merge: transactions in one block (t1,t2 in b1), \
+                   don't carryforward the state from a previous transaction t0 \
+                   in b1" =
       let state_hash_and_body1 = (state_body_hash, state_body) in
       test_base_and_merge ~state_hash_and_body1
         ~state_hash_and_body2:state_hash_and_body1 ~carryforward1:false
         ~carryforward2:true
 
-    let%test "base_and_merge: transactions in two different blocks (t1,t2 in \
-              b1, b2 resp.), carryforward the state from a previous \
-              transaction t0 in b1" =
+    let%test_unit "base_and_merge: transactions in two different blocks (t1,t2 \
+                   in b1, b2 resp.), carryforward the state from a previous \
+                   transaction t0 in b1" =
       let state_hash_and_body1 =
         let open Staged_ledger_diff in
         let state_body0 =
@@ -587,9 +589,9 @@ let%test_module "Transaction union tests" =
 
     (*t2 is in a new state, therefore do not carryforward the previous state*)
 
-    let%test "base_and_merge: transactions in two different blocks (t1,t2 in \
-              b1, b2 resp.), don't carryforward the state from a previous \
-              transaction t0 in b1" =
+    let%test_unit "base_and_merge: transactions in two different blocks (t1,t2 \
+                   in b1, b2 resp.), don't carryforward the state from a \
+                   previous transaction t0 in b1" =
       let state_hash_and_body1 =
         let state_body0 =
           let open Staged_ledger_diff in

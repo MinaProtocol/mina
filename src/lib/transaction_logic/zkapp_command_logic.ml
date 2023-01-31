@@ -211,6 +211,7 @@ module Local_state = struct
         ; success : 'bool
         ; account_update_index : 'length
         ; failure_status_tbl : 'failure_status_tbl
+        ; will_succeed : 'bool
         }
       [@@deriving compare, equal, hash, sexp, yojson, fields, hlist]
     end
@@ -230,6 +231,7 @@ module Local_state = struct
       ; bool
       ; length
       ; failure_status_tbl
+      ; bool
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -326,7 +328,9 @@ module type Account_update_intf = sig
 
   val account_id : t -> account_id
 
-  val is_delegate_call : t -> bool
+  val may_use_parents_own_token : t -> bool
+
+  val may_use_token_inherited_from_parent : t -> bool
 
   val use_full_commitment : t -> bool
 
@@ -335,7 +339,8 @@ module type Account_update_intf = sig
   val implicit_account_creation_fee : t -> bool
 
   val check_authorization :
-       commitment:transaction_commitment
+       will_succeed:bool
+    -> commitment:transaction_commitment
     -> calls:call_forest
     -> t
     -> [ `Proof_verifies of bool ] * [ `Signature_verifies of bool ]
@@ -522,6 +527,8 @@ module type Account_intf = sig
     val increment_nonce : t -> controller
 
     val set_voting_for : t -> controller
+
+    val set_timing : t -> controller
 
     include Iffable with type bool := bool
   end
@@ -874,8 +881,11 @@ module Start_data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('account_updates, 'field) t =
-        { account_updates : 'account_updates; memo_hash : 'field }
+      type ('account_updates, 'field, 'bool) t =
+        { account_updates : 'account_updates
+        ; memo_hash : 'field
+        ; will_succeed : 'bool
+        }
       [@@deriving sexp, yojson]
     end
   end]
@@ -937,11 +947,19 @@ module Make (Inputs : Inputs_intf) = struct
     let (account_update, account_update_forest), remainder_of_current_forest =
       Call_forest.pop_exn (Stack_frame.calls current_forest)
     in
-    let is_delegate_call = Account_update.is_delegate_call account_update in
+    let may_use_parents_own_token =
+      Account_update.may_use_parents_own_token account_update
+    in
+    let may_use_token_inherited_from_parent =
+      Account_update.may_use_token_inherited_from_parent account_update
+    in
     let caller_id =
-      Token_id.if_ is_delegate_call
+      Token_id.if_ may_use_token_inherited_from_parent
         ~then_:(Stack_frame.caller_caller current_forest)
-        ~else_:(Stack_frame.caller current_forest)
+        ~else_:
+          (Token_id.if_ may_use_parents_own_token
+             ~then_:(Stack_frame.caller current_forest)
+             ~else_:Token_id.default )
     in
     (* Cases:
        - [account_update_forest] is empty, [remainder_of_current_forest] is empty.
@@ -987,11 +1005,8 @@ module Make (Inputs : Inputs_intf) = struct
              ~then_:newly_popped_frame ~else_:remainder_of_current_forest_frame )
         ~else_:
           (let caller =
-             Token_id.if_ is_delegate_call
-               ~then_:(Stack_frame.caller current_forest)
-               ~else_:
-                 (Account_id.derive_token_id
-                    ~owner:(Account_update.account_id account_update) )
+             Account_id.derive_token_id
+               ~owner:(Account_update.account_id account_update)
            and caller_caller = caller_id in
            Stack_frame.make ~calls:account_update_forest ~caller ~caller_caller
           )
@@ -1056,12 +1071,23 @@ module Make (Inputs : Inputs_intf) = struct
       | `Compute _ ->
           is_start'
     in
+    let will_succeed =
+      match is_start with
+      | `Compute start_data ->
+          Bool.if_ is_start' ~then_:start_data.will_succeed
+            ~else_:local_state.will_succeed
+      | `Yes start_data ->
+          start_data.will_succeed
+      | `No ->
+          local_state.will_succeed
+    in
     let local_state =
       { local_state with
         ledger =
           Inputs.Ledger.if_ is_start'
             ~then_:(Inputs.Global_state.first_pass_ledger global_state)
             ~else_:local_state.ledger
+      ; will_succeed
       }
     in
     let ( (account_update, remaining, call_stack)
@@ -1202,7 +1228,8 @@ module Make (Inputs : Inputs_intf) = struct
           ~then_:local_state.full_transaction_commitment
           ~else_:local_state.transaction_commitment
       in
-      Inputs.Account_update.check_authorization ~commitment
+      Inputs.Account_update.check_authorization
+        ~will_succeed:local_state.will_succeed ~commitment
         ~calls:account_update_forest account_update
     in
     assert_ ~pos:__POS__
@@ -1247,15 +1274,18 @@ module Make (Inputs : Inputs_intf) = struct
       Token_id.(equal default) account_update_token
     in
     let account_is_untimed = Bool.not (Account.is_timed a) in
-    (* Set account timing for new accounts, if specified. *)
+    (* Set account timing. *)
     let a, local_state =
       let timing = Account_update.Update.timing account_update in
+      let has_permission =
+        Controller.check ~proof_verifies ~signature_verifies
+          (Account.Permissions.set_timing a)
+      in
       let local_state =
-        Local_state.add_check local_state
-          Update_not_permitted_timing_existing_account
+        Local_state.add_check local_state Update_not_permitted_timing
           Bool.(
             Set_or_keep.is_keep timing
-            ||| (account_is_untimed &&& signature_verifies))
+            ||| (account_is_untimed &&& has_permission))
       in
       let timing =
         Set_or_keep.set_or_keep ~if_:Timing.if_ timing (Account.timing a)
@@ -1806,6 +1836,15 @@ module Make (Inputs : Inputs_intf) = struct
       in
       (local_state, global_state)
     in
+    (* If this is the last account update, and [will_succeed] is false, then
+       [success] must also be false.
+    *)
+    Bool.(
+      Assert.any ~pos:__POS__
+        [ not is_last_account_update
+        ; local_state.will_succeed
+        ; not local_state.success
+        ]) ;
     (* If this is the last party and there were no failures, update the second
        pass ledger and the supply increase.
     *)
@@ -1854,6 +1893,9 @@ module Make (Inputs : Inputs_intf) = struct
           Amount.Signed.if_ is_last_account_update
             ~then_:Amount.(Signed.of_unsigned zero)
             ~else_:local_state.supply_increase
+      ; will_succeed =
+          Bool.if_ is_last_account_update ~then_:Bool.true_
+            ~else_:local_state.will_succeed
       }
     in
     (global_state, local_state)
