@@ -54,4 +54,4 @@ console.log(
 let zkappKey = PrivateKey.fromBase58(zkappKeyBase58);
 let zkappAddress = zkappKey.toPublicKey();
 
-process.exit(111);
+throw Error("invalid something");

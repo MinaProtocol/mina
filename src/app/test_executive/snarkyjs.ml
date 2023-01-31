@@ -39,9 +39,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let stdout = String.strip output.stdout in
     [%log info] "Stdout: $stdout" ~metadata:[ ("stdout", `String stdout) ] ;
     if not (String.is_empty output.stderr) then
-      [%log error] "Stderr: $Stderr"
-        ~metadata:[ ("error", `String output.stderr) ] ;
-    Malleable_error.ok_unit
+      Malleable_error.hard_error_string output.stderr
+    else Malleable_error.ok_unit
 
   let run network t =
     let open Malleable_error.Let_syntax in
