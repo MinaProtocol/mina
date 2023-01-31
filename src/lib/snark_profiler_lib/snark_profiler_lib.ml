@@ -571,12 +571,12 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
     apply_transactions_and_keep_intermediate_ledgers ~txn_state_view
       sparse_ledger0 transitions
   in
-  let final_first_pass_ledger = List.last_exn first_pass_target_ledgers in
+  let final_first_pass_ledger =
+    Sparse_ledger.merkle_root (List.last_exn first_pass_target_ledgers)
+  in
   List.iter second_pass_target_ledgers ~f:(fun l ->
       assert (
-        Ledger_hash.equal
-          (Sparse_ledger.merkle_root l)
-          (Sparse_ledger.merkle_root final_first_pass_ledger) ) ) ;
+        Ledger_hash.equal (Sparse_ledger.merkle_root l) final_first_pass_ledger ) ) ;
   let%bind (base_proof_time, _, _), base_proofs_rev =
     List.zip_exn first_pass_target_ledgers applied_txns
     |> Async.Deferred.List.fold

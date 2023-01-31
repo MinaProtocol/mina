@@ -626,7 +626,7 @@ let get_snarked_ledger t state_hash_opt =
       in
       let ledger = Ledger.of_database root_snarked_ledger in
       let path = Transition_frontier.path_map frontier b ~f:Fn.id in
-      let%bind _ =
+      let%bind () =
         List.fold_until ~init:(Ok ()) path
           ~f:(fun _acc b ->
             if Transition_frontier.Breadcrumb.just_emitted_a_proof b then

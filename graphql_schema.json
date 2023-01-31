@@ -6247,7 +6247,7 @@
             {
               "name": "sourceFirstPassLedgerHash",
               "description":
-                "Base58Check-encoded hash of the source first pass ledger",
+                "Base58Check-encoded hash of the source first-pass ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6264,7 +6264,7 @@
             {
               "name": "targetFirstPassLedgerHash",
               "description":
-                "Base58Check-encoded hash of the target first pass ledger",
+                "Base58Check-encoded hash of the target first-pass ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6281,7 +6281,7 @@
             {
               "name": "sourceSecondPassLedgerHash",
               "description":
-                "Base58Check-encoded hash of the source second pass ledger",
+                "Base58Check-encoded hash of the source second-pass ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6298,7 +6298,7 @@
             {
               "name": "targetSecondPassLedgerHash",
               "description":
-                "Base58Check-encoded hash of the target second pass ledger",
+                "Base58Check-encoded hash of the target second-pass ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
