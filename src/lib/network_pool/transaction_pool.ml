@@ -2709,9 +2709,11 @@ let%test_module _ =
       in
       let zkapp_command =
         Or_error.ok_exn
-          (Zkapp_command.Valid.to_valid ~ledger:best_tip_ledger
-             ~get:Mina_ledger.Ledger.get
-             ~location_of_account:Mina_ledger.Ledger.location_of_account
+          (Zkapp_command.Valid.to_valid
+             ~find_vk:
+               (Zkapp_command.Verifiable.find_vk_via_ledger
+                  ~ledger:best_tip_ledger ~get:Mina_ledger.Ledger.get
+                  ~location_of_account:Mina_ledger.Ledger.location_of_account )
              zkapp_command )
       in
       let zkapp_command = User_command.Zkapp_command zkapp_command in
