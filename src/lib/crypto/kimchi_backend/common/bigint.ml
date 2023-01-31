@@ -37,6 +37,8 @@ module type Intf = sig
 
   val length_in_bytes : int
 
+  val to_hex : t -> string
+
   val to_hex_string : t -> string
 
   val of_hex_string : ?reverse:bool -> string -> t
@@ -59,6 +61,10 @@ module Make
   let to_hex_string t =
     let data = to_bytes t in
     "0x" ^ String.uppercase (Hex.encode ~reverse:true (Bytes.to_string data))
+
+  let to_hex t =
+    let data = to_bytes t in
+    Hex.encode (Bytes.to_string data)
 
   let sexp_of_t t = to_hex_string t |> Sexp.of_string
 
