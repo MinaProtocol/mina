@@ -24,7 +24,7 @@ module Authorization_kind = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      (* TODO: yojson for Field.t in snarky *)
+      (* TODO: yojson for Field.t in snarky (#12591) *)
       type t =
             Mina_wire_types.Mina_base.Account_update.Authorization_kind.V1.t =
         | Signature

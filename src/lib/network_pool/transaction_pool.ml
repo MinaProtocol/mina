@@ -358,13 +358,13 @@ struct
         User_command.extract_vks cmd
         |> List.iter ~f:(fun vk -> table_modify ~key:vk.hash ~value:vk t)
 
-      let lift1 t table_modify cmd =
-        Transaction_hash.User_command_with_valid_signature.forget_check cmd
-        |> With_hash.data |> lift_common t table_modify
-
-      let lift2 t table_modify (cmd : User_command.Valid.t With_status.t) =
+      let lift t table_modify (cmd : User_command.Valid.t With_status.t) =
         With_status.data cmd |> User_command.forget_check
         |> lift_common t table_modify
+
+      let lift_hashed t table_modify cmd =
+        Transaction_hash.User_command_with_valid_signature.forget_check cmd
+        |> With_hash.data |> lift_common t table_modify
     end
 
     type t =
@@ -506,8 +506,10 @@ struct
          Don't forget to modify the refcount table as well as remove from the
          index pool.
       *)
-      let vk_table_lift1 = Vk_refcount_table.lift1 t.verification_key_table in
-      let vk_table_lift2 = Vk_refcount_table.lift2 t.verification_key_table in
+      let vk_table_lift = Vk_refcount_table.lift t.verification_key_table in
+      let vk_table_lift_hashed =
+        Vk_refcount_table.lift_hashed t.verification_key_table
+      in
       let global_slot = Indexed_pool.global_slot_since_genesis t.pool in
       t.best_tip_ledger <- Some best_tip_ledger ;
       let pool_max_size = t.config.pool_max_size in
@@ -523,8 +525,8 @@ struct
               ]
             @ metadata )
       in
-      List.iter new_commands ~f:(vk_table_lift2 Vk_refcount_table.inc) ;
-      List.iter removed_commands ~f:(vk_table_lift2 Vk_refcount_table.dec) ;
+      List.iter new_commands ~f:(vk_table_lift Vk_refcount_table.inc) ;
+      List.iter removed_commands ~f:(vk_table_lift Vk_refcount_table.dec) ;
       [%log' trace t.logger]
         ~metadata:
           [ ( "removed"
@@ -570,6 +572,8 @@ struct
             in
             (pool', Sequence.append dropped_so_far dropped_seq) )
       in
+      Sequence.iter dropped_backtrack
+        ~f:(vk_table_lift_hashed Vk_refcount_table.dec) ;
       (* Track what locally generated commands were removed from the pool
          during backtracking due to the max size constraint. *)
       let locally_generated_dropped =
@@ -589,8 +593,6 @@ struct
                        Transaction_hash.User_command_with_valid_signature
                        .to_yojson locally_generated_dropped ) )
             ] ;
-      List.iter locally_generated_dropped
-        ~f:(vk_table_lift1 Vk_refcount_table.dec) ;
       let pool'', dropped_commands =
         let accounts_to_check =
           List.fold (new_commands @ removed_commands) ~init:Account_id.Set.empty
@@ -642,6 +644,7 @@ struct
                  (Transaction_hash.User_command_with_valid_signature.hash cmd) )
       in
       List.iter committed_commands ~f:(fun cmd ->
+          vk_table_lift_hashed Vk_refcount_table.dec cmd ;
           Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
           |> Option.iter ~f:(fun data ->
                  Hashtbl.add_exn t.locally_generated_committed ~key:cmd ~data ) ) ;
@@ -650,9 +653,6 @@ struct
             Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
             |> Option.is_some )
       in
-      if not @@ List.is_empty commit_conflicts_locally_generated then
-        List.iter commit_conflicts_locally_generated
-          ~f:(vk_table_lift1 Vk_refcount_table.dec) ;
       [%log' info t.logger]
         "Locally generated commands $cmds dropped because they conflicted with \
          a committed command."
@@ -678,7 +678,7 @@ struct
              be in locally_generated_committed. If it wasn't, try re-adding to
              the pool. *)
           let remove_cmd () =
-            vk_table_lift1 Vk_refcount_table.dec cmd ;
+            vk_table_lift_hashed Vk_refcount_table.dec cmd ;
             assert (
               Option.is_some
               @@ Hashtbl.find_and_remove t.locally_generated_uncommitted cmd )
@@ -735,7 +735,7 @@ struct
                             , Transaction_hash.User_command_with_valid_signature
                               .to_yojson cmd )
                           ] ;
-                      vk_table_lift1 Vk_refcount_table.inc cmd ;
+                      vk_table_lift_hashed Vk_refcount_table.inc cmd ;
                       Mina_metrics.(
                         Gauge.set Transaction_pool.pool_size
                           (Float.of_int (Indexed_pool.size pool'''))) ;
@@ -754,7 +754,7 @@ struct
                 , Transaction_hash.User_command_with_valid_signature.to_yojson
                     cmd )
               ] ;
-          vk_table_lift1 Vk_refcount_table.dec cmd ;
+          vk_table_lift_hashed Vk_refcount_table.dec cmd ;
           ignore
             ( Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
               : (Time.t * [ `Batch of int ]) option ) ) ;
@@ -1127,7 +1127,7 @@ struct
                              ~location_of_account:
                                Base_ledger.location_of_account vk_hash
                              account_id ) ) )
-          |> Envelope.Incoming.sequence_error
+          |> Envelope.Incoming.lift_error
           |> Result.map_error ~f:(Error.tag ~tag:"Verification_failed")
           |> Deferred.return
         in
@@ -1298,7 +1298,7 @@ struct
 
         (* apply changes to the vk-refcount-table here *)
         let () =
-          let lift = Vk_refcount_table.lift1 t.verification_key_table in
+          let lift = Vk_refcount_table.lift_hashed t.verification_key_table in
           List.iter added_cmds ~f:(lift Vk_refcount_table.inc) ;
           List.iter all_dropped_cmds ~f:(lift Vk_refcount_table.dec)
         in

@@ -91,7 +91,7 @@ module Incoming = struct
 
   let map ~f t = { t with data = f t.data }
 
-  let sequence_error t =
+  let lift_error t =
     let open Result.Let_syntax in
     let%map data = t.data in
     { t with data }
