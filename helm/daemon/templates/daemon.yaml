@@ -29,9 +29,9 @@ spec:
       - name: fix-libp2p-perms
         image: busybox:latest
         command:
-        - bash
+        - sh
         - -c
-        - /bin/cp /libp2p-keys/* /root/libp2p-keys && /bin/chmod -R 0700 /root/libp2p-keys/
+        - cp /libp2p-keys/* /root/libp2p-keys && chmod -R 0700 /root/libp2p-keys/
         volumeMounts:
         - name: mounted-libp2p-keys
           mountPath: /libp2p-keys
@@ -42,9 +42,9 @@ spec:
       - name: fix-mina-perms
         image: busybox:latest
         command:
-        - bash
+        - sh
         - -c
-        - /bin/cp /mina-keys/* /root/mina-keys/ && /bin/chmod -R 0700 /root/mina-keys/
+        - cp /mina-keys/* /root/mina-keys/ && chmod -R 0700 /root/mina-keys/
         volumeMounts:
         - name: mounted-mina-keys
           mountPath: /mina-keys
@@ -157,8 +157,12 @@ spec:
         imagePullPolicy: Always
         volumeMounts:
         {{- if $node.libp2pKeys.enabled }}
-        - name: actual-libp2p
+        - name: fixed-libp2p-keys
           mountPath: /root/libp2p-keys
+        {{- end }}
+        {{- if $node.minaKeys.enabled }}
+        - name: fixed-mina-keys
+          mountPath: /root/mina-keys
         {{- end }}
         {{- if $.Values.deployment.uploadBlocksToGCloud }}
         - name: gcloud-keyfile

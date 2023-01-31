@@ -37,7 +37,7 @@ nodes:
     libp2pKeys:
       enabled: true
     minaKeys:
-      enabled: true
+      enabled: false
       produceBlocks: true
   - name: "seed-2"
     class: "seed"
