@@ -1802,7 +1802,10 @@ let create ?wallets (config : Config.t) =
                                       (* should never occur *)
                                       Deferred.unit
                                   | Some network ->
-                                      Mina_networking.ban_peer network peer )
+                                      let%bind.Deferred _ban_expiry =
+                                        Mina_networking.ban_peer network peer
+                                      in
+                                      Deferred.unit )
                             in
                             Deferred.return
                               (Error

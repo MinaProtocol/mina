@@ -32,7 +32,7 @@ val build :
   -> logger:Logger.t
   -> precomputed_values:Precomputed_values.t
   -> verifier:Verifier.t
-  -> ban_peer:(Peer.t -> unit Deferred.t)
+  -> ban_peer:(Peer.t -> Time.t Deferred.t)
   -> parent:t
   -> transition:Mina_block.almost_valid_block
   -> sender:Envelope.Sender.t option

@@ -3,11 +3,6 @@ open Core_kernel
 open Network_peer
 open Network_peer.Rpc_intf
 
-type ban_creator = { banned_peer : Peer.t; banned_until : Time.t }
-[@@deriving fields]
-
-type ban_notification = { banned_peer : Peer.t; banned_until : Time.t }
-
 module type Gossip_net_intf = sig
   type t
 
@@ -35,9 +30,9 @@ module type Gossip_net_intf = sig
   val set_connection_gating :
     t -> Mina_net2.connection_gating -> Mina_net2.connection_gating Deferred.t
 
-  val ban_peer : t -> Peer.t -> unit Deferred.t
+  val ban_peer : t -> Peer.t -> until:Time.t -> unit Deferred.t
 
-  val banned_peers : t -> Peer.t list
+  val banned_peers : t -> (Peer.t * Time.t) list
 
   val random_peers : t -> int -> Peer.t list Deferred.t
 

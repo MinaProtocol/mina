@@ -295,7 +295,7 @@ module Instance = struct
                Breadcrumb.build ~skip_staged_ledger_verification:`All
                  ~logger:t.factory.logger ~precomputed_values
                  ~verifier:t.factory.verifier
-                 ~ban_peer:(fun _ -> Deferred.unit)
+                 ~ban_peer:(fun _ -> Deferred.return @@ Time.now ())
                  ~parent ~transition ~sender:None ~transition_receipt_time ()
              in
              let%map () = apply_diff Diff.(E (New_node (Full breadcrumb))) in

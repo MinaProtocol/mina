@@ -131,7 +131,8 @@ let write_graph (_ : t) =
 
 let ban_sender ~network = function
   | Envelope.Sender.Remote peer ->
-      Mina_networking.ban_peer network peer
+      let%bind _ban_expiry = Mina_networking.ban_peer network peer in
+      Deferred.unit
   | Local ->
       Deferred.unit
 
@@ -441,7 +442,9 @@ let download_state_hashes t ~logger ~network ~frontier ~target_hash
             in
             [%log error] "%s" error_msg
               ~metadata:[ ("peer", Peer.to_yojson peer) ] ;
-            let%bind.Deferred () = Mina_networking.ban_peer network peer in
+            let%bind.Deferred _ban_expiry =
+              Mina_networking.ban_peer network peer
+            in
             Deferred.Result.fail `Invalid_transition_chain_proof
       in
       Deferred.return
@@ -696,7 +699,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
        -> logger:Logger.t
        -> precomputed_values:Precomputed_values.t
        -> verifier:Verifier.t
-       -> ban_peer:(Peer.t -> unit Deferred.t)
+       -> ban_peer:(Peer.t -> Time.t Deferred.t)
        -> parent:Breadcrumb.t
        -> transition:Mina_block.almost_valid_block
        -> sender:Envelope.Sender.t option

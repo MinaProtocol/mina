@@ -95,11 +95,12 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
           let%map () =
             match sender with
             | None | Some Envelope.Sender.Local ->
-                return ()
+                Deferred.unit
             | Some (Envelope.Sender.Remote peer) ->
                 [%log error] "Gossiped invalid transaction"
                   ~metadata:[ ("error", `String message) ] ;
-                ban_peer peer
+                let%bind _ban_expiry = ban_peer peer in
+                Deferred.unit
           in
           Error (`Invalid_staged_ledger_diff (Error.of_string message))
       | Error (`Invalid_staged_ledger_diff errors) ->
@@ -119,7 +120,8 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
             | Some (Envelope.Sender.Remote peer) ->
                 [%log error] "Gossiped invalid transaction"
                   ~metadata:[ ("error", `String message) ] ;
-                ban_peer peer
+                let%bind _ban_expiry = ban_peer peer in
+                Deferred.unit
           in
           return @@ Error (`Invalid_staged_ledger_hash (Error.of_string message))
       | Error (`Staged_ledger_application_failed staged_ledger_error) ->
@@ -147,7 +149,8 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
                 | Mismatched_statuses _
                 | Invalid_public_key _
                 | Unexpected _ ->
-                    ban_peer peer )
+                    let%bind _ban_expiry = ban_peer peer in
+                    Deferred.unit )
           in
           Error
             (`Invalid_staged_ledger_diff

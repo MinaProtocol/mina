@@ -355,7 +355,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               (Buffered (`Capacity 10, `Overflow Crash))
           in
           let disjoint_breadcrumb = List.last_exn branch in
-          let ban_peer _ = Deferred.unit in
+          let ban_peer _ = Deferred.return (Time.now ()) in
           let scheduler =
             create ~frontier ~precomputed_values ~verifier ~ban_peer
               ~catchup_job_writer ~catchup_breadcrumbs_writer
@@ -415,7 +415,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let[@warning "-8"] [ breadcrumb_1; breadcrumb_2 ] =
             List.map ~f:register_breadcrumb branch
           in
-          let ban_peer _ = Deferred.unit in
+          let ban_peer _ = Deferred.return (Time.now ()) in
           let scheduler =
             create ~precomputed_values ~frontier ~verifier ~ban_peer
               ~catchup_job_writer ~catchup_breadcrumbs_writer
@@ -493,7 +493,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
               (Buffered (`Capacity 10, `Overflow Crash))
           in
-          let ban_peer _ = Deferred.unit in
+          let ban_peer _ = Deferred.return (Time.now ()) in
           let scheduler =
             create ~precomputed_values ~frontier ~verifier ~ban_peer
               ~catchup_job_writer ~catchup_breadcrumbs_writer

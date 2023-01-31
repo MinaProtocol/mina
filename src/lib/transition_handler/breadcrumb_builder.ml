@@ -149,7 +149,8 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
                                       , `String staged_ledger_error )
                                     ; ("error", Error_json.error_to_yojson error)
                                     ] ;
-                                ban_peer ip_addr )
+                                let%bind _ban_expiry = ban_peer ip_addr in
+                                Deferred.unit )
                           in
                           Error error
                         in

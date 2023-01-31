@@ -98,7 +98,7 @@ module Rpcs : sig
                 (State_hash.Stable.V1.t * string) list
             ; git_commit : string
             ; uptime_minutes : int
-            ; banned_peers : Peer.Stable.V1.t list
+            ; banned_peers : (Peer.Stable.V1.t * Time.Stable.V1.t) list
             ; block_height_opt : int option
             }
         end
@@ -273,9 +273,11 @@ val connection_gating_config : t -> Mina_net2.connection_gating Deferred.t
 val set_connection_gating_config :
   t -> Mina_net2.connection_gating -> Mina_net2.connection_gating Deferred.t
 
-val ban_peer : t -> Peer.t -> unit Deferred.t
+(** the returned time is the ban expiration *)
+val ban_peer : t -> Peer.t -> Time.t Deferred.t
 
-val banned_peers : t -> Peer.t list
+(** the times are the ban expirations *)
+val banned_peers : t -> (Peer.t * Time.t) list
 
 val create :
      Config.t

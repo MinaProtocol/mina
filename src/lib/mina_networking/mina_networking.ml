@@ -694,7 +694,18 @@ module Rpcs = struct
                 (State_hash.Stable.V1.t * string) list
             ; git_commit : string
             ; uptime_minutes : int
-            ; banned_peers : Peer.Stable.V1.t list
+            ; banned_peers :
+                ( Peer.Stable.V1.t
+                * (Time.Stable.V1.t
+                  [@version_asserted]
+                  [@to_yojson fun tm -> `String (Time.to_string tm)]
+                  [@of_yojson
+                    function
+                    | `String s ->
+                        Ok (Time.of_string s)
+                    | _ ->
+                        Error "expected string"] ) )
+                list
             ; block_height_opt : int option [@default None]
             }
           [@@deriving to_yojson, of_yojson]
@@ -905,7 +916,7 @@ module Config = struct
 end
 
 type t = { logger : Logger.t; gossip_net : Gossip_net.Any.t }
-[@@deriving fields]
+(* [@@deriving fields]*)
 
 let wrap_rpc_data_in_envelope conn data =
   Envelope.Incoming.wrap_peer ~data ~sender:conn
@@ -928,6 +939,22 @@ let protocol_version_status t =
       (Header.current_protocol_version header)
   in
   { valid_current; valid_next; matches_daemon }
+
+let ban_notify (t : t) peer banned_until =
+  Gossip_net.Any.query_peer t.gossip_net peer.Peer.peer_id Rpcs.Ban_notify
+    banned_until
+  >>| Fn.const (Ok ())
+
+let ban_expiry () =
+  let now = Time.now () in
+  let span = Time.Span.day in
+  Time.add now span
+
+let ban_peer (t : t) peer =
+  let until = ban_expiry () in
+  let%bind () = Gossip_net.Any.ban_peer t.gossip_net peer ~until in
+  let%map () = ban_notify t peer until >>| Fn.const () in
+  until
 
 let create (config : Config.t) ~sinks
     ~(get_some_initial_peers :
@@ -982,8 +1009,7 @@ let create (config : Config.t) ~sinks
       incr_failed_response failed_response_counter ) ;
     result
   in
-  (* once we have gossip net, we can ban senders *)
-  let gossip_net_ref = ref None in
+  let gossip_net_ref : Gossip_net.Any.t option ref = ref None in
   let ban_sender sender =
     don't_wait_for
       ( match sender with
@@ -992,9 +1018,14 @@ let create (config : Config.t) ~sinks
       | Remote peer -> (
           match !gossip_net_ref with
           | None ->
+              (* should never occur *)
               Deferred.unit
           | Some gossip_net ->
-              Gossip_net.Any.ban_peer gossip_net peer ) )
+              let until = ban_expiry () in
+              let%bind () = Gossip_net.Any.ban_peer gossip_net peer ~until in
+              Gossip_net.Any.query_peer gossip_net peer.Peer.peer_id
+                Rpcs.Ban_notify until
+              >>| Fn.const () ) )
   in
   let validate_protocol_versions ~rpc_name sender external_transition =
     let { valid_current; valid_next; matches_daemon } =
@@ -1350,7 +1381,9 @@ include struct
   let set_connection_gating_config t config =
     lift set_connection_gating t config
 
-  let ban_peer t peer = lift ban_peer t peer
+  (* `ban_peer` is defined above; it calculates the expiry time,
+     passed to the gossip net implementation
+  *)
 
   let banned_peers t = lift banned_peers t
 end
@@ -1428,10 +1461,6 @@ let get_transition_chain ?heartbeat_timeout ?timeout t =
 let get_best_tip ?heartbeat_timeout ?timeout t peer =
   make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_best_tip
     ~label:"best tip" t peer ()
-
-let ban_notify t peer banned_until =
-  query_peer t peer.Peer.peer_id Rpcs.Ban_notify banned_until
-  >>| Fn.const (Ok ())
 
 let try_non_preferred_peers (type b) t input peers ~rpc :
     b Envelope.Incoming.t Deferred.Or_error.t =

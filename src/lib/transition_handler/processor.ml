@@ -148,7 +148,8 @@ let process_transition ~context:(module Context : CONTEXT) ~verifier ~frontier
             | Local ->
                 Deferred.unit
             | Remote peer ->
-                ban_peer peer
+                let%bind _ban_expiry = ban_peer peer in
+                Deferred.unit
           in
           return @@ Error ()
       | Error `Already_in_frontier ->
@@ -438,7 +439,7 @@ let%test_module "Transition_handler.Processor tests" =
                 in
                 let clean_up_catchup_scheduler = Ivar.create () in
                 let cache = Unprocessed_transition_cache.create ~logger in
-                let ban_peer _ = Deferred.unit in
+                let ban_peer _ = Deferred.return (Time.now ()) in
                 run
                   ~context:(module Context)
                   ~time_controller ~verifier ~ban_peer

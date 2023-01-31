@@ -189,7 +189,16 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
     let peers_snapshot_max_staleness = Time.Span.of_sec 30.
 
-    let banned_peer_set = Peer.Hash_set.create ()
+    module Banned = struct
+      module T = struct
+        type t = Peer.t * Time.t [@@deriving hash, compare, sexp]
+      end
+
+      include T
+      include Hashable.Make (T)
+    end
+
+    let banned_peer_set : Banned.t Hash_set.t = Banned.Hash_set.create ()
 
     (* Creates just the helper, making sure to register everything
        BEFORE we start listening/advertise ourselves for discovery. *)
@@ -301,7 +310,8 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                 ~known_private_ip_nets:config.known_private_ip_nets
                 ~initial_gating_config:
                   Mina_net2.
-                    { banned_peers = Hash_set.to_list banned_peer_set
+                    { banned_peers =
+                        Hash_set.to_list banned_peer_set |> List.map ~f:fst
                     ; trusted_peers =
                         List.filter_map ~f:Mina_net2.Multiaddr.to_peer
                           config.initial_peers
@@ -855,18 +865,27 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       let%bind net2 = !(t.net2) in
       Mina_net2.set_connection_gating_config net2 config
 
-    let ban_peer t peer =
+    let ban_peer t peer ~until =
       let%bind net2 = !(t.net2) in
-      Hash_set.add banned_peer_set peer ;
-      let%map _gating = Mina_net2.set_banned_peers net2 banned_peer_set in
+      Hash_set.add banned_peer_set (peer, until) ;
+      let get_banned_peers () =
+        Hash_set.to_list banned_peer_set
+        |> List.map ~f:(fun (peer, _until) -> peer)
+      in
+      let banned_peers = get_banned_peers () in
+      let%map _gating = Mina_net2.set_banned_peers net2 banned_peers in
       don't_wait_for
-        ( let%bind () = after @@ Time.Span.of_day 1.0 in
-          Hash_set.remove banned_peer_set peer ;
-          let%bind _gating = Mina_net2.set_banned_peers net2 banned_peer_set in
-          Deferred.unit
-          : unit Deferred.t )
+        (let span = Time.diff until (Time.now ()) in
+         let%bind () = after span in
+         (* ban lifted, remove peer from set *)
+         Hash_set.filter_inplace banned_peer_set ~f:(fun (p, _until) ->
+             not @@ Peer.equal p peer ) ;
+         let new_banned_peers = get_banned_peers () in
+         let%bind _gating = Mina_net2.set_banned_peers net2 new_banned_peers in
+         Deferred.unit )
 
-    let banned_peers _t : Peer.t list = Hash_set.to_list banned_peer_set
+    let banned_peers _t : (Peer.t * Time.t) list =
+      Hash_set.to_list banned_peer_set
 
     let restart_helper t = t.restart_helper ()
   end
