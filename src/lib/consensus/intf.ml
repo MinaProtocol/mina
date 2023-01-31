@@ -38,7 +38,7 @@ module type Blockchain_state = sig
          , 'snarked_ledger_hash
          , 'local_state
          , 'time
-         , 'body_ref
+         , 'body_reference
          , 'signed_amount
          , 'pending_coinbase_stack
          , 'fee_excess

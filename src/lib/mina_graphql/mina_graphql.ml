@@ -601,22 +601,22 @@ module Types = struct
         "Transition from a source ledger to a target ledger with some fee \
          excess and increase in supply " ~fields:(fun _ ->
         [ field "sourceFirstPassLedgerHash" ~typ:(non_null ledger_hash)
-            ~doc:"Base58Check-encoded hash of the source first pass ledger"
+            ~doc:"Base58Check-encoded hash of the source first-pass ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.Poly.source; _ } ->
               source.first_pass_ledger )
         ; field "targetFirstPassLedgerHash" ~typ:(non_null ledger_hash)
-            ~doc:"Base58Check-encoded hash of the target first pass ledger"
+            ~doc:"Base58Check-encoded hash of the target first-pass ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.Poly.target; _ } ->
               target.first_pass_ledger )
         ; field "sourceSecondPassLedgerHash" ~typ:(non_null ledger_hash)
-            ~doc:"Base58Check-encoded hash of the source second pass ledger"
+            ~doc:"Base58Check-encoded hash of the source second-pass ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.Poly.source; _ } ->
               source.second_pass_ledger )
         ; field "targetSecondPassLedgerHash" ~typ:(non_null ledger_hash)
-            ~doc:"Base58Check-encoded hash of the target second pass ledger"
+            ~doc:"Base58Check-encoded hash of the target second-pass ledger"
             ~args:Arg.[]
             ~resolve:(fun _ { Transaction_snark.Statement.Poly.target; _ } ->
               target.second_pass_ledger )
@@ -1160,6 +1160,11 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ permission ->
                 permission.Permissions.Poly.set_voting_for )
+          ; field "setTiming" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to set the timing of the account"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission ->
+                permission.Permissions.Poly.set_timing )
           ] )
 
     let account_vk =

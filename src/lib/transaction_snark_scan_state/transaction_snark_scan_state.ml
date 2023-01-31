@@ -313,7 +313,7 @@ end
 module Make_statement_scanner (Verifier : sig
   type t
 
-  val verify : verifier:t -> P.t list -> bool Deferred.Or_error.t
+  val verify : verifier:t -> P.t list -> unit Or_error.t Deferred.Or_error.t
 end) =
 struct
   module Fold = Parallel_scan.State.Make_foldable (Deferred)
@@ -541,10 +541,10 @@ struct
         Deferred.return (Error `Empty)
     | Ok (Some (res, proofs), _) -> (
         match%map.Deferred Verifier.verify ~verifier proofs with
-        | Ok true ->
+        | Ok (Ok ()) ->
             Ok res
-        | Ok false ->
-            Error (`Error (Error.of_string "Bad proofs"))
+        | Ok (Error err) ->
+            Error (`Error (Error.tag ~tag:"Verifier issue" err))
         | Error e ->
             Error (`Error e) )
     | Error e ->
@@ -926,6 +926,7 @@ let apply_ordered_txns_stepwise ordered_txns ~ledger ~get_protocol_state
             ; success = t.local_state.success
             ; account_update_index = t.local_state.account_update_index
             ; failure_status_tbl = t.local_state.failure_status_tbl
+            ; will_succeed = t.local_state.will_succeed
             }
           in
           Ledger.Transaction_partially_applied.Zkapp_command

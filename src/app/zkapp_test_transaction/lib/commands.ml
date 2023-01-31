@@ -30,6 +30,24 @@ let vk_and_prover =
   lazy
     (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
 
+let get_second_pass_ledger_mask ~ledger ~constraint_constants ~global_slot
+    ~state_body zkapp_command =
+  let second_pass_ledger =
+    let new_mask =
+      Mina_ledger.Ledger.Mask.create ~depth:(Mina_ledger.Ledger.depth ledger) ()
+    in
+    Mina_ledger.Ledger.register_mask ledger new_mask
+  in
+  let _partial_stmt =
+    Mina_ledger.Ledger.apply_transaction_first_pass ~constraint_constants
+      ~global_slot
+      ~txn_state_view:(Mina_state.Protocol_state.Body.view state_body)
+      second_pass_ledger
+      (Mina_transaction.Transaction.Command (Zkapp_command zkapp_command))
+    |> Or_error.ok_exn
+  in
+  second_pass_ledger
+
 let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
   let ledger = Ledger.create ~depth:constraint_constants.ledger_depth () in
   let _v =
@@ -91,20 +109,8 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
   in
   let witnesses =
     let second_pass_ledger =
-      let new_mask =
-        Mina_ledger.Ledger.Mask.create
-          ~depth:(Mina_ledger.Ledger.depth ledger)
-          ()
-      in
-      Mina_ledger.Ledger.register_mask ledger new_mask
-    in
-    let _partial_stmt =
-      Mina_ledger.Ledger.apply_transaction_first_pass ~constraint_constants
-        ~global_slot
-        ~txn_state_view:(Mina_state.Protocol_state.Body.view state_body)
-        second_pass_ledger
-        (Mina_transaction.Transaction.Command (Zkapp_command zkapp_command))
-      |> Or_error.ok_exn
+      get_second_pass_ledger_mask ~ledger ~constraint_constants ~global_slot
+        ~state_body zkapp_command
     in
     Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
       ~global_slot ~state_body ~fee_excess:Currency.Amount.Signed.zero
@@ -206,20 +212,8 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   in
   let witnesses =
     let second_pass_ledger =
-      let new_mask =
-        Mina_ledger.Ledger.Mask.create
-          ~depth:(Mina_ledger.Ledger.depth ledger)
-          ()
-      in
-      Mina_ledger.Ledger.register_mask ledger new_mask
-    in
-    let _partial_stmt =
-      Mina_ledger.Ledger.apply_transaction_first_pass ~constraint_constants
-        ~global_slot
-        ~txn_state_view:(Mina_state.Protocol_state.Body.view state_body)
-        second_pass_ledger
-        (Mina_transaction.Transaction.Command (Zkapp_command zkapp_command))
-      |> Or_error.ok_exn
+      get_second_pass_ledger_mask ~ledger ~constraint_constants ~global_slot
+        ~state_body zkapp_command
     in
     Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
       ~global_slot ~state_body ~fee_excess:Currency.Amount.Signed.zero
@@ -277,9 +271,11 @@ module Events = struct
 end
 
 module Util = struct
-  let keypair_of_file ?(which = "Fee Payer") f =
+  let keypair_of_file ~which f =
     printf "%s keyfile\n" which ;
     Secrets.Keypair.Terminal_stdin.read_exn ~which f
+
+  let fee_payer_keypair_of_file = keypair_of_file ~which:"Fee payer"
 
   let snapp_keypair_of_file = keypair_of_file ~which:"Zkapp Account"
 
@@ -327,7 +323,7 @@ end
 
 let test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file () =
   let open Deferred.Let_syntax in
-  let%bind keypair = Util.keypair_of_file keyfile in
+  let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_kp = Util.snapp_keypair_of_file zkapp_keyfile in
   let%bind ledger =
     let%map config_json = Genesis_ledger_helper.load_config_json config_file in
@@ -355,7 +351,7 @@ let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
     ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo =
   let open Deferred.Let_syntax in
   let%bind sender_keypair = Util.keypair_of_file sender ~which:"Sender" in
-  let%bind fee_payer_keypair = Util.keypair_of_file fee_payer in
+  let%bind fee_payer_keypair = Util.fee_payer_keypair_of_file fee_payer in
   let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
   let spec =
     { Transaction_snark.For_tests.Deploy_snapp_spec.sender =
@@ -381,7 +377,7 @@ let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
 let upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     ~verification_key ~zkapp_uri ~auth =
   let open Deferred.Let_syntax in
-  let%bind keypair = Util.keypair_of_file keyfile in
+  let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_account_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
   let verification_key =
     let data =
@@ -436,8 +432,8 @@ let transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer ~fee_payer_nonce
     List.fold ~init:Currency.Amount.zero receivers ~f:(fun acc (_, a) ->
         Option.value_exn (Currency.Amount.add acc a) )
   in
-  let%bind sender_keypair = Util.keypair_of_file sender in
-  let%bind fee_payer_keypair = Util.keypair_of_file fee_payer in
+  let%bind sender_keypair = Util.keypair_of_file ~which:"Sender" sender in
+  let%bind fee_payer_keypair = Util.fee_payer_keypair_of_file fee_payer in
   let spec =
     { Transaction_snark.For_tests.Multiple_transfers_spec.sender =
         (sender_keypair, sender_nonce)
@@ -463,7 +459,7 @@ let transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer ~fee_payer_nonce
 
 let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state =
   let open Deferred.Let_syntax in
-  let%bind keypair = Util.keypair_of_file keyfile in
+  let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
   let app_state = Util.app_state_of_list app_state in
   let spec =
@@ -500,7 +496,7 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state =
 let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
     ~auth =
   let open Deferred.Let_syntax in
-  let%bind keypair = Util.keypair_of_file keyfile in
+  let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_account_keypair = Util.snapp_keypair_of_file snapp_keyfile in
   let zkapp_uri = Zkapp_basic.Set_or_keep.Set zkapp_uri in
   let spec =
@@ -539,7 +535,7 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
 let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     ~sequence_state =
   let open Deferred.Let_syntax in
-  let%bind keypair = Util.keypair_of_file keyfile in
+  let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
   let actions = Util.sequence_state_of_list sequence_state in
   let spec =
@@ -576,7 +572,7 @@ let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
 let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ~token_symbol ~auth =
   let open Deferred.Let_syntax in
-  let%bind keypair = Util.keypair_of_file keyfile in
+  let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_account_keypair = Util.snapp_keypair_of_file snapp_keyfile in
   let token_symbol = Zkapp_basic.Set_or_keep.Set token_symbol in
   let spec =
@@ -615,7 +611,7 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
 let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     ~permissions ~current_auth =
   let open Deferred.Let_syntax in
-  let%bind keypair = Util.keypair_of_file keyfile in
+  let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
   let spec =
     { Transaction_snark.For_tests.Update_states_spec.sender = (keypair, nonce)

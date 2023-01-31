@@ -36,7 +36,13 @@ end
 
 module Lookup_pattern = struct
   module T = struct
-    type t = Lookup [@@deriving hash, eq, compare, sexp]
+    type t = Kimchi_types.lookup_pattern =
+      | Xor
+      | ChaChaFinal
+      | Lookup
+      | RangeCheck
+      | ForeignFieldMul
+    [@@deriving hash, eq, compare, sexp]
   end
 
   include Core_kernel.Hashable.Make (T)
@@ -90,9 +96,7 @@ module Env = struct
     ; beta : 'a
     ; gamma : 'a
     ; unnormalized_lagrange_basis : int -> 'a
-    ; enabled_if : Kimchi_types.feature_flag * (unit -> 'a) -> 'a
-    ; foreign_field_modulus : int -> 'a
-    ; neg_foreign_field_modulus : int -> 'a
+    ; if_feature : Kimchi_types.feature_flag * (unit -> 'a) * (unit -> 'a) -> 'a
     }
 end
 
@@ -113,7 +117,7 @@ module Tick : S = struct
        ; endo_coefficient = _
        ; pow
        ; var
-       ; field = _
+       ; field
        ; cell
        ; alpha_pow
        ; double = _
@@ -121,14 +125,12 @@ module Tick : S = struct
        ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows = _
+       ; vanishes_on_last_4_rows
        ; joint_combiner = _
-       ; beta = _
-       ; gamma = _
-       ; unnormalized_lagrange_basis = _
-       ; enabled_if = _
-       ; foreign_field_modulus = _
-       ; neg_foreign_field_modulus = _
+       ; beta
+       ; gamma
+       ; unnormalized_lagrange_basis
+       ; if_feature
        } :
         a Env.t ) =
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
@@ -236,6 +238,66 @@ module Tick : S = struct
             + (mds (2, 0) * x_12)
             + (mds (2, 1) * x_13)
             + (mds (2, 2) * x_14) ) ) )
+    + if_feature
+        ( ChaCha
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    + if_feature
+        ( RangeCheck
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    + if_feature
+        ( ForeignFieldAdd
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    + if_feature
+        ( ForeignFieldMul
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    + if_feature
+        ( Xor
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    + if_feature
+        ( Rot
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
     + cell (var (Index Generic, Curr))
       * ( (cell (var (Coefficient 0, Curr)) * cell (var (Witness 0, Curr)))
         + (cell (var (Coefficient 1, Curr)) * cell (var (Witness 1, Curr)))
@@ -252,6 +314,324 @@ module Tick : S = struct
               * cell (var (Witness 3, Curr))
               * cell (var (Witness 4, Curr))
             + cell (var (Coefficient 9, Curr)) ) )
+    + if_feature
+        ( LookupTables
+        , (fun () ->
+            alpha_pow 24
+            * ( vanishes_on_last_4_rows
+              * ( cell (var (LookupAggreg, Next))
+                  * ( if_feature
+                        ( LookupsPerRow 0
+                        , (fun () ->
+                            gamma
+                            * ( beta
+                              + field
+                                  "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              )
+                            + cell (var (LookupSorted 0, Curr))
+                            + (beta * cell (var (LookupSorted 0, Next))) )
+                        , fun () ->
+                            field
+                              "0x0000000000000000000000000000000000000000000000000000000000000001"
+                        )
+                    * if_feature
+                        ( LookupsPerRow 1
+                        , (fun () ->
+                            gamma
+                            * ( beta
+                              + field
+                                  "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              )
+                            + cell (var (LookupSorted 1, Next))
+                            + (beta * cell (var (LookupSorted 1, Curr))) )
+                        , fun () ->
+                            field
+                              "0x0000000000000000000000000000000000000000000000000000000000000001"
+                        )
+                    * if_feature
+                        ( LookupsPerRow 2
+                        , (fun () ->
+                            gamma
+                            * ( beta
+                              + field
+                                  "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              )
+                            + cell (var (LookupSorted 2, Curr))
+                            + (beta * cell (var (LookupSorted 2, Next))) )
+                        , fun () ->
+                            field
+                              "0x0000000000000000000000000000000000000000000000000000000000000001"
+                        )
+                    * if_feature
+                        ( LookupsPerRow 3
+                        , (fun () ->
+                            gamma
+                            * ( beta
+                              + field
+                                  "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              )
+                            + cell (var (LookupSorted 3, Next))
+                            + (beta * cell (var (LookupSorted 3, Curr))) )
+                        , fun () ->
+                            field
+                              "0x0000000000000000000000000000000000000000000000000000000000000001"
+                        )
+                    * if_feature
+                        ( LookupsPerRow 4
+                        , (fun () ->
+                            gamma
+                            * ( beta
+                              + field
+                                  "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              )
+                            + cell (var (LookupSorted 4, Curr))
+                            + (beta * cell (var (LookupSorted 4, Next))) )
+                        , fun () ->
+                            field
+                              "0x0000000000000000000000000000000000000000000000000000000000000001"
+                        ) )
+                - cell (var (LookupAggreg, Curr))
+                  * ( ( ( field
+                            "0x0000000000000000000000000000000000000000000000000000000000000001"
+                        - ( if_feature
+                              ( LookupPattern Xor
+                              , (fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                  )
+                              , fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                              )
+                          + if_feature
+                              ( LookupPattern ChaChaFinal
+                              , (fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                  )
+                              , fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                              )
+                          + if_feature
+                              ( LookupPattern Lookup
+                              , (fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                  )
+                              , fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                              )
+                          + if_feature
+                              ( LookupPattern RangeCheck
+                              , (fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                  )
+                              , fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                              )
+                          + if_feature
+                              ( LookupPattern ForeignFieldMul
+                              , (fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                  )
+                              , fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                              ) ) )
+                        * ( if_feature
+                              ( LookupsPerRow 1
+                              , (fun () -> gamma)
+                              , fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              )
+                          * if_feature
+                              ( LookupsPerRow 2
+                              , (fun () -> gamma)
+                              , fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              )
+                          * if_feature
+                              ( LookupsPerRow 3
+                              , (fun () -> gamma)
+                              , fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              )
+                          * if_feature
+                              ( LookupsPerRow 4
+                              , (fun () -> gamma)
+                              , fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              )
+                          * ( ( field
+                                  "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              + beta )
+                            * if_feature
+                                ( LookupsPerRow 2
+                                , (fun () ->
+                                    field
+                                      "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                    + beta )
+                                , fun () ->
+                                    field
+                                      "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                )
+                            * if_feature
+                                ( LookupsPerRow 3
+                                , (fun () ->
+                                    field
+                                      "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                    + beta )
+                                , fun () ->
+                                    field
+                                      "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                )
+                            * if_feature
+                                ( LookupsPerRow 4
+                                , (fun () ->
+                                    field
+                                      "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                    + beta )
+                                , fun () ->
+                                    field
+                                      "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                ) ) )
+                      + if_feature
+                          ( LookupPattern Xor
+                          , (fun () ->
+                              field
+                                "0x0000000000000000000000000000000000000000000000000000000000000000"
+                              )
+                          , fun () ->
+                              field
+                                "0x0000000000000000000000000000000000000000000000000000000000000000"
+                          )
+                      + if_feature
+                          ( LookupPattern ChaChaFinal
+                          , (fun () ->
+                              field
+                                "0x0000000000000000000000000000000000000000000000000000000000000000"
+                              )
+                          , fun () ->
+                              field
+                                "0x0000000000000000000000000000000000000000000000000000000000000000"
+                          )
+                      + if_feature
+                          ( LookupPattern Lookup
+                          , (fun () ->
+                              field
+                                "0x0000000000000000000000000000000000000000000000000000000000000000"
+                              )
+                          , fun () ->
+                              field
+                                "0x0000000000000000000000000000000000000000000000000000000000000000"
+                          )
+                      + if_feature
+                          ( LookupPattern RangeCheck
+                          , (fun () ->
+                              field
+                                "0x0000000000000000000000000000000000000000000000000000000000000000"
+                              )
+                          , fun () ->
+                              field
+                                "0x0000000000000000000000000000000000000000000000000000000000000000"
+                          )
+                      + if_feature
+                          ( LookupPattern ForeignFieldMul
+                          , (fun () ->
+                              field
+                                "0x0000000000000000000000000000000000000000000000000000000000000000"
+                              )
+                          , fun () ->
+                              field
+                                "0x0000000000000000000000000000000000000000000000000000000000000000"
+                          ) )
+                    * ( gamma
+                        * ( beta
+                          + field
+                              "0x0000000000000000000000000000000000000000000000000000000000000001"
+                          )
+                      + cell (var (LookupTable, Curr))
+                      + (beta * cell (var (LookupTable, Next))) ) ) ) )
+            + alpha_pow 25
+              * ( unnormalized_lagrange_basis 0
+                * ( cell (var (LookupAggreg, Curr))
+                  - field
+                      "0x0000000000000000000000000000000000000000000000000000000000000001"
+                  ) )
+            + alpha_pow 26
+              * ( unnormalized_lagrange_basis (-4)
+                * ( cell (var (LookupAggreg, Curr))
+                  - field
+                      "0x0000000000000000000000000000000000000000000000000000000000000001"
+                  ) )
+            + alpha_pow 27
+              * if_feature
+                  ( LookupsPerRow 1
+                  , (fun () ->
+                      unnormalized_lagrange_basis (-4)
+                      * ( cell (var (LookupSorted 0, Curr))
+                        - cell (var (LookupSorted 1, Curr)) ) )
+                  , fun () ->
+                      field
+                        "0x0000000000000000000000000000000000000000000000000000000000000000"
+                  )
+            + alpha_pow 28
+              * if_feature
+                  ( LookupsPerRow 2
+                  , (fun () ->
+                      unnormalized_lagrange_basis 0
+                      * ( cell (var (LookupSorted 1, Curr))
+                        - cell (var (LookupSorted 2, Curr)) ) )
+                  , fun () ->
+                      field
+                        "0x0000000000000000000000000000000000000000000000000000000000000000"
+                  )
+            + alpha_pow 29
+              * if_feature
+                  ( LookupsPerRow 3
+                  , (fun () ->
+                      unnormalized_lagrange_basis (-4)
+                      * ( cell (var (LookupSorted 2, Curr))
+                        - cell (var (LookupSorted 3, Curr)) ) )
+                  , fun () ->
+                      field
+                        "0x0000000000000000000000000000000000000000000000000000000000000000"
+                  )
+            + alpha_pow 30
+              * if_feature
+                  ( LookupsPerRow 4
+                  , (fun () ->
+                      unnormalized_lagrange_basis 0
+                      * ( cell (var (LookupSorted 3, Curr))
+                        - cell (var (LookupSorted 4, Curr)) ) )
+                  , fun () ->
+                      field
+                        "0x0000000000000000000000000000000000000000000000000000000000000000"
+                  )
+            + alpha_pow 31
+              * if_feature
+                  ( RuntimeLookupTables
+                  , (fun () ->
+                      field
+                        "0x0000000000000000000000000000000000000000000000000000000000000000"
+                      )
+                  , fun () ->
+                      field
+                        "0x0000000000000000000000000000000000000000000000000000000000000000"
+                  ) )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
 
   let index_terms (type a)
       ({ add = ( + )
@@ -270,18 +650,977 @@ module Tick : S = struct
        ; mds = _
        ; endo_coefficient
        ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows = _
-       ; joint_combiner = _
-       ; beta = _
-       ; gamma = _
+       ; vanishes_on_last_4_rows
+       ; joint_combiner
+       ; beta
+       ; gamma
        ; unnormalized_lagrange_basis = _
-       ; enabled_if
-       ; foreign_field_modulus
-       ; neg_foreign_field_modulus
+       ; if_feature
        } :
         a Env.t ) =
     Column.Table.of_alist_exn
-      [ ( Index CompleteAdd
+      [ ( LookupKindIndex Xor
+        , lazy
+            (if_feature
+               ( LookupTables
+               , (fun () ->
+                   alpha_pow 24
+                   * ( vanishes_on_last_4_rows
+                     * ( field
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                       * ( cell (var (LookupAggreg, Curr))
+                         * ( ( field
+                                 "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                               * if_feature
+                                   ( LookupPattern Xor
+                                   , (fun () ->
+                                       field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   , fun () ->
+                                       field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                   )
+                               * ( if_feature
+                                     ( LookupsPerRow 1
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 2
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 3
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 4
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * ( ( field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     + beta )
+                                   * if_feature
+                                       ( LookupsPerRow 2
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   * if_feature
+                                       ( LookupsPerRow 3
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   * if_feature
+                                       ( LookupsPerRow 4
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       ) ) )
+                             + if_feature
+                                 ( LookupPattern Xor
+                                 , (fun () ->
+                                     ( field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     + beta )
+                                     * if_feature
+                                         ( LookupsPerRow 2
+                                         , (fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                             + beta )
+                                         , fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         )
+                                     * if_feature
+                                         ( LookupsPerRow 3
+                                         , (fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                             + beta )
+                                         , fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         )
+                                     * if_feature
+                                         ( LookupsPerRow 4
+                                         , (fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                             + beta )
+                                         , fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * ( joint_combiner
+                                               * cell (var (Witness 11, Curr))
+                                             + cell (var (Witness 7, Curr)) )
+                                         + cell (var (Witness 3, Curr)) ) )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * ( joint_combiner
+                                               * cell (var (Witness 12, Curr))
+                                             + cell (var (Witness 8, Curr)) )
+                                         + cell (var (Witness 4, Curr)) ) )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * ( joint_combiner
+                                               * cell (var (Witness 13, Curr))
+                                             + cell (var (Witness 9, Curr)) )
+                                         + cell (var (Witness 5, Curr)) ) )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * ( joint_combiner
+                                               * cell (var (Witness 14, Curr))
+                                             + cell (var (Witness 10, Curr)) )
+                                         + cell (var (Witness 6, Curr)) ) ) )
+                                 , fun () ->
+                                     field
+                                       "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                 ) )
+                           * ( gamma
+                               * ( beta
+                                 + field
+                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                 )
+                             + cell (var (LookupTable, Curr))
+                             + (beta * cell (var (LookupTable, Next))) ) ) ) )
+                     ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
+      ; ( LookupKindIndex ChaChaFinal
+        , lazy
+            (if_feature
+               ( LookupTables
+               , (fun () ->
+                   alpha_pow 24
+                   * ( vanishes_on_last_4_rows
+                     * ( field
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                       * ( cell (var (LookupAggreg, Curr))
+                         * ( ( field
+                                 "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                               * if_feature
+                                   ( LookupPattern ChaChaFinal
+                                   , (fun () ->
+                                       field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   , fun () ->
+                                       field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                   )
+                               * ( if_feature
+                                     ( LookupsPerRow 1
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 2
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 3
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 4
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * ( ( field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     + beta )
+                                   * if_feature
+                                       ( LookupsPerRow 2
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   * if_feature
+                                       ( LookupsPerRow 3
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   * if_feature
+                                       ( LookupsPerRow 4
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       ) ) )
+                             + if_feature
+                                 ( LookupPattern ChaChaFinal
+                                 , (fun () ->
+                                     ( field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     + beta )
+                                     * if_feature
+                                         ( LookupsPerRow 2
+                                         , (fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                             + beta )
+                                         , fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         )
+                                     * if_feature
+                                         ( LookupsPerRow 3
+                                         , (fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                             + beta )
+                                         , fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         )
+                                     * if_feature
+                                         ( LookupsPerRow 4
+                                         , (fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                             + beta )
+                                         , fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * ( field
+                                                 "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000001"
+                                               * cell (var (Witness 1, Curr))
+                                             + field
+                                                 "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000000"
+                                               * cell (var (Witness 5, Curr)) )
+                                         + ( field
+                                               "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000001"
+                                             * cell (var (Witness 1, Curr))
+                                           + field
+                                               "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000000"
+                                             * cell (var (Witness 5, Curr)) ) )
+                                       )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * ( field
+                                                 "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000001"
+                                               * cell (var (Witness 2, Curr))
+                                             + field
+                                                 "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000000"
+                                               * cell (var (Witness 6, Curr)) )
+                                         + ( field
+                                               "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000001"
+                                             * cell (var (Witness 2, Curr))
+                                           + field
+                                               "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000000"
+                                             * cell (var (Witness 6, Curr)) ) )
+                                       )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * ( field
+                                                 "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000001"
+                                               * cell (var (Witness 3, Curr))
+                                             + field
+                                                 "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000000"
+                                               * cell (var (Witness 7, Curr)) )
+                                         + ( field
+                                               "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000001"
+                                             * cell (var (Witness 3, Curr))
+                                           + field
+                                               "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000000"
+                                             * cell (var (Witness 7, Curr)) ) )
+                                       )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * ( field
+                                                 "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000001"
+                                               * cell (var (Witness 4, Curr))
+                                             + field
+                                                 "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000000"
+                                               * cell (var (Witness 8, Curr)) )
+                                         + ( field
+                                               "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000001"
+                                             * cell (var (Witness 4, Curr))
+                                           + field
+                                               "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000000"
+                                             * cell (var (Witness 8, Curr)) ) )
+                                       ) )
+                                 , fun () ->
+                                     field
+                                       "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                 ) )
+                           * ( gamma
+                               * ( beta
+                                 + field
+                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                 )
+                             + cell (var (LookupTable, Curr))
+                             + (beta * cell (var (LookupTable, Next))) ) ) ) )
+                     ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
+      ; ( LookupKindIndex Lookup
+        , lazy
+            (if_feature
+               ( LookupTables
+               , (fun () ->
+                   alpha_pow 24
+                   * ( vanishes_on_last_4_rows
+                     * ( field
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                       * ( cell (var (LookupAggreg, Curr))
+                         * ( ( field
+                                 "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                               * if_feature
+                                   ( LookupPattern Lookup
+                                   , (fun () ->
+                                       field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   , fun () ->
+                                       field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                   )
+                               * ( if_feature
+                                     ( LookupsPerRow 1
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 2
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 3
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 4
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * ( ( field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     + beta )
+                                   * if_feature
+                                       ( LookupsPerRow 2
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   * if_feature
+                                       ( LookupsPerRow 3
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   * if_feature
+                                       ( LookupsPerRow 4
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       ) ) )
+                             + if_feature
+                                 ( LookupPattern Lookup
+                                 , (fun () ->
+                                     if_feature
+                                       ( LookupsPerRow 4
+                                       , (fun () -> gamma)
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                     * ( ( field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         + beta )
+                                       * if_feature
+                                           ( LookupsPerRow 2
+                                           , (fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               + beta )
+                                           , fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           )
+                                       * if_feature
+                                           ( LookupsPerRow 3
+                                           , (fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               + beta )
+                                           , fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           )
+                                       * if_feature
+                                           ( LookupsPerRow 4
+                                           , (fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               + beta )
+                                           , fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           ) )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * cell (var (Witness 2, Curr))
+                                         + cell (var (Witness 1, Curr))
+                                         + joint_combiner
+                                           * if_feature
+                                               ( TableWidth 2
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * if_feature
+                                               ( TableWidth 3
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * cell (var (Witness 0, Curr)) ) )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * cell (var (Witness 4, Curr))
+                                         + cell (var (Witness 3, Curr))
+                                         + joint_combiner
+                                           * if_feature
+                                               ( TableWidth 2
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * if_feature
+                                               ( TableWidth 3
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * cell (var (Witness 0, Curr)) ) )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * cell (var (Witness 6, Curr))
+                                         + cell (var (Witness 5, Curr))
+                                         + joint_combiner
+                                           * if_feature
+                                               ( TableWidth 2
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * if_feature
+                                               ( TableWidth 3
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * cell (var (Witness 0, Curr)) ) ) )
+                                 , fun () ->
+                                     field
+                                       "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                 ) )
+                           * ( gamma
+                               * ( beta
+                                 + field
+                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                 )
+                             + cell (var (LookupTable, Curr))
+                             + (beta * cell (var (LookupTable, Next))) ) ) ) )
+                     ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
+      ; ( LookupKindIndex RangeCheck
+        , lazy
+            (if_feature
+               ( LookupTables
+               , (fun () ->
+                   alpha_pow 24
+                   * ( vanishes_on_last_4_rows
+                     * ( field
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                       * ( cell (var (LookupAggreg, Curr))
+                         * ( ( field
+                                 "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                               * if_feature
+                                   ( LookupPattern RangeCheck
+                                   , (fun () ->
+                                       field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   , fun () ->
+                                       field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                   )
+                               * ( if_feature
+                                     ( LookupsPerRow 1
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 2
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 3
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 4
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * ( ( field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     + beta )
+                                   * if_feature
+                                       ( LookupsPerRow 2
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   * if_feature
+                                       ( LookupsPerRow 3
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   * if_feature
+                                       ( LookupsPerRow 4
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       ) ) )
+                             + if_feature
+                                 ( LookupPattern RangeCheck
+                                 , (fun () ->
+                                     ( field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     + beta )
+                                     * if_feature
+                                         ( LookupsPerRow 2
+                                         , (fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                             + beta )
+                                         , fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         )
+                                     * if_feature
+                                         ( LookupsPerRow 3
+                                         , (fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                             + beta )
+                                         , fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         )
+                                     * if_feature
+                                         ( LookupsPerRow 4
+                                         , (fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                             + beta )
+                                         , fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         )
+                                     * ( gamma
+                                       + ( cell (var (Witness 3, Curr))
+                                         + joint_combiner
+                                           * if_feature
+                                               ( TableWidth 2
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * if_feature
+                                               ( TableWidth 3
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               ) ) )
+                                     * ( gamma
+                                       + ( cell (var (Witness 4, Curr))
+                                         + joint_combiner
+                                           * if_feature
+                                               ( TableWidth 2
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * if_feature
+                                               ( TableWidth 3
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               ) ) )
+                                     * ( gamma
+                                       + ( cell (var (Witness 5, Curr))
+                                         + joint_combiner
+                                           * if_feature
+                                               ( TableWidth 2
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * if_feature
+                                               ( TableWidth 3
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               ) ) )
+                                     * ( gamma
+                                       + ( cell (var (Witness 6, Curr))
+                                         + joint_combiner
+                                           * if_feature
+                                               ( TableWidth 2
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * if_feature
+                                               ( TableWidth 3
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               ) ) ) )
+                                 , fun () ->
+                                     field
+                                       "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                 ) )
+                           * ( gamma
+                               * ( beta
+                                 + field
+                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                 )
+                             + cell (var (LookupTable, Curr))
+                             + (beta * cell (var (LookupTable, Next))) ) ) ) )
+                     ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
+      ; ( LookupKindIndex ForeignFieldMul
+        , lazy
+            (if_feature
+               ( LookupTables
+               , (fun () ->
+                   alpha_pow 24
+                   * ( vanishes_on_last_4_rows
+                     * ( field
+                           "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                       * ( cell (var (LookupAggreg, Curr))
+                         * ( ( field
+                                 "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
+                               * if_feature
+                                   ( LookupPattern ForeignFieldMul
+                                   , (fun () ->
+                                       field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   , fun () ->
+                                       field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                   )
+                               * ( if_feature
+                                     ( LookupsPerRow 1
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 2
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 3
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 4
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * ( ( field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     + beta )
+                                   * if_feature
+                                       ( LookupsPerRow 2
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   * if_feature
+                                       ( LookupsPerRow 3
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   * if_feature
+                                       ( LookupsPerRow 4
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       ) ) )
+                             + if_feature
+                                 ( LookupPattern ForeignFieldMul
+                                 , (fun () ->
+                                     if_feature
+                                       ( LookupsPerRow 3
+                                       , (fun () -> gamma)
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                     * if_feature
+                                         ( LookupsPerRow 4
+                                         , (fun () -> gamma)
+                                         , fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         )
+                                     * ( ( field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         + beta )
+                                       * if_feature
+                                           ( LookupsPerRow 2
+                                           , (fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               + beta )
+                                           , fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           )
+                                       * if_feature
+                                           ( LookupsPerRow 3
+                                           , (fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               + beta )
+                                           , fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           )
+                                       * if_feature
+                                           ( LookupsPerRow 4
+                                           , (fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               + beta )
+                                           , fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           ) )
+                                     * ( gamma
+                                       + ( cell (var (Witness 7, Curr))
+                                         + joint_combiner
+                                           * if_feature
+                                               ( TableWidth 2
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * if_feature
+                                               ( TableWidth 3
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               ) ) )
+                                     * ( gamma
+                                       + ( field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000200"
+                                           * cell (var (Witness 7, Curr))
+                                         + joint_combiner
+                                           * if_feature
+                                               ( TableWidth 2
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * if_feature
+                                               ( TableWidth 3
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               ) ) ) )
+                                 , fun () ->
+                                     field
+                                       "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                 ) )
+                           * ( gamma
+                               * ( beta
+                                 + field
+                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                 )
+                             + cell (var (LookupTable, Curr))
+                             + (beta * cell (var (LookupTable, Next))) ) ) ) )
+                     ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
+      ; ( LookupRuntimeSelector
+        , lazy
+            (if_feature
+               ( LookupTables
+               , (fun () ->
+                   alpha_pow 31
+                   * if_feature
+                       ( RuntimeLookupTables
+                       , (fun () -> cell (var (LookupRuntimeTable, Curr)))
+                       , fun () ->
+                           field
+                             "0x0000000000000000000000000000000000000000000000000000000000000000"
+                       ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
+      ; ( Index CompleteAdd
         , lazy
             (let x_0 =
                cell (var (Witness 2, Curr)) - cell (var (Witness 0, Curr))
@@ -1047,9 +2386,9 @@ module Tick : S = struct
                  * cell (var (Witness 13, Curr)) ) ) )
       ; ( Index ChaCha0
         , lazy
-            (enabled_if
+            (if_feature
                ( ChaCha
-               , fun () ->
+               , (fun () ->
                    square (cell (var (Witness 2, Next)))
                    - cell (var (Witness 2, Next))
                    + alpha_pow 1
@@ -1130,12 +2469,16 @@ module Tick : S = struct
                        + field
                            "0x0000000000000000000000000000000000000000000000000000000010000000"
                          * cell (var (Witness 6, Curr))
-                       - cell (var (Witness 1, Next)) ) ) ) )
+                       - cell (var (Witness 1, Next)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index ChaCha1
         , lazy
-            (enabled_if
+            (if_feature
                ( ChaCha
-               , fun () ->
+               , (fun () ->
                    square (cell (var (Witness 2, Next)))
                    - cell (var (Witness 2, Next))
                    + alpha_pow 1
@@ -1216,12 +2559,16 @@ module Tick : S = struct
                        + field
                            "0x0000000000000000000000000000000000000000000000000000000010000000"
                          * cell (var (Witness 3, Next))
-                       - cell (var (Witness 1, Next)) ) ) ) )
+                       - cell (var (Witness 1, Next)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index ChaCha2
         , lazy
-            (enabled_if
+            (if_feature
                ( ChaCha
-               , fun () ->
+               , (fun () ->
                    square (cell (var (Witness 2, Next)))
                    - cell (var (Witness 2, Next))
                    + alpha_pow 1
@@ -1302,12 +2649,16 @@ module Tick : S = struct
                        + field
                            "0x0000000000000000000000000000000000000000000000000000000010000000"
                          * cell (var (Witness 4, Next))
-                       - cell (var (Witness 1, Next)) ) ) ) )
+                       - cell (var (Witness 1, Next)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index ChaChaFinal
         , lazy
-            (enabled_if
+            (if_feature
                ( ChaCha
-               , fun () ->
+               , (fun () ->
                    square (cell (var (Witness 5, Curr)))
                    - cell (var (Witness 5, Curr))
                    + alpha_pow 1
@@ -1402,12 +2753,16 @@ module Tick : S = struct
                                "0x2000000000000000000000000000000011234C7E04A67C8DCC96987680000001"
                              * ( cell (var (Witness 2, Next))
                                - cell (var (Witness 6, Next)) ) )
-                       - cell (var (Witness 0, Curr)) ) ) ) )
+                       - cell (var (Witness 0, Curr)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index RangeCheck0
         , lazy
-            (enabled_if
+            (if_feature
                ( RangeCheck
-               , fun () ->
+               , (fun () ->
                    cell (var (Witness 7, Curr))
                    * ( cell (var (Witness 7, Curr))
                      - field
@@ -1723,12 +3078,16 @@ module Tick : S = struct
                          - ( cell (var (Witness 0, Curr))
                            + field
                                "0x0000000000000000000000000000000000000000010000000000000000000000"
-                             * cell (var (Witness 0, Next)) ) ) ) ) ) )
+                             * cell (var (Witness 0, Next)) ) ) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index RangeCheck1
         , lazy
-            (enabled_if
+            (if_feature
                ( RangeCheck
-               , fun () ->
+               , (fun () ->
                    cell (var (Witness 2, Curr))
                    * ( cell (var (Witness 2, Curr))
                      - field
@@ -2585,52 +3944,47 @@ module Tick : S = struct
                          * field
                              "0x0000000000000000000000000000000000000000000000000000000000001000"
                          * cell (var (Witness 2, Curr))
-                       - cell (var (Witness 0, Curr)) ) ) ) )
+                       - cell (var (Witness 0, Curr)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index ForeignFieldAdd
         , lazy
-            (enabled_if
+            (if_feature
                ( ForeignFieldAdd
-               , fun () ->
-                   cell (var (Witness 7, Curr))
-                   * ( cell (var (Witness 7, Curr))
-                     - cell (var (Witness 6, Curr)) )
+               , (fun () ->
+                   cell (var (Witness 6, Curr))
+                   * ( cell (var (Witness 6, Curr))
+                     - cell (var (Coefficient 3, Curr)) )
                    + alpha_pow 1
-                     * ( ( cell (var (Witness 6, Curr))
-                         + field
+                     * ( cell (var (Witness 7, Curr))
+                       * ( cell (var (Witness 7, Curr))
+                         - field
                              "0x0000000000000000000000000000000000000000000000000000000000000001"
                          )
-                       * ( cell (var (Witness 6, Curr))
-                         - field
+                       * ( cell (var (Witness 7, Curr))
+                         + field
                              "0x0000000000000000000000000000000000000000000000000000000000000001"
                          ) )
                    + alpha_pow 2
-                     * ( cell (var (Witness 8, Curr))
-                       * ( cell (var (Witness 8, Curr))
-                         - field
-                             "0x0000000000000000000000000000000000000000000000000000000000000001"
-                         )
-                       * ( cell (var (Witness 8, Curr))
-                         + field
-                             "0x0000000000000000000000000000000000000000000000000000000000000001"
-                         ) )
-                   + alpha_pow 3
                      * ( cell (var (Witness 0, Curr))
                        + cell (var (Witness 1, Curr))
                          * field
                              "0x0000000000000000000000000000000000000000010000000000000000000000"
-                       + cell (var (Witness 6, Curr))
+                       + cell (var (Coefficient 3, Curr))
                          * ( cell (var (Witness 3, Curr))
                            + cell (var (Witness 4, Curr))
                              * field
                                  "0x0000000000000000000000000000000000000000010000000000000000000000"
                            )
-                       - cell (var (Witness 7, Curr))
-                         * ( foreign_field_modulus 0
-                           + foreign_field_modulus 1
+                       - cell (var (Witness 6, Curr))
+                         * ( cell (var (Coefficient 0, Curr))
+                           + cell (var (Coefficient 1, Curr))
                              * field
                                  "0x0000000000000000000000000000000000000000010000000000000000000000"
                            )
-                       - cell (var (Witness 8, Curr))
+                       - cell (var (Witness 7, Curr))
                          * field
                              "0x0000000000000000000100000000000000000000000000000000000000000000"
                        - ( cell (var (Witness 0, Next))
@@ -2638,28 +3992,33 @@ module Tick : S = struct
                            * field
                                "0x0000000000000000000000000000000000000000010000000000000000000000"
                          ) )
-                   + alpha_pow 4
+                   + alpha_pow 3
                      * ( cell (var (Witness 2, Curr))
-                       + cell (var (Witness 6, Curr))
+                       + cell (var (Coefficient 3, Curr))
                          * cell (var (Witness 5, Curr))
-                       - (cell (var (Witness 7, Curr)) * foreign_field_modulus 2)
-                       + cell (var (Witness 8, Curr))
-                       - cell (var (Witness 2, Next)) ) ) ) )
+                       - cell (var (Witness 6, Curr))
+                         * cell (var (Coefficient 2, Curr))
+                       + cell (var (Witness 7, Curr))
+                       - cell (var (Witness 2, Next)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index ForeignFieldMul
         , lazy
-            (enabled_if
+            (if_feature
                ( ForeignFieldMul
-               , fun () ->
-                   cell (var (Witness 7, Next))
-                   * ( cell (var (Witness 7, Next))
+               , (fun () ->
+                   cell (var (Witness 13, Curr))
+                   * ( cell (var (Witness 13, Curr))
                      - field
                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
-                   * ( cell (var (Witness 7, Next))
+                   * ( cell (var (Witness 13, Curr))
                      - field
                          "0x0000000000000000000000000000000000000000000000000000000000000002"
                      )
-                   * ( cell (var (Witness 7, Next))
+                   * ( cell (var (Witness 13, Curr))
                      - field
                          "0x0000000000000000000000000000000000000000000000000000000000000003"
                      )
@@ -2668,39 +4027,39 @@ module Tick : S = struct
                          * cell (var (Witness 4, Curr))
                        + cell (var (Witness 1, Curr))
                          * cell (var (Witness 3, Curr))
+                       + cell (var (Witness 9, Curr))
+                         * cell (var (Coefficient 4, Curr))
                        + cell (var (Witness 10, Curr))
-                         * neg_foreign_field_modulus 1
-                       + cell (var (Witness 11, Curr))
-                         * neg_foreign_field_modulus 0
+                         * cell (var (Coefficient 3, Curr))
                        - ( field
                              "0x0000000000000000000000000000000000000000010000000000000000000000"
                            * ( field
                                  "0x0000000000000000000000000000000000000000010000000000000000000000"
-                               * cell (var (Witness 7, Next))
+                               * cell (var (Witness 13, Curr))
                              + cell (var (Witness 6, Next)) )
                          + cell (var (Witness 5, Next)) ) )
                    + alpha_pow 2
-                     * ( cell (var (Witness 9, Curr))
-                       * ( cell (var (Witness 9, Curr))
+                     * ( cell (var (Witness 8, Curr))
+                       * ( cell (var (Witness 8, Curr))
                          - field
                              "0x0000000000000000000000000000000000000000000000000000000000000001"
                          )
-                       * ( cell (var (Witness 9, Curr))
+                       * ( cell (var (Witness 8, Curr))
                          - field
                              "0x0000000000000000000000000000000000000000000000000000000000000002"
                          )
-                       * ( cell (var (Witness 9, Curr))
+                       * ( cell (var (Witness 8, Curr))
                          - field
                              "0x0000000000000000000000000000000000000000000000000000000000000003"
                          ) )
                    + alpha_pow 3
                      * ( field
                            "0x0000000000000000000100000000000000000000000000000000000000000000"
-                         * cell (var (Witness 9, Curr))
+                         * cell (var (Witness 8, Curr))
                        - ( cell (var (Witness 0, Curr))
                            * cell (var (Witness 3, Curr))
-                         + cell (var (Witness 10, Curr))
-                           * neg_foreign_field_modulus 0
+                         + cell (var (Witness 9, Curr))
+                           * cell (var (Coefficient 3, Curr))
                          + field
                              "0x0000000000000000000000000000000000000000010000000000000000000000"
                            * cell (var (Witness 5, Next))
@@ -2709,11 +4068,6 @@ module Tick : S = struct
                              "0x0000000000000000000000000000000000000000010000000000000000000000"
                            * cell (var (Witness 1, Next)) ) )
                    + alpha_pow 4
-                     * ( cell (var (Witness 8, Curr))
-                       - field
-                           "0x0000000000000000000000000000000000000000000000000000000000000200"
-                         * cell (var (Witness 7, Curr)) )
-                   + alpha_pow 5
                      * ( field
                            "0x0000000000000000000000000000000000000000010000000000000000000000"
                          * ( field
@@ -2726,19 +4080,19 @@ module Tick : S = struct
                            * cell (var (Witness 3, Curr))
                          + cell (var (Witness 1, Curr))
                            * cell (var (Witness 4, Curr))
-                         + cell (var (Witness 10, Curr))
-                           * neg_foreign_field_modulus 2
-                         + cell (var (Witness 12, Curr))
-                           * neg_foreign_field_modulus 0
+                         + cell (var (Witness 9, Curr))
+                           * cell (var (Coefficient 5, Curr))
                          + cell (var (Witness 11, Curr))
-                           * neg_foreign_field_modulus 1
+                           * cell (var (Coefficient 3, Curr))
+                         + cell (var (Witness 10, Curr))
+                           * cell (var (Coefficient 4, Curr))
                          + ( field
                                "0x0000000000000000000000000000000000000000010000000000000000000000"
-                             * cell (var (Witness 7, Next))
+                             * cell (var (Witness 13, Curr))
                            + cell (var (Witness 6, Next)) )
-                         + cell (var (Witness 9, Curr))
+                         + cell (var (Witness 8, Curr))
                          - cell (var (Witness 2, Next)) ) )
-                   + alpha_pow 6
+                   + alpha_pow 5
                      * ( ( field
                              "0x0000000000000000000100000000000000000000000000000000000000000000"
                            * cell (var (Witness 2, Curr))
@@ -2755,18 +4109,18 @@ module Tick : S = struct
                            + cell (var (Witness 3, Curr)) )
                        - ( field
                              "0x0000000000000000000100000000000000000000000000000000000000000000"
-                           * cell (var (Witness 12, Curr))
+                           * cell (var (Witness 11, Curr))
                          + field
                              "0x0000000000000000000000000000000000000000010000000000000000000000"
-                           * cell (var (Witness 11, Curr))
-                         + cell (var (Witness 10, Curr)) )
+                           * cell (var (Witness 10, Curr))
+                         + cell (var (Witness 9, Curr)) )
                          * ( field
                                "0x0000000000000000000100000000000000000000000000000000000000000000"
-                             * foreign_field_modulus 2
+                             * cell (var (Coefficient 2, Curr))
                            + field
                                "0x0000000000000000000000000000000000000000010000000000000000000000"
-                             * foreign_field_modulus 1
-                           + foreign_field_modulus 0 )
+                             * cell (var (Coefficient 1, Curr))
+                           + cell (var (Coefficient 0, Curr)) )
                        - ( field
                              "0x0000000000000000000100000000000000000000000000000000000000000000"
                            * cell (var (Witness 2, Next))
@@ -2774,38 +4128,36 @@ module Tick : S = struct
                              "0x0000000000000000000000000000000000000000010000000000000000000000"
                            * cell (var (Witness 1, Next))
                          + cell (var (Witness 0, Next)) ) )
+                   + alpha_pow 6
+                     * ( square (cell (var (Witness 12, Curr)))
+                       - cell (var (Witness 12, Curr)) )
                    + alpha_pow 7
-                     * ( square (cell (var (Witness 13, Curr)))
-                       - cell (var (Witness 13, Curr)) )
-                   + alpha_pow 8
                      * ( field
                            "0x0000000000000000000100000000000000000000000000000000000000000000"
-                         * cell (var (Witness 13, Curr))
-                       - ( cell (var (Witness 10, Curr))
+                         * cell (var (Witness 12, Curr))
+                       - ( cell (var (Witness 9, Curr))
                          + field
                              "0x0000000000000000000000000000000000000000010000000000000000000000"
-                           * cell (var (Witness 11, Curr))
-                         + ( neg_foreign_field_modulus 0
+                           * cell (var (Witness 10, Curr))
+                         + ( cell (var (Coefficient 3, Curr))
                            + field
                                "0x0000000000000000000000000000000000000000010000000000000000000000"
-                             * neg_foreign_field_modulus 1 ) )
+                             * cell (var (Coefficient 4, Curr)) ) )
                        + cell (var (Witness 3, Next)) )
-                   + alpha_pow 9
-                     * ( square (cell (var (Witness 14, Curr)))
-                       - cell (var (Witness 14, Curr)) )
-                   + alpha_pow 10
-                     * ( field
-                           "0x0000000000000000000000000000000000000000010000000000000000000000"
-                         * cell (var (Witness 14, Curr))
-                       - ( cell (var (Witness 12, Curr))
-                         + neg_foreign_field_modulus 2 )
-                       - cell (var (Witness 13, Curr))
-                       + cell (var (Witness 4, Next)) ) ) ) )
+                   + alpha_pow 8
+                     * ( cell (var (Witness 4, Next))
+                       - ( cell (var (Witness 11, Curr))
+                         + cell (var (Coefficient 5, Curr)) )
+                       - cell (var (Witness 12, Curr)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index Xor16
         , lazy
-            (enabled_if
+            (if_feature
                ( Xor
-               , fun () ->
+               , (fun () ->
                    cell (var (Witness 3, Curr))
                    + cell (var (Witness 4, Curr))
                      * pow
@@ -2873,12 +4225,16 @@ module Tick : S = struct
                                "0x0000000000000000000000000000000000000000000000000000000000000002"
                            , 16 )
                          * cell (var (Witness 2, Next))
-                       - cell (var (Witness 2, Curr)) ) ) ) )
+                       - cell (var (Witness 2, Curr)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index Rot64
         , lazy
-            (enabled_if
+            (if_feature
                ( Rot
-               , fun () ->
+               , (fun () ->
                    cell (var (Witness 7, Curr))
                    * ( cell (var (Witness 7, Curr))
                      - field
@@ -3150,7 +4506,11 @@ module Tick : S = struct
                          - cell (var (Coefficient 0, Curr))
                          + field
                              "0x0000000000000000000000000000000000000000000000010000000000000000"
-                         ) ) ) ) )
+                         ) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ]
 end
 
@@ -3164,7 +4524,7 @@ module Tock : S = struct
        ; endo_coefficient = _
        ; pow
        ; var
-       ; field = _
+       ; field
        ; cell
        ; alpha_pow
        ; double = _
@@ -3172,14 +4532,12 @@ module Tock : S = struct
        ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows = _
+       ; vanishes_on_last_4_rows
        ; joint_combiner = _
-       ; beta = _
-       ; gamma = _
-       ; unnormalized_lagrange_basis = _
-       ; enabled_if = _
-       ; foreign_field_modulus = _
-       ; neg_foreign_field_modulus = _
+       ; beta
+       ; gamma
+       ; unnormalized_lagrange_basis
+       ; if_feature
        } :
         a Env.t ) =
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
@@ -3287,6 +4645,66 @@ module Tock : S = struct
             + (mds (2, 0) * x_12)
             + (mds (2, 1) * x_13)
             + (mds (2, 2) * x_14) ) ) )
+    + if_feature
+        ( ChaCha
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    + if_feature
+        ( RangeCheck
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    + if_feature
+        ( ForeignFieldAdd
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    + if_feature
+        ( ForeignFieldMul
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    + if_feature
+        ( Xor
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    + if_feature
+        ( Rot
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
     + cell (var (Index Generic, Curr))
       * ( (cell (var (Coefficient 0, Curr)) * cell (var (Witness 0, Curr)))
         + (cell (var (Coefficient 1, Curr)) * cell (var (Witness 1, Curr)))
@@ -3303,6 +4721,324 @@ module Tock : S = struct
               * cell (var (Witness 3, Curr))
               * cell (var (Witness 4, Curr))
             + cell (var (Coefficient 9, Curr)) ) )
+    + if_feature
+        ( LookupTables
+        , (fun () ->
+            alpha_pow 24
+            * ( vanishes_on_last_4_rows
+              * ( cell (var (LookupAggreg, Next))
+                  * ( if_feature
+                        ( LookupsPerRow 0
+                        , (fun () ->
+                            gamma
+                            * ( beta
+                              + field
+                                  "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              )
+                            + cell (var (LookupSorted 0, Curr))
+                            + (beta * cell (var (LookupSorted 0, Next))) )
+                        , fun () ->
+                            field
+                              "0x0000000000000000000000000000000000000000000000000000000000000001"
+                        )
+                    * if_feature
+                        ( LookupsPerRow 1
+                        , (fun () ->
+                            gamma
+                            * ( beta
+                              + field
+                                  "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              )
+                            + cell (var (LookupSorted 1, Next))
+                            + (beta * cell (var (LookupSorted 1, Curr))) )
+                        , fun () ->
+                            field
+                              "0x0000000000000000000000000000000000000000000000000000000000000001"
+                        )
+                    * if_feature
+                        ( LookupsPerRow 2
+                        , (fun () ->
+                            gamma
+                            * ( beta
+                              + field
+                                  "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              )
+                            + cell (var (LookupSorted 2, Curr))
+                            + (beta * cell (var (LookupSorted 2, Next))) )
+                        , fun () ->
+                            field
+                              "0x0000000000000000000000000000000000000000000000000000000000000001"
+                        )
+                    * if_feature
+                        ( LookupsPerRow 3
+                        , (fun () ->
+                            gamma
+                            * ( beta
+                              + field
+                                  "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              )
+                            + cell (var (LookupSorted 3, Next))
+                            + (beta * cell (var (LookupSorted 3, Curr))) )
+                        , fun () ->
+                            field
+                              "0x0000000000000000000000000000000000000000000000000000000000000001"
+                        )
+                    * if_feature
+                        ( LookupsPerRow 4
+                        , (fun () ->
+                            gamma
+                            * ( beta
+                              + field
+                                  "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              )
+                            + cell (var (LookupSorted 4, Curr))
+                            + (beta * cell (var (LookupSorted 4, Next))) )
+                        , fun () ->
+                            field
+                              "0x0000000000000000000000000000000000000000000000000000000000000001"
+                        ) )
+                - cell (var (LookupAggreg, Curr))
+                  * ( ( ( field
+                            "0x0000000000000000000000000000000000000000000000000000000000000001"
+                        - ( if_feature
+                              ( LookupPattern Xor
+                              , (fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                  )
+                              , fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                              )
+                          + if_feature
+                              ( LookupPattern ChaChaFinal
+                              , (fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                  )
+                              , fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                              )
+                          + if_feature
+                              ( LookupPattern Lookup
+                              , (fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                  )
+                              , fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                              )
+                          + if_feature
+                              ( LookupPattern RangeCheck
+                              , (fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                  )
+                              , fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                              )
+                          + if_feature
+                              ( LookupPattern ForeignFieldMul
+                              , (fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                  )
+                              , fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                              ) ) )
+                        * ( if_feature
+                              ( LookupsPerRow 1
+                              , (fun () -> gamma)
+                              , fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              )
+                          * if_feature
+                              ( LookupsPerRow 2
+                              , (fun () -> gamma)
+                              , fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              )
+                          * if_feature
+                              ( LookupsPerRow 3
+                              , (fun () -> gamma)
+                              , fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              )
+                          * if_feature
+                              ( LookupsPerRow 4
+                              , (fun () -> gamma)
+                              , fun () ->
+                                  field
+                                    "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              )
+                          * ( ( field
+                                  "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              + beta )
+                            * if_feature
+                                ( LookupsPerRow 2
+                                , (fun () ->
+                                    field
+                                      "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                    + beta )
+                                , fun () ->
+                                    field
+                                      "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                )
+                            * if_feature
+                                ( LookupsPerRow 3
+                                , (fun () ->
+                                    field
+                                      "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                    + beta )
+                                , fun () ->
+                                    field
+                                      "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                )
+                            * if_feature
+                                ( LookupsPerRow 4
+                                , (fun () ->
+                                    field
+                                      "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                    + beta )
+                                , fun () ->
+                                    field
+                                      "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                ) ) )
+                      + if_feature
+                          ( LookupPattern Xor
+                          , (fun () ->
+                              field
+                                "0x0000000000000000000000000000000000000000000000000000000000000000"
+                              )
+                          , fun () ->
+                              field
+                                "0x0000000000000000000000000000000000000000000000000000000000000000"
+                          )
+                      + if_feature
+                          ( LookupPattern ChaChaFinal
+                          , (fun () ->
+                              field
+                                "0x0000000000000000000000000000000000000000000000000000000000000000"
+                              )
+                          , fun () ->
+                              field
+                                "0x0000000000000000000000000000000000000000000000000000000000000000"
+                          )
+                      + if_feature
+                          ( LookupPattern Lookup
+                          , (fun () ->
+                              field
+                                "0x0000000000000000000000000000000000000000000000000000000000000000"
+                              )
+                          , fun () ->
+                              field
+                                "0x0000000000000000000000000000000000000000000000000000000000000000"
+                          )
+                      + if_feature
+                          ( LookupPattern RangeCheck
+                          , (fun () ->
+                              field
+                                "0x0000000000000000000000000000000000000000000000000000000000000000"
+                              )
+                          , fun () ->
+                              field
+                                "0x0000000000000000000000000000000000000000000000000000000000000000"
+                          )
+                      + if_feature
+                          ( LookupPattern ForeignFieldMul
+                          , (fun () ->
+                              field
+                                "0x0000000000000000000000000000000000000000000000000000000000000000"
+                              )
+                          , fun () ->
+                              field
+                                "0x0000000000000000000000000000000000000000000000000000000000000000"
+                          ) )
+                    * ( gamma
+                        * ( beta
+                          + field
+                              "0x0000000000000000000000000000000000000000000000000000000000000001"
+                          )
+                      + cell (var (LookupTable, Curr))
+                      + (beta * cell (var (LookupTable, Next))) ) ) ) )
+            + alpha_pow 25
+              * ( unnormalized_lagrange_basis 0
+                * ( cell (var (LookupAggreg, Curr))
+                  - field
+                      "0x0000000000000000000000000000000000000000000000000000000000000001"
+                  ) )
+            + alpha_pow 26
+              * ( unnormalized_lagrange_basis (-4)
+                * ( cell (var (LookupAggreg, Curr))
+                  - field
+                      "0x0000000000000000000000000000000000000000000000000000000000000001"
+                  ) )
+            + alpha_pow 27
+              * if_feature
+                  ( LookupsPerRow 1
+                  , (fun () ->
+                      unnormalized_lagrange_basis (-4)
+                      * ( cell (var (LookupSorted 0, Curr))
+                        - cell (var (LookupSorted 1, Curr)) ) )
+                  , fun () ->
+                      field
+                        "0x0000000000000000000000000000000000000000000000000000000000000000"
+                  )
+            + alpha_pow 28
+              * if_feature
+                  ( LookupsPerRow 2
+                  , (fun () ->
+                      unnormalized_lagrange_basis 0
+                      * ( cell (var (LookupSorted 1, Curr))
+                        - cell (var (LookupSorted 2, Curr)) ) )
+                  , fun () ->
+                      field
+                        "0x0000000000000000000000000000000000000000000000000000000000000000"
+                  )
+            + alpha_pow 29
+              * if_feature
+                  ( LookupsPerRow 3
+                  , (fun () ->
+                      unnormalized_lagrange_basis (-4)
+                      * ( cell (var (LookupSorted 2, Curr))
+                        - cell (var (LookupSorted 3, Curr)) ) )
+                  , fun () ->
+                      field
+                        "0x0000000000000000000000000000000000000000000000000000000000000000"
+                  )
+            + alpha_pow 30
+              * if_feature
+                  ( LookupsPerRow 4
+                  , (fun () ->
+                      unnormalized_lagrange_basis 0
+                      * ( cell (var (LookupSorted 3, Curr))
+                        - cell (var (LookupSorted 4, Curr)) ) )
+                  , fun () ->
+                      field
+                        "0x0000000000000000000000000000000000000000000000000000000000000000"
+                  )
+            + alpha_pow 31
+              * if_feature
+                  ( RuntimeLookupTables
+                  , (fun () ->
+                      field
+                        "0x0000000000000000000000000000000000000000000000000000000000000000"
+                      )
+                  , fun () ->
+                      field
+                        "0x0000000000000000000000000000000000000000000000000000000000000000"
+                  ) )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
 
   let index_terms (type a)
       ({ add = ( + )
@@ -3321,18 +5057,977 @@ module Tock : S = struct
        ; mds = _
        ; endo_coefficient
        ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows = _
-       ; joint_combiner = _
-       ; beta = _
-       ; gamma = _
+       ; vanishes_on_last_4_rows
+       ; joint_combiner
+       ; beta
+       ; gamma
        ; unnormalized_lagrange_basis = _
-       ; enabled_if
-       ; foreign_field_modulus
-       ; neg_foreign_field_modulus
+       ; if_feature
        } :
         a Env.t ) =
     Column.Table.of_alist_exn
-      [ ( Index CompleteAdd
+      [ ( LookupKindIndex Xor
+        , lazy
+            (if_feature
+               ( LookupTables
+               , (fun () ->
+                   alpha_pow 24
+                   * ( vanishes_on_last_4_rows
+                     * ( field
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                       * ( cell (var (LookupAggreg, Curr))
+                         * ( ( field
+                                 "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                               * if_feature
+                                   ( LookupPattern Xor
+                                   , (fun () ->
+                                       field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   , fun () ->
+                                       field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                   )
+                               * ( if_feature
+                                     ( LookupsPerRow 1
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 2
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 3
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 4
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * ( ( field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     + beta )
+                                   * if_feature
+                                       ( LookupsPerRow 2
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   * if_feature
+                                       ( LookupsPerRow 3
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   * if_feature
+                                       ( LookupsPerRow 4
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       ) ) )
+                             + if_feature
+                                 ( LookupPattern Xor
+                                 , (fun () ->
+                                     ( field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     + beta )
+                                     * if_feature
+                                         ( LookupsPerRow 2
+                                         , (fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                             + beta )
+                                         , fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         )
+                                     * if_feature
+                                         ( LookupsPerRow 3
+                                         , (fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                             + beta )
+                                         , fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         )
+                                     * if_feature
+                                         ( LookupsPerRow 4
+                                         , (fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                             + beta )
+                                         , fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * ( joint_combiner
+                                               * cell (var (Witness 11, Curr))
+                                             + cell (var (Witness 7, Curr)) )
+                                         + cell (var (Witness 3, Curr)) ) )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * ( joint_combiner
+                                               * cell (var (Witness 12, Curr))
+                                             + cell (var (Witness 8, Curr)) )
+                                         + cell (var (Witness 4, Curr)) ) )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * ( joint_combiner
+                                               * cell (var (Witness 13, Curr))
+                                             + cell (var (Witness 9, Curr)) )
+                                         + cell (var (Witness 5, Curr)) ) )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * ( joint_combiner
+                                               * cell (var (Witness 14, Curr))
+                                             + cell (var (Witness 10, Curr)) )
+                                         + cell (var (Witness 6, Curr)) ) ) )
+                                 , fun () ->
+                                     field
+                                       "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                 ) )
+                           * ( gamma
+                               * ( beta
+                                 + field
+                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                 )
+                             + cell (var (LookupTable, Curr))
+                             + (beta * cell (var (LookupTable, Next))) ) ) ) )
+                     ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
+      ; ( LookupKindIndex ChaChaFinal
+        , lazy
+            (if_feature
+               ( LookupTables
+               , (fun () ->
+                   alpha_pow 24
+                   * ( vanishes_on_last_4_rows
+                     * ( field
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                       * ( cell (var (LookupAggreg, Curr))
+                         * ( ( field
+                                 "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                               * if_feature
+                                   ( LookupPattern ChaChaFinal
+                                   , (fun () ->
+                                       field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   , fun () ->
+                                       field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                   )
+                               * ( if_feature
+                                     ( LookupsPerRow 1
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 2
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 3
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 4
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * ( ( field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     + beta )
+                                   * if_feature
+                                       ( LookupsPerRow 2
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   * if_feature
+                                       ( LookupsPerRow 3
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   * if_feature
+                                       ( LookupsPerRow 4
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       ) ) )
+                             + if_feature
+                                 ( LookupPattern ChaChaFinal
+                                 , (fun () ->
+                                     ( field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     + beta )
+                                     * if_feature
+                                         ( LookupsPerRow 2
+                                         , (fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                             + beta )
+                                         , fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         )
+                                     * if_feature
+                                         ( LookupsPerRow 3
+                                         , (fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                             + beta )
+                                         , fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         )
+                                     * if_feature
+                                         ( LookupsPerRow 4
+                                         , (fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                             + beta )
+                                         , fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * ( field
+                                                 "0x2000000000000000000000000000000011234C7E04CA546EC623759080000001"
+                                               * cell (var (Witness 1, Curr))
+                                             + field
+                                                 "0x2000000000000000000000000000000011234C7E04CA546EC623759080000000"
+                                               * cell (var (Witness 5, Curr)) )
+                                         + ( field
+                                               "0x2000000000000000000000000000000011234C7E04CA546EC623759080000001"
+                                             * cell (var (Witness 1, Curr))
+                                           + field
+                                               "0x2000000000000000000000000000000011234C7E04CA546EC623759080000000"
+                                             * cell (var (Witness 5, Curr)) ) )
+                                       )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * ( field
+                                                 "0x2000000000000000000000000000000011234C7E04CA546EC623759080000001"
+                                               * cell (var (Witness 2, Curr))
+                                             + field
+                                                 "0x2000000000000000000000000000000011234C7E04CA546EC623759080000000"
+                                               * cell (var (Witness 6, Curr)) )
+                                         + ( field
+                                               "0x2000000000000000000000000000000011234C7E04CA546EC623759080000001"
+                                             * cell (var (Witness 2, Curr))
+                                           + field
+                                               "0x2000000000000000000000000000000011234C7E04CA546EC623759080000000"
+                                             * cell (var (Witness 6, Curr)) ) )
+                                       )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * ( field
+                                                 "0x2000000000000000000000000000000011234C7E04CA546EC623759080000001"
+                                               * cell (var (Witness 3, Curr))
+                                             + field
+                                                 "0x2000000000000000000000000000000011234C7E04CA546EC623759080000000"
+                                               * cell (var (Witness 7, Curr)) )
+                                         + ( field
+                                               "0x2000000000000000000000000000000011234C7E04CA546EC623759080000001"
+                                             * cell (var (Witness 3, Curr))
+                                           + field
+                                               "0x2000000000000000000000000000000011234C7E04CA546EC623759080000000"
+                                             * cell (var (Witness 7, Curr)) ) )
+                                       )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * ( field
+                                                 "0x2000000000000000000000000000000011234C7E04CA546EC623759080000001"
+                                               * cell (var (Witness 4, Curr))
+                                             + field
+                                                 "0x2000000000000000000000000000000011234C7E04CA546EC623759080000000"
+                                               * cell (var (Witness 8, Curr)) )
+                                         + ( field
+                                               "0x2000000000000000000000000000000011234C7E04CA546EC623759080000001"
+                                             * cell (var (Witness 4, Curr))
+                                           + field
+                                               "0x2000000000000000000000000000000011234C7E04CA546EC623759080000000"
+                                             * cell (var (Witness 8, Curr)) ) )
+                                       ) )
+                                 , fun () ->
+                                     field
+                                       "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                 ) )
+                           * ( gamma
+                               * ( beta
+                                 + field
+                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                 )
+                             + cell (var (LookupTable, Curr))
+                             + (beta * cell (var (LookupTable, Next))) ) ) ) )
+                     ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
+      ; ( LookupKindIndex Lookup
+        , lazy
+            (if_feature
+               ( LookupTables
+               , (fun () ->
+                   alpha_pow 24
+                   * ( vanishes_on_last_4_rows
+                     * ( field
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                       * ( cell (var (LookupAggreg, Curr))
+                         * ( ( field
+                                 "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                               * if_feature
+                                   ( LookupPattern Lookup
+                                   , (fun () ->
+                                       field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   , fun () ->
+                                       field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                   )
+                               * ( if_feature
+                                     ( LookupsPerRow 1
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 2
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 3
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 4
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * ( ( field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     + beta )
+                                   * if_feature
+                                       ( LookupsPerRow 2
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   * if_feature
+                                       ( LookupsPerRow 3
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   * if_feature
+                                       ( LookupsPerRow 4
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       ) ) )
+                             + if_feature
+                                 ( LookupPattern Lookup
+                                 , (fun () ->
+                                     if_feature
+                                       ( LookupsPerRow 4
+                                       , (fun () -> gamma)
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                     * ( ( field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         + beta )
+                                       * if_feature
+                                           ( LookupsPerRow 2
+                                           , (fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               + beta )
+                                           , fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           )
+                                       * if_feature
+                                           ( LookupsPerRow 3
+                                           , (fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               + beta )
+                                           , fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           )
+                                       * if_feature
+                                           ( LookupsPerRow 4
+                                           , (fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               + beta )
+                                           , fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           ) )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * cell (var (Witness 2, Curr))
+                                         + cell (var (Witness 1, Curr))
+                                         + joint_combiner
+                                           * if_feature
+                                               ( TableWidth 2
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * if_feature
+                                               ( TableWidth 3
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * cell (var (Witness 0, Curr)) ) )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * cell (var (Witness 4, Curr))
+                                         + cell (var (Witness 3, Curr))
+                                         + joint_combiner
+                                           * if_feature
+                                               ( TableWidth 2
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * if_feature
+                                               ( TableWidth 3
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * cell (var (Witness 0, Curr)) ) )
+                                     * ( gamma
+                                       + ( joint_combiner
+                                           * cell (var (Witness 6, Curr))
+                                         + cell (var (Witness 5, Curr))
+                                         + joint_combiner
+                                           * if_feature
+                                               ( TableWidth 2
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * if_feature
+                                               ( TableWidth 3
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * cell (var (Witness 0, Curr)) ) ) )
+                                 , fun () ->
+                                     field
+                                       "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                 ) )
+                           * ( gamma
+                               * ( beta
+                                 + field
+                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                 )
+                             + cell (var (LookupTable, Curr))
+                             + (beta * cell (var (LookupTable, Next))) ) ) ) )
+                     ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
+      ; ( LookupKindIndex RangeCheck
+        , lazy
+            (if_feature
+               ( LookupTables
+               , (fun () ->
+                   alpha_pow 24
+                   * ( vanishes_on_last_4_rows
+                     * ( field
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                       * ( cell (var (LookupAggreg, Curr))
+                         * ( ( field
+                                 "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                               * if_feature
+                                   ( LookupPattern RangeCheck
+                                   , (fun () ->
+                                       field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   , fun () ->
+                                       field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                   )
+                               * ( if_feature
+                                     ( LookupsPerRow 1
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 2
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 3
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 4
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * ( ( field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     + beta )
+                                   * if_feature
+                                       ( LookupsPerRow 2
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   * if_feature
+                                       ( LookupsPerRow 3
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   * if_feature
+                                       ( LookupsPerRow 4
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       ) ) )
+                             + if_feature
+                                 ( LookupPattern RangeCheck
+                                 , (fun () ->
+                                     ( field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     + beta )
+                                     * if_feature
+                                         ( LookupsPerRow 2
+                                         , (fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                             + beta )
+                                         , fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         )
+                                     * if_feature
+                                         ( LookupsPerRow 3
+                                         , (fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                             + beta )
+                                         , fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         )
+                                     * if_feature
+                                         ( LookupsPerRow 4
+                                         , (fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                             + beta )
+                                         , fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         )
+                                     * ( gamma
+                                       + ( cell (var (Witness 3, Curr))
+                                         + joint_combiner
+                                           * if_feature
+                                               ( TableWidth 2
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * if_feature
+                                               ( TableWidth 3
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               ) ) )
+                                     * ( gamma
+                                       + ( cell (var (Witness 4, Curr))
+                                         + joint_combiner
+                                           * if_feature
+                                               ( TableWidth 2
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * if_feature
+                                               ( TableWidth 3
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               ) ) )
+                                     * ( gamma
+                                       + ( cell (var (Witness 5, Curr))
+                                         + joint_combiner
+                                           * if_feature
+                                               ( TableWidth 2
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * if_feature
+                                               ( TableWidth 3
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               ) ) )
+                                     * ( gamma
+                                       + ( cell (var (Witness 6, Curr))
+                                         + joint_combiner
+                                           * if_feature
+                                               ( TableWidth 2
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * if_feature
+                                               ( TableWidth 3
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               ) ) ) )
+                                 , fun () ->
+                                     field
+                                       "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                 ) )
+                           * ( gamma
+                               * ( beta
+                                 + field
+                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                 )
+                             + cell (var (LookupTable, Curr))
+                             + (beta * cell (var (LookupTable, Next))) ) ) ) )
+                     ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
+      ; ( LookupKindIndex ForeignFieldMul
+        , lazy
+            (if_feature
+               ( LookupTables
+               , (fun () ->
+                   alpha_pow 24
+                   * ( vanishes_on_last_4_rows
+                     * ( field
+                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                       * ( cell (var (LookupAggreg, Curr))
+                         * ( ( field
+                                 "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
+                               * if_feature
+                                   ( LookupPattern ForeignFieldMul
+                                   , (fun () ->
+                                       field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   , fun () ->
+                                       field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                   )
+                               * ( if_feature
+                                     ( LookupsPerRow 1
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 2
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 3
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * if_feature
+                                     ( LookupsPerRow 4
+                                     , (fun () -> gamma)
+                                     , fun () ->
+                                         field
+                                           "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     )
+                                 * ( ( field
+                                         "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                     + beta )
+                                   * if_feature
+                                       ( LookupsPerRow 2
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   * if_feature
+                                       ( LookupsPerRow 3
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                   * if_feature
+                                       ( LookupsPerRow 4
+                                       , (fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           + beta )
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       ) ) )
+                             + if_feature
+                                 ( LookupPattern ForeignFieldMul
+                                 , (fun () ->
+                                     if_feature
+                                       ( LookupsPerRow 3
+                                       , (fun () -> gamma)
+                                       , fun () ->
+                                           field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                       )
+                                     * if_feature
+                                         ( LookupsPerRow 4
+                                         , (fun () -> gamma)
+                                         , fun () ->
+                                             field
+                                               "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         )
+                                     * ( ( field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                         + beta )
+                                       * if_feature
+                                           ( LookupsPerRow 2
+                                           , (fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               + beta )
+                                           , fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           )
+                                       * if_feature
+                                           ( LookupsPerRow 3
+                                           , (fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               + beta )
+                                           , fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           )
+                                       * if_feature
+                                           ( LookupsPerRow 4
+                                           , (fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               + beta )
+                                           , fun () ->
+                                               field
+                                                 "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                           ) )
+                                     * ( gamma
+                                       + ( cell (var (Witness 7, Curr))
+                                         + joint_combiner
+                                           * if_feature
+                                               ( TableWidth 2
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * if_feature
+                                               ( TableWidth 3
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               ) ) )
+                                     * ( gamma
+                                       + ( field
+                                             "0x0000000000000000000000000000000000000000000000000000000000000200"
+                                           * cell (var (Witness 7, Curr))
+                                         + joint_combiner
+                                           * if_feature
+                                               ( TableWidth 2
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               )
+                                           * if_feature
+                                               ( TableWidth 3
+                                               , (fun () -> joint_combiner)
+                                               , fun () ->
+                                                   field
+                                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                               ) ) ) )
+                                 , fun () ->
+                                     field
+                                       "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                 ) )
+                           * ( gamma
+                               * ( beta
+                                 + field
+                                     "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                 )
+                             + cell (var (LookupTable, Curr))
+                             + (beta * cell (var (LookupTable, Next))) ) ) ) )
+                     ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
+      ; ( LookupRuntimeSelector
+        , lazy
+            (if_feature
+               ( LookupTables
+               , (fun () ->
+                   alpha_pow 31
+                   * if_feature
+                       ( RuntimeLookupTables
+                       , (fun () -> cell (var (LookupRuntimeTable, Curr)))
+                       , fun () ->
+                           field
+                             "0x0000000000000000000000000000000000000000000000000000000000000000"
+                       ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
+      ; ( Index CompleteAdd
         , lazy
             (let x_0 =
                cell (var (Witness 2, Curr)) - cell (var (Witness 0, Curr))
@@ -4098,9 +6793,9 @@ module Tock : S = struct
                  * cell (var (Witness 13, Curr)) ) ) )
       ; ( Index ChaCha0
         , lazy
-            (enabled_if
+            (if_feature
                ( ChaCha
-               , fun () ->
+               , (fun () ->
                    square (cell (var (Witness 2, Next)))
                    - cell (var (Witness 2, Next))
                    + alpha_pow 1
@@ -4181,12 +6876,16 @@ module Tock : S = struct
                        + field
                            "0x0000000000000000000000000000000000000000000000000000000010000000"
                          * cell (var (Witness 6, Curr))
-                       - cell (var (Witness 1, Next)) ) ) ) )
+                       - cell (var (Witness 1, Next)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index ChaCha1
         , lazy
-            (enabled_if
+            (if_feature
                ( ChaCha
-               , fun () ->
+               , (fun () ->
                    square (cell (var (Witness 2, Next)))
                    - cell (var (Witness 2, Next))
                    + alpha_pow 1
@@ -4267,12 +6966,16 @@ module Tock : S = struct
                        + field
                            "0x0000000000000000000000000000000000000000000000000000000010000000"
                          * cell (var (Witness 3, Next))
-                       - cell (var (Witness 1, Next)) ) ) ) )
+                       - cell (var (Witness 1, Next)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index ChaCha2
         , lazy
-            (enabled_if
+            (if_feature
                ( ChaCha
-               , fun () ->
+               , (fun () ->
                    square (cell (var (Witness 2, Next)))
                    - cell (var (Witness 2, Next))
                    + alpha_pow 1
@@ -4353,12 +7056,16 @@ module Tock : S = struct
                        + field
                            "0x0000000000000000000000000000000000000000000000000000000010000000"
                          * cell (var (Witness 4, Next))
-                       - cell (var (Witness 1, Next)) ) ) ) )
+                       - cell (var (Witness 1, Next)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index ChaChaFinal
         , lazy
-            (enabled_if
+            (if_feature
                ( ChaCha
-               , fun () ->
+               , (fun () ->
                    square (cell (var (Witness 5, Curr)))
                    - cell (var (Witness 5, Curr))
                    + alpha_pow 1
@@ -4453,12 +7160,16 @@ module Tock : S = struct
                                "0x2000000000000000000000000000000011234C7E04CA546EC623759080000001"
                              * ( cell (var (Witness 2, Next))
                                - cell (var (Witness 6, Next)) ) )
-                       - cell (var (Witness 0, Curr)) ) ) ) )
+                       - cell (var (Witness 0, Curr)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index RangeCheck0
         , lazy
-            (enabled_if
+            (if_feature
                ( RangeCheck
-               , fun () ->
+               , (fun () ->
                    cell (var (Witness 7, Curr))
                    * ( cell (var (Witness 7, Curr))
                      - field
@@ -4774,12 +7485,16 @@ module Tock : S = struct
                          - ( cell (var (Witness 0, Curr))
                            + field
                                "0x0000000000000000000000000000000000000000010000000000000000000000"
-                             * cell (var (Witness 0, Next)) ) ) ) ) ) )
+                             * cell (var (Witness 0, Next)) ) ) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index RangeCheck1
         , lazy
-            (enabled_if
+            (if_feature
                ( RangeCheck
-               , fun () ->
+               , (fun () ->
                    cell (var (Witness 2, Curr))
                    * ( cell (var (Witness 2, Curr))
                      - field
@@ -5636,52 +8351,47 @@ module Tock : S = struct
                          * field
                              "0x0000000000000000000000000000000000000000000000000000000000001000"
                          * cell (var (Witness 2, Curr))
-                       - cell (var (Witness 0, Curr)) ) ) ) )
+                       - cell (var (Witness 0, Curr)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index ForeignFieldAdd
         , lazy
-            (enabled_if
+            (if_feature
                ( ForeignFieldAdd
-               , fun () ->
-                   cell (var (Witness 7, Curr))
-                   * ( cell (var (Witness 7, Curr))
-                     - cell (var (Witness 6, Curr)) )
+               , (fun () ->
+                   cell (var (Witness 6, Curr))
+                   * ( cell (var (Witness 6, Curr))
+                     - cell (var (Coefficient 3, Curr)) )
                    + alpha_pow 1
-                     * ( ( cell (var (Witness 6, Curr))
-                         + field
+                     * ( cell (var (Witness 7, Curr))
+                       * ( cell (var (Witness 7, Curr))
+                         - field
                              "0x0000000000000000000000000000000000000000000000000000000000000001"
                          )
-                       * ( cell (var (Witness 6, Curr))
-                         - field
+                       * ( cell (var (Witness 7, Curr))
+                         + field
                              "0x0000000000000000000000000000000000000000000000000000000000000001"
                          ) )
                    + alpha_pow 2
-                     * ( cell (var (Witness 8, Curr))
-                       * ( cell (var (Witness 8, Curr))
-                         - field
-                             "0x0000000000000000000000000000000000000000000000000000000000000001"
-                         )
-                       * ( cell (var (Witness 8, Curr))
-                         + field
-                             "0x0000000000000000000000000000000000000000000000000000000000000001"
-                         ) )
-                   + alpha_pow 3
                      * ( cell (var (Witness 0, Curr))
                        + cell (var (Witness 1, Curr))
                          * field
                              "0x0000000000000000000000000000000000000000010000000000000000000000"
-                       + cell (var (Witness 6, Curr))
+                       + cell (var (Coefficient 3, Curr))
                          * ( cell (var (Witness 3, Curr))
                            + cell (var (Witness 4, Curr))
                              * field
                                  "0x0000000000000000000000000000000000000000010000000000000000000000"
                            )
-                       - cell (var (Witness 7, Curr))
-                         * ( foreign_field_modulus 0
-                           + foreign_field_modulus 1
+                       - cell (var (Witness 6, Curr))
+                         * ( cell (var (Coefficient 0, Curr))
+                           + cell (var (Coefficient 1, Curr))
                              * field
                                  "0x0000000000000000000000000000000000000000010000000000000000000000"
                            )
-                       - cell (var (Witness 8, Curr))
+                       - cell (var (Witness 7, Curr))
                          * field
                              "0x0000000000000000000100000000000000000000000000000000000000000000"
                        - ( cell (var (Witness 0, Next))
@@ -5689,28 +8399,33 @@ module Tock : S = struct
                            * field
                                "0x0000000000000000000000000000000000000000010000000000000000000000"
                          ) )
-                   + alpha_pow 4
+                   + alpha_pow 3
                      * ( cell (var (Witness 2, Curr))
-                       + cell (var (Witness 6, Curr))
+                       + cell (var (Coefficient 3, Curr))
                          * cell (var (Witness 5, Curr))
-                       - (cell (var (Witness 7, Curr)) * foreign_field_modulus 2)
-                       + cell (var (Witness 8, Curr))
-                       - cell (var (Witness 2, Next)) ) ) ) )
+                       - cell (var (Witness 6, Curr))
+                         * cell (var (Coefficient 2, Curr))
+                       + cell (var (Witness 7, Curr))
+                       - cell (var (Witness 2, Next)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index ForeignFieldMul
         , lazy
-            (enabled_if
+            (if_feature
                ( ForeignFieldMul
-               , fun () ->
-                   cell (var (Witness 7, Next))
-                   * ( cell (var (Witness 7, Next))
+               , (fun () ->
+                   cell (var (Witness 13, Curr))
+                   * ( cell (var (Witness 13, Curr))
                      - field
                          "0x0000000000000000000000000000000000000000000000000000000000000001"
                      )
-                   * ( cell (var (Witness 7, Next))
+                   * ( cell (var (Witness 13, Curr))
                      - field
                          "0x0000000000000000000000000000000000000000000000000000000000000002"
                      )
-                   * ( cell (var (Witness 7, Next))
+                   * ( cell (var (Witness 13, Curr))
                      - field
                          "0x0000000000000000000000000000000000000000000000000000000000000003"
                      )
@@ -5719,39 +8434,39 @@ module Tock : S = struct
                          * cell (var (Witness 4, Curr))
                        + cell (var (Witness 1, Curr))
                          * cell (var (Witness 3, Curr))
+                       + cell (var (Witness 9, Curr))
+                         * cell (var (Coefficient 4, Curr))
                        + cell (var (Witness 10, Curr))
-                         * neg_foreign_field_modulus 1
-                       + cell (var (Witness 11, Curr))
-                         * neg_foreign_field_modulus 0
+                         * cell (var (Coefficient 3, Curr))
                        - ( field
                              "0x0000000000000000000000000000000000000000010000000000000000000000"
                            * ( field
                                  "0x0000000000000000000000000000000000000000010000000000000000000000"
-                               * cell (var (Witness 7, Next))
+                               * cell (var (Witness 13, Curr))
                              + cell (var (Witness 6, Next)) )
                          + cell (var (Witness 5, Next)) ) )
                    + alpha_pow 2
-                     * ( cell (var (Witness 9, Curr))
-                       * ( cell (var (Witness 9, Curr))
+                     * ( cell (var (Witness 8, Curr))
+                       * ( cell (var (Witness 8, Curr))
                          - field
                              "0x0000000000000000000000000000000000000000000000000000000000000001"
                          )
-                       * ( cell (var (Witness 9, Curr))
+                       * ( cell (var (Witness 8, Curr))
                          - field
                              "0x0000000000000000000000000000000000000000000000000000000000000002"
                          )
-                       * ( cell (var (Witness 9, Curr))
+                       * ( cell (var (Witness 8, Curr))
                          - field
                              "0x0000000000000000000000000000000000000000000000000000000000000003"
                          ) )
                    + alpha_pow 3
                      * ( field
                            "0x0000000000000000000100000000000000000000000000000000000000000000"
-                         * cell (var (Witness 9, Curr))
+                         * cell (var (Witness 8, Curr))
                        - ( cell (var (Witness 0, Curr))
                            * cell (var (Witness 3, Curr))
-                         + cell (var (Witness 10, Curr))
-                           * neg_foreign_field_modulus 0
+                         + cell (var (Witness 9, Curr))
+                           * cell (var (Coefficient 3, Curr))
                          + field
                              "0x0000000000000000000000000000000000000000010000000000000000000000"
                            * cell (var (Witness 5, Next))
@@ -5760,11 +8475,6 @@ module Tock : S = struct
                              "0x0000000000000000000000000000000000000000010000000000000000000000"
                            * cell (var (Witness 1, Next)) ) )
                    + alpha_pow 4
-                     * ( cell (var (Witness 8, Curr))
-                       - field
-                           "0x0000000000000000000000000000000000000000000000000000000000000200"
-                         * cell (var (Witness 7, Curr)) )
-                   + alpha_pow 5
                      * ( field
                            "0x0000000000000000000000000000000000000000010000000000000000000000"
                          * ( field
@@ -5777,19 +8487,19 @@ module Tock : S = struct
                            * cell (var (Witness 3, Curr))
                          + cell (var (Witness 1, Curr))
                            * cell (var (Witness 4, Curr))
-                         + cell (var (Witness 10, Curr))
-                           * neg_foreign_field_modulus 2
-                         + cell (var (Witness 12, Curr))
-                           * neg_foreign_field_modulus 0
+                         + cell (var (Witness 9, Curr))
+                           * cell (var (Coefficient 5, Curr))
                          + cell (var (Witness 11, Curr))
-                           * neg_foreign_field_modulus 1
+                           * cell (var (Coefficient 3, Curr))
+                         + cell (var (Witness 10, Curr))
+                           * cell (var (Coefficient 4, Curr))
                          + ( field
                                "0x0000000000000000000000000000000000000000010000000000000000000000"
-                             * cell (var (Witness 7, Next))
+                             * cell (var (Witness 13, Curr))
                            + cell (var (Witness 6, Next)) )
-                         + cell (var (Witness 9, Curr))
+                         + cell (var (Witness 8, Curr))
                          - cell (var (Witness 2, Next)) ) )
-                   + alpha_pow 6
+                   + alpha_pow 5
                      * ( ( field
                              "0x0000000000000000000100000000000000000000000000000000000000000000"
                            * cell (var (Witness 2, Curr))
@@ -5806,18 +8516,18 @@ module Tock : S = struct
                            + cell (var (Witness 3, Curr)) )
                        - ( field
                              "0x0000000000000000000100000000000000000000000000000000000000000000"
-                           * cell (var (Witness 12, Curr))
+                           * cell (var (Witness 11, Curr))
                          + field
                              "0x0000000000000000000000000000000000000000010000000000000000000000"
-                           * cell (var (Witness 11, Curr))
-                         + cell (var (Witness 10, Curr)) )
+                           * cell (var (Witness 10, Curr))
+                         + cell (var (Witness 9, Curr)) )
                          * ( field
                                "0x0000000000000000000100000000000000000000000000000000000000000000"
-                             * foreign_field_modulus 2
+                             * cell (var (Coefficient 2, Curr))
                            + field
                                "0x0000000000000000000000000000000000000000010000000000000000000000"
-                             * foreign_field_modulus 1
-                           + foreign_field_modulus 0 )
+                             * cell (var (Coefficient 1, Curr))
+                           + cell (var (Coefficient 0, Curr)) )
                        - ( field
                              "0x0000000000000000000100000000000000000000000000000000000000000000"
                            * cell (var (Witness 2, Next))
@@ -5825,38 +8535,36 @@ module Tock : S = struct
                              "0x0000000000000000000000000000000000000000010000000000000000000000"
                            * cell (var (Witness 1, Next))
                          + cell (var (Witness 0, Next)) ) )
+                   + alpha_pow 6
+                     * ( square (cell (var (Witness 12, Curr)))
+                       - cell (var (Witness 12, Curr)) )
                    + alpha_pow 7
-                     * ( square (cell (var (Witness 13, Curr)))
-                       - cell (var (Witness 13, Curr)) )
-                   + alpha_pow 8
                      * ( field
                            "0x0000000000000000000100000000000000000000000000000000000000000000"
-                         * cell (var (Witness 13, Curr))
-                       - ( cell (var (Witness 10, Curr))
+                         * cell (var (Witness 12, Curr))
+                       - ( cell (var (Witness 9, Curr))
                          + field
                              "0x0000000000000000000000000000000000000000010000000000000000000000"
-                           * cell (var (Witness 11, Curr))
-                         + ( neg_foreign_field_modulus 0
+                           * cell (var (Witness 10, Curr))
+                         + ( cell (var (Coefficient 3, Curr))
                            + field
                                "0x0000000000000000000000000000000000000000010000000000000000000000"
-                             * neg_foreign_field_modulus 1 ) )
+                             * cell (var (Coefficient 4, Curr)) ) )
                        + cell (var (Witness 3, Next)) )
-                   + alpha_pow 9
-                     * ( square (cell (var (Witness 14, Curr)))
-                       - cell (var (Witness 14, Curr)) )
-                   + alpha_pow 10
-                     * ( field
-                           "0x0000000000000000000000000000000000000000010000000000000000000000"
-                         * cell (var (Witness 14, Curr))
-                       - ( cell (var (Witness 12, Curr))
-                         + neg_foreign_field_modulus 2 )
-                       - cell (var (Witness 13, Curr))
-                       + cell (var (Witness 4, Next)) ) ) ) )
+                   + alpha_pow 8
+                     * ( cell (var (Witness 4, Next))
+                       - ( cell (var (Witness 11, Curr))
+                         + cell (var (Coefficient 5, Curr)) )
+                       - cell (var (Witness 12, Curr)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index Xor16
         , lazy
-            (enabled_if
+            (if_feature
                ( Xor
-               , fun () ->
+               , (fun () ->
                    cell (var (Witness 3, Curr))
                    + cell (var (Witness 4, Curr))
                      * pow
@@ -5924,12 +8632,16 @@ module Tock : S = struct
                                "0x0000000000000000000000000000000000000000000000000000000000000002"
                            , 16 )
                          * cell (var (Witness 2, Next))
-                       - cell (var (Witness 2, Curr)) ) ) ) )
+                       - cell (var (Witness 2, Curr)) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ; ( Index Rot64
         , lazy
-            (enabled_if
+            (if_feature
                ( Rot
-               , fun () ->
+               , (fun () ->
                    cell (var (Witness 7, Curr))
                    * ( cell (var (Witness 7, Curr))
                      - field
@@ -6201,7 +8913,11 @@ module Tock : S = struct
                          - cell (var (Coefficient 0, Curr))
                          + field
                              "0x0000000000000000000000000000000000000000000000010000000000000000"
-                         ) ) ) ) )
+                         ) ) )
+               , fun () ->
+                   field
+                     "0x0000000000000000000000000000000000000000000000000000000000000000"
+               ) ) )
       ]
 end
 
@@ -6224,13 +8940,11 @@ module Tick_with_lookup : S = struct
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
        ; vanishes_on_last_4_rows
-       ; joint_combiner
+       ; joint_combiner = _
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis
-       ; enabled_if = _
-       ; foreign_field_modulus = _
-       ; neg_foreign_field_modulus = _
+       ; if_feature = _
        } :
         a Env.t ) =
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
@@ -6386,26 +9100,16 @@ module Tick_with_lookup : S = struct
                   + cell (var (LookupSorted 3, Next))
                   + (beta * cell (var (LookupSorted 3, Curr))) ) )
             - cell (var (LookupAggreg, Curr))
-              * ( ( gamma
-                  + pow (joint_combiner, 2)
-                    * field
-                        "0x0000000000000000000000000000000000000000000000000000000000000000"
-                  )
-                * ( gamma
-                  + pow (joint_combiner, 2)
-                    * field
-                        "0x0000000000000000000000000000000000000000000000000000000000000000"
-                  )
-                * ( gamma
-                  + pow (joint_combiner, 2)
-                    * field
-                        "0x0000000000000000000000000000000000000000000000000000000000000000"
-                  )
-                * pow
-                    ( field
+              * ( gamma * gamma * gamma
+                * ( ( field
                         "0x0000000000000000000000000000000000000000000000000000000000000001"
-                      + beta
-                    , 3 )
+                    + beta )
+                  * ( field
+                        "0x0000000000000000000000000000000000000000000000000000000000000001"
+                    + beta )
+                  * ( field
+                        "0x0000000000000000000000000000000000000000000000000000000000000001"
+                    + beta ) )
                 * ( gamma
                     * ( beta
                       + field
@@ -6443,7 +9147,7 @@ module Tick_with_lookup : S = struct
        ; sub = ( - )
        ; mul = ( * )
        ; square
-       ; pow
+       ; pow = _
        ; var
        ; field
        ; cell
@@ -6460,9 +9164,7 @@ module Tick_with_lookup : S = struct
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis = _
-       ; enabled_if = _
-       ; foreign_field_modulus = _
-       ; neg_foreign_field_modulus = _
+       ; if_feature = _
        } :
         a Env.t ) =
     Column.Table.of_alist_exn
@@ -6475,45 +9177,39 @@ module Tick_with_lookup : S = struct
                 * ( cell (var (LookupAggreg, Curr))
                   * ( ( field
                           "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
-                        * ( ( gamma
-                            + pow (joint_combiner, 2)
-                              * field
-                                  "0x0000000000000000000000000000000000000000000000000000000000000000"
-                            )
-                          * ( gamma
-                            + pow (joint_combiner, 2)
-                              * field
-                                  "0x0000000000000000000000000000000000000000000000000000000000000000"
-                            )
-                          * ( gamma
-                            + pow (joint_combiner, 2)
-                              * field
-                                  "0x0000000000000000000000000000000000000000000000000000000000000000"
-                            )
-                          * pow
-                              ( field
+                        * ( gamma * gamma * gamma
+                          * ( ( field
                                   "0x0000000000000000000000000000000000000000000000000000000000000001"
-                                + beta
-                              , 3 ) )
-                      + pow
-                          ( field
+                              + beta )
+                            * ( field
+                                  "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              + beta )
+                            * ( field
+                                  "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              + beta ) ) )
+                      + ( field
+                            "0x0000000000000000000000000000000000000000000000000000000000000001"
+                        + beta )
+                        * ( field
                               "0x0000000000000000000000000000000000000000000000000000000000000001"
-                            + beta
-                          , 3 )
+                          + beta )
+                        * ( field
+                              "0x0000000000000000000000000000000000000000000000000000000000000001"
+                          + beta )
                         * ( gamma
                           + ( (joint_combiner * cell (var (Witness 2, Curr)))
                             + cell (var (Witness 1, Curr))
-                            + pow (joint_combiner, 2)
+                            + joint_combiner * joint_combiner
                               * cell (var (Witness 0, Curr)) ) )
                         * ( gamma
                           + ( (joint_combiner * cell (var (Witness 4, Curr)))
                             + cell (var (Witness 3, Curr))
-                            + pow (joint_combiner, 2)
+                            + joint_combiner * joint_combiner
                               * cell (var (Witness 0, Curr)) ) )
                         * ( gamma
                           + ( (joint_combiner * cell (var (Witness 6, Curr)))
                             + cell (var (Witness 5, Curr))
-                            + pow (joint_combiner, 2)
+                            + joint_combiner * joint_combiner
                               * cell (var (Witness 0, Curr)) ) ) )
                     * ( gamma
                         * ( beta
@@ -6523,7 +9219,7 @@ module Tick_with_lookup : S = struct
                       + cell (var (LookupTable, Curr))
                       + (beta * cell (var (LookupTable, Next))) ) ) ) ) ) ) )
       ; ( LookupRuntimeSelector
-        , lazy (alpha_pow 30 * cell (var (LookupRuntimeTable, Curr))) )
+        , lazy (alpha_pow 31 * cell (var (LookupRuntimeTable, Curr))) )
       ; ( Index CompleteAdd
         , lazy
             (let x_0 =
@@ -7310,13 +10006,11 @@ module Tock_with_lookup : S = struct
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
        ; vanishes_on_last_4_rows
-       ; joint_combiner
+       ; joint_combiner = _
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis
-       ; enabled_if = _
-       ; foreign_field_modulus = _
-       ; neg_foreign_field_modulus = _
+       ; if_feature = _
        } :
         a Env.t ) =
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
@@ -7472,26 +10166,16 @@ module Tock_with_lookup : S = struct
                   + cell (var (LookupSorted 3, Next))
                   + (beta * cell (var (LookupSorted 3, Curr))) ) )
             - cell (var (LookupAggreg, Curr))
-              * ( ( gamma
-                  + pow (joint_combiner, 2)
-                    * field
-                        "0x0000000000000000000000000000000000000000000000000000000000000000"
-                  )
-                * ( gamma
-                  + pow (joint_combiner, 2)
-                    * field
-                        "0x0000000000000000000000000000000000000000000000000000000000000000"
-                  )
-                * ( gamma
-                  + pow (joint_combiner, 2)
-                    * field
-                        "0x0000000000000000000000000000000000000000000000000000000000000000"
-                  )
-                * pow
-                    ( field
+              * ( gamma * gamma * gamma
+                * ( ( field
                         "0x0000000000000000000000000000000000000000000000000000000000000001"
-                      + beta
-                    , 3 )
+                    + beta )
+                  * ( field
+                        "0x0000000000000000000000000000000000000000000000000000000000000001"
+                    + beta )
+                  * ( field
+                        "0x0000000000000000000000000000000000000000000000000000000000000001"
+                    + beta ) )
                 * ( gamma
                     * ( beta
                       + field
@@ -7529,7 +10213,7 @@ module Tock_with_lookup : S = struct
        ; sub = ( - )
        ; mul = ( * )
        ; square
-       ; pow
+       ; pow = _
        ; var
        ; field
        ; cell
@@ -7546,9 +10230,7 @@ module Tock_with_lookup : S = struct
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis = _
-       ; enabled_if = _
-       ; foreign_field_modulus = _
-       ; neg_foreign_field_modulus = _
+       ; if_feature = _
        } :
         a Env.t ) =
     Column.Table.of_alist_exn
@@ -7561,45 +10243,39 @@ module Tock_with_lookup : S = struct
                 * ( cell (var (LookupAggreg, Curr))
                   * ( ( field
                           "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
-                        * ( ( gamma
-                            + pow (joint_combiner, 2)
-                              * field
-                                  "0x0000000000000000000000000000000000000000000000000000000000000000"
-                            )
-                          * ( gamma
-                            + pow (joint_combiner, 2)
-                              * field
-                                  "0x0000000000000000000000000000000000000000000000000000000000000000"
-                            )
-                          * ( gamma
-                            + pow (joint_combiner, 2)
-                              * field
-                                  "0x0000000000000000000000000000000000000000000000000000000000000000"
-                            )
-                          * pow
-                              ( field
+                        * ( gamma * gamma * gamma
+                          * ( ( field
                                   "0x0000000000000000000000000000000000000000000000000000000000000001"
-                                + beta
-                              , 3 ) )
-                      + pow
-                          ( field
+                              + beta )
+                            * ( field
+                                  "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              + beta )
+                            * ( field
+                                  "0x0000000000000000000000000000000000000000000000000000000000000001"
+                              + beta ) ) )
+                      + ( field
+                            "0x0000000000000000000000000000000000000000000000000000000000000001"
+                        + beta )
+                        * ( field
                               "0x0000000000000000000000000000000000000000000000000000000000000001"
-                            + beta
-                          , 3 )
+                          + beta )
+                        * ( field
+                              "0x0000000000000000000000000000000000000000000000000000000000000001"
+                          + beta )
                         * ( gamma
                           + ( (joint_combiner * cell (var (Witness 2, Curr)))
                             + cell (var (Witness 1, Curr))
-                            + pow (joint_combiner, 2)
+                            + joint_combiner * joint_combiner
                               * cell (var (Witness 0, Curr)) ) )
                         * ( gamma
                           + ( (joint_combiner * cell (var (Witness 4, Curr)))
                             + cell (var (Witness 3, Curr))
-                            + pow (joint_combiner, 2)
+                            + joint_combiner * joint_combiner
                               * cell (var (Witness 0, Curr)) ) )
                         * ( gamma
                           + ( (joint_combiner * cell (var (Witness 6, Curr)))
                             + cell (var (Witness 5, Curr))
-                            + pow (joint_combiner, 2)
+                            + joint_combiner * joint_combiner
                               * cell (var (Witness 0, Curr)) ) ) )
                     * ( gamma
                         * ( beta
@@ -7609,7 +10285,7 @@ module Tock_with_lookup : S = struct
                       + cell (var (LookupTable, Curr))
                       + (beta * cell (var (LookupTable, Next))) ) ) ) ) ) ) )
       ; ( LookupRuntimeSelector
-        , lazy (alpha_pow 30 * cell (var (LookupRuntimeTable, Curr))) )
+        , lazy (alpha_pow 31 * cell (var (LookupRuntimeTable, Curr))) )
       ; ( Index CompleteAdd
         , lazy
             (let x_0 =

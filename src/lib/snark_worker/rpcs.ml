@@ -1,3 +1,4 @@
+open Core_kernel
 open Async
 open Signature_lib
 
@@ -66,7 +67,9 @@ module Make (Inputs : Intf.Inputs_intf) = struct
 
       module T = struct
         type query =
-          (Transaction_witness.t, Ledger_proof.t) Work.Single.Spec.t Work.Spec.t
+          Error.t
+          * (Transaction_witness.t, Ledger_proof.t) Work.Single.Spec.t
+            Work.Spec.t
           * Public_key.Compressed.t
 
         type response = unit

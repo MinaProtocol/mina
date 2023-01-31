@@ -5,4 +5,3 @@ module Fp = Basic.Fp
 module Fq = Basic.Fq
 module Vesta = Basic.Vesta
 module Pallas = Basic.Pallas
-module Precomputed = Precomputed

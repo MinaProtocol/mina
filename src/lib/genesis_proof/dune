@@ -34,7 +34,6 @@
    block_time
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
-   mina_ledger
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_let)))

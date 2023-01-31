@@ -1823,7 +1823,7 @@ let%test_module _ =
                               (Account.Nonce.succ nonce)
                         ; valid_while = Ignore
                         }
-                    ; call_type = Call
+                    ; may_use_token = No
                     ; use_full_commitment = not double_increment_sender
                     ; implicit_account_creation_fee = false
                     ; authorization_kind = None_given
@@ -1845,7 +1845,7 @@ let%test_module _ =
                         ; account = Account_update.Account_precondition.Accept
                         ; valid_while = Ignore
                         }
-                    ; call_type = Call
+                    ; may_use_token = No
                     ; implicit_account_creation_fee = false
                     ; use_full_commitment = not increment_receiver
                     ; authorization_kind = None_given

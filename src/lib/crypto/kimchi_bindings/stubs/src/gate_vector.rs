@@ -66,6 +66,12 @@ pub mod fp {
         gate.into()
     }
 
+    #[ocaml_gen::func]
+    #[ocaml::func]
+    pub fn caml_pasta_fp_plonk_gate_vector_len(v: CamlPastaFpPlonkGateVectorPtr) -> usize {
+        v.as_ref().0.len()
+    }
+
     // TODO: remove this function
     #[ocaml_gen::func]
     #[ocaml::func]
@@ -152,6 +158,12 @@ pub mod fq {
     ) -> CamlCircuitGate<CamlFq> {
         let gate = &(v.as_ref().0)[i as usize];
         gate.into()
+    }
+
+    #[ocaml_gen::func]
+    #[ocaml::func]
+    pub fn caml_pasta_fq_plonk_gate_vector_len(v: CamlPastaFqPlonkGateVectorPtr) -> usize {
+        v.as_ref().0.len()
     }
 
     #[ocaml_gen::func]
