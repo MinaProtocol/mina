@@ -126,11 +126,17 @@ spec:
           value: {{ $node.ports.p2p | quote }}
         {{- if $node.libp2pKeys.enabled }}
         - name: MINA_LIBP2P_PASS
-          value: {{ $node.libp2pKeys.password | quote }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ $node.name }}
+              key: "libp2p-password"
         {{- end }}
         {{- if $node.minaKeys.enabled }}
         - name: MINA_PRIVKEY_PASS
-          value: {{ $node.minaKeys.password | quote }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ $node.name }}
+              key: "key-password"
         {{- end }}
         ports:
         - name: client-port
@@ -171,7 +177,7 @@ spec:
       {{- if $node.minaKeys.enabled }}
       - name: mounted-mina-keys
         secret:
-          secretName: {{ $node.minaKeys.secret }}
+          secretName: {{ $node.name }}
           defaultMode: 0600
           items:
           - key: {{ $node.name }}-key
@@ -184,7 +190,7 @@ spec:
       {{- if $node.libp2pKeys.enabled }}
       - name: mounted-libp2p-keys
         secret:
-          secretName: {{ $node.libp2pKeys.secret }}
+          secretName: {{ $node.name }}
           defaultMode: 0600
           items:
           - key: {{ $node.name }}-libp2p

@@ -35,13 +35,9 @@ nodes:
       enabled: false
       address: production-mainnet-archive:3086
     libp2pKeys:
-      enabled: false
-      secret: "some-secret-name"
-      password: "MINA_LIBP2P_PASS"
+      enabled: true
     minaKeys:
-      enabled: false
-      secret: "some-secret-name"
-      password: "MINA_PRIVKEY_PASS"
+      enabled: true
       produceBlocks: true
   - name: "seed-2"
     class: "seed"
@@ -61,13 +57,9 @@ nodes:
       enabled: false
       address: production-mainnet-archive:3086
     libp2pKeys:
-      enabled: false
-      secret: "some-secret-name"
-      password: "MINA_LIBP2P_PASS"
+      enabled: true
     minaKeys:
       enabled: false
-      secret: "some-secret-name"
-      password: "MINA_PRIVKEY_PASS"
       produceBlocks: true
   - name: "seed-3"
     class: "seed"
@@ -87,13 +79,9 @@ nodes:
       enabled: false
       address: production-mainnet-archive:3086
     libp2pKeys:
-      enabled: false
-      secret: "some-secret-name"
-      password: "MINA_LIBP2P_PASS"
+      enabled: true
     minaKeys:
       enabled: false
-      secret: "some-secret-name"
-      password: "MINA_PRIVKEY_PASS"
       produceBlocks: true
   - name: "seed-4"
     class: "seed"
@@ -113,13 +101,9 @@ nodes:
       enabled: false
       address: backup-mainnet-archive:3086
     libp2pKeys:
-      enabled: false
-      secret: "some-secret-name"
-      password: "MINA_LIBP2P_PASS"
+      enabled: true
     minaKeys:
       enabled: false
-      secret: "some-secret-name"
-      password: "MINA_PRIVKEY_PASS"
       produceBlocks: true
   - name: "seed-5"
     class: "seed"
@@ -139,13 +123,9 @@ nodes:
       enabled: false
       address: backup-mainnet-archive:3086
     libp2pKeys:
-      enabled: false
-      secret: "some-secret-name"
-      password: "MINA_LIBP2P_PASS"
+      enabled: true
     minaKeys:
       enabled: false
-      secret: "some-secret-name"
-      password: "MINA_PRIVKEY_PASS"
       produceBlocks: true
   - name: "seed-6"
     class: "seed"
@@ -165,13 +145,9 @@ nodes:
       enabled: false
       address: backup-mainnet-archive:3086
     libp2pKeys:
-      enabled: false
-      secret: "some-secret-name"
-      password: "MINA_LIBP2P_PASS"
+      enabled: true
     minaKeys:
       enabled: false
-      secret: "some-secret-name"
-      password: "MINA_PRIVKEY_PASS"
       produceBlocks: true
 
 requests:
