@@ -219,8 +219,12 @@ let%test_module "Epoch ledger sync tests" =
           (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
           ~logger
         |> Deferred.map ~f:(function
-             | Some answer ->
+             | Some (Either.First answer) ->
                  Ok answer
+             | Some (Either.Second _sender) ->
+                 Error
+                   (Error.of_string
+                      Mina_networking.protocol_violation_answer_query_string )
              | None ->
                  if
                    List.mem genesis_ledger_hashes ledger_hash

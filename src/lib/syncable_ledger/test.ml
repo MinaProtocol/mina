@@ -70,11 +70,15 @@ struct
     don't_wait_for
       (Linear_pipe.iter_unordered ~max_concurrency:3 qr
          ~f:(fun (root_hash, query) ->
-           let%bind answ_opt =
+           let%bind answ_either =
              Sync_responder.answer_query sr (Envelope.Incoming.local query)
            in
            let answ =
-             Option.value_exn ~message:"refused to answer query" answ_opt
+             match answ_either with
+             | Either.First answ ->
+                 answ
+             | Either.Second _sender ->
+                 failwith "Expected answer to sync query"
            in
            let%bind () =
              if match query with What_contents _ -> true | _ -> false then
@@ -129,12 +133,16 @@ struct
                      : [ `New | `Repeat | `Update_data ] ) ;
                  Deferred.unit )
                else
-                 let%bind answ_opt =
+                 let%bind answ_either =
                    Sync_responder.answer_query !sr
                      (Envelope.Incoming.local query)
                  in
                  let answ =
-                   Option.value_exn ~message:"refused to answer query" answ_opt
+                   match answ_either with
+                   | Either.First answ ->
+                       answ
+                   | Either.Second _sender ->
+                       failwith "Expected answer to sync query"
                  in
                  Linear_pipe.write aw
                    (!desired_root, query, Envelope.Incoming.local answ)
