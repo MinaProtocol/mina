@@ -588,6 +588,19 @@ let%test_module "gate finalization" =
           }
       end) )
 
+    let%test_module "range check 64 bits" =
+      ( module Make (struct
+        let example =
+          no_public_input
+            Kimchi_bindings.Protocol.Proof.Fp.example_with_range_check0
+
+        let actual_feature_flags =
+          { Plonk_types.Features.none_bool with
+            range_check0 = true
+          ; lookup = true
+          }
+      end) )
+
     let%test_module "chacha" =
       ( module Make (struct
         let example =
