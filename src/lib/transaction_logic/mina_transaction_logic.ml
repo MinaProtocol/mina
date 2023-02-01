@@ -2138,10 +2138,8 @@ module Make (L : Ledger_intf.S) :
   let apply_zkapp_command_second_pass ledger c :
       Transaction_applied.Zkapp_command_applied.t Or_error.t =
     let open Or_error.Let_syntax in
-    let%map x, _acc =
-      apply_zkapp_command_second_pass_aux ~init:None
-        ~f:(fun _acc state -> Some state)
-        ledger c
+    let%map x, () =
+      apply_zkapp_command_second_pass_aux ~init:() ~f:Fn.const ledger c
     in
     x
 

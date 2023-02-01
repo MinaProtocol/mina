@@ -679,16 +679,15 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
          assumption: genesis block occupies global slot 0
       *)
       if Int64.Table.mem global_slot_hashes_tbl Int64.zero then
-        if true then
-          [%log info]
-            "Block chain leading to target state hash includes genesis block, \
-             length = %d"
-            (Int.Set.length block_ids)
-        else (
-          [%log fatal]
-            "Block chain leading to target state hash does not include genesis \
-             block" ;
-          Core_kernel.exit 1 ) ;
+        [%log info]
+          "Block chain leading to target state hash includes genesis block, \
+           length = %d"
+          (Int.Set.length block_ids)
+      else (
+        [%log fatal]
+          "Block chain leading to target state hash does not include genesis \
+           block" ;
+        Core_kernel.exit 1 ) ;
       (* some mutable state, less painful than passing epoch ledgers throughout *)
       let staking_epoch_ledger = ref ledger in
       let next_epoch_ledger = ref ledger in

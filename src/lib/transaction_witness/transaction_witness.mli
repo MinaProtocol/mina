@@ -9,8 +9,7 @@ module Zkapp_command_segment_witness : sig
   module Stable : sig
     module V1 : sig
       type t =
-        { (* PROBLEM: The parties ledger is a dependency of the final fee payment ledger... how do we compute them at the same time? *)
-          global_first_pass_ledger : Sparse_ledger.Stable.V2.t
+        { global_first_pass_ledger : Sparse_ledger.Stable.V2.t
         ; global_second_pass_ledger : Sparse_ledger.Stable.V2.t
         ; local_state_init :
             ( ( Token_id.Stable.V2.t
