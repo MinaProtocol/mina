@@ -60,7 +60,8 @@ module Features : sig
     module V1 : sig
       type 'bool t =
         { chacha : 'bool
-        ; range_check : 'bool
+        ; range_check0 : 'bool
+        ; range_check1 : 'bool
         ; foreign_field_add : 'bool
         ; foreign_field_mul : 'bool
         ; xor : 'bool
@@ -78,9 +79,9 @@ module Features : sig
 
   type flags = bool t
 
-  val to_vector : 'a t -> ('a, Nat.N8.n) Vector.t
+  val to_vector : 'a t -> ('a, Nat.N9.n) Vector.t
 
-  val of_vector : ('a, Nat.N8.n) Vector.t -> 'a t
+  val of_vector : ('a, Nat.N9.n) Vector.t -> 'a t
 
   val typ :
        ('var, 'value, 'f) Snarky_backendless.Typ.t

@@ -36,7 +36,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           work_delay = Some 1
         ; transaction_capacity =
             Some Runtime_config.Proof_keys.Transaction_capacity.small
-        ; block_window_duration_ms = Some 150000
         }
     }
 
@@ -625,29 +624,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~f:Fn.id
     in
     let snark_work_event_subscription =
-      let node_id = Network.Node.id node in
-      let module Ledger_hash_tuple = struct
-        type t = Frozen_ledger_hash.t * Frozen_ledger_hash.t
-        [@@deriving hash, compare, sexp]
-      end in
-      let hashset = Hash_set.create (module Ledger_hash_tuple) in
       Event_router.on (event_router t) Snark_work_gossip
-        ~f:(fun node (work, direction) ->
+        ~f:(fun _ (_, direction) ->
           ( match direction with
-          | Received when String.equal node_id (Network.Node.id node) -> (
-              let stmt =
-                match work.work.work with `One stmt | `Two (stmt, _) -> stmt
-              in
-              match
-                Hash_set.strict_add hashset
-                  (stmt.source.ledger, stmt.target.ledger)
-              with
-              | Ok () ->
-                  [%log info] "Received new snark work"
-              | Error _ ->
-                  [%log info] "Received duplicate snark work" )
-          | Received | Sent ->
-              () ) ;
+          | Sent ->
+              ()
+          | Received ->
+              [%log info] "Received new snark work" ) ;
           Deferred.return `Continue )
     in
     let snark_work_failure_subscription =

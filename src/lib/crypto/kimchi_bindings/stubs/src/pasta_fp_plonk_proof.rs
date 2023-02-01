@@ -386,6 +386,75 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
 
 #[ocaml_gen::func]
 #[ocaml::func]
+pub fn caml_pasta_fp_plonk_proof_example_with_range_check0(
+    srs: CamlFpSrs,
+) -> (CamlPastaFpPlonkIndex, CamlProverProof<CamlGVesta, CamlFp>) {
+    use ark_ff::Zero;
+    use commitment_dlog::srs::{endos, SRS};
+    use kimchi::circuits::{
+        constraints::ConstraintSystem,
+        gate::{CircuitGate, Connect},
+        polynomial::COLUMNS,
+        polynomials::{generic::GenericGateSpec, range_check},
+        wires::Wire,
+    };
+
+    let gates = {
+        // Public input row with value 0
+        let mut gates = vec![CircuitGate::<Fp>::create_generic_gadget(
+            Wire::for_row(0),
+            GenericGateSpec::Const(Fp::zero()),
+            None,
+        )];
+        let mut row = 1;
+        CircuitGate::<Fp>::extend_range_check(&mut gates, &mut row);
+
+        // Temporary workaround for lookup-table/domain-size issue
+        for _ in 0..(1 << 13) {
+            gates.push(CircuitGate::zero(Wire::for_row(gates.len())));
+        }
+
+        // Connect the zero row to the range-check row to check prefix are zeros
+        gates.connect_64bit(0, 1);
+
+        gates
+    };
+
+    // witness
+    let witness = {
+        // create row for the zero value
+        let mut witness: [_; COLUMNS] = array_init(|_col| vec![Fp::zero(); 1]);
+        // create row for the 64-bit value
+        range_check::witness::extend_single(&mut witness, Fp::from(2u128.pow(64) - 1));
+        witness
+    };
+
+    // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
+    let cs = ConstraintSystem::<Fp>::create(gates)
+        .lookup(vec![range_check::gadget::lookup_table()])
+        .build()
+        .unwrap();
+
+    let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+    ptr.add_lagrange_basis(cs.domain.d1);
+
+    let (endo_q, _endo_r) = endos::<Pallas>();
+    let index = ProverIndex::<Vesta>::create(cs, endo_q, srs.0);
+    let group_map = <Vesta as CommitmentCurve>::Map::setup();
+    let proof = ProverProof::create_recursive::<EFqSponge, EFrSponge>(
+        &group_map,
+        witness,
+        &[],
+        &index,
+        vec![],
+        None,
+    )
+    .unwrap();
+    (CamlPastaFpPlonkIndex(Box::new(index)), proof.into())
+}
+
+#[ocaml_gen::func]
+#[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
     srs: CamlFpSrs,
 ) -> (
@@ -617,7 +686,6 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
         polynomial::COLUMNS,
         polynomials::{
             generic::GenericGateSpec,
-            range_check,
             rot::{self, RotMode},
         },
         wires::Wire,

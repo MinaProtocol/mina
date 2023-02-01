@@ -106,8 +106,8 @@ open Composition_types.Wrap.Proof_state.Deferred_values.Plonk
 
 type 'bool all_feature_flags =
   { lookup_tables : 'bool Lazy.t
-  ; table_width_1 : 'bool Lazy.t
-  ; table_width_2 : 'bool Lazy.t
+  ; table_width_at_least_1 : 'bool Lazy.t
+  ; table_width_at_least_2 : 'bool Lazy.t
   ; table_width_3 : 'bool Lazy.t
   ; lookups_per_row_2 : 'bool Lazy.t
   ; lookups_per_row_3 : 'bool Lazy.t
@@ -120,8 +120,9 @@ type 'bool all_feature_flags =
 let expand_feature_flags (type boolean)
     (module B : Bool_intf with type t = boolean)
     ({ chacha
-     ; range_check
-     ; foreign_field_add
+     ; range_check0
+     ; range_check1
+     ; foreign_field_add = _
      ; foreign_field_mul
      ; xor
      ; rot
@@ -131,11 +132,12 @@ let expand_feature_flags (type boolean)
       boolean Plonk_types.Features.t ) : boolean all_feature_flags =
   let lookup_tables =
     lazy
-      (B.any [ chacha; range_check; foreign_field_add; foreign_field_mul; rot ])
+      (B.any
+         [ chacha; range_check0; range_check1; foreign_field_mul; xor; rot ] )
   in
   let lookup_pattern_range_check =
     (* RangeCheck, Rot gates use RangeCheck lookup pattern *)
-    lazy (B.( ||| ) range_check rot)
+    lazy B.(range_check0 ||| range_check1 ||| rot)
   in
   let lookup_pattern_xor =
     (* Xor, ChaCha gates use Xor lookup pattern *)
@@ -146,15 +148,15 @@ let expand_feature_flags (type boolean)
     (* Xor, ChaChaFinal have max_joint_size = 3 *)
     lookup_pattern_xor
   in
-  let table_width_2 =
+  let table_width_at_least_2 =
     (* Lookup has max_joint_size = 2 *)
     lazy (B.( ||| ) (Lazy.force table_width_3) lookup)
   in
-  let table_width_1 =
+  let table_width_at_least_1 =
     (* RangeCheck, ForeignFieldMul have max_joint_size = 2 *)
     lazy
       (B.any
-         [ Lazy.force table_width_2
+         [ Lazy.force table_width_at_least_2
          ; Lazy.force lookup_pattern_range_check
          ; foreign_field_mul
          ] )
@@ -175,8 +177,8 @@ let expand_feature_flags (type boolean)
     lazy (B.( ||| ) (Lazy.force lookups_per_row_3) foreign_field_mul)
   in
   { lookup_tables
-  ; table_width_1
-  ; table_width_2
+  ; table_width_at_least_1
+  ; table_width_at_least_2
   ; table_width_3
   ; lookups_per_row_2
   ; lookups_per_row_3
@@ -222,8 +224,10 @@ let get_feature_flag (feature_flags : _ all_feature_flags)
   match feature with
   | ChaCha ->
       Some feature_flags.features.chacha
-  | RangeCheck ->
-      Some feature_flags.features.range_check
+  | RangeCheck0 ->
+      Some feature_flags.features.range_check0
+  | RangeCheck1 ->
+      Some feature_flags.features.range_check1
   | ForeignFieldAdd ->
       Some feature_flags.features.foreign_field_add
   | ForeignFieldMul ->
@@ -239,9 +243,9 @@ let get_feature_flag (feature_flags : _ all_feature_flags)
   | TableWidth 3 ->
       Some (Lazy.force feature_flags.table_width_3)
   | TableWidth 2 ->
-      Some (Lazy.force feature_flags.table_width_2)
+      Some (Lazy.force feature_flags.table_width_at_least_2)
   | TableWidth i when i <= 1 ->
-      Some (Lazy.force feature_flags.table_width_1)
+      Some (Lazy.force feature_flags.table_width_at_least_1)
   | TableWidth _ ->
       None
   | LookupsPerRow 4 ->
@@ -524,11 +528,11 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
                 compute_feature (Index ChaChaFinal) feature_flags.chacha
                   actual_feature_flags.chacha
             ; range_check0 =
-                compute_feature (Index RangeCheck0) feature_flags.range_check
-                  actual_feature_flags.range_check
+                compute_feature (Index RangeCheck0) feature_flags.range_check0
+                  actual_feature_flags.range_check0
             ; range_check1 =
-                compute_feature (Index RangeCheck1) feature_flags.range_check
-                  actual_feature_flags.range_check
+                compute_feature (Index RangeCheck1) feature_flags.range_check1
+                  actual_feature_flags.range_check1
             ; foreign_field_add =
                 compute_feature (Index ForeignFieldAdd)
                   feature_flags.foreign_field_add
