@@ -62,6 +62,8 @@ module type S = sig
     Base_internalhash_types.state -> t -> Base_internalhash_types.state
 
   val hash : t -> int
+
+  val to_field : t -> Zkapp_basic.F.t
 end
 
 module type S_checked = sig

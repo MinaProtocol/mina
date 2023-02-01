@@ -228,6 +228,8 @@ module Call_forest = struct
       end
 
       let create : Account_update.t -> t = Account_update.digest
+
+      let to_field = Fn.id
     end
 
     module Forest = struct
@@ -250,6 +252,8 @@ module Call_forest = struct
           Random_oracle.Checked.hash
             ~init:Hash_prefix_states.account_update_cons [| hash; h_tl |]
       end
+
+      let to_field = Fn.id
 
       let empty = empty
 
@@ -288,6 +292,8 @@ module Call_forest = struct
         in
         Random_oracle.hash ~init:Hash_prefix_states.account_update_node
           [| account_update_digest; stack_hash |]
+
+      let to_field = Fn.id
     end
   end
 

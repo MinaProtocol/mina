@@ -19,7 +19,7 @@ let account_id = Account_id.create pk_compressed Token_id.default
 (* we want to create a circuit with a domain of size 2^16 *)
 let num_constraints = 1 lsl 15
 
-let tag, _cache, _p_module, Pickles.Provers.[ prover ] =
+let tag, _cache, p_module, Pickles.Provers.[ prover ] =
   Zkapps_examples.compile () ~cache:Cache_dir.cache ~auxiliary_typ:Impl.Typ.unit
     ~branches:(module Nat.N1)
     ~max_proofs_verified:(module Nat.N0)
@@ -29,6 +29,8 @@ let tag, _cache, _p_module, Pickles.Provers.[ prover ] =
          constraint_constants )
     ~choices:(fun ~self:_ ->
       [ Zkapps_big_circuit.rule ~num_constraints pk_compressed ] )
+
+module P = (val p_module)
 
 let vk : Side_loaded_verification_key.t =
   Pickles.Side_loaded.Verification_key.of_compiled tag
@@ -127,6 +129,41 @@ let zkapp_command : Zkapp_command.t =
     ; account_updates
     ; memo
     }
+
+let before = Time.now ()
+
+let () =
+  Format.eprintf "Running a bunch of verifications %s@." (Time.to_string before)
+
+let () =
+  let proof =
+    match account_update.account_update.authorization with
+    | Proof p ->
+        p
+    | _ ->
+        assert false
+  in
+  let stmt =
+    let digest =
+      Zkapp_command.Call_forest.Digest.Account_update.(
+        to_field @@ create account_update.account_update)
+    in
+    { Zkapp_statement.Poly.account_update = digest
+    ; calls = Zkapp_command.Call_forest.Digest.Forest.(to_field @@ empty)
+    }
+  in
+  for _ = 1 to 100 do
+    Or_error.ok_exn
+    @@ Async.Thread_safe.block_on_async_exn (fun () ->
+           Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ
+             [ (vk, stmt, proof) ] )
+  done
+
+let after = Time.now ()
+
+let () =
+  Format.eprintf "Took time to verify 100: %s@."
+    (Time.Span.to_string_hum (Time.diff after before))
 
 let () =
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
