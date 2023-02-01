@@ -1222,10 +1222,19 @@ struct
         in
         (* handle drops of locally generated commands *)
         let all_dropped_cmds = dropped_for_add @ dropped_for_size in
-        let all_dropped_cmd_hashes =
-          List.map all_dropped_cmds
+        let dropped_for_add_hashes =
+          List.map dropped_for_add
             ~f:Transaction_hash.User_command_with_valid_signature.hash
           |> Transaction_hash.Set.of_list
+        in
+        let dropped_for_size_hashes =
+          List.map dropped_for_size
+            ~f:Transaction_hash.User_command_with_valid_signature.hash
+          |> Transaction_hash.Set.of_list
+        in
+        let all_dropped_cmd_hashes =
+          Transaction_hash.Set.union dropped_for_add_hashes
+            dropped_for_size_hashes
         in
         [%log' debug t.logger]
           "Dropping $num_for_add commands from pool while adding new commands, \
@@ -1273,12 +1282,16 @@ struct
             ~f:(fun _ ->
               Counter.inc_one Transaction_pool.transactions_added_to_pool )) ;
         (* partition the results *)
-        let accepted, rejected =
-          List.partition_map add_results ~f:(function
+        let accepted, rejected, _dropped =
+          List.partition3_map add_results ~f:(function
             | Ok (cmd, _dropped) ->
-                Either.First cmd
+                if
+                  Set.mem all_dropped_cmd_hashes
+                    (Transaction_hash.User_command_with_valid_signature.hash cmd)
+                then `Trd cmd
+                else `Fst cmd
             | Error (cmd, error) ->
-                Either.Second (cmd, error) )
+                `Snd (cmd, error) )
         in
         (* determine if we should re-broadcast this diff *)
         let decision =
@@ -2878,4 +2891,76 @@ let%test_module _ =
           assert_pool_txs t [] ;
           let%bind () = add_commands' t all_cmds in
           assert_pool_txs t all_cmds ; Deferred.unit )
+
+    let mk_zkapp_user_cmd (pool : Test.Resource_pool.t) zkapp_command =
+      let best_tip_ledger = Option.value_exn pool.best_tip_ledger in
+      let keymap =
+        Array.fold (Array.append test_keys extra_keys)
+          ~init:Public_key.Compressed.Map.empty
+          ~f:(fun map { public_key; private_key } ->
+            let key = Public_key.compress public_key in
+            Public_key.Compressed.Map.add_exn map ~key ~data:private_key )
+      in
+      let zkapp_command =
+        Or_error.ok_exn
+          (Zkapp_command.Valid.to_valid ~ledger:best_tip_ledger
+             ~get:Mina_ledger.Ledger.get
+             ~location_of_account:Mina_ledger.Ledger.location_of_account
+             zkapp_command )
+      in
+      let zkapp_command = User_command.Zkapp_command zkapp_command in
+      let%bind zkapp_command =
+        replace_valid_zkapp_command_authorizations ~keymap
+          ~ledger:best_tip_ledger [ zkapp_command ]
+      in
+      let zkapp_command = List.hd_exn zkapp_command in
+      Deferred.return zkapp_command
+
+    let mk_basic_zkapp ?(fee = 10_000_000_000) ?(empty_update = false)
+        ?(preconditions = None) nonce fee_payer_kp =
+      let open Zkapp_command_builder in
+      let preconditions =
+        Option.value preconditions
+          ~default:
+            Account_update.Preconditions.
+              { network = Zkapp_precondition.Protocol_state.accept
+              ; account = Account_update.Account_precondition.Accept
+              ; valid_while = Ignore
+              }
+      in
+      let account_updates =
+        if empty_update then []
+        else
+          mk_forest
+            [ mk_node
+                (mk_account_update_body Signature No fee_payer_kp
+                   Token_id.default 0 ~preconditions )
+                []
+            ]
+      in
+      account_updates
+      |> mk_zkapp_command ~memo:"" ~fee
+           ~fee_payer_pk:(Public_key.compress fee_payer_kp.public_key)
+           ~fee_payer_nonce:(Account.Nonce.of_int nonce)
+
+    let%test_unit "zkapp cmd with same nonce should replace previous submitted \
+                   zkapp with same nonce" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind () = after (Time.Span.of_sec 2.) in
+          let%bind t = setup_test () in
+          assert_pool_txs t [] ;
+          let fee_payer_kp = test_keys.(0) in
+          let%bind valid_command1 =
+            mk_basic_zkapp ~fee:10_000_000_000 0 fee_payer_kp
+            |> mk_zkapp_user_cmd t.txn_pool
+          in
+          let%bind valid_command2 =
+            mk_basic_zkapp ~fee:20_000_000_000 ~empty_update:true 0 fee_payer_kp
+            |> mk_zkapp_user_cmd t.txn_pool
+          in
+          let%bind () =
+            add_commands t ([ valid_command1 ] @ [ valid_command2 ])
+            >>| assert_pool_apply [ valid_command2 ]
+          in
+          Deferred.unit )
   end )
