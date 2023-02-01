@@ -7,6 +7,10 @@ type invalid =
     Signature_lib.Public_key.Compressed.Stable.Latest.t list
   | `Invalid_proof of (Error.t[@to_yojson Error_json.error_to_yojson])
   | `Missing_verification_key of
+    Signature_lib.Public_key.Compressed.Stable.Latest.t list
+  | `Unexpected_verification_key of
+    Signature_lib.Public_key.Compressed.Stable.Latest.t list
+  | `Mismatched_authorization_kind of
     Signature_lib.Public_key.Compressed.Stable.Latest.t list ]
 [@@deriving bin_io_unversioned, to_yojson]
 
@@ -23,6 +27,10 @@ let invalid_to_error (invalid : invalid) : Error.t =
       Error.createf "Invalid_signature: [%s]" (keys_to_string keys)
   | `Missing_verification_key keys ->
       Error.createf "Missing_verification_key: [%s]" (keys_to_string keys)
+  | `Unexpected_verification_key keys ->
+      Error.createf "Unexpected_verification_key: [%s]" (keys_to_string keys)
+  | `Mismatched_authorization_kind keys ->
+      Error.createf "Mismatched_authorization_kind: [%s]" (keys_to_string keys)
   | `Invalid_proof err ->
       Error.tag ~tag:"Invalid_proof" err
 
@@ -85,13 +93,13 @@ let check :
                   if p.body.use_full_commitment then full_tx_commitment
                   else tx_commitment
                 in
-                match p.authorization with
-                | Signature s ->
+                match (p.authorization, p.body.authorization_kind) with
+                | Signature s, Signature ->
                     check_signature s p.body.public_key commitment ;
                     None
-                | None_given ->
+                | None_given, None_given ->
                     None
-                | Proof pi -> (
+                | Proof pi, Proof vk_hash -> (
                     match vk_opt with
                     | None ->
                         return
@@ -100,13 +108,27 @@ let check :
                               @@ Account_update.account_id p
                             ] )
                     | Some (vk : _ With_hash.t) ->
-                        Some (vk.data, stmt, pi) ) )
+                        if
+                          (* check that vk expected for proof is the one being used *)
+                          Snark_params.Tick.Field.equal vk_hash
+                            (With_hash.hash vk)
+                        then Some (vk.data, stmt, pi)
+                        else
+                          return
+                            (`Unexpected_verification_key
+                              [ Account_id.public_key
+                                @@ Account_update.account_id p
+                              ] ) )
+                | _ ->
+                    return
+                      (`Mismatched_authorization_kind
+                        [ Account_id.public_key @@ Account_update.account_id p ]
+                        ) )
           in
           let v : User_command.Valid.t =
-            (*Verification keys should be present if it reaches here*)
+            (* Verification keys should be present if it reaches here *)
             let zkapp_command =
-              Or_error.ok_exn
-                (Zkapp_command.Valid.of_verifiable zkapp_command_with_vk)
+              Zkapp_command.Valid.of_verifiable zkapp_command_with_vk
             in
             User_command.Poly.Zkapp_command zkapp_command
           in

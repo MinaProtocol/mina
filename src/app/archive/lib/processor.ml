@@ -448,13 +448,35 @@ module Zkapp_sequence_states = struct
       id
 end
 
+module Zkapp_verification_key_hashes = struct
+  type t = int array
+
+  let typ = Caqti_type.string
+
+  let table_name = "zkapp_verification_key_hashes"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      (verification_key_hash : Pickles.Backend.Tick.Field.t) =
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name
+      ~cols:([ "value" ], typ)
+      (module Conn)
+      (Pickles.Backend.Tick.Field.to_string verification_key_hash)
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int Caqti_type.string
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "value" ]) )
+      id
+end
+
 module Zkapp_verification_keys = struct
-  type t = { verification_key : string; hash : string }
+  type t = { verification_key : string; hash_id : int }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ string; string ]
+      Caqti_type.[ string; int ]
 
   let table_name = "zkapp_verification_keys"
 
@@ -463,11 +485,14 @@ module Zkapp_verification_keys = struct
         ( Pickles.Side_loaded.Verification_key.t
         , Pickles.Backend.Tick.Field.t )
         With_hash.t ) =
+    let open Deferred.Result.Let_syntax in
     let verification_key =
       Pickles.Side_loaded.Verification_key.to_base64 vk.data
     in
-    let hash = Pickles.Backend.Tick.Field.to_string vk.hash in
-    let value = { hash; verification_key } in
+    let%bind hash_id =
+      Zkapp_verification_key_hashes.add_if_doesn't_exist (module Conn) vk.hash
+    in
+    let value = { verification_key; hash_id } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
@@ -1460,6 +1485,7 @@ module Zkapp_account_update_body = struct
     ; implicit_account_creation_fee : bool
     ; may_use_token : string
     ; authorization_kind : string
+    ; verification_key_hash_id : int option
     }
   [@@deriving fields, hlist]
 
@@ -1481,6 +1507,7 @@ module Zkapp_account_update_body = struct
         ; bool
         ; string
         ; string
+        ; option int
         ]
 
   let table_name = "zkapp_account_update_body"
@@ -1535,7 +1562,20 @@ module Zkapp_account_update_body = struct
       Account_update.May_use_token.to_string body.may_use_token
     in
     let authorization_kind =
-      Account_update.Authorization_kind.to_string body.authorization_kind
+      Account_update.Authorization_kind.to_control_tag body.authorization_kind
+      |> Control.Tag.to_string
+    in
+    let%bind verification_key_hash_id =
+      match body.authorization_kind with
+      | Account_update.Authorization_kind.Proof vk_hash ->
+          let%map id =
+            Zkapp_verification_key_hashes.add_if_doesn't_exist
+              (module Conn)
+              vk_hash
+          in
+          Some id
+      | _ ->
+          return None
     in
     let value =
       { account_identifier_id
@@ -1553,6 +1593,7 @@ module Zkapp_account_update_body = struct
       ; implicit_account_creation_fee
       ; may_use_token
       ; authorization_kind
+      ; verification_key_hash_id
       }
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)

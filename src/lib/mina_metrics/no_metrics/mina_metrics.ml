@@ -100,6 +100,8 @@ module Transaction_pool = struct
 
   let transactions_added_to_pool : Counter.t = ()
 
+  let vk_refcount_table_size : Gauge.t = ()
+
   let zkapp_transactions_added_to_pool : Counter.t = ()
 
   let zkapp_transaction_size : Counter.t = ()

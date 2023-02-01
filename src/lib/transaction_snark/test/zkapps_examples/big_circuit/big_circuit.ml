@@ -33,14 +33,22 @@ let tag, _cache, _p_module, Pickles.Provers.[ prover ] =
 let vk : Side_loaded_verification_key.t =
   Pickles.Side_loaded.Verification_key.of_compiled tag
 
-let account_update, () = Async.Thread_safe.block_on_async_exn prover
+let vk_hash = Mina_base.Verification_key_wire.digest_vk vk
+
+let account_update : Account_update.t =
+  let ({ account_update; _ } : _ Zkapp_command.Call_forest.tree), () =
+    Async.Thread_safe.block_on_async_exn prover
+  in
+  { body = { account_update.body with authorization_kind = Proof vk_hash }
+  ; authorization = account_update.authorization
+  }
 
 let deploy_account_update_body : Account_update.Body.t =
   { Account_update.Body.dummy with
     public_key = pk_compressed
   ; update =
       { Account_update.Update.dummy with
-        verification_key = Set { data = vk; hash = Zkapp_account.digest_vk vk }
+        verification_key = Set { data = vk; hash = vk_hash }
       }
   ; preconditions =
       { Account_update.Preconditions.network =
@@ -60,7 +68,7 @@ let deploy_account_update : Account_update.t =
 
 let account_updates =
   []
-  |> Zkapp_command.Call_forest.cons_tree account_update
+  |> Zkapp_command.Call_forest.cons account_update
   |> Zkapp_command.Call_forest.cons deploy_account_update
 
 let memo = Signed_command_memo.empty
