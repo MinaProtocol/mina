@@ -310,7 +310,7 @@ module type Full = sig
 
     val update_states :
          ?receiver_auth:Control.Tag.t
-      -> ?zkapp_prover:
+      -> ?zkapp_prover_and_vk:
            ( unit
            , unit
            , unit
@@ -318,6 +318,9 @@ module type Full = sig
            , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t)
              Async.Deferred.t )
            Pickles.Prover.t
+           * ( Pickles.Side_loaded.Verification_key.t
+             , Snark_params.Tick.Field.t )
+             With_hash.t
       -> ?empty_sender:bool
       -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Update_states_spec.t

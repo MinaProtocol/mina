@@ -2778,6 +2778,108 @@
         },
         {
           "kind": "INPUT_OBJECT",
+          "name": "AuthorizationKindStructuredInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "isSigned",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "isProved",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "verificationKeyHash",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Field",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "isSigned",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "isProved",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "verificationKeyHash",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Field",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
           "name": "AccountUpdateBodyInput",
           "description": null,
           "fields": [
@@ -3025,8 +3127,8 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "AuthorizationKind",
+                  "kind": "INPUT_OBJECT",
+                  "name": "AuthorizationKindStructuredInput",
                   "ofType": null
                 }
               },
@@ -3252,8 +3354,8 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "AuthorizationKind",
+                  "kind": "INPUT_OBJECT",
+                  "name": "AuthorizationKindStructuredInput",
                   "ofType": null
                 }
               },
@@ -3275,7 +3377,7 @@
               "args": [],
               "type": {
                 "kind": "SCALAR",
-                "name": "SnappProof",
+                "name": "ZkappProof",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -3300,7 +3402,7 @@
               "description": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "SnappProof",
+                "name": "ZkappProof",
                 "ofType": null
               },
               "defaultValue": null
@@ -6729,7 +6831,7 @@
         },
         {
           "kind": "SCALAR",
-          "name": "SnappProof",
+          "name": "ZkappProof",
           "description": null,
           "fields": null,
           "inputFields": null,
@@ -6748,7 +6850,7 @@
               "args": [],
               "type": {
                 "kind": "SCALAR",
-                "name": "SnappProof",
+                "name": "ZkappProof",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -6773,12 +6875,61 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "AuthorizationKind",
+          "kind": "OBJECT",
+          "name": "AuthorizationKindStructured",
           "description": null,
-          "fields": null,
+          "fields": [
+            {
+              "name": "isSigned",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "isProved",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "verificationKeyHash",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Field",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
           "inputFields": null,
-          "interfaces": null,
+          "interfaces": [],
           "enumValues": null,
           "possibleTypes": null
         },
@@ -8185,8 +8336,8 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "AuthorizationKind",
+                  "kind": "OBJECT",
+                  "name": "AuthorizationKindStructured",
                   "ofType": null
                 }
               },

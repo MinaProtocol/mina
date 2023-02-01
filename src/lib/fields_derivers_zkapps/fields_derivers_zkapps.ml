@@ -530,7 +530,7 @@ let proof obj : _ Unified_input.t =
     | Error _err ->
         raise_invalid_scalar `Proof s
   in
-  iso_string obj ~name:"SnappProof" ~js_type:String
+  iso_string obj ~name:"ZkappProof" ~js_type:String
     ~to_string:Pickles.Side_loaded.Proof.to_base64 ~of_string
 
 let verification_key_with_hash obj =

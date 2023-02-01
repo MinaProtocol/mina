@@ -540,7 +540,7 @@ let zkapp_command_to_transaction ~logger ~pool (cmd : Sql.Zkapp_command.t) :
         in
         let (authorization : Control.t) =
           match body.authorization_kind with
-          | Proof ->
+          | Proof _ ->
               Proof Proof.transaction_dummy
           | Signature ->
               Signature Signature.dummy

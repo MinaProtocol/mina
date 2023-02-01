@@ -99,7 +99,7 @@ let%test_unit "1-of-2" =
       |> run_and_check |> Or_error.ok_exn )
 
 (* test a snapp tx with a 3-account_update ring *)
-let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
+let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
   let open Mina_transaction_logic.For_tests in
   let gen =
     let open Quickcheck.Generator.Let_syntax in
@@ -229,9 +229,9 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                     ; account = Full Zkapp_precondition.Account.accept
                     ; valid_while = Ignore
                     }
-                ; use_full_commitment = false
                 ; may_use_token = No
-                ; authorization_kind = Proof
+                ; use_full_commitment = false
+                ; authorization_kind = Proof (With_hash.hash vk)
                 }
             ; authorization = Proof Mina_base.Proof.transaction_dummy
             }

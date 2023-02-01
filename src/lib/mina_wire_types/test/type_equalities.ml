@@ -198,10 +198,6 @@ module Mina_base = struct
       (O.Account_update.Body.Events'.Stable)
       (W.Account_update.Body.Events')
   include Assert_equal0V1 (O.Ledger_hash.Stable) (W.Ledger_hash)
-  include
-    Assert_equal0V1
-      (O.Zkapp_command.Valid.Verification_key_hash.Stable)
-      (W.Zkapp_command.Valid.Verification_key_hash)
 
   include
     Assert_equal0V1

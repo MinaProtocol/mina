@@ -1089,11 +1089,10 @@ module T = struct
   let check_commands ledger ~verifier (cs : User_command.t list) =
     let open Deferred.Or_error.Let_syntax in
     let%bind cs =
-      Or_error.try_with (fun () ->
-          List.map cs ~f:(fun cmd ->
-              let open Ledger in
-              User_command.to_verifiable ~ledger ~get ~location_of_account cmd
-              |> Or_error.ok_exn ) )
+      User_command.Last.to_all_verifiable cs
+        ~find_vk:
+          (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger ~get:Ledger.get
+             ~location_of_account:Ledger.location_of_account )
       |> Deferred.return
     in
     let%map xs = Verifier.verify_commands verifier cs in
@@ -1104,7 +1103,9 @@ module T = struct
         | ( `Invalid_keys _
           | `Invalid_signature _
           | `Invalid_proof _
-          | `Missing_verification_key _ ) as invalid ->
+          | `Missing_verification_key _
+          | `Unexpected_verification_key _
+          | `Mismatched_authorization_kind _ ) as invalid ->
             Error
               (Verifier.Failure.Verification_failed
                  (Error.tag ~tag:"verification failed on command"
@@ -1855,82 +1856,6 @@ module T = struct
       epoch_ledger
     |> not
 
-  let validate_account_update_proofs ~logger ~validating_ledger
-      (txn : User_command.Valid.t) =
-    let open Result.Let_syntax in
-    let get_verification_keys account_ids =
-      List.fold_until account_ids ~init:Account_id.Map.empty
-        ~f:(fun acc id ->
-          let get_vk () =
-            let open Option.Let_syntax in
-            let%bind loc =
-              Transaction_snark.Transaction_validator.Hashless_ledger
-              .location_of_account validating_ledger id
-            in
-            let%bind account =
-              Transaction_snark.Transaction_validator.Hashless_ledger.get
-                validating_ledger loc
-            in
-            let%bind zkapp = account.zkapp in
-            let%map vk = zkapp.verification_key in
-            vk.hash
-          in
-          match get_vk () with
-          | Some vk ->
-              Continue (Account_id.Map.update acc id ~f:(fun _ -> vk))
-          | None ->
-              [%log error]
-                ~metadata:[ ("account_id", Account_id.to_yojson id) ]
-                "Staged_ledger_diff creation: Verification key not found for \
-                 account_update with proof authorization and account_id \
-                 $account_id" ;
-              Stop Account_id.Map.empty )
-        ~finish:Fn.id
-    in
-    match txn with
-    | Zkapp_command p ->
-        let%map checked_verification_keys =
-          Account_id.Map.of_alist_or_error p.verification_keys
-        in
-        let proof_zkapp_command =
-          Zkapp_command.Call_forest.fold ~init:Account_id.Set.empty
-            p.zkapp_command.account_updates ~f:(fun acc p ->
-              if
-                Control.(Tag.equal Proof (tag (Account_update.authorization p)))
-              then Account_id.Set.add acc (Account_update.account_id p)
-              else acc )
-        in
-        let current_verification_keys =
-          get_verification_keys (Account_id.Set.to_list proof_zkapp_command)
-        in
-        if
-          Account_id.Set.length proof_zkapp_command
-          = Account_id.Map.length checked_verification_keys
-          && Account_id.Map.equal
-               Zkapp_command.Valid.Verification_key_hash.equal
-               checked_verification_keys current_verification_keys
-        then true
-        else (
-          [%log error]
-            ~metadata:
-              [ ( "checked_verification_keys"
-                , [%to_yojson:
-                    (Account_id.t * Zkapp_command.Valid.Verification_key_hash.t)
-                    list]
-                    (Account_id.Map.to_alist checked_verification_keys) )
-              ; ( "current_verification_keys"
-                , [%to_yojson:
-                    (Account_id.t * Zkapp_command.Valid.Verification_key_hash.t)
-                    list]
-                    (Account_id.Map.to_alist current_verification_keys) )
-              ]
-            "Staged_ledger_diff creation: Verifcation keys used for verifying \
-             proofs $checked_verification_keys and verification keys in the \
-             ledger $current_verification_keys don't match" ;
-          false )
-    | _ ->
-        Ok true
-
   let create_diff
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(global_slot : Mina_numbers.Global_slot.t) ?(log_block_creation = false)
@@ -2015,14 +1940,6 @@ module T = struct
               match
                 O1trace.sync_thread "validate_transaction_against_staged_ledger"
                   (fun () ->
-                    let%bind valid_proofs =
-                      validate_account_update_proofs ~logger ~validating_ledger
-                        txn
-                    in
-                    let%bind () =
-                      if valid_proofs then Ok ()
-                      else Or_error.errorf "Verification key mismatch"
-                    in
                     Transaction_validator.apply_transaction_first_pass
                       ~constraint_constants ~global_slot validating_ledger
                       ~txn_state_view:current_state_view
@@ -2154,7 +2071,7 @@ let%test_module "staged ledger tests" =
 
     let logger = Logger.null ()
 
-    let `VK vk, `Prover zkapp_prover =
+    let `VK vk, `Prover _zkapp_prover =
       Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
 
     let verifier =
@@ -2619,9 +2536,12 @@ let%test_module "staged ledger tests" =
               in
               let valid_zkapp_command_with_auths : Zkapp_command.Valid.t =
                 match
-                  Zkapp_command.Valid.to_valid zkapp_command_with_auths ~ledger
-                    ~get:Ledger.get
-                    ~location_of_account:Ledger.location_of_account
+                  Zkapp_command.Valid.to_valid
+                    ~find_vk:
+                      (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
+                         ~get:Ledger.get
+                         ~location_of_account:Ledger.location_of_account )
+                    zkapp_command_with_auths
                 with
                 | Ok ps ->
                     ps
@@ -3926,6 +3846,8 @@ let%test_module "staged ledger tests" =
                   | Error _ ->
                       assert false ) ) )
 
+    (* TODO: Re-enable after https://github.com/MinaProtocol/mina/pull/12397 *)
+    (*
     let%test_unit "Mismatched verification keys in zkApp accounts and \
                    transactions" =
       let open Transaction_snark.For_tests in
@@ -4004,14 +3926,17 @@ let%test_module "staged ledger tests" =
                     l
                   in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states ~zkapp_prover
-                      ~constraint_constants test_spec
+                    let zkapp_prover_and_vk = (zkapp_prover, vk) in
+                    Transaction_snark.For_tests.update_states
+                      ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   let valid_zkapp_command =
                     Or_error.ok_exn
-                      (Zkapp_command.Valid.to_valid ~ledger:valid_against_ledger
-                         ~get:Ledger.get
-                         ~location_of_account:Ledger.location_of_account
+                      (Zkapp_command.Valid.to_valid
+                         ~find_vk:
+                           (Zkapp_command.Verifiable.find_vk_via_ledger
+                              ~ledger:valid_against_ledger ~get:Ledger.get
+                              ~location_of_account:Ledger.location_of_account )
                          zkapp_command )
                   in
                   ignore
@@ -4069,5 +3994,5 @@ let%test_module "staged ledger tests" =
                            ( Transaction_status.Failure.Collection.to_yojson tbl
                            |> Yojson.Safe.to_string ) )
                   | _ ->
-                      failwith "expecting zkapp_command transaction" ) ) )
+                      failwith "expecting zkapp_command transaction" ) ) ) *)
   end )

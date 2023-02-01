@@ -47,11 +47,10 @@ module Failure = struct
         | Account_proved_state_precondition_unsatisfied
         | Account_is_new_precondition_unsatisfied
         | Protocol_state_precondition_unsatisfied
+        | Unexpected_verification_key_hash
         | Valid_while_precondition_unsatisfied
         | Incorrect_nonce
         | Invalid_fee_excess
-        | Incorrect_verification_key of
-            { expected_verification_key_hash : Zkapp_basic.F.Stable.V1.t }
         | Cancelled
       [@@deriving sexp, yojson, equal, compare, variants, hash]
 
@@ -132,12 +131,9 @@ module Failure = struct
       ~account_proved_state_precondition_unsatisfied:add
       ~account_is_new_precondition_unsatisfied:add
       ~protocol_state_precondition_unsatisfied:add
-      ~valid_while_precondition_unsatisfied:add ~incorrect_nonce:add
-      ~invalid_fee_excess:add
-      ~incorrect_verification_key:(fun acc var ->
-        var.constructor ~expected_verification_key_hash:Zkapp_basic.F.zero
-        :: acc )
-      ~cancelled:add
+      ~valid_while_precondition_unsatisfied:add
+      ~unexpected_verification_key_hash:add ~incorrect_nonce:add
+      ~invalid_fee_excess:add ~cancelled:add
 
   let gen = Quickcheck.Generator.of_list all
 
@@ -224,14 +220,12 @@ module Failure = struct
         "Protocol_state_precondition_unsatisfied"
     | Valid_while_precondition_unsatisfied ->
         "Valid_while_precondition_unsatisfied"
+    | Unexpected_verification_key_hash ->
+        "Unexpected_verification_key_hash"
     | Incorrect_nonce ->
         "Incorrect_nonce"
     | Invalid_fee_excess ->
         "Invalid_fee_excess"
-    | Incorrect_verification_key
-        { expected_verification_key_hash = expected_key } ->
-        sprintf "Incorrect_verification_key_%s"
-          (Zkapp_basic.F.to_string expected_key)
     | Cancelled ->
         "Cancelled"
 
@@ -316,6 +310,8 @@ module Failure = struct
         Ok Protocol_state_precondition_unsatisfied
     | "Valid_while_precondition_unsatisfied" ->
         Ok Valid_while_precondition_unsatisfied
+    | "Unexpected_verification_key_hash" ->
+        Ok Unexpected_verification_key_hash
     | "Incorrect_nonce" ->
         Ok Incorrect_nonce
     | "Invalid_fee_excess" ->
@@ -345,13 +341,6 @@ module Failure = struct
               , fun str ->
                   Account_app_state_precondition_unsatisfied (int_of_string str)
               )
-            ; ( "Incorrect_verification_key_"
-              , ""
-              , fun str ->
-                  Incorrect_verification_key
-                    { expected_verification_key_hash =
-                        Zkapp_basic.F.of_string str
-                    } )
             ]
         in
         match res with
@@ -469,17 +458,14 @@ module Failure = struct
         "The account update's protocol state precondition unsatisfied"
     | Valid_while_precondition_unsatisfied ->
         "The account update's valid-until precondition was unsatisfied"
+    | Unexpected_verification_key_hash ->
+        "The account update's verification key hash does not match the \
+         verification key in the ledger account"
     | Incorrect_nonce ->
         "Incorrect nonce"
     | Invalid_fee_excess ->
         "Fee excess from zkapp_command transaction more than the transaction \
          fees"
-    | Incorrect_verification_key { expected_verification_key_hash = vk } ->
-        sprintf
-          "The update's account verification key did not match the \
-           verification key that the authorization proof was valid against \
-           (%s)"
-          (Zkapp_basic.F.to_string vk)
     | Cancelled ->
         "The account update is cancelled because there's a failure in the \
          zkApp transaction"

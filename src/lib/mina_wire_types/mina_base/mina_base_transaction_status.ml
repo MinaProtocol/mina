@@ -41,11 +41,10 @@ module Failure = struct
       | Account_proved_state_precondition_unsatisfied
       | Account_is_new_precondition_unsatisfied
       | Protocol_state_precondition_unsatisfied
+      | Unexpected_verification_key_hash
       | Valid_while_precondition_unsatisfied
       | Incorrect_nonce
       | Invalid_fee_excess
-      | Incorrect_verification_key of
-          { expected_verification_key_hash : Mina_base_zkapp_basic.F.V1.t }
       | Cancelled
   end
 
