@@ -448,13 +448,13 @@ module Improper_calls = struct
 
   let random_input = Impl.Field.Constant.(random (), random ())
 
-  let run_circuit_as_prover circuit : unit =
+  let use_for_witness_generation circuit : unit =
     let compiled = Impl.generate_witness ~input_typ ~return_typ circuit in
     let input = random_input in
     let _b = compiled input in
     ()
 
-  let run_circuit_as_circuit circuit : unit =
+  let use_for_constraint_generation circuit : unit =
     let cs : Impl.R1CS_constraint_system.t =
       Impl.constraint_system ~input_typ ~return_typ circuit
     in
@@ -468,10 +468,10 @@ module Improper_calls = struct
       in
       let circuit ((_a, _b) : Impl.Field.t * Impl.Field.t) () =
         Impl.as_prover (fun _ ->
-            run_circuit_as_circuit inner_circuit ;
+            use_for_constraint_generation inner_circuit ;
             () )
       in
-      run_circuit_as_prover circuit ;
+      use_for_witness_generation circuit ;
       ()
 
     let circuit_functions_with_global_outside_circuit () : unit =
@@ -497,14 +497,14 @@ module Improper_calls = struct
         Impl.as_prover (fun _ -> use_circuit_functions a b ; ()) ;
         ()
       in
-      run_circuit_as_prover circuit ;
+      use_for_witness_generation circuit ;
       ()
 
     let prover_functions_outside_prover_block () : unit =
       let circuit ((a, b) : Impl.Field.t * Impl.Field.t) () =
         use_prover_functions a b ; ()
       in
-      run_circuit_as_circuit circuit ;
+      use_for_constraint_generation circuit ;
       ()
 
     let prover_functions_outside_prover_block () : unit =
@@ -521,10 +521,10 @@ module Improper_calls = struct
       in
       let circuit ((_a, _b) : Impl.Field.t * Impl.Field.t) () =
         Impl.as_prover (fun _ ->
-            run_circuit_as_prover inner_circuit ;
+            use_for_witness_generation inner_circuit ;
             () )
       in
-      run_circuit_as_prover circuit ;
+      use_for_witness_generation circuit ;
       ()
 
     let prover_function_in_prover_block_of_other_circuit () : unit =
@@ -533,10 +533,10 @@ module Improper_calls = struct
       in
       let circuit ((_a, _b) : Impl.Field.t * Impl.Field.t) () =
         Impl.as_prover (fun _ ->
-            run_circuit_as_circuit inner_circuit ;
+            use_for_constraint_generation inner_circuit ;
             () )
       in
-      run_circuit_as_prover circuit ;
+      use_for_witness_generation circuit ;
       ()
 
     let prover_function_in_prover_block_of_other_circuit () : unit =
