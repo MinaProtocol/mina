@@ -10,10 +10,20 @@ let mk_forest ps :
 let mk_node account_update calls : _ Zkapp_command.Call_forest.Tree.t =
   { account_update; account_update_digest = (); calls = mk_forest calls }
 
-let mk_account_update_body authorization_kind may_use_token kp token_id
-    balance_change : Account_update.Body.Simple.t =
+let mk_account_update_body ?preconditions ?(increment_nonce = false)
+    ?(update = Account_update.Update.noop) authorization_kind may_use_token kp
+    token_id balance_change : Account_update.Body.Simple.t =
   let open Signature_lib in
-  { update = Account_update.Update.noop
+  let preconditions =
+    Option.value preconditions
+      ~default:
+        Account_update.Preconditions.
+          { network = Zkapp_precondition.Protocol_state.accept
+          ; account = Account_update.Account_precondition.Accept
+          ; valid_while = Ignore
+          }
+  in
+  { update
   ; public_key = Public_key.compress kp.Keypair.public_key
   ; token_id
   ; balance_change =
@@ -21,16 +31,12 @@ let mk_account_update_body authorization_kind may_use_token kp token_id
         ~magnitude:
           (Currency.Amount.of_nanomina_int_exn (Int.abs balance_change))
         ~sgn:(if Int.is_negative balance_change then Sgn.Neg else Pos)
-  ; increment_nonce = false
+  ; increment_nonce
   ; events = []
   ; actions = []
   ; call_data = Pickles.Impls.Step.Field.Constant.zero
   ; call_depth = 0
-  ; preconditions =
-      { network = Zkapp_precondition.Protocol_state.accept
-      ; account = Account_update.Account_precondition.Accept
-      ; valid_while = Ignore
-      }
+  ; preconditions
   ; use_full_commitment = true
   ; implicit_account_creation_fee = false
   ; may_use_token

@@ -287,6 +287,22 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ~metadata:[ ("error", `String err_str) ] ;
         Malleable_error.hard_error (Error.of_string err_str)
 
+  let get_pooled_zkapp_commands ~logger node pk =
+    [%log info] "Getting pooled zkApp commands"
+      ~metadata:
+        [ ("pub_key", Signature_lib.Public_key.Compressed.to_yojson pk) ] ;
+    match%bind.Deferred
+      Network.Node.get_pooled_zkapp_commands ~logger node ~pk
+    with
+    | Ok zkapp_commands ->
+        [%log info] "Got pooled zkApp commands" ;
+        Malleable_error.return zkapp_commands
+    | Error err ->
+        let err_str = Error.to_string_mach err in
+        [%log error] "Error getting pooled zkApp commands"
+          ~metadata:[ ("error", `String err_str) ] ;
+        Malleable_error.hard_error (Error.of_string err_str)
+
   let compatible_item req_item ledg_item ~equal =
     match (req_item, ledg_item) with
     | Mina_base.Zkapp_basic.Set_or_keep.Keep, _ ->
