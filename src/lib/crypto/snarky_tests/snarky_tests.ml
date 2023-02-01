@@ -426,14 +426,9 @@ let outside_circuit_tests =
   ; ("out-of-circuit constraint (bad)", `Quick, out_of_circuit_constraint)
   ]
 
-(* run tests *)
-
-let api_tests =
-  [ ("generate witness", `Quick, generate_witness)
-  ; ("compile imperative API", `Quick, get_hash_of_circuit)
-  ; ("compile monadic API", `Quick, MonadicAPI.get_hash_of_circuit)
-  ]
-
+(****************************
+ * improper calls tests *
+ ****************************)
 module Improper_calls = struct
   let input_typ = Impl.Typ.tuple2 Impl.Field.typ Impl.Field.typ
 
@@ -454,10 +449,7 @@ module Improper_calls = struct
   let random_input = Impl.Field.Constant.(random (), random ())
 
   let run_circuit_as_prover circuit : unit =
-    let f (inputs : Impl.Proof_inputs.t) _ = inputs in
-    let compiled =
-      Impl.generate_witness_conv ~f ~input_typ ~return_typ circuit
-    in
+    let compiled = Impl.generate_witness ~input_typ ~return_typ circuit in
     let input = random_input in
     let _b = compiled input in
     ()
@@ -557,14 +549,36 @@ module Improper_calls = struct
   end
 
   let tests =
-    [ ("test1", `Quick, Tests.circuit_function_inside_circuit_inside_prover)
-    ; ("test2", `Quick, Tests.circuit_functions_with_global_outside_circuit)
-    ; ("test3", `Quick, Tests.circuit_functions_inside_prover)
-    ; ("test4", `Quick, Tests.prover_functions_outside_prover_block)
-    ; ("test5", `Quick, Tests.prover_function_inside_circuit_inside_circuit)
-    ; ("test6", `Quick, Tests.prover_function_in_prover_block_of_other_circuit)
+    [ ( "call circuit functions inside a prover block of another circuit"
+      , `Quick
+      , Tests.circuit_function_inside_circuit_inside_prover )
+    ; ( "calling circuit functions that use globals outside circuit should fail"
+      , `Quick
+      , Tests.circuit_functions_with_global_outside_circuit )
+    ; ( "call circuit functions inside an as_prover block"
+      , `Quick
+      , Tests.circuit_functions_inside_prover )
+    ; ( "calling prover functions outside of a as_prover block should fail"
+      , `Quick
+      , Tests.prover_functions_outside_prover_block )
+    ; ( "call prover functions inside a prover block inside another block of \
+         other circuit"
+      , `Quick
+      , Tests.prover_function_inside_circuit_inside_circuit )
+    ; ( "calling prover functions outside prover block but inside block of \
+         other circuit also fails "
+      , `Quick
+      , Tests.prover_function_in_prover_block_of_other_circuit )
     ]
 end
+
+(* run tests *)
+
+let api_tests =
+  [ ("generate witness", `Quick, generate_witness)
+  ; ("compile imperative API", `Quick, get_hash_of_circuit)
+  ; ("compile monadic API", `Quick, MonadicAPI.get_hash_of_circuit)
+  ]
 
 (* run tests *)
 
