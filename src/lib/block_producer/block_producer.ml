@@ -298,7 +298,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
             let ledger_proof_statement =
               match ledger_proof_opt with
               | Some (proof, _) ->
-                  Ledger_proof.statement_with_sok proof
+                  Ledger_proof.statement proof
               | None ->
                   let state =
                     previous_protocol_state |> Protocol_state.blockchain_state

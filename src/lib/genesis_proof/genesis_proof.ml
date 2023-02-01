@@ -160,8 +160,11 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
   in
   let curr = t.protocol_state_with_hashes.data in
   let dummy_txn_stmt : Transaction_snark.Statement.With_sok.t =
-    Blockchain_state.ledger_proof_statement
-      (Protocol_state.blockchain_state curr)
+    let t =
+      Blockchain_state.ledger_proof_statement
+        (Protocol_state.blockchain_state curr)
+    in
+    { t with sok_digest = Sok_message.Digest.default }
   in
   let genesis_epoch_ledger =
     match t.genesis_epoch_data with

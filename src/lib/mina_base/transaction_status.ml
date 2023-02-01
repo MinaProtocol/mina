@@ -135,7 +135,8 @@ module Failure = struct
       ~valid_while_precondition_unsatisfied:add ~incorrect_nonce:add
       ~invalid_fee_excess:add
       ~incorrect_verification_key:(fun acc var ->
-        var.constructor Zkapp_basic.F.zero :: acc )
+        var.constructor ~expected_verification_key_hash:Zkapp_basic.F.zero
+        :: acc )
       ~cancelled:add
 
   let gen = Quickcheck.Generator.of_list all

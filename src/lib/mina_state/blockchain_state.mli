@@ -58,7 +58,7 @@ module Value : sig
         , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
         , Pending_coinbase.Stack_versioned.Stable.V1.t
         , Fee_excess.Stable.V1.t
-        , Sok_message.Digest.Stable.V1.t )
+        , unit )
         Poly.Stable.V2.t
       [@@deriving sexp, equal, compare, hash, yojson]
 
@@ -78,7 +78,7 @@ include
       , Currency.Amount.Signed.var
       , Pending_coinbase.Stack.var
       , Fee_excess.var
-      , Sok_message.Digest.Checked.t )
+      , unit )
       Poly.t
      and type value := Value.t
 
@@ -122,7 +122,7 @@ val create_value :
   -> genesis_ledger_hash:Frozen_ledger_hash.t
   -> timestamp:Block_time.t
   -> body_reference:Consensus.Body_reference.t
-  -> ledger_proof_statement:Snarked_ledger_state.With_sok.t
+  -> ledger_proof_statement:Snarked_ledger_state.t
   -> Value.t
 
 val negative_one :
@@ -175,7 +175,7 @@ type display =
   , string
   , string
   , string
-  , string )
+  , unit )
   Poly.t
 [@@deriving yojson]
 

@@ -74,7 +74,7 @@ module Value = struct
         , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
         , Pending_coinbase.Stack_versioned.Stable.V1.t
         , Fee_excess.Stable.V1.t
-        , Sok_message.Digest.Stable.V1.t )
+        , unit )
         Poly.Stable.V2.t
       [@@deriving sexp, equal, compare, hash, yojson]
 
@@ -92,7 +92,7 @@ type var =
   , Currency.Amount.Signed.var
   , Pending_coinbase.Stack.var
   , Fee_excess.var
-  , Sok_message.Digest.Checked.t )
+  , unit )
   Poly.t
 
 let create_value ~staged_ledger_hash ~genesis_ledger_hash ~timestamp
@@ -108,7 +108,7 @@ let typ : (var, Value.t) Typ.t =
   Typ.of_hlistable
     [ Staged_ledger_hash.typ
     ; Frozen_ledger_hash.typ
-    ; Snarked_ledger_state.With_sok.typ
+    ; Snarked_ledger_state.typ
     ; Block_time.Checked.typ
     ; Consensus.Body_reference.typ
     ]
@@ -128,7 +128,7 @@ let var_to_input
   let open Random_oracle.Input.Chunked in
   let open Checked.Let_syntax in
   let%map ledger_proof_statement =
-    Snarked_ledger_state.With_sok.Checked.to_input ledger_proof_statement
+    Snarked_ledger_state.Checked.to_input ledger_proof_statement
   in
   List.reduce_exn ~f:append
     [ Staged_ledger_hash.var_to_input staged_ledger_hash
@@ -150,7 +150,7 @@ let to_input
   List.reduce_exn ~f:append
     [ Staged_ledger_hash.to_input staged_ledger_hash
     ; Frozen_ledger_hash.to_input genesis_ledger_hash
-    ; Snarked_ledger_state.With_sok.to_input ledger_proof_statement
+    ; Snarked_ledger_state.to_input ledger_proof_statement
     ; Block_time.to_input timestamp
     ; Consensus.Body_reference.to_input body_reference
     ]
@@ -164,8 +164,7 @@ let negative_one
   { staged_ledger_hash =
       Staged_ledger_hash.genesis ~constraint_constants ~genesis_ledger_hash
   ; genesis_ledger_hash
-  ; ledger_proof_statement =
-      Snarked_ledger_state.With_sok.genesis ~genesis_ledger_hash
+  ; ledger_proof_statement = Snarked_ledger_state.genesis ~genesis_ledger_hash
   ; timestamp = consensus_constants.genesis_state_timestamp
   ; body_reference = genesis_body_reference
   }
@@ -182,7 +181,7 @@ type display =
   , string
   , string
   , string
-  , string )
+  , unit )
   Poly.t
 [@@deriving yojson]
 
@@ -200,8 +199,7 @@ let display
   ; genesis_ledger_hash =
       Visualization.display_prefix_of_string
       @@ Frozen_ledger_hash.to_base58_check @@ genesis_ledger_hash
-  ; ledger_proof_statement =
-      Snarked_ledger_state.With_sok.display ledger_proof_statement
+  ; ledger_proof_statement = Snarked_ledger_state.display ledger_proof_statement
   ; timestamp =
       Time.to_string_trimmed ~zone:Time.Zone.utc
         (Block_time.to_time_exn timestamp)

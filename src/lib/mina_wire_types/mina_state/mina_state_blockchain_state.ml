@@ -37,7 +37,7 @@ module Value = struct
       , (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
       , Mina_base.Pending_coinbase.Stack_versioned.V1.t
       , Mina_base.Fee_excess.V1.t
-      , Mina_base.Sok_message.Digest.V1.t )
+      , unit )
       Poly.V2.t
   end
 end

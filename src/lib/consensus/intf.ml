@@ -57,7 +57,7 @@ module type Blockchain_state = sig
       , Amount.Signed.t
       , Pending_coinbase.Stack_versioned.Stable.V1.t
       , Fee_excess.Stable.V1.t
-      , Sok_message.Digest.Stable.V1.t )
+      , unit )
       Poly.t
     [@@deriving sexp]
   end
@@ -71,7 +71,7 @@ module type Blockchain_state = sig
     , Currency.Amount.Signed.var
     , Pending_coinbase.Stack.var
     , Fee_excess.var
-    , Sok_message.Digest.Checked.t )
+    , unit )
     Poly.t
 
   val staged_ledger_hash :

@@ -83,8 +83,8 @@ let non_pc_registers_equal_var t1 t2 =
       |> Impl.Boolean.all )
 
 let txn_statement_ledger_hashes_equal
-    (s1 : Transaction_snark.Statement.With_sok.Checked.t)
-    (s2 : Transaction_snark.Statement.With_sok.Checked.t) =
+    (s1 : Transaction_snark.Statement.Checked.t)
+    (s2 : Transaction_snark.Statement.Checked.t) =
   Impl.make_checked (fun () ->
       let module F = Core_kernel.Field in
       let ( ! ) x = Impl.run_checked x in
@@ -229,7 +229,8 @@ let%snarkydef_ step ~(logger : Logger.t)
     let%bind txn_stmt_ledger_hashes_didn't_change =
       txn_statement_ledger_hashes_equal
         (previous_state |> Protocol_state.blockchain_state)
-          .ledger_proof_statement txn_snark
+          .ledger_proof_statement
+        { txn_snark with sok_digest = () }
     and supply_increase_is_zero =
       Currency.Amount.(
         Signed.Checked.equal txn_snark.supply_increase

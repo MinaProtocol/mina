@@ -171,6 +171,27 @@ module type Full = sig
 
   val typ : (var, t) Tick.Typ.t
 
+  type display =
+    (string, string, string, string, unit, Local_state.display) Poly.t
+
+  val display : Stable.Latest.t -> display
+
+  val genesis : genesis_ledger_hash:Frozen_ledger_hash.t -> t
+
+  val to_input : t -> Tick.Field.t Random_oracle.Input.Chunked.t
+
+  val to_field_elements : t -> Tick.Field.t array
+
+  module Checked : sig
+    type t = var
+
+    val to_input :
+      var -> Tick.Field.Var.t Random_oracle.Input.Chunked.t Tick.Checked.t
+
+    (* This is actually a checked function. *)
+    val to_field_elements : var -> Tick.Field.Var.t array
+  end
+
   module With_sok : sig
     [%%versioned:
     module Stable : sig

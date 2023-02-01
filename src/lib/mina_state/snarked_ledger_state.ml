@@ -215,6 +215,129 @@ module Make_str (A : Wire_types.Concrete) = struct
     Poly.typ Frozen_ledger_hash.typ Currency.Amount.Signed.typ
       Pending_coinbase.Stack.typ Fee_excess.typ Tick.Typ.unit Local_state.typ
 
+  type display =
+    (string, string, string, string, unit, Local_state.display) Poly.t
+
+  let display (t : t) : display =
+    let display_ledger_hash t =
+      Visualization.display_prefix_of_string
+      @@ Frozen_ledger_hash.to_base58_check t
+    in
+    let display_register (t : _ Registers.t) =
+      { Registers.first_pass_ledger = display_ledger_hash t.first_pass_ledger
+      ; second_pass_ledger = display_ledger_hash t.second_pass_ledger
+      ; pending_coinbase_stack =
+          Pending_coinbase.Stack.to_yojson t.pending_coinbase_stack
+          |> Yojson.Safe.to_string
+      ; local_state = Local_state.display t.local_state
+      }
+    in
+    { Poly.source = display_register t.source
+    ; target = display_register t.target
+    ; connecting_ledger_left = display_ledger_hash t.connecting_ledger_left
+    ; connecting_ledger_right = display_ledger_hash t.connecting_ledger_right
+    ; supply_increase =
+        Currency.Amount.Signed.to_yojson t.supply_increase
+        |> Yojson.Safe.to_string
+    ; fee_excess = Fee_excess.to_yojson t.fee_excess |> Yojson.Safe.to_string
+    ; sok_digest = ()
+    }
+
+  let genesis ~genesis_ledger_hash : t =
+    let registers =
+      { Registers.first_pass_ledger = genesis_ledger_hash
+      ; second_pass_ledger = genesis_ledger_hash
+      ; pending_coinbase_stack = Pending_coinbase.Stack.empty
+      ; local_state = Local_state.dummy ()
+      }
+    in
+    { source = registers
+    ; target = registers
+    ; connecting_ledger_left = genesis_ledger_hash
+    ; connecting_ledger_right = genesis_ledger_hash
+    ; supply_increase = Currency.Amount.Signed.zero
+    ; fee_excess = Fee_excess.empty
+    ; sok_digest = ()
+    }
+
+  let to_input
+      ({ source
+       ; target
+       ; connecting_ledger_left
+       ; connecting_ledger_right
+       ; supply_increase
+       ; fee_excess
+       ; sok_digest = _
+       } :
+        t ) =
+    let input =
+      Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
+        [| Registers.to_input source
+         ; Registers.to_input target
+         ; Frozen_ledger_hash.to_input connecting_ledger_left
+         ; Frozen_ledger_hash.to_input connecting_ledger_right
+         ; Amount.Signed.to_input supply_increase
+         ; Fee_excess.to_input fee_excess
+        |]
+    in
+    if !top_hash_logging_enabled then
+      Format.eprintf
+        !"Generating unchecked top hash from:@.%{sexp: Tick.Field.t \
+          Random_oracle.Input.Chunked.t}@."
+        input ;
+    input
+
+  let to_field_elements t = Random_oracle.pack_input (to_input t)
+
+  module Checked = struct
+    type t = var
+
+    let to_input
+        ({ source
+         ; target
+         ; connecting_ledger_left
+         ; connecting_ledger_right
+         ; supply_increase
+         ; fee_excess
+         ; sok_digest = _
+         } :
+          t ) =
+      let open Tick in
+      let open Checked.Let_syntax in
+      let%bind fee_excess = Fee_excess.to_input_checked fee_excess in
+      let source = Registers.Checked.to_input source
+      and target = Registers.Checked.to_input target in
+      let%bind supply_increase =
+        Amount.Signed.Checked.to_input supply_increase
+      in
+      let input =
+        Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
+          [| source
+           ; target
+           ; Frozen_ledger_hash.var_to_input connecting_ledger_left
+           ; Frozen_ledger_hash.var_to_input connecting_ledger_right
+           ; supply_increase
+           ; fee_excess
+          |]
+      in
+      let%map () =
+        as_prover
+          As_prover.(
+            if !top_hash_logging_enabled then
+              let%map input = Random_oracle.read_typ' input in
+              Format.eprintf
+                !"Generating checked top hash from:@.%{sexp: Field.t \
+                  Random_oracle.Input.Chunked.t}@."
+                input
+            else return ())
+      in
+      input
+
+    let to_field_elements t =
+      let open Tick.Checked.Let_syntax in
+      Tick.Run.run_checked (to_input t >>| Random_oracle.Checked.pack_input)
+  end
+
   module With_sok = struct
     [%%versioned
     module Stable = struct
@@ -237,47 +360,15 @@ module Make_str (A : Wire_types.Concrete) = struct
       (string, string, string, string, string, Local_state.display) Poly.t
 
     let display (t : t) : display =
-      let display_ledger_hash t =
-        Visualization.display_prefix_of_string
-        @@ Frozen_ledger_hash.to_base58_check t
-      in
-      let display_register (t : _ Registers.t) =
-        { Registers.first_pass_ledger = display_ledger_hash t.first_pass_ledger
-        ; second_pass_ledger = display_ledger_hash t.second_pass_ledger
-        ; pending_coinbase_stack =
-            Pending_coinbase.Stack.to_yojson t.pending_coinbase_stack
-            |> Yojson.Safe.to_string
-        ; local_state = Local_state.display t.local_state
-        }
-      in
-      { Poly.source = display_register t.source
-      ; target = display_register t.target
-      ; connecting_ledger_left = display_ledger_hash t.connecting_ledger_left
-      ; connecting_ledger_right = display_ledger_hash t.connecting_ledger_right
-      ; supply_increase =
-          Currency.Amount.Signed.to_yojson t.supply_increase
-          |> Yojson.Safe.to_string
-      ; fee_excess = Fee_excess.to_yojson t.fee_excess |> Yojson.Safe.to_string
-      ; sok_digest =
+      let display_without_sok = display { t with sok_digest = () } in
+      { display_without_sok with
+        sok_digest =
           Sok_message.Digest.to_yojson t.sok_digest |> Yojson.Safe.to_string
       }
 
     let genesis ~genesis_ledger_hash : t =
-      let registers =
-        { Registers.first_pass_ledger = genesis_ledger_hash
-        ; second_pass_ledger = genesis_ledger_hash
-        ; pending_coinbase_stack = Pending_coinbase.Stack.empty
-        ; local_state = Local_state.dummy ()
-        }
-      in
-      { source = registers
-      ; target = registers
-      ; connecting_ledger_left = genesis_ledger_hash
-      ; connecting_ledger_right = genesis_ledger_hash
-      ; supply_increase = Currency.Amount.Signed.zero
-      ; fee_excess = Fee_excess.empty
-      ; sok_digest = Sok_message.Digest.default
-      }
+      let genesis_without_sok = genesis ~genesis_ledger_hash in
+      { genesis_without_sok with sok_digest = Sok_message.Digest.default }
 
     type var =
       ( Frozen_ledger_hash.var
@@ -293,26 +384,11 @@ module Make_str (A : Wire_types.Concrete) = struct
         Pending_coinbase.Stack.typ Fee_excess.typ Sok_message.Digest.typ
         Local_state.typ
 
-    let to_input
-        ({ source
-         ; target
-         ; connecting_ledger_left
-         ; connecting_ledger_right
-         ; supply_increase
-         ; fee_excess
-         ; sok_digest
-         } :
-          t ) =
+    let to_input ({ sok_digest; _ } as t : t) =
       let input =
+        let input_without_sok = to_input { t with sok_digest = () } in
         Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
-          [| Sok_message.Digest.to_input sok_digest
-           ; Registers.to_input source
-           ; Registers.to_input target
-           ; Frozen_ledger_hash.to_input connecting_ledger_left
-           ; Frozen_ledger_hash.to_input connecting_ledger_right
-           ; Amount.Signed.to_input supply_increase
-           ; Fee_excess.to_input fee_excess
-          |]
+          [| Sok_message.Digest.to_input sok_digest; input_without_sok |]
       in
       if !top_hash_logging_enabled then
         Format.eprintf
@@ -326,33 +402,18 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Checked = struct
       type t = var
 
-      let to_input
-          ({ source
-           ; target
-           ; connecting_ledger_left
-           ; connecting_ledger_right
-           ; supply_increase
-           ; fee_excess
-           ; sok_digest
-           } :
-            t ) =
+      module Checked_without_sok = Checked
+
+      let to_input ({ sok_digest; _ } as t : t) =
         let open Tick in
         let open Checked.Let_syntax in
-        let%bind fee_excess = Fee_excess.to_input_checked fee_excess in
-        let source = Registers.Checked.to_input source
-        and target = Registers.Checked.to_input target in
-        let%bind supply_increase =
-          Amount.Signed.Checked.to_input supply_increase
+        let%bind input_without_sok =
+          Checked_without_sok.to_input { t with sok_digest = () }
         in
         let input =
           Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
             [| Sok_message.Digest.Checked.to_input sok_digest
-             ; source
-             ; target
-             ; Frozen_ledger_hash.var_to_input connecting_ledger_left
-             ; Frozen_ledger_hash.var_to_input connecting_ledger_right
-             ; supply_increase
-             ; fee_excess
+             ; input_without_sok
             |]
         in
         let%map () =
