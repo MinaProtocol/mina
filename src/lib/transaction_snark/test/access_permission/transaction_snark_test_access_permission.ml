@@ -10,6 +10,8 @@ module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 
 let%test_module "Access permission tests" =
   ( module struct
+    let () = Backtrace.elide := false
+
     let sk = Private_key.create ()
 
     let pk = Public_key.of_private_key_exn sk
@@ -41,10 +43,12 @@ let%test_module "Access permission tests" =
     let memo = Signed_command_memo.empty
 
     let run_test ?expected_failure auth_kind access_permission =
-      let account_update =
+      let account_update : Account_update.t =
         match auth_kind with
         | Account_update.Authorization_kind.Proof _ ->
-            account_update
+            { body = { account_update.body with authorization_kind = auth_kind }
+            ; authorization = account_update.authorization
+            }
         | Account_update.Authorization_kind.Signature ->
             { body =
                 { account_update.body with
@@ -71,15 +75,7 @@ let%test_module "Access permission tests" =
             { Account_update.Update.dummy with
               permissions =
                 Set { Permissions.user_default with access = access_permission }
-            ; verification_key =
-                Set
-                  { data = vk
-                  ; hash =
-                      (* TODO: This function should live in
-                         [Side_loaded_verification_key].
-                      *)
-                      Zkapp_account.digest_vk vk
-                  }
+            ; verification_key = Set { data = vk; hash = vk_hash }
             }
         ; preconditions =
             { Account_update.Preconditions.network =
