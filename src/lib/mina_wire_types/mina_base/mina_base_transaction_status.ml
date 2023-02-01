@@ -45,8 +45,7 @@ module Failure = struct
       | Incorrect_nonce
       | Invalid_fee_excess
       | Incorrect_verification_key of
-          [ `Expected_verification_key of
-            Pickles.Side_loaded.Verification_key.V2.t ]
+          { expected_verification_key_hash : Mina_base_zkapp_basic.F.V1.t }
       | Cancelled
   end
 

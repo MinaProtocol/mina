@@ -51,8 +51,7 @@ module Failure = struct
         | Incorrect_nonce
         | Invalid_fee_excess
         | Incorrect_verification_key of
-            [ `Expected_verification_key of
-              Side_loaded_verification_key.Stable.V2.t ]
+            { expected_verification_key_hash : Zkapp_basic.F.Stable.V1.t }
         | Cancelled
       [@@deriving sexp, yojson, equal, compare, variants, hash]
 
@@ -136,9 +135,7 @@ module Failure = struct
       ~valid_while_precondition_unsatisfied:add ~incorrect_nonce:add
       ~invalid_fee_excess:add
       ~incorrect_verification_key:(fun acc var ->
-        var.constructor
-          (`Expected_verification_key Side_loaded_verification_key.dummy)
-        :: acc )
+        var.constructor Zkapp_basic.F.zero :: acc )
       ~cancelled:add
 
   let gen = Quickcheck.Generator.of_list all
@@ -230,9 +227,10 @@ module Failure = struct
         "Incorrect_nonce"
     | Invalid_fee_excess ->
         "Invalid_fee_excess"
-    | Incorrect_verification_key (`Expected_verification_key expected_key) ->
+    | Incorrect_verification_key
+        { expected_verification_key_hash = expected_key } ->
         sprintf "Incorrect_verification_key_%s"
-          (Side_loaded_verification_key.to_base64 expected_key)
+          (Zkapp_basic.F.to_string expected_key)
     | Cancelled ->
         "Cancelled"
 
@@ -349,10 +347,10 @@ module Failure = struct
             ; ( "Incorrect_verification_key_"
               , ""
               , fun str ->
-                  let vk =
-                    Or_error.ok_exn (Side_loaded_verification_key.of_base64 str)
-                  in
-                  Incorrect_verification_key (`Expected_verification_key vk) )
+                  Incorrect_verification_key
+                    { expected_verification_key_hash =
+                        Zkapp_basic.F.of_string str
+                    } )
             ]
         in
         match res with
@@ -475,11 +473,12 @@ module Failure = struct
     | Invalid_fee_excess ->
         "Fee excess from zkapp_command transaction more than the transaction \
          fees"
-    | Incorrect_verification_key (`Expected_verification_key vk) ->
+    | Incorrect_verification_key { expected_verification_key_hash = vk } ->
         sprintf
-          "The party's account verification key did not match the verification \
-           key that the party's authorization proof was valid against (%s)"
-          (Side_loaded_verification_key.to_base64 vk)
+          "The update's account verification key did not match the \
+           verification key that the authorization proof was valid against \
+           (%s)"
+          (Zkapp_basic.F.to_string vk)
     | Cancelled ->
         "The account update is cancelled because there's a failure in the \
          zkApp transaction"
