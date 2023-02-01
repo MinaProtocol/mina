@@ -820,7 +820,8 @@ let staged_transactions_with_state_hash t =
   List.map pending_transactions_per_block
     ~f:(Transactions_ordered.map ~f:extract_txn_and_global_slot)
 
-let apply_ordered_txns ordered_txns ~ledger ~get_protocol_state
+(* written in continuation passing style so that implementation can be used both sync and async *)
+let apply_ordered_txns_stepwise ordered_txns ~ledger ~get_protocol_state
     ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger =
   let open Or_error.Let_syntax in
   let apply ~apply ~ledger t state_hash block_global_slot =
@@ -837,196 +838,219 @@ let apply_ordered_txns ordered_txns ~ledger ~get_protocol_state
           (State_hash.to_base58_check state_hash)
           (Error.to_string_hum e)
   in
-  let apply_first_pass txns =
-    List.fold_until txns ~init:(Ok [])
-      ~f:(fun acc (t : Transaction_with_witness.t) ->
+  let rec apply_txns_first_pass ?(acc = []) ~k txns =
+    match txns with
+    | [] ->
+        k (List.rev acc)
+    | txn :: txns' ->
         let transaction, state_hash, block_global_slot =
-          extract_txn_and_global_slot t
+          extract_txn_and_global_slot txn
         in
         let expected_status = transaction.status in
-        match
-          Or_error.both acc
-            (apply ~apply:apply_first_pass ~ledger transaction.data state_hash
-               block_global_slot )
-        with
-        | Ok (acc, res) ->
-            Continue_or_stop.Continue (Ok ((expected_status, res) :: acc))
-        | Error e ->
-            Stop (Error e) )
-      ~finish:(Or_error.map ~f:List.rev)
+        let%map partially_applied_txn =
+          apply ~apply:apply_first_pass ~ledger transaction.data state_hash
+            block_global_slot
+        in
+        `Continue
+          (fun () ->
+            apply_txns_first_pass
+              ~acc:((expected_status, partially_applied_txn) :: acc)
+              ~k txns' )
   in
-  let apply_second_pass partial_txns =
-    List.fold_until partial_txns ~init:(Ok ())
-      ~f:(fun _acc (expected_status, partial_txn) ->
-        match apply_second_pass ledger partial_txn with
-        | Ok res ->
-            let status = Ledger.Transaction_applied.transaction_status res in
-            if Transaction_status.equal expected_status status then
-              Continue (Ok ())
-            else
-              Stop
-                (Or_error.errorf
-                   !"Transaction produced unxpected application status. \
-                     Expected status:%{sexp:Transaction_status.t} \
-                     Got:%{sexp:Transaction_status.t} Transaction:%{sexp: \
-                     Transaction.t}"
-                   expected_status status
-                   (Ledger.Transaction_partially_applied.command partial_txn) )
-        | Error e ->
-            Stop (Error e) )
-      ~finish:Fn.id
+  let rec apply_txns_second_pass ~k partially_applied_txns =
+    match partially_applied_txns with
+    | [] ->
+        k ()
+    | (expected_status, partially_applied_txn) :: partially_applied_txns' ->
+        let%bind res = apply_second_pass ledger partially_applied_txn in
+        let status = Ledger.Transaction_applied.transaction_status res in
+        if Transaction_status.equal expected_status status then
+          Ok
+            (`Continue
+              (fun () -> apply_txns_second_pass ~k partially_applied_txns') )
+        else
+          Or_error.errorf
+            !"Transaction produced unxpected application status. Expected \
+              status:%{sexp:Transaction_status.t} \
+              Got:%{sexp:Transaction_status.t} Transaction:%{sexp: \
+              Transaction.t}"
+            expected_status status
+            (Ledger.Transaction_partially_applied.command partially_applied_txn)
   in
-  let apply_previous_incomplete_txns txns =
+  let apply_previous_incomplete_txns ~k txns =
     (*Note: Previous incomplete transactions refer to the block's transactions from previous scan state tree that were split between the two trees.
       The set in the previous tree have gone through the first pass. For the second pass that is to happen after the rest of the set goes through the first pass, we need partially applied state - result of previous tree's transactions' first pass. To generate the partial state, we do a a first pass application of previous tree's transaction on a sparse ledger created from witnesses stored in the scan state and then use it to apply to the ledger here*)
-    let%bind partial_txns_sparse_ledger =
-      List.fold_until txns ~init:(Ok [])
-        ~f:(fun acc (t : Transaction_with_witness.t) ->
+    let inject_ledger_info partially_applied_txn =
+      let open Sparse_ledger.T.Transaction_partially_applied in
+      match partially_applied_txn with
+      | Zkapp_command t ->
+          let%map original_first_pass_account_states =
+            Mina_stdlib.Result.List.map t.original_first_pass_account_states
+              ~f:(fun (id, loc_opt) ->
+                match loc_opt with
+                | None ->
+                    return (id, None)
+                | Some (_sparse_ledger_loc, account) -> (
+                    match Ledger.location_of_account ledger id with
+                    | Some loc ->
+                        return (id, Some (loc, account))
+                    | None ->
+                        Or_error.errorf
+                          "Original accounts states from partially applied \
+                           transactions don't exist in the ledger" ) )
+          in
+          let global_state : Ledger.Global_state.t =
+            { first_pass_ledger = ledger
+            ; second_pass_ledger = ledger
+            ; fee_excess = t.global_state.fee_excess
+            ; supply_increase = t.global_state.supply_increase
+            ; protocol_state = t.global_state.protocol_state
+            ; block_global_slot = t.global_state.block_global_slot
+            }
+          in
+          let local_state =
+            { Mina_transaction_logic.Zkapp_command_logic.Local_state.stack_frame =
+                t.local_state.stack_frame
+            ; call_stack = t.local_state.call_stack
+            ; transaction_commitment = t.local_state.transaction_commitment
+            ; full_transaction_commitment =
+                t.local_state.full_transaction_commitment
+            ; token_id = t.local_state.token_id
+            ; excess = t.local_state.excess
+            ; supply_increase = t.local_state.supply_increase
+            ; ledger
+            ; success = t.local_state.success
+            ; account_update_index = t.local_state.account_update_index
+            ; failure_status_tbl = t.local_state.failure_status_tbl
+            ; will_succeed = t.local_state.will_succeed
+            }
+          in
+          Ledger.Transaction_partially_applied.Zkapp_command
+            { command = t.command
+            ; previous_hash = t.previous_hash
+            ; original_first_pass_account_states
+            ; constraint_constants = t.constraint_constants
+            ; state_view = t.state_view
+            ; global_state
+            ; local_state
+            }
+      | Signed_command c ->
+          return
+            (Ledger.Transaction_partially_applied.Signed_command
+               { previous_hash = c.previous_hash; applied = c.applied } )
+      | Fee_transfer f ->
+          return
+            (Ledger.Transaction_partially_applied.Fee_transfer
+               { previous_hash = f.previous_hash; applied = f.applied } )
+      | Coinbase c ->
+          return
+            (Ledger.Transaction_partially_applied.Coinbase
+               { previous_hash = c.previous_hash; applied = c.applied } )
+    in
+    let rec apply_txns_to_witnesses_first_pass ?(acc = []) ~k txns =
+      match txns with
+      | [] ->
+          k (List.rev acc)
+      | txn :: txns' ->
           let transaction, state_hash, block_global_slot =
-            extract_txn_and_global_slot t
+            extract_txn_and_global_slot txn
           in
           let expected_status = transaction.status in
-          match
-            Or_error.both acc
-              (apply ~apply:apply_first_pass_sparse_ledger
-                 ~ledger:t.first_pass_ledger_witness transaction.data state_hash
-                 block_global_slot )
-          with
-          | Ok (acc, res) ->
-              Continue (Ok ((expected_status, res) :: acc))
-          | Error e ->
-              Stop (Error e) )
-        ~finish:(Or_error.map ~f:List.rev)
-    in
-    let%bind partial_txns_ledger =
-      (*Replace the sparse ledger info in the intermediate state with ledger info *)
-      List.fold_until ~init:(Ok []) partial_txns_sparse_ledger
-        ~f:(fun acc
-                ( expected_status
-                , (t : Sparse_ledger.T.Transaction_partially_applied.t) ) ->
-          let t =
-            match t with
-            | Zkapp_command t ->
-                let%map original_first_pass_account_states =
-                  List.fold_until ~init:(Ok [])
-                    t.original_first_pass_account_states
-                    ~f:(fun acc (id, loc_opt) ->
-                      let loc_opt =
-                        match loc_opt with
-                        | None ->
-                            Ok None
-                        | Some (_sparse_ledger_loc, account) -> (
-                            match Ledger.location_of_account ledger id with
-                            | Some loc ->
-                                Ok (Some (loc, account))
-                            | None ->
-                                Or_error.errorf
-                                  "Original accounts states from partially \
-                                   applied transactions don't exist in the \
-                                   ledger" )
-                      in
-                      match Or_error.both acc loc_opt with
-                      | Ok (acc, loc_opt) ->
-                          Continue (Ok ((id, loc_opt) :: acc))
-                      | Error e ->
-                          Stop (Error e) )
-                    ~finish:(Or_error.map ~f:List.rev)
-                in
-                let global_state : Ledger.Global_state.t =
-                  { first_pass_ledger = ledger
-                  ; second_pass_ledger = ledger
-                  ; fee_excess = t.global_state.fee_excess
-                  ; supply_increase = t.global_state.supply_increase
-                  ; protocol_state = t.global_state.protocol_state
-                  ; block_global_slot = t.global_state.block_global_slot
-                  }
-                in
-                let local_state =
-                  { Mina_transaction_logic.Zkapp_command_logic.Local_state
-                    .stack_frame = t.local_state.stack_frame
-                  ; call_stack = t.local_state.call_stack
-                  ; transaction_commitment =
-                      t.local_state.transaction_commitment
-                  ; full_transaction_commitment =
-                      t.local_state.full_transaction_commitment
-                  ; token_id = t.local_state.token_id
-                  ; excess = t.local_state.excess
-                  ; supply_increase = t.local_state.supply_increase
-                  ; ledger
-                  ; success = t.local_state.success
-                  ; account_update_index = t.local_state.account_update_index
-                  ; failure_status_tbl = t.local_state.failure_status_tbl
-                  ; will_succeed = t.local_state.will_succeed
-                  }
-                in
-                Ledger.Transaction_partially_applied.Zkapp_command
-                  { command = t.command
-                  ; previous_hash = t.previous_hash
-                  ; original_first_pass_account_states
-                  ; constraint_constants = t.constraint_constants
-                  ; state_view = t.state_view
-                  ; global_state
-                  ; local_state
-                  }
-            | Signed_command c ->
-                Ok
-                  (Signed_command
-                     { previous_hash = c.previous_hash; applied = c.applied } )
-            | Fee_transfer f ->
-                Ok
-                  (Fee_transfer
-                     { previous_hash = f.previous_hash; applied = f.applied } )
-            | Coinbase c ->
-                Ok
-                  (Coinbase
-                     { previous_hash = c.previous_hash; applied = c.applied } )
+          let%bind partially_applied_txn =
+            apply ~apply:apply_first_pass_sparse_ledger
+              ~ledger:txn.first_pass_ledger_witness transaction.data state_hash
+              block_global_slot
           in
-          match Or_error.both acc t with
-          | Ok (acc, t) ->
-              Continue (Ok ((expected_status, t) :: acc))
-          | Error e ->
-              Stop (Error e) )
-        ~finish:(Or_error.map ~f:List.rev)
-    in
-    apply_second_pass partial_txns_ledger
-  in
-  let%map _, first_pass_ledger_target =
-    List.fold_until ordered_txns
-      ~init:(Ok ([], Ledger.merkle_root ledger))
-      ~f:(fun acc (txns_per_block : _ Transactions_ordered.Poly.t) ->
-        match
-          let%bind previous_incomplete, _ = acc in
-          let%bind partially_applied_txns =
-            apply_first_pass txns_per_block.first_pass
+          let%map partially_applied_txn' =
+            inject_ledger_info partially_applied_txn
           in
-          let first_pass_end = Ledger.merkle_root ledger in
-          let%bind () = apply_previous_incomplete_txns previous_incomplete in
-          let%map () = apply_second_pass partially_applied_txns in
-          (txns_per_block.current_incomplete, first_pass_end)
-        with
-        | Ok (current_incomplete, first_pass_end) ->
-            Continue (Ok (current_incomplete, first_pass_end))
-        | Error e ->
-            Stop (Error e) )
-      ~finish:Fn.id
+          `Continue
+            (fun () ->
+              apply_txns_to_witnesses_first_pass
+                ~acc:((expected_status, partially_applied_txn') :: acc)
+                ~k txns' )
+    in
+    apply_txns_to_witnesses_first_pass txns ~k:(fun partially_applied_txns ->
+        apply_txns_second_pass partially_applied_txns ~k )
   in
-  first_pass_ledger_target
+  let rec apply_txns previous_incomplete
+      (ordered_txns : _ Transactions_ordered.Poly.t list) =
+    match ordered_txns with
+    | [] ->
+        Ok (`Complete (Ledger.merkle_root ledger))
+    | txns_per_block :: ordered_txns' ->
+        apply_txns_first_pass txns_per_block.first_pass
+          ~k:(fun partially_applied_txns ->
+            apply_previous_incomplete_txns previous_incomplete ~k:(fun () ->
+                apply_txns_second_pass partially_applied_txns ~k:(fun () ->
+                    apply_txns txns_per_block.current_incomplete ordered_txns' ) ) )
+  in
+  apply_txns [] ordered_txns
 
-let apply_last_proof_transactions ~ledger ~get_protocol_state ~apply_first_pass
-    ~apply_second_pass ~apply_first_pass_sparse_ledger t =
+let apply_ordered_txns_sync ordered_txns ~ledger ~get_protocol_state
+    ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger =
+  let rec run = function
+    | Ok (`Continue k) ->
+        run (k ())
+    | Ok (`Complete x) ->
+        Ok x
+    | Error err ->
+        Error err
+  in
+  run
+  @@ apply_ordered_txns_stepwise ordered_txns ~ledger ~get_protocol_state
+       ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger
+
+let apply_ordered_txns_async ordered_txns ?(async_batch_size = 10) ~ledger
+    ~get_protocol_state ~apply_first_pass ~apply_second_pass
+    ~apply_first_pass_sparse_ledger =
+  let open Deferred.Result.Let_syntax in
+  let yield =
+    let f = Staged.unstage (Scheduler.yield_every ~n:async_batch_size) in
+    fun () -> f () |> Deferred.map ~f:Result.return
+  in
+  let rec run result =
+    let%bind () = yield () in
+    match result with
+    | Ok (`Continue k) ->
+        run (k ())
+    | Ok (`Complete x) ->
+        return x
+    | Error err ->
+        Deferred.return (Error err)
+  in
+  run
+  @@ apply_ordered_txns_stepwise ordered_txns ~ledger ~get_protocol_state
+       ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger
+
+let apply_last_proof_transactions_sync ~ledger ~get_protocol_state
+    ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger t =
   match latest_ledger_proof' t with
   | None ->
       Or_error.errorf "No transactions found"
   | Some (_, txns_per_block) ->
-      apply_ordered_txns txns_per_block ~ledger ~get_protocol_state
+      apply_ordered_txns_sync txns_per_block ~ledger ~get_protocol_state
         ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger
       |> Or_error.ignore_m
 
-let apply_staged_transactions ~ledger ~get_protocol_state ~apply_first_pass
-    ~apply_second_pass ~apply_first_pass_sparse_ledger t =
-  let staged_transactions_with_state_hash = staged_transactions t in
-  apply_ordered_txns staged_transactions_with_state_hash ~ledger
+let apply_last_proof_transactions_async ?async_batch_size ~ledger
     ~get_protocol_state ~apply_first_pass ~apply_second_pass
+    ~apply_first_pass_sparse_ledger t =
+  match latest_ledger_proof' t with
+  | None ->
+      Deferred.Or_error.errorf "No transactions found"
+  | Some (_, txns_per_block) ->
+      apply_ordered_txns_async txns_per_block ?async_batch_size ~ledger
+        ~get_protocol_state ~apply_first_pass ~apply_second_pass
+        ~apply_first_pass_sparse_ledger
+      |> Deferred.Or_error.ignore_m
+
+let apply_staged_transactions_async ?async_batch_size ~ledger
+    ~get_protocol_state ~apply_first_pass ~apply_second_pass
+    ~apply_first_pass_sparse_ledger t =
+  let staged_transactions_with_state_hash = staged_transactions t in
+  apply_ordered_txns_async staged_transactions_with_state_hash ?async_batch_size
+    ~ledger ~get_protocol_state ~apply_first_pass ~apply_second_pass
     ~apply_first_pass_sparse_ledger
 
 let free_space t = Parallel_scan.free_space t.scan_state

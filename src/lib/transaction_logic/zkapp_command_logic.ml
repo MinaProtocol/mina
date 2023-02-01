@@ -1811,22 +1811,30 @@ module Make (Inputs : Inputs_intf) = struct
       Local_state.add_check local_state Global_supply_increase_overflow
         Bool.(not global_supply_increase_update_failed)
     in
-    let global_state =
-      Global_state.set_supply_increase global_state
-        (Amount.Signed.if_
-           Bool.(is_last_account_update &&& local_state.success)
-           ~then_:new_global_supply_increase
-           ~else_:(Global_state.supply_increase global_state) )
-    in
     (* The first account_update must succeed. *)
     Bool.(
       assert_with_failure_status_tbl ~pos:__POS__
         ((not is_start') ||| local_state.success)
         local_state.failure_status_tbl) ;
-    (*Update both the ledgers*)
-    let update_first_pass_ledger = Bool.(is_start' &&& local_state.success) in
-    let update_second_pass_ledger =
-      Bool.(is_last_account_update &&& local_state.success)
+    (* If we are the fee payer (is_start' = true), push the first pass ledger
+       and set the local ledger to be the second pass ledger in preparation for
+       the children.
+    *)
+    let local_state, global_state =
+      let is_fee_payer = is_start' in
+      let global_state =
+        Global_state.set_first_pass_ledger ~should_update:is_fee_payer
+          global_state local_state.ledger
+      in
+      let local_state =
+        { local_state with
+          ledger =
+            Inputs.Ledger.if_ is_fee_payer
+              ~then_:(Global_state.second_pass_ledger global_state)
+              ~else_:local_state.ledger
+        }
+      in
+      (local_state, global_state)
     in
     (* If this is the last account update, and [will_succeed] is false, then
        [success] must also be false.
@@ -1837,15 +1845,21 @@ module Make (Inputs : Inputs_intf) = struct
         ; local_state.will_succeed
         ; not local_state.success
         ]) ;
+    (* If this is the last party and there were no failures, update the second
+       pass ledger and the supply increase.
+    *)
     let global_state =
-      let gs_first_pass_updated =
-        Global_state.set_first_pass_ledger
-          ~should_update:update_first_pass_ledger global_state
-          local_state.ledger
+      let is_successful_last_party =
+        Bool.(is_last_account_update &&& local_state.success)
+      in
+      let global_state =
+        Global_state.set_supply_increase global_state
+          (Amount.Signed.if_ is_successful_last_party
+             ~then_:new_global_supply_increase
+             ~else_:(Global_state.supply_increase global_state) )
       in
       Global_state.set_second_pass_ledger
-        ~should_update:update_second_pass_ledger gs_first_pass_updated
-        local_state.ledger
+        ~should_update:is_successful_last_party global_state local_state.ledger
     in
     let local_state =
       (* Make sure to reset the local_state at the end of a transaction.
@@ -1867,8 +1881,7 @@ module Make (Inputs : Inputs_intf) = struct
             ~else_:local_state.token_id
       ; ledger =
           Inputs.Ledger.if_ is_last_account_update
-            ~then_:
-              (Inputs.Ledger.empty ~depth:constraint_constants.ledger_depth ())
+            ~then_:(Inputs.Ledger.empty ~depth:0 ())
             ~else_:local_state.ledger
       ; success =
           Bool.if_ is_last_account_update ~then_:Bool.true_
