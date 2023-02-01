@@ -111,6 +111,8 @@ module Make_str (A : Wire_types.Concrete) = struct
   end
 
   let typ = Field.typ
+
+  let to_field = Fn.id
 end
 
 module Digest = Wire_types.Make (Make_sig) (Make_str)

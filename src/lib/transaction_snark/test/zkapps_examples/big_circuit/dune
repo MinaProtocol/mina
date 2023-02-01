@@ -12,6 +12,7 @@
   yojson
   ;; local libraries
   cache_dir
+  crypto_params
   currency
   data_hash_lib
   genesis_constants

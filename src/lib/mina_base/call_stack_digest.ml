@@ -35,6 +35,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         [| (h :> Field.t); t |]
   end
 
+  let to_field = Fn.id
+
   let constant = Field.constant
 
   let typ = Field.typ
