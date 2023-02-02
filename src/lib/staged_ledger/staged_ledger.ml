@@ -1796,6 +1796,17 @@ module T = struct
       epoch_ledger
     |> not
 
+  let with_ledger_mask base_ledger ~f =
+    let mask =
+      Ledger.register_mask base_ledger
+        (Ledger.Mask.create ~depth:(Ledger.depth base_ledger) ())
+    in
+    let r = f mask in
+    ignore
+      ( Ledger.unregister_mask_exn ~loc:Caml.__LOC__ mask
+        : Ledger.unattached_mask ) ;
+    r
+
   let create_diff
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(global_slot : Mina_numbers.Global_slot.t) ?(log_block_creation = false)
@@ -1809,146 +1820,153 @@ module T = struct
         let module Transaction_validator =
           Transaction_snark.Transaction_validator
         in
-        let validating_ledger = Transaction_validator.create t.ledger in
-        let is_new_account pk =
-          Transaction_validator.Hashless_ledger.location_of_account
-            validating_ledger
-            (Account_id.create pk Token_id.default)
-          |> Option.is_none
-        in
-        let is_coinbase_receiver_new = is_new_account coinbase_receiver in
-        if supercharge_coinbase then
-          [%log info]
-            "No locked tokens in the delegator/delegatee account, applying \
-             supercharged coinbase" ;
-        let partitions = Scan_state.partition_if_overflowing t.scan_state in
-        let work_to_do = Scan_state.work_statements_for_new_diff t.scan_state in
-        let completed_works_seq, proof_count =
-          List.fold_until work_to_do ~init:(Sequence.empty, 0)
-            ~f:(fun (seq, count) w ->
-              match get_completed_work w with
-              | Some cw_checked ->
-                  (*If new provers can't pay the account-creation-fee then discard
-                    their work unless their fee is zero in which case their account
-                    won't be created. This is to encourage using an existing accounts
-                    for snarking.
-                    This also imposes new snarkers to have a min fee until one of
-                    their snarks are purchased and their accounts get created*)
-                  if
-                    Currency.Fee.(cw_checked.fee = zero)
-                    || Currency.Fee.(
-                         cw_checked.fee
-                         >= constraint_constants.account_creation_fee)
-                    || not (is_new_account cw_checked.prover)
-                  then
-                    Continue
-                      ( Sequence.append seq (Sequence.singleton cw_checked)
-                      , One_or_two.length cw_checked.proofs + count )
-                  else (
-                    [%log debug]
-                      ~metadata:
-                        [ ( "work"
-                          , Transaction_snark_work.Checked.to_yojson cw_checked
-                          )
-                        ; ( "work_ids"
-                          , Transaction_snark_work.Statement.compact_json w )
-                        ; ("snark_fee", Currency.Fee.to_yojson cw_checked.fee)
-                        ; ( "account_creation_fee"
-                          , Currency.Fee.to_yojson
-                              constraint_constants.account_creation_fee )
-                        ]
-                      !"Staged_ledger_diff creation: Snark fee $snark_fee \
-                        insufficient to create the snark worker account" ;
-                    Stop (seq, count) )
-              | None ->
-                  [%log debug]
-                    ~metadata:
-                      [ ( "statement"
-                        , Transaction_snark_work.Statement.to_yojson w )
-                      ; ( "work_ids"
-                        , Transaction_snark_work.Statement.compact_json w )
-                      ]
-                    !"Staged_ledger_diff creation: No snark work found for \
-                      $statement" ;
-                  Stop (seq, count) )
-            ~finish:Fn.id
-        in
-        (*Transactions in reverse order for faster removal if there is no space when creating the diff*)
-        let valid_on_this_ledger, invalid_on_this_ledger =
-          Sequence.fold_until transactions_by_fee ~init:(Sequence.empty, [], 0)
-            ~f:(fun (valid_seq, invalid_txns, count) txn ->
-              match
-                O1trace.sync_thread "validate_transaction_against_staged_ledger"
-                  (fun () ->
-                    Transaction_validator.apply_transaction
-                      ~constraint_constants ~global_slot validating_ledger
-                      ~txn_state_view:current_state_view
-                      (Command (User_command.forget_check txn)) )
-              with
-              | Error e ->
-                  [%log error]
-                    ~metadata:
-                      [ ("user_command", User_command.Valid.to_yojson txn)
-                      ; ("error", Error_json.error_to_yojson e)
-                      ]
-                    "Staged_ledger_diff creation: Skipping user command: \
-                     $user_command due to error: $error" ;
-                  Continue (valid_seq, (txn, e) :: invalid_txns, count)
-              | Ok status ->
-                  let txn_with_status = { With_status.data = txn; status } in
-                  let valid_seq' =
-                    Sequence.append
-                      (Sequence.singleton txn_with_status)
-                      valid_seq
+        with_ledger_mask t.ledger ~f:(fun validating_ledger ->
+            let is_new_account pk =
+              Ledger.location_of_account validating_ledger
+                (Account_id.create pk Token_id.default)
+              |> Option.is_none
+            in
+            let is_coinbase_receiver_new = is_new_account coinbase_receiver in
+            if supercharge_coinbase then
+              [%log info]
+                "No locked tokens in the delegator/delegatee account, applying \
+                 supercharged coinbase" ;
+            let partitions = Scan_state.partition_if_overflowing t.scan_state in
+            let work_to_do =
+              Scan_state.work_statements_for_new_diff t.scan_state
+            in
+            let completed_works_seq, proof_count =
+              List.fold_until work_to_do ~init:(Sequence.empty, 0)
+                ~f:(fun (seq, count) w ->
+                  match get_completed_work w with
+                  | Some cw_checked ->
+                      (*If new provers can't pay the account-creation-fee then discard
+                        their work unless their fee is zero in which case their account
+                        won't be created. This is to encourage using an existing accounts
+                        for snarking.
+                        This also imposes new snarkers to have a min fee until one of
+                        their snarks are purchased and their accounts get created*)
+                      if
+                        Currency.Fee.(cw_checked.fee = zero)
+                        || Currency.Fee.(
+                             cw_checked.fee
+                             >= constraint_constants.account_creation_fee)
+                        || not (is_new_account cw_checked.prover)
+                      then
+                        Continue
+                          ( Sequence.append seq (Sequence.singleton cw_checked)
+                          , One_or_two.length cw_checked.proofs + count )
+                      else (
+                        [%log debug]
+                          ~metadata:
+                            [ ( "work"
+                              , Transaction_snark_work.Checked.to_yojson
+                                  cw_checked )
+                            ; ( "work_ids"
+                              , Transaction_snark_work.Statement.compact_json w
+                              )
+                            ; ( "snark_fee"
+                              , Currency.Fee.to_yojson cw_checked.fee )
+                            ; ( "account_creation_fee"
+                              , Currency.Fee.to_yojson
+                                  constraint_constants.account_creation_fee )
+                            ]
+                          !"Staged_ledger_diff creation: Snark fee $snark_fee \
+                            insufficient to create the snark worker account" ;
+                        Stop (seq, count) )
+                  | None ->
+                      [%log debug]
+                        ~metadata:
+                          [ ( "statement"
+                            , Transaction_snark_work.Statement.to_yojson w )
+                          ; ( "work_ids"
+                            , Transaction_snark_work.Statement.compact_json w )
+                          ]
+                        !"Staged_ledger_diff creation: No snark work found for \
+                          $statement" ;
+                      Stop (seq, count) )
+                ~finish:Fn.id
+            in
+            (*Transactions in reverse order for faster removal if there is no space when creating the diff*)
+            let valid_on_this_ledger, invalid_on_this_ledger =
+              Sequence.fold_until transactions_by_fee
+                ~init:(Sequence.empty, [], 0)
+                ~f:(fun (valid_seq, invalid_txns, count) txn ->
+                  match
+                    O1trace.sync_thread
+                      "validate_transaction_against_staged_ledger" (fun () ->
+                        Transaction_validator.apply_transaction
+                          ~constraint_constants ~global_slot validating_ledger
+                          ~txn_state_view:current_state_view
+                          (Command (User_command.forget_check txn)) )
+                  with
+                  | Error e ->
+                      [%log error]
+                        ~metadata:
+                          [ ("user_command", User_command.Valid.to_yojson txn)
+                          ; ("error", Error_json.error_to_yojson e)
+                          ]
+                        "Staged_ledger_diff creation: Skipping user command: \
+                         $user_command due to error: $error" ;
+                      Continue (valid_seq, (txn, e) :: invalid_txns, count)
+                  | Ok status ->
+                      let txn_with_status =
+                        { With_status.data = txn; status }
+                      in
+                      let valid_seq' =
+                        Sequence.append
+                          (Sequence.singleton txn_with_status)
+                          valid_seq
+                      in
+                      let count' = count + 1 in
+                      if count' >= Scan_state.free_space t.scan_state then
+                        Stop (valid_seq', invalid_txns)
+                      else Continue (valid_seq', invalid_txns, count') )
+                ~finish:(fun (valid, invalid, _) -> (valid, invalid))
+            in
+            let diff, log =
+              O1trace.sync_thread "generate_staged_ledger_diff" (fun () ->
+                  generate ~constraint_constants logger completed_works_seq
+                    valid_on_this_ledger ~receiver:coinbase_receiver
+                    ~is_coinbase_receiver_new ~supercharge_coinbase partitions )
+            in
+            let%map diff =
+              (* Fill in the statuses for commands. *)
+              with_ledger_mask t.ledger ~f:(fun status_ledger ->
+                  let generate_status txn =
+                    O1trace.sync_thread "get_transaction__status" (fun () ->
+                        Transaction_validator.apply_transaction
+                          ~constraint_constants ~global_slot status_ledger
+                          ~txn_state_view:current_state_view txn )
                   in
-                  let count' = count + 1 in
-                  if count' >= Scan_state.free_space t.scan_state then
-                    Stop (valid_seq', invalid_txns)
-                  else Continue (valid_seq', invalid_txns, count') )
-            ~finish:(fun (valid, invalid, _) -> (valid, invalid))
-        in
-        let diff, log =
-          O1trace.sync_thread "generate_staged_ledger_diff" (fun () ->
-              generate ~constraint_constants logger completed_works_seq
-                valid_on_this_ledger ~receiver:coinbase_receiver
-                ~is_coinbase_receiver_new ~supercharge_coinbase partitions )
-        in
-        let%map diff =
-          (* Fill in the statuses for commands. *)
-          let generate_status =
-            let status_ledger = Transaction_validator.create t.ledger in
-            fun txn ->
-              O1trace.sync_thread "get_transaction__status" (fun () ->
-                  Transaction_validator.apply_transaction ~constraint_constants
-                    ~global_slot status_ledger
-                    ~txn_state_view:current_state_view txn )
-          in
-          Pre_diff_info.compute_statuses ~constraint_constants ~diff
-            ~coinbase_amount:
-              (Option.value_exn
-                 (coinbase_amount ~constraint_constants ~supercharge_coinbase) )
-            ~coinbase_receiver ~generate_status
-            ~forget:User_command.forget_check
-        in
-        let summaries, detailed = List.unzip log in
-        [%log debug]
-          "Number of proofs ready for purchase: $proof_count Number of user \
-           commands ready to be included: $txn_count Diff creation log: \
-           $diff_log"
-          ~metadata:
-            [ ("proof_count", `Int proof_count)
-            ; ("txn_count", `Int (Sequence.length valid_on_this_ledger))
-            ; ("diff_log", Diff_creation_log.summary_list_to_yojson summaries)
-            ] ;
-        if log_block_creation then
-          [%log debug] "Detailed diff creation log: $diff_log"
-            ~metadata:
-              [ ( "diff_log"
-                , Diff_creation_log.detail_list_to_yojson
-                    (List.map ~f:List.rev detailed) )
-              ] ;
-        ( { Staged_ledger_diff.With_valid_signatures_and_proofs.diff }
-        , invalid_on_this_ledger ) )
+                  Pre_diff_info.compute_statuses ~constraint_constants ~diff
+                    ~coinbase_amount:
+                      (Option.value_exn
+                         (coinbase_amount ~constraint_constants
+                            ~supercharge_coinbase ) )
+                    ~coinbase_receiver ~generate_status
+                    ~forget:User_command.forget_check )
+            in
+            let summaries, detailed = List.unzip log in
+            [%log debug]
+              "Number of proofs ready for purchase: $proof_count Number of \
+               user commands ready to be included: $txn_count Diff creation \
+               log: $diff_log"
+              ~metadata:
+                [ ("proof_count", `Int proof_count)
+                ; ("txn_count", `Int (Sequence.length valid_on_this_ledger))
+                ; ( "diff_log"
+                  , Diff_creation_log.summary_list_to_yojson summaries )
+                ] ;
+            if log_block_creation then
+              [%log debug] "Detailed diff creation log: $diff_log"
+                ~metadata:
+                  [ ( "diff_log"
+                    , Diff_creation_log.detail_list_to_yojson
+                        (List.map ~f:List.rev detailed) )
+                  ] ;
+            ( { Staged_ledger_diff.With_valid_signatures_and_proofs.diff }
+            , invalid_on_this_ledger ) ) )
 
   let latest_block_accounts_created t ~previous_block_state_hash =
     let scan_state = scan_state t in
@@ -2711,21 +2729,18 @@ let%test_module "staged ledger tests" =
           )
 
     let compute_statuses ~ledger ~coinbase_amount ~global_slot diff =
-      let generate_status =
-        let module Transaction_validator =
-          Transaction_snark.Transaction_validator
-        in
-        let status_ledger = Transaction_validator.create ledger in
-        fun txn ->
-          let txn_state_view = dummy_state_view () in
-          O1trace.sync_thread "get_transactin_status" (fun () ->
-              Transaction_validator.apply_transaction ~constraint_constants
-                ~global_slot status_ledger ~txn_state_view txn )
-      in
-      Pre_diff_info.compute_statuses ~constraint_constants ~diff
-        ~coinbase_amount ~coinbase_receiver ~generate_status ~forget:Fn.id
-      |> Result.map_error ~f:Pre_diff_info.Error.to_error
-      |> Or_error.ok_exn
+      with_ledger_mask ledger ~f:(fun status_ledger ->
+          let generate_status txn =
+            let txn_state_view = dummy_state_view () in
+            O1trace.sync_thread "get_transactin_status" (fun () ->
+                Transaction_snark.Transaction_validator.apply_transaction
+                  ~constraint_constants ~global_slot status_ledger
+                  ~txn_state_view txn )
+          in
+          Pre_diff_info.compute_statuses ~constraint_constants ~diff
+            ~coinbase_amount ~coinbase_receiver ~generate_status ~forget:Fn.id
+          |> Result.map_error ~f:Pre_diff_info.Error.to_error
+          |> Or_error.ok_exn )
 
     let%test_unit "Invalid diff test: check zero fee excess for partitions" =
       let create_diff_with_non_zero_fee_excess ~ledger ~coinbase_amount

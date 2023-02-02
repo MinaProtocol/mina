@@ -13,7 +13,7 @@ open Mina_base
    accounts always yield the same results.*)
 let%test_module "account timing check" =
   ( module struct
-    open Transaction_snark.Transaction_validator.For_tests
+    open Mina_ledger.Ledger.For_tests
 
     let account_with_default_vesting_schedule ?(token = Token_id.default)
         ?(initial_minimum_balance = Balance.of_mina_int_exn 10_000)
