@@ -322,7 +322,8 @@ let test_snapp_update ?expected_failure ?state_body ?snapp_permissions ~vk
             ?permissions:snapp_permissions ~vk ~ledger snapp_pk ;
           let open Async.Deferred.Let_syntax in
           let%bind zkapp_command =
-            Transaction_snark.For_tests.update_states ~zkapp_prover
+            let zkapp_prover_and_vk = (zkapp_prover, vk) in
+            Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk
               ~constraint_constants test_spec
           in
           check_zkapp_command_with_merges_exn ?expected_failure ?state_body

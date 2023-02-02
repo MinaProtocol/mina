@@ -48,7 +48,11 @@ let verify_commands _ (cs : User_command.Verifiable.t list) :
       | `Invalid_proof err ->
           `Invalid_proof err
       | `Missing_verification_key keys ->
-          `Missing_verification_key keys )
+          `Missing_verification_key keys
+      | `Unexpected_verification_key keys ->
+          `Unexpected_verification_key keys
+      | `Mismatched_authorization_kind keys ->
+          `Mismatched_authorization_kind keys )
   |> Deferred.Or_error.return
 
 let verify_transaction_snarks _ ts =

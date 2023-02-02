@@ -23,6 +23,7 @@
    mina_numbers
    one_or_two
    pickles
+   random_oracle
    signature_lib
    sgn
    snark_params

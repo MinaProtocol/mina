@@ -81,10 +81,16 @@ CREATE TABLE zkapp_events
 , element_ids              int[]            NOT NULL
 );
 
+/* field elements derived from verification keys */
+CREATE TABLE zkapp_verification_key_hashes
+( id                                    serial          PRIMARY KEY
+, value                                 text            NOT NULL UNIQUE
+);
+
 CREATE TABLE zkapp_verification_keys
 ( id                       serial           PRIMARY KEY
 , verification_key         text             NOT NULL UNIQUE
-, hash                     text             NOT NULL UNIQUE
+, hash_id                  int              NOT NULL UNIQUE REFERENCES zkapp_verification_key_hashes(id)
 );
 
 CREATE TYPE zkapp_auth_required_type AS ENUM ('none', 'either', 'proof', 'signature', 'both', 'impossible');
@@ -252,6 +258,10 @@ CREATE TYPE authorization_kind_type AS ENUM ('None_given', 'Signature', 'Proof')
 
 /* events_ids and actions_ids indicate a list of ids in
    zkapp_state_data_array.
+
+   invariant: verification_key_hash_id is not NULL iff authorization_kind = Proof
+   in OCaml, the verification key hash is stored with the Proof authorization kind
+   here, they're kept separate so we can use an enum type
 */
 CREATE TABLE zkapp_account_update_body
 ( id                                    serial          PRIMARY KEY
@@ -270,6 +280,7 @@ CREATE TABLE zkapp_account_update_body
 , implicit_account_creation_fee         boolean         NOT NULL
 , may_use_token                         may_use_token  NOT NULL
 , authorization_kind                    authorization_kind_type NOT NULL
+, verification_key_hash_id              int                       REFERENCES zkapp_verification_key_hashes(id)
 );
 
 /* possible future enhancement: add NULLable authorization column for proofs and signatures */

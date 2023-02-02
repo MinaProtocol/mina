@@ -358,6 +358,10 @@ module Transaction_pool = struct
     in
     Counter.v "transactions_added_to_pool" ~help ~namespace ~subsystem
 
+  let vk_refcount_table_size : Gauge.t =
+    let help = "Size of verification key refcount table" in
+    Gauge.v "vk_refcount_table_size" ~help ~namespace ~subsystem
+
   let zkapp_transactions_added_to_pool : Counter.t =
     let help =
       "Number of zkapp transactions added to the pool since the node start"

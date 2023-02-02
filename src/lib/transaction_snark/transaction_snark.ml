@@ -1170,6 +1170,12 @@ module Make_str (A : Wire_types.Concrete) = struct
             Zkapp_basic.Flagged_option.if_ ~if_:Data_as_hash.if_ b ~then_ ~else_
         end
 
+        module Verification_key_hash = struct
+          type t = Field.t
+
+          let equal = Field.equal
+        end
+
         module Actions = struct
           type t = Zkapp_account.Actions.var
 
@@ -1314,6 +1320,10 @@ module Make_str (A : Wire_types.Concrete) = struct
             { data = { a with zkapp = { a.zkapp with verification_key } }
             ; hash
             }
+
+          let verification_key_hash (a : t) : Verification_key_hash.t =
+            verification_key a |> Zkapp_basic.Flagged_option.data
+            |> Data_as_hash.hash
 
           let last_sequence_slot (a : t) = a.data.zkapp.last_sequence_slot
 
@@ -1939,6 +1949,9 @@ module Make_str (A : Wire_types.Concrete) = struct
 
             let is_signed ({ account_update; _ } : t) =
               account_update.data.authorization_kind.is_signed
+
+            let verification_key_hash ({ account_update; _ } : t) =
+              account_update.data.authorization_kind.verification_key_hash
 
             module Update = struct
               open Zkapp_basic
@@ -4184,8 +4197,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let account_update_proof (p : Account_update.t) =
       match p.authorization with
-      | Proof p ->
-          Some p
+      | Proof proof ->
+          Some proof
       | Signature _ | None_given ->
           None
 
@@ -4800,7 +4813,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
       [@@deriving sexp]
 
-      let spec_of_t
+      let spec_of_t ~vk
           { fee
           ; sender
           ; fee_payer
@@ -4835,21 +4848,32 @@ module Make_str (A : Wire_types.Concrete) = struct
             | Signature ->
                 Signature
             | Proof ->
-                Proof
+                Proof (With_hash.hash vk)
             | _ ->
                 Signature )
         }
     end
 
-    let update_states ?receiver_auth ?zkapp_prover ?empty_sender
+    let update_states ?receiver_auth ?zkapp_prover_and_vk ?empty_sender
         ~constraint_constants (spec : Update_states_spec.t) =
+      let prover, vk =
+        match zkapp_prover_and_vk with
+        | Some (prover, vk) ->
+            (prover, vk)
+        | None ->
+            (* we don't always need this, but calculate it just once *)
+            let `VK vk, `Prover prover =
+              create_trivial_snapp ~constraint_constants ()
+            in
+            (prover, vk)
+      in
       let ( `Zkapp_command ({ Zkapp_command.fee_payer; memo; _ } as p)
           , `Sender_account_update sender_account_update
           , `Proof_zkapp_command snapp_zkapp_command
           , `Txn_commitment commitment
           , `Full_txn_commitment full_commitment ) =
         create_zkapp_command ~constraint_constants
-          (Update_states_spec.spec_of_t spec)
+          (Update_states_spec.spec_of_t ~vk spec)
           ~update:spec.snapp_update
           ~receiver_update:Mina_base.Account_update.Update.noop ?receiver_auth
           ?empty_sender
@@ -4878,16 +4902,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                 let handler
                     (Snarky_backendless.Request.With { request; respond }) =
                   match request with _ -> respond Unhandled
-                in
-                let prover =
-                  match zkapp_prover with
-                  | Some prover ->
-                      prover
-                  | None ->
-                      let _, `Prover p =
-                        create_trivial_snapp ~constraint_constants ()
-                      in
-                      p
                 in
                 let%map.Async.Deferred (), (), (pi : Pickles.Side_loaded.Proof.t)
                     =
@@ -5120,9 +5134,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; use_full_commitment = false
             ; implicit_account_creation_fee = false
             ; may_use_token = No
-            ; authorization_kind = Proof
+            ; authorization_kind = Proof (With_hash.hash vk)
             }
-        ; authorization = Proof Mina_base.Proof.blockchain_dummy
+        ; authorization = Proof Mina_base.Proof.transaction_dummy
         }
       in
       let memo = Signed_command_memo.empty in

@@ -10,10 +10,22 @@ let mk_forest ps :
 let mk_node account_update calls : _ Zkapp_command.Call_forest.Tree.t =
   { account_update; account_update_digest = (); calls = mk_forest calls }
 
-let mk_account_update_body authorization_kind may_use_token kp token_id
-    balance_change : Account_update.Body.Simple.t =
+let mk_account_update_body ?preconditions ?increment_nonce ?update
+    authorization_kind may_use_token kp token_id balance_change :
+    Account_update.Body.Simple.t =
   let open Signature_lib in
-  { update = Account_update.Update.noop
+  let preconditions =
+    Option.value preconditions
+      ~default:
+        Account_update.Preconditions.
+          { network = Zkapp_precondition.Protocol_state.accept
+          ; account = Account_update.Account_precondition.Accept
+          ; valid_while = Ignore
+          }
+  in
+  let increment_nonce = Option.value increment_nonce ~default:false in
+  let update = Option.value update ~default:Account_update.Update.noop in
+  { update
   ; public_key = Public_key.compress kp.Keypair.public_key
   ; token_id
   ; balance_change =
@@ -21,16 +33,12 @@ let mk_account_update_body authorization_kind may_use_token kp token_id
         ~magnitude:
           (Currency.Amount.of_nanomina_int_exn (Int.abs balance_change))
         ~sgn:(if Int.is_negative balance_change then Sgn.Neg else Pos)
-  ; increment_nonce = false
+  ; increment_nonce
   ; events = []
   ; actions = []
   ; call_data = Pickles.Impls.Step.Field.Constant.zero
   ; call_depth = 0
-  ; preconditions =
-      { network = Zkapp_precondition.Protocol_state.accept
-      ; account = Account_update.Account_precondition.Accept
-      ; valid_while = Ignore
-      }
+  ; preconditions
   ; use_full_commitment = true
   ; implicit_account_creation_fee = false
   ; may_use_token
@@ -63,7 +71,7 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
                match p.authorization_kind with
                | None_given ->
                    Control.None_given
-               | Proof ->
+               | Proof _ ->
                    Control.Proof Mina_base.Proof.blockchain_dummy
                | Signature ->
                    Control.Signature Signature.dummy
@@ -114,10 +122,10 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
     { zkapp_command.fee_payer with authorization = fee_payer_signature }
   in
   let open Async_kernel.Deferred.Let_syntax in
-  let%map account_updates_with_valid_signatures =
+  let%map account_updates_with_valid_authorizations =
     Zkapp_command.Call_forest.deferred_mapi zkapp_command.account_updates
       ~f:(fun _ndx ({ body; authorization } : Account_update.t) tree ->
-        let%map authorization_with_valid_signature =
+        let%map valid_authorization =
           match authorization with
           | Control.Signature _dummy ->
               let pk = body.public_key in
@@ -136,7 +144,7 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
               let use_full_commitment = body.use_full_commitment in
               let signature = sign_for_account_update ~use_full_commitment sk in
               return (Control.Signature signature)
-          | Proof _ -> (
+          | Proof _proof -> (
               match prover with
               | None ->
                   return authorization
@@ -153,11 +161,9 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
           | None_given ->
               return authorization
         in
-        { Account_update.body
-        ; authorization = authorization_with_valid_signature
-        } )
+        { Account_update.body; authorization = valid_authorization } )
   in
   { zkapp_command with
     fee_payer = fee_payer_with_valid_signature
-  ; account_updates = account_updates_with_valid_signatures
+  ; account_updates = account_updates_with_valid_authorizations
   }

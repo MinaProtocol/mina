@@ -44,7 +44,8 @@ val gen_protocol_state_precondition :
     Generated zkapp_command uses dummy signatures and dummy proofs.
   *)
 val gen_zkapp_command_from :
-     ?failure:failure
+     ?global_slot:Mina_numbers.Global_slot.t
+  -> ?failure:failure
   -> ?max_account_updates:int
   -> ?max_token_updates:int
   -> fee_payer_keypair:Signature_lib.Keypair.t
@@ -60,7 +61,8 @@ val gen_zkapp_command_from :
 (** Generate a list of zkapp_command, `fee_payer_keypairs` contains a list of possible fee payers
   *)
 val gen_list_of_zkapp_command_from :
-     ?failure:failure
+     ?global_slot:Mina_numbers.Global_slot.t
+  -> ?failure:failure
   -> ?max_account_updates:int
   -> ?max_token_updates:int
   -> fee_payer_keypairs:Signature_lib.Keypair.t list

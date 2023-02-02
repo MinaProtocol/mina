@@ -12,7 +12,10 @@ module Base = struct
       | `Invalid_signature of Signature_lib.Public_key.Compressed.t list
       | `Invalid_proof of Error.t
       | `Missing_verification_key of Signature_lib.Public_key.Compressed.t list
-      ]
+      | `Unexpected_verification_key of
+        Signature_lib.Public_key.Compressed.t list
+      | `Mismatched_authorization_kind of
+        Signature_lib.Public_key.Compressed.t list ]
     [@@deriving bin_io, to_yojson]
 
     val invalid_to_error : invalid -> Error.t

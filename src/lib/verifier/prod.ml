@@ -79,7 +79,9 @@ module Worker_state = struct
                    | `Invalid_keys _
                    | `Invalid_signature _
                    | `Invalid_proof _
-                   | `Missing_verification_key _ ->
+                   | `Missing_verification_key _
+                   | `Unexpected_verification_key _
+                   | `Mismatched_authorization_kind _ ->
                        [] )
                in
                let%map all_verified =
@@ -98,7 +100,11 @@ module Worker_state = struct
                  | `Invalid_proof err ->
                      `Invalid_proof err
                  | `Missing_verification_key keys ->
-                     `Missing_verification_key keys )
+                     `Missing_verification_key keys
+                 | `Unexpected_verification_key keys ->
+                     `Unexpected_verification_key keys
+                 | `Mismatched_authorization_kind keys ->
+                     `Mismatched_authorization_kind keys )
 
              let verify_blockchain_snarks = B.Proof.verify
 
@@ -134,7 +140,11 @@ module Worker_state = struct
                    | `Invalid_proof err ->
                        `Invalid_proof err
                    | `Missing_verification_key keys ->
-                       `Missing_verification_key keys )
+                       `Missing_verification_key keys
+                   | `Unexpected_verification_key keys ->
+                       `Unexpected_verification_key keys
+                   | `Mismatched_authorization_kind keys ->
+                       `Mismatched_authorization_kind keys )
                |> Deferred.return
 
              let verify_blockchain_snarks _ = Deferred.return (Ok ())
