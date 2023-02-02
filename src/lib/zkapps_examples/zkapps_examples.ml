@@ -190,9 +190,11 @@ module Account_update_under_construction = struct
       ; call_data : Field.t option
       ; events : Events.t
       ; actions : Actions.t
+      ; vk_hash : Field.t
       }
 
-    let create ~public_key ?(token_id = Token_id.(Checked.constant default))
+    let create ~public_key ~vk_hash
+        ?(token_id = Token_id.(Checked.constant default))
         ?(may_use_token = Account_update.May_use_token.Checked.constant No) () =
       { public_key
       ; token_id
@@ -203,6 +205,7 @@ module Account_update_under_construction = struct
       ; call_data = None
       ; events = Events.create ()
       ; actions = Actions.create ()
+      ; vk_hash
       }
 
     let to_account_update_and_calls (t : t) :
@@ -269,9 +272,7 @@ module Account_update_under_construction = struct
         ; authorization_kind =
             { is_signed = Boolean.false_
             ; is_proved = Boolean.true_
-            ; verification_key_hash =
-                Field.zero
-                (* the vk hash is a dummy, to be patched with `patch_verification_key_hashes`, below *)
+            ; verification_key_hash = t.vk_hash
             }
         }
       in
@@ -313,11 +314,11 @@ module Account_update_under_construction = struct
   end
 end
 
-class account_update ~public_key ?token_id ?may_use_token =
+class account_update ~public_key ~vk_hash ?token_id ?may_use_token =
   object
     val mutable account_update =
-      Account_update_under_construction.In_circuit.create ~public_key ?token_id
-        ?may_use_token ()
+      Account_update_under_construction.In_circuit.create ~public_key ~vk_hash
+        ?token_id ?may_use_token ()
 
     method assert_state_proved =
       account_update <-
@@ -430,9 +431,9 @@ open Pickles_types
 open Hlist
 
 let wrap_main ~public_key ?token_id ?may_use_token f
-    { Pickles.Inductive_rule.public_input = () } =
+    { Pickles.Inductive_rule.public_input = vk_hash } =
   let account_update =
-    new account_update ~public_key ?token_id ?may_use_token
+    new account_update ~public_key ~vk_hash ?token_id ?may_use_token
   in
   let auxiliary_output = f account_update in
   { Pickles.Inductive_rule.previous_proof_statements = []
@@ -467,8 +468,8 @@ let compile :
              , prev_valuess
              , widthss
              , heightss
-             , unit
-             , unit
+             , Field.t
+             , Field.Constant.t
              , account_update
              , unit (* TODO: Remove? *)
              , auxiliary_var
@@ -499,6 +500,7 @@ let compile :
          H3_2.T(Pickles.Prover).t =
  fun ?self ?cache ?disk_keys ~auxiliary_typ ~branches ~max_proofs_verified ~name
      ~constraint_constants ~choices () ->
+  let vk_hash = ref None in
   let choices ~self =
     let rec go :
         type prev_varss prev_valuess widthss heightss.
@@ -506,8 +508,8 @@ let compile :
            , prev_valuess
            , widthss
            , heightss
-           , unit
-           , unit
+           , Field.t
+           , Field.Constant.t
            , account_update
            , unit
            , auxiliary_var
@@ -531,12 +533,16 @@ let compile :
           ; prevs
           ; uses_lookup
           ; main =
-              (fun main_input ->
+              (fun { Pickles.Inductive_rule.public_input = () } ->
+                let vk_hash =
+                  exists Field.typ ~compute:(fun () ->
+                      Lazy.force @@ Option.value_exn !vk_hash )
+                in
                 let { Pickles.Inductive_rule.previous_proof_statements
                     ; public_output = account_update_under_construction
                     ; auxiliary_output
                     } =
-                  main main_input
+                  main { Pickles.Inductive_rule.public_input = vk_hash }
                 in
                 let public_output, account_update_tree =
                   to_account_update account_update_under_construction
@@ -555,6 +561,13 @@ let compile :
       ~public_input:(Output Zkapp_statement.typ)
       ~auxiliary_typ:Typ.(Prover_value.typ () * auxiliary_typ)
       ~branches ~max_proofs_verified ~name ~constraint_constants ~choices
+  in
+  let () =
+    vk_hash :=
+      Some
+        ( lazy
+          ( Zkapp_account.digest_vk
+          @@ Pickles.Side_loaded.Verification_key.of_compiled tag ) )
   in
   let provers =
     let rec go :
