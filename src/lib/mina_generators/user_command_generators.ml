@@ -137,7 +137,7 @@ let zkapp_command_with_ledger ?num_keypairs ?max_account_updates
   in
   let zkapp_command =
     Or_error.ok_exn
-      (Zkapp_command.Valid.to_valid
+      (Zkapp_command.Valid.to_valid ~status:Applied
          ~find_vk:
            (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger ~get:Ledger.get
               ~location_of_account:Ledger.location_of_account )
@@ -186,7 +186,7 @@ let sequence_zkapp_command_with_ledger ?max_account_updates ?max_token_updates
       in
       let valid_zkapp_command =
         Or_error.ok_exn
-          (Zkapp_command.Valid.to_valid
+          (Zkapp_command.Valid.to_valid ~status:Applied
              ~find_vk:
                (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
                   ~get:Ledger.get

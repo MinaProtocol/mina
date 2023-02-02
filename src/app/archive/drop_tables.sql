@@ -60,13 +60,13 @@ DROP TABLE zkapp_epoch_ledger;
 
 DROP TABLE zkapp_permissions;
 
-DROP TABLE zkapp_state_data_array;
+DROP TABLE zkapp_field_array;
 
 DROP TABLE zkapp_states_nullable;
 
 DROP TABLE zkapp_states;
 
-DROP TABLE zkapp_state_data;
+DROP TABLE zkapp_field;
 
 DROP TABLE zkapp_timing_info;
 

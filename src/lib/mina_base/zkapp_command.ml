@@ -1126,6 +1126,7 @@ module Verifiable : sig
 
   val create :
        T.t
+    -> status:Transaction_status.t
     -> find_vk:
          (   Zkapp_basic.F.t
           -> Account_id.t
@@ -1136,12 +1137,12 @@ module Verifiable : sig
     (** creates verifiables from a list of commands that caches verification
         keys and permits _any_ vks that have been seen earlier in the list. *)
     val create_all :
-         T.t list
+         T.t With_status.t list
       -> find_vk:
            (   Zkapp_basic.F.t
             -> Account_id.t
             -> (Verification_key_wire.t, Error.t) Result.t )
-      -> t list Or_error.t
+      -> t With_status.t list Or_error.t
   end
 
   module Last : sig
@@ -1149,12 +1150,12 @@ module Verifiable : sig
         keys and permits only the _last_ vk that has been seen earlier in the
         list. *)
     val create_all :
-         T.t list
+         T.t With_status.t list
       -> find_vk:
            (   Zkapp_basic.F.t
             -> Account_id.t
             -> (Verification_key_wire.t, Error.t) Result.t )
-      -> t list Or_error.t
+      -> t With_status.t list Or_error.t
   end
 end = struct
   [%%versioned
@@ -1198,9 +1199,11 @@ end = struct
     | Some vk ->
         ok_if_vk_hash_expected ~got:vk ~expected:expected_vk_hash
     | None ->
-        Error
-          (Error.create "No verification key found for proved account update"
-             ("account_id", account_id) [%sexp_of: string * Account_id.t] )
+        let err =
+          Error.create "No verification key found for proved account update"
+            ("account_id", account_id) [%sexp_of: string * Account_id.t]
+        in
+        Error err
 
   (* Ensures that there's a verification_key available for all account_updates
    * and creates a valid command associating the correct keys with each
@@ -1210,8 +1213,8 @@ end = struct
    * subsequent account_updates use the replaced key instead of looking in the
    * ledger for the key (ie set by a previous transaction).
    *)
-  let create ({ fee_payer; account_updates; memo } : T.t) ~find_vk :
-      t Or_error.t =
+  let create ({ fee_payer; account_updates; memo } : T.t)
+      ~(status : Transaction_status.t) ~find_vk : t Or_error.t =
     With_return.with_return (fun { return } ->
         let tbl = Account_id.Table.create () in
         let vks_overridden =
@@ -1238,8 +1241,11 @@ end = struct
                 | Error _ as err ->
                     return err
               in
-              match p.body.authorization_kind with
-              | Proof vk_hash ->
+              match
+                ( p.body.authorization_kind
+                , phys_equal status Transaction_status.Applied )
+              with
+              | Proof vk_hash, true -> (
                   let prioritized_vk =
                     (* only lookup _past_ vk setting, ie exclude the new one we
                      * potentially set in this account_update (use the non-'
@@ -1250,7 +1256,7 @@ end = struct
                           ok_if_vk_hash_expected ~got:vk ~expected:vk_hash
                         with
                         | Ok vk ->
-                            vk
+                            Some vk
                         | Error err ->
                             return (Error err) )
                     | Some None ->
@@ -1270,13 +1276,18 @@ end = struct
                         | Error e ->
                             return (Error e)
                         | Ok vk ->
-                            vk )
+                            Some vk )
                   in
-                  Account_id.Table.update tbl account_id ~f:(fun _ ->
-                      With_hash.hash prioritized_vk ) ;
-                  (* return the updated overrides *)
-                  vks_overridden := vks_overriden' ;
-                  (p, Some prioritized_vk)
+                  match prioritized_vk with
+                  | Some prioritized_vk ->
+                      Account_id.Table.update tbl account_id ~f:(fun _ ->
+                          With_hash.hash prioritized_vk ) ;
+                      (* return the updated overrides *)
+                      vks_overridden := vks_overriden' ;
+                      (p, Some prioritized_vk)
+                  | None ->
+                      (* The transaction failed, so we allow the vk to be missing. *)
+                      (p, None) )
               | _ ->
                   vks_overridden := vks_overriden' ;
                   (p, None) )
@@ -1318,18 +1329,21 @@ end = struct
     val set : 'a t -> key:Zkapp_basic.F.t -> data:'a -> 'a t
   end) =
   struct
-    let create_all (cmds : T.t list)
+    let create_all (cmds : T.t With_status.t list)
         ~(find_vk :
               Zkapp_basic.F.t
            -> Account_id.t
-           -> (Verification_key_wire.t, Error.t) Result.t ) : t list Or_error.t
-        =
+           -> (Verification_key_wire.t, Error.t) Result.t ) :
+        t With_status.t list Or_error.t =
       Or_error.try_with (fun () ->
           snd (* remove the helper cache we folded with *)
             (List.fold_map cmds ~init:Cache.empty
-               ~f:(fun (running_cache : Verification_key_wire.t Cache.t) cmd ->
+               ~f:(fun
+                    (running_cache : Verification_key_wire.t Cache.t)
+                    { data = cmd; status }
+                  ->
                  let verified_cmd : t =
-                   create cmd ~find_vk:(fun vk_hash account_id ->
+                   create cmd ~status ~find_vk:(fun vk_hash account_id ->
                        (* first we check if there's anything in the running
                           cache within this chunk so far *)
                        match Cache.find running_cache vk_hash with
@@ -1345,7 +1359,8 @@ end = struct
                      ~f:(fun acc vk ->
                        Cache.set acc ~key:(With_hash.hash vk) ~data:vk )
                  in
-                 (running_cache', verified_cmd) ) ) )
+                 (running_cache', { With_status.data = verified_cmd; status }) )
+            ) )
   end
 
   module Any = struct
@@ -1438,6 +1453,7 @@ module type Valid_intf = sig
 
   val to_valid :
        T.t
+    -> status:Transaction_status.t
     -> find_vk:
          (   Zkapp_basic.F.t
           -> Account_id.t
@@ -1488,8 +1504,8 @@ struct
 
   let forget (t : t) : T.t = t.zkapp_command
 
-  let to_valid (t : T.t) ~find_vk : t Or_error.t =
-    Verifiable.create t ~find_vk |> Or_error.map ~f:of_verifiable
+  let to_valid (t : T.t) ~status ~find_vk : t Or_error.t =
+    Verifiable.create t ~status ~find_vk |> Or_error.map ~f:of_verifiable
 end
 
 [%%define_locally Stable.Latest.(of_yojson, to_yojson)]

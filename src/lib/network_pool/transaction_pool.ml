@@ -1112,22 +1112,26 @@ struct
 
         let%bind diff' =
           O1trace.sync_thread "convert_transactions_to_verifiable" (fun () ->
-              Envelope.Incoming.map diff
-                ~f:
-                  (User_command.Any.to_all_verifiable
-                     ~find_vk:(fun vk_hash account_id ->
-                       match
-                         Vk_refcount_table.find t.verification_key_table vk_hash
-                       with
-                       | Some (_, vk) ->
-                           Ok vk
-                       | None ->
-                           Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
-                             ~get:Base_ledger.get
-                             ~location_of_account:
-                               Base_ledger.location_of_account vk_hash
-                             account_id ) ) )
+              Envelope.Incoming.map diff ~f:(fun diff ->
+                  List.map diff ~f:(fun cmd ->
+                      { With_status.status = Applied; data = cmd } )
+                  |> User_command.Any.to_all_verifiable
+                       ~find_vk:(fun vk_hash account_id ->
+                         match
+                           Vk_refcount_table.find t.verification_key_table
+                             vk_hash
+                         with
+                         | Some (_, vk) ->
+                             Ok vk
+                         | None ->
+                             Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
+                               ~get:Base_ledger.get
+                               ~location_of_account:
+                                 Base_ledger.location_of_account vk_hash
+                               account_id ) ) )
           |> Envelope.Incoming.lift_error
+          |> Result.map
+               ~f:(Envelope.Incoming.map ~f:(List.map ~f:With_status.data))
           |> Result.map_error ~f:(Error.tag ~tag:"Verification_failed")
           |> Deferred.return
         in
@@ -1703,7 +1707,9 @@ let%test_module _ =
                   Zkapp_command_builder.replace_authorizations ~keymap ~prover
                     (Zkapp_command.Valid.forget zkapp_command_dummy_auths)
                 in
-                User_command.Zkapp_command cmd
+                { With_status.data = User_command.Zkapp_command cmd
+                ; status = Applied
+                }
             | Signed_command _ ->
                 failwith "Expected Zkapp_command valid user command" )
       in
@@ -1714,7 +1720,8 @@ let%test_module _ =
                ~get:Mina_ledger.Ledger.get
                ~location_of_account:Mina_ledger.Ledger.location_of_account )
         |> Or_error.bind ~f:(fun xs ->
-               List.map xs ~f:User_command.check_verifiable
+               List.map xs ~f:(fun cmd ->
+                   User_command.check_verifiable cmd.data )
                |> Or_error.combine_errors )
       with
       | Ok cmds ->
@@ -1897,7 +1904,7 @@ let%test_module _ =
       in
       let zkapp_command =
         Or_error.ok_exn
-          (Zkapp_command.Valid.to_valid
+          (Zkapp_command.Valid.to_valid ~status:Applied
              ~find_vk:
                (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger:()
                   ~get:(fun _ _ -> failwith "Not expecting proof zkapp_command")
@@ -1989,7 +1996,7 @@ let%test_module _ =
             in
             let valid_zkapp_command =
               Or_error.ok_exn
-                (Zkapp_command.Valid.to_valid
+                (Zkapp_command.Valid.to_valid ~status:Applied
                    ~find_vk:
                      (Zkapp_command.Verifiable.find_vk_via_ledger
                         ~ledger:best_tip_ledger ~get:Mina_ledger.Ledger.get
@@ -2723,7 +2730,7 @@ let%test_module _ =
       in
       let zkapp_command =
         Or_error.ok_exn
-          (Zkapp_command.Valid.to_valid
+          (Zkapp_command.Valid.to_valid ~status:Applied
              ~find_vk:
                (Zkapp_command.Verifiable.find_vk_via_ledger
                   ~ledger:best_tip_ledger ~get:Mina_ledger.Ledger.get

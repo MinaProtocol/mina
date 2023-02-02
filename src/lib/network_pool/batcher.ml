@@ -330,7 +330,9 @@ module Transaction_pool = struct
             in
             let%map res =
               (* Verify the unknowns *)
-              Verifier.verify_commands verifier (List.map unknowns ~f:snd)
+              Verifier.verify_commands verifier
+                (List.map unknowns ~f:(fun (_, txn) ->
+                     { With_status.data = txn; status = Applied } ) )
             in
             (* We now iterate over the results of the unknown transactions and appropriately modify
                the verification result of the diff that it belongs to. *)
