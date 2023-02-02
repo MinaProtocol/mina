@@ -131,7 +131,7 @@ let update_of_id pool update_id =
       Deferred.List.map field_ids ~f:(fun id_opt ->
           Option.value_map id_opt ~default:(return None) ~f:(fun id ->
               let%map field =
-                query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id)
+                query_db ~f:(fun db -> Processor.Zkapp_field.load db id)
               in
               Some field ) )
     in
@@ -378,19 +378,17 @@ let protocol_state_precondition_of_id pool id =
 let load_events pool id =
   let query_db ~f = Mina_caqti.query ~f pool in
   let%map fields_list =
-    (* each id refers to an item in 'zkapp_state_data_array' *)
+    (* each id refers to an item in 'zkapp_field_array' *)
     let%bind field_array_ids =
       query_db ~f:(fun db -> Processor.Zkapp_events.load db id)
     in
     Deferred.List.map (Array.to_list field_array_ids) ~f:(fun array_id ->
         let%bind field_ids =
-          query_db ~f:(fun db ->
-              Processor.Zkapp_state_data_array.load db array_id )
+          query_db ~f:(fun db -> Processor.Zkapp_field_array.load db array_id)
         in
         Deferred.List.map (Array.to_list field_ids) ~f:(fun field_id ->
             let%map field_str =
-              query_db ~f:(fun db ->
-                  Processor.Zkapp_state_data.load db field_id )
+              query_db ~f:(fun db -> Processor.Zkapp_field.load db field_id)
             in
             Zkapp_basic.F.of_string field_str ) )
   in
@@ -458,7 +456,7 @@ let get_account_update_body ~pool body_id =
   let%bind actions = load_events pool actions_id in
   let%bind call_data =
     let%map field_str =
-      query_db ~f:(fun db -> Processor.Zkapp_state_data.load db call_data_id)
+      query_db ~f:(fun db -> Processor.Zkapp_field.load db call_data_id)
     in
     Zkapp_basic.F.of_string field_str
   in
@@ -569,8 +567,7 @@ let get_account_update_body ~pool body_id =
             Deferred.List.map elements ~f:(fun id_opt ->
                 Option.value_map id_opt ~default:(return None) ~f:(fun id ->
                     let%map field_str =
-                      query_db ~f:(fun db ->
-                          Processor.Zkapp_state_data.load db id )
+                      query_db ~f:(fun db -> Processor.Zkapp_field.load db id)
                     in
                     Some (Zkapp_basic.F.of_string field_str) ) )
           in
@@ -581,7 +578,7 @@ let get_account_update_body ~pool body_id =
             Option.value_map sequence_state_id ~default:(return None)
               ~f:(fun id ->
                 let%map field_str =
-                  query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id)
+                  query_db ~f:(fun db -> Processor.Zkapp_field.load db id)
                 in
                 Some (Zkapp_basic.F.of_string field_str) )
           in
@@ -823,7 +820,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
         let%bind app_state =
           let%map field_strs =
             Deferred.List.map elements ~f:(fun id ->
-                query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id) )
+                query_db ~f:(fun db -> Processor.Zkapp_field.load db id) )
           in
           let fields = List.map field_strs ~f:Zkapp_basic.F.of_string in
           Zkapp_state.V.of_list_exn fields
@@ -866,7 +863,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
         let%bind sequence_state =
           let%map field_strs =
             Deferred.List.map elements ~f:(fun id ->
-                query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id) )
+                query_db ~f:(fun db -> Processor.Zkapp_field.load db id) )
           in
           let fields = List.map field_strs ~f:Zkapp_basic.F.of_string in
           Pickles_types.Vector.Vector_5.of_list_exn fields
