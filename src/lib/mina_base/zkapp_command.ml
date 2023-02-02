@@ -1199,17 +1199,11 @@ end = struct
     | Some vk ->
         ok_if_vk_hash_expected ~got:vk ~expected:expected_vk_hash
     | None ->
-        (* (
-           match status with
-           | Transaction_status.Applied ->
-        *)
         let err =
           Error.create "No verification key found for proved account update"
             ("account_id", account_id) [%sexp_of: string * Account_id.t]
         in
         Error err
-  (*| Transaction_status.Failed _ ->
-      Ok None )*)
 
   (* Ensures that there's a verification_key available for all account_updates
    * and creates a valid command associating the correct keys with each
