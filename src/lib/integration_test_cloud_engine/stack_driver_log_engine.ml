@@ -238,7 +238,7 @@ module Subscription = struct
         ; "table(DATA)"
         ]
     in
-    [%log spam] "Pull result from stackdriver: $result"
+    [%log info] "Pull result from stackdriver: $result"
       ~metadata:[ ("result", `String result) ] ;
     match String.split_lines result with
     | [] | [ "DATA" ] ->
