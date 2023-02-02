@@ -2009,7 +2009,7 @@ let%test_module "staged ledger tests" =
 
     let logger = Logger.null ()
 
-    let `VK vk, `Prover _zkapp_prover =
+    let `VK vk, `Prover zkapp_prover =
       Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
 
     let verifier =
@@ -3798,8 +3798,6 @@ let%test_module "staged ledger tests" =
                   | Error _ ->
                       assert false ) ) )
 
-    (* TODO: Re-enable after https://github.com/MinaProtocol/mina/pull/12397 *)
-    (*
     let%test_unit "Mismatched verification keys in zkApp accounts and \
                    transactions" =
       let open Transaction_snark.For_tests in
@@ -3887,8 +3885,8 @@ let%test_module "staged ledger tests" =
                       (Zkapp_command.Valid.to_valid ~status:Applied
                          ~find_vk:
                            (Zkapp_command.Verifiable.find_vk_via_ledger
+                              ~ledger:valid_against_ledger ~get:Ledger.get
                               ~location_of_account:Ledger.location_of_account )
->>>>>>> origin/develop
                          zkapp_command )
                   in
                   ignore
@@ -3902,15 +3900,45 @@ let%test_module "staged ledger tests" =
                   let global_slot =
                     Mina_numbers.Global_slot.of_int global_slot
                   in
+                  let failed_zkapp_command =
+                    Or_error.ok_exn
+                      (Zkapp_command.Valid.to_valid
+                         ~status:
+                           Transaction_status.(
+                             Failed
+                               [ []
+                               ; [ Failure.Unexpected_verification_key_hash ]
+                               ])
+                         ~find_vk:
+                           (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
+                              ~get:Ledger.get
+                              ~location_of_account:Ledger.location_of_account )
+                         zkapp_command )
+                  in
                   let%bind _proof, diff =
                     create_and_apply ~global_slot sl
                       (Sequence.singleton
-                         (User_command.Zkapp_command valid_zkapp_command) )
+                         (User_command.Zkapp_command failed_zkapp_command) )
                       stmt_to_work_one_prover
                   in
-                  let commands = Staged_ledger_diff.commands diff in
-                  (*Zkapp_command with incompatible vk should not be in the diff*)
-                  assert (List.is_empty commands) ;
+                  let command =
+                    Staged_ledger_diff.commands diff |> List.hd_exn
+                  in
+                  (*Zkapp_command with incompatible vk is added with failed status*)
+                  ( match command.status with
+                  | Failed failure_tbl ->
+                      let failures = List.concat failure_tbl in
+                      assert (not (List.is_empty failures)) ;
+                      let failed_as_expected =
+                        List.fold failures ~init:false ~f:(fun acc f ->
+                            acc
+                            || Mina_base.Transaction_status.Failure.(
+                                 equal Unexpected_verification_key_hash f) )
+                      in
+                      assert failed_as_expected
+                  | Applied ->
+                      failwith
+                        "expected zkapp command to fail due to vk mismatch" ) ;
                   (*Update the account to have correct vk*)
                   let loc =
                     Option.value_exn
@@ -3946,5 +3974,5 @@ let%test_module "staged ledger tests" =
                            ( Transaction_status.Failure.Collection.to_yojson tbl
                            |> Yojson.Safe.to_string ) )
                   | _ ->
-                      failwith "expecting zkapp_command transaction" ) ) ) *)
+                      failwith "expecting zkapp_command transaction" ) ) )
   end )

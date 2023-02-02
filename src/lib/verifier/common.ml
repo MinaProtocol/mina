@@ -103,16 +103,16 @@ let check :
                 | None_given, None_given ->
                     None
                 | Proof pi, Proof vk_hash -> (
-                    match vk_opt with
-                    | None ->
-                        return
-                          (`Missing_verification_key
-                            [ Account_id.public_key
-                              @@ Account_update.account_id p
-                            ] )
-                    | Some (vk : _ With_hash.t) -> (
-                        match status with
-                        | Applied ->
+                    match status with
+                    | Applied -> (
+                        match vk_opt with
+                        | None ->
+                            return
+                              (`Missing_verification_key
+                                [ Account_id.public_key
+                                  @@ Account_update.account_id p
+                                ] )
+                        | Some (vk : _ With_hash.t) ->
                             if
                               (* check that vk expected for proof is the one being used *)
                               Snark_params.Tick.Field.equal vk_hash
@@ -123,10 +123,10 @@ let check :
                                 (`Unexpected_verification_key
                                   [ Account_id.public_key
                                     @@ Account_update.account_id p
-                                  ] )
-                        | Failed _ ->
-                            (* Don't verify the proof if it has failed. *)
-                            None ) )
+                                  ] ) )
+                    | Failed _ ->
+                        (* Don't verify the proof if it has failed. *)
+                        None )
                 | _ ->
                     return
                       (`Mismatched_authorization_kind

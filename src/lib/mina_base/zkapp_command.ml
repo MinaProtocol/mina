@@ -1241,8 +1241,11 @@ end = struct
                 | Error _ as err ->
                     return err
               in
-              match p.body.authorization_kind with
-              | Proof vk_hash -> (
+              match
+                ( p.body.authorization_kind
+                , phys_equal status Transaction_status.Applied )
+              with
+              | Proof vk_hash, true -> (
                   let prioritized_vk =
                     (* only lookup _past_ vk setting, ie exclude the new one we
                      * potentially set in this account_update (use the non-'
@@ -1256,32 +1259,24 @@ end = struct
                             Some vk
                         | Error err ->
                             return (Error err) )
-                    | Some None -> (
-                        match status with
-                        | Applied ->
-                            (* we explicitly have erased the key *)
-                            let err =
-                              Error.create
-                                "No verification key found for proved account \
-                                 update: the verification key was removed by a \
-                                 previous account update"
-                                ("account_id", account_id)
-                                [%sexp_of: string * Account_id.t]
-                            in
-                            return (Error err)
-                        | Failed _ ->
-                            None )
+                    | Some None ->
+                        (* we explicitly have erased the key *)
+                        let err =
+                          Error.create
+                            "No verification key found for proved account \
+                             update: the verification key was removed by a \
+                             previous account update"
+                            ("account_id", account_id)
+                            [%sexp_of: string * Account_id.t]
+                        in
+                        return (Error err)
                     | None -> (
                         (* we haven't set anything; lookup the vk in the fallback *)
-                        match status with
-                        | Applied -> (
-                            match find_vk vk_hash account_id with
-                            | Error e ->
-                                return (Error e)
-                            | Ok vk ->
-                                Some vk )
-                        | Failed _ ->
-                            None )
+                        match find_vk vk_hash account_id with
+                        | Error e ->
+                            return (Error e)
+                        | Ok vk ->
+                            Some vk )
                   in
                   match prioritized_vk with
                   | Some prioritized_vk ->
