@@ -361,8 +361,7 @@ let compute_statuses
   let split_transaction_statuses txns_with_statuses =
     List.partition_map txns_with_statuses ~f:(fun txn_applied ->
         let { With_status.data = txn; status } =
-          Transaction_snark.Transaction_validator.Transaction_applied
-          .transaction txn_applied
+          Mina_ledger.Ledger.Transaction_applied.transaction txn_applied
         in
         match txn with
         | Transaction.Command cmd ->
