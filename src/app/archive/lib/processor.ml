@@ -230,8 +230,8 @@ module Account_identifiers = struct
       id
 end
 
-module Zkapp_state_data = struct
-  let table_name = "zkapp_state_data"
+module Zkapp_field = struct
+  let table_name = "zkapp_field"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (fp : Pickles.Backend.Tick.Field.t) =
@@ -248,15 +248,15 @@ module Zkapp_state_data = struct
       id
 end
 
-module Zkapp_state_data_array = struct
-  let table_name = "zkapp_state_data_array"
+module Zkapp_field_array = struct
+  let table_name = "zkapp_field_array"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (fps : Pickles.Backend.Tick.Field.t array) =
     let open Deferred.Result.Let_syntax in
     let%bind (element_ids : int array) =
       Mina_caqti.deferred_result_list_map (Array.to_list fps)
-        ~f:(Zkapp_state_data.add_if_doesn't_exist (module Conn))
+        ~f:(Zkapp_field.add_if_doesn't_exist (module Conn))
       >>| Array.of_list
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -308,7 +308,7 @@ module Zkapp_states_nullable = struct
       Mina_caqti.deferred_result_list_map (Vector.to_list fps)
         ~f:
           ( Mina_caqti.add_if_some
-          @@ Zkapp_state_data.add_if_doesn't_exist (module Conn) )
+          @@ Zkapp_field.add_if_doesn't_exist (module Conn) )
     in
     let t =
       match element_ids with
@@ -369,7 +369,7 @@ module Zkapp_states = struct
     let open Deferred.Result.Let_syntax in
     let%bind (element_ids : int list) =
       Mina_caqti.deferred_result_list_map (Vector.to_list fps)
-        ~f:(Zkapp_state_data.add_if_doesn't_exist (module Conn))
+        ~f:(Zkapp_field.add_if_doesn't_exist (module Conn))
     in
     let t =
       match element_ids with
@@ -427,7 +427,7 @@ module Zkapp_sequence_states = struct
     let open Deferred.Result.Let_syntax in
     let%bind (element_ids : int list) =
       Mina_caqti.deferred_result_list_map (Vector.to_list fps) ~f:(fun field ->
-          Zkapp_state_data.add_if_doesn't_exist (module Conn) field )
+          Zkapp_field.add_if_doesn't_exist (module Conn) field )
     in
     let t =
       match element_ids with
@@ -872,7 +872,7 @@ module Zkapp_account_precondition_values = struct
     in
     let%bind sequence_state_id =
       Mina_caqti.add_if_zkapp_check
-        (Zkapp_state_data.add_if_doesn't_exist (module Conn))
+        (Zkapp_field.add_if_doesn't_exist (module Conn))
         acct.sequence_state
     in
     let receipt_chain_hash =
@@ -1451,7 +1451,7 @@ module Zkapp_events = struct
     let open Deferred.Result.Let_syntax in
     let%bind (element_ids : int array) =
       Mina_caqti.deferred_result_list_map events
-        ~f:(Zkapp_state_data_array.add_if_doesn't_exist (module Conn))
+        ~f:(Zkapp_field_array.add_if_doesn't_exist (module Conn))
       >>| Array.of_list
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -1530,7 +1530,7 @@ module Zkapp_account_update_body = struct
       Zkapp_events.add_if_doesn't_exist (module Conn) body.actions
     in
     let%bind call_data_id =
-      Zkapp_state_data.add_if_doesn't_exist (module Conn) body.call_data
+      Zkapp_field.add_if_doesn't_exist (module Conn) body.call_data
     in
     let%bind zkapp_network_precondition_id =
       Zkapp_network_precondition.add_if_doesn't_exist
