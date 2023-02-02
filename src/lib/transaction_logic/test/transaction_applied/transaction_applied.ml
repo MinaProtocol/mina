@@ -54,6 +54,16 @@ let%test_module "transaction_applied" =
       and previous_hash_input = Field.of_int 0 in
       { varying = varying_input; previous_hash = previous_hash_input }
 
-    let%test "supply_increase" = true
-    (* Currency.Amount.zero == burned_tokens stable_type_generator *)
+    type signed_amount = Currency.Amount.Signed.t
+    [@@deriving equal, sexp, compare]
+
+    (* let signed_amount_equal (expr1 : signed_amount) (expr2 : signed_amount) =
+         Currency.Amount.Signed.equal expr1 expr2
+
+       let sexp_of_signed_amount = Currency.Amount.Signed.sexp_of_t *)
+
+    let%test_unit "supply_increase" =
+      [%test_eq: signed_amount Or_error.t]
+        (Or_error.return Currency.Amount.Signed.zero)
+        (supply_increase stable_type_generator)
   end )
