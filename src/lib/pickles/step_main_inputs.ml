@@ -24,41 +24,11 @@ let unrelated_g =
 
 open Impl
 
-(* Sponge debugging -- this should never be committed enabled *)
-let debug_sponge_enabled : bool = false
-
-(* Debug helper to convert circuit field element to a hex string *)
-let field_element_to_hex fe =
-  let fe = As_prover.read Field.typ fe in
-  Kimchi_backend.Pasta.Vesta_based_plonk.(Bigint.to_hex (Field.to_bigint fe))
-
-(* In sponge debug mode, prints a standard sponge debug line, otherwise does nothing.
-   Note: standard sponge debug line must match the output of Kimchi's sponge debug mode *)
-let debug_sponge (operation : string) (input : Field.t option)
-    (sponge : Field.t Sponge.t) =
-  if debug_sponge_enabled then
-    as_prover (fun () ->
-        (* Convert sponge_state to match Rust style debug string *)
-        let sponge_state =
-          match sponge.sponge_state with
-          | Absorbed n ->
-              Printf.sprintf "Absorbed(%d)" n
-          | Squeezed n ->
-              Printf.sprintf "Squeezed(%d)" n
-        in
-        (* Print debug header, operation and sponge_state *)
-        Format.eprintf !"debug_sponge: %s state %s" operation sponge_state ;
-        (* Print sponge's state array *)
-        Array.iter sponge.state ~f:(fun fe ->
-            Format.eprintf " %s" (field_element_to_hex fe) ) ;
-        Format.eprintf "@." ;
-        (* Print optional input *)
-        match input with
-        | Some input ->
-            Format.eprintf "debug_sponge: %s input %s@." operation
-              (field_element_to_hex input)
-        | None ->
-            () )
+(* Debug helper to convert step circuit field element to a hex string *)
+let read_step_circuit_field_element_as_hex fe =
+  let prover_fe = As_prover.read Field.typ fe in
+  Kimchi_backend.Pasta.Vesta_based_plonk.(
+    Bigint.to_hex (Field.to_bigint prover_fe))
 
 module Other_field = struct
   type t = Tock.Field.t [@@deriving sexp]
@@ -94,26 +64,29 @@ module Sponge = struct
         let params = Tick_field_sponge.params
       end)
 
-  module S = Sponge.Make_sponge (Permutation)
+  module S = Sponge.Make_debug_sponge (struct
+    include Permutation
+    module Impl = Impls.Step
+
+    (* Optional sponge name used in debug mode *)
+    let sponge_name = "step "
+
+    (* To enable debug mode, set to: Some read_step_circuit_field_element_as_hex *)
+    let debug_helper_fn = None
+  end)
+
   include S
 
-  let squeeze_field t =
-    debug_sponge "squeeze_field" None t ;
-    squeeze t
+  let squeeze_field t = squeeze t
 
-  let squeeze t =
-    debug_sponge "squeeze" None t ;
-    squeeze t
+  let squeeze t = squeeze t
 
   let absorb t input =
     match input with
     | `Field x ->
-        debug_sponge "absorb" (Some x) t ;
         absorb t x
     | `Bits bs ->
-        let fe = Field.pack bs in
-        debug_sponge "absorb2" (Some fe) t ;
-        absorb t fe
+        absorb t (Field.pack bs)
 end
 
 let%test_unit "sponge" =
