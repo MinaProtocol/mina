@@ -330,7 +330,8 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
       in
       let parties =
         Async.Thread_safe.block_on_async_exn (fun () ->
-            Transaction_snark.For_tests.update_states ~zkapp_prover:prover
+            Transaction_snark.For_tests.update_states
+              ~zkapp_prover_and_vk:(prover, verification_key)
               ~constraint_constants ~empty_sender spec
               ~receiver_auth:Control.Tag.Signature )
       in
@@ -615,9 +616,12 @@ let profile_zkapps ~verifier ledger zkapp_commands =
         let%bind res =
           Verifier.verify_commands verifier
             [ { With_status.data =
-                  User_command.to_verifiable ~status:Applied ~ledger
-                    ~get:Mina_ledger.Ledger.get
-                    ~location_of_account:Mina_ledger.Ledger.location_of_account
+                  User_command.to_verifiable ~status:Applied
+                    ~find_vk:
+                      (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
+                         ~get:Mina_ledger.Ledger.get
+                         ~location_of_account:
+                           Mina_ledger.Ledger.location_of_account )
                     (Zkapp_command zkapp_command)
                   |> Or_error.ok_exn
               ; status = Applied

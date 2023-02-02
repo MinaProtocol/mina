@@ -472,7 +472,7 @@ let%test_unit "tokens test" =
   in
   let main (ledger : t) =
     let execute_zkapp_command_transaction
-        (zkapp_command :
+        (account_updates :
           (Account_update.Body.Simple.t, unit, unit) Zkapp_command.Call_forest.t
           ) : unit =
       let _, ({ nonce; _ } : Account.t), _ =
@@ -480,13 +480,15 @@ let%test_unit "tokens test" =
           (Account_id.create pk Token_id.default)
         |> Or_error.ok_exn
       in
+      let zkapp_command =
+        mk_zkapp_command ~fee:7 ~fee_payer_pk:pk ~fee_payer_nonce:nonce
+          account_updates
+      in
       match
         apply_zkapp_command_unchecked ~constraint_constants
           ~global_slot:
             (Mina_numbers.Global_slot.succ view.global_slot_since_genesis)
-          ~state_view:view ledger
-          (mk_zkapp_command ~fee:7 ~fee_payer_pk:pk ~fee_payer_nonce:nonce
-             zkapp_command )
+          ~state_view:view ledger zkapp_command
       with
       | Ok ({ command = { status; _ }; _ }, _) -> (
           match status with
@@ -510,9 +512,37 @@ let%test_unit "tokens test" =
             ()
     in
     let token_funder, _ = keypair_and_amounts.(1) in
+    let token_funder_pk = token_funder.public_key |> Public_key.compress in
     let token_owner = Keypair.create () in
+    let token_owner_pk = token_owner.public_key |> Public_key.compress in
     let token_account1 = Keypair.create () in
     let token_account2 = Keypair.create () in
+    (* patch ledger so that token funder account has Proof send permission and a
+       zkapp acount dummy verification key
+
+       allows use of Proof authorization in `create_token` zkApp, below
+    *)
+    iteri ledger ~f:(fun _n acct ->
+        if Public_key.Compressed.equal acct.public_key token_funder_pk then
+          let acct_id = Account_id.create token_funder_pk Token_id.default in
+          let loc = Option.value_exn @@ location_of_account ledger acct_id in
+          let acct_with_zkapp =
+            { acct with
+              permissions =
+                { acct.permissions with send = Permissions.Auth_required.Proof }
+            ; zkapp =
+                Some
+                  { Zkapp_account.default with
+                    verification_key =
+                      Some
+                        With_hash.
+                          { data = Side_loaded_verification_key.dummy
+                          ; hash = Zkapp_account.dummy_vk_hash ()
+                          }
+                  }
+            }
+          in
+          set ledger loc acct_with_zkapp ) ;
     let account_creation_fee =
       Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
     in
@@ -520,21 +550,20 @@ let%test_unit "tokens test" =
         (Account_update.Body.Simple.t, unit, unit) Zkapp_command.Call_forest.t =
       mk_forest
         [ mk_node
-            (mk_account_update_body Signature No token_funder Token_id.default
+            (mk_account_update_body
+               (Proof (Zkapp_account.dummy_vk_hash ()))
+               No token_funder Token_id.default
                (-(4 * account_creation_fee)) )
             []
         ; mk_node
-            (mk_account_update_body Proof No token_owner Token_id.default
+            (mk_account_update_body Signature No token_owner Token_id.default
                (3 * account_creation_fee) )
             []
         ]
     in
     let custom_token_id =
       Account_id.derive_token_id
-        ~owner:
-          (Account_id.create
-             (Public_key.compress token_owner.public_key)
-             Token_id.default )
+        ~owner:(Account_id.create token_owner_pk Token_id.default)
     in
     let token_minting =
       mk_forest
@@ -590,10 +619,7 @@ let%test_unit "tokens test" =
     in
     execute_zkapp_command_transaction create_token ;
     (* Check that token_owner exists *)
-    ledger_get_exn ledger
-      (Public_key.compress token_owner.public_key)
-      Token_id.default
-    |> ignore ;
+    ledger_get_exn ledger token_owner_pk Token_id.default |> ignore ;
     execute_zkapp_command_transaction token_minting ;
     check_token_balance token_account1 100 ;
     execute_zkapp_command_transaction token_transfers ;
