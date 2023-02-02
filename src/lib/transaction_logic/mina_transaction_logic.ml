@@ -2050,10 +2050,6 @@ module Make (L : Ledger_intf.S) :
         ( (g_state : Inputs.Global_state.t)
         , (l_state : _ Zkapp_command_logic.Local_state.t) ) :
         (user_acc * Transaction_status.Failure.Collection.t) Or_error.t =
-      printf
-        !"Global state fee excess: %{sexp:Amount.Signed.t} \n\
-         \ local state excess: %{sexp: Amount.Signed.t}\n"
-        g_state.fee_excess l_state.excess ;
       if List.is_empty l_state.stack_frame.Stack_frame.calls then
         Ok (user_acc, l_state.failure_status_tbl)
       else
@@ -2592,11 +2588,22 @@ module For_tests = struct
             ; set_timing = Either
             }
           in
+          let zkapp =
+            Some
+              { Zkapp_account.default with
+                verification_key =
+                  Some
+                    { With_hash.hash = Zkapp_basic.F.zero
+                    ; data = Side_loaded_verification_key.dummy
+                    }
+              }
+          in
           L.set l loc
             { account with
               balance =
                 Currency.Balance.of_uint64 (Unsigned.UInt64.of_int64 amount)
             ; permissions
+            ; zkapp
             } )
 
     let gen () : t Quickcheck.Generator.t =
@@ -2764,9 +2771,13 @@ module For_tests = struct
                 ; may_use_token = No
                 ; use_full_commitment
                 ; implicit_account_creation_fee = true
-                ; authorization_kind = Signature
+                ; authorization_kind =
+                    ( if use_full_commitment then Signature
+                    else Proof Zkapp_basic.F.zero )
                 }
-            ; authorization = Signature Signature.dummy
+            ; authorization =
+                ( if use_full_commitment then Signature Signature.dummy
+                else Proof Mina_base.Proof.transaction_dummy )
             }
           ; { body =
                 { public_key = receiver
