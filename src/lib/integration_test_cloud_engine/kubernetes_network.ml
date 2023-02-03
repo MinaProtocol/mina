@@ -1194,15 +1194,14 @@ end
 type t =
   { namespace : string
   ; constants : Test_config.constants
-  ; seeds : Node.t list
-  ; block_producers : Node.t list
-  ; snark_coordinators : Node.t list
-  ; snark_workers : Node.t list
-  ; archive_nodes : Node.t list
-  ; testnet_log_filter : string (* ; keypairs : Signature_lib.Keypair.t list *)
-  ; block_producer_keypairs : Signature_lib.Keypair.t list
-  ; extra_genesis_keypairs : Signature_lib.Keypair.t list
-  ; nodes_by_pod_id : Node.t String.Map.t
+  ; seeds : Node.t Core.String.Map.t
+  ; block_producers : Node.t Core.String.Map.t
+  ; snark_coordinators : Node.t Core.String.Map.t
+  ; snark_workers : Node.t Core.String.Map.t
+  ; archive_nodes : Node.t Core.String.Map.t
+  ; nodes_by_pod_id : Node.t Core.String.Map.t
+  ; testnet_log_filter : string
+  ; genesis_keypairs : Network_keypair.t Core.String.Map.t
   }
 
 let constants { constants; _ } = constants
@@ -1223,34 +1222,37 @@ let archive_nodes { archive_nodes; _ } = archive_nodes
 
 (* all_nodes returns all *actual* mina nodes; note that a snark_worker is a pod within the network but not technically a mina node, therefore not included here.  snark coordinators on the other hand ARE mina nodes *)
 let all_nodes { seeds; block_producers; snark_coordinators; archive_nodes; _ } =
-  List.concat [ seeds; block_producers; snark_coordinators; archive_nodes ]
+  List.concat
+    [ Core.String.Map.to_alist seeds
+    ; Core.String.Map.to_alist block_producers
+    ; Core.String.Map.to_alist snark_coordinators
+    ; Core.String.Map.to_alist archive_nodes
+    ]
+  |> Core.String.Map.of_alist_exn
 
 (* all_pods returns everything in the network.  remember that snark_workers will never initialize and will never sync, and aren't supposed to *)
-let all_pods
-    { seeds
-    ; block_producers
-    ; snark_coordinators
-    ; snark_workers
-    ; archive_nodes
-    ; _
-    } =
-  List.concat
-    [ seeds; block_producers; snark_coordinators; snark_workers; archive_nodes ]
+(* TODO snark workers and snark coordinators have the same key name, but different workload ids*)
+let all_pods { nodes_by_pod_id; _ } = Core.String.Map.data nodes_by_pod_id
 
 (* all_non_seed_pods returns everything in the network except seed nodes *)
-let all_non_seed_pods
-    { block_producers; snark_coordinators; snark_workers; archive_nodes; _ } =
-  List.concat
-    [ block_producers; snark_coordinators; snark_workers; archive_nodes ]
+let all_non_seed_pods { nodes_by_pod_id; seeds; _ } =
+  let seedlist = Core.String.Map.keys seeds in
+  let rec remove_all_keys_in_list mp lst =
+    match lst with
+    | [] ->
+        mp
+    | hd :: tl ->
+        remove_all_keys_in_list (Core.String.Map.remove mp hd) tl
+  in
+  Core.String.Map.data (remove_all_keys_in_list nodes_by_pod_id seedlist)
 
-let all_keypairs { block_producer_keypairs; extra_genesis_keypairs; _ } =
-  block_producer_keypairs @ extra_genesis_keypairs
+let genesis_keypairs { genesis_keypairs; _ } = genesis_keypairs
 
-let block_producer_keypairs { block_producer_keypairs; _ } =
-  block_producer_keypairs
+(* let block_producer_keypairs { block_producer_keypairs; _ } =
+     block_producer_keypairs
 
-let extra_genesis_keypairs { extra_genesis_keypairs; _ } =
-  extra_genesis_keypairs
+   let extra_genesis_keypairs { extra_genesis_keypairs; _ } =
+     extra_genesis_keypairs *)
 
 let lookup_node_by_pod_id t = Map.find t.nodes_by_pod_id
 

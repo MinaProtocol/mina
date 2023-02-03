@@ -22,7 +22,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   (* TODO: test snark work *)
   let config =
     let open Test_config in
-    let open Test_config.Wallet in
+    (* let open Test_config.Wallet in *)
     let make_timing ~min_balance ~cliff_time ~cliff_amount ~vesting_period
         ~vesting_increment : Mina_base.Account_timing.t =
       let open Currency in
@@ -36,24 +36,51 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     { default with
       requires_graphql = true
-    ; block_producers =
-        [ { balance = "400000"; timing = Untimed } (* 400_000_000_000_000 *)
-        ; { balance = "300000"; timing = Untimed } (* 300_000_000_000_000 *)
-        ; { balance = "30000"
+    ; genesis_ledger =
+        [ { account_name = "block-producer1-key"
+          ; balance = "400000"
+          ; timing = Untimed
+          }
+        ; { account_name = "block-producer2-key"
+          ; balance = "300000"
+          ; timing = Untimed
+          }
+        ; { account_name = "block-producer3-key"
+          ; balance = "30000"
           ; timing =
               make_timing ~min_balance:10_000_000_000_000 ~cliff_time:8
                 ~cliff_amount:0 ~vesting_period:4
                 ~vesting_increment:5_000_000_000_000
           }
+        ; { account_name = "snark-node-key"
+          ; balance = "1000"
+          ; timing = Untimed
+          }
+        ; { account_name = "extra1"; balance = "1000"; timing = Untimed }
+        ; { account_name = "extra2"; balance = "1000"; timing = Untimed }
+        ]
+    ; block_producers =
+        [ { node_name = "block-producer1"
+          ; account_name = "block-producer1-key"
+          }
+          (* 400_000_000_000_000 *)
+        ; { node_name = "block-producer2"
+          ; account_name = "block-producer2-key"
+          }
+          (* 300_000_000_000_000 *)
+        ; { node_name = "block-producer3"
+          ; account_name = "block-producer3-key"
+          }
           (* 30_000_000_000_000 mina is the total.  initially, the balance will be 10k mina.  after 8 global slots, the cliff is hit, although the cliff amount is 0.  4 slots after that, 5_000_000_000_000 mina will vest, and 4 slots after that another 5_000_000_000_000 will vest, and then twice again, for a total of 30k mina all fully liquid and unlocked at the end of the schedule*)
         ]
-    ; extra_genesis_accounts =
-        [ { balance = "1000"; timing = Untimed }
-        ; { balance = "1000"; timing = Untimed }
-        ]
-    ; num_archive_nodes = 1
-    ; num_snark_workers = 4
+    ; snark_worker =
+        Some
+          { node_name = "snark-node"
+          ; account_name = "snark-node-key"
+          ; replicas = 4
+          }
     ; snark_worker_fee = "0.0001"
+    ; num_archive_nodes = 1
     ; proof_config =
         { proof_config_default with
           work_delay = Some 1
