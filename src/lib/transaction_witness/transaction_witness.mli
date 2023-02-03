@@ -9,7 +9,8 @@ module Zkapp_command_segment_witness : sig
   module Stable : sig
     module V1 : sig
       type t =
-        { global_ledger : Sparse_ledger.Stable.V2.t
+        { global_first_pass_ledger : Sparse_ledger.Stable.V2.t
+        ; global_second_pass_ledger : Sparse_ledger.Stable.V2.t
         ; local_state_init :
             ( ( Token_id.Stable.V2.t
               , Zkapp_command.Call_forest.With_hashes.Stable.V1.t )
@@ -50,7 +51,8 @@ module Stable : sig
   module V2 : sig
     type t =
       { transaction : Mina_transaction.Transaction.Stable.V2.t
-      ; ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
+      ; first_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
+      ; second_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
       ; protocol_state_body : Mina_state.Protocol_state.Body.Value.Stable.V2.t
       ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
       ; status : Mina_base.Transaction_status.Stable.V2.t

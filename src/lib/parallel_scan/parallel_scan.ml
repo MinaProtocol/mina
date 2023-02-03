@@ -1461,9 +1461,7 @@ let next_on_new_tree t =
   curr_tree_space = t.max_base_jobs
 
 let pending_data t =
-  List.concat_map
-    Mina_stdlib.Nonempty_list.(to_list @@ rev t.trees)
-    ~f:Tree.base_jobs
+  List.map Mina_stdlib.Nonempty_list.(to_list @@ rev t.trees) ~f:Tree.base_jobs
 
 let view_jobs_with_position (state : ('merge, 'base) State.t) fa fd =
   List.fold ~init:[] (Mina_stdlib.Nonempty_list.to_list state.trees)

@@ -3,205 +3,16 @@ module type Full = sig
   open Mina_base
   open Mina_transaction
   open Snark_params
-  open Mina_state
   open Currency
   module Transaction_validator = Transaction_validator
 
   (** For debugging. Logs to stderr the inputs to the top hash. *)
   val with_top_hash_logging : (unit -> 'a) -> 'a
 
-  module Pending_coinbase_stack_state : sig
-    module Init_stack : sig
-      [%%versioned:
-      module Stable : sig
-        module V1 : sig
-          type t =
-            | Base of Pending_coinbase.Stack_versioned.Stable.V1.t
-            | Merge
-          [@@deriving sexp, hash, compare, equal, yojson]
-        end
-      end]
-    end
+  module Pending_coinbase_stack_state =
+    Mina_state.Snarked_ledger_state.Pending_coinbase_stack_state
 
-    module Poly : sig
-      [%%versioned:
-      module Stable : sig
-        module V1 : sig
-          type 'pending_coinbase t =
-            { source : 'pending_coinbase; target : 'pending_coinbase }
-          [@@deriving compare, equal, fields, hash, sexp, yojson]
-
-          val to_latest :
-               ('pending_coinbase -> 'pending_coinbase')
-            -> 'pending_coinbase t
-            -> 'pending_coinbase' t
-        end
-      end]
-
-      val typ :
-           ('pending_coinbase_var, 'pending_coinbase) Tick.Typ.t
-        -> ('pending_coinbase_var t, 'pending_coinbase t) Tick.Typ.t
-    end
-
-    type 'pending_coinbase poly = 'pending_coinbase Poly.t =
-      { source : 'pending_coinbase; target : 'pending_coinbase }
-    [@@deriving sexp, hash, compare, equal, fields, yojson]
-
-    [%%versioned:
-    module Stable : sig
-      module V1 : sig
-        type t = Pending_coinbase.Stack_versioned.Stable.V1.t Poly.Stable.V1.t
-        [@@deriving compare, equal, hash, sexp, yojson]
-      end
-    end]
-
-    type var = Pending_coinbase.Stack.var Poly.t
-
-    open Tick
-
-    val typ : (var, t) Typ.t
-
-    val to_input : t -> Field.t Random_oracle.Input.Chunked.t
-
-    val var_to_input : var -> Field.Var.t Random_oracle.Input.Chunked.t
-  end
-
-  module Statement : sig
-    module Poly : sig
-      [%%versioned:
-      module Stable : sig
-        module V2 : sig
-          type ( 'ledger_hash
-               , 'amount
-               , 'pending_coinbase
-               , 'fee_excess
-               , 'sok_digest
-               , 'local_state )
-               t =
-            { source :
-                ( 'ledger_hash
-                , 'pending_coinbase
-                , 'local_state )
-                Registers.Stable.V1.t
-            ; target :
-                ( 'ledger_hash
-                , 'pending_coinbase
-                , 'local_state )
-                Registers.Stable.V1.t
-            ; supply_increase : 'amount
-            ; fee_excess : 'fee_excess
-            ; sok_digest : 'sok_digest
-            }
-          [@@deriving compare, equal, hash, sexp, yojson, hlist]
-        end
-      end]
-
-      val with_empty_local_state :
-           supply_increase:'amount
-        -> fee_excess:'fee_excess
-        -> sok_digest:'sok_digest
-        -> source:'ledger_hash
-        -> target:'ledger_hash
-        -> pending_coinbase_stack_state:
-             'pending_coinbase Pending_coinbase_stack_state.poly
-        -> ( 'ledger_hash
-           , 'amount
-           , 'pending_coinbase
-           , 'fee_excess
-           , 'sok_digest
-           , Mina_transaction_logic.Zkapp_command_logic.Local_state.Value.t )
-           t
-    end
-
-    type ( 'ledger_hash
-         , 'amount
-         , 'pending_coinbase
-         , 'fee_excess
-         , 'sok_digest
-         , 'local_state )
-         poly =
-          ( 'ledger_hash
-          , 'amount
-          , 'pending_coinbase
-          , 'fee_excess
-          , 'sok_digest
-          , 'local_state )
-          Poly.t =
-      { source : ('ledger_hash, 'pending_coinbase, 'local_state) Registers.t
-      ; target : ('ledger_hash, 'pending_coinbase, 'local_state) Registers.t
-      ; supply_increase : 'amount
-      ; fee_excess : 'fee_excess
-      ; sok_digest : 'sok_digest
-      }
-    [@@deriving compare, equal, hash, sexp, yojson]
-
-    [%%versioned:
-    module Stable : sig
-      module V2 : sig
-        type t =
-          ( Frozen_ledger_hash.Stable.V1.t
-          , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
-          , Pending_coinbase.Stack_versioned.Stable.V1.t
-          , Fee_excess.Stable.V1.t
-          , unit
-          , Local_state.Stable.V1.t )
-          Poly.Stable.V2.t
-        [@@deriving compare, equal, hash, sexp, yojson]
-      end
-    end]
-
-    module With_sok : sig
-      [%%versioned:
-      module Stable : sig
-        module V2 : sig
-          type t =
-            ( Frozen_ledger_hash.Stable.V1.t
-            , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
-            , Pending_coinbase.Stack_versioned.Stable.V1.t
-            , Fee_excess.Stable.V1.t
-            , Sok_message.Digest.Stable.V1.t
-            , Local_state.Stable.V1.t )
-            Poly.Stable.V2.t
-          [@@deriving compare, equal, hash, sexp, yojson]
-        end
-      end]
-
-      type var =
-        ( Frozen_ledger_hash.var
-        , Amount.Signed.var
-        , Pending_coinbase.Stack.var
-        , Fee_excess.var
-        , Sok_message.Digest.Checked.t
-        , Local_state.Checked.t )
-        Poly.t
-
-      open Tick
-
-      val typ : (var, t) Typ.t
-
-      val to_input : t -> Field.t Random_oracle.Input.Chunked.t
-
-      val to_field_elements : t -> Field.t array
-
-      module Checked : sig
-        type t = var
-
-        val to_input :
-          var -> Field.Var.t Random_oracle.Input.Chunked.t Checked.t
-
-        (* This is actually a checked function. *)
-        val to_field_elements : var -> Field.Var.t array
-      end
-    end
-
-    val gen : t Quickcheck.Generator.t
-
-    val merge : t -> t -> t Or_error.t
-
-    include Hashable.S_binable with type t := t
-
-    include Comparable.S with type t := t
-  end
+  module Statement = Mina_state.Snarked_ledger_state
 
   [%%versioned:
   module Stable : sig
@@ -215,6 +26,8 @@ module type Full = sig
   val proof : t -> Mina_base.Proof.t
 
   val statement : t -> Statement.t
+
+  val statement_with_sok : t -> Statement.With_sok.t
 
   val sok_digest : t -> Sok_message.Digest.t
 
@@ -252,12 +65,10 @@ module type Full = sig
        ?preeval:bool
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> sok_message:Sok_message.t
-    -> source:Frozen_ledger_hash.t
-    -> target:Frozen_ledger_hash.t
+    -> source_first_pass_ledger:Frozen_ledger_hash.t
+    -> target_first_pass_ledger:Frozen_ledger_hash.t
     -> init_stack:Pending_coinbase.Stack.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-    -> zkapp_account1:Zkapp_account.t option
-    -> zkapp_account2:Zkapp_account.t option
     -> supply_increase:Amount.Signed.t
     -> Transaction.Valid.t Transaction_protocol_state.t
     -> Tick.Handler.t
@@ -266,8 +77,8 @@ module type Full = sig
   val check_user_command :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> sok_message:Sok_message.t
-    -> source:Frozen_ledger_hash.t
-    -> target:Frozen_ledger_hash.t
+    -> source_first_pass_ledger:Frozen_ledger_hash.t
+    -> target_first_pass_ledger:Frozen_ledger_hash.t
     -> init_stack:Pending_coinbase.Stack.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> supply_increase:Amount.Signed.t
@@ -279,12 +90,10 @@ module type Full = sig
        ?preeval:bool
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> sok_message:Sok_message.t
-    -> source:Frozen_ledger_hash.t
-    -> target:Frozen_ledger_hash.t
+    -> source_first_pass_ledger:Frozen_ledger_hash.t
+    -> target_first_pass_ledger:Frozen_ledger_hash.t
     -> init_stack:Pending_coinbase.Stack.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-    -> zkapp_account1:Zkapp_account.t option
-    -> zkapp_account2:Zkapp_account.t option
     -> supply_increase:Amount.Signed.t
     -> Transaction.Valid.t Transaction_protocol_state.t
     -> Tick.Handler.t
@@ -379,17 +188,19 @@ module type Full = sig
     -> global_slot:Mina_numbers.Global_slot.t
     -> state_body:Transaction_protocol_state.Block_data.t
     -> fee_excess:Currency.Amount.Signed.t
-    -> [ `Ledger of Mina_ledger.Ledger.t
-       | `Sparse_ledger of Mina_ledger.Sparse_ledger.t ]
     -> ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
        * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
+       * [ `Ledger of Mina_ledger.Ledger.t
+         | `Sparse_ledger of Mina_ledger.Sparse_ledger.t ]
+       * [ `Ledger of Mina_ledger.Ledger.t
+         | `Sparse_ledger of Mina_ledger.Sparse_ledger.t ]
+       * [ `Connecting_ledger_hash of Ledger_hash.t ]
        * Zkapp_command.t )
        list
     -> ( Zkapp_command_segment.Witness.t
        * Zkapp_command_segment.Basic.t
        * Statement.With_sok.t )
        list
-       * Mina_ledger.Sparse_ledger.t
 
   module Make (Inputs : sig
     val constraint_constants : Genesis_constants.Constraint_constants.t

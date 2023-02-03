@@ -67,8 +67,11 @@ let%test_module "Transaction union tests" =
                 (User_command.Signed_command
                    (Signed_command.forget_check user_command) )
             in
-            Transaction_snark.Statement.Poly.with_empty_local_state ~source
-              ~target ~sok_digest
+            Transaction_snark.Statement.Poly.with_empty_local_state
+              ~source_first_pass_ledger:source ~target_first_pass_ledger:target
+              ~source_second_pass_ledger:target
+              ~target_second_pass_ledger:target ~connecting_ledger_left:target
+              ~connecting_ledger_right:target ~sok_digest
               ~fee_excess:(Or_error.ok_exn (Transaction.fee_excess txn))
               ~supply_increase:user_command_supply_increase
               ~pending_coinbase_stack_state
@@ -126,12 +129,17 @@ let%test_module "Transaction union tests" =
               [ producer_id; receiver_id; other_id ]
           in
           let sparse_ledger_after, applied_transaction =
-            Sparse_ledger.apply_transaction
-              ~constraint_constants:U.constraint_constants sparse_ledger
-              ~global_slot
-              ~txn_state_view:
-                (txn_in_block.block_data |> Mina_state.Protocol_state.Body.view)
-              txn_in_block.transaction
+            Result.( >>= )
+              (Sparse_ledger.apply_transaction_first_pass
+                 ~constraint_constants:U.constraint_constants ~global_slot
+                 sparse_ledger
+                 ~txn_state_view:
+                   ( txn_in_block.block_data
+                   |> Mina_state.Protocol_state.Body.view )
+                 txn_in_block.transaction )
+              (fun (sparse_ledger, partially_applied) ->
+                Sparse_ledger.apply_transaction_second_pass sparse_ledger
+                  partially_applied )
             |> Or_error.ok_exn
           in
           let supply_increase =
@@ -145,12 +153,13 @@ let%test_module "Transaction union tests" =
             ~sok_message:
               (Mina_base.Sok_message.create ~fee:Currency.Fee.zero
                  ~prover:Public_key.Compressed.empty )
-            ~source:(Sparse_ledger.merkle_root sparse_ledger)
-            ~target:(Sparse_ledger.merkle_root sparse_ledger_after)
+            ~source_first_pass_ledger:(Sparse_ledger.merkle_root sparse_ledger)
+            ~target_first_pass_ledger:
+              (Sparse_ledger.merkle_root sparse_ledger_after)
             ~init_stack:pending_coinbase_init
             ~pending_coinbase_stack_state:
               { source = source_stack; target = pending_coinbase_stack_target }
-            ~zkapp_account1:None ~zkapp_account2:None ~supply_increase )
+            ~supply_increase )
 
     let%test_unit "coinbase with new state body hash" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -183,7 +192,7 @@ let%test_module "Transaction union tests" =
                 Mina_state.Protocol_state.Body.consensus_state state_body
                 |> Consensus.Data.Consensus_state.global_slot_since_genesis
               in
-              let target =
+              let target_first_pass_ledger =
                 Ledger.merkle_root_after_user_command_exn ledger
                   ~txn_global_slot:current_global_slot t1
               in
@@ -219,8 +228,8 @@ let%test_module "Transaction union tests" =
               in
               Transaction_snark.check_user_command ~constraint_constants
                 ~sok_message
-                ~source:(Ledger.merkle_root ledger)
-                ~target ~init_stack:pending_coinbase_stack
+                ~source_first_pass_ledger:(Ledger.merkle_root ledger)
+                ~target_first_pass_ledger ~init_stack:pending_coinbase_stack
                 ~pending_coinbase_stack_state
                 ~supply_increase:user_command_supply_increase
                 { transaction = t1

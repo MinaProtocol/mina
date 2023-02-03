@@ -33,8 +33,6 @@ val pending_coinbase_state_stack :
   -> global_slot:Mina_numbers.Global_slot.t
   -> Transaction_snark.Pending_coinbase_stack_state.t
 
-val apply_zkapp_command : Ledger.t -> Zkapp_command.t list -> Sparse_ledger.t
-
 val dummy_rule :
      (Zkapp_statement.Checked.t, 'a, 'b, 'c) Pickles.Tag.t
   -> ( Zkapp_statement.Checked.t * (Zkapp_statement.Checked.t * unit)

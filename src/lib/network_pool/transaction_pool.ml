@@ -1920,9 +1920,8 @@ let%test_module _ =
         (mk_payment' ?valid_until ~sender_idx ~fee ~nonce ~receiver_idx ~amount
            () )
 
-    let mk_zkapp_command_cmds (pool : Test.Resource_pool.t) :
+    let mk_zkapp_commands_single_block num_cmds (pool : Test.Resource_pool.t) :
         User_command.Valid.t list Deferred.t =
-      let num_cmds = 7 in
       assert (num_cmds < Array.length test_keys - 1) ;
       let best_tip_ledger = Option.value_exn pool.best_tip_ledger in
       let keymap =
@@ -2135,7 +2134,20 @@ let%test_module _ =
           (Ledger.Any_ledger.cast (module Mina_ledger.Ledger) ledger)
           (Ledger.Mask.create ~depth:(Ledger.depth ledger) ()) ;
       let%map () = reorg test [] [] in
-      commit_commands test cs ; ledger
+      assert (
+        not (phys_equal (Option.value_exn test.txn_pool.best_tip_ledger) ledger) ) ;
+      assert (
+        phys_equal
+          (Option.value_exn test.txn_pool.best_tip_ledger)
+          !(test.best_tip_ref) ) ;
+      commit_commands test cs ;
+      assert (
+        not (phys_equal (Option.value_exn test.txn_pool.best_tip_ledger) ledger) ) ;
+      assert (
+        phys_equal
+          (Option.value_exn test.txn_pool.best_tip_ledger)
+          !(test.best_tip_ref) ) ;
+      ledger
 
     let advance_chain test cs = commit_commands test cs ; reorg test cs []
 
@@ -2175,7 +2187,8 @@ let%test_module _ =
     let%test_unit "transactions are removed in linear case (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
-          mk_zkapp_command_cmds test.txn_pool >>= mk_linear_case_test test )
+          mk_zkapp_commands_single_block 7 test.txn_pool
+          >>= mk_linear_case_test test )
 
     let mk_remove_and_add_test t cmds =
       assert_pool_txs t [] ;
@@ -2196,7 +2209,8 @@ let%test_module _ =
                    (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
-          mk_zkapp_command_cmds test.txn_pool >>= mk_remove_and_add_test test )
+          mk_zkapp_commands_single_block 7 test.txn_pool
+          >>= mk_remove_and_add_test test )
 
     let mk_invalid_test t cmds =
       assert_pool_txs t [] ;
@@ -2215,7 +2229,8 @@ let%test_module _ =
     let%test_unit "invalid transactions are not accepted (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
-          mk_zkapp_command_cmds test.txn_pool >>= mk_invalid_test test )
+          mk_zkapp_commands_single_block 7 test.txn_pool
+          >>= mk_invalid_test test )
 
     let current_global_slot () =
       let current_time = Block_time.now time_controller in
@@ -2249,7 +2264,7 @@ let%test_module _ =
                    changes (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
-          mk_zkapp_command_cmds test.txn_pool
+          mk_zkapp_commands_single_block 7 test.txn_pool
           >>= mk_now_invalid_test test
                 ~mk_command:
                   (mk_transfer_zkapp_command ?valid_period:None
@@ -2306,7 +2321,7 @@ let%test_module _ =
     let%test_unit "expired transactions are not accepted (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
-          mk_zkapp_command_cmds test.txn_pool
+          mk_zkapp_commands_single_block 7 test.txn_pool
           >>= mk_expired_not_accepted_test test ~padding:55 )
 
     let%test_unit "Expired transactions that are already in the pool are \
@@ -2499,7 +2514,6 @@ let%test_module _ =
         List.map ~f:(fun x -> User_command.Signed_command x) txs0
         @ txs1 @ txs2 @ txs3
       in
-      Core.Printf.printf !"PHASE 1\n%!" ;
       let%bind () = add_commands' t txs_all in
       assert_pool_txs t txs_all ;
       let replace_txs =
@@ -2540,7 +2554,6 @@ let%test_module _ =
            mk_payment ~sender_idx:3 ~fee ~nonce:1 ~receiver_idx:4 ~amount () )
         ]
       in
-      Core.Printf.printf !"PHASE 2\n%!" ;
       add_commands t replace_txs
       >>| assert_pool_apply
             [ List.nth_exn replace_txs 0; List.nth_exn replace_txs 2 ]
@@ -2652,20 +2665,20 @@ let%test_module _ =
          rebroadcastable pool, if they were removed and not re-added *)
       (* restore up to after the application of the first command *)
       t.best_tip_ref := checkpoint_2 ;
-      (* reorge both removes and re-adds the first command (which is local) *)
+      (* reorg both removes and re-adds the first command (which is local) *)
       let%bind () = reorg t (List.take cmds 1) (List.take cmds 5) in
       assert_pool_txs t (List.slice cmds 1 7) ;
       assert_rebroadcastable t (List.nth_exn cmds 1 :: List.slice cmds 5 7) ;
       (* Committing them again removes them from the pool again. *)
-      commit_commands t (List.slice cmds 1 7) ;
-      let%bind () = reorg t (List.slice cmds 1 7) [] in
-      assert_pool_txs t [] ;
-      assert_rebroadcastable t [] ;
+      commit_commands t (List.slice cmds 1 5) ;
+      let%bind () = reorg t (List.slice cmds 1 5) [] in
+      assert_pool_txs t (List.slice cmds 5 7) ;
+      assert_rebroadcastable t (List.slice cmds 5 7) ;
       (* When transactions expire from rebroadcast pool they are gone. This
          doesn't affect the main pool.
       *)
       t.best_tip_ref := checkpoint_1 ;
-      let%bind () = reorg t [] (List.take cmds 7) in
+      let%bind () = reorg t [] (List.take cmds 5) in
       assert_pool_txs t (List.take cmds 7) ;
       assert_rebroadcastable t (List.take cmds 2 @ List.slice cmds 5 7) ;
       ignore
@@ -2683,7 +2696,8 @@ let%test_module _ =
     let%test_unit "rebroadcastable transaction behavior (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
-          mk_zkapp_command_cmds test.txn_pool >>= mk_rebroadcastable_test test )
+          mk_zkapp_commands_single_block 7 test.txn_pool
+          >>= mk_rebroadcastable_test test )
 
     let%test_unit "apply user cmds and zkapps" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -2696,7 +2710,7 @@ let%test_module _ =
           *)
           let take_len = num_cmds / 2 in
           let%bind snapp_cmds =
-            let%map cmds = mk_zkapp_command_cmds t.txn_pool in
+            let%map cmds = mk_zkapp_commands_single_block 7 t.txn_pool in
             List.take cmds take_len
           in
           let user_cmds = List.drop independent_cmds take_len in

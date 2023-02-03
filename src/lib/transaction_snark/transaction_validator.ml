@@ -21,15 +21,22 @@ let apply_user_command ~constraint_constants ~txn_global_slot l uc =
             .status )
         (Ledger.apply_user_command l' ~constraint_constants ~txn_global_slot uc) )
 
-let apply_transaction' ~constraint_constants ~global_slot ~txn_state_view l t =
+let apply_transactions' ~constraint_constants ~global_slot ~txn_state_view l t =
   O1trace.sync_thread "apply_transaction" (fun () ->
       within_mask l ~f:(fun l' ->
-          Ledger.apply_transaction ~constraint_constants ~global_slot
+          Ledger.apply_transactions ~constraint_constants ~global_slot
             ~txn_state_view l' t ) )
 
-let apply_transaction ~constraint_constants ~global_slot ~txn_state_view l txn =
-  Result.map ~f:Ledger.Transaction_applied.transaction_status
-    (apply_transaction' l ~constraint_constants ~global_slot ~txn_state_view txn)
+let apply_transactions ~constraint_constants ~global_slot ~txn_state_view l txn
+    =
+  apply_transactions' l ~constraint_constants ~global_slot ~txn_state_view txn
+
+let apply_transaction_first_pass ~constraint_constants ~global_slot
+    ~txn_state_view l txn : Ledger.Transaction_partially_applied.t Or_error.t =
+  O1trace.sync_thread "apply_transaction_first_pass" (fun () ->
+      within_mask l ~f:(fun l' ->
+          Ledger.apply_transaction_first_pass l' ~constraint_constants
+            ~global_slot ~txn_state_view txn ) )
 
 let%test_unit "invalid transactions do not dirty the ledger" =
   let open Core in

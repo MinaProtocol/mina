@@ -929,7 +929,7 @@ let%test_unit "wire embedded in graphql" =
   Quickcheck.test ~shrinker:Wire.shrinker Wire.gen ~f:(fun w ->
       [%test_eq: Wire.t] (Wire.of_graphql_repr (Wire.to_graphql_repr w)) w )
 
-let zkapp_command (t : t) : _ Call_forest.t =
+let all_account_updates (t : t) : _ Call_forest.t =
   let p = t.fee_payer in
   let body = Account_update.Body.of_fee_payer p.body in
   let fee_payer : Account_update.t =
@@ -984,7 +984,7 @@ let extract_vks (t : t) : Verification_key_wire.t List.t =
 let account_updates_list (t : t) : Account_update.t list =
   Call_forest.fold t.account_updates ~init:[] ~f:(Fn.flip List.cons) |> List.rev
 
-let zkapp_command_list (t : t) : Account_update.t list =
+let all_account_updates_list (t : t) : Account_update.t list =
   Call_forest.fold t.account_updates
     ~init:[ Account_update.of_fee_payer (fee_payer_account_update t) ]
     ~f:(Fn.flip List.cons)
@@ -1587,6 +1587,8 @@ module Make_update_group (Input : sig
 
   type spec
 
+  type connecting_ledger_hash
+
   val zkapp_segment_of_controls : Control.t list -> spec
 end) : sig
   module Zkapp_command_intermediate_state : sig
@@ -1597,12 +1599,15 @@ end) : sig
       ; spec : Input.spec
       ; state_before : state
       ; state_after : state
+      ; connecting_ledger : Input.connecting_ledger_hash
       }
   end
 
   val group_by_zkapp_command_rev :
-       Account_update.t list list
-    -> (Input.global_state * Input.local_state) list list
+       t list
+    -> (Input.global_state * Input.local_state * Input.connecting_ledger_hash)
+       list
+       list
     -> Zkapp_command_intermediate_state.t list
 end = struct
   open Input
@@ -1615,18 +1620,19 @@ end = struct
       ; spec : spec
       ; state_before : state
       ; state_after : state
+      ; connecting_ledger : connecting_ledger_hash
       }
   end
 
   (** [group_by_zkapp_command_rev zkapp_commands stmtss] identifies before/after pairs of
-      statements, corresponding to zkapp_command in [zkapp_commands] which minimize the
+      statements, corresponding to account updates for each zkapp_command in [zkapp_commands] which minimize the
       number of snark proofs needed to prove all of the zkapp_command.
 
-      This function is intended to take the zkapp_command from multiple transactions as
-      its input, which may be converted from a [Zkapp_command.t list] using
-      [List.map ~f:Zkapp_command.zkapp_command]. The [stmtss] argument should be a list of
-      the same length, with 1 more state than the number of zkapp_command for each
-      transaction.
+      This function is intended to take multiple zkapp transactions as
+      its input, which is then converted to a [Account_update.t list list] using
+      [List.map ~f:Zkapp_command.zkapp_command]. The [stmtss] argument should
+      be a list of the same length, with 1 more state than the number of
+      zkapp_command for each transaction.
 
       For example, two transactions made up of zkapp_command [[p1; p2; p3]] and
       [[p4; p5]] should have the statements [[[s0; s1; s2; s3]; [s3; s4; s5]]],
@@ -1639,15 +1645,23 @@ end = struct
       will need to be passed as part of the snark witness while applying that
       pair.
   *)
-  let group_by_zkapp_command_rev (zkapp_commands : Account_update.t list list)
-      (stmtss : (global_state * local_state) list list) :
-      Zkapp_command_intermediate_state.t list =
+  let group_by_zkapp_command_rev (zkapp_commands : t list)
+      (stmtss : (global_state * local_state * connecting_ledger_hash) list list)
+      : Zkapp_command_intermediate_state.t list =
     let intermediate_state ~kind ~spec ~before ~after =
+      let global_before, local_before, _ = before in
+      let global_after, local_after, connecting_ledger = after in
       { Zkapp_command_intermediate_state.kind
       ; spec
-      ; state_before = { global = fst before; local = snd before }
-      ; state_after = { global = fst after; local = snd after }
+      ; state_before = { global = global_before; local = local_before }
+      ; state_after = { global = global_after; local = local_after }
+      ; connecting_ledger
       }
+    in
+    let zkapp_account_updatess =
+      []
+      :: List.map zkapp_commands ~f:(fun (zkapp_command : t) ->
+             all_account_updates_list zkapp_command )
     in
     let rec group_by_zkapp_command_rev
         (zkapp_commands : Account_update.t list list) stmtss acc =
@@ -1674,7 +1688,7 @@ end = struct
       | ( ({ authorization = Proof _ as a1; _ } :: zkapp_command)
           :: zkapp_commands
         , (before :: (after :: _ as stmts)) :: stmtss ) ->
-          (* This account_update contains a proof, don't pair it with other zkapp_command. *)
+          (* This account_update contains a proof, don't pair it with other account updates. *)
           group_by_zkapp_command_rev
             (zkapp_command :: zkapp_commands)
             (stmts :: stmtss)
@@ -1687,7 +1701,7 @@ end = struct
              :: zkapp_commands
         , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
           (* This account_update is part of a new transaction, and contains a proof, don't
-             pair it with other zkapp_command.
+             pair it with other account updates.
           *)
           group_by_zkapp_command_rev
             (zkapp_command :: zkapp_commands)
@@ -1889,7 +1903,7 @@ end = struct
             "group_by_zkapp_command_rev: No statements given for transaction \
              after next"
     in
-    group_by_zkapp_command_rev zkapp_commands stmtss []
+    group_by_zkapp_command_rev zkapp_account_updatess stmtss []
 end
 
 (*Transaction_snark.Zkapp_command_segment.Basic.t*)
@@ -1899,6 +1913,8 @@ module Update_group = Make_update_group (struct
   type local_state = unit
 
   type global_state = unit
+
+  type connecting_ledger_hash = unit
 
   type spec = possible_segments
 
@@ -1941,9 +1957,9 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
     |> fun (updates, ev, sev) -> (List.rev updates, ev, sev)
   in
   let groups =
-    Update_group.group_by_zkapp_command_rev ([] :: [ all_updates ])
-      ( [ ((), ()) ]
-      :: [ ((), ()) :: List.map all_updates ~f:(fun _ -> ((), ())) ] )
+    Update_group.group_by_zkapp_command_rev [ t ]
+      ( [ ((), (), ()) ]
+      :: [ ((), (), ()) :: List.map all_updates ~f:(fun _ -> ((), (), ())) ] )
   in
   let proof_segments, signed_singles, signed_pairs =
     List.fold ~init:(0, 0, 0) groups
