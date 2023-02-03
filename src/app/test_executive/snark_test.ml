@@ -42,6 +42,39 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
     }
 
+  (*
+     TODO, new config format should look like
+
+       let config =
+         let open Test_config in
+         let open Test_config.Wallet in
+         { default with
+           requires_graphql = true
+         ; genesis_ledger = [
+               { key_name = "bp1_key"; balance = "400000"; timing = Untimed }
+             ; { key_name = "bp2_key"; balance = "300000"; timing = Untimed }
+             ; { key_name = "extra1_key"; balance = "1000"; timing = Untimed }
+             ; { key_name = "extra2_key"; balance = "1000"; timing = Untimed }
+             ; { key_name = "snark_worker1_key"; balance = "10"; timing = Untimed }
+         ]
+         ; block_producers =
+             [ { node_name = "bp1"; node_key_name = "bp1_key" }
+             ; { node_name = "bp2"; node_key_name = "bp2_key" }
+             ]
+         ; num_archive_nodes = 0
+         ; snark_workers = [
+               { node_name = "snark_worker"; node_key_name = "snark_worker1_key"; replicas = 4 }
+         ]
+         ; snark_worker_fee = "0.0001"
+         ; proof_config =
+             { proof_config_default with
+               work_delay = Some 1
+             ; transaction_capacity =
+                 Some Runtime_config.Proof_keys.Transaction_capacity.small
+             }
+         }
+  *)
+
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
@@ -67,7 +100,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let sender_pub_key =
       sender_kp.public_key |> Signature_lib.Public_key.compress
     in
-
+    (* let snark_worker_pk = Test_config.default.snark_worker_public_key in *)
     let%bind () =
       section_hard
         "send out a bunch more txns to fill up the snark ledger, then wait for \
@@ -96,25 +129,25 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
     in
-    let%bind () =
-      section_hard "check snark worker's account balance"
-        (let%bind { total_balance = snark_worker_balance; _ } =
-           Network.Node.must_get_account_data ~logger untimed_node_b
-             ~public_key:Test_config.default.snark_worker_public_key
-         in
-         if
-           Currency.Amount.( >= )
-             (Currency.Balance.to_amount snark_worker_balance)
-             snark_worker_expected
-         then Malleable_error.return ()
-         else
-           Malleable_error.soft_error_format ~value:()
-             "Error with snark_worker_balance.  snark_worker_balance is %d and \
-              should be %d.  snark fee is %d"
-             (Currency.Balance.to_int snark_worker_balance)
-             (Currency.Amount.to_int snark_worker_expected)
-             (Currency.Fee.to_int fee) )
-    in
+    (* let%bind () =
+         section_hard "check snark worker's account balance"
+           (let%bind { total_balance = snark_worker_balance; _ } =
+              Network.Node.must_get_account_data ~logger untimed_node_b
+                ~public_key:snark_worker_pk
+            in
+            if
+              Currency.Amount.( >= )
+                (Currency.Balance.to_amount snark_worker_balance)
+                snark_worker_expected
+            then Malleable_error.return ()
+            else
+              Malleable_error.soft_error_format ~value:()
+                "Error with snark_worker_balance.  snark_worker_balance is %d and \
+                 should be %d.  snark fee is %d"
+                (Currency.Balance.to_int snark_worker_balance)
+                (Currency.Amount.to_int snark_worker_expected)
+                (Currency.Fee.to_int fee) )
+       in *)
     section_hard "dfasdfdasf"
       (let%bind hash =
          let%map { hash; _ } =

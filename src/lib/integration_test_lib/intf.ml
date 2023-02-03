@@ -176,6 +176,8 @@ module Engine = struct
 
     type t
 
+    (* val labeled_keypairs : ( Signature_lib.Public_key.Compressed.t * Signature_lib.Private_key.t ) String.Map.t *)
+
     val constants : t -> Test_config.constants
 
     val constraint_constants : t -> Genesis_constants.Constraint_constants.t
@@ -194,11 +196,7 @@ module Engine = struct
 
     val all_nodes : t -> Node.t list
 
-    val all_keypairs : t -> Signature_lib.Keypair.t list
-
-    val block_producer_keypairs : t -> Signature_lib.Keypair.t list
-
-    val extra_genesis_keypairs : t -> Signature_lib.Keypair.t list
+    val genesis_keypairs : t -> Network_keypair.t Core.String.Map.t
 
     val initialize_infra : logger:Logger.t -> t -> unit Malleable_error.t
   end
