@@ -14,4 +14,6 @@ module Selection_methods : sig
   module Random : Selection_method_intf
 
   module Sequence : Selection_method_intf
+
+  module Coordinated : Selection_method_intf
 end
