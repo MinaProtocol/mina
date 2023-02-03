@@ -122,7 +122,7 @@ module Work_selection_method = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Sequence | Random
+      type t = Sequence | Random | Coordinated
 
       let to_latest = Fn.id
     end
@@ -134,6 +134,8 @@ let work_selection_method_val = function
       Work_selection_method.Sequence
   | "rand" ->
       Random
+  | "coordinated" ->
+      Coordinated
   | _ ->
       failwith "Invalid work selection"
 
@@ -147,3 +149,5 @@ let work_selection_method_to_module :
       (module Work_selector.Selection_methods.Sequence)
   | Random ->
       (module Work_selector.Selection_methods.Random)
+  | Coordinated ->
+      (module Work_selector.Selection_methods.Coordinated)
