@@ -190,9 +190,11 @@ module Account_update_under_construction = struct
       ; call_data : Field.t option
       ; events : Events.t
       ; actions : Actions.t
+      ; vk_hash : Field.t
       }
 
-    let create ~public_key ?(token_id = Token_id.(Checked.constant default))
+    let create ~public_key ~vk_hash
+        ?(token_id = Token_id.(Checked.constant default))
         ?(may_use_token = Account_update.May_use_token.Checked.constant No) () =
       { public_key
       ; token_id
@@ -203,6 +205,7 @@ module Account_update_under_construction = struct
       ; call_data = None
       ; events = Events.create ()
       ; actions = Actions.create ()
+      ; vk_hash
       }
 
     let to_account_update_and_calls (t : t) :
@@ -269,9 +272,7 @@ module Account_update_under_construction = struct
         ; authorization_kind =
             { is_signed = Boolean.false_
             ; is_proved = Boolean.true_
-            ; verification_key_hash =
-                Field.zero
-                (* the vk hash is a dummy, to be patched with `patch_verification_key_hashes`, below *)
+            ; verification_key_hash = t.vk_hash
             }
         }
       in
@@ -313,11 +314,11 @@ module Account_update_under_construction = struct
   end
 end
 
-class account_update ~public_key ?token_id ?may_use_token =
+class account_update ~public_key ~vk_hash ?token_id ?may_use_token =
   object
     val mutable account_update =
-      Account_update_under_construction.In_circuit.create ~public_key ?token_id
-        ?may_use_token ()
+      Account_update_under_construction.In_circuit.create ~public_key ~vk_hash
+        ?token_id ?may_use_token ()
 
     method assert_state_proved =
       account_update <-
@@ -430,9 +431,9 @@ open Pickles_types
 open Hlist
 
 let wrap_main ~public_key ?token_id ?may_use_token f
-    { Pickles.Inductive_rule.public_input = () } =
+    { Pickles.Inductive_rule.public_input = vk_hash } =
   let account_update =
-    new account_update ~public_key ?token_id ?may_use_token
+    new account_update ~public_key ~vk_hash ?token_id ?may_use_token
   in
   let auxiliary_output = f account_update in
   { Pickles.Inductive_rule.previous_proof_statements = []
@@ -467,8 +468,8 @@ let compile :
              , prev_valuess
              , widthss
              , heightss
-             , unit
-             , unit
+             , Field.t
+             , Field.Constant.t
              , account_update
              , unit (* TODO: Remove? *)
              , auxiliary_var
@@ -499,6 +500,7 @@ let compile :
          H3_2.T(Pickles.Prover).t =
  fun ?self ?cache ?disk_keys ~auxiliary_typ ~branches ~max_proofs_verified ~name
      ~constraint_constants ~choices () ->
+  let vk_hash = ref None in
   let choices ~self =
     let rec go :
         type prev_varss prev_valuess widthss heightss.
@@ -506,8 +508,8 @@ let compile :
            , prev_valuess
            , widthss
            , heightss
-           , unit
-           , unit
+           , Field.t
+           , Field.Constant.t
            , account_update
            , unit
            , auxiliary_var
@@ -531,12 +533,16 @@ let compile :
           ; prevs
           ; uses_lookup
           ; main =
-              (fun main_input ->
+              (fun { Pickles.Inductive_rule.public_input = () } ->
+                let vk_hash =
+                  exists Field.typ ~compute:(fun () ->
+                      Lazy.force @@ Option.value_exn !vk_hash )
+                in
                 let { Pickles.Inductive_rule.previous_proof_statements
                     ; public_output = account_update_under_construction
                     ; auxiliary_output
                     } =
-                  main main_input
+                  main { Pickles.Inductive_rule.public_input = vk_hash }
                 in
                 let public_output, account_update_tree =
                   to_account_update account_update_under_construction
@@ -555,6 +561,13 @@ let compile :
       ~public_input:(Output Zkapp_statement.typ)
       ~auxiliary_typ:Typ.(Prover_value.typ () * auxiliary_typ)
       ~branches ~max_proofs_verified ~name ~constraint_constants ~choices
+  in
+  let () =
+    vk_hash :=
+      Some
+        ( lazy
+          ( Zkapp_account.digest_vk
+          @@ Pickles.Side_loaded.Verification_key.of_compiled tag ) )
   in
   let provers =
     let rec go :
@@ -606,44 +619,3 @@ let compile :
     go provers
   in
   (tag, cache_handle, proof, provers)
-
-(* replace dummy vk hashes in account updates *)
-let patch_verification_key_hashes ?ledger account_updates =
-  (* update vk hashes if Set in an account update *)
-  let vk_hash_tbl : Impl.field Public_key.Compressed.Table.t =
-    Public_key.Compressed.Table.create ()
-  in
-  (* if ledger provided, add vk hashes from those accounts *)
-  Option.iter ledger ~f:(fun (ledger : Mina_ledger.Ledger.t) ->
-      Mina_ledger.Ledger.iteri ledger ~f:(fun _n acct ->
-          Option.iter acct.zkapp ~f:(fun zkapp ->
-              Option.iter zkapp.verification_key ~f:(fun vk ->
-                  let pk : Public_key.Compressed.t = acct.public_key in
-                  Public_key.Compressed.Table.set vk_hash_tbl ~key:pk
-                    ~data:(With_hash.hash vk) ) ) ) ) ;
-  Zkapp_command.Call_forest.map account_updates
-    ~f:(fun (acct_update : Account_update.t) ->
-      let pk = acct_update.body.public_key in
-      let acct_update' =
-        match Public_key.Compressed.Table.find vk_hash_tbl pk with
-        | None ->
-            acct_update
-        | Some vk_hash -> (
-            match acct_update.body.authorization_kind with
-            | Proof _ ->
-                { acct_update with
-                  body =
-                    { acct_update.body with authorization_kind = Proof vk_hash }
-                }
-            | Signature | None_given ->
-                acct_update )
-      in
-      (* add entry for subsequent updates *)
-      ( match acct_update.body.update.verification_key with
-      | Set vk ->
-          let vk_hash = With_hash.hash vk in
-          Public_key.Compressed.Table.set vk_hash_tbl ~key:pk ~data:vk_hash
-      | Keep ->
-          () ) ;
-      acct_update' )
-  |> Zkapp_command.Call_forest.accumulate_hashes'

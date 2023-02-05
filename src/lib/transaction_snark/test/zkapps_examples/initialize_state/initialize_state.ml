@@ -105,10 +105,7 @@ let%test_module "Initialize state test" =
              ~handler:(Zkapps_initialize_state.update_state_handler new_state) )
     end
 
-    let test_zkapp_command ?expected_failure zkapp_command0 =
-      let zkapp_command =
-        Zkapps_examples.patch_verification_key_hashes zkapp_command0
-      in
+    let test_zkapp_command ?expected_failure zkapp_command =
       let memo = Signed_command_memo.empty in
       let transaction_commitment : Zkapp_command.Transaction_commitment.t =
         (* TODO: This is a pain. *)
