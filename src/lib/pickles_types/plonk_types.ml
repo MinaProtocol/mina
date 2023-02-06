@@ -178,6 +178,11 @@ module Features = struct
   type with_flags = Opt.Flag.t t
 
   type with_booleans = bool t
+
+  let create_all flag = { lookup = flag; runtime_tables = flag }
+
+  let map { lookup; runtime_tables } ~f =
+    { lookup = f lookup; runtime_tables = f runtime_tables }
 end
 
 module Evals = struct

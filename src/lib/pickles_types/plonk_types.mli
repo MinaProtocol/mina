@@ -82,6 +82,10 @@ module Features : sig
   type with_flags = Opt.Flag.t t
 
   type with_booleans = bool t
+
+  val create_all : 'a -> 'a t
+
+  val map : 'a t -> f:('a -> 'b) -> 'b t
 end
 
 module Messages : sig
