@@ -559,25 +559,35 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let module V = H4.To_vector (Int) in
         V.f prev_varss_length (M.f choices)
       in
-      let step_uses_lookup =
+      let feature_flags =
         let rec go :
-            type a b c d. (a, b, c, d) H4.T(IR).t -> Plonk_types.Opt.Flag.t =
+            type a b c d.
+            (a, b, c, d) H4.T(IR).t -> Plonk_types.Features.with_flags =
          fun rules ->
           match rules with
           | [] ->
-              No
-          | r :: rules -> (
-              let rest_usage = go rules in
-              match (r.feature_flags.lookup, rest_usage) with
-              | true, Yes ->
-                  Yes
-              | false, No ->
-                  No
-              | _, Maybe | true, No | false, Yes ->
-                  Maybe )
+              Plonk_types.Features.create_all Plonk_types.Opt.Flag.No
+          | [ r ] ->
+              Plonk_types.Features.map r.feature_flags ~f:(function
+                | true ->
+                    Plonk_types.Opt.Flag.Yes
+                | false ->
+                    Plonk_types.Opt.Flag.No )
+          | r :: rules ->
+              let feature_flags = go rules in
+              Plonk_types.Features.map2 r.feature_flags feature_flags
+                ~f:(fun enabled flag ->
+                  match (enabled, flag) with
+                  | true, Yes ->
+                      Plonk_types.Opt.Flag.Yes
+                  | false, No ->
+                      No
+                  | _, Maybe | true, No | false, Yes ->
+                      Maybe )
         in
         go choices
       in
+      let step_uses_lookup = feature_flags.lookup in
       let step_data =
         let i = ref 0 in
         Timer.clock __LOC__ ;
