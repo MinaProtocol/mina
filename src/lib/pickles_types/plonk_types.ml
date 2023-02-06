@@ -181,7 +181,7 @@ module Features = struct
 end
 
 module Lookup_config = struct
-  type t = { lookup : Opt.Flag.t; runtime : Opt.Flag.t }
+  type t = Features.with_flags
 end
 
 module Evals = struct
@@ -239,20 +239,21 @@ module Evals = struct
         (f, bool) In_circuit.t =
       { sorted; aggreg; table; runtime = Opt.of_option runtime }
 
-    let typ impl e ~runtime ~dummy =
+    let typ impl e ~runtime_tables ~dummy =
       Snarky_backendless.Typ.of_hlistable
         [ Snarky_backendless.Typ.array ~length:sorted_length e
         ; e
         ; e
-        ; Opt.typ impl runtime e ~dummy
+        ; Opt.typ impl runtime_tables e ~dummy
         ]
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
 
-    let opt_typ impl ({ lookup; runtime } : Lookup_config.t) ~dummy:z elt =
+    let opt_typ impl ({ lookup; runtime_tables } : Lookup_config.t) ~dummy:z elt
+        =
       Opt.typ impl lookup
-        ~dummy:(dummy z ~runtime:(Opt.Flag.equal runtime Yes))
-        (typ impl ~runtime ~dummy:z elt)
+        ~dummy:(dummy z ~runtime:(Opt.Flag.equal runtime_tables Yes))
+        (typ impl ~runtime_tables ~dummy:z elt)
   end
 
   [%%versioned
@@ -647,26 +648,26 @@ module Messages = struct
 
     let sorted_length = 5
 
-    let dummy ~runtime z =
+    let dummy ~runtime_tables z =
       { aggreg = z
       ; sorted = Array.create ~len:sorted_length z
-      ; runtime = Option.some_if runtime z
+      ; runtime = Option.some_if runtime_tables z
       }
 
-    let typ bool_typ e ~runtime ~dummy =
+    let typ bool_typ e ~runtime_tables ~dummy =
       Snarky_backendless.Typ.of_hlistable
         [ Snarky_backendless.Typ.array ~length:sorted_length e
         ; e
-        ; Opt.typ bool_typ runtime e ~dummy
+        ; Opt.typ bool_typ runtime_tables e ~dummy
         ]
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
 
-    let opt_typ bool_typ ~(lookup : Opt.Flag.t) ~(runtime : Opt.Flag.t) ~dummy:z
-        elt =
+    let opt_typ bool_typ ~(lookup : Opt.Flag.t) ~(runtime_tables : Opt.Flag.t)
+        ~dummy:z elt =
       Opt.typ bool_typ lookup
-        ~dummy:(dummy z ~runtime:Opt.Flag.(equal runtime Yes))
-        (typ bool_typ ~runtime ~dummy:z elt)
+        ~dummy:(dummy z ~runtime_tables:Opt.Flag.(equal runtime_tables Yes))
+        (typ bool_typ ~runtime_tables ~dummy:z elt)
   end
 
   [%%versioned
@@ -695,7 +696,7 @@ module Messages = struct
 
   let typ (type n f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) g
-      ({ lookup; runtime } : Lookup_config.t) ~dummy
+      ({ lookup; runtime_tables } : Lookup_config.t) ~dummy
       ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t) ~bool
       =
     let open Snarky_backendless.Typ in
@@ -708,7 +709,7 @@ module Messages = struct
         ~dummy_group_element:dummy ~bool
     in
     let lookup =
-      Lookup.opt_typ Impl.Boolean.typ ~lookup ~runtime ~dummy:[| dummy |]
+      Lookup.opt_typ Impl.Boolean.typ ~lookup ~runtime_tables ~dummy:[| dummy |]
         (wo [ 1 ])
     in
     of_hlistable

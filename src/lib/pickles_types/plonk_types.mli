@@ -85,7 +85,7 @@ module Features : sig
 end
 
 module Lookup_config : sig
-  type t = { lookup : Opt.Flag.t; runtime : Opt.Flag.t }
+  type t = Features.with_flags
 end
 
 module Messages : sig

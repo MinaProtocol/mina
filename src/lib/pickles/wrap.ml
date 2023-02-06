@@ -300,7 +300,7 @@ let%test "lookup finalization" =
     constant
       (Plonk_types.All_evals.typ
          (module Impls.Step)
-         { lookup = Maybe; runtime = Maybe } )
+         { lookup = Maybe; runtime_tables = Maybe } )
       { evals = { public_input = x_hat_evals; evals = proof.openings.evals }
       ; ft_eval1 = proof.openings.ft_eval1
       }

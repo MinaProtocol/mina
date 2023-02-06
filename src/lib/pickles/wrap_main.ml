@@ -82,10 +82,11 @@ let split_field (x : Field.t) : Field.t * Boolean.var =
   Field.(Assert.equal ((of_int 2 * y) + (is_odd :> t)) x) ;
   res
 
-let lookup_config = { Plonk_types.Lookup_config.lookup = No; runtime = No }
+let lookup_config : Plonk_types.Features.with_flags =
+  { lookup = No; runtime_tables = No }
 
-let commitment_lookup_config =
-  { Plonk_types.Lookup_config.lookup = No; runtime = No }
+let commitment_lookup_config : Plonk_types.Features.with_flags =
+  { lookup = No; runtime_tables = No }
 
 let lookup_config_for_pack =
   { Types.Wrap.Lookup_parameters.zero = Common.Lookup_parameters.tock_zero
