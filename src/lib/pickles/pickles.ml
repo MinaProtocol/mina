@@ -602,7 +602,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 Timer.clock __LOC__ ;
                 let res =
                   Common.time "make step data" (fun () ->
-                      Step_branch_data.create ~index:!i ~step_uses_lookup
+                      Step_branch_data.create ~index:!i ~feature_flags
                         ~max_proofs_verified:Max_proofs_verified.n
                         ~branches:Branches.n ~self ~public_input ~auxiliary_typ
                         Arg_var.to_field_elements Arg_value.to_field_elements
@@ -2097,7 +2097,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
           end in
           let proofs_verifieds = Vector.[ 2 ] in
           let (T inner_step_data as step_data) =
-            Step_branch_data.create ~index:0 ~step_uses_lookup:No
+            Step_branch_data.create ~index:0
+              ~feature_flags:
+                Pickles_types.Plonk_types.(Features.create_all Opt.Flag.No)
               ~max_proofs_verified:Max_proofs_verified.n ~branches:Branches.n
               ~self ~public_input:(Input typ) ~auxiliary_typ:typ
               A.to_field_elements A_value.to_field_elements rule ~wrap_domains
@@ -3022,7 +3024,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
           end in
           let proofs_verifieds = Vector.[ 2 ] in
           let (T inner_step_data as step_data) =
-            Step_branch_data.create ~index:0 ~step_uses_lookup:No
+            Step_branch_data.create ~index:0
+              ~feature_flags:
+                Pickles_types.Plonk_types.(Features.create_all Opt.Flag.No)
               ~max_proofs_verified:Max_proofs_verified.n ~branches:Branches.n
               ~self ~public_input:(Input typ) ~auxiliary_typ:typ
               A.to_field_elements A_value.to_field_elements rule ~wrap_domains
