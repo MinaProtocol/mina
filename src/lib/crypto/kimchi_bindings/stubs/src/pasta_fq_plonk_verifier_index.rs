@@ -86,7 +86,8 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas> {
 
         let feature_flags = FeatureFlags {
             chacha: false,
-            range_check: false,
+            range_check0: false,
+            range_check1: false,
             foreign_field_add: false,
             foreign_field_mul: false,
             rot: false,
@@ -133,7 +134,8 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas> {
             chacha_comm,
             xor_comm: None,
 
-            range_check_comm: None,
+            range_check0_comm: None,
+            range_check1_comm: None,
             foreign_field_add_comm: None,
             foreign_field_mul_comm: None,
             rot_comm: None,
