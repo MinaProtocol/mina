@@ -40,12 +40,12 @@ let initialize_rule public_key : _ Pickles.Inductive_rule.t =
   { identifier = "Initialize zkApp"
   ; prevs = []
   ; main = initialize public_key
-  ; uses_lookup = false
+  ; feature_flags = Pickles_types.Plonk_types.Features.create_all false
   }
 
 let update_actions_rule public_key : _ Pickles.Inductive_rule.t =
   { identifier = "Update sequence events"
   ; prevs = []
   ; main = update_actions public_key
-  ; uses_lookup = false
+  ; feature_flags = Pickles_types.Plonk_types.Features.create_all false
   }

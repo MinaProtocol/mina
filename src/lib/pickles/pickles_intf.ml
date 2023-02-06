@@ -233,7 +233,7 @@ module type S = sig
       ; main :
              'a_var main_input
           -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return
-      ; uses_lookup : bool
+      ; feature_flags : Pickles_types.Plonk_types.Features.with_bools
       }
   end
 

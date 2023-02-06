@@ -568,7 +568,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               No
           | r :: rules -> (
               let rest_usage = go rules in
-              match (r.uses_lookup, rest_usage) with
+              match (r.feature_flags.lookup, rest_usage) with
               | true, Yes ->
                   Yes
               | false, No ->
@@ -798,7 +798,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
               ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
               ~public_input ~auxiliary_typ
-              ~uses_lookup:(if b.rule.uses_lookup then Yes else No)
+              ~uses_lookup:(if b.rule.feature_flags.lookup then Yes else No)
               (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
               wrap_vk.index
           in
@@ -1302,7 +1302,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
                     ; prevs = []
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.create_all false
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -1365,7 +1365,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
                     ; prevs = []
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.create_all false
                     ; main =
                         (fun _ ->
                           dummy_constraints () ;
@@ -1432,7 +1432,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
                     ; prevs = [ self ]
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.create_all false
                     ; main =
                         (fun { public_input = self } ->
                           let prev =
@@ -1539,7 +1539,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   }
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.create_all false
                     ; prevs = [ No_recursion.tag; self ]
                     ; main =
                         (fun { public_input = self } ->
@@ -1673,7 +1673,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   }
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.create_all false
                     ; prevs = [ No_recursion_return.tag; self ]
                     ; main =
                         (fun { public_input = () } ->
@@ -1797,7 +1797,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   }
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.create_all false
                     ; prevs = []
                     ; main =
                         (fun { public_input = x } ->
@@ -1862,7 +1862,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   }
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.create_all false
                     ; prevs = []
                     ; main =
                         (fun { public_input = input } ->
@@ -1969,7 +1969,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               ; public_output = ()
               ; auxiliary_output = ()
               } )
-        ; uses_lookup = false
+        ; feature_flags = Plonk_types.Features.create_all false
         }
 
       module M = struct
@@ -2792,7 +2792,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~name:"recurse-on-bad" ~constraint_constants
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.create_all false
                     ; prevs = [ tag; tag ]
                     ; main =
                         (fun { public_input = () } ->
@@ -2874,7 +2874,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let rule : _ Inductive_rule.t =
         let open Impls.Step in
         { identifier = "main"
-        ; uses_lookup = false
+        ; feature_flags = Plonk_types.Features.create_all false
         ; prevs = [ tag; tag ]
         ; main =
             (fun { public_input = () } ->
@@ -3682,7 +3682,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~name:"recurse-on-bad" ~constraint_constants
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.create_all false
                     ; prevs = [ tag; tag ]
                     ; main =
                         (fun { public_input = () } ->
@@ -3793,7 +3793,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
                     ; prevs = []
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.create_all false
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -3846,7 +3846,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
                     ; prevs = []
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.create_all false
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -3899,7 +3899,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
                     ; prevs = []
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.create_all false
                     ; main =
                         (fun { public_input = self } ->
                           dummy_constraints () ;
@@ -3976,7 +3976,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
                     ; prevs = [ side_loaded_tag ]
-                    ; uses_lookup = false
+                    ; feature_flags = Plonk_types.Features.create_all false
                     ; main =
                         (fun { public_input = self } ->
                           let prev =

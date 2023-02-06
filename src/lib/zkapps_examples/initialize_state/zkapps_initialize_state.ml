@@ -39,12 +39,12 @@ let initialize_rule public_key : _ Pickles.Inductive_rule.t =
   { identifier = "Initialize snapp"
   ; prevs = []
   ; main = initialize public_key
-  ; uses_lookup = false
+  ; feature_flags = Pickles_types.Plonk_types.Features.create_all false
   }
 
 let update_state_rule public_key : _ Pickles.Inductive_rule.t =
   { identifier = "Update state"
   ; prevs = []
   ; main = update_state public_key
-  ; uses_lookup = false
+  ; feature_flags = Pickles_types.Plonk_types.Features.create_all false
   }

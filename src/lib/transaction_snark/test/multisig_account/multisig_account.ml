@@ -210,7 +210,8 @@ let%test_module "multisig_account" =
                         ; public_output = ()
                         ; auxiliary_output = ()
                         } )
-                  ; uses_lookup = false
+                  ; feature_flags =
+                      Pickles_types.Plonk_types.Features.create_all false
                   }
                 in
                 Pickles.compile () ~cache:Cache_dir.cache
@@ -258,7 +259,8 @@ let%test_module "multisig_account" =
                             ; public_output = ()
                             ; auxiliary_output = ()
                             } )
-                      ; uses_lookup = false
+                      ; feature_flags =
+                          Pickles_types.Plonk_types.Features.create_all false
                       }
                     ] )
               in

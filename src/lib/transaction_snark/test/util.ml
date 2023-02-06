@@ -290,7 +290,7 @@ let dummy_rule self : _ Pickles.Inductive_rule.t =
         ; public_output = ()
         ; auxiliary_output = ()
         } )
-  ; uses_lookup = false
+  ; feature_flags = Pickles_types.Plonk_types.Features.create_all false
   }
 
 let gen_snapp_ledger =

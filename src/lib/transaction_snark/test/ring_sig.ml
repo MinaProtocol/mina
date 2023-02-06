@@ -56,7 +56,7 @@ let ring_sig_rule (ring_member_pks : Schnorr.Chunked.Public_key.t list) :
         ; public_output = ()
         ; auxiliary_output = ()
         } )
-  ; uses_lookup = false
+  ; feature_flags = Pickles_types.Plonk_types.Features.create_all false
   }
 
 let%test_unit "1-of-1" =

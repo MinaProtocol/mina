@@ -423,7 +423,7 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
         ; public_output = ()
         ; auxiliary_output = ()
         } )
-  ; uses_lookup = false
+  ; feature_flags = Plonk_types.Features.create_all false
   }
 
 module type S = sig

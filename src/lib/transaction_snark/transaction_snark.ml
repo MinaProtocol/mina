@@ -2081,7 +2081,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ; public_output = ()
                   ; auxiliary_output = ()
                   } )
-            ; uses_lookup = false
+            ; feature_flags = Plonk_types.Features.create_all false
             }
         | Opt_signed_opt_signed ->
             { identifier = "opt_signed-opt_signed"
@@ -2096,7 +2096,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ; public_output = ()
                   ; auxiliary_output = ()
                   } )
-            ; uses_lookup = false
+            ; feature_flags = Plonk_types.Features.create_all false
             }
         | Opt_signed ->
             { identifier = "opt_signed"
@@ -2111,7 +2111,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ; public_output = ()
                   ; auxiliary_output = ()
                   } )
-            ; uses_lookup = false
+            ; feature_flags = Plonk_types.Features.create_all false
             }
     end
 
@@ -3071,7 +3071,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; public_output = ()
             ; auxiliary_output = ()
             } )
-      ; uses_lookup = false
+      ; feature_flags = Plonk_types.Features.create_all false
       }
 
     let transaction_union_handler handler (transaction : Transaction_union.t)
@@ -3231,7 +3231,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; public_output = ()
             ; auxiliary_output = ()
             } )
-      ; uses_lookup = false
+      ; feature_flags = Plonk_types.Features.create_all false
       }
   end
 
@@ -4111,7 +4111,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; public_output = ()
                 ; auxiliary_output = ()
                 } )
-          ; uses_lookup = false
+          ; feature_flags = Plonk_types.Features.create_all false
           }
         in
         Pickles.compile () ~cache:Cache_dir.cache
