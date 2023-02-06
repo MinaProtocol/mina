@@ -249,7 +249,17 @@ module Tick : S = struct
               "0x0000000000000000000000000000000000000000000000000000000000000000"
         )
     + if_feature
-        ( RangeCheck
+        ( RangeCheck0
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    + if_feature
+        ( RangeCheck1
         , (fun () ->
             field
               "0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -2761,7 +2771,7 @@ module Tick : S = struct
       ; ( Index RangeCheck0
         , lazy
             (if_feature
-               ( RangeCheck
+               ( RangeCheck0
                , (fun () ->
                    cell (var (Witness 7, Curr))
                    * ( cell (var (Witness 7, Curr))
@@ -3086,7 +3096,7 @@ module Tick : S = struct
       ; ( Index RangeCheck1
         , lazy
             (if_feature
-               ( RangeCheck
+               ( RangeCheck1
                , (fun () ->
                    cell (var (Witness 2, Curr))
                    * ( cell (var (Witness 2, Curr))
@@ -4656,7 +4666,17 @@ module Tock : S = struct
               "0x0000000000000000000000000000000000000000000000000000000000000000"
         )
     + if_feature
-        ( RangeCheck
+        ( RangeCheck0
+        , (fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+            )
+        , fun () ->
+            field
+              "0x0000000000000000000000000000000000000000000000000000000000000000"
+        )
+    + if_feature
+        ( RangeCheck1
         , (fun () ->
             field
               "0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -7168,7 +7188,7 @@ module Tock : S = struct
       ; ( Index RangeCheck0
         , lazy
             (if_feature
-               ( RangeCheck
+               ( RangeCheck0
                , (fun () ->
                    cell (var (Witness 7, Curr))
                    * ( cell (var (Witness 7, Curr))
@@ -7493,7 +7513,7 @@ module Tock : S = struct
       ; ( Index RangeCheck1
         , lazy
             (if_feature
-               ( RangeCheck
+               ( RangeCheck1
                , (fun () ->
                    cell (var (Witness 2, Curr))
                    * ( cell (var (Witness 2, Curr))
