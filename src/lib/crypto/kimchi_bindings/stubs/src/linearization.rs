@@ -15,7 +15,8 @@ pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
         None => None,
         Some(lookup_features) => Some(FeatureFlags {
             chacha: false,
-            range_check: false,
+            range_check0: false,
+            range_check1: false,
             rot: false,
             foreign_field_add: false,
             foreign_field_mul: false,
