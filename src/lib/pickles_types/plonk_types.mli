@@ -84,10 +84,6 @@ module Features : sig
   type with_booleans = bool t
 end
 
-module Lookup_config : sig
-  type t = Features.with_flags
-end
-
 module Messages : sig
   module Poly : sig
     type ('w, 'z, 't) t = { w : 'w; z : 'z; t : 't }
@@ -144,7 +140,7 @@ module Messages : sig
   val typ :
        (module Snarky_backendless.Snark_intf.Run with type field = 'f)
     -> ('a, 'b, 'f) Snarky_backendless.Typ.t
-    -> Lookup_config.t
+    -> Features.with_flags
     -> dummy:'b
     -> commitment_lengths:((int, 'n) Vector.vec, int, int) Poly.t
     -> bool:('c, bool, 'f) Snarky_backendless.Typ.t
@@ -328,7 +324,7 @@ module All_evals : sig
 
   val typ :
        (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-    -> Lookup_config.t
+    -> Features.with_flags
     -> ( ( 'f Snarky_backendless.Cvar.t
          , 'f Snarky_backendless.Cvar.t array
          , 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )

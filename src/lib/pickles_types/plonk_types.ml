@@ -180,10 +180,6 @@ module Features = struct
   type with_booleans = bool t
 end
 
-module Lookup_config = struct
-  type t = Features.with_flags
-end
-
 module Evals = struct
   module Lookup = struct
     [%%versioned
@@ -249,8 +245,8 @@ module Evals = struct
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
 
-    let opt_typ impl ({ lookup; runtime_tables } : Lookup_config.t) ~dummy:z elt
-        =
+    let opt_typ impl ({ lookup; runtime_tables } : Features.with_flags) ~dummy:z
+        elt =
       Opt.typ impl lookup
         ~dummy:(dummy z ~runtime:(Opt.Flag.equal runtime_tables Yes))
         (typ impl ~runtime_tables ~dummy:z elt)
@@ -696,7 +692,7 @@ module Messages = struct
 
   let typ (type n f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) g
-      ({ lookup; runtime_tables } : Lookup_config.t) ~dummy
+      ({ lookup; runtime_tables } : Features.with_flags) ~dummy
       ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t) ~bool
       =
     let open Snarky_backendless.Typ in
