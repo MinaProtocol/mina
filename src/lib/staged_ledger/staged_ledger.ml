@@ -743,6 +743,17 @@ module T = struct
           Second "not_found_in_pool"
     with Statement_of_job_failure -> Second "statement_of_job_failure"
 
+  let optimized =
+    match Sys.getenv "MINA_SKIP_REDUNDANT_SNARK_VERIFICATIONS" with
+    | Some _ ->
+        true
+    | None ->
+        false
+
+  let work_already_verified_check =
+    if optimized then work_already_verified_check
+    else fun ~get_completed_work:_ _jobs _work -> Second "disabled"
+
   let check_completed_works ~logger ~verifier ~get_completed_work scan_state
       (completed_works : Transaction_snark_work.t list) =
     let work_count = List.length completed_works in
