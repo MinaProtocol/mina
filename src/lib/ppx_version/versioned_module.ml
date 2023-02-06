@@ -16,6 +16,55 @@ let with_versioned_json = "with_versioned_json"
 
 let no_toplevel_latest_type_str = "no_toplevel_latest_type"
 
+let ty_decl_to_string =
+  let buf = Buffer.create 2048 in
+  let formatter =
+    Versioned_util.diff_formatter @@ Format.formatter_of_buffer buf
+  in
+  (* remove internal attributes, on core type in manifest and in records or variants in kind *)
+  let ty_decl_remove_internal_attributes ty_decl =
+    let removed_in_kind =
+      match ty_decl.ptype_kind with
+      | Ptype_variant ctors ->
+          Ptype_variant
+            (List.map ctors ~f:(fun ctor -> { ctor with pcd_attributes = [] }))
+      | Ptype_record labels ->
+          Ptype_record
+            (List.map labels ~f:(fun label ->
+                 { label with pld_attributes = [] } ) )
+      | kind ->
+          kind
+    in
+    let removed_in_manifest =
+      Option.map ty_decl.ptype_manifest ~f:(fun core_type ->
+          { core_type with ptyp_attributes = [] } )
+    in
+    { ty_decl with
+      ptype_manifest = removed_in_manifest
+    ; ptype_kind = removed_in_kind
+    }
+  in
+  (* filter attributes from types *)
+  let filter_ty_decls_attrs ty_decl =
+    let ty_decl_no_attrs = ty_decl_remove_internal_attributes ty_decl in
+    { ty_decl_no_attrs with ptype_attributes = [] }
+  in
+  let filter_type_manifests type_decl =
+    match type_decl.ptype_kind with
+    | Ptype_abstract | Ptype_open ->
+        type_decl
+    | Ptype_variant _ | Ptype_record _ ->
+        { type_decl with ptype_manifest = None }
+  in
+  fun ty_decl ->
+    Buffer.clear buf ;
+    let ty_decl' = ty_decl |> filter_ty_decls_attrs |> filter_type_manifests in
+    Pprintast.type_declaration formatter ty_decl' ;
+    Format.pp_print_flush formatter () ;
+    let s = Buffer.contents buf in
+    (* formatter replaces initial newline with space, removed here *)
+    String.sub s ~pos:1 ~len:(String.length s - 1)
+
 (* option to `deriving version' *)
 type version_option = No_version_option | Binable | Rpc [@@deriving equal]
 
@@ -763,16 +812,18 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
     let register_shape =
       let open Ast_builder in
       match t_stri.pstr_desc with
-      | Pstr_type (_, [ { ptype_name; ptype_params; _ } ]) ->
+      | Pstr_type (_, [ ty_decl ]) ->
           (* incomplete shape if there are type parameters *)
-          if List.is_empty ptype_params then
+          if List.is_empty ty_decl.ptype_params then
+            let ty_decl_str = ty_decl_to_string ty_decl in
             [%str
               let (_ : _) =
                 let path =
                   Core_kernel.sprintf "%s:%s.%s" __FILE__ __FUNCTION__
-                    [%e estring ptype_name.txt]
+                    [%e estring ty_decl.ptype_name.txt]
                 in
-                Ppx_version_runtime.Shapes.register path bin_shape_t]
+                Ppx_version_runtime.Shapes.register path bin_shape_t
+                  [%e estring ty_decl_str]]
           else []
       | _ ->
           failwith "Expected single type declaration in structure item"
@@ -1246,21 +1297,25 @@ let version_module ~loc ~path:_ ~version_option modname modbody =
     raise exn
 
 let convert_rpc_version (stri : structure_item) =
-  let register_shapes =
+  let register_shapes query_ty_decl response_ty_decl =
     let (module Ast_builder) = Ast_builder.make stri.pstr_loc in
     let open Ast_builder in
+    let query_ty_decl_str = ty_decl_to_string query_ty_decl in
+    let response_ty_decl_str = ty_decl_to_string response_ty_decl in
     [%str
       let (_ : _) =
         let query_path =
           Core_kernel.sprintf "%s:%s.%s" __FILE__ __FUNCTION__
             [%e estring "query"]
         in
-        Ppx_version_runtime.Shapes.register query_path bin_shape_query ;
+        Ppx_version_runtime.Shapes.register query_path bin_shape_query
+          [%e estring query_ty_decl_str] ;
         let response_path =
           Core_kernel.sprintf "%s:%s.%s" __FILE__ __FUNCTION__
             [%e estring "response"]
         in
-        Ppx_version_runtime.Shapes.register response_path bin_shape_response]
+        Ppx_version_runtime.Shapes.register response_path bin_shape_response
+          [%e estring response_ty_decl_str]]
   in
   let add_derivers_to_types = function
     | { pstr_desc = Pstr_type (rec_flag, [ ty_decl ]); pstr_loc }
@@ -1302,6 +1357,22 @@ let convert_rpc_version (stri : structure_item) =
           let str_items_with_derivers =
             List.map str_items ~f:add_derivers_to_types
           in
+          let ty_decls =
+            List.filter_map str_items_with_derivers ~f:(fun stri ->
+                match stri.pstr_desc with
+                | Pstr_type (Recursive, [ ty_decl ]) ->
+                    Some ty_decl
+                | _ ->
+                    None )
+          in
+          let query_ty_decl =
+            List.find_exn ty_decls ~f:(fun ty_decl ->
+                String.equal ty_decl.ptype_name.txt "query" )
+          in
+          let response_ty_decl =
+            List.find_exn ty_decls ~f:(fun ty_decl ->
+                String.equal ty_decl.ptype_name.txt "response" )
+          in
           let pmb_expr_with_derivers =
             { mod_expr with
               pmod_desc =
@@ -1314,7 +1385,9 @@ let convert_rpc_version (stri : structure_item) =
                               { inner_mod_expr with
                                 pmod_desc =
                                   Pmod_structure
-                                    (str_items_with_derivers @ register_shapes)
+                                    ( str_items_with_derivers
+                                    @ register_shapes query_ty_decl
+                                        response_ty_decl )
                               }
                           }
                     }
