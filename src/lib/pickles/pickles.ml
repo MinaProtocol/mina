@@ -3072,6 +3072,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
                Import.Types.Step_bp_vec.t
              , Import.Types.Branch_data.t )
              Import.Types.Wrap.Statement.In_circuit.t
+
+        val check_verifier_error : Error.t -> unit
       end) =
       struct
         open Impls.Step
@@ -3222,9 +3224,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
           ((), p)
 
         let%test "should not be able to verify invalid proof" =
-          Or_error.is_error
-          @@ Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ proof_with_stmt ] )
+          match
+            Promise.block_on_async_exn (fun () ->
+                Proof.verify_promise [ proof_with_stmt ] )
+          with
+          | Ok () ->
+              false
+          | Error err ->
+              M.check_verifier_error err ; true
 
         module Recurse_on_bad_proof = struct
           open Impls.Step
@@ -3313,6 +3320,20 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     { stmt.proof_state.deferred_values with b = shift_value b }
                 }
             }
+
+          let check_verifier_error err =
+            (* Convert to JSON to make it easy to parse. *)
+            err |> Error_json.error_to_yojson
+            |> Yojson.Safe.Util.member "multiple"
+            |> Yojson.Safe.Util.to_list
+            |> List.find_exn ~f:(fun json ->
+                   let prefix =
+                     json
+                     |> Yojson.Safe.Util.member "string"
+                     |> Yojson.Safe.Util.to_string |> String.sub ~pos:0 ~len:3
+                   in
+                   String.equal prefix "b: " )
+            |> fun _ -> ()
         end) )
 
       let%test_module "test domain size too large" =
@@ -3334,6 +3355,20 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     }
                 }
             }
+
+          let check_verifier_error err =
+            (* Convert to JSON to make it easy to parse. *)
+            err |> Error_json.error_to_yojson
+            |> Yojson.Safe.Util.member "multiple"
+            |> Yojson.Safe.Util.to_list
+            |> List.find_exn ~f:(fun json ->
+                   let error =
+                     json
+                     |> Yojson.Safe.Util.member "string"
+                     |> Yojson.Safe.Util.to_string
+                   in
+                   String.equal error "domain size is small enough" )
+            |> fun _ -> ()
         end) )
     end )
 
