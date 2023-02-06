@@ -60,7 +60,8 @@ let%test_module "Valid_while precondition tests" =
                     (Signature_lib.Public_key.compress new_kp.public_key) ;
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states ~zkapp_prover
+                    Transaction_snark.For_tests.update_states
+                      ~zkapp_prover_and_vk:(zkapp_prover, vk)
                       ~constraint_constants
                       (create_spec specs new_kp global_slot)
                   in
@@ -81,7 +82,8 @@ let%test_module "Valid_while precondition tests" =
                     (Signature_lib.Public_key.compress new_kp.public_key) ;
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states ~zkapp_prover
+                    Transaction_snark.For_tests.update_states
+                      ~zkapp_prover_and_vk:(zkapp_prover, vk)
                       ~constraint_constants
                       (create_spec specs new_kp global_slot)
                   in
@@ -396,6 +398,8 @@ let%test_module "Account precondition tests" =
   ( module struct
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
+    let zkapp_prover_and_vk = (zkapp_prover, vk)
+
     let constraint_constants = U.constraint_constants
 
     let memo = Signed_command_memo.create_from_string_exn "account precondition"
@@ -516,13 +520,13 @@ let%test_module "Account precondition tests" =
                   Mina_transaction_logic.For_tests.Init_ledger.init
                     (module Mina_ledger.Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  (*create a snapp account*)
+                  (*create a zkAapp account*)
                   Transaction_snark.For_tests.create_trivial_zkapp_account ~vk
                     ~ledger snapp_pk ;
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states ~zkapp_prover
-                      ~constraint_constants test_spec
+                    Transaction_snark.For_tests.update_states
+                      ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   U.check_zkapp_command_with_merges_exn ~state_body ledger
                     [ zkapp_command ] ) ) )
@@ -583,8 +587,8 @@ let%test_module "Account precondition tests" =
                     }
                   in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states ~zkapp_prover
-                      ~constraint_constants test_spec
+                    Transaction_snark.For_tests.update_states
+                      ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   U.check_zkapp_command_with_merges_exn ~state_body ledger
                     [ zkapp_command ] ) ) )
@@ -638,8 +642,8 @@ let%test_module "Account precondition tests" =
                   in
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states ~zkapp_prover
-                      ~constraint_constants test_spec
+                    Transaction_snark.For_tests.update_states
+                      ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   Mina_transaction_logic.For_tests.Init_ledger.init
                     (module Mina_ledger.Ledger.Ledger_inner)

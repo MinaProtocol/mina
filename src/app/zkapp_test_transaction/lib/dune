@@ -48,6 +48,7 @@
    kimchi_backend
    mina_base.import
    mina_transaction_logic
+   mina_transaction
    staged_ledger_diff
    mina_wire_types
  )

@@ -58,10 +58,11 @@ let create ?(how_to_add = `Enqueue_back) ?logger ?compare_init
 
 let call_verifier t (ps : 'proof list) = t.verifier ps
 
-(*Worst case (if all the proofs are invalid): log n * (2^(log n) + 1)
-  In the average case this should show better performance.
-  We could implement the trusted/untrusted batches from the snark pool batching RFC #4882
-  to further mitigate possible DoS/DDoS here*)
+(* Worst case (if all the proofs are invalid): log n * (2^(log n) + 1)
+   In the average case this should show better performance.
+   We could implement the trusted/untrusted batches from the snark pool batching RFC #4882
+   to further mitigate possible DoS/DDoS here
+*)
 let rec determine_outcome :
     type p r partial.
        (p, r) elt list
@@ -74,34 +75,48 @@ let rec determine_outcome :
  fun ps res v ->
   O1trace.thread "determining_batcher_outcome" (fun () ->
       (* First separate out all the known results. That information will definitely be included
-         in the outcome. *)
+         in the outcome.
+      *)
+      let logger = Logger.create () in
       let potentially_invalid =
         List.filter_map (List.zip_exn ps res) ~f:(fun (elt, r) ->
             match r with
             | `Valid r ->
                 if Ivar.is_full elt.res then
-                  [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+                  [%log error] "Ivar.fill bug is here!" ;
                 Ivar.fill elt.res (Ok (Ok r)) ;
                 None
             | `Invalid_keys keys ->
                 if Ivar.is_full elt.res then
-                  [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+                  [%log error] "Ivar.fill bug is here!" ;
                 Ivar.fill elt.res (Ok (Error (`Invalid_keys keys))) ;
                 None
             | `Invalid_signature keys ->
                 if Ivar.is_full elt.res then
-                  [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+                  [%log error] "Ivar.fill bug is here!" ;
                 Ivar.fill elt.res (Ok (Error (`Invalid_signature keys))) ;
                 None
             | `Invalid_proof err ->
                 if Ivar.is_full elt.res then
-                  [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+                  [%log error] "Ivar.fill bug is here!" ;
                 Ivar.fill elt.res (Ok (Error (`Invalid_proof err))) ;
                 None
             | `Missing_verification_key keys ->
                 if Ivar.is_full elt.res then
-                  [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+                  [%log error] "Ivar.fill bug is here!" ;
                 Ivar.fill elt.res (Ok (Error (`Missing_verification_key keys))) ;
+                None
+            | `Unexpected_verification_key keys ->
+                if Ivar.is_full elt.res then
+                  [%log error] "Ivar.fill bug is here!" ;
+                Ivar.fill elt.res
+                  (Ok (Error (`Unexpected_verification_key keys))) ;
+                None
+            | `Mismatched_authorization_kind keys ->
+                if Ivar.is_full elt.res then
+                  [%log error] "Ivar.fill bug is here!" ;
+                Ivar.fill elt.res
+                  (Ok (Error (`Mismatched_authorization_kind keys))) ;
                 None
             | `Potentially_invalid (new_hint, err) ->
                 Some (elt, new_hint, err) )
@@ -112,8 +127,7 @@ let rec determine_outcome :
           (* All results are known *)
           return ()
       | [ ({ res; _ }, _, err) ] ->
-          if Ivar.is_full res then
-            [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+          if Ivar.is_full res then [%log error] "Ivar.fill bug is here!" ;
           Ivar.fill res (Ok (Error (`Invalid_proof err))) ;
           (* If there is a potentially invalid proof in this batch of size 1, then
              that proof is itself invalid. *)
@@ -311,12 +325,14 @@ module Transaction_pool = struct
                           | `Valid _ ->
                               None
                           | `Valid_assuming (v, _) ->
-                              (* TODO: This rechecks the signatures on snapp transactions... oh well for now *)
+                              (* TODO: This rechecks the signatures on zkApp transactions... oh well for now *)
                               Some ((i, j), v) ) )
             in
             let%map res =
               (* Verify the unknowns *)
-              Verifier.verify_commands verifier (List.map unknowns ~f:snd)
+              Verifier.verify_commands verifier
+                (List.map unknowns ~f:(fun (_, txn) ->
+                     { With_status.data = txn; status = Applied } ) )
             in
             (* We now iterate over the results of the unknown transactions and appropriately modify
                the verification result of the diff that it belongs to. *)
@@ -332,6 +348,12 @@ module Transaction_pool = struct
                 | `Missing_verification_key keys ->
                     (* Invalidate the whole diff *)
                     result.(i) <- `Missing_verification_key keys
+                | `Unexpected_verification_key keys ->
+                    (* Invalidate the whole diff *)
+                    result.(i) <- `Unexpected_verification_key keys
+                | `Mismatched_authorization_kind keys ->
+                    (* Invalidate the whole diff *)
+                    result.(i) <- `Mismatched_authorization_kind keys
                 | `Invalid_proof err ->
                     (* Invalidate the whole diff *)
                     result.(i) <- `Invalid_proof err
@@ -340,7 +362,9 @@ module Transaction_pool = struct
                     | `Invalid_keys _
                     | `Invalid_signature _
                     | `Invalid_proof _
-                    | `Missing_verification_key _ ->
+                    | `Missing_verification_key _
+                    | `Unexpected_verification_key _
+                    | `Mismatched_authorization_kind _ ->
                         (* If this diff has already been declared invalid, knowing that one of its
                            transactions is partially valid is not useful. *)
                         ()
@@ -353,7 +377,9 @@ module Transaction_pool = struct
                     | `Invalid_keys _
                     | `Invalid_signature _
                     | `Invalid_proof _
-                    | `Missing_verification_key _ ->
+                    | `Missing_verification_key _
+                    | `Unexpected_verification_key _
+                    | `Mismatched_authorization_kind _ ->
                         ()
                     | `In_progress a ->
                         a.(j) <- `Valid c ) ) ;
@@ -366,6 +392,10 @@ module Transaction_pool = struct
                   `Invalid_proof err
               | `Missing_verification_key keys ->
                   `Missing_verification_key keys
+              | `Unexpected_verification_key keys ->
+                  `Unexpected_verification_key keys
+              | `Mismatched_authorization_kind keys ->
+                  `Mismatched_authorization_kind keys
               | `In_progress a -> (
                   (* If the diff is all valid, we're done. If not, we return a partial
                        result. *)

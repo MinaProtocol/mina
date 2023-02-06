@@ -95,8 +95,8 @@ let%test_module "transaction logic consistency" =
               { Sok_message.fee = Fee.zero
               ; prover = Public_key.Compressed.empty
               }
-            ~source:(Sparse_ledger.merkle_root source)
-            ~target:(Sparse_ledger.merkle_root target)
+            ~source_first_pass_ledger:(Sparse_ledger.merkle_root source)
+            ~target_first_pass_ledger:(Sparse_ledger.merkle_root target)
             ~init_stack:coinbase_stack_source
             ~pending_coinbase_stack_state:
               { source = coinbase_stack_source
@@ -109,7 +109,6 @@ let%test_module "transaction logic consistency" =
               (Sparse_ledger.next_available_token source)
             ~next_available_token_after:
               (Sparse_ledger.next_available_token target)
-            ~zkapp_account1:None ~zkapp_account2:None
             { transaction; block_data }
             (unstage (Sparse_ledger.handler source)) )
 

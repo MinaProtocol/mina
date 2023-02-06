@@ -18,7 +18,7 @@ module Worker_state = struct
       (Protocol_state.Value.t * Proof.t) list -> unit Or_error.t Deferred.t
 
     val verify_commands :
-         Mina_base.User_command.Verifiable.t list
+         Mina_base.User_command.Verifiable.t With_status.t list
       -> [ `Valid of Mina_base.User_command.Valid.t
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
@@ -67,7 +67,8 @@ module Worker_state = struct
                let proof_level = proof_level
              end)
 
-             let verify_commands (cs : User_command.Verifiable.t list) :
+             let verify_commands
+                 (cs : User_command.Verifiable.t With_status.t list) :
                  _ list Deferred.t =
                let cs = List.map cs ~f:Common.check in
                let to_verify =
@@ -79,7 +80,9 @@ module Worker_state = struct
                    | `Invalid_keys _
                    | `Invalid_signature _
                    | `Invalid_proof _
-                   | `Missing_verification_key _ ->
+                   | `Missing_verification_key _
+                   | `Unexpected_verification_key _
+                   | `Mismatched_authorization_kind _ ->
                        [] )
                in
                let%map all_verified =
@@ -98,7 +101,11 @@ module Worker_state = struct
                  | `Invalid_proof err ->
                      `Invalid_proof err
                  | `Missing_verification_key keys ->
-                     `Missing_verification_key keys )
+                     `Missing_verification_key keys
+                 | `Unexpected_verification_key keys ->
+                     `Unexpected_verification_key keys
+                 | `Mismatched_authorization_kind keys ->
+                     `Mismatched_authorization_kind keys )
 
              let verify_blockchain_snarks = B.Proof.verify
 
@@ -134,7 +141,11 @@ module Worker_state = struct
                    | `Invalid_proof err ->
                        `Invalid_proof err
                    | `Missing_verification_key keys ->
-                       `Missing_verification_key keys )
+                       `Missing_verification_key keys
+                   | `Unexpected_verification_key keys ->
+                       `Unexpected_verification_key keys
+                   | `Mismatched_authorization_kind keys ->
+                       `Mismatched_authorization_kind keys )
                |> Deferred.return
 
              let verify_blockchain_snarks _ = Deferred.return (Ok ())
@@ -173,7 +184,7 @@ module Worker = struct
           ('w, (Transaction_snark.t * Sok_message.t) list, unit Or_error.t) F.t
       ; verify_commands :
           ( 'w
-          , User_command.Verifiable.t list
+          , User_command.Verifiable.t With_status.t list
           , [ `Valid of User_command.Valid.t
             | `Valid_assuming of
               ( Pickles.Side_loaded.Verification_key.t
@@ -241,7 +252,10 @@ module Worker = struct
               , verify_transaction_snarks )
         ; verify_commands =
             f
-              ( [%bin_type_class: User_command.Verifiable.Stable.Latest.t list]
+              ( [%bin_type_class:
+                  User_command.Verifiable.Stable.Latest.t
+                  With_status.Stable.Latest.t
+                  list]
               , [%bin_type_class:
                   [ `Valid of User_command.Valid.Stable.Latest.t
                   | `Valid_assuming of
