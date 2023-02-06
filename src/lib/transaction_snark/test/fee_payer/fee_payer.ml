@@ -169,9 +169,9 @@ let%test_module "Fee payer tests" =
               ( match
                   let mask = Ledger.Mask.create ~depth:U.ledger_depth () in
                   let ledger0 = Ledger.register_mask ledger mask in
-                  Ledger.apply_transaction ledger0 ~constraint_constants
+                  Ledger.apply_transactions ledger0 ~constraint_constants
                     ~global_slot ~txn_state_view
-                    (Transaction.Command (Zkapp_command zkapp_command))
+                    [ Transaction.Command (Zkapp_command zkapp_command) ]
                 with
               | Error _ ->
                   (*TODO : match on exact error*) ()
@@ -179,18 +179,16 @@ let%test_module "Fee payer tests" =
                   failwith "Ledger.apply_transaction should have failed" ) ;
               (*Sparse ledger application fails*)
               match
-                Or_error.try_with (fun () ->
-                    Transaction_snark.zkapp_command_witnesses_exn
-                      ~constraint_constants ~global_slot
-                      ~state_body:U.genesis_state_body
-                      ~fee_excess:Amount.Signed.zero (`Ledger ledger)
-                      [ ( `Pending_coinbase_init_stack U.init_stack
-                        , `Pending_coinbase_of_statement
-                            (U.pending_coinbase_state_stack
-                               ~state_body_hash:U.genesis_state_body_hash
-                               ~global_slot )
-                        , zkapp_command )
-                      ] )
+                let sparse_ledger =
+                  Sparse_ledger.of_any_ledger
+                    (Ledger.Any_ledger.cast
+                       (module Ledger.Mask.Attached)
+                       ledger )
+                in
+                Sparse_ledger.apply_transaction_first_pass ~constraint_constants
+                  ~global_slot ~txn_state_view sparse_ledger
+                  (Mina_transaction.Transaction.Command
+                     (Zkapp_command zkapp_command) )
               with
               | Ok _a ->
                   failwith "Expected sparse ledger application to fail"

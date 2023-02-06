@@ -25,7 +25,7 @@ let verify_blockchain_snarks _ _ = Deferred.Or_error.return (Ok ())
 (* N.B.: Valid_assuming is never returned, in fact; we assert a return type
    containing Valid_assuming to match the expected type
 *)
-let verify_commands _ (cs : User_command.Verifiable.t list) :
+let verify_commands _ (cs : User_command.Verifiable.t With_status.t list) :
     [ `Valid of Mina_base.User_command.Valid.t
     | `Valid_assuming of
       ( Pickles.Side_loaded.Verification_key.t
@@ -48,7 +48,11 @@ let verify_commands _ (cs : User_command.Verifiable.t list) :
       | `Invalid_proof err ->
           `Invalid_proof err
       | `Missing_verification_key keys ->
-          `Missing_verification_key keys )
+          `Missing_verification_key keys
+      | `Unexpected_verification_key keys ->
+          `Unexpected_verification_key keys
+      | `Mismatched_authorization_kind keys ->
+          `Mismatched_authorization_kind keys )
   |> Deferred.Or_error.return
 
 let verify_transaction_snarks _ ts =

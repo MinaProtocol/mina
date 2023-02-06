@@ -369,7 +369,7 @@ let%test_module "multisig_account" =
                         }
                     ; use_full_commitment = false
                     ; may_use_token = No
-                    ; authorization_kind = Proof
+                    ; authorization_kind = Proof (With_hash.hash vk)
                     }
                 ; authorization = Proof Mina_base.Proof.transaction_dummy
                 }
@@ -461,7 +461,6 @@ let%test_module "multisig_account" =
                   }
               in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              ignore
-                ( U.apply_zkapp_command ledger [ zkapp_command ]
-                  : Sparse_ledger.t ) ) )
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
   end )

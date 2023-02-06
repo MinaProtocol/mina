@@ -97,13 +97,14 @@ let generate_zkapp_commands_and_apply_them_consecutively ~trials
     mk_ledgers_and_fee_payers ~num_of_fee_payers:trials ()
   in
   let account_state_tbl = Account_id.Table.create () in
+  let global_slot = Mina_numbers.Global_slot.of_int 1 in
   Test_util.with_randomness 123456789 (fun () ->
       let test i =
         Quickcheck.test ~trials:1
           (Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
-             ~protocol_state_view:U.genesis_state_view ~account_state_tbl
-             ~fee_payer_keypair:fee_payer_keypairs.(i) ~max_account_updates
-             ~keymap ~ledger ~vk () )
+             ~global_slot ~protocol_state_view:U.genesis_state_view
+             ~account_state_tbl ~fee_payer_keypair:fee_payer_keypairs.(i)
+             ~max_account_updates ~keymap ~ledger ~vk () )
           ~f:(fun zkapp_command_dummy_auths ->
             let open Async in
             Thread_safe.block_on_async_exn (fun () ->
@@ -126,8 +127,8 @@ let generate_zkapp_commands_and_apply_them_consecutively ~trials
                                |> Option.value_exn |> Account.to_yojson ) ) )
                     ]
                   "generated zkapp_command" ;
-                U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] )
-            )
+                U.check_zkapp_command_with_merges_exn ~global_slot ledger
+                  [ zkapp_command ] ) )
       in
       for i = 0 to trials - 1 do
         test i
@@ -140,9 +141,10 @@ let generate_zkapp_commands_and_apply_them_freshly ~trials ~max_account_updates
         let ledger, fee_payer_keypairs, keymap =
           mk_ledgers_and_fee_payers ~num_of_fee_payers:trials ()
         in
+        let global_slot = Mina_numbers.Global_slot.of_int 2 in
         Quickcheck.test ~trials:1
           (Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
-             ~protocol_state_view:U.genesis_state_view
+             ~global_slot ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i) ~max_account_updates
              ~keymap ~ledger ~vk () )
           ~f:(fun zkapp_command_dummy_auths ->
@@ -152,8 +154,8 @@ let generate_zkapp_commands_and_apply_them_freshly ~trials ~max_account_updates
                   Zkapp_command_builder.replace_authorizations ~prover ~keymap
                     zkapp_command_dummy_auths
                 in
-                U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] )
-            )
+                U.check_zkapp_command_with_merges_exn ~global_slot ledger
+                  [ zkapp_command ] ) )
       in
       for i = 0 to trials - 1 do
         test i
@@ -166,9 +168,11 @@ let mk_invalid_test ~trials ~max_account_updates ~type_of_failure
         let ledger, fee_payer_keypairs, keymap =
           mk_ledgers_and_fee_payers ~num_of_fee_payers:trials ()
         in
+        let global_slot = Mina_numbers.Global_slot.of_int 3 in
         Quickcheck.test ~trials:1
           (Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
-             ~failure:type_of_failure ~protocol_state_view:U.genesis_state_view
+             ~global_slot ~failure:type_of_failure
+             ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i) ~max_account_updates
              ~keymap ~ledger ~vk () )
           ~f:(fun zkapp_command_dummy_auths ->
@@ -184,7 +188,7 @@ let mk_invalid_test ~trials ~max_account_updates ~type_of_failure
                   "generated zkapp_command" ;
                 U.check_zkapp_command_with_merges_exn
                   ~expected_failure:expected_failure_status ledger
-                  [ zkapp_command ] ~state_body:U.genesis_state_body ) )
+                  [ zkapp_command ] ~global_slot ) )
       in
       for i = 0 to trials - 1 do
         test i

@@ -823,7 +823,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let wrap_requests, wrap_main =
         match override_wrap_main with
         | None ->
-            Wrap_main.wrap_main full_signature prev_varss_length step_vks
+            let srs = Tick.Keypair.load_urs () in
+            Wrap_main.wrap_main ~srs full_signature prev_varss_length step_vks
               proofs_verifieds step_domains max_proofs_verified
         | Some { wrap_main; tweak_statement = _ } ->
             wrap_main wrap_domains full_signature prev_varss_length step_vks

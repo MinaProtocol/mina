@@ -81,14 +81,38 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
 
 module T = Mina_transaction_logic.Make (L)
 
-let apply_zkapp_command_unchecked_with_states ~constraint_constants ~global_slot
-    ~state_view ~fee_excess ~supply_increase ledger c =
-  let open T in
-  apply_zkapp_command_unchecked_aux ~constraint_constants ~global_slot
-    ~state_view ~fee_excess ~supply_increase (ref ledger) c ~init:[]
+let apply_transaction_logic f t x =
+  let open Or_error.Let_syntax in
+  let t' = ref t in
+  let%map app = f t' x in
+  (!t', app)
+
+let apply_user_command ~constraint_constants ~txn_global_slot =
+  apply_transaction_logic
+    (T.apply_user_command ~constraint_constants ~txn_global_slot)
+
+let apply_transaction_first_pass ~constraint_constants ~global_slot
+    ~txn_state_view =
+  apply_transaction_logic
+    (T.apply_transaction_first_pass ~constraint_constants ~global_slot
+       ~txn_state_view )
+
+let apply_transaction_second_pass =
+  apply_transaction_logic T.apply_transaction_second_pass
+
+let apply_transactions ~constraint_constants ~global_slot ~txn_state_view =
+  apply_transaction_logic
+    (T.apply_transactions ~constraint_constants ~global_slot ~txn_state_view)
+
+let apply_zkapp_first_pass_unchecked_with_states ~constraint_constants
+    ~global_slot ~state_view ~fee_excess ~supply_increase ~first_pass_ledger
+    ~second_pass_ledger c =
+  T.apply_zkapp_command_first_pass_aux ~constraint_constants ~global_slot
+    ~state_view ~fee_excess ~supply_increase (ref first_pass_ledger) c ~init:[]
     ~f:(fun
          acc
-         ( { ledger
+         ( { first_pass_ledger
+           ; second_pass_ledger = _ (*expected to be empty*)
            ; fee_excess
            ; supply_increase
            ; protocol_state
@@ -96,7 +120,31 @@ let apply_zkapp_command_unchecked_with_states ~constraint_constants ~global_slot
            }
          , local_state )
        ->
-      ( { GS.ledger = !ledger
+      ( { GS.first_pass_ledger = !first_pass_ledger
+        ; second_pass_ledger
+        ; fee_excess
+        ; supply_increase
+        ; protocol_state
+        ; block_global_slot
+        }
+      , { local_state with ledger = !(local_state.ledger) } )
+      :: acc )
+
+let apply_zkapp_second_pass_unchecked_with_states ~init ledger c =
+  T.apply_zkapp_command_second_pass_aux (ref ledger) c ~init
+    ~f:(fun
+         acc
+         ( { first_pass_ledger
+           ; second_pass_ledger
+           ; fee_excess
+           ; supply_increase
+           ; protocol_state
+           ; block_global_slot
+           }
+         , local_state )
+       ->
+      ( { GS.first_pass_ledger = !first_pass_ledger
+        ; second_pass_ledger = !second_pass_ledger
         ; fee_excess
         ; supply_increase
         ; protocol_state
@@ -107,7 +155,7 @@ let apply_zkapp_command_unchecked_with_states ~constraint_constants ~global_slot
   |> Result.map ~f:(fun (account_update_applied, rev_states) ->
          let module LS = Mina_transaction_logic.Zkapp_command_logic.Local_state
          in
-         let module Applied = Transaction_applied.Zkapp_command_applied in
+         let module Applied = T.Transaction_applied.Zkapp_command_applied in
          let states =
            match rev_states with
            | [] ->
@@ -143,21 +191,3 @@ let apply_zkapp_command_unchecked_with_states ~constraint_constants ~global_slot
                go [ final_state ] rev_states
          in
          (account_update_applied, states) )
-
-let apply_transaction_logic f t x =
-  let open Or_error.Let_syntax in
-  let t' = ref t in
-  let%map app = f t' x in
-  (!t', app)
-
-let apply_user_command ~constraint_constants ~txn_global_slot =
-  apply_transaction_logic
-    (T.apply_user_command ~constraint_constants ~txn_global_slot)
-
-let apply_transaction' ~constraint_constants ~global_slot ~txn_state_view l t =
-  O1trace.sync_thread "apply_transaction" (fun () ->
-      T.apply_transaction ~constraint_constants ~global_slot ~txn_state_view l t )
-
-let apply_transaction ~constraint_constants ~global_slot ~txn_state_view =
-  apply_transaction_logic
-    (apply_transaction' ~constraint_constants ~global_slot ~txn_state_view)

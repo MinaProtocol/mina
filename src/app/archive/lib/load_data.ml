@@ -131,7 +131,7 @@ let update_of_id pool update_id =
       Deferred.List.map field_ids ~f:(fun id_opt ->
           Option.value_map id_opt ~default:(return None) ~f:(fun id ->
               let%map field =
-                query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id)
+                query_db ~f:(fun db -> Processor.Zkapp_field.load db id)
               in
               Some field ) )
     in
@@ -151,25 +151,33 @@ let update_of_id pool update_id =
     |> Set_or_keep.of_option
   in
   let%bind verification_key =
-    let%map vk_opt =
+    let%bind vk_opt =
       Option.value_map verification_key_id ~default:(return None) ~f:(fun id ->
           let%map vk =
             query_db ~f:(fun db -> Processor.Zkapp_verification_keys.load db id)
           in
           Some vk )
     in
-    Set_or_keep.of_option
-      (Option.map vk_opt ~f:(fun { verification_key; hash } ->
-           match
-             Pickles.Side_loaded.Verification_key.of_base64 verification_key
-           with
-           | Ok vk ->
-               let data = vk in
-               let hash = Pickles.Backend.Tick.Field.of_string hash in
-               { With_hash.data; hash }
-           | Error err ->
-               failwithf "Could not Base64-decode verification key: %s"
-                 (Error.to_string_hum err) () ) )
+    match vk_opt with
+    | None ->
+        return Set_or_keep.Keep
+    | Some { verification_key; hash_id } -> (
+        match
+          Pickles.Side_loaded.Verification_key.of_base64 verification_key
+        with
+        | Ok vk ->
+            let data = vk in
+            let%bind hash =
+              let%map hash_str =
+                query_db ~f:(fun db ->
+                    Processor.Zkapp_verification_key_hashes.load db hash_id )
+              in
+              Pickles.Backend.Tick.Field.of_string hash_str
+            in
+            return @@ Set_or_keep.Set { With_hash.data; hash }
+        | Error err ->
+            failwithf "Could not Base64-decode verification key: %s"
+              (Error.to_string_hum err) () )
   in
   let%bind permissions =
     let%map perms_opt =
@@ -370,19 +378,17 @@ let protocol_state_precondition_of_id pool id =
 let load_events pool id =
   let query_db ~f = Mina_caqti.query ~f pool in
   let%map fields_list =
-    (* each id refers to an item in 'zkapp_state_data_array' *)
+    (* each id refers to an item in 'zkapp_field_array' *)
     let%bind field_array_ids =
       query_db ~f:(fun db -> Processor.Zkapp_events.load db id)
     in
     Deferred.List.map (Array.to_list field_array_ids) ~f:(fun array_id ->
         let%bind field_ids =
-          query_db ~f:(fun db ->
-              Processor.Zkapp_state_data_array.load db array_id )
+          query_db ~f:(fun db -> Processor.Zkapp_field_array.load db array_id)
         in
         Deferred.List.map (Array.to_list field_ids) ~f:(fun field_id ->
             let%map field_str =
-              query_db ~f:(fun db ->
-                  Processor.Zkapp_state_data.load db field_id )
+              query_db ~f:(fun db -> Processor.Zkapp_field.load db field_id)
             in
             Zkapp_basic.F.of_string field_str ) )
   in
@@ -426,6 +432,7 @@ let get_account_update_body ~pool body_id =
            ; implicit_account_creation_fee
            ; may_use_token
            ; authorization_kind
+           ; verification_key_hash_id
            } =
     query_db ~f:(fun db -> Processor.Zkapp_account_update_body.load db body_id)
   in
@@ -449,7 +456,7 @@ let get_account_update_body ~pool body_id =
   let%bind actions = load_events pool actions_id in
   let%bind call_data =
     let%map field_str =
-      query_db ~f:(fun db -> Processor.Zkapp_state_data.load db call_data_id)
+      query_db ~f:(fun db -> Processor.Zkapp_field.load db call_data_id)
     in
     Zkapp_basic.F.of_string field_str
   in
@@ -560,8 +567,7 @@ let get_account_update_body ~pool body_id =
             Deferred.List.map elements ~f:(fun id_opt ->
                 Option.value_map id_opt ~default:(return None) ~f:(fun id ->
                     let%map field_str =
-                      query_db ~f:(fun db ->
-                          Processor.Zkapp_state_data.load db id )
+                      query_db ~f:(fun db -> Processor.Zkapp_field.load db id)
                     in
                     Some (Zkapp_basic.F.of_string field_str) ) )
           in
@@ -572,7 +578,7 @@ let get_account_update_body ~pool body_id =
             Option.value_map sequence_state_id ~default:(return None)
               ~f:(fun id ->
                 let%map field_str =
-                  query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id)
+                  query_db ~f:(fun db -> Processor.Zkapp_field.load db id)
                 in
                 Some (Zkapp_basic.F.of_string field_str) )
           in
@@ -596,8 +602,27 @@ let get_account_update_body ~pool body_id =
     get_global_slot_bounds pool zkapp_valid_while_precondition_id
   in
   let may_use_token = Account_update.May_use_token.of_string may_use_token in
-  let authorization_kind =
-    Account_update.Authorization_kind.of_string_exn authorization_kind
+  let%bind authorization_kind =
+    match Control.Tag.of_string_exn authorization_kind with
+    | Proof -> (
+        match verification_key_hash_id with
+        | Some id ->
+            let%map vk_hash_str =
+              Mina_caqti.query pool ~f:(fun db ->
+                  Processor.Zkapp_verification_key_hashes.load db id )
+            in
+            Account_update.Authorization_kind.Proof
+              (Zkapp_basic.F.of_string vk_hash_str)
+        | None ->
+            failwith
+              "Expected non-NULL verification_key_hash_id for Proof \
+               authorization kind" )
+    | Signature ->
+        assert (Option.is_none verification_key_hash_id) ;
+        return Account_update.Authorization_kind.Signature
+    | None_given ->
+        assert (Option.is_none verification_key_hash_id) ;
+        return Account_update.Authorization_kind.None_given
   in
   return
     ( { public_key
@@ -795,7 +820,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
         let%bind app_state =
           let%map field_strs =
             Deferred.List.map elements ~f:(fun id ->
-                query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id) )
+                query_db ~f:(fun db -> Processor.Zkapp_field.load db id) )
           in
           let fields = List.map field_strs ~f:Zkapp_basic.F.of_string in
           Zkapp_state.V.of_list_exn fields
@@ -803,7 +828,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
         let%bind verification_key =
           Option.value_map verification_key_id ~default:(return None)
             ~f:(fun id ->
-              let%map { verification_key; hash } =
+              let%bind { verification_key; hash_id } =
                 query_db ~f:(fun db ->
                     Processor.Zkapp_verification_keys.load db id )
               in
@@ -817,7 +842,13 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
                     failwithf "Could not Base64-decode verification key: %s" err
                       ()
               in
-              let hash = Zkapp_basic.F.of_string hash in
+              let%map hash =
+                let%map hash_str =
+                  query_db ~f:(fun db ->
+                      Processor.Zkapp_verification_key_hashes.load db hash_id )
+                in
+                Zkapp_basic.F.of_string hash_str
+              in
               Some ({ data; hash } : _ With_hash.t) )
         in
         let zkapp_version =
@@ -832,7 +863,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
         let%bind sequence_state =
           let%map field_strs =
             Deferred.List.map elements ~f:(fun id ->
-                query_db ~f:(fun db -> Processor.Zkapp_state_data.load db id) )
+                query_db ~f:(fun db -> Processor.Zkapp_field.load db id) )
           in
           let fields = List.map field_strs ~f:Zkapp_basic.F.of_string in
           Pickles_types.Vector.Vector_5.of_list_exn fields
