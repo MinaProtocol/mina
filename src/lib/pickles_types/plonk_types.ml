@@ -177,7 +177,7 @@ module Features = struct
 
   type with_flags = Opt.Flag.t t
 
-  type with_booleans = bool t
+  type with_bools = bool t
 
   let create_all flag = { lookup = flag; runtime_tables = flag }
 
