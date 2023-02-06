@@ -313,10 +313,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   end
 
   type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
-    { (** An override for wrap_main, which allows for adversarial testing with
-          an 'invalid' pickles statement by passing a dummy proof.
-      *)
-      wrap_main :
+    { wrap_main :
         'max_local_max_proofs_verifieds.
            Domains.t
         -> ( 'max_proofs_verified
@@ -362,14 +359,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  , Impls.Wrap.Field.t )
                  Composition_types.Wrap.Statement.t
               -> unit )
-    ; (** A function to modify the statement passed into the wrap proof, which
-          will be later passed to recursion pickles rules.
-
-          This function can be used to modify the pickles statement in an
-          adversarial way, along with [wrap_main] above that allows that
-          statement to be accepted.
-      *)
-      tweak_statement :
+          (** An override for wrap_main, which allows for adversarial testing
+              with an 'invalid' pickles statement by passing a dummy proof.
+          *)
+    ; tweak_statement :
         'actual_proofs_verified 'b 'e.
            ( Import.Challenge.Constant.t
            , Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -433,6 +426,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
              Import.Types.Step_bp_vec.t
            , Import.Types.Branch_data.t )
            Import.Types.Wrap.Statement.In_circuit.t
+          (** A function to modify the statement passed into the wrap proof,
+              which will be later passed to recursion pickles rules.
+
+              This function can be used to modify the pickles statement in an
+              adversarial way, along with [wrap_main] above that allows that
+              statement to be accepted.
+          *)
     }
 
   module Make
@@ -3061,24 +3061,37 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let override_wrap_main =
         { wrap_main =
             (fun _ _ _ _ _ _ _ ->
-              ( Requests.Wrap.create ()
-              , fun _ ->
-                  let module SC' = SC in
-                  let open Impls.Wrap in
-                  let open Wrap_main_inputs in
-                  let open Wrap_main in
-                  let x =
-                    exists Field.typ ~compute:(fun () ->
-                        Field.Constant.of_int 3 )
-                  in
-                  let y =
-                    exists Field.typ ~compute:(fun () ->
-                        Field.Constant.of_int 0 )
-                  in
-                  let z =
-                    exists Field.typ ~compute:(fun () ->
-                        Field.Constant.of_int 0 )
-                  in
+              let requests =
+                (* The requests that the logic in [Wrap.wrap] use to pass
+                   values into and out of the wrap proof circuit.
+                   Since these are unnecessary for the dummy circuit below, we
+                   generate them without using them.
+                *)
+                Requests.Wrap.create ()
+              in
+              (* A replacement for the 'wrap' circuit, which makes no
+                 assertions about the statement that it receives as its first
+                 argument.
+              *)
+              let wrap_main _ =
+                let module SC' = SC in
+                let open Impls.Wrap in
+                let open Wrap_main_inputs in
+                let open Wrap_main in
+                (* Create some variables to be used in constraints below. *)
+                let x =
+                  exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3)
+                in
+                let y =
+                  exists Field.typ ~compute:(fun () -> Field.Constant.of_int 0)
+                in
+                let z =
+                  exists Field.typ ~compute:(fun () -> Field.Constant.of_int 0)
+                in
+                (* Every circuit must use at least 1 of each constraint; we
+                   use them here.
+                *)
+                let () =
                   let g = Inner_curve.one in
                   let sponge = Sponge.create sponge_params in
                   Sponge.absorb sponge x ;
@@ -3095,12 +3108,19 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ignore
                     ( Wrap_verifier.Scalar_challenge.endo g ~num_bits:4
                         (Kimchi_backend_common.Scalar_challenge.create x)
-                      : Field.t * Field.t ) ;
-                  for i = 0 to 64000 do
-                    assert_r1cs x y z
-                  done ) )
+                      : Field.t * Field.t )
+                in
+                (* Pad the circuit so that its domain size matches the one
+                   that would have been used by the true wrap_main.
+                *)
+                for i = 0 to 64000 do
+                  assert_r1cs x y z
+                done
+              in
+              (requests, wrap_main) )
         ; tweak_statement =
             (fun stmt ->
+              (* Modify the statement to contain an invalid [b] value. *)
               let b = Tick.Field.random () in
               let shift_value =
                 Shifted_value.Type1.of_field
