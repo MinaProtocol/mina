@@ -528,6 +528,13 @@ let wrap
     | None ->
         next_statement
     | Some f ->
+        (* For adversarial tests, we want to simulate an adversary creating a
+           proof that doesn't match the pickles protocol.
+           In order to do this, we pass a function [tweak_statement] that takes
+           the valid statement that we computed above and 'tweaks' it so that
+           the statement is no longer valid. This modified statement is then
+           propagated as part of any later recursion.
+        *)
         f next_statement
   in
   let messages_for_next_wrap_proof_prepared =

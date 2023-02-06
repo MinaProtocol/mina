@@ -313,7 +313,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
   end
 
   type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
-    { wrap_main :
+    { (** An override for wrap_main, which allows for adversarial testing with
+          an 'invalid' pickles statement by passing a dummy proof.
+      *)
+      wrap_main :
         'max_local_max_proofs_verifieds.
            Domains.t
         -> ( 'max_proofs_verified
@@ -359,7 +362,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  , Impls.Wrap.Field.t )
                  Composition_types.Wrap.Statement.t
               -> unit )
-    ; tweak_statement :
+    ; (** A function to modify the statement passed into the wrap proof, which
+          will be later passed to recursion pickles rules.
+
+          This function can be used to modify the pickles statement in an
+          adversarial way, along with [wrap_main] above that allows that
+          statement to be accepted.
+      *)
+      tweak_statement :
         'actual_proofs_verified 'b 'e.
            ( Import.Challenge.Constant.t
            , Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -827,6 +837,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
             Wrap_main.wrap_main ~srs full_signature prev_varss_length step_vks
               proofs_verifieds step_domains max_proofs_verified
         | Some { wrap_main; tweak_statement = _ } ->
+            (* Instead of creating a proof using the pickles wrap circuit, we
+               have been asked to create proof in an 'adversarial' way, where
+               the wrap circuit is some other circuit.
+               The [wrap_main] value passed in as part of [override_wrap_main]
+               defines the alternative circuit to run; this will usually be a
+               dummy circuit that verifies any public input for the purposes of
+               testing.
+            *)
             wrap_main wrap_domains full_signature prev_varss_length step_vks
               proofs_verifieds step_domains max_proofs_verified
       in
@@ -949,6 +967,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 | None ->
                     None
                 | Some { tweak_statement; wrap_main = _ } ->
+                    (* Extract the [tweak_statement] part of the
+                       [override_wrap_main], so that we can run an adversarial
+                       test.
+
+                       This function modifies the statement that will be proved
+                       over, and which gets passed to later recursive pickles
+                       rules.
+                    *)
                     Some tweak_statement
               in
               Wrap.wrap ~max_proofs_verified:Max_proofs_verified.n
