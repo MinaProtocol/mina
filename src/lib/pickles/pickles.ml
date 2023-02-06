@@ -3314,6 +3314,27 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 }
             }
         end) )
+
+      let%test_module "test domain size too large" =
+        ( module Make (struct
+          let tweak_statement (stmt : _ Import.Types.Wrap.Statement.In_circuit.t)
+              =
+            (* Modify the statement to use an invalid domain size. *)
+            { stmt with
+              proof_state =
+                { stmt.proof_state with
+                  deferred_values =
+                    { stmt.proof_state.deferred_values with
+                      branch_data =
+                        { stmt.proof_state.deferred_values.branch_data with
+                          Branch_data.domain_log2 =
+                            Branch_data.Domain_log2.of_int_exn
+                              (Nat.to_int Kimchi_pasta.Basic.Rounds.Step.n + 1)
+                        }
+                    }
+                }
+            }
+        end) )
     end )
 
   let%test_module "domain too small" =
