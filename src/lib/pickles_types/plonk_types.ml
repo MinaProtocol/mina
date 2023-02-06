@@ -183,6 +183,11 @@ module Features = struct
 
   let map { lookup; runtime_tables } ~f =
     { lookup = f lookup; runtime_tables = f runtime_tables }
+
+  let map2 t1 t2 ~f =
+    { lookup = f t1.lookup t2.lookup
+    ; runtime_tables = f t1.runtime_tables t2.runtime_tables
+    }
 end
 
 module Evals = struct

@@ -86,6 +86,8 @@ module Features : sig
   val create_all : 'a -> 'a t
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
+
+  val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t
 end
 
 module Messages : sig
