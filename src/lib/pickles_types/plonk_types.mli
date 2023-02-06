@@ -71,6 +71,19 @@ module Permuts = Nat.N7
 module Permuts_minus_1 = Nat.N6
 module Permuts_minus_1_vec = Vector.Vector_6
 
+module Features : sig
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type 'flag t = { lookup : 'flag; runtime_tables : 'flag }
+    end
+  end]
+
+  type with_flags = Opt.Flag.t t
+
+  type with_booleans = bool t
+end
+
 module Lookup_config : sig
   type t = { lookup : Opt.Flag.t; runtime : Opt.Flag.t }
 end

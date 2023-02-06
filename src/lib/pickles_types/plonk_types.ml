@@ -167,6 +167,19 @@ module Opt = struct
   end
 end
 
+module Features = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'flag t = { lookup : 'flag; runtime_tables : 'flag }
+    end
+  end]
+
+  type with_flags = Opt.Flag.t t
+
+  type with_booleans = bool t
+end
+
 module Lookup_config = struct
   type t = { lookup : Opt.Flag.t; runtime : Opt.Flag.t }
 end
