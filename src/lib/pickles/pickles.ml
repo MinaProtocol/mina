@@ -4160,6 +4160,355 @@ module Make_str (_ : Wire_types.Concrete) = struct
           (Field.Constant.one, b3)
       end
     end )
+
+  let%test_module "side-loaded with feature flags" =
+    ( module struct
+      open Impls.Step
+
+      module Statement = struct
+        type t = Field.t
+
+        let to_field_elements x = [| x |]
+
+        module Constant = struct
+          type t = Field.Constant.t [@@deriving bin_io]
+
+          let to_field_elements x = [| x |]
+        end
+      end
+
+      (* Currently, a circuit must have at least 1 of every type of constraint. *)
+      let dummy_constraints () =
+        Impl.(
+          let x =
+            exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3)
+          in
+          let g =
+            exists Step_main_inputs.Inner_curve.typ ~compute:(fun _ ->
+                Tick.Inner_curve.(to_affine_exn one) )
+          in
+          ignore
+            ( SC.to_field_checked'
+                (module Impl)
+                ~num_bits:16
+                (Kimchi_backend_common.Scalar_challenge.create x)
+              : Field.t * Field.t * Field.t ) ;
+          ignore
+            ( Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
+              : Step_main_inputs.Inner_curve.t ) ;
+          ignore
+            ( Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
+              : Step_main_inputs.Inner_curve.t ) ;
+          ignore
+            ( Step_verifier.Scalar_challenge.endo g ~num_bits:4
+                (Kimchi_backend_common.Scalar_challenge.create x)
+              : Field.t * Field.t ))
+
+      module No_recursion = struct
+        module Statement = Statement
+
+        let tag, _, p, Provers.[ step ] =
+          Common.time "compile" (fun () ->
+              compile_promise () ~public_input:(Input Field.typ)
+                ~auxiliary_typ:Typ.unit
+                ~branches:(module Nat.N1)
+                ~max_proofs_verified:(module Nat.N0)
+                ~name:"blockchain-snark"
+                ~constraint_constants:
+                  (* Dummy values *)
+                  { sub_windows_per_window = 0
+                  ; ledger_depth = 0
+                  ; work_delay = 0
+                  ; block_window_duration_ms = 0
+                  ; transaction_capacity = Log_2 0
+                  ; pending_coinbase_depth = 0
+                  ; coinbase_amount = Unsigned.UInt64.of_int 0
+                  ; supercharged_coinbase_factor = 0
+                  ; account_creation_fee = Unsigned.UInt64.of_int 0
+                  ; fork = None
+                  }
+                ~choices:(fun ~self ->
+                  [ { identifier = "main"
+                    ; prevs = []
+                    ; feature_flags = Plonk_types.Features.none_bool
+                    ; main =
+                        (fun { public_input = self } ->
+                          dummy_constraints () ;
+                          Field.Assert.equal self Field.zero ;
+                          { previous_proof_statements = []
+                          ; public_output = ()
+                          ; auxiliary_output = ()
+                          } )
+                    }
+                  ] ) )
+
+        module Proof = (val p)
+
+        let example =
+          let (), (), b0 =
+            Common.time "b0" (fun () ->
+                Promise.block_on_async_exn (fun () -> step Field.Constant.zero) )
+          in
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
+          (Field.Constant.zero, b0)
+
+        let example_input, example_proof = example
+      end
+
+      module Fake_1_recursion = struct
+        module Statement = Statement
+
+        let tag, _, p, Provers.[ step ] =
+          Common.time "compile" (fun () ->
+              compile_promise () ~public_input:(Input Field.typ)
+                ~auxiliary_typ:Typ.unit
+                ~branches:(module Nat.N1)
+                ~max_proofs_verified:(module Nat.N1)
+                ~name:"blockchain-snark"
+                ~constraint_constants:
+                  (* Dummy values *)
+                  { sub_windows_per_window = 0
+                  ; ledger_depth = 0
+                  ; work_delay = 0
+                  ; block_window_duration_ms = 0
+                  ; transaction_capacity = Log_2 0
+                  ; pending_coinbase_depth = 0
+                  ; coinbase_amount = Unsigned.UInt64.of_int 0
+                  ; supercharged_coinbase_factor = 0
+                  ; account_creation_fee = Unsigned.UInt64.of_int 0
+                  ; fork = None
+                  }
+                ~choices:(fun ~self ->
+                  [ { identifier = "main"
+                    ; prevs = []
+                    ; feature_flags = Plonk_types.Features.none_bool
+                    ; main =
+                        (fun { public_input = self } ->
+                          dummy_constraints () ;
+                          Field.Assert.equal self Field.zero ;
+                          { previous_proof_statements = []
+                          ; public_output = ()
+                          ; auxiliary_output = ()
+                          } )
+                    }
+                  ] ) )
+
+        module Proof = (val p)
+
+        let example =
+          let (), (), b0 =
+            Common.time "b0" (fun () ->
+                Promise.block_on_async_exn (fun () -> step Field.Constant.zero) )
+          in
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
+          (Field.Constant.zero, b0)
+
+        let example_input, example_proof = example
+      end
+
+      module Fake_2_recursion = struct
+        module Statement = Statement
+
+        let tag, _, p, Provers.[ step ] =
+          Common.time "compile" (fun () ->
+              compile_promise () ~public_input:(Input Field.typ)
+                ~auxiliary_typ:Typ.unit
+                ~branches:(module Nat.N1)
+                ~max_proofs_verified:(module Nat.N2)
+                ~name:"blockchain-snark"
+                ~constraint_constants:
+                  (* Dummy values *)
+                  { sub_windows_per_window = 0
+                  ; ledger_depth = 0
+                  ; work_delay = 0
+                  ; block_window_duration_ms = 0
+                  ; transaction_capacity = Log_2 0
+                  ; pending_coinbase_depth = 0
+                  ; coinbase_amount = Unsigned.UInt64.of_int 0
+                  ; supercharged_coinbase_factor = 0
+                  ; account_creation_fee = Unsigned.UInt64.of_int 0
+                  ; fork = None
+                  }
+                ~choices:(fun ~self ->
+                  [ { identifier = "main"
+                    ; prevs = []
+                    ; feature_flags = Plonk_types.Features.none_bool
+                    ; main =
+                        (fun { public_input = self } ->
+                          dummy_constraints () ;
+                          Field.Assert.equal self Field.zero ;
+                          { previous_proof_statements = []
+                          ; public_output = ()
+                          ; auxiliary_output = ()
+                          } )
+                    }
+                  ] ) )
+
+        module Proof = (val p)
+
+        let example =
+          let (), (), b0 =
+            Common.time "b0" (fun () ->
+                Promise.block_on_async_exn (fun () -> step Field.Constant.zero) )
+          in
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
+          (Field.Constant.zero, b0)
+
+        let example_input, example_proof = example
+      end
+
+      module Simple_chain = struct
+        module Statement = Statement
+
+        type _ Snarky_backendless.Request.t +=
+          | Prev_input : Field.Constant.t Snarky_backendless.Request.t
+          | Proof : Side_loaded.Proof.t Snarky_backendless.Request.t
+          | Verifier_index :
+              Side_loaded.Verification_key.t Snarky_backendless.Request.t
+
+        let handler (prev_input : Field.Constant.t) (proof : _ Proof.t)
+            (verifier_index : Side_loaded.Verification_key.t)
+            (Snarky_backendless.Request.With { request; respond }) =
+          match request with
+          | Prev_input ->
+              respond (Provide prev_input)
+          | Proof ->
+              respond (Provide proof)
+          | Verifier_index ->
+              respond (Provide verifier_index)
+          | _ ->
+              respond Unhandled
+
+        let maybe_features = Plonk_types.Features.(map none ~f:(fun _ -> Plonk_types.Opt.Flag.Maybe))
+
+        let side_loaded_tag =
+          Side_loaded.create ~name:"foo"
+            ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
+            ~feature_flags:maybe_features ~typ:Field.typ
+
+        let tag, _, p, Provers.[ step ] =
+          Common.time "compile" (fun () ->
+              compile_promise () ~public_input:(Input Field.typ)
+                ~auxiliary_typ:Typ.unit
+                ~branches:(module Nat.N1)
+                ~max_proofs_verified:(module Nat.N1)
+                ~name:"blockchain-snark"
+                ~constraint_constants:
+                  (* Dummy values *)
+                  { sub_windows_per_window = 0
+                  ; ledger_depth = 0
+                  ; work_delay = 0
+                  ; block_window_duration_ms = 0
+                  ; transaction_capacity = Log_2 0
+                  ; pending_coinbase_depth = 0
+                  ; coinbase_amount = Unsigned.UInt64.of_int 0
+                  ; supercharged_coinbase_factor = 0
+                  ; account_creation_fee = Unsigned.UInt64.of_int 0
+                  ; fork = None
+                  }
+                ~choices:(fun ~self ->
+                  [ { identifier = "main"
+                    ; prevs = [ side_loaded_tag ]
+                    ; feature_flags = Plonk_types.Features.none_bool
+                    ; main =
+                        (fun { public_input = self } ->
+                          let prev =
+                            exists Field.typ ~request:(fun () -> Prev_input)
+                          in
+                          let proof =
+                            exists (Typ.Internal.ref ()) ~request:(fun () ->
+                                Proof )
+                          in
+                          let vk =
+                            exists (Typ.Internal.ref ()) ~request:(fun () ->
+                                Verifier_index )
+                          in
+                          as_prover (fun () ->
+                              let vk = As_prover.Ref.get vk in
+                              Side_loaded.in_prover side_loaded_tag vk ) ;
+                          let vk =
+                            exists Side_loaded_verification_key.typ
+                              ~compute:(fun () -> As_prover.Ref.get vk)
+                          in
+                          Side_loaded.in_circuit side_loaded_tag vk ;
+                          let is_base_case = Field.equal Field.zero self in
+                          let self_correct = Field.(equal (one + prev) self) in
+                          Boolean.Assert.any [ self_correct; is_base_case ] ;
+                          { previous_proof_statements =
+                              [ { public_input = prev
+                                ; proof
+                                ; proof_must_verify = Boolean.true_
+                                }
+                              ]
+                          ; public_output = ()
+                          ; auxiliary_output = ()
+                          } )
+                    }
+                  ] ) )
+
+        module Proof = (val p)
+
+        let example1 =
+          let (), (), b1 =
+            Common.time "b1" (fun () ->
+                Promise.block_on_async_exn (fun () ->
+                    step
+                      ~handler:
+                        (handler No_recursion.example_input
+                           (Side_loaded.Proof.of_proof
+                              No_recursion.example_proof )
+                           (Side_loaded.Verification_key.of_compiled
+                              No_recursion.tag ) )
+                      Field.Constant.one ) )
+          in
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ (Field.Constant.one, b1) ] ) ) ;
+          (Field.Constant.one, b1)
+
+        let example2 =
+          let (), (), b2 =
+            Common.time "b2" (fun () ->
+                Promise.block_on_async_exn (fun () ->
+                    step
+                      ~handler:
+                        (handler Fake_1_recursion.example_input
+                           (Side_loaded.Proof.of_proof
+                              Fake_1_recursion.example_proof )
+                           (Side_loaded.Verification_key.of_compiled
+                              Fake_1_recursion.tag ) )
+                      Field.Constant.one ) )
+          in
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ (Field.Constant.one, b2) ] ) ) ;
+          (Field.Constant.one, b2)
+
+        let example3 =
+          let (), (), b3 =
+            Common.time "b3" (fun () ->
+                Promise.block_on_async_exn (fun () ->
+                    step
+                      ~handler:
+                        (handler Fake_2_recursion.example_input
+                           (Side_loaded.Proof.of_proof
+                              Fake_2_recursion.example_proof )
+                           (Side_loaded.Verification_key.of_compiled
+                              Fake_2_recursion.tag ) )
+                      Field.Constant.one ) )
+          in
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ (Field.Constant.one, b3) ] ) ) ;
+          (Field.Constant.one, b3)
+      end
+    end )
 end
 
 include Wire_types.Make (Make_sig) (Make_str)
