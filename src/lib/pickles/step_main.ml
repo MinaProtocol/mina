@@ -46,7 +46,7 @@ let verify_one ~srs
         in
         (* TODO: Refactor args into an "unfinalized proof" struct *)
         finalize_other_proof d.max_proofs_verified ~step_domains:d.step_domains
-          ~step_uses_lookup:d.step_uses_lookup ~sponge ~prev_challenges
+          ~step_uses_lookup:d.feature_flags.lookup ~sponge ~prev_challenges
           proof_state.deferred_values prev_proof_evals )
   in
   let branch_data = proof_state.deferred_values.branch_data in
@@ -88,7 +88,7 @@ let verify_one ~srs
     with_label __LOC__ (fun () ->
         verify ~srs
           ~lookup_parameters:
-            { use = d.step_uses_lookup
+            { use = d.feature_flags.lookup
             ; zero =
                 { var =
                     { challenge = Field.zero
@@ -200,7 +200,7 @@ let step_main :
       Typ.t
   end in
   let uses_lookup (d : _ Tag.t) =
-    if Type_equal.Id.same self.id d.id then basic.step_uses_lookup
+    if Type_equal.Id.same self.id d.id then basic.feature_flags.lookup
     else Types_map.uses_lookup d
   in
   let lookup_usage =
@@ -483,7 +483,7 @@ let step_main :
                     ; wrap_domain = `Known basic.wrap_domains.h
                     ; step_domains = `Known basic.step_domains
                     ; wrap_key = dlog_plonk_index
-                    ; step_uses_lookup = basic.step_uses_lookup
+                    ; feature_flags = basic.feature_flags
                     }
                   in
                   let module M =

@@ -587,7 +587,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
         in
         go choices
       in
-      let step_uses_lookup = feature_flags.lookup in
       let step_data =
         let i = ref 0 in
         Timer.clock __LOC__ ;
@@ -887,7 +886,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ; wrap_vk = Lazy.map wrap_vk ~f:Verification_key.index
         ; wrap_domains
         ; step_domains
-        ; step_uses_lookup
+        ; feature_flags
         }
       in
       Timer.clock __LOC__ ;
@@ -931,7 +930,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         { max_proofs_verified
         ; public_input = typ
         ; branches = Verification_key.Max_branches.n
-        ; step_uses_lookup = uses_lookup
+        ; feature_flags = { lookup = uses_lookup; runtime_tables = uses_lookup }
         }
 
     module Proof = struct
@@ -2731,7 +2730,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           let data : _ Types_map.Compiled.t =
             { branches = Branches.n
-            ; step_uses_lookup = No
+            ; feature_flags =
+                Plonk_types.Features.create_all Plonk_types.Opt.Flag.No
             ; proofs_verifieds
             ; max_proofs_verified = (module Max_proofs_verified)
             ; public_input = typ
@@ -3623,7 +3623,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           let data : _ Types_map.Compiled.t =
             { branches = Branches.n
-            ; step_uses_lookup = No
+            ; feature_flags =
+                Plonk_types.Features.create_all Plonk_types.Opt.Flag.No
             ; proofs_verifieds
             ; max_proofs_verified = (module Max_proofs_verified)
             ; public_input = typ

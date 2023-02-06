@@ -140,7 +140,7 @@ let create
         ; proofs_verifieds
         ; wrap_domains
         ; step_domains
-        ; step_uses_lookup = feature_flags.lookup
+        ; feature_flags
         }
       ~public_input ~auxiliary_typ ~self_branches:branches ~proofs_verified
       ~local_signature:widths ~local_signature_length ~local_branches:heights
