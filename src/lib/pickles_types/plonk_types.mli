@@ -87,8 +87,9 @@ module Features : sig
   val of_vector : ('a, Nat.N9.n) Vector.t -> 'a t
 
   val typ :
-       ('var, 'value, 'f) Snarky_backendless.Typ.t
-    -> ('var t, 'value t, 'f) Snarky_backendless.Typ.t
+       ('var, bool, 'f) Snarky_backendless.Typ.t
+    -> feature_flags:options
+    -> ('var t, bool t, 'f) Snarky_backendless.Typ.t
 
   val none : options
 

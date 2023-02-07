@@ -245,10 +245,59 @@ module Features = struct
     ; runtime_tables
     }
 
-  let typ bool =
-    Vector.typ bool Nat.N9.n
-    |> Snarky_backendless.Typ.transport ~there:to_vector ~back:of_vector
-    |> Snarky_backendless.Typ.transport_var ~there:to_vector ~back:of_vector
+  let typ bool
+      ~feature_flags:
+        { chacha
+        ; range_check0
+        ; range_check1
+        ; foreign_field_add
+        ; foreign_field_mul
+        ; xor
+        ; rot
+        ; lookup
+        ; runtime_tables
+        } =
+    (* TODO: This should come from snarky. *)
+    let constant (type var value)
+        (typ : (var, value, _) Snarky_backendless.Typ.t) (x : value) : var =
+      let (Typ typ) = typ in
+      let fields, aux = typ.value_to_fields x in
+      let fields =
+        Array.map ~f:(fun x -> Snarky_backendless.Cvar.Constant x) fields
+      in
+      typ.var_of_fields (fields, aux)
+    in
+    let constant_typ ~there value =
+      let open Snarky_backendless.Typ in
+      unit ()
+      |> transport ~there ~back:(fun () -> value)
+      |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> constant bool value)
+    in
+    let bool_typ_of_flag = function
+      | Opt.Flag.Yes ->
+          constant_typ
+            ~there:(function true -> () | false -> assert false)
+            true
+      | Opt.Flag.No ->
+          constant_typ
+            ~there:(function false -> () | true -> assert false)
+            false
+      | Opt.Flag.Maybe ->
+          bool
+    in
+    Snarky_backendless.Typ.of_hlistable
+      [ bool_typ_of_flag chacha
+      ; bool_typ_of_flag range_check0
+      ; bool_typ_of_flag range_check1
+      ; bool_typ_of_flag foreign_field_add
+      ; bool_typ_of_flag foreign_field_mul
+      ; bool_typ_of_flag xor
+      ; bool_typ_of_flag rot
+      ; bool_typ_of_flag lookup
+      ; bool_typ_of_flag runtime_tables
+      ]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
 
   let none =
     { chacha = Opt.Flag.No

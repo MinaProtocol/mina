@@ -35,29 +35,7 @@ let verify_one ~srs
     (messages_for_next_wrap_proof : Digest.t) (unfinalized : Unfinalized.t)
     (should_verify : B.t) : _ Vector.t * B.t =
   Boolean.Assert.( = ) unfinalized.should_finalize should_verify ;
-  let deferred_values =
-    (* Strengthen the values to constants when we know they're true or false.
-       This lets us skip some later computations.
-    *)
-    { proof_state.deferred_values with
-      plonk =
-        { proof_state.deferred_values.plonk with
-          feature_flags =
-            Plonk_types.Features.map2
-              proof_state.deferred_values.plonk.feature_flags d.feature_flags
-              ~f:(fun actual_flag flag ->
-                match flag with
-                | No ->
-                    Boolean.Assert.( = ) actual_flag Boolean.false_ ;
-                    Boolean.false_
-                | Yes ->
-                    Boolean.Assert.( = ) actual_flag Boolean.true_ ;
-                    Boolean.true_
-                | Maybe ->
-                    actual_flag )
-        }
-    }
-  in
+  let deferred_values = proof_state.deferred_values in
   let finalized, chals =
     with_label __LOC__ (fun () ->
         let sponge_digest = proof_state.sponge_digest_before_evaluations in
