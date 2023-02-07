@@ -599,9 +599,9 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
           Some (Boolean.( &&& ) is_some (equal expected actual))
       | Maybe (is_some, expected), Maybe (is_some_actual, actual) ->
           Some
-            (Boolean.( ||| )
+            (Boolean.( &&& )
                (Boolean.equal is_some is_some_actual)
-               (equal expected actual) )
+               (Boolean.( ||| ) (Boolean.not is_some) (equal expected actual)) )
       | Some _, Maybe _ ->
           assert false
       | None, (Some _ | Maybe _) ->
