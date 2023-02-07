@@ -905,6 +905,10 @@ module Wrap : sig
             ) ) )
         Hlist.HlistId.t
 
+      type 'a vec9 :=
+        ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit)))))))))
+        Hlist.HlistId.t
+
       type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'fp_opt, 'bool) flat_repr :=
         ( ('a, Nat.N9.n) Vector.t
         * ( ('b, Nat.N2.n) Vector.t
@@ -912,8 +916,7 @@ module Wrap : sig
             * ( ('d, Nat.N3.n) Vector.t
               * ( 'e
                 * ( ('f, Nat.N1.n) Vector.t
-                  * (('bool, Nat.N9.n) Vector.t * ('g * ('fp_opt vec12 * unit)))
-                  ) ) ) ) ) )
+                  * ('bool vec9 * ('g * ('fp_opt vec12 * unit))) ) ) ) ) ) )
         Hlist.HlistId.t
 
       (** A layout of the raw data in a statement, which is needed for
@@ -1181,6 +1184,10 @@ module Step : sig
                 ) ) ) )
           Hlist.HlistId.t
 
+        type 'a vec9 :=
+          ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit)))))))))
+          Hlist.HlistId.t
+
         type ( 'field
              , 'digest
              , 'challenge
@@ -1198,8 +1205,8 @@ module Step : sig
                     , 'num_bulletproof_challenges )
                     Vector.t
                   * ( ('bool, Nat.N1.n) Vector.t
-                    * ( ('bool, Nat.N9.n) Vector.t
-                      * ('optional * ('fp_opt vec12 * unit)) ) ) ) ) ) ) )
+                    * ('bool vec9 * ('optional * ('fp_opt vec12 * unit))) ) ) )
+              ) ) )
           Hlist.HlistId.t
 
         (** A layout of the raw data in this value, which is needed for
@@ -1262,8 +1269,7 @@ module Step : sig
                  * ( ('b, Nat.N3.n) Vector.t
                    * ( 'e
                      * ( ('g, Nat.N1.n) Vector.t
-                       * ( ('g, Nat.N9.n) Vector.t
-                         * ('j * ('fp_opt vec12 * unit)) ) ) ) ) ) ) )
+                       * ('g vec9 * ('j * ('fp_opt vec12 * unit))) ) ) ) ) ) )
              Hlist.HlistId.t
 
         val of_data :
@@ -1273,8 +1279,7 @@ module Step : sig
                  * ( ('d, Nat.N3.n) Vector.t
                    * ( 'e
                      * ( ('f, Nat.N1.n) Vector.t
-                       * ( ('f, Nat.N9.n) Vector.t
-                         * ('g * ('fp_opt vec12 * unit)) ) ) ) ) ) ) )
+                       * ('f vec9 * ('g * ('fp_opt vec12 * unit))) ) ) ) ) ) )
              Hlist.HlistId.t
           -> option_map:
                (   'g Hlist0.Id.t
@@ -1372,6 +1377,10 @@ module Step : sig
           ) ) )
       Hlist.HlistId.t
 
+    type 'a vec9 :=
+      ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit)))))))))
+      Hlist.HlistId.t
+
     val to_data :
          ( ( ('a, 'b, 'c, 'fp_opt, 'd, 'e, 'f, 'g) Per_proof.In_circuit.t
            , 'h )
@@ -1390,8 +1399,8 @@ module Step : sig
                     * ( ('b, Nat.N3.n) Vector.t
                       * ( 'e
                         * ( ('g, Nat.N1.n) Vector.t
-                          * ( ('g, Nat.N9.n) Vector.t
-                            * ('l * ('fp_opt vec12 * unit)) ) ) ) ) ) ) )
+                          * ('g vec9 * ('l * ('fp_opt vec12 * unit))) ) ) ) ) )
+                )
                 Hlist.HlistId.t
            , 'h )
            Vector.t
@@ -1405,8 +1414,7 @@ module Step : sig
                  * ( ('d, Nat.N3.n) Vector.t
                    * ( 'e
                      * ( ('f, Nat.N1.n) Vector.t
-                       * ( ('f, Nat.N9.n) Vector.t
-                         * ('g * ('fp_opt vec12 * unit)) ) ) ) ) ) ) )
+                       * ('f vec9 * ('g * ('fp_opt vec12 * unit))) ) ) ) ) ) )
              Hlist.HlistId.t
            , 'h )
            Vector.t
@@ -1514,6 +1522,10 @@ module Step : sig
           ) ) )
       Hlist.HlistId.t
 
+    type 'a vec9 :=
+      ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit)))))))))
+      Hlist.HlistId.t
+
     val to_data :
          ( ( ( 'a
              , 'b
@@ -1541,8 +1553,7 @@ module Step : sig
                  * ( ('b, Nat.N3.n) Vector.t
                    * ( 'e
                      * ( ('g, Nat.N1.n) Vector.t
-                       * ( ('g, Nat.N9.n) Vector.t
-                         * ('m * ('fp_opt vec12 * unit)) ) ) ) ) ) ) )
+                       * ('g vec9 * ('m * ('fp_opt vec12 * unit))) ) ) ) ) ) )
              Hlist.HlistId.t
            , 'h )
            Vector.t
@@ -1556,8 +1567,7 @@ module Step : sig
                  * ( ('d, Nat.N3.n) Vector.t
                    * ( 'e
                      * ( ('f, Nat.N1.n) Vector.t
-                       * ( ('f, Nat.N9.n) Vector.t
-                         * ('g * ('fp_opt vec12 * unit)) ) ) ) ) ) ) )
+                       * ('f vec9 * ('g * ('fp_opt vec12 * unit))) ) ) ) ) ) )
              Hlist.HlistId.t
            , 'h )
            Vector.t
@@ -1596,7 +1606,7 @@ module Step : sig
                    * ( ('d Scalar_challenge.t, Nat.N3.n) Vector.t
                      * ( ('i, 'c) Vector.t
                        * ( (bool, Nat.N1.n) Vector.t
-                         * ( (bool, Nat.N9.n) Vector.t
+                         * ( bool vec9
                            * ( ('d Scalar_challenge.t * unit) Hlist.HlistId.t
                                option
                              * ('f option vec12 * unit) ) ) ) ) ) ) ) )
@@ -1614,10 +1624,9 @@ module Step : sig
                              Snarky_backendless__Snark_intf.Boolean0.t
                            , Nat.N1.n )
                            Vector.t
-                         * ( ( 'a Snarky_backendless.Cvar.t
-                               Snarky_backendless__Snark_intf.Boolean0.t
-                             , Nat.N9.n )
-                             Vector.t
+                         * ( 'a Snarky_backendless.Cvar.t
+                             Snarky_backendless__Snark_intf.Boolean0.t
+                             vec9
                            * ( ( ('e Scalar_challenge.t * unit) Hlist.HlistId.t
                                , 'a Snarky_backendless.Cvar.t
                                  Snarky_backendless__Snark_intf.Boolean0.t )

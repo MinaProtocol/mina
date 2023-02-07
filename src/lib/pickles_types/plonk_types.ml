@@ -200,7 +200,7 @@ module Features = struct
 
   type flags = bool t
 
-  let to_vector
+  let to_data
       { chacha
       ; range_check0
       ; range_check1
@@ -210,7 +210,7 @@ module Features = struct
       ; rot
       ; lookup
       ; runtime_tables
-      } : _ Vector.t =
+      } : _ Hlist.HlistId.t =
     [ chacha
     ; range_check0
     ; range_check1
@@ -222,7 +222,7 @@ module Features = struct
     ; runtime_tables
     ]
 
-  let of_vector
+  let of_data
       ([ chacha
        ; range_check0
        ; range_check1
@@ -233,7 +233,7 @@ module Features = struct
        ; lookup
        ; runtime_tables
        ] :
-        _ Vector.t ) =
+        _ Hlist.HlistId.t ) =
     { chacha
     ; range_check0
     ; range_check1

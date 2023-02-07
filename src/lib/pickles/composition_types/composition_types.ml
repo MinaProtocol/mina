@@ -895,7 +895,17 @@ module Wrap = struct
           ; Vector (B Digest, Nat.N3.n)
           ; Vector (B Bulletproof_challenge, Backend.Tick.Rounds.n)
           ; Vector (B Branch_data, Nat.N1.n)
-          ; Vector (B Bool, Nat.N9.n)
+          ; Spec.T.Struct
+              [ B Bool
+              ; B Bool
+              ; B Bool
+              ; B Bool
+              ; B Bool
+              ; B Bool
+              ; B Bool
+              ; B Bool
+              ; B Bool
+              ]
           ; Lookup_parameters.opt_spec impl lookup
           ; Proof_state.Deferred_values.Plonk.In_circuit.Optional_column_scalars
             .spec impl lookup.zero feature_flags
@@ -968,7 +978,7 @@ module Wrap = struct
           ; digest
           ; bulletproof_challenges
           ; index
-          ; Plonk_types.Features.to_vector feature_flags
+          ; Plonk_types.Features.to_data feature_flags
           ; option_map lookup
               ~f:Proof_state.Deferred_values.Plonk.In_circuit.Lookup.to_struct
           ; optional_column_scalars
@@ -1032,8 +1042,7 @@ module Wrap = struct
                     ; endomul
                     ; endomul_scalar
                     ; perm
-                    ; feature_flags =
-                        Plonk_types.Features.of_vector feature_flags
+                    ; feature_flags = Plonk_types.Features.of_data feature_flags
                     ; lookup =
                         option_map lookup
                           ~f:
@@ -1233,7 +1242,17 @@ module Step = struct
             ; Vector (Scalar Challenge, Nat.N3.n)
             ; Vector (B Bulletproof_challenge, bp_log2)
             ; Vector (B Bool, Nat.N1.n)
-            ; Vector (B Bool, Nat.N9.n)
+            ; Spec.T.Struct
+                [ B Bool
+                ; B Bool
+                ; B Bool
+                ; B Bool
+                ; B Bool
+                ; B Bool
+                ; B Bool
+                ; B Bool
+                ; B Bool
+                ]
             ; Wrap.Lookup_parameters.opt_spec impl lookup
             ; Wrap.Proof_state.Deferred_values.Plonk.In_circuit
               .Optional_column_scalars
@@ -1295,7 +1314,7 @@ module Step = struct
           ; scalar_challenge
           ; bulletproof_challenges
           ; bool
-          ; Plonk_types.Features.to_vector feature_flags
+          ; Plonk_types.Features.to_data feature_flags
           ; option_map lookup
               ~f:Deferred_values.Plonk.In_circuit.Lookup.to_struct
           ; optional_column_scalars
@@ -1340,7 +1359,7 @@ module Step = struct
                   ; endomul
                   ; endomul_scalar
                   ; perm
-                  ; feature_flags = Plonk_types.Features.of_vector feature_flags
+                  ; feature_flags = Plonk_types.Features.of_data feature_flags
                   ; lookup =
                       option_map lookup
                         ~f:Deferred_values.Plonk.In_circuit.Lookup.of_struct

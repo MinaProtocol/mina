@@ -82,9 +82,15 @@ module Features : sig
 
   type flags = bool t
 
-  val to_vector : 'a t -> ('a, Nat.N9.n) Vector.t
+  val to_data :
+       'a t
+    -> ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit)))))))))
+       Hlist.HlistId.t
 
-  val of_vector : ('a, Nat.N9.n) Vector.t -> 'a t
+  val of_data :
+       ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit)))))))))
+       Hlist.HlistId.t
+    -> 'a t
 
   val typ :
        ('var, bool, 'f) Snarky_backendless.Typ.t
