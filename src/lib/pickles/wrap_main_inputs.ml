@@ -66,7 +66,7 @@ module Sponge = struct
         let params = Tock_field_sponge.params
       end)
 
-  module S = Sponge.Make_sponge (struct
+  module S = Sponge.Make_debug_sponge (struct
     include Permutation
     module Impl = Impls.Wrap
 
