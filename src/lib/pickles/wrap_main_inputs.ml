@@ -68,7 +68,7 @@ module Sponge = struct
 
   module S = Sponge.Make_debug_sponge (struct
     include Permutation
-    module Impl = Impls.Wrap
+    module Circuit = Impls.Wrap
 
     (* Optional sponge name used in debug mode *)
     let sponge_name = "wrap"
