@@ -69,10 +69,10 @@ module Sponge = struct
     module Impl = Impls.Step
 
     (* Optional sponge name used in debug mode *)
-    let sponge_name = "step "
+    let sponge_name = "step"
 
-    (* To enable debug mode, set to: Some read_step_circuit_field_element_as_hex *)
-    let debug_helper_fn = None
+    (* To enable debug mode, set environment variable [sponge_name] to "t", "1" or "true". *)
+    let debug_helper_fn = read_step_circuit_field_element_as_hex
   end)
 
   include S

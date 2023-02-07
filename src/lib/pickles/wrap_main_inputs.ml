@@ -71,10 +71,10 @@ module Sponge = struct
     module Impl = Impls.Wrap
 
     (* Optional sponge name used in debug mode *)
-    let sponge_name = "wrap "
+    let sponge_name = "wrap"
 
-    (* To enable debug mode, set to: Some read_wrap_circuit_field_element_as_hex *)
-    let debug_helper_fn = None
+    (* To enable debug mode, set environment variable [sponge_name] to "t", "1" or "true". *)
+    let debug_helper_fn = read_wrap_circuit_field_element_as_hex
   end)
 
   include S
