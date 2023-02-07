@@ -1,6 +1,5 @@
 open Core_kernel
 open Mina_base
-open Async
 
 type invalid =
   [ `Invalid_keys of Signature_lib.Public_key.Compressed.Stable.Latest.t list
@@ -34,6 +33,8 @@ let invalid_to_error (invalid : invalid) : Error.t =
       Error.createf "Mismatched_authorization_kind: [%s]" (keys_to_string keys)
   | `Invalid_proof err ->
       Error.tag ~tag:"Invalid_proof" err
+
+let skip_sigheck = Option.is_some (Sys.getenv_opt "MINA_SKIP_SIGCHECK")
 
 let check :
        User_command.Verifiable.t With_status.t
@@ -83,16 +84,9 @@ let check :
                     (`Invalid_signature [ Signature_lib.Public_key.compress pk ])
                 else ()
           in
-          let _check_signature =
-            match Sys.getenv "MINA_SKIP_SIGCHECK" with
-            | Some _ ->
-                ()
-            | None ->
-                check_signature fee_payer.authorization
-                  fee_payer.body.public_key full_tx_commitment
-          in
-          _check_signature ;
-
+          if not skip_sigheck then
+            check_signature fee_payer.authorization fee_payer.body.public_key
+              full_tx_commitment ;
           let zkapp_command_with_hashes_list =
             account_updates |> Zkapp_statement.zkapp_statements_of_forest'
             |> Zkapp_command.Call_forest.With_hashes_and_data
