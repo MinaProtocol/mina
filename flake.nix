@@ -247,6 +247,7 @@
             (runIntegrationTest "medium-bootstrap" { })
             (runIntegrationTest "zkapps" { with-archive = true; })
             (runIntegrationTest "zkapps-timing" { with-archive = true; })
+            (runIntegrationTest "verification-key-update" { with-archive = false; })
           ];
         };
     } // utils.lib.eachDefaultSystem (system:
