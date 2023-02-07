@@ -11,7 +11,8 @@ let constraint_constants = Genesis_constants.Constraint_constants.compiled
 
 let genesis_constants = Genesis_constants.compiled
 
-let proof_level = Genesis_constants.Proof_level.compiled
+(* Always run tests with proof-level Full *)
+let proof_level = Genesis_constants.Proof_level.Full
 
 let consensus_constants =
   Consensus.Constants.create ~constraint_constants

@@ -214,10 +214,7 @@ let%test_module "Composability test" =
         |> fst
     end
 
-    let test_zkapp_command ?expected_failure zkapp_command0 =
-      let zkapp_command =
-        Zkapps_examples.patch_verification_key_hashes zkapp_command0
-      in
+    let test_zkapp_command ?expected_failure zkapp_command =
       let transaction_commitment : Zkapp_command.Transaction_commitment.t =
         (* TODO: This is a pain. *)
         let account_updates_hash =

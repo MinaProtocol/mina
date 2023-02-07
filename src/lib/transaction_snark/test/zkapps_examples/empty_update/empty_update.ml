@@ -69,7 +69,6 @@ let account_updates =
   []
   |> Zkapp_command.Call_forest.cons_tree account_update
   |> Zkapp_command.Call_forest.cons deploy_account_update
-  |> Zkapps_examples.patch_verification_key_hashes
 
 let memo = Signed_command_memo.empty
 

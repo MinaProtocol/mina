@@ -29,7 +29,8 @@ let
     dyn = "3.5.0";
     fiber = "3.5.0";
     chrome-trace = "3.5.0";
-    ocaml-lsp-server = "1.14.1";
+    ocaml-lsp-server = "1.15.1-4.14";
+    ocamlc-loc = "3.5.0";
     ocaml-system = ocaml;
     ocamlformat-rpc-lib = "0.22.4";
     omd = "1.3.2";

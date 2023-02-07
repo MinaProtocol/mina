@@ -6,24 +6,38 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 Checkout the "master" branch of the mina repository, ensure your Docker configuration has a large amount of RAM (at least 12GB, recommended 16GB) and then run the following:
 
+### Release v1.3.1.2 (Mainnet and Devnet)
+
 ```
 cat dockerfiles/stages/1-build-deps \
 dockerfiles/stages/2-opam-deps \
     dockerfiles/stages/3-builder \
     dockerfiles/stages/4-production \
-    | docker build -t mina-rosetta-ubuntu:v1.3.0 \
-        --build-arg "DUNE_PROFILE=mainnet"
+    | docker build -t mina-rosetta-ubuntu:v1.3.1.2 \
+        --build-arg "DUNE_PROFILE=mainnet" \
         --build-arg "MINA_BRANCH=master" -
 ```
 
-This creates an image (mina-rosetta-ubuntu:v1.3.0) based on Ubuntu
+This creates an image (mina-rosetta-ubuntu:v1.3.1.2) based on Ubuntu
 20.04 and includes the most recent release of the mina daemon along
 with mina-archive and mina-rosetta. Note the `DUNE_PROFILE` argument,
 which should take a different value depending on which network you
 want to connect to. Complete list of predefined `dune` profiles can be
 found in `src/config` directory in the main repository.
 
-Alternatively, you could use the official image `minaprotocol/mina-rosetta:1.3.1.2-25388a0-bullseye-mainnet` which is built in exactly this way by buildkite CI/CD.
+Alternatively, you could use the official image `minaprotocol/mina-rosetta:1.3.1.2-25388a0-bullseye` which is built in exactly this way by buildkite CI/CD.
+
+### Release v2.0.0 (Berkeley)
+
+```
+cat dockerfiles/stages/1-build-deps \
+dockerfiles/stages/2-opam-deps \
+    dockerfiles/stages/3-builder \
+    dockerfiles/stages/4-production \
+    | docker build -t mina-rosetta-ubuntu:v2.0.0 \
+        --build-arg "DUNE_PROFILE=devnet" \
+        --build-arg "MINA_BRANCH=develop" -
+```
 
 ## How to Run
 
@@ -40,7 +54,7 @@ For example, to run the `docker-devnet-start.sh` and connect to the live Devnet 
 docker run -it --rm --name rosetta \
     --entrypoint=./docker-devnet-start.sh \
     -p 10101:10101 -p 3081:3081 -p 3085:3085 -p 3086:3086 -p 3087:3087 \
-    minaprotocol/mina-rosetta-ubuntu:v1.3.0
+    minaprotocol/mina-rosetta:1.3.1.2-25388a0-bullseye
 ```
 
 * Port 10101 is the default P2P port and must be exposed to the open internet
@@ -49,20 +63,31 @@ docker run -it --rm --name rosetta \
 * Archive node runs on port 3086
 * Rosetta runs on port 3087
 
+
+
+To run the `docker-demo-start.sh` and create a network [Beta Release 2.0]:
+
+```
+docker run -it --rm --name rosetta \
+    --entrypoint=./docker-demo-start.sh \
+    -p 8302:8302 -p 3085:3085 -p 3086:3086 -p 3087:3087 -p 3088:3088 \
+    mina-rosetta-ubuntu:v2.0.0
+```
+
 To run the `docker-berkeley-start.sh` and connect to the live Berkeley network [Beta Release 2.0]:
 
 ```
 docker run -it --rm --name rosetta \
-    --entrypoint=./docker-devnet-start.sh \
+    --entrypoint=./docker-berkeley-start.sh \
     -p 8302:8302 -p 3085:3085 -p 3086:3086 -p 3087:3087 -p 3088:3088 \
-    minaprotocol/mina-rosetta:1.3.2beta2-release-2.0.0-0b63498-focal
+    mina-rosetta-ubuntu:v2.0.0
 ```
 
 * Port 8302 is the default libp2p port and must be exposed to the open internet
 * The GraphQL API runs on port 3085 (accessible via `localhost:3085/graphql`)
 * Archive node runs on port 3086
 * Rosetta runs on port 3087 (offline) and 3088 (online)
-* 1.3.2beta2-release-2.0.0-0b63498-<codename> is the [latest Beta release](https://github.com/MinaProtocol/mina/discussions/categories/berkeley) available
+* minaprotocol/mina-rosetta:1.3.2beta2-release-2.0.0-05c2f73-<codename> is the [latest Beta release](https://github.com/MinaProtocol/mina/discussions/categories/berkeley) available
 
 Note: Both examples will take 20min-1hr for your node to sync
 
@@ -195,7 +220,7 @@ The Construction API is _not_ validated using `rosetta-cli` as this would requir
 
 ### Reproduce agent and rosetta-cli validation
 
-`minaprotocol/mina-rosetta-ubuntu:v1.3.0` and `rosetta-cli @ v0.5.12`
+`minaprotocol/mina-rosetta:1.3.1.2-25388a0-bullseye` and `rosetta-cli @ v0.5.12`
 using this [`rosetta.conf`](https://github.com/MinaProtocol/mina/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/rosetta.conf) and the [`bootstrap_balances.json`](https://github.com/MinaProtocol/mina/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/bootstrap_balances.json) next to it.
 
 **Create one of each transaction type using the test-agent and exit**
@@ -219,7 +244,7 @@ $ docker run -d --rm \
     --publish 3085:3085 \
     --name mina-rosetta-demo \
     --entrypoint ./docker-demo-start.sh \
-    minaprotocol/mina-rosetta-ubuntu:v1.3.0
+    minaprotocol/mina-rosetta:1.3.1.2-25388a0-bullseye
 
 $ docker logs --follow mina-rosetta-demo
 
