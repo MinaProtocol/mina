@@ -462,12 +462,14 @@ module Improper_calls = struct
     ()
 
   module Tests = struct
+    open Impl
+
     let circuit_function_inside_circuit_inside_prover () =
-      let inner_circuit ((a, b) : Impl.Field.t * Impl.Field.t) () : unit =
+      let inner_circuit ((a, b) : Field.t * Field.t) () : unit =
         use_circuit_functions a b ; ()
       in
-      let circuit ((_a, _b) : Impl.Field.t * Impl.Field.t) () =
-        Impl.as_prover (fun _ ->
+      let circuit ((_a, _b) : Field.t * Field.t) () =
+        as_prover (fun _ ->
             use_for_constraint_generation inner_circuit ;
             () )
       in
@@ -477,13 +479,12 @@ module Improper_calls = struct
     let circuit_functions_with_global_outside_circuit () : unit =
       let a, b = random_input in
       let a, b =
-        Impl.Field.(
+        Field.(
           let a = constant a in
           let b = constant b in
           (a, b))
       in
-      Impl.Field.Assert.not_equal a b ;
-      ()
+      Field.Assert.not_equal a b ; ()
 
     let circuit_functions_with_global_outside_circuit () : unit =
       Alcotest.(
@@ -493,15 +494,15 @@ module Improper_calls = struct
           circuit_functions_with_global_outside_circuit)
 
     let circuit_functions_inside_prover () : unit =
-      let circuit ((a, b) : Impl.Field.t * Impl.Field.t) () =
-        Impl.as_prover (fun _ -> use_circuit_functions a b ; ()) ;
+      let circuit ((a, b) : Field.t * Field.t) () =
+        as_prover (fun _ -> use_circuit_functions a b ; ()) ;
         ()
       in
       use_for_witness_generation circuit ;
       ()
 
     let prover_functions_outside_prover_block () : unit =
-      let circuit ((a, b) : Impl.Field.t * Impl.Field.t) () =
+      let circuit ((a, b) : Field.t * Field.t) () =
         use_prover_functions a b ; ()
       in
       use_for_constraint_generation circuit ;
@@ -514,25 +515,46 @@ module Improper_calls = struct
           (Failure "Can't evaluate prover code outside an as_prover block")
           prover_functions_outside_prover_block)
 
+    (* There could be cases like recursive proofs where a proof
+        is generated inside another and used by the outher circuit *)
     let prover_function_inside_circuit_inside_circuit () : unit =
-      let inner_circuit ((a, b) : Impl.Field.t * Impl.Field.t) () : unit =
-        Impl.as_prover (fun _ -> use_prover_functions a b ; ()) ;
+      let inner_circuit ((a, b) : Field.t * Field.t) () : unit =
+        as_prover (fun _ -> use_prover_functions a b ; ()) ;
         ()
       in
-      let circuit ((_a, _b) : Impl.Field.t * Impl.Field.t) () =
-        Impl.as_prover (fun _ ->
-            use_for_witness_generation inner_circuit ;
-            () )
+      let circuit ((a, b) : Field.t * Field.t) () =
+        let inner_value =
+          (* generate witness for inner circuit and return first public input *)
+          exists Field.typ ~compute:(fun _ ->
+              let compiled =
+                generate_witness ~input_typ ~return_typ inner_circuit
+              in
+              let input = random_input in
+              (* passes *)
+              assert (As_prover.in_prover_block ()) ;
+              let proof = compiled input in
+              let a =
+                Kimchi_bindings.FieldVectors.Fp.get proof.public_inputs 0
+              in
+              (* fails *)
+              assert (As_prover.in_prover_block ()) ;
+              (* and thus this also fails *)
+              let b = As_prover.read_var b in
+              let ab = Field.Constant.(mul a b) in
+              ab )
+        in
+        let c = Field.(inner_value + a) in
+        Field.Assert.non_zero c ; ()
       in
       use_for_witness_generation circuit ;
       ()
 
     let prover_function_in_prover_block_of_other_circuit () : unit =
-      let inner_circuit ((a, b) : Impl.Field.t * Impl.Field.t) () =
+      let inner_circuit ((a, b) : Field.t * Field.t) () =
         use_prover_functions a b ; ()
       in
-      let circuit ((_a, _b) : Impl.Field.t * Impl.Field.t) () =
-        Impl.as_prover (fun _ ->
+      let circuit ((_a, _b) : Field.t * Field.t) () =
+        as_prover (fun _ ->
             use_for_constraint_generation inner_circuit ;
             () )
       in
