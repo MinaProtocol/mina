@@ -87,9 +87,9 @@ module type Amount_intf = sig
 
     val equal : t -> t -> bool
 
-    val is_pos : t -> bool
-
     val is_neg : t -> bool
+
+    val is_non_neg : t -> bool
 
     val negate : t -> t
 
@@ -1418,7 +1418,7 @@ module Make (Inputs : Inputs_intf) = struct
               ~else_:local_state.supply_increase
         }
       in
-      let is_receiver = Amount.Signed.is_pos actual_balance_change in
+      let is_receiver = Amount.Signed.is_non_neg actual_balance_change in
       let local_state =
         let controller =
           Controller.if_ is_receiver
@@ -1745,7 +1745,7 @@ module Make (Inputs : Inputs_intf) = struct
         assert_ ~pos:__POS__
           ( (not is_start')
           ||| ( account_update_token_is_default
-              &&& Amount.Signed.is_pos local_delta ) )) ;
+              &&& Amount.Signed.is_non_neg local_delta ) )) ;
       let new_local_fee_excess, `Overflow overflow =
         Amount.Signed.add_flagged local_state.excess local_delta
       in
