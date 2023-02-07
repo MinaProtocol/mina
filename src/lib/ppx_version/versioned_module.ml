@@ -21,33 +21,120 @@ let ty_decl_to_string =
   let formatter =
     Versioned_util.diff_formatter @@ Format.formatter_of_buffer buf
   in
-  (* remove internal attributes, on core type in manifest and in records or variants in kind *)
-  let ty_decl_remove_internal_attributes ty_decl =
-    let removed_in_kind =
-      match ty_decl.ptype_kind with
-      | Ptype_variant ctors ->
-          Ptype_variant
-            (List.map ctors ~f:(fun ctor -> { ctor with pcd_attributes = [] }))
-      | Ptype_record labels ->
-          Ptype_record
-            (List.map labels ~f:(fun label ->
-                 { label with pld_attributes = [] } ) )
-      | kind ->
-          kind
-    in
-    let removed_in_manifest =
-      Option.map ty_decl.ptype_manifest ~f:(fun core_type ->
-          { core_type with ptyp_attributes = [] } )
-    in
-    { ty_decl with
-      ptype_manifest = removed_in_manifest
-    ; ptype_kind = removed_in_kind
-    }
-  in
   (* filter attributes from types *)
-  let filter_ty_decls_attrs ty_decl =
-    let ty_decl_no_attrs = ty_decl_remove_internal_attributes ty_decl in
-    { ty_decl_no_attrs with ptype_attributes = [] }
+  let filter_attrs =
+    object (self)
+      inherit Ast_traverse.map
+
+      method! core_type ty =
+        { ty with
+          ptyp_desc = self#core_type_desc ty.ptyp_desc
+        ; ptyp_attributes = []
+        }
+
+      method! core_type_desc ty_desc =
+        match ty_desc with
+        | Ptyp_arrow (arg, ty_from, ty_to) ->
+            Ptyp_arrow (arg, self#core_type ty_from, self#core_type ty_to)
+        | Ptyp_tuple tys ->
+            Ptyp_tuple (List.map tys ~f:self#core_type)
+        | Ptyp_constr (loc, tys) ->
+            Ptyp_constr (loc, List.map tys ~f:self#core_type)
+        | Ptyp_class (loc, tys) ->
+            Ptyp_class (loc, List.map tys ~f:self#core_type)
+        | Ptyp_alias (ty, label) ->
+            Ptyp_alias (self#core_type ty, label)
+        | Ptyp_object (fields, closed) ->
+            let fields' =
+              List.map fields ~f:(fun field ->
+                  let pof_desc =
+                    match field.pof_desc with
+                    | Otag (label, ty) ->
+                        Otag (label, self#core_type ty)
+                    | Oinherit ty ->
+                        Oinherit (self#core_type ty)
+                  in
+                  let pof_attributes = [] in
+                  { field with pof_desc; pof_attributes } )
+            in
+            Ptyp_object (fields', closed)
+        | Ptyp_poly (parms, ty) ->
+            Ptyp_poly (parms, self#core_type ty)
+        | Ptyp_package (mod_name, with_types) ->
+            let with_types' =
+              List.map with_types ~f:(fun (loc, ty) ->
+                  (loc, self#core_type ty) )
+            in
+            Ptyp_package (mod_name, with_types')
+        | Ptyp_variant (fields, closed, labels) ->
+            let fields' =
+              List.map fields ~f:(fun field ->
+                  let prf_desc =
+                    match field.prf_desc with
+                    | Rtag (label, const, tys) ->
+                        Rtag (label, const, List.map tys ~f:self#core_type)
+                    | Rinherit ty ->
+                        Rinherit (self#core_type ty)
+                  in
+                  { field with prf_desc; prf_attributes = [] } )
+            in
+            Ptyp_variant (fields', closed, labels)
+        | Ptyp_any | Ptyp_var _ ->
+            ty_desc
+        | Ptyp_extension _ ->
+            (* punting on very unlikely case *)
+            ty_desc
+
+      method! type_kind =
+        function
+        | Ptype_abstract ->
+            Ptype_abstract
+        | Ptype_variant ctors ->
+            let ctors' =
+              List.map ctors ~f:(fun ctor ->
+                  let pcd_args =
+                    match ctor.pcd_args with
+                    | Pcstr_tuple tys ->
+                        Pcstr_tuple (List.map tys ~f:self#core_type)
+                    | Pcstr_record labels ->
+                        Pcstr_record
+                          (List.map labels ~f:(fun label ->
+                               { label with
+                                 pld_type = self#core_type label.pld_type
+                               ; pld_attributes = []
+                               } ) )
+                  in
+                  let pcd_res = Option.map ctor.pcd_res ~f:self#core_type in
+                  { ctor with pcd_args; pcd_res; pcd_attributes = [] } )
+            in
+            Ptype_variant ctors'
+        | Ptype_record labels ->
+            Ptype_record
+              (List.map labels ~f:(fun label ->
+                   { label with
+                     pld_type = self#core_type label.pld_type
+                   ; pld_attributes = []
+                   } ) )
+        | Ptype_open ->
+            Ptype_open
+
+      method! type_declaration ty_decl =
+        let ptype_params =
+          List.map ty_decl.ptype_params ~f:(fun (ty, var_inj) ->
+              (self#core_type ty, var_inj) )
+        in
+        let ptype_manifest =
+          Option.map ty_decl.ptype_manifest ~f:self#core_type
+        in
+        let ptype_kind = self#type_kind ty_decl.ptype_kind in
+        { ty_decl with
+          ptype_params
+        ; ptype_manifest
+        ; ptype_cstrs = []
+        ; ptype_kind
+        ; ptype_attributes = []
+        }
+    end
   in
   let filter_type_manifests type_decl =
     match type_decl.ptype_kind with
@@ -58,7 +145,9 @@ let ty_decl_to_string =
   in
   fun ty_decl ->
     Buffer.clear buf ;
-    let ty_decl' = ty_decl |> filter_ty_decls_attrs |> filter_type_manifests in
+    let ty_decl' =
+      ty_decl |> filter_attrs#type_declaration |> filter_type_manifests
+    in
     Pprintast.type_declaration formatter ty_decl' ;
     Format.pp_print_flush formatter () ;
     let s = Buffer.contents buf in
@@ -151,8 +240,8 @@ let erase_stable_versions =
   object
     inherit Ast_traverse.map as super
 
-    method! core_type typ =
-      match typ.ptyp_desc with
+    method! core_type ty =
+      match ty.ptyp_desc with
       | Ptyp_constr
           ({ txt = Ldot (Ldot (Ldot (lid, "Stable"), vn), "t"); loc }, typs)
         when try
@@ -160,19 +249,19 @@ let erase_stable_versions =
                true
              with _ -> false ->
           (* Erase [.Stable.Vn.t] to [.t] *)
-          let typ =
-            { typ with
+          let ty =
+            { ty with
               ptyp_desc = Ptyp_constr ({ txt = Ldot (lid, "t"); loc }, typs)
             }
           in
-          super#core_type typ
+          super#core_type ty
       | _ ->
-          super#core_type typ
+          super#core_type ty
 
-    method! type_declaration typ =
-      let typ = super#type_declaration typ in
+    method! type_declaration ty_decl =
+      let ty_decl = super#type_declaration ty_decl in
       let ptype_attributes : attributes =
-        List.filter_map typ.ptype_attributes
+        List.filter_map ty_decl.ptype_attributes
           ~f:(fun ({ attr_name; attr_payload = payload; attr_loc } as attr) ->
             if String.equal attr_name.txt "deriving" then
               let remove_derivers = [| "bin_io"; "version" |] in
@@ -248,15 +337,15 @@ let erase_stable_versions =
                   Some attr
             else Some attr )
       in
-      { typ with
+      { ty_decl with
         ptype_attributes
       ; ptype_manifest =
           Some
-            (Ast_helper.Typ.constr ~loc:typ.ptype_loc
+            (Ast_helper.Typ.constr ~loc:ty_decl.ptype_loc
                { Location.txt = Longident.parse "Stable.Latest.t"
-               ; loc = typ.ptype_loc
+               ; loc = ty_decl.ptype_loc
                }
-               (List.map ~f:fst typ.ptype_params) )
+               (List.map ~f:fst ty_decl.ptype_params) )
       }
   end
 
