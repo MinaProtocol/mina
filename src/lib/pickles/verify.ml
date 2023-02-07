@@ -175,7 +175,8 @@ let verify_heterogenous (ts : Instance.t list) =
           ; beta = plonk0.beta
           ; gamma = plonk0.gamma
           ; lookup =
-              Option.map (Plonk_types.Opt.to_option p.lookup) ~f:(fun l ->
+              Option.map (Plonk_types.Opt.to_option_unsafe p.lookup)
+                ~f:(fun l ->
                   { Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
                     .Lookup
                     .joint_combiner = Option.value_exn plonk0.joint_combiner

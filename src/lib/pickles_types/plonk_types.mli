@@ -14,9 +14,12 @@ module Opt : sig
   **)
   val value_exn : ('a, 'bool) t -> 'a
 
-  (** [value_exn o] is [Some v] when [o] if [Some v] or [Maybe (_, v)], [None]
-      otherwise *)
-  val to_option : ('a, 'bool) t -> 'a option
+  (** [to_option_unsafe o] is [Some v] when [o] if [Some v] or [Maybe (_, v)],
+      [None] otherwise.
+  *)
+  val to_option_unsafe : ('a, 'bool) t -> 'a option
+
+  val to_option : ('a, bool) t -> 'a option
 
   module Flag : sig
     type t = Yes | No | Maybe [@@deriving sexp, compare, yojson, hash, equal]

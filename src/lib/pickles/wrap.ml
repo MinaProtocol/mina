@@ -422,7 +422,7 @@ let%test_module "gate finalization" =
           { deferred_values with
             plonk =
               { deferred_values.plonk with
-                lookup = Opt.to_option deferred_values.plonk.lookup
+                lookup = Opt.to_option_unsafe deferred_values.plonk.lookup
               ; optional_column_scalars =
                   Composition_types.Wrap.Proof_state.Deferred_values.Plonk
                   .In_circuit
@@ -914,7 +914,8 @@ let wrap
   in
   ( { proof = next_proof
     ; statement =
-        Types.Wrap.Statement.to_minimal next_statement ~to_option:Opt.to_option
+        Types.Wrap.Statement.to_minimal next_statement
+          ~to_option:Opt.to_option_unsafe
     ; prev_evals =
         { Plonk_types.All_evals.evals =
             { public_input = x_hat_evals; evals = proof.openings.evals }

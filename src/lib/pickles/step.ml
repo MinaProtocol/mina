@@ -273,7 +273,8 @@ struct
                     ; beta = plonk0.beta
                     ; gamma = plonk0.gamma
                     ; lookup =
-                        Option.map (Opt.to_option plonk.lookup) ~f:(fun l ->
+                        Option.map (Opt.to_option_unsafe plonk.lookup)
+                          ~f:(fun l ->
                             { Composition_types.Wrap.Proof_state.Deferred_values
                               .Plonk
                               .In_circuit
@@ -521,7 +522,7 @@ struct
                 ; beta = chal plonk0.beta
                 ; gamma = chal plonk0.gamma
                 ; lookup =
-                    Option.map (Opt.to_option plonk.lookup) ~f:(fun l ->
+                    Option.map (Opt.to_option_unsafe plonk.lookup) ~f:(fun l ->
                         { Composition_types.Wrap.Proof_state.Deferred_values
                           .Plonk
                           .In_circuit

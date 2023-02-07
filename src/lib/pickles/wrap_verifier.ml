@@ -874,7 +874,7 @@ struct
     (* TODO: r actually does not need to be a scalar challenge. *)
     let r = scalar_to_field (Import.Scalar_challenge.create r_actual) in
     let plonk_minimal =
-      Plonk.to_minimal plonk ~to_option:Plonk_types.Opt.to_option
+      Plonk.to_minimal plonk ~to_option:Plonk_types.Opt.to_option_unsafe
     in
     let combined_evals =
       let n = Common.Max_degree.wrap_log2 in

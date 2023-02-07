@@ -977,7 +977,9 @@ struct
     in
     let xi = scalar xi in
     let r = scalar (Import.Scalar_challenge.create r_actual) in
-    let plonk_minimal = Plonk.to_minimal plonk ~to_option:Opt.to_option in
+    let plonk_minimal =
+      Plonk.to_minimal plonk ~to_option:Opt.to_option_unsafe
+    in
     let combined_evals =
       let n = Int.ceil_log2 Max_degree.step in
       let zeta_n : Field.t = pow2_pow plonk.zeta n in
