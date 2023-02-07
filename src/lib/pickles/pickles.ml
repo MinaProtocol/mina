@@ -4385,7 +4385,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
           | _ ->
               respond Unhandled
 
-        let maybe_features = Plonk_types.Features.(map none ~f:(fun _ -> Plonk_types.Opt.Flag.Maybe))
+        let maybe_features =
+          Plonk_types.Features.(
+            map none ~f:(fun _ -> Plonk_types.Opt.Flag.Maybe))
 
         let side_loaded_tag =
           Side_loaded.create ~name:"foo"
