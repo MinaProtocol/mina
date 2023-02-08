@@ -246,7 +246,7 @@ module Make (Inputs : Intf.Inputs_intf) :
       (* TODO: Make this configurable. *)
       Genesis_constants.Constraint_constants.compiled
     in
-    let now () = Unix.time () |> round |> int_of_float in
+    let now () = (Unix.gettimeofday ()) *. 1000. |> round |> int_of_float in
     let register_t = now () in
     let%bind state =
       Worker_state.create ~constraint_constants ~proof_level ()
