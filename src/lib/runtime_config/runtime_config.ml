@@ -440,6 +440,8 @@ module Accounts = struct
 
     let of_yojson json =
       Result.bind ~f:of_json_layout (Json_layout.Accounts.Single.of_yojson json)
+
+    let default = Json_layout.Accounts.Single.default
   end
 
   type single = Single.t =
