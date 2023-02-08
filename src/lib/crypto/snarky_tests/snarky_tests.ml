@@ -179,7 +179,7 @@ module RangeCircuits = struct
         true
 
   let test_range_gates =
-    QCheck.Test.make ~count:10
+    QCheck.Test.make ~count:100
       ~name:"test range gates during witness generation"
       (* TODO: it'd be nicer to generate actual fields directly, since that domain is most likely smaller *)
       QCheck.(tup3 bool pos_int pos_int)
