@@ -1,4 +1,3 @@
-import Client from "mina-signer";
 import {
   Field,
   declareState,
@@ -6,12 +5,7 @@ import {
   State,
   PrivateKey,
   SmartContract,
-  deploy,
   isReady,
-  shutdown,
-  addCachedAccount,
-  Mina,
-  verify,
 } from "snarkyjs";
 
 await isReady;
