@@ -272,13 +272,18 @@ let rec etyp :
           in
           typ.var_of_fields (fields, aux)
         in
-        let open Snarky_backendless.Typ in
-        let typ =
-          unit ()
-          |> transport ~there:(fun y -> assert_eq x y) ~back:(fun () -> x)
-          |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> constant_var)
-        in
-        T (typ, f, f')
+        (* We skip any constraints that would be added here, but we *do* use
+           the underlying [Typ.t] to make sure that we allocate public inputs
+           correctly.
+        *)
+        T
+          ( Typ
+              { typ with
+                check =
+                  (fun _ -> Snarky_backendless.Checked_runner.Simple.return ())
+              }
+          , (fun _ -> f constant_var)
+          , f' )
 
 module Common (Impl : Snarky_backendless.Snark_intf.Run) = struct
   module Digest = D.Make (Impl)
