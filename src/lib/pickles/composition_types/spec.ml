@@ -64,11 +64,12 @@ module rec T : sig
         ; bool : (module Bool_intf with type var = 'bool)
         }
         -> ('a1 option, ('a2, 'bool) Plonk_types.Opt.t, 'env) t
+    | Constant : 'a * ('a -> 'a -> unit) * ('a, 'b, 'env) t -> ('a, 'b, 'env) t
 end =
   T
 
 type ('scalar, 'env) pack =
-  { pack : 'a 'b. ('a, 'b, 'env) basic -> 'b -> 'scalar array }
+  { pack : 'a 'b. ('a, 'b, 'env) basic -> 'a option -> 'b -> 'scalar array }
 
 let rec pack :
     type t v env.
@@ -76,33 +77,63 @@ let rec pack :
     -> one:'scalar
     -> ('scalar, env) pack
     -> (t, v, env) T.t
+    -> t option
     -> v
     -> 'scalar array =
- fun ~zero ~one p spec t ->
+ fun ~zero ~one p spec t_constant_opt t ->
   match spec with
   | B spec ->
-      p.pack spec t
+      p.pack spec t_constant_opt t
   | Scalar chal ->
+      let t_constant_opt =
+        Option.map t_constant_opt ~f:(fun { Sc.inner = x } -> x)
+      in
       let { Sc.inner = t } = t in
-      p.pack chal t
+      p.pack chal t_constant_opt t
   | Vector (spec, _) ->
-      Array.concat_map (Vector.to_array t) ~f:(pack ~zero ~one p spec)
+      let t_constant_opt = Option.map ~f:Vector.to_array t_constant_opt in
+      let t = Vector.to_array t in
+      pack ~zero ~one p (Array (spec, Array.length t)) t_constant_opt t
   | Struct [] ->
       [||]
   | Struct (spec :: specs) ->
       let (hd :: tl) = t in
-      let hd = pack ~zero ~one p spec hd in
-      Array.append hd (pack ~zero ~one p (Struct specs) tl)
+      let hd_constant_opt, tl_constant_opt =
+        match t_constant_opt with
+        | None ->
+            (None, None)
+        | Some (hd :: tl) ->
+            (Some hd, Some tl)
+      in
+      let hd = pack ~zero ~one p spec hd_constant_opt hd in
+      Array.append hd (pack ~zero ~one p (Struct specs) tl_constant_opt tl)
   | Array (spec, _) ->
-      Array.concat_map t ~f:(pack ~zero ~one p spec)
-  | Opt { inner; flag; dummy1 = _; dummy2 } -> (
+      Array.concat_mapi t ~f:(fun i t ->
+          let t_constant_opt =
+            Option.map t_constant_opt ~f:(fun t_const -> t_const.(i))
+          in
+          pack ~zero ~one p spec t_constant_opt t )
+  | Opt { inner; flag; dummy1; dummy2 } -> (
       match t with
       | None ->
-          Array.append [| zero |] (pack ~zero ~one p inner dummy2)
+          let t_constant_opt = Option.map t_constant_opt ~f:(fun _ -> dummy1) in
+          Array.append [| zero |]
+            (pack ~zero ~one p inner t_constant_opt dummy2)
       | Some x ->
-          Array.append [| one |] (pack ~zero ~one p inner x)
+          let t_constant_opt =
+            Option.map ~f:(fun x -> Option.value_exn x) t_constant_opt
+          in
+          Array.append [| one |] (pack ~zero ~one p inner t_constant_opt x)
       | Maybe (b, x) ->
-          Array.append (p.pack Bool b) (pack ~zero ~one p inner x) )
+          let b_constant_opt = Option.map ~f:Option.is_some t_constant_opt in
+          let x_constant_opt =
+            Option.map ~f:(Option.value ~default:dummy1) t_constant_opt
+          in
+          Array.append
+            (p.pack Bool b_constant_opt b)
+            (pack ~zero ~one p inner x_constant_opt x) )
+  | Constant (x, _, inner) ->
+      pack ~zero ~one p inner (Some x) t
 
 type ('f, 'env) typ =
   { typ :
@@ -145,6 +176,19 @@ let rec typ :
         (* Always use the same "maybe" layout which is a boolean and then the value *)
         Plonk_types.Opt.constant_layout_typ bool flag ~dummy:dummy1
           ~dummy_var:dummy2 ~true_ ~false_ (typ t inner)
+    | Constant (x, assert_eq, spec) ->
+        let (Typ typ) = typ t spec in
+        let constant_var =
+          let fields, aux = typ.value_to_fields x in
+          let fields =
+            Array.map fields ~f:(fun x -> Snarky_backendless.Cvar.Constant x)
+          in
+          typ.var_of_fields (fields, aux)
+        in
+        let open Snarky_backendless.Typ in
+        unit ()
+        |> transport ~there:(fun y -> assert_eq x y) ~back:(fun () -> x)
+        |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> constant_var)
 
 type 'env exists = T : ('t1, 't2, 'env) T.t -> 'env exists
 
@@ -219,6 +263,22 @@ let rec etyp :
               ~false_:(f_bool' B.false_) bool flag a
           , f
           , f' )
+    | Constant (x, assert_eq, spec) ->
+        let (T (Typ typ, f, f')) = etyp e spec in
+        let constant_var =
+          let fields, aux = typ.value_to_fields x in
+          let fields =
+            Array.map fields ~f:(fun x -> Snarky_backendless.Cvar.Constant x)
+          in
+          typ.var_of_fields (fields, aux)
+        in
+        let open Snarky_backendless.Typ in
+        let typ =
+          unit ()
+          |> transport ~there:(fun y -> assert_eq x y) ~back:(fun () -> x)
+          |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> constant_var)
+        in
+        T (typ, f, f')
 
 module Common (Impl : Snarky_backendless.Snark_intf.Run) = struct
   module Digest = D.Make (Impl)
@@ -254,9 +314,12 @@ let pack_basic (type field other_field other_field_var)
   let pack :
       type a b.
          (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
+      -> a option
       -> b
       -> [ `Field of other_field_var | `Packed_bits of Field.t * int ] array =
-   fun basic x ->
+   fun basic x_constant_opt x ->
+    (* TODO *)
+    ignore x_constant_opt ;
     match basic with
     | Unit ->
         [||]
@@ -284,6 +347,7 @@ let pack (type f) ((module Impl) as impl : f impl) t =
   pack (pack_basic impl) t
     ~zero:(`Packed_bits (Field.zero, 1))
     ~one:(`Packed_bits (Field.one, 1))
+    None
 
 let typ_basic (type field other_field other_field_var)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
