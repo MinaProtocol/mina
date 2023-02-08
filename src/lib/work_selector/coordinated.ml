@@ -2,10 +2,12 @@ open Core_kernel
 
 let coordinator_url =
   Sys.getenv_opt "MINA_SNARK_COORDINATOR_URL"
-  |> Option.value ~default:"http://localhost:8080/lock-job"
+  |> Option.value ~default:"http://localhost:8080"
 
 let query_coordinator identifier =
-  let url = String.concat ~sep:"/" [ coordinator_url; identifier ] in
+  let url =
+    String.concat ~sep:"/" [ coordinator_url; "lock-job"; identifier ]
+  in
   match Ezcurl.put ~url ~content:(`String "") () with
   | Ok response ->
       Stdlib.Printf.printf "+++ querying coordinator: %s -> %d \n%!" url
