@@ -40,7 +40,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info] "Stdout: $stdout" ~metadata:[ ("stdout", `String stdout) ] ;
     if not (String.is_empty output.stderr) then (
       [%log error]
-        "An error occured during the execution of the test script: %s"
+        "An error occured during the execution of the test script: \"%s\""
         output.stderr ;
       Malleable_error.hard_error_string output.stderr )
     else Malleable_error.ok_unit
