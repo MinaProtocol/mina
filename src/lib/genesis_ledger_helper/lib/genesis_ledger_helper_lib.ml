@@ -625,25 +625,6 @@ let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
     ; epoch_data = None
     }
 
-(*
-let empty =
-  { Poly.public_key = Public_key.Compressed.empty
-  ; token_id = Token_id.default
-  ; token_symbol = Token_symbol.default
-  ; balance = Balance.zero
-  ; nonce = Nonce.zero
-  ; receipt_chain_hash = Receipt.Chain_hash.empty
-  ; delegate = None
-  ; voting_for = State_hash.dummy
-  ; timing = Timing.Untimed
-  ; permissions =
-      Permissions.user_default
-      (* TODO: This should maybe be Permissions.empty *)
-  ; zkapp = None
-  }
-
-*)
-
 let%test_module "Runtime config" =
   ( module struct
     [@@@warning "-32"]
