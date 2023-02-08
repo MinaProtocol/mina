@@ -402,6 +402,7 @@ end
  * outside-of-circuit tests *
  ****************************)
 
+(** this is a pure function and should be runnable from anywhere *)
 let out_of_circuit_constant () =
   (* mul or addition should work within the Cvar AST *)
   let one = Impl.Field.constant Impl.Field.Constant.one in
@@ -420,6 +421,7 @@ let out_of_circuit_constant () =
   Impl.Field.Assert.not_equal one two ;
   ()
 
+(** this should be an impure function, and as such needs to be run within an API function (e.g. generate_witness, constraint_system). Otherwise it is expected to fail *)
 let out_of_circuit_constraint () =
   let one =
     Impl.exists Impl.Field.typ ~compute:(fun _ -> Impl.Field.Constant.one)
