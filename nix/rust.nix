@@ -10,7 +10,7 @@ let
   toolchainHashes = {
     "1.67.0" = "sha256-riZUc+R9V35c/9e8KJUE+8pzpXyl0lRXt3ZkKlxoY0g=";
     "nightly-2022-09-12" =
-      "sha256-Q1pMbQAO5omjvS4ECozBsujielyjQigHg1eJx3Ly26A=";
+      "sha256-MM8fdvveBEWzpwjH7u6C0F7qSWGPIMpfZWLgVxSqtxY=";
     # copy this line with the correct toolchain name
     "placeholder" = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
   };
