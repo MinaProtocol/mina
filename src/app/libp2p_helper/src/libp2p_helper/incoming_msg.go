@@ -34,7 +34,7 @@ var rpcRequestExtractors = map[ipc.Libp2pHelperInterface_RpcRequest_Which]extrac
 
 var pushMesssageExtractors = map[ipc.Libp2pHelperInterface_PushMessage_Which]extractPushMessage{
 	ipc.Libp2pHelperInterface_PushMessage_Which_addResource:      fromAddResourcePush,
-	ipc.Libp2pHelperInterface_PushMessage_Which_deleteResource:   fromDeleteResourcePush,
+	ipc.Libp2pHelperInterface_PushMessage_Which_removeResource:   fromRemoveResourcePush,
 	ipc.Libp2pHelperInterface_PushMessage_Which_downloadResource: fromDownloadResourcePush,
 	ipc.Libp2pHelperInterface_PushMessage_Which_validation:       fromValidationPush,
 	ipc.Libp2pHelperInterface_PushMessage_Which_heartbeatPeer:    fromHeartbeatPeerPush,

@@ -76,7 +76,14 @@ type BitswapState interface {
 	GetStatus(key [32]byte) (codanet.RootBlockStatus, error)
 	SetStatus(key [32]byte, value codanet.RootBlockStatus) error
 	DeleteStatus(key [32]byte) error
+
+	// Delete blocks for which no reference exist
 	DeleteBlocks(keys [][32]byte) error
+
+	// Reference or dereference blocks related to the root.
+	// Blocks with references are protected from deletion.
+	UpdateReferences(root [32]byte, exists bool, keys ...[32]byte) error
+
 	ViewBlock(key [32]byte, callback func([]byte) error) error
 	StoreDownloadedBlock(block blocks.Block) error
 	NodeDownloadParams() map[cid.Cid]map[root][]NodeIndex
@@ -251,10 +258,6 @@ func processDownloadedBlockStep(params map[root][]NodeIndex, block blocks.Block,
 func processDownloadedBlock(block blocks.Block, bs BitswapState) {
 	bs.CheckInvariants()
 	id := block.Cid()
-	err := bs.StoreDownloadedBlock(block)
-	if err != nil {
-		bitswapLogger.Errorf("Failed to store block %s", id)
-	}
 	nodeDownloadParams := bs.NodeDownloadParams()
 	rootDownloadStates := bs.RootDownloadStates()
 	depthIndices := bs.DepthIndices()
@@ -276,11 +279,23 @@ func processDownloadedBlock(block blocks.Block, bs BitswapState) {
 		}
 		rootState.remainingNodeCounter = rootState.remainingNodeCounter - len(ixs)
 		rps[root] = rootState
+		blockHash, err := codanet.CidToBlockHash(id)
+		if err == nil {
+			err = bs.UpdateReferences(root, true, blockHash)
+		}
+		if err != nil {
+			bitswapLogger.Errorf("Failed to strore reference for block %s (to root %s)",
+				id, codanet.BlockHashToCidSuffix(root))
+		}
+	}
+	err := bs.StoreDownloadedBlock(block)
+	if err != nil {
+		bitswapLogger.Errorf("Failed to store block %s", id)
 	}
 	newParams, malformed := processDownloadedBlockStep(oldPs, block, rps, bs.MaxBlockSize(), depthIndices, bs.DataConfig())
 	for root, err := range malformed {
 		bitswapLogger.Warnf("Block %s of root %s is malformed: %s", id, codanet.BlockHashToCidSuffix(root), err)
-		ClearRootDownloadState(bs, root)
+		DeleteRoot(bs, root)
 		bs.SendResourceUpdate(ipc.ResourceUpdateType_broken, rps[root].getTag(), root)
 	}
 

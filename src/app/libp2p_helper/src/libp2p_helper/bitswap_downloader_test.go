@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"codanet"
 	"container/heap"
 	"context"
@@ -13,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-errors/errors"
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	ipld "github.com/ipfs/go-ipld-format"
@@ -106,11 +108,16 @@ func genValidBlockGroup(r *rand.Rand, tag BitswapDataTag) blockGroup {
 	dataLen := r.Intn(100000) + 64
 	return genValidBlockGroupImpl(r, genMaxBlockSize(r, 1000), dataLen, tag)
 }
+
 func genValidBlockGroupImpl(r *rand.Rand, maxBlockSize, dataLen int, tag BitswapDataTag) blockGroup {
+	return genValidBlockGroupImplWithHashF(r, badHash, maxBlockSize, dataLen, tag)
+}
+
+func genValidBlockGroupImplWithHashF(r *rand.Rand, hashF func([]byte) BitswapBlockLink, maxBlockSize, dataLen int, tag BitswapDataTag) blockGroup {
 	data := make([]byte, dataLen+1)
 	data[0] = byte(tag)
 	r.Read(data[1:])
-	blocksRaw, root_ := SplitDataToBitswapBlocksLengthPrefixedWithHashF(maxBlockSize, badHash, data)
+	blocksRaw, root_ := SplitDataToBitswapBlocksLengthPrefixedWithHashF(maxBlockSize, hashF, data)
 	blocks := make(map[cid.Cid][]byte)
 	for bLink, b := range blocksRaw {
 		blocks[codanet.BlockHashToCid(bLink)] = b
@@ -122,7 +129,29 @@ func genValidBlockGroupImpl(r *rand.Rand, maxBlockSize, dataLen int, tag Bitswap
 	}
 }
 
-func (bg *blockGroup) addDuplicateOfRoot(r *rand.Rand, rootIx int, tag BitswapDataTag) int {
+func (bg *blockGroup) getData(startIx int) ([]byte, BitswapDataTag) {
+	start := bg.starts[startIx]
+	allBlocks := map[BitswapBlockLink][]byte{}
+	for h, b := range bg.blocks {
+		key, err := codanet.CidToBlockHash(h)
+		panicOnErr(err)
+		allBlocks[key] = b
+	}
+	data, err := JoinBitswapBlocks(allBlocks, start.root)
+	panicOnErr(err)
+	if data[4] != byte(start.tag) {
+		panic("tag mismatch")
+	}
+	len_ := binary.LittleEndian.Uint32(data)
+	if int(len_) != len(data)-4 {
+		panic(fmt.Sprintf("length mismatch: %d != %d", len_, len(data)-4))
+	}
+	return data[5:], start.tag
+}
+
+// Creates a new valid root with last link pointing to the given root and other links pointing
+// to the same (randomly-generated) block tree
+func (bg *blockGroup) addDuplicateOfRoot(r *rand.Rand, hashF func([]byte) BitswapBlockLink, rootIx int, tag BitswapDataTag) int {
 	n := len(bg.blocks)
 	subRoot := bg.starts[rootIx].root
 	var subDataLen int
@@ -148,7 +177,7 @@ func (bg *blockGroup) addDuplicateOfRoot(r *rand.Rand, rootIx int, tag BitswapDa
 		r.Read(sisterData)
 		sisterBlocks, sisterRoot = SplitDataToBitswapBlocks(bg.maxBlockSize, sisterData)
 	}
-	totDataLen := sisterDataLen*(lpb-1) + subDataLen + 4 + (bg.maxBlockSize-2)%BITSWAP_BLOCK_LINK_SIZE - 4
+	totDataLen := sisterDataLen*(lpb-1) + subDataLen + (bg.maxBlockSize-2)%BITSWAP_BLOCK_LINK_SIZE
 	rootBlock := make([]byte, bg.maxBlockSize)
 	binary.LittleEndian.PutUint16(rootBlock, uint16(lpb))
 	for i := 0; i < lpb-1; i++ {
@@ -161,7 +190,7 @@ func (bg *blockGroup) addDuplicateOfRoot(r *rand.Rand, rootIx int, tag BitswapDa
 	for sbLink, sb := range sisterBlocks {
 		bg.blocks[codanet.BlockHashToCid(sbLink)] = sb
 	}
-	newRoot := badHash(rootBlock)
+	newRoot := hashF(rootBlock)
 	bg.blocks[codanet.BlockHashToCid(newRoot)] = rootBlock
 	bg.starts = append(bg.starts, blockGroupStart{root: newRoot, tag: tag})
 	return len(bg.starts) - 1
@@ -169,12 +198,15 @@ func (bg *blockGroup) addDuplicateOfRoot(r *rand.Rand, rootIx int, tag BitswapDa
 
 func genValidBlockGroupWithManyDuplicates(r *rand.Rand, tag1 BitswapDataTag, tag2 BitswapDataTag, tag3 BitswapDataTag) blockGroup {
 	maxBlockSize := genMaxBlockSize(r, 256)
+	return genValidBlockGroupWithManyDuplicatesWithMaxSize(r, badHash, maxBlockSize, tag1, tag2, tag3)
+}
+func genValidBlockGroupWithManyDuplicatesWithMaxSize(r *rand.Rand, hashF func([]byte) BitswapBlockLink, maxBlockSize int, tag1 BitswapDataTag, tag2 BitswapDataTag, tag3 BitswapDataTag) blockGroup {
 	lpb := LinksPerBlock(maxBlockSize)
 	// 3 full layers
 	fullN := 1 + lpb + lpb*lpb
 	dataLen := fullN*(maxBlockSize-2) - (fullN-1)*BITSWAP_BLOCK_LINK_SIZE - 5
-	bg := genValidBlockGroupImpl(r, maxBlockSize, dataLen, tag1)
-	bg.addDuplicateOfRoot(r, bg.addDuplicateOfRoot(r, 0, tag2), tag3)
+	bg := genValidBlockGroupImplWithHashF(r, hashF, maxBlockSize, dataLen, tag1)
+	bg.addDuplicateOfRoot(r, hashF, bg.addDuplicateOfRoot(r, hashF, 0, tag2), tag3)
 	return bg
 }
 
@@ -232,6 +264,7 @@ func (rp *testRootParams) getTag() BitswapDataTag {
 	return rp.tag
 }
 
+// Run small-step processing processDownloadedBlockStep for every block in block group (from roots to children)
 func (bg *blockGroup) execute(r *rand.Rand, tagConfig map[BitswapDataTag]BitswapDataConfig) malformedRoots {
 	visited := make(map[BitswapBlockLink]bool)
 	q := make(linkHeap, 0)
@@ -495,7 +528,6 @@ func TestProcessDownloadedBlockStepInvalidStructure(t *testing.T) {
 		0: {maxSize: math.MaxInt32, downloadTimeout: time.Minute},
 	}
 	seed := time.Now().Unix()
-	// 1635580518
 	t.Logf("Seed: %d", seed)
 	r := rand.New(rand.NewSource(seed))
 
@@ -552,7 +584,7 @@ func TestProcessDownloadedBlockStep(t *testing.T) {
 		_, m1HasRoot := m1[root1]
 		require.True(t, m1HasRoot && len(m1) >= 1)
 		// Duplicate tree as subtree of a new block tree
-		bg1.addDuplicateOfRoot(r, 0, 1)
+		bg1.addDuplicateOfRoot(r, badHash, 0, 1)
 		require.Equal(t, 0, len(bg1.execute(r, tagConfig)))
 		// Replace one block with invalid block and back again
 		// we do not recalculate links as they are not recalculated
@@ -610,6 +642,7 @@ func TestProcessDownloadedBlockStep(t *testing.T) {
 type testBitswapState struct {
 	r                  *rand.Rand
 	statuses           map[BitswapBlockLink]codanet.RootBlockStatus
+	refs               map[BitswapBlockLink]map[root]struct{}
 	blocks             map[cid.Cid][]byte
 	nodeDownloadParams map[cid.Cid]map[root][]NodeIndex
 	rootDownloadStates map[root]*RootDownloadState
@@ -690,10 +723,34 @@ func (bs *testBitswapState) DeleteStatus(key [32]byte) error {
 }
 func (bs *testBitswapState) DeleteBlocks(keys [][32]byte) error {
 	for _, key := range keys {
-		delete(bs.blocks, codanet.BlockHashToCid(key))
+		if len(bs.refs[key]) == 0 {
+			delete(bs.blocks, codanet.BlockHashToCid(key))
+		}
 	}
 	return nil
 }
+
+func (bs *testBitswapState) UpdateReferences(root_ [32]byte, exists bool, keys ...[32]byte) error {
+	for _, key := range keys {
+		keyRefs, hasKeyRefs := bs.refs[key]
+		if exists {
+			if !hasKeyRefs {
+				keyRefs = make(map[root]struct{})
+				bs.refs[key] = keyRefs
+			}
+			keyRefs[root_] = struct{}{}
+		} else {
+			if hasKeyRefs {
+				delete(keyRefs, root_)
+				if len(keyRefs) == 0 {
+					delete(bs.refs, key)
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (bs *testBitswapState) ViewBlock(key [32]byte, callback func([]byte) error) error {
 	cid := codanet.BlockHashToCid(key)
 	b, has := bs.blocks[cid]
@@ -734,7 +791,7 @@ func (bs *testBitswapState) CheckInvariants() {
 	}
 }
 
-func testBitswapDownloadDo(t *testing.T, r *rand.Rand, bg blockGroup, prepopulatedBlocks *cid.Set, removedBlocks map[cid.Cid]root, expectedToFail []root) {
+func testBitswapDownloadDo(t *testing.T, r *rand.Rand, bg blockGroup, prepopulatedBlocks *cid.Set, removedBlocks map[cid.Cid]root, expectedToFail []root) *testBitswapState {
 	expectedToTimeout := map[root]bool{}
 	for _, b := range removedBlocks {
 		expectedToTimeout[b] = true
@@ -749,6 +806,7 @@ func testBitswapDownloadDo(t *testing.T, r *rand.Rand, bg blockGroup, prepopulat
 	bs := &testBitswapState{
 		r:                  r,
 		statuses:           map[BitswapBlockLink]codanet.RootBlockStatus{},
+		refs:               map[BitswapBlockLink]map[root]struct{}{},
 		blocks:             initBlocks,
 		nodeDownloadParams: map[cid.Cid]map[root][]NodeIndex{},
 		rootDownloadStates: map[root]*RootDownloadState{},
@@ -857,13 +915,14 @@ loop:
 	if expectedToTimeoutTotal != len(bs.rootDownloadStates) {
 		t.Error("Unexpected number of root download states")
 	}
+	return bs
 }
 
 func genLargeBlockGroup(r *rand.Rand) (blockGroup, map[cid.Cid]root, []root) {
 	removedBlocks := make(map[cid.Cid]root)
 	expectFail := make([]root, 0)
 	bg1 := genValidBlockGroupImpl(r, genMaxBlockSize(r, 1000), r.Intn(100000)+64, 0)
-	_ = bg1.addDuplicateOfRoot(r, 0, 0)
+	_ = bg1.addDuplicateOfRoot(r, badHash, 0, 0)
 	for j := 0; j < 20; j++ {
 		bg1.add(genValidBlockGroupImpl(r, bg1.maxBlockSize, 256+r.Intn(10000), 0))
 	}
@@ -921,6 +980,80 @@ func (bs *testBitswapState) DataConfig() map[BitswapDataTag]BitswapDataConfig {
 		0: {maxSize: TEST_MAX_SIZE_1, downloadTimeout: TEST_DOWNLOAD_TIMEOUT},
 		1: {maxSize: TEST_MAX_SIZE_2, downloadTimeout: TEST_DOWNLOAD_TIMEOUT},
 		2: {maxSize: TEST_MAX_SIZE_3, downloadTimeout: TEST_DOWNLOAD_TIMEOUT},
+	}
+}
+
+// Check that all blocks belonging to root are present in state
+func traverseChildren(bg blockGroup, bs BitswapState, link [32]byte, callback func([32]byte, []byte) error) error {
+	cid := codanet.BlockHashToCid(link)
+	block := bg.blocks[cid]
+	if block != nil {
+		err := bs.ViewBlock(link, func(b []byte) error { return callback(link, b) })
+		if err != nil {
+			return err
+		}
+		links, _, err := ReadBitswapBlock(block)
+		if err != nil {
+			return err
+		}
+		for _, child := range links {
+			err = traverseChildren(bg, bs, child, callback)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func TestBitswapDownloadAndRemove(t *testing.T) {
+	seed := time.Now().Unix()
+	t.Logf("Seed: %d", seed)
+	r := rand.New(rand.NewSource(seed))
+	empty := cid.NewSet()
+	for i := 0; i < 1000; i++ {
+		bg := genValidBlockGroupWithManyDuplicates(r, 0, 1, 0)
+		rootIxs := r.Perm(len(bg.starts))
+		bs := testBitswapDownloadDo(t, r, bg, empty, make(map[cid.Cid]root), nil)
+		for _, rootIx := range rootIxs {
+			root := bg.starts[rootIx].root
+			err := traverseChildren(bg, bs, root, func(link [32]byte, b []byte) error {
+				if _, has := bs.refs[link][root]; !has {
+					return errors.New("reference not found")
+				}
+				return nil
+			})
+			if err != nil {
+				t.Errorf("Error checking refs: %s", err)
+			}
+		}
+		for i, rootIx := range rootIxs {
+			start := bg.starts[rootIx]
+			tag, err := DeleteRoot(bs, start.root)
+			panicOnErr(err)
+			require.Equal(t, start.tag, tag)
+			for _, otherRootIx := range rootIxs[i+1:] {
+				otherStart := bg.starts[otherRootIx]
+				status, err := bs.GetStatus(otherStart.root)
+				panicOnErr(err)
+				require.Equal(t, codanet.Full, status)
+				err = traverseChildren(bg, bs, otherStart.root, func(link [32]byte, b []byte) error {
+					cid := codanet.BlockHashToCid(link)
+					block := bg.blocks[cid]
+					if bytes.Equal(b, block) {
+						return nil
+					}
+					return errors.New("not equal blocks")
+				})
+				if err != nil {
+					t.Errorf("Error traversing children (rootIx=%d otherRootIx=%d) of other root %s: %s", rootIx, otherRootIx, codanet.BlockHashToCidSuffix(otherStart.root), err)
+				}
+			}
+		}
+		if t.Failed() {
+			bg.print()
+			break
+		}
 	}
 }
 

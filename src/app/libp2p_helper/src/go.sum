@@ -823,8 +823,8 @@ github.com/neelance/sourcemap v0.0.0-20151028013722-8c68805598ab/go.mod h1:Qr6/a
 github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI8A=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
 github.com/nxadm/tail v1.4.8/go.mod h1:+ncqLTQzXmGhMZNUePPaPqPvBxHAIsmXswZKocGu+AU=
-github.com/o1-labs/go-bs-lmdb v1.1.0 h1:qfZNYs5tMJ5Ym23avKIbpubfWJBtSJ1REhu51qb9U6M=
-github.com/o1-labs/go-bs-lmdb v1.1.0/go.mod h1:MGOPzEutRw24iN0qrSSbqOIzbgnyFQST/cKlnVSBmnI=
+github.com/o1-labs/go-bs-lmdb v1.2.1 h1:vweOC9utt/eUiaJvoREMuTvfR/uAej86nXopudKmzgU=
+github.com/o1-labs/go-bs-lmdb v1.2.1/go.mod h1:MGOPzEutRw24iN0qrSSbqOIzbgnyFQST/cKlnVSBmnI=
 github.com/o1-labs/go-bs-tests v0.0.6 h1:MytWPo5kOMgxK29UkU6ycWRJrMhuILUSQAtYpn5ek0g=
 github.com/o1-labs/go-libp2p-kad-dht-patcher v1.0.1 h1:ZHIunld4MHZ1+7ZVRGKkgSFiwgl63q+EwD54tXkWYmo=
 github.com/o1-labs/go-libp2p-kad-dht-patcher v1.0.1/go.mod h1:6mAIfA1Qlqr0n8Y1AZk4ErlVT5MX3JuYS9UKznySmA8=
