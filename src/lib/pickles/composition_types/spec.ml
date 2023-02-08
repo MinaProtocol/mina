@@ -64,6 +64,13 @@ module rec T : sig
         ; bool : (module Bool_intf with type var = 'bool)
         }
         -> ('a1 option, ('a2, 'bool) Plonk_types.Opt.t, 'env) t
+    | Opt_unflagged :
+        { inner : ('a1, 'a2, (< bool1 : bool ; bool2 : 'bool ; .. > as 'env)) t
+        ; flag : Plonk_types.Opt.Flag.t
+        ; dummy1 : 'a1
+        ; dummy2 : 'a2
+        }
+        -> ('a1 option, 'a2 option, 'env) t
     | Constant : 'a * ('a -> 'a -> unit) * ('a, 'b, 'env) t -> ('a, 'b, 'env) t
 end =
   T
@@ -132,6 +139,16 @@ let rec pack :
           Array.append
             (p.pack Bool b_constant_opt b)
             (pack ~zero ~one p inner x_constant_opt x) )
+  | Opt_unflagged { inner; flag; dummy1; dummy2 } -> (
+      match t with
+      | None ->
+          let t_constant_opt = Option.map t_constant_opt ~f:(fun _ -> dummy1) in
+          pack ~zero ~one p inner t_constant_opt dummy2
+      | Some x ->
+          let t_constant_opt =
+            Option.map ~f:(fun x -> Option.value_exn x) t_constant_opt
+          in
+          pack ~zero ~one p inner t_constant_opt x )
   | Constant (x, _, inner) ->
       pack ~zero ~one p inner (Some x) t
 
@@ -176,6 +193,25 @@ let rec typ :
         (* Always use the same "maybe" layout which is a boolean and then the value *)
         Plonk_types.Opt.constant_layout_typ bool flag ~dummy:dummy1
           ~dummy_var:dummy2 ~true_ ~false_ (typ t inner)
+    | Opt_unflagged { inner; flag; dummy1; dummy2 } -> (
+        match flag with
+        | Plonk_types.Opt.Flag.No ->
+            let open Snarky_backendless.Typ in
+            unit ()
+            |> Snarky_backendless.Typ.transport
+                 ~there:(function Some _ -> assert false | None -> ())
+                 ~back:(fun () -> None)
+            |> Snarky_backendless.Typ.transport_var
+                 ~there:(function Some _ -> assert false | None -> ())
+                 ~back:(fun x -> None)
+        | Plonk_types.Opt.Flag.(Yes | Maybe) ->
+            typ t inner
+            |> Snarky_backendless.Typ.transport
+                 ~there:(function Some x -> x | None -> dummy1)
+                 ~back:(fun x -> Some x)
+            |> Snarky_backendless.Typ.transport_var
+                 ~there:(function Some x -> x | None -> dummy2)
+                 ~back:(fun x -> Some x) )
     | Constant (x, assert_eq, spec) ->
         let (Typ typ) = typ t spec in
         let constant_var =
@@ -263,6 +299,16 @@ let rec etyp :
               ~false_:(f_bool' B.false_) bool flag a
           , f
           , f' )
+    | Opt_unflagged { inner; flag; dummy1; dummy2 } ->
+        let (T (typ, f, f_inv)) = etyp e inner in
+        let f x = Some (f x) in
+        let f_inv = function None -> f_inv dummy2 | Some x -> f_inv x in
+        let typ =
+          typ
+          |> Snarky_backendless.Typ.transport
+               ~there:(Option.value ~default:dummy1) ~back:(fun x -> Some x)
+        in
+        T (typ, f, f_inv)
     | Constant (x, assert_eq, spec) ->
         let (T (Typ typ, f, f')) = etyp e spec in
         let constant_var =

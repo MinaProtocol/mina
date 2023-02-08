@@ -70,6 +70,13 @@ module rec T : sig
            , ('a2, 'bool) Pickles_types.Plonk_types.Opt.t
            , (< bool1 : bool ; bool2 : 'bool ; .. > as 'env) )
            t
+    | Opt_unflagged :
+        { inner : ('a1, 'a2, (< bool1 : bool ; bool2 : 'bool ; .. > as 'env)) t
+        ; flag : Pickles_types.Plonk_types.Opt.Flag.t
+        ; dummy1 : 'a1
+        ; dummy2 : 'a2
+        }
+        -> ('a1 option, 'a2 option, 'env) t
     | Constant : 'a * ('a -> 'a -> unit) * ('a, 'b, 'env) t -> ('a, 'b, 'env) t
 end
 
