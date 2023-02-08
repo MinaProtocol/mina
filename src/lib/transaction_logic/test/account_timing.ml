@@ -77,4 +77,29 @@ let%test_module "Test account timing." =
           [%test_eq: txn_result]
             (validate_timing ~account ~txn_amount ~txn_global_slot)
             (Ok Untimed) )
+
+    let%test_unit "Before cliff time balance above the minimum can be spent." =
+      Quickcheck.test
+        (let open Quickcheck.Generator.Let_syntax in
+        let%bind account = Account.gen_timed in
+        let init_min_bal, cliff_time =
+          match account.timing with
+          | Account.Timing.Untimed ->
+              assert false (* the generator only generates timed accounts. *)
+          | Account.Timing.Timed t ->
+              (t.initial_minimum_balance, t.cliff_time)
+        in
+        let max_amount =
+          let open Balance in
+          account.balance - to_amount init_min_bal
+          |> Option.value_map ~default:Amount.zero ~f:to_amount
+        in
+        let%bind amount = Amount.(gen_incl zero max_amount) in
+        let max_slot = Global_slot.(of_int (to_int cliff_time - 1)) in
+        let%map slot = Global_slot.(gen_incl zero max_slot) in
+        (account, amount, slot))
+        ~f:(fun (account, txn_amount, txn_global_slot) ->
+          [%test_eq: txn_result]
+            (validate_timing ~account ~txn_amount ~txn_global_slot)
+            (Ok account.timing) )
   end )

@@ -823,7 +823,7 @@ let gen_timed =
     balance - to_amount initial_minimum_balance
     |> Option.value_map ~default:Amount.zero ~f:to_amount
   in
-  let%bind cliff_time = Global_slot.gen in
+  let%bind cliff_time = Global_slot.(gen_incl (of_int 1) max_value) in
   let%bind cliff_amount = Amount.(gen_incl zero initial_available_amount) in
   (* vesting period must be at least one to avoid division by zero *)
   let%bind vesting_period =
