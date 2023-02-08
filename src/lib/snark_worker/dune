@@ -45,6 +45,8 @@
    mina_state
    transaction_protocol_state
    ppx_version_runtime
+   ezcurl
+   uri
  )
  (preprocess
   (pps
