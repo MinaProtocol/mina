@@ -403,17 +403,29 @@ end
  ****************************)
 
 let out_of_circuit_constant () =
-  let one = Impl.Field.Constant.one in
-  let two = Impl.Field.Constant.of_int 2 in
-  let x = Impl.Field.constant one in
-  let y = Impl.Field.constant two in
-  let _const_mul : Impl.Field.t = Impl.Field.mul x y in
+  (* mul or addition should work within the Cvar AST *)
+  let one = Impl.Field.constant Impl.Field.Constant.one in
+  let two = Impl.Field.constant (Impl.Field.Constant.of_int 2) in
+  let _mul : Impl.Field.t = Impl.Field.mul one two in
+  let _add : Impl.Field.t = Impl.Field.add one two in
+
+  (* asserts on constant should be pure *)
+  Impl.Field.Assert.not_equal one two ;
+  Impl.Field.Assert.gt ~bit_length:2 two one ;
+  Impl.Field.Assert.gte ~bit_length:2 two one ;
+  Impl.Field.Assert.lt ~bit_length:2 one two ;
+  Impl.Field.Assert.lte ~bit_length:2 one two ;
+  Impl.Field.Assert.equal one one ;
+  Impl.Field.Assert.non_zero one ;
+  Impl.Field.Assert.not_equal one two ;
   ()
 
 let out_of_circuit_constraint () =
-  let one = Impl.Field.constant Impl.Field.Constant.one in
-  let two = Impl.Field.constant (Impl.Field.Constant.of_int 2) in
-  Impl.Field.Assert.not_equal one two
+  let one =
+    Impl.exists Impl.Field.typ ~compute:(fun _ -> Impl.Field.Constant.one)
+  in
+  let one_cst = Impl.Field.constant Impl.Field.Constant.one in
+  Impl.Field.Assert.equal one one_cst
 
 let out_of_circuit_constraint () =
   Alcotest.(
@@ -441,9 +453,14 @@ let () =
     List.map ~f:QCheck_alcotest.to_alcotest [ RangeCircuits.test_range_gates ]
   in
   Alcotest.run "Simple snarky tests"
-    [ ("outside of circuit tests", outside_circuit_tests)
+    [ ("outside of circuit tests before", outside_circuit_tests)
     ; ("API tests", api_tests)
     ; ("circuit tests", circuit_tests)
     ; ("As_prover tests", As_prover_circuits.as_prover_tests)
     ; ("range checks", range_checks)
+      (* We run the pure functions before and after other tests,
+         because we've had bugs in the past where it would only work after the global state was initialized by an API function
+         (like generate_witness, or constraint_system).
+      *)
+    ; ("outside of circuit tests after", outside_circuit_tests)
     ]
