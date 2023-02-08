@@ -50,6 +50,7 @@ RUN apt-get update --quiet \
     libprocps-dev \
     libsodium-dev \
     libssl-dev \
+    libcurl4-gnutls-dev \
     build-essential \
     ca-certificates \
     capnproto \
