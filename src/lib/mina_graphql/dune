@@ -81,7 +81,7 @@
    random_oracle
    coda_genesis_proof
    mina_version
-   coda_runtime_config
+   mina_runtime_config
    mina_base.import
    pickles.backend
    pickles_types
