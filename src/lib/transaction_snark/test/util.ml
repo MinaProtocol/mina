@@ -68,6 +68,10 @@ let trivial_zkapp =
   lazy
     (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
 
+type pass_number = Pass_1 | Pass_2
+
+let pass_number_to_int = function Pass_1 -> 1 | Pass_2 -> 2
+
 let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
     ?global_slot ?(state_body = genesis_state_body) ledger zkapp_commands =
   let module T = (val Lazy.force snark_module) in
@@ -104,10 +108,17 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
               with
               | Error err -> (
                   match expected_failure with
-                  | Some failure ->
+                  | Some (failure, Pass_1) ->
                       check_failure failure err ;
                       (* got expected failure, let's go *)
                       return Async.Deferred.unit
+                  | Some (failure, Pass_2) ->
+                      failwithf
+                        "apply_transaction_first_pass failed with %s, but \
+                         expected %s on pass 2"
+                        (Error.to_string_hum err)
+                        (Transaction_status.Failure.to_string failure)
+                        ()
                   | None ->
                       failwith
                         (sprintf "apply_transaction_first_pass failed with %s"
@@ -142,12 +153,18 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
           with
           | Error err -> (
               match expected_failure with
-              | Some failure ->
+              | Some (failure, Pass_2) ->
                   check_failure failure err ; Async.Deferred.unit
+              | Some (failure, Pass_1) ->
+                  failwithf
+                    "zkapp_command_witnesses_exn failed with %s, but expected \
+                     %s on pass 1"
+                    (Error.to_string_hum err)
+                    (Transaction_status.Failure.to_string failure)
+                    ()
               | None ->
-                  failwith
-                    (sprintf "zkapp_command_witnesses_exn failed with %s"
-                       (Error.to_string_hum err) ) )
+                  failwithf "zkapp_command_witnesses_exn failed with %s"
+                    (Error.to_string_hum err) () )
           | Ok witnesses -> (
               let open Async.Deferred.Let_syntax in
               let applied, statement_opt =
@@ -249,13 +266,14 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                   match command.status with
                   | Applied -> (
                       match expected_failure with
-                      | Some failure ->
+                      | Some (failure, pass) ->
                           failwith
                             (sprintf
                                !"Application did not fail as expected. \
                                  Expected failure: \
-                                 %{sexp:Mina_base.Transaction_status.Failure.t}"
-                               failure )
+                                 %{sexp:Mina_base.Transaction_status.Failure.t} \
+                                 on pass %d"
+                               failure (pass_number_to_int pass) )
                       | None ->
                           run_in_snark () )
                   | Failed failure_tbl -> (
@@ -266,7 +284,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                                !"Application failed. Failure statuses: %{sexp: \
                                  Mina_base.Transaction_status.Failure.Collection.t}"
                                failure_tbl )
-                      | Some failure ->
+                      | Some (failure, Pass_2) ->
                           let failures = List.concat failure_tbl in
                           assert (not (List.is_empty failures)) ;
                           let failed_as_expected =
@@ -277,15 +295,22 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                                      equal failure f) )
                           in
                           if not failed_as_expected then
-                            failwith
-                              (sprintf
-                                 !"Application failed but not as expected. \
-                                   Expected failure: \
-                                   %{sexp:Mina_base.Transaction_status.Failure.t} \
-                                   Failure statuses: %{sexp: \
-                                   Mina_base.Transaction_status.Failure.Collection.t}"
-                                 failure failure_tbl )
-                          else run_in_snark () ) )
+                            failwithf
+                              !"Application failed but not as expected. \
+                                Expected failure: \
+                                %{sexp:Mina_base.Transaction_status.Failure.t} \
+                                Failure statuses: %{sexp: \
+                                Mina_base.Transaction_status.Failure.Collection.t}"
+                              failure failure_tbl ()
+                          else run_in_snark ()
+                      | Some (failure, Pass_1) ->
+                          failwithf
+                            !"Expected failure during pass 1, which did not \
+                              occur: \
+                              %{sexp:Mina_base.Transaction_status.Failure.t} \
+                              Failure statuses during pass 2: %{sexp: \
+                              Mina_base.Transaction_status.Failure.Collection.t}"
+                            failure failure_tbl () ) )
               | _ ->
                   failwith "zkapp_command expected" ) ) )
 

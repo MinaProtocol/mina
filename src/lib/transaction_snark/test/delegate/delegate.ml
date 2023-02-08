@@ -1,11 +1,13 @@
 open Mina_base
+module U = Transaction_snark_tests.Util
 
 module Test_input : Transaction_snark_tests.Test_zkapp_update.Input_intf =
 struct
   let test_description = "delegate"
 
   let failure_expected =
-    Mina_base.Transaction_status.Failure.Update_not_permitted_delegate
+    ( Mina_base.Transaction_status.Failure.Update_not_permitted_delegate
+    , U.Pass_2 )
 
   let snapp_update =
     let pk =

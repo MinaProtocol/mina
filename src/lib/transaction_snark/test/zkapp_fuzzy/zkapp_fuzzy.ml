@@ -218,7 +218,8 @@ let test_timed_account ~trials ~max_account_updates () =
                   "generated zkapp_command" ;
                 U.check_zkapp_command_with_merges_exn
                   ~expected_failure:
-                    Transaction_status.Failure.Source_minimum_balance_violation
+                    ( Transaction_status.Failure.Source_minimum_balance_violation
+                    , Pass_1 )
                   ledger [ zkapp_command ] ~state_body:U.genesis_state_body ) )
       in
       for i = 0 to trials - 1 do
@@ -244,26 +245,28 @@ let () =
            ~max_account_updates () ;
          mk_invalid_test ~trials ~max_account_updates
            ~type_of_failure:Invalid_protocol_state_precondition
-           ~expected_failure_status:Protocol_state_precondition_unsatisfied ;
+           ~expected_failure_status:
+             (Protocol_state_precondition_unsatisfied, Pass_2) ;
          mk_invalid_test ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `App_state)
-           ~expected_failure_status:Update_not_permitted_app_state ;
+           ~expected_failure_status:(Update_not_permitted_app_state, Pass_2) ;
          mk_invalid_test ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `Verification_key)
-           ~expected_failure_status:Update_not_permitted_verification_key ;
+           ~expected_failure_status:
+             (Update_not_permitted_verification_key, Pass_2) ;
          mk_invalid_test ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `Zkapp_uri)
-           ~expected_failure_status:Update_not_permitted_zkapp_uri ;
+           ~expected_failure_status:(Update_not_permitted_zkapp_uri, Pass_2) ;
          mk_invalid_test ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `Token_symbol)
-           ~expected_failure_status:Update_not_permitted_token_symbol ;
+           ~expected_failure_status:(Update_not_permitted_token_symbol, Pass_2) ;
          mk_invalid_test ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `Voting_for)
-           ~expected_failure_status:Update_not_permitted_voting_for ;
+           ~expected_failure_status:(Update_not_permitted_voting_for, Pass_2) ;
          mk_invalid_test ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `Send)
-           ~expected_failure_status:Update_not_permitted_balance ;
+           ~expected_failure_status:(Update_not_permitted_balance, Pass_2) ;
          mk_invalid_test ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `Receive)
-           ~expected_failure_status:Update_not_permitted_balance ;
+           ~expected_failure_status:(Update_not_permitted_balance, Pass_2) ;
          test_timed_account ~trials ~max_account_updates ())
