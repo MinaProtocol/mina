@@ -75,16 +75,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { balance = "90000000000"; timing = Untimed }
         ; { balance = "10000000000"; timing = Untimed }
         ]
-    ; extra_genesis_accounts = [ { balance = "5000"; timing = Untimed } ]
     ; num_archive_nodes = 1
     ; num_snark_workers = 2
     ; snark_worker_fee = "0.0001"
-    ; proof_config =
-        { proof_config_default with
-          work_delay = Some 1
-        ; transaction_capacity =
-            Some Runtime_config.Proof_keys.Transaction_capacity.small
-        }
     }
 
   let logger = Logger.create ()
@@ -100,9 +93,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               @ Network.snark_coordinators network ) ) )
     in
     let whale1 = List.hd_exn block_producer_nodes in
+    let%bind whale1_pk = pub_key_of_node whale1 in
+    let%bind whale1_sk = priv_key_of_node whale1 in
     let constraint_constants = Network.constraint_constants network in
-    let fish1_kp = List.hd_exn @@ Network.extra_genesis_keypairs network in
-
+    let (whale1_kp : Keypair.t) =
+      { public_key = whale1_pk |> Public_key.decompress_exn
+      ; private_key = whale1_sk
+      }
+    in
     (* Build the provers for the various rules. *)
     let tag1, _, _, Pickles.Provers.[ trivial_prover1 ] =
       Zkapps_examples.compile () ~cache:Cache_dir.cache
@@ -187,7 +185,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Signed_command_memo.create_from_string_exn "Zkapp create account"
       in
       let (spec : Transaction_snark.For_tests.Deploy_snapp_spec.t) =
-        { sender = (fish1_kp, Account.Nonce.zero)
+        { sender = (whale1_kp, Account.Nonce.zero)
         ; fee = Currency.Fee.of_nanomina_int_exn 20_000_000
         ; fee_payer = None
         ; amount = Currency.Amount.of_mina_int_exn 100
