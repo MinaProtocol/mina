@@ -43,7 +43,8 @@ let pack_statement max_proofs_verified ~lookup ~feature_flags t =
     (Statement.spec
        (module Impl)
        max_proofs_verified Backend.Tock.Rounds.n lookup feature_flags )
-    (Statement.to_data t ~option_map:Plonk_types.Opt.map)
+    (Statement.to_data t ~option_map:Plonk_types.Opt.map
+       ~to_opt:Plonk_types.Opt.to_option_unsafe )
 
 let shifts ~log2_size = Common.tock_shifts ~log2_size
 

@@ -948,7 +948,7 @@ module Wrap : sig
              , ( ('challenge2 Scalar_challenge.t * unit) Hlist.HlistId.t
                , 'bool2 )
                opt
-             , ('field2, 'bool2) opt
+             , 'field2 option
              , 'bool2 )
              flat_repr
            , < bool1 : bool
@@ -979,11 +979,15 @@ module Wrap : sig
                    (   'h Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
                     -> ('h * unit) Hlist.HlistId.t )
               -> 'j Hlist0.Id.t )
-        -> ('c, 'a, 'b, 'e, 'f, 'g, 'j, 'fp_opt, 'bool) flat_repr
+        -> to_opt:('fp_opt -> 'fp_opt2)
+        -> ('c, 'a, 'b, 'e, 'f, 'g, 'j, 'fp_opt2, 'bool) flat_repr
 
       (** Construct a statement (as structured data) from the flat data-based representation. *)
       val of_data :
-           ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'fp_opt, 'bool) flat_repr
+           ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'fp option, 'bool) flat_repr
+        -> feature_flags:
+             Pickles_types.Plonk_types.Opt.Flag.t
+             Pickles_types.Plonk_types.Features.t
         -> option_map:
              (   'g Hlist0.Id.t
               -> f:
@@ -991,7 +995,8 @@ module Wrap : sig
                     -> 'h Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
                    )
               -> 'j )
-        -> ('b, 'c, 'a, 'fp_opt, 'j, 'bool, 'd, 'd, 'd, 'e, 'f) t
+        -> of_opt:(('fp, 'bool) Pickles_types.Plonk_types.Opt.t -> 'fp_opt2)
+        -> ('b, 'c, 'a, 'fp_opt2, 'j, 'bool, 'd, 'd, 'd, 'e, 'f) t
     end
 
     val to_minimal :
@@ -1237,9 +1242,7 @@ module Step : sig
                , ( ('challenge2 Scalar_challenge.t * unit) Hlist.HlistId.t
                  , 'field2 Snarky_backendless__Snark_intf.Boolean0.t )
                  Plonk_types.Opt.t
-               , ( 'field2
-                 , 'field2 Snarky_backendless__Snark_intf.Boolean0.t )
-                 Plonk_types.Opt.t
+               , 'field2 option
                , 'num_bulletproof_challenges )
                flat_repr
              , < bool1 : bool
@@ -1263,13 +1266,14 @@ module Step : sig
                      (   'h Deferred_values.Plonk.In_circuit.Lookup.t
                       -> ('h * unit) Hlist.HlistId.t )
                 -> 'j Hlist0.Id.t )
+          -> to_opt:('fp_opt -> 'fp_opt2)
           -> ( ('c, Nat.N9.n) Vector.t
              * ( ('f, Nat.N1.n) Vector.t
                * ( ('a, Nat.N2.n) Vector.t
                  * ( ('b, Nat.N3.n) Vector.t
                    * ( 'e
                      * ( ('g, Nat.N1.n) Vector.t
-                       * ('g vec9 * ('j * ('fp_opt vec12 * unit))) ) ) ) ) ) )
+                       * ('g vec9 * ('j * ('fp_opt2 vec12 * unit))) ) ) ) ) ) )
              Hlist.HlistId.t
 
         val of_data :
@@ -1279,15 +1283,20 @@ module Step : sig
                  * ( ('d, Nat.N3.n) Vector.t
                    * ( 'e
                      * ( ('f, Nat.N1.n) Vector.t
-                       * ('f vec9 * ('g * ('fp_opt vec12 * unit))) ) ) ) ) ) )
+                       * ('f vec9 * ('g * ('fp option vec12 * unit))) ) ) ) ) )
+             )
              Hlist.HlistId.t
+          -> feature_flags:
+               Pickles_types.Plonk_types.Opt.Flag.t
+               Pickles_types.Plonk_types.Features.t
           -> option_map:
                (   'g Hlist0.Id.t
                 -> f:
                      (   ('h * unit) Hlist.HlistId.t
                       -> 'h Deferred_values.Plonk.In_circuit.Lookup.t )
                 -> 'j )
-          -> ('c, 'd, 'a, 'fp_opt, 'j, 'e, 'b, 'f) t
+          -> of_opt:(('fp, 'f) Pickles_types.Plonk_types.Opt.t -> 'fp_opt2)
+          -> ('c, 'd, 'a, 'fp_opt2, 'j, 'e, 'b, 'f) t
 
         val map_lookup :
              ('a, 'b, 'c, 'fp_opt, 'd, 'e, 'f, 'g) t
@@ -1380,65 +1389,6 @@ module Step : sig
     type 'a vec9 :=
       ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit)))))))))
       Hlist.HlistId.t
-
-    val to_data :
-         ( ( ('a, 'b, 'c, 'fp_opt, 'd, 'e, 'f, 'g) Per_proof.In_circuit.t
-           , 'h )
-           Vector.t
-         , 'i Hlist0.Id.t )
-         t
-      -> ( (    option_map:
-                  (   'd
-                   -> f:
-                        (   'j Deferred_values.Plonk.In_circuit.Lookup.t
-                         -> ('j * unit) Hlist.HlistId.t )
-                   -> 'l Hlist0.Id.t )
-             -> ( ('c, Nat.N9.n) Vector.t
-                * ( ('f, Nat.N1.n) Vector.t
-                  * ( ('a, Nat.N2.n) Vector.t
-                    * ( ('b, Nat.N3.n) Vector.t
-                      * ( 'e
-                        * ( ('g, Nat.N1.n) Vector.t
-                          * ('g vec9 * ('l * ('fp_opt vec12 * unit))) ) ) ) ) )
-                )
-                Hlist.HlistId.t
-           , 'h )
-           Vector.t
-         * ('i * unit) )
-         Hlist.HlistId.t
-
-    val of_data :
-         ( ( ( ('a, Nat.N9.n) Vector.t
-             * ( ('b, Nat.N1.n) Vector.t
-               * ( ('c, Nat.N2.n) Vector.t
-                 * ( ('d, Nat.N3.n) Vector.t
-                   * ( 'e
-                     * ( ('f, Nat.N1.n) Vector.t
-                       * ('f vec9 * ('g * ('fp_opt vec12 * unit))) ) ) ) ) ) )
-             Hlist.HlistId.t
-           , 'h )
-           Vector.t
-         * ('i * unit) )
-         Hlist.HlistId.t
-      -> ( (    option_map:
-                  (   'g Hlist0.Id.t
-                   -> f:
-                        (   ('j * unit) Hlist.HlistId.t
-                         -> 'j Deferred_values.Plonk.In_circuit.Lookup.t )
-                   -> 'l )
-             -> ( 'c
-                , 'd
-                , 'a
-                , 'fp_opt
-                , 'l
-                , 'e Hlist0.Id.t
-                , 'b
-                , 'f )
-                Per_proof.In_circuit.t
-           , 'h )
-           Vector.t
-         , 'i )
-         t
 
     val typ :
          'f Spec.impl
@@ -1547,13 +1497,14 @@ module Step : sig
                  (   'k Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
                   -> ('k * unit) Hlist.HlistId.t )
             -> 'm Hlist0.Id.t )
+      -> to_opt:('fp_opt -> 'fp_opt2)
       -> ( ( ( ('c, Nat.N9.n) Vector.t
              * ( ('f, Nat.N1.n) Vector.t
                * ( ('a, Nat.N2.n) Vector.t
                  * ( ('b, Nat.N3.n) Vector.t
                    * ( 'e
                      * ( ('g, Nat.N1.n) Vector.t
-                       * ('g vec9 * ('m * ('fp_opt vec12 * unit))) ) ) ) ) ) )
+                       * ('g vec9 * ('m * ('fp_opt2 vec12 * unit))) ) ) ) ) ) )
              Hlist.HlistId.t
            , 'h )
            Vector.t
@@ -1567,22 +1518,27 @@ module Step : sig
                  * ( ('d, Nat.N3.n) Vector.t
                    * ( 'e
                      * ( ('f, Nat.N1.n) Vector.t
-                       * ('f vec9 * ('g * ('fp_opt vec12 * unit))) ) ) ) ) ) )
+                       * ('f vec9 * ('g * ('fp option vec12 * unit))) ) ) ) ) )
+             )
              Hlist.HlistId.t
            , 'h )
            Vector.t
          * ('i * ('j * unit)) )
          Hlist.HlistId.t
+      -> feature_flags:
+           Pickles_types.Plonk_types.Opt.Flag.t
+           Pickles_types.Plonk_types.Features.t
       -> option_map:
            (   'g Hlist0.Id.t
             -> f:
                  (   ('k * unit) Hlist.HlistId.t
                   -> 'k Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t )
             -> 'm )
+      -> of_opt:(('fp, 'f) Pickles_types.Plonk_types.Opt.t -> 'fp_opt2)
       -> ( ( ( 'c
              , 'd
              , 'a
-             , 'fp_opt
+             , 'fp_opt2
              , 'm
              , 'e Hlist0.Id.t
              , 'b
@@ -1631,12 +1587,7 @@ module Step : sig
                                , 'a Snarky_backendless.Cvar.t
                                  Snarky_backendless__Snark_intf.Boolean0.t )
                                Plonk_types.Opt.t
-                             * ( ( 'g
-                                 , 'a Snarky_backendless.Cvar.t
-                                   Snarky_backendless__Snark_intf.Boolean0.t )
-                                 Plonk_types.Opt.t
-                                 vec12
-                               * unit ) ) ) ) ) ) ) ) )
+                             * ('g option vec12 * unit) ) ) ) ) ) ) ) )
                Hlist.HlistId.t
              , 'b )
              Vector.t

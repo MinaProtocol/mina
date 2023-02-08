@@ -131,6 +131,21 @@ module Wrap = struct
               ; runtime_tables = f runtime_tables
               }
 
+            let map2 ~f t1 t2 =
+              { chacha0 = f t1.chacha0 t2.chacha0
+              ; chacha1 = f t1.chacha1 t2.chacha1
+              ; chacha2 = f t1.chacha2 t2.chacha2
+              ; chacha_final = f t1.chacha_final t2.chacha_final
+              ; range_check0 = f t1.range_check0 t2.range_check0
+              ; range_check1 = f t1.range_check1 t2.range_check1
+              ; foreign_field_add = f t1.foreign_field_add t2.foreign_field_add
+              ; foreign_field_mul = f t1.foreign_field_mul t2.foreign_field_mul
+              ; xor = f t1.xor t2.xor
+              ; rot = f t1.rot t2.rot
+              ; lookup_gate = f t1.lookup_gate t2.lookup_gate
+              ; runtime_tables = f t1.runtime_tables t2.runtime_tables
+              }
+
             let to_list
                 { chacha0
                 ; chacha1
@@ -217,17 +232,53 @@ module Wrap = struct
               ; runtime_tables
               }
 
+            let of_feature_flags (feature_flags : _ Plonk_types.Features.t) =
+              { chacha0 = feature_flags.chacha
+              ; chacha1 = feature_flags.chacha
+              ; chacha2 = feature_flags.chacha
+              ; chacha_final = feature_flags.chacha
+              ; range_check0 = feature_flags.range_check0
+              ; range_check1 = feature_flags.range_check1
+              ; foreign_field_add = feature_flags.foreign_field_add
+              ; foreign_field_mul = feature_flags.foreign_field_mul
+              ; xor = feature_flags.xor
+              ; rot = feature_flags.rot
+              ; lookup_gate = feature_flags.lookup
+              ; runtime_tables = feature_flags.runtime_tables
+              }
+
+            let make_opt feature_flags t =
+              let flags = of_feature_flags feature_flags in
+              map2 flags t ~f:(fun flag v ->
+                  match v with
+                  | Some v ->
+                      Plonk_types.Opt.Maybe (flag, v)
+                  | None ->
+                      Plonk_types.Opt.None )
+
+            let refine_opt feature_flags t =
+              let flags = of_feature_flags feature_flags in
+              map2 flags t ~f:(fun flag v ->
+                  match (flag, v) with
+                  | Plonk_types.Opt.Flag.Yes, Plonk_types.Opt.Maybe (_, v) ->
+                      Plonk_types.Opt.Some v
+                  | Plonk_types.Opt.Flag.Yes, _ ->
+                      assert false
+                  | Plonk_types.Opt.Flag.Maybe, _ ->
+                      v
+                  | Plonk_types.Opt.Flag.No, _ ->
+                      Plonk_types.Opt.None )
+
             let spec (type f) ((module Impl) : f impl) (zero : _ Zero_values.t)
                 (feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
                 =
               let opt_spec flag =
                 let opt_spec =
-                  Spec.T.Opt
+                  Spec.T.Opt_unflagged
                     { inner = B Field
                     ; flag
                     ; dummy1 = zero.value.scalar
                     ; dummy2 = zero.var.scalar
-                    ; bool = (module Impl.Boolean)
                     }
                 in
                 match flag with
@@ -236,19 +287,22 @@ module Wrap = struct
                 | _ ->
                     opt_spec
               in
+              let [ f1; f2; f3; f4; f5; f6; f7; f8; f9; f10; f11; f12 ] =
+                of_feature_flags feature_flags |> to_data
+              in
               Spec.T.Struct
-                [ opt_spec feature_flags.chacha
-                ; opt_spec feature_flags.chacha
-                ; opt_spec feature_flags.chacha
-                ; opt_spec feature_flags.chacha
-                ; opt_spec feature_flags.range_check0
-                ; opt_spec feature_flags.range_check1
-                ; opt_spec feature_flags.foreign_field_add
-                ; opt_spec feature_flags.foreign_field_mul
-                ; opt_spec feature_flags.xor
-                ; opt_spec feature_flags.rot
-                ; opt_spec feature_flags.lookup
-                ; opt_spec feature_flags.runtime_tables
+                [ opt_spec f1
+                ; opt_spec f2
+                ; opt_spec f3
+                ; opt_spec f4
+                ; opt_spec f5
+                ; opt_spec f6
+                ; opt_spec f7
+                ; opt_spec f8
+                ; opt_spec f9
+                ; opt_spec f10
+                ; opt_spec f11
+                ; opt_spec f12
                 ]
 
             let typ (type f fp)
@@ -970,7 +1024,7 @@ module Wrap = struct
            ; messages_for_next_step_proof
              (* messages_for_next_step_proof is represented as a digest inside the circuit *)
            } :
-            _ t ) ~option_map =
+            _ t ) ~option_map ~to_opt =
         let open Vector in
         let fp =
           [ combined_inner_product
@@ -994,8 +1048,9 @@ module Wrap = struct
         in
         let index = [ branch_data ] in
         let optional_column_scalars =
-          Proof_state.Deferred_values.Plonk.In_circuit.Optional_column_scalars
-          .to_data optional_column_scalars
+          let open
+            Proof_state.Deferred_values.Plonk.In_circuit.Optional_column_scalars in
+          optional_column_scalars |> map ~f:to_opt |> to_data
         in
         Hlist.HlistId.
           [ fp
@@ -1022,7 +1077,7 @@ module Wrap = struct
             ; feature_flags
             ; lookup
             ; optional_column_scalars
-            ] ~option_map : _ t =
+            ] ~feature_flags:flags ~option_map ~of_opt : _ t =
         let open Vector in
         let [ combined_inner_product
             ; b
@@ -1045,9 +1100,12 @@ module Wrap = struct
           digest
         in
         let [ branch_data ] = index in
+        let feature_flags = Plonk_types.Features.of_data feature_flags in
         let optional_column_scalars =
-          Proof_state.Deferred_values.Plonk.In_circuit.Optional_column_scalars
-          .of_data optional_column_scalars
+          let open
+            Proof_state.Deferred_values.Plonk.In_circuit.Optional_column_scalars in
+          of_data optional_column_scalars
+          |> make_opt feature_flags |> refine_opt flags |> map ~f:of_opt
         in
         { proof_state =
             { deferred_values =
@@ -1068,7 +1126,7 @@ module Wrap = struct
                     ; endomul
                     ; endomul_scalar
                     ; perm
-                    ; feature_flags = Plonk_types.Features.of_data feature_flags
+                    ; feature_flags
                     ; lookup =
                         option_map lookup
                           ~f:
@@ -1311,7 +1369,7 @@ module Step = struct
              ; should_finalize
              ; sponge_digest_before_evaluations
              } :
-              _ t ) ~option_map =
+              _ t ) ~option_map ~to_opt =
           let open Vector in
           let fq =
             [ combined_inner_product
@@ -1330,8 +1388,8 @@ module Step = struct
           let digest = [ sponge_digest_before_evaluations ] in
           let bool = [ should_finalize ] in
           let optional_column_scalars =
-            Deferred_values.Plonk.In_circuit.Optional_column_scalars.to_data
-              optional_column_scalars
+            let open Deferred_values.Plonk.In_circuit.Optional_column_scalars in
+            optional_column_scalars |> map ~f:to_opt |> to_data
           in
           let open Hlist.HlistId in
           [ fq
@@ -1367,7 +1425,13 @@ module Step = struct
               ; feature_flags
               ; lookup
               ; optional_column_scalars
-              ] ~option_map : _ t =
+              ] ~feature_flags:flags ~option_map ~of_opt : _ t =
+          let feature_flags = Plonk_types.Features.of_data feature_flags in
+          let optional_column_scalars =
+            let open Deferred_values.Plonk.In_circuit.Optional_column_scalars in
+            of_data optional_column_scalars
+            |> make_opt feature_flags |> refine_opt flags |> map ~f:of_opt
+          in
           { deferred_values =
               { xi
               ; bulletproof_challenges
@@ -1385,13 +1449,11 @@ module Step = struct
                   ; endomul
                   ; endomul_scalar
                   ; perm
-                  ; feature_flags = Plonk_types.Features.of_data feature_flags
+                  ; feature_flags
                   ; lookup =
                       option_map lookup
                         ~f:Deferred_values.Plonk.In_circuit.Lookup.of_struct
-                  ; optional_column_scalars =
-                      Deferred_values.Plonk.In_circuit.Optional_column_scalars
-                      .of_data optional_column_scalars
+                  ; optional_column_scalars
                   }
               }
           ; should_finalize
@@ -1422,11 +1484,13 @@ module Step = struct
         Spec.typ impl fq ~assert_16_bits
           (spec impl Backend.Tock.Rounds.n lookup_config feature_flags)
         |> Snarky_backendless.Typ.transport
-             ~there:(to_data ~option_map:Option.map)
-             ~back:(of_data ~option_map:Option.map)
+             ~there:(to_data ~option_map:Option.map ~to_opt:Fn.id)
+             ~back:
+               (of_data ~option_map:Option.map ~feature_flags
+                  ~of_opt:Opt.to_option )
         |> Snarky_backendless.Typ.transport_var
-             ~there:(to_data ~option_map:Opt.map)
-             ~back:(of_data ~option_map:Opt.map)
+             ~there:(to_data ~option_map:Opt.map ~to_opt:Opt.to_option_unsafe)
+             ~back:(of_data ~option_map:Opt.map ~feature_flags ~of_opt:Fn.id)
     end
 
     type ('unfinalized_proofs, 'messages_for_next_step_proof) t =
@@ -1497,10 +1561,10 @@ module Step = struct
     let to_data
         { proof_state = { unfinalized_proofs; messages_for_next_step_proof }
         ; messages_for_next_wrap_proof
-        } ~option_map =
+        } ~option_map ~to_opt =
       let open Hlist.HlistId in
       [ Vector.map unfinalized_proofs
-          ~f:(Proof_state.Per_proof.In_circuit.to_data ~option_map)
+          ~f:(Proof_state.Per_proof.In_circuit.to_data ~option_map ~to_opt)
       ; messages_for_next_step_proof
       ; messages_for_next_wrap_proof
       ]
@@ -1510,11 +1574,13 @@ module Step = struct
           [ unfinalized_proofs
           ; messages_for_next_step_proof
           ; messages_for_next_wrap_proof
-          ] ~option_map =
+          ] ~feature_flags ~option_map ~of_opt =
       { proof_state =
           { unfinalized_proofs =
               Vector.map unfinalized_proofs
-                ~f:(Proof_state.Per_proof.In_circuit.of_data ~option_map)
+                ~f:
+                  (Proof_state.Per_proof.In_circuit.of_data ~feature_flags
+                     ~option_map ~of_opt )
           ; messages_for_next_step_proof
           }
       ; messages_for_next_wrap_proof
