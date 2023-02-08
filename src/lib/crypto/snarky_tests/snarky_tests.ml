@@ -13,7 +13,6 @@ end)
 (* helpers *)
 
 let compare_with obtained filepath =
-  let (_ : int) = Sys.command "tree" in
   let filepath = "examples/" ^ filepath in
   let expected = In_channel.read_all filepath in
   if String.(trim obtained <> trim expected) then (
