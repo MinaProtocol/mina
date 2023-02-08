@@ -812,17 +812,29 @@ let gen_with_constrained_balance ~low ~high =
 
 let gen_timed =
   let open Quickcheck.Let_syntax in
+  let open Currency in
   let%bind public_key = Public_key.Compressed.gen in
   let%bind token_id = Token_id.gen in
   let account_id = Account_id.create public_key token_id in
-  let%bind balance = Currency.Balance.gen in
-  let%bind initial_minimum_balance = Currency.Balance.gen in
+  let%bind initial_minimum_balance = Balance.(gen_incl one max_int) in
+  let%bind balance = Balance.(gen_incl initial_minimum_balance max_int) in
+  let initial_available_amount =
+    let open Balance in
+    balance - to_amount initial_minimum_balance
+    |> Option.value_map ~default:Amount.zero ~f:to_amount
+  in
   let%bind cliff_time = Global_slot.gen in
-  let%bind cliff_amount = Amount.gen in
+  let%bind cliff_amount = Amount.(gen_incl zero initial_available_amount) in
   (* vesting period must be at least one to avoid division by zero *)
   let%bind vesting_period =
     Int.gen_incl 1 100 >>= Fn.compose return Global_slot.of_int
   in
   let%map vesting_increment = Amount.gen in
-  create_timed account_id balance ~initial_minimum_balance ~cliff_time
-    ~cliff_amount ~vesting_period ~vesting_increment
+  match
+    create_timed account_id balance ~initial_minimum_balance ~cliff_time
+      ~cliff_amount ~vesting_period ~vesting_increment
+  with
+  | Error e ->
+     failwith @@ Error.to_string_hum e
+  | Ok a ->
+      a

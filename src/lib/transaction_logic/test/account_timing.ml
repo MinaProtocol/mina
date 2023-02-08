@@ -52,4 +52,29 @@ let%test_module "Test account timing." =
                 txn_amount txn_global_slot account.balance
             |> Result.map_error ~f:(Error.tag ~tag:nsf_tag) )
             (validate_timing ~account ~txn_amount ~txn_global_slot) )
+
+    let%test_unit "Account with zero minimum balance becomes untimed." =
+      Quickcheck.test
+        (let open Quickcheck.Generator.Let_syntax in
+        let%bind a = Account.gen_timed in
+        let account =
+          let open Account in
+          let open Timing in
+          match a.timing with
+          | Untimed ->
+              a
+          | Timed t ->
+              { a with
+                timing = Timed { t with initial_minimum_balance = Balance.zero }
+              }
+        in
+        let%bind amount =
+          Amount.(gen_incl zero (Balance.to_amount account.balance))
+        in
+        let%map slot = Global_slot.gen in
+        (account, amount, slot))
+        ~f:(fun (account, txn_amount, txn_global_slot) ->
+          [%test_eq: txn_result]
+            (validate_timing ~account ~txn_amount ~txn_global_slot)
+            (Ok Untimed) )
   end )
