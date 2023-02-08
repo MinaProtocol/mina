@@ -221,13 +221,20 @@ module Wrap = struct
                 (feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
                 =
               let opt_spec flag =
-                Spec.T.Opt
-                  { inner = B Field
-                  ; flag
-                  ; dummy1 = zero.value.scalar
-                  ; dummy2 = zero.var.scalar
-                  ; bool = (module Impl.Boolean)
-                  }
+                let opt_spec =
+                  Spec.T.Opt
+                    { inner = B Field
+                    ; flag
+                    ; dummy1 = zero.value.scalar
+                    ; dummy2 = zero.var.scalar
+                    ; bool = (module Impl.Boolean)
+                    }
+                in
+                match flag with
+                | Plonk_types.Opt.Flag.No ->
+                    Spec.T.Constant (None, (fun _ _ -> (* TODO *) ()), opt_spec)
+                | _ ->
+                    opt_spec
               in
               Spec.T.Struct
                 [ opt_spec feature_flags.chacha
