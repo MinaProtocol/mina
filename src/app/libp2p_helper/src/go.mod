@@ -20,7 +20,7 @@ require (
 	github.com/libp2p/go-libp2p-record v0.2.0
 	github.com/multiformats/go-multiaddr v0.9.0
 	github.com/multiformats/go-multihash v0.2.3
-	github.com/o1-labs/go-bs-lmdb v1.1.0
+	github.com/o1-labs/go-bs-lmdb v1.2.1
 	github.com/o1-labs/go-libp2p-kad-dht-patcher v1.1.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/shirou/gopsutil/v3 v3.22.7

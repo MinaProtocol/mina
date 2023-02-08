@@ -27,12 +27,12 @@ func (m AddResourcePush) handle(app *app) {
 	}
 }
 
-type DeleteResourcePushT = ipc.Libp2pHelperInterface_DeleteResource
-type DeleteResourcePush DeleteResourcePushT
+type RemoveResourcePushT = ipc.Libp2pHelperInterface_RemoveResource
+type RemoveResourcePush RemoveResourcePushT
 
-func fromDeleteResourcePush(m ipcPushMessage) (pushMessage, error) {
-	i, err := m.DeleteResource()
-	return DeleteResourcePush(i), err
+func fromRemoveResourcePush(m ipcPushMessage) (pushMessage, error) {
+	i, err := m.RemoveResource()
+	return RemoveResourcePush(i), err
 }
 
 func extractRootBlockList(l ipc.RootBlockId_List) ([]root, error) {
@@ -52,14 +52,14 @@ func extractRootBlockList(l ipc.RootBlockId_List) ([]root, error) {
 	return ids, nil
 }
 
-func (m DeleteResourcePush) handle(app *app) {
-	idsM, err := DeleteResourcePushT(m).Ids()
+func (m RemoveResourcePush) handle(app *app) {
+	idsM, err := RemoveResourcePushT(m).Ids()
 	var links []root
 	if err == nil {
 		links, err = extractRootBlockList(idsM)
 	}
 	if err != nil {
-		app.P2p.Logger.Errorf("DeleteResourcePush.handle: error %s", err)
+		app.P2p.Logger.Errorf("RemoveResourcePush.handle: error %s", err)
 		return
 	}
 	app.bitswapCtx.deleteCmds <- bitswapDeleteCmd{links}

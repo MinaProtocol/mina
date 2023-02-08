@@ -702,6 +702,8 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		return nil, err
 	}
 	bitswapNetwork := bitnet.NewFromIpfsHost(host, kad, bitnet.Prefix(BitSwapExchange))
+	// Block store is provided, but only read-only methods are used
+	// TODO update Bitswap libraries to require only read-only methods
 	bs := bitswap.New(context.Background(), bitswapNetwork, bstore.Blockstore())
 
 	// nil fields are initialized by beginAdvertising

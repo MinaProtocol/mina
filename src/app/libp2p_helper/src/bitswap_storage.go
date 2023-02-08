@@ -1,7 +1,9 @@
 package codanet
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 
 	blocks "github.com/ipfs/go-block-format"
@@ -24,14 +26,23 @@ type BitswapStorage interface {
 	GetStatus(ctx context.Context, key [32]byte) (RootBlockStatus, error)
 	SetStatus(ctx context.Context, key [32]byte, value RootBlockStatus) error
 	DeleteStatus(ctx context.Context, key [32]byte) error
+
+	// Delete blocks for which no reference exist
 	DeleteBlocks(ctx context.Context, keys [][32]byte) error
+
 	ViewBlock(ctx context.Context, key [32]byte, callback func([]byte) error) error
 	StoreBlocks(ctx context.Context, blocks []blocks.Block) error
+
+	// Reference or dereference blocks related to the root.
+	// Blocks with references are protected from deletion.
+	UpdateReferences(ctx context.Context, root [32]byte, exists bool, keys ...[32]byte) error
 }
 
 type BitswapStorageLmdb struct {
 	blockstore *lmdbbs.Blockstore
 	statusDB   lmdb.DBI
+	// Reference DB
+	refsDB lmdb.DBI
 }
 
 func OpenBitswapStorageLmdb(path string) (*BitswapStorageLmdb, error) {
@@ -51,7 +62,11 @@ func OpenBitswapStorageLmdb(path string) (*BitswapStorageLmdb, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create/open lmdb status database: %s", err)
 	}
-	return &BitswapStorageLmdb{blockstore: blockstore, statusDB: statusDB}, nil
+	refsDB, err := blockstore.OpenDB("refs")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create/open lmdb refs database: %w", err)
+	}
+	return &BitswapStorageLmdb{blockstore: blockstore, statusDB: statusDB, refsDB: refsDB}, nil
 }
 
 func (b *BitswapStorageLmdb) Blockstore() blockstore.Blockstore {
@@ -87,6 +102,19 @@ func (bs *BitswapStorageLmdb) GetStatus(ctx context.Context, key [32]byte) (res 
 	return
 }
 
+func (bs *BitswapStorageLmdb) UpdateReferences(ctx context.Context, root [32]byte, exists bool, keys ...[32]byte) error {
+	for _, key := range keys {
+		compositeKey := append(key[:], root[:]...)
+		err := bs.blockstore.PutData(ctx, bs.refsDB, compositeKey, func([]byte, bool) ([]byte, bool, error) {
+			return nil, exists, nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (bs *BitswapStorageLmdb) DeleteStatus(ctx context.Context, key [32]byte) error {
 	return bs.blockstore.PutData(ctx, bs.statusDB, key[:], func(prevVal []byte, exists bool) ([]byte, bool, error) {
 		prev, err := UnmarshalRootBlockStatus(prevVal)
@@ -118,17 +146,34 @@ func (bs *BitswapStorageLmdb) SetStatus(ctx context.Context, key [32]byte, newSt
 			}
 		}
 		if !isStatusTransitionAllowed(exists, prev, newStatus) {
-			return nil, false, fmt.Errorf("wrong status transition: from %d to %d", prev, newStatus)
+			return nil, false, fmt.Errorf("wrong status transition: from %d to %d (exists: %v)", prev, newStatus, exists)
 		}
 		return []byte{byte(newStatus)}, true, nil
 	})
 }
-func (bs *BitswapStorageLmdb) DeleteBlocks(ctx context.Context, keys [][32]byte) error {
-	cids := make([]cid.Cid, len(keys))
-	for i, key := range keys {
-		cids[i] = BlockHashToCid(key)
+func hasKeyWithPrefix(db lmdb.DBI, txn *lmdb.Txn, prefix []byte) (bool, error) {
+	cur, err := txn.OpenCursor(db)
+	if err != nil {
+		return false, err
 	}
-	return bs.blockstore.DeleteMany(ctx, cids)
+	defer cur.Close()
+	k, _, err := cur.Get(prefix, nil, lmdb.SetRange)
+	if lmdb.IsNotFound(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	return bytes.HasPrefix(k, prefix), nil
+}
+func (bs *BitswapStorageLmdb) DeleteBlocks(ctx context.Context, keys [][32]byte) error {
+	keys_ := make([][]byte, len(keys))
+	for i := range keys {
+		keys_[i] = keys[i][:]
+	}
+	return bs.blockstore.DeleteBlocksIf(ctx, keys_, func(txn *lmdb.Txn, key []byte) (bool, error) {
+		hasPrefix, err := hasKeyWithPrefix(bs.refsDB, txn, key)
+		return !hasPrefix, err
+	})
 }
 
 const (
@@ -144,6 +189,16 @@ func cidToKeyMapper(id cid.Cid) []byte {
 		return mh.Digest
 	}
 	return nil
+}
+
+func CidToBlockHash(id cid.Cid) ([32]byte, error) {
+	mh, err := multihash.Decode(id.Hash())
+	var res [32]byte
+	if err == nil && mh.Code == MULTI_HASH_CODE && id.Prefix().Codec == cid.Raw && len(mh.Digest) == 32 {
+		copy(res[:], mh.Digest)
+		return res, nil
+	}
+	return res, errors.New("unexpected format of cid")
 }
 
 func keyToCidMapperDo(key []byte) cid.Cid {

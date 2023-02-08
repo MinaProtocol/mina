@@ -332,7 +332,7 @@ struct Libp2pHelperInterface {
     result @1 :ValidationResult;
   }
 
-  struct DeleteResource {
+  struct RemoveResource {
     ids @0 :List(RootBlockId);
   }
 
@@ -420,7 +420,7 @@ struct Libp2pHelperInterface {
     union {
       validation @1 :Libp2pHelperInterface.Validation;
       addResource @2 :Libp2pHelperInterface.AddResource;
-      deleteResource @3 :Libp2pHelperInterface.DeleteResource;
+      removeResource @3 :Libp2pHelperInterface.RemoveResource;
       downloadResource @4 :Libp2pHelperInterface.DownloadResource;
       heartbeatPeer @5 :Libp2pHelperInterface.HeartbeatPeer;
     }

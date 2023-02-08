@@ -100,6 +100,8 @@ val create_add_resource_push_message : tag:int -> data:string -> push_message
 val create_download_resource_push_message :
   tag:int -> ids:string list -> push_message
 
+val create_remove_resource_push_message : ids:string list -> push_message
+
 val create_heartbeat_peer_push_message : peer_id:Peer.Id.t -> push_message
 
 val push_message_to_outgoing_message : push_message -> outgoing_message
