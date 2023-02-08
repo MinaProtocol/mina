@@ -38,8 +38,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%map output = Async_unix.Process.collect_output_and_wait process in
     let stdout = String.strip output.stdout in
     [%log info] "Stdout: $stdout" ~metadata:[ ("stdout", `String stdout) ] ;
-    if not (String.is_empty output.stderr) then
-      Malleable_error.hard_error_string output.stderr
+    if not (String.is_empty output.stderr) then (
+      [%log error]
+        "An error occured during the execution of the test script: %s"
+        output.stderr ;
+      Malleable_error.hard_error_string output.stderr )
     else Malleable_error.ok_unit
 
   let run network t =

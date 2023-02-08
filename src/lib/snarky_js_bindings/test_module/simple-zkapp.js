@@ -54,4 +54,6 @@ console.log(
 let zkappKey = PrivateKey.fromBase58(zkappKeyBase58);
 let zkappAddress = zkappKey.toPublicKey();
 
+console.log(`simple-zkapp.js: Starting integration test`);
+
 throw Error("invalid something");
