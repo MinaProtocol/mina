@@ -51,11 +51,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
     let block_producer_nodes = Network.block_producers network in
     let node = List.hd_exn block_producer_nodes in
-    let%bind my_sk = priv_key_of_node node in
-    let ({ private_key = zkapp_sk; public_key = _zkapp_pk }
-          : Signature_lib.Keypair.t ) =
-      Signature_lib.Keypair.create ()
-    in
+    let%bind fee_payer_key = priv_key_of_node node in
     let graphql_uri = Network.Node.graphql_uri node in
 
     let%bind () =
@@ -68,8 +64,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ~prog:"./src/lib/snarky_js_bindings/test_module/node"
             ~args:
               [ "src/lib/snarky_js_bindings/test_module/simple-zkapp.js"
-              ; Signature_lib.Private_key.to_base58_check zkapp_sk
-              ; Signature_lib.Private_key.to_base58_check my_sk
+              ; Signature_lib.Private_key.to_base58_check fee_payer_key
               ; graphql_uri
               ]
             ()
