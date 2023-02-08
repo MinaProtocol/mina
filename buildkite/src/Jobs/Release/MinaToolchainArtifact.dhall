@@ -24,7 +24,6 @@ Pipeline.build
           S.strictlyStart (S.contains "dockerfiles/stages/3-"),
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaToolchainArtifact"),
           S.strictly (S.contains "opam.export")
-          S.strictlyStart (S.contains "dockerfiles/stages/3-"),
           -- Rust version has changed
           S.strictlyEnd (S.contains "rust-toolchain.toml"),
         ],
