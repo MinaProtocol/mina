@@ -401,8 +401,8 @@ end
  * outside-of-circuit tests *
  ****************************)
 
-(** this is a pure function and should be runnable from anywhere *)
-let out_of_circuit_constant () =
+(** This is a pure function and should be runnable from anywhere. *)
+let out_of_circuit_pure_function () =
   (* mul or addition should work within the Cvar AST *)
   let one = Impl.Field.constant Impl.Field.Constant.one in
   let two = Impl.Field.constant (Impl.Field.Constant.of_int 2) in
@@ -420,23 +420,24 @@ let out_of_circuit_constant () =
   Impl.Field.Assert.not_equal one two ;
   ()
 
-(** this should be an impure function, and as such needs to be run within an API function (e.g. generate_witness, constraint_system). Otherwise it is expected to fail *)
-let out_of_circuit_constraint () =
+(** This should be an impure function, and as such needs to be run within an API function (e.g. generate_witness, constraint_system). Otherwise it is expected to fail. *)
+let out_of_circuit_impure_function () =
+  printf "out_of_circuit_impure_function: %s\n" (Impl.dump ()) ;
   let one =
     Impl.exists Impl.Field.typ ~compute:(fun _ -> Impl.Field.Constant.one)
   in
   let one_cst = Impl.Field.constant Impl.Field.Constant.one in
   Impl.Field.Assert.equal one one_cst
 
-let out_of_circuit_constraint () =
+let out_of_circuit_impure_function () =
   Alcotest.(
     check_raises "should fail to create constraints outside of a circuit"
       (Failure "This function can't be run outside of a checked computation."))
-    out_of_circuit_constraint
+    out_of_circuit_impure_function
 
 let outside_circuit_tests =
-  [ ("out-of-circuit constant", `Quick, out_of_circuit_constant)
-  ; ("out-of-circuit constraint (bad)", `Quick, out_of_circuit_constraint)
+  [ ("out-of-circuit constant", `Quick, out_of_circuit_pure_function)
+  ; ("out-of-circuit constraint (bad)", `Quick, out_of_circuit_impure_function)
   ]
 
 (* run tests *)
