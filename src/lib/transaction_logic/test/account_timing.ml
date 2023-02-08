@@ -102,4 +102,79 @@ let%test_module "Test account timing." =
           [%test_eq: txn_result]
             (validate_timing ~account ~txn_amount ~txn_global_slot)
             (Ok account.timing) )
+
+    let%test_unit "Minimum balance decreases over time." =
+      Quickcheck.test
+        (let open Quickcheck.Generator.Let_syntax in
+        let%bind account = Account.gen_timed in
+        let initial_minimum_balance, cliff_time =
+          match account.timing with
+          | Account.Timing.Untimed ->
+              assert false (* the generator only generates timed accounts. *)
+          | Account.Timing.Timed t ->
+              (t.initial_minimum_balance, t.cliff_time)
+        in
+        let available_amount =
+          let open Balance in
+          account.balance - to_amount initial_minimum_balance
+          |> Option.value_map ~f:Balance.to_amount ~default:Amount.zero
+        in
+        let%bind amount = Amount.(gen_incl zero available_amount) in
+        let%map slot = Global_slot.(gen_incl cliff_time max_value) in
+        (account, amount, slot))
+        ~f:(fun (account, txn_amount, txn_global_slot) ->
+          let open Account.Timing in
+          [%test_pred: txn_result]
+            (function
+              | Ok Untimed ->
+                  true
+              | Ok (Timed t) -> (
+                  match account.Account.Poly.timing with
+                  | Untimed ->
+                      false
+                  | Timed initial_t ->
+                      let open Balance in
+                      t.initial_minimum_balance
+                      <= initial_t.initial_minimum_balance )
+              | Error _ ->
+                  false )
+            (validate_timing ~account ~txn_amount ~txn_global_slot) )
+
+    let%test_unit "Timed accounts fail if minimum balance would be violated." =
+      Quickcheck.test
+        (let open Quickcheck.Generator.Let_syntax in
+        let%bind account = Account.gen_timed in
+        let initial_minimum_balance, cliff_time =
+          match account.timing with
+          | Account.Timing.Untimed ->
+              assert false (* the generator only generates timed accounts. *)
+          | Account.Timing.Timed t ->
+              (t.initial_minimum_balance, t.cliff_time)
+        in
+        let available_amount =
+          let open Balance in
+          (let open Option.Let_syntax in
+          let%bind avail =
+            account.balance - to_amount initial_minimum_balance
+          in
+          Amount.(to_amount avail + of_nanomina_int_exn 1))
+          |> Option.value ~default:Amount.zero
+        in
+        let%bind amount =
+          Amount.(gen_incl available_amount (Balance.to_amount account.balance))
+        in
+        let%map slot =
+          Global_slot.(gen_incl zero (of_int @@ (to_int cliff_time - 1)))
+        in
+        (initial_minimum_balance, account, amount, slot))
+        ~f:(fun (min_balance, account, txn_amount, txn_global_slot) ->
+          [%test_eq: txn_result]
+            ( Or_error.errorf
+                !"For timed account, the requested transaction for amount \
+                  %{sexp: Amount.t} at global slot %{sexp: Global_slot.t}, \
+                  applying the transaction would put the balance below the \
+                  calculated minimum balance of %{sexp: Balance.t}"
+                txn_amount txn_global_slot min_balance
+            |> Or_error.tag ~tag:min_balance_tag )
+            (validate_timing ~account ~txn_amount ~txn_global_slot) )
   end )
