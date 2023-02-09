@@ -124,7 +124,7 @@ end
 module Plonk_constraint = struct
   open Core_kernel
 
-  (** A PLONK constraint (or gate) can be [Basic], [Poseidon], [EC_add_complete], [EC_scale], [EC_endoscale], or [EC_endoscalar]. *)
+  (** A PLONK constraint (or gate) can be [Basic], [Poseidon], [EC_add_complete], [EC_scale], [EC_endoscale], [EC_endoscalar], [Xor16] *)
   module T = struct
     type ('v, 'f) t =
       | Basic of { l : 'f * 'v; r : 'f * 'v; o : 'f * 'v; m : 'f; c : 'f }
@@ -144,6 +144,26 @@ module Plonk_constraint = struct
       | EC_endoscale of
           { state : 'v Endoscale_round.t array; xs : 'v; ys : 'v; n_acc : 'v }
       | EC_endoscalar of { state : 'v Endoscale_scalar_round.t array }
+      | Xor16 of
+          { in1 : 'v
+          ; in2 : 'v
+          ; out : 'v
+          ; in1_0 : 'v
+          ; in1_1 : 'v
+          ; in1_2 : 'v
+          ; in1_3 : 'v
+          ; in2_0 : 'v
+          ; in2_1 : 'v
+          ; in2_2 : 'v
+          ; in2_3 : 'v
+          ; out_0 : 'v
+          ; out_1 : 'v
+          ; out_2 : 'v
+          ; out_3 : 'v
+          ; next_in1 : 'v
+          ; next_in2 : 'v
+          ; next_out : 'v
+          }
     [@@deriving sexp]
 
     (** map t *)
@@ -180,6 +200,46 @@ module Plonk_constraint = struct
           EC_endoscalar
             { state =
                 Array.map ~f:(fun x -> Endoscale_scalar_round.map ~f x) state
+            }
+      | Xor16
+          { in1
+          ; in2
+          ; out
+          ; in1_0
+          ; in1_1
+          ; in1_2
+          ; in1_3
+          ; in2_0
+          ; in2_1
+          ; in2_2
+          ; in2_3
+          ; out_0
+          ; out_1
+          ; out_2
+          ; out_3
+          ; next_in1
+          ; next_in2
+          ; next_out
+          } ->
+          Xor16
+            { in1 = f in1
+            ; in2 = f in2
+            ; out = f out
+            ; in1_0 = f in1_0
+            ; in1_1 = f in1_1
+            ; in1_2 = f in1_2
+            ; in1_3 = f in1_3
+            ; in2_0 = f in2_0
+            ; in2_1 = f in2_1
+            ; in2_2 = f in2_2
+            ; in2_3 = f in2_3
+            ; out_0 = f out_0
+            ; out_1 = f out_1
+            ; out_2 = f out_2
+            ; out_3 = f out_3
+            ; next_in1 = f next_in1
+            ; next_in2 = f next_in2
+            ; next_out = f next_out
             }
 
     (** [eval (module F) get_variable gate] checks that [gate]'s polynomial is
@@ -1069,6 +1129,7 @@ end = struct
              ; None
              ; None
              ; None
+             ; None
             |]
           in
           add_row sys vars Zero [||]
@@ -1242,6 +1303,55 @@ end = struct
           ~f:
             (Fn.compose add_endoscale_scalar_round
                (Endoscale_scalar_round.map ~f:reduce_to_v) )
+    | Plonk_constraint.T
+        (Xor16
+          { in1
+          ; in2
+          ; out
+          ; in1_0
+          ; in1_1
+          ; in1_2
+          ; in1_3
+          ; in2_0
+          ; in2_1
+          ; in2_2
+          ; in2_3
+          ; out_0
+          ; out_1
+          ; out_2
+          ; out_3
+          ; next_in1
+          ; next_in2
+          ; next_out
+          } ) ->
+        let curr_row =
+          [| Some (reduce_to_v in1)
+           ; Some (reduce_to_v in2)
+           ; Some (reduce_to_v out)
+           ; Some (reduce_to_v in1_0)
+           ; Some (reduce_to_v in1_1)
+           ; Some (reduce_to_v in1_2)
+           ; Some (reduce_to_v in1_3)
+           ; Some (reduce_to_v in2_0)
+           ; Some (reduce_to_v in2_1)
+           ; Some (reduce_to_v in2_2)
+           ; Some (reduce_to_v in2_3)
+           ; Some (reduce_to_v out_0)
+           ; Some (reduce_to_v out_1)
+           ; Some (reduce_to_v out_2)
+           ; Some (reduce_to_v out_3)
+          |]
+        in
+        let left = Some (reduce_to_v next_in1) in
+        let right = Some (reduce_to_v next_in2) in
+        let output = Some (reduce_to_v next_out) in
+        let var = Option.map ~f:snd in
+
+        (* The generic gate after a Xor16 gate is a Const to check that all values are zero. For that, the first coefficient is 1 and the rest will be zero.*)
+        add_row sys curr_row Xor16 [||] ;
+        add_generic_constraint ?left:(var left) ?right:(var right)
+          ?output:(var output)
+          [| Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.zero |]
     | constr ->
         failwithf "Unhandled constraint %s"
           Obj.(Extension_constructor.name (Extension_constructor.of_val constr))
