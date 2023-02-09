@@ -119,7 +119,7 @@ val finalize_other_proof :
        Pickles_types.Vector.t
   -> ( Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
      , Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
-       Pickles__.Import.Scalar_challenge.t
+       Import.Scalar_challenge.t
      , Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
        Pickles_types.Shifted_value.Type2.t
      , ( Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
@@ -130,11 +130,11 @@ val finalize_other_proof :
      , Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
        Snarky_backendless.Boolean.t
      , ( Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
-         Pickles__.Import.Scalar_challenge.t
-         Pickles__.Import.Bulletproof_challenge.t
+         Import.Scalar_challenge.t
+         Import.Bulletproof_challenge.t
        , 'c )
        Pickles_types.Vector.t )
-     Pickles__.Import.Types.Step.Proof_state.Deferred_values.In_circuit.t
+     Import.Types.Step.Proof_state.Deferred_values.In_circuit.t
   -> ( Wrap_main_inputs.Impl.Field.t
      , Wrap_main_inputs.Impl.Field.t Array.t
      , Wrap_main_inputs.Impl.Boolean.var )
