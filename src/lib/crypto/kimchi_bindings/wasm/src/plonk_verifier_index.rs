@@ -3,7 +3,6 @@ use ark_ec::AffineCurve;
 use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use array_init::array_init;
-use commitment_dlog::srs::SRS;
 use kimchi::circuits::{
     constraints::FeatureFlags,
     lookup::lookups::{LookupFeatures, LookupPatterns},
@@ -14,6 +13,7 @@ use kimchi::circuits::{
 use kimchi::linearization::expr_linearization;
 use kimchi::verifier_index::VerifierIndex as DlogVerifierIndex;
 use paste::paste;
+use poly_commitment::srs::SRS;
 use std::path::Path;
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
@@ -378,7 +378,7 @@ macro_rules! impl_verification_key {
                     // Rc<_>s into weak pointers.
                     SRSValue::Ref(unsafe { &*Rc::into_raw(urs_copy) })
                 }; */
-                let (endo_q, _endo_r) = commitment_dlog::srs::endos::<$GOther>();
+                let (endo_q, _endo_r) = poly_commitment::srs::endos::<$GOther>();
                 let domain = Domain::<$F>::new(1 << log_size_of_group).unwrap();
 
                 let feature_flags =
@@ -486,7 +486,7 @@ macro_rules! impl_verification_key {
                 path: String,
             ) -> Result<DlogVerifierIndex<$G>, JsValue> {
                 let path = Path::new(&path);
-                let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
+                let (endo_q, _endo_r) = poly_commitment::srs::endos::<GAffineOther>();
                 DlogVerifierIndex::<$G>::from_file(
                     Some(srs.0.clone()),
                     path,
@@ -561,7 +561,7 @@ macro_rules! impl_verification_key {
                 index: &$WasmIndex,
             ) -> WasmPlonkVerifierIndex {
                 {
-                    let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
+                    let ptr: &mut poly_commitment::srs::SRS<GAffine> =
                         unsafe { &mut *(std::sync::Arc::as_ptr(&index.0.as_ref().srs) as *mut _) };
                     ptr.add_lagrange_basis(index.0.as_ref().cs.domain.d1);
                 }

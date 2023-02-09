@@ -7,8 +7,6 @@ use crate::srs::fp::CamlFpSrs;
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-use commitment_dlog::commitment::caml::CamlPolyComm;
-use commitment_dlog::{commitment::PolyComm, srs::SRS};
 use kimchi::circuits::constraints::FeatureFlags;
 use kimchi::circuits::lookup::lookups::{LookupFeatures, LookupPatterns};
 use kimchi::circuits::polynomials::permutation::Shifts;
@@ -16,6 +14,8 @@ use kimchi::circuits::polynomials::permutation::{zk_polynomial, zk_w3};
 use kimchi::circuits::wires::{COLUMNS, PERMUTS};
 use kimchi::{linearization::expr_linearization, verifier_index::VerifierIndex};
 use mina_curves::pasta::{Fp, Pallas, Vesta};
+use poly_commitment::commitment::caml::CamlPolyComm;
+use poly_commitment::{commitment::PolyComm, srs::SRS};
 use std::convert::TryInto;
 use std::path::Path;
 
@@ -63,7 +63,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
         let evals = index.evals;
         let shifts = index.shifts;
 
-        let (endo_q, _endo_r) = commitment_dlog::srs::endos::<Pallas>();
+        let (endo_q, _endo_r) = poly_commitment::srs::endos::<Pallas>();
         let domain = Domain::<Fp>::new(1 << index.domain.log_size_of_group).expect("wrong size");
 
         let coefficients_comm: Vec<PolyComm<Vesta>> =
@@ -165,7 +165,7 @@ pub fn read_raw(
     path: String,
 ) -> Result<VerifierIndex<Vesta>, ocaml::Error> {
     let path = Path::new(&path);
-    let (endo_q, _endo_r) = commitment_dlog::srs::endos::<Pallas>();
+    let (endo_q, _endo_r) = poly_commitment::srs::endos::<Pallas>();
     VerifierIndex::<Vesta>::from_file(Some(srs.0), path, offset.map(|x| x as u64), endo_q).map_err(
         |_e| {
             ocaml::Error::invalid_argument("caml_pasta_fp_plonk_verifier_index_raw_read")
@@ -212,7 +212,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_create(
     index: CamlPastaFpPlonkIndexPtr,
 ) -> CamlPastaFpPlonkVerifierIndex {
     {
-        let ptr: &mut commitment_dlog::srs::SRS<Vesta> =
+        let ptr: &mut poly_commitment::srs::SRS<Vesta> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
         ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }

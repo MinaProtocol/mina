@@ -1,8 +1,10 @@
 use ark_ec::AffineCurve;
-use commitment_dlog::{commitment::CommitmentCurve, PolyComm};
 use kimchi::circuits::lookup::index::LookupSelectors;
-use kimchi::circuits::lookup::lookups::{LookupFeatures, LookupInfo, LookupPattern, LookupPatterns};
+use kimchi::circuits::lookup::lookups::{
+    LookupFeatures, LookupInfo, LookupPattern, LookupPatterns,
+};
 use kimchi::verifier_index::LookupVerifierIndex;
+use poly_commitment::{commitment::CommitmentCurve, PolyComm};
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlPlonkDomain<Fr> {
@@ -115,7 +117,7 @@ impl From<CamlLookupInfo> for LookupInfo {
             LookupFeatures {
                 patterns,
                 joint_lookup_used: max_joint_size > 1,
-                uses_runtime_tables
+                uses_runtime_tables,
             }
         };
         LookupInfo {

@@ -8,10 +8,7 @@ use crate::{
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use array_init::array_init;
-use commitment_dlog::commitment::{CommitmentCurve, PolyComm};
-use commitment_dlog::evaluation_proof::OpeningProof;
 use groupmap::GroupMap;
-use kimchi::{prover::caml::CamlProverProof, verifier_index::VerifierIndex};
 use kimchi::prover_index::ProverIndex;
 use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
 use kimchi::{
@@ -20,11 +17,14 @@ use kimchi::{
     },
     verifier::Context,
 };
+use kimchi::{prover::caml::CamlProverProof, verifier_index::VerifierIndex};
 use mina_curves::pasta::{Fp, Fq, Pallas, Vesta, VestaParameters};
 use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
+use poly_commitment::commitment::{CommitmentCurve, PolyComm};
+use poly_commitment::evaluation_proof::OpeningProof;
 use std::convert::TryInto;
 
 type EFqSponge = DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>;
@@ -39,7 +39,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
     prev_sgs: Vec<CamlGVesta>,
 ) -> Result<CamlProverProof<CamlGVesta, CamlFp>, ocaml::Error> {
     {
-        let ptr: &mut commitment_dlog::srs::SRS<Vesta> =
+        let ptr: &mut poly_commitment::srs::SRS<Vesta> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
         ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }
@@ -106,7 +106,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
     CamlProverProof<CamlGVesta, CamlFp>,
 ) {
     use ark_ff::Zero;
-    use commitment_dlog::srs::{endos, SRS};
+    use poly_commitment::srs::{endos, SRS};
     use kimchi::circuits::{
         constraints::ConstraintSystem,
         gate::{CircuitGate, GateType},
