@@ -96,15 +96,20 @@ let generate_zkapp_commands_and_apply_them_consecutively ~trials
   let ledger, fee_payer_keypairs, keymap =
     mk_ledgers_and_fee_payers ~num_of_fee_payers:trials ()
   in
-  let account_state_tbl = Account_id.Table.create () in
   let global_slot = Mina_numbers.Global_slot.of_int 1 in
+  let account_state_tbl = Account_id.Table.create () in
   Test_util.with_randomness 123456789 (fun () ->
       let test i =
         Quickcheck.test ~trials:1
           (Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
-             ~global_slot ~protocol_state_view:U.genesis_state_view
-             ~account_state_tbl ~fee_payer_keypair:fee_payer_keypairs.(i)
-             ~max_account_updates ~keymap ~ledger ~vk () )
+             ~generator_options:
+               { Mina_generators.Zkapp_command_generators.default with
+                 txn_global_slot = Some global_slot
+               ; max_account_updates
+               ; account_state_tbl
+               ; vk = Some vk
+               }
+             ~fee_payer_keypair:fee_payer_keypairs.(i) ~keymap ~ledger () )
           ~f:(fun zkapp_command_dummy_auths ->
             let open Async in
             Thread_safe.block_on_async_exn (fun () ->
@@ -144,9 +149,13 @@ let generate_zkapp_commands_and_apply_them_freshly ~trials ~max_account_updates
         let global_slot = Mina_numbers.Global_slot.of_int 2 in
         Quickcheck.test ~trials:1
           (Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
-             ~global_slot ~protocol_state_view:U.genesis_state_view
-             ~fee_payer_keypair:fee_payer_keypairs.(i) ~max_account_updates
-             ~keymap ~ledger ~vk () )
+             ~generator_options:
+               { Mina_generators.Zkapp_command_generators.default with
+                 txn_global_slot = Some global_slot
+               ; max_account_updates
+               ; vk = Some vk
+               }
+             ~fee_payer_keypair:fee_payer_keypairs.(i) ~keymap ~ledger () )
           ~f:(fun zkapp_command_dummy_auths ->
             let open Async in
             Thread_safe.block_on_async_exn (fun () ->
@@ -171,10 +180,14 @@ let mk_invalid_test ~trials ~max_account_updates ~type_of_failure
         let global_slot = Mina_numbers.Global_slot.of_int 3 in
         Quickcheck.test ~trials:1
           (Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
-             ~global_slot ~failure:type_of_failure
-             ~protocol_state_view:U.genesis_state_view
-             ~fee_payer_keypair:fee_payer_keypairs.(i) ~max_account_updates
-             ~keymap ~ledger ~vk () )
+             ~generator_options:
+               { Mina_generators.Zkapp_command_generators.default with
+                 txn_global_slot = Some global_slot
+               ; failure = Some type_of_failure
+               ; max_account_updates
+               ; vk = Some vk
+               }
+             ~fee_payer_keypair:fee_payer_keypairs.(i) ~keymap ~ledger () )
           ~f:(fun zkapp_command_dummy_auths ->
             let open Async in
             Thread_safe.block_on_async_exn (fun () ->
@@ -202,9 +215,12 @@ let test_timed_account ~trials ~max_account_updates () =
         in
         Quickcheck.test ~trials:1
           (Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
-             ~protocol_state_view:U.genesis_state_view
-             ~fee_payer_keypair:fee_payer_keypairs.(i) ~max_account_updates
-             ~keymap ~ledger ~vk () )
+             ~generator_options:
+               { Mina_generators.Zkapp_command_generators.default with
+                 max_account_updates
+               ; vk = Some vk
+               }
+             ~fee_payer_keypair:fee_payer_keypairs.(i) ~keymap ~ledger () )
           ~f:(fun zkapp_command_dummy_auths ->
             let open Async in
             Thread_safe.block_on_async_exn (fun () ->
@@ -219,7 +235,7 @@ let test_timed_account ~trials ~max_account_updates () =
                 U.check_zkapp_command_with_merges_exn
                   ~expected_failure:
                     Transaction_status.Failure.Source_minimum_balance_violation
-                  ledger [ zkapp_command ] ~state_body:U.genesis_state_body ) )
+                  ledger [ zkapp_command ] ) )
       in
       for i = 0 to trials - 1 do
         test i
