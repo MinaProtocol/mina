@@ -41,6 +41,75 @@ val wrap :
   -> step_plonk_indices:'d
   -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
   -> actual_feature_flags:bool Plonk_types.Features.t
+  -> ?tweak_statement:
+       (   ( Import.Challenge.Constant.t
+           , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
+           , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+           , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+             , bool )
+             Import.Types.Opt.t
+           , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
+               Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+               .In_circuit
+               .Lookup
+               .t
+             , bool )
+             Import.Types.Opt.t
+           , bool
+           , 'max_proofs_verified
+             Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
+           , (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.vec
+           , ( 'b
+             , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.Stable.V1.t
+               , 'actual_proofs_verified )
+               Pickles_types.Vector.t
+             , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
+                   Import.Bulletproof_challenge.t
+                 , 'e )
+                 Pickles_types.Vector.t
+               , 'actual_proofs_verified )
+               Pickles_types.Vector.t )
+             Proof.Base.Messages_for_next_proof_over_same_field.Step.t
+           , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
+             Import.Types.Bulletproof_challenge.t
+             Import.Types.Step_bp_vec.t
+           , Import.Types.Branch_data.t )
+           Import.Types.Wrap.Statement.In_circuit.t
+        -> ( Import.Challenge.Constant.t
+           , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
+           , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+           , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+             , bool )
+             Import.Types.Opt.t
+           , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
+               Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+               .In_circuit
+               .Lookup
+               .t
+             , bool )
+             Import.Types.Opt.t
+           , bool
+           , 'max_proofs_verified
+             Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
+           , ( Limb_vector.Constant.Hex64.t
+             , Composition_types.Digest.Limbs.n )
+             Pickles_types.Vector.vec
+           , ( 'b
+             , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.Stable.V1.t
+               , 'actual_proofs_verified )
+               Pickles_types.Vector.t
+             , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
+                   Import.Bulletproof_challenge.t
+                 , 'e )
+                 Pickles_types.Vector.t
+               , 'actual_proofs_verified )
+               Pickles_types.Vector.t )
+             Proof.Base.Messages_for_next_proof_over_same_field.Step.t
+           , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
+             Import.Types.Bulletproof_challenge.t
+             Import.Types.Step_bp_vec.t
+           , Import.Types.Branch_data.t )
+           Import.Types.Wrap.Statement.In_circuit.t )
   -> Kimchi_pasta.Pallas_based_plonk.Keypair.t
   -> ( 'b
      , ( ( Impls.Wrap.Challenge.Constant.t

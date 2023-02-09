@@ -11,12 +11,15 @@ use array_init::array_init;
 use commitment_dlog::commitment::{CommitmentCurve, PolyComm};
 use commitment_dlog::evaluation_proof::OpeningProof;
 use groupmap::GroupMap;
-use kimchi::proof::{
-    PointEvaluations, ProofEvaluations, ProverCommitments, ProverProof, RecursionChallenge,
-};
-use kimchi::prover::caml::CamlProverProof;
+use kimchi::{prover::caml::CamlProverProof, verifier_index::VerifierIndex};
 use kimchi::prover_index::ProverIndex;
 use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
+use kimchi::{
+    proof::{
+        PointEvaluations, ProofEvaluations, ProverCommitments, ProverProof, RecursionChallenge,
+    },
+    verifier::Context,
+};
 use mina_curves::pasta::{Fp, Fq, Pallas, Vesta, VestaParameters};
 use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
@@ -68,6 +71,9 @@ pub fn caml_pasta_fp_plonk_proof_create(
         .map_err(|_| ocaml::Error::Message("the witness should be a column of 15 vectors"))?;
     let index: &ProverIndex<Vesta> = &index.as_ref().0;
 
+    // public input
+    let public_input = witness[0][0..index.cs.public].to_vec();
+
     // NB: This method is designed only to be used by tests. However, since creating a new reference will cause `drop` to be called on it once we are done with it. Since `drop` calls `caml_shutdown` internally, we *really, really* do not want to do this, but we have no other way to get at the active runtime.
     // TODO: There's actually a way to get a handle to the runtime as a function argument. Switch
     // to doing this instead.
@@ -85,7 +91,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
             None,
         )
         .map_err(|e| ocaml::Error::Error(e.into()))?;
-        Ok(proof.into())
+        Ok((proof, public_input).into())
     })
 }
 
@@ -193,10 +199,13 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
         None,
     )
     .unwrap();
+
+    let caml_prover_proof = (proof, vec![public_input]).into();
+
     (
         CamlPastaFpPlonkIndex(Box::new(index)),
         public_input.into(),
-        proof.into(),
+        caml_prover_proof,
     )
 }
 
@@ -318,7 +327,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
         None,
     )
     .unwrap();
-    (CamlPastaFpPlonkIndex(Box::new(index)), proof.into())
+    (CamlPastaFpPlonkIndex(Box::new(index)), (proof, vec![]).into())
 }
 
 #[ocaml_gen::func]
@@ -381,7 +390,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
         None,
     )
     .unwrap();
-    (CamlPastaFpPlonkIndex(Box::new(index)), proof.into())
+    (CamlPastaFpPlonkIndex(Box::new(index)), (proof, vec![]).into())
 }
 
 #[ocaml_gen::func]
@@ -450,7 +459,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check0(
         None,
     )
     .unwrap();
-    (CamlPastaFpPlonkIndex(Box::new(index)), proof.into())
+    (CamlPastaFpPlonkIndex(Box::new(index)), (proof, vec![]).into())
 }
 
 #[ocaml_gen::func]
@@ -576,7 +585,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
     (
         CamlPastaFpPlonkIndex(Box::new(index)),
         public_input.into(),
-        proof.into(),
+        (proof, vec![public_input]).into(),
     )
 }
 
@@ -665,7 +674,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
     (
         CamlPastaFpPlonkIndex(Box::new(index)),
         (public_input.0.into(), public_input.1.into()),
-        proof.into(),
+        (proof, vec![public_input.0, public_input.1]).into(),
     )
 }
 
@@ -759,7 +768,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
     (
         CamlPastaFpPlonkIndex(Box::new(index)),
         (public_input.0.into(), public_input.1.into()),
-        proof.into(),
+        (proof, vec![public_input.0, public_input.1]).into(),
     )
 }
 
@@ -832,7 +841,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_chacha(
         None,
     )
     .unwrap();
-    (CamlPastaFpPlonkIndex(Box::new(index)), proof.into())
+    (CamlPastaFpPlonkIndex(Box::new(index)), (proof, vec![]).into())
 }
 
 #[ocaml_gen::func]
@@ -843,11 +852,19 @@ pub fn caml_pasta_fp_plonk_proof_verify(
 ) -> bool {
     let group_map = <Vesta as CommitmentCurve>::Map::setup();
 
+    let (proof, public_input) = proof.into();
+    let verifier_index = index.into();
+    let context = Context {
+        verifier_index: &verifier_index,
+        proof: &proof,
+        public_input: &public_input,
+    };
+
     batch_verify::<
         Vesta,
         DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>,
         DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>,
-    >(&group_map, [(&index.into(), &proof.into())].as_ref())
+    >(&group_map, &[context])
     .is_ok()
 }
 
@@ -860,16 +877,27 @@ pub fn caml_pasta_fp_plonk_proof_batch_verify(
     let ts: Vec<_> = indexes
         .into_iter()
         .zip(proofs.into_iter())
-        .map(|(i, p)| (i.into(), p.into()))
+        .map(|(caml_index, caml_proof)| {
+            let verifier_index: VerifierIndex<Vesta> = caml_index.into();
+            let (proof, public_input): (ProverProof<_>, Vec<_>) = caml_proof.into();
+            (verifier_index, proof, public_input)
+        })
         .collect();
-    let ts: Vec<_> = ts.iter().map(|(i, p)| (i, p)).collect();
+    let ts_ref: Vec<_> = ts
+        .iter()
+        .map(|(verifier_index, proof, public_input)| Context {
+            verifier_index,
+            proof,
+            public_input,
+        })
+        .collect();
     let group_map = GroupMap::<Fq>::setup();
 
     batch_verify::<
         Vesta,
         DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>,
         DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>,
-    >(&group_map, &ts)
+    >(&group_map, &ts_ref)
     .is_ok()
 }
 
@@ -912,6 +940,7 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProverProof<CamlGVesta, CamlFp> 
         poseidon_selector: eval(),
     };
 
+    let public = vec![Fp::one(), Fp::one()];
     let dlogproof = ProverProof {
         commitments: ProverCommitments {
             w_comm: array_init(|_| comm()),
@@ -922,11 +951,10 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProverProof<CamlGVesta, CamlFp> 
         proof,
         evals,
         ft_eval1: Fp::one(),
-        public: vec![Fp::one(), Fp::one()],
         prev_challenges,
     };
 
-    dlogproof.into()
+    (dlogproof, public).into()
 }
 
 #[ocaml_gen::func]

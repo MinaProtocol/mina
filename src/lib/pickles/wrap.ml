@@ -662,7 +662,7 @@ let wrap
       (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t )
     ~dlog_plonk_index wrap_main ~(typ : _ Impls.Step.Typ.t) ~step_vk
     ~actual_wrap_domains ~step_plonk_indices ~feature_flags
-    ~actual_feature_flags pk
+    ~actual_feature_flags ?tweak_statement pk
     ({ statement = prev_statement; prev_evals; proof; index = which_index } :
       ( _
       , _
@@ -846,6 +846,20 @@ let wrap
     ; messages_for_next_step_proof =
         prev_statement.proof_state.messages_for_next_step_proof
     }
+  in
+  let next_statement =
+    match tweak_statement with
+    | None ->
+        next_statement
+    | Some f ->
+        (* For adversarial tests, we want to simulate an adversary creating a
+           proof that doesn't match the pickles protocol.
+           In order to do this, we pass a function [tweak_statement] that takes
+           the valid statement that we computed above and 'tweaks' it so that
+           the statement is no longer valid. This modified statement is then
+           propagated as part of any later recursion.
+        *)
+        f next_statement
   in
   let messages_for_next_wrap_proof_prepared =
     P.Base.Messages_for_next_proof_over_same_field.Wrap.prepare

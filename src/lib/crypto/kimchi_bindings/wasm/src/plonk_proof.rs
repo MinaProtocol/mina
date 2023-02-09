@@ -13,6 +13,7 @@ use ark_ec::AffineCurve;
 use ark_ff::One;
 use array_init::array_init;
 use kimchi::circuits::wires::COLUMNS;
+use kimchi::verifier::Context;
 // use std::path::Path;
 use commitment_dlog::{
     commitment::{CommitmentCurve, PolyComm},
@@ -375,8 +376,8 @@ macro_rules! impl_proof {
             }
             type WasmProverProof = [<Wasm $field_name:camel ProverProof>];
 
-            impl From<&ProverProof<$G>> for WasmProverProof {
-                fn from(x: &ProverProof<$G>) -> Self {
+            impl From<(&ProverProof<$G>, &Vec<$F>)> for WasmProverProof {
+                fn from((x, public): (&ProverProof<$G>, &Vec<$F>)) -> Self {
                     let (scalars, comms) =
                         x.prev_challenges
                             .iter()
@@ -389,16 +390,16 @@ macro_rules! impl_proof {
                         proof: x.proof.clone().into(),
                         evals: x.evals.clone().into(),
                         ft_eval1: x.ft_eval1.clone().into(),
-                        public: x.public.clone().into_iter().map(Into::into).collect(),
+                        public: public.clone().into_iter().map(Into::into).collect(),
                         prev_challenges_scalars: scalars,
                         prev_challenges_comms: comms,
                     }
                 }
             }
 
-            impl From<ProverProof<$G>> for WasmProverProof {
-                fn from(x: ProverProof<$G>) -> Self {
-                    let ProverProof {ft_eval1, commitments, proof, evals , public, prev_challenges} = x;
+            impl From<(ProverProof<$G>, Vec<$F>)> for WasmProverProof {
+                fn from((x, public): (ProverProof<$G>, Vec<$F>)) -> Self {
+                    let ProverProof {ft_eval1, commitments, proof, evals , prev_challenges} = x;
                     let (scalars, comms) =
                         prev_challenges
                             .into_iter()
@@ -416,13 +417,12 @@ macro_rules! impl_proof {
                 }
             }
 
-            impl From<&WasmProverProof> for ProverProof<$G> {
+            impl From<&WasmProverProof> for (ProverProof<$G>, Vec<$F>) {
                 fn from(x: &WasmProverProof) -> Self {
-                    ProverProof {
+                    let proof = ProverProof {
                         commitments: x.commitments.clone().into(),
                         proof: x.proof.clone().into(),
                         evals: x.evals.clone().into(),
-                        public: x.public.clone().into_iter().map(Into::into).collect(),
                         prev_challenges:
                             (&x.prev_challenges_scalars)
                                 .into_iter()
@@ -435,17 +435,18 @@ macro_rules! impl_proof {
                                 })
                                 .collect(),
                         ft_eval1: x.ft_eval1.clone().into()
-                    }
+                    };
+                    let public = x.public.clone().into_iter().map(Into::into).collect();
+                    (proof, public)
                 }
             }
 
-            impl From<WasmProverProof> for ProverProof<$G> {
+            impl From<WasmProverProof> for (ProverProof<$G>, Vec<$F>) {
                 fn from(x: WasmProverProof) -> Self {
-                    ProverProof {
+                    let proof =ProverProof {
                         commitments: x.commitments.into(),
                         proof: x.proof.into(),
                         evals: x.evals.into(),
-                        public: x.public.into_iter().map(Into::into).collect(),
                         prev_challenges:
                             (x.prev_challenges_scalars)
                                 .into_iter()
@@ -458,7 +459,9 @@ macro_rules! impl_proof {
                                 })
                                 .collect(),
                         ft_eval1: x.ft_eval1.into()
-                    }
+                    };
+                    let public = x.public.into_iter().map(Into::into).collect();
+                    (proof, public)
                 }
             }
 
@@ -536,7 +539,7 @@ macro_rules! impl_proof {
 
                 #[wasm_bindgen]
                 pub fn serialize(&self) -> String {
-                    let proof = ProverProof::from(self);
+                    let (proof, _public_input) = self.into();
                     let serialized = rmp_serde::to_vec(&proof).unwrap();
                     base64::encode(serialized)
                 }
@@ -586,22 +589,7 @@ macro_rules! impl_proof {
 
                 let index: &ProverIndex<$G> = &index.0.as_ref();
 
-
-                // let mut vec = index.linearization.index_terms.iter().map(|i| format!("{:?}", i)).collect::<Vec<_>>();
-                // vec.sort_by(|s, t| s.cmp(&t));
-                // console_log(&format!("{:?}", vec));
-
-                // print witness
-                // for (i, w) in witness.iter().enumerate() {
-                //     let st = w.iter().map(|f| format!("{}", f)).collect::<Vec<_>>().join("\n");
-                //     console_log(&format!("witness {}\n{}\n", i, st));
-                // }
-
-                // verify witness
-                // this seems to throw in general
-                // console_log(&"verifying witness!");
-                // index.cs.verify(&witness).expect("incorrect witness");
-                // console_log(&"verifying witness ok");
+                let public_input = witness[0][0..index.cs.public].to_vec();
 
                 // Release the runtime lock so that other threads can run using it while we generate the proof.
                 let group_map = GroupMap::<_>::setup();
@@ -610,7 +598,7 @@ macro_rules! impl_proof {
                     DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
                 >(&group_map, witness, &[], index, prev, None);
                 return match maybe_proof {
-                    Ok(proof) => proof.into(),
+                    Ok(proof) => (proof, public_input).into(),
                     Err(err) => {
                         log(&err.to_string());
                         panic!("thrown an error")
@@ -624,13 +612,15 @@ macro_rules! impl_proof {
                 proof: WasmProverProof,
             ) -> bool {
                 let group_map = <$G as CommitmentCurve>::Map::setup();
+                let verifier_index = &index.into();
+                let (proof, public_input) = &proof.into();
                 batch_verify::<
                     $G,
                     DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
                     DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
                 >(
                     &group_map,
-                    &[(&index.into(), &proof.into())]
+                    &[Context { verifier_index, proof, public_input }]
                 ).is_ok()
             }
 
@@ -658,9 +648,9 @@ macro_rules! impl_proof {
                 let ts: Vec<_> = indexes
                     .into_iter()
                     .zip(proofs.into_iter())
-                    .map(|(i, p)| (i.into(), p.into()))
+                    .map(|(index, proof)| (index.into(), proof.into()))
                     .collect();
-                let ts: Vec<_> = ts.iter().map(|(i, p)| (i, p)).collect();
+                let ts: Vec<_> = ts.iter().map(|(verifier_index, (proof, public_input))| Context { verifier_index, proof, public_input}).collect();
                 let group_map = GroupMap::<_>::setup();
 
                 batch_verify::<
@@ -719,11 +709,11 @@ macro_rules! impl_proof {
                     proof,
                     evals,
                     ft_eval1: $F::one(),
-                    public: vec![$F::one(), $F::one()],
                     prev_challenges,
                 };
 
-                dlogproof.into()
+                let public = vec![$F::one(), $F::one()];
+                (dlogproof, public).into()
             }
 
             #[wasm_bindgen]

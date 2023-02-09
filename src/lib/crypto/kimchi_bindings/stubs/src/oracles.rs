@@ -61,10 +61,10 @@ macro_rules! impl_oracles {
                         .commitment
                 };
 
-                let proof: ProverProof<$G> = proof.into();
+                let (proof, public_input): (ProverProof<$G>, Vec<$F>) = proof.into();
 
                 let oracles_result =
-                    proof.oracles::<DefaultFqSponge<$curve_params, PlonkSpongeConstantsKimchi>, DefaultFrSponge<$F, PlonkSpongeConstantsKimchi>>(&index, &p_comm)?;
+                    proof.oracles::<DefaultFqSponge<$curve_params, PlonkSpongeConstantsKimchi>, DefaultFrSponge<$F, PlonkSpongeConstantsKimchi>>(&index, &p_comm, &public_input)?;
 
                 let (mut sponge, combined_inner_product, p_eval, digest, oracles) = (
                     oracles_result.fq_sponge,
