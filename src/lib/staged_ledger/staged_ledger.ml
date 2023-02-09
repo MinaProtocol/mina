@@ -2528,8 +2528,14 @@ let%test_module "staged ledger tests" =
       let open Quickcheck.Generator.Let_syntax in
       let%bind zkapp_command_and_fee_payer_keypairs, ledger =
         Mina_generators.User_command_generators
-        .sequence_zkapp_command_with_ledger ~max_token_updates:1
-          ~length:num_zkapps ~vk ?failure ()
+        .sequence_zkapp_command_with_ledger
+          ~generator_options:
+            { Mina_generators.Zkapp_command_generators.default with
+              max_token_updates = 1
+            ; vk = Some vk
+            ; failure
+            }
+          ~length:num_zkapps ()
       in
       let zkapps =
         List.map zkapp_command_and_fee_payer_keypairs ~f:(function

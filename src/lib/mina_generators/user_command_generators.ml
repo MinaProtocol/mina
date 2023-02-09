@@ -14,8 +14,8 @@ include User_command.Gen
 (* using Precomputed_values depth introduces a cyclic dependency *)
 [%%inject "ledger_depth", ledger_depth]
 
-let zkapp_command_with_ledger ?num_keypairs ?max_account_updates
-    ?max_token_updates ?account_state_tbl ?vk ?failure () =
+let zkapp_command_with_ledger ?num_keypairs
+    ?(generator_options = Zkapp_command_generators.default) () =
   let open Quickcheck.Let_syntax in
   let open Signature_lib in
   (* Need a fee payer keypair, a keypair for the "balancing" account (so that the balance changes
@@ -25,17 +25,12 @@ let zkapp_command_with_ledger ?num_keypairs ?max_account_updates
      We'll put the fee payer account and max_account_updates accounts in the
      ledger, and have max_account_updates keypairs available for new accounts
   *)
-  let max_account_updates =
-    Option.value max_account_updates
-      ~default:Zkapp_command_generators.max_account_updates
-  in
-  let max_token_updates =
-    Option.value max_token_updates
-      ~default:Zkapp_command_generators.max_token_updates
-  in
   let num_keypairs =
     Option.value num_keypairs
-      ~default:((max_account_updates * 2) + (max_token_updates * 3) + 2)
+      ~default:
+        ( (generator_options.max_account_updates * 2)
+        + (generator_options.max_token_updates * 3)
+        + 2 )
   in
   let keypairs = List.init num_keypairs ~f:(fun _ -> Keypair.create ()) in
   let keymap =
@@ -51,7 +46,7 @@ let zkapp_command_with_ledger ?num_keypairs ?max_account_updates
         Account_id.create (Public_key.compress public_key) Token_id.default )
   in
   let verification_key =
-    match vk with
+    match generator_options.vk with
     | None ->
         With_hash.
           { data = Side_loaded_verification_key.dummy
@@ -127,13 +122,9 @@ let zkapp_command_with_ledger ?num_keypairs ?max_account_updates
       | Ok (`Added, _) ->
           () ) ;
   (* to keep track of account states across transactions *)
-  let account_state_tbl =
-    Option.value account_state_tbl ~default:(Account_id.Table.create ())
-  in
   let%bind zkapp_command =
-    Zkapp_command_generators.gen_zkapp_command_from ~max_account_updates
-      ~max_token_updates ~fee_payer_keypair ~keymap ~ledger ~account_state_tbl
-      ?vk ?failure ()
+    Zkapp_command_generators.gen_zkapp_command_from ~generator_options
+      ~fee_payer_keypair ~keymap ~ledger ()
   in
   let zkapp_command =
     Or_error.ok_exn
@@ -147,8 +138,8 @@ let zkapp_command_with_ledger ?num_keypairs ?max_account_updates
   return
     (User_command.Zkapp_command zkapp_command, fee_payer_keypair, keymap, ledger)
 
-let sequence_zkapp_command_with_ledger ?max_account_updates ?max_token_updates
-    ?length ?vk ?failure () =
+let sequence_zkapp_command_with_ledger
+    ?(generator_options = Zkapp_command_generators.default) ?length () =
   let open Quickcheck.Let_syntax in
   let%bind length =
     match length with
@@ -157,20 +148,10 @@ let sequence_zkapp_command_with_ledger ?max_account_updates ?max_token_updates
     | None ->
         Quickcheck.Generator.small_non_negative_int
   in
-  let max_account_updates =
-    Option.value max_account_updates
-      ~default:Zkapp_command_generators.max_account_updates
-  in
-  let max_token_updates =
-    Option.value max_token_updates
-      ~default:Zkapp_command_generators.max_token_updates
-  in
-  let num_keypairs = length * max_account_updates * 2 in
+  let num_keypairs = length * generator_options.max_account_updates * 2 in
   (* Keep track of account states across multiple zkapp_command transaction *)
-  let account_state_tbl = Account_id.Table.create () in
   let%bind zkapp_command, fee_payer_keypair, keymap, ledger =
-    zkapp_command_with_ledger ~num_keypairs ~max_account_updates
-      ~max_token_updates ~account_state_tbl ?vk ?failure ()
+    zkapp_command_with_ledger ~num_keypairs ~generator_options ()
   in
   let rec go zkapp_command_and_fee_payer_keypairs n =
     if n <= 1 then
@@ -180,9 +161,8 @@ let sequence_zkapp_command_with_ledger ?max_account_updates ?max_token_updates
         , ledger )
     else
       let%bind zkapp_command =
-        Zkapp_command_generators.gen_zkapp_command_from ~max_account_updates
-          ~max_token_updates ~fee_payer_keypair ~keymap ~ledger
-          ~account_state_tbl ?vk ?failure ()
+        Zkapp_command_generators.gen_zkapp_command_from ~generator_options
+          ~fee_payer_keypair ~keymap ~ledger ()
       in
       let valid_zkapp_command =
         Or_error.ok_exn

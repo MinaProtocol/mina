@@ -54,12 +54,6 @@ let%test_module "Archive node unit tests" =
       Mina_generators.User_command_generators.payment_with_random_participants
         ~keys ~max_amount:1000 ~fee_range:10 ()
 
-    let genesis_state_view =
-      let genesis_state_body =
-        precomputed_values.protocol_state_with_hashes.data.body
-      in
-      Mina_state.Protocol_state.Body.view genesis_state_body
-
     let user_command_zkapp_gen :
         ('a, Zkapp_command.t) User_command.t_ Base_quickcheck.Generator.t =
       let open Base_quickcheck.Generator.Let_syntax in
@@ -110,8 +104,7 @@ let%test_module "Archive node unit tests" =
       |> fun _ ->
       let%map (zkapp_command : Zkapp_command.t) =
         Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
-          ~fee_payer_keypair ~keymap ~ledger
-          ~protocol_state_view:genesis_state_view ()
+          ~fee_payer_keypair ~keymap ~ledger ()
       in
       User_command.Zkapp_command zkapp_command
 
