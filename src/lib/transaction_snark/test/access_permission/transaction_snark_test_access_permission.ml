@@ -189,27 +189,35 @@ let%test_module "Access permission tests" =
     let%test_unit "Signature with None" = run_test Signature None
 
     let%test_unit "None_given with Either" =
-      run_test ~expected_failure:Update_not_permitted_access None_given Either
+      run_test
+        ~expected_failure:(Update_not_permitted_access, Pass_2)
+        None_given Either
 
     let%test_unit "Proof with Either" = run_test (Proof vk_hash) Either
 
     let%test_unit "Signature with Either" = run_test Signature Either
 
     let%test_unit "None_given with Proof" =
-      run_test ~expected_failure:Update_not_permitted_access None_given Proof
+      run_test
+        ~expected_failure:(Update_not_permitted_access, Pass_2)
+        None_given Proof
 
     let%test_unit "Proof with Proof" = run_test (Proof vk_hash) Proof
 
     let%test_unit "Signature with Proof" =
-      run_test ~expected_failure:Update_not_permitted_access Signature Proof
+      run_test
+        ~expected_failure:(Update_not_permitted_access, Pass_2)
+        Signature Proof
 
     let%test_unit "None_given with Signature" =
-      run_test ~expected_failure:Update_not_permitted_access None_given
-        Signature
+      run_test
+        ~expected_failure:(Update_not_permitted_access, Pass_2)
+        None_given Signature
 
     let%test_unit "Proof with Signature" =
-      run_test ~expected_failure:Update_not_permitted_access (Proof vk_hash)
-        Signature
+      run_test
+        ~expected_failure:(Update_not_permitted_access, Pass_2)
+        (Proof vk_hash) Signature
 
     let%test_unit "Signature with Signature" = run_test Signature Signature
   end )

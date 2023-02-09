@@ -88,7 +88,8 @@ let%test_module "Valid_while precondition tests" =
                       (create_spec specs new_kp global_slot)
                   in
                   U.check_zkapp_command_with_merges_exn
-                    ~expected_failure:Valid_while_precondition_unsatisfied
+                    ~expected_failure:
+                      (Valid_while_precondition_unsatisfied, U.Pass_2)
                     ~global_slot:Mina_numbers.Global_slot.zero ledger
                     [ zkapp_command ] ) ) )
   end )
@@ -388,9 +389,10 @@ let%test_module "Protocol state precondition tests" =
                     init_ledger ledger ;
                   U.check_zkapp_command_with_merges_exn
                     ~expected_failure:
-                      Transaction_status.Failure
-                      .Protocol_state_precondition_unsatisfied ~state_body
-                    ledger
+                      ( Transaction_status.Failure
+                        .Protocol_state_precondition_unsatisfied
+                      , U.Pass_2 )
+                    ~state_body ledger
                     [ zkapp_command_with_valid_fee_payer ] ) ) )
   end )
 
@@ -656,9 +658,10 @@ let%test_module "Account precondition tests" =
                     ~ledger snapp_pk ;
                   U.check_zkapp_command_with_merges_exn
                     ~expected_failure:
-                      Transaction_status.Failure
-                      .Account_nonce_precondition_unsatisfied ~state_body ledger
-                    [ zkapp_command ] ) ) )
+                      ( Transaction_status.Failure
+                        .Account_nonce_precondition_unsatisfied
+                      , U.Pass_2 )
+                    ~state_body ledger [ zkapp_command ] ) ) )
 
     let%test_unit "invalid account predicate in fee payer" =
       let state_body = U.genesis_state_body in
