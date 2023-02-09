@@ -1345,13 +1345,11 @@ end = struct
         let left = Some (reduce_to_v next_in1) in
         let right = Some (reduce_to_v next_in2) in
         let output = Some (reduce_to_v next_out) in
-        let var = Option.map ~f:snd in
-
         (* The generic gate after a Xor16 gate is a Const to check that all values are zero. For that, the first coefficient is 1 and the rest will be zero.*)
         add_row sys curr_row Xor16 [||] ;
-        add_generic_constraint ?left:(var left) ?right:(var right)
-          ?output:(var output)
+        add_generic_constraint ?l:left ?r:right ?o:output
           [| Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.zero |]
+          sys
     | constr ->
         failwithf "Unhandled constraint %s"
           Obj.(Extension_constructor.name (Extension_constructor.of_val constr))
