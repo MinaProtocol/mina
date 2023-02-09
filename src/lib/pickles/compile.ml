@@ -54,15 +54,8 @@ let pad_local_max_proofs_verifieds
   V.f length (M.f local_max_proofs_verifieds)
 
 open Kimchi_backend
-
 module Proof_ = P.Base
 module Proof = P
-
-module Statement_with_proof = struct
-  type ('s, 'max_width, _) t =
-    (* TODO: use Max local max proofs verified instead of max_width *)
-    ('max_width, 'max_width) Proof.t
-end
 
 let pad_messages_for_next_wrap_proof
     (type local_max_proofs_verifieds max_local_max_proofs_verifieds
