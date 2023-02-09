@@ -64,7 +64,7 @@ module Make
 
   let to_hex t =
     let data = to_bytes t in
-    Hex.encode (Bytes.to_string data)
+    Hex.encode ~reverse:true (Bytes.to_string data)
 
   let sexp_of_t t = to_hex_string t |> Sexp.of_string
 
