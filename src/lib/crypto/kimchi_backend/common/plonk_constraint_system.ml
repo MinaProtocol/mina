@@ -160,7 +160,7 @@ module Plonk_constraint = struct
           ; vc5 : 'v
           ; vc6 : 'v
           ; vc7 : 'v (* LSBs *)
-          ; coeff : 'f
+          ; compact : 'f
                 (* Limbs mode: 0 (standard 3-limb) or 1 (compact 2-limb) *)
           }
     [@@deriving sexp]
@@ -216,7 +216,7 @@ module Plonk_constraint = struct
           ; vc5
           ; vc6
           ; vc7
-          ; coeff
+          ; compact
           } ->
           RangeCheck0
             { v = f v
@@ -1314,7 +1314,7 @@ end = struct
           ; vc5
           ; vc6
           ; vc7
-          ; coeff
+          ; compact
           } ) ->
         (*
         //! 0   1   2   3   4   5   6   7   8   9  10  11  12  13  14
