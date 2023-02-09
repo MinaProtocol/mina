@@ -2022,7 +2022,9 @@ let%test_module "account timing check" =
                 ledger_init_state ;
               Transaction_snark_tests.Util.check_zkapp_command_with_merges_exn
                 ~expected_failure:
-                  Transaction_status.Failure.Update_not_permitted_timing ledger
+                  ( Transaction_status.Failure.Update_not_permitted_timing
+                  , Pass_2 )
+                ledger
                 [ create_timed_account_zkapp_command ] ) )
 
     let%test_unit "zkApp command, change untimed account to timed" =
@@ -2177,7 +2179,8 @@ let%test_module "account timing check" =
                   Transaction_snark_tests.Util
                   .check_zkapp_command_with_merges_exn
                     ~expected_failure:
-                      Transaction_status.Failure.Update_not_permitted_timing
+                      ( Transaction_status.Failure.Update_not_permitted_timing
+                      , Pass_2 )
                     ledger
                     [ update_timing_zkapp_command ] ) ) )
   end )

@@ -12,7 +12,7 @@ module type Input_intf = sig
 
   val test_description : string
 
-  val failure_expected : Mina_base.Transaction_status.Failure.t
+  val failure_expected : Mina_base.Transaction_status.Failure.t * U.pass_number
 end
 
 module Make (Input : Input_intf) = struct
