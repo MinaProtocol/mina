@@ -603,12 +603,24 @@ module Make_str (A : Wire_types.Concrete) = struct
       (`Min_balance curr_min_balance, timing)
 
     let side_loaded =
+      let feature_flags =
+        let open Pickles_types.Plonk_types in
+        { Features.range_check0 = Opt.Flag.Maybe
+        ; range_check1 = Opt.Flag.Maybe
+        ; foreign_field_add = Opt.Flag.Maybe
+        ; foreign_field_mul = Opt.Flag.Maybe
+        ; xor = Opt.Flag.Maybe
+        ; rot = Opt.Flag.Maybe
+        ; lookup = Opt.Flag.Maybe
+        ; runtime_tables = Opt.Flag.Maybe
+        }
+      in
       Memo.of_comparable
         (module Int)
         (fun i ->
           let open Zkapp_statement in
           Pickles.Side_loaded.create ~typ ~name:(sprintf "zkapp_%d" i)
-            ~uses_lookup:Maybe
+            ~feature_flags
             ~max_proofs_verified:
               (module Pickles.Side_loaded.Verification_key.Max_width) )
 
@@ -2081,7 +2093,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ; public_output = ()
                   ; auxiliary_output = ()
                   } )
-            ; uses_lookup = false
+            ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
             }
         | Opt_signed_opt_signed ->
             { identifier = "opt_signed-opt_signed"
@@ -2096,7 +2108,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ; public_output = ()
                   ; auxiliary_output = ()
                   } )
-            ; uses_lookup = false
+            ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
             }
         | Opt_signed ->
             { identifier = "opt_signed"
@@ -2111,7 +2123,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ; public_output = ()
                   ; auxiliary_output = ()
                   } )
-            ; uses_lookup = false
+            ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
             }
     end
 
@@ -3071,7 +3083,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; public_output = ()
             ; auxiliary_output = ()
             } )
-      ; uses_lookup = false
+      ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
       }
 
     let transaction_union_handler handler (transaction : Transaction_union.t)
@@ -3231,7 +3243,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; public_output = ()
             ; auxiliary_output = ()
             } )
-      ; uses_lookup = false
+      ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
       }
   end
 
@@ -4111,7 +4123,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; public_output = ()
                 ; auxiliary_output = ()
                 } )
-          ; uses_lookup = false
+          ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
           }
         in
         Pickles.compile () ~cache:Cache_dir.cache

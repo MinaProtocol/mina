@@ -286,6 +286,7 @@ let%test_module "Zkapp payments tests" =
                     Transaction_snark.For_tests.multiple_transfers test_spec
                   in
                   U.check_zkapp_command_with_merges_exn
-                    ~expected_failure:Transaction_status.Failure.Overflow ledger
-                    [ zkapp_command ] ) ) )
+                    ~expected_failure:
+                      (Transaction_status.Failure.Overflow, Pass_2)
+                    ledger [ zkapp_command ] ) ) )
   end )

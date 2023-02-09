@@ -1,8 +1,6 @@
 use ark_ec::AffineCurve;
 use kimchi::circuits::lookup::index::LookupSelectors;
-use kimchi::circuits::lookup::lookups::{
-    LookupFeatures, LookupInfo, LookupPattern, LookupPatterns,
-};
+use kimchi::circuits::lookup::lookups::{LookupFeatures, LookupInfo};
 use kimchi::verifier_index::LookupVerifierIndex;
 use poly_commitment::{commitment::CommitmentCurve, PolyComm};
 
@@ -74,15 +72,11 @@ where
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlLookupInfo {
-    /// A single lookup constraint is a vector of lookup constraints to be applied at a row.
-    /// This is a vector of all the kinds of lookup constraints in this configuration.
-    pub kinds: Vec<LookupPattern>,
     /// The maximum length of an element of `kinds`. This can be computed from `kinds`.
     pub max_per_row: ocaml::Int,
     /// The maximum joint size of any joint lookup in a constraint in `kinds`. This can be computed from `kinds`.
     pub max_joint_size: ocaml::Int,
-    /// True if runtime lookup tables are used.
-    pub uses_runtime_tables: bool,
+    pub features: LookupFeatures,
 }
 
 impl From<LookupInfo> for CamlLookupInfo {
@@ -93,10 +87,9 @@ impl From<LookupInfo> for CamlLookupInfo {
             max_joint_size,
         } = li;
         CamlLookupInfo {
-            kinds: features.patterns.into_iter().collect(),
+            features,
             max_per_row: max_per_row as ocaml::Int,
             max_joint_size: max_joint_size as ocaml::Int,
-            uses_runtime_tables: features.uses_runtime_tables,
         }
     }
 }
@@ -104,22 +97,10 @@ impl From<LookupInfo> for CamlLookupInfo {
 impl From<CamlLookupInfo> for LookupInfo {
     fn from(li: CamlLookupInfo) -> LookupInfo {
         let CamlLookupInfo {
-            kinds,
+            features,
             max_per_row,
             max_joint_size,
-            uses_runtime_tables,
         } = li;
-        let features = {
-            let mut patterns = LookupPatterns::default();
-            for kind in kinds {
-                patterns[kind] = true;
-            }
-            LookupFeatures {
-                patterns,
-                joint_lookup_used: max_joint_size > 1,
-                uses_runtime_tables,
-            }
-        };
         LookupInfo {
             features,
             max_per_row: max_per_row as usize,

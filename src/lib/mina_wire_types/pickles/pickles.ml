@@ -36,6 +36,7 @@ module M = struct
                 ( challenge_constant
                 , challenge_constant Kimchi_types.scalar_challenge
                 , Snark_params.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+                , bool
                 , 'messages_for_next_wrap_proof
                 , digest_constant
                 , 'messages_for_next_step_proof

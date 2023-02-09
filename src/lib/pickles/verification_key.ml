@@ -18,12 +18,24 @@ module Verifier_index_json = struct
       | ForeignFieldMul
     [@@deriving yojson]
 
-    type lookup_info = Kimchi_types.VerifierIndex.Lookup.lookup_info =
-      { kinds : lookup_pattern array
-      ; max_per_row : int
-      ; max_joint_size : int
+    type lookup_patterns = Kimchi_types.lookup_patterns =
+      { xor : bool
+      ; chacha_final : bool
+      ; lookup : bool
+      ; range_check : bool
+      ; foreign_field_mul : bool
+      }
+    [@@deriving yojson]
+
+    type lookup_features = Kimchi_types.lookup_features =
+      { patterns : lookup_patterns
+      ; joint_lookup_used : bool
       ; uses_runtime_tables : bool
       }
+    [@@deriving yojson]
+
+    type lookup_info = Kimchi_types.VerifierIndex.Lookup.lookup_info =
+      { max_per_row : int; max_joint_size : int; features : lookup_features }
     [@@deriving yojson]
 
     type 'polyComm t = 'polyComm Kimchi_types.VerifierIndex.Lookup.t =

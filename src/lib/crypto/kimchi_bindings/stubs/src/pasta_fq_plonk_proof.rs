@@ -159,7 +159,7 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq>
         chals: vec![Fq::one(), Fq::one()],
         comm: comm(),
     };
-    let prev_challenges = vec![prev.clone(), prev.clone(), prev.clone()];
+    let prev_challenges = vec![prev.clone(), prev.clone(), prev];
 
     let g = Pallas::prime_subgroup_generator();
     let proof = OpeningProof {
