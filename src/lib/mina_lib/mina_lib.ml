@@ -866,7 +866,7 @@ let best_chain ?max_length t =
   let best_tip_path = Transition_frontier.best_tip_path ?max_length frontier in
   match max_length with
   | Some max_length
-    when Mina_stdlib.List.Length.Compare.(best_tip_path > max_length) ->
+    when Mina_stdlib.List.Length.Compare.(best_tip_path >= max_length) ->
       (* The [best_tip_path] has already been truncated to the correct length,
          we skip adding the root to stay below the maximum.
       *)
