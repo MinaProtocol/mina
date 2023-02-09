@@ -1475,7 +1475,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
                   }
-                ~choices:(fun ~self ->
+                ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -1538,7 +1538,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
                   }
-                ~choices:(fun ~self ->
+                ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -1969,7 +1969,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
                   }
-                ~choices:(fun ~self ->
+                ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
                     ; prevs = []
@@ -2034,7 +2034,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
                   }
-                ~choices:(fun ~self ->
+                ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
                     ; prevs = []
@@ -3009,7 +3009,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"recurse-on-bad" ~constraint_constants
-                ~choices:(fun ~self ->
+                ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
                     ; prevs = [ tag; tag ]
@@ -3249,7 +3249,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"recurse-on-bad" ~constraint_constants
-                ~choices:(fun ~self ->
+                ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
                     ; prevs = [ tag; tag ]
@@ -3359,7 +3359,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
                   }
-                ~choices:(fun ~self ->
+                ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -3412,7 +3412,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
                   }
-                ~choices:(fun ~self ->
+                ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -3465,7 +3465,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
                   }
-                ~choices:(fun ~self ->
+                ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -3522,7 +3522,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
             ~feature_flags:Plonk_types.Features.none ~typ:Field.typ
 
-        let tag, _, p, Provers.[ step ] =
+        let _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -3542,7 +3542,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
                   }
-                ~choices:(fun ~self ->
+                ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = [ side_loaded_tag ]
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -3584,7 +3584,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
         module Proof = (val p)
 
-        let example1 =
+        let _example1 =
           let (), (), b1 =
             Common.time "b1" (fun () ->
                 Promise.block_on_async_exn (fun () ->
@@ -3602,7 +3602,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  Proof.verify_promise [ (Field.Constant.one, b1) ] ) ) ;
           (Field.Constant.one, b1)
 
-        let example2 =
+        let _example2 =
           let (), (), b2 =
             Common.time "b2" (fun () ->
                 Promise.block_on_async_exn (fun () ->
@@ -3620,7 +3620,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  Proof.verify_promise [ (Field.Constant.one, b2) ] ) ) ;
           (Field.Constant.one, b2)
 
-        let example3 =
+        let _example3 =
           let (), (), b3 =
             Common.time "b3" (fun () ->
                 Promise.block_on_async_exn (fun () ->
@@ -3706,7 +3706,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
                   }
-                ~choices:(fun ~self ->
+                ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -3759,7 +3759,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
                   }
-                ~choices:(fun ~self ->
+                ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -3812,7 +3812,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
                   }
-                ~choices:(fun ~self ->
+                ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -3873,7 +3873,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
             ~feature_flags:maybe_features ~typ:Field.typ
 
-        let tag, _, p, Provers.[ step ] =
+        let _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
@@ -3893,7 +3893,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; account_creation_fee = Unsigned.UInt64.of_int 0
                   ; fork = None
                   }
-                ~choices:(fun ~self ->
+                ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = [ side_loaded_tag ]
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -3935,7 +3935,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
         module Proof = (val p)
 
-        let example1 =
+        let _example1 =
           let (), (), b1 =
             Common.time "b1" (fun () ->
                 Promise.block_on_async_exn (fun () ->
@@ -3953,7 +3953,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  Proof.verify_promise [ (Field.Constant.one, b1) ] ) ) ;
           (Field.Constant.one, b1)
 
-        let example2 =
+        let _example2 =
           let (), (), b2 =
             Common.time "b2" (fun () ->
                 Promise.block_on_async_exn (fun () ->
@@ -3971,7 +3971,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  Proof.verify_promise [ (Field.Constant.one, b2) ] ) ) ;
           (Field.Constant.one, b2)
 
-        let example3 =
+        let _example3 =
           let (), (), b3 =
             Common.time "b3" (fun () ->
                 Promise.block_on_async_exn (fun () ->
