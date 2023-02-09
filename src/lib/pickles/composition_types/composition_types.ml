@@ -1266,6 +1266,34 @@ module Step = struct
         (** A layout of the raw data in this value, which is needed for
           representing it inside the circuit. *)
         let spec impl bp_log2 lookup feature_flags =
+          let feature_flags_spec =
+            let [ f1; f2; f3; f4; f5; f6; f7; f8 ] =
+              (* Ensure that layout is the same *)
+              Plonk_types.Features.to_data feature_flags
+            in
+            let constant x =
+              Spec.T.Constant (x, (fun x y -> assert (Bool.equal x y)), B Bool)
+            in
+            let maybe_constant flag =
+              match flag with
+              | Plonk_types.Opt.Flag.Yes ->
+                  constant true
+              | Plonk_types.Opt.Flag.No ->
+                  constant false
+              | Plonk_types.Opt.Flag.Maybe ->
+                  Spec.T.B Bool
+            in
+            Spec.T.Struct
+              [ maybe_constant f1
+              ; maybe_constant f2
+              ; maybe_constant f3
+              ; maybe_constant f4
+              ; maybe_constant f5
+              ; maybe_constant f6
+              ; maybe_constant f7
+              ; maybe_constant f8
+              ]
+          in
           Spec.T.Struct
             [ Vector (B Field, Nat.N9.n)
             ; Vector (B Digest, Nat.N1.n)
@@ -1273,16 +1301,7 @@ module Step = struct
             ; Vector (Scalar Challenge, Nat.N3.n)
             ; Vector (B Bulletproof_challenge, bp_log2)
             ; Vector (B Bool, Nat.N1.n)
-            ; Spec.T.Struct
-                [ B Bool
-                ; B Bool
-                ; B Bool
-                ; B Bool
-                ; B Bool
-                ; B Bool
-                ; B Bool
-                ; B Bool
-                ]
+            ; feature_flags_spec
             ; Wrap.Lookup_parameters.opt_spec impl lookup
             ; Wrap.Proof_state.Deferred_values.Plonk.In_circuit
               .Optional_column_scalars
