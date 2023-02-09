@@ -160,7 +160,8 @@ module Plonk_constraint = struct
           ; vc5 : 'v
           ; vc6 : 'v
           ; vc7 : 'v (* LSBs *)
-          ; coeff : 'f (* Limbs mode: 0 (standard 3-limb) or (compact 2-limb) *)
+          ; coeff : 'f
+                (* Limbs mode: 0 (standard 3-limb) or 1 (compact 2-limb) *)
           }
     [@@deriving sexp]
 
