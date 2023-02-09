@@ -47,12 +47,14 @@ val dummy_rule :
      , unit )
      Pickles.Inductive_rule.t
 
+type pass_number = Pass_1 | Pass_2
+
 (** Generates base and merge snarks of all the account_update segments
 
     Raises if either the snark generation or application fails
 *)
 val check_zkapp_command_with_merges_exn :
-     ?expected_failure:Mina_base.Transaction_status.Failure.t
+     ?expected_failure:Mina_base.Transaction_status.Failure.t * pass_number
   -> ?ignore_outside_snark:bool
   -> ?global_slot:Mina_numbers.Global_slot.t
   -> ?state_body:Transaction_protocol_state.Block_data.t
@@ -80,7 +82,7 @@ val gen_snapp_ledger :
   Base_quickcheck.Generator.t
 
 val test_snapp_update :
-     ?expected_failure:Mina_base.Transaction_status.Failure.t
+     ?expected_failure:Mina_base.Transaction_status.Failure.t * pass_number
   -> ?state_body:Transaction_protocol_state.Block_data.t
   -> ?snapp_permissions:Permissions.t
   -> vk:(Side_loaded_verification_key.t, Tick.Field.t) With_hash.t
