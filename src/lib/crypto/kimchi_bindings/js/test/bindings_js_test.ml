@@ -1042,6 +1042,7 @@ let verification_evals_to_list
     ; mul_comm : 'PolyComm
     ; emul_comm : 'PolyComm
     ; endomul_scalar_comm : 'PolyComm
+    ; chacha_comm : 'PolyComm array option
     } =
   generic_comm :: psm_comm :: complete_add_comm :: mul_comm :: emul_comm
   :: endomul_scalar_comm
