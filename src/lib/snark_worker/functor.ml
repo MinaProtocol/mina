@@ -364,10 +364,20 @@ module Make (Inputs : Intf.Inputs_intf) :
           daemon_address
       with
       | Error e ->
-          let _ = notify_job_get_error (now ()) (Error.to_string_hum e) in
+          let err =
+            Yojson.Safe.to_string
+              (`Assoc
+                [ ("kind", `String "Other")
+                ; ("error", `String (Error.to_string_hum e))
+                ] )
+          in
+          let _ = notify_job_get_error (now ()) err in
           log_and_retry "getting work" e (retry_pause 10.) go
       | Ok None ->
-          let _ = notify_job_get_error (now ()) "No Available Job" in
+          let err =
+            Yojson.Safe.to_string (`Assoc [ ("kind", `String "NoAvailableJob") ])
+          in
+          let _ = notify_job_get_error (now ()) err in
           let random_delay =
             Worker_state.worker_wait_time
             +. (0.5 *. Random.float Worker_state.worker_wait_time)
