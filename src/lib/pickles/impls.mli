@@ -1,3 +1,5 @@
+open Pickles_types
+
 module Wrap_impl :
     module type of Snarky_backendless.Snark.Run.Make (Backend.Tock)
 
@@ -37,14 +39,16 @@ module Step : sig
   val input :
        proofs_verified:'a Pickles_types.Nat.t
     -> wrap_rounds:'b Pickles_types.Nat.t
-    -> uses_lookup:Pickles_types.Plonk_types.Opt.Flag.t
+    -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
     -> ( ( ( ( Impl.Field.t
              , Impl.Field.t Composition_types.Scalar_challenge.t
              , Other_field.t Pickles_types.Shifted_value.Type2.t
-             , ( ( Impl.Field.t Composition_types.Scalar_challenge.t
-                   Pickles_types.Hlist0.Id.t
-                 , Other_field.t Pickles_types.Shifted_value.Type2.t
-                   Pickles_types.Hlist0.Id.t )
+             , ( Other_field.t Pickles_types.Shifted_value.Type2.t
+               , Impl.field Snarky_backendless.Cvar.t
+                 Snarky_backendless.Snark_intf.Boolean0.t )
+               Pickles_types.Plonk_types.Opt.t
+             , ( Impl.Field.t Composition_types.Scalar_challenge.t
+                 Pickles_types.Hlist0.Id.t
                  Composition_types.Step.Proof_state.Deferred_values.Plonk
                  .In_circuit
                  .Lookup
@@ -71,10 +75,8 @@ module Step : sig
        , ( ( ( Challenge.Constant.t
              , Challenge.Constant.t Composition_types.Scalar_challenge.t
              , Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
-             , ( Challenge.Constant.t Composition_types.Scalar_challenge.t
-                 Pickles_types.Hlist0.Id.t
-               , Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
-                 Pickles_types.Hlist0.Id.t )
+             , Other_field.Constant.t Pickles_types.Shifted_value.Type2.t option
+             , Challenge.Constant.t Composition_types.Scalar_challenge.t
                Composition_types.Step.Proof_state.Deferred_values.Plonk
                .In_circuit
                .Lookup
@@ -152,18 +154,18 @@ module Wrap : sig
     -> ( ( Impl.Field.t
          , Impl.Field.t Composition_types.Scalar_challenge.t
          , Impl.Field.t Pickles_types.Shifted_value.Type1.t
-         , ( ( Impl.Field.t Composition_types.Scalar_challenge.t
-               Pickles_types.Hlist0.Id.t
-               Pickles_types.Hlist0.Id.t
-             , Impl.Field.t Pickles_types.Shifted_value.Type1.t
-               Pickles_types.Hlist0.Id.t
-               Pickles_types.Hlist0.Id.t )
+         , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
+           , Impl.field Snarky_backendless.Cvar.t
+             Snarky_backendless.Snark_intf.Boolean0.t )
+           Pickles_types.Plonk_types.Opt.t
+         , ( Impl.Field.t Composition_types.Scalar_challenge.t
              Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
              .Lookup
              .t
            , Impl.field Snarky_backendless.Cvar.t
              Snarky_backendless.Snark_intf.Boolean0.t )
            Pickles_types.Plonk_types.Opt.t
+         , Impl.Boolean.var
          , Impl.field Snarky_backendless.Cvar.t
          , Impl.field Snarky_backendless.Cvar.t
          , Impl.field Snarky_backendless.Cvar.t
@@ -178,15 +180,13 @@ module Wrap : sig
        , ( Limb_vector.Challenge.Constant.t
          , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
          , Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
-         , ( Limb_vector.Challenge.Constant.t
-             Composition_types.Scalar_challenge.t
-             Pickles_types.Hlist0.Id.t
-           , Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
-             Pickles_types.Hlist0.Id.t )
+         , Other_field.Constant.t Pickles_types.Shifted_value.Type1.t option
+         , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
            Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
            .Lookup
            .t
            option
+         , bool
          , ( Limb_vector.Constant.Hex64.t
            , Composition_types.Digest.Limbs.n )
            Pickles_types.Vector.vec

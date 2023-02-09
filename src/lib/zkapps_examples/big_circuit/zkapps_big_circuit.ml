@@ -40,5 +40,5 @@ let rule ~num_constraints public_key : _ Pickles.Inductive_rule.t =
   { identifier = "Empty update with a large circuit"
   ; prevs = []
   ; main = main ~num_constraints public_key
-  ; uses_lookup = false
+  ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
   }
