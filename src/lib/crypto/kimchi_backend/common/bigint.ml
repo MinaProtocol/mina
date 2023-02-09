@@ -62,8 +62,7 @@ module Make
     let data = to_bytes t in
     String.uppercase (Hex.encode ~reverse:true (Bytes.to_string data))
 
-  let to_hex_string t =
-    "0x" ^ to_hex t
+  let to_hex_string t = "0x" ^ to_hex t
 
   let sexp_of_t t = to_hex_string t |> Sexp.of_string
 
