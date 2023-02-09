@@ -1338,6 +1338,7 @@ end = struct
            ; Some (reduce_to_v vc7) (* LSBs *)
           |]
         in
+        let coeff = if compact then Fp.one else Fp.zero in
         add_row sys vars RangeCheck0 [| coeff |]
     | constr ->
         failwithf "Unhandled constraint %s"
