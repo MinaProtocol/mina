@@ -234,7 +234,7 @@ module Plonk_constraint = struct
             ; vc5 = f vc5
             ; vc6 = f vc6
             ; vc7 = f vc7
-            ; coeff
+            ; compact
             }
 
     (** [eval (module F) get_variable gate] checks that [gate]'s polynomial is
