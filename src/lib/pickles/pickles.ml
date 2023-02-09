@@ -137,7 +137,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
         and use *that* in the "verifies" computation.
   *)
   open Kimchi_backend
-
   module Proof = P
 
   module Statement_with_proof = struct
@@ -2071,7 +2070,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ; feature_flags = Plonk_types.Features.none_bool
         }
 
-      let override_wrap_main: _ Compile.wrap_main_generic =
+      let override_wrap_main : _ Compile.wrap_main_generic =
         { wrap_main =
             (fun _ _ _ _ _ _ _ ->
               let requests =
