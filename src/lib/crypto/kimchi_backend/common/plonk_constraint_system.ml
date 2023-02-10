@@ -192,21 +192,37 @@ module Plonk_constraint = struct
                 (* Limbs mode: 0 (standard 3-limb) or 1 (compact 2-limb) *)
           }
       | RangeCheck1 of
-          { v : 'v (* Value to constrain to 88-bits *)
-          ; opt : 'v (* Optional value used in compact 2-limb mode *)
-          ; vc0 : 'v (* MSBs, 2-bit crumb *)
-          ; vp0 : 'v (* vpX are 12-bit plookup chunks *)
-          ; vp1 : 'v
-          ; vp2 : 'v
-          ; vp3 : 'v
-          ; vc1 : 'v (* vcX are 2-bit crumbs *)
-          ; vc2 : 'v
-          ; vc3 : 'v
-          ; vc4 : 'v
-          ; vc5 : 'v
-          ; vc6 : 'v
-          ; vc7 : 'v
-          ; vc8 : 'v (* LSBs *)
+          { (* Current row *)
+            v2 : 'v (* Value to constrain to 88-bits *)
+          ; v12 : 'v (* Optional value used in compact 2-limb mode *)
+          ; v2c0 : 'v (* MSBs, 2-bit crumb *)
+          ; v2p0 : 'v (* vpX are 12-bit plookup chunks *)
+          ; v2p1 : 'v
+          ; v2p2 : 'v
+          ; v2p3 : 'v
+          ; v2c1 : 'v (* vcX are 2-bit crumbs *)
+          ; v2c2 : 'v
+          ; v2c3 : 'v
+          ; v2c4 : 'v
+          ; v2c5 : 'v
+          ; v2c6 : 'v
+          ; v2c7 : 'v
+          ; v2c8 : 'v (* LSBs *)
+          ; (* Next row *) v2c9 : 'v
+          ; v2c10 : 'v
+          ; v2c11 : 'v
+          ; v0p0 : 'v
+          ; v0p1 : 'v
+          ; v1p0 : 'v
+          ; v1p1 : 'v
+          ; v2c12 : 'v
+          ; v2c13 : 'v
+          ; v2c14 : 'v
+          ; v2c15 : 'v
+          ; v2c16 : 'v
+          ; v2c17 : 'v
+          ; v2c18 : 'v
+          ; v2c19 : 'v
           }
       | Raw of
           { kind : Kimchi_gate_type.t; values : 'v array; coeffs : 'f array }
@@ -284,38 +300,68 @@ module Plonk_constraint = struct
             ; compact
             }
       | RangeCheck1
-          { v
-          ; opt
-          ; vc0
-          ; vp0
-          ; vp1
-          ; vp2
-          ; vp3
-          ; vc1
-          ; vc2
-          ; vc3
-          ; vc4
-          ; vc5
-          ; vc6
-          ; vc7
-          ; vc8
+          { (* Current row *) v2
+          ; v12
+          ; v2c0
+          ; v2p0
+          ; v2p1
+          ; v2p2
+          ; v2p3
+          ; v2c1
+          ; v2c2
+          ; v2c3
+          ; v2c4
+          ; v2c5
+          ; v2c6
+          ; v2c7
+          ; v2c8
+          ; (* Next row *) v2c9
+          ; v2c10
+          ; v2c11
+          ; v0p0
+          ; v0p1
+          ; v1p0
+          ; v1p1
+          ; v2c12
+          ; v2c13
+          ; v2c14
+          ; v2c15
+          ; v2c16
+          ; v2c17
+          ; v2c18
+          ; v2c19
           } ->
           RangeCheck1
-            { v = f v
-            ; opt = f opt
-            ; vc0 = f vc0
-            ; vp0 = f vp0
-            ; vp1 = f vp1
-            ; vp2 = f vp2
-            ; vp3 = f vp3
-            ; vc1 = f vc1
-            ; vc2 = f vc2
-            ; vc3 = f vc3
-            ; vc4 = f vc4
-            ; vc5 = f vc5
-            ; vc6 = f vc6
-            ; vc7 = f vc7
-            ; vc8 = f vc8
+            { (* Current row *) v2 = f v2
+            ; v12 = f v12
+            ; v2c0 = f v2c0
+            ; v2p0 = f v2p0
+            ; v2p1 = f v2p1
+            ; v2p2 = f v2p2
+            ; v2p3 = f v2p3
+            ; v2c1 = f v2c1
+            ; v2c2 = f v2c2
+            ; v2c3 = f v2c3
+            ; v2c4 = f v2c4
+            ; v2c5 = f v2c5
+            ; v2c6 = f v2c6
+            ; v2c7 = f v2c7
+            ; v2c8 = f v2c8
+            ; (* Next row *) v2c9 = f v2c9
+            ; v2c10 = f v2c10
+            ; v2c11 = f v2c11
+            ; v0p0 = f v0p0
+            ; v0p1 = f v0p1
+            ; v1p0 = f v1p0
+            ; v1p1 = f v1p1
+            ; v2c12 = f v2c12
+            ; v2c13 = f v2c13
+            ; v2c14 = f v2c14
+            ; v2c15 = f v2c15
+            ; v2c16 = f v2c16
+            ; v2c17 = f v2c17
+            ; v2c18 = f v2c18
+            ; v2c19 = f v2c19
             }
       | Raw { kind; values; coeffs } ->
           Raw { kind; values = Array.map ~f values; coeffs }
@@ -1425,45 +1471,80 @@ end = struct
         add_row sys vars RangeCheck0 [| coeff |]
     | Plonk_constraint.T
         (RangeCheck1
-          { v
-          ; opt
-          ; vc0
-          ; vp0
-          ; vp1
-          ; vp2
-          ; vp3
-          ; vc1
-          ; vc2
-          ; vc3
-          ; vc4
-          ; vc5
-          ; vc6
-          ; vc7
-          ; vc8
+          { (* Current row *) v2
+          ; v12
+          ; v2c0
+          ; v2p0
+          ; v2p1
+          ; v2p2
+          ; v2p3
+          ; v2c1
+          ; v2c2
+          ; v2c3
+          ; v2c4
+          ; v2c5
+          ; v2c6
+          ; v2c7
+          ; v2c8
+          ; (* Next row *) v2c9
+          ; v2c10
+          ; v2c11
+          ; v0p0
+          ; v0p1
+          ; v1p0
+          ; v1p1
+          ; v2c12
+          ; v2c13
+          ; v2c14
+          ; v2c15
+          ; v2c16
+          ; v2c17
+          ; v2c18
+          ; v2c19
           } ) ->
         (*
-        //! 0   1   2   3   4   5   6   7   8   9  10  11  12  13  14
-        //! v opt vc0 vp0 vp1 vp2 vp3 vc1 vc2 vc3 vc4 vc5 vc6 vc7 vc8
+        //!       0      1      2     3    4    5    6     7     8     9    10    11    12   13     14
+        //! Curr: v2   v12   v2c0  v2p0 v2p1 v2p2 v2p3  v2c1  v2c2  v2c3  v2c4  v2c5  v2c6 v2c7   v2c8
+        //! Next: v2c9 v2c10 v2c11 v0p0 v0p1 v1p0 v1p1 v2c12 v2c13 v2c14 v2c15 v2c16 v2c17 v2c18 v2c19
         *)
-        let vars =
-          [| Some (reduce_to_v v)
-           ; Some (reduce_to_v opt)
-           ; Some (reduce_to_v vc0) (* MSBs *)
-           ; Some (reduce_to_v vp0)
-           ; Some (reduce_to_v vp1)
-           ; Some (reduce_to_v vp2)
-           ; Some (reduce_to_v vp3)
-           ; Some (reduce_to_v vc1)
-           ; Some (reduce_to_v vc2)
-           ; Some (reduce_to_v vc3)
-           ; Some (reduce_to_v vc4)
-           ; Some (reduce_to_v vc5)
-           ; Some (reduce_to_v vc6)
-           ; Some (reduce_to_v vc7)
-           ; Some (reduce_to_v vc8) (* LSBs *)
+        let vars_curr =
+          [| (* Current row *) Some (reduce_to_v v2)
+           ; Some (reduce_to_v v12)
+           ; Some (reduce_to_v v2c0) (* MSBs *)
+           ; Some (reduce_to_v v2p0)
+           ; Some (reduce_to_v v2p1)
+           ; Some (reduce_to_v v2p2)
+           ; Some (reduce_to_v v2p3)
+           ; Some (reduce_to_v v2c1)
+           ; Some (reduce_to_v v2c2)
+           ; Some (reduce_to_v v2c3)
+           ; Some (reduce_to_v v2c4)
+           ; Some (reduce_to_v v2c5)
+           ; Some (reduce_to_v v2c6)
+           ; Some (reduce_to_v v2c7)
+           ; Some (reduce_to_v v2c8) (* LSBs *)
           |]
         in
-        add_row sys vars RangeCheck1 [||]
+        let vars_next =
+          [| (* Next row *) Some (reduce_to_v v2c9)
+           ; Some (reduce_to_v v2c10)
+           ; Some (reduce_to_v v2c11)
+           ; Some (reduce_to_v v0p0)
+           ; Some (reduce_to_v v0p1)
+           ; Some (reduce_to_v v1p0)
+           ; Some (reduce_to_v v1p1)
+           ; Some (reduce_to_v v2c12)
+           ; Some (reduce_to_v v2c13)
+           ; Some (reduce_to_v v2c14)
+           ; Some (reduce_to_v v2c15)
+           ; Some (reduce_to_v v2c16)
+           ; Some (reduce_to_v v2c17)
+           ; Some (reduce_to_v v2c18)
+           ; Some (reduce_to_v v2c19)
+          |]
+        in
+        add_row sys vars_curr RangeCheck1 [||] ;
+        add_row sys vars_next Zero [||]
     | Plonk_constraint.T (Raw { kind; values; coeffs }) ->
         let values =
           Array.init 15 ~f:(fun i ->
