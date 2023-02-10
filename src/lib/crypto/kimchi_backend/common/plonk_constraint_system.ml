@@ -1379,9 +1379,8 @@ end = struct
         let output = Some (reduce_to_v next_out) in
         (* The generic gate after a Xor16 gate is a Const to check that all values are zero. For that, the first coefficient is 1 and the rest will be zero.*)
         add_row sys curr_row Xor16 [||] ;
-        add_generic_constraint ?l:left ?r:right ?o:output
+        add_row sys [| left; right; output |] Generic
           [| Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.zero |]
-          sys
     | Plonk_constraint.T (Raw { kind; values; coeffs }) ->
         let values =
           Array.init 15 ~f:(fun i ->
