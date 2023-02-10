@@ -224,6 +224,30 @@ module Plonk_constraint = struct
           ; v2c18 : 'v
           ; v2c19 : 'v
           }
+      | ForeignFieldMul of
+          { (* Current row *)
+            left_input0 : 'v
+          ; left_input1 : 'v
+          ; left_input2 : 'v
+          ; right_input0 : 'v (* vpX are 12-bit plookup chunks *)
+          ; right_input1 : 'v
+          ; right_input2 : 'v
+          ; carry1_lo : 'v
+          ; carry1_hi : 'v
+          ; carry0 : 'v
+          ; quotient0 : 'v
+          ; quotient1 : 'v
+          ; quotient2 : 'v
+          ; quotient_bound_carry : 'v
+          ; product1_hi_1 : 'v
+          ; (* Next row *) remainder0 : 'v
+          ; remainder1 : 'v
+          ; remainder2 : 'v
+          ; quotient_bound01 : 'v
+          ; quotient_bound2 : 'v
+          ; product1_lo : 'v
+          ; product1_hi_0 : 'v
+          }
       | Raw of
           { kind : Kimchi_gate_type.t; values : 'v array; coeffs : 'f array }
     [@@deriving sexp]
@@ -362,6 +386,52 @@ module Plonk_constraint = struct
             ; v2c17 = f v2c17
             ; v2c18 = f v2c18
             ; v2c19 = f v2c19
+            }
+      | ForeignFieldMul
+          { (* Current row *) left_input0
+          ; left_input1
+          ; left_input2
+          ; right_input0
+          ; right_input1
+          ; right_input2
+          ; carry1_lo
+          ; carry1_hi
+          ; carry0
+          ; quotient0
+          ; quotient1
+          ; quotient2
+          ; quotient_bound_carry
+          ; product1_hi_1
+          ; (* Next row *) remainder0
+          ; remainder1
+          ; remainder2
+          ; quotient_bound01
+          ; quotient_bound2
+          ; product1_lo
+          ; product1_hi_0
+          } ->
+          ForeignFieldMul
+            { (* Current row *) left_input0 = f left_input0
+            ; left_input1 = f left_input1
+            ; left_input2 = f left_input2
+            ; right_input0 = f right_input0
+            ; right_input1 = f right_input1
+            ; right_input2 = f right_input2
+            ; carry1_lo = f carry1_lo
+            ; carry1_hi = f carry1_hi
+            ; carry0 = f carry0
+            ; quotient0 = f quotient0
+            ; quotient1 = f quotient1
+            ; quotient2 = f quotient2
+            ; quotient_bound_carry = f quotient_bound_carry
+            ; product1_hi_1 = f product1_hi_1
+            ; (* Next row *) remainder0 = f remainder0
+            ; remainder1 = f remainder1
+            ; remainder2 = f remainder2
+            ; quotient_bound01 = f quotient_bound01
+            ; quotient_bound2 = f quotient_bound2
+            ; product1_lo = f product1_lo
+            ; product1_hi_0 = f product1_hi_0
             }
       | Raw { kind; values; coeffs } ->
           Raw { kind; values = Array.map ~f values; coeffs }
@@ -1544,6 +1614,78 @@ end = struct
           |]
         in
         add_row sys vars_curr RangeCheck1 [||] ;
+        add_row sys vars_next Zero [||]
+    | Plonk_constraint.T
+        (ForeignFieldMul
+          { (* Current row *) left_input0
+          ; left_input1
+          ; left_input2
+          ; right_input0
+          ; right_input1
+          ; right_input2
+          ; carry1_lo
+          ; carry1_hi
+          ; carry0
+          ; quotient0
+          ; quotient1
+          ; quotient2
+          ; quotient_bound_carry
+          ; product1_hi_1
+          ; (* Next row *) remainder0
+          ; remainder1
+          ; remainder2
+          ; quotient_bound01
+          ; quotient_bound2
+          ; product1_lo
+          ; product1_hi_0
+          } ) ->
+        (*
+         //! | col | `ForeignFieldMul`            | `Zero`                    |
+         //! | --- | ---------------------------- | ------------------------- |
+         //! |   0 | `left_input0`         (copy) | `remainder0`       (copy) |
+         //! |   1 | `left_input1`         (copy) | `remainder1`       (copy) |
+         //! |   2 | `left_input2`         (copy) | `remainder2`       (copy) |
+         //! |   3 | `right_input0`        (copy) | `quotient_bound01` (copy) |
+         //! |   4 | `right_input1`        (copy) | `quotient_bound2`  (copy) |
+         //! |   5 | `right_input2`        (copy) | `product1_lo`      (copy) |
+         //! |   6 | `carry1_lo`           (copy) | `product1_hi_0`    (copy) |
+         //! |   7 | `carry1_hi`        (plookup) |                           |
+         //! |   8 | `carry0`                     |                           |
+         //! |   9 | `quotient0`                  |                           |
+         //! |  10 | `quotient1`                  |                           |
+         //! |  11 | `quotient2`                  |                           |
+         //! |  12 | `quotient_bound_carry`       |                           |
+         //! |  13 | `product1_hi_1`              |                           |
+         //! |  14 |                              |                           |
+        *)
+        let vars_curr =
+          [| (* Current row *) Some (reduce_to_v left_input0)
+           ; Some (reduce_to_v left_input1)
+           ; Some (reduce_to_v left_input2)
+           ; Some (reduce_to_v right_input0)
+           ; Some (reduce_to_v right_input1)
+           ; Some (reduce_to_v right_input2)
+           ; Some (reduce_to_v carry1_lo)
+           ; Some (reduce_to_v carry1_hi)
+           ; Some (reduce_to_v carry0)
+           ; Some (reduce_to_v quotient0)
+           ; Some (reduce_to_v quotient1)
+           ; Some (reduce_to_v quotient2)
+           ; Some (reduce_to_v quotient_bound_carry)
+           ; Some (reduce_to_v product1_hi_1)
+          |]
+        in
+        let vars_next =
+          [| (* Next row *) Some (reduce_to_v remainder0)
+           ; Some (reduce_to_v remainder1)
+           ; Some (reduce_to_v remainder2)
+           ; Some (reduce_to_v quotient_bound01)
+           ; Some (reduce_to_v quotient_bound2)
+           ; Some (reduce_to_v product1_lo)
+           ; Some (reduce_to_v product1_hi_0)
+          |]
+        in
+        add_row sys vars_curr ForeignFieldMul [||] ;
         add_row sys vars_next Zero [||]
     | Plonk_constraint.T (Raw { kind; values; coeffs }) ->
         let values =
