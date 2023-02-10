@@ -31,7 +31,8 @@ class NotSoSimpleZkapp extends SmartContract {
     this.balance.addInPlace(UInt64.from(initialBalance));
     this.setPermissions({
       ...Permissions.default(),
-      balance: Permissions.none(),
+      send: Permissions.proof(),
+      editState: Permissions.proof(),
     });
   }
 
@@ -46,10 +47,9 @@ class NotSoSimpleZkapp extends SmartContract {
     let callerAddress = caller.toPublicKey();
     callerAddress.assertEquals(privilegedAddress);
 
-    // assert that the caller account is new - this way, payout can only happen once
     let callerAccountUpdate = AccountUpdate.create(callerAddress);
     callerAccountUpdate.account.isNew.assertEquals(Bool(true));
-    // pay out half of the zkapp balance to the caller
+
     let balance = this.account.balance.get();
     this.account.balance.assertEquals(balance);
     let halfBalance = balance.div(2);
@@ -153,16 +153,32 @@ accountAfterUpdate = Mina.getAccount(zkappAddress);
 accountAfterUpdate.balance.assertEquals(UInt64.from(initialBalance));
 accountAfterUpdate.appState[0].assertEquals(Field(131));
 
-/* console.log("payout 1");
+console.log("payout 1");
 tx = await Mina.transaction(feePayerKey, () => {
   AccountUpdate.fundNewAccount(feePayerKey);
   zkapp.payout(privilegedKey);
 });
 await tx.prove();
 await (await tx.sign([feePayerKey]).send()).wait();
-console.log(accountAfterUpdate.balance.toString());
+accountAfterUpdate.balance.assertEquals(UInt64.from(10000000000));
 
 accountAfterUpdate = Mina.getAccount(zkappAddress);
-console.log(accountAfterUpdate.balance.toString());
- */
+accountAfterUpdate.balance.assertEquals(UInt64.from(5000000000));
+
+console.log("payout 2 (expected to fail)");
+tx = await Mina.transaction(feePayerKey, () => {
+  AccountUpdate.fundNewAccount(feePayerKey);
+  zkapp.payout(privilegedKey);
+});
+
+try {
+  await tx.prove();
+  await (await tx.sign([feePayerKey]).send()).wait();
+} catch (error) {
+  // ! TODO check state change
+  console.log("Failed as expected");
+}
+
+accountAfterUpdate = Mina.getAccount(zkappAddress);
+accountAfterUpdate.balance.assertEquals(UInt64.from(5000000000));
 shutdown();
