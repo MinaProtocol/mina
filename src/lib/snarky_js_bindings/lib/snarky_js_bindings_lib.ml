@@ -2380,6 +2380,16 @@ let dummy_base64_proof () =
   let proof = Pickles.Proof.dummy n2 n2 n2 ~domain_log2:15 in
   Proof2.to_base64 proof |> Js.string
 
+let dummy_verification_key () =
+  let vk = Pickles.Side_loaded.Verification_key.dummy in
+  object%js
+    val data = Pickles.Side_loaded.Verification_key.to_base64 vk |> Js.string
+
+    val hash =
+      Mina_base.Zkapp_account.digest_vk vk
+      |> Field.Constant.to_string |> Js.string
+  end
+
 let pickles =
   object%js
     val compile = pickles_compile
@@ -2389,6 +2399,8 @@ let pickles =
     val verify = verify
 
     val dummyBase64Proof = dummy_base64_proof
+
+    val dummyVerificationKey = dummy_verification_key
 
     val proofToBase64 = proof_to_base64
 
