@@ -4,6 +4,34 @@ open Unsigned.Size_t
 
 (* TODO: open Core here instead of opening it multiple times below *)
 
+module Kimchi_gate_type = struct
+  (* Alias to allow deriving sexp *)
+  type t = Kimchi_types.gate_type =
+    | Zero
+    | Generic
+    | Poseidon
+    | CompleteAdd
+    | VarBaseMul
+    | EndoMul
+    | EndoMulScalar
+    | ChaCha0
+    | ChaCha1
+    | ChaCha2
+    | ChaChaFinal
+    | Lookup
+    | CairoClaim
+    | CairoInstruction
+    | CairoFlags
+    | CairoTransition
+    | RangeCheck0
+    | RangeCheck1
+    | ForeignFieldAdd
+    | ForeignFieldMul
+    | Xor16
+    | Rot64
+  [@@deriving sexp]
+end
+
 (** A gate interface, parameterized by a field. *)
 module type Gate_vector_intf = sig
   open Unsigned
@@ -88,7 +116,7 @@ module Gate_spec = struct
 
   (** A gate/row/constraint consists of a type (kind), a row, the other cells its columns/cells are connected to (wired_to), and the selector polynomial associated with the gate. *)
   type ('row, 'f) t =
-    { kind : (Kimchi_types.gate_type[@sexp.opaque])
+    { kind : Kimchi_gate_type.t
     ; wired_to : 'row Position.t array
     ; coeffs : 'f array
     }
@@ -164,6 +192,8 @@ module Plonk_constraint = struct
           ; next_in2 : 'v
           ; next_out : 'v
           }
+      | Raw of
+          { kind : Kimchi_gate_type.t; values : 'v array; coeffs : 'f array }
     [@@deriving sexp]
 
     (** map t *)
@@ -241,6 +271,8 @@ module Plonk_constraint = struct
             ; next_in2 = f next_in2
             ; next_out = f next_out
             }
+      | Raw { kind; values; coeffs } ->
+          Raw { kind; values = Array.map ~f values; coeffs }
 
     (** [eval (module F) get_variable gate] checks that [gate]'s polynomial is
         satisfied by the assignments given by [get_variable].
@@ -1350,6 +1382,15 @@ end = struct
         add_generic_constraint ?l:left ?r:right ?o:output
           [| Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.zero |]
           sys
+    | Plonk_constraint.T (Raw { kind; values; coeffs }) ->
+        let values =
+          Array.init 15 ~f:(fun i ->
+              (* Insert [None] if the index is beyond the end of the [values]
+                 array.
+              *)
+              Option.try_with (fun () -> reduce_to_v values.(i)) )
+        in
+        add_row sys values kind coeffs
     | constr ->
         failwithf "Unhandled constraint %s"
           Obj.(Extension_constructor.name (Extension_constructor.of_val constr))

@@ -27,7 +27,7 @@
    child_processes
    precomputed_values
    coda_genesis_ledger
-   coda_runtime_config
+   mina_runtime_config
    sgn
    mina_base.util
    kimchi_backend.pasta

@@ -233,7 +233,7 @@ module type S = sig
       ; main :
              'a_var main_input
           -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return
-      ; uses_lookup : bool
+      ; feature_flags : bool Pickles_types.Plonk_types.Features.t
       }
   end
 
@@ -333,7 +333,7 @@ module type S = sig
     val create :
          name:string
       -> max_proofs_verified:(module Nat.Add.Intf with type n = 'n1)
-      -> uses_lookup:Plonk_types.Opt.Flag.t
+      -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
       -> typ:('var, 'value) Impls.Step.Typ.t
       -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
 

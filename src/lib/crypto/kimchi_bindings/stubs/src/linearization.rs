@@ -1,31 +1,13 @@
 use kimchi::{
-    circuits::{
-        constraints::FeatureFlags,
-        expr::Linearization,
-        lookup::lookups::{LookupFeatures, LookupPatterns},
-    },
+    circuits::expr::Linearization,
     linearization::{constraints_expr, linearization_columns},
 };
 
 /// Converts the linearization of the kimchi circuit polynomial into a printable string.
 pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
-    lookup_features: Option<LookupFeatures>,
 ) -> (String, Vec<(String, String)>) {
-    let feature_flags = match lookup_features {
-        None => None,
-        Some(lookup_features) => Some(FeatureFlags {
-            chacha: false,
-            range_check0: false,
-            range_check1: false,
-            rot: false,
-            foreign_field_add: false,
-            foreign_field_mul: false,
-            xor: false,
-            lookup_features,
-        }),
-    };
-    let evaluated_cols = linearization_columns::<F>(feature_flags.as_ref());
-    let (linearization, _powers_of_alpha) = constraints_expr::<F>(feature_flags.as_ref(), true);
+    let evaluated_cols = linearization_columns::<F>(None);
+    let (linearization, _powers_of_alpha) = constraints_expr::<F>(None, true);
 
     let Linearization {
         constant_term,
@@ -45,37 +27,12 @@ pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
     (constant, other_terms)
 }
 
-pub fn lookup_gate_config(
-) -> LookupFeatures {
-    LookupFeatures {
-        patterns: LookupPatterns {
-            xor: false,
-            chacha_final: false,
-            lookup: true,
-            range_check: false,
-            foreign_field_mul: false,
-        },
-        joint_lookup_used: true,
-        uses_runtime_tables: true,
-    }
-}
-
 #[ocaml::func]
 pub fn fp_linearization_strings() -> (String, Vec<(String, String)>) {
-    linearization_strings::<mina_curves::pasta::Fp>(None)
+    linearization_strings::<mina_curves::pasta::Fp>()
 }
 
 #[ocaml::func]
 pub fn fq_linearization_strings() -> (String, Vec<(String, String)>) {
-    linearization_strings::<mina_curves::pasta::Fq>(None)
-}
-
-#[ocaml::func]
-pub fn fp_lookup_gate_linearization_strings() -> (String, Vec<(String, String)>) {
-    linearization_strings::<mina_curves::pasta::Fp>(Some(lookup_gate_config()))
-}
-
-#[ocaml::func]
-pub fn fq_lookup_gate_linearization_strings() -> (String, Vec<(String, String)>) {
-    linearization_strings::<mina_curves::pasta::Fq>(Some(lookup_gate_config()))
+    linearization_strings::<mina_curves::pasta::Fq>()
 }

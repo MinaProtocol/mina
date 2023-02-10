@@ -29,7 +29,7 @@
    key_gen
    integration_test_lib
    graphql_lib
-   coda_runtime_config
+   mina_runtime_config
    mina_base
    genesis_constants
    genesis_ledger_helper

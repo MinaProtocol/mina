@@ -1,3 +1,5 @@
+open Pickles_types
+
 val wrap :
      max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t
   -> (module Pickles_types.Hlist.Maxes.S
@@ -9,18 +11,18 @@ val wrap :
   -> (   ( Impls.Wrap.Impl.Field.t
          , Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
          , Impls.Wrap.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-         , ( ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
-               Pickles_types.Hlist0.Id.t
-               Pickles_types.Hlist0.Id.t
-             , Impls.Wrap.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-               Pickles_types.Hlist0.Id.t
-               Pickles_types.Hlist0.Id.t )
+         , ( Impls.Wrap.Impl.Field.t Pickles_types.Shifted_value.Type1.t
+           , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
+             Snarky_backendless.Snark_intf.Boolean0.t )
+           Pickles_types.Plonk_types.Opt.t
+         , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
              Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
              .Lookup
              .t
            , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
              Snarky_backendless.Snark_intf.Boolean0.t )
            Pickles_types.Plonk_types.Opt.t
+         , Impls.Wrap.Impl.Boolean.var
          , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
          , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
          , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
@@ -37,23 +39,28 @@ val wrap :
   -> step_vk:Kimchi_bindings.Protocol.VerifierIndex.Fp.t
   -> actual_wrap_domains:(Core_kernel.Int.t, 'c) Pickles_types.Vector.t
   -> step_plonk_indices:'d
+  -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+  -> actual_feature_flags:bool Plonk_types.Features.t
   -> ?tweak_statement:
        (   ( Import.Challenge.Constant.t
-           , Import.Challenge.Constant.t Import.Scalar_challenge.t
+           , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
            , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-           , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
-               , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t )
+           , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+             , bool )
+             Import.Types.Opt.t
+           , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
                Composition_types.Wrap.Proof_state.Deferred_values.Plonk
                .In_circuit
                .Lookup
                .t
              , bool )
              Import.Types.Opt.t
+           , bool
            , 'max_proofs_verified
              Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
            , (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.vec
            , ( 'b
-             , ( Kimchi_pasta__Pallas_based_plonk.Proof.G.Affine.Stable.V1.t
+             , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.Stable.V1.t
                , 'actual_proofs_verified )
                Pickles_types.Vector.t
              , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -62,30 +69,33 @@ val wrap :
                  Pickles_types.Vector.t
                , 'actual_proofs_verified )
                Pickles_types.Vector.t )
-             Pickles__Proof.Base.Messages_for_next_proof_over_same_field.Step.t
+             Proof.Base.Messages_for_next_proof_over_same_field.Step.t
            , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
              Import.Types.Bulletproof_challenge.t
              Import.Types.Step_bp_vec.t
            , Import.Types.Branch_data.t )
            Import.Types.Wrap.Statement.In_circuit.t
         -> ( Import.Challenge.Constant.t
-           , Import.Challenge.Constant.t Import.Scalar_challenge.t
+           , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
            , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-           , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
-               , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t )
+           , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+             , bool )
+             Import.Types.Opt.t
+           , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
                Composition_types.Wrap.Proof_state.Deferred_values.Plonk
                .In_circuit
                .Lookup
                .t
              , bool )
              Import.Types.Opt.t
+           , bool
            , 'max_proofs_verified
              Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
            , ( Limb_vector.Constant.Hex64.t
              , Composition_types.Digest.Limbs.n )
              Pickles_types.Vector.vec
            , ( 'b
-             , ( Kimchi_pasta__Pallas_based_plonk.Proof.G.Affine.Stable.V1.t
+             , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.Stable.V1.t
                , 'actual_proofs_verified )
                Pickles_types.Vector.t
              , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -94,7 +104,7 @@ val wrap :
                  Pickles_types.Vector.t
                , 'actual_proofs_verified )
                Pickles_types.Vector.t )
-             Pickles__Proof.Base.Messages_for_next_proof_over_same_field.Step.t
+             Proof.Base.Messages_for_next_proof_over_same_field.Step.t
            , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
              Import.Types.Bulletproof_challenge.t
              Import.Types.Step_bp_vec.t
@@ -105,11 +115,9 @@ val wrap :
      , ( ( Impls.Wrap.Challenge.Constant.t
          , Impls.Wrap.Challenge.Constant.t Import.Types.Scalar_challenge.t
          , Impls.Wrap.Field.Constant.t Pickles_types.Shifted_value.Type2.t
-         , ( Impls.Step.Challenge.Constant.t Composition_types.Scalar_challenge.t
-             Pickles_types.Hlist0.Id.t
-           , Impls.Step.Other_field.Constant.t
-             Pickles_types.Shifted_value.Type2.t
-             Pickles_types.Hlist0.Id.t )
+         , Impls.Wrap.Field.Constant.t Pickles_types.Shifted_value.Type2.t
+           option
+         , Impls.Step.Challenge.Constant.t Composition_types.Scalar_challenge.t
            Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
            .Lookup
            .t
@@ -176,7 +184,8 @@ val combined_inner_product :
   -> r:Backend.Tick.Field.t
   -> plonk:
        ( Backend.Tick.Field.t
-       , Backend.Tick.Field.t )
+       , Backend.Tick.Field.t
+       , bool )
        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
   -> xi:Backend.Tick.Field.t
   -> zeta:Backend.Tick.Field.t
@@ -191,4 +200,4 @@ module Type1 :
     module type of
       Plonk_checks.Make
         (Pickles_types.Shifted_value.Type1)
-        (Plonk_checks.Scalars.Tick_with_lookup)
+        (Plonk_checks.Scalars.Tick)
