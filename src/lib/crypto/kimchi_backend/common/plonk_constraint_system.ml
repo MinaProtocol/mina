@@ -172,7 +172,7 @@ module Plonk_constraint = struct
       | EC_endoscale of
           { state : 'v Endoscale_round.t array; xs : 'v; ys : 'v; n_acc : 'v }
       | EC_endoscalar of { state : 'v Endoscale_scalar_round.t array }
-      | Xor16 of
+      | Xor of
           { in1 : 'v
           ; in2 : 'v
           ; out : 'v
@@ -188,9 +188,6 @@ module Plonk_constraint = struct
           ; out_1 : 'v
           ; out_2 : 'v
           ; out_3 : 'v
-          ; next_in1 : 'v
-          ; next_in2 : 'v
-          ; next_out : 'v
           }
       | Raw of
           { kind : Kimchi_gate_type.t; values : 'v array; coeffs : 'f array }
@@ -231,7 +228,7 @@ module Plonk_constraint = struct
             { state =
                 Array.map ~f:(fun x -> Endoscale_scalar_round.map ~f x) state
             }
-      | Xor16
+      | Xor
           { in1
           ; in2
           ; out
@@ -247,11 +244,8 @@ module Plonk_constraint = struct
           ; out_1
           ; out_2
           ; out_3
-          ; next_in1
-          ; next_in2
-          ; next_out
           } ->
-          Xor16
+          Xor
             { in1 = f in1
             ; in2 = f in2
             ; out = f out
@@ -267,9 +261,6 @@ module Plonk_constraint = struct
             ; out_1 = f out_1
             ; out_2 = f out_2
             ; out_3 = f out_3
-            ; next_in1 = f next_in1
-            ; next_in2 = f next_in2
-            ; next_out = f next_out
             }
       | Raw { kind; values; coeffs } ->
           Raw { kind; values = Array.map ~f values; coeffs }
@@ -1304,6 +1295,7 @@ end = struct
            ; None
            ; None
            ; None
+           ; None
           |]
         in
         add_row sys vars Zero [||]
@@ -1336,7 +1328,7 @@ end = struct
             (Fn.compose add_endoscale_scalar_round
                (Endoscale_scalar_round.map ~f:reduce_to_v) )
     | Plonk_constraint.T
-        (Xor16
+        (Xor
           { in1
           ; in2
           ; out
@@ -1352,9 +1344,6 @@ end = struct
           ; out_1
           ; out_2
           ; out_3
-          ; next_in1
-          ; next_in2
-          ; next_out
           } ) ->
         let curr_row =
           [| Some (reduce_to_v in1)
@@ -1374,13 +1363,10 @@ end = struct
            ; Some (reduce_to_v out_3)
           |]
         in
-        let left = Some (reduce_to_v next_in1) in
-        let right = Some (reduce_to_v next_in2) in
-        let output = Some (reduce_to_v next_out) in
-        (* The generic gate after a Xor16 gate is a Const to check that all values are zero. For that, the first coefficient is 1 and the rest will be zero.*)
-        add_row sys curr_row Xor16 [||] ;
-        add_row sys [| left; right; output |] Generic
-          [| Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.zero |]
+        (* The generic gate after a Xor16 gate is a Const to check that all values are zero.
+           For that, the first coefficient is 1 and the rest will be zero.
+           This will be included in the gadget for a chain of Xors, not here.*)
+        add_row sys curr_row Xor16 [||]
     | Plonk_constraint.T (Raw { kind; values; coeffs }) ->
         let values =
           Array.init 15 ~f:(fun i ->
