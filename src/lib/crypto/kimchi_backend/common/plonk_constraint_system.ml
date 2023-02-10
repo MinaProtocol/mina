@@ -152,7 +152,7 @@ end
 module Plonk_constraint = struct
   open Core_kernel
 
-  (** A PLONK constraint (or gate) can be [Basic], [Poseidon], [EC_add_complete], [EC_scale], [EC_endoscale], [EC_endoscalar], [Xor] *)
+  (** A PLONK constraint (or gate) can be [Basic], [Poseidon], [EC_add_complete], [EC_scale], [EC_endoscale], [EC_endoscalar], [RangeCheck0], [RangeCheck1], [Xor] *)
   module T = struct
     type ('v, 'f) t =
       | Basic of { l : 'f * 'v; r : 'f * 'v; o : 'f * 'v; m : 'f; c : 'f }
@@ -172,6 +172,58 @@ module Plonk_constraint = struct
       | EC_endoscale of
           { state : 'v Endoscale_round.t array; xs : 'v; ys : 'v; n_acc : 'v }
       | EC_endoscalar of { state : 'v Endoscale_scalar_round.t array }
+      | RangeCheck0 of
+          { v0 : 'v (* Value to constrain to 88-bits *)
+          ; v0p0 : 'v (* MSBs *)
+          ; v0p1 : 'v (* vpX are 12-bit plookup chunks *)
+          ; v0p2 : 'v
+          ; v0p3 : 'v
+          ; v0p4 : 'v
+          ; v0p5 : 'v
+          ; v0c0 : 'v (* vcX are 2-bit crumbs *)
+          ; v0c1 : 'v
+          ; v0c2 : 'v
+          ; v0c3 : 'v
+          ; v0c4 : 'v
+          ; v0c5 : 'v
+          ; v0c6 : 'v
+          ; v0c7 : 'v (* LSBs *)
+          ; compact : 'f
+                (* Limbs mode coefficient: 0 (standard 3-limb) or 1 (compact 2-limb) *)
+          }
+      | RangeCheck1 of
+          { (* Current row *)
+            v2 : 'v (* Value to constrain to 88-bits *)
+          ; v12 : 'v (* Optional value used in compact 2-limb mode *)
+          ; v2c0 : 'v (* MSBs, 2-bit crumb *)
+          ; v2p0 : 'v (* vpX are 12-bit plookup chunks *)
+          ; v2p1 : 'v
+          ; v2p2 : 'v
+          ; v2p3 : 'v
+          ; v2c1 : 'v (* vcX are 2-bit crumbs *)
+          ; v2c2 : 'v
+          ; v2c3 : 'v
+          ; v2c4 : 'v
+          ; v2c5 : 'v
+          ; v2c6 : 'v
+          ; v2c7 : 'v
+          ; v2c8 : 'v (* LSBs *)
+          ; (* Next row *) v2c9 : 'v
+          ; v2c10 : 'v
+          ; v2c11 : 'v
+          ; v0p0 : 'v
+          ; v0p1 : 'v
+          ; v1p0 : 'v
+          ; v1p1 : 'v
+          ; v2c12 : 'v
+          ; v2c13 : 'v
+          ; v2c14 : 'v
+          ; v2c15 : 'v
+          ; v2c16 : 'v
+          ; v2c17 : 'v
+          ; v2c18 : 'v
+          ; v2c19 : 'v
+          }
       | Xor of
           { in1 : 'v
           ; in2 : 'v
@@ -188,25 +240,6 @@ module Plonk_constraint = struct
           ; out_1 : 'v
           ; out_2 : 'v
           ; out_3 : 'v
-          }
-      | RangeCheck0 of
-          { v : 'v (* Value to constrain to 88-bits *)
-          ; vp0 : 'v (* MSBs *)
-          ; vp1 : 'v (* vpX are 12-bit plookup chunks *)
-          ; vp2 : 'v
-          ; vp3 : 'v
-          ; vp4 : 'v
-          ; vp5 : 'v
-          ; vc0 : 'v (* vcX are 2-bit crumbs *)
-          ; vc1 : 'v
-          ; vc2 : 'v
-          ; vc3 : 'v
-          ; vc4 : 'v
-          ; vc5 : 'v
-          ; vc6 : 'v
-          ; vc7 : 'v (* LSBs *)
-          ; compact : 'f
-                (* Limbs mode: 0 (standard 3-limb) or 1 (compact 2-limb) *)
           }
       | Raw of
           { kind : Kimchi_gate_type.t; values : 'v array; coeffs : 'f array }
@@ -247,6 +280,106 @@ module Plonk_constraint = struct
             { state =
                 Array.map ~f:(fun x -> Endoscale_scalar_round.map ~f x) state
             }
+      | RangeCheck0
+          { v0
+          ; v0p0
+          ; v0p1
+          ; v0p2
+          ; v0p3
+          ; v0p4
+          ; v0p5
+          ; v0c0
+          ; v0c1
+          ; v0c2
+          ; v0c3
+          ; v0c4
+          ; v0c5
+          ; v0c6
+          ; v0c7
+          ; compact
+          } ->
+          RangeCheck0
+            { v0 = f v0
+            ; v0p0 = f v0p0
+            ; v0p1 = f v0p1
+            ; v0p2 = f v0p2
+            ; v0p3 = f v0p3
+            ; v0p4 = f v0p4
+            ; v0p5 = f v0p5
+            ; v0c0 = f v0c0
+            ; v0c1 = f v0c1
+            ; v0c2 = f v0c2
+            ; v0c3 = f v0c3
+            ; v0c4 = f v0c4
+            ; v0c5 = f v0c5
+            ; v0c6 = f v0c6
+            ; v0c7 = f v0c7
+            ; compact
+            }
+      | RangeCheck1
+          { (* Current row *) v2
+          ; v12
+          ; v2c0
+          ; v2p0
+          ; v2p1
+          ; v2p2
+          ; v2p3
+          ; v2c1
+          ; v2c2
+          ; v2c3
+          ; v2c4
+          ; v2c5
+          ; v2c6
+          ; v2c7
+          ; v2c8
+          ; (* Next row *) v2c9
+          ; v2c10
+          ; v2c11
+          ; v0p0
+          ; v0p1
+          ; v1p0
+          ; v1p1
+          ; v2c12
+          ; v2c13
+          ; v2c14
+          ; v2c15
+          ; v2c16
+          ; v2c17
+          ; v2c18
+          ; v2c19
+          } ->
+          RangeCheck1
+            { (* Current row *) v2 = f v2
+            ; v12 = f v12
+            ; v2c0 = f v2c0
+            ; v2p0 = f v2p0
+            ; v2p1 = f v2p1
+            ; v2p2 = f v2p2
+            ; v2p3 = f v2p3
+            ; v2c1 = f v2c1
+            ; v2c2 = f v2c2
+            ; v2c3 = f v2c3
+            ; v2c4 = f v2c4
+            ; v2c5 = f v2c5
+            ; v2c6 = f v2c6
+            ; v2c7 = f v2c7
+            ; v2c8 = f v2c8
+            ; (* Next row *) v2c9 = f v2c9
+            ; v2c10 = f v2c10
+            ; v2c11 = f v2c11
+            ; v0p0 = f v0p0
+            ; v0p1 = f v0p1
+            ; v1p0 = f v1p0
+            ; v1p1 = f v1p1
+            ; v2c12 = f v2c12
+            ; v2c13 = f v2c13
+            ; v2c14 = f v2c14
+            ; v2c15 = f v2c15
+            ; v2c16 = f v2c16
+            ; v2c17 = f v2c17
+            ; v2c18 = f v2c18
+            ; v2c19 = f v2c19
+            }
       | Xor
           { in1
           ; in2
@@ -280,42 +413,6 @@ module Plonk_constraint = struct
             ; out_1 = f out_1
             ; out_2 = f out_2
             ; out_3 = f out_3
-            }
-      | RangeCheck0
-          { v
-          ; vp0
-          ; vp1
-          ; vp2
-          ; vp3
-          ; vp4
-          ; vp5
-          ; vc0
-          ; vc1
-          ; vc2
-          ; vc3
-          ; vc4
-          ; vc5
-          ; vc6
-          ; vc7
-          ; compact
-          } ->
-          RangeCheck0
-            { v = f v
-            ; vp0 = f vp0
-            ; vp1 = f vp1
-            ; vp2 = f vp2
-            ; vp3 = f vp3
-            ; vp4 = f vp4
-            ; vp5 = f vp5
-            ; vc0 = f vc0
-            ; vc1 = f vc1
-            ; vc2 = f vc2
-            ; vc3 = f vc3
-            ; vc4 = f vc4
-            ; vc5 = f vc5
-            ; vc6 = f vc6
-            ; vc7 = f vc7
-            ; compact
             }
       | Raw { kind; values; coeffs } ->
           Raw { kind; values = Array.map ~f values; coeffs }
@@ -1383,6 +1480,125 @@ end = struct
             (Fn.compose add_endoscale_scalar_round
                (Endoscale_scalar_round.map ~f:reduce_to_v) )
     | Plonk_constraint.T
+        (RangeCheck0
+          { v0
+          ; v0p0
+          ; v0p1
+          ; v0p2
+          ; v0p3
+          ; v0p4
+          ; v0p5
+          ; v0c0
+          ; v0c1
+          ; v0c2
+          ; v0c3
+          ; v0c4
+          ; v0c5
+          ; v0c6
+          ; v0c7
+          ; compact
+          } ) ->
+        (*
+        //! 0   1   2   3   4   5   6   7   8   9  10  11  12  13  14
+        //! v vp0 vp1 vp2 vp3 vp4 vp5 vc0 vc1 vc2 vc3 vc4 vc5 vc6 vc7
+        *)
+        let vars =
+          [| Some (reduce_to_v v0)
+           ; Some (reduce_to_v v0p0) (* MSBs *)
+           ; Some (reduce_to_v v0p1)
+           ; Some (reduce_to_v v0p2)
+           ; Some (reduce_to_v v0p3)
+           ; Some (reduce_to_v v0p4)
+           ; Some (reduce_to_v v0p5)
+           ; Some (reduce_to_v v0c0)
+           ; Some (reduce_to_v v0c1)
+           ; Some (reduce_to_v v0c2)
+           ; Some (reduce_to_v v0c3)
+           ; Some (reduce_to_v v0c4)
+           ; Some (reduce_to_v v0c5)
+           ; Some (reduce_to_v v0c6)
+           ; Some (reduce_to_v v0c7) (* LSBs *)
+          |]
+        in
+        let coeff = if Fp.equal compact Fp.one then Fp.one else Fp.zero in
+        add_row sys vars RangeCheck0 [| coeff |]
+    | Plonk_constraint.T
+        (RangeCheck1
+          { (* Current row *) v2
+          ; v12
+          ; v2c0
+          ; v2p0
+          ; v2p1
+          ; v2p2
+          ; v2p3
+          ; v2c1
+          ; v2c2
+          ; v2c3
+          ; v2c4
+          ; v2c5
+          ; v2c6
+          ; v2c7
+          ; v2c8
+          ; (* Next row *) v2c9
+          ; v2c10
+          ; v2c11
+          ; v0p0
+          ; v0p1
+          ; v1p0
+          ; v1p1
+          ; v2c12
+          ; v2c13
+          ; v2c14
+          ; v2c15
+          ; v2c16
+          ; v2c17
+          ; v2c18
+          ; v2c19
+          } ) ->
+        (*
+        //!       0      1      2     3    4    5    6     7     8     9    10    11    12   13     14
+        //! Curr: v2   v12   v2c0  v2p0 v2p1 v2p2 v2p3  v2c1  v2c2  v2c3  v2c4  v2c5  v2c6 v2c7   v2c8
+        //! Next: v2c9 v2c10 v2c11 v0p0 v0p1 v1p0 v1p1 v2c12 v2c13 v2c14 v2c15 v2c16 v2c17 v2c18 v2c19
+        *)
+        let vars_curr =
+          [| (* Current row *) Some (reduce_to_v v2)
+           ; Some (reduce_to_v v12)
+           ; Some (reduce_to_v v2c0) (* MSBs *)
+           ; Some (reduce_to_v v2p0)
+           ; Some (reduce_to_v v2p1)
+           ; Some (reduce_to_v v2p2)
+           ; Some (reduce_to_v v2p3)
+           ; Some (reduce_to_v v2c1)
+           ; Some (reduce_to_v v2c2)
+           ; Some (reduce_to_v v2c3)
+           ; Some (reduce_to_v v2c4)
+           ; Some (reduce_to_v v2c5)
+           ; Some (reduce_to_v v2c6)
+           ; Some (reduce_to_v v2c7)
+           ; Some (reduce_to_v v2c8) (* LSBs *)
+          |]
+        in
+        let vars_next =
+          [| (* Next row *) Some (reduce_to_v v2c9)
+           ; Some (reduce_to_v v2c10)
+           ; Some (reduce_to_v v2c11)
+           ; Some (reduce_to_v v0p0)
+           ; Some (reduce_to_v v0p1)
+           ; Some (reduce_to_v v1p0)
+           ; Some (reduce_to_v v1p1)
+           ; Some (reduce_to_v v2c12)
+           ; Some (reduce_to_v v2c13)
+           ; Some (reduce_to_v v2c14)
+           ; Some (reduce_to_v v2c15)
+           ; Some (reduce_to_v v2c16)
+           ; Some (reduce_to_v v2c17)
+           ; Some (reduce_to_v v2c18)
+           ; Some (reduce_to_v v2c19)
+          |]
+        in
+        add_row sys vars_curr RangeCheck1 [||] ;
+        add_row sys vars_next Zero [||]
+    | Plonk_constraint.T
         (Xor
           { in1
           ; in2
@@ -1422,49 +1638,6 @@ end = struct
            For that, the first coefficient is 1 and the rest will be zero.
            This will be included in the gadget for a chain of Xors, not here.*)
         add_row sys curr_row Xor16 [||]
-    | Plonk_constraint.T
-        (RangeCheck0
-          { v
-          ; vp0
-          ; vp1
-          ; vp2
-          ; vp3
-          ; vp4
-          ; vp5
-          ; vc0
-          ; vc1
-          ; vc2
-          ; vc3
-          ; vc4
-          ; vc5
-          ; vc6
-          ; vc7
-          ; compact
-          } ) ->
-        (*
-        //! 0   1   2   3   4   5   6   7   8   9  10  11  12  13  14
-        //! v vp0 vp1 vp2 vp3 vp4 vp5 vc0 vc1 vc2 vc3 vc4 vc5 vc6 vc7
-        *)
-        let vars =
-          [| Some (reduce_to_v v)
-           ; Some (reduce_to_v vp0) (* MSBs *)
-           ; Some (reduce_to_v vp1)
-           ; Some (reduce_to_v vp2)
-           ; Some (reduce_to_v vp3)
-           ; Some (reduce_to_v vp4)
-           ; Some (reduce_to_v vp5)
-           ; Some (reduce_to_v vc0)
-           ; Some (reduce_to_v vc1)
-           ; Some (reduce_to_v vc2)
-           ; Some (reduce_to_v vc3)
-           ; Some (reduce_to_v vc4)
-           ; Some (reduce_to_v vc5)
-           ; Some (reduce_to_v vc6)
-           ; Some (reduce_to_v vc7) (* LSBs *)
-          |]
-        in
-        let coeff = if Fp.equal compact Fp.one then Fp.one else Fp.zero in
-        add_row sys vars RangeCheck0 [| coeff |]
     | Plonk_constraint.T (Raw { kind; values; coeffs }) ->
         let values =
           Array.init 15 ~f:(fun i ->
