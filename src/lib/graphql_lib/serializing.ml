@@ -117,7 +117,7 @@ module Transaction_hash :
   String_intf with type t = Mina_transaction.Transaction_hash.t = struct
   type t = Mina_transaction.Transaction_hash.t
 
-  let parse = Mina_transaction.Transaction_hash.of_base58_check_exn
+  let parse = Mina_transaction.Transaction_hash.of_string
 
   let serialize = unimplemented_serializer "transaction_hash"
 end

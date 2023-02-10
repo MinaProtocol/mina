@@ -3,7 +3,7 @@ open Graphql_basic_scalars.Testing
 
 module Make (Schema : Schema) = struct
   module TransactionHash =
-    Make_scalar_using_base58_check
+    Make_scalar_using_to_string
       (Mina_transaction.Transaction_hash)
       (struct
         let name = "TransactionHash"

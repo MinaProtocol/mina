@@ -1783,7 +1783,7 @@ module User_command = struct
       Conn.find_opt
         (Caqti_request.find_opt Caqti_type.string Caqti_type.int
            (Mina_caqti.select_cols ~select:"id" ~table_name ~cols:[ "hash" ] ()) )
-        (Transaction_hash.to_base58_check transaction_hash)
+        (Transaction_hash.to_string transaction_hash)
 
     let load (module Conn : CONNECTION) ~(id : int) =
       Conn.find
@@ -1864,7 +1864,7 @@ module User_command = struct
             ; valid_until
             ; memo =
                 Signed_command.memo t |> Signed_command_memo.to_base58_check
-            ; hash = transaction_hash |> Transaction_hash.to_base58_check
+            ; hash = transaction_hash |> Transaction_hash.to_string
             }
 
     let add_extensional_if_doesn't_exist (module Conn : CONNECTION)
@@ -1909,7 +1909,7 @@ module User_command = struct
                     (Fn.compose Unsigned.UInt32.to_int64
                        Mina_numbers.Global_slot.to_uint32 )
             ; memo = user_cmd.memo |> Signed_command_memo.to_base58_check
-            ; hash = user_cmd.hash |> Transaction_hash.to_base58_check
+            ; hash = user_cmd.hash |> Transaction_hash.to_string
             }
   end
 
@@ -1934,7 +1934,7 @@ module User_command = struct
         ( Caqti_request.find_opt Caqti_type.string Caqti_type.int
         @@ Mina_caqti.select_cols ~select:"id" ~table_name ~cols:[ "hash" ] ()
         )
-        (Transaction_hash.to_base58_check transaction_hash)
+        (Transaction_hash.to_string transaction_hash)
 
     let load (module Conn : CONNECTION) id =
       Conn.find
@@ -1958,7 +1958,7 @@ module User_command = struct
       let memo = ps.memo |> Signed_command_memo.to_base58_check in
       let hash =
         Transaction_hash.hash_command (Zkapp_command ps)
-        |> Transaction_hash.to_base58_check
+        |> Transaction_hash.to_string
       in
       Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
         ~table_name:"zkapp_commands" ~cols:(Fields.names, typ)
@@ -2016,7 +2016,7 @@ module Internal_command = struct
             ~tannot:(function
               | "command_type" -> Some "internal_command_type" | _ -> None )
             ~cols:[ "hash"; "command_type" ] () ) )
-      (Transaction_hash.to_base58_check transaction_hash, command_type)
+      (Transaction_hash.to_string transaction_hash, command_type)
 
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
@@ -2050,7 +2050,7 @@ module Internal_command = struct
           { command_type = internal_cmd.command_type
           ; receiver_id
           ; fee = Currency.Fee.to_string internal_cmd.fee
-          ; hash = internal_cmd.hash |> Transaction_hash.to_base58_check
+          ; hash = internal_cmd.hash |> Transaction_hash.to_string
           }
 end
 
@@ -2120,7 +2120,7 @@ module Fee_transfer = struct
           ; fee =
               Fee_transfer.Single.fee t |> Currency.Fee.to_uint64
               |> Unsigned.UInt64.to_int64
-          ; hash = transaction_hash |> Transaction_hash.to_base58_check
+          ; hash = transaction_hash |> Transaction_hash.to_string
           }
 end
 
@@ -2167,7 +2167,7 @@ module Coinbase = struct
           ; amount =
               Coinbase.amount t |> Currency.Amount.to_uint64
               |> Unsigned.UInt64.to_int64
-          ; hash = transaction_hash |> Transaction_hash.to_base58_check
+          ; hash = transaction_hash |> Transaction_hash.to_string
           }
 end
 

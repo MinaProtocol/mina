@@ -12,11 +12,9 @@ end]
 
 type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson, equal]
 
-val of_base58_check : string -> t Or_error.t
+val of_string : string -> t
 
-val of_base58_check_exn : string -> t
-
-val to_base58_check : t -> string
+val to_string : t -> string
 
 val hash_signed_command : Signed_command.t -> t
 

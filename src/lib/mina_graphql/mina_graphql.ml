@@ -4042,12 +4042,12 @@ module Queries = struct
           (* Transactions identified by hashes. *)
           match hashes_opt with
           | Some hashes ->
-              List.filter_map hashes ~f:(fun hash ->
-                  hash |> Transaction_hash.of_base58_check |> Result.ok
-                  |> Option.bind
-                       ~f:
-                         (Network_pool.Transaction_pool.Resource_pool
-                          .find_by_hash resource_pool ) )
+              List.filter_map hashes ~f:(fun s ->
+                  try
+                    let hash = Transaction_hash.of_string s in
+                    Network_pool.Transaction_pool.Resource_pool.find_by_hash
+                      resource_pool hash
+                  with _ -> None )
           | None ->
               []
         in

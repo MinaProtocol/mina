@@ -2092,7 +2092,7 @@ let hash_transaction =
      fun () ->
        match Transaction_hash.hash_of_transaction_id transaction_id with
        | Ok hash ->
-           printf "%s\n" (Transaction_hash.to_base58_check hash)
+           printf "%s\n" (Transaction_hash.to_string hash)
        | Error err ->
            Format.eprintf "Could not hash transaction: %s@."
              (Error.to_string_hum err) )

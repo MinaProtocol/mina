@@ -263,6 +263,8 @@ module type Full = sig
         , Signature.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving compare, sexp, hash, yojson]
+
+      val to_latest : t -> Latest.t
     end
   end]
 
