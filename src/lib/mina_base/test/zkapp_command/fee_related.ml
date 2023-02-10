@@ -12,11 +12,12 @@ let%test_module "fee_related_tests" =
       let open Quickcheck.Generator.Let_syntax in
       let%bind public_key = Int.quickcheck_generator in
       let%bind is_odd = Bool.quickcheck_generator in
+      let%bind currency = Currency.Fee.gen in
       let%map nonce = Int.quickcheck_generator in
       { Mina_wire_types.Mina_base.Account_update.Body.Fee_payer.V1.public_key =
           { x = Field.of_int 1; is_odd = false }
           (* How can I generate Fee rather than have it fixed as one? *)
-      ; fee = Currency.Fee.one
+      ; fee = currency
       ; valid_until = Some (Mina_numbers.Global_slot.random ())
       ; nonce = Unsigned.UInt32.of_int nonce
       }
@@ -49,5 +50,8 @@ let%test_module "fee_related_tests" =
 
     (* Tests for fee_excess *)
     (* let%test_unit "fee_excess" =
-       [%test_eq: Currency.Fee.t] () (fee_excess @@ body_maker x) *)
+       Quickcheck.test feepayer_body_generator ~f:(fun x ->
+           [%test_eq: (Token_id.t, Currency.Fee.Signed.t) Fee_excess.Poly.t]
+             (fee_excess @@ body_maker x)
+             (fee_excess @@ body_maker x) ) *)
   end )
