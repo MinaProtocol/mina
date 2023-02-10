@@ -91,6 +91,7 @@ module type Rpcs_versioned_S = sig
 
       type response =
         (Work.Spec.t * Signature_lib.Public_key.Compressed.t) option
+        * (float * float * float * float)
       [@@deriving bin_io]
 
       val rpc : (query, response) Rpc.Rpc.t
@@ -103,7 +104,7 @@ module type Rpcs_versioned_S = sig
     module V2 : sig
       type query = Work.Result.t [@@deriving bin_io]
 
-      type response = unit [@@deriving bin_io]
+      type response = float * float * float [@@deriving bin_io]
 
       val rpc : (query, response) Rpc.Rpc.t
     end
@@ -137,11 +138,12 @@ module type S0 = sig
         with type Master.T.query = unit
          and type Master.T.response =
           (Work.Spec.t * Signature_lib.Public_key.Compressed.t) option
+          * (float * float * float * float)
 
     module Submit_work :
       Rpc_master
         with type Master.T.query = Work.Result.t
-         and type Master.T.response = unit
+         and type Master.T.response = float * float * float
 
     module Failed_to_generate_snark :
       Rpc_master
