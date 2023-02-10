@@ -373,7 +373,7 @@ module Make (Inputs : Intf.Inputs_intf) :
           in
           let _ = notify_job_get_error (now ()) err in
           log_and_retry "getting work" e (retry_pause 10.) go
-      | Ok None ->
+      | Ok (None, _times) ->
           let err =
             Yojson.Safe.to_string (`Assoc [ ("kind", `String "NoAvailableJob") ])
           in
@@ -387,7 +387,7 @@ module Make (Inputs : Intf.Inputs_intf) :
             ~metadata:[ ("time", `Float random_delay) ] ;
           let%bind () = wait ~sec:random_delay () in
           go ()
-      | Ok (Some (work, public_key)) -> (
+      | Ok (Some (work, public_key), _times) -> (
           [%log info]
             "SNARK work $work_ids received from $address. Starting proof \
              generation"
@@ -470,7 +470,7 @@ module Make (Inputs : Intf.Inputs_intf) :
                 | Error e ->
                     log_and_retry "submitting work" e (retry_pause 10.)
                       submit_work
-                | Ok () ->
+                | Ok _times ->
                     let _ = notify_work_submit_success (now ()) job_ids in
                     go ()
               in
