@@ -229,7 +229,7 @@ module Plonk_constraint = struct
           { left_input_lo : 'v
           ; left_input_mi : 'v
           ; left_input_hi : 'v
-          ; right_input_lo : 'v (* vpX are 12-bit plookup chunks *)
+          ; right_input_lo : 'v
           ; right_input_mi : 'v
           ; right_input_hi : 'v
           ; field_overflow : 'v
@@ -240,7 +240,7 @@ module Plonk_constraint = struct
             left_input0 : 'v
           ; left_input1 : 'v
           ; left_input2 : 'v
-          ; right_input0 : 'v (* vpX are 12-bit plookup chunks *)
+          ; right_input0 : 'v
           ; right_input1 : 'v
           ; right_input2 : 'v
           ; carry1_lo : 'v
@@ -264,7 +264,7 @@ module Plonk_constraint = struct
             word : 'v
           ; rotated : 'v
           ; excess : 'v
-          ; bound_limb0 : 'v (* vpX are 12-bit plookup chunks *)
+          ; bound_limb0 : 'v
           ; bound_limb1 : 'v
           ; bound_limb2 : 'v
           ; bound_limb3 : 'v
