@@ -1673,6 +1673,7 @@ end = struct
            ; Some (reduce_to_v quotient2)
            ; Some (reduce_to_v quotient_bound_carry)
            ; Some (reduce_to_v product1_hi_1)
+           ; None
           |]
         in
         let vars_next =
@@ -1683,6 +1684,14 @@ end = struct
            ; Some (reduce_to_v quotient_bound2)
            ; Some (reduce_to_v product1_lo)
            ; Some (reduce_to_v product1_hi_0)
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
           |]
         in
         add_row sys vars_curr ForeignFieldMul [||] ;
