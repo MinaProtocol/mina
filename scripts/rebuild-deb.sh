@@ -69,6 +69,7 @@ echo "Control File:"
 cat "${BUILDDIR}/DEBIAN/control"
 
 # Binaries
+rm -rf "${BUILDDIR}/usr/local/bin"
 mkdir -p "${BUILDDIR}/usr/local/bin"
 cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
 cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
@@ -166,7 +167,7 @@ chmod +w $p2p_path
 # Only for nix builds
 # patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
 chmod -w $p2p_path
-cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
+# cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
 cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/mina-create-genesis"
 
 mkdir -p "${BUILDDIR}/usr/lib/systemd/user"

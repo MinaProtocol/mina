@@ -21,7 +21,7 @@
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    random_oracle
-   coda_runtime_config
+   mina_runtime_config
    transaction_witness
    transaction_protocol_state
    coda_genesis_ledger
@@ -48,6 +48,7 @@
    kimchi_backend
    mina_base.import
    mina_transaction_logic
+   mina_transaction
    staged_ledger_diff
    mina_wire_types
  )

@@ -58,6 +58,7 @@ module Poly : sig
       type 'controller t =
             'controller Mina_wire_types.Mina_base.Permissions.Poly.V2.t =
         { edit_state : 'controller
+        ; access : 'controller
         ; send : 'controller
         ; receive : 'controller (* TODO: Consider having fee *)
         ; set_delegate : 'controller
@@ -68,6 +69,7 @@ module Poly : sig
         ; set_token_symbol : 'controller
         ; increment_nonce : 'controller
         ; set_voting_for : 'controller
+        ; set_timing : 'controller
         }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end

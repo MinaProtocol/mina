@@ -1,6 +1,6 @@
 module Statement = struct
   module V2 = struct
-    type t = Transaction_snark.Statement.V2.t One_or_two.V1.t
+    type t = Mina_state.Snarked_ledger_state.V2.t One_or_two.V1.t
   end
 end
 

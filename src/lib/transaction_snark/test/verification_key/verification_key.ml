@@ -6,7 +6,8 @@ struct
   let test_description = "verification_key"
 
   let failure_expected =
-    Mina_base.Transaction_status.Failure.Update_not_permitted_verification_key
+    ( Mina_base.Transaction_status.Failure.Update_not_permitted_verification_key
+    , Transaction_snark_tests.Util.Pass_2 )
 
   let snapp_update : Account_update.Update.t =
     let new_verification_key :

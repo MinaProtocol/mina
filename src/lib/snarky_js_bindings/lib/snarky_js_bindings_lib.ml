@@ -1559,15 +1559,11 @@ module Circuit = struct
     let digest =
       Backend.R1CS_constraint_system.digest cs |> Md5.to_hex |> Js.string
     in
-    (* TODO: to_json doesn't return anything; call into kimchi instead *)
     let json =
       Js.Unsafe.(
         fun_call
           global ##. JSON##.parse
-          [| inject
-               ( Backend.R1CS_constraint_system.to_json cs
-               |> Yojson.Safe.to_string |> Js.string )
-          |])
+          [| inject (Backend.R1CS_constraint_system.to_json cs |> Js.string) |])
     in
     object%js
       val rows = rows
@@ -1948,7 +1944,7 @@ module Choices = struct
         (fun ~self ->
           let prevs = prevs ~self in
           { Pickles.Inductive_rule.identifier = Js.to_string rule##.identifier
-          ; uses_lookup = false
+          ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
           ; prevs
           ; main =
               (fun { public_input } ->
@@ -2231,7 +2227,6 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
     Pickles.compile_promise () ~choices
       ~public_input:(Input (public_input_typ public_input_size))
       ~auxiliary_typ:Typ.unit
-      ~override_wrap_domain:Pickles_base.Proofs_verified.N1
       ~branches:(module Branches)
       ~max_proofs_verified:(module Max_proofs_verified)
       ~name ~constraint_constants
@@ -2296,7 +2291,8 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
   let verify (public_input_js : public_input_js) (proof : _ Pickles.Proof.t) =
     let public_input = Public_input.(public_input_js |> of_js |> to_constant) in
     Proof.verify_promise [ (public_input, proof) ]
-    |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
+    |> Promise.map ~f:(fun x -> Js.bool (Or_error.is_ok x))
+    |> Promise_js_helpers.to_js
   in
   object%js
     val provers = Obj.magic provers
@@ -2364,7 +2360,8 @@ let verify (public_input : public_input_js) (proof : proof)
           (Error.to_string_hum err) ()
   in
   Pickles.Side_loaded.verify_promise ~typ [ (vk, public_input, proof) ]
-  |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
+  |> Promise.map ~f:(fun x -> Js.bool (Or_error.is_ok x))
+  |> Promise_js_helpers.to_js
 
 let dummy_base64_proof () =
   let n2 = Pickles_types.Nat.N2.n in
@@ -2428,7 +2425,8 @@ module Ledger = struct
     ; editSequenceState : Js.js_string Js.t Js.readonly_prop
     ; setTokenSymbol : Js.js_string Js.t Js.readonly_prop
     ; incrementNonce : Js.js_string Js.t Js.readonly_prop
-    ; setVotingFor : Js.js_string Js.t Js.readonly_prop >
+    ; setVotingFor : Js.js_string Js.t Js.readonly_prop
+    ; setTiming : Js.js_string Js.t Js.readonly_prop >
     Js.t
 
   type timing =
@@ -2461,6 +2459,7 @@ module Ledger = struct
     { edit_state = None
     ; send = None
     ; receive = None
+    ; access = None
     ; set_delegate = None
     ; set_permissions = None
     ; set_verification_key = None
@@ -2469,6 +2468,7 @@ module Ledger = struct
     ; set_token_symbol = None
     ; increment_nonce = None
     ; set_voting_for = None
+    ; set_timing = None
     }
 
   module L : Mina_base.Ledger_intf.S = struct
@@ -2755,6 +2755,9 @@ module Ledger = struct
         val setVotingFor =
           Js.string
             (Mina_base.Permissions.Auth_required.to_string p.set_voting_for)
+
+        val setTiming =
+          Js.string (Mina_base.Permissions.Auth_required.to_string p.set_timing)
       end
 
     let timing (t : Mina_base.Account_timing.t) : timing =
@@ -3104,7 +3107,9 @@ module Ledger = struct
     check_account_update_signatures txn ;
     let ledger = l##.value in
     let application_result =
-      T.apply_zkapp_command_unchecked ~state_view:network_state
+      T.apply_zkapp_command_unchecked
+        ~global_slot:network_state.global_slot_since_genesis
+        ~state_view:network_state
         ~constraint_constants:
           { Genesis_constants.Constraint_constants.compiled with
             account_creation_fee = Currency.Fee.of_string account_creation_fee

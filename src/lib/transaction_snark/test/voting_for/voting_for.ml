@@ -5,7 +5,8 @@ struct
   let test_description = "voting_for"
 
   let failure_expected =
-    Mina_base.Transaction_status.Failure.Update_not_permitted_voting_for
+    ( Mina_base.Transaction_status.Failure.Update_not_permitted_voting_for
+    , Transaction_snark_tests.Util.Pass_2 )
 
   let snapp_update : Account_update.Update.t =
     { Account_update.Update.dummy with

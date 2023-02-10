@@ -37,6 +37,7 @@ module Base : sig
                 Import.Scalar_challenge.Stable.V2.t
               , Backend.Tick.Field.Stable.V1.t
                 Pickles_types.Shifted_value.Type1.Stable.V1.t
+              , bool
               , 'messages_for_next_wrap_proof
               , Import.Digest.Constant.Stable.V1.t
               , 'messages_for_next_step_proof
@@ -65,6 +66,7 @@ module Base : sig
           ( Import.Challenge.Constant.t
           , Import.Challenge.Constant.t Import.Scalar_challenge.t
           , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+          , bool
           , 'messages_for_next_wrap_proof
           , Import.Digest.Constant.t
           , 'messages_for_next_step_proof
