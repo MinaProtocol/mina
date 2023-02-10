@@ -505,12 +505,12 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
              ledger catchup: $error" ;
           Deferred.Or_error.fail
             (Error.tag ~tag:"verifier threw an error" error)
-      | Error `Invalid_proof ->
+      | Error (`Invalid_proof err) ->
           let%map () =
             (* TODO: Isolate and punish all the evil sender *)
             Deferred.unit
           in
-          Error (Error.of_string "invalid proof")
+          Error (Error.tag ~tag:"invalid proof" err)
     in
     let verification_end_time = Core.Time.now () in
     [%log debug]

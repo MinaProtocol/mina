@@ -17,7 +17,7 @@ create_account(1){
 }
 
 // Workflow used to generate payment transactions
-transfer(10){
+transfer_payment(10){
   transfer{
     transfer.network = {"network":"debug", "blockchain":"mina"};
     currency = {"symbol":"MINA", "decimals":9};
@@ -86,6 +86,67 @@ transfer(10){
           "value":{{recipient_amount}},
           "currency":{{currency}}
         }
+      }
+    ];
+  }
+}
+
+// Workflow used to generate delegation transactions
+transfer_delegation(10){
+  transfer{
+    transfer.network = {"network":"debug", "blockchain":"mina"};
+    currency = {"symbol":"MINA", "decimals":9};
+    sender = find_balance({
+      "minimum_balance":{
+        "value": "20000000000",
+        "currency": {{currency}}
+      }
+    });
+
+    // Set the recipient_amount as some value <= sender.balance-max_fee
+    // creation fee of the account if it did not exist before the transaction 
+    max_fee = "4000000000";
+    min_fee = "2000000000";
+
+    // We limit the amount to genereate multiple transactions with the
+    // same prefunded account
+    available_amount = "6000000000";
+
+    recipient_amount = random_number({"minimum": {{max_fee}}, "maximum": {{available_amount}}});
+    print_message({"recipient_amount":{{recipient_amount}}});
+
+    // Find recipient and construct operations
+    sender_amount = 0 - {{recipient_amount}};
+    fee = random_number({"minimum": {{min_fee}}, "maximum": {{max_fee}}});
+    minus_fee = 0 - {{fee}};
+    recipient = find_balance({
+      "not_account_identifier":[{{sender.account_identifier}}],
+      "minimum_balance":{
+        "value": "0",
+        "currency": {{currency}}
+      },
+      "create_limit": 100,
+      "create_probability": 50
+    });
+    transfer.confirmation_depth = "1";
+    transfer.preprocess_metadata={"valid_until": "4294967295"};
+    transfer.operations = [
+      {
+        "operation_identifier":{"index":0},
+        "type":"fee_payment",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value": {{minus_fee}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":1},
+       "type":"delegate_change",
+        "account":{{sender.account_identifier}},
+	"metadata":{
+	  "delegate_change_target": "PLACEHOLDER_PREFUNDED_ADDRESS"
+	}
       }
     ];
   }

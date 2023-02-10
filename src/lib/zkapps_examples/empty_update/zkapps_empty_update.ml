@@ -9,5 +9,5 @@ let rule public_key : _ Pickles.Inductive_rule.t =
   { identifier = "Empty update"
   ; prevs = []
   ; main = main public_key
-  ; uses_lookup = false
+  ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
   }

@@ -17,6 +17,7 @@
    base.md5
    base.caml
    async_unix
+   splittable_random
    ;; local libraries
    mina_wire_types
    mina_base.import

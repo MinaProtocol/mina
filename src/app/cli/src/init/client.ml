@@ -1038,8 +1038,14 @@ let pending_snark_work =
                           ; fee_excess =
                               to_signed_fee_exn f.sign f.fee_magnitude
                           ; supply_increase = w.supply_increase
-                          ; source_ledger_hash = w.source_ledger_hash
-                          ; target_ledger_hash = w.target_ledger_hash
+                          ; source_first_pass_ledger_hash =
+                              w.source_first_pass_ledger_hash
+                          ; target_first_pass_ledger_hash =
+                              w.target_first_pass_ledger_hash
+                          ; source_second_pass_ledger_hash =
+                              w.source_second_pass_ledger_hash
+                          ; target_second_pass_ledger_hash =
+                              w.target_second_pass_ledger_hash
                           } ) )
                     response.pendingSnarkWork )
              in

@@ -4,6 +4,34 @@ open Unsigned.Size_t
 
 (* TODO: open Core here instead of opening it multiple times below *)
 
+module Kimchi_gate_type = struct
+  (* Alias to allow deriving sexp *)
+  type t = Kimchi_types.gate_type =
+    | Zero
+    | Generic
+    | Poseidon
+    | CompleteAdd
+    | VarBaseMul
+    | EndoMul
+    | EndoMulScalar
+    | ChaCha0
+    | ChaCha1
+    | ChaCha2
+    | ChaChaFinal
+    | Lookup
+    | CairoClaim
+    | CairoInstruction
+    | CairoFlags
+    | CairoTransition
+    | RangeCheck0
+    | RangeCheck1
+    | ForeignFieldAdd
+    | ForeignFieldMul
+    | Xor16
+    | Rot64
+  [@@deriving sexp]
+end
+
 (** A gate interface, parameterized by a field. *)
 module type Gate_vector_intf = sig
   open Unsigned
@@ -18,15 +46,19 @@ module type Gate_vector_intf = sig
 
   val get : t -> int -> field Kimchi_types.circuit_gate
 
+  val len : t -> int
+
   val digest : int -> t -> bytes
+
+  val to_json : int -> t -> string
 end
 
 (** A row indexing in a constraint system. *)
 module Row = struct
   open Core_kernel
 
-  (** Either a public input row, 
-      or a non-public input row that starts at index 0. 
+  (** Either a public input row,
+      or a non-public input row that starts at index 0.
     *)
   type t = Public_input of int | After_public_input of int
   [@@deriving hash, sexp, compare]
@@ -52,10 +84,10 @@ module Position = struct
   let create_cols (row : 'row) : _ t array =
     Array.init Constants.permutation_cols ~f:(fun i -> { row; col = i })
 
-  (** Given a number of columns, 
+  (** Given a number of columns,
       append enough column wires to get an entire row.
       The wire appended will simply point to themselves,
-      so as to not take part in the permutation argument. 
+      so as to not take part in the permutation argument.
     *)
   let append_cols (row : 'row) (cols : _ t array) : _ t array =
     let padding_offset = Array.length cols in
@@ -66,12 +98,12 @@ module Position = struct
     in
     Array.append cols padding
 
-  (** Converts an array of [Constants.columns] to [Constants.permutation_cols]. 
-    This is useful to truncate arrays of cells to the ones that only matter for the permutation argument. 
+  (** Converts an array of [Constants.columns] to [Constants.permutation_cols].
+    This is useful to truncate arrays of cells to the ones that only matter for the permutation argument.
     *)
   let cols_to_perms cols = Array.slice cols 0 Constants.permutation_cols
 
-  (** Converts a [Position.t] into the Rust-compatible type [Kimchi_types.wire]. 
+  (** Converts a [Position.t] into the Rust-compatible type [Kimchi_types.wire].
     *)
   let to_rust_wire { row; col } : Kimchi_types.wire = { row; col }
 end
@@ -84,7 +116,7 @@ module Gate_spec = struct
 
   (** A gate/row/constraint consists of a type (kind), a row, the other cells its columns/cells are connected to (wired_to), and the selector polynomial associated with the gate. *)
   type ('row, 'f) t =
-    { kind : (Kimchi_types.gate_type[@sexp.opaque])
+    { kind : Kimchi_gate_type.t
     ; wired_to : 'row Position.t array
     ; coeffs : 'f array
     }
@@ -140,6 +172,60 @@ module Plonk_constraint = struct
       | EC_endoscale of
           { state : 'v Endoscale_round.t array; xs : 'v; ys : 'v; n_acc : 'v }
       | EC_endoscalar of { state : 'v Endoscale_scalar_round.t array }
+      | RangeCheck0 of
+          { v0 : 'v (* Value to constrain to 88-bits *)
+          ; v0p0 : 'v (* MSBs *)
+          ; v0p1 : 'v (* vpX are 12-bit plookup chunks *)
+          ; v0p2 : 'v
+          ; v0p3 : 'v
+          ; v0p4 : 'v
+          ; v0p5 : 'v
+          ; v0c0 : 'v (* vcX are 2-bit crumbs *)
+          ; v0c1 : 'v
+          ; v0c2 : 'v
+          ; v0c3 : 'v
+          ; v0c4 : 'v
+          ; v0c5 : 'v
+          ; v0c6 : 'v
+          ; v0c7 : 'v (* LSBs *)
+          ; compact : 'f
+                (* Limbs mode coefficient: 0 (standard 3-limb) or 1 (compact 2-limb) *)
+          }
+      | RangeCheck1 of
+          { (* Current row *)
+            v2 : 'v (* Value to constrain to 88-bits *)
+          ; v12 : 'v (* Optional value used in compact 2-limb mode *)
+          ; v2c0 : 'v (* MSBs, 2-bit crumb *)
+          ; v2p0 : 'v (* vpX are 12-bit plookup chunks *)
+          ; v2p1 : 'v
+          ; v2p2 : 'v
+          ; v2p3 : 'v
+          ; v2c1 : 'v (* vcX are 2-bit crumbs *)
+          ; v2c2 : 'v
+          ; v2c3 : 'v
+          ; v2c4 : 'v
+          ; v2c5 : 'v
+          ; v2c6 : 'v
+          ; v2c7 : 'v
+          ; v2c8 : 'v (* LSBs *)
+          ; (* Next row *) v2c9 : 'v
+          ; v2c10 : 'v
+          ; v2c11 : 'v
+          ; v0p0 : 'v
+          ; v0p1 : 'v
+          ; v1p0 : 'v
+          ; v1p1 : 'v
+          ; v2c12 : 'v
+          ; v2c13 : 'v
+          ; v2c14 : 'v
+          ; v2c15 : 'v
+          ; v2c16 : 'v
+          ; v2c17 : 'v
+          ; v2c18 : 'v
+          ; v2c19 : 'v
+          }
+      | Raw of
+          { kind : Kimchi_gate_type.t; values : 'v array; coeffs : 'f array }
     [@@deriving sexp]
 
     (** map t *)
@@ -177,6 +263,108 @@ module Plonk_constraint = struct
             { state =
                 Array.map ~f:(fun x -> Endoscale_scalar_round.map ~f x) state
             }
+      | RangeCheck0
+          { v0
+          ; v0p0
+          ; v0p1
+          ; v0p2
+          ; v0p3
+          ; v0p4
+          ; v0p5
+          ; v0c0
+          ; v0c1
+          ; v0c2
+          ; v0c3
+          ; v0c4
+          ; v0c5
+          ; v0c6
+          ; v0c7
+          ; compact
+          } ->
+          RangeCheck0
+            { v0 = f v0
+            ; v0p0 = f v0p0
+            ; v0p1 = f v0p1
+            ; v0p2 = f v0p2
+            ; v0p3 = f v0p3
+            ; v0p4 = f v0p4
+            ; v0p5 = f v0p5
+            ; v0c0 = f v0c0
+            ; v0c1 = f v0c1
+            ; v0c2 = f v0c2
+            ; v0c3 = f v0c3
+            ; v0c4 = f v0c4
+            ; v0c5 = f v0c5
+            ; v0c6 = f v0c6
+            ; v0c7 = f v0c7
+            ; compact
+            }
+      | RangeCheck1
+          { (* Current row *) v2
+          ; v12
+          ; v2c0
+          ; v2p0
+          ; v2p1
+          ; v2p2
+          ; v2p3
+          ; v2c1
+          ; v2c2
+          ; v2c3
+          ; v2c4
+          ; v2c5
+          ; v2c6
+          ; v2c7
+          ; v2c8
+          ; (* Next row *) v2c9
+          ; v2c10
+          ; v2c11
+          ; v0p0
+          ; v0p1
+          ; v1p0
+          ; v1p1
+          ; v2c12
+          ; v2c13
+          ; v2c14
+          ; v2c15
+          ; v2c16
+          ; v2c17
+          ; v2c18
+          ; v2c19
+          } ->
+          RangeCheck1
+            { (* Current row *) v2 = f v2
+            ; v12 = f v12
+            ; v2c0 = f v2c0
+            ; v2p0 = f v2p0
+            ; v2p1 = f v2p1
+            ; v2p2 = f v2p2
+            ; v2p3 = f v2p3
+            ; v2c1 = f v2c1
+            ; v2c2 = f v2c2
+            ; v2c3 = f v2c3
+            ; v2c4 = f v2c4
+            ; v2c5 = f v2c5
+            ; v2c6 = f v2c6
+            ; v2c7 = f v2c7
+            ; v2c8 = f v2c8
+            ; (* Next row *) v2c9 = f v2c9
+            ; v2c10 = f v2c10
+            ; v2c11 = f v2c11
+            ; v0p0 = f v0p0
+            ; v0p1 = f v0p1
+            ; v1p0 = f v1p0
+            ; v1p1 = f v1p1
+            ; v2c12 = f v2c12
+            ; v2c13 = f v2c13
+            ; v2c14 = f v2c14
+            ; v2c15 = f v2c15
+            ; v2c16 = f v2c16
+            ; v2c17 = f v2c17
+            ; v2c18 = f v2c18
+            ; v2c19 = f v2c19
+            }
+      | Raw { kind; values; coeffs } ->
+          Raw { kind; values = Array.map ~f values; coeffs }
 
     (** [eval (module F) get_variable gate] checks that [gate]'s polynomial is
         satisfied by the assignments given by [get_variable].
@@ -252,8 +440,8 @@ type ('f, 'rust_gates) circuit =
   | Unfinalized_rev of (unit, 'f) Gate_spec.t list
       (** A circuit still being written. *)
   | Compiled of Core_kernel.Md5.t * 'rust_gates
-      (** Once finalized, a circuit is represented as a digest 
-    and a list of gates that corresponds to the circuit. 
+      (** Once finalized, a circuit is represented as a digest
+    and a list of gates that corresponds to the circuit.
   *)
 
 (** The constraint system. *)
@@ -315,7 +503,7 @@ let set_prev_challenges sys challenges =
 (** ? *)
 module Make
     (Fp : Field.S)
-    (* We create a type for gate vector, instead of using `Gate.t list`. If we did, we would have to convert it to a `Gate.t array` to pass it across the FFI boundary, where then it gets converted to a `Vec<Gate>`; it's more efficient to just create the `Vec<Gate>` directly. 
+    (* We create a type for gate vector, instead of using `Gate.t list`. If we did, we would have to convert it to a `Gate.t array` to pass it across the FFI boundary, where then it gets converted to a `Vec<Gate>`; it's more efficient to just create the `Vec<Gate>` directly.
     *)
     (Gates : Gate_vector_intf with type field := Fp.t)
     (Params : sig
@@ -359,22 +547,11 @@ module Make
 
   val finalize_and_get_gates : t -> Gates.t
 
+  val num_constraints : t -> int
+
   val digest : t -> Md5.t
 
-  val to_json :
-       t
-    -> ([ `Null
-        | `Bool of bool
-        | `Int of int
-        | `Intlit of string
-        | `Float of float
-        | `String of string
-        | `Assoc of (string * 'json) list
-        | `List of 'json list
-        | `Tuple of 'json list
-        | `Variant of string * 'json option ]
-        as
-        'json )
+  val to_json : t -> string
 end = struct
   open Core_kernel
   open Pickles_types
@@ -385,7 +562,7 @@ end = struct
       a hash table that maps each position to the next one.
       For example, if one of the equivalence class is [pos1, pos3, pos7],
       the function will return a hashtable that maps pos1 to pos3,
-      pos3 to pos7, and pos7 to pos1. 
+      pos3 to pos7, and pos7 to pos1.
     *)
   let equivalence_classes_to_hashtbl sys =
     let module Relative_position = struct
@@ -413,7 +590,7 @@ end = struct
             Hashtbl.add_exn res ~key:input ~data:output ) ) ;
     res
 
-  (** Compute the witness, given the constraint system `sys` 
+  (** Compute the witness, given the constraint system `sys`
       and a function that converts the indexed secret inputs to their concrete values.
    *)
   let compute_witness (sys : t) (external_values : int -> Fp.t) :
@@ -493,9 +670,6 @@ end = struct
     ; union_finds = V.Table.create ()
     }
 
-  (* TODO *)
-  let to_json _ = `List []
-
   (** Returns the number of auxiliary inputs. *)
   let get_auxiliary_input_size t = t.auxiliary_input_size
 
@@ -524,7 +698,7 @@ end = struct
 
   (** Adds {row; col} to the system's wiring under a specific key.
       A key is an external or internal variable.
-      The row must be given relative to the start of the circuit 
+      The row must be given relative to the start of the circuit
       (so at the start of the public-input rows). *)
   let wire' sys key row (col : int) =
     ignore (union_find sys key : V.t Union_find.t) ;
@@ -557,7 +731,7 @@ end = struct
         (* Add to row. *)
         sys.rows_rev <- vars :: sys.rows_rev
 
-  (** Adds zero-knowledgeness to the gates/rows, 
+  (** Adds zero-knowledgeness to the gates/rows,
       and convert into Rust type [Gates.t].
       This can only be called once.
     *)
@@ -648,6 +822,13 @@ end = struct
   (** Calls [finalize_and_get_gates] and ignores the result. *)
   let finalize t = ignore (finalize_and_get_gates t : Gates.t)
 
+  let num_constraints sys = finalize_and_get_gates sys |> Gates.len
+
+  let to_json (sys : t) : string =
+    let gates = finalize_and_get_gates sys in
+    let public_input_size = Set_once.get_exn sys.public_input_size [%here] in
+    Gates.to_json public_input_size gates
+
   (* Returns a hash of the circuit. *)
   let rec digest (sys : t) =
     match sys.gates with
@@ -656,9 +837,9 @@ end = struct
     | Compiled (digest, _) ->
         digest
 
-  (** Regroup terms that share the same variable. 
+  (** Regroup terms that share the same variable.
       For example, (3, i2) ; (2, i2) can be simplified to (5, i2).
-      It assumes that the list of given terms is sorted, 
+      It assumes that the list of given terms is sorted,
       and that i0 is the smallest one.
       For example, `i0 = 1` and `terms = [(_, 2); (_, 2); (_; 4); ...]`
 
@@ -693,7 +874,7 @@ end = struct
     in
     Some (terms_list, Map.length terms, has_constant_term)
 
-  (** Adds a generic constraint to the constraint system. 
+  (** Adds a generic constraint to the constraint system.
       As there are two generic gates per row, we queue
       every other generic gate.
       *)
@@ -708,8 +889,8 @@ end = struct
         add_row sys [| l; r; o; l2; r2; o2 |] Generic coeffs ;
         sys.pending_generic_gate <- None
 
-  (** Converts a number of scaled additions \sum s_i * x_i 
-      to as many constraints as needed, 
+  (** Converts a number of scaled additions \sum s_i * x_i
+      to as many constraints as needed,
       creating temporary variables for each new row/constraint,
       and returning the output variable.
 
@@ -721,7 +902,7 @@ end = struct
       - internal_var_1 = s1 * x1 + s2 * x2
       - internal_var_2 = 1 * internal_var_1 + s3 * x3
       - return (1, internal_var_2)
-      
+
       It assumes that the list of terms is not empty. *)
   let completely_reduce sys (terms : (Fp.t * int) list) =
     (* just adding constrained variables without values *)
@@ -743,8 +924,8 @@ end = struct
     go terms
 
   (** Converts a linear combination of variables into a set of constraints.
-      It returns the output variable as (1, `Var res), 
-      unless the output is a constant, in which case it returns (c, `Constant). 
+      It returns the output variable as (1, `Var res),
+      unless the output is a constant, in which case it returns (c, `Constant).
     *)
   let reduce_lincom sys (x : Fp.t Snarky_backendless.Cvar.t) =
     let constant, terms =
@@ -1245,6 +1426,134 @@ end = struct
           ~f:
             (Fn.compose add_endoscale_scalar_round
                (Endoscale_scalar_round.map ~f:reduce_to_v) )
+    | Plonk_constraint.T
+        (RangeCheck0
+          { v0
+          ; v0p0
+          ; v0p1
+          ; v0p2
+          ; v0p3
+          ; v0p4
+          ; v0p5
+          ; v0c0
+          ; v0c1
+          ; v0c2
+          ; v0c3
+          ; v0c4
+          ; v0c5
+          ; v0c6
+          ; v0c7
+          ; compact
+          } ) ->
+        (*
+        //! 0   1   2   3   4   5   6   7   8   9  10  11  12  13  14
+        //! v vp0 vp1 vp2 vp3 vp4 vp5 vc0 vc1 vc2 vc3 vc4 vc5 vc6 vc7
+        *)
+        let vars =
+          [| Some (reduce_to_v v0)
+           ; Some (reduce_to_v v0p0) (* MSBs *)
+           ; Some (reduce_to_v v0p1)
+           ; Some (reduce_to_v v0p2)
+           ; Some (reduce_to_v v0p3)
+           ; Some (reduce_to_v v0p4)
+           ; Some (reduce_to_v v0p5)
+           ; Some (reduce_to_v v0c0)
+           ; Some (reduce_to_v v0c1)
+           ; Some (reduce_to_v v0c2)
+           ; Some (reduce_to_v v0c3)
+           ; Some (reduce_to_v v0c4)
+           ; Some (reduce_to_v v0c5)
+           ; Some (reduce_to_v v0c6)
+           ; Some (reduce_to_v v0c7) (* LSBs *)
+          |]
+        in
+        let coeff = if Fp.equal compact Fp.one then Fp.one else Fp.zero in
+        add_row sys vars RangeCheck0 [| coeff |]
+    | Plonk_constraint.T
+        (RangeCheck1
+          { (* Current row *) v2
+          ; v12
+          ; v2c0
+          ; v2p0
+          ; v2p1
+          ; v2p2
+          ; v2p3
+          ; v2c1
+          ; v2c2
+          ; v2c3
+          ; v2c4
+          ; v2c5
+          ; v2c6
+          ; v2c7
+          ; v2c8
+          ; (* Next row *) v2c9
+          ; v2c10
+          ; v2c11
+          ; v0p0
+          ; v0p1
+          ; v1p0
+          ; v1p1
+          ; v2c12
+          ; v2c13
+          ; v2c14
+          ; v2c15
+          ; v2c16
+          ; v2c17
+          ; v2c18
+          ; v2c19
+          } ) ->
+        (*
+        //!       0      1      2     3    4    5    6     7     8     9    10    11    12   13     14
+        //! Curr: v2   v12   v2c0  v2p0 v2p1 v2p2 v2p3  v2c1  v2c2  v2c3  v2c4  v2c5  v2c6 v2c7   v2c8
+        //! Next: v2c9 v2c10 v2c11 v0p0 v0p1 v1p0 v1p1 v2c12 v2c13 v2c14 v2c15 v2c16 v2c17 v2c18 v2c19
+        *)
+        let vars_curr =
+          [| (* Current row *) Some (reduce_to_v v2)
+           ; Some (reduce_to_v v12)
+           ; Some (reduce_to_v v2c0) (* MSBs *)
+           ; Some (reduce_to_v v2p0)
+           ; Some (reduce_to_v v2p1)
+           ; Some (reduce_to_v v2p2)
+           ; Some (reduce_to_v v2p3)
+           ; Some (reduce_to_v v2c1)
+           ; Some (reduce_to_v v2c2)
+           ; Some (reduce_to_v v2c3)
+           ; Some (reduce_to_v v2c4)
+           ; Some (reduce_to_v v2c5)
+           ; Some (reduce_to_v v2c6)
+           ; Some (reduce_to_v v2c7)
+           ; Some (reduce_to_v v2c8) (* LSBs *)
+          |]
+        in
+        let vars_next =
+          [| (* Next row *) Some (reduce_to_v v2c9)
+           ; Some (reduce_to_v v2c10)
+           ; Some (reduce_to_v v2c11)
+           ; Some (reduce_to_v v0p0)
+           ; Some (reduce_to_v v0p1)
+           ; Some (reduce_to_v v1p0)
+           ; Some (reduce_to_v v1p1)
+           ; Some (reduce_to_v v2c12)
+           ; Some (reduce_to_v v2c13)
+           ; Some (reduce_to_v v2c14)
+           ; Some (reduce_to_v v2c15)
+           ; Some (reduce_to_v v2c16)
+           ; Some (reduce_to_v v2c17)
+           ; Some (reduce_to_v v2c18)
+           ; Some (reduce_to_v v2c19)
+          |]
+        in
+        add_row sys vars_curr RangeCheck1 [||] ;
+        add_row sys vars_next Zero [||]
+    | Plonk_constraint.T (Raw { kind; values; coeffs }) ->
+        let values =
+          Array.init 15 ~f:(fun i ->
+              (* Insert [None] if the index is beyond the end of the [values]
+                 array.
+              *)
+              Option.try_with (fun () -> reduce_to_v values.(i)) )
+        in
+        add_row sys values kind coeffs
     | constr ->
         failwithf "Unhandled constraint %s"
           Obj.(Extension_constructor.name (Extension_constructor.of_val constr))

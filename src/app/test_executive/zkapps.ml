@@ -183,6 +183,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; set_zkapp_uri = Proof
         ; set_token_symbol = Proof
         ; set_voting_for = Proof
+        ; set_timing = Proof
         ; send = Proof
         }
       in
@@ -421,12 +422,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let with_dummy_signatures =
           mk_forest
             [ mk_node
-                (mk_account_update_body Signature Call token_owner
+                (mk_account_update_body Signature No token_owner
                    Token_id.default
                    (-account_creation_fee_int) )
                 [ mk_node
-                    (mk_account_update_body Signature Call token_accounts.(0)
-                       custom_token_id 10000 )
+                    (mk_account_update_body Signature Parents_own_token
+                       token_accounts.(0) custom_token_id 10000 )
                     []
                 ]
             ]
@@ -440,14 +441,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let with_dummy_signatures =
           mk_forest
             [ mk_node
-                (mk_account_update_body Signature Call token_owner
+                (mk_account_update_body Signature No token_owner
                    Token_id.default
                    (-2 * account_creation_fee_int) )
                 [ mk_node
-                    (mk_account_update_body Signature Call token_owner
-                       custom_token_id 0 )
+                    (mk_account_update_body Signature Parents_own_token
+                       token_owner custom_token_id 0 )
                     [ mk_node
-                        (mk_account_update_body Signature Call
+                        (mk_account_update_body Signature Parents_own_token
                            token_accounts.(2) custom_token_id2 500 )
                         []
                     ]
@@ -464,23 +465,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let with_dummy_signatures =
           mk_forest
             [ mk_node
-                (mk_account_update_body Signature Call token_owner
+                (mk_account_update_body Signature No token_owner
                    Token_id.default
                    (-account_creation_fee_int) )
                 [ mk_node
-                    (mk_account_update_body Signature Call token_accounts.(0)
-                       custom_token_id (-30) )
+                    (mk_account_update_body Signature Parents_own_token
+                       token_accounts.(0) custom_token_id (-30) )
                     []
                 ; mk_node
-                    (mk_account_update_body Signature Call token_accounts.(1)
-                       custom_token_id 30 )
+                    (mk_account_update_body Signature Parents_own_token
+                       token_accounts.(1) custom_token_id 30 )
                     []
                 ; mk_node
-                    (mk_account_update_body Signature Call token_funder
+                    (mk_account_update_body Signature No token_funder
                        Token_id.default (-50) )
                     []
                 ; mk_node
-                    (mk_account_update_body Signature Call token_funder
+                    (mk_account_update_body Signature No token_funder
                        Token_id.default 50 )
                     []
                 ]
@@ -496,26 +497,26 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let with_dummy_signatures =
           mk_forest
             [ mk_node
-                (mk_account_update_body Signature Call token_owner
+                (mk_account_update_body Signature No token_owner
                    Token_id.default
                    (-account_creation_fee_int) )
                 [ mk_node
-                    (mk_account_update_body Signature Call token_accounts.(1)
-                       custom_token_id (-5) )
+                    (mk_account_update_body Signature Parents_own_token
+                       token_accounts.(1) custom_token_id (-5) )
                     []
                 ; mk_node
-                    (mk_account_update_body Signature Call token_accounts.(0)
-                       custom_token_id 5 )
+                    (mk_account_update_body Signature Parents_own_token
+                       token_accounts.(0) custom_token_id 5 )
                     []
                 ; mk_node
-                    (mk_account_update_body Signature Call token_owner
-                       custom_token_id 0 )
+                    (mk_account_update_body Signature Parents_own_token
+                       token_owner custom_token_id 0 )
                     [ mk_node
-                        (mk_account_update_body Signature Call
+                        (mk_account_update_body Signature Parents_own_token
                            token_accounts.(2) custom_token_id2 (-210) )
                         []
                     ; mk_node
-                        (mk_account_update_body Signature Call
+                        (mk_account_update_body Signature Parents_own_token
                            token_accounts.(3) custom_token_id2 210 )
                         []
                     ]
@@ -623,14 +624,22 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~f:Fn.id
     in
     let snark_work_event_subscription =
-      Event_router.on (event_router t) Snark_work_gossip ~f:(fun _ _ ->
-          [%log info] "Received new snark work" ;
+      Event_router.on (event_router t) Snark_work_gossip
+        ~f:(fun _ (_, direction) ->
+          ( match direction with
+          | Sent ->
+              ()
+          | Received ->
+              [%log info] "Received new snark work" ) ;
           Deferred.return `Continue )
     in
     let snark_work_failure_subscription =
-      Event_router.on (event_router t) Snark_work_failed ~f:(fun _ _ ->
+      Event_router.on (event_router t) Snark_work_failed ~f:(fun _ failure ->
           [%log error]
-            "A snark worker encountered an error while creating a proof" ;
+            "A snark worker encountered an error while creating a proof: \
+             $failure"
+            ~metadata:
+              [ ("failure", Event_type.Snark_work_failed.to_yojson failure) ] ;
           Deferred.return `Continue )
     in
     let%bind () =

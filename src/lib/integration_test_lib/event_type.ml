@@ -308,7 +308,7 @@ module Gossip = struct
           { work; sender = _ } ->
           Ok ({ work }, Direction.Received)
       | Mina_networking.Gossip_snark_pool_diff { work } ->
-          Ok ({ work }, Direction.Received)
+          Ok ({ work }, Direction.Sent)
       | _ ->
           bad_parse
 
@@ -343,7 +343,7 @@ module Gossip = struct
 end
 
 module Snark_work_failed = struct
-  type t = unit [@@deriving yojson]
+  type t = { error : Yojson.Safe.t } [@@deriving yojson]
 
   let name = "Snark_work_failed"
 
@@ -352,8 +352,8 @@ module Snark_work_failed = struct
   let parse_func message =
     let open Or_error.Let_syntax in
     match%bind parse id message with
-    | Snark_worker.Generating_snark_work_failed ->
-        Ok ()
+    | Snark_worker.Generating_snark_work_failed { error } ->
+        Ok { error }
     | _ ->
         bad_parse
 

@@ -508,8 +508,8 @@ module Initial_validate_batcher = struct
         >>| function
         | Ok tvs ->
             Ok (List.map tvs ~f:(fun x -> `Valid x))
-        | Error `Invalid_proof ->
-            Ok (List.map xs ~f:(fun x -> `Potentially_invalid (input x)))
+        | Error (`Invalid_proof err) ->
+            Ok (List.map xs ~f:(fun x -> `Potentially_invalid (input x, err)))
         | Error (`Verifier_error e) ->
             Error e )
 
@@ -558,10 +558,10 @@ module Verify_work_batcher = struct
                      (One_or_two.map proofs ~f:(fun p -> (p, msg))) ) )
         |> Verifier.verify_transaction_snarks verifier
         >>| function
-        | Ok true ->
+        | Ok (Ok ()) ->
             Ok (List.map xs ~f:(fun x -> `Valid (input x)))
-        | Ok false ->
-            Ok (List.map xs ~f:(fun x -> `Potentially_invalid (input x)))
+        | Ok (Error err) ->
+            Ok (List.map xs ~f:(fun x -> `Potentially_invalid (input x, err)))
         | Error e ->
             Error e )
 
@@ -586,11 +586,13 @@ let initial_validate ~context:(module Context : CONTEXT) ~trust_system
     | Ok (Ok tv) ->
         return (Ok { transition with data = tv })
     | Ok (Error invalid) ->
-        let s = "initial_validate: block failed to verify, invalid proof" in
+        let err = Verifier.invalid_to_error invalid in
         [%log warn]
-          ~metadata:[ ("state_hash", state_hash) ]
-          "%s, %s" s
-          (Verifier.invalid_to_string invalid) ;
+          ~metadata:
+            [ ("state_hash", state_hash)
+            ; ("err", Error_json.error_to_yojson err)
+            ]
+          "initial_validate: block failed to verify due to $err." ;
         let%map () =
           match transition.sender with
           | Local ->
@@ -600,7 +602,11 @@ let initial_validate ~context:(module Context : CONTEXT) ~trust_system
                 record trust_system logger peer
                   Actions.(Sent_invalid_proof, None))
         in
-        Error (`Error (Error.of_string s))
+        let err =
+          Error.tag err
+            ~tag:"initial_validate: block failed to verify, invalid proof"
+        in
+        Error (`Error err)
     | Error e ->
         [%log warn]
           ~metadata:
@@ -871,7 +877,9 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
                 [%log' warn t.logger] "verification failed! redownloading"
                   ~metadata:
                     [ ("state_hash", State_hash.to_yojson node.state_hash)
-                    ; ("error", `String (Verifier.invalid_to_string err))
+                    ; ( "error"
+                      , Error_json.error_to_yojson
+                          (Verifier.invalid_to_error err) )
                     ] ;
                 ( match iv.sender with
                 | Local ->
