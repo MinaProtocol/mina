@@ -238,6 +238,8 @@ module Make (Inputs : Intf.Inputs_intf) :
           "+++ coordinator stats put: %s %s -> failed: %s \n%!" url content msg ;
         None
 
+  let int_of_time t = t *. 1000. |> round |> int_of_float
+
   let main
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
         with type Work.ledger_proof = Inputs.Ledger_proof.t ) ~logger
@@ -246,7 +248,7 @@ module Make (Inputs : Intf.Inputs_intf) :
       (* TODO: Make this configurable. *)
       Genesis_constants.Constraint_constants.compiled
     in
-    let now () = Unix.gettimeofday () *. 1000. |> round |> int_of_float in
+    let now () = Unix.gettimeofday () |> int_of_time in
     let register_t = now () in
     let%bind state =
       Worker_state.create ~constraint_constants ~proof_level ()
@@ -277,24 +279,50 @@ module Make (Inputs : Intf.Inputs_intf) :
             (Yojson.Safe.to_string
                (`Assoc [ ("kind", `String "JobGetInit"); ("time", `Int t) ]) ) )
     in
-    let notify_job_get_error t error =
+    let notify_job_get_error t error
+        ( received_time
+        , request_work_start_time
+        , request_work_end_time
+        , respond_time ) =
       Option.map !id_opt ~f:(fun id ->
+          let request_work_end_time =
+            if Float.(request_work_end_time < 0.0) then respond_time
+            else request_work_end_time
+          in
           coordinator_stats_put id
             (Yojson.Safe.to_string
                (`Assoc
                  [ ("kind", `String "JobGetError")
                  ; ("time", `Int t)
                  ; ("error", `String error)
+                 ; ("job_get_node_received_t", `Int (int_of_time received_time))
+                 ; ( "job_get_node_request_work_init_t"
+                   , `Int (int_of_time request_work_start_time) )
+                 ; ( "job_get_node_request_work_success_t"
+                   , `Int (int_of_time request_work_end_time) )
                  ] ) ) )
     in
-    let notify_job_get_success t job_ids =
+    let notify_job_get_success t job_ids
+        ( received_time
+        , request_work_start_time
+        , request_work_end_time
+        , respond_time ) =
       Option.map !id_opt ~f:(fun id ->
+          let request_work_end_time =
+            if Float.(request_work_end_time < 0.0) then respond_time
+            else request_work_end_time
+          in
           coordinator_stats_put id
             (Yojson.Safe.to_string
                (`Assoc
                  [ ("kind", `String "JobGetSuccess")
                  ; ("time", `Int t)
                  ; ("ids", `String job_ids)
+                 ; ("job_get_node_received_t", `Int (int_of_time received_time))
+                 ; ( "job_get_node_request_work_init_t"
+                   , `Int (int_of_time request_work_start_time) )
+                 ; ( "job_get_node_request_work_success_t"
+                   , `Int (int_of_time request_work_end_time) )
                  ] ) ) )
     in
     let notify_work_create_error t job_ids error =
@@ -329,7 +357,8 @@ module Make (Inputs : Intf.Inputs_intf) :
                     ; ("error", `String error)
                     ] ) ) )
        in *)
-    let notify_work_submit_success t job_ids =
+    let notify_work_submit_success t job_ids
+        (received_time, add_work_start_time, add_work_end_time) =
       Option.map !id_opt ~f:(fun id ->
           coordinator_stats_put id
             (Yojson.Safe.to_string
@@ -337,6 +366,12 @@ module Make (Inputs : Intf.Inputs_intf) :
                  [ ("kind", `String "WorkSubmitSuccess")
                  ; ("time", `Int t)
                  ; ("ids", `String job_ids)
+                 ; ( "work_submit_node_received_t"
+                   , `Int (int_of_time received_time) )
+                 ; ( "work_submit_node_add_work_init_t"
+                   , `Int (int_of_time add_work_start_time) )
+                 ; ( "work_submit_node_add_work_success_t"
+                   , `Int (int_of_time add_work_end_time) )
                  ] ) ) )
     in
     let rec go () =
@@ -371,13 +406,13 @@ module Make (Inputs : Intf.Inputs_intf) :
                 ; ("error", `String (Error.to_string_hum e))
                 ] )
           in
-          let _ = notify_job_get_error (now ()) err in
+          let _ = notify_job_get_error (now ()) err (-1.0, -1.0, -1.0, -1.0) in
           log_and_retry "getting work" e (retry_pause 10.) go
-      | Ok (None, _times) ->
+      | Ok (None, times) ->
           let err =
             Yojson.Safe.to_string (`Assoc [ ("kind", `String "NoAvailableJob") ])
           in
-          let _ = notify_job_get_error (now ()) err in
+          let _ = notify_job_get_error (now ()) err times in
           let random_delay =
             Worker_state.worker_wait_time
             +. (0.5 *. Random.float Worker_state.worker_wait_time)
@@ -387,7 +422,7 @@ module Make (Inputs : Intf.Inputs_intf) :
             ~metadata:[ ("time", `Float random_delay) ] ;
           let%bind () = wait ~sec:random_delay () in
           go ()
-      | Ok (Some (work, public_key), _times) -> (
+      | Ok (Some (work, public_key), times) -> (
           [%log info]
             "SNARK work $work_ids received from $address. Starting proof \
              generation"
@@ -426,7 +461,7 @@ module Make (Inputs : Intf.Inputs_intf) :
             | _ ->
                 assert false
           in
-          let _ = notify_job_get_success (now ()) job_ids in
+          let _ = notify_job_get_success (now ()) job_ids times in
 
           let%bind () = wait () in
           (* Pause to wait for stdout to flush *)
@@ -470,8 +505,8 @@ module Make (Inputs : Intf.Inputs_intf) :
                 | Error e ->
                     log_and_retry "submitting work" e (retry_pause 10.)
                       submit_work
-                | Ok _times ->
-                    let _ = notify_work_submit_success (now ()) job_ids in
+                | Ok times ->
+                    let _ = notify_work_submit_success (now ()) job_ids times in
                     go ()
               in
               submit_work () )
