@@ -15,8 +15,7 @@ let%test_module "fee_related_tests" =
       let%bind currency = Currency.Fee.gen in
       let%map nonce = Int.quickcheck_generator in
       { Mina_wire_types.Mina_base.Account_update.Body.Fee_payer.V1.public_key =
-          { x = Field.of_int 1; is_odd = false }
-          (* How can I generate Fee rather than have it fixed as one? *)
+          { x = Field.of_int public_key; is_odd }
       ; fee = currency
       ; valid_until = Some (Mina_numbers.Global_slot.random ())
       ; nonce = Unsigned.UInt32.of_int nonce
