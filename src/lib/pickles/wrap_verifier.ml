@@ -490,8 +490,8 @@ struct
     with_label __LOC__ (fun () -> scalar_chal zeta_0 zeta_1)
 
   let assert_eq_plonk
-      (m1 : (_, Field.t Import.Scalar_challenge.t) Plonk.Minimal.t)
-      (m2 : (_, Scalar_challenge.t) Plonk.Minimal.t) =
+      (m1 : (_, Field.t Import.Scalar_challenge.t, _) Plonk.Minimal.t)
+      (m2 : (_, Scalar_challenge.t, _) Plonk.Minimal.t) =
     iter2 m1 m2
       ~chal:(fun c1 c2 -> Field.Assert.equal c1 c2)
       ~scalar_chal:(fun ({ inner = t1 } : _ Import.Scalar_challenge.t)
@@ -718,8 +718,15 @@ struct
           ; gamma = plonk.gamma
           ; zeta = plonk.zeta
           ; joint_combiner
+          ; feature_flags = plonk.feature_flags
           }
-          { alpha; beta; gamma; zeta; joint_combiner } ;
+          { alpha
+          ; beta
+          ; gamma
+          ; zeta
+          ; joint_combiner
+          ; feature_flags = plonk.feature_flags
+          } ;
         (sponge_digest_before_evaluations, bulletproof_challenges) )
 
   let mask_evals (type n) ~(lengths : (int, n) Vector.t Evals.t)
@@ -816,6 +823,7 @@ struct
         , _
         , _ Shifted_value.Type2.t
         , _
+        , _
         , _ )
         Types.Step.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
@@ -866,7 +874,7 @@ struct
     (* TODO: r actually does not need to be a scalar challenge. *)
     let r = scalar_to_field (Import.Scalar_challenge.create r_actual) in
     let plonk_minimal =
-      Plonk.to_minimal plonk ~to_option:Plonk_types.Opt.to_option
+      Plonk.to_minimal plonk ~to_option:Plonk_types.Opt.to_option_unsafe
     in
     let combined_evals =
       let n = Common.Max_degree.wrap_log2 in
@@ -878,8 +886,27 @@ struct
           , actual_evaluation ~pt_to_n:zetaw_n x1 ) )
     in
     let env =
+      let module Env_bool = struct
+        include Boolean
+
+        type t = Boolean.var
+      end in
+      let module Env_field = struct
+        include Field
+
+        type bool = Env_bool.t
+
+        let if_ (b : bool) ~then_ ~else_ =
+          match Impl.Field.to_constant (b :> t) with
+          | Some x ->
+              (* We have a constant, only compute the branch we care about. *)
+              if Impl.Field.Constant.(equal one) x then then_ () else else_ ()
+          | None ->
+              if_ b ~then_:(then_ ()) ~else_:(else_ ())
+      end in
       Plonk_checks.scalars_env
-        (module Field)
+        (module Env_bool)
+        (module Env_field)
         ~srs_length_log2:Common.Max_degree.wrap_log2
         ~endo:(Impl.Field.constant Endo.Wrap_inner_curve.base)
         ~mds:sponge_params.mds
@@ -897,8 +924,7 @@ struct
             with_label __LOC__ (fun () ->
                 Plonk_checks.ft_eval0
                   (module Field)
-                  ~lookup_constant_term_part:None ~env ~domain plonk_minimal
-                  combined_evals evals1.public_input )
+                  ~env ~domain plonk_minimal combined_evals evals1.public_input )
           in
           (* sum_i r^i sum_j xi^j f_j(beta_i) *)
           let actual_combined_inner_product =
@@ -968,7 +994,8 @@ struct
     in
     let plonk_checks_passed =
       with_label __LOC__ (fun () ->
-          Plonk_checks.checked
+          (* This proof is a wrap proof; no need to consider features. *)
+          Plonk_checks.checked ~feature_flags:Plonk_types.Features.none
             (module Impl)
             ~env ~shift:shift2 plonk combined_evals )
     in

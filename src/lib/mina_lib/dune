@@ -25,7 +25,7 @@
    best_tip_prover
    proof_carrying_data
    mina_compile_config
-   coda_runtime_config
+   mina_runtime_config
    ledger_proof
    mina_net2
    network_peer

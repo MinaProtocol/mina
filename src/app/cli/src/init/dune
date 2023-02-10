@@ -92,7 +92,7 @@
    participating_state
    staged_ledger
    mina_commands
-   coda_runtime_config
+   mina_runtime_config
    coda_genesis_ledger
    mina_networking
    sgn

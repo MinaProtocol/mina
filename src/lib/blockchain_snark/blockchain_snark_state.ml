@@ -423,7 +423,7 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
         ; public_output = ()
         ; auxiliary_output = ()
         } )
-  ; uses_lookup = false
+  ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
   }
 
 module type S = sig
@@ -480,7 +480,7 @@ end) : S = struct
 
   let tag, cache_handle, p, Pickles.Provers.[ step ] =
     Pickles.compile () ~cache:Cache_dir.cache ~public_input:(Input typ)
-      ~auxiliary_typ:Typ.unit ~override_wrap_domain:N1
+      ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N2)
       ~name:"blockchain-snark"
