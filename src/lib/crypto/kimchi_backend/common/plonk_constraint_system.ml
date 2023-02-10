@@ -191,6 +191,23 @@ module Plonk_constraint = struct
           ; compact : 'f
                 (* Limbs mode: 0 (standard 3-limb) or 1 (compact 2-limb) *)
           }
+      | RangeCheck1 of
+          { v : 'v (* Value to constrain to 88-bits *)
+          ; opt : 'v (* Optional value used in compact 2-limb mode *)
+          ; vc0 : 'v (* MSBs, 2-bit crumb *)
+          ; vp0 : 'v (* vpX are 12-bit plookup chunks *)
+          ; vp1 : 'v
+          ; vp2 : 'v
+          ; vp3 : 'v
+          ; vc1 : 'v (* vcX are 2-bit crumbs *)
+          ; vc2 : 'v
+          ; vc3 : 'v
+          ; vc4 : 'v
+          ; vc5 : 'v
+          ; vc6 : 'v
+          ; vc7 : 'v
+          ; vc8 : 'v (* LSBs *)
+          }
       | Raw of
           { kind : Kimchi_gate_type.t; values : 'v array; coeffs : 'f array }
     [@@deriving sexp]
@@ -265,6 +282,40 @@ module Plonk_constraint = struct
             ; vc6 = f vc6
             ; vc7 = f vc7
             ; compact
+            }
+      | RangeCheck1
+          { v
+          ; opt
+          ; vc0
+          ; vp0
+          ; vp1
+          ; vp2
+          ; vp3
+          ; vc1
+          ; vc2
+          ; vc3
+          ; vc4
+          ; vc5
+          ; vc6
+          ; vc7
+          ; vc8
+          } ->
+          RangeCheck1
+            { v = f v
+            ; opt = f opt
+            ; vc0 = f vc0
+            ; vp0 = f vp0
+            ; vp1 = f vp1
+            ; vp2 = f vp2
+            ; vp3 = f vp3
+            ; vc1 = f vc1
+            ; vc2 = f vc2
+            ; vc3 = f vc3
+            ; vc4 = f vc4
+            ; vc5 = f vc5
+            ; vc6 = f vc6
+            ; vc7 = f vc7
+            ; vc8 = f vc8
             }
       | Raw { kind; values; coeffs } ->
           Raw { kind; values = Array.map ~f values; coeffs }
@@ -1372,6 +1423,47 @@ end = struct
         in
         let coeff = if Fp.equal compact Fp.one then Fp.one else Fp.zero in
         add_row sys vars RangeCheck0 [| coeff |]
+    | Plonk_constraint.T
+        (RangeCheck1
+          { v
+          ; opt
+          ; vc0
+          ; vp0
+          ; vp1
+          ; vp2
+          ; vp3
+          ; vc1
+          ; vc2
+          ; vc3
+          ; vc4
+          ; vc5
+          ; vc6
+          ; vc7
+          ; vc8
+          } ) ->
+        (*
+        //! 0   1   2   3   4   5   6   7   8   9  10  11  12  13  14
+        //! v opt vc0 vp0 vp1 vp2 vp3 vc1 vc2 vc3 vc4 vc5 vc6 vc7 vc8
+        *)
+        let vars =
+          [| Some (reduce_to_v v)
+           ; Some (reduce_to_v opt)
+           ; Some (reduce_to_v vc0) (* MSBs *)
+           ; Some (reduce_to_v vp0)
+           ; Some (reduce_to_v vp1)
+           ; Some (reduce_to_v vp2)
+           ; Some (reduce_to_v vp3)
+           ; Some (reduce_to_v vc1)
+           ; Some (reduce_to_v vc2)
+           ; Some (reduce_to_v vc3)
+           ; Some (reduce_to_v vc4)
+           ; Some (reduce_to_v vc5)
+           ; Some (reduce_to_v vc6)
+           ; Some (reduce_to_v vc7)
+           ; Some (reduce_to_v vc8) (* LSBs *)
+          |]
+        in
+        add_row sys vars RangeCheck1 [||]
     | Plonk_constraint.T (Raw { kind; values; coeffs }) ->
         let values =
           Array.init 15 ~f:(fun i ->
