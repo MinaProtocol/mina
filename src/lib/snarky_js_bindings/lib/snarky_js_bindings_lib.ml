@@ -366,12 +366,20 @@ let () =
      ; ("lte", fun { less_or_equal; _ } -> less_or_equal)
      ; ("gt", fun { less_or_equal; _ } -> Boolean.not less_or_equal)
      ; ("gte", fun { less; _ } -> Boolean.not less)
+     ; ("lessThan", fun { less; _ } -> less)
+     ; ("lessThanOrEqual", fun { less_or_equal; _ } -> less_or_equal)
+     ; ("greaterThan", fun { less_or_equal; _ } -> Boolean.not less_or_equal)
+     ; ("greaterThanOrEqual", fun { less; _ } -> Boolean.not less)
      ] ;
    List.iter ~f:cmp_method
      [ ("assertLt", Field.Assert.lt)
      ; ("assertLte", Field.Assert.lte)
      ; ("assertGt", Field.Assert.gt)
      ; ("assertGte", Field.Assert.gte)
+     ; ("assertLessThan", Field.Assert.lt)
+     ; ("assertLessThanOrEqual", Field.Assert.lte)
+     ; ("assertGreaterThan", Field.Assert.gt)
+     ; ("assertGreaterThanOrEqual", Field.Assert.gte)
      ] ) ;
 
   arg_optdef_arg_method field_class "assertEquals"
@@ -379,6 +387,10 @@ let () =
       try Field.Assert.equal this##.value (As_field.value y)
       with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
   optdef_arg_method field_class "assertBoolean"
+    (fun this (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
+      try Impl.assert_ (Constraint.boolean this##.value)
+      with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
+  optdef_arg_method field_class "assertBool"
     (fun this (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
       try Impl.assert_ (Constraint.boolean this##.value)
       with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
@@ -3396,6 +3408,73 @@ module Ledger = struct
     method_ "applyJsonTransaction" apply_json_transaction
 end
 
+let test =
+  let module Signed_command = Mina_base.Signed_command in
+  let module Signed_command_payload = Mina_base.Signed_command_payload in
+  let ok_exn result =
+    let open Ppx_deriving_yojson_runtime.Result in
+    match result with Ok c -> c | Error e -> failwith ("not ok: " ^ e)
+  in
+  let keypair () = Signature_lib.Keypair.create () in
+  object%js
+    val transactionHash =
+      object%js
+        method hashPayment (command : Js.js_string Js.t) =
+          let command : Signed_command.t =
+            command |> Js.to_string |> Yojson.Safe.from_string
+            |> Signed_command.of_yojson |> ok_exn
+          in
+          Mina_transaction.Transaction_hash.(
+            command |> hash_signed_command |> to_base58_check |> Js.string)
+
+        method hashPaymentV1 (command : Js.js_string Js.t) =
+          let command : Signed_command.t_v1 =
+            command |> Js.to_string |> Yojson.Safe.from_string
+            |> Signed_command.Stable.V1.of_yojson |> ok_exn
+          in
+          Mina_transaction.Transaction_hash.(
+            command |> hash_signed_command_v1 |> to_base58_check |> Js.string)
+
+        method serializeCommon (command : Js.js_string Js.t) =
+          let command : Signed_command_payload.Common.t =
+            command |> Js.to_string |> Yojson.Safe.from_string
+            |> Signed_command_payload.Common.of_yojson |> ok_exn
+          in
+          Binable.to_bigstring
+            (module Signed_command_payload.Common.Stable.Latest)
+            command
+
+        method serializePayment (command : Js.js_string Js.t) =
+          let command : Signed_command.t =
+            command |> Js.to_string |> Yojson.Safe.from_string
+            |> Signed_command.of_yojson |> ok_exn
+          in
+          Binable.to_bigstring (module Signed_command.Stable.Latest) command
+
+        method serializePaymentV1 (command : Js.js_string Js.t) =
+          let command : Signed_command.t_v1 =
+            command |> Js.to_string |> Yojson.Safe.from_string
+            |> Signed_command.Stable.V1.of_yojson |> ok_exn
+          in
+          Signed_command.Base58_check_v1.to_base58_check command |> Js.string
+
+        method examplePayment =
+          let kp = keypair () in
+          let payload : Signed_command_payload.t =
+            { Signed_command_payload.dummy with
+              body =
+                Payment
+                  { Mina_base.Payment_payload.dummy with
+                    source_pk = Signature_lib.Public_key.compress kp.public_key
+                  }
+            }
+          in
+          let payment = Signed_command.sign kp payload in
+          (payment :> Signed_command.t)
+          |> Signed_command.to_yojson |> Yojson.Safe.to_string |> Js.string
+      end
+  end
+
 (* export stuff *)
 
 let export () =
@@ -3406,7 +3485,8 @@ let export () =
   Js.export "Poseidon" poseidon ;
   Js.export "Circuit" Circuit.circuit ;
   Js.export "Ledger" Ledger.ledger_class ;
-  Js.export "Pickles" pickles
+  Js.export "Pickles" pickles ;
+  Js.export "Test" test
 
 let export_global () =
   let snarky_obj =
@@ -3421,6 +3501,7 @@ let export_global () =
          ; ("Circuit", i Circuit.circuit)
          ; ("Ledger", i Ledger.ledger_class)
          ; ("Pickles", i pickles)
+         ; ("Test", i test)
         |])
   in
   Js.Unsafe.(set global (Js.string "__snarky") snarky_obj)

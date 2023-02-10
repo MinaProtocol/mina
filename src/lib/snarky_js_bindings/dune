@@ -11,7 +11,9 @@
  (name snarky_js_node)
  (modules snarky_js_node)
  (modes js)
- (link_flags (-noautolink))
+ (flags (-g))
+ (link_flags
+  (-noautolink -g))
  (js_of_ocaml
   (flags +toplevel.js +dynlink.js --pretty --source-map)
   (link_flags --source-map)

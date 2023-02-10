@@ -30,9 +30,11 @@ let version_bytes =
     ; ("userCommandMemo", `Int (Char.to_int user_command_memo))
     ; ("privateKey", `Int (Char.to_int private_key))
     ; ("signature", `Int (Char.to_int signature))
+    ; ("transactionHash", `Int (Char.to_int transaction_hash))
+    ; ("signedCommandV1", `Int (Char.to_int signed_command_v1))
     ]
 
-let poseidon_params =
+let poseidon_params_kimchi =
   `Assoc
     [ ("mds", array (array string) Sponge.Params.pasta_p_kimchi.mds)
     ; ( "roundConstants"
@@ -46,10 +48,24 @@ let poseidon_params =
     ; ("power", `Int Pickles.Tick_field_sponge.Inputs.alpha)
     ]
 
+let poseidon_params_legacy =
+  `Assoc
+    [ ("mds", array (array string) Sponge.Params.pasta_p_legacy.mds)
+    ; ( "roundConstants"
+      , array (array string) Sponge.Params.pasta_p_legacy.round_constants )
+    ; ("fullRounds", `Int Random_oracle.Legacy.Inputs.rounds_full)
+    ; ("partialRounds", `Int Random_oracle.Legacy.Inputs.rounds_partial)
+    ; ("hasInitialRoundConstant", `Bool Random_oracle.Legacy.Inputs.initial_ark)
+    ; ("stateSize", `Int Random_oracle.Legacy.state_size)
+    ; ("rate", `Int Random_oracle.Legacy.rate)
+    ; ("power", `Int Random_oracle.Legacy.Inputs.alpha)
+    ]
+
 let constants =
   [ ("prefixes", prefixes)
   ; ("versionBytes", version_bytes)
-  ; ("poseidonParamsKimchiFp", poseidon_params)
+  ; ("poseidonParamsKimchiFp", poseidon_params_kimchi)
+  ; ("poseidonParamsLegacyFp", poseidon_params_legacy)
   ]
 
 let () =
