@@ -174,6 +174,32 @@ module Plonk_constraint = struct
       | EC_endoscalar of { state : 'v Endoscale_scalar_round.t array }
       | Raw of
           { kind : Kimchi_gate_type.t; values : 'v array; coeffs : 'f array }
+      | FFAdd of
+          { left_lo : 'v
+          ; left_mi : 'v
+          ; left_hi : 'v
+          ; right_lo : 'v
+          ; right_mi : 'v
+          ; right_hi : 'v
+          ; field_ovf : 'v
+          ; carry : 'v
+          ; out_lo : 'v
+          ; out_mi : 'v
+          ; out_hi : 'v
+          }
+      | FFAdd_final of
+          { res_lo : 'v
+          ; res_mi : 'v
+          ; res_hi : 'v
+          ; shift_lo : 'v
+          ; shift_mi : 'v
+          ; shift_hi : 'v
+          ; bound_ovf : 'v
+          ; bound_carry : 'v
+          ; bound_lo : 'v
+          ; bound_mi : 'v
+          ; bound_hi : 'v
+          }
     [@@deriving sexp]
 
     (** map t *)
@@ -213,6 +239,58 @@ module Plonk_constraint = struct
             }
       | Raw { kind; values; coeffs } ->
           Raw { kind; values = Array.map ~f values; coeffs }
+      | FFAdd
+          { left_lo
+          ; left_mi
+          ; left_hi
+          ; right_lo
+          ; right_mi
+          ; right_hi
+          ; field_ovf
+          ; carry
+          ; out_lo
+          ; out_mi
+          ; out_hi
+          } ->
+          FFAdd
+            { left_lo = f left_lo
+            ; left_mi = f left_mi
+            ; left_hi = f left_hi
+            ; right_lo = f right_lo
+            ; right_mi = f right_mi
+            ; right_hi = f right_hi
+            ; field_ovf = f field_ovf
+            ; carry = f carry
+            ; out_lo = f out_lo
+            ; out_mi = f out_mi
+            ; out_hi = f out_hi
+            }
+      | FFAdd_final
+          { res_lo
+          ; res_mi
+          ; res_hi
+          ; shift_lo
+          ; shift_mi
+          ; shift_hi
+          ; bound_ovf
+          ; bound_carry
+          ; bound_lo
+          ; bound_mi
+          ; bound_hi
+          } ->
+          FFAdd_final
+            { res_lo = f res_lo
+            ; res_mi = f res_mi
+            ; res_hi = f res_hi
+            ; shift_lo = f shift_lo
+            ; shift_mi = f shift_mi
+            ; shift_hi = f shift_hi
+            ; bound_ovf = f bound_ovf
+            ; bound_carry = f bound_carry
+            ; bound_lo = f bound_lo
+            ; bound_mi = f bound_mi
+            ; bound_hi = f bound_hi
+            }
 
     (** [eval (module F) get_variable gate] checks that [gate]'s polynomial is
         satisfied by the assignments given by [get_variable].
@@ -316,6 +394,8 @@ type ('f, 'rust_gates) t =
   ; (* Queue (of size 1) of generic gate. *)
     mutable pending_generic_gate :
       (V.t option * V.t option * V.t option * 'f array) option
+  ; (* Queue (of size 1) of chained foreign field addition gates. It contains the result of the previous FFAdd *)
+    mutable chain_ffadd_gate : (V.t * V.t * V.t) option
   ; (* V.t's corresponding to constant values. We reuse them so we don't need to
        use a fresh generic constraint each time to create a constant.
     *)
@@ -514,6 +594,7 @@ end = struct
     ; equivalence_classes = V.Table.create ()
     ; auxiliary_input_size = 0
     ; pending_generic_gate = None
+    ; chain_ffadd_gate = None
     ; cached_constants = Hashtbl.create (module Fp)
     ; union_finds = V.Table.create ()
     }
@@ -736,6 +817,40 @@ end = struct
         let coeffs = Array.append coeffs coeffs2 in
         add_row sys [| l; r; o; l2; r2; o2 |] Generic coeffs ;
         sys.pending_generic_gate <- None
+
+  let add_ffadd_constraint l_lo l_mi l_hi r_lo r_mi r_hi ovf c o_lo o_mi o_hi
+      sys : unit =
+    match sys.chain_ffadd_gate with
+    (* if there is no chain of FFAdd open, then start it and queue the result *)
+    | Some (res_lo, res_mi, res_hi) ->
+        assert (V.equal l_lo res_lo) ;
+        assert (V.equal l_mi res_mi) ;
+        assert (V.equal l_hi res_hi) ;
+        add_row sys
+          [| Some l_lo
+           ; Some l_mi
+           ; Some l_hi
+           ; Some r_lo
+           ; Some r_mi
+           ; Some r_hi
+           ; Some ovf
+           ; Some c
+          |]
+          ForeignFieldAdd [||] ;
+        sys.chain_ffadd_gate <- Some (o_lo o_mi o_hi)
+    | None ->
+        add_row sys
+          [| Some l_lo
+           ; Some l_mi
+           ; Some l_hi
+           ; Some r_lo
+           ; Some r_mi
+           ; Some r_hi
+           ; Some ovf
+           ; Some c
+          |]
+          ForeignFieldAdd [||] ;
+        sys.chain_ffadd_gate <- Some (o_lo o_mi o_hi)
 
   (** Converts a number of scaled additions \sum s_i * x_i 
       to as many constraints as needed, 
@@ -1101,6 +1216,7 @@ end = struct
              ; None
              ; None
              ; None
+             ; None
             |]
           in
           add_row sys vars Zero [||]
@@ -1243,6 +1359,7 @@ end = struct
            ; None
            ; None
            ; None
+           ; None
           |]
         in
         add_row sys vars Zero [||]
@@ -1283,6 +1400,69 @@ end = struct
               Option.try_with (fun () -> reduce_to_v values.(i)) )
         in
         add_row sys values kind coeffs
+    | Plonk_constraint.T
+        (FFAdd
+          { left_lo
+          ; left_mi
+          ; left_hi
+          ; right_lo
+          ; right_mi
+          ; right_hi
+          ; field_ovf
+          ; carry
+          ; out_lo
+          ; out_mi
+          ; out_hi
+          } ) ->
+        let l_lo = reduce_to_v left_lo in
+        let l_mi = reduce_to_v left_mi in
+        let l_hi = reduce_to_v left_hi in
+        let r_lo = reduce_to_v right_lo in
+        let r_mi = reduce_to_v right_mi in
+        let r_hi = reduce_to_v right_hi in
+        let ovf = reduce_to_v field_ovf in
+        let c = reduce_to_v carry in
+        let o_lo = reduce_to_v out_lo in
+        let o_mi = reduce_to_v out_mi in
+        let o_hi = reduce_to_v out_hi in
+        (* This will concatenate this gate to a previous chain if any and save the output for the next chain *)
+        add_ffadd_constraint l_lo l_mi l_hi r_lo r_mi r_hi ovf c o_lo o_mi o_hi
+          sys
+    | Plonk_constraint.T
+        (FFAdd_final
+          { res_lo
+          ; res_mi
+          ; res_hi
+          ; shift_lo
+          ; shift_mi
+          ; shift_hi
+          ; bound_ovf
+          ; bound_carry
+          ; bound_lo
+          ; bound_mi
+          ; bound_hi
+          } ) ->
+        assert (Fp.equal shift_lo Fp.zero) ;
+        assert (Fp.equal shift_mi Fp.zero) ;
+        (* assert (Fp.equal shift_hi two_to_limb) ; *)
+        assert (Fp.equal bound_ovf Fp.one) ;
+        let l_lo = reduce_to_v res_lo in
+        let l_mi = reduce_to_v res_mi in
+        let l_hi = reduce_to_v res_hi in
+        let r_lo = reduce_to_v shift_lo in
+        let r_mi = reduce_to_v shift_mi in
+        let r_hi = reduce_to_v shift_hi in
+        let ovf = reduce_to_v bound_ovf in
+        let c = reduce_to_v bound_carry in
+        let o_lo = reduce_to_v bound_lo in
+        let o_mi = reduce_to_v bound_mi in
+        let o_hi = reduce_to_v bound_hi in
+        (* This will concatenate this gate to a previous chain if any and save the output for the next chain *)
+        add_ffadd_constraint l_lo l_mi l_hi r_lo r_mi r_hi ovf c o_lo o_mi o_hi
+          sys ;
+        (* Finalize the chain with a zero gate and the content of the pending chain *)
+        add_row sys [| o_lo; o_mi; o_hi |] Zero [||] ;
+        sys.chain_ffadd_gate <- None
     | constr ->
         failwithf "Unhandled constraint %s"
           Obj.(Extension_constructor.name (Extension_constructor.of_val constr))
