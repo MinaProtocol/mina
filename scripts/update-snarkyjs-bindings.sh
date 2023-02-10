@@ -1,4 +1,7 @@
 #!/bin/bash
+
+set -e
+
 SNARKY_JS_PATH=src/lib/snarky_js_bindings/snarkyjs
 
 # 1. node build
