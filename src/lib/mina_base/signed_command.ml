@@ -86,8 +86,32 @@ module Make_str (_ : Wire_types.Concrete) = struct
         Poly.Stable.V1.t
       [@@deriving compare, sexp, hash, yojson]
 
-      (* don't need to coerce old commands to new ones *)
-      let to_latest _ = failwith "Not implemented"
+      let to_latest ({ payload; signer; signature } : t) : Latest.t =
+        let payload : Signed_command_payload.t =
+          let common : Signed_command_payload.Common.t =
+            { fee = payload.common.fee
+            ; fee_payer_pk = payload.common.fee_payer_pk
+            ; nonce = payload.common.nonce
+            ; valid_until = payload.common.valid_until
+            ; memo = payload.common.memo
+            }
+          in
+          let body : Signed_command_payload.Body.t =
+            match payload.body with
+            | Payment payment_payload ->
+                let payload' : Payment_payload.t =
+                  { source_pk = payment_payload.source_pk
+                  ; receiver_pk = payment_payload.receiver_pk
+                  ; amount = payment_payload.amount
+                  }
+                in
+                Payment payload'
+            | Stake_delegation stake_delegation_payload ->
+                Stake_delegation stake_delegation_payload
+          in
+          { common; body }
+        in
+        { payload; signer; signature }
     end
   end]
 
