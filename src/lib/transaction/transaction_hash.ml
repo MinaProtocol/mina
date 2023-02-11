@@ -223,7 +223,7 @@ let%test "signed command v1 hash from transaction id" =
   let transaction_id =
     "BD421DxjdoLimeUh4RA4FEvHdDn6bfxyMVWiWUwbYzQkqhNUv8B5M4gCSREpu9mVueBYoHYWkwB8BMf6iS2jjV8FffvPGkuNeczBfY7YRwLuUGBRCQJ3ktFBrNuu4abqgkYhXmcS2xyzoSGxHbXkJRAokTwjQ9HP6TLSeXz9qa92nJaTeccMnkoZBmEitsZWWnTCMqDc6rhN4Z9UMpg4wzdPMwNJvLRuJBD14Dd5pR84KBoY9rrnv66rHPc4m2hH9QSEt4aEJC76BQ446pHN9ZLmyhrk28f5xZdBmYxp3hV13fJEJ3Gv1XqJMBqFxRhzCVGoKDbLAaNRb5F1u1WxTzJu5n4cMMDEYydGEpNirY2PKQqHkR8gEqjXRTkpZzP8G19qT"
   in
-  (* N.B.: this is the old-style hash, computed by digesting the Base58Check serialization *)
+  (* the V1 signed command is converted to a V2 signed command, then hashed *)
   let expected_hash = "5Jua7BcbaiRN7uRBHw2meaJen9pwD4Ct3YMY7o5tfagjayhtusAg" in
   let hash =
     match hash_of_transaction_id transaction_id with
