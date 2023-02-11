@@ -186,7 +186,7 @@ struct
     { id = Signed_command_to_be_included_in_frontier
     ; description =
         sprintf "signed command with hash %s"
-          (Transaction_hash.to_base58_check txn_hash)
+          (Transaction_hash.to_string txn_hash)
     ; predicate = Network_state_predicate (check (), check)
     ; soft_timeout = Slots soft_timeout_in_slots
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)

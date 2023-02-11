@@ -691,7 +691,7 @@ module Parse = struct
   end
 
   module Impl (M : Monad_fail.S) = struct
-    let check_sufficient_fee (type a) (payment : a -> Transaction.Unsigned.Rendered.Payment.t option) (transaction : a) : (unit, Errors.t) Result.t = 
+    let check_sufficient_fee (type a) (payment : a -> Transaction.Unsigned.Rendered.Payment.t option) (transaction : a) : (unit, Errors.t) Result.t =
       match payment transaction with
     | Some pay -> if Transaction.Unsigned.Rendered.Payment.is_fee_sufficient pay then Ok () else  Result.fail @@ Errors.create `Transaction_submit_fee_small
     | None -> Ok ()
@@ -831,7 +831,7 @@ module Hash = struct
       in
       let hash =
         Transaction_hash.hash_command (User_command.Signed_command full_command)
-        |> Transaction_hash.to_base58_check
+        |> Transaction_hash.to_string
       in
       Transaction_identifier_response.create
         (Transaction_identifier.create hash)

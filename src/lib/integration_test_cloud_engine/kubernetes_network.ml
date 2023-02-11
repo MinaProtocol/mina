@@ -712,7 +712,7 @@ module Node = struct
     [%log info] "Sent payment"
       ~metadata:
         [ ("user_command_id", `String res.id)
-        ; ("hash", `String (Transaction_hash.to_base58_check res.hash))
+        ; ("hash", `String (Transaction_hash.to_string res.hash))
         ; ("nonce", `Int (Mina_numbers.Account_nonce.to_int res.nonce))
         ] ;
     res
@@ -868,7 +868,7 @@ module Node = struct
     [%log info] "stake delegation sent"
       ~metadata:
         [ ("user_command_id", `String res.id)
-        ; ("hash", `String (Transaction_hash.to_base58_check res.hash))
+        ; ("hash", `String (Transaction_hash.to_string res.hash))
         ; ("nonce", `Int (Mina_numbers.Account_nonce.to_int res.nonce))
         ] ;
     res
@@ -912,7 +912,7 @@ module Node = struct
     [%log info] "Sent payment"
       ~metadata:
         [ ("user_command_id", `String res.id)
-        ; ("hash", `String (Transaction_hash.to_base58_check res.hash))
+        ; ("hash", `String (Transaction_hash.to_string res.hash))
         ; ("nonce", `Int (Mina_numbers.Account_nonce.to_int res.nonce))
         ] ;
     res

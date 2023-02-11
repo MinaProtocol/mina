@@ -21,7 +21,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           in
           [%log info] "gossip_consistency test: payment #%d sent with hash %s."
             n
-            (Transaction_hash.to_base58_check hash) ;
+            (Transaction_hash.to_string hash) ;
           hash
         in
         go (n - 1) (List.append hashlist [ hash ])
@@ -45,7 +45,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             "gossip_consistency test: payment #%d with hash %s successfully \
              included in frontier."
             n
-            (Transaction_hash.to_base58_check hash) ;
+            (Transaction_hash.to_string hash) ;
           ()
         in
         go (n - 1) (List.tl_exn hashlist)

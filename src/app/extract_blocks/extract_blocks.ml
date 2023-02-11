@@ -286,7 +286,7 @@ let fill_in_user_commands pool block_state_hash =
             Unsigned.UInt32.of_int64 valid |> Mina_numbers.Global_slot.of_uint32 )
       in
       let memo = user_cmd.memo |> Signed_command_memo.of_base58_check_exn in
-      let hash = user_cmd.hash |> Transaction_hash.of_base58_check_exn in
+      let hash = user_cmd.hash |> Transaction_hash.of_string in
       let%bind block_user_cmd =
         query_db ~f:(fun db ->
             Processor.Block_and_signed_command.load db ~block_id
@@ -338,7 +338,7 @@ let fill_in_internal_commands pool block_state_hash =
       let command_type = internal_cmd.command_type in
       let%bind receiver = account_identifier_of_id internal_cmd.receiver_id in
       let fee = Currency.Fee.of_string internal_cmd.fee in
-      let hash = internal_cmd.hash |> Transaction_hash.of_base58_check_exn in
+      let hash = internal_cmd.hash |> Transaction_hash.of_string in
       let%bind block_internal_cmd =
         query_db ~f:(fun db ->
             Processor.Block_and_internal_command.load db ~block_id
@@ -392,7 +392,7 @@ let fill_in_zkapp_commands pool block_state_hash =
           ~f:(Load_data.get_account_update_body ~pool)
       in
       let memo = zkapp_cmd.memo |> Signed_command_memo.of_base58_check_exn in
-      let hash = zkapp_cmd.hash |> Transaction_hash.of_base58_check_exn in
+      let hash = zkapp_cmd.hash |> Transaction_hash.of_string in
       let%bind block_zkapp_cmd =
         query_db ~f:(fun db ->
             Processor.Block_and_zkapp_command.load db ~block_id

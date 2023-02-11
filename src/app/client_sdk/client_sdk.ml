@@ -229,7 +229,7 @@ let _ =
          in
          Transaction_hash.hash_signed_command
            { payload; signer; signature = Signature.dummy }
-         |> Transaction_hash.to_base58_check |> Js.string
+         |> Transaction_hash.to_string |> Js.string
 
        (** sign payment transaction payload with private key *)
        method signStakeDelegation (network_js : string_js)
@@ -292,7 +292,7 @@ let _ =
          in
          Transaction_hash.hash_signed_command
            { payload; signer; signature = Signature.dummy }
-         |> Transaction_hash.to_base58_check |> Js.string
+         |> Transaction_hash.to_string |> Js.string
 
        (** sign a transaction in Rosetta rendered format *)
        method signRosettaTransaction (sk_base58_check_js : string_js)

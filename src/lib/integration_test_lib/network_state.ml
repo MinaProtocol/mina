@@ -51,7 +51,7 @@ module Make
                   (State_hash.Set.to_list set |> List.map State_hash.to_yojson) )]
     ; blocks_including_txn : State_hash.Set.t Transaction_hash.Map.t
           [@to_yojson
-            map_to_yojson ~f_key_to_string:Transaction_hash.to_base58_check
+            map_to_yojson ~f_key_to_string:Transaction_hash.to_string
               ~f_value_to_yojson:(set_to_yojson ~element:State_hash.to_yojson)]
     }
   [@@deriving to_yojson]
@@ -232,7 +232,7 @@ module Make
                       [%log debug]
                         "adding or updating txn_hash %s to \
                          state.blocks_including_txn"
-                        (Transaction_hash.to_base58_check hash) ;
+                        (Transaction_hash.to_string hash) ;
                       Transaction_hash.Map.set accum ~key:hash ~data:block_set' )
                 in
                 { state with
