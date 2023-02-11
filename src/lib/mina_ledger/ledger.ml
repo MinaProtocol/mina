@@ -44,7 +44,7 @@ module Ledger_inner = struct
         type t = Ledger_hash.Stable.V1.t
         [@@deriving sexp, compare, hash, equal, yojson]
 
-        type _unused = unit constraint t = Arg.t
+        let (_ : (t, Arg.t) Type_equal.t) = Type_equal.T
 
         let to_latest = Fn.id
 
