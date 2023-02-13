@@ -118,8 +118,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
   (* type of signed commands, pre-Berkeley hard fork *)
   type t_v1 = Stable.V1.t
 
-  type _unused = unit
-    constraint (Payload.t, Public_key.t, Signature.t) Poly.t = t
+  let (_ : (t, (Payload.t, Public_key.t, Signature.t) Poly.t) Type_equal.t) =
+    Type_equal.T
 
   include (Stable.Latest : module type of Stable.Latest with type t := t)
 
