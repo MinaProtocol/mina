@@ -152,7 +152,7 @@ end
 module Plonk_constraint = struct
   open Core_kernel
 
-  (** A PLONK constraint (or gate) can be [Basic], [Poseidon], [EC_add_complete], [EC_scale], [EC_endoscale], or [EC_endoscalar]. *)
+  (** A PLONK constraint (or gate) can be [Basic], [Poseidon], [EC_add_complete], [EC_scale], [EC_endoscale], [EC_endoscalar], [RangeCheck0], [RangeCheck1], [Xor] *)
   module T = struct
     type ('v, 'f) t =
       | Basic of { l : 'f * 'v; r : 'f * 'v; o : 'f * 'v; m : 'f; c : 'f }
@@ -224,6 +224,23 @@ module Plonk_constraint = struct
           ; v2c17 : 'v
           ; v2c18 : 'v
           ; v2c19 : 'v
+          }
+      | Xor of
+          { in1 : 'v
+          ; in2 : 'v
+          ; out : 'v
+          ; in1_0 : 'v
+          ; in1_1 : 'v
+          ; in1_2 : 'v
+          ; in1_3 : 'v
+          ; in2_0 : 'v
+          ; in2_1 : 'v
+          ; in2_2 : 'v
+          ; in2_3 : 'v
+          ; out_0 : 'v
+          ; out_1 : 'v
+          ; out_2 : 'v
+          ; out_3 : 'v
           }
       | ForeignFieldAdd of
           { left_input_lo : 'v
@@ -429,6 +446,40 @@ module Plonk_constraint = struct
             ; v2c17 = f v2c17
             ; v2c18 = f v2c18
             ; v2c19 = f v2c19
+            }
+      | Xor
+          { in1
+          ; in2
+          ; out
+          ; in1_0
+          ; in1_1
+          ; in1_2
+          ; in1_3
+          ; in2_0
+          ; in2_1
+          ; in2_2
+          ; in2_3
+          ; out_0
+          ; out_1
+          ; out_2
+          ; out_3
+          } ->
+          Xor
+            { in1 = f in1
+            ; in2 = f in2
+            ; out = f out
+            ; in1_0 = f in1_0
+            ; in1_1 = f in1_1
+            ; in1_2 = f in1_2
+            ; in1_3 = f in1_3
+            ; in2_0 = f in2_0
+            ; in2_1 = f in2_1
+            ; in2_2 = f in2_2
+            ; in2_3 = f in2_3
+            ; out_0 = f out_0
+            ; out_1 = f out_1
+            ; out_2 = f out_2
+            ; out_3 = f out_3
             }
       | ForeignFieldAdd
           { left_input_lo
@@ -1448,6 +1499,7 @@ end = struct
              ; None
              ; None
              ; None
+             ; None
             |]
           in
           add_row sys vars Zero [||]
@@ -1582,6 +1634,7 @@ end = struct
            ; Some (reduce_to_v xs)
            ; Some (reduce_to_v ys)
            ; Some (reduce_to_v n_acc)
+           ; None
            ; None
            ; None
            ; None
@@ -1739,6 +1792,64 @@ end = struct
         in
         add_row sys vars_curr RangeCheck1 [||] ;
         add_row sys vars_next Zero [||]
+    | Plonk_constraint.T
+        (Xor
+          { in1
+          ; in2
+          ; out
+          ; in1_0
+          ; in1_1
+          ; in1_2
+          ; in1_3
+          ; in2_0
+          ; in2_1
+          ; in2_2
+          ; in2_3
+          ; out_0
+          ; out_1
+          ; out_2
+          ; out_3
+          } ) ->
+        (* | Column |          Curr    | Next (gadget responsibility) |
+           | ------ | ---------------- | ---------------------------- |
+           |      0 | copy     `in1`   | copy     `in1'`              |
+           |      1 | copy     `in2`   | copy     `in2'`              |
+           |      2 | copy     `out`   | copy     `out'`              |
+           |      3 | plookup0 `in1_0` |                              |
+           |      4 | plookup1 `in1_1` |                              |
+           |      5 | plookup2 `in1_2` |                              |
+           |      6 | plookup3 `in1_3` |                              |
+           |      7 | plookup0 `in2_0` |                              |
+           |      8 | plookup1 `in2_1` |                              |
+           |      9 | plookup2 `in2_2` |                              |
+           |     10 | plookup3 `in2_3` |                              |
+           |     11 | plookup0 `out_0` |                              |
+           |     12 | plookup1 `out_1` |                              |
+           |     13 | plookup2 `out_2` |                              |
+           |     14 | plookup3 `out_3` |                              |
+        *)
+        let curr_row =
+          [| Some (reduce_to_v in1)
+           ; Some (reduce_to_v in2)
+           ; Some (reduce_to_v out)
+           ; Some (reduce_to_v in1_0)
+           ; Some (reduce_to_v in1_1)
+           ; Some (reduce_to_v in1_2)
+           ; Some (reduce_to_v in1_3)
+           ; Some (reduce_to_v in2_0)
+           ; Some (reduce_to_v in2_1)
+           ; Some (reduce_to_v in2_2)
+           ; Some (reduce_to_v in2_3)
+           ; Some (reduce_to_v out_0)
+           ; Some (reduce_to_v out_1)
+           ; Some (reduce_to_v out_2)
+           ; Some (reduce_to_v out_3)
+          |]
+        in
+        (* The generic gate after a Xor16 gate is a Const to check that all values are zero.
+           For that, the first coefficient is 1 and the rest will be zero.
+           This will be included in the gadget for a chain of Xors, not here.*)
+        add_row sys curr_row Xor16 [||]
     | Plonk_constraint.T
         (ForeignFieldAdd
           { left_input_lo
