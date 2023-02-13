@@ -1716,23 +1716,23 @@ end = struct
           ; out_2
           ; out_3
           } ) ->
-         (* | Column |          Curr    | Next (gadget responsibility) |
-            | ------ | ---------------- | ---------------------------- |
-            |      0 | copy     `in1`   | copy     `in1'`              |
-            |      1 | copy     `in2`   | copy     `in2'`              |
-            |      2 | copy     `out`   | copy     `out'`              |
-            |      3 | plookup0 `in1_0` |                              |
-            |      4 | plookup1 `in1_1` |                              |
-            |      5 | plookup2 `in1_2` |                              |
-            |      6 | plookup3 `in1_3` |                              |
-            |      7 | plookup0 `in2_0` |                              |
-            |      8 | plookup1 `in2_1` |                              |
-            |      9 | plookup2 `in2_2` |                              |
-            |     10 | plookup3 `in2_3` |                              |
-            |     11 | plookup0 `out_0` |                              |
-            |     12 | plookup1 `out_1` |                              |
-            |     13 | plookup2 `out_2` |                              |
-            |     14 | plookup3 `out_3` |                              | 
+        (* | Column |          Curr    | Next (gadget responsibility) |
+           | ------ | ---------------- | ---------------------------- |
+           |      0 | copy     `in1`   | copy     `in1'`              |
+           |      1 | copy     `in2`   | copy     `in2'`              |
+           |      2 | copy     `out`   | copy     `out'`              |
+           |      3 | plookup0 `in1_0` |                              |
+           |      4 | plookup1 `in1_1` |                              |
+           |      5 | plookup2 `in1_2` |                              |
+           |      6 | plookup3 `in1_3` |                              |
+           |      7 | plookup0 `in2_0` |                              |
+           |      8 | plookup1 `in2_1` |                              |
+           |      9 | plookup2 `in2_2` |                              |
+           |     10 | plookup3 `in2_3` |                              |
+           |     11 | plookup0 `out_0` |                              |
+           |     12 | plookup1 `out_1` |                              |
+           |     13 | plookup2 `out_2` |                              |
+           |     14 | plookup3 `out_3` |                              |
         *)
         let curr_row =
           [| Some (reduce_to_v in1)
