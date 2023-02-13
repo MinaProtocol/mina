@@ -241,6 +241,16 @@ module Plonk_constraint = struct
           ; out_2 : 'v
           ; out_3 : 'v
           }
+      | ForeignFieldAdd of
+          { left_input_lo : 'v
+          ; left_input_mi : 'v
+          ; left_input_hi : 'v
+          ; right_input_lo : 'v (* vpX are 12-bit plookup chunks *)
+          ; right_input_mi : 'v
+          ; right_input_hi : 'v
+          ; field_overflow : 'v
+          ; carry : 'v
+          }
       | ForeignFieldMul of
           { (* Current row *)
             left_input0 : 'v
@@ -437,6 +447,26 @@ module Plonk_constraint = struct
             ; out_1 = f out_1
             ; out_2 = f out_2
             ; out_3 = f out_3
+            }
+      | ForeignFieldAdd
+          { left_input_lo
+          ; left_input_mi
+          ; left_input_hi
+          ; right_input_lo
+          ; right_input_mi
+          ; right_input_hi
+          ; field_overflow
+          ; carry
+          } ->
+          ForeignFieldAdd
+            { left_input_lo = f left_input_lo
+            ; left_input_mi = f left_input_mi
+            ; left_input_hi = f left_input_hi
+            ; right_input_lo = f right_input_lo
+            ; right_input_mi = f right_input_mi
+            ; right_input_hi = f right_input_hi
+            ; field_overflow = f field_overflow
+            ; carry = f carry
             }
       | ForeignFieldMul
           { (* Current row *) left_input0
@@ -1686,6 +1716,24 @@ end = struct
           ; out_2
           ; out_3
           } ) ->
+         (* | Column |          Curr    | Next (gadget responsibility) |
+            | ------ | ---------------- | ---------------------------- |
+            |      0 | copy     `in1`   | copy     `in1'`              |
+            |      1 | copy     `in2`   | copy     `in2'`              |
+            |      2 | copy     `out`   | copy     `out'`              |
+            |      3 | plookup0 `in1_0` |                              |
+            |      4 | plookup1 `in1_1` |                              |
+            |      5 | plookup2 `in1_2` |                              |
+            |      6 | plookup3 `in1_3` |                              |
+            |      7 | plookup0 `in2_0` |                              |
+            |      8 | plookup1 `in2_1` |                              |
+            |      9 | plookup2 `in2_2` |                              |
+            |     10 | plookup3 `in2_3` |                              |
+            |     11 | plookup0 `out_0` |                              |
+            |     12 | plookup1 `out_1` |                              |
+            |     13 | plookup2 `out_2` |                              |
+            |     14 | plookup3 `out_3` |                              | 
+        *)
         let curr_row =
           [| Some (reduce_to_v in1)
            ; Some (reduce_to_v in2)
@@ -1708,6 +1756,56 @@ end = struct
            For that, the first coefficient is 1 and the rest will be zero.
            This will be included in the gadget for a chain of Xors, not here.*)
         add_row sys curr_row Xor16 [||]
+    | Plonk_constraint.T
+        (ForeignFieldAdd
+          { left_input_lo
+          ; left_input_mi
+          ; left_input_hi
+          ; right_input_lo
+          ; right_input_mi
+          ; right_input_hi
+          ; field_overflow
+          ; carry
+          } ) ->
+        (*
+        //! | col | `ForeignFieldAdd`        | Next (circuit/gadget responsibility) |
+        //! | --- | ------------------------ | ------------------------------------ |
+        //! |   0 | `left_input_lo`  (copy)  | `result_lo` (copy)                   |
+        //! |   1 | `left_input_mi`  (copy)  | `result_mi` (copy)                   |
+        //! |   2 | `left_input_hi`  (copy)  | `result_hi` (copy)                   |
+        //! |   3 | `right_input_lo` (copy)  |                                      |
+        //! |   4 | `right_input_mi` (copy)  |                                      |
+        //! |   5 | `right_input_hi` (copy)  |                                      |
+        //! |   6 | `field_overflow` (copy?) |                                      |
+        //! |   7 | `carry`                  |                                      |
+        //! |   8 |                          |                                      |
+        //! |   9 |                          |                                      |
+        //! |  10 |                          |                                      |
+        //! |  11 |                          |                                      |
+        //! |  12 |                          |                                      |
+        //! |  13 |                          |                                      |
+        //! |  14 |                          |                                      |
+        *)
+        let vars =
+          [| (* Current row *) Some (reduce_to_v left_input_lo)
+           ; Some (reduce_to_v left_input_mi)
+           ; Some (reduce_to_v left_input_hi)
+           ; Some (reduce_to_v right_input_lo)
+           ; Some (reduce_to_v right_input_mi)
+           ; Some (reduce_to_v right_input_hi)
+           ; Some (reduce_to_v field_overflow)
+           ; Some (reduce_to_v carry)
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+          |]
+        in
+        add_row sys vars ForeignFieldAdd [||]
+    | Plonk_constraint.T
         (ForeignFieldMul
           { (* Current row *) left_input0
           ; left_input1
