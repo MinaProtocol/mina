@@ -294,7 +294,7 @@ module Make (Inputs : Intf.Inputs_intf) :
                (`Assoc
                  [ ("kind", `String "JobGetError")
                  ; ("time", `Int t)
-                 ; ("error", `String error)
+                 ; ("error", error)
                  ; ("job_get_node_received_t", `Int (int_of_time received_time))
                  ; ( "job_get_node_request_work_init_t"
                    , `Int (int_of_time request_work_start_time) )
@@ -400,18 +400,15 @@ module Make (Inputs : Intf.Inputs_intf) :
       with
       | Error e ->
           let err =
-            Yojson.Safe.to_string
-              (`Assoc
-                [ ("kind", `String "Other")
-                ; ("error", `String (Error.to_string_hum e))
-                ] )
+            `Assoc
+              [ ("kind", `String "Other")
+              ; ("error", `String (Error.to_string_hum e))
+              ]
           in
           let _ = notify_job_get_error (now ()) err (-1.0, -1.0, -1.0, -1.0) in
           log_and_retry "getting work" e (retry_pause 10.) go
       | Ok (None, times) ->
-          let err =
-            Yojson.Safe.to_string (`Assoc [ ("kind", `String "NoAvailableJob") ])
-          in
+          let err = `Assoc [ ("kind", `String "NoAvailableJob") ] in
           let _ = notify_job_get_error (now ()) err times in
           let random_delay =
             Worker_state.worker_wait_time
