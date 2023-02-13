@@ -16,7 +16,12 @@ module Poly : sig
     end
 
     module V1 : sig
-      type ('pk, 'token_id, 'amount) t
+      type ('pk, 'token_id, 'amount) t =
+        { source_pk : 'pk
+        ; receiver_pk : 'pk
+        ; token_id : 'token_id
+        ; amount : 'amount
+        }
       [@@deriving bin_io, equal, sexp, hash, yojson, version]
     end
 
