@@ -224,6 +224,16 @@ module Plonk_constraint = struct
           ; v2c18 : 'v
           ; v2c19 : 'v
           }
+      | ForeignFieldAdd of
+          { left_input_lo : 'v
+          ; left_input_mi : 'v
+          ; left_input_hi : 'v
+          ; right_input_lo : 'v (* vpX are 12-bit plookup chunks *)
+          ; right_input_mi : 'v
+          ; right_input_hi : 'v
+          ; field_overflow : 'v
+          ; carry : 'v
+          }
       | ForeignFieldMul of
           { (* Current row *)
             left_input0 : 'v
@@ -386,6 +396,26 @@ module Plonk_constraint = struct
             ; v2c17 = f v2c17
             ; v2c18 = f v2c18
             ; v2c19 = f v2c19
+            }
+      | ForeignFieldAdd
+          { left_input_lo
+          ; left_input_mi
+          ; left_input_hi
+          ; right_input_lo
+          ; right_input_mi
+          ; right_input_hi
+          ; field_overflow
+          ; carry
+          } ->
+          ForeignFieldAdd
+            { left_input_lo = f left_input_lo
+            ; left_input_mi = f left_input_mi
+            ; left_input_hi = f left_input_hi
+            ; right_input_lo = f right_input_lo
+            ; right_input_mi = f right_input_mi
+            ; right_input_hi = f right_input_hi
+            ; field_overflow = f field_overflow
+            ; carry = f carry
             }
       | ForeignFieldMul
           { (* Current row *) left_input0
@@ -1615,6 +1645,55 @@ end = struct
         in
         add_row sys vars_curr RangeCheck1 [||] ;
         add_row sys vars_next Zero [||]
+    | Plonk_constraint.T
+        (ForeignFieldAdd
+          { left_input_lo
+          ; left_input_mi
+          ; left_input_hi
+          ; right_input_lo
+          ; right_input_mi
+          ; right_input_hi
+          ; field_overflow
+          ; carry
+          } ) ->
+        (*
+        //! | col | `ForeignFieldAdd`        | Next (circuit/gadget responsibility) |
+        //! | --- | ------------------------ | ------------------------------------ |
+        //! |   0 | `left_input_lo`  (copy)  | `result_lo` (copy)                   |
+        //! |   1 | `left_input_mi`  (copy)  | `result_mi` (copy)                   |
+        //! |   2 | `left_input_hi`  (copy)  | `result_hi` (copy)                   |
+        //! |   3 | `right_input_lo` (copy)  |                                      |
+        //! |   4 | `right_input_mi` (copy)  |                                      |
+        //! |   5 | `right_input_hi` (copy)  |                                      |
+        //! |   6 | `field_overflow` (copy?) |                                      |
+        //! |   7 | `carry`                  |                                      |
+        //! |   8 |                          |                                      |
+        //! |   9 |                          |                                      |
+        //! |  10 |                          |                                      |
+        //! |  11 |                          |                                      |
+        //! |  12 |                          |                                      |
+        //! |  13 |                          |                                      |
+        //! |  14 |                          |                                      |
+        *)
+        let vars =
+          [| (* Current row *) Some (reduce_to_v left_input_lo)
+           ; Some (reduce_to_v left_input_mi)
+           ; Some (reduce_to_v left_input_hi)
+           ; Some (reduce_to_v right_input_lo)
+           ; Some (reduce_to_v right_input_mi)
+           ; Some (reduce_to_v right_input_hi)
+           ; Some (reduce_to_v field_overflow)
+           ; Some (reduce_to_v carry)
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+          |]
+        in
+        add_row sys vars ForeignFieldAdd [||]
     | Plonk_constraint.T
         (ForeignFieldMul
           { (* Current row *) left_input0
