@@ -85,19 +85,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let fish1_account_id =
       Mina_base.Account_id.create fish1_pk Mina_base.Token_id.default
     in
-    let with_timeout =
-      let soft_slots = 3 in
-      let soft_timeout = Network_time_span.Slots soft_slots in
-      let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
-      Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
-    in
-    let wait_for_zkapp ~has_failures zkapp_command =
-      let%map () =
-        wait_for t @@ with_timeout
-        @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures
-             ~zkapp_command
+    let wait_for_zkapp =
+      let with_timeout =
+        let soft_slots = 3 in
+        let soft_timeout = Network_time_span.Slots soft_slots in
+        let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
+        Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
       in
-      [%log info] "zkApp transaction included in transition frontier"
+      fun ~has_failures zkapp_command ->
+        let%map () =
+          wait_for t @@ with_timeout
+          @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures
+               ~zkapp_command
+        in
+        [%log info] "zkApp transaction included in transition frontier"
     in
     let%bind () =
       section_hard "Wait for nodes to initialize"
@@ -235,8 +236,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~n:(padding_payments ())
     in
     let%bind () =
+      let with_timeout =
+        let soft_slots = 5 in
+        let soft_timeout = Network_time_span.Slots soft_slots in
+        let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
+        Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
+      in
       section_hard "wait for 1 block to be produced"
-        (wait_for t (Wait_condition.blocks_to_be_produced 1))
+        (wait_for t @@ with_timeout @@ Wait_condition.blocks_to_be_produced 1)
     in
     let%bind () =
       section "Verify invalid zkapp commands are removed from transaction pool"
