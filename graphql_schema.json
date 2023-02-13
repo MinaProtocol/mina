@@ -11761,19 +11761,6 @@
               "deprecationReason": null
             },
             {
-              "name": "genesis_balance",
-              "description":
-                "The amount of MINA owned by the account at Genesis",
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "AnnotatedBalance",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "nonce",
               "description":
                 "A natural number that increases with each transaction (stringified uint32)",
