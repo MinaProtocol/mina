@@ -48,9 +48,15 @@ let%test_module "fee_related_tests" =
             (fee_payer_pk @@ body_maker x) )
 
     (* Tests for fee_excess *)
-    (* let%test_unit "fee_excess" =
-       Quickcheck.test feepayer_body_generator ~f:(fun x ->
-           [%test_eq: (Token_id.t, Currency.Fee.Signed.t) Fee_excess.Poly.t]
-             (fee_excess @@ body_maker x)
-             (fee_excess @@ body_maker x) ) *)
+    let%test_unit "fee_excess" =
+      Quickcheck.test feepayer_body_generator ~f:(fun x ->
+          [%test_eq: (Token_id.t, Currency.Fee.Signed.t) Fee_excess.Poly.t]
+            { fee_token_l = Token_id.default
+            ; fee_excess_l =
+                Currency.Fee.Signed.of_unsigned
+                @@ (body_maker x).fee_payer.body.fee
+            ; fee_token_r = Token_id.default
+            ; fee_excess_r = Currency.Fee.Signed.zero
+            }
+            (fee_excess @@ body_maker x) )
   end )
