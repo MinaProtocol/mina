@@ -11,28 +11,64 @@ open Import
 module G = struct
   let lookup_verification_enabled = false
 
+  let prod_old ~one ~add ~mul chals pt =
+    let ( + ) = add and ( * ) = mul in
+    let k = Array.length chals in
+    let pow_two_pows =
+      let res = Array.init k ~f:(fun _ -> pt) in
+      for i = 1 to k - 1 do
+        let y = res.(i - 1) in
+        res.(i) <- y * y
+      done ;
+      res
+    in
+    let prod f =
+      let r = ref (f 0) in
+      for i = 1 to k - 1 do
+        r := f i * !r
+      done ;
+      !r
+    in
+    prod (fun i -> one + (chals.(i) * pow_two_pows.(k - 1 - i)))
+
+  (* More efficient version of {!val:prod_old} above. Uses a single loop
+     iteration and does not allocate the "square series array". *)
+  let prod ~one ~add ~mul chals pt =
+    let k = Array.length chals in
+    assert (k > 0) ;
+    let ( + ) = add and ( * ) = mul in
+    let p = ref pt in
+    let r = ref (one + (chals.(k - 1) * pt)) in
+    for i = k - 2 downto 0 do
+      p := !p * !p ;
+      let v = one + (chals.(i) * !p) in
+      r := !r * v
+    done ;
+    !r
+
+  let%test_unit "prod-prod_old" =
+    let one = Bigint.one and mul = Bigint.( * ) and add = Bigint.( + ) in
+    Quickcheck.(
+      test ~trials:15
+        Generator.(
+          tuple2
+            (list_non_empty Bigint.(gen_incl zero (of_int Int.max_value)))
+            Bigint.(gen_incl (of_int 2) (of_int 1024)))
+        ~f:(fun (chals, pt) ->
+          let chals = Array.of_list chals in
+          let r1 = prod_old ~one ~mul ~add chals pt
+          and r2 = prod ~one ~mul ~add chals pt in
+          if not (Bigint.equal r1 r2) then (
+            Format.eprintf "@[<v>Test failed@,@[<hov>chals = %a@]@,pt = %a@]@."
+              Sexp.pp
+              (Array.sexp_of_t Bigint.sexp_of_t chals)
+              Bigint.pp pt ;
+            assert false ) ))
+
   (* given [chals], compute
      \prod_i (1 + chals.(i) * x^{2^{k - 1 - i}}) *)
   let challenge_polynomial ~one ~add ~mul chals =
-    let ( + ) = add and ( * ) = mul in
-    stage (fun pt ->
-        let k = Array.length chals in
-        let pow_two_pows =
-          let res = Array.init k ~f:(fun _ -> pt) in
-          for i = 1 to k - 1 do
-            let y = res.(i - 1) in
-            res.(i) <- y * y
-          done ;
-          res
-        in
-        let prod f =
-          let r = ref (f 0) in
-          for i = 1 to k - 1 do
-            r := f i * !r
-          done ;
-          !r
-        in
-        prod (fun i -> one + (chals.(i) * pow_two_pows.(k - 1 - i))) )
+    stage (prod ~one ~add ~mul chals)
 
   let num_possible_domains = Nat.S Wrap_hack.Padded_length.n
 
