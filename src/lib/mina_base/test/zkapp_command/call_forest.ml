@@ -187,17 +187,13 @@ module Tree_test = struct
          (tree 1 [ node 0 []; node 2 [ node 3 [] ] ])
          ~f:(fun i x -> i + x) )
 
-  (* let%test_unit "deferred_mapi_with_trees' equivalent to mapi_with_trees'" =
-     Quickcheck.test
-       ( Quickcheck.Generator.tuple2 Int.quickcheck_generator
-       @@ Tree.Stable.V1.quickcheck_generator Int.quickcheck_generator
-            Int.quickcheck_generator Int.quickcheck_generator )
-       ~f:(fun (i, tree) ->
-         let tree' = Tree.mapi_with_trees' ~i tree ~f:(fun _ _ _ -> ()) in
-         Async_kernel.Deferred. tree'' =Tree.deferred_mapi_with_trees' ~i tree ~f:(fun _ _ _ ->
-               Async_kernel.return () )
-         in
-         [%test_result: (int, unit, unit) Tree.t] ~expect:tree' tree'' ) *)
+  let%test_unit "mapi_forest'" =
+    [%test_result:
+      int * ((int, unit, unit) Tree.t, unit) With_stack_hash.t list]
+      ~expect:(7, [ node 4 [ node 4 []; node 7 [ node 9 [] ] ] ])
+      (Tree.mapi_forest' ~i:3
+         [ node 1 [ node 0 []; node 2 [ node 3 [] ] ] ]
+         ~f:(fun i x -> i + x) )
 end
 
 let%test_unit "shape" =
@@ -223,3 +219,29 @@ let%test_unit "shape" =
              ] )
        ; (1, Node [])
        ] )
+
+let%test_unit "match_up" =
+  let l_1 = [ 1; 2; 3; 4; 5; 6; 7; 8 ] in
+  let l_2 =
+    [ (0, 'a')
+    ; (1, 'b')
+    ; (2, 'c')
+    ; (3, 'd')
+    ; (4, 'e')
+    ; (5, 'f')
+    ; (6, 'g')
+    ; (7, 'h')
+    ]
+  in
+  let expect =
+    [ (1, 'a')
+    ; (2, 'b')
+    ; (3, 'c')
+    ; (4, 'd')
+    ; (5, 'e')
+    ; (6, 'f')
+    ; (7, 'g')
+    ; (8, 'h')
+    ]
+  in
+  [%test_result: (int * char) list] ~expect (match_up l_1 l_2)
