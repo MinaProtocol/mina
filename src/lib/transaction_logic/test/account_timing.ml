@@ -1,15 +1,67 @@
-open! Core_kernel
-open! Mina_transaction_logic
+open Core_kernel
+open Mina_transaction_logic
 open Currency
 open Mina_base
 open Mina_numbers
 
-type txn_result =
-  ((Global_slot.t, Balance.t, Amount.t) Account_timing.tt, Error.t) Result.t
-[@@deriving compare, sexp]
+type txn_result = (Account.Timing.t, Error.t) Result.t [@@deriving compare, sexp]
+
+let final_vesting_slot ~initial_minimum_balance ~cliff_time ~cliff_amount
+    ~vesting_period ~vesting_increment =
+  let open Unsigned in
+  let to_vest =
+    Balance.(initial_minimum_balance - cliff_amount)
+    |> Option.value_map ~default:UInt64.zero ~f:Balance.to_uint64
+  in
+  let incr = Amount.to_uint64 vesting_increment in
+  let periods =
+    let open UInt64 in
+    let open Infix in
+    (to_vest / incr) + (if equal (rem to_vest incr) zero then zero else one)
+  in
+  let open UInt32 in
+  let open Infix in
+  Global_slot.to_uint32 cliff_time
+  + (UInt64.to_uint32 periods * Global_slot.to_uint32 vesting_period)
+  |> Global_slot.of_uint32
+
+let timing_final_vesting_slot = function
+  | Account.Timing.Untimed ->
+      Global_slot.zero
+  | Timed
+      { initial_minimum_balance
+      ; cliff_time
+      ; cliff_amount
+      ; vesting_period
+      ; vesting_increment
+      } ->
+      final_vesting_slot ~initial_minimum_balance ~cliff_time ~cliff_amount
+        ~vesting_period ~vesting_increment
 
 let%test_module "Test account timing." =
   ( module struct
+    (* Test that the timed account generator only generates accounts that
+       are completely vested before the largest possible slot, (2^32)-1. *)
+    let%test_unit "Test fine-tuning of the account generation." =
+      Quickcheck.test Account.gen_timed ~f:(fun account ->
+          [%test_eq: Balance.t option]
+            (Some Balance.zero)
+            ( match account.timing with
+            | Untimed ->
+                None
+            | Timed
+                { initial_minimum_balance
+                ; cliff_time
+                ; cliff_amount
+                ; vesting_period
+                ; vesting_increment
+                } ->
+               let global_slot = Global_slot.max_value in
+               Option.some @@
+                Account.min_balance_at_slot ~global_slot ~cliff_time
+                  ~cliff_amount ~vesting_period ~vesting_increment
+                  ~initial_minimum_balance ) )
+
     let%test_unit "Untimed accounts succeed if they have enough funds." =
       Quickcheck.test
         (let open Quickcheck.Generator.Let_syntax in
@@ -23,18 +75,13 @@ let%test_module "Test account timing." =
           [%test_eq: txn_result] (Ok Account.Timing.Poly.Untimed)
             (validate_timing ~account ~txn_amount ~txn_global_slot) )
 
-    let%test_unit "Untimed accounts fail if funds are insufficient." =
+    let%test_unit "All accounts fail if funds are insufficient." =
       Quickcheck.test
         (let open Quickcheck.Generator.Let_syntax in
-        (* We need to generate an amount strictly greater than the balance,
-           therefore the balance cannot be at its maximum available value. *)
-        let max_balance =
-          let open Balance in
-          max_int - Amount.one |> Option.value ~default:zero
-        in
         let%bind account =
-          Account.gen_with_constrained_balance ~low:Balance.zero
-            ~high:max_balance
+          let open Quickcheck.Generator in
+          union [ Account.gen; Account.gen_timed ]
+          |> filter ~f:(fun a -> Balance.(a.balance < max_int))
         in
         let min_amount =
           Amount.(Balance.to_amount account.balance + of_nanomina_int_exn 1)
@@ -52,31 +99,6 @@ let%test_module "Test account timing." =
                 txn_amount txn_global_slot account.balance
             |> Result.map_error ~f:(Error.tag ~tag:nsf_tag) )
             (validate_timing ~account ~txn_amount ~txn_global_slot) )
-
-    let%test_unit "Account with zero minimum balance becomes untimed." =
-      Quickcheck.test
-        (let open Quickcheck.Generator.Let_syntax in
-        let%bind a = Account.gen_timed in
-        let account =
-          let open Account in
-          let open Timing in
-          match a.timing with
-          | Untimed ->
-              a
-          | Timed t ->
-              { a with
-                timing = Timed { t with initial_minimum_balance = Balance.zero }
-              }
-        in
-        let%bind amount =
-          Amount.(gen_incl zero (Balance.to_amount account.balance))
-        in
-        let%map slot = Global_slot.gen in
-        (account, amount, slot))
-        ~f:(fun (account, txn_amount, txn_global_slot) ->
-          [%test_eq: txn_result]
-            (validate_timing ~account ~txn_amount ~txn_global_slot)
-            (Ok Untimed) )
 
     let%test_unit "Before cliff time balance above the minimum can be spent." =
       Quickcheck.test
@@ -103,16 +125,16 @@ let%test_module "Test account timing." =
             (validate_timing ~account ~txn_amount ~txn_global_slot)
             (Ok account.timing) )
 
-    let%test_unit "Minimum balance decreases over time." =
+    let%test_unit "Before the end of vesting, timing never changes." =
       Quickcheck.test
         (let open Quickcheck.Generator.Let_syntax in
         let%bind account = Account.gen_timed in
-        let initial_minimum_balance, cliff_time =
+        let initial_minimum_balance =
           match account.timing with
           | Account.Timing.Untimed ->
               assert false (* the generator only generates timed accounts. *)
           | Account.Timing.Timed t ->
-              (t.initial_minimum_balance, t.cliff_time)
+              t.initial_minimum_balance
         in
         let available_amount =
           let open Balance in
@@ -120,25 +142,31 @@ let%test_module "Test account timing." =
           |> Option.value_map ~f:Balance.to_amount ~default:Amount.zero
         in
         let%bind amount = Amount.(gen_incl zero available_amount) in
-        let%map slot = Global_slot.(gen_incl cliff_time max_value) in
+        let final_slot =
+          Global_slot.(
+            sub (timing_final_vesting_slot account.timing) (of_int 1))
+          |> Option.value ~default:Global_slot.zero
+        in
+        let%map slot = Global_slot.(gen_incl zero final_slot) in
         (account, amount, slot))
         ~f:(fun (account, txn_amount, txn_global_slot) ->
-          let open Account.Timing in
-          [%test_pred: txn_result]
-            (function
-              | Ok Untimed ->
-                  true
-              | Ok (Timed t) -> (
-                  match account.Account.Poly.timing with
-                  | Untimed ->
-                      false
-                  | Timed initial_t ->
-                      let open Balance in
-                      t.initial_minimum_balance
-                      <= initial_t.initial_minimum_balance )
-              | Error _ ->
-                  false )
+          [%test_eq: txn_result] (Ok account.timing)
             (validate_timing ~account ~txn_amount ~txn_global_slot) )
+
+    let%test_unit "Account with zero minimum balance becomes untimed." =
+      Quickcheck.test
+        (let open Quickcheck.Generator.Let_syntax in
+        let%bind account = Account.gen_timed in
+        let%bind amount =
+          Amount.(gen_incl zero (Balance.to_amount account.balance))
+        in
+        let final_slot = timing_final_vesting_slot account.timing in
+        let%map slot = Global_slot.(gen_incl final_slot max_value) in
+        (account, amount, slot))
+        ~f:(fun (account, txn_amount, txn_global_slot) ->
+          [%test_eq: txn_result]
+            (validate_timing ~account ~txn_amount ~txn_global_slot)
+            (Ok Untimed) )
 
     let%test_unit "Timed accounts fail if minimum balance would be violated." =
       Quickcheck.test

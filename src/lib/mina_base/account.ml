@@ -813,23 +813,48 @@ let gen_with_constrained_balance ~low ~high =
 let gen_timed =
   let open Quickcheck.Let_syntax in
   let open Currency in
+  let open Unsigned in
   let%bind public_key = Public_key.Compressed.gen in
   let%bind token_id = Token_id.gen in
   let account_id = Account_id.create public_key token_id in
   let%bind initial_minimum_balance = Balance.(gen_incl one max_int) in
   let%bind balance = Balance.(gen_incl initial_minimum_balance max_int) in
-  let initial_available_amount =
-    let open Balance in
-    balance - to_amount initial_minimum_balance
-    |> Option.value_map ~default:Amount.zero ~f:to_amount
+  let%bind vesting_schedule_end = Global_slot.(gen_incl (of_int 1) max_value) in
+  let%bind cliff_time =
+    Global_slot.(gen_incl (of_int 1) vesting_schedule_end)
   in
-  let%bind cliff_time = Global_slot.(gen_incl (of_int 1) max_value) in
-  let%bind cliff_amount = Amount.(gen_incl zero initial_available_amount) in
+  let vesting_slots =
+    let open Global_slot in
+    let open UInt32.Infix in
+    to_uint32 vesting_schedule_end - to_uint32 cliff_time
+  in
   (* vesting period must be at least one to avoid division by zero *)
-  let%bind vesting_period =
-    Int.gen_incl 1 100 >>= Fn.compose return Global_slot.of_int
+  let%bind vesting_period = Int.gen_incl 1 1000 >>| Global_slot.of_int in
+  (* We need to arrange vesting schedule so that all funds are vested before the
+     maximum global slot, which is 2 ^ 32. *)
+  let vesting_periods_count =
+    Unsigned.UInt32.div vesting_slots vesting_period |> UInt64.of_uint32
   in
-  let%map vesting_increment = Amount.gen in
+  let max_cliff_amt =
+    Balance.(initial_minimum_balance - Amount.of_uint64 vesting_periods_count)
+    |> Option.value_map ~f:Balance.to_amount ~default:Amount.zero
+  in
+  let%bind cliff_amount =
+    if UInt32.(compare vesting_slots zero) > 0 then
+      Amount.(gen_incl zero max_cliff_amt)
+    else return @@ Balance.to_amount initial_minimum_balance
+  in
+  let to_vest =
+    Balance.(initial_minimum_balance - cliff_amount)
+    |> Option.value_map ~default:Unsigned.UInt64.zero ~f:Balance.to_uint64
+  in
+  let vesting_increment =
+    if Unsigned.UInt64.(equal vesting_periods_count zero) then Amount.one
+      (* This value does not matter anyway. *)
+    else
+      UInt64.Infix.((to_vest / vesting_periods_count) + UInt64.one)
+      |> Amount.of_uint64
+  in
   match
     create_timed account_id balance ~initial_minimum_balance ~cliff_time
       ~cliff_amount ~vesting_period ~vesting_increment
@@ -837,4 +862,4 @@ let gen_timed =
   | Error e ->
      failwith @@ Error.to_string_hum e
   | Ok a ->
-      a
+      return a
