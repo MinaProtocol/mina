@@ -170,14 +170,12 @@ val apply_last_proof_transactions_async :
   -> t
   -> unit Deferred.Or_error.t
 
-(** Apply all the currently staged transaction to snarked ledger based on the 
-    two-pass system- first pass includes legacy transactions and zkapp payments
-    and the second pass includes account updates. [ignore_incomplete] is to
-    ignore the account updates that were not completed in a single scan state
-    tree corresponding to a proof. Set this to true when applying transactions
-    to get the snarked ledger corresponding to a proof.
-    Returns the target first pass ledger after all the transactions have been
-    applied
+(** Apply all the staged transactions to snarked ledger based on the 
+    two-pass system to obtain the staged ledger- first pass includes legacy 
+    transactions and zkapp payments and the second pass includes account 
+    updates.
+    Returns the target first pass ledger hash after all the transactions have 
+    been applied
     *)
 val apply_staged_transactions_async :
      ?async_batch_size:int
