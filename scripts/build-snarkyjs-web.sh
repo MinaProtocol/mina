@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 SNARKY_JS_PATH=$1
 [ -z "$SNARKY_JS_PATH" ] && SNARKY_JS_PATH=src/lib/snarky_js_bindings/snarkyjs
 
