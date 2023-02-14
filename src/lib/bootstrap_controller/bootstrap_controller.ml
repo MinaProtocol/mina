@@ -241,6 +241,14 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
       in
       let constraint_constants = precomputed_values.constraint_constants in
       let rec loop previous_cycles =
+        if not (List.is_empty previous_cycles) then
+          [%log info]
+            !"Restarting bootstrap after $last_cycle"
+            ~metadata:
+              [ ( "last_cycle"
+                , bootstrap_cycle_stats_to_yojson (List.hd_exn previous_cycles)
+                )
+              ] ;
         let sync_ledger_pipe = "sync ledger pipe" in
         let sync_ledger_reader, sync_ledger_writer =
           create ~name:sync_ledger_pipe
@@ -319,6 +327,18 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         Mina_metrics.(
           Gauge.set Bootstrap.num_of_root_snarked_ledger_retargeted
             (Float.of_int t.num_of_root_snarked_ledger_retargeted)) ;
+        [%log info]
+          !"Finished syncing to root snarked ledger in $time_elapsed with \
+            $num_retargets retargets ($ledger_root, $synced_root)"
+          ~metadata:
+            [ ( "time_elapsed"
+              , `String (Time.Span.to_string_hum sync_ledger_time) )
+            ; ("num_retargets", `Int t.num_of_root_snarked_ledger_retargeted)
+            ; ( "ledger_root"
+              , Ledger_hash.to_yojson
+                  (Ledger.Db.merkle_root temp_snarked_ledger) )
+            ; ("synced_root", Frozen_ledger_hash.to_yojson hash)
+            ] ;
         let%bind ( staged_ledger_data_download_time
                  , staged_ledger_construction_time
                  , staged_ledger_aux_result ) =
@@ -337,6 +357,17 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
               , expected_merkle_root
               , pending_coinbases
               , protocol_states ) -> (
+              [%log info]
+                !"Finished downloading root staged ledger data in \
+                  $time_elapsed ($expected_merkle_root)"
+                ~metadata:
+                  [ ( "time_elapsed"
+                    , `String
+                        (Time.Span.to_string_hum
+                           staged_ledger_data_download_time ) )
+                  ; ( "expected_merkle_root"
+                    , Frozen_ledger_hash.to_yojson expected_merkle_root )
+                  ] ;
               let%map staged_ledger_construction_result =
                 let open Deferred.Or_error.Let_syntax in
                 let received_staged_ledger_hash =
@@ -411,6 +442,14 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                   time_deferred
                     (let open Deferred.Let_syntax in
                     let temp_mask = Ledger.of_database temp_snarked_ledger in
+                    [%log info]
+                      !"Constructing root staged ledger from \
+                        $snarked_ledger_hash"
+                      ~metadata:
+                        [ ( "snarked_ledger_hash"
+                          , Ledger_hash.to_yojson (Ledger.merkle_root temp_mask)
+                          )
+                        ] ;
                     let%map result =
                       Staged_ledger
                       .of_scan_state_pending_coinbases_and_snarked_ledger
@@ -437,6 +476,19 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                            , new_root
                            , protocol_states ) ))
                 in
+                [%log info]
+                  !"Finished constructing with $status root staged ledger in \
+                    $time_elapsed"
+                  ~metadata:
+                    [ ( "status"
+                      , `String
+                          ( if Result.is_ok construction_result then "ok"
+                          else "error" ) )
+                    ; ( "time_elapsed"
+                      , `String
+                          (Time.Span.to_string_hum
+                             staged_ledger_construction_time ) )
+                    ] ;
                 Ok (staged_ledger_construction_time, construction_result)
               in
               match staged_ledger_construction_result with
