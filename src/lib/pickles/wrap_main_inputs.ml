@@ -10,10 +10,10 @@ open Import
 let high_entropy_bits = 128
 
 let sponge_params_constant =
-  Sponge.Params.(map pasta_q ~f:Impl.Field.Constant.of_string)
+  Sponge.Params.(map pasta_q_kimchi ~f:Impl.Field.Constant.of_string)
 
 let field_random_oracle ?(length = Me.Field.size_in_bits - 1) s =
-  Me.Field.of_bits (bits_random_oracle ~length s)
+  Me.Field.of_bits (Ro.bits_random_oracle ~length s)
 
 let unrelated_g =
   let group_map =
@@ -25,6 +25,12 @@ let unrelated_g =
   fun (x, y) -> group_map (field_random_oracle (str x ^ str y))
 
 open Impl
+
+(* Debug helper to convert wrap circuit field element to a hex string *)
+let read_wrap_circuit_field_element_as_hex fe =
+  let prover_fe = As_prover.read Field.typ fe in
+  Kimchi_backend.Pasta.Pallas_based_plonk.(
+    Bigint.to_hex (Field.to_bigint prover_fe))
 
 module Other_field = struct
   type t = Impls.Step.Field.Constant.t [@@deriving sexp]
@@ -60,13 +66,22 @@ module Sponge = struct
         let params = Tock_field_sponge.params
       end)
 
-  module S = Sponge.Make_sponge (Permutation)
+  module S = Sponge.Make_debug_sponge (struct
+    include Permutation
+    module Circuit = Impls.Wrap
+
+    (* Optional sponge name used in debug mode *)
+    let sponge_name = "wrap"
+
+    (* To enable debug mode, set environment variable [sponge_name] to "t", "1" or "true". *)
+    let debug_helper_fn = read_wrap_circuit_field_element_as_hex
+  end)
+
   include S
 
   let squeeze_field = squeeze
 
-  let squeeze =
-    Util.squeeze_with_packed (module Impl) ~squeeze ~high_entropy_bits
+  let squeeze = squeeze
 end
 
 let%test_unit "sponge" =
@@ -78,16 +93,16 @@ module Input_domain = struct
     let domain_size = Domain.size domain in
     time "lagrange" (fun () ->
         Array.init domain_size ~f:(fun i ->
-            (Marlin_plonk_bindings.Pasta_fp_urs.lagrange_commitment
+            (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment
                (Tick.Keypair.load_urs ()) domain_size i )
               .unshifted.(0)
-            |> Or_infinity.finite_exn ) )
+            |> Common.finite_exn ) )
 
   let domain = Domain.Pow_2_roots_of_unity 7
 end
 
 module Inner_curve = struct
-  module C = Pasta.Vesta
+  module C = Kimchi_pasta.Pasta.Vesta
 
   module Inputs = struct
     module Impl = Impl
@@ -164,7 +179,9 @@ module Inner_curve = struct
 
   module Scaling_precomputation = T.Scaling_precomputation
 
-  let ( + ) = T.add_exn
+  let ( + ) t1 t2 = Plonk_curve_ops.add_fast (module Impl) t1 t2
+
+  let double t = t + t
 
   let scale t bs =
     with_label __LOC__ (fun () ->
@@ -202,6 +219,6 @@ module Ops = Plonk_curve_ops.Make (Impl) (Inner_curve)
 module Generators = struct
   let h =
     lazy
-      ( Marlin_plonk_bindings.Pasta_fp_urs.h (Backend.Tick.Keypair.load_urs ())
-      |> Or_infinity.finite_exn )
+      ( Kimchi_bindings.Protocol.SRS.Fp.urs_h (Backend.Tick.Keypair.load_urs ())
+      |> Common.finite_exn )
 end

@@ -45,6 +45,11 @@ variable "mina_archive_schema" {
   default = ""
 }
 
+variable "mina_archive_schema_aux_files" {
+  type    = list(string)
+  default = []
+}
+
 variable "mina_agent_image" {
   type    = string
   default = "codaprotocol/coda-user-agent:0.1.4"
@@ -250,6 +255,26 @@ variable "make_report_accounts" {
 variable "log_precomputed_blocks" {
   type = bool
   default = false
+}
+
+variable "worker_cpu_request" {
+  type    = number
+  default = 0
+}
+
+variable "worker_mem_request" {
+  type    = string
+  default = "0Mi"
+}
+
+variable "cpu_request" {
+  type    = number
+  default = 0
+}
+
+variable "mem_request" {
+  type    = string
+  default = "0Mi"
 }
 
 # Archive-Postgres Vars

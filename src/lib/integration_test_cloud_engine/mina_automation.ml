@@ -116,17 +116,17 @@ module Network_config = struct
     let bp_keypairs, extra_keypairs =
       List.split_n
         (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
-        (List.drop (Array.to_list (Lazy.force Sample_keypairs.keypairs)) 1)
+        (List.drop
+           (Array.to_list (Lazy.force Key_gen.Sample_keypairs.keypairs))
+           1 )
         num_block_producers
     in
-    if List.length bp_keypairs < num_block_producers then
+    if Mina_stdlib.List.Length.Compare.(bp_keypairs < num_block_producers) then
       failwith
         "not enough sample keypairs for specified number of block producers" ;
-    assert (List.length bp_keypairs >= num_block_producers) ;
-    if List.length bp_keypairs < num_block_producers then
-      failwith
-        "not enough sample keypairs for specified number of extra keypairs" ;
-    assert (List.length extra_keypairs >= List.length extra_genesis_accounts) ;
+
+    assert (
+      Stdlib.List.compare_lengths extra_keypairs extra_genesis_accounts >= 0 ) ;
     let extra_keypairs_cut =
       List.take extra_keypairs (List.length extra_genesis_accounts)
     in
@@ -149,10 +149,10 @@ module Network_config = struct
           in
           let default = Runtime_config.Accounts.Single.default in
           { default with
-            pk = Some (Public_key.Compressed.to_string pk)
+            pk = Public_key.Compressed.to_string pk
           ; sk = Some (Private_key.to_base58_check sk)
           ; balance =
-              Balance.of_formatted_string balance
+              Balance.of_mina_string_exn balance
               (* delegation currently unsupported *)
           ; delegate = None
           ; timing
@@ -175,15 +175,37 @@ module Network_config = struct
                   ; vesting_increment = t.vesting_increment
                   }
           in
+          (* an account may be used for snapp transactions, so add
+             permissions
+          *)
+          let (permissions : Runtime_config.Accounts.Single.Permissions.t option)
+              =
+            Some
+              { edit_state = None
+              ; send = None
+              ; receive = None
+              ; access = None
+              ; set_delegate = None
+              ; set_permissions = None
+              ; set_verification_key = None
+              ; set_zkapp_uri = None
+              ; edit_sequence_state = None
+              ; set_token_symbol = None
+              ; increment_nonce = None
+              ; set_voting_for = None
+              ; set_timing = None
+              }
+          in
           let default = Runtime_config.Accounts.Single.default in
           { default with
-            pk = Some (Public_key.Compressed.to_string pk)
+            pk = Public_key.Compressed.to_string pk
           ; sk = None
           ; balance =
-              Balance.of_formatted_string balance
+              Balance.of_mina_string_exn balance
               (* delegation currently unsupported *)
           ; delegate = None
           ; timing
+          ; permissions
           } )
     in
     (* DAEMON CONFIG *)
@@ -193,7 +215,16 @@ module Network_config = struct
     in
     let runtime_config =
       { Runtime_config.daemon =
-          Some { txpool_max_size = Some txpool_max_size; peer_list_url = None }
+          Some
+            { txpool_max_size = Some txpool_max_size
+            ; peer_list_url = None
+            ; zkapp_proof_update_cost = None
+            ; zkapp_signed_single_update_cost = None
+            ; zkapp_signed_pair_update_cost = None
+            ; zkapp_transaction_cost_limit = None
+            ; max_event_elements = None
+            ; max_action_elements = None
+            }
       ; genesis =
           Some
             { k = Some k
@@ -241,7 +272,9 @@ module Network_config = struct
       ^ Mina_version.commit_id ^ "/src/app/archive/"
     in
     let mina_archive_schema_aux_files =
-      [ mina_archive_base_url ^ "create_schema.sql" ]
+      [ mina_archive_base_url ^ "create_schema.sql"
+      ; mina_archive_base_url ^ "zkapp_tables.sql"
+      ]
     in
     let mk_net_keypair index (pk, sk) =
       let secret_name = "test-keypair-" ^ Int.to_string index in
@@ -297,22 +330,11 @@ module Network_config = struct
     [ Block.Terraform
         { Block.Terraform.required_version = ">= 0.12.0"
         ; backend =
-            Backend.S3
-              { Backend.S3.key =
+            Backend.Local
+              { path =
                   "terraform-" ^ network_config.terraform.testnet_name
                   ^ ".tfstate"
-              ; encrypt = true
-              ; region = aws_region
-              ; bucket = "o1labs-terraform-state"
-              ; acl = "bucket-owner-full-control"
               }
-        }
-    ; Block.Provider
-        { Block.Provider.provider = "aws"
-        ; region = aws_region
-        ; zone = None
-        ; project = None
-        ; alias = None
         }
     ; Block.Provider
         { Block.Provider.provider = "google"
@@ -415,7 +437,7 @@ module Network_manager = struct
           accum + (max_nodes * 3) )
       (*
         the max_node_count_by_node_pool is per zone.  us-west1 has 3 zones (we assume this never changes).
-          therefore to get the actual number of nodes a node_pool has, we multiply by 3.  
+          therefore to get the actual number of nodes a node_pool has, we multiply by 3.
           then we sum up the number of nodes in all our node_pools to get the actual total maximum number of nodes that we can scale up to *)
     in
     let nodes_available = max_nodes - num_kube_nodes in

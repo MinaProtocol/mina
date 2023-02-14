@@ -25,6 +25,7 @@
    block_time
    verifier
    rose_tree
+   mina_ledger
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_version ppx_deriving.std ppx_deriving_yojson)))

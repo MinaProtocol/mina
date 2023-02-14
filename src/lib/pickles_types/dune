@@ -1,18 +1,40 @@
 (library
-  (inline_tests)
-  (name pickles_types)
-  (public_name pickles_types)
-  (preprocess (pps ppx_coda ppx_version ppx_deriving_yojson ppx_jane ppx_deriving.std h_list.ppx))
-  (instrumentation (backend bisect_ppx))
-  (libraries
-   ;;opam libraries
-   bin_prot.shape
-   base.caml
-   core_kernel
-   result
-   sexplib0
-   ppx_inline_test.config
-   ;;local libraries
-   snarky.backendless
-   marlin_plonk_bindings_types
-))
+ (inline_tests)
+ (name pickles_types)
+ (public_name pickles_types)
+ ; Deactivated warnings
+ ;
+ ; 40: name-out-scope (activate later)
+ ;
+ ; 41: ambiguous name (too many of them for now, activate later)
+ ;
+ ; 42: disambiguated-name (rely on type disambiguation ,not too bad but closer
+ ; module openings may both solve the warning *and* help the reader)
+ ;
+ ; 44: open-shadow-identifier (the use of Core_kernel use makes it ubiquitous)
+ (flags
+  (:standard -w +a-40..42-44 -warn-error +a))
+ (preprocess
+  (pps
+   ppx_mina
+   ppx_version
+   ppx_deriving_yojson
+   ppx_jane
+   ppx_deriving.std
+   h_list.ppx))
+ (modules_without_implementation sigs poly_types)
+ (instrumentation
+  (backend bisect_ppx))
+ (libraries
+   ;; opam libraries
+  ppx_inline_test.config
+  sexplib0
+  result
+  core_kernel
+  base.caml
+  bin_prot.shape
+  ;; local libraries
+  snarky.backendless
+  tuple_lib
+  ppx_version.runtime
+  ))

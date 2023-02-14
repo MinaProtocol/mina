@@ -4,12 +4,11 @@ module Make_test (F : Intf.Basic) = struct
   let test arg_typ gen_arg sexp_of_arg label unchecked checked =
     let open F.Impl in
     let converted x =
-      let (), r =
+      let r =
         run_and_check
           (let open Checked.Let_syntax in
           let%bind x = exists arg_typ ~compute:(As_prover.return x) in
           checked x >>| As_prover.read F.typ)
-          ()
         |> Or_error.ok_exn
       in
       r
@@ -504,17 +503,17 @@ module E3
        which is evidently correct.
     *)
     let ( * ) (a1, b1, c1) (a2, b2, c2) =
-      with_label __LOC__
-        (let open F in
-        let%map a = a1 * a2
-        and b = b1 * b2
-        and c = c1 * c2
-        and t1 = (b1 + c1) * (b2 + c2)
-        and t2 = (a1 + b1) * (a2 + b2)
-        and t3 = (a1 + c1) * (a2 + c2) in
-        ( a + Params.mul_by_non_residue (t1 - b - c)
-        , t2 - a - b + Params.mul_by_non_residue c
-        , t3 - a + b - c ))
+      with_label __LOC__ (fun () ->
+          let open F in
+          let%map a = a1 * a2
+          and b = b1 * b2
+          and c = c1 * c2
+          and t1 = (b1 + c1) * (b2 + c2)
+          and t2 = (a1 + b1) * (a2 + b2)
+          and t3 = (a1 + c1) * (a2 + c2) in
+          ( a + Params.mul_by_non_residue (t1 - b - c)
+          , t2 - a - b + Params.mul_by_non_residue c
+          , t3 - a + b - c ) )
 
     (*
        (a + S b + S^2 c)^2
@@ -563,16 +562,16 @@ module E3
     let mul_by_primitive_element (a, b, c) = (Params.mul_by_non_residue c, a, b)
 
     let assert_r1cs (a1, b1, c1) (a2, b2, c2) (a3, b3, c3) =
-      with_label __LOC__
-        (let open F in
-        let%bind b = b1 * b2 and c = c1 * c2 and t1 = (b1 + c1) * (b2 + c2) in
-        let a = a3 - Params.mul_by_non_residue (t1 - b - c) in
-        let%map () = assert_r1cs a1 a2 a
-        and () =
-          assert_r1cs (a1 + b1) (a2 + b2)
-            (b3 + a + b - Params.mul_by_non_residue c)
-        and () = assert_r1cs (a1 + c1) (a2 + c2) (c3 + a - b + c) in
-        ())
+      with_label __LOC__ (fun () ->
+          let open F in
+          let%bind b = b1 * b2 and c = c1 * c2 and t1 = (b1 + c1) * (b2 + c2) in
+          let a = a3 - Params.mul_by_non_residue (t1 - b - c) in
+          let%map () = assert_r1cs a1 a2 a
+          and () =
+            assert_r1cs (a1 + b1) (a2 + b2)
+              (b3 + a + b - Params.mul_by_non_residue c)
+          and () = assert_r1cs (a1 + c1) (a2 + c2) (c3 + a - b + c) in
+          () )
 
     let square = `Custom square
 

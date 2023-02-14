@@ -6,7 +6,12 @@ type t = { name : string; mutable state : Univ_map.t } [@@deriving sexp_of]
 type thread = t [@@deriving sexp_of]
 
 module Graph = struct
-  module G = Graph.Imperative.Digraph.Concrete (String)
+  module G = Graph.Imperative.Digraph.Concrete (struct
+    include String
+
+    let hash = Hash.Builtin.hash_string
+  end)
+
   include G
 
   include Graph.Graphviz.Dot (struct
@@ -53,7 +58,7 @@ let set_state thread id value =
 let iter_threads ~f = Hashtbl.iter threads ~f
 
 let dump_thread_graph () =
-  let buf = Buffer.create 1024 in
+  let buf = Stdlib.Buffer.create 1024 in
   Graph.fprint_graph (Format.formatter_of_buffer buf) graph ;
   Stdlib.Buffer.to_bytes buf
 
