@@ -426,7 +426,9 @@ let validate_frontier_dependencies ~to_header
     Fn.compose Protocol_state.consensus_state protocol_state
   in
   let%bind () =
-    Result.ok_if_true (is_block_in_frontier hash) ~error:`Already_in_frontier
+    Result.ok_if_true
+      (not @@ is_block_in_frontier hash)
+      ~error:`Already_in_frontier
   in
   let%bind () =
     (* need pervasive (=) in scope for comparing polymorphic variant *)
