@@ -219,6 +219,9 @@ module Token_symbol = struct
   [%%endif]
 end
 
+(* the `token_symbol` describes a token id owned by the account id
+   from this account, not the token id used by this account
+*)
 module Poly = struct
   [%%versioned
   module Stable = struct
