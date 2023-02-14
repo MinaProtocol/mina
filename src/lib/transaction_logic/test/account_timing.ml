@@ -6,6 +6,12 @@ open Mina_numbers
 
 type txn_result = (Account.Timing.t, Error.t) Result.t [@@deriving compare, sexp]
 
+let init_min_bal a =
+  Option.value ~default:Balance.zero @@ Account.initial_minimum_balance a
+
+let cliff_time a =
+  Option.value ~default:Global_slot.zero @@ Account.cliff_time a
+
 let final_vesting_slot ~initial_minimum_balance ~cliff_time ~cliff_amount
     ~vesting_period ~vesting_increment =
   let open Unsigned in
@@ -104,20 +110,15 @@ let%test_module "Test account timing." =
       Quickcheck.test
         (let open Quickcheck.Generator.Let_syntax in
         let%bind account = Account.gen_timed in
-        let init_min_bal, cliff_time =
-          match account.timing with
-          | Account.Timing.Untimed ->
-              assert false (* the generator only generates timed accounts. *)
-          | Account.Timing.Timed t ->
-              (t.initial_minimum_balance, t.cliff_time)
-        in
         let max_amount =
           let open Balance in
-          account.balance - to_amount init_min_bal
+          account.balance - to_amount (init_min_bal account)
           |> Option.value_map ~default:Amount.zero ~f:to_amount
         in
         let%bind amount = Amount.(gen_incl zero max_amount) in
-        let max_slot = Global_slot.(of_int (to_int cliff_time - 1)) in
+        let max_slot =
+          Global_slot.(of_int (to_int (cliff_time account) - 1))
+        in
         let%map slot = Global_slot.(gen_incl zero max_slot) in
         (account, amount, slot))
         ~f:(fun (account, txn_amount, txn_global_slot) ->
@@ -129,16 +130,9 @@ let%test_module "Test account timing." =
       Quickcheck.test
         (let open Quickcheck.Generator.Let_syntax in
         let%bind account = Account.gen_timed in
-        let initial_minimum_balance =
-          match account.timing with
-          | Account.Timing.Untimed ->
-              assert false (* the generator only generates timed accounts. *)
-          | Account.Timing.Timed t ->
-              t.initial_minimum_balance
-        in
         let available_amount =
           let open Balance in
-          account.balance - to_amount initial_minimum_balance
+          account.balance - to_amount (init_min_bal account)
           |> Option.value_map ~f:Balance.to_amount ~default:Amount.zero
         in
         let%bind amount = Amount.(gen_incl zero available_amount) in
@@ -172,18 +166,12 @@ let%test_module "Test account timing." =
       Quickcheck.test
         (let open Quickcheck.Generator.Let_syntax in
         let%bind account = Account.gen_timed in
-        let initial_minimum_balance, cliff_time =
-          match account.timing with
-          | Account.Timing.Untimed ->
-              assert false (* the generator only generates timed accounts. *)
-          | Account.Timing.Timed t ->
-              (t.initial_minimum_balance, t.cliff_time)
-        in
         let available_amount =
           let open Balance in
           (let open Option.Let_syntax in
           let%bind avail =
-            account.balance - to_amount initial_minimum_balance
+            account.balance
+            - to_amount (init_min_bal account)
           in
           Amount.(to_amount avail + of_nanomina_int_exn 1))
           |> Option.value ~default:Amount.zero
@@ -192,17 +180,19 @@ let%test_module "Test account timing." =
           Amount.(gen_incl available_amount (Balance.to_amount account.balance))
         in
         let%map slot =
-          Global_slot.(gen_incl zero (of_int @@ (to_int cliff_time - 1)))
+          Global_slot.(
+            gen_incl zero (of_int @@ (to_int (cliff_time account) - 1)))
         in
-        (initial_minimum_balance, account, amount, slot))
-        ~f:(fun (min_balance, account, txn_amount, txn_global_slot) ->
+        (account, amount, slot))
+        ~f:(fun (account, txn_amount, txn_global_slot) ->
           [%test_eq: txn_result]
             ( Or_error.errorf
                 !"For timed account, the requested transaction for amount \
                   %{sexp: Amount.t} at global slot %{sexp: Global_slot.t}, \
                   applying the transaction would put the balance below the \
                   calculated minimum balance of %{sexp: Balance.t}"
-                txn_amount txn_global_slot min_balance
+                txn_amount txn_global_slot
+                (init_min_bal account)
             |> Or_error.tag ~tag:min_balance_tag )
             (validate_timing ~account ~txn_amount ~txn_global_slot) )
   end )

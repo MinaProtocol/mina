@@ -699,6 +699,37 @@ let create_time_locked public_key balance ~initial_minimum_balance ~cliff_time =
     ~vesting_period:Global_slot.(succ zero)
     ~vesting_increment:initial_minimum_balance
 
+let initial_minimum_balance Poly.{ timing; _ } =
+  match timing with
+  | Timing.Untimed ->
+      None
+  | Timed t ->
+      Some t.initial_minimum_balance
+
+let cliff_time Poly.{ timing; _ } =
+  match timing with
+  | Timing.Untimed ->
+      None
+  | Timed t ->
+      Some t.cliff_time
+
+let cliff_amount Poly.{ timing; _ } =
+  match timing with Timing.Untimed -> None | Timed t -> Some t.cliff_amount
+
+let vesting_increment Poly.{ timing } =
+  match timing with
+  | Timing.Untimed ->
+      None
+  | Timed t ->
+      Some t.vesting_increment
+
+let vesting_period Poly.{ timing; _ } =
+  match timing with
+  | Timing.Untimed ->
+      None
+  | Timed t ->
+      Some t.vesting_period
+
 let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
     ~vesting_increment ~initial_minimum_balance =
   let open Unsigned in
