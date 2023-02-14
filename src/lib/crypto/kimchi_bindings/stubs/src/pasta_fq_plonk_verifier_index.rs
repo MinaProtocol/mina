@@ -47,9 +47,6 @@ impl From<VerifierIndex<Pallas>> for CamlPastaFqPlonkVerifierIndex {
                 mul_comm: vi.mul_comm.into(),
                 emul_comm: vi.emul_comm.into(),
                 endomul_scalar_comm: vi.endomul_scalar_comm.into(),
-                chacha_comm: vi
-                    .chacha_comm
-                    .map(|x| x.to_vec().iter().map(Into::into).collect()),
             },
             shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
             lookup_index: vi.lookup_index.map(Into::into),
@@ -75,17 +72,10 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas> {
             .try_into()
             .expect("vector of sigma comm is of wrong size");
 
-        let chacha_comm: Option<Vec<PolyComm<Pallas>>> = evals
-            .chacha_comm
-            .map(|x| x.iter().map(Into::into).collect());
-        let chacha_comm: Option<[_; 4]> =
-            chacha_comm.map(|x| x.try_into().expect("vector of sigma comm is of wrong size"));
-
         let shifts: Vec<Fq> = shifts.iter().map(Into::into).collect();
         let shift: [Fq; PERMUTS] = shifts.try_into().expect("wrong size");
 
         let feature_flags = FeatureFlags {
-            chacha: false,
             range_check0: false,
             range_check1: false,
             foreign_field_add: false,
@@ -95,7 +85,6 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas> {
             lookup_features: LookupFeatures {
                 patterns: LookupPatterns {
                     xor: false,
-                    chacha_final: false,
                     lookup: false,
                     range_check: false,
                     foreign_field_mul: false,
@@ -105,7 +94,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas> {
             },
         };
 
-        // TODO chacha, dummy_lookup_value ?
+        // TODO dummy_lookup_value ?
         let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true);
 
         VerifierIndex::<Pallas> {
@@ -131,7 +120,6 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas> {
             emul_comm: evals.emul_comm.into(),
             endomul_scalar_comm: evals.endomul_scalar_comm.into(),
 
-            chacha_comm,
             xor_comm: None,
 
             range_check0_comm: None,
@@ -260,7 +248,6 @@ pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierInd
             mul_comm: comm(),
             endomul_scalar_comm: comm(),
             emul_comm: comm(),
-            chacha_comm: None,
         },
         shifts: (0..PERMUTS - 1).map(|_| Fq::one().into()).collect(),
         lookup_index: None,

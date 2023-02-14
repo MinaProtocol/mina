@@ -69,8 +69,6 @@ macro_rules! impl_verification_key {
                 pub emul_comm: $WasmPolyComm,
                 #[wasm_bindgen(skip)]
                 pub endomul_scalar_comm: $WasmPolyComm,
-                #[wasm_bindgen(skip)]
-                pub chacha_comm: WasmVector<$WasmPolyComm>,
             }
             type WasmPlonkVerificationEvals = [<Wasm $field_name:camel PlonkVerificationEvals>];
 
@@ -96,7 +94,6 @@ macro_rules! impl_verification_key {
                         mul_comm: mul_comm.clone(),
                         emul_comm: emul_comm.clone(),
                         endomul_scalar_comm: endomul_scalar_comm.clone(),
-                        chacha_comm: (vec![]).into(),
                     }
                 }
 
@@ -178,16 +175,6 @@ macro_rules! impl_verification_key {
                 #[wasm_bindgen(setter)]
                 pub fn set_endomul_scalar_comm(&mut self, x: $WasmPolyComm) {
                     self.endomul_scalar_comm = x;
-                }
-
-                #[wasm_bindgen(getter)]
-                pub fn chacha_comm(&self) -> WasmVector<$WasmPolyComm> {
-                    self.chacha_comm.clone()
-                }
-
-                #[wasm_bindgen(setter)]
-                pub fn set_chacha_comm(&mut self, x: WasmVector<$WasmPolyComm>) {
-                    self.chacha_comm = x;
                 }
             }
 
@@ -302,10 +289,6 @@ macro_rules! impl_verification_key {
                         mul_comm: vi.mul_comm.into(),
                         emul_comm: vi.emul_comm.into(),
                         endomul_scalar_comm: vi.endomul_scalar_comm.into(),
-                        chacha_comm:
-                            match vi.chacha_comm {
-                                None => vec![].into(),
-                                Some(cs) => vec![(&cs[0]).into(), (&cs[1]).into(), (&cs[2]).into(), (&cs[3]).into()].into()
                             }
                     },
                     shifts:
@@ -341,10 +324,6 @@ macro_rules! impl_verification_key {
                         mul_comm: vi.mul_comm.clone().into(),
                         emul_comm: vi.emul_comm.clone().into(),
                         endomul_scalar_comm: vi.endomul_scalar_comm.clone().into(),
-                        chacha_comm:
-                            match &vi.chacha_comm {
-                                None => vec![].into(),
-                                Some(cs) => vec![cs[0].clone().into(), cs[1].clone().into(), cs[2].clone().into(), cs[3].clone().into()].into()
                             }
                     },
                     shifts:
@@ -383,7 +362,6 @@ macro_rules! impl_verification_key {
 
                 let feature_flags =
                     FeatureFlags {
-                        chacha: false,
                         range_check0: false,
                         range_check1: false,
                         foreign_field_add: false,
@@ -394,7 +372,6 @@ macro_rules! impl_verification_key {
                         LookupFeatures {
                             patterns: LookupPatterns {
                                 xor: false,
-                                chacha_final: false,
                                 lookup: false,
                                 range_check: false,
                                 foreign_field_mul: false, },
@@ -421,7 +398,6 @@ macro_rules! impl_verification_key {
 
                         endomul_scalar_comm: (&evals.endomul_scalar_comm).into(),
                         // TODO
-                        chacha_comm: None,
                         range_check0_comm: None,
                         range_check1_comm: None,
                         foreign_field_add_comm: None,
@@ -616,7 +592,6 @@ macro_rules! impl_verification_key {
                         mul_comm: comm(),
                         emul_comm: comm(),
                         endomul_scalar_comm: comm(),
-                        chacha_comm: vec![].into(),
                     },
                     shifts:
                         WasmShifts {

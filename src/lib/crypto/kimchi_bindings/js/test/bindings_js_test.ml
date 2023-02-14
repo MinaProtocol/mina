@@ -1042,13 +1042,10 @@ let verification_evals_to_list
     ; mul_comm : 'PolyComm
     ; emul_comm : 'PolyComm
     ; endomul_scalar_comm : 'PolyComm
-    ; chacha_comm : 'PolyComm array option
     } =
   generic_comm :: psm_comm :: complete_add_comm :: mul_comm :: emul_comm
   :: endomul_scalar_comm
-  :: ( Array.append sigma_comm coefficients_comm
-     |> Array.append (Option.value ~default:[||] chacha_comm)
-     |> Array.to_list )
+  :: (Array.append sigma_comm coefficients_comm |> Array.to_list)
 
 let eq_verifier_index ~field_equal ~other_field_equal
     { VerifierIndex.domain = { log_size_of_group = i1_1; group_gen = f1 }

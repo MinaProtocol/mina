@@ -219,8 +219,6 @@ let lookup_tables_used feature_flags =
 let get_feature_flag (feature_flags : _ all_feature_flags)
     (feature : Kimchi_types.feature_flag) =
   match feature with
-  | ChaCha ->
-      None
   | RangeCheck0 ->
       Some feature_flags.features.range_check0
   | RangeCheck1 ->
@@ -257,8 +255,6 @@ let get_feature_flag (feature_flags : _ all_feature_flags)
       Some feature_flags.features.lookup
   | LookupPattern Xor ->
       Some (Lazy.force feature_flags.lookup_pattern_xor)
-  | LookupPattern ChaChaFinal ->
-      None
   | LookupPattern RangeCheck ->
       Some (Lazy.force feature_flags.lookup_pattern_range_check)
   | LookupPattern ForeignFieldMul ->
@@ -303,8 +299,7 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
         get_eval (Opt.value_exn e.lookup).aggreg
     | LookupRuntimeTable ->
         get_eval (Opt.value_exn (Opt.value_exn e.lookup).runtime)
-    | LookupKindIndex (Lookup | Xor | ChaChaFinal | RangeCheck | ForeignFieldMul)
-      ->
+    | LookupKindIndex (Lookup | Xor | RangeCheck | ForeignFieldMul) ->
         failwith "Lookup kind index should have been linearized away"
     | LookupRuntimeSelector ->
         failwith "Lookup runtime selector should have been linearized away"
