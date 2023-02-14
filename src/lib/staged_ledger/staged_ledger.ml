@@ -352,7 +352,7 @@ module T = struct
 
   let of_scan_state_pending_coinbases_and_snarked_ledger' ~constraint_constants
       ~pending_coinbases ~scan_state ~snarked_ledger ~snarked_local_state:_
-      ~expected_merkle_root ~get_state f =
+      ~expected_merkle_root ~get_state ~logger f =
     let open Deferred.Or_error.Let_syntax in
     let apply_first_pass =
       Ledger.apply_transaction_first_pass ~constraint_constants
@@ -371,9 +371,14 @@ module T = struct
       Scan_state.apply_staged_transactions_async
         ~async_batch_size:transaction_application_scheduler_batch_size
         ~ledger:snarked_ledger ~get_protocol_state:get_state ~apply_first_pass
-        ~apply_second_pass ~apply_first_pass_sparse_ledger scan_state
+        ~apply_second_pass ~apply_first_pass_sparse_ledger ~logger scan_state
     in
     let staged_ledger_hash = Ledger.merkle_root snarked_ledger in
+    [%log info] "ledger after: $ledger expected $expected_ledger"
+      ~metadata:
+        [ ("ledger", Ledger_hash.to_yojson staged_ledger_hash)
+        ; ("expected_ledger", Ledger_hash.to_yojson expected_merkle_root)
+        ] ;
     let%bind () =
       Deferred.return
       @@ Result.ok_if_true
@@ -397,15 +402,16 @@ module T = struct
       ~snarked_local_state ~expected_merkle_root ~pending_coinbases ~get_state =
     of_scan_state_pending_coinbases_and_snarked_ledger' ~constraint_constants
       ~pending_coinbases ~scan_state ~snarked_ledger ~snarked_local_state
-      ~expected_merkle_root ~get_state
+      ~expected_merkle_root ~get_state ~logger
       (of_scan_state_and_ledger ~logger ~get_state ~verifier)
 
-  let of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
+  let of_scan_state_pending_coinbases_and_snarked_ledger_unchecked ~logger
       ~constraint_constants ~scan_state ~snarked_ledger ~snarked_local_state
       ~expected_merkle_root ~pending_coinbases ~get_state =
     of_scan_state_pending_coinbases_and_snarked_ledger' ~constraint_constants
       ~pending_coinbases ~scan_state ~snarked_ledger ~snarked_local_state
-      ~expected_merkle_root ~get_state of_scan_state_and_ledger_unchecked
+      ~expected_merkle_root ~get_state ~logger
+      of_scan_state_and_ledger_unchecked
 
   let copy
       { scan_state; ledger; constraint_constants; pending_coinbase_collection }

@@ -181,6 +181,7 @@ val apply_last_proof_transactions_async :
     *)
 val apply_staged_transactions_async :
      ?async_batch_size:int
+  -> logger:Logger.t
   -> ledger:Ledger.t
   -> get_protocol_state:
        (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)

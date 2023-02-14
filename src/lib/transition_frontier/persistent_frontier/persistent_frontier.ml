@@ -61,7 +61,7 @@ let construct_staged_ledger_at_root ~(precomputed_values : Precomputed_values.t)
       ~constraint_constants:precomputed_values.constraint_constants
       ~pending_coinbases
       ~expected_merkle_root:(Staged_ledger_hash.ledger_hash staged_ledger_hash)
-      ~get_state
+      ~get_state ~logger
   in
   let is_genesis =
     Mina_block.Validated.header root_transition

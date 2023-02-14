@@ -45,6 +45,7 @@ module Transaction_with_witness = struct
         ; init_stack :
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
             .t
+              [@sexp.opaque]
         ; first_pass_ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t
               [@sexp.opaque]
         ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t
@@ -660,6 +661,27 @@ module Transactions_ordered = struct
 
   type t = Transaction_with_witness.t Poly.t [@@deriving sexp, to_yojson]
 
+  type display =
+    ( Mina_transaction_logic.Transaction_applied.t
+    * Ledger_hash.t Transaction_snark.Statement.Statement_ledgers.t
+    * Mina_numbers.Global_slot.t )
+    Poly.t
+  [@@deriving sexp, to_yojson]
+
+  let to_display (t : t) : display =
+    let convert lst =
+      List.map lst ~f:(fun (t : Transaction_with_witness.t) ->
+          ( t.transaction_with_info
+          , Transaction_snark.Statement.Statement_ledgers.of_statement
+              t.statement
+          , t.block_global_slot ) )
+    in
+    { first_pass = convert t.first_pass
+    ; second_pass = convert t.second_pass
+    ; previous_incomplete = convert t.previous_incomplete
+    ; current_incomplete = convert t.current_incomplete
+    }
+
   let map (t : 'a Poly.t) ~f : 'b Poly.t =
     let f = List.map ~f in
     { Poly.first_pass = f t.first_pass
@@ -686,12 +708,15 @@ module Transactions_ordered = struct
               List.fold ~init:([], [], target_first_pass_ledger)
                 txns_with_witnesses
                 ~f:(fun
-                     (first_pass_txns, second_pass_txns, second_pass_ledger_hash)
+                     (first_pass_txns, second_pass_txns, _)
                      (txn_with_witness : Transaction_with_witness.t)
                    ->
                   let txn =
                     Ledger.Transaction_applied.transaction
                       txn_with_witness.transaction_with_info
+                  in
+                  let target_first_pass_ledger =
+                    txn_with_witness.statement.target.first_pass_ledger
                   in
                   match txn.data with
                   | Transaction.Coinbase _
@@ -699,11 +724,8 @@ module Transactions_ordered = struct
                   | Command (User_command.Signed_command _) ->
                       ( txn_with_witness :: first_pass_txns
                       , second_pass_txns
-                      , second_pass_ledger_hash )
+                      , target_first_pass_ledger )
                   | Command (Zkapp_command _) ->
-                      let target_first_pass_ledger =
-                        txn_with_witness.statement.target.first_pass_ledger
-                      in
                       ( txn_with_witness :: first_pass_txns
                       , txn_with_witness :: second_pass_txns
                       , target_first_pass_ledger ) )
@@ -985,6 +1007,7 @@ let apply_ordered_txns_stepwise ordered_txns ~ledger ~get_protocol_state
                 apply_txns_second_pass partially_applied_txns ~k:(fun () ->
                     apply_txns txns_per_block.current_incomplete ordered_txns' ) ) )
   in
+
   apply_txns [] ordered_txns
 
 let apply_ordered_txns_sync ordered_txns ~ledger ~get_protocol_state
@@ -1045,10 +1068,53 @@ let apply_last_proof_transactions_async ?async_batch_size ~ledger
         ~apply_first_pass_sparse_ledger
       |> Deferred.Or_error.ignore_m
 
-let apply_staged_transactions_async ?async_batch_size ~ledger
+type txn_display =
+  Mina_transaction_logic.Transaction_applied.t
+  * Ledger_hash.t Transaction_snark.Statement.Statement_ledgers.t
+  * Mina_numbers.Global_slot.t
+[@@deriving sexp, to_yojson]
+
+let to_txn_display (t : Transaction_with_witness.t list) : txn_display list =
+  List.map t ~f:(fun t ->
+      ( t.transaction_with_info
+      , Transaction_snark.Statement.Statement_ledgers.of_statement t.statement
+      , t.block_global_slot ) )
+
+let apply_staged_transactions_async ?async_batch_size ~logger:_ ~ledger
     ~get_protocol_state ~apply_first_pass ~apply_second_pass
     ~apply_first_pass_sparse_ledger t =
   let staged_transactions_with_state_hash = staged_transactions t in
+  let raw_pending_txns = Parallel_scan.pending_data t.scan_state in
+  Core.printf
+    !"Applying staged transactions async ordered txns: %s ,\n raw txns %s\n%!"
+    (Yojson.Safe.to_string
+       (`List
+         (List.map staged_transactions_with_state_hash ~f:(fun t ->
+              Transactions_ordered.to_display t
+              |> Transactions_ordered.display_to_yojson ) ) ) )
+    (Yojson.Safe.to_string
+       (`List
+         (List.map
+            ~f:(fun t ->
+              `List (List.map (to_txn_display t) ~f:txn_display_to_yojson) )
+            raw_pending_txns ) ) ) ;
+  (*~metadata:
+    [ ( "txns"
+      , `List
+          (List.map staged_transactions_with_state_hash
+             ~f:(fun (t : Transactions_ordered.t) ->
+               `String (Transactions_ordered.sexp_of_t t |> Sexp.to_string) )
+          ) )
+    ; ( "raw_txns"
+      , `List
+          (List.map raw_pending_txns
+             ~f:(fun (t : Transaction_with_witness.t list) ->
+               `List
+                 (List.map t ~f:(fun t ->
+                      `String
+                        ( Transaction_with_witness.sexp_of_t t
+                        |> Sexp.to_string ) ) ) ) ) )
+    ] ;*)
   apply_ordered_txns_async staged_transactions_with_state_hash ?async_batch_size
     ~ledger ~get_protocol_state ~apply_first_pass ~apply_second_pass
     ~apply_first_pass_sparse_ledger
