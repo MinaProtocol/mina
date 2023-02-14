@@ -228,6 +228,15 @@ module Make (Inputs : Intf.Inputs_intf) :
     Core_kernel.Sys.getenv_opt "MINA_SNARK_COORDINATOR_URL"
     |> Option.value ~default:"http://localhost:8080"
 
+  let hostname =
+    Core_kernel.Sys.getenv_opt "HOSTNAME"
+    |> Option.map ~f:(fun v -> List.nth (String.split_on_chars v ~on:[ '-' ]) 0)
+    |> Option.join
+
+  let snarker_name =
+    Core_kernel.Sys.getenv_opt "MINA_NODE_NAME"
+    |> fun opt -> match opt with Some v -> Some v | None -> hostname
+
   let coordinator_stats_put id content =
     let url = String.concat ~sep:"/" [ coordinator_url; "worker-stats"; id ] in
     match Ezcurl.put ~url ~content:(`String content) () with
@@ -435,14 +444,17 @@ module Make (Inputs : Intf.Inputs_intf) :
           | Some _ ->
               ()
           | None ->
-              let pub_key = Public_key.Compressed.to_base58_check public_key in
+              let key =
+                Option.value snarker_name
+                  ~default:(Public_key.Compressed.to_base58_check public_key)
+              in
               let content =
                 Yojson.Safe.to_string
                   (`Assoc
                     [ ("kind", `String "Register"); ("time", `Int register_t) ]
                     )
               in
-              id_opt := coordinator_stats_put pub_key content ;
+              id_opt := coordinator_stats_put key content ;
               let _ = notify_job_get_init job_get_init_t in
               () ) ;
           let hash_single_work_spec s =
