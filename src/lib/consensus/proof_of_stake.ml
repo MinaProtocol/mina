@@ -1100,7 +1100,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             end
           end]
 
-          type _unused = unit constraint Stable.Latest.t = Staking.Value.t
+          let (_ : (Stable.Latest.t, Staking.Value.t) Type_equal.t) =
+            Type_equal.T
         end
       end
 

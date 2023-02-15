@@ -1477,7 +1477,7 @@ let gen_zkapp_command_from ?(generator_options = default)
   let receipt_elt =
     let _txn_commitment, full_txn_commitment =
       (* also computed in replace_authorizations, but easier just to re-compute here *)
-      Zkapp_command_builder.get_transaction_commitments
+      Zkapp_command.get_transaction_commitments
         zkapp_command_dummy_authorizations
     in
     Receipt.Zkapp_command_elt.Zkapp_command_commitment full_txn_commitment
