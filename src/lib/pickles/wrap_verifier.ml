@@ -548,9 +548,9 @@ struct
                   [| `Field (x, n) |] )
           in
 
-          let constant_part, non_constant_terms =
-            Array.foldi public_input ~init:([], [])
-              ~f:(fun i (csts, non_cst_terms) -> function
+          let constant_part, non_constant_terms, corrections =
+            Array.foldi public_input ~init:([], [], [])
+              ~f:(fun i (csts, non_cst_terms, corrs) -> function
               | `Field (Constant c, _) ->
                   let cst =
                     if Field.Constant.(equal zero) c then None
@@ -563,50 +563,29 @@ struct
                               (Field.Constant.unpack c) )
                            srs i )
                   in
-                  (cst :: csts, non_cst_terms)
+                  (cst :: csts, non_cst_terms, corrs)
               | `Field x ->
-                  let term =
+                  let term, corrs =
                     match x with
                     | b, 1 ->
                         assert_ (Constraint.boolean (b :> Field.t)) ;
-                        `Cond_add
-                          (Boolean.Unsafe.of_cvar b, lagrange ~domain srs i)
+                        ( `Cond_add
+                            (Boolean.Unsafe.of_cvar b, lagrange ~domain srs i)
+                        , corrs )
                     | x, n ->
-                        `Add_with_correction
-                          ( (x, n)
-                          , lagrange_with_correction ~input_length:n ~domain srs
-                              i )
+                        let ((_, corr) as v) =
+                          lagrange_with_correction ~input_length:n ~domain srs i
+                        in
+                        (`Add_with_correction ((x, n), v), corr :: corrs)
                   in
-                  (csts, term :: non_cst_terms) )
+                  (csts, term :: non_cst_terms, corrs) )
           in
           with_label __LOC__ (fun () ->
               (* Sum all corrections *)
               let correction =
                 with_label __LOC__ (fun () ->
-                    (* Find the first occurrence of [`Add_with_correction _]
-                       value to properly initialize the accumulator of the
-                       subsequent fold call on the rest of the [terms] list. *)
-                    let init, remaining_terms =
-                      let rec loop = function
-                        | [] ->
-                            failwith
-                              "Wrap_verifier.correction: expected at least an \
-                               addition with correction term"
-                        | `Cond_add _ :: l ->
-                            loop l
-                        | `Add_with_correction (_, (_, corr)) :: l ->
-                            (corr, l)
-                      in
-                      loop non_constant_terms
-                    in
-                    List.fold remaining_terms ~init ~f:(fun acc term ->
-                        match term with
-                        | `Cond_add _ ->
-                            acc
-                        | `Add_with_correction (_, (_, corr)) ->
-                            Ops.add_fast acc corr ) )
+                    List.reduce_exn corrections ~f:Ops.add_fast )
               in
-
               with_label __LOC__ (fun () ->
                   let init =
                     List.fold constant_part ~init:correction ~f:(fun acc ->
