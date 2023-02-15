@@ -272,3 +272,12 @@ let gen_forest_shape =
 let%test_unit "mask" =
   Quickcheck.test gen_forest_shape ~f:(fun (f, s) ->
       [%test_result: Shape.t] ~expect:s (shape @@ mask f s) )
+
+let%test_unit "to_account_updates is the inverse of of_account_updates" =
+  Quickcheck.test (Quickcheck.Generator.list Int.quickcheck_generator)
+    ~f:(fun forest ->
+      let forest' =
+        to_account_updates
+          (of_account_updates ~account_update_depth:Fn.id forest)
+      in
+      [%test_result: int list] ~expect:forest forest' )
