@@ -548,23 +548,23 @@ struct
                   [| `Field (x, n) |] )
           in
           let constant_part, non_constant_part =
-            List.partition_map
-              Array.(to_list (mapi public_input ~f:(fun i t -> (i, t))))
-              ~f:(fun (i, t) ->
-                match t with
-                | `Field (Constant c, _) ->
-                    First
-                      ( if Field.Constant.(equal zero) c then None
-                      else if Field.Constant.(equal one) c then
-                        Some (lagrange ~domain srs i)
-                      else
-                        Some
-                          (scaled_lagrange ~domain
-                             (Inner_curve.Constant.Scalar.project
-                                (Field.Constant.unpack c) )
-                             srs i ) )
-                | `Field x ->
-                    Second (i, x) )
+            Array.foldi public_input ~init:([], [])
+              ~f:(fun i (csts, non_csts) -> function
+              | `Field (Constant c, _) ->
+                  let cst =
+                    if Field.Constant.(equal zero) c then None
+                    else if Field.Constant.(equal one) c then
+                      Some (lagrange ~domain srs i)
+                    else
+                      Some
+                        (scaled_lagrange ~domain
+                           (Inner_curve.Constant.Scalar.project
+                              (Field.Constant.unpack c) )
+                           srs i )
+                  in
+                  (cst :: csts, non_csts)
+              | `Field x ->
+                  (csts, (i, x) :: non_csts) )
           in
           with_label __LOC__ (fun () ->
               let terms =
