@@ -11,9 +11,12 @@
  (name snarky_js_node)
  (modules snarky_js_node)
  (modes js)
- (link_flags (-noautolink))
+ (flags (-g))
+ (link_flags
+  (-noautolink -g))
  (js_of_ocaml
-  (flags +toplevel.js +dynlink.js --pretty --source-map-inline)
+  (flags +toplevel.js +dynlink.js --pretty --source-map)
+  (link_flags --source-map)
   (javascript_files overrides.js))
  (libraries snarky_js_bindings_lib node_backend)
  (link_deps
@@ -31,7 +34,7 @@
  (modes js)
  (link_flags (-noautolink))
  (js_of_ocaml
-  (flags +toplevel.js +dynlink.js --pretty --source-map-inline)
+  (flags +toplevel.js +dynlink.js --pretty)
   (javascript_files overrides.js))
  (libraries snarky_js_bindings_lib chrome_backend)
  (link_deps
