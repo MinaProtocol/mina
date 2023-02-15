@@ -4,7 +4,8 @@ open Currency
 open Mina_base
 open Mina_numbers
 
-type txn_result = (Account.Timing.t, Error.t) Result.t [@@deriving compare, sexp]
+type txn_result = (Account.Timing.t, Error.t) Result.t
+[@@deriving compare, sexp]
 
 let init_min_bal a =
   Option.value ~default:Balance.zero @@ Account.initial_minimum_balance a
@@ -23,7 +24,7 @@ let final_vesting_slot ~initial_minimum_balance ~cliff_time ~cliff_amount
   let periods =
     let open UInt64 in
     let open Infix in
-    (to_vest / incr) + (if equal (rem to_vest incr) zero then zero else one)
+    (to_vest / incr) + if equal (rem to_vest incr) zero then zero else one
   in
   let open UInt32 in
   let open Infix in
@@ -44,14 +45,18 @@ let timing_final_vesting_slot = function
       final_vesting_slot ~initial_minimum_balance ~cliff_time ~cliff_amount
         ~vesting_period ~vesting_increment
 
+(* These tests verify basic invariants of timed accounts' behaviour.
+   This is done very simply by exercising the function which determines
+   whether a transaction is valid. See the Account_timing modules in
+   transaction_snakrs/test library for testing these rules with
+   constructing actual transactions and applying them to a ledger. *)
 let%test_module "Test account timing." =
   ( module struct
     (* Test that the timed account generator only generates accounts that
        are completely vested before the largest possible slot, (2^32)-1. *)
     let%test_unit "Test fine-tuning of the account generation." =
       Quickcheck.test Account.gen_timed ~f:(fun account ->
-          [%test_eq: Balance.t option]
-            (Some Balance.zero)
+          [%test_eq: Balance.t option] (Some Balance.zero)
             ( match account.timing with
             | Untimed ->
                 None
@@ -62,11 +67,11 @@ let%test_module "Test account timing." =
                 ; vesting_period
                 ; vesting_increment
                 } ->
-               let global_slot = Global_slot.max_value in
-               Option.some @@
-                Account.min_balance_at_slot ~global_slot ~cliff_time
-                  ~cliff_amount ~vesting_period ~vesting_increment
-                  ~initial_minimum_balance ) )
+                let global_slot = Global_slot.max_value in
+                Option.some
+                @@ Account.min_balance_at_slot ~global_slot ~cliff_time
+                     ~cliff_amount ~vesting_period ~vesting_increment
+                     ~initial_minimum_balance ) )
 
     let%test_unit "Untimed accounts succeed if they have enough funds." =
       Quickcheck.test
@@ -116,9 +121,7 @@ let%test_module "Test account timing." =
           |> Option.value_map ~default:Amount.zero ~f:to_amount
         in
         let%bind amount = Amount.(gen_incl zero max_amount) in
-        let max_slot =
-          Global_slot.(of_int (to_int (cliff_time account) - 1))
-        in
+        let max_slot = Global_slot.(of_int (to_int (cliff_time account) - 1)) in
         let%map slot = Global_slot.(gen_incl zero max_slot) in
         (account, amount, slot))
         ~f:(fun (account, txn_amount, txn_global_slot) ->
@@ -169,10 +172,7 @@ let%test_module "Test account timing." =
         let available_amount =
           let open Balance in
           (let open Option.Let_syntax in
-          let%bind avail =
-            account.balance
-            - to_amount (init_min_bal account)
-          in
+          let%bind avail = account.balance - to_amount (init_min_bal account) in
           Amount.(to_amount avail + of_nanomina_int_exn 1))
           |> Option.value ~default:Amount.zero
         in
@@ -191,8 +191,7 @@ let%test_module "Test account timing." =
                   %{sexp: Amount.t} at global slot %{sexp: Global_slot.t}, \
                   applying the transaction would put the balance below the \
                   calculated minimum balance of %{sexp: Balance.t}"
-                txn_amount txn_global_slot
-                (init_min_bal account)
+                txn_amount txn_global_slot (init_min_bal account)
             |> Or_error.tag ~tag:min_balance_tag )
             (validate_timing ~account ~txn_amount ~txn_global_slot) )
   end )
