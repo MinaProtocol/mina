@@ -2,6 +2,8 @@
 
 # Script collects binaries and keys and builds deb archives.
 
+echo "--- Setting up the envrionment to build debian packages..."
+
 set -euo pipefail
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
@@ -103,6 +105,8 @@ build_deb() {
   ls -lh ${1}_*.deb
   echo "deleting BUILDDIR ${BUILDDIR}"
   rm -rf "${BUILDDIR}"
+
+  echo "--- Built ${1}_${MINA_DEB_VERSION}.deb"
 }
 
 # Function to DRY copying config files into daemon packages
@@ -165,7 +169,7 @@ if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
 then
 
   echo "------------------------------------------------------------"
-  echo "Building generate keypair deb:"
+  echo "--- Building generate keypair deb:"
 
   create_control_file mina-generate-keypair "${SHARED_DEPS}" 'Utility to regenerate mina private public keys in new format'
 
@@ -183,7 +187,7 @@ if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
 then
 
   echo "------------------------------------------------------------"
-  echo "Building mainnet deb without keys:"
+  echo "--- Building mainnet deb without keys:"
 
   create_control_file mina-mainnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
 
@@ -199,7 +203,7 @@ if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
 then
 
   echo "------------------------------------------------------------"
-  echo "Building testnet signatures deb without keys:"
+  echo "--- Building testnet signatures deb without keys:"
 
   copy_control_file mina-devnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network'
 
@@ -212,7 +216,7 @@ fi # only builds on mainnet-like branches
 
 ##################################### ZKAPP TEST TXN #######################################
 echo "------------------------------------------------------------"
-echo "Building Mina Berkeley ZkApp test transaction tool:"
+echo "--- Building Mina Berkeley ZkApp test transaction tool:"
 
 create_control_file mina-zkapp-test-transaction "${SHARED_DEPS}${DAEMON_DEPS}" 'Utility to generate ZkApp transactions in Mina GraphQL format'
 
@@ -225,7 +229,7 @@ build_deb mina-zkapp-test-transaction
 
 ##################################### BERKELEY PACKAGE #######################################
 echo "------------------------------------------------------------"
-echo "Building Mina Berkeley testnet signatures deb without keys:"
+echo "--- Building Mina Berkeley testnet signatures deb without keys:"
 
 mkdir -p "${BUILDDIR}/DEBIAN"
 create_control_file mina-berkeley "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
