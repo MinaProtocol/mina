@@ -281,3 +281,16 @@ let%test_unit "to_account_updates is the inverse of of_account_updates" =
           (of_account_updates ~account_update_depth:Fn.id forest)
       in
       [%test_result: int list] ~expect:forest forest' )
+
+let%test_unit "to_zkapp_command_with_hashes_list" =
+  let node i hash calls =
+    { With_stack_hash.elt = Tree_test.tree i calls; stack_hash = hash }
+  in
+  let computed =
+    to_zkapp_command_with_hashes_list
+      [ node 0 'a' [ node 1 'b' []; node 2 'c' [ node 3 'd' [] ] ]
+      ; node 4 'e' [ node 5 'f' [] ]
+      ]
+  in
+  let expect = [ (0, 'a'); (1, 'b'); (2, 'c'); (3, 'd'); (4, 'e'); (5, 'f') ] in
+  [%test_result: (int * char) list] ~expect computed
