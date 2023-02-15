@@ -708,7 +708,7 @@ module Transactions_ordered = struct
               List.fold ~init:([], [], target_first_pass_ledger)
                 txns_with_witnesses
                 ~f:(fun
-                     (first_pass_txns, second_pass_txns, _)
+                     (first_pass_txns, second_pass_txns, old_root)
                      (txn_with_witness : Transaction_with_witness.t)
                    ->
                   let txn =
@@ -724,7 +724,7 @@ module Transactions_ordered = struct
                   | Command (User_command.Signed_command _) ->
                       ( txn_with_witness :: first_pass_txns
                       , second_pass_txns
-                      , target_first_pass_ledger )
+                      , old_root )
                   | Command (Zkapp_command _) ->
                       ( txn_with_witness :: first_pass_txns
                       , txn_with_witness :: second_pass_txns
