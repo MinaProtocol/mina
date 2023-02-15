@@ -582,14 +582,30 @@ struct
               in
               let correction =
                 with_label __LOC__ (fun () ->
-                    List.reduce_exn
-                      (List.filter_map terms ~f:(function
+                    (* Find the first occurrence of `Add_with_correction to
+                       properly initialize the subsequent fold call on the rest
+                       of the [terms] list *)
+                    let init, remaining_terms =
+                      let rec loop = function
+                        | [] ->
+                            failwith
+                              "Wrap_verifier.correction: expected at least an \
+                               addition with correction term"
+                        | `Cond_add _ :: l ->
+                            loop l
+                        | `Add_with_correction (_, (_, corr)) :: l ->
+                            (corr, l)
+                      in
+                      loop terms
+                    in
+                    List.fold remaining_terms ~init ~f:(fun acc term ->
+                        match term with
                         | `Cond_add _ ->
-                            None
+                            acc
                         | `Add_with_correction (_, (_, corr)) ->
-                            Some corr ) )
-                      ~f:Ops.add_fast )
+                            Ops.add_fast acc corr ) )
               in
+
               with_label __LOC__ (fun () ->
                   let init =
                     List.fold constant_part ~init:correction ~f:(fun acc ->
