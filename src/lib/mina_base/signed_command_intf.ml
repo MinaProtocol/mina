@@ -174,8 +174,6 @@ module type S = sig
 
   val check_valid_keys : t -> bool
 
-  module Base58_check_v1 : Codable.Base58_check_intf with type t := t_v1
-
   module For_tests : sig
     (** the signature kind is an argument, to match `sign`, but ignored *)
     val fake_sign :

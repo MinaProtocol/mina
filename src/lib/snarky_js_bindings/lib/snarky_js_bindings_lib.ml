@@ -3464,11 +3464,12 @@ let test =
           Binable.to_bigstring (module Signed_command.Stable.Latest) command
 
         method serializePaymentV1 (command : Js.js_string Js.t) =
-          let command : Signed_command.t_v1 =
+          let command_v1 : Signed_command.t_v1 =
             command |> Js.to_string |> Yojson.Safe.from_string
             |> Signed_command.Stable.V1.of_yojson |> ok_exn
           in
-          Signed_command.Base58_check_v1.to_base58_check command |> Js.string
+          let command = Signed_command.Stable.V1.to_latest command_v1 in
+          Binable.to_bigstring (module Signed_command.Stable.Latest) command
 
         method examplePayment =
           let kp = keypair () in

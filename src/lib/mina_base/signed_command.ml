@@ -417,9 +417,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let version_byte = Base58_check.Version_bytes.signed_command_v1
   end
 
-  module Base58_check_v1 = Codable.Make_base58_check (V1_all_tagged)
-
-  let of_base58_check_exn_v1 = Base58_check_v1.of_base58_check
+  let of_base58_check_exn_v1 =
+    let module Base58_check_v1 = Codable.Make_base58_check (V1_all_tagged) in
+    Base58_check_v1.of_base58_check
 
   (* give transaction ids have version tag *)
   include Codable.Make_base64 (Stable.Latest.With_top_version_tag)
