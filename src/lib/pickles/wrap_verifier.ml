@@ -547,9 +547,10 @@ struct
               | `Packed_bits (x, n) ->
                   [| `Field (x, n) |] )
           in
-          let constant_part, non_constant_part =
+
+          let constant_part, non_constant_terms =
             Array.foldi public_input ~init:([], [])
-              ~f:(fun i (csts, non_csts) -> function
+              ~f:(fun i (csts, non_cst_terms) -> function
               | `Field (Constant c, _) ->
                   let cst =
                     if Field.Constant.(equal zero) c then None
@@ -562,13 +563,9 @@ struct
                               (Field.Constant.unpack c) )
                            srs i )
                   in
-                  (cst :: csts, non_csts)
+                  (cst :: csts, non_cst_terms)
               | `Field x ->
-                  (csts, (i, x) :: non_csts) )
-          in
-          with_label __LOC__ (fun () ->
-              let terms =
-                List.map non_constant_part ~f:(fun (i, x) ->
+                  let term =
                     match x with
                     | b, 1 ->
                         assert_ (Constraint.boolean (b :> Field.t)) ;
@@ -578,13 +575,17 @@ struct
                         `Add_with_correction
                           ( (x, n)
                           , lagrange_with_correction ~input_length:n ~domain srs
-                              i ) )
-              in
+                              i )
+                  in
+                  (csts, term :: non_cst_terms) )
+          in
+          with_label __LOC__ (fun () ->
+              (* Sum all corrections *)
               let correction =
                 with_label __LOC__ (fun () ->
-                    (* Find the first occurrence of `Add_with_correction to
-                       properly initialize the subsequent fold call on the rest
-                       of the [terms] list *)
+                    (* Find the first occurrence of [`Add_with_correction _]
+                       value to properly initialize the accumulator of the
+                       subsequent fold call on the rest of the [terms] list. *)
                     let init, remaining_terms =
                       let rec loop = function
                         | [] ->
@@ -596,7 +597,7 @@ struct
                         | `Add_with_correction (_, (_, corr)) :: l ->
                             (corr, l)
                       in
-                      loop terms
+                      loop non_constant_terms
                     in
                     List.fold remaining_terms ~init ~f:(fun acc term ->
                         match term with
@@ -611,7 +612,7 @@ struct
                     List.fold constant_part ~init:correction ~f:(fun acc ->
                       function None -> acc | Some v -> Ops.add_fast acc v )
                   in
-                  List.foldi terms ~init ~f:(fun i acc term ->
+                  List.foldi non_constant_terms ~init ~f:(fun i acc term ->
                       match term with
                       | `Cond_add (b, g) ->
                           with_label __LOC__ (fun () ->
