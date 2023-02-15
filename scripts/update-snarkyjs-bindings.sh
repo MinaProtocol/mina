@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 SNARKY_JS_PATH=src/lib/snarky_js_bindings/snarkyjs
 
 # 1. node build
