@@ -234,6 +234,20 @@ let%test_unit "match_up error" =
     assert false
   with Assert_failure _ -> assert true
 
+let%test_unit "match_up error 2" =
+  let l_1 = [ 1; 2; 3 ] in
+  let l_2 = [ (2, 'a'); (3, 'b'); (4, 'c'); (5, 'd') ] in
+  try
+    ignore @@ match_up l_1 l_2 ;
+    assert false
+  with Assert_failure _ -> assert true
+
+let%test_unit "match_up empty" =
+  let l_1 = [ 1; 2; 3; 4; 5; 6 ] in
+  let l_2 = [ (1, 'a'); (2, 'b'); (3, 'c'); (4, 'd') ] in
+  let expect = [] in
+  [%test_result: (int * char) list] ~expect (match_up l_1 l_2)
+
 let gen_forest_shape =
   let open Quickcheck.Generator.Let_syntax in
   let%bind forest =
