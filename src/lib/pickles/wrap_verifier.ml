@@ -592,9 +592,8 @@ struct
               in
               with_label __LOC__ (fun () ->
                   let init =
-                    List.fold
-                      (List.filter_map ~f:Fn.id constant_part)
-                      ~init:correction ~f:Ops.add_fast
+                    List.fold constant_part ~init:correction ~f:(fun acc ->
+                      function None -> acc | Some v -> Ops.add_fast acc v )
                   in
                   List.foldi terms ~init ~f:(fun i acc term ->
                       match term with
