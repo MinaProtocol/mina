@@ -220,28 +220,41 @@ let%test_unit "shape" =
        ; (1, Node [])
        ] )
 
-let%test_unit "match_up" =
-  let l_1 = [ 1; 2; 3; 4; 5; 6; 7; 8 ] in
-  let l_2 =
-    [ (0, 'a')
-    ; (1, 'b')
-    ; (2, 'c')
-    ; (3, 'd')
-    ; (4, 'e')
-    ; (5, 'f')
-    ; (6, 'g')
-    ; (7, 'h')
-    ]
-  in
-  let expect =
-    [ (1, 'a')
-    ; (2, 'b')
-    ; (3, 'c')
-    ; (4, 'd')
-    ; (5, 'e')
-    ; (6, 'f')
-    ; (7, 'g')
-    ; (8, 'h')
-    ]
-  in
+let%test_unit "match_up ok" =
+  let l_1 = [ 1; 2; 3; 4; 5; 6 ] in
+  let l_2 = [ (0, 'a'); (1, 'b'); (2, 'c'); (3, 'd') ] in
+  let expect = [ (1, 'a'); (2, 'b'); (3, 'c'); (4, 'd') ] in
   [%test_result: (int * char) list] ~expect (match_up l_1 l_2)
+
+let%test_unit "match_up error" =
+  let l_1 = [ 1; 2; 3 ] in
+  let l_2 = [ (0, 'a'); (1, 'b'); (2, 'c'); (3, 'd') ] in
+  try
+    ignore @@ match_up l_1 l_2 ;
+    assert false
+  with Assert_failure _ -> assert true
+
+let gen_forest_shape =
+  let open Quickcheck.Generator.Let_syntax in
+  let%bind forest =
+    quickcheck_generator Int.quickcheck_generator Int.quickcheck_generator
+      Unit.quickcheck_generator
+  in
+  let rec gen_shape (Shape.Node shape) =
+    let%bind length = Int.gen_incl 0 (List.length shape) in
+    let l = List.sub shape ~pos:0 ~len:length in
+    let%map l =
+      List.fold_left l ~init:(Quickcheck.Generator.return [])
+        ~f:(fun acc (i, s) ->
+          let%map acc = acc and s = gen_shape s in
+          (i, s) :: acc )
+    in
+    Shape.Node (List.rev l)
+  in
+  let shape = shape forest in
+  let%map shape = gen_shape shape in
+  (forest, shape)
+
+let%test_unit "mask" =
+  Quickcheck.test gen_forest_shape ~f:(fun (f, s) ->
+      [%test_result: Shape.t] ~expect:s (shape @@ mask f s) )
