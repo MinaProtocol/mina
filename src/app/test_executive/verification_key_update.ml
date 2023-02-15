@@ -32,7 +32,7 @@ struct
     { identifier = sprintf "Trivial %d" Id.id
     ; prevs = []
     ; main
-    ; uses_lookup = false
+    ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
     }
 end
 
@@ -72,8 +72,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; block_producers =
-        [ { balance = "90000000000"; timing = Untimed }
-        ; { balance = "10000000000"; timing = Untimed }
+        [ { balance = "9000000000"; timing = Untimed }
+        ; { balance = "1000000000"; timing = Untimed }
         ]
     ; num_archive_nodes = 1
     ; num_snark_workers = 2
