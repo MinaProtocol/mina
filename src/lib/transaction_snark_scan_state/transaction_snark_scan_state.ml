@@ -45,10 +45,10 @@ module Transaction_with_witness = struct
         ; init_stack :
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
             .t
-        ; first_pass_ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t
-              [@sexp.opaque]
-        ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.Stable.V2.t
-              [@sexp.opaque]
+        ; first_pass_ledger_witness :
+            (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
+        ; second_pass_ledger_witness :
+            (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
         ; block_global_slot : Mina_numbers.Global_slot.Stable.V1.t
         }
       [@@deriving sexp, to_yojson]
