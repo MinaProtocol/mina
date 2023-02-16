@@ -1,4 +1,3 @@
-module Endo = Endo
 module P = Proof
 
 module type Statement_intf = Intf.Statement
@@ -7,10 +6,8 @@ module type Statement_var_intf = Intf.Statement_var
 
 module type Statement_value_intf = Intf.Statement_value
 
-module Common = Common
-open Tuple_lib
-module Scalar_challenge = Scalar_challenge
 module SC = Scalar_challenge
+open Tuple_lib
 open Core_kernel
 open Async_kernel
 open Import

@@ -1,10 +1,7 @@
-module Scalar_challenge = Scalar_challenge
-module Endo = Endo
 open Core_kernel
 open Async_kernel
 open Pickles_types
 open Hlist
-module Common = Common
 
 exception Return_digest of Md5.t
 
