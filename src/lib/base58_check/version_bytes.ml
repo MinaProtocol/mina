@@ -34,7 +34,7 @@ let state_hash : t = '\x10'
 
 let state_body_hash : t = '\x11'
 
-let transaction_hash : t = '\x12'
+(* don't use \x12, which was for pre-Berkeley hard fork transaction hashes *)
 
 (* used only to deserialize transaction ids, pre-Berkeley hard fork *)
 let signed_command_v1 : t = '\x13'
@@ -56,6 +56,8 @@ let zkapp_command : t = '\x1A'
 let verification_key : t = '\x1B'
 
 let token_id_key : t = '\x1C'
+
+let transaction_hash : t = '\x1D'
 
 (** used for testing only *)
 

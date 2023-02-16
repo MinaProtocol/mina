@@ -149,7 +149,7 @@ module Network_config = struct
           in
           let default = Runtime_config.Accounts.Single.default in
           { default with
-            pk = Some (Public_key.Compressed.to_string pk)
+            pk = Public_key.Compressed.to_string pk
           ; sk = Some (Private_key.to_base58_check sk)
           ; balance =
               Balance.of_mina_string_exn balance
@@ -198,7 +198,7 @@ module Network_config = struct
           in
           let default = Runtime_config.Accounts.Single.default in
           { default with
-            pk = Some (Public_key.Compressed.to_string pk)
+            pk = Public_key.Compressed.to_string pk
           ; sk = None
           ; balance =
               Balance.of_mina_string_exn balance

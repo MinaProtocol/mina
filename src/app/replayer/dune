@@ -44,7 +44,7 @@
    mina_transaction_logic
    mina_caqti
    genesis_constants
-   coda_runtime_config
+   mina_runtime_config
    logger
    kimchi_backend
    kimchi_backend.pasta
