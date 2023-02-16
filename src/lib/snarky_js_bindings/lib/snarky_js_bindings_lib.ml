@@ -3444,8 +3444,10 @@ let test =
             command |> Js.to_string |> Yojson.Safe.from_string
             |> Signed_command.Stable.V1.of_yojson |> ok_exn
           in
+          let b58 = Signed_command.to_base58_check_v1 command in
           Mina_transaction.Transaction_hash.(
-            command |> hash_signed_command_v1 |> to_base58_check |> Js.string)
+            b58 |> digest_string |> to_base58_check)
+          |> Js.string
 
         method serializeCommon (command : Js.js_string Js.t) =
           let command : Signed_command_payload.Common.t =
@@ -3468,7 +3470,7 @@ let test =
             command |> Js.to_string |> Yojson.Safe.from_string
             |> Signed_command.Stable.V1.of_yojson |> ok_exn
           in
-          Signed_command.Base58_check_v1.to_base58_check command |> Js.string
+          Signed_command.to_base58_check_v1 command |> Js.string
 
         method examplePayment =
           let kp = keypair () in

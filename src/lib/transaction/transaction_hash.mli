@@ -12,6 +12,8 @@ end]
 
 type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson, equal]
 
+val digest_string : ?off:int -> ?len:int -> string -> t
+
 val of_base58_check : string -> t Or_error.t
 
 val of_base58_check_exn : string -> t
