@@ -1361,16 +1361,6 @@ module Types = struct
                     isn't tracked by the queried daemon"
                  ~args:Arg.[]
                  ~resolve:(fun _ { locked; _ } -> locked)
-             ; field "isTokenOwner" ~typ:bool ~deprecated:(Deprecated None)
-                 ~doc:"True if this account owns its associated token"
-                 ~args:Arg.[]
-                 ~resolve:(fun _ _ -> None)
-             ; field "isDisabled" ~typ:bool ~deprecated:(Deprecated None)
-                 ~doc:
-                   "True if this account has been disabled by the owner of the \
-                    associated token"
-                 ~args:Arg.[]
-                 ~resolve:(fun _ _ -> None)
              ; field "index" ~typ:int
                  ~doc:
                    "The index of this account in the ledger, or null if this \
@@ -1413,7 +1403,9 @@ module Types = struct
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.permissions )
              ; field "tokenSymbol" ~typ:string
-                 ~doc:"The token symbol associated with this account"
+                 ~doc:
+                   "The symbol for the token owned by this account, if there \
+                    is one"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.token_symbol )
