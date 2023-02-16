@@ -434,6 +434,44 @@ let api_tests =
   ; ("compile monadic API", `Quick, MonadicAPI.get_hash_of_circuit)
   ]
 
+module Protocol_circuits = struct
+  let proof_level, constraint_constants =
+    Genesis_constants.(Proof_level.Full, Constraint_constants.compiled)
+
+  let blockchain () : unit =
+    let expected = "fe5c73e8189b27aa30ea96076825416e" in
+
+    let digest =
+      Blockchain_snark.Blockchain_snark_state.constraint_system_digests
+    in
+    let digest = digest ~proof_level ~constraint_constants () in
+    let _, hash = Option.value_exn (List.hd digest) in
+    let digest = Md5.to_hex hash in
+
+    Format.printf "expected:\n%s\n\n" expected ;
+    Format.printf "obtained:\n%s\n" digest ;
+    assert (String.(digest = expected)) ;
+    ()
+
+  let transaction () : unit =
+    let expected = "31e96945d5bf7c8d4b1089c59c3b878b" in
+    let digest =
+      Transaction_snark.constraint_system_digests ~constraint_constants ()
+    in
+    let _, hash = Option.value_exn (List.hd digest) in
+    let digest = Core.Md5.to_hex hash in
+
+    Format.printf "expected:\n%s\n\n" expected ;
+    Format.printf "obtained:\n%s\n" digest ;
+    assert (String.(digest = expected)) ;
+    ()
+
+  let tests =
+    [ ("test blockchain circuit", `Quick, blockchain)
+    ; ("test transaction circuit", `Quick, transaction)
+    ]
+end
+
 (* run tests *)
 
 let () =
@@ -446,4 +484,5 @@ let () =
     ; ("circuit tests", circuit_tests)
     ; ("As_prover tests", As_prover_circuits.as_prover_tests)
     ; ("range checks", range_checks)
+    ; ("protocol circuits", Protocol_circuits.tests)
     ]
