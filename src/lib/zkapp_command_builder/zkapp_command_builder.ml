@@ -78,29 +78,13 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
       |> Zkapp_command.Call_forest.accumulate_hashes_predicated
   }
 
-let get_transaction_commitments (zkapp_command : Zkapp_command.t) =
-  let memo_hash = Signed_command_memo.hash zkapp_command.memo in
-  let fee_payer_hash =
-    Account_update.of_fee_payer zkapp_command.fee_payer
-    |> Zkapp_command.Digest.Account_update.create
-  in
-  let account_updates_hash = Zkapp_command.account_updates_hash zkapp_command in
-  let txn_commitment =
-    Zkapp_command.Transaction_commitment.create ~account_updates_hash
-  in
-  let full_txn_commitment =
-    Zkapp_command.Transaction_commitment.create_complete txn_commitment
-      ~memo_hash ~fee_payer_hash
-  in
-  (txn_commitment, full_txn_commitment)
-
 (* replace dummy signatures, proofs with valid ones for fee payer, other zkapp_command
    [keymap] maps compressed public keys to private keys
 *)
 let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
     Zkapp_command.t Async_kernel.Deferred.t =
   let txn_commitment, full_txn_commitment =
-    get_transaction_commitments zkapp_command
+    Zkapp_command.get_transaction_commitments zkapp_command
   in
   let sign_for_account_update ~use_full_commitment sk =
     let commitment =

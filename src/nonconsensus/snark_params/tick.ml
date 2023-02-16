@@ -88,7 +88,7 @@ module Inner_curve = struct
     *)
     type t = Pasta.Fq.t [@@deriving bin_io_unversioned, sexp]
 
-    type _unused = unit constraint t = Tock.Field.t
+    let (_ : (t, Tock.Field.t) Type_equal.t) = Type_equal.T
 
     let size = Pasta.Fq.order
 

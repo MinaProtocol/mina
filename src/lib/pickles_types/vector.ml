@@ -506,11 +506,7 @@ module Vector_2 = struct
 
   include T
 
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
+  let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
 end
 
 module Vector_4 = struct
@@ -531,11 +527,7 @@ module Vector_4 = struct
 
   include T
 
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
+  let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
 end
 
 module Vector_5 = struct
@@ -556,11 +548,7 @@ module Vector_5 = struct
 
   include T
 
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
+  let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
 end
 
 module Vector_6 = struct
@@ -581,11 +569,7 @@ module Vector_6 = struct
 
   include T
 
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
+  let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
 end
 
 module Vector_7 = struct
@@ -606,11 +590,7 @@ module Vector_7 = struct
 
   include T
 
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
+  let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
 end
 
 module Vector_8 = struct
@@ -631,11 +611,7 @@ module Vector_8 = struct
 
   include T
 
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
+  let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
 end
 
 module Vector_15 = struct
@@ -656,11 +632,7 @@ module Vector_15 = struct
 
   include T
 
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
+  let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
 end
 
 module Vector_16 = struct
@@ -681,9 +653,5 @@ module Vector_16 = struct
 
   include T
 
-  let () =
-    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
+  let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
 end
