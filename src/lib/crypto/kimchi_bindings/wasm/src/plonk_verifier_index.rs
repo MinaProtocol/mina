@@ -289,7 +289,6 @@ macro_rules! impl_verification_key {
                         mul_comm: vi.mul_comm.into(),
                         emul_comm: vi.emul_comm.into(),
                         endomul_scalar_comm: vi.endomul_scalar_comm.into(),
-                            }
                     },
                     shifts:
                         WasmShifts {
@@ -324,7 +323,6 @@ macro_rules! impl_verification_key {
                         mul_comm: vi.mul_comm.clone().into(),
                         emul_comm: vi.emul_comm.clone().into(),
                         endomul_scalar_comm: vi.endomul_scalar_comm.clone().into(),
-                            }
                     },
                     shifts:
                         WasmShifts {
