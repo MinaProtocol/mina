@@ -1209,7 +1209,7 @@ let apply_last_proof_transactions_async ?async_batch_size ~ledger
         (Yojson.Safe.to_string
            (`List
              (List.map ~f:txn_display_to_yojson
-                (to_txn_display t.previous_incomplete_zkapp_updates) ) ) ) ;
+                (to_txn_display (fst t.previous_incomplete_zkapp_updates)) ) ) ) ;
       apply_ordered_txns_async ~stop_at_first_pass:true txns_per_block
         ?async_batch_size ~ledger ~get_protocol_state ~apply_first_pass
         ~apply_second_pass ~apply_first_pass_sparse_ledger
