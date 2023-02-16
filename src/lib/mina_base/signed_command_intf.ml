@@ -209,6 +209,8 @@ module type S = sig
 
   val of_base58_check_exn_v1 : string -> t_v1 Or_error.t
 
+  val to_base58_check_v1 : t_v1 -> string
+
   include Codable.Base64_intf with type t := t
 end
 
