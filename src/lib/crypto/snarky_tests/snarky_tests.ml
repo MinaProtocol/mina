@@ -445,7 +445,7 @@ module Protocol_circuits = struct
       Blockchain_snark.Blockchain_snark_state.constraint_system_digests
     in
     let digest = digest ~proof_level ~constraint_constants () in
-    let _, hash = Option.value_exn (List.hd digest) in
+    let _, hash = List.hd_exn digest in
     let digest = Md5.to_hex hash in
 
     Format.printf "expected:\n%s\n\n" expected ;
@@ -458,7 +458,7 @@ module Protocol_circuits = struct
     let digest =
       Transaction_snark.constraint_system_digests ~constraint_constants ()
     in
-    let _, hash = Option.value_exn (List.hd digest) in
+    let _, hash = List.hd_exn digest in
     let digest = Core.Md5.to_hex hash in
 
     Format.printf "expected:\n%s\n\n" expected ;
