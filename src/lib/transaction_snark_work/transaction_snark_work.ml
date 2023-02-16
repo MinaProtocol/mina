@@ -25,7 +25,7 @@ module Statement = struct
 
       let to_latest = Fn.id
 
-      type _unused = unit constraint t = Arg.Stable.V2.t
+      let (_ : (t, Arg.Stable.V2.t) Type_equal.t) = Type_equal.T
 
       include Hashable.Make_binable (Arg.Stable.V2)
     end

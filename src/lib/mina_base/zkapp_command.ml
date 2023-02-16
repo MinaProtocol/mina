@@ -2018,6 +2018,20 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
     in
     Error (Error.of_string err_msg)
 
+let get_transaction_commitments (zkapp_command : t) =
+  let memo_hash = Signed_command_memo.hash zkapp_command.memo in
+  let fee_payer_hash =
+    Account_update.of_fee_payer zkapp_command.fee_payer
+    |> Digest.Account_update.create
+  in
+  let account_updates_hash = account_updates_hash zkapp_command in
+  let txn_commitment = Transaction_commitment.create ~account_updates_hash in
+  let full_txn_commitment =
+    Transaction_commitment.create_complete txn_commitment ~memo_hash
+      ~fee_payer_hash
+  in
+  (txn_commitment, full_txn_commitment)
+
 let inner_query =
   lazy
     (Option.value_exn ~message:"Invariant: All projectable derivers are Some"
