@@ -33,8 +33,8 @@ module type S = sig
   type 'f t = 'f Stable.V1.t
 
   val typ :
-       ('a, 'b, 'f) Snarky_backendless.Typ.t
-    -> ('a t, 'b t, 'f) Snarky_backendless.Typ.t
+       ('a, 'b, 'f, 'field_var) Snarky_backendless.Typ.t
+    -> ('a t, 'b t, 'f, 'field_var) Snarky_backendless.Typ.t
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
 
@@ -70,8 +70,8 @@ module Type1 : sig
   val equal : ('a, 'res) Sigs.rel2 -> ('a t, 'res) Sigs.rel2
 
   val typ :
-       ('a, 'b, 'f) Snarky_backendless.Typ.t
-    -> ('a t, 'b t, 'f) Snarky_backendless.Typ.t
+       ('a, 'b, 'f, 'field_var) Snarky_backendless.Typ.t
+    -> ('a t, 'b t, 'f, 'field_var) Snarky_backendless.Typ.t
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
 
@@ -105,8 +105,8 @@ module Type2 : sig
   val equal : ('a, 'res) Sigs.rel2 -> ('a t, 'res) Sigs.rel2
 
   val typ :
-       ('a, 'b, 'f) Snarky_backendless.Typ.t
-    -> ('a t, 'b t, 'f) Snarky_backendless.Typ.t
+       ('a, 'b, 'f, 'field_var) Snarky_backendless.Typ.t
+    -> ('a t, 'b t, 'f, 'field_var) Snarky_backendless.Typ.t
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
 

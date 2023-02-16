@@ -1,12 +1,12 @@
 val add_fast :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+     'f Snarky_backendless.Snark.m
   -> ?check_finite:bool
   -> 'f Snarky_backendless.Cvar.t * 'f Snarky_backendless.Cvar.t
   -> 'f Snarky_backendless.Cvar.t * 'f Snarky_backendless.Cvar.t
   -> 'f Snarky_backendless.Cvar.t * 'f Snarky_backendless.Cvar.t
 
 module Make
-    (Impl : Snarky_backendless.Snark_intf.Run)
+    (Impl : Snarky_backendless.Snark_intf.Run_with_cvar)
     (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t) : sig
   type var := Impl.field Snarky_backendless.Cvar.t
 

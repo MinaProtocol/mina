@@ -14,7 +14,7 @@ module T (Impl : Snarky_backendless.Snark_intf.Run) = struct
   type nonrec 'n t = (Impl.field, 'n) t
 end
 
-module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
+module Make (Impl : Snarky_backendless.Snark_intf.Run_with_cvar) = struct
   module Constant = Constant
   open Impl
   include T (Impl)

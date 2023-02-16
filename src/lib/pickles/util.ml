@@ -43,7 +43,7 @@ let rec absorb :
 let ones_vector :
     type f n.
        first_zero:f Snarky_backendless.Cvar.t
-    -> (module Snarky_backendless.Snark_intf.Run with type field = f)
+    -> f Snarky_backendless.Snark.m
     -> n Nat.t
     -> (f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t, n) Vector.t =
  fun ~first_zero (module Impl) n ->
@@ -62,8 +62,7 @@ let ones_vector :
   in
   go Boolean.true_ 0 n
 
-let seal (type f)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
+let seal (type f) ((module Impl) : f Snarky_backendless.Snark.m)
     (x : Impl.Field.t) : Impl.Field.t =
   let open Impl in
   match Field.to_constant_and_terms x with
@@ -76,7 +75,7 @@ let seal (type f)
       Field.Assert.equal x y ; y
 
 let lowest_128_bits (type f) ~constrain_low_bits ~assert_128_bits
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) x =
+    ((module Impl) : f Snarky_backendless.Snark.m) x =
   let open Impl in
   let pow2 =
     (* 2 ^ n *)

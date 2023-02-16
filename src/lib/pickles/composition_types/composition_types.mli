@@ -4,7 +4,12 @@ module Opt = Plonk_types.Opt
 type ('a, 'b) opt := ('a, 'b) Opt.t
 
 type ('var, 'value, 'field, 'checked) snarky_typ :=
-  ('var, 'value, 'field, 'checked) Snarky_backendless.Types.Typ.t
+  ( 'var
+  , 'value
+  , 'field
+  , 'field Snarky_backendless.Cvar.t
+  , 'checked )
+  Snarky_backendless.Types.Typ.t
 
 (** {2 Module aliases} *)
 
@@ -89,11 +94,16 @@ module Wrap : sig
                  ( 'a
                  , 'b
                  , 'f
+                 , 'f Snarky_backendless.Cvar.t
                  , ( unit
                    , 'f )
                    Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
                  Snarky_backendless.Types.Typ.t
-              -> ('a t, 'b t, 'f) Snarky_backendless.Typ.t
+              -> ( 'a t
+                 , 'b t
+                 , 'f
+                 , 'f Snarky_backendless.Cvar.t )
+                 Snarky_backendless.Typ.t
           end
 
           module Optional_column_scalars : sig
@@ -174,20 +184,31 @@ module Wrap : sig
                  ( 'c
                  , 'd
                  , 'f
+                 , 'f Snarky_backendless.Cvar.t
                  , ( unit
                    , 'f )
                    Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
                  Snarky_backendless.Types.Typ.t
-            -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
+            -> scalar_challenge:
+                 ( 'e
+                 , 'b
+                 , 'f
+                 , 'f Snarky_backendless.Cvar.t )
+                 Snarky_backendless.Typ.t
             -> bool:
                  ( ('f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
                     as
                     'boolean )
                  , bool
-                 , 'f )
+                 , 'f
+                 , 'f Snarky_backendless.Cvar.t )
                  Snarky_backendless.Typ.t
             -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
-            -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
+            -> ( 'fp
+               , 'a
+               , 'f
+               , 'f Snarky_backendless.Cvar.t )
+               Snarky_backendless.Typ.t
             -> ( ( 'c
                  , 'e Scalar_challenge.t
                  , 'fp
@@ -202,7 +223,8 @@ module Wrap : sig
                  , 'b Scalar_challenge.t Lookup.t option
                  , bool )
                  t
-               , 'f )
+               , 'f
+               , 'f Snarky_backendless.Cvar.t )
                Snarky_backendless.Typ.t
         end
 
@@ -344,7 +366,7 @@ module Wrap : sig
         [@@deriving sexp, compare, yojson, hash, equal]
 
         val typ :
-             (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+             'f Snarky_backendless.Snark.m
           -> dummy_scalar:'a
           -> dummy_scalar_challenge:'b Scalar_challenge.t
           -> challenge:
@@ -355,9 +377,18 @@ module Wrap : sig
                  , 'f )
                  Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
                snarky_typ
-          -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
+          -> scalar_challenge:
+               ( 'e
+               , 'b
+               , 'f
+               , 'f Snarky_backendless.Cvar.t )
+               Snarky_backendless.Typ.t
           -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
-          -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
+          -> ( 'fp
+             , 'a
+             , 'f
+             , 'f Snarky_backendless.Cvar.t )
+             Snarky_backendless.Typ.t
           -> ( 'g
              , 'h
              , 'f
@@ -400,7 +431,8 @@ module Wrap : sig
                  Vector.vec
                , 'h )
                Stable.Latest.t
-             , 'f )
+             , 'f
+             , 'f Snarky_backendless.Cvar.t )
              Snarky_backendless.Typ.t
       end
 
@@ -516,11 +548,12 @@ module Wrap : sig
            , (unit, 'c) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
            )
            snarky_typ
-        -> ('d, 'e, 'c) Snarky_backendless.Typ.t
+        -> ('d, 'e, 'c, 'c Snarky_backendless.Cvar.t) Snarky_backendless.Typ.t
         -> length:'f Nat.nat
         -> ( ('a, ('d, 'f) Vector.vec) t
            , ('b, ('e, 'f) Vector.vec) t
-           , 'c )
+           , 'c
+           , 'c Snarky_backendless.Cvar.t )
            Snarky_backendless.Typ.t
     end
 
@@ -574,7 +607,7 @@ module Wrap : sig
       [@@deriving sexp, compare, yojson, hash, equal]
 
       val typ :
-           (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+           'f Snarky_backendless.Snark.m
         -> dummy_scalar:'a
         -> dummy_scalar_challenge:'b Scalar_challenge.t
         -> challenge:
@@ -585,9 +618,10 @@ module Wrap : sig
                , 'f )
                Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
              snarky_typ
-        -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
+        -> scalar_challenge:
+             ('e, 'b, 'f, 'f Snarky_backendless.Cvar.t) Snarky_backendless.Typ.t
         -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
-        -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
+        -> ('fp, 'a, 'f, 'f Snarky_backendless.Cvar.t) Snarky_backendless.Typ.t
         -> ( 'g
            , 'h
            , 'f
@@ -645,7 +679,8 @@ module Wrap : sig
                Vector.vec
              , 'l )
              Stable.Latest.t
-           , 'f )
+           , 'f
+           , 'f Snarky_backendless.Cvar.t )
            Snarky_backendless.Typ.t
     end
 
@@ -688,8 +723,8 @@ module Wrap : sig
       -> 'f Core_kernel.Array.t
 
     val typ :
-         ('a, 'b, 'c) Snarky_backendless.Typ.t
-      -> ('d, 'e, 'c) Snarky_backendless.Typ.t
+         ('a, 'b, 'c, 'c Snarky_backendless.Cvar.t) Snarky_backendless.Typ.t
+      -> ('d, 'e, 'c, 'c Snarky_backendless.Cvar.t) Snarky_backendless.Typ.t
       -> ( 'f
          , 'g
          , 'c
@@ -705,7 +740,8 @@ module Wrap : sig
       -> 'j Nat.nat
       -> ( ('a, 'f, ('d, 'j) Vector.vec, 'h) t
          , ('b, 'g, ('e, 'j) Vector.vec, 'i) t
-         , 'c )
+         , 'c
+         , 'c Snarky_backendless.Cvar.t )
          Snarky_backendless.Typ.t
   end
 
@@ -1356,7 +1392,8 @@ module Step : sig
              , (Limb_vector.Constant.Hex64.t, Digest.Limbs.n) Vector.t
              , bool )
              In_circuit.t
-           , 'a )
+           , 'a
+           , 'a Snarky_backendless.Cvar.t )
            Snarky_backendless.Typ.t
     end
 
@@ -1449,7 +1486,8 @@ module Step : sig
              Vector.t
            , (Limb_vector.Constant.Hex64.t, Digest.Limbs.n) Vector.t )
            t
-         , 'f )
+         , 'f
+         , 'f Snarky_backendless.Cvar.t )
          Snarky_backendless.Typ.t
   end
 

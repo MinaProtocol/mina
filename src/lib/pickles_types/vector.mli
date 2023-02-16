@@ -96,13 +96,13 @@ module With_length (N : Nat_intf) : S with type 'a t = ('a, N.n) vec
 (** {1 Functions} *)
 
 val typ :
-     ('a, 'b, 'c) Snarky_backendless.Typ.t
+     ('a, 'b, 'c, 'field_var) Snarky_backendless.Typ.t
   -> 'd Nat.nat
-  -> (('a, 'd) vec, ('b, 'd) vec, 'c) Snarky_backendless.Typ.t
+  -> (('a, 'd) vec, ('b, 'd) vec, 'c, 'field_var) Snarky_backendless.Typ.t
 
 val typ' :
-     (('var, 'value, 'f) Snarky_backendless.Typ.t, 'n) t
-  -> (('var, 'n) t, ('value, 'n) t, 'f) Snarky_backendless.Typ.t
+     (('var, 'value, 'f, 'field_var) Snarky_backendless.Typ.t, 'n) t
+  -> (('var, 'n) t, ('value, 'n) t, 'f, 'field_var) Snarky_backendless.Typ.t
 
 val of_list : 'a list -> 'a e
 

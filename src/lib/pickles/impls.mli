@@ -33,7 +33,12 @@ module Step : sig
 
     val typ_unchecked : (t, Constant.t) Typ.t
 
-    val typ : (t, Constant.t, Internal_Basic.field) Snarky_backendless.Typ.t
+    val typ :
+      ( t
+      , Constant.t
+      , Internal_Basic.field
+      , Internal_Basic.field_var )
+      Snarky_backendless.Typ.t
   end
 
   val input :
@@ -145,7 +150,8 @@ module Wrap : sig
     val typ :
       ( Impl.Field.t
       , Backend.Tick.Field.t
-      , Wrap_impl.Internal_Basic.Field.t )
+      , Wrap_impl.Internal_Basic.Field.t
+      , Wrap_impl.Internal_Basic.field_var )
       Snarky_backendless.Typ.t
   end
 

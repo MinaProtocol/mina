@@ -29,8 +29,12 @@ module One_hot : sig
   val to_input : zero:'a -> one:'a -> t -> 'a Random_oracle_input.Chunked.t
 
   val typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-    -> ('f Checked.t, t, 'f) Snarky_backendless.Typ.t
+       'f Snarky_backendless.Snark.m
+    -> ( 'f Checked.t
+       , t
+       , 'f
+       , 'f Snarky_backendless.Cvar.t )
+       Snarky_backendless.Typ.t
 end
 
 type 'f boolean = 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
@@ -47,10 +51,11 @@ module Prefix_mask : sig
   val back : bool vec2 -> t
 
   val typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+       'f Snarky_backendless.Snark.m
     -> ( 'f Checked.t
        , t
        , 'f
+       , 'f Snarky_backendless.Cvar.t
        , (unit, 'f) Snarky_backendless.Checked_runner.Simple.t )
        Snarky_backendless__.Types.Typ.t
 end

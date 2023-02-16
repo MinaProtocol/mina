@@ -92,8 +92,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       }
     [@@deriving hlist]
 
-    let pack (type f)
-        (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
+    let pack (type f) ((module Impl) : f Snarky_backendless.Snark.m)
         ({ proofs_verified_mask; domain_log2 } : f t) : Impl.Field.t =
       let open Impl.Field in
       let four = of_int 4 in
@@ -101,14 +100,12 @@ module Make_str (A : Wire_types.Concrete) = struct
       + pack (Pickles_types.Vector.to_list proofs_verified_mask)
   end
 
-  let packed_typ (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) =
+  let packed_typ (type f) ((module Impl) : f Snarky_backendless.Snark.m) =
     Impl.Typ.transport Impl.Typ.field
       ~there:(pack (module Impl))
       ~back:(unpack (module Impl))
 
-  let typ (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
+  let typ (type f) ((module Impl) : f Snarky_backendless.Snark.m)
       ~(* We actually only need it to be less than 252 bits in order to pack
           the whole branch_data struct safely, but it's cheapest to check that it's
           under 16 bits *)

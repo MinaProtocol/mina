@@ -19,8 +19,9 @@ val unpack : 'a -> 'a t
 val map : 'a t -> f:('a -> 'b) -> 'b t
 
 val typ :
-     ('a, 'b, 'c) Snarky_backendless.Typ.t
+     ('a, 'b, 'c, 'd) Snarky_backendless.Typ.t
   -> ( 'a Kimchi_backend_common.Scalar_challenge.t t
      , 'b Kimchi_backend_common.Scalar_challenge.t t
-     , 'c )
+     , 'c
+     , 'd )
      Snarky_backendless.Typ.t

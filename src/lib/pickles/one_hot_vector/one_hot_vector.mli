@@ -12,7 +12,7 @@ module T (Impl : Snarky_backendless.Snark_intf.Run) : sig
   type nonrec 'n t = (Impl.field, 'n) t
 end
 
-module Make (Impl : Snarky_backendless.Snark_intf.Run) : sig
+module Make (Impl : Snarky_backendless.Snark_intf.Run_with_cvar) : sig
   open Impl
   module Constant = Constant
 

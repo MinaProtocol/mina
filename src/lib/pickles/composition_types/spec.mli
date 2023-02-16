@@ -1,4 +1,4 @@
-type 'f impl = (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+type 'f impl = 'f Snarky_backendless.Snark.m
 
 type (_, _, _) basic =
   | Unit : (unit, unit, < .. >) basic
@@ -86,6 +86,7 @@ val typ :
   -> ( 'b
      , 'c
      , 'a
+     , 'a Snarky_backendless.Cvar.t
      , (unit, 'a) Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
      Snarky_backendless.Types.Typ.t
   -> ( 'd
@@ -113,12 +114,16 @@ val typ :
        ; field2 : 'b
        ; .. > )
      T.t
-  -> ('e, 'd, 'a) Snarky_backendless.Typ.t
+  -> ('e, 'd, 'a, 'a Snarky_backendless.Cvar.t) Snarky_backendless.Typ.t
 
 module ETyp : sig
   type ('var, 'value, 'f) t =
     | T :
-        ('inner, 'value, 'f) Snarky_backendless.Typ.t
+        ( 'inner
+        , 'value
+        , 'f
+        , 'f Snarky_backendless.Cvar.t )
+        Snarky_backendless.Typ.t
         * ('inner -> 'var)
         * ('var -> 'inner)
         -> ('var, 'value, 'f) t

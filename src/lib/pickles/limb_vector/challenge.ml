@@ -5,7 +5,7 @@ type 'f t = 'f Snarky_backendless.Cvar.t
 module Constant = Constant.Make (Nat.N2)
 
 module type S = sig
-  module Impl : Snarky_backendless.Snark_intf.Run
+  module Impl : Snarky_backendless.Snark_intf.Run_with_cvar
 
   open Impl
 
@@ -26,6 +26,6 @@ module type S = sig
   val length : int
 end
 
-module Make (Impl : Snarky_backendless.Snark_intf.Run) :
+module Make (Impl : Snarky_backendless.Snark_intf.Run_with_cvar) :
   S with module Impl := Impl =
   Make.T (Impl) (Nat.N2)

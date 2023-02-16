@@ -7,7 +7,7 @@ module type Field = sig
 end
 
 module Make
-    (Impl : Snarky_backendless.Snark_intf.Run) (B : sig
+    (Impl : Snarky_backendless.Snark_intf.Run_with_cvar) (B : sig
       open Impl
 
       val params : field Sponge.Params.t

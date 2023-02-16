@@ -90,8 +90,7 @@ module Prefix_mask = struct
     | [ true; false ] ->
         invalid_arg "Prefix_mask.back: invalid mask [false; true]"
 
-  let typ (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) :
+  let typ (type f) ((module Impl) : f Snarky_backendless.Snark.m) :
       (f Checked.t, proofs_verified) Impl.Typ.t =
     let open Impl in
     Typ.transport
@@ -134,8 +133,7 @@ module One_hot = struct
     in
     Random_oracle_input.Chunked.packeds (Array.map one_hot ~f:(fun b -> (b, 1)))
 
-  let typ (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) :
+  let typ (type f) ((module Impl) : f Snarky_backendless.Snark.m) :
       (f Checked.t, proofs_verified) Impl.Typ.t =
     let module M = One_hot_vector.Make (Impl) in
     let open Impl in

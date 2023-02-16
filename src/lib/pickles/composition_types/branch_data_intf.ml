@@ -31,19 +31,25 @@ module type S = sig
       }
 
     val pack :
-         (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-      -> 'f t
-      -> 'f Snarky_backendless.Cvar.t
+      'f Snarky_backendless.Snark.m -> 'f t -> 'f Snarky_backendless.Cvar.t
   end
 
   val typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+       'f Snarky_backendless.Snark.m
     -> assert_16_bits:('f Snarky_backendless.Cvar.t -> unit)
-    -> ('f Checked.t, t, 'f) Snarky_backendless.Typ.t
+    -> ( 'f Checked.t
+       , t
+       , 'f
+       , 'f Snarky_backendless.Cvar.t )
+       Snarky_backendless.Typ.t
 
   val packed_typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-    -> ('f Snarky_backendless.Cvar.t, t, 'f) Snarky_backendless.Typ.t
+       'f Snarky_backendless.Snark.m
+    -> ( 'f Snarky_backendless.Cvar.t
+       , t
+       , 'f
+       , 'f Snarky_backendless.Cvar.t )
+       Snarky_backendless.Typ.t
 
   val length_in_bits : int
 

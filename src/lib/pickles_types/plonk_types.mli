@@ -26,21 +26,29 @@ module Opt : sig
   end
 
   val constant_layout_typ :
-       ('b, bool, 'f) Snarky_backendless.Typ.t
+       ('b, bool, 'f, 'f Snarky_backendless.Cvar.t) Snarky_backendless.Typ.t
     -> true_:'b
     -> false_:'b
     -> Flag.t
-    -> ('a_var, 'a, 'f) Snarky_backendless.Typ.t
+    -> ('a_var, 'a, 'f, 'f Snarky_backendless.Cvar.t) Snarky_backendless.Typ.t
     -> dummy:'a
     -> dummy_var:'a_var
-    -> (('a_var, 'b) t, 'a option, 'f) Snarky_backendless.Typ.t
+    -> ( ('a_var, 'b) t
+       , 'a option
+       , 'f
+       , 'f Snarky_backendless.Cvar.t )
+       Snarky_backendless.Typ.t
 
   val typ :
-       ('b, bool, 'f) Snarky_backendless.Typ.t
+       ('b, bool, 'f, 'f Snarky_backendless.Cvar.t) Snarky_backendless.Typ.t
     -> Flag.t
-    -> ('a_var, 'a, 'f) Snarky_backendless.Typ.t
+    -> ('a_var, 'a, 'f, 'f Snarky_backendless.Cvar.t) Snarky_backendless.Typ.t
     -> dummy:'a
-    -> (('a_var, 'b) t, 'a option, 'f) Snarky_backendless.Typ.t
+    -> ( ('a_var, 'b) t
+       , 'a option
+       , 'f
+       , 'f Snarky_backendless.Cvar.t )
+       Snarky_backendless.Typ.t
 
   (** A sequence that should be considered to have stopped at
        the first occurence of {!Flag.No} *)
@@ -93,9 +101,13 @@ module Features : sig
     -> 'a t
 
   val typ :
-       ('var, bool, 'f) Snarky_backendless.Typ.t
+       ('var, bool, 'f, 'f Snarky_backendless.Cvar.t) Snarky_backendless.Typ.t
     -> feature_flags:options
-    -> ('var t, bool t, 'f) Snarky_backendless.Typ.t
+    -> ( 'var t
+       , bool t
+       , 'f
+       , 'f Snarky_backendless.Cvar.t )
+       Snarky_backendless.Typ.t
 
   val none : options
 
@@ -177,17 +189,19 @@ module Messages : sig
   end
 
   val typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-    -> ('a, 'b, 'f) Snarky_backendless.Typ.t
+       'f Snarky_backendless.Snark.m
+    -> ('a, 'b, 'f, 'f Snarky_backendless.Cvar.t) Snarky_backendless.Typ.t
     -> Opt.Flag.t Features.t
     -> dummy:'b
     -> commitment_lengths:((int, 'n) Vector.vec, int, int) Poly.t
-    -> bool:('c, bool, 'f) Snarky_backendless.Typ.t
+    -> bool:
+         ('c, bool, 'f, 'f Snarky_backendless.Cvar.t) Snarky_backendless.Typ.t
     -> ( ( 'a
          , 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )
          In_circuit.t
        , 'b t
-       , 'f )
+       , 'f
+       , 'f Snarky_backendless.Cvar.t )
        Snarky_backendless.Typ.t
 end
 
@@ -280,15 +294,17 @@ module Openings : sig
          ( 'a
          , 'b
          , 'c
+         , 'field_var
          , (unit, 'c) Snarky_backendless.Checked_runner.Simple.t )
          Snarky_backendless.Types.Typ.typ
       -> ( 'd
          , 'e
          , 'c
+         , 'field_var
          , (unit, 'c) Snarky_backendless.Checked_runner.Simple.t )
          Snarky_backendless.Types.Typ.typ
       -> length:int
-      -> (('d, 'a) t, ('e, 'b) t, 'c) Snarky_backendless.Typ.t
+      -> (('d, 'a) t, ('e, 'b) t, 'c, 'field_var) Snarky_backendless.Typ.t
   end
 
   module Stable : sig
@@ -362,7 +378,7 @@ module All_evals : sig
   val map : ('a, 'b) t -> f1:('a -> 'c) -> f2:('b -> 'd) -> ('c, 'd) t
 
   val typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+       'f Snarky_backendless.Snark.m
     -> Opt.Flag.t Features.t
     -> ( ( 'f Snarky_backendless.Cvar.t
          , 'f Snarky_backendless.Cvar.t array
@@ -370,6 +386,7 @@ module All_evals : sig
          In_circuit.t
        , ('f, 'f array) t
        , 'f
+       , 'f Snarky_backendless.Cvar.t
        , (unit, 'f) Snarky_backendless.Checked_runner.Simple.t )
        Snarky_backendless.Types.Typ.typ
 end

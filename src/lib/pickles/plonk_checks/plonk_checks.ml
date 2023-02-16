@@ -566,10 +566,9 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     but we deferred the arithmetic checks until here
     so that we have the efficiency of the native field.
   *)
-  let checked (type t)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = t)
-      ~shift ~env ~feature_flags
-      (plonk : (_, _, _, _ Opt.t, _ Opt.t, _) In_circuit.t) evals =
+  let checked (type t) ((module Impl) : t Snarky_backendless.Snark.m) ~shift
+      ~env ~feature_flags (plonk : (_, _, _, _ Opt.t, _ Opt.t, _) In_circuit.t)
+      evals =
     let actual =
       derive_plonk ~with_label:Impl.with_label
         (module Impl.Field)

@@ -337,9 +337,9 @@ module With_length (N : Nat.Intf) = struct
 end
 
 let rec typ' :
-    type f var value n.
-       ((var, value, f) Snarky_backendless.Typ.t, n) t
-    -> ((var, n) t, (value, n) t, f) Snarky_backendless.Typ.t =
+    type f f_var var value n.
+       ((var, value, f, f_var) Snarky_backendless.Typ.t, n) t
+    -> ((var, n) t, (value, n) t, f, f_var) Snarky_backendless.Typ.t =
   let open Snarky_backendless.Typ in
   fun elts ->
     match elts with

@@ -305,9 +305,8 @@ module Wrap = struct
                 ; opt_spec f12
                 ]
 
-            let typ (type f fp)
-                (module Impl : Snarky_backendless.Snark_intf.Run
-                  with type field = f ) (fp : (fp, _) Impl.Typ.t) ~dummy_scalar
+            let typ (type f fp) ((module Impl) : f Snarky_backendless.Snark.m)
+                (fp : (fp, _) Impl.Typ.t) ~dummy_scalar
                 (feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
                 =
               let opt_typ flag =
@@ -392,11 +391,10 @@ module Wrap = struct
                   t.optional_column_scalars
             }
 
-          let typ (type f fp)
-              (module Impl : Snarky_backendless.Snark_intf.Run
-                with type field = f ) ~dummy_scalar ~dummy_scalar_challenge
-              ~challenge ~scalar_challenge ~bool ~feature_flags
-              (fp : (fp, _, f) Snarky_backendless.Typ.t) =
+          let typ (type f fp) ((module Impl) : f Snarky_backendless.Snark.m)
+              ~dummy_scalar ~dummy_scalar_challenge ~challenge ~scalar_challenge
+              ~bool ~feature_flags (fp : (fp, _, f, _) Snarky_backendless.Typ.t)
+              =
             Snarky_backendless.Typ.of_hlistable
               [ Scalar_challenge.typ scalar_challenge
               ; challenge
@@ -569,10 +567,9 @@ module Wrap = struct
         let to_hlist, of_hlist = (to_hlist, of_hlist)
 
         let typ (type f fp)
-            ((module Impl) as impl :
-              (module Snarky_backendless.Snark_intf.Run with type field = f) )
-            ~dummy_scalar ~dummy_scalar_challenge ~challenge ~scalar_challenge
-            ~feature_flags (fp : (fp, _, f) Snarky_backendless.Typ.t) index =
+            ((module Impl) as impl : f Snarky_backendless.Snark.m) ~dummy_scalar
+            ~dummy_scalar_challenge ~challenge ~scalar_challenge ~feature_flags
+            (fp : (fp, _, f, _) Snarky_backendless.Typ.t) index =
           Snarky_backendless.Typ.of_hlistable
             [ Plonk.In_circuit.typ impl ~dummy_scalar ~dummy_scalar_challenge
                 ~challenge ~scalar_challenge ~bool:Impl.Boolean.typ
@@ -715,10 +712,9 @@ module Wrap = struct
 
       let to_hlist, of_hlist = (to_hlist, of_hlist)
 
-      let typ (type f fp)
-          (impl : (module Snarky_backendless.Snark_intf.Run with type field = f))
+      let typ (type f fp) ((module Impl) as impl : f Snarky_backendless.Snark.m)
           ~dummy_scalar ~dummy_scalar_challenge ~challenge ~scalar_challenge
-          ~feature_flags (fp : (fp, _, f) Snarky_backendless.Typ.t)
+          ~feature_flags (fp : (fp, _, f, _) Snarky_backendless.Typ.t)
           messages_for_next_wrap_proof digest index =
         Snarky_backendless.Typ.of_hlistable
           [ Deferred_values.In_circuit.typ impl ~dummy_scalar
@@ -1521,13 +1517,13 @@ module Step = struct
         }
     end
 
-    let typ (type n f)
-        ( (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-        as impl ) zero ~assert_16_bits
+    let typ (type n f) ((module Impl) as impl : f Snarky_backendless.Snark.m)
+        zero ~assert_16_bits
         (proofs_verified :
           (Plonk_types.Opt.Flag.t Plonk_types.Features.t, n) Vector.t ) fq :
         ( ((_, _) Vector.t, _) t
         , ((_, _) Vector.t, _) t
+        , _
         , _ )
         Snarky_backendless.Typ.t =
       let per_proof feature_flags =

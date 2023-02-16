@@ -31,7 +31,8 @@ module Other_field : sig
   val typ :
     ( t
     , Impls.Step.Other_field.Constant.t
-    , Impls.Step.Internal_Basic.field )
+    , Impls.Step.Internal_Basic.field
+    , Impls.Step.Internal_Basic.field_var )
     Snarky_backendless.Typ.t
 end
 

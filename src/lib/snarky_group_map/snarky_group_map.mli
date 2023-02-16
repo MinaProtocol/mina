@@ -23,8 +23,5 @@ module Checked : sig
     -> ('input -> 'f Cvar.t * 'f Cvar.t) Core_kernel.Staged.t
 
   val to_group :
-       (module Snark_intf.Run with type field = 'f)
-    -> params:'f Params.t
-    -> 'f Cvar.t
-    -> 'f Cvar.t * 'f Cvar.t
+    'f Snark.m -> params:'f Params.t -> 'f Cvar.t -> 'f Cvar.t * 'f Cvar.t
 end

@@ -129,7 +129,7 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (Sc : Scalars.S) : s
        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
 
   val checked :
-       (module Snarky_backendless.Snark_intf.Run with type field = 't)
+       't Snarky_backendless.Snark.m
     -> shift:'t Snarky_backendless.Cvar.t Shifted_value.Shift.t
     -> env:'t Snarky_backendless.Cvar.t Scalars.Env.t
     -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t

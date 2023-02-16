@@ -160,17 +160,29 @@ module H1 = struct
 
   module Typ (Impl : sig
     type field
+
+    type field_var
   end)
   (F : T1)
   (Var : T1)
   (Val : T1) (C : sig
-    val f : 'a F.t -> ('a Var.t, 'a Val.t, Impl.field) Snarky_backendless.Typ.t
+    val f :
+         'a F.t
+      -> ( 'a Var.t
+         , 'a Val.t
+         , Impl.field
+         , Impl.field_var )
+         Snarky_backendless.Typ.t
   end) =
   struct
     let rec f :
         type xs.
            xs T(F).t
-        -> (xs T(Var).t, xs T(Val).t, Impl.field) Snarky_backendless.Typ.t =
+        -> ( xs T(Var).t
+           , xs T(Val).t
+           , Impl.field
+           , Impl.field_var )
+           Snarky_backendless.Typ.t =
       let transport, transport_var, tuple2, unit =
         Snarky_backendless.Typ.(transport, transport_var, tuple2, unit)
       in
@@ -243,8 +255,11 @@ module H2 = struct
   module Typ (Impl : sig
     type field
 
+    type field_var
+
     module Typ : sig
-      type ('var, 'value) t = ('var, 'value, field) Snarky_backendless.Typ.t
+      type ('var, 'value) t =
+        ('var, 'value, field, field_var) Snarky_backendless.Typ.t
     end
   end) =
   struct
@@ -256,7 +271,8 @@ module H2 = struct
            (vars, values) T(Impl.Typ).t
         -> ( vars H1.T(Id).t
            , values H1.T(Id).t
-           , Impl.field )
+           , Impl.field
+           , Impl.field_var )
            Snarky_backendless.Typ.t =
      fun ts ->
       match ts with
@@ -680,6 +696,8 @@ module H4 = struct
 
   module Typ (Impl : sig
     type field
+
+    type field_var
   end)
   (F : T4)
   (Var : T3)
@@ -688,7 +706,8 @@ module H4 = struct
          ('var, 'value, 'n1, 'n2) F.t
       -> ( ('var, 'n1, 'n2) Var.t
          , ('value, 'n1, 'n2) Val.t
-         , Impl.field )
+         , Impl.field
+         , Impl.field_var )
          Snarky_backendless.Typ.t
   end) =
   struct
@@ -700,7 +719,8 @@ module H4 = struct
            (vars, values, ns1, ns2) T(F).t
         -> ( (vars, ns1, ns2) H3.T(Var).t
            , (values, ns1, ns2) H3.T(Val).t
-           , Impl.field )
+           , Impl.field
+           , Impl.field_var )
            Snarky_backendless.Typ.t =
      fun ts ->
       match ts with
@@ -824,6 +844,8 @@ module H6 = struct
 
   module Typ (Impl : sig
     type field
+
+    type field_var
   end)
   (F : T6)
   (Var : T4)
@@ -832,7 +854,8 @@ module H6 = struct
          ('var, 'value, 'ret_var, 'ret_value, 'n1, 'n2) F.t
       -> ( ('var, 'ret_var, 'n1, 'n2) Var.t
          , ('value, 'ret_value, 'n1, 'n2) Val.t
-         , Impl.field )
+         , Impl.field
+         , Impl.field_var )
          Snarky_backendless.Typ.t
   end) =
   struct
@@ -844,7 +867,8 @@ module H6 = struct
            (vars, values, ret_vars, ret_values, ns1, ns2) T(F).t
         -> ( (vars, ret_vars, ns1, ns2) H4.T(Var).t
            , (values, ret_values, ns1, ns2) H4.T(Val).t
-           , Impl.field )
+           , Impl.field
+           , Impl.field_var )
            Snarky_backendless.Typ.t =
      fun ts ->
       match ts with

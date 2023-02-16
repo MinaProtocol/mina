@@ -1,6 +1,6 @@
 (* Pseudo *)
 
-module Make (Impl : Snarky_backendless.Snark_intf.Run) : sig
+module Make (Impl : Snarky_backendless.Snark_intf.Run_with_cvar) : sig
   type ('a, 'n) t =
     'n One_hot_vector.T(Impl).t * ('a, 'n) Pickles_types.Vector.t
 

@@ -68,8 +68,8 @@ module Opt = struct
 
   open Snarky_backendless
 
-  let some_typ (type a a_var f bool_var) (t : (a_var, a, f) Typ.t) :
-      ((a_var, bool_var) t, a option, f) Typ.t =
+  let some_typ (type a a_var f bool_var) (t : (a_var, a, f, _) Typ.t) :
+      ((a_var, bool_var) t, a option, f, _) Typ.t =
     Typ.transport t ~there:(fun x -> Option.value_exn x) ~back:Option.return
     |> Typ.transport_var
          ~there:(function
@@ -79,7 +79,8 @@ module Opt = struct
                failwith "Opt.some_typ: expected Some" )
          ~back:(fun x -> Some x)
 
-  let none_typ (type a a_var f bool) () : ((a_var, bool) t, a option, f) Typ.t =
+  let none_typ (type a a_var f bool) () :
+      ((a_var, bool) t, a option, f, _) Typ.t =
     Typ.transport (Typ.unit ())
       ~there:(fun _ -> ())
       ~back:(fun () : _ Option.t -> None)
@@ -92,8 +93,9 @@ module Opt = struct
          ~back:(fun () : _ t -> None)
 
   let maybe_typ (type a a_var bool_var f)
-      (bool_typ : (bool_var, bool, f) Snarky_backendless.Typ.t) ~(dummy : a)
-      (a_typ : (a_var, a, f) Typ.t) : ((a_var, bool_var) t, a option, f) Typ.t =
+      (bool_typ : (bool_var, bool, f, _) Snarky_backendless.Typ.t) ~(dummy : a)
+      (a_typ : (a_var, a, f, _) Typ.t) :
+      ((a_var, bool_var) t, a option, f, _) Typ.t =
     Typ.transport
       (Typ.tuple2 bool_typ a_typ)
       ~there:(fun (t : a option) ->
@@ -109,7 +111,7 @@ module Opt = struct
          ~back:(fun (b, x) -> Maybe (b, x))
 
   let constant_layout_typ (type a a_var f) (bool_typ : _ Typ.t) ~true_ ~false_
-      (flag : Flag.t) (a_typ : (a_var, a, f) Typ.t) ~(dummy : a)
+      (flag : Flag.t) (a_typ : (a_var, a, f, _) Typ.t) ~(dummy : a)
       ~(dummy_var : a_var) =
     let (Typ bool_typ) = bool_typ in
     let bool_typ : _ Typ.t =
@@ -141,7 +143,7 @@ module Opt = struct
            match flag with No -> None | Yes -> Some x | Maybe -> Maybe (b, x) )
 
   let typ (type a a_var f) bool_typ (flag : Flag.t)
-      (a_typ : (a_var, a, f) Typ.t) ~(dummy : a) =
+      (a_typ : (a_var, a, f, _) Typ.t) ~(dummy : a) =
     match flag with
     | Yes ->
         some_typ a_typ
@@ -259,7 +261,7 @@ module Features = struct
         } =
     (* TODO: This should come from snarky. *)
     let constant (type var value)
-        (typ : (var, value, _) Snarky_backendless.Typ.t) (x : value) : var =
+        (typ : (var, value, _, _) Snarky_backendless.Typ.t) (x : value) : var =
       let (Typ typ) = typ in
       let fields, aux = typ.value_to_fields x in
       let fields =
@@ -614,11 +616,13 @@ module Evals = struct
         @ [ lookup.aggreg; lookup.table ]
         @ Option.to_list lookup.runtime
 
-  let typ (type f a_var a)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-      ~dummy e lookup_config :
-      ((a_var, Impl.Boolean.var) In_circuit.t, a t, f) Snarky_backendless.Typ.t
-      =
+  let typ (type f a_var a) ((module Impl) : f Snarky_backendless.Snark.m) ~dummy
+      e lookup_config :
+      ( (a_var, Impl.Boolean.var) In_circuit.t
+      , a t
+      , f
+      , _ )
+      Snarky_backendless.Typ.t =
     let open Impl in
     let lookup_typ = Lookup.opt_typ Impl.Boolean.typ lookup_config e ~dummy in
     Typ.of_hlistable
@@ -700,9 +704,8 @@ module All_evals = struct
     ; ft_eval1 = f1 t.ft_eval1
     }
 
-  let typ (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-      lookup_config =
+  let typ (type f) ((module Impl) : f Snarky_backendless.Snark.m) lookup_config
+      =
     let open Impl.Typ in
     let single = array ~length:1 field in
     let evals =
@@ -768,10 +771,11 @@ module Poly_comm = struct
     let padded_array_typ0 = padded_array_typ
 
     let typ (type f g g_var bool_var)
-        (g : (g_var, g, f) Snarky_backendless.Typ.t) ~length
+        (g : (g_var, g, f, _) Snarky_backendless.Typ.t) ~length
         ~dummy_group_element
-        ~(bool : (bool_var, bool, f) Snarky_backendless.Typ.t) :
-        ((bool_var * g_var) t, g Or_infinity.t t, f) Snarky_backendless.Typ.t =
+        ~(bool : (bool_var, bool, f, _) Snarky_backendless.Typ.t) :
+        ((bool_var * g_var) t, g Or_infinity.t t, f, _) Snarky_backendless.Typ.t
+        =
       let open Snarky_backendless.Typ in
       let g_inf =
         transport (tuple2 bool g)
@@ -869,8 +873,7 @@ module Messages = struct
     [@@deriving hlist, fields]
   end
 
-  let typ (type n f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) g
+  let typ (type n f) ((module Impl) : f Snarky_backendless.Snark.m) g
       ({ lookup; runtime_tables; _ } : Opt.Flag.t Features.t) ~dummy
       ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t) ~bool
       =
