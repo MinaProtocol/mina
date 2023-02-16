@@ -708,7 +708,7 @@ module Transactions_ordered = struct
               List.fold ~init:([], [], target_first_pass_ledger)
                 txns_with_witnesses
                 ~f:(fun
-                     (first_pass_txns, second_pass_txns, old_root)
+                     (first_pass_txns, second_pass_txns, _old_root)
                      (txn_with_witness : Transaction_with_witness.t)
                    ->
                   let txn =
@@ -724,7 +724,7 @@ module Transactions_ordered = struct
                   | Command (User_command.Signed_command _) ->
                       ( txn_with_witness :: first_pass_txns
                       , second_pass_txns
-                      , old_root )
+                      , target_first_pass_ledger )
                   | Command (Zkapp_command _) ->
                       ( txn_with_witness :: first_pass_txns
                       , txn_with_witness :: second_pass_txns
@@ -842,10 +842,26 @@ let staged_transactions_with_state_hash t =
   List.map pending_transactions_per_block
     ~f:(Transactions_ordered.map ~f:extract_txn_and_global_slot)
 
+type txn_display =
+  Mina_transaction_logic.Transaction_applied.t
+  * Ledger_hash.t Transaction_snark.Statement.Statement_ledgers.t
+  * Mina_numbers.Global_slot.t
+[@@deriving sexp, to_yojson]
+
+let to_txn_display (t : Transaction_with_witness.t list) : txn_display list =
+  List.map t ~f:(fun t ->
+      ( t.transaction_with_info
+      , Transaction_snark.Statement.Statement_ledgers.of_statement t.statement
+      , t.block_global_slot ) )
+
 (* written in continuation passing style so that implementation can be used both sync and async *)
-let apply_ordered_txns_stepwise ordered_txns ~ledger ~get_protocol_state
-    ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger =
+let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
+    ~ledger ~get_protocol_state ~apply_first_pass ~apply_second_pass
+    ~apply_first_pass_sparse_ledger =
   let open Or_error.Let_syntax in
+  let first_pass_ledger_target (txn : Transaction_with_witness.t) =
+    txn.statement.target.first_pass_ledger
+  in
   let apply ~apply ~ledger t state_hash block_global_slot =
     match get_protocol_state state_hash with
     | Ok state ->
@@ -873,6 +889,10 @@ let apply_ordered_txns_stepwise ordered_txns ~ledger ~get_protocol_state
           apply ~apply:apply_first_pass ~ledger transaction.data state_hash
             block_global_slot
         in
+        assert (
+          Ledger_hash.equal
+            (Ledger.merkle_root ledger)
+            (first_pass_ledger_target txn) ) ;
         `Continue
           (fun () ->
             apply_txns_first_pass
@@ -885,6 +905,9 @@ let apply_ordered_txns_stepwise ordered_txns ~ledger ~get_protocol_state
         k ()
     | (expected_status, partially_applied_txn) :: partially_applied_txns' ->
         let%bind res = apply_second_pass ledger partially_applied_txn in
+        Core.printf
+          !"applying SP Second pass_ledger : %{sexp: Ledger_hash.t} \n%!"
+          (Ledger.merkle_root ledger) ;
         let status = Ledger.Transaction_applied.transaction_status res in
         if Transaction_status.equal expected_status status then
           Ok
@@ -899,9 +922,15 @@ let apply_ordered_txns_stepwise ordered_txns ~ledger ~get_protocol_state
             expected_status status
             (Ledger.Transaction_partially_applied.command partially_applied_txn)
   in
-  let apply_previous_incomplete_txns ~k txns =
+  let apply_previous_incomplete_txns ~k
+      (txns :
+        [ `Unapplied of Transaction_with_witness.t list
+        | `Partially_applied of
+          (Transaction_status.t * Ledger.Transaction_partially_applied.t) list
+        ] ) =
     (*Note: Previous incomplete transactions refer to the block's transactions from previous scan state tree that were split between the two trees.
       The set in the previous tree have gone through the first pass. For the second pass that is to happen after the rest of the set goes through the first pass, we need partially applied state - result of previous tree's transactions' first pass. To generate the partial state, we do a a first pass application of previous tree's transaction on a sparse ledger created from witnesses stored in the scan state and then use it to apply to the ledger here*)
+    Core.printf !"applying previous\n%!" ;
     let inject_ledger_info partially_applied_txn =
       let open Sparse_ledger.T.Transaction_partially_applied in
       match partially_applied_txn with
@@ -992,26 +1021,80 @@ let apply_ordered_txns_stepwise ordered_txns ~ledger ~get_protocol_state
                 ~acc:((expected_status, partially_applied_txn') :: acc)
                 ~k txns' )
     in
-    apply_txns_to_witnesses_first_pass txns ~k:(fun partially_applied_txns ->
-        apply_txns_second_pass partially_applied_txns ~k )
+    match txns with
+    | `Unapplied txns ->
+        apply_txns_to_witnesses_first_pass txns
+          ~k:(fun partially_applied_txns ->
+            apply_txns_second_pass partially_applied_txns ~k )
+    | `Partially_applied partially_applied_txns ->
+        apply_txns_second_pass partially_applied_txns ~k
   in
   let rec apply_txns previous_incomplete
       (ordered_txns : _ Transactions_ordered.Poly.t list) =
     match ordered_txns with
     | [] ->
-        Ok (`Complete (Ledger.merkle_root ledger))
-    | txns_per_block :: ordered_txns' ->
+        apply_previous_incomplete_txns previous_incomplete ~k:(fun () ->
+            Ok (`Complete (Ledger.merkle_root ledger)) )
+    | [ txns_per_block ] when stop_at_first_pass ->
+        (*Last block; don't apply second pass. This is for snarked ledgers which are first pass ledgers*)
+        Core.printf
+          !"processing txns per block %{sexp: Transactions_ordered.display}\n%!"
+          (Transactions_ordered.to_display txns_per_block) ;
         apply_txns_first_pass txns_per_block.first_pass
+          ~k:(fun _partially_applied_txns ->
+            (*Apply second pass of previous tree's transactions, if any*)
+            apply_previous_incomplete_txns previous_incomplete ~k:(fun () ->
+                apply_txns (`Unapplied []) [] ) )
+    | txns_per_block :: ordered_txns' ->
+        Core.printf
+          !"processing txns per block %{sexp: Transactions_ordered.display}\n%!"
+          (Transactions_ordered.to_display txns_per_block) ;
+        (*Apply first pass of a blocks transactions either new or continued from previous tree*)
+        (*apply_txns_first_pass txns_per_block.first_pass
           ~k:(fun partially_applied_txns ->
+            (*Apply second pass from previous tree's transactions, if any*)
             apply_previous_incomplete_txns previous_incomplete ~k:(fun () ->
                 apply_txns_second_pass partially_applied_txns ~k:(fun () ->
-                    apply_txns txns_per_block.current_incomplete ordered_txns' ) ) )
+                      apply_txns (`Unapplied txns_per_block.current_incomplete) ordered_txns' )) )*)
+        apply_txns_first_pass txns_per_block.first_pass
+          ~k:(fun partially_applied_txns ->
+            (*Apply second pass of previous tree's transactions, if any*)
+            apply_previous_incomplete_txns previous_incomplete ~k:(fun () ->
+                (*if this block is at the border of a tree and has transactions for the same block in the next tree then apply after first pass application of the remaining transactions in the next tree before second pass applications of txns in this tree*)
+                let continue_previous_tree's_txns =
+                  (* If this is a continuation from previous tree for the same block (incomplete txns in both sets) then do second pass now*)
+                  let previous_not_empty =
+                    match previous_incomplete with
+                    | `Unapplied txns ->
+                        not (List.is_empty txns)
+                    | `Partially_applied txns ->
+                        not (List.is_empty txns)
+                  in
+                  previous_not_empty
+                  && not (List.is_empty txns_per_block.current_incomplete)
+                in
+                let do_second_pass =
+                  (not (List.is_empty txns_per_block.second_pass))
+                  || continue_previous_tree's_txns
+                in
+                if do_second_pass then
+                  apply_txns_second_pass partially_applied_txns ~k:(fun () ->
+                      apply_txns (`Unapplied []) ordered_txns' )
+                else
+                  apply_txns (`Partially_applied partially_applied_txns)
+                    ordered_txns' ) )
   in
+  let previous_incomplete =
+    (*`Unapplied []*)
+    Option.value_map (List.hd ordered_txns) ~default:(`Unapplied [])
+      ~f:(fun (first_block : Transactions_ordered.t) ->
+        `Unapplied first_block.previous_incomplete )
+  in
+  apply_txns previous_incomplete ordered_txns
 
-  apply_txns [] ordered_txns
-
-let apply_ordered_txns_sync ordered_txns ~ledger ~get_protocol_state
-    ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger =
+let apply_ordered_txns_sync ?stop_at_first_pass ordered_txns ~ledger
+    ~get_protocol_state ~apply_first_pass ~apply_second_pass
+    ~apply_first_pass_sparse_ledger =
   let rec run = function
     | Ok (`Continue k) ->
         run (k ())
@@ -1021,12 +1104,13 @@ let apply_ordered_txns_sync ordered_txns ~ledger ~get_protocol_state
         Error err
   in
   run
-  @@ apply_ordered_txns_stepwise ordered_txns ~ledger ~get_protocol_state
-       ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger
+  @@ apply_ordered_txns_stepwise ?stop_at_first_pass ordered_txns ~ledger
+       ~get_protocol_state ~apply_first_pass ~apply_second_pass
+       ~apply_first_pass_sparse_ledger
 
-let apply_ordered_txns_async ordered_txns ?(async_batch_size = 10) ~ledger
-    ~get_protocol_state ~apply_first_pass ~apply_second_pass
-    ~apply_first_pass_sparse_ledger =
+let apply_ordered_txns_async ?stop_at_first_pass ordered_txns
+    ?(async_batch_size = 10) ~ledger ~get_protocol_state ~apply_first_pass
+    ~apply_second_pass ~apply_first_pass_sparse_ledger =
   let open Deferred.Result.Let_syntax in
   let yield =
     let f = Staged.unstage (Scheduler.yield_every ~n:async_batch_size) in
@@ -1043,8 +1127,9 @@ let apply_ordered_txns_async ordered_txns ?(async_batch_size = 10) ~ledger
         Deferred.return (Error err)
   in
   run
-  @@ apply_ordered_txns_stepwise ordered_txns ~ledger ~get_protocol_state
-       ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger
+  @@ apply_ordered_txns_stepwise ?stop_at_first_pass ordered_txns ~ledger
+       ~get_protocol_state ~apply_first_pass ~apply_second_pass
+       ~apply_first_pass_sparse_ledger
 
 let apply_last_proof_transactions_sync ~ledger ~get_protocol_state
     ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger t =
@@ -1052,8 +1137,9 @@ let apply_last_proof_transactions_sync ~ledger ~get_protocol_state
   | None ->
       Or_error.errorf "No transactions found"
   | Some (_, txns_per_block) ->
-      apply_ordered_txns_sync txns_per_block ~ledger ~get_protocol_state
-        ~apply_first_pass ~apply_second_pass ~apply_first_pass_sparse_ledger
+      apply_ordered_txns_sync ~stop_at_first_pass:true txns_per_block ~ledger
+        ~get_protocol_state ~apply_first_pass ~apply_second_pass
+        ~apply_first_pass_sparse_ledger
       |> Or_error.ignore_m
 
 let apply_last_proof_transactions_async ?async_batch_size ~ledger
@@ -1063,22 +1149,32 @@ let apply_last_proof_transactions_async ?async_batch_size ~ledger
   | None ->
       Deferred.Or_error.errorf "No transactions found"
   | Some (_, txns_per_block) ->
-      apply_ordered_txns_async txns_per_block ?async_batch_size ~ledger
-        ~get_protocol_state ~apply_first_pass ~apply_second_pass
-        ~apply_first_pass_sparse_ledger
+      let raw_pending_txns =
+        Parallel_scan.last_emitted_value t.scan_state |> Option.value_exn |> snd
+      in
+      Core.printf
+        !"Applying staged transactions async ordered txns: %s ,\n\
+         \ raw txns %s\n\
+         \ \n\
+         \ previous zkapp txns %s \n\
+         \ %!"
+        (Yojson.Safe.to_string
+           (`List
+             (List.map txns_per_block ~f:(fun t ->
+                  Transactions_ordered.to_display t
+                  |> Transactions_ordered.display_to_yojson ) ) ) )
+        (Yojson.Safe.to_string
+           (`List
+             (List.map ~f:txn_display_to_yojson
+                (to_txn_display raw_pending_txns) ) ) )
+        (Yojson.Safe.to_string
+           (`List
+             (List.map ~f:txn_display_to_yojson
+                (to_txn_display t.previous_incomplete_zkapp_updates) ) ) ) ;
+      apply_ordered_txns_async ~stop_at_first_pass:true txns_per_block
+        ?async_batch_size ~ledger ~get_protocol_state ~apply_first_pass
+        ~apply_second_pass ~apply_first_pass_sparse_ledger
       |> Deferred.Or_error.ignore_m
-
-type txn_display =
-  Mina_transaction_logic.Transaction_applied.t
-  * Ledger_hash.t Transaction_snark.Statement.Statement_ledgers.t
-  * Mina_numbers.Global_slot.t
-[@@deriving sexp, to_yojson]
-
-let to_txn_display (t : Transaction_with_witness.t list) : txn_display list =
-  List.map t ~f:(fun t ->
-      ( t.transaction_with_info
-      , Transaction_snark.Statement.Statement_ledgers.of_statement t.statement
-      , t.block_global_slot ) )
 
 let apply_staged_transactions_async ?async_batch_size ~logger:_ ~ledger
     ~get_protocol_state ~apply_first_pass ~apply_second_pass
@@ -1098,23 +1194,6 @@ let apply_staged_transactions_async ?async_batch_size ~logger:_ ~ledger
             ~f:(fun t ->
               `List (List.map (to_txn_display t) ~f:txn_display_to_yojson) )
             raw_pending_txns ) ) ) ;
-  (*~metadata:
-    [ ( "txns"
-      , `List
-          (List.map staged_transactions_with_state_hash
-             ~f:(fun (t : Transactions_ordered.t) ->
-               `String (Transactions_ordered.sexp_of_t t |> Sexp.to_string) )
-          ) )
-    ; ( "raw_txns"
-      , `List
-          (List.map raw_pending_txns
-             ~f:(fun (t : Transaction_with_witness.t list) ->
-               `List
-                 (List.map t ~f:(fun t ->
-                      `String
-                        ( Transaction_with_witness.sexp_of_t t
-                        |> Sexp.to_string ) ) ) ) ) )
-    ] ;*)
   apply_ordered_txns_async staged_transactions_with_state_hash ?async_batch_size
     ~ledger ~get_protocol_state ~apply_first_pass ~apply_second_pass
     ~apply_first_pass_sparse_ledger
