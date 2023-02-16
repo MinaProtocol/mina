@@ -165,6 +165,7 @@ module Stable = struct
           Parallel_scan.State.Stable.V1.t
       ; previous_incomplete_zkapp_updates :
           Transaction_with_witness.Stable.V2.t list
+          * [ `Border_block_continued_in_the_next_tree of bool ]
       }
     [@@deriving sexp]
 
@@ -177,7 +178,8 @@ module Stable = struct
           (Binable.to_string (module Transaction_with_witness.Stable.V2))
       in
       let incomplete_updates =
-        List.fold ~init:"" t.previous_incomplete_zkapp_updates ~f:(fun acc t ->
+        List.fold ~init:"" (fst t.previous_incomplete_zkapp_updates)
+          ~f:(fun acc t ->
             acc
             ^ Binable.to_string (module Transaction_with_witness.Stable.V2) t )
         |> Digestif.SHA256.digest_string
@@ -640,7 +642,8 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
 let create ~work_delay ~transaction_capacity_log_2 : t =
   let k = Int.pow 2 transaction_capacity_log_2 in
   { scan_state = Parallel_scan.empty ~delay:work_delay ~max_base_jobs:k
-  ; previous_incomplete_zkapp_updates = []
+  ; previous_incomplete_zkapp_updates =
+      ([], `Border_block_continued_in_the_next_tree false)
   }
 
 let empty ~(constraint_constants : Genesis_constants.Constraint_constants.t) ()
@@ -793,10 +796,27 @@ let latest_ledger_proof' t =
   let%map proof, txns_with_witnesses =
     Parallel_scan.last_emitted_value t.scan_state
   in
+  let ( previous_incomplete
+      , `Border_block_continued_in_the_next_tree continued_in_next_tree ) =
+    t.previous_incomplete_zkapp_updates
+  in
   let txns =
-    Transactions_ordered.first_and_second_pass_transactions_per_tree
-      txns_with_witnesses
-      ~previous_incomplete:t.previous_incomplete_zkapp_updates
+    if continued_in_next_tree then
+      Transactions_ordered.first_and_second_pass_transactions_per_tree
+        txns_with_witnesses ~previous_incomplete
+    else
+      let txns =
+        Transactions_ordered.first_and_second_pass_transactions_per_tree
+          txns_with_witnesses ~previous_incomplete:[]
+      in
+      if List.is_empty previous_incomplete then txns
+      else
+        { Transactions_ordered.Poly.first_pass = []
+        ; second_pass = []
+        ; previous_incomplete
+        ; current_incomplete = []
+        }
+        :: txns
   in
   (proof, txns)
 
@@ -808,33 +828,52 @@ let latest_ledger_proof t =
 
 let incomplete_txns_from_recent_proof_tree t =
   let open Option.Let_syntax in
-  let%map proof, txns_with_witnesses =
-    Parallel_scan.last_emitted_value t.scan_state
-  in
-  let txns_per_block =
-    Transactions_ordered.first_and_second_pass_transactions_per_tree
-      txns_with_witnesses
-      ~previous_incomplete:t.previous_incomplete_zkapp_updates
-  in
+  let%map proof, txns_per_block = latest_ledger_proof' t in
   let txns =
     match List.last txns_per_block with
     | None ->
-        []
+        ([], `Border_block_continued_in_the_next_tree false)
     | Some txns_in_last_block ->
-        txns_in_last_block.current_incomplete
+        (*First pass ledger is considered as the snarked ledger, so any account update whether completed in the same tree or not should be included in the next tree *)
+        if not (List.is_empty txns_in_last_block.second_pass) then
+          ( txns_in_last_block.second_pass
+          , `Border_block_continued_in_the_next_tree false )
+        else
+          ( txns_in_last_block.current_incomplete
+          , `Border_block_continued_in_the_next_tree true )
   in
   (proof, txns)
 
 let staged_transactions t =
-  let previous_incomplete =
-    Option.value_map ~default:[]
+  let ( previous_incomplete
+      , `Border_block_continued_in_the_next_tree continued_in_next_tree ) =
+    Option.value_map
+      ~default:([], `Border_block_continued_in_the_next_tree false)
       (incomplete_txns_from_recent_proof_tree t)
       ~f:snd
   in
-  Transactions_ordered.first_and_second_pass_transactions_per_forest
-    (Parallel_scan.pending_data t.scan_state)
-    ~previous_incomplete
-  |> List.concat
+  let txns =
+    if continued_in_next_tree then
+      Transactions_ordered.first_and_second_pass_transactions_per_forest
+        (Parallel_scan.pending_data t.scan_state)
+        ~previous_incomplete
+    else
+      let txns =
+        Transactions_ordered.first_and_second_pass_transactions_per_forest
+          (Parallel_scan.pending_data t.scan_state)
+          ~previous_incomplete:[]
+      in
+      if List.is_empty previous_incomplete then txns
+      else
+        [ { Transactions_ordered.Poly.first_pass = []
+          ; second_pass = []
+          ; previous_incomplete
+          ; current_incomplete = []
+          }
+        ]
+        :: txns
+  in
+  List.concat txns
 
 (*All the transactions in the order in which they were applied along with the parent protocol state of the blocks that contained them*)
 let staged_transactions_with_state_hash t =
@@ -1380,15 +1419,22 @@ let fill_work_and_enqueue_transactions t transactions work =
     Parallel_scan.update t.scan_state ~completed_jobs:work_list
       ~data:transactions
   in
-  let%map result_opt, previous_incomplete_zkapp_updates =
+  let%map result_opt, scan_state' =
     Option.value_map
-      ~default:(Ok (None, t.previous_incomplete_zkapp_updates))
+      ~default:
+        (Ok
+           ( None
+           , { scan_state = updated_scan_state
+             ; previous_incomplete_zkapp_updates =
+                 t.previous_incomplete_zkapp_updates
+             } ) )
       proof_opt
-      ~f:(fun ((proof, _), txns_with_witnesses) ->
+      ~f:(fun ((proof, _), _txns_with_witnesses) ->
         let curr_stmt = Ledger_proof.statement proof in
-        (*TODO: get genesis ledger hash if the old_proof is none*)
         let prev_stmt, incomplete_zkapp_updates_from_old_proof =
-          Option.value_map ~default:(curr_stmt, [])
+          Option.value_map
+            ~default:
+              (curr_stmt, ([], `Border_block_continued_in_the_next_tree false))
             old_proof_and_incomplete_zkapp_updates
             ~f:(fun ((p', _), incomplete_zkapp_updates_from_old_proof) ->
               ( Ledger_proof.statement p'
@@ -1404,27 +1450,27 @@ let fill_work_and_enqueue_transactions t transactions work =
         in
         match stmts_connect with
         | Ok () ->
-            let txns =
-              Transactions_ordered.first_and_second_pass_transactions_per_tree
-                txns_with_witnesses
-                ~previous_incomplete:incomplete_zkapp_updates_from_old_proof
+            let scan_state' =
+              { scan_state = updated_scan_state
+              ; previous_incomplete_zkapp_updates =
+                  incomplete_zkapp_updates_from_old_proof
+              }
             in
-            Ok
-              ( Some
-                  ( proof
-                  , List.map txns
-                      ~f:
-                        (Transactions_ordered.map ~f:extract_txn_and_global_slot)
-                  )
-              , incomplete_zkapp_updates_from_old_proof )
+            (*This block is for when there's a proof emitted so Option.
+              value_exn is safe here
+              [latest_ledger_proof] generates ordered transactions
+              appropriately*)
+            let (proof, _), txns =
+              Option.value_exn (latest_ledger_proof scan_state')
+            in
+            Ok (Some (proof, txns), scan_state')
         | Error e ->
             Or_error.errorf
               "The new final statement does not connect to the previous \
                proof's statement: %s"
               (Error.to_string_hum e) )
   in
-  ( result_opt
-  , { scan_state = updated_scan_state; previous_incomplete_zkapp_updates } )
+  (result_opt, scan_state')
 
 let required_state_hashes t =
   List.fold ~init:State_hash.Set.empty
