@@ -4030,32 +4030,45 @@ module Queries = struct
              This is a little redundant, but it makes our API more
              consistent.
           *)
-          let with_valid_signature user_cmd =
-            (* The user commands get piped through [forget_check]
-               below; this is just to make the types work
-               without extra unnecessary mapping in the other
-               branches above.
-            *)
-            let (`If_this_is_used_it_should_have_a_comment_justifying_it cmd) =
-              User_command.to_valid_unsafe user_cmd
-            in
-            Transaction_hash.User_command_with_valid_signature.create cmd
-          in
           match txns_opt with
           | Some txns ->
               List.filter_map txns ~f:(fun serialized_txn ->
                   (* base64 could be a signed command or zkapp command *)
                   match Signed_command.of_base64 serialized_txn with
                   | Ok signed_command ->
+                      let user_cmd =
+                        User_command.Signed_command signed_command
+                      in
+                      (* The command gets piped through [forget_check]
+                         below; this is just to make the types work
+                         without extra unnecessary mapping in the other
+                         branches above.
+                      *)
+                      let (`If_this_is_used_it_should_have_a_comment_justifying_it
+                            valid_cmd ) =
+                        User_command.to_valid_unsafe user_cmd
+                      in
                       Some
-                        ( with_valid_signature
-                        @@ User_command.Signed_command signed_command )
+                        (Transaction_hash.User_command_with_valid_signature
+                         .create valid_cmd )
                   | Error _ -> (
                       match Zkapp_command.of_base64 serialized_txn with
                       | Ok zkapp_command ->
+                          let user_cmd =
+                            User_command.Zkapp_command zkapp_command
+                          in
+                          (* The command gets piped through [forget_check]
+                             below; this is just to make the types work
+                             without extra unnecessary mapping in the other
+                             branches above.
+                          *)
+                          let (`If_this_is_used_it_should_have_a_comment_justifying_it
+                                valid_cmd ) =
+                            User_command.to_valid_unsafe user_cmd
+                          in
                           Some
-                            ( with_valid_signature
-                            @@ User_command.Zkapp_command zkapp_command )
+                            (Transaction_hash.User_command_with_valid_signature
+                             .create valid_cmd )
                       | Error _ ->
                           (* invalid base64 for a transaction *)
                           None ) )
