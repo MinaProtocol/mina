@@ -209,7 +209,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { body =
             { Account_update.Body.Fee_payer.dummy with
               public_key = zkapp_pk
-            ; fee = Currency.Fee.(of_nanomina_int_exn 1000)
+            ; fee = Currency.Fee.(of_nanomina_int_exn 20_000_000)
             }
         ; authorization = Signature.dummy
         }
