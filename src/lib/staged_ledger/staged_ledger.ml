@@ -368,7 +368,7 @@ module T = struct
       partial_txn
     in
     let%bind first_pass_ledger_target =
-      Scan_state.apply_staged_transactions_async
+      Scan_state.get_staged_ledger_async
         ~async_batch_size:transaction_application_scheduler_batch_size
         ~ledger:snarked_ledger ~get_protocol_state:get_state ~apply_first_pass
         ~apply_second_pass ~apply_first_pass_sparse_ledger scan_state
@@ -2549,7 +2549,7 @@ let%test_module "staged ledger tests" =
                 | Some (proof, _transactions) ->
                     (*update snarked ledger with the transactions in the most recently emitted proof*)
                     let%map res =
-                      Sl.Scan_state.apply_last_proof_transactions_async
+                      Sl.Scan_state.get_snarked_ledger_async
                         ~ledger:snarked_ledger ~get_protocol_state:get_state
                         ~apply_first_pass ~apply_second_pass
                         ~apply_first_pass_sparse_ledger !sl.scan_state
@@ -2573,7 +2573,7 @@ let%test_module "staged ledger tests" =
                   (Ledger.Mask.create ~depth:(Ledger.depth snarked_ledger) ())
               in
               let%map _first_pass_ledger_target =
-                Scan_state.apply_staged_transactions_async
+                Scan_state.get_staged_ledger_async
                   ~async_batch_size:transaction_application_scheduler_batch_size
                   ~ledger:sl_of_snarked_ledger ~get_protocol_state:get_state
                   ~apply_first_pass ~apply_second_pass

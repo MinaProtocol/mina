@@ -121,7 +121,7 @@ val latest_ledger_proof :
     tree corresponding to a proof. Set this to true when applying transactions
     to get the snarked ledger corresponding to a proof.
     *)
-val apply_last_proof_transactions_sync :
+val get_snarked_ledger_sync :
      ledger:Ledger.t
   -> get_protocol_state:
        (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)
@@ -145,7 +145,7 @@ val apply_last_proof_transactions_sync :
   -> t
   -> unit Or_error.t
 
-val apply_last_proof_transactions_async :
+val get_snarked_ledger_async :
      ?async_batch_size:int
   -> ledger:Ledger.t
   -> get_protocol_state:
@@ -177,7 +177,7 @@ val apply_last_proof_transactions_async :
     Returns the target first pass ledger hash after all the transactions have 
     been applied
     *)
-val apply_staged_transactions_async :
+val get_staged_ledger_async :
      ?async_batch_size:int
   -> ledger:Ledger.t
   -> get_protocol_state:
