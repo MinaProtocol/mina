@@ -875,32 +875,7 @@ let _ =
          let vbmul3 =
            mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (rand_fields 20)
          in
-         let endomul1 =
-           mk_wires ChaCha0 6 (6, 0) (6, 1) (6, 2) (rand_fields 30)
-         in
-         let endomul2 =
-           mk_wires ChaCha1 7 (7, 0) (7, 1) (7, 2) (rand_fields 31)
-         in
-         let endomul3 =
-           mk_wires ChaCha2 8 (8, 0) (8, 1) (8, 2) (rand_fields 32)
-         in
-         let endomul4 =
-           mk_wires ChaChaFinal 9 (9, 0) (9, 1) (9, 2) (rand_fields 33)
-         in
-         let all =
-           [ zero
-           ; generic
-           ; add1
-           ; add2
-           ; vbmul1
-           ; vbmul2
-           ; vbmul3
-           ; endomul1
-           ; endomul2
-           ; endomul3
-           ; endomul4
-           ]
-         in
+         let all = [ zero; generic; add1; add2; vbmul1; vbmul2; vbmul3 ] in
          let test_vec vec =
            List.iter (add vec) all ;
            List.iteri (fun i x -> assert (eq x (get vec i))) all ;
@@ -987,32 +962,7 @@ let _ =
            let vbmul3 =
              mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (rand_fields 20)
            in
-           let endomul1 =
-             mk_wires ChaCha0 6 (6, 0) (6, 1) (6, 2) (rand_fields 30)
-           in
-           let endomul2 =
-             mk_wires ChaCha1 7 (7, 0) (7, 1) (7, 2) (rand_fields 31)
-           in
-           let endomul3 =
-             mk_wires ChaCha2 8 (8, 0) (8, 1) (8, 2) (rand_fields 32)
-           in
-           let endomul4 =
-             mk_wires ChaChaFinal 9 (9, 0) (9, 1) (9, 2) (rand_fields 33)
-           in
-           let all =
-             [ zero
-             ; generic
-             ; add1
-             ; add2
-             ; vbmul1
-             ; vbmul2
-             ; vbmul3
-             ; endomul1
-             ; endomul2
-             ; endomul3
-             ; endomul4
-             ]
-           in
+           let all = [ zero; generic; add1; add2; vbmul1; vbmul2; vbmul3 ] in
            List.iter (add vec) all ;
            vec
          in
