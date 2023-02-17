@@ -22,8 +22,8 @@ module Block_producer_node = struct
   type t = { node_name : string; account_name : string }
 end
 
-module Snark_worker_node = struct
-  type t = { node_name : string; account_name : string; replicas : int }
+module Snark_coordinator_node = struct
+  type t = { node_name : string; account_name : string; worker_nodes : int }
   [@@deriving to_yojson]
 end
 
@@ -39,7 +39,7 @@ type t =
         (* testnet topography *)
   ; genesis_ledger : Test_Account.t list
   ; block_producers : Block_producer_node.t list
-  ; snark_worker : Snark_worker_node.t option
+  ; snark_coordinator : Snark_coordinator_node.t option
   ; snark_worker_fee : string
   ; num_archive_nodes : int
   ; log_precomputed_blocks : bool
@@ -70,7 +70,7 @@ let default =
   { requires_graphql = false
   ; genesis_ledger = []
   ; block_producers = []
-  ; snark_worker = None
+  ; snark_coordinator = None
   ; snark_worker_fee =
       "0.025"
       (* ; snark_worker_public_key =

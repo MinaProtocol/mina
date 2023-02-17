@@ -789,7 +789,7 @@ module Node = struct
 end
 
 module Workload_to_deploy = struct
-  type t = { workload_id : string; pod_info : Node.pod_info list }
+  type t = { workload_id : string; pod_info : Node.pod_info }
 
   let construct_workload workload_id pod_info : t = { workload_id; pod_info }
 
@@ -821,14 +821,20 @@ module Workload_to_deploy = struct
       |> List.filter ~f:(Fn.compose not String.is_empty)
       |> List.map ~f:(String.substr_replace_first ~pattern:"pod/" ~with_:"")
     in
-    if Stdlib.List.compare_lengths t.pod_info pod_ids <> 0 then
+    (* we have a strict 1 workload to 1 pod setup. *)
+    if not (Int.equal (List.length pod_ids) 1) then
       failwithf
-        "Unexpected number of replicas in kubernetes deployment for workload \
-         %s: expected %d, got %d"
-        t.workload_id (List.length t.pod_info) (List.length pod_ids) () ;
-    List.zip_exn t.pod_info pod_ids
-    |> List.map ~f:(fun (pod_info, pod_id) ->
-           { Node.app_id; pod_id; pod_info; config } )
+        "Unexpected number of pods in a the kubernetes workload %s: there are \
+         %d pods in this workload, but in the Lucy GKE infrastructure engine \
+         there should always be exactly 1 pod per workload"
+        t.workload_id (List.length pod_ids) () ;
+
+    let pod_id = List.hd_exn pod_ids in
+    let pod_info = t.pod_info in
+    { Node.app_id; pod_id; pod_info; config }
+  (* List.zip_exn t.pod_info pod_ids
+     |> List.map ~f:(fun (pod_info, pod_id) ->
+            { Node.app_id; pod_id; pod_info; config } ) *)
 end
 
 type t =
