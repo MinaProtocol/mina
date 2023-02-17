@@ -474,18 +474,20 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       type magnitude = Unsigned.t [@@deriving sexp, compare]
 
-      let create ~magnitude ~sgn = { magnitude; sgn }
+      let create ~magnitude ~sgn =
+        { magnitude
+        ; sgn = (if Unsigned.(equal magnitude zero) then Sgn.Pos else sgn)
+        }
 
       let sgn { sgn; _ } = sgn
 
       let magnitude { magnitude; _ } = magnitude
 
-      let zero : t = create ~magnitude:zero ~sgn:Sgn.Pos
+      let zero : t = { magnitude = zero; sgn = Sgn.Pos }
 
       let gen =
         Quickcheck.Generator.map2 gen Sgn.gen ~f:(fun magnitude sgn ->
-            if Unsigned.(equal zero magnitude) then zero
-            else create ~magnitude ~sgn )
+            create ~magnitude ~sgn )
 
       let sgn_to_bool = function Sgn.Pos -> true | Neg -> false
 
