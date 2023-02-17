@@ -21,10 +21,6 @@ module Gate_type = struct
       | VarBaseMul
       | EndoMul
       | EndoMulScalar
-      | ChaCha0
-      | ChaCha1
-      | ChaCha2
-      | ChaChaFinal
       | Lookup
       | CairoClaim
       | CairoInstruction
@@ -47,7 +43,6 @@ module Lookup_pattern = struct
   module T = struct
     type t = Kimchi_types.lookup_pattern =
       | Xor
-      | ChaChaFinal
       | Lookup
       | RangeCheck
       | ForeignFieldMul
