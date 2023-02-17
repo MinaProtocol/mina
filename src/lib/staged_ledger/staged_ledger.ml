@@ -234,7 +234,7 @@ module T = struct
     { scan_state : Scan_state.t
     ; ledger :
         ((* Invariant: this is the ledger after having applied all the
-            transactions in the above state. *)
+             transactions in the above state. *)
          Ledger.attached_mask
         [@sexp.opaque] )
     ; constraint_constants : Genesis_constants.Constraint_constants.t

@@ -11927,23 +11927,6 @@
               "deprecationReason": null
             },
             {
-              "name": "isTokenOwner",
-              "description": "True if this account owns its associated token",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "isDeprecated": true,
-              "deprecationReason": null
-            },
-            {
-              "name": "isDisabled",
-              "description":
-                "True if this account has been disabled by the owner of the associated token",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "isDeprecated": true,
-              "deprecationReason": null
-            },
-            {
               "name": "index",
               "description":
                 "The index of this account in the ledger, or null if this account does not yet have a known position in the best tip ledger",
@@ -12006,7 +11989,8 @@
             },
             {
               "name": "tokenSymbol",
-              "description": "The token symbol associated with this account",
+              "description":
+                "The symbol for the token owned by this account, if there is one",
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
