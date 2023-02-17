@@ -64,8 +64,8 @@ let tests : test list =
   ; ( "opt-block-prod"
     , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
   ; ("snarkyjs", (module Snarkyjs.Make : Intf.Test.Functor_intf))
-  ; ( "supercharged_rewards"
-    , (module Supercharged_reward.Make : Intf.Test.Functor_intf) )
+  ; ( "block_producer_reward"
+    , (module Block_producer_reward_test.Make : Intf.Test.Functor_intf) )
   ]
 
 let report_test_errors ~log_error_set ~internal_error_set =
