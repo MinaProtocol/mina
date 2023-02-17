@@ -1615,9 +1615,9 @@ module Make (L : Ledger_intf.S) :
         (* Correctness of these functions hinges on the fact that zero is
            only ever expressed as {sgn = Pos; magnitude = zero}. Sadly, this
            is not guaranteed by the module's signature, as it's internal
-           structure is exposed. Ideally, it should be hidden and create
-           function should make sure that magnitude = zero implies positive
-           sign.
+           structure is exposed. Create function never produces this unwanted
+           value, but the type's internal structure is still exposed, so it's
+           possible theoretically to obtain it.
 
            For the moment, however, there is some consolation in the fact that
            addition never produces negative zero, even if it was one of its
