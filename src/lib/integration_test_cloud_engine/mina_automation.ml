@@ -32,7 +32,7 @@ module Network_config = struct
     }
   [@@deriving to_yojson]
 
-  type snark_worker_config =
+  type snark_coordinator_config =
     { name : string
           (* ; id : string *)
           (* ; keypair : Network_keypair.t *)
@@ -40,7 +40,7 @@ module Network_config = struct
           (* ; private_key : string *)
           (* ; keypair_secret : string *)
           (* ; libp2p_secret : string *)
-    ; replicas : int
+    ; worker_nodes : int
     }
   [@@deriving to_yojson]
 
@@ -64,7 +64,7 @@ module Network_config = struct
     ; archive_node_count : int
     ; mina_archive_schema : string
     ; mina_archive_schema_aux_files : string list
-    ; snark_worker_config : snark_worker_config option
+    ; snark_coordinator_config : snark_coordinator_config option
     ; snark_worker_fee : string (* ; snark_worker_public_key : string *)
     ; cpu_request : int
     ; mem_request : string
@@ -107,7 +107,7 @@ module Network_config = struct
     let { requires_graphql
         ; genesis_ledger
         ; block_producers
-        ; snark_worker
+        ; snark_coordinator
         ; snark_worker_fee
         ; num_archive_nodes
         ; log_precomputed_blocks (* ; num_plain_nodes *)
@@ -321,8 +321,8 @@ module Network_config = struct
              let kp_name, (_, (pk, sk)) = element in
              (kp_name, mk_net_keypair kp_name (pk, sk)) ) )
     in
-    let snark_worker_config =
-      match snark_worker with
+    let snark_coordinator_config =
+      match snark_coordinator with
       | None ->
           None
       | Some conf ->
@@ -332,7 +332,7 @@ module Network_config = struct
           Some
             { name = conf.node_name
             ; public_key = network_kp.public_key_file
-            ; replicas = conf.replicas
+            ; worker_nodes = conf.worker_nodes
             }
     in
 
@@ -367,7 +367,7 @@ module Network_config = struct
         ; archive_node_count = num_archive_nodes
         ; mina_archive_schema
         ; mina_archive_schema_aux_files
-        ; snark_worker_config (* ; snark_worker_public_key *)
+        ; snark_coordinator_config (* ; snark_worker_public_key *)
         ; snark_worker_fee
         ; aws_route53_zone_id
         ; cpu_request = 6
@@ -596,40 +596,32 @@ module Network_manager = struct
       Core.String.Map.add_exn Core.String.Map.empty ~key:"seed"
         ~data:
           (Kubernetes_network.Workload_to_deploy.construct_workload "seed"
-             [ Kubernetes_network.Workload_to_deploy.cons_pod_info "mina" ] )
+             (Kubernetes_network.Workload_to_deploy.cons_pod_info "mina") )
     in
 
     let snark_coordinator_workloads, snark_worker_workloads =
-      match network_config.terraform.snark_worker_config with
+      match network_config.terraform.snark_coordinator_config with
       | Some config ->
-          let snark_coordinator_id =
-            String.lowercase
-              (String.sub config.public_key
-                 ~pos:(String.length config.public_key - 6)
-                 ~len:6 )
-          in
           let snark_coordinator_workloads =
-            if config.replicas > 0 then
+            if config.worker_nodes > 0 then
               Core.String.Map.of_alist_exn
-                [ ( config.name ^ "-coordinator-" ^ snark_coordinator_id
+                [ ( config.name
                   , Kubernetes_network.Workload_to_deploy.construct_workload
-                      (config.name ^ "-coordinator-" ^ snark_coordinator_id)
-                      [ Kubernetes_network.Workload_to_deploy.cons_pod_info
-                          "mina"
-                      ] )
+                      config.name
+                      (Kubernetes_network.Workload_to_deploy.cons_pod_info
+                         "mina" ) )
                 ]
             else Core.String.Map.of_alist_exn []
           in
           let snark_worker_workloads =
-            if config.replicas > 0 then
+            if config.worker_nodes > 0 then
               Core.String.Map.of_alist_exn
-                [ ( config.name ^ "-worker-" ^ snark_coordinator_id
-                  , Kubernetes_network.Workload_to_deploy.construct_workload
-                      (config.name ^ "-worker-" ^ snark_coordinator_id)
-                      (List.init config.replicas ~f:(fun _i ->
-                           Kubernetes_network.Workload_to_deploy.cons_pod_info
-                             "worker" ) ) )
-                ]
+                (List.init config.worker_nodes ~f:(fun i ->
+                     ( config.name ^ "-worker-" ^ Core.Int.to_string i
+                     , Kubernetes_network.Workload_to_deploy.construct_workload
+                         (config.name ^ "-worker-" ^ Core.Int.to_string i)
+                         (Kubernetes_network.Workload_to_deploy.cons_pod_info
+                            "worker" ) ) ) )
             else Core.String.Map.of_alist_exn []
           in
           (snark_coordinator_workloads, snark_worker_workloads)
@@ -669,9 +661,8 @@ module Network_manager = struct
           ( bp_config.name
           , Kubernetes_network.Workload_to_deploy.construct_workload
               bp_config.name
-              [ Kubernetes_network.Workload_to_deploy.cons_pod_info
-                  ~network_keypair:bp_config.keypair "mina"
-              ] ) )
+              (Kubernetes_network.Workload_to_deploy.cons_pod_info
+                 ~network_keypair:bp_config.keypair "mina" ) ) )
       |> Core.String.Map.of_alist_exn
     in
     let archive_workloads =
@@ -679,9 +670,8 @@ module Network_manager = struct
           ( sprintf "archive-%d" (i + 1)
           , Kubernetes_network.Workload_to_deploy.construct_workload
               (sprintf "archive-%d" (i + 1))
-              [ Kubernetes_network.Workload_to_deploy.cons_pod_info
-                  ~has_archive_container:true "mina"
-              ] ) )
+              (Kubernetes_network.Workload_to_deploy.cons_pod_info
+                 ~has_archive_container:true "mina" ) ) )
       |> Core.String.Map.of_alist_exn
     in
     let workloads_by_id =
@@ -772,31 +762,34 @@ module Network_manager = struct
       ; graphql_enabled = t.graphql_enabled
       }
     in
+    let func_for_fold ~(key : string) ~data accum_M =
+      let%bind mp = accum_M in
+      let%map node =
+        Kubernetes_network.Workload_to_deploy.get_nodes_from_workload data
+          ~config
+      in
+      Core.String.Map.add_exn mp ~key ~data:node
+    in
     let%map seeds =
-      Malleable_error.List.map t.seed_workloads
-        ~f:
-          (Kubernetes_network.Workload_to_deploy.get_nodes_from_workload ~config)
-      >>| List.concat
+      Core.String.Map.fold t.seed_workloads
+        ~init:(Malleable_error.return Core.String.Map.empty)
+        ~f:func_for_fold
     and block_producers =
-      Malleable_error.List.map t.block_producer_workloads
-        ~f:
-          (Kubernetes_network.Workload_to_deploy.get_nodes_from_workload ~config)
-      >>| List.concat
+      Core.String.Map.fold t.block_producer_workloads
+        ~init:(Malleable_error.return Core.String.Map.empty)
+        ~f:func_for_fold
     and snark_coordinators =
-      Malleable_error.List.map t.snark_coordinator_workloads
-        ~f:
-          (Kubernetes_network.Workload_to_deploy.get_nodes_from_workload ~config)
-      >>| List.concat
+      Core.String.Map.fold t.snark_coordinator_workloads
+        ~init:(Malleable_error.return Core.String.Map.empty)
+        ~f:func_for_fold
     and snark_workers =
-      Malleable_error.List.map t.snark_worker_workloads
-        ~f:
-          (Kubernetes_network.Workload_to_deploy.get_nodes_from_workload ~config)
-      >>| List.concat
+      Core.String.Map.fold t.snark_worker_workloads
+        ~init:(Malleable_error.return Core.String.Map.empty)
+        ~f:func_for_fold
     and archive_nodes =
-      Malleable_error.List.map t.archive_workloads
-        ~f:
-          (Kubernetes_network.Workload_to_deploy.get_nodes_from_workload ~config)
-      >>| List.concat
+      Core.String.Map.fold t.archive_workloads
+        ~init:(Malleable_error.return Core.String.Map.empty)
+        ~f:func_for_fold
     in
     let all_nodes =
       seeds @ block_producers @ snark_coordinators @ snark_workers
