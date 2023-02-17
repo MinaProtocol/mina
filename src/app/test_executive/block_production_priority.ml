@@ -72,9 +72,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "wait for nodes to initialize"
         (Malleable_error.List.iter
-           ( Network.seeds network
-           @ Network.block_producers network
-           @ Network.snark_coordinators network )
+           (Network.all_nodes network)
            ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize) )
     in
     let%bind () =
