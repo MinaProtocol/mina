@@ -21,16 +21,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Test_config.Wallet in
     { default with
       requires_graphql = true
-    ; block_producers =
-        [ { balance = "1000"; timing = Untimed } (* 400_000_000_000_000 *) ]
-    ; num_snark_workers = 1
-    ; snark_worker_fee = "0.0001"
-    ; proof_config =
-        { proof_config_default with
-          work_delay = Some 1
-        ; transaction_capacity =
-            Some Runtime_config.Proof_keys.Transaction_capacity.small
-        }
+    ; block_producers = [ { balance = "1000"; timing = Untimed } ]
     }
 
   let run network t =
@@ -53,7 +44,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize) )
     in
     let%bind () =
-      section_hard "wait for 1 blocks to be produced"
+      section_hard "wait for 1 block to be produced"
         (wait_for t (Wait_condition.blocks_to_be_produced 1))
     in
     let%bind () =
