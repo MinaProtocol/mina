@@ -231,13 +231,12 @@ val get_transition_chain :
   -> Mina_block.t list Deferred.Or_error.t
 
 val add_bitswap_resource :
-  t -> tag:Staged_ledger_diff.Body.Tag.t -> data:string -> unit Deferred.t
+  t -> tag:Mina_net2.Bitswap_tag.t -> data:string -> unit Deferred.t
 
 val download_bitswap_resource :
-     t
-  -> tag:Staged_ledger_diff.Body.Tag.t
-  -> ids:Consensus.Body_reference.t list
-  -> unit Deferred.t
+  t -> tag:Mina_net2.Bitswap_tag.t -> ids:Blake2.t list -> unit Deferred.t
+
+val remove_bitswap_resource : t -> ids:Blake2.t list -> unit Deferred.t
 
 val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      t

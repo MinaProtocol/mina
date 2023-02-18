@@ -303,6 +303,10 @@ let skip_genesis_protocol_state_validation `This_block_was_generated_internally
     (t, validation) =
   (t, Unsafe.set_valid_genesis_state validation)
 
+let skip_genesis_protocol_state_validation_header
+    `This_header_was_loaded_from_persistence (t, validation) =
+  (t, Unsafe.set_valid_genesis_state validation)
+
 let reset_genesis_protocol_state_validation (block_with_hash, validation) =
   match validation with
   | ( time_received
@@ -391,6 +395,16 @@ let skip_delta_block_chain_validation `This_block_was_not_received_via_gossip
     (t, validation) =
   let previous_protocol_state_hash =
     t |> With_hash.data |> Block.header |> Header.protocol_state
+    |> Protocol_state.previous_state_hash
+  in
+  ( t
+  , Unsafe.set_valid_delta_block_chain validation
+      (Mina_stdlib.Nonempty_list.singleton previous_protocol_state_hash) )
+
+let skip_delta_block_chain_validation_header
+    `This_header_was_loaded_from_persistence (t, validation) =
+  let previous_protocol_state_hash =
+    t |> With_hash.data |> Header.protocol_state
     |> Protocol_state.previous_state_hash
   in
   ( t
@@ -491,7 +505,11 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
   let body = Block.body block in
   let apply_start_time = Core.Time.now () in
   let body_ref_from_header = Blockchain_state.body_reference blockchain_state in
-  let body_ref_computed = Staged_ledger_diff.Body.compute_reference body in
+  let body_ref_computed =
+    Staged_ledger_diff.Body.compute_reference
+      ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
+      body
+  in
   let%bind.Deferred.Result () =
     if Blake2.equal body_ref_computed body_ref_from_header then
       Deferred.Result.return ()
@@ -607,6 +625,10 @@ let validate_protocol_versions (t, validation) =
 
 let skip_protocol_versions_validation `This_block_has_valid_protocol_versions
     (t, validation) =
+  (t, Unsafe.set_valid_protocol_versions validation)
+
+let skip_protocol_versions_validation_header
+    `This_header_was_loaded_from_persistence (t, validation) =
   (t, Unsafe.set_valid_protocol_versions validation)
 
 let with_body (header_with_hash, validation) body =

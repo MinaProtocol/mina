@@ -51,21 +51,38 @@ let verify_header_is_relevant ?record_event_for_senders
 let preserve_body st body =
   match st with
   | Transition_state.Received ({ body_opt = None; _ } as r) ->
+      let body_ref =
+        With_hash.data (header_with_hash_of_received_header r.header)
+        |> Mina_block.Header.body_reference
+      in
       ( Transition_state.Received { r with body_opt = Some body }
-      , `Nop (`Preserved_body body) )
+      , `Nop (`Preserved_body (body_ref, body)) )
   | Verifying_blockchain_proof ({ body_opt = None; _ } as r) ->
+      let body_ref =
+        Mina_block.Validation.header r.header
+        |> Mina_block.Header.body_reference
+      in
       ( Verifying_blockchain_proof { r with body_opt = Some body }
-      , `Nop (`Preserved_body body) )
+      , `Nop (`Preserved_body (body_ref, body)) )
   | Downloading_body
       ({ substate = { status = Processing (In_progress ctx); _ } as s; _ } as r)
     ->
+      let body_ref =
+        Mina_block.Validation.header r.header
+        |> Mina_block.Header.body_reference
+      in
       ( Downloading_body
           { r with substate = { s with status = Processing (Done body) } }
-      , `Mark_downloading_body_processed (Some ctx.interrupt_ivar, body) )
+      , `Mark_downloading_body_processed
+          (Some ctx.interrupt_ivar, body_ref, body) )
   | Downloading_body ({ substate = { status = Failed _; _ } as s; _ } as r) ->
+      let body_ref =
+        Mina_block.Validation.header r.header
+        |> Mina_block.Header.body_reference
+      in
       ( Downloading_body
           { r with substate = { s with status = Processing (Done body) } }
-      , `Mark_downloading_body_processed (None, body) )
+      , `Mark_downloading_body_processed (None, body_ref, body) )
   | _ ->
       (st, `Nop `No_body_preserved)
 

@@ -1,17 +1,23 @@
 open Core_kernel
 open Mina_base
 
+exception Transition_state_not_found
+
 module type Callbacks = sig
   val on_invalid :
        ?reason:[ `Proof | `Signature_or_proof | `Other ]
     -> error:Error.t
     -> aux:Transition_state.aux_data
+    -> body_ref:Consensus.Body_reference.t
     -> Substate_types.transition_meta
     -> unit
 
-  val on_add_new : State_hash.t -> unit
+  val on_add_new : Mina_block.Header.with_hash -> unit
 
-  val on_remove : State_hash.t -> unit
+  val on_add_invalid : Substate_types.transition_meta -> unit
+
+  val on_remove :
+    reason:[ `Prunning | `In_frontier ] -> Transition_state.t -> unit
 end
 
 module Inmem (C : Callbacks) = struct
@@ -25,9 +31,15 @@ module Inmem (C : Callbacks) = struct
     in
     let key = transition_meta.Substate_types.state_hash in
     State_hash.Table.add_exn transition_states ~key ~data:state ;
-    C.on_add_new key
+    match Transition_state.header state with
+    | Some h ->
+        C.on_add_new h
+    | None ->
+        C.on_add_invalid transition_meta
 
-  (** Mark transition and all its descedandants invalid. *)
+  (** Mark transition and all its descedandants invalid and return
+      transition metas of all transitions marked invalid
+      (that were not in [Invalid] state before the call). *)
   let mark_invalid ?reason transition_states ~error:err
       ~state_hash:top_state_hash =
     let open Transition_state in
@@ -42,8 +54,14 @@ module Inmem (C : Callbacks) = struct
       let%bind.Option state = st_opt in
       let%map.Option aux = Transition_state.aux_data state in
       let transition_meta = State_functions.transition_meta state in
-      C.on_invalid ?reason ~error ~aux transition_meta ;
-      res := transition_meta :: !res ;
+      Option.iter (Transition_state.header state) ~f:(fun header ->
+          let body_ref =
+            With_hash.data header |> Mina_block.Header.protocol_state
+            |> Mina_state.Protocol_state.blockchain_state
+            |> Mina_state.Blockchain_state.body_reference
+          in
+          C.on_invalid ?reason ~error ~aux ~body_ref transition_meta ;
+          res := transition_meta :: !res ) ;
       ( match state with
       | Received { gossip_data; _ }
       | Verifying_blockchain_proof { gossip_data; _ } ->
@@ -92,22 +110,22 @@ module Inmem (C : Callbacks) = struct
        State_hash.Table.set transition_states ~key:state_hash ~data:st
 
   let update transition_states state =
-    (* TODO raise exception on updating non-existent key *)
-    State_hash.Table.set transition_states
-      ~key:(Transition_state.State_functions.transition_meta state).state_hash
-      ~data:state
+    State_hash.Table.update transition_states
+      (Transition_state.State_functions.transition_meta state).state_hash
+      ~f:(function
+      | Some _ ->
+          state
+      | _ ->
+          raise Transition_state_not_found )
 
-  let remove transition_states state_hash =
-    Option.value_map ~default:() ~f:(fun _ -> C.on_remove state_hash)
-    @@ State_hash.Table.find_and_remove transition_states state_hash
+  let remove transition_states ~reason =
+    Fn.compose (Option.iter ~f:(C.on_remove ~reason))
+    @@ State_hash.Table.find_and_remove transition_states
 
   let update' transition_states ~f state_hash =
-    Option.iter (find transition_states state_hash) ~f:(fun st ->
-        match f st with
-        | None ->
-            remove transition_states state_hash
-        | Some st' ->
-            update transition_states st' )
+    Option.iter
+      (find transition_states state_hash)
+      ~f:(Fn.compose (update transition_states) f)
 
   let shutdown_in_progress =
     State_hash.Table.map_inplace ~f:Transition_state.shutdown_in_progress
@@ -117,6 +135,9 @@ module Inmem (C : Callbacks) = struct
 
   let clear transition_states =
     shutdown_in_progress transition_states ;
+    List.iter
+      (State_hash.Table.data transition_states)
+      ~f:(C.on_remove ~reason:`Prunning) ;
     State_hash.Table.clear transition_states
 end
 

@@ -1295,8 +1295,6 @@ module type CONTEXT = sig
 
   val consensus_constants : Consensus.Constants.t
 
-  val conf_dir : string
-
   val catchup_config : Mina_intf.catchup_config
 end
 
@@ -1309,8 +1307,6 @@ let context (config : Config.t) =
     let consensus_constants = precomputed_values.consensus_constants
 
     let constraint_constants = precomputed_values.constraint_constants
-
-    let conf_dir = config.conf_dir
 
     let catchup_config = config.catchup_config
   end : CONTEXT )
@@ -1489,18 +1485,6 @@ end
 
 let create ?wallets (config : Config.t) =
   let module Context = (val context config) in
-  let catchup_mode =
-    match config.catchup_mode with
-    | `Super ->
-        `Super
-    | `Normal ->
-        `Normal
-    | `Bit ->
-        `Bit
-          (Transition_frontier_controller.Bit_catchup
-           .create_in_mem_transition_states ~trust_system:config.trust_system
-             ~logger:config.logger )
-  in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
@@ -1878,29 +1862,43 @@ let create ?wallets (config : Config.t) =
               }
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
-          let on_bitswap_update_ref =
-            ref (fun ~tag type_ ids ->
-                let type_str =
-                  match type_ with
-                  | `Added ->
-                      "added"
-                  | `Removed ->
-                      "removed"
-                  | `Broken ->
-                      "broken"
-                in
-                [%log' warn Context.logger]
-                  "Ignoring bitswap update (tag: %d, type: %s) for $ids"
-                  (Staged_ledger_diff.Body.Tag.to_enum tag)
-                  type_str
-                  ~metadata:
-                    [ ("ids", `List (List.map ~f:Blake2.to_yojson ids)) ] )
+          let log_ignoring_bitswap_update ~tag type_ ids =
+            let type_str =
+              match type_ with
+              | `Added ->
+                  "added"
+              | `Removed ->
+                  "removed"
+              | `Broken ->
+                  "broken"
+            in
+            [%log' warn Context.logger]
+              "Ignoring bitswap update (tag: %d, type: %s) for $ids"
+              (Mina_net2.Bitswap_tag.to_enum tag)
+              type_str
+              ~metadata:[ ("ids", `List (List.map ~f:Blake2.to_yojson ids)) ]
           in
+          let on_block_body_update_ref =
+            ref (log_ignoring_bitswap_update ~tag:Mina_net2.Bitswap_tag.Body)
+          in
+          let block_db_path =
+            Core.(config.conf_dir ^/ "mina_net2" ^/ "block-db")
+          in
+          let block_storage = Lmdb_storage.Block.create block_db_path in
+          let header_db_path = Core.(config.conf_dir ^/ "header-db") in
+          let header_storage = Lmdb_storage.Header.create header_db_path in
+          let known_body_refs = Bit_catchup_state.Known_body_refs.create () in
           let%bind net =
             O1trace.thread "mina_networking" (fun () ->
                 Mina_networking.create config.net_config ~get_some_initial_peers
                   ~on_bitswap_update:(fun ~tag type_ ids ->
-                    !on_bitswap_update_ref ~tag type_ ids )
+                    match (tag, type_) with
+                    | Mina_net2.Bitswap_tag.Body, (`Added as type')
+                    | Mina_net2.Bitswap_tag.Body, (`Broken as type') ->
+                        !on_block_body_update_ref type' ids
+                    | Mina_net2.Bitswap_tag.Body, `Removed ->
+                        Bit_catchup_state.Known_body_refs.on_block_body_removed
+                          known_body_refs ~header_storage ids )
                   ~sinks
                   ~get_staged_ledger_aux_and_pending_coinbases_at_hash:(fun query_env
                                                                             ->
@@ -2059,6 +2057,24 @@ let create ?wallets (config : Config.t) =
               |> Validation.reset_frontier_dependencies_validation
               |> Validation.reset_staged_ledger_diff_validation )
           in
+          let catchup_mode =
+            match config.catchup_mode with
+            | `Super ->
+                `Super
+            | `Normal ->
+                `Normal
+            | `Bit ->
+                `Bit
+                  ( Transition_frontier_controller.create_transition_states
+                      ~trust_system:config.trust_system ~logger:config.logger
+                      ~block_storage ~header_storage
+                      ~block_storage_actions:
+                        (Bootstrap_controller.block_storage_actions net)
+                      ~known_body_refs
+                  , known_body_refs
+                  , block_storage
+                  , header_storage )
+          in
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
               ~context:(module Context)
@@ -2074,7 +2090,7 @@ let create ?wallets (config : Config.t) =
               ~producer_transition_reader ~most_recent_valid_block
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
-              ~notify_online ~on_bitswap_update_ref ()
+              ~notify_online ~on_block_body_update_ref ()
           in
           let valid_transitions_for_api, new_blocks =
             Strict_pipe.Reader.Fork.two valid_transitions

@@ -20,12 +20,11 @@ type event_t =
       | `Invalid_genesis_protocol_state
       | `Invalid_protocol_version
       | `Mismatched_protocol_version ]
-  | `Preserved_body_for_retrieved_ancestor of Mina_block.Body.t ]
+  | `Preserved_body_for_retrieved_ancestor of
+    Consensus.Body_reference.t * Mina_block.Body.t ]
 
 module type MINI_CONTEXT = sig
   include Transition_handler.Validator.CONTEXT
-
-  val conf_dir : string
 
   val catchup_config : Mina_intf.catchup_config
 end
@@ -227,4 +226,11 @@ let controlling_bandwidth ?priority ~resource
       start_action ~need_deallocate:false action' ;
       Substate.Waiting
 
-module Body_ref_table = Hashtbl.Make (Consensus.Body_reference)
+let check_body_of_header_in_storage ~context:(module Context : CONTEXT)
+    header_with_hash =
+  Context.check_body_in_storage
+    ( With_hash.data header_with_hash
+    |> Mina_block.Header.protocol_state
+    |> Mina_state.(
+         Fn.compose Blockchain_state.body_reference
+           Protocol_state.blockchain_state) )

@@ -29,6 +29,7 @@
    transaction_snark_work
    transition_frontier_bit_catchup
    data_hash_lib
+   lmdb_storage
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_version ppx_deriving.std ppx_deriving_yojson)))

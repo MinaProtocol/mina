@@ -167,11 +167,6 @@ let setup (type n) ~context:(module Context : CONTEXT)
   in
   { fake_gossip_network; peer_networks }
 
-let with_temp_dir f =
-  File_system.with_temp_dir
-    (Filename.temp_dir_name ^/ "fake_network_get_ancestry")
-    ~f
-
 module Generator = struct
   open Quickcheck
   open Generator.Let_syntax
@@ -254,38 +249,34 @@ module Generator = struct
             f
         | None ->
             fun query_env ->
-              with_temp_dir (fun conf_dir ->
-                  Deferred.return
-                    (Sync_handler.Root.prove
-                       ~context:
-                         ( module struct
-                           include Context
+              Deferred.return
+                (Sync_handler.Root.prove
+                   ~context:
+                     ( module struct
+                       include Context
 
-                           let conf_dir = conf_dir
-
-                           let catchup_config =
-                             { Mina_intf.max_download_time_per_block_sec = 1.
-                             ; max_download_jobs = 20
-                             ; max_verifier_jobs = 1
-                             ; max_proofs_per_batch = 100
-                             ; max_retrieve_hash_chain_jobs = 5
-                             ; building_breadcrumb_timeout = Time.Span.of_min 2.
-                             ; bitwap_download_timeout = Time.Span.of_sec 2.
-                             ; peer_download_timeout = Time.Span.of_sec 2.
-                             ; ancestry_verification_timeout =
-                                 Time.Span.of_sec 30.
-                             ; ancestry_download_timeout = Time.Span.of_sec 3.
-                             ; transaction_snark_verification_timeout =
-                                 Time.Span.of_min 4.
-                             ; bitswap_enabled = true
-                             }
-                         end )
-                       ~frontier
-                       ( Envelope.Incoming.data query_env
-                       |> With_hash.map_hash ~f:(fun state_hash ->
-                              { State_hash.State_hashes.state_hash
-                              ; state_body_hash = None
-                              } ) ) ) ) )
+                       let catchup_config =
+                         { Mina_intf.max_download_time_per_block_sec = 1.
+                         ; max_download_jobs = 20
+                         ; max_verifier_jobs = 1
+                         ; max_proofs_per_batch = 100
+                         ; max_retrieve_hash_chain_jobs = 5
+                         ; building_breadcrumb_timeout = Time.Span.of_min 2.
+                         ; bitwap_download_timeout = Time.Span.of_sec 2.
+                         ; peer_download_timeout = Time.Span.of_sec 2.
+                         ; ancestry_verification_timeout = Time.Span.of_sec 30.
+                         ; ancestry_download_timeout = Time.Span.of_sec 3.
+                         ; transaction_snark_verification_timeout =
+                             Time.Span.of_min 4.
+                         ; bitswap_enabled = true
+                         }
+                     end )
+                   ~frontier
+                   ( Envelope.Incoming.data query_env
+                   |> With_hash.map_hash ~f:(fun state_hash ->
+                          { State_hash.State_hashes.state_hash
+                          ; state_body_hash = None
+                          } ) ) ) )
     ; get_best_tip =
         ( match get_best_tip with
         | Some f ->

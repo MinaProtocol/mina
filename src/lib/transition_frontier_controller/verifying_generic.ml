@@ -178,6 +178,8 @@ module Make (F : F) = struct
       there is an unprocessed ancestor covered by this active progress, action won't
       be interrupted and it will be assigned to the first unprocessed ancestor.
 
+      If [reuse_ctx] is [false] and [Substate.In_progress] context exists, it will be ignored.
+
       If [baton] is set to [true] in the transition being updated, the baton will
       be passed to the next transition with [Substate.Processing (Substate.In_progress _)]
       and transitions in between will get restarted.  *)
@@ -190,7 +192,6 @@ module Make (F : F) = struct
       match substate.status with
       | Processing ctx when reuse_ctx ->
           Some (Some ctx)
-      (* TODO check if the context below needs to be canceled *)
       | Processing _ | Failed _ ->
           Some None
       | _ ->

@@ -7,6 +7,7 @@ module Libp2p_stream = Libp2p_stream
 module Multiaddr = Multiaddr
 module Validation_callback = Validation_callback
 module Sink = Sink
+module Bitswap_tag = Bitswap_tag
 
 exception
   Libp2p_helper_died_unexpectedly = Libp2p_helper
@@ -81,10 +82,7 @@ type protocol_handler =
   }
 
 type on_bitswap_update_t =
-     tag:Staged_ledger_diff.Body.Tag.t
-  -> [ `Added | `Removed | `Broken ]
-  -> Blake2.t list
-  -> unit
+  tag:Bitswap_tag.t -> [ `Added | `Removed | `Broken ] -> Blake2.t list -> unit
 
 type t =
   { conf_dir : string
@@ -564,7 +562,7 @@ let handle_push_message t push_message =
                 Libp2p_ipc.undefined_union
                   ~context:"DaemonInterface.PushMessage.ResourceUpdated" n
           in
-          match Staged_ledger_diff.Body.Tag.of_enum tag with
+          match Bitswap_tag.of_enum tag with
           | Some tag ->
               t.resource_update_callback ~tag type_ ids
           | _ ->
@@ -648,3 +646,5 @@ let send_heartbeat t peer_id = Libp2p_helper.send_heartbeat ~peer_id t.helper
 let add_bitswap_resource t = Libp2p_helper.send_add_resource t.helper
 
 let download_bitswap_resource t = Libp2p_helper.send_download_resource t.helper
+
+let remove_bitswap_resource t = Libp2p_helper.send_remove_resource t.helper

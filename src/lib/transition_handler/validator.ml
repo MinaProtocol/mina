@@ -16,7 +16,7 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 end
 
-let verify_header_is_relevant ~context:(module Context : CONTEXT) ~frontier
+let is_header_relevant_against_root ~context:(module Context : CONTEXT) ~root
     header_with_hash =
   let module Context = struct
     include Context
@@ -25,37 +25,41 @@ let verify_header_is_relevant ~context:(module Context : CONTEXT) ~frontier
       Logger.extend logger
         [ ("selection_context", `String "Transition_handler.Validator") ]
   end in
-  let transition_hash =
-    State_hash.With_state_hashes.state_hash header_with_hash
-  in
-  [%log' internal Context.logger] "Validate_transition" ;
   let get_consensus_constants h =
     Mina_block.Header.protocol_state h |> Protocol_state.consensus_state
   in
+  Consensus.Hooks.equal_select_status `Take
+    (Consensus.Hooks.select
+       ~context:(module Context)
+       ~existing:
+         (Transition_frontier.Breadcrumb.consensus_state_with_hashes root)
+       ~candidate:(With_hash.map ~f:get_consensus_constants header_with_hash) )
+
+let verify_header_is_relevant ~context:(module Context : CONTEXT) ~frontier
+    header_with_hash =
+  [%log' internal Context.logger] "Validate_transition" ;
   let blockchain_length =
     With_hash.data header_with_hash |> Mina_block.Header.blockchain_length
   in
-  let root_breadcrumb = Transition_frontier.root frontier in
   [%log' internal Context.logger] "@block_metadata"
     ~metadata:
       [ ("blockchain_length", Mina_numbers.Length.to_yojson blockchain_length) ] ;
   [%log' internal Context.logger] "Check_transition_not_in_frontier" ;
-  let open Result.Let_syntax in
-  let%bind () =
+  let transition_hash =
+    State_hash.With_state_hashes.state_hash header_with_hash
+  in
+  let root = Transition_frontier.root frontier in
+  let%bind.Result () =
     Option.fold
       (Transition_frontier.find frontier transition_hash)
       ~init:Result.(Ok ())
       ~f:(fun _ _ -> Result.Error (`In_frontier transition_hash))
   in
-  [%log' internal Context.logger] "Check_transition_not_in_process" ;
+  [%log' internal Context.logger] "Check_transition_preferred_over_root" ;
   Result.ok_if_true
-    (Consensus.Hooks.equal_select_status `Take
-       (Consensus.Hooks.select
-          ~context:(module Context)
-          ~existing:
-            (Transition_frontier.Breadcrumb.consensus_state_with_hashes
-               root_breadcrumb )
-          ~candidate:(With_hash.map ~f:get_consensus_constants header_with_hash) ) )
+    (is_header_relevant_against_root
+       ~context:(module Context)
+       ~root header_with_hash )
     ~error:`Disconnected
 
 let verify_transition_is_relevant ~context:(module Context : CONTEXT) ~frontier

@@ -122,6 +122,13 @@ module Make_str (A : Wire_types.Concrete) = struct
   let blockchain_length h =
     protocol_state h |> Mina_state.Protocol_state.consensus_state
     |> Consensus.Data.Consensus_state.blockchain_length
+
+  let body_reference =
+    Fn.compose
+      Mina_state.(
+        Fn.compose Blockchain_state.body_reference
+          Protocol_state.blockchain_state)
+      protocol_state
 end
 
 include Wire_types.Make (Make_sig) (Make_str)

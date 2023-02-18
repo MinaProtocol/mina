@@ -57,4 +57,6 @@ let of_hex_exn = Blake2.of_hex
 
 let to_raw_string = Blake2.to_raw_string
 
+let to_blake2 = Fn.id
+
 let of_blake2 = Fn.id

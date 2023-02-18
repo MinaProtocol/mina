@@ -320,6 +320,7 @@ let generate_next_state ~intr_module ~constraint_constants
             in
             let body_reference =
               Staged_ledger_diff.Body.compute_reference
+                ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
                 (Body.create @@ Staged_ledger_diff.forget diff)
             in
             let blockchain_state =

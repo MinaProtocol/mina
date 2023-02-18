@@ -32,6 +32,7 @@
    pickles
    pickles.backend
    snark_params
+   lmdb_storage
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_mina)))

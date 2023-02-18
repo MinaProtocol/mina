@@ -19,8 +19,6 @@ module type CONTEXT = sig
 
   val consensus_constants : Consensus.Constants.t
 
-  val conf_dir : string
-
   val catchup_config : Mina_intf.catchup_config
 end
 
@@ -238,6 +236,21 @@ let external_transition_compare ~context:(module Context : CONTEXT) =
       then -1
       else 1 )
     ~f:(With_hash.map ~f:get_consensus_state)
+
+(* TODO consider moiving somewhere else *)
+let block_storage_actions network =
+  { Bit_catchup_state.add_body =
+      (fun body ->
+        don't_wait_for
+          (Mina_networking.add_bitswap_resource network ~tag:Body
+             ~data:(Staged_ledger_diff.Body.to_raw_string body) ) )
+  ; remove_body =
+      (fun ids ->
+        don't_wait_for
+          (Mina_networking.remove_bitswap_resource
+             ~ids:(List.map ids ~f:Consensus.Body_reference.to_blake2)
+             network ) )
+  }
 
 (* We conditionally ask other peers for their best tip. This is for testing
    eager bootstrapping and the regular functionalities of bootstrapping in
@@ -580,6 +593,13 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                       Instance.set_root_state_hash instance
                       @@ Mina_block.Validated.state_hash
                       @@ Mina_block.Validated.lift new_root )) ;
+                let module Context_ = struct
+                  include Context
+
+                  let is_header_relevant =
+                    Transition_handler.Validator.is_header_relevant_against_root
+                      ~context:(module Context)
+                end in
                 let%map new_frontier =
                   let fail msg =
                     failwith
@@ -587,9 +607,11 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                          bootstrapping: " ^ msg )
                   in
                   Transition_frontier.load
-                    ~context:(module Context)
+                    ~context:(module Context_)
                     ~retry_with_fresh_db:false ~verifier ~consensus_local_state
-                    ~persistent_root ~persistent_frontier ~catchup_mode ()
+                    ~persistent_root ~persistent_frontier ~catchup_mode
+                    ~block_storage_actions:(block_storage_actions network)
+                    ()
                   >>| function
                   | Ok frontier ->
                       frontier
@@ -697,41 +719,33 @@ let%test_module "Bootstrap_controller tests" =
 
     let constraint_constants = precomputed_values.constraint_constants
 
-    let with_temp_dir f =
-      File_system.with_temp_dir
-        (Filename.temp_dir_name ^/ "bootstrap_controller_test")
-        ~f
-
     let with_context f =
-      with_temp_dir (fun conf_dir ->
-          let module Context = struct
-            let logger = Logger.create ()
+      let module Context = struct
+        let logger = Logger.create ()
 
-            let precomputed_values = precomputed_values
+        let precomputed_values = precomputed_values
 
-            let constraint_constants =
-              Genesis_constants.Constraint_constants.for_unit_tests
+        let constraint_constants =
+          Genesis_constants.Constraint_constants.for_unit_tests
 
-            let consensus_constants = precomputed_values.consensus_constants
+        let consensus_constants = precomputed_values.consensus_constants
 
-            let conf_dir = conf_dir
-
-            let catchup_config =
-              { Mina_intf.max_download_time_per_block_sec = 1.
-              ; max_download_jobs = 20
-              ; max_verifier_jobs = 1
-              ; max_proofs_per_batch = 100
-              ; max_retrieve_hash_chain_jobs = 5
-              ; building_breadcrumb_timeout = Time.Span.of_min 2.
-              ; bitwap_download_timeout = Time.Span.of_sec 2.
-              ; peer_download_timeout = Time.Span.of_sec 2.
-              ; ancestry_verification_timeout = Time.Span.of_sec 30.
-              ; ancestry_download_timeout = Time.Span.of_sec 3.
-              ; transaction_snark_verification_timeout = Time.Span.of_min 4.
-              ; bitswap_enabled = true
-              }
-          end in
-          f (module Context : CONTEXT) )
+        let catchup_config =
+          { Mina_intf.max_download_time_per_block_sec = 1.
+          ; max_download_jobs = 20
+          ; max_verifier_jobs = 1
+          ; max_proofs_per_batch = 100
+          ; max_retrieve_hash_chain_jobs = 5
+          ; building_breadcrumb_timeout = Time.Span.of_min 2.
+          ; bitwap_download_timeout = Time.Span.of_sec 2.
+          ; peer_download_timeout = Time.Span.of_sec 2.
+          ; ancestry_verification_timeout = Time.Span.of_sec 30.
+          ; ancestry_download_timeout = Time.Span.of_sec 3.
+          ; transaction_snark_verification_timeout = Time.Span.of_min 4.
+          ; bitswap_enabled = true
+          }
+      end in
+      f (module Context : CONTEXT)
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->

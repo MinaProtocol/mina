@@ -3,9 +3,11 @@ open Async_kernel
 open Pipe_lib
 open Mina_block
 open Mina_base
-module Bit_catchup = Bit_catchup
 
 module type CONTEXT = Context.MINI_CONTEXT
+
+let create_transition_states =
+  Transition_states_callbacks.create_transition_states
 
 let run_with_normal_or_super_catchup ~context:(module Context : CONTEXT)
     ~trust_system ~verifier ~network ~time_controller ~get_completed_work
@@ -155,9 +157,9 @@ let run_with_normal_or_super_catchup ~context:(module Context : CONTEXT)
     ~f:(Strict_pipe.Writer.write verified_transition_writer)
   |> don't_wait_for
 
-let run ~on_bitswap_update_ref ~frontier =
+let run ~on_block_body_update_ref ~frontier =
   match Transition_frontier.catchup_state frontier with
   | Full _ | Hash _ ->
       run_with_normal_or_super_catchup ~frontier
   | Bit _ ->
-      Bit_catchup.run ~on_bitswap_update_ref ~frontier
+      Bit_catchup.run ~on_block_body_update_ref ~frontier

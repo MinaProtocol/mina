@@ -34,8 +34,15 @@ module Make (Inputs : Inputs_intf) :
 
   let find_in_catchup_state ~frontier state_hash =
     match Transition_frontier.catchup_state frontier with
-    | Bit state ->
-        Bit_catchup_state.find_header state state_hash
+    | Bit (state, _) -> (
+        let open Bit_catchup_state in
+        match%bind.Option
+          Transition_states.find state.transition_states state_hash
+        with
+        | Received _ | Verifying_blockchain_proof _ ->
+            None
+        | st ->
+            Transition_state.header st )
     | _ ->
         None
 

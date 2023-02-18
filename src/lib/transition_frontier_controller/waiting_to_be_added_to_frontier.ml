@@ -35,12 +35,12 @@ let promote_to ~context:(module Context : CONTEXT) ~block_vc
   Waiting_to_be_added_to_frontier { breadcrumb; source; children }
 
 (** [handle_produced_transition] adds locally produced block to the catchup state *)
-let handle_produced_transition ~context:(module Context : CONTEXT)
-    ~transition_states breadcrumb =
+let handle_produced_transition ~context:(module Context : CONTEXT) ~state
+    breadcrumb =
   let state_hash = Frontier_base.Breadcrumb.state_hash breadcrumb in
   Context.broadcast (Frontier_base.Breadcrumb.block_with_hash breadcrumb) ;
   let st_opt =
-    match Transition_states.find transition_states state_hash with
+    match Transition_states.find state.transition_states state_hash with
     | None ->
         Some
           (Transition_state.Waiting_to_be_added_to_frontier
@@ -55,5 +55,5 @@ let handle_produced_transition ~context:(module Context : CONTEXT)
         None
   in
 
-  Option.iter st_opt ~f:(Transition_states.add_new transition_states) ;
+  Option.iter st_opt ~f:(Bit_catchup_state.add_new state) ;
   st_opt

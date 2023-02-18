@@ -4,15 +4,6 @@ open Async
 open Context
 open Bit_catchup_state
 
-let check_body_storage ~context header_with_hash =
-  let (module Context : CONTEXT) = context in
-  Context.check_body_in_storage
-    ( With_hash.data header_with_hash
-    |> Mina_block.Header.protocol_state
-    |> Mina_state.(
-         Fn.compose Blockchain_state.body_reference
-           Protocol_state.blockchain_state) )
-
 (** [mark_done state_hash] assigns a transition corresponding to [state_hash]
   with a [Processing] or [Failed] status new status [Processing (Done ())] and
   returns in-progress context if the transition was in progress of receiving ancestry.
@@ -96,7 +87,7 @@ let handle_preserve_hint ~actions ~transition_states ~context (st, hint) =
       Verifying_complete_works.make_independent ~context ~actions
         ~transition_states state_hash ;
       bp
-  | `Mark_downloading_body_processed (ivar_opt, body) ->
+  | `Mark_downloading_body_processed (ivar_opt, body_ref, body) ->
       ( match st with
       | Downloading_body { baton = true; _ } ->
           Downloading_body.pass_the_baton ~transition_states ~context
@@ -107,7 +98,7 @@ let handle_preserve_hint ~actions ~transition_states ~context (st, hint) =
       Option.iter ivar_opt ~f:(Fn.flip Ivar.fill_if_empty ()) ;
       actions.Misc.mark_processed_and_promote
         ~reason:"received gossip with body" [ meta.state_hash ] ;
-      `Preserved_body body
+      `Preserved_body (body_ref, body)
 
 let pre_validate_header ~context:(module Context : CONTEXT) hh =
   let open Result in
@@ -139,7 +130,7 @@ let lookup_transition ~transition_states ~frontier state_hash =
 *)
 let insert_invalid_state_impl ~is_parent_in_frontier ~state ~actions
     ~transition_meta ~children_list error =
-  Transition_states.add_new state.transition_states
+  Bit_catchup_state.add_new state
     (Transition_state.Invalid { transition_meta; error }) ;
   Misc.handle_non_regular_child ~state ~is_parent_in_frontier ~is_invalid:true
     transition_meta ;
@@ -182,16 +173,15 @@ let set_processing_to_failed ~state_hash ~logger error = function
           ; ("new_status_error", reason)
           ] ;
       Gossip.drop_gossip_data `Ignore gossip_data ;
-      Some
-        (Transition_state.Received
-           { r with
-             substate = { r.substate with status = Failed error }
-           ; gossip_data = Gossip.No_validation_callback
-           } )
+      Transition_state.Received
+        { r with
+          substate = { r.substate with status = Failed error }
+        ; gossip_data = Gossip.No_validation_callback
+        }
   | st ->
-      Some st
+      st
 
-let split_retrieve_chain_element ~context = function
+let split_element_and_check_storage ~context = function
   | `Block bh ->
       let hh = With_hash.map ~f:Mina_block.header bh in
       ( Substate.transition_meta_of_header_with_hash hh
@@ -200,7 +190,7 @@ let split_retrieve_chain_element ~context = function
   | `Header hh ->
       ( Substate.transition_meta_of_header_with_hash hh
       , Some hh
-      , check_body_storage ~context hh )
+      , check_body_of_header_in_storage ~context hh )
   | `Meta m ->
       (m, None, None)
 
@@ -255,27 +245,27 @@ let get_canopy ~frontier ~state length =
   :: canopy_from_transitions
   @ best_tip_closest @ best_tip_rest_sparse
 
-let rec pre_validate_and_add_retrieved ~context ~actions ~sender ~state ?body hh
-    =
+let rec pre_validate_and_add_retrieved ~context ~actions ?sender:sender_opt
+    ~state ?body hh =
   match pre_validate_header ~context hh with
   | Ok vh ->
-      add_received ~context ~actions ~state ?body ~preferred_peers:[ sender ]
+      add_received ~context ~actions ~state ?body
+        ~preferred_peers:(Option.to_list sender_opt)
         (Gossip.Pre_initial_valid vh)
         ~gossip_data:Gossip_types.No_validation_callback
         ~received:
-          [ { Transition_state.sender
-            ; received_at = Time.now ()
-            ; gossip_topic = None
-            }
-          ] ;
-      Ok
-        (Option.value_map
-           ~f:(fun b -> `Preserved_body b)
-           ~default:`No_body_preserved body )
+          (Option.value_map ~default:[] sender_opt ~f:(fun sender ->
+               [ { Transition_state.sender
+                 ; received_at = Time.now ()
+                 ; gossip_topic = None
+                 }
+               ] ) ) ;
+      Ok ()
   | Error e ->
       let header = With_hash.data hh in
       let (module Context : CONTEXT) = context in
-      Context.record_event (`Pre_validate_header_invalid (sender, header, e)) ;
+      Option.iter sender_opt ~f:(fun sender ->
+          Context.record_event (`Pre_validate_header_invalid (sender, header, e)) ) ;
       let e' =
         Error.of_string
         @@
@@ -299,7 +289,7 @@ let rec pre_validate_and_add_retrieved ~context ~actions ~sender ~state ?body hh
         ~is_parent_in_frontier e' ;
       Error e'
 
-(** Handle an ancestor returned by [retrieve_chain] function.
+(** Handle a non-gossip ancestor.
   
     The ancestor's block is pre-validated and added to transition states
     (if not yet present there).
@@ -318,7 +308,7 @@ and handle_retrieved_ancestor ~context ~actions ~state ~sender el =
     }
   in
   let transition_meta, hh_opt, body =
-    split_retrieve_chain_element ~context el
+    split_element_and_check_storage ~context el
   in
   let state_hash = transition_meta.state_hash in
   match (Transition_states.find state.transition_states state_hash, hh_opt) with
@@ -341,8 +331,16 @@ and handle_retrieved_ancestor ~context ~actions ~state ~sender el =
       in
       match relevance_status with
       | `Relevant ->
-          pre_validate_and_add_retrieved ~context ~actions ~sender ~state ?body
-            hh
+          Result.map
+            (pre_validate_and_add_retrieved ~context ~actions ~sender ~state
+               ?body hh ) ~f:(fun () ->
+              Option.value_map
+                ~f:(fun b ->
+                  let body_ref =
+                    With_hash.data hh |> Mina_block.Header.body_reference
+                  in
+                  `Preserved_body (body_ref, b) )
+                ~default:`No_body_preserved body )
       | _ ->
           Ok `No_body_preserved )
   | None, None ->
@@ -431,18 +429,15 @@ and upon_f ~top_state_hash ~actions ~context ~state ~cancel_child_contexts =
                Context.record_event (`Preserved_body_for_retrieved_ancestor b) )
     else
       let error = Error.of_string "parent is invalid" in
-      let transition_meta, _, _ = split_retrieve_chain_element ~context el in
-      ( match
-          Transition_states.find state.transition_states
-            transition_meta.state_hash
-        with
-      | Some (Transition_state.Invalid _) ->
-          ()
-      | Some _ ->
-          actions.Misc.mark_invalid ~error transition_meta.state_hash
-      | None ->
-          insert_invalid_state ~is_parent_in_frontier:false ~actions ~state
-            ~transition_meta error ) ;
+      let transition_meta, _, _ = split_element_and_check_storage ~context el in
+      if
+        Option.is_some
+        @@ Transition_states.find state.transition_states
+             transition_meta.state_hash
+      then actions.Misc.mark_invalid ~error transition_meta.state_hash
+      else
+        insert_invalid_state ~is_parent_in_frontier:false ~actions ~state
+          ~transition_meta error ;
       res
   in
   let on_error e =
@@ -535,8 +530,10 @@ and restart_failed_ancestor ~state ~actions ~context top_state_hash =
 (** [add_received] adds a gossip to the state.
 
   Pre-conditions:
-  * transition is neither in frontier nor in catchup state
-  * [verify_header_is_relevant] returns [`Relevant] for the gossip
+
+  - transition is neither in frontier nor in catchup state
+
+  - [Gossip.verify_header_is_relevant] returns [`Relevant] for the gossip
 *)
 and add_received ~context ~actions ~state ~gossip_data ~received ?body:body_opt
     ~preferred_peers received_header =
@@ -589,7 +586,7 @@ and add_received ~context ~actions ~state ~gossip_data ~received ?body:body_opt
       ~f:(mark_done ~logger:Context.logger ~transition_states)
   in
   let add_to_state status =
-    Transition_states.add_new transition_states
+    Bit_catchup_state.add_new state
       (Received
          { body_opt
          ; header = received_header
@@ -666,7 +663,9 @@ and add_received ~context ~actions ~state ~gossip_data ~received ?body:body_opt
 (** Add a gossip to catchup state *)
 let handle_gossip ~context ~actions ~state ?body ~gd_map gossip_header =
   let header_with_hash = Mina_block.Validation.header_with_hash gossip_header in
-  let body_from_storage = check_body_storage ~context header_with_hash in
+  let body_from_storage =
+    check_body_of_header_in_storage ~context header_with_hash
+  in
   let body = if is_some body then body else body_from_storage in
   let state_hash = State_hash.With_state_hashes.state_hash header_with_hash in
   let relevance_status =
@@ -713,7 +712,12 @@ let handle_gossip ~context ~actions ~state ?body ~gd_map gossip_header =
       add_received ~actions ~context ~state ~gossip_data ~received ?body
         ~preferred_peers:senders (Initial_valid gossip_header) ;
       Option.value_map
-        ~f:(fun b -> `Preserved_body b)
+        ~f:(fun b ->
+          let body_ref =
+            Mina_block.Validation.header gossip_header
+            |> Mina_block.Header.body_reference
+          in
+          `Preserved_body (body_ref, b) )
         ~default:`No_body_preserved body
   | `Preserve_gossip_data ->
       let f =
@@ -760,19 +764,42 @@ let handle_network_transition ~context:(module Context : CONTEXT) ~actions
        ~context:(module Context)
        ~actions ~state ?body ~gd_map header_with_validation
 
-let handle_downloaded_body ~context ~actions ~body_reference_to_state_hash
-    ~transition_states body_ref =
+let handle_downloaded_body ~context ~actions ~known_body_refs ~transition_states
+    body_ref =
   let (module Context : CONTEXT) = context in
-  let%bind.Option body = Context.check_body_in_storage body_ref in
-  let%bind.Option state_hash =
-    Body_ref_table.find body_reference_to_state_hash body_ref
+  let or_error s = Result.of_option ~error:(Error.of_string s) in
+  let check () =
+    let%bind.Or_error body =
+      Context.check_body_in_storage body_ref |> or_error "body not in storage"
+    in
+    let%bind.Or_error state_hashes =
+      Known_body_refs.state_hashes known_body_refs body_ref
+      |> or_error "block ref is unknown"
+    in
+    let%map.Or_error states =
+      Result.all
+      @@ List.map state_hashes ~f:(fun state_hash ->
+             Transition_states.find transition_states state_hash
+             |> or_error "state isn't in transition states" )
+    in
+    (body, state_hashes, states)
   in
-  [%log' info Context.logger] "Retrieved body $body_ref for $state_hash"
-    ~metadata:
-      [ ("body_ref", Consensus.Body_reference.to_yojson body_ref)
-      ; ("state_hash", State_hash.to_yojson state_hash)
-      ] ;
-  let%map.Option st = Transition_states.find transition_states state_hash in
-  ( state_hash
-  , Gossip.preserve_body st body
-    |> handle_preserve_hint ~actions ~transition_states ~context )
+  match check () with
+  | Error e ->
+      [%log' warn Context.logger]
+        "Failed processing retrieved body $body_ref: %s" (Error.to_string_hum e)
+        ~metadata:[ ("body_ref", Consensus.Body_reference.to_yojson body_ref) ]
+  | Ok (body, state_hashes, states) ->
+      [%log' info Context.logger] "Retrieved body $body_ref for $state_hashes"
+        ~metadata:
+          [ ("body_ref", Consensus.Body_reference.to_yojson body_ref)
+          ; ( "state_hashes"
+            , `List (List.map state_hashes ~f:State_hash.to_yojson) )
+          ] ;
+      List.iter states ~f:(fun st ->
+          ignore
+            ( handle_preserve_hint ~actions ~transition_states ~context
+                (Gossip.preserve_body st body)
+              : [ `No_body_preserved
+                | `Preserved_body of
+                  Consensus.Body_reference.t * Mina_block.Body.t ] ) )

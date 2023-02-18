@@ -55,10 +55,7 @@ exception Libp2p_helper_died_unexpectedly
 type t
 
 type on_bitswap_update_t =
-     tag:Staged_ledger_diff.Body.Tag.t
-  -> [ `Added | `Removed | `Broken ]
-  -> Blake2.t list
-  -> unit
+  tag:Bitswap_tag.t -> [ `Added | `Removed | `Broken ] -> Blake2.t list -> unit
 
 (** A "multiaddr" is libp2p's extensible encoding for network addresses.
 
@@ -117,6 +114,7 @@ end
 
 module Validation_callback = Validation_callback
 module Sink = Sink
+module Bitswap_tag = Bitswap_tag
 
 module For_tests : sig
   module Helper = Libp2p_helper
@@ -393,10 +391,8 @@ val banned_ips : t -> Unix.Inet_addr.t list
 val send_heartbeat : t -> Peer.Id.t -> unit
 
 val download_bitswap_resource :
-     t
-  -> tag:Staged_ledger_diff.Body.Tag.t
-  -> ids:Consensus.Body_reference.t list
-  -> unit
+  t -> tag:Bitswap_tag.t -> ids:Blake2.t list -> unit
 
-val add_bitswap_resource :
-  t -> tag:Staged_ledger_diff.Body.Tag.t -> data:string -> unit
+val add_bitswap_resource : t -> tag:Bitswap_tag.t -> data:string -> unit
+
+val remove_bitswap_resource : t -> ids:Blake2.t list -> unit

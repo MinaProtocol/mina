@@ -335,24 +335,10 @@ let pre_validate_header_invalid_action ~header = function
               , `String Protocol_version.(current |> to_string) )
             ] ) )
 
-let handle_invalid ~children =
-  List.iter ~f:(fun meta ->
-      State_hash.Table.change children meta.Substate.parent_state_hash
-        ~f:(function
-        | Some (`Invalid_children, lst) ->
-            Some (`Invalid_children, meta.state_hash :: lst)
-        | other ->
-            other ) )
-
 let get_status_name =
   Substate.view
     ~f:{ viewer = (fun { status; _ } -> Substate.name_of_status status) }
     ~state_functions
-
-let mark_invalid ~state ?reason ~error state_hash =
-  Transition_states.mark_invalid ?reason ~error ~state_hash
-    state.transition_states
-  |> handle_invalid ~children:state.children
 
 (** [promote_to_next_state] takes [old_state] of a transition with [Processed] status
     and updates it to [next_state_opt].
@@ -382,7 +368,7 @@ let promote_to_next_state ~context:(module Context : CONTEXT) ~write_actions
   | None ->
       State_hash.Table.change state.children state_hash
         ~f:(Option.map ~f:(Tuple2.map_fst ~f:(const `Parent_in_frontier))) ;
-      Transition_states.remove transition_states state_hash
+      Transition_states.remove ~reason:`In_frontier transition_states state_hash
   | Some st ->
       Transition_states.update transition_states st ) ;
   Processed_skipping.Dsu.remove ~key:state_hash Context.processed_dsu ;
@@ -536,14 +522,16 @@ let actions ~write_actions ~context ~state =
     if List.is_empty hashes then ()
     else mpp_impl ~actions:(Deferred.return actions) ?reason hashes
   and actions =
-    { mark_invalid = mark_invalid ~state; mark_processed_and_promote }
+    { mark_invalid = Bit_catchup_state.mark_invalid ~state
+    ; mark_processed_and_promote
+    }
   in
   actions
 
 type throttles = { verifier : Simple_throttle.t; download : Simple_throttle.t }
 
 let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
-    ~block_storage ~get_completed_work ~throttles ~body_reference_to_state_hash
+    ~block_storage ~get_completed_work ~throttles
     ~context:(module Context_ : Context.MINI_CONTEXT) =
   let outdated_root_cache =
     Transition_handler.Core_extended_cache.Lru.create ~destruct:None 1000
@@ -582,21 +570,13 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
 
     let download_body ~header ~preferred_peers (module I : Interruptible.F) =
       let start_time = Time.now () in
-      let body_reference =
-        With_hash.data header |> Mina_block.Header.protocol_state
-        |> Mina_state.(
-             Fn.compose Blockchain_state.body_reference
-               Protocol_state.blockchain_state)
-      in
+      let body_ref = Mina_block.Header.body_reference (With_hash.data header) in
       let meta = Substate.transition_meta_of_header_with_hash header in
-      let tag = Staged_ledger_diff.Body.Tag.Body in
       let%bind.I.Deferred_let_syntax () =
         if catchup_config.bitswap_enabled then
           let%bind () =
-            Body_ref_table.set body_reference_to_state_hash ~key:body_reference
-              ~data:meta.state_hash ;
-            Mina_networking.download_bitswap_resource network ~tag
-              ~ids:[ body_reference ]
+            Mina_networking.download_bitswap_resource network ~tag:Body
+              ~ids:[ body_ref ]
           in
           Async.after catchup_config.bitwap_download_timeout
         else Deferred.unit
@@ -606,8 +586,7 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
           "Bitswap download of body $body_reference for $state_hash failed"
           ~metadata:
             [ ("state_hash", State_hash.to_yojson meta.state_hash)
-            ; ( "body_reference"
-              , Consensus.Body_reference.to_yojson body_reference )
+            ; ("body_reference", Consensus.Body_reference.to_yojson body_ref)
             ] ;
       let%bind.I.Result res =
         download_ancestors ~preferred_peers
@@ -621,11 +600,10 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
       | `Block bh, _ ->
           let body = Mina_block.body (With_hash.data bh) in
           let%map.I.Deferred_let_syntax () =
-            let data =
-              Staged_ledger_diff.Body.to_binio_bigstring body
-              |> Bigstring.to_string
-            in
-            Mina_networking.add_bitswap_resource network ~tag ~data
+            if Misc.is_block_not_full ~logger block_storage body_ref then
+              Mina_networking.add_bitswap_resource network ~tag:Body
+                ~data:(Staged_ledger_diff.Body.to_raw_string body)
+            else Deferred.unit
           in
           Ok body
       | _ ->
@@ -771,14 +749,13 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
           don't_wait_for
           @@ Trust_system.record_envelope_sender trust_system logger sender
                action
-      | `Preserved_body_for_retrieved_ancestor body ->
-          let tag = Staged_ledger_diff.Body.Tag.Body in
-          let data =
-            Staged_ledger_diff.Body.to_binio_bigstring body
-            |> Bigstring.to_string
-          in
-          don't_wait_for
-            (Mina_networking.add_bitswap_resource ~tag ~data network)
+      | `Preserved_body_for_retrieved_ancestor (body_ref, body) ->
+          if Misc.is_block_not_full ~logger block_storage body_ref then
+            (* TODO check it's not yet there *)
+            don't_wait_for
+              (Mina_networking.add_bitswap_resource ~tag:Body
+                 ~data:(Staged_ledger_diff.Body.to_raw_string body)
+                 network )
 
     let allocate_bandwidth ?priority = function
       | `Verifier ->
@@ -801,99 +778,17 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
   end in
   (module Context : CONTEXT)
 
-module Transition_states_callbacks (Context : sig
-  val trust_system : Trust_system.t
-
-  val logger : Logger.t
-end) =
-struct
-  let on_invalid ?(reason = `Other) ~error ~aux _meta =
-    let f { Transition_state.sender; gossip_topic; _ } =
-      let action =
-        match reason with
-        | `Other when Option.is_some gossip_topic ->
-            Trust_system.Actions.Gossiped_invalid_transition
-        | `Other ->
-            Sent_invalid_transition
-        | `Proof ->
-            Sent_invalid_proof
-        | `Signature_or_proof ->
-            Sent_invalid_signature_or_proof
-      in
-      Trust_system.record_envelope_sender Context.trust_system Context.logger
-        (Network_peer.Envelope.Sender.Remote sender)
-        (action, Some (Error.to_string_hum error, []))
-    in
-    don't_wait_for (Deferred.List.iter ~f aux.Transition_state.received)
-
-  let on_add_new state_hash =
-    (* TODO print state that is added *)
-    [%log' info Context.logger]
-      "Adding transition $state_hash to bit-catchup state"
-      ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] ;
-    Mina_metrics.Gauge.inc_one
-      Mina_metrics.Transition_frontier_controller.transitions_being_processed
-
-  let on_remove state_hash =
-    [%log' info Context.logger]
-      "Removing transition $state_hash from bit-catchup state"
-      ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] ;
-    Mina_metrics.Gauge.dec_one
-      Mina_metrics.Transition_frontier_controller.transitions_being_processed
-end
-
-let create_in_mem_transition_states ~trust_system ~logger =
-  Transition_states.create_inmem
-    ( module Transition_states_callbacks (struct
-      let trust_system = trust_system
-
-      let logger = logger
-    end) )
-
-let on_bitswap_update ~context ~actions ~body_reference_to_state_hash
-    ~transition_states ~tag type_ ids =
-  let (module Context : CONTEXT) = context in
-  let handle_downloaded_body body_ref =
-    [%log' info Context.logger] "Downloaded body $body_ref"
-      ~metadata:[ ("body_ref", Consensus.Body_reference.to_yojson body_ref) ] ;
-    ignore
-      ( Received.handle_downloaded_body ~context ~actions
-          ~body_reference_to_state_hash ~transition_states
-          (Consensus.Body_reference.of_blake2 body_ref)
-        : ( State_hash.t
-          * [ `No_body_preserved | `Preserved_body of Mina_block.Body.t ] )
-          option )
-  in
-  match (tag, type_) with
-  | Staged_ledger_diff.Body.Tag.Body, `Added ->
-      List.iter ids ~f:handle_downloaded_body
-  | _ ->
-      let type_str =
-        match type_ with
-        | `Added ->
-            "added"
-        | `Removed ->
-            "removed"
-        | `Broken ->
-            "broken"
-      in
-      [%log' warn Context.logger]
-        "Ignoring bitswap update (tag: %d, type: %s) for $ids"
-        (Staged_ledger_diff.Body.Tag.to_enum tag)
-        type_str
-        ~metadata:[ ("ids", `List (List.map ~f:Blake2.to_yojson ids)) ]
-
-let run ~frontier ~(on_bitswap_update_ref : Mina_net2.on_bitswap_update_t ref)
-    ~context ~trust_system ~verifier ~network ~time_controller
-    ~get_completed_work ~collected_transitions ~network_transition_reader
-    ~producer_transition_reader ~clear_reader ~verified_transition_writer =
+let run ~frontier ~on_block_body_update_ref ~context ~trust_system ~verifier
+    ~network ~time_controller ~get_completed_work ~collected_transitions
+    ~network_transition_reader ~producer_transition_reader ~clear_reader
+    ~verified_transition_writer =
   let open Pipe_lib in
   (* Overflow of this buffer shouldn't happen because building a breadcrumb is expected to be a more time-heavy action than inserting the breadcrumb into frontier *)
   let breadcrumb_notification_reader, breadcrumb_notification_writer =
     Strict_pipe.create ~name:"frontier-notifier"
       (Buffered (`Capacity 1, `Overflow (Strict_pipe.Drop_head ignore)))
   in
-  let state =
+  let state, for_catchup =
     match Transition_frontier.catchup_state frontier with
     | Bit t ->
         t
@@ -903,9 +798,6 @@ let run ~frontier ~(on_bitswap_update_ref : Mina_net2.on_bitswap_update_t ref)
            catchup tree"
   in
   let (module Context_ : Context.MINI_CONTEXT) = context in
-  (* TODO is "block-db" the right path ? *)
-  let block_db_path = Core.(Context_.conf_dir ^/ "mina_net2" ^/ "block-db") in
-  let block_storage = Lmdb_storage.Block.create block_db_path in
   let write_verified_transition (`Transition t, `Source _) : unit =
     Pipe_lib.Strict_pipe.Writer.write verified_transition_writer t
   in
@@ -921,46 +813,65 @@ let run ~frontier ~(on_bitswap_update_ref : Mina_net2.on_bitswap_update_t ref)
         Simple_throttle.create Context_.catchup_config.max_download_jobs
     }
   in
-  let body_reference_to_state_hash = Body_ref_table.create () in
   let context =
     make_context ~context ~frontier ~time_controller ~verifier ~trust_system
-      ~network ~block_storage ~throttles ~get_completed_work
-      ~body_reference_to_state_hash
+      ~network ~block_storage:state.block_storage ~throttles ~get_completed_work
   in
-  let (module Context : CONTEXT) = context in
-  let logger = Context.logger in
+  let logger = Context_.logger in
   let transition_states = state.transition_states in
   let actions = actions ~context ~state ~write_actions in
-  on_bitswap_update_ref :=
-    on_bitswap_update ~context ~actions ~body_reference_to_state_hash
-      ~transition_states ;
+  let prev_bitswap_update_f = !on_block_body_update_ref in
+  (on_block_body_update_ref :=
+     function
+     | `Broken ->
+         List.iter
+           ~f:
+             (Known_body_refs.handle_broken ~logger state.known_body_refs
+                ~mark_invalid:
+                  (actions.Misc.mark_invalid
+                     ~error:(Error.of_string "broken body") ) )
+     | `Added ->
+         List.iter
+           ~f:
+             (Received.handle_downloaded_body ~context ~actions
+                ~known_body_refs:state.known_body_refs ~transition_states ) ) ;
   let initial_catchup_trigger = ref (Some (Block_time.now time_controller)) in
+  List.iter for_catchup ~f:(fun hh ->
+      let body = Context.check_body_of_header_in_storage ~context hh in
+      Result.iter_error
+        (Received.pre_validate_and_add_retrieved ~context ~actions ~state ?body
+           hh ) ~f:(fun err ->
+          [%log warn]
+            "Invalid $header with $state_hash pre-loaded from header storage: \
+             $error"
+            ~metadata:
+              [ ("header", Mina_block.Header.to_yojson (With_hash.data hh))
+              ; ( "state_hash"
+                , State_hash.With_state_hashes.state_hash hh
+                  |> State_hash.to_yojson )
+              ; ("error", Error_json.error_to_yojson err)
+              ] ) ) ;
   List.iter collected_transitions ~f:(fun transition_tuple ->
       Received.handle_collected_transition ~context ~actions ~state
         transition_tuple
       |> function
       | `No_body_preserved ->
           ()
-      | `Preserved_body body ->
-          let tag = Staged_ledger_diff.Body.Tag.Body in
-          let data =
-            Staged_ledger_diff.Body.to_binio_bigstring body
-            |> Bigstring.to_string
-          in
-          don't_wait_for
-            (Mina_networking.add_bitswap_resource network ~tag ~data) ) ;
+      | `Preserved_body (body_ref, body) ->
+          if Misc.is_block_not_full ~logger state.block_storage body_ref then
+            don't_wait_for
+              (Mina_networking.add_bitswap_resource network ~tag:Body
+                 ~data:(Staged_ledger_diff.Body.to_raw_string body) ) ) ;
   don't_wait_for
   @@ Strict_pipe.Reader.iter producer_transition_reader ~f:(fun b ->
-         let tag = Staged_ledger_diff.Body.Tag.Body in
          let body = Frontier_base.Breadcrumb.block b |> Mina_block.body in
-         let data =
-           Staged_ledger_diff.Body.to_binio_bigstring body
-           |> Bigstring.to_string
+         let%map () =
+           Mina_networking.add_bitswap_resource network ~tag:Body
+             ~data:(Staged_ledger_diff.Body.to_raw_string body)
          in
-         let%map () = Mina_networking.add_bitswap_resource network ~tag ~data in
          let st_opt =
            Waiting_to_be_added_to_frontier.handle_produced_transition ~context
-             ~transition_states b
+             ~state b
          in
          Option.iter st_opt
            ~f:
@@ -972,36 +883,43 @@ let run ~frontier ~(on_bitswap_update_ref : Mina_net2.on_bitswap_update_t ref)
   @@ Strict_pipe.Reader.iter network_transition_reader ~f:(fun gossip ->
          Received.handle_network_transition ~context ~actions ~state gossip
          |> function
-         | `No_body_preserved ->
-             Deferred.unit
-         | `Preserved_body body ->
-             let tag = Staged_ledger_diff.Body.Tag.Body in
-             let data =
-               Staged_ledger_diff.Body.to_binio_bigstring body
-               |> Bigstring.to_string
-             in
-             Mina_networking.add_bitswap_resource network ~tag ~data ) ;
+         | `Preserved_body (body_ref, body)
+           when Misc.is_block_not_full ~logger state.block_storage body_ref ->
+             Mina_networking.add_bitswap_resource network ~tag:Body
+               ~data:(Staged_ledger_diff.Body.to_raw_string body)
+         | _ ->
+             Deferred.unit ) ;
   don't_wait_for
   @@ Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
          let open Strict_pipe.Writer in
+         on_block_body_update_ref := prev_bitswap_update_f ;
          Transition_states.shutdown_in_progress transition_states ;
          kill breadcrumb_notification_writer ) ;
   don't_wait_for
   @@ Strict_pipe.Reader.iter breadcrumb_notification_reader ~f:(fun () ->
          let f (_, b) =
            let parent_hash = Frontier_base.Breadcrumb.parent_hash b in
-           match Transition_frontier.find frontier parent_hash with
-           | Some _ ->
+           let state_hash = Frontier_base.Breadcrumb.state_hash b in
+           match
+             ( Transition_frontier.find frontier parent_hash
+             , Transition_states.find transition_states state_hash )
+           with
+           | Some _, Some _ ->
                true
-           | _ ->
-               let state_hash = Frontier_base.Breadcrumb.state_hash b in
+           | None, _ ->
                [%log warn]
-                 "When trying to add breadcrumb $state_hash, its parent had \
+                 "When trying to add breadcrumb $state_hash, its parent has \
                   been removed from transition frontier: $parent_hash"
                  ~metadata:
                    [ ("parent_hash", State_hash.to_yojson parent_hash)
                    ; ("state_hash", State_hash.to_yojson state_hash)
                    ] ;
+               false
+           | _, None ->
+               [%log warn]
+                 "When trying to add breadcrumb $state_hash, it has been \
+                  removed from transition states"
+                 ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] ;
                false
          in
          let breadcrumbs =
@@ -1031,7 +949,7 @@ let run ~frontier ~(on_bitswap_update_ref : Mina_net2.on_bitswap_update_t ref)
              | _ ->
                  () ) ;
          let%map.Deferred () =
-           Transition_frontier.add_breadcrumbs_exn Context.frontier
+           Transition_frontier.add_breadcrumbs_exn frontier
              (List.map ~f:snd breadcrumbs)
          in
          let promote (source, b) =
@@ -1043,7 +961,7 @@ let run ~frontier ~(on_bitswap_update_ref : Mina_net2.on_bitswap_update_t ref)
                  Transition_handler.Processor.record_block_inclusion_time
                    (Frontier_base.Breadcrumb.validated_transition b)
                    ~time_controller
-                   ~consensus_constants:Context.consensus_constants
+                   ~consensus_constants:Context_.consensus_constants
                in
                Option.iter !initial_catchup_trigger ~f:(fun start_time ->
                    if Block_time.(start_time < transition_time) then (
@@ -1061,4 +979,5 @@ let run ~frontier ~(on_bitswap_update_ref : Mina_net2.on_bitswap_update_t ref)
          in
          List.iter breadcrumbs ~f:promote )
 (* TODO handle case when transition states were recovered from persistence and some transitions
-   were marked `Processing Done` or `Processed` but were not promoted *)
+   were marked `Processing Done` or `Processed` but were not promoted
+   (not needed now because transition states are not persisted and are reset between calls to run() )*)

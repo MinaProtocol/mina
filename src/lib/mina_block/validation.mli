@@ -114,6 +114,25 @@ val validate_genesis_protocol_state :
      , [> `Invalid_genesis_protocol_state ] )
      Result.t
 
+val skip_genesis_protocol_state_validation_header :
+     [ `This_header_was_loaded_from_persistence ]
+  -> ( 'a
+     , [ `Genesis_state ] * unit Truth.false_t
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_header
+  -> ( 'a
+     , [ `Genesis_state ] * unit Truth.true_t
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_header
+
 val skip_genesis_protocol_state_validation :
      [ `This_block_was_generated_internally ]
   -> ( 'a
@@ -195,6 +214,27 @@ val validate_delta_block_chain :
        with_header
      , [> `Invalid_delta_block_chain_proof ] )
      Result.t
+
+val skip_delta_block_chain_validation_header :
+     [ `This_header_was_loaded_from_persistence ]
+  -> ( 'a
+     , 'b
+     , 'c
+     , [ `Delta_block_chain ]
+       * State_hash.t Mina_stdlib.Nonempty_list.t Truth.false_t
+     , 'd
+     , 'e
+     , 'f )
+     with_header
+  -> ( 'a
+     , 'b
+     , 'c
+     , [ `Delta_block_chain ]
+       * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
+     , 'd
+     , 'e
+     , 'f )
+     with_header
 
 val skip_delta_block_chain_validation :
      [ `This_block_was_not_received_via_gossip ]
@@ -406,6 +446,25 @@ val skip_protocol_versions_validation :
      , 'f
      , [ `Protocol_versions ] * unit Truth.true_t )
      with_block
+
+val skip_protocol_versions_validation_header :
+     [ `This_header_was_loaded_from_persistence ]
+  -> ( 'a
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , 'f
+     , [ `Protocol_versions ] * unit Truth.false_t )
+     with_header
+  -> ( 'a
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , 'f
+     , [ `Protocol_versions ] * unit Truth.true_t )
+     with_header
 
 val with_body :
      ( 'a

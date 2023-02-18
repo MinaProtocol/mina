@@ -97,6 +97,9 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
   let add_bitswap_resource (Any ((module M), t)) = M.add_bitswap_resource t
 
+  let remove_bitswap_resource (Any ((module M), t)) =
+    M.remove_bitswap_resource t
+
   let download_bitswap_resource (Any ((module M), t)) =
     M.download_bitswap_resource t
 end

@@ -3,7 +3,7 @@ open Core_kernel
 type t
 
 module Root_block_status : sig
-  type t = Partial | Full | Deleting [@@deriving enum]
+  type t = Partial | Full | Deleting [@@deriving enum, equal]
 end
 
 val create : string -> t

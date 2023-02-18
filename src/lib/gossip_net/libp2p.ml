@@ -980,6 +980,10 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
     let download_bitswap_resource t ~tag ~ids =
       let%map net2 = !(t.net2) in
       Mina_net2.download_bitswap_resource net2 ~tag ~ids
+
+    let remove_bitswap_resource t ~ids =
+      let%map net2 = !(t.net2) in
+      Mina_net2.remove_bitswap_resource net2 ~ids
   end
 
   include T

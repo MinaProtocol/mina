@@ -22,10 +22,10 @@ module Storage = Generic.Read_only (F)
 type t = Storage.t * Storage.holder
 
 module Root_block_status = struct
-  type t = Partial | Full | Deleting [@@deriving enum]
+  type t = Partial | Full | Deleting [@@deriving enum, equal]
 end
 
-let body_tag = Staged_ledger_diff.Body.Tag.(to_enum Body)
+let body_tag = Mina_net2.Bitswap_tag.(to_enum Body)
 
 let full_status = Root_block_status.to_enum Full
 
@@ -151,13 +151,17 @@ let%test_module "Block storage tests" =
 
     let send_and_receive ~helper ~reader ~db breadcrumb =
       let body = Breadcrumb.block breadcrumb |> Mina_block.body in
-      let body_ref = Staged_ledger_diff.Body.compute_reference body in
+      let body_ref =
+        Staged_ledger_diff.Body.compute_reference
+          ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
+          body
+      in
       let data =
         Staged_ledger_diff.Body.to_binio_bigstring body |> Bigstring.to_string
       in
       [%log info] "Sending add resource" ;
       Mina_net2.For_tests.Helper.send_add_resource
-        ~tag:Staged_ledger_diff.Body.Tag.Body ~data helper ;
+        ~tag:Mina_net2.Bitswap_tag.Body ~data helper ;
       [%log info] "Waiting for push message" ;
       let%map id_ = Pipe.read reader in
       let id = match id_ with `Ok a -> a | _ -> failwith "unexpected" in
@@ -188,7 +192,7 @@ let%test_module "Block storage tests" =
                    Base_quickcheck.quickcheck_generator_char ) ~trials:n
                 ~f:(fun data ->
                   Mina_net2.For_tests.Helper.send_add_resource
-                    ~tag:Staged_ledger_diff.Body.Tag.Body ~data helper ) ;
+                    ~tag:Mina_net2.Bitswap_tag.Body ~data helper ) ;
               match%bind Pipe.read_exactly reader ~num_values:n with
               | `Exactly _ ->
                   make_breadcrumb root >>= send_and_receive ~db ~helper ~reader

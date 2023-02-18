@@ -1,13 +1,10 @@
 open Pipe_lib
-
-val create_in_mem_transition_states :
-     trust_system:Trust_system.t
-  -> logger:Logger.t
-  -> Bit_catchup_state.Transition_states.t
+open Core_kernel
 
 val run :
      frontier:Transition_frontier.t
-  -> on_bitswap_update_ref:Mina_net2.on_bitswap_update_t Core_kernel.ref
+  -> on_block_body_update_ref:
+       ([< `Added | `Broken ] -> Consensus.Body_reference.t list -> unit) ref
   -> context:(module Context.MINI_CONTEXT)
   -> trust_system:Trust_system.t
   -> verifier:Verifier.t

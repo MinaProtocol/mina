@@ -32,9 +32,13 @@ val preserve_body :
      Transition_state.t
   -> Mina_block.Body.t
   -> Transition_state.t
-     * [ `Nop of [ `No_body_preserved | `Preserved_body of Mina_block.Body.t ]
+     * [ `Nop of
+         [ `No_body_preserved
+         | `Preserved_body of Consensus.Body_reference.t * Mina_block.Body.t ]
        | `Mark_downloading_body_processed of
-         unit Async_kernel.Ivar.t option * Mina_block.Body.t ]
+         unit Async_kernel.Ivar.t option
+         * Consensus.Body_reference.t
+         * Mina_block.Body.t ]
 
 (** [preserve_relevant_gossip] takes data of a recently received gossip related to a
     transition already present in the catchup state. It preserves useful data of gossip
@@ -50,12 +54,18 @@ val preserve_relevant_gossip :
   -> gossip_header:Mina_block.initial_valid_header
   -> Transition_state.t
   -> Transition_state.t
-     * [ `Nop of [ `No_body_preserved | `Preserved_body of Mina_block.Body.t ]
+     * [ `Nop of
+         [ `No_body_preserved
+         | `Preserved_body of Consensus.Body_reference.t * Mina_block.Body.t ]
        | `Mark_verifying_blockchain_proof_processed of
-         [ `No_body_preserved | `Preserved_body of Mina_block.Body.t ]
+         [ `No_body_preserved
+         | `Preserved_body of Consensus.Body_reference.t * Mina_block.Body.t ]
          * Mina_block.initial_valid_header
        | `Mark_downloading_body_processed of
-         unit Async_kernel.Ivar.t option * Mina_block.Body.t
+         unit Async_kernel.Ivar.t option
+         * Consensus.Body_reference.t
+         * Mina_block.Body.t
        | `Start_processing_verifying_complete_works of
-         [ `No_body_preserved | `Preserved_body of Mina_block.Body.t ]
+         [ `No_body_preserved
+         | `Preserved_body of Consensus.Body_reference.t * Mina_block.Body.t ]
          * State_hash.t ]

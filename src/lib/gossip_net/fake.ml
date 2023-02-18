@@ -300,6 +300,10 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       (* TODO is this implementation what it should be? *)
       Deferred.unit
 
+    let remove_bitswap_resource _ ~ids:_ =
+      (* TODO is this implementation what it should be? *)
+      Deferred.unit
+
     let download_bitswap_resource _ ~tag:_ ~ids:_ =
       (* TODO is this implementation what it should be? *)
       Deferred.unit

@@ -145,6 +145,9 @@ module Base (F_func : F) = struct
   let set_impl ?txn ~env lazy_db key value =
     Lmdb.Map.set ?txn (init_db ?txn ~env lazy_db) key value
 
+  let remove_impl ?txn ~env lazy_db key =
+    Lmdb.Map.remove ?txn (init_db ?txn ~env lazy_db) key ?value:None
+
   let iter_impl ?txn ~env ~perm ~iter_f lazy_db =
     let run_cursor cursor =
       try iter_f cursor (Lmdb.Cursor.first cursor) with Lmdb.Not_found -> ()
@@ -232,6 +235,9 @@ module Read_write (F_func : F) = struct
   let iter ~env:t db ~f =
     with_env t ~force:true ~perm:Rw ~default:() ~f:(fun env ->
         iter_rw_impl ~env db ~f )
+
+  let remove ~env:t db key =
+    with_env t ~perm:Rw ~default:() ~f:(fun env -> remove_impl ~env db key)
 end
 
 let%test_module "Lmdb storage tests" =

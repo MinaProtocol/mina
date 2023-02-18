@@ -1612,6 +1612,9 @@ let add_bitswap_resource { gossip_net; _ } =
 let download_bitswap_resource { gossip_net; _ } =
   Gossip_net.Any.download_bitswap_resource gossip_net
 
+let remove_bitswap_resource { gossip_net; _ } =
+  Gossip_net.Any.remove_bitswap_resource gossip_net
+
 let get_best_tip ?heartbeat_timeout ?timeout t peer =
   make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_best_tip
     ~label:"best tip" t peer ()
