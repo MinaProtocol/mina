@@ -11,8 +11,6 @@ module type CONTEXT = sig
 
   val consensus_constants : Consensus.Constants.t
 
-  val conf_dir : string
-
   val catchup_config : Mina_intf.catchup_config
 end
 
@@ -29,7 +27,10 @@ val run :
   -> persistent_root:Transition_frontier.Persistent_root.t
   -> persistent_frontier:Transition_frontier.Persistent_frontier.t
   -> initial_root_transition:Mina_block.Validated.t
-  -> catchup_mode:
-       [ `Bit of Bit_catchup_state.Transition_states.t | `Normal | `Super ]
+  -> catchup_mode:[ `Bit of Bit_catchup_state.create_args_t | `Normal | `Super ]
   -> (Transition_frontier.t * Transition_frontier.Gossip.element list)
      Deferred.t
+
+(* TODO consider moiving somewhere else *)
+val block_storage_actions :
+  Mina_networking.t -> Bit_catchup_state.block_storage_actions

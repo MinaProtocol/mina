@@ -42,11 +42,10 @@ let update_status_for_unprocessed ~logger ~transition_states ~state_hash status
           (Substate.name_of_status old_status)
           (Substate.name_of_status status)
           ~metadata ;
-        Some
-          (Transition_state.Building_breadcrumb
-             { r with substate = { r.substate with status }; block_vc } )
+        Transition_state.Building_breadcrumb
+          { r with substate = { r.substate with status }; block_vc }
     | st ->
-        Some st
+        st
   in
   Transition_states.update' transition_states state_hash ~f
 
@@ -212,8 +211,6 @@ let restart_failed_ancestor ~actions ~context ~transition_states ~state_hash
               ] )
   | _ ->
       ()
-
-(* TODO investigate issue of building breadcrumbs being prematurely abrupted (e.g. after 15s) *)
 
 (** Promote a transition that is in [Verifying_complete_works] state with
     [Processed] status to [Building_breadcrumb] state.

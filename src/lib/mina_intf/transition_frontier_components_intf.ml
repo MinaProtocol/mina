@@ -29,8 +29,6 @@ module type CONTEXT = sig
 
   val consensus_constants : Consensus.Constants.t
 
-  val conf_dir : string
-
   val catchup_config : catchup_config
 end
 
@@ -374,8 +372,9 @@ module type Transition_router_intf = sig
          Mina_block.initial_valid_header Broadcast_pipe.Reader.t
          * Mina_block.initial_valid_header Broadcast_pipe.Writer.t
     -> catchup_mode:
-         [ `Bit of Bit_catchup_state.Transition_states.t | `Normal | `Super ]
+         [ `Bit of Bit_catchup_state.create_args_t | `Normal | `Super ]
     -> notify_online:(unit -> unit Deferred.t)
-    -> on_bitswap_update_ref:Mina_net2.on_bitswap_update_t ref
+    -> on_block_body_update_ref:
+         ([< `Added | `Broken ] -> Consensus.Body_reference.t list -> unit) ref
     -> Mina_block.Validated.t Strict_pipe.Reader.t * unit Ivar.t
 end

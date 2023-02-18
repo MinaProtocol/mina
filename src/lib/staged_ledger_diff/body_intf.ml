@@ -1,9 +1,4 @@
 module type Full = sig
-  (* TODO Consider moving to a different location. as in future this won't be only about block body *)
-  module Tag : sig
-    type t = Body [@@deriving enum]
-  end
-
   [%%versioned:
   module Stable : sig
     [@@@no_toplevel_latest_type]
@@ -21,5 +16,7 @@ module type Full = sig
 
   val to_binio_bigstring : t -> Core_kernel.Bigstring.t
 
-  val compute_reference : t -> Consensus.Body_reference.t
+  val to_raw_string : t -> string
+
+  val compute_reference : tag:int -> t -> Consensus.Body_reference.t
 end

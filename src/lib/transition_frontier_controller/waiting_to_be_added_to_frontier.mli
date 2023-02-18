@@ -13,6 +13,6 @@ val promote_to :
 (** [handle_produced_transition] adds locally produced block to the catchup state *)
 val handle_produced_transition :
      context:(module Context.CONTEXT)
-  -> transition_states:Transition_states.t
+  -> state:Bit_catchup_state.t
   -> Frontier_base.Breadcrumb.t
   -> Transition_state.t option

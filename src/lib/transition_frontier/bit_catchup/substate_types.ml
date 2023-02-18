@@ -187,12 +187,13 @@ module type Transition_states_intf = sig
   val modify_substate_ : t -> f:unit modifier -> State_hash.t -> unit
 
   (** Remove transition state from the map  *)
-  val remove : t -> State_hash.t -> unit
+  val remove : t -> reason:[ `Prunning | `In_frontier ] -> State_hash.t -> unit
 
-  (** Update transition state in the map  *)
+  (** Update transition state in the map. Raises an exception if state wasn't present in the map.  *)
   val update : t -> state_t -> unit
 
-  val update' : t -> f:(state_t -> state_t option) -> State_hash.t -> unit
+  (** Update transition state in the map if it exists.  *)
+  val update' : t -> f:(state_t -> state_t) -> State_hash.t -> unit
 
   (** Shutdown actions that are in progress *)
   val shutdown_in_progress : t -> unit

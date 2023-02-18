@@ -25,6 +25,9 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val is_header_relevant :
+    root:Frontier_base.Breadcrumb.t -> Mina_block.Header.with_hash -> bool
 end
 
 let max_catchup_chunk_length = 20
@@ -83,7 +86,7 @@ let genesis_root_data ~precomputed_values =
 let load_from_persistence_and_start ~context:(module Context : CONTEXT)
     ~verifier ~consensus_local_state ~max_length ~persistent_root
     ~persistent_root_instance ~persistent_frontier ~persistent_frontier_instance
-    ~catchup_mode ignore_consensus_local_state =
+    ~catchup_mode ~block_storage_actions ignore_consensus_local_state =
   let open Context in
   let open Deferred.Result.Let_syntax in
   let root_identifier =
@@ -151,10 +154,12 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
   in
   { logger
   ; catchup_state =
-      Catchup_state.create catchup_mode
+      Catchup_state.create ~logger catchup_mode
         ~root:(Full_frontier.root full_frontier)
         ~is_in_frontier:
           (Fn.compose Option.is_some @@ Full_frontier.find full_frontier)
+        ~iter_frontier:(Full_frontier.iter full_frontier)
+        ~block_storage_actions ~is_header_relevant
   ; verifier
   ; consensus_local_state
   ; full_frontier
@@ -177,7 +182,8 @@ let rec load_with_max_length :
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
     -> catchup_mode:
-         [ `Bit of Bit_catchup_state.Transition_states.t | `Normal | `Super ]
+         [ `Bit of Bit_catchup_state.create_args_t | `Normal | `Super ]
+    -> block_storage_actions:Bit_catchup_state.block_storage_actions
     -> unit
     -> ( t
        , [> `Bootstrap_required
@@ -187,7 +193,8 @@ let rec load_with_max_length :
        Deferred.Result.t =
  fun ~context:(module Context : CONTEXT) ~max_length
      ?(retry_with_fresh_db = true) ~verifier ~consensus_local_state
-     ~persistent_root ~persistent_frontier ~catchup_mode () ->
+     ~persistent_root ~persistent_frontier ~catchup_mode ~block_storage_actions
+     () ->
   let open Context in
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
@@ -214,9 +221,10 @@ let rec load_with_max_length :
         match%bind
           load_from_persistence_and_start
             ~context:(module Context)
-            ~verifier ~consensus_local_state ~max_length ~persistent_root
-            ~persistent_root_instance ~catchup_mode ~persistent_frontier
-            ~persistent_frontier_instance ignore_consensus_local_state
+            ~block_storage_actions ~verifier ~consensus_local_state ~max_length
+            ~persistent_root ~persistent_root_instance ~catchup_mode
+            ~persistent_frontier ~persistent_frontier_instance
+            ignore_consensus_local_state
         with
         | Ok _ as result ->
             [%str_log trace] Persisted_frontier_loaded ;
@@ -313,8 +321,9 @@ let rec load_with_max_length :
         in
         load_with_max_length
           ~context:(module Context)
-          ~max_length ~verifier ~consensus_local_state ~persistent_root
-          ~persistent_frontier ~retry_with_fresh_db:false ~catchup_mode ()
+          ~block_storage_actions ~max_length ~verifier ~consensus_local_state
+          ~persistent_root ~persistent_frontier ~retry_with_fresh_db:false
+          ~catchup_mode ()
         >>| Result.map_error ~f:(function
               | `Persistent_frontier_malformed ->
                   `Failure
@@ -340,17 +349,13 @@ let rec load_with_max_length :
       | res ->
           return res )
 
-let load ?(retry_with_fresh_db = true) ~context:(module Context : CONTEXT)
-    ~verifier ~consensus_local_state ~persistent_root ~persistent_frontier
-    ~catchup_mode () =
-  let open Context in
+let load ?(retry_with_fresh_db = true) ~context =
+  let (module Context : CONTEXT) = context in
   let max_length =
-    global_max_length (Precomputed_values.genesis_constants precomputed_values)
+    global_max_length
+      (Precomputed_values.genesis_constants Context.precomputed_values)
   in
-  load_with_max_length
-    ~context:(module Context)
-    ~max_length ~retry_with_fresh_db ~verifier ~consensus_local_state
-    ~persistent_root ~persistent_frontier ~catchup_mode ()
+  load_with_max_length ~context ~max_length ~retry_with_fresh_db
 
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)
@@ -679,6 +684,8 @@ module For_tests = struct
       let constraint_constants = precomputed_values.constraint_constants
 
       let consensus_constants = precomputed_values.consensus_constants
+
+      let is_header_relevant ~root:_ _ = true
     end in
     let open Context in
     let open Quickcheck.Generator.Let_syntax in
@@ -740,6 +747,9 @@ module For_tests = struct
         ignore
         @@ Ledger_transfer.transfer_accounts ~src:root_snarked_ledger
              ~dest:(Persistent_root.Instance.snarked_ledger instance) ) ;
+    let block_storage_actions =
+      Bit_catchup_state.{ add_body = ignore; remove_body = ignore }
+    in
     let frontier_result =
       Async.Thread_safe.block_on_async_exn (fun () ->
           load_with_max_length ~max_length ~retry_with_fresh_db:false
@@ -753,7 +763,7 @@ module For_tests = struct
                   `Normal
               | None ->
                   `Normal )
-            ~persistent_frontier () )
+            ~block_storage_actions ~persistent_frontier () )
     in
     let frontier =
       let fail msg = failwith ("failed to load transition frontier: " ^ msg) in

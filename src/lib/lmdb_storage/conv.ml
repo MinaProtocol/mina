@@ -28,3 +28,16 @@ let blake2 =
         serialise string alloc str )
       ~deserialise:(fun s -> deserialise string s |> Blake2.of_raw_string)
       ())
+
+let bin_prot_conv (t : 'a Bin_prot.Type_class.t) =
+  Lmdb.Conv.(
+    make
+      ~serialise:(fun alloc x ->
+        let sz = t.writer.size x in
+        let res = alloc sz in
+        let _pos = t.writer.write ~pos:0 res in
+        res )
+      ~deserialise:
+        (let pos_ref = ref 0 in
+         t.reader.read ~pos_ref )
+      ())

@@ -224,3 +224,25 @@ let shutdown_modifier = function
 let shutdown_in_progress st =
   Option.value_map ~default:st ~f:fst
     (State_functions.modify_substate ~f:{ modifier = shutdown_modifier } st)
+
+let header = function
+  | Received { header; _ } ->
+      Some (Gossip_types.header_with_hash_of_received_header header)
+  | Verifying_blockchain_proof { header; _ } ->
+      Some (Mina_block.Validation.header_with_hash header)
+  | Downloading_body { header; _ } ->
+      Some (Mina_block.Validation.header_with_hash header)
+  | Verifying_complete_works { block; _ } ->
+      Some
+        ( Mina_block.Validation.block_with_hash block
+        |> With_hash.map ~f:Mina_block.header )
+  | Building_breadcrumb { block; _ } ->
+      Some
+        ( Mina_block.Validation.block_with_hash block
+        |> With_hash.map ~f:Mina_block.header )
+  | Waiting_to_be_added_to_frontier { breadcrumb; _ } ->
+      Some
+        ( Frontier_base.Breadcrumb.block_with_hash breadcrumb
+        |> With_hash.map ~f:Mina_block.header )
+  | Invalid _ ->
+      None

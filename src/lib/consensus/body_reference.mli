@@ -27,4 +27,6 @@ val of_hex_exn : string -> t
 
 val to_raw_string : t -> string
 
+val to_blake2 : t -> Blake2.t
+
 val of_blake2 : Blake2.t -> t

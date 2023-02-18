@@ -69,10 +69,15 @@ let add_to_children_of_parent_in_frontier =
 let add_orphan = handle_non_regular_child_with_tag ~tag:`Orphans
 
 let handle_non_regular_child ~state ~is_parent_in_frontier ~is_invalid meta =
-  let ret tag = handle_non_regular_child_with_tag ~state ~tag meta in
+  let handle tag = handle_non_regular_child_with_tag ~state ~tag meta in
   if
     Option.is_some
       (Transition_states.find state.transition_states meta.parent_state_hash)
-  then ( if is_invalid then ret `Invalid_children )
-  else if is_parent_in_frontier then ret `Parent_in_frontier
-  else ret `Orphans
+  then ( if is_invalid then handle `Invalid_children )
+  else if is_parent_in_frontier then handle `Parent_in_frontier
+  else handle `Orphans
+
+let is_block_not_full ~logger block_storage body_ref =
+  not
+    (Option.equal Lmdb_storage.Block.Root_block_status.equal (Some Full)
+       (Lmdb_storage.Block.get_status ~logger block_storage body_ref) )

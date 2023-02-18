@@ -33,6 +33,7 @@
    kimchi_backend
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
+   lmdb_storage
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_mina)))

@@ -13,8 +13,6 @@ module type CONTEXT = sig
 
   val consensus_constants : Consensus.Constants.t
 
-  val conf_dir : string
-
   val catchup_config : Mina_intf.catchup_config
 end
 
@@ -97,7 +95,7 @@ let is_transition_for_bootstrap ~context:(module Context : CONTEXT) frontier
           ~existing:root_consensus_state ~candidate:new_consensus_state
 
 let start_transition_frontier_controller ~context:(module Context : CONTEXT)
-    ~on_bitswap_update_ref ~trust_system ~verifier ~network ~time_controller
+    ~on_block_body_update_ref ~trust_system ~verifier ~network ~time_controller
     ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
     ~collected_transitions ?transition_writer_ref ~frontier_w frontier =
   let open Context in
@@ -129,14 +127,14 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
   Broadcast_pipe.Writer.write frontier_w (Some frontier) |> don't_wait_for ;
   Transition_frontier_controller.run
     ~context:(module Context)
-    ~on_bitswap_update_ref ~trust_system ~verifier ~network ~time_controller
+    ~on_block_body_update_ref ~trust_system ~verifier ~network ~time_controller
     ~collected_transitions ~frontier
     ~network_transition_reader:transition_frontier_controller_reader
     ~producer_transition_reader ~clear_reader ~verified_transition_writer ;
   transition_writer_ref
 
 let start_bootstrap_controller ~context:(module Context : CONTEXT)
-    ~on_bitswap_update_ref ~trust_system ~verifier ~network ~time_controller
+    ~on_block_body_update_ref ~trust_system ~verifier ~network ~time_controller
     ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
     ?transition_writer_ref ~consensus_local_state ~frontier_w
     ~initial_root_transition ~persistent_root ~persistent_frontier
@@ -157,7 +155,7 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT)
       ()
   in
   ( match catchup_mode with
-  | `Bit transition_states ->
+  | `Bit (transition_states, _, _, _) ->
       Bit_catchup_state.Transition_states.clear transition_states
   | _ ->
       () ) ;
@@ -192,10 +190,10 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT)
       Strict_pipe.Writer.kill bootstrap_controller_writer ;
       start_transition_frontier_controller
         ~context:(module Context)
-        ~on_bitswap_update_ref ~trust_system ~verifier ~network ~time_controller
-        ~producer_transition_writer_ref ~verified_transition_writer
-        ~clear_reader ~collected_transitions ~transition_writer_ref ~frontier_w
-        new_frontier
+        ~on_block_body_update_ref ~trust_system ~verifier ~network
+        ~time_controller ~producer_transition_writer_ref
+        ~verified_transition_writer ~clear_reader ~collected_transitions
+        ~transition_writer_ref ~frontier_w new_frontier
       |> Fn.const () ) ;
   transition_writer_ref
 
@@ -303,13 +301,21 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
            x.data ) )
 
 let load_frontier ~context:(module Context : CONTEXT) ~verifier
-    ~persistent_frontier ~persistent_root ~consensus_local_state ~catchup_mode =
+    ~persistent_frontier ~persistent_root ~consensus_local_state ~catchup_mode
+    ~block_storage_actions =
+  let module Tf_context = struct
+    include Context
+
+    let is_header_relevant =
+      Transition_handler.Validator.is_header_relevant_against_root
+        ~context:(module Context)
+  end in
   let open Context in
   match%map
     Transition_frontier.load
-      ~context:(module Context)
+      ~context:(module Tf_context)
       ~verifier ~consensus_local_state ~persistent_root ~persistent_frontier
-      ~catchup_mode ()
+      ~catchup_mode ~block_storage_actions ()
   with
   | Ok frontier ->
       [%log info] "Successfully loaded frontier" ;
@@ -365,11 +371,12 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
             "Will start initialization without connecting to too many peers" )
     ]
 
-let initialize ~context:(module Context : CONTEXT) ~on_bitswap_update_ref
+let initialize ~context:(module Context : CONTEXT) ~on_block_body_update_ref
     ~network ~is_seed ~is_demo_mode ~verifier ~trust_system ~time_controller
     ~frontier_w ~producer_transition_writer_ref ~clear_reader
     ~verified_transition_writer ~most_recent_valid_block_writer ~persistent_root
-    ~persistent_frontier ~consensus_local_state ~catchup_mode ~notify_online =
+    ~persistent_frontier ~consensus_local_state ~catchup_mode ~notify_online
+    ~block_storage_actions =
   let open Context in
   let%bind () =
     if is_demo_mode then return ()
@@ -387,7 +394,7 @@ let initialize ~context:(module Context : CONTEXT) ~on_bitswap_update_ref
       (load_frontier
          ~context:(module Context)
          ~verifier ~persistent_frontier ~persistent_root ~consensus_local_state
-         ~catchup_mode )
+         ~catchup_mode ~block_storage_actions )
   with
   | best_seen_transition, None ->
       [%log info] "Unable to load frontier; starting bootstrap" ;
@@ -396,7 +403,7 @@ let initialize ~context:(module Context : CONTEXT) ~on_bitswap_update_ref
           with_instance_exn persistent_frontier ~f:Instance.get_root_transition)
         >>| Result.ok_or_failwith
       in
-      start_bootstrap_controller ~on_bitswap_update_ref
+      start_bootstrap_controller ~on_block_body_update_ref
         ~context:(module Context)
         ~trust_system ~verifier ~network ~time_controller
         ~producer_transition_writer_ref ~verified_transition_writer
@@ -425,10 +432,10 @@ let initialize ~context:(module Context : CONTEXT) ~on_bitswap_update_ref
       let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
       start_bootstrap_controller
         ~context:(module Context)
-        ~on_bitswap_update_ref ~trust_system ~verifier ~network ~time_controller
-        ~producer_transition_writer_ref ~verified_transition_writer
-        ~clear_reader ?transition_writer_ref:None ~consensus_local_state
-        ~frontier_w ~persistent_root ~persistent_frontier
+        ~on_block_body_update_ref ~trust_system ~verifier ~network
+        ~time_controller ~producer_transition_writer_ref
+        ~verified_transition_writer ~clear_reader ?transition_writer_ref:None
+        ~consensus_local_state ~frontier_w ~persistent_root ~persistent_frontier
         ~initial_root_transition ~catchup_mode
         ~best_seen_transition:(Some best_tip)
   | best_tip_opt, Some frontier ->
@@ -494,10 +501,10 @@ let initialize ~context:(module Context : CONTEXT) ~on_bitswap_update_ref
       in
       start_transition_frontier_controller
         ~context:(module Context)
-        ~on_bitswap_update_ref ~trust_system ~verifier ~network ~time_controller
-        ~producer_transition_writer_ref ~verified_transition_writer
-        ~clear_reader ~collected_transitions ?transition_writer_ref:None
-        ~frontier_w frontier
+        ~on_block_body_update_ref ~trust_system ~verifier ~network
+        ~time_controller ~producer_transition_writer_ref
+        ~verified_transition_writer ~clear_reader ~collected_transitions
+        ?transition_writer_ref:None ~frontier_w frontier
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
@@ -545,7 +552,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~producer_transition_reader
     ~most_recent_valid_block:
       (most_recent_valid_block_reader, most_recent_valid_block_writer)
-    ~catchup_mode ~notify_online ~on_bitswap_update_ref =
+    ~catchup_mode ~notify_online ~on_block_body_update_ref =
   let open Context in
   let initialization_finish_signal = Ivar.create () in
   let clear_reader, clear_writer =
@@ -610,11 +617,13 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
       let%map transition_writer_ref =
         initialize
           ~context:(module Context)
-          ~on_bitswap_update_ref ~network ~is_seed ~is_demo_mode ~verifier
+          ~on_block_body_update_ref ~network ~is_seed ~is_demo_mode ~verifier
           ~trust_system ~persistent_frontier ~persistent_root ~time_controller
           ~frontier_w ~catchup_mode ~producer_transition_writer_ref
           ~clear_reader ~verified_transition_writer
           ~most_recent_valid_block_writer ~consensus_local_state ~notify_online
+          ~block_storage_actions:
+            (Bootstrap_controller.block_storage_actions network)
       in
       Ivar.fill_if_empty initialization_finish_signal () ;
       let valid_transition_reader1, valid_transition_reader2 =

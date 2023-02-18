@@ -27,6 +27,9 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val is_header_relevant :
+    root:Frontier_base.Breadcrumb.t -> Mina_block.Header.with_hash -> bool
 end
 
 include Frontier_intf.S
@@ -56,8 +59,8 @@ val load :
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> persistent_root:Persistent_root.t
   -> persistent_frontier:Persistent_frontier.t
-  -> catchup_mode:
-       [ `Bit of Bit_catchup_state.Transition_states.t | `Normal | `Super ]
+  -> catchup_mode:[ `Bit of Bit_catchup_state.create_args_t | `Normal | `Super ]
+  -> block_storage_actions:Bit_catchup_state.block_storage_actions
   -> unit
   -> ( t
      , [ `Failure of string
@@ -115,7 +118,8 @@ module For_tests : sig
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
     -> catchup_mode:
-         [ `Bit of Bit_catchup_state.Transition_states.t | `Normal | `Super ]
+         [ `Bit of Bit_catchup_state.create_args_t | `Normal | `Super ]
+    -> block_storage_actions:Bit_catchup_state.block_storage_actions
     -> unit
     -> ( t
        , [ `Failure of string

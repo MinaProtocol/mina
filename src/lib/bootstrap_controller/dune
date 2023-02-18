@@ -65,4 +65,7 @@
    kimchi_backend.pasta.basic
    mina_wire_types
    file_system
+   lmdb_storage
+   staged_ledger_diff
+   transition_handler
    ))
