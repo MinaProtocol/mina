@@ -37,7 +37,18 @@ let serialize compiled_circuit : string =
  ********************************)
 
 let circuit1 input _ : unit (* no output *) =
-  failwith "you need to implement the circuit for exercise 1"
+  let one = Impl.constant Impl.Field.typ (Impl.Field.Constant.of_int 1) in
+  let two = Impl.constant Impl.Field.typ (Impl.Field.Constant.of_int 2) in
+  let res = Impl.Field.add input one in
+  Impl.Field.Assert.equal res two
+
+(* field as a bunch of helpers that can make this more concise: *)
+let circuit1 input _ : unit (* no output *) =
+  (* field defines a helper [constant]. *)
+  let two = Impl.Field.constant (Impl.Field.Constant.of_int 2) in
+  (* Field redefines [+] and [one] as well .*)
+  let res = Impl.Field.(input + one) in
+  Impl.Field.Assert.equal res two
 
 (* check if it compiles and runs *)
 let () =
@@ -50,5 +61,28 @@ let () =
 (* check serialization *)
 let () =
   let compiled = compile ~input_typ:Impl.Typ.field circuit1 in
+  let serialized = serialize compiled in
+  Format.printf "%s@." serialized
+
+(********************************
+  * Exercise 2: input1 + input2 == 2.  *
+  ********************************)
+
+let circuit2 _input _ : unit (* no output *) =
+  failwith "you must feel excited about this exercise"
+
+let input_typ = Impl.Typ.(tuple2 field field)
+
+(* check if it compiles and runs *)
+let () =
+  let input_val = Impl.Field.Constant.(of_int 1, of_int 1) in
+  let (_ : Impl.Proof_inputs.t) =
+    generate_witness ~input_typ ~input_val circuit2
+  in
+  ()
+
+(* check serialization *)
+let () =
+  let compiled = compile ~input_typ circuit2 in
   let serialized = serialize compiled in
   Format.printf "%s@." serialized
