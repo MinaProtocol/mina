@@ -64,12 +64,14 @@ let () =
   let serialized = serialize compiled in
   Format.printf "%s@." serialized
 
-(********************************
+(***************************************
   * Exercise 2: input1 + input2 == 2.  *
-  ********************************)
+  **************************************)
 
-let circuit2 _input _ : unit (* no output *) =
-  failwith "you must feel excited about this exercise"
+let circuit2 (input : Impl.Field.t * Impl.Field.t) _ : unit =
+  let res = Impl.Field.(fst input + snd input) in
+  let two = Impl.Field.constant (Impl.Field.Constant.of_int 2) in
+  Impl.Field.Assert.equal res two
 
 let input_typ = Impl.Typ.(tuple2 field field)
 
@@ -84,5 +86,47 @@ let () =
 (* check serialization *)
 let () =
   let compiled = compile ~input_typ circuit2 in
+  let serialized = serialize compiled in
+  Format.printf "%s@." serialized
+
+(*********************************************************
+  * Exercise 3:                                          *
+  * if b { assert!(priv) } else if !b { assert!(!priv).  *
+  ********************************************************)
+
+type my_boolean_type = unit (* todo *)
+
+let input_typ : (my_boolean_type, bool) Impl.Typ.t =
+  Typ
+    { var_to_fields = (fun my_boolean_type -> failwith "todo")
+    ; var_of_fields = (fun (cvars, _) -> failwith "todo")
+    ; value_to_fields = (fun b -> failwith "todo")
+    ; value_of_fields = (fun (fields, _) -> failwith "todo")
+    ; size_in_field_elements = failwith "todo"
+    ; constraint_system_auxiliary = (fun () -> ())
+    ; check =
+        (fun my_boolean_type -> Impl.make_checked (fun _ -> failwith "todo"))
+    }
+
+(* our first gadget! *)
+let is_true (var : my_boolean_type) : unit = failwith "how can I check that.."
+
+let circuit3 (input : my_boolean_type) _ : unit = is_true input
+
+(* check if it compiles and runs *)
+let () =
+  ( match generate_witness ~input_typ ~input_val:false circuit3 with
+  | exception _ ->
+      Format.printf "correctly failed@."
+  | _ ->
+      failwith "passing `false` to the circuit should have failed" ) ;
+  let (_ : Impl.Proof_inputs.t) =
+    generate_witness ~input_typ ~input_val:true circuit3
+  in
+  ()
+
+(* check serialization *)
+let () =
+  let compiled = compile ~input_typ circuit3 in
   let serialized = serialize compiled in
   Format.printf "%s@." serialized
