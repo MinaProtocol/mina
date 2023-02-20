@@ -97,7 +97,11 @@ module type Gossip_net_intf = sig
   val ban_notification_reader : t -> ban_notification Linear_pipe.Reader.t
 
   val add_bitswap_resource :
-    t -> tag:Mina_net2.Bitswap_tag.t -> data:string -> unit Deferred.t
+       t
+    -> id:Blake2.t
+    -> tag:Mina_net2.Bitswap_tag.t
+    -> data:string
+    -> unit Deferred.t
 
   val download_bitswap_resource :
     t -> tag:Mina_net2.Bitswap_tag.t -> ids:Blake2.t list -> unit Deferred.t

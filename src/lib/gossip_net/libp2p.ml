@@ -200,8 +200,9 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
     (* Creates just the helper, making sure to register everything
        BEFORE we start listening/advertise ourselves for discovery. *)
-    let create_libp2p ?(allow_multiple_instances = false) (config : Config.t)
-        rpc_handlers first_peer_ivar high_connectivity_ivar ~added_seeds ~pids
+    let create_libp2p ?(allow_multiple_instances = false)
+        ?outstanding_resource_requests (config : Config.t) rpc_handlers
+        first_peer_ivar high_connectivity_ivar ~added_seeds ~pids
         ~on_unexpected_termination
         ~sinks:
           (Message.Any_sinks (sinksM, (sink_block, sink_tx, sink_snark_work)))
@@ -242,7 +243,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                   ~all_peers_seen_metric:config.all_peers_seen_metric
                   ~on_peer_connected:(fun _ -> record_peer_connection ())
                   ~on_peer_disconnected:ignore ~logger:config.logger ~conf_dir
-                  ~on_bitswap_update ~pids () ) )
+                  ~on_bitswap_update ~pids ?outstanding_resource_requests () ) )
       with
       | Ok (Ok net2) -> (
           let open Mina_net2 in
@@ -578,7 +579,10 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                     in
                     don't_wait_for
                       ( after restart_after
-                      >>= fun () -> Mina_net2.shutdown n >>| restart_libp2p )
+                      >>= fun () ->
+                      Mina_net2.shutdown n
+                      >>| fun reqs ->
+                      restart_libp2p ~outstanding_resource_requests:reqs () )
                 | None ->
                     () ) ;
                 n ) ;
@@ -596,20 +600,24 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
           upon res (fun _ ->
               [%log' trace config.logger] ~metadata:[]
                 "Successfully restarted libp2p" )
-        and start_libp2p () =
+        and start_libp2p ?outstanding_resource_requests () =
           let libp2p =
-            create_libp2p ~allow_multiple_instances config rpc_handlers
-              first_peer_ivar high_connectivity_ivar ~added_seeds ~pids
+            create_libp2p ~allow_multiple_instances
+              ?outstanding_resource_requests config rpc_handlers first_peer_ivar
+              high_connectivity_ivar ~added_seeds ~pids
               ~on_unexpected_termination:restart_libp2p ~sinks
               ~on_bitswap_update
           in
           on_libp2p_create libp2p ; Deferred.ignore_m libp2p
-        and restart_libp2p () = don't_wait_for (start_libp2p ()) in
+        and restart_libp2p ?outstanding_resource_requests () =
+          don't_wait_for (start_libp2p ?outstanding_resource_requests ())
+        in
         don't_wait_for
           (Strict_pipe.Reader.iter restarts_r ~f:(fun () ->
                let%bind n = !net2_ref in
-               let%bind () = Mina_net2.shutdown n in
-               restart_libp2p () ; !net2_ref >>| ignore ) ) ;
+               let%bind outstanding_resource_requests = Mina_net2.shutdown n in
+               restart_libp2p ~outstanding_resource_requests () ;
+               Deferred.ignore_m !net2_ref ) ) ;
         start_libp2p ()
       in
       let ban_configuration =
@@ -973,9 +981,9 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
     let restart_helper t = t.restart_helper ()
 
-    let add_bitswap_resource t ~tag ~data =
+    let add_bitswap_resource t ~id ~tag ~data =
       let%map net2 = !(t.net2) in
-      Mina_net2.add_bitswap_resource net2 ~tag ~data
+      Mina_net2.add_bitswap_resource net2 ~id ~tag ~data
 
     let download_bitswap_resource t ~tag ~ids =
       let%map net2 = !(t.net2) in

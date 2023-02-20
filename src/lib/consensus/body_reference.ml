@@ -22,8 +22,9 @@ end]
 
 type t = Stable.Latest.t
 
-[%%define_locally
-Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson, of_yojson, hash)]
+[%%define_locally Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson, of_yojson)]
+
+include Hashable.Make (Stable.Latest)
 
 type var = Boolean.var list
 

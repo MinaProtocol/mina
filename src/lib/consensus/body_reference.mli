@@ -9,7 +9,9 @@ module Stable : sig
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, compare, yojson, equal, hash]
+type t = Stable.Latest.t [@@deriving sexp, compare, yojson, equal]
+
+include Core_kernel.Hashable with type t := t
 
 type var
 

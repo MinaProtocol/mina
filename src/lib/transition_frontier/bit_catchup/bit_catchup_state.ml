@@ -14,7 +14,8 @@ type create_args_t =
   * Lmdb_storage.Header.t
 
 type block_storage_actions =
-  { add_body : Staged_ledger_diff.Body.t -> unit
+  { add_body :
+      id:Consensus.Body_reference.t -> Staged_ledger_diff.Body.t -> unit
   ; remove_body : Consensus.Body_reference.t list -> unit
   }
 
@@ -248,7 +249,7 @@ let create ~root ~logger ~is_in_frontier transition_states ~block_storage
         | Some Full ->
             ()
         | _ ->
-            block_storage_actions.add_body (Mina_block.body block)
+            block_storage_actions.add_body ~id:body_ref (Mina_block.body block)
       in
       match Lmdb_storage.Header.get header_storage state_hash with
       | None ->

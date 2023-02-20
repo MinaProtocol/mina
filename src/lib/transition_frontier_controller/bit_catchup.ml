@@ -601,7 +601,8 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
           let body = Mina_block.body (With_hash.data bh) in
           let%map.I.Deferred_let_syntax () =
             if Misc.is_block_not_full ~logger block_storage body_ref then
-              Mina_networking.add_bitswap_resource network ~tag:Body
+              Mina_networking.add_bitswap_resource network ~id:body_ref
+                ~tag:Body
                 ~data:(Staged_ledger_diff.Body.to_raw_string body)
             else Deferred.unit
           in
@@ -753,7 +754,7 @@ let make_context ~frontier ~time_controller ~verifier ~trust_system ~network
           if Misc.is_block_not_full ~logger block_storage body_ref then
             (* TODO check it's not yet there *)
             don't_wait_for
-              (Mina_networking.add_bitswap_resource ~tag:Body
+              (Mina_networking.add_bitswap_resource ~id:body_ref ~tag:Body
                  ~data:(Staged_ledger_diff.Body.to_raw_string body)
                  network )
 
@@ -860,13 +861,18 @@ let run ~frontier ~on_block_body_update_ref ~context ~trust_system ~verifier
       | `Preserved_body (body_ref, body) ->
           if Misc.is_block_not_full ~logger state.block_storage body_ref then
             don't_wait_for
-              (Mina_networking.add_bitswap_resource network ~tag:Body
+              (Mina_networking.add_bitswap_resource network ~id:body_ref
+                 ~tag:Body
                  ~data:(Staged_ledger_diff.Body.to_raw_string body) ) ) ;
   don't_wait_for
   @@ Strict_pipe.Reader.iter producer_transition_reader ~f:(fun b ->
          let body = Frontier_base.Breadcrumb.block b |> Mina_block.body in
+         let body_ref =
+           Frontier_base.Breadcrumb.block b
+           |> Mina_block.header |> Mina_block.Header.body_reference
+         in
          let%map () =
-           Mina_networking.add_bitswap_resource network ~tag:Body
+           Mina_networking.add_bitswap_resource network ~id:body_ref ~tag:Body
              ~data:(Staged_ledger_diff.Body.to_raw_string body)
          in
          let st_opt =
@@ -885,7 +891,7 @@ let run ~frontier ~on_block_body_update_ref ~context ~trust_system ~verifier
          |> function
          | `Preserved_body (body_ref, body)
            when Misc.is_block_not_full ~logger state.block_storage body_ref ->
-             Mina_networking.add_bitswap_resource network ~tag:Body
+             Mina_networking.add_bitswap_resource network ~id:body_ref ~tag:Body
                ~data:(Staged_ledger_diff.Body.to_raw_string body)
          | _ ->
              Deferred.unit ) ;

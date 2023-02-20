@@ -338,12 +338,11 @@ module Gossip = struct
 
     let name = "Block_gossip"
 
-    let id = Transition_handler.Block_sink.block_received_structured_events_id
+    let id = Network_pool.Block_sink.block_received_structured_events_id
 
     let parse_func message =
       match%bind parse id message with
-      | Transition_handler.Block_sink.Block_received { state_hash; sender = _ }
-        ->
+      | Network_pool.Block_sink.Block_received { state_hash; sender = _ } ->
           Ok ({ state_hash }, Direction.Received)
       | Mina_networking.Gossip_new_state { state_hash } ->
           Ok ({ state_hash }, Sent)

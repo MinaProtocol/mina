@@ -791,7 +791,7 @@ module For_tests = struct
         @@ Ledger_transfer.transfer_accounts ~src:root_snarked_ledger
              ~dest:(Persistent_root.Instance.snarked_ledger instance) ) ;
     let block_storage_actions =
-      Bit_catchup_state.{ add_body = ignore; remove_body = ignore }
+      Bit_catchup_state.{ add_body = (fun ~id:_ _ -> ()); remove_body = ignore }
     in
     let frontier_result =
       Async.Thread_safe.block_on_async_exn (fun () ->

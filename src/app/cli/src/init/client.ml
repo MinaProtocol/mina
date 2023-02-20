@@ -1610,7 +1610,7 @@ let generate_libp2p_keypair_do privkey_path =
         with
         | Ok net ->
             let%bind me = Mina_net2.generate_random_keypair net in
-            let%bind () = Mina_net2.shutdown net in
+            let%bind _ = Mina_net2.shutdown net in
             let%map () =
               Secrets.Libp2p_keypair.Terminal_stdin.write_exn ~privkey_path me
             in

@@ -57,6 +57,8 @@ type t
 type on_bitswap_update_t =
   tag:Bitswap_tag.t -> [ `Added | `Removed | `Broken ] -> Blake2.t list -> unit
 
+type outstanding_request_t = [ `Add of Bitswap_tag.t * string | `Remove ]
+
 (** A "multiaddr" is libp2p's extensible encoding for network addresses.
 
     They generally look like paths, and are read left-to-right. Each protocol
@@ -137,6 +139,7 @@ end
 *)
 val create :
      ?allow_multiple_instances:bool
+  -> ?outstanding_resource_requests:outstanding_request_t Blake2.Table.t
   -> all_peers_seen_metric:bool
   -> logger:Logger.t
   -> pids:Child_processes.Termination.t
@@ -372,7 +375,7 @@ val add_peer : t -> Multiaddr.t -> is_seed:bool -> unit Deferred.Or_error.t
 val begin_advertising : t -> unit Deferred.Or_error.t
 
 (** Stop listening, close all connections and subscription pipes, and kill the subprocess. *)
-val shutdown : t -> unit Deferred.t
+val shutdown : t -> outstanding_request_t Blake2.Table.t Deferred.t
 
 (** Configure the connection gateway.
 
@@ -393,6 +396,7 @@ val send_heartbeat : t -> Peer.Id.t -> unit
 val download_bitswap_resource :
   t -> tag:Bitswap_tag.t -> ids:Blake2.t list -> unit
 
-val add_bitswap_resource : t -> tag:Bitswap_tag.t -> data:string -> unit
+val add_bitswap_resource :
+  t -> id:Blake2.t -> tag:Bitswap_tag.t -> data:string -> unit
 
 val remove_bitswap_resource : t -> ids:Blake2.t list -> unit

@@ -1,6 +1,6 @@
 open Mina_base
 open Core_kernel
-module M = Hashtbl.Make (Consensus.Body_reference)
+module M = Consensus.Body_reference.Table
 
 type t =
   { known : ([ `Invalid | `Regular ] * State_hash.Set.t) M.t

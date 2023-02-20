@@ -84,6 +84,8 @@ type protocol_handler =
 type on_bitswap_update_t =
   tag:Bitswap_tag.t -> [ `Added | `Removed | `Broken ] -> Blake2.t list -> unit
 
+type outstanding_request_t = [ `Add of Bitswap_tag.t * string | `Remove ]
+
 type t =
   { conf_dir : string
   ; helper : Libp2p_helper.t
@@ -99,6 +101,7 @@ type t =
   ; peer_connected_callback : string -> unit
   ; peer_disconnected_callback : string -> unit
   ; resource_update_callback : on_bitswap_update_t
+  ; outstanding_resource_requests : outstanding_request_t Blake2.Table.t
   }
 
 let banned_ips t = t.banned_ips
@@ -109,7 +112,8 @@ let me t = Ivar.read t.my_keypair
 
 (** TODO: graceful shutdown. Reset all our streams, sync the databases, then
     shutdown. Replace kill invocation with an RPC. *)
-let shutdown t = Libp2p_helper.shutdown t.helper
+let shutdown t =
+  Libp2p_helper.shutdown t.helper >>| const t.outstanding_resource_requests
 
 let generate_random_keypair t = Keypair.generate_random t.helper
 
@@ -550,6 +554,7 @@ let handle_push_message t push_message =
           in
           let tag = tag_get m in
           let ids = List.map ~f:to_body_ref (ids_get_list m) in
+          List.iter ids ~f:(Blake2.Table.remove t.outstanding_resource_requests) ;
           let type_, type_str =
             match type_get m with
             | Added ->
@@ -577,9 +582,10 @@ let handle_push_message t push_message =
   | Undefined n ->
       Libp2p_ipc.undefined_union ~context:"DaemonInterface.PushMessage" n
 
-let create ?(allow_multiple_instances = false) ~all_peers_seen_metric ~logger
-    ~pids ~conf_dir ~on_peer_connected ~on_peer_disconnected ~on_bitswap_update
-    () =
+let create ?(allow_multiple_instances = false)
+    ?(outstanding_resource_requests = Blake2.Table.create ())
+    ~all_peers_seen_metric ~logger ~pids ~conf_dir ~on_peer_connected
+    ~on_peer_disconnected ~on_bitswap_update () =
   let open Deferred.Or_error.Let_syntax in
   let push_message_handler =
     ref (fun _msg ->
@@ -611,9 +617,21 @@ let create ?(allow_multiple_instances = false) ~all_peers_seen_metric ~logger
         (fun peer_id -> on_peer_disconnected (Peer.Id.unsafe_of_string peer_id))
     ; protocol_handlers = Hashtbl.create (module String)
     ; resource_update_callback = on_bitswap_update
+    ; outstanding_resource_requests
     }
   in
   (push_message_handler := fun msg -> handle_push_message t msg) ;
+  let for_remove =
+    Blake2.Table.fold ~init:[] outstanding_resource_requests
+      ~f:(fun ~key ~data ->
+        match data with
+        | `Remove ->
+            List.cons key
+        | `Add (tag, resource) ->
+            Libp2p_helper.send_add_resource ~tag ~data:resource t.helper ;
+            ident )
+  in
+  Libp2p_helper.send_remove_resource ~ids:for_remove t.helper ;
   ( if all_peers_seen_metric then
     let log_all_peers_interval = Time.Span.of_hr 2.0 in
     let log_message_batch_size = 50 in
@@ -643,8 +661,15 @@ let create ?(allow_multiple_instances = false) ~all_peers_seen_metric ~logger
 
 let send_heartbeat t peer_id = Libp2p_helper.send_heartbeat ~peer_id t.helper
 
-let add_bitswap_resource t = Libp2p_helper.send_add_resource t.helper
+let add_bitswap_resource t ~id ~tag ~data =
+  Blake2.Table.set ~key:id
+    ~data:(`Add (tag, data))
+    t.outstanding_resource_requests ;
+  Libp2p_helper.send_add_resource ~tag ~data t.helper
 
 let download_bitswap_resource t = Libp2p_helper.send_download_resource t.helper
 
-let remove_bitswap_resource t = Libp2p_helper.send_remove_resource t.helper
+let remove_bitswap_resource t ~ids =
+  List.iter ids ~f:(fun key ->
+      Blake2.Table.set ~key ~data:`Remove t.outstanding_resource_requests ) ;
+  Libp2p_helper.send_remove_resource ~ids t.helper

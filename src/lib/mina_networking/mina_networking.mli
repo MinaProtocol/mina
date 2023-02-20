@@ -231,7 +231,11 @@ val get_transition_chain :
   -> Mina_block.t list Deferred.Or_error.t
 
 val add_bitswap_resource :
-  t -> tag:Mina_net2.Bitswap_tag.t -> data:string -> unit Deferred.t
+     t
+  -> id:Blake2.t
+  -> tag:Mina_net2.Bitswap_tag.t
+  -> data:string
+  -> unit Deferred.t
 
 val download_bitswap_resource :
   t -> tag:Mina_net2.Bitswap_tag.t -> ids:Blake2.t list -> unit Deferred.t
