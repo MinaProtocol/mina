@@ -3,7 +3,7 @@
 open Core_kernel
 module Shape_tbl = Hashtbl.Make (Base.String)
 
-let shape_tbl : Bin_prot.Shape.t Shape_tbl.t = Shape_tbl.create ()
+let shape_tbl : (Bin_prot.Shape.t * string) Shape_tbl.t = Shape_tbl.create ()
 
 let find path_to_type = Shape_tbl.find shape_tbl path_to_type
 
@@ -14,8 +14,8 @@ let equal_shapes shape1 shape2 =
   let canonical2 = Bin_prot.Shape.eval shape2 in
   Bin_prot.Shape.Canonical.compare canonical1 canonical2 = 0
 
-let register path_to_type (shape : Bin_prot.Shape.t) =
-  match Shape_tbl.add shape_tbl ~key:path_to_type ~data:shape with
+let register path_to_type (shape : Bin_prot.Shape.t) (ty_decl : string) =
+  match Shape_tbl.add shape_tbl ~key:path_to_type ~data:(shape, ty_decl) with
   | `Ok ->
       ()
   | `Duplicate -> (
@@ -23,7 +23,7 @@ let register path_to_type (shape : Bin_prot.Shape.t) =
          once will yield duplicates; OK if the shapes are the same
       *)
       match find path_to_type with
-      | Some shape' ->
+      | Some (shape', _ty_decl) ->
           if not (equal_shapes shape shape') then
             failwithf "Different type shapes at path %s" path_to_type ()
           else ()

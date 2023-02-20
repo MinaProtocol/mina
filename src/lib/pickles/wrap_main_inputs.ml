@@ -26,6 +26,12 @@ let unrelated_g =
 
 open Impl
 
+(* Debug helper to convert wrap circuit field element to a hex string *)
+let read_wrap_circuit_field_element_as_hex fe =
+  let prover_fe = As_prover.read Field.typ fe in
+  Kimchi_backend.Pasta.Pallas_based_plonk.(
+    Bigint.to_hex (Field.to_bigint prover_fe))
+
 module Other_field = struct
   type t = Impls.Step.Field.Constant.t [@@deriving sexp]
 
@@ -60,7 +66,17 @@ module Sponge = struct
         let params = Tock_field_sponge.params
       end)
 
-  module S = Sponge.Make_sponge (Permutation)
+  module S = Sponge.Make_debug_sponge (struct
+    include Permutation
+    module Circuit = Impls.Wrap
+
+    (* Optional sponge name used in debug mode *)
+    let sponge_name = "wrap"
+
+    (* To enable debug mode, set environment variable [sponge_name] to "t", "1" or "true". *)
+    let debug_helper_fn = read_wrap_circuit_field_element_as_hex
+  end)
+
   include S
 
   let squeeze_field = squeeze

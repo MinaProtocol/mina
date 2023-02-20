@@ -1,0 +1,67 @@
+(library
+ (name snark_profiler_lib)
+ (public_name snark_profiler_lib)
+ (libraries
+   ;;opam libraries
+   integers
+   astring
+   sexplib0
+   result
+   async_kernel
+   async_unix
+   core_kernel
+   core
+   base
+   async
+   base.caml
+   base.base_internalhash_types
+   ;;local libraries
+   mina_wire_types
+   child_processes
+   snark_worker
+   genesis_ledger_helper.lib
+   logger
+   coda_genesis_proof
+   data_hash_lib
+   currency
+   genesis_constants
+   generated_graphql_queries
+   mina_transaction
+   mina_generators
+   mina_ledger
+   mina_base
+   mina_state
+   genesis_ledger_helper
+   signature_lib
+   mina_base.import
+   mina_numbers
+   precomputed_values
+   with_hash
+   transaction_snark
+   transaction_snark_tests
+   transaction_protocol_state
+   test_util
+   sgn
+   unsigned_extended
+   snark_work_lib
+   mina_compile_config
+   mina_transaction_logic
+   verifier
+   parallel
+   random_oracle
+   kimchi_backend
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   pickles_types
+   pickles
+   pickles.backend
+   snark_params
+   zkapp_command_builder
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_mina ppx_version
+                  ; ppx_jane except ppx_optcomp
+                  ppx_base ppx_assert ppx_bench ppx_bin_prot ppx_custom_printf
+                  ppx_fields_conv ppx_fixed_literal ppx_here ppx_inline_test ppx_let
+                  ppx_module_timer ppx_optional ppx_pipebang ppx_sexp_message
+                  ppx_sexp_value ppx_string ppx_typerep_conv ppx_variants_conv)))

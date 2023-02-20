@@ -10,7 +10,8 @@ module Zkapp_command_segment_witness = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { global_ledger : Sparse_ledger.Stable.V2.t
+        { global_first_pass_ledger : Sparse_ledger.Stable.V2.t
+        ; global_second_pass_ledger : Sparse_ledger.Stable.V2.t
         ; local_state_init :
             ( ( Token_id.Stable.V2.t
               , Zkapp_command.Call_forest.With_hashes.Stable.V1.t )
@@ -33,13 +34,15 @@ module Zkapp_command_segment_witness = struct
             Mina_transaction_logic.Zkapp_command_logic.Local_state.Stable.V1.t
         ; start_zkapp_command :
             ( Zkapp_command.Stable.V1.t
-            , Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t )
+            , Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
+            , bool )
             Mina_transaction_logic.Zkapp_command_logic.Start_data.Stable.V1.t
             list
         ; state_body : Mina_state.Protocol_state.Body.Value.Stable.V2.t
         ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
+        ; block_global_slot : Mina_numbers.Global_slot.Stable.V1.t
         }
-      [@@deriving sexp, to_yojson]
+      [@@deriving sexp, yojson]
 
       let to_latest = Fn.id
     end
@@ -51,12 +54,14 @@ module Stable = struct
   module V2 = struct
     type t =
       { transaction : Mina_transaction.Transaction.Stable.V2.t
-      ; ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
+      ; first_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
+      ; second_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
       ; protocol_state_body : Mina_state.Protocol_state.Body.Value.Stable.V2.t
       ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
       ; status : Mina_base.Transaction_status.Stable.V2.t
+      ; block_global_slot : Mina_numbers.Global_slot.Stable.V1.t
       }
-    [@@deriving sexp, to_yojson]
+    [@@deriving sexp, yojson]
 
     let to_latest = Fn.id
   end

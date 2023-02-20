@@ -6,7 +6,8 @@ struct
   let test_description = "app_state"
 
   let failure_expected =
-    Mina_base.Transaction_status.Failure.Update_not_permitted_app_state
+    ( Mina_base.Transaction_status.Failure.Update_not_permitted_app_state
+    , Transaction_snark_tests.Util.Pass_2 )
 
   let snapp_update =
     { Account_update.Update.dummy with

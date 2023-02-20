@@ -948,6 +948,22 @@
               "deprecationReason": null
             },
             {
+              "name": "access",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "send",
               "description": null,
               "args": [],
@@ -1093,6 +1109,22 @@
             },
             {
               "name": "setVotingFor",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setTiming",
               "description": null,
               "args": [],
               "type": {
@@ -1124,6 +1156,20 @@
               "defaultValue": null
             },
             {
+              "name": "access",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
               "name": "send",
               "description": null,
               "type": {
@@ -1251,6 +1297,20 @@
             },
             {
               "name": "setVotingFor",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "setTiming",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -1680,78 +1740,6 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Sign",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "INPUT_OBJECT",
-          "name": "GlobalSlotIntervalInput",
-          "description": null,
-          "fields": [
-            {
-              "name": "lower",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt32",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "upper",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt32",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": [
-            {
-              "name": "lower",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt32",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "upper",
-              "description": null,
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt32",
                   "ofType": null
                 }
               },
@@ -2552,6 +2540,78 @@
         },
         {
           "kind": "INPUT_OBJECT",
+          "name": "GlobalSlotIntervalInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "lower",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "upper",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "lower",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "upper",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
           "name": "PreconditionsInput",
           "description": null,
           "fields": [
@@ -2586,6 +2646,18 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "validWhile",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "GlobalSlotIntervalInput",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": [
@@ -2612,6 +2684,190 @@
                 "ofType": {
                   "kind": "INPUT_OBJECT",
                   "name": "AccountPreconditionInput",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "validWhile",
+              "description": null,
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "GlobalSlotIntervalInput",
+                "ofType": null
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "MayUseTokenInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "parentsOwnToken",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "inheritFromParent",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "parentsOwnToken",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "inheritFromParent",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "AuthorizationKindStructuredInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "isSigned",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "isProved",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "verificationKeyHash",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Field",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "isSigned",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "isProved",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "verificationKeyHash",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Field",
                   "ofType": null
                 }
               },
@@ -2832,7 +3088,7 @@
               "deprecationReason": null
             },
             {
-              "name": "caller",
+              "name": "implicitAccountCreationFee",
               "description": null,
               "args": [],
               "type": {
@@ -2840,7 +3096,23 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "TokenId",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "mayUseToken",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "MayUseTokenInput",
                   "ofType": null
                 }
               },
@@ -2855,8 +3127,8 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "AuthorizationKind",
+                  "kind": "INPUT_OBJECT",
+                  "name": "AuthorizationKindStructuredInput",
                   "ofType": null
                 }
               },
@@ -3048,14 +3320,28 @@
               "defaultValue": null
             },
             {
-              "name": "caller",
+              "name": "implicitAccountCreationFee",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "TokenId",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "mayUseToken",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "MayUseTokenInput",
                   "ofType": null
                 }
               },
@@ -3068,8 +3354,8 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "AuthorizationKind",
+                  "kind": "INPUT_OBJECT",
+                  "name": "AuthorizationKindStructuredInput",
                   "ofType": null
                 }
               },
@@ -3091,7 +3377,7 @@
               "args": [],
               "type": {
                 "kind": "SCALAR",
-                "name": "SnappProof",
+                "name": "ZkappProof",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -3116,7 +3402,7 @@
               "description": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "SnappProof",
+                "name": "ZkappProof",
                 "ofType": null
               },
               "defaultValue": null
@@ -6061,8 +6347,9 @@
             "Transition from a source ledger to a target ledger with some fee excess and increase in supply ",
           "fields": [
             {
-              "name": "sourceLedgerHash",
-              "description": "Base58Check-encoded hash of the source ledger",
+              "name": "sourceFirstPassLedgerHash",
+              "description":
+                "Base58Check-encoded hash of the source first-pass ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6077,8 +6364,43 @@
               "deprecationReason": null
             },
             {
-              "name": "targetLedgerHash",
-              "description": "Base58Check-encoded hash of the target ledger",
+              "name": "targetFirstPassLedgerHash",
+              "description":
+                "Base58Check-encoded hash of the target first-pass ledger",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "LedgerHash",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "sourceSecondPassLedgerHash",
+              "description":
+                "Base58Check-encoded hash of the source second-pass ledger",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "LedgerHash",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "targetSecondPassLedgerHash",
+              "description":
+                "Base58Check-encoded hash of the target second-pass ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6509,7 +6831,7 @@
         },
         {
           "kind": "SCALAR",
-          "name": "SnappProof",
+          "name": "ZkappProof",
           "description": null,
           "fields": null,
           "inputFields": null,
@@ -6528,7 +6850,7 @@
               "args": [],
               "type": {
                 "kind": "SCALAR",
-                "name": "SnappProof",
+                "name": "ZkappProof",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -6553,12 +6875,104 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "AuthorizationKind",
+          "kind": "OBJECT",
+          "name": "AuthorizationKindStructured",
           "description": null,
-          "fields": null,
+          "fields": [
+            {
+              "name": "isSigned",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "isProved",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "verificationKeyHash",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Field",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
           "inputFields": null,
-          "interfaces": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "MayUseToken",
+          "description": null,
+          "fields": [
+            {
+              "name": "parentsOwnToken",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "inheritFromParent",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
           "enumValues": null,
           "possibleTypes": null
         },
@@ -7105,6 +7519,18 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "validWhile",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "GlobalSlotInterval",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -7308,6 +7734,22 @@
               "deprecationReason": null
             },
             {
+              "name": "access",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "send",
               "description": null,
               "args": [],
@@ -7453,6 +7895,22 @@
             },
             {
               "name": "setVotingFor",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setTiming",
               "description": null,
               "args": [],
               "type": {
@@ -7839,7 +8297,7 @@
               "deprecationReason": null
             },
             {
-              "name": "caller",
+              "name": "implicitAccountCreationFee",
               "description": null,
               "args": [],
               "type": {
@@ -7847,7 +8305,23 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "TokenId",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "mayUseToken",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "MayUseToken",
                   "ofType": null
                 }
               },
@@ -7862,8 +8336,8 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "AuthorizationKind",
+                  "kind": "OBJECT",
+                  "name": "AuthorizationKindStructured",
                   "ofType": null
                 }
               },
@@ -10793,6 +11267,22 @@
               "deprecationReason": null
             },
             {
+              "name": "access",
+              "description": "Authorization required to access the account",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "AccountAuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "setDelegate",
               "description": "Authorization required to set the delegate",
               "args": [],
@@ -10911,6 +11401,23 @@
               "name": "setVotingFor",
               "description":
                 "Authorization required to set the state hash the account is voting for",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "AccountAuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "setTiming",
+              "description":
+                "Authorization required to set the timing of the account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -11254,19 +11761,6 @@
               "deprecationReason": null
             },
             {
-              "name": "genesis_balance",
-              "description":
-                "The amount of MINA owned by the account at Genesis",
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "AnnotatedBalance",
-                "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
               "name": "nonce",
               "description":
                 "A natural number that increases with each transaction (stringified uint32)",
@@ -11433,23 +11927,6 @@
               "deprecationReason": null
             },
             {
-              "name": "isTokenOwner",
-              "description": "True if this account owns its associated token",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "isDeprecated": true,
-              "deprecationReason": null
-            },
-            {
-              "name": "isDisabled",
-              "description":
-                "True if this account has been disabled by the owner of the associated token",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "isDeprecated": true,
-              "deprecationReason": null
-            },
-            {
               "name": "index",
               "description":
                 "The index of this account in the ledger, or null if this account does not yet have a known position in the best tip ledger",
@@ -11512,7 +11989,8 @@
             },
             {
               "name": "tokenSymbol",
-              "description": "The token symbol associated with this account",
+              "description":
+                "The symbol for the token owned by this account, if there is one",
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,

@@ -7,13 +7,13 @@ let TestExecutive = ../../Command/TestExecutive.dhall
 
 let dependsOn = [
     { name = "TestnetIntegrationTests", key = "build-test-executive" },
-    { name = "MinaArtifactBullseye", key = "daemon-devnet-bullseye-docker-image" },
+    { name = "MinaArtifactBullseye", key = "daemon-berkeley-bullseye-docker-image" },
     { name = "MinaArtifactBullseye", key = "archive-bullseye-docker-image" }
 ]
 let dependsOnJs = [
     { name = "TestnetIntegrationTests", key = "build-test-executive" },
     { name = "TestnetIntegrationTests", key = "build-js-tests" },
-    { name = "MinaArtifactBullseye", key = "daemon-devnet-bullseye-docker-image" },
+    { name = "MinaArtifactBullseye", key = "daemon-berkeley-bullseye-docker-image" },
     { name = "MinaArtifactBullseye", key = "archive-bullseye-docker-image" }
 ]
 
@@ -41,6 +41,7 @@ in Pipeline.build Pipeline.Config::{
     TestExecutive.execute "medium-bootstrap" dependsOn,
     TestExecutive.execute "zkapps" dependsOn,
     TestExecutive.execute "zkapps-timing" dependsOn,
+    TestExecutive.execute "zkapps-nonce" dependsOn,
     TestExecutive.executeWithJs "snarkyjs" dependsOnJs
   ]
 }

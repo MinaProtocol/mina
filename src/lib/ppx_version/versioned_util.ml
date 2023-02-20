@@ -17,10 +17,10 @@ let check_modname ~loc name : string =
     Location.raise_errorf ~loc
       "Expected a module named Stable, but got a module named %s." name
 
-(* for diffing types and binable functors, replace newlines in standard formatter
+(* for diffing types and binable functors, replace newlines in formatter
    with a space, so string is all on one line *)
-let diff_formatter =
-  let out_funs = Format.(pp_get_formatter_out_functions std_formatter ()) in
+let diff_formatter formatter =
+  let out_funs = Format.(pp_get_formatter_out_functions formatter ()) in
   let out_funs' =
     { out_funs with
       out_newline = (fun () -> out_funs.out_spaces 1)

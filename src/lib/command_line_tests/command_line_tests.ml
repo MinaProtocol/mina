@@ -19,13 +19,13 @@ let%test_module "Command line tests" =
        the mina.exe executable must have been built before running the test
        here, else it will fail
     *)
-    let coda_exe = "../../app/cli/src/mina.exe"
+    let mina_exe = "../../app/cli/src/mina.exe"
 
     let create_daemon_process config_dir genesis_ledger_dir libp2p_keypair_path
         port =
       let%bind working_dir = Sys.getcwd () in
       Core.printf "Starting daemon inside %s\n" working_dir ;
-      Process.create ~prog:coda_exe
+      Process.create ~prog:mina_exe
         ~args:
           [ "daemon"
           ; "-seed"
@@ -51,7 +51,7 @@ let%test_module "Command line tests" =
       Core.printf "Starting daemon inside %s\n" working_dir ;
       let%map _ =
         match%map
-          Process.run ~prog:coda_exe
+          Process.run ~prog:mina_exe
             ~args:
               [ "daemon"
               ; "-seed"
@@ -81,11 +81,11 @@ let%test_module "Command line tests" =
       Ok ()
 
     let stop_daemon port =
-      Process.run () ~prog:coda_exe
+      Process.run () ~prog:mina_exe
         ~args:[ "client"; "stop-daemon"; "-daemon-port"; sprintf "%d" port ]
 
     let start_client port =
-      Process.run ~prog:coda_exe
+      Process.run ~prog:mina_exe
         ~args:[ "client"; "status"; "-daemon-port"; sprintf "%d" port ]
         ()
 
@@ -93,8 +93,8 @@ let%test_module "Command line tests" =
 
     let create_config_files_and_dirs () =
       (* create empty config dir to avoid any issues with the default config dir *)
-      let conf = Filename.temp_dir ~in_dir:"/tmp" "coda_spun_test" "" in
-      let genesis = Filename.temp_dir ~in_dir:"/tmp" "coda_genesis_state" "" in
+      let conf = Filename.temp_dir ~in_dir:"/tmp" "mina_spun_test" "" in
+      let genesis = Filename.temp_dir ~in_dir:"/tmp" "mina_genesis_state" "" in
       let libp2p_keypair_dir =
         Filename.temp_dir ~in_dir:"/tmp" "mina_test_libp2p_keypair" ""
       in
@@ -241,7 +241,7 @@ let%test_module "Command line tests" =
               Error.raise err )
 
     let%test "The mina daemon works in background mode" =
-      match Core.Sys.is_file coda_exe with
+      match Core.Sys.is_file mina_exe with
       | `Yes ->
           Async.Thread_safe.block_on_async_exn test_background_daemon
       | _ ->
@@ -249,7 +249,7 @@ let%test_module "Command line tests" =
           false
 
     let%test "The mina daemon recovers from crashes" =
-      match Core.Sys.is_file coda_exe with
+      match Core.Sys.is_file mina_exe with
       | `Yes ->
           Async.Thread_safe.block_on_async_exn test_daemon_recover
       | _ ->

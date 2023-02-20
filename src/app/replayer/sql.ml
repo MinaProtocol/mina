@@ -179,7 +179,6 @@ module User_command = struct
     ; block_id : int
     ; block_height : int64
     ; global_slot_since_genesis : int64
-    ; txn_global_slot_since_genesis : int64
     ; sequence_no : int
     ; status : string
     }
@@ -200,7 +199,6 @@ module User_command = struct
         ; int
         ; int64
         ; int64
-        ; int64
         ; int
         ; string
         ]
@@ -208,7 +206,7 @@ module User_command = struct
   let query =
     Caqti_request.collect Caqti_type.int typ
       {sql| SELECT command_type,fee_payer_id, source_id,receiver_id,fee,amount,valid_until,memo,nonce,
-                   blocks.id,blocks.height,blocks.global_slot_since_genesis,parent.global_slot_since_genesis,
+                   blocks.id,blocks.height,blocks.global_slot_since_genesis,
                    sequence_no,status
 
             FROM user_commands AS uc
@@ -220,10 +218,6 @@ module User_command = struct
             INNER JOIN blocks
 
             ON blocks.id = buc.block_id
-
-            INNER JOIN blocks as parent
-
-            ON parent.id = blocks.parent_id
 
             WHERE uc.id = $1
 
@@ -251,7 +245,6 @@ module Zkapp_command = struct
     ; memo : string
     ; block_id : int
     ; global_slot_since_genesis : int64
-    ; txn_global_slot_since_genesis : int64
     ; sequence_no : int
     ; hash : string
     }
@@ -260,21 +253,12 @@ module Zkapp_command = struct
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.
-        [ int
-        ; Mina_caqti.array_int_typ
-        ; string
-        ; int
-        ; int64
-        ; int64
-        ; int
-        ; string
-        ]
+        [ int; Mina_caqti.array_int_typ; string; int; int64; int; string ]
 
   let query =
     Caqti_request.collect Caqti_type.int typ
       {sql| SELECT zkapp_fee_payer_body_id,zkapp_account_updates_ids,memo,
                    blocks.id,blocks.global_slot_since_genesis,
-                   parent.global_slot_since_genesis,
                    sequence_no,hash
 
             FROM zkapp_commands AS zkc
@@ -286,10 +270,6 @@ module Zkapp_command = struct
             INNER JOIN blocks
 
             ON blocks.id = bzc.block_id
-
-            INNER JOIN blocks as parent
-
-            ON parent.id = blocks.parent_id
 
             WHERE zkc.id = $1
 
@@ -318,7 +298,6 @@ module Internal_command = struct
     ; block_id : int
     ; block_height : int64
     ; global_slot_since_genesis : int64
-    ; txn_global_slot_since_genesis : int64
     ; sequence_no : int
     ; secondary_sequence_no : int
     }
@@ -326,16 +305,15 @@ module Internal_command = struct
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ string; int; int64; int; int64; int64; int64; int; int ]
+      Caqti_type.[ string; int; int64; int; int64; int64; int; int ]
 
-  (* the transaction global slot since genesis is taken from the internal command's parent block, mirroring
+  (* the transaction global slot since genesis is taken from the internal command's current block, mirroring
      the call to Staged_ledger.apply in Block_producer
   *)
   let query =
     Caqti_request.collect Caqti_type.int typ
       {sql| SELECT command_type,receiver_id,fee,
                    blocks.id,blocks.height,blocks.global_slot_since_genesis,
-                   parent.global_slot_since_genesis,
                    sequence_no,secondary_sequence_no
 
             FROM internal_commands AS ic
@@ -347,10 +325,6 @@ module Internal_command = struct
             INNER JOIN blocks
 
             ON blocks.id = bic.block_id
-
-            INNER JOIN blocks as parent
-
-            ON parent.id = blocks.parent_id
 
             WHERE ic.id = $1
 

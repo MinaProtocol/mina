@@ -107,6 +107,7 @@ module Json_layout = struct
           { edit_state : Auth_required.t [@default None]
           ; send : Auth_required.t [@default None]
           ; receive : Auth_required.t [@default None]
+          ; access : Auth_required.t [@default None]
           ; set_delegate : Auth_required.t [@default None]
           ; set_permissions : Auth_required.t [@default None]
           ; set_verification_key : Auth_required.t [@default None]
@@ -115,6 +116,7 @@ module Json_layout = struct
           ; set_token_symbol : Auth_required.t [@default None]
           ; increment_nonce : Auth_required.t [@default None]
           ; set_voting_for : Auth_required.t [@default None]
+          ; set_timing : Auth_required.t [@default None]
           }
         [@@deriving yojson, fields, dhall_type, sexp, bin_io_unversioned]
 
@@ -174,8 +176,8 @@ module Json_layout = struct
         end
 
         type t =
-          { state : Field.t list
-          ; verification_key : Verification_key.t option
+          { app_state : Field.t list
+          ; verification_key : Verification_key.t option [@default None]
           ; zkapp_version : Zkapp_version.t
           ; sequence_state : Field.t list
           ; last_sequence_slot : int
@@ -190,7 +192,7 @@ module Json_layout = struct
       end
 
       type t =
-        { pk : string option [@default None]
+        { pk : string
         ; sk : string option [@default None]
         ; balance : Currency.Balance.t
         ; delegate : string option [@default None]
@@ -211,7 +213,7 @@ module Json_layout = struct
       let of_yojson json = of_yojson_generic ~fields of_yojson json
 
       let default : t =
-        { pk = None
+        { pk = Signature_lib.Public_key.Compressed.(to_base58_check empty)
         ; sk = None
         ; balance = Currency.Balance.zero
         ; delegate = None
@@ -414,7 +416,7 @@ module Accounts = struct
     module Zkapp_account = Json_layout.Accounts.Single.Zkapp_account
 
     type t = Json_layout.Accounts.Single.t =
-      { pk : string option
+      { pk : string
       ; sk : string option
       ; balance : Currency.Balance.Stable.Latest.t
       ; delegate : string option
@@ -443,7 +445,7 @@ module Accounts = struct
   end
 
   type single = Single.t =
-    { pk : string option
+    { pk : string
     ; sk : string option
     ; balance : Currency.Balance.t
     ; delegate : string option

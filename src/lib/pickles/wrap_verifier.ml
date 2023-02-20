@@ -207,14 +207,14 @@ struct
   let lagrange (type n)
       ~domain:
         ( (which_branch : n One_hot_vector.t)
-        , (domains : (Domains.t, n) Vector.t) ) i =
+        , (domains : (Domains.t, n) Vector.t) ) srs i =
     Vector.map domains ~f:(fun d ->
-        let d =
-          Precomputed.Lagrange_precomputations.index_of_domain_log2
-            (Domain.log2_size d.h)
-        in
-        match Precomputed.Lagrange_precomputations.vesta.(d).(i) with
-        | [| g |] ->
+        let d = Int.pow 2 (Domain.log2_size d.h) in
+        match
+          (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i)
+            .unshifted
+        with
+        | [| Finite g |] ->
             let g = Inner_curve.Constant.of_affine g in
             Inner_curve.constant g
         | _ ->
@@ -227,14 +227,14 @@ struct
   let scaled_lagrange (type n) c
       ~domain:
         ( (which_branch : n One_hot_vector.t)
-        , (domains : (Domains.t, n) Vector.t) ) i =
+        , (domains : (Domains.t, n) Vector.t) ) srs i =
     Vector.map domains ~f:(fun d ->
-        let d =
-          Precomputed.Lagrange_precomputations.index_of_domain_log2
-            (Domain.log2_size d.h)
-        in
-        match Precomputed.Lagrange_precomputations.vesta.(d).(i) with
-        | [| g |] ->
+        let d = Int.pow 2 (Domain.log2_size d.h) in
+        match
+          (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i)
+            .unshifted
+        with
+        | [| Finite g |] ->
             let g = Inner_curve.Constant.of_affine g in
             Inner_curve.Constant.scale g c |> Inner_curve.constant
         | _ ->
@@ -247,7 +247,7 @@ struct
   let lagrange_with_correction (type n) ~input_length
       ~domain:
         ( (which_branch : n One_hot_vector.t)
-        , (domains : (Domains.t, n) Vector.t) ) i : Inner_curve.t Double.t =
+        , (domains : (Domains.t, n) Vector.t) ) srs i : Inner_curve.t Double.t =
     with_label __LOC__ (fun () ->
         let actual_shift =
           (* TODO: num_bits should maybe be input_length - 1. *)
@@ -257,12 +257,12 @@ struct
           if i = 0 then x else pow2pow Inner_curve.Constant.(x + x) (i - 1)
         in
         let base_and_correction (h : Domain.t) =
-          let d =
-            Precomputed.Lagrange_precomputations.index_of_domain_log2
-              (Domain.log2_size h)
-          in
-          match Precomputed.Lagrange_precomputations.vesta.(d).(i) with
-          | [| g |] ->
+          let d = Int.pow 2 (Domain.log2_size h) in
+          match
+            (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i)
+              .unshifted
+          with
+          | [| Finite g |] ->
               let open Inner_curve.Constant in
               let g = of_affine g in
               ( Inner_curve.constant g
@@ -490,8 +490,8 @@ struct
     with_label __LOC__ (fun () -> scalar_chal zeta_0 zeta_1)
 
   let assert_eq_plonk
-      (m1 : (_, Field.t Import.Scalar_challenge.t) Plonk.Minimal.t)
-      (m2 : (_, Scalar_challenge.t) Plonk.Minimal.t) =
+      (m1 : (_, Field.t Import.Scalar_challenge.t, _) Plonk.Minimal.t)
+      (m2 : (_, Scalar_challenge.t, _) Plonk.Minimal.t) =
     iter2 m1 m2
       ~chal:(fun c1 c2 -> Field.Assert.equal c1 c2)
       ~scalar_chal:(fun ({ inner = t1 } : _ Import.Scalar_challenge.t)
@@ -500,7 +500,7 @@ struct
 
   let incrementally_verify_proof (type b)
       (module Max_proofs_verified : Nat.Add.Intf with type n = b)
-      ~actual_proofs_verified_mask ~step_domains
+      ~actual_proofs_verified_mask ~step_domains ~srs
       ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
       ~(public_input :
          [ `Field of Field.t * Boolean.var | `Packed_bits of Field.t * int ]
@@ -556,13 +556,13 @@ struct
                     First
                       ( if Field.Constant.(equal zero) c then None
                       else if Field.Constant.(equal one) c then
-                        Some (lagrange ~domain i)
+                        Some (lagrange ~domain srs i)
                       else
                         Some
                           (scaled_lagrange ~domain
                              (Inner_curve.Constant.Scalar.project
                                 (Field.Constant.unpack c) )
-                             i ) )
+                             srs i ) )
                 | `Field x ->
                     Second (i, x) )
           in
@@ -572,12 +572,13 @@ struct
                     match x with
                     | b, 1 ->
                         assert_ (Constraint.boolean (b :> Field.t)) ;
-                        `Cond_add (Boolean.Unsafe.of_cvar b, lagrange ~domain i)
+                        `Cond_add
+                          (Boolean.Unsafe.of_cvar b, lagrange ~domain srs i)
                     | x, n ->
                         `Add_with_correction
                           ( (x, n)
-                          , lagrange_with_correction ~input_length:n ~domain i
-                          ) )
+                          , lagrange_with_correction ~input_length:n ~domain srs
+                              i ) )
               in
               let correction =
                 with_label __LOC__ (fun () ->
@@ -717,8 +718,15 @@ struct
           ; gamma = plonk.gamma
           ; zeta = plonk.zeta
           ; joint_combiner
+          ; feature_flags = plonk.feature_flags
           }
-          { alpha; beta; gamma; zeta; joint_combiner } ;
+          { alpha
+          ; beta
+          ; gamma
+          ; zeta
+          ; joint_combiner
+          ; feature_flags = plonk.feature_flags
+          } ;
         (sponge_digest_before_evaluations, bulletproof_challenges) )
 
   let mask_evals (type n) ~(lengths : (int, n) Vector.t Evals.t)
@@ -815,6 +823,7 @@ struct
         , _
         , _ Shifted_value.Type2.t
         , _
+        , _
         , _ )
         Types.Step.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
@@ -865,7 +874,7 @@ struct
     (* TODO: r actually does not need to be a scalar challenge. *)
     let r = scalar_to_field (Import.Scalar_challenge.create r_actual) in
     let plonk_minimal =
-      Plonk.to_minimal plonk ~to_option:Plonk_types.Opt.to_option
+      Plonk.to_minimal plonk ~to_option:Plonk_types.Opt.to_option_unsafe
     in
     let combined_evals =
       let n = Common.Max_degree.wrap_log2 in
@@ -877,8 +886,27 @@ struct
           , actual_evaluation ~pt_to_n:zetaw_n x1 ) )
     in
     let env =
+      let module Env_bool = struct
+        include Boolean
+
+        type t = Boolean.var
+      end in
+      let module Env_field = struct
+        include Field
+
+        type bool = Env_bool.t
+
+        let if_ (b : bool) ~then_ ~else_ =
+          match Impl.Field.to_constant (b :> t) with
+          | Some x ->
+              (* We have a constant, only compute the branch we care about. *)
+              if Impl.Field.Constant.(equal one) x then then_ () else else_ ()
+          | None ->
+              if_ b ~then_:(then_ ()) ~else_:(else_ ())
+      end in
       Plonk_checks.scalars_env
-        (module Field)
+        (module Env_bool)
+        (module Env_field)
         ~srs_length_log2:Common.Max_degree.wrap_log2
         ~endo:(Impl.Field.constant Endo.Wrap_inner_curve.base)
         ~mds:sponge_params.mds
@@ -896,8 +924,7 @@ struct
             with_label __LOC__ (fun () ->
                 Plonk_checks.ft_eval0
                   (module Field)
-                  ~lookup_constant_term_part:None ~env ~domain plonk_minimal
-                  combined_evals evals1.public_input )
+                  ~env ~domain plonk_minimal combined_evals evals1.public_input )
           in
           (* sum_i r^i sum_j xi^j f_j(beta_i) *)
           let actual_combined_inner_product =
@@ -967,7 +994,8 @@ struct
     in
     let plonk_checks_passed =
       with_label __LOC__ (fun () ->
-          Plonk_checks.checked
+          (* This proof is a wrap proof; no need to consider features. *)
+          Plonk_checks.checked ~feature_flags:Plonk_types.Features.none
             (module Impl)
             ~env ~shift:shift2 plonk combined_evals )
     in

@@ -600,16 +600,26 @@ module Types = struct
       ~doc:
         "Transition from a source ledger to a target ledger with some fee \
          excess and increase in supply " ~fields:(fun _ ->
-        [ field "sourceLedgerHash" ~typ:(non_null ledger_hash)
-            ~doc:"Base58Check-encoded hash of the source ledger"
+        [ field "sourceFirstPassLedgerHash" ~typ:(non_null ledger_hash)
+            ~doc:"Base58Check-encoded hash of the source first-pass ledger"
             ~args:Arg.[]
-            ~resolve:(fun _ { Transaction_snark.Statement.source; _ } ->
-              source.ledger )
-        ; field "targetLedgerHash" ~typ:(non_null ledger_hash)
-            ~doc:"Base58Check-encoded hash of the target ledger"
+            ~resolve:(fun _ { Transaction_snark.Statement.Poly.source; _ } ->
+              source.first_pass_ledger )
+        ; field "targetFirstPassLedgerHash" ~typ:(non_null ledger_hash)
+            ~doc:"Base58Check-encoded hash of the target first-pass ledger"
             ~args:Arg.[]
-            ~resolve:(fun _ { Transaction_snark.Statement.target; _ } ->
-              target.ledger )
+            ~resolve:(fun _ { Transaction_snark.Statement.Poly.target; _ } ->
+              target.first_pass_ledger )
+        ; field "sourceSecondPassLedgerHash" ~typ:(non_null ledger_hash)
+            ~doc:"Base58Check-encoded hash of the source second-pass ledger"
+            ~args:Arg.[]
+            ~resolve:(fun _ { Transaction_snark.Statement.Poly.source; _ } ->
+              source.second_pass_ledger )
+        ; field "targetSecondPassLedgerHash" ~typ:(non_null ledger_hash)
+            ~doc:"Base58Check-encoded hash of the target second-pass ledger"
+            ~args:Arg.[]
+            ~resolve:(fun _ { Transaction_snark.Statement.Poly.target; _ } ->
+              target.second_pass_ledger )
         ; field "feeExcess" ~typ:(non_null signed_fee)
             ~doc:
               "Total transaction fee that is not accounted for in the \
@@ -1017,35 +1027,17 @@ module Types = struct
           , Permissions.t option
           , Zkapp_account.t option )
           Account.Poly.t
-      ; genesis_balance : AnnotatedBalance.t option
       ; locked : bool option
       ; is_actively_staking : bool
       ; path : string
       ; index : Account.Index.t option
       }
 
-    let genesis_balance mina public_key =
-      let gl = Mina_lib.genesis_ledger mina in
-      Ledger.fold_until (Lazy.force gl) ~init:()
-        ~f:(fun () a ->
-          if Account.Key.compare (Account.public_key a) public_key = 0 then
-            Stop
-              (Some
-                 AnnotatedBalance.
-                   { total = a.balance
-                   ; unknown = Balance.zero
-                   ; timing = a.timing
-                   ; breadcrumb = None
-                   } )
-          else Continue () )
-        ~finish:(Fun.const None)
-
     let lift mina pk account =
       let block_production_pubkeys = Mina_lib.block_production_pubkeys mina in
       let accounts = Mina_lib.wallets mina in
       let best_tip_ledger = Mina_lib.best_ledger mina in
       { account
-      ; genesis_balance = genesis_balance mina account.public_key
       ; locked = Secrets.Wallets.check_locked accounts ~needle:pk
       ; is_actively_staking =
           ( if Token_id.(equal default) account.token_id then
@@ -1100,6 +1092,10 @@ module Types = struct
               ~doc:"Authorization required to receive tokens"
               ~args:Arg.[]
               ~resolve:(fun _ permission -> permission.Permissions.Poly.receive)
+          ; field "access" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to access the account"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission -> permission.Permissions.Poly.access)
           ; field "setDelegate" ~typ:(non_null auth_required)
               ~doc:"Authorization required to set the delegate"
               ~args:Arg.[]
@@ -1146,6 +1142,11 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ permission ->
                 permission.Permissions.Poly.set_voting_for )
+          ; field "setTiming" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to set the timing of the account"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission ->
+                permission.Permissions.Poly.set_timing )
           ] )
 
     let account_vk =
@@ -1186,10 +1187,6 @@ module Types = struct
                  ~doc:"The amount of MINA owned by the account"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } -> account.Account.Poly.balance)
-             ; field "genesis_balance" ~typ:AnnotatedBalance.obj
-                 ~doc:"The amount of MINA owned by the account at Genesis"
-                 ~args:Arg.[]
-                 ~resolve:(fun _ (b : t) -> b.genesis_balance)
              ; field "nonce" ~typ:account_nonce
                  ~doc:
                    "A natural number that increases with each transaction \
@@ -1295,8 +1292,6 @@ module Types = struct
                    List.map
                      ~f:(fun a ->
                        { account = Partial_account.of_full_account a
-                       ; genesis_balance =
-                           genesis_balance mina account.public_key
                        ; locked = None
                        ; is_actively_staking = true
                        ; path = ""
@@ -1328,8 +1323,6 @@ module Types = struct
                    List.map
                      ~f:(fun a ->
                        { account = Partial_account.of_full_account a
-                       ; genesis_balance =
-                           genesis_balance mina account.public_key
                        ; locked = None
                        ; is_actively_staking = true
                        ; path = ""
@@ -1368,16 +1361,6 @@ module Types = struct
                     isn't tracked by the queried daemon"
                  ~args:Arg.[]
                  ~resolve:(fun _ { locked; _ } -> locked)
-             ; field "isTokenOwner" ~typ:bool ~deprecated:(Deprecated None)
-                 ~doc:"True if this account owns its associated token"
-                 ~args:Arg.[]
-                 ~resolve:(fun _ _ -> None)
-             ; field "isDisabled" ~typ:bool ~deprecated:(Deprecated None)
-                 ~doc:
-                   "True if this account has been disabled by the owner of the \
-                    associated token"
-                 ~args:Arg.[]
-                 ~resolve:(fun _ _ -> None)
              ; field "index" ~typ:int
                  ~doc:
                    "The index of this account in the ledger, or null if this \
@@ -1420,7 +1403,9 @@ module Types = struct
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.permissions )
              ; field "tokenSymbol" ~typ:string
-                 ~doc:"The token symbol associated with this account"
+                 ~doc:
+                   "The symbol for the token owned by this account, if there \
+                    is one"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.token_symbol )
@@ -3480,6 +3465,9 @@ module Mutations = struct
                 in
                 let applied =
                   Ledger.apply_zkapp_command_unchecked ~constraint_constants
+                    ~global_slot:
+                      ( Transition_frontier.Breadcrumb.consensus_state breadcrumb
+                      |> Consensus.Data.Consensus_state.curr_global_slot )
                     ~state_view ledger zkapp_command
                 in
                 (* rearrange data to match result type of `send_zkapp_command` *)
@@ -4029,7 +4017,7 @@ module Queries = struct
           | None ->
               []
         in
-        let txns =
+        let txns : Transaction_hash.User_command_with_valid_signature.t list =
           (* Transactions as identified by IDs.
              This is a little redundant, but it makes our API more
              consistent.
@@ -4037,21 +4025,45 @@ module Queries = struct
           match txns_opt with
           | Some txns ->
               List.filter_map txns ~f:(fun serialized_txn ->
-                  Signed_command.of_base64 serialized_txn
-                  |> Result.map ~f:(fun signed_command ->
-                         (* These commands get piped through [forget_check]
-                            below; this is just to make the types work
-                            without extra unnecessary mapping in the other
-                            branches above.
-                         *)
-                         let (`If_this_is_used_it_should_have_a_comment_justifying_it
-                               cmd ) =
-                           User_command.to_valid_unsafe
-                             (Signed_command signed_command)
-                         in
-                         Transaction_hash.User_command_with_valid_signature
-                         .create cmd )
-                  |> Result.ok )
+                  (* base64 could be a signed command or zkapp command *)
+                  match Signed_command.of_base64 serialized_txn with
+                  | Ok signed_command ->
+                      let user_cmd =
+                        User_command.Signed_command signed_command
+                      in
+                      (* The command gets piped through [forget_check]
+                         below; this is just to make the types work
+                         without extra unnecessary mapping in the other
+                         branches above.
+                      *)
+                      let (`If_this_is_used_it_should_have_a_comment_justifying_it
+                            valid_cmd ) =
+                        User_command.to_valid_unsafe user_cmd
+                      in
+                      Some
+                        (Transaction_hash.User_command_with_valid_signature
+                         .create valid_cmd )
+                  | Error _ -> (
+                      match Zkapp_command.of_base64 serialized_txn with
+                      | Ok zkapp_command ->
+                          let user_cmd =
+                            User_command.Zkapp_command zkapp_command
+                          in
+                          (* The command gets piped through [forget_check]
+                             below; this is just to make the types work
+                             without extra unnecessary mapping in the other
+                             branches above.
+                          *)
+                          let (`If_this_is_used_it_should_have_a_comment_justifying_it
+                                valid_cmd ) =
+                            User_command.to_valid_unsafe user_cmd
+                          in
+                          Some
+                            (Transaction_hash.User_command_with_valid_signature
+                             .create valid_cmd )
+                      | Error _ ->
+                          (* invalid base64 for a transaction *)
+                          None ) )
           | None ->
               []
         in
@@ -4087,10 +4099,8 @@ module Queries = struct
         let resource_pool =
           Network_pool.Transaction_pool.resource_pool transaction_pool
         in
-        let signed_cmds =
-          get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
-        in
-        List.filter_map signed_cmds ~f:(fun txn ->
+        let cmds = get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt in
+        List.filter_map cmds ~f:(fun txn ->
             let cmd_with_hash =
               Transaction_hash.User_command_with_valid_signature.forget_check
                 txn
@@ -4125,10 +4135,8 @@ module Queries = struct
         let resource_pool =
           Network_pool.Transaction_pool.resource_pool transaction_pool
         in
-        let signed_cmds =
-          get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
-        in
-        List.filter_map signed_cmds ~f:(fun txn ->
+        let cmds = get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt in
+        List.filter_map cmds ~f:(fun txn ->
             let cmd_with_hash =
               Transaction_hash.User_command_with_valid_signature.forget_check
                 txn
@@ -4193,7 +4201,6 @@ module Queries = struct
     |> List.map ~f:(fun pk ->
            { Types.AccountObj.account =
                Types.AccountObj.Partial_account.of_pk mina pk
-           ; genesis_balance = Types.AccountObj.genesis_balance mina pk
            ; locked = Secrets.Wallets.check_locked wallets ~needle:pk
            ; is_actively_staking =
                Public_key.Compressed.Set.mem block_production_pubkeys pk

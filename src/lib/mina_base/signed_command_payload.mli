@@ -35,7 +35,10 @@ module Body : sig
     end
 
     module V1 : sig
-      type t [@@deriving compare, equal, sexp, hash, yojson]
+      type t =
+        | Payment of Payment_payload.Stable.V1.t
+        | Stake_delegation of Stake_delegation.Stable.V1.t
+      [@@deriving compare, equal, sexp, hash, yojson]
     end
   end]
 
@@ -95,7 +98,7 @@ module Common : sig
         , Mina_numbers.Global_slot.Stable.V1.t
         , Signed_command_memo.Stable.V1.t )
         Poly.Stable.V2.t
-      [@@deriving compare, equal, sexp, hash]
+      [@@deriving compare, equal, sexp, hash, yojson]
     end
 
     module V1 : sig

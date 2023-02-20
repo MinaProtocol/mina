@@ -25,8 +25,8 @@ class NotSoSimpleZkapp extends SmartContract {
     this.x = State();
   }
 
-  deploy(args) {
-    super.deploy(args);
+  init() {
+    super.init();
     this.x.set(initialState);
     this.balance.addInPlace(UInt64.from(initialBalance));
     this.setPermissions({

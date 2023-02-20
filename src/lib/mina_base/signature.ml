@@ -40,7 +40,7 @@ module Stable = struct
     end
 
     (* Base58Check encodes t *)
-    let _f : unit -> (t, Codable_arg.t) Type_equal.t = fun () -> Type_equal.T
+    let (_ : (t, Codable_arg.t) Type_equal.t) = Type_equal.T
 
     include Codable.Make_base58_check (Codable_arg)
 

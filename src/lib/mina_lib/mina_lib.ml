@@ -606,19 +606,21 @@ let get_ledger t state_hash_opt =
         "get_ledger: state hash not found in transition frontier"
 
 let get_snarked_ledger t state_hash_opt =
-  let open Or_error.Let_syntax in
+  let open Deferred.Or_error.Let_syntax in
   let%bind state_hash =
-    Option.value_map state_hash_opt ~f:Or_error.return
+    Option.value_map state_hash_opt ~f:Deferred.Or_error.return
       ~default:
         ( match best_tip t with
         | `Active bc ->
-            Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
+            Deferred.Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
         | `Bootstrapping ->
-            Or_error.error_string
+            Deferred.Or_error.error_string
               "get_snarked_ledger: can't get snarked ledger hash while \
                bootstrapping" )
   in
-  let%bind frontier = t.components.transition_frontier |> peek_frontier in
+  let%bind frontier =
+    t.components.transition_frontier |> peek_frontier |> Deferred.return
+  in
   match Transition_frontier.find frontier state_hash with
   | Some b ->
       let root_snarked_ledger =
@@ -627,60 +629,49 @@ let get_snarked_ledger t state_hash_opt =
       let ledger = Ledger.of_database root_snarked_ledger in
       let path = Transition_frontier.path_map frontier b ~f:Fn.id in
       let%bind _ =
-        List.fold_until ~init:(Ok ()) path
-          ~f:(fun _acc b ->
+        Mina_stdlib.Deferred.Result.List.iter path ~f:(fun b ->
             if Transition_frontier.Breadcrumb.just_emitted_a_proof b then
-              match
-                Staged_ledger.proof_txns_with_state_hashes
-                  (Transition_frontier.Breadcrumb.staged_ledger b)
-              with
-              | None ->
-                  Stop
-                    (Or_error.error_string
-                       (sprintf
-                          "No transactions corresponding to the emitted proof \
-                           for state_hash:%s"
-                          (State_hash.to_base58_check
-                             (Transition_frontier.Breadcrumb.state_hash b) ) ) )
-              | Some txns -> (
-                  match
-                    List.fold_until ~init:(Ok ())
-                      (Mina_stdlib.Nonempty_list.to_list txns)
-                      ~f:(fun _acc (txn, state_hash) ->
-                        (*Validate transactions against the protocol state associated with the transaction*)
-                        match
-                          Transition_frontier.find_protocol_state frontier
-                            state_hash
-                        with
-                        | Some state -> (
-                            let txn_state_view =
-                              Mina_state.Protocol_state.body state
-                              |> Mina_state.Protocol_state.Body.view
-                            in
-                            match
-                              Ledger.apply_transaction
-                                ~constraint_constants:
-                                  t.config.precomputed_values
-                                    .constraint_constants ~txn_state_view ledger
-                                txn.data
-                            with
-                            | Ok _ ->
-                                Continue (Ok ())
-                            | e ->
-                                Stop (Or_error.map e ~f:ignore) )
-                        | None ->
-                            Stop
-                              (Or_error.errorf
-                                 !"Coudln't find protocol state with hash %s"
-                                 (State_hash.to_base58_check state_hash) ) )
-                      ~finish:Fn.id
-                  with
-                  | Ok _ ->
-                      Continue (Ok ())
-                  | e ->
-                      Stop e )
-            else Continue (Ok ()) )
-          ~finish:Fn.id
+              (*Validate transactions against the protocol state associated with the transaction*)
+              let get_protocol_state state_hash =
+                match
+                  Transition_frontier.find_protocol_state frontier state_hash
+                with
+                | Some s ->
+                    Ok s
+                | None ->
+                    Or_error.errorf "Failed to find protocol state for hash %s"
+                      (State_hash.to_base58_check state_hash)
+              in
+              let apply_first_pass =
+                Ledger.apply_transaction_first_pass
+                  ~constraint_constants:
+                    t.config.precomputed_values.constraint_constants
+              in
+              let apply_second_pass = Ledger.apply_transaction_second_pass in
+              let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
+                  sparse_ledger txn =
+                let open Or_error.Let_syntax in
+                let%map _ledger, partial_txn =
+                  Mina_ledger.Sparse_ledger.apply_transaction_first_pass
+                    ~constraint_constants:
+                      t.config.precomputed_values.constraint_constants
+                    ~global_slot ~txn_state_view sparse_ledger txn
+                in
+                partial_txn
+              in
+              Staged_ledger.Scan_state.apply_last_proof_transactions_async
+                ~ledger ~get_protocol_state ~apply_first_pass ~apply_second_pass
+                ~apply_first_pass_sparse_ledger
+                (Staged_ledger.scan_state
+                   (Transition_frontier.Breadcrumb.staged_ledger b) )
+              |> Deferred.Result.map_error ~f:(fun e ->
+                     Error.createf
+                       "Failed to apply proof transactions for state_hash:%s : \
+                        %s"
+                       (State_hash.to_base58_check
+                          (Transition_frontier.Breadcrumb.state_hash b) )
+                       (Error.to_string_hum e) )
+            else return () )
       in
       let snarked_ledger_hash =
         Transition_frontier.Breadcrumb.block b
@@ -692,15 +683,15 @@ let get_snarked_ledger t state_hash_opt =
       if Frozen_ledger_hash.equal snarked_ledger_hash merkle_root then (
         let res = Ledger.to_list ledger in
         ignore @@ Ledger.unregister_mask_exn ~loc:__LOC__ ledger ;
-        Ok res )
+        return res )
       else
-        Or_error.errorf
+        Deferred.Or_error.errorf
           "Expected snarked ledger hash %s but got %s for state hash %s"
           (Frozen_ledger_hash.to_base58_check snarked_ledger_hash)
           (Frozen_ledger_hash.to_base58_check merkle_root)
           (State_hash.to_base58_check state_hash)
   | None ->
-      Or_error.error_string
+      Deferred.Or_error.error_string
         "get_snarked_ledger: state hash not found in transition frontier"
 
 let get_account t aid =
@@ -875,7 +866,7 @@ let best_chain ?max_length t =
   let best_tip_path = Transition_frontier.best_tip_path ?max_length frontier in
   match max_length with
   | Some max_length
-    when Mina_stdlib.List.Length.Compare.(best_tip_path > max_length) ->
+    when Mina_stdlib.List.Length.Compare.(best_tip_path >= max_length) ->
       (* The [best_tip_path] has already been truncated to the correct length,
          we skip adding the root to stay below the maximum.
       *)

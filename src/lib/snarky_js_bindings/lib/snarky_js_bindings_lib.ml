@@ -366,12 +366,20 @@ let () =
      ; ("lte", fun { less_or_equal; _ } -> less_or_equal)
      ; ("gt", fun { less_or_equal; _ } -> Boolean.not less_or_equal)
      ; ("gte", fun { less; _ } -> Boolean.not less)
+     ; ("lessThan", fun { less; _ } -> less)
+     ; ("lessThanOrEqual", fun { less_or_equal; _ } -> less_or_equal)
+     ; ("greaterThan", fun { less_or_equal; _ } -> Boolean.not less_or_equal)
+     ; ("greaterThanOrEqual", fun { less; _ } -> Boolean.not less)
      ] ;
    List.iter ~f:cmp_method
      [ ("assertLt", Field.Assert.lt)
      ; ("assertLte", Field.Assert.lte)
      ; ("assertGt", Field.Assert.gt)
      ; ("assertGte", Field.Assert.gte)
+     ; ("assertLessThan", Field.Assert.lt)
+     ; ("assertLessThanOrEqual", Field.Assert.lte)
+     ; ("assertGreaterThan", Field.Assert.gt)
+     ; ("assertGreaterThanOrEqual", Field.Assert.gte)
      ] ) ;
 
   arg_optdef_arg_method field_class "assertEquals"
@@ -379,6 +387,10 @@ let () =
       try Field.Assert.equal this##.value (As_field.value y)
       with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
   optdef_arg_method field_class "assertBoolean"
+    (fun this (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
+      try Impl.assert_ (Constraint.boolean this##.value)
+      with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
+  optdef_arg_method field_class "assertBool"
     (fun this (msg : Js.js_string Js.t Js.Optdef.t) : unit ->
       try Impl.assert_ (Constraint.boolean this##.value)
       with exn -> log_and_raise_error_with_message ~exn ~msg ) ;
@@ -1559,15 +1571,11 @@ module Circuit = struct
     let digest =
       Backend.R1CS_constraint_system.digest cs |> Md5.to_hex |> Js.string
     in
-    (* TODO: to_json doesn't return anything; call into kimchi instead *)
     let json =
       Js.Unsafe.(
         fun_call
           global ##. JSON##.parse
-          [| inject
-               ( Backend.R1CS_constraint_system.to_json cs
-               |> Yojson.Safe.to_string |> Js.string )
-          |])
+          [| inject (Backend.R1CS_constraint_system.to_json cs |> Js.string) |])
     in
     object%js
       val rows = rows
@@ -1948,7 +1956,7 @@ module Choices = struct
         (fun ~self ->
           let prevs = prevs ~self in
           { Pickles.Inductive_rule.identifier = Js.to_string rule##.identifier
-          ; uses_lookup = false
+          ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
           ; prevs
           ; main =
               (fun { public_input } ->
@@ -2231,7 +2239,6 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
     Pickles.compile_promise () ~choices
       ~public_input:(Input (public_input_typ public_input_size))
       ~auxiliary_typ:Typ.unit
-      ~override_wrap_domain:Pickles_base.Proofs_verified.N1
       ~branches:(module Branches)
       ~max_proofs_verified:(module Max_proofs_verified)
       ~name ~constraint_constants
@@ -2296,7 +2303,8 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
   let verify (public_input_js : public_input_js) (proof : _ Pickles.Proof.t) =
     let public_input = Public_input.(public_input_js |> of_js |> to_constant) in
     Proof.verify_promise [ (public_input, proof) ]
-    |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
+    |> Promise.map ~f:(fun x -> Js.bool (Or_error.is_ok x))
+    |> Promise_js_helpers.to_js
   in
   object%js
     val provers = Obj.magic provers
@@ -2364,12 +2372,23 @@ let verify (public_input : public_input_js) (proof : proof)
           (Error.to_string_hum err) ()
   in
   Pickles.Side_loaded.verify_promise ~typ [ (vk, public_input, proof) ]
-  |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
+  |> Promise.map ~f:(fun x -> Js.bool (Or_error.is_ok x))
+  |> Promise_js_helpers.to_js
 
 let dummy_base64_proof () =
   let n2 = Pickles_types.Nat.N2.n in
   let proof = Pickles.Proof.dummy n2 n2 n2 ~domain_log2:15 in
   Proof2.to_base64 proof |> Js.string
+
+let dummy_verification_key () =
+  let vk = Pickles.Side_loaded.Verification_key.dummy in
+  object%js
+    val data = Pickles.Side_loaded.Verification_key.to_base64 vk |> Js.string
+
+    val hash =
+      Mina_base.Zkapp_account.digest_vk vk
+      |> Field.Constant.to_string |> Js.string
+  end
 
 let pickles =
   object%js
@@ -2380,6 +2399,8 @@ let pickles =
     val verify = verify
 
     val dummyBase64Proof = dummy_base64_proof
+
+    val dummyVerificationKey = dummy_verification_key
 
     val proofToBase64 = proof_to_base64
 
@@ -2428,7 +2449,8 @@ module Ledger = struct
     ; editSequenceState : Js.js_string Js.t Js.readonly_prop
     ; setTokenSymbol : Js.js_string Js.t Js.readonly_prop
     ; incrementNonce : Js.js_string Js.t Js.readonly_prop
-    ; setVotingFor : Js.js_string Js.t Js.readonly_prop >
+    ; setVotingFor : Js.js_string Js.t Js.readonly_prop
+    ; setTiming : Js.js_string Js.t Js.readonly_prop >
     Js.t
 
   type timing =
@@ -2461,6 +2483,7 @@ module Ledger = struct
     { edit_state = None
     ; send = None
     ; receive = None
+    ; access = None
     ; set_delegate = None
     ; set_permissions = None
     ; set_verification_key = None
@@ -2469,6 +2492,7 @@ module Ledger = struct
     ; set_token_symbol = None
     ; increment_nonce = None
     ; set_voting_for = None
+    ; set_timing = None
     }
 
   module L : Mina_base.Ledger_intf.S = struct
@@ -2755,6 +2779,9 @@ module Ledger = struct
         val setVotingFor =
           Js.string
             (Mina_base.Permissions.Auth_required.to_string p.set_voting_for)
+
+        val setTiming =
+          Js.string (Mina_base.Permissions.Auth_required.to_string p.set_timing)
       end
 
     let timing (t : Mina_base.Account_timing.t) : timing =
@@ -3104,7 +3131,9 @@ module Ledger = struct
     check_account_update_signatures txn ;
     let ledger = l##.value in
     let application_result =
-      T.apply_zkapp_command_unchecked ~state_view:network_state
+      T.apply_zkapp_command_unchecked
+        ~global_slot:network_state.global_slot_since_genesis
+        ~state_view:network_state
         ~constraint_constants:
           { Genesis_constants.Constraint_constants.compiled with
             account_creation_fee = Currency.Fee.of_string account_creation_fee
@@ -3391,6 +3420,75 @@ module Ledger = struct
     method_ "applyJsonTransaction" apply_json_transaction
 end
 
+let test =
+  let module Signed_command = Mina_base.Signed_command in
+  let module Signed_command_payload = Mina_base.Signed_command_payload in
+  let ok_exn result =
+    let open Ppx_deriving_yojson_runtime.Result in
+    match result with Ok c -> c | Error e -> failwith ("not ok: " ^ e)
+  in
+  let keypair () = Signature_lib.Keypair.create () in
+  object%js
+    val transactionHash =
+      object%js
+        method hashPayment (command : Js.js_string Js.t) =
+          let command : Signed_command.t =
+            command |> Js.to_string |> Yojson.Safe.from_string
+            |> Signed_command.of_yojson |> ok_exn
+          in
+          Mina_transaction.Transaction_hash.(
+            command |> hash_signed_command |> to_base58_check |> Js.string)
+
+        method hashPaymentV1 (command : Js.js_string Js.t) =
+          let command : Signed_command.t_v1 =
+            command |> Js.to_string |> Yojson.Safe.from_string
+            |> Signed_command.Stable.V1.of_yojson |> ok_exn
+          in
+          let b58 = Signed_command.to_base58_check_v1 command in
+          Mina_transaction.Transaction_hash.(
+            b58 |> digest_string |> to_base58_check)
+          |> Js.string
+
+        method serializeCommon (command : Js.js_string Js.t) =
+          let command : Signed_command_payload.Common.t =
+            command |> Js.to_string |> Yojson.Safe.from_string
+            |> Signed_command_payload.Common.of_yojson |> ok_exn
+          in
+          Binable.to_bigstring
+            (module Signed_command_payload.Common.Stable.Latest)
+            command
+
+        method serializePayment (command : Js.js_string Js.t) =
+          let command : Signed_command.t =
+            command |> Js.to_string |> Yojson.Safe.from_string
+            |> Signed_command.of_yojson |> ok_exn
+          in
+          Binable.to_bigstring (module Signed_command.Stable.Latest) command
+
+        method serializePaymentV1 (command : Js.js_string Js.t) =
+          let command : Signed_command.t_v1 =
+            command |> Js.to_string |> Yojson.Safe.from_string
+            |> Signed_command.Stable.V1.of_yojson |> ok_exn
+          in
+          Signed_command.to_base58_check_v1 command |> Js.string
+
+        method examplePayment =
+          let kp = keypair () in
+          let payload : Signed_command_payload.t =
+            { Signed_command_payload.dummy with
+              body =
+                Payment
+                  { Mina_base.Payment_payload.dummy with
+                    source_pk = Signature_lib.Public_key.compress kp.public_key
+                  }
+            }
+          in
+          let payment = Signed_command.sign kp payload in
+          (payment :> Signed_command.t)
+          |> Signed_command.to_yojson |> Yojson.Safe.to_string |> Js.string
+      end
+  end
+
 (* export stuff *)
 
 let export () =
@@ -3401,7 +3499,8 @@ let export () =
   Js.export "Poseidon" poseidon ;
   Js.export "Circuit" Circuit.circuit ;
   Js.export "Ledger" Ledger.ledger_class ;
-  Js.export "Pickles" pickles
+  Js.export "Pickles" pickles ;
+  Js.export "Test" test
 
 let export_global () =
   let snarky_obj =
@@ -3416,6 +3515,7 @@ let export_global () =
          ; ("Circuit", i Circuit.circuit)
          ; ("Ledger", i Ledger.ledger_class)
          ; ("Pickles", i pickles)
+         ; ("Test", i test)
         |])
   in
   Js.Unsafe.(set global (Js.string "__snarky") snarky_obj)

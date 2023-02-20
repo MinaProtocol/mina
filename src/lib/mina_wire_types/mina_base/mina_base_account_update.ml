@@ -1,6 +1,13 @@
 module Authorization_kind = struct
   module V1 = struct
-    type t = Signature | Proof | None_given
+    (* field for Proof is a verification key hash *)
+    type t = Signature | Proof of Snark_params.Tick.Field.t | None_given
+  end
+end
+
+module May_use_token = struct
+  module V1 = struct
+    type t = No | Parents_own_token | Inherit_from_parent
   end
 end
 
@@ -54,6 +61,7 @@ module Preconditions = struct
     type t =
       { network : Mina_base_zkapp_precondition.Protocol_state.V1.t
       ; account : Account_precondition.V1.t
+      ; valid_while : Mina_base_zkapp_precondition.Valid_while.V1.t
       }
   end
 end
@@ -89,7 +97,8 @@ module Body = struct
       ; call_data : Pickles.Backend.Tick.Field.V1.t
       ; preconditions : Preconditions.V1.t
       ; use_full_commitment : bool
-      ; caller : Mina_base_token_id.V2.t
+      ; implicit_account_creation_fee : bool
+      ; may_use_token : May_use_token.V1.t
       ; authorization_kind : Authorization_kind.V1.t
       }
   end
