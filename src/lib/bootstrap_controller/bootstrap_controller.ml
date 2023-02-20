@@ -240,9 +240,11 @@ let external_transition_compare ~context:(module Context : CONTEXT) =
 (* TODO consider moiving somewhere else *)
 let block_storage_actions network =
   { Bit_catchup_state.add_body =
-      (fun body ->
+      (fun ~id body ->
         don't_wait_for
-          (Mina_networking.add_bitswap_resource network ~tag:Body
+          (Mina_networking.add_bitswap_resource network
+             ~id:(Consensus.Body_reference.to_blake2 id)
+             ~tag:Body
              ~data:(Staged_ledger_diff.Body.to_raw_string body) ) )
   ; remove_body =
       (fun ids ->

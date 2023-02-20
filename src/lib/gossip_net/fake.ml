@@ -296,7 +296,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       t.connection_gating := config ;
       Deferred.return config
 
-    let add_bitswap_resource _ ~tag:_ ~data:_ =
+    let add_bitswap_resource _ ~id:_ ~tag:_ ~data:_ =
       (* TODO is this implementation what it should be? *)
       Deferred.unit
 
