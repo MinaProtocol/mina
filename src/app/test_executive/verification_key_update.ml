@@ -199,7 +199,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec
     in
-    let call_forest_to_zkapp call_forest : Zkapp_command.t =
+    let call_forest_to_zkapp ~call_forest ~nonce : Zkapp_command.t =
       let memo = Signed_command_memo.empty in
       let transaction_commitment : Zkapp_command.Transaction_commitment.t =
         let account_updates_hash = Zkapp_command.Call_forest.hash call_forest in
@@ -209,6 +209,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { body =
             { Account_update.Body.Fee_payer.dummy with
               public_key = zkapp_pk
+            ; nonce
             ; fee = Currency.Fee.(of_nanomina_int_exn 20_000_000)
             }
         ; authorization = Signature.dummy
@@ -265,18 +266,25 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       |> Zkapp_command.Call_forest.cons_tree account_update1
       |> Zkapp_command.Call_forest.cons (update_vk vk1)
     in
-    let zkapp_command_update_vk1 = call_forest_to_zkapp call_forest1 in
+    let zkapp_command_update_vk1 =
+      call_forest_to_zkapp ~call_forest:call_forest1
+        ~nonce:Account.Nonce.(of_int 1)
+    in
     let call_forest2 =
       []
       |> Zkapp_command.Call_forest.cons_tree account_update1
       |> Zkapp_command.Call_forest.cons (update_vk vk2)
     in
-    let zkapp_command_update_vk2 = call_forest_to_zkapp call_forest2 in
+    let zkapp_command_update_vk2 =
+      call_forest_to_zkapp ~call_forest:call_forest2
+        ~nonce:Account.Nonce.(of_int 2)
+    in
     let call_forest_refers_vk2 =
       [] |> Zkapp_command.Call_forest.cons_tree account_update2
     in
     let zkapp_command_refers_vk2 =
-      call_forest_to_zkapp call_forest_refers_vk2
+      call_forest_to_zkapp ~call_forest:call_forest_refers_vk2
+        ~nonce:Account.Nonce.(of_int 3)
     in
 
     let with_timeout =
