@@ -28,8 +28,7 @@ class NotSoSimpleZkapp extends SmartContract {
   init() {
     super.init();
     this.x.set(initialState);
-    this.balance.addInPlace(UInt64.from(initialBalance));
-    this.setPermissions({
+    this.account.permissions.set({
       ...Permissions.default(),
       send: Permissions.proof(),
       editState: Permissions.proof(),
@@ -59,12 +58,18 @@ class NotSoSimpleZkapp extends SmartContract {
     this.emitEvent("payoutReceiver", callerAddress);
     this.emitEvent("payout", halfBalance);
   }
+
+  deposit(amount) {
+    let senderUpdate = AccountUpdate.createSigned(this.sender);
+    senderUpdate.send({ to: this, amount });
+  }
 }
 // note: this is our non-typescript way of doing what our decorators do
 declareState(NotSoSimpleZkapp, { x: Field });
 declareMethods(NotSoSimpleZkapp, {
   update: [Field],
   payout: [PrivateKey],
+  deposit: [UInt64],
 });
 
 // parse command line; for local testing, use random keys as fallback
@@ -75,7 +80,7 @@ feePayerKeyBase58 ||= PrivateKey.random().toBase58();
 //if (!graphql_uri) throw Error("Graphql uri is undefined, aborting");
 
 console.log(
-  `simple-zkapp.js: Running with zkapp key ${zkappKeyBase58}, fee payer key ${feePayerKeyBase58} and graphql uri ${graphql_uri}`
+  `simple-zkapp.js: Running with zkapp key ${zkappKeyBase58}, fee payer key ${feePayerKeyBase58} and graphql uri ${graphql_uri}\n\n`
 );
 
 let Local = Mina.LocalBlockchain({ proofsEnabled: true });
@@ -98,87 +103,108 @@ let zkappTargetBalance = 10_000_000_000;
 let initialBalance = zkappTargetBalance;
 let initialState = Field(1);
 
-console.log(`simple-zkapp.js: Starting integration test`);
+console.log(`simple-zkapp.js: Starting integration test\n`);
 
 let zkapp = new NotSoSimpleZkapp(zkappAddress);
 await NotSoSimpleZkapp.compile();
 
-console.log("deploy");
-let tx = await Mina.transaction(feePayerKey, () => {
-  AccountUpdate.fundNewAccount(feePayerKey, {
-    initialBalance: initialBalance,
-  });
-  zkapp.deploy({ zkappKey });
+console.log("deploying contract\n");
+let tx = await Mina.transaction(feePayerAddress, () => {
+  AccountUpdate.fundNewAccount(feePayerAddress);
+
+  zkapp.deploy();
+});
+await tx.prove();
+await (await tx.sign([feePayerKey, zkappKey]).send()).wait();
+
+let zkappAccount = Mina.getAccount(zkappAddress);
+
+// we deployed the contract with an initial state of 1
+expectAssertEquals(zkappAccount.appState[0], Field(1));
+
+// the fresh zkapp account shouldn't have any funds
+expectAssertEquals(zkappAccount.balance, UInt64.from(0));
+
+console.log("deposit funds\n");
+tx = await Mina.transaction(feePayerAddress, () => {
+  zkapp.deposit(UInt64.from(initialBalance));
 });
 await tx.prove();
 await (await tx.sign([feePayerKey]).send()).wait();
 
-let accountAfterDeploy = Mina.getAccount(zkappAddress);
+zkappAccount = Mina.getAccount(zkappAddress);
 
-try {
-  accountAfterDeploy.balance.assertEquals(UInt64.from(initialBalance));
-} catch (error) {
-  throw Error(
-    `Actual balance ${accountAfterDeploy.balance.toString()} does not match expected balance of ${initialBalance}`
-  );
-}
+// we deposit 10_000_000_000 funds into the zkapp account
+expectAssertEquals(zkappAccount.balance, UInt64.from(initialBalance));
 
-try {
-  accountAfterDeploy.appState[0].assertEquals(Field(1));
-} catch (error) {
-  throw Error(
-    `Actual state ${accountAfterDeploy.appState[0].toString()} does not match expected balance of ${1}`
-  );
-}
-
-console.log("update 1");
-tx = await Mina.transaction(feePayerKey, () => {
+console.log("update 1\n");
+tx = await Mina.transaction(feePayerAddress, () => {
   zkapp.update(Field(30));
 });
 await tx.prove();
 await (await tx.sign([feePayerKey]).send()).wait();
 
-let accountAfterUpdate = Mina.getAccount(zkappAddress);
-accountAfterUpdate.balance.assertEquals(UInt64.from(initialBalance));
-accountAfterUpdate.appState[0].assertEquals(Field(31));
+zkappAccount = Mina.getAccount(zkappAddress);
 
-console.log("update 2");
-tx = await Mina.transaction(feePayerKey, () => {
+// no balance change expected
+expectAssertEquals(zkappAccount.balance, UInt64.from(initialBalance));
+
+// we updated the zkapp state to 31. x = x.add(y) ---- 31 = 1 + 30
+expectAssertEquals(zkappAccount.appState[0], Field(31));
+
+console.log("update 2\n");
+tx = await Mina.transaction(feePayerAddress, () => {
   zkapp.update(Field(100));
 });
 await tx.prove();
 await (await tx.sign([feePayerKey]).send()).wait();
 
-accountAfterUpdate = Mina.getAccount(zkappAddress);
-accountAfterUpdate.balance.assertEquals(UInt64.from(initialBalance));
-accountAfterUpdate.appState[0].assertEquals(Field(131));
+zkappAccount = Mina.getAccount(zkappAddress);
 
-console.log("payout 1");
-tx = await Mina.transaction(feePayerKey, () => {
-  AccountUpdate.fundNewAccount(feePayerKey);
+// no balance change expected
+expectAssertEquals(zkappAccount.balance, UInt64.from(initialBalance));
+
+// we updated the zkapp state to 131
+expectAssertEquals(zkappAccount.appState[0], Field(131));
+
+console.log("payout 1\n");
+tx = await Mina.transaction(feePayerAddress, () => {
+  AccountUpdate.fundNewAccount(feePayerAddress);
   zkapp.payout(privilegedKey);
 });
 await tx.prove();
 await (await tx.sign([feePayerKey]).send()).wait();
-accountAfterUpdate.balance.assertEquals(UInt64.from(10000000000));
 
-accountAfterUpdate = Mina.getAccount(zkappAddress);
-accountAfterUpdate.balance.assertEquals(UInt64.from(5000000000));
+zkappAccount = Mina.getAccount(zkappAddress);
 
-console.log("payout 2 (expected to fail)");
-tx = await Mina.transaction(feePayerKey, () => {
-  AccountUpdate.fundNewAccount(feePayerKey);
+// we withdraw (payout) half of the initial balance
+expectAssertEquals(zkappAccount.balance, UInt64.from(initialBalance / 2));
+
+console.log("payout 2 (expected to fail)\n");
+tx = await Mina.transaction(feePayerAddress, () => {
+  AccountUpdate.fundNewAccount(feePayerAddress);
   zkapp.payout(privilegedKey);
 });
 
+// this tx should fail, but we wont know that here - so we just check that no state has changed
 try {
   await tx.prove();
   await (await tx.sign([feePayerKey]).send()).wait();
-} catch (error) {
-  // ! TODO check state change
-  console.log("Failed as expected");
+} catch (error) {}
+
+zkappAccount = Mina.getAccount(zkappAddress);
+
+// checking that state hasn't changed - we expect the tx to fail so the state should equal previous state
+expectAssertEquals(zkappAccount.balance, UInt64.from(initialBalance / 2));
+
+function expectAssertEquals(actual, expected) {
+  try {
+    actual.assertEquals(expected);
+  } catch (error) {
+    throw Error(
+      `Expected value ${expected.toString()}, but got ${actual.toString()}`
+    );
+  }
 }
 
-accountAfterUpdate = Mina.getAccount(zkappAddress);
-accountAfterUpdate.balance.assertEquals(UInt64.from(5000000000));
 shutdown();
