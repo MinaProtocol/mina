@@ -2425,7 +2425,8 @@ module Ledger = struct
     ; zkappVersion : int Js.readonly_prop
     ; sequenceState : field_class Js.t Js.js_array Js.t Js.readonly_prop
     ; lastSequenceSlot : int Js.readonly_prop
-    ; provedState : bool_class Js.t Js.readonly_prop >
+    ; provedState : bool_class Js.t Js.readonly_prop
+    ; zkappUri : Js.js_string Js.t Js.readonly_prop >
     Js.t
 
   type permissions =
@@ -2721,6 +2722,8 @@ module Ledger = struct
           Mina_numbers.Global_slot.to_int a.last_sequence_slot
 
         val provedState = boolean a.proved_state
+
+        val zkappUri = Js.string a.zkapp_uri
       end
 
     let permissions (p : Mina_base.Permissions.t) : permissions =
@@ -2804,11 +2807,11 @@ module Ledger = struct
 
         val votingFor = field (a.voting_for :> Impl.field)
 
-        val zkapp = option zkapp_account a.zkapp
+        val timing = timing a.timing
 
         val permissions = permissions a.permissions
 
-        val timing = timing a.timing
+        val zkapp = option zkapp_account a.zkapp
       end
   end
 
@@ -3095,6 +3098,20 @@ module Ledger = struct
     let loc = L.location_of_account l##.value (account_id pk token) in
     let account = Option.bind loc ~f:(L.get l##.value) in
     To_js.option To_js.account account
+
+  let account_to_json =
+    let deriver = Mina_base.Account.deriver @@ Fields_derivers_zkapps.o () in
+    let to_json' = Fields_derivers_zkapps.to_json deriver in
+    let to_json (account : Mina_base.Account.t) =
+      account |> to_json' |> Yojson.Safe.to_string |> Js.string
+    in
+    to_json
+
+  let get_account_new l (pk : public_key) (token : field_class Js.t) :
+      Js.js_string Js.t Js.optdef =
+    let loc = L.location_of_account l##.value (account_id pk token) in
+    let account = Option.bind loc ~f:(L.get l##.value) in
+    To_js.option account_to_json account
 
   let add_account l (pk : public_key) (balance : Js.js_string Js.t) =
     add_account_exn l##.value pk (Js.to_string balance)
@@ -3398,6 +3415,7 @@ module Ledger = struct
       end ) ;
 
     method_ "getAccount" get_account ;
+    method_ "getAccountNew" get_account_new ;
     method_ "addAccount" add_account ;
     method_ "applyJsonTransaction" apply_json_transaction
 end
