@@ -249,7 +249,7 @@ module Poly = struct
         ; permissions : 'permissions
         ; zkapp : 'zkapp_opt
         }
-      [@@deriving sexp, equal, compare, hash, yojson, fields, hlist]
+      [@@deriving sexp, equal, compare, hash, yojson, fields, hlist, annot]
 
       let to_latest = Fn.id
     end
@@ -847,3 +847,16 @@ let gen_timed =
   let%map vesting_increment = Amount.gen in
   create_timed account_id balance ~initial_minimum_balance ~cliff_time
     ~cliff_amount ~vesting_period ~vesting_increment
+
+let deriver obj =
+  let open Fields_derivers_zkapps in
+  let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
+  let token_permissions = ( !. ) ~skip_data:() skip in
+  finish "Account" ~t_toplevel_annots:Poly.t_toplevel_annots
+  @@ Poly.Fields.make_creator ~public_key:!.public_key ~token_id:!.field
+       ~token_permissions ~token_symbol:!.string ~balance:!.balance
+       ~nonce:!.uint32 ~receipt_chain_hash:!.field ~delegate:!.public_key
+       ~voting_for:!.field ~timing:!.Timing.deriver
+       ~permissions:!.Permissions.deriver
+       ~zkapp:!.(option ~js_type:Or_undefined (Zkapp_account.deriver @@ o ()))
+       obj
