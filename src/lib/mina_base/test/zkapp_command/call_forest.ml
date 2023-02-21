@@ -220,6 +220,17 @@ let%test_unit "shape" =
        ; (1, Node [])
        ] )
 
+let%test_unit "shape indexes always start with 0 and increse by 1" =
+  Quickcheck.test
+    (quickcheck_generator Int.quickcheck_generator Int.quickcheck_generator
+       Int.quickcheck_generator ) ~f:(fun tree ->
+      let rec check_shape (Shape.Node xs) =
+        List.iteri xs ~f:(fun i (j, xs') ->
+            [%test_eq: int] i j ;
+            check_shape xs' )
+      in
+      check_shape (shape tree) )
+
 let%test_unit "match_up ok" =
   let l_1 = [ 1; 2; 3; 4; 5; 6 ] in
   let l_2 = [ (0, 'a'); (1, 'b'); (2, 'c'); (3, 'd') ] in
