@@ -92,8 +92,8 @@ struct
   let deriver obj =
     let open Fields_derivers_zkapps in
     let events = list @@ array field (o ()) in
-    with_checked
-      ~checked:(Data_as_hash.deriver events)
+    needs_custom_js
+      ~js_type:(Data_as_hash.deriver events)
       ~name:Inputs.deriver_name events obj
 end
 
