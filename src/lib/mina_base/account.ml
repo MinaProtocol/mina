@@ -853,9 +853,10 @@ let deriver obj =
   let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
   let token_permissions = ( !. ) ~skip_data:() skip in
   finish "Account" ~t_toplevel_annots:Poly.t_toplevel_annots
-  @@ Poly.Fields.make_creator ~public_key:!.public_key ~token_id:!.field
-       ~token_permissions ~token_symbol:!.string ~balance:!.balance
-       ~nonce:!.uint32 ~receipt_chain_hash:!.field ~delegate:!.public_key
+  @@ Poly.Fields.make_creator ~public_key:!.public_key
+       ~token_id:!.Token_id.deriver ~token_permissions ~token_symbol:!.string
+       ~balance:!.balance ~nonce:!.uint32 ~receipt_chain_hash:!.field
+       ~delegate:!.(option ~js_type:Or_undefined (public_key @@ o ()))
        ~voting_for:!.field ~timing:!.Timing.deriver
        ~permissions:!.Permissions.deriver
        ~zkapp:!.(option ~js_type:Or_undefined (Zkapp_account.deriver @@ o ()))

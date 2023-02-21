@@ -421,6 +421,6 @@ let deriver obj =
        ~app_state:!.(Zkapp_state.deriver field)
        ~verification_key:
          !.(option ~js_type:Or_undefined (verification_key_with_hash @@ o ()))
-       ~zkapp_version:!.int ~sequence_state:!.sequence_state_deriver
+       ~zkapp_version:!.uint32 ~sequence_state:!.sequence_state_deriver
        ~last_sequence_slot:!.global_slot ~proved_state:!.bool
        ~zkapp_uri:!.string obj
