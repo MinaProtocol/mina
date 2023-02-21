@@ -268,7 +268,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let zkapp_command_update_vk1 =
       call_forest_to_zkapp ~call_forest:call_forest1
-        ~nonce:Account.Nonce.(of_int 1)
+        ~nonce:Account.Nonce.(of_int 0)
     in
     let call_forest2 =
       []
@@ -277,14 +277,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let zkapp_command_update_vk2 =
       call_forest_to_zkapp ~call_forest:call_forest2
-        ~nonce:Account.Nonce.(of_int 2)
+        ~nonce:Account.Nonce.(of_int 1)
     in
     let call_forest_refers_vk2 =
       [] |> Zkapp_command.Call_forest.cons_tree account_update2
     in
     let zkapp_command_refers_vk2 =
       call_forest_to_zkapp ~call_forest:call_forest_refers_vk2
-        ~nonce:Account.Nonce.(of_int 3)
+        ~nonce:Account.Nonce.(of_int 2)
     in
 
     let with_timeout =
