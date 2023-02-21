@@ -74,26 +74,28 @@ declareMethods(NotSoSimpleZkapp, {
 
 // parse command line; for local testing, use random keys as fallback
 let [feePayerKeyBase58, graphql_uri] = process.argv.slice(2);
-let zkappKeyBase58 = PrivateKey.random().toBase58();
-feePayerKeyBase58 ||= PrivateKey.random().toBase58();
 
-//if (!graphql_uri) throw Error("Graphql uri is undefined, aborting");
+if (!graphql_uri) throw Error("Graphql uri is undefined, aborting");
+if (!feePayerKeyBase58) throw Error("Fee payer key is undefined, aborting");
 
-console.log(
-  `simple-zkapp.js: Running with zkapp key ${zkappKeyBase58}, fee payer key ${feePayerKeyBase58} and graphql uri ${graphql_uri}\n\n`
-);
+let LocalNetwork = Mina.Network(graphql_uri);
+Mina.setActiveInstance(LocalNetwork);
 
-let Local = Mina.LocalBlockchain({ proofsEnabled: true });
-Mina.setActiveInstance(Local);
-
-// ! TODO: REMOVE
-feePayerKeyBase58 = Local.testAccounts[1].privateKey.toBase58();
-
-let zkappKey = PrivateKey.fromBase58(zkappKeyBase58);
+let zkappKey = PrivateKey.random();
 let zkappAddress = zkappKey.toPublicKey();
 
 let feePayerKey = PrivateKey.fromBase58(feePayerKeyBase58);
 let feePayerAddress = feePayerKey.toPublicKey();
+
+try {
+  Mina.getAccount(feePayerAddress);
+} catch (error) {
+  throw Error(
+    `The fee payer account needs to be funded in order for the script to succeed! Please provide the private key of an already funded account. ${feePayerAddress.toBase58()}, ${feePayerKeyBase58}\n\n${
+      error.message
+    }`
+  );
+}
 
 // a special account that is allowed to pull out half of the zkapp balance, once
 let privilegedKey = PrivateKey.random();
@@ -102,6 +104,10 @@ let privilegedAddress = privilegedKey.toPublicKey();
 let zkappTargetBalance = 10_000_000_000;
 let initialBalance = zkappTargetBalance;
 let initialState = Field(1);
+
+console.log(
+  `simple-zkapp.js: Running with zkapp key ${zkappKeyBase58}, fee payer key ${feePayerKeyBase58} and graphql uri ${graphql_uri}\n\n`
+);
 
 console.log(`simple-zkapp.js: Starting integration test\n`);
 
@@ -187,10 +193,8 @@ tx = await Mina.transaction(feePayerAddress, () => {
 });
 
 // this tx should fail, but we wont know that here - so we just check that no state has changed
-try {
-  await tx.prove();
-  await (await tx.sign([feePayerKey]).send()).wait();
-} catch (error) {}
+await tx.prove();
+await (await tx.sign([feePayerKey]).send()).wait();
 
 zkappAccount = Mina.getAccount(zkappAddress);
 
