@@ -194,6 +194,19 @@ module Tree_test = struct
       (Tree.mapi_forest' ~i:3
          [ node 1 [ node 0 []; node 2 [ node 3 [] ] ] ]
          ~f:(fun i x -> i + x) )
+
+  let%test_unit "deferred_map_forest f x is equivalent to map_forest f x" =
+    Quickcheck.test
+      (quickcheck_generator Int.quickcheck_generator Int.quickcheck_generator
+         Int.quickcheck_generator ) ~f:(fun x ->
+        let tree_sync = Tree.map_forest ~f:(fun x -> x + 1) x in
+        let tree_async =
+          Async_unix.Thread_safe.block_on_async_exn (fun () ->
+              Tree.deferred_map_forest
+                ~f:(fun x _ -> Async_kernel.return (x + 1))
+                x )
+        in
+        [%test_eq: (int, int, int) t] tree_sync tree_async )
 end
 
 let%test_unit "shape" =
