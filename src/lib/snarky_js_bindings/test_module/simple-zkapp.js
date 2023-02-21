@@ -13,6 +13,7 @@ import {
   Bool,
   shutdown,
   Permissions,
+  fetchAccount,
 } from "snarkyjs";
 
 await isReady;
@@ -87,9 +88,10 @@ let zkappAddress = zkappKey.toPublicKey();
 let feePayerKey = PrivateKey.fromBase58(feePayerKeyBase58);
 let feePayerAddress = feePayerKey.toPublicKey();
 
-try {
-  Mina.getAccount(feePayerAddress);
-} catch (error) {
+let res = await fetchAccount({
+  publicKey: feePayerAddress,
+});
+if (res.error) {
   throw Error(
     `The fee payer account needs to be funded in order for the script to succeed! Please provide the private key of an already funded account. ${feePayerAddress.toBase58()}, ${feePayerKeyBase58}\n\n${
       error.message
@@ -106,7 +108,7 @@ let initialBalance = zkappTargetBalance;
 let initialState = Field(1);
 
 console.log(
-  `simple-zkapp.js: Running with zkapp key ${zkappKeyBase58}, fee payer key ${feePayerKeyBase58} and graphql uri ${graphql_uri}\n\n`
+  `simple-zkapp.js: Running with zkapp key ${zkappKey.toBase58()}, fee payer key ${feePayerKeyBase58} and graphql uri ${graphql_uri}\n\n`
 );
 
 console.log(`simple-zkapp.js: Starting integration test\n`);
@@ -123,6 +125,7 @@ let tx = await Mina.transaction(feePayerAddress, () => {
 await tx.prove();
 await (await tx.sign([feePayerKey, zkappKey]).send()).wait();
 
+await fetchAccount({ publicKey: feePayerAddress });
 let zkappAccount = Mina.getAccount(zkappAddress);
 
 // we deployed the contract with an initial state of 1
@@ -138,6 +141,7 @@ tx = await Mina.transaction(feePayerAddress, () => {
 await tx.prove();
 await (await tx.sign([feePayerKey]).send()).wait();
 
+await fetchAccount({ publicKey: feePayerAddress });
 zkappAccount = Mina.getAccount(zkappAddress);
 
 // we deposit 10_000_000_000 funds into the zkapp account
@@ -150,6 +154,7 @@ tx = await Mina.transaction(feePayerAddress, () => {
 await tx.prove();
 await (await tx.sign([feePayerKey]).send()).wait();
 
+await fetchAccount({ publicKey: feePayerAddress });
 zkappAccount = Mina.getAccount(zkappAddress);
 
 // no balance change expected
@@ -165,6 +170,7 @@ tx = await Mina.transaction(feePayerAddress, () => {
 await tx.prove();
 await (await tx.sign([feePayerKey]).send()).wait();
 
+await fetchAccount({ publicKey: feePayerAddress });
 zkappAccount = Mina.getAccount(zkappAddress);
 
 // no balance change expected
@@ -181,6 +187,7 @@ tx = await Mina.transaction(feePayerAddress, () => {
 await tx.prove();
 await (await tx.sign([feePayerKey]).send()).wait();
 
+await fetchAccount({ publicKey: feePayerAddress });
 zkappAccount = Mina.getAccount(zkappAddress);
 
 // we withdraw (payout) half of the initial balance
@@ -196,6 +203,7 @@ tx = await Mina.transaction(feePayerAddress, () => {
 await tx.prove();
 await (await tx.sign([feePayerKey]).send()).wait();
 
+await fetchAccount({ publicKey: feePayerAddress });
 zkappAccount = Mina.getAccount(zkappAddress);
 
 // checking that state hasn't changed - we expect the tx to fail so the state should equal previous state
