@@ -7,8 +7,6 @@ use crate::{
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use array_init::array_init;
-use commitment_dlog::commitment::{CommitmentCurve, PolyComm};
-use commitment_dlog::evaluation_proof::OpeningProof;
 use groupmap::GroupMap;
 use kimchi::prover_index::ProverIndex;
 use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
@@ -24,6 +22,8 @@ use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
+use poly_commitment::commitment::{CommitmentCurve, PolyComm};
+use poly_commitment::evaluation_proof::OpeningProof;
 use std::convert::TryInto;
 
 #[ocaml_gen::func]
@@ -35,7 +35,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
     prev_sgs: Vec<CamlGPallas>,
 ) -> Result<CamlProverProof<CamlGPallas, CamlFq>, ocaml::Error> {
     {
-        let ptr: &mut commitment_dlog::srs::SRS<Pallas> =
+        let ptr: &mut poly_commitment::srs::SRS<Pallas> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
         ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }

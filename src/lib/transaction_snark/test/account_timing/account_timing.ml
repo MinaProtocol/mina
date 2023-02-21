@@ -10,7 +10,7 @@ open Mina_base
    mina_base/account_timing.ml module for details.
 
    This module tests that checked and unchecked computations for timed
-   accounts always yield the same results.*)
+   accounts always yield the same results. *)
 let%test_module "account timing check" =
   ( module struct
     open Mina_ledger.Ledger.For_tests
@@ -819,7 +819,12 @@ let%test_module "account timing check" =
            there are also a couple of fixed cases.
 
            Check out how available_funds are computed in order to learn
-           the mechanics of a timed account. *)
+           the mechanics of a timed account.
+
+           The module Account_timing in transaction_lib tests tests the
+           raw rules of account timing. See that for the invariants that
+           should hold. Here, timed accounts' behaviour is tested within
+           a ledger building actual transactions. *)
         type t =
           { balance : Currency.Balance.t
           ; init_min_bal : Currency.Balance.t

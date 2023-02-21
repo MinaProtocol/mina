@@ -101,9 +101,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "Wait for nodes to initialize"
         (wait_for t
-           (Wait_condition.nodes_to_initialize
-              ( Network.seeds network @ block_producer_nodes
-              @ Network.snark_coordinators network ) ) )
+           (Wait_condition.nodes_to_initialize @@ Network.all_nodes network) )
     in
     let keymap =
       List.fold [ fish1_kp ] ~init:Signature_lib.Public_key.Compressed.Map.empty
