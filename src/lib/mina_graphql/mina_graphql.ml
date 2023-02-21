@@ -1174,8 +1174,13 @@ module Types = struct
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.public_key )
+             ; field "tokenId" ~typ:(non_null token_id)
+                 ~doc:"The token associated with this account"
+                 ~args:Arg.[]
+                 ~resolve:(fun _ { account; _ } -> account.Account.Poly.token_id)
              ; field "token" ~typ:(non_null token_id)
                  ~doc:"The token associated with this account"
+                 ~deprecated:(Deprecated (Some "Use tokenId"))
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } -> account.Account.Poly.token_id)
              ; field "timing" ~typ:(non_null account_timing)
@@ -4324,21 +4329,22 @@ module Queries = struct
             [] )
 
   let token_owner =
-    field "tokenOwner" ~doc:"Find the account ID that owns a given token"
-      ~typ:Types.account_id
+    field "tokenOwner" ~doc:"Find the account that owns a given token"
+      ~typ:Types.AccountObj.account
       ~args:
         Arg.
-          [ arg "tokenId" ~doc:"Token ID to find the owner for"
+          [ arg "tokenId" ~doc:"Token ID to find the owning account for"
               ~typ:(non_null Types.Input.TokenId.arg_typ)
           ]
       ~resolve:(fun { ctx = mina; _ } () token ->
-        mina |> Mina_lib.best_tip |> Participating_state.active
-        |> Option.bind ~f:(fun tip ->
-               let ledger =
-                 Transition_frontier.Breadcrumb.staged_ledger tip
-                 |> Staged_ledger.ledger
-               in
-               Ledger.token_owner ledger token ) )
+        let open Option.Let_syntax in
+        let%bind tip = Mina_lib.best_tip mina |> Participating_state.active in
+        let ledger =
+          Transition_frontier.Breadcrumb.staged_ledger tip
+          |> Staged_ledger.ledger
+        in
+        let%map account_id = Ledger.token_owner ledger token in
+        Types.AccountObj.get_best_ledger_account mina account_id )
 
   let transaction_status =
     result_field2 "transactionStatus" ~doc:"Get the status of a transaction"
