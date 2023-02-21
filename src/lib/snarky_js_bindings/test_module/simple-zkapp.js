@@ -73,6 +73,12 @@ declareMethods(NotSoSimpleZkapp, {
   deposit: [UInt64],
 });
 
+// slightly adjusted polling parameters for tx.wait()
+const waitParams = {
+  maxAttempts: 30,
+  interval: 45000,
+};
+
 // parse command line; for local testing, use random keys as fallback
 let [feePayerKeyBase58, graphql_uri] = process.argv.slice(2);
 
@@ -110,7 +116,7 @@ let initialState = Field(1);
 console.log(
   `simple-zkapp.js: Running with zkapp address ${zkappKey
     .toPublicKey()
-    .toBase58()}, fee payer key ${feePayerKeyBase58} and graphql uri ${graphql_uri}\n\n`
+    .toBase58()}, fee payer address ${feePayerAddress.toBase58()} and graphql uri ${graphql_uri}\n\n`
 );
 
 console.log(`simple-zkapp.js: Starting integration test\n`);
@@ -128,9 +134,9 @@ let tx = await Mina.transaction(
   }
 );
 await tx.prove();
-await (await tx.sign([feePayerKey, zkappKey]).send()).wait();
+await (await tx.sign([feePayerKey, zkappKey]).send()).wait(waitParams);
 
-await fetchAccount({ publicKey: feePayerAddress });
+await fetchAccount({ publicKey: zkappAddress });
 let zkappAccount = Mina.getAccount(zkappAddress);
 
 // we deployed the contract with an initial state of 1
@@ -147,9 +153,9 @@ tx = await Mina.transaction(
   }
 );
 await tx.prove();
-await (await tx.sign([feePayerKey]).send()).wait();
+await (await tx.sign([feePayerKey]).send()).wait(waitParams);
 
-await fetchAccount({ publicKey: feePayerAddress });
+await fetchAccount({ publicKey: zkappAddress });
 zkappAccount = Mina.getAccount(zkappAddress);
 
 // we deposit 10_000_000_000 funds into the zkapp account
@@ -163,9 +169,9 @@ tx = await Mina.transaction(
   }
 );
 await tx.prove();
-await (await tx.sign([feePayerKey]).send()).wait();
+await (await tx.sign([feePayerKey]).send()).wait(waitParams);
 
-await fetchAccount({ publicKey: feePayerAddress });
+await fetchAccount({ publicKey: zkappAddress });
 zkappAccount = Mina.getAccount(zkappAddress);
 
 // no balance change expected
@@ -182,9 +188,9 @@ tx = await Mina.transaction(
   }
 );
 await tx.prove();
-await (await tx.sign([feePayerKey]).send()).wait();
+await (await tx.sign([feePayerKey]).send()).wait(waitParams);
 
-await fetchAccount({ publicKey: feePayerAddress });
+await fetchAccount({ publicKey: zkappAddress });
 zkappAccount = Mina.getAccount(zkappAddress);
 
 // no balance change expected
@@ -202,9 +208,9 @@ tx = await Mina.transaction(
   }
 );
 await tx.prove();
-await (await tx.sign([feePayerKey]).send()).wait();
+await (await tx.sign([feePayerKey]).send()).wait(waitParams);
 
-await fetchAccount({ publicKey: feePayerAddress });
+await fetchAccount({ publicKey: zkappAddress });
 zkappAccount = Mina.getAccount(zkappAddress);
 
 // we withdraw (payout) half of the initial balance
@@ -221,9 +227,9 @@ tx = await Mina.transaction(
 
 // this tx should fail, but we wont know that here - so we just check that no state has changed
 await tx.prove();
-await (await tx.sign([feePayerKey]).send()).wait();
+await (await tx.sign([feePayerKey]).send()).wait(waitParams);
 
-await fetchAccount({ publicKey: feePayerAddress });
+await fetchAccount({ publicKey: zkappAddress });
 zkappAccount = Mina.getAccount(zkappAddress);
 
 // checking that state hasn't changed - we expect the tx to fail so the state should equal previous state
