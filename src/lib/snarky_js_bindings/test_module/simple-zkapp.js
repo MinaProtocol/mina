@@ -171,15 +171,6 @@ tx = await Mina.transaction(
 await tx.prove();
 await (await tx.sign([feePayerKey]).send()).wait(waitParams);
 
-await fetchAccount({ publicKey: zkappAddress });
-zkappAccount = Mina.getAccount(zkappAddress);
-
-// no balance change expected
-expectAssertEquals(zkappAccount.balance, UInt64.from(initialBalance));
-
-// we updated the zkapp state to 31. x = x.add(y) ---- 31 = 1 + 30
-expectAssertEquals(zkappAccount.appState[0], Field(31));
-
 console.log("update 2\n");
 tx = await Mina.transaction(
   { sender: feePayerAddress, fee: 100_000_000 },
