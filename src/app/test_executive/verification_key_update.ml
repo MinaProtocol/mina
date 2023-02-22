@@ -151,7 +151,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ; permissions =
                 Set
                   { edit_state = Proof
-                  ; send = Proof
+                  ; send = Signature
                   ; receive = Proof
                   ; set_delegate = Proof
                   ; set_permissions = Signature
@@ -161,7 +161,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                   ; set_token_symbol = Proof
                   ; increment_nonce = Proof
                   ; set_voting_for = Proof
-                  ; access = Proof
+                  ; access = Signature
                   ; set_timing = Signature
                   }
             }
