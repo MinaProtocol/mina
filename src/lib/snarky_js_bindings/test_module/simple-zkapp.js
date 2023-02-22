@@ -218,8 +218,13 @@ tx = await Mina.transaction(
 
 // this tx should fail, but we wont know that here - so we just check that no state has changed
 await tx.prove();
-await (await tx.sign([feePayerKey]).send()).wait(waitParams);
+let txId = await tx.sign([feePayerKey]).send();
+await txId.wait(waitParams);
 
+if (txId.isSuccess)
+  throw Error("The transaction was expected to fail, but it succeeded anyway!");
+
+// although we just checked above that the tx failed, I just would like to double-check that anyway (cross checking logic)
 await fetchAccount({ publicKey: zkappAddress });
 zkappAccount = Mina.getAccount(zkappAddress);
 
