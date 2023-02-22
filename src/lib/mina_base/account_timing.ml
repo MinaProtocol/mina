@@ -70,15 +70,14 @@ module As_record = struct
 end
 
 (* convert sum type to record format, useful for to_bits and typ *)
-let to_record t : _ As_record.t =
+let to_record t =
   match t with
   | Untimed ->
       let slot_unused = Global_slot.zero in
       let slot_one = Global_slot.(succ zero) in
       let balance_unused = Balance.zero in
       let amount_unused = Amount.zero in
-
-      { is_timed = false
+      { As_record.is_timed = false
       ; initial_minimum_balance = balance_unused
       ; cliff_time = slot_unused
       ; cliff_amount = amount_unused
@@ -101,14 +100,13 @@ let to_record t : _ As_record.t =
       }
 
 let of_record
-    As_record.
-      { is_timed
-      ; initial_minimum_balance
-      ; cliff_time
-      ; cliff_amount
-      ; vesting_period
-      ; vesting_increment
-      } : t =
+    { As_record.is_timed
+    ; initial_minimum_balance
+    ; cliff_time
+    ; cliff_amount
+    ; vesting_period
+    ; vesting_increment
+    } : t =
   if is_timed then
     Timed
       { initial_minimum_balance
@@ -165,14 +163,13 @@ let var_to_input
     |]
 
 let var_of_t (t : t) : var =
-  let ({ is_timed
-       ; initial_minimum_balance
-       ; cliff_time
-       ; cliff_amount
-       ; vesting_period
-       ; vesting_increment
-       }
-        : _ As_record.t ) =
+  let { As_record.is_timed
+      ; initial_minimum_balance
+      ; cliff_time
+      ; cliff_amount
+      ; vesting_period
+      ; vesting_increment
+      } =
     to_record t
   in
   { is_timed = Boolean.var_of_value is_timed
@@ -276,14 +273,13 @@ let if_ b ~(then_ : var) ~(else_ : var) =
     Amount.Checked.if_ b ~then_:then_.vesting_increment
       ~else_:else_.vesting_increment
   in
-  As_record.
-    { is_timed
-    ; initial_minimum_balance
-    ; cliff_time
-    ; cliff_amount
-    ; vesting_period
-    ; vesting_increment
-    }
+  { As_record.is_timed
+  ; initial_minimum_balance
+  ; cliff_time
+  ; cliff_amount
+  ; vesting_period
+  ; vesting_increment
+  }
 
 let deriver obj =
   let open Fields_derivers_zkapps in
