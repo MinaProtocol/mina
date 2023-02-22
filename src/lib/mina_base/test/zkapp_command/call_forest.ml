@@ -14,8 +14,7 @@ module Tree = struct
     module V1 = struct
       include V1
 
-      let quickcheck_generator account_update_gen account_update_digest_gen
-          digest_gen =
+      let gen account_update_gen account_update_digest_gen digest_gen =
         let open Quickcheck.Generator.Let_syntax in
         Quickcheck.Generator.fixed_point (fun self ->
             let%bind calls_length =
@@ -50,13 +49,12 @@ module Shape = struct
       l_x l_y
 end
 
-let quickcheck_generator account_update_gen account_update_digest_gen digest_gen
-    =
+let gen account_update_gen account_update_digest_gen digest_gen =
   let open Quickcheck.Generator.Let_syntax in
   Quickcheck.Generator.list
     (With_stack_hash.Stable.V1.quickcheck_generator
-       (Tree.Stable.V1.quickcheck_generator account_update_gen
-          account_update_digest_gen digest_gen )
+       (Tree.Stable.V1.gen account_update_gen account_update_digest_gen
+          digest_gen )
        digest_gen )
 
 module Tree_test = struct
@@ -134,8 +132,8 @@ module Tree_test = struct
   let%test_unit "mapi_with_trees preserves shape" =
     let open Quickcheck.Generator.Let_syntax in
     Quickcheck.test
-      (Tree.Stable.V1.quickcheck_generator Int.quickcheck_generator
-         Int.quickcheck_generator Int.quickcheck_generator ) ~f:(fun tree ->
+      (Tree.Stable.V1.gen Int.quickcheck_generator Int.quickcheck_generator
+         Int.quickcheck_generator ) ~f:(fun tree ->
         let tree' = Tree.mapi_with_trees tree ~f:(fun _ _ _ -> ()) in
         try
           Tree.fold2_exn tree tree' ~init:() ~f:(fun _ _ _ -> ()) ;
@@ -152,7 +150,7 @@ module Tree_test = struct
   let%test_unit "mapi_forest_with_trees preserves shape" =
     let open Quickcheck.Generator.Let_syntax in
     Quickcheck.test
-      (quickcheck_generator Int.quickcheck_generator Int.quickcheck_generator
+      (gen Int.quickcheck_generator Int.quickcheck_generator
          Int.quickcheck_generator ) ~f:(fun forest ->
         let forest' = Tree.mapi_forest_with_trees forest ~f:(fun _ _ _ -> ()) in
         try
@@ -171,8 +169,8 @@ module Tree_test = struct
     let open Quickcheck.Generator.Let_syntax in
     Quickcheck.test
       ( Quickcheck.Generator.tuple2 Int.quickcheck_generator
-      @@ Tree.Stable.V1.quickcheck_generator Int.quickcheck_generator
-           Int.quickcheck_generator Int.quickcheck_generator )
+      @@ Tree.Stable.V1.gen Int.quickcheck_generator Int.quickcheck_generator
+           Int.quickcheck_generator )
       ~f:(fun (i, tree) ->
         let _, tree' = Tree.mapi' ~i tree ~f:(fun _ _ -> ()) in
         try
@@ -197,7 +195,7 @@ module Tree_test = struct
 
   let%test_unit "deferred_map_forest f x is equivalent to map_forest f x" =
     Quickcheck.test
-      (quickcheck_generator Int.quickcheck_generator Int.quickcheck_generator
+      (gen Int.quickcheck_generator Int.quickcheck_generator
          Int.quickcheck_generator ) ~f:(fun x ->
         let tree_sync = Tree.map_forest ~f:(fun x -> x + 1) x in
         let tree_async =
@@ -235,7 +233,7 @@ let%test_unit "shape" =
 
 let%test_unit "shape indexes always start with 0 and increse by 1" =
   Quickcheck.test
-    (quickcheck_generator Int.quickcheck_generator Int.quickcheck_generator
+    (gen Int.quickcheck_generator Int.quickcheck_generator
        Int.quickcheck_generator ) ~f:(fun tree ->
       let rec check_shape (Shape.Node xs) =
         List.iteri xs ~f:(fun i (j, xs') ->
@@ -275,7 +273,7 @@ let%test_unit "match_up empty" =
 let gen_forest_shape =
   let open Quickcheck.Generator.Let_syntax in
   let%bind forest =
-    quickcheck_generator Int.quickcheck_generator Int.quickcheck_generator
+    gen Int.quickcheck_generator Int.quickcheck_generator
       Unit.quickcheck_generator
   in
   let rec gen_shape (Shape.Node shape) =
