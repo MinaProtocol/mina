@@ -84,16 +84,17 @@ module Tree_test = struct
          [ node 5 [ node 6 [ node 7 [] ] ]; node 8 [ node 9 [] ] ]
          ~f:(fun acc x y -> acc + x + y)
          ~init:0 )
-      ~expect:45 ;
+      ~expect:45
+
+  let%test "fold_forest2 fails" =
     try
-      ignore
-      @@ Tree.fold_forest2_exn
-           [ node 0 [ node 1 [] ]; node 3 [ node 4 [] ] ]
-           [ node 5 [ node 6 [ node 7 [] ] ]; node 8 [ node 9 [] ] ]
-           ~f:(fun acc x y -> acc + x + y)
-           ~init:0 ;
-      assert false
-    with _ -> assert true
+      Tree.fold_forest2_exn
+        [ node 0 [ node 1 [] ]; node 3 [ node 4 [] ] ]
+        [ node 5 [ node 6 [ node 7 [] ] ]; node 8 [ node 9 [] ] ]
+        ~f:(fun _ _ _ -> ())
+        ~init:() ;
+      false
+    with _ -> true
 
   let%test_unit "iter_forest2_exn" =
     let expect = List.rev [ (1, 4); (2, 5); (3, 6) ] in
@@ -103,14 +104,16 @@ module Tree_test = struct
       [ node 1 []; node 2 []; node 3 [] ]
       [ node 4 []; node 5 []; node 6 [] ]
       ~f ;
-    [%test_result: (int * int) list] ~expect !actual ;
+    [%test_result: (int * int) list] ~expect !actual
+
+  let%test "iter_forest2_exn fails" =
     try
       Tree.iter_forest2_exn
         [ node 1 []; node 2 []; node 3 [] ]
         [ node 4 []; node 5 [ node 0 [] ]; node 6 [] ]
-        ~f ;
-      assert false
-    with _ -> assert true
+        ~f:(fun _ _ -> ()) ;
+      false
+    with _ -> true
 
   let%test_unit "iter2_exn" =
     let expect = List.rev [ (1, 4); (2, 5); (3, 6) ] in
@@ -120,14 +123,16 @@ module Tree_test = struct
       (tree 1 [ node 2 []; node 3 [] ])
       (tree 4 [ node 5 []; node 6 [] ])
       ~f ;
-    [%test_result: (int * int) list] ~expect !actual ;
+    [%test_result: (int * int) list] ~expect !actual
+
+  let%test "iter2_exn fails" =
     try
       Tree.iter2_exn
         (tree 1 [ node 2 []; node 3 [] ])
         (tree 4 [ node 5 []; node 6 [ node 3 [] ] ])
-        ~f ;
-      assert false
-    with _ -> assert true
+        ~f:(fun _ _ -> ()) ;
+      false
+    with _ -> true
 
   let%test_unit "mapi_with_trees preserves shape" =
     let open Quickcheck.Generator.Let_syntax in
@@ -135,10 +140,7 @@ module Tree_test = struct
       (Tree.Stable.V1.gen Int.quickcheck_generator Int.quickcheck_generator
          Int.quickcheck_generator ) ~f:(fun tree ->
         let tree' = Tree.mapi_with_trees tree ~f:(fun _ _ _ -> ()) in
-        try
-          Tree.fold2_exn tree tree' ~init:() ~f:(fun _ _ _ -> ()) ;
-          assert true
-        with _ -> assert false )
+        ignore @@ Tree.fold2_exn tree tree' ~init:() ~f:(fun _ _ _ -> ()) )
 
   let%test_unit "mapi_with_trees unit test" =
     [%test_result: (int, unit, unit) Tree.t]
@@ -153,10 +155,7 @@ module Tree_test = struct
       (gen Int.quickcheck_generator Int.quickcheck_generator
          Int.quickcheck_generator ) ~f:(fun forest ->
         let forest' = Tree.mapi_forest_with_trees forest ~f:(fun _ _ _ -> ()) in
-        try
-          Tree.fold_forest2_exn forest forest' ~init:() ~f:(fun _ _ _ -> ()) ;
-          assert true
-        with _ -> assert false )
+        Tree.fold_forest2_exn forest forest' ~init:() ~f:(fun _ _ _ -> ()) )
 
   let%test_unit "mapi_forest_with_trees unit test" =
     [%test_result: (int, unit, unit) t]
@@ -173,10 +172,7 @@ module Tree_test = struct
            Int.quickcheck_generator )
       ~f:(fun (i, tree) ->
         let _, tree' = Tree.mapi' ~i tree ~f:(fun _ _ -> ()) in
-        try
-          Tree.fold2_exn tree tree' ~init:() ~f:(fun _ _ _ -> ()) ;
-          assert true
-        with _ -> assert false )
+        Tree.fold2_exn tree tree' ~init:() ~f:(fun _ _ _ -> ()) )
 
   let%test_unit "mapi'" =
     [%test_result: int * (int, unit, unit) Tree.t]
@@ -248,21 +244,21 @@ let%test_unit "match_up ok" =
   let expect = [ (1, 'a'); (2, 'b'); (3, 'c'); (4, 'd') ] in
   [%test_result: (int * char) list] ~expect (match_up l_1 l_2)
 
-let%test_unit "match_up error" =
+let%test "match_up error" =
   let l_1 = [ 1; 2; 3 ] in
   let l_2 = [ (0, 'a'); (1, 'b'); (2, 'c'); (3, 'd') ] in
   try
     ignore @@ match_up l_1 l_2 ;
-    assert false
-  with Assert_failure _ -> assert true
+    false
+  with _ -> true
 
-let%test_unit "match_up error 2" =
+let%test "match_up error 2" =
   let l_1 = [ 1; 2; 3 ] in
   let l_2 = [ (2, 'a'); (3, 'b'); (4, 'c'); (5, 'd') ] in
   try
     ignore @@ match_up l_1 l_2 ;
-    assert false
-  with Assert_failure _ -> assert true
+    false
+  with _ -> true
 
 let%test_unit "match_up empty" =
   let l_1 = [ 1; 2; 3; 4; 5; 6 ] in
