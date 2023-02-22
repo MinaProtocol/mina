@@ -2403,67 +2403,11 @@ let pickles =
   end
 
 module Ledger = struct
-  type js_uint32 = < value : field_class Js.t Js.readonly_prop > Js.t
-
-  type js_uint64 = < value : field_class Js.t Js.readonly_prop > Js.t
-
   type private_key = < s : scalar_class Js.t Js.prop > Js.t
 
   type public_key =
     < x : field_class Js.t Js.readonly_prop
     ; isOdd : bool_class Js.t Js.readonly_prop >
-    Js.t
-
-  type zkapp_account =
-    < appState : field_class Js.t Js.js_array Js.t Js.readonly_prop
-    ; verificationKey :
-        < hash : Js.js_string Js.t Js.readonly_prop
-        ; data : Js.js_string Js.t Js.readonly_prop >
-        Js.t
-        Js.optdef
-        Js.readonly_prop
-    ; zkappVersion : int Js.readonly_prop
-    ; sequenceState : field_class Js.t Js.js_array Js.t Js.readonly_prop
-    ; lastSequenceSlot : int Js.readonly_prop
-    ; provedState : bool_class Js.t Js.readonly_prop
-    ; zkappUri : Js.js_string Js.t Js.readonly_prop >
-    Js.t
-
-  type permissions =
-    < editState : Js.js_string Js.t Js.readonly_prop
-    ; send : Js.js_string Js.t Js.readonly_prop
-    ; receive : Js.js_string Js.t Js.readonly_prop
-    ; setDelegate : Js.js_string Js.t Js.readonly_prop
-    ; setPermissions : Js.js_string Js.t Js.readonly_prop
-    ; setVerificationKey : Js.js_string Js.t Js.readonly_prop
-    ; setZkappUri : Js.js_string Js.t Js.readonly_prop
-    ; editSequenceState : Js.js_string Js.t Js.readonly_prop
-    ; setTokenSymbol : Js.js_string Js.t Js.readonly_prop
-    ; incrementNonce : Js.js_string Js.t Js.readonly_prop
-    ; setVotingFor : Js.js_string Js.t Js.readonly_prop >
-    Js.t
-
-  type timing =
-    < isTimed : bool_class Js.t Js.readonly_prop
-    ; initialMinimumBalance : js_uint64 Js.readonly_prop
-    ; cliffTime : js_uint32 Js.readonly_prop
-    ; cliffAmount : js_uint64 Js.readonly_prop
-    ; vestingPeriod : js_uint32 Js.readonly_prop
-    ; vestingIncrement : js_uint64 Js.readonly_prop >
-    Js.t
-
-  type account =
-    < publicKey : public_key Js.readonly_prop
-    ; tokenId : field_class Js.t Js.readonly_prop
-    ; tokenSymbol : Js.js_string Js.t Js.readonly_prop
-    ; balance : js_uint64 Js.readonly_prop
-    ; nonce : js_uint32 Js.readonly_prop
-    ; receiptChainHash : field_class Js.t Js.readonly_prop
-    ; delegate : public_key Js.optdef Js.readonly_prop
-    ; votingFor : field_class Js.t Js.readonly_prop
-    ; zkapp : zkapp_account Js.optdef Js.readonly_prop
-    ; permissions : permissions Js.readonly_prop
-    ; timing : timing Js.readonly_prop >
     Js.t
 
   let ledger_class : < .. > Js.t =
