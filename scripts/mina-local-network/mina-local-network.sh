@@ -181,6 +181,37 @@ spawn-archive-node() {
   exec-archive-node $@ &>${FOLDER}/log.txt &
 }
 
+# Checks connection to database. Give possible reason for lack of connectivity.
+# Function assumes that env have pg_isready command installed. This cli utility is installed along with postgres server
+check-db-connection() {
+  echo "Checking connection to archive database..."
+  printf "\n"
+
+  case `pg_isready -U ${PG_USER} -h ${PG_HOST} -p ${PG_PORT} -d ${PG_DB} &>/dev/null; echo $?` in
+    0)
+      echo "Connection to database successful!"
+      ;;
+    1)
+      echo -n "The server is rejecting connections (for example during startup)"
+      exit 1
+      ;;
+    2)
+      echo -n "There was no response from server to the connection attempt"
+      exit 1
+      ;;
+    3)
+      echo -n "No attempt was made (for example due to invalid parameters)"
+      exit 1
+      ;;
+    *)
+      echo -n "Unknown issue when connecting to database"
+      exit 1
+      ;;
+  esac
+
+  printf "\n"
+}
+
 # ================================================
 # Parse inputs from arguments
 
@@ -305,7 +336,10 @@ if ${ARCHIVE}; then
   echo "================================"
   printf "\n"
 
-  psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT}/${PG_DB} -c "SELECT * FROM user_commands;" &>/dev/null
+  check-db-connection
+
+  echo "================================"
+  printf "\n"
 
   ARCHIVE_ADDRESS_CLI_ARG="-archive-address ${ARCHIVE_SERVER_PORT}"
 fi
