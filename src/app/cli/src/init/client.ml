@@ -101,7 +101,7 @@ let get_tokens_graphql =
          in
          printf "Accounts are held for token IDs:\n" ;
          Array.iter response.accounts ~f:(fun account ->
-             printf "%s " (Token_id.to_string account.token) ) ) )
+             printf "%s " (Token_id.to_string account.tokenId) ) ) )
 
 let get_time_offset_graphql =
   Command.async
