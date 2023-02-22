@@ -2413,20 +2413,6 @@ module Ledger = struct
   let ledger_class : < .. > Js.t =
     Js.Unsafe.eval_string {js|(function(v) { this.value = v; return this })|js}
 
-  let loose_permissions : Mina_base.Permissions.t =
-    { edit_state = None
-    ; send = None
-    ; receive = None
-    ; set_delegate = None
-    ; set_permissions = None
-    ; set_verification_key = None
-    ; set_zkapp_uri = None
-    ; edit_sequence_state = None
-    ; set_token_symbol = None
-    ; increment_nonce = None
-    ; set_voting_for = None
-    }
-
   module L : Mina_base.Ledger_intf.S = struct
     module Account = Mina_base.Account
     module Account_id = Mina_base.Account_id
@@ -2465,11 +2451,7 @@ module Ledger = struct
         match loc with
         | None ->
             let loc = next_location t in
-            let a =
-              { (Account.create id Currency.Balance.zero) with
-                permissions = loose_permissions
-              }
-            in
+            let a = Account.create id Currency.Balance.zero in
             t := { !t with locations = Map.set !t.locations ~key:id ~data:loc } ;
             set t loc a ;
             (`Added, a, loc)
@@ -2873,11 +2855,7 @@ module Ledger = struct
     let account_id = account_id pk default_token_id_js in
     let bal_u64 = Unsigned.UInt64.of_string balance in
     let balance = Currency.Balance.of_uint64 bal_u64 in
-    let a : Mina_base.Account.t =
-      { (Mina_base.Account.create account_id balance) with
-        permissions = loose_permissions
-      }
-    in
+    let a : Mina_base.Account.t = Mina_base.Account.create account_id balance in
     create_new_account_exn l account_id a
 
   let create
