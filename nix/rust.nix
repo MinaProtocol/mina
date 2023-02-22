@@ -95,11 +95,16 @@ in
 
   kimchi-rust = rustChannelFromToolchainFileOf
     ../src/lib/crypto/kimchi_bindings/wasm/rust-toolchain.toml;
-  kimchi-rust-wasm = final.kimchi-rust.rust.override {
+  kimchi-rust-wasm = (final.kimchi-rust.rust.override {
     targets = [ "wasm32-unknown-unknown" ];
     # rust-src is needed for -Zbuild-std
     extensions = [ "rust-src" ];
-  };
+  }).overrideAttrs (oa: {
+    nativeBuildInputs = oa.nativeBuildInputs or [ ] ++ [ final.makeWrapper ];
+    buildCommand = oa.buildCommand + ''
+      wrapProgram "$out/bin/rustc" --append-flags --sysroot --append-flags "$out"
+    '';
+  });
 
   # Work around https://github.com/rust-lang/wg-cargo-std-aware/issues/23
   kimchi-rust-std-deps = final.rustPlatform.importCargoLock {
