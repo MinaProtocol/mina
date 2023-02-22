@@ -275,18 +275,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       |> Zkapp_command.Call_forest.cons_tree account_update1
       |> Zkapp_command.Call_forest.cons (update_vk vk2)
     in
-    let zkapp_command_update_vk2 =
+    let zkapp_command_update_vk2_refers_vk1 =
       call_forest_to_zkapp ~call_forest:call_forest2
         ~nonce:Account.Nonce.(of_int 1)
     in
-    let call_forest_refers_vk2 =
-      [] |> Zkapp_command.Call_forest.cons_tree account_update2
+    let call_forest_update_vk2 =
+      []
+      |> Zkapp_command.Call_forest.cons_tree account_update2
+      |> Zkapp_command.Call_forest.cons (update_vk vk2)
     in
-    let zkapp_command_refers_vk2 =
-      call_forest_to_zkapp ~call_forest:call_forest_refers_vk2
-        ~nonce:Account.Nonce.(of_int 2)
+    let zkapp_command_update_vk2 =
+      call_forest_to_zkapp ~call_forest:call_forest_update_vk2
+        ~nonce:Account.Nonce.(of_int 1)
     in
-
     let with_timeout =
       let soft_slots = 3 in
       let soft_timeout = Network_time_span.Slots soft_slots in
@@ -327,23 +328,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section
         "Send zkApp to update to a new verification key v2 and then refers to \
          the old key v1"
-        (send_zkapp ~logger whale1 zkapp_command_update_vk2)
+        (send_invalid_zkapp ~logger whale1 zkapp_command_update_vk2_refers_vk1
+           "Verification_failed" )
     in
     let%bind () =
-      section "Send zkApp that refers to the new key v2"
-        (send_zkapp ~logger whale1 zkapp_command_refers_vk2)
+      section
+        "Send zkApp to update to a new verification key v2 and then refers to \
+         that"
+        (send_zkapp ~logger whale1 zkapp_command_update_vk2)
     in
     let%bind () =
       section
         "Wait for zkApp to upate to a new verification key v2 and then refers \
          to the old key v1 to fail"
-        (wait_for_zkapp ~has_failures:true zkapp_command_update_vk2)
-    in
-    let%bind () =
-      section
-        "Wait for zkApp that refers to the new key v2 to be included in \
-         transition frontier"
-        (wait_for_zkapp ~has_failures:false zkapp_command_refers_vk2)
+        (wait_for_zkapp ~has_failures:false zkapp_command_update_vk2)
     in
     section_hard "Wait for proof to be emitted"
       (wait_for t
