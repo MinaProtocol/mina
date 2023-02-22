@@ -26,8 +26,8 @@ let%test_module "Fee payer tests" =
                    snapp account" =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
-          let fee = Fee.of_int 1_000_000 in
-          let amount = Amount.of_int 10_000_000_000 in
+          let fee = Fee.of_nanomina_int_exn 1_000_000 in
+          let amount = Amount.of_mina_int_exn 10 in
           let test_spec : Spec.t =
             { sender = (new_kp, Mina_base.Account.Nonce.zero)
             ; fee
@@ -41,7 +41,7 @@ let%test_module "Fee payer tests" =
             ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions = None
             }
           in
@@ -52,7 +52,7 @@ let%test_module "Fee payer tests" =
                    non-snapp account" =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
-          let fee = Fee.of_int 1_000_000 in
+          let fee = Fee.of_nanomina_int_exn 1_000_000 in
           let amount = Amount.zero in
           let spec = List.hd_exn specs in
           let test_spec : Spec.t =
@@ -68,7 +68,7 @@ let%test_module "Fee payer tests" =
             ; current_auth = Permissions.Auth_required.Signature
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions = None
             }
           in
@@ -79,8 +79,8 @@ let%test_module "Fee payer tests" =
                    account" =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
-          let fee = Fee.of_int 1_000_000 in
-          let amount = Amount.of_int 10_000_000_000 in
+          let fee = Fee.of_nanomina_int_exn 1_000_000 in
+          let amount = Amount.of_mina_int_exn 10 in
           let test_spec : Spec.t =
             { sender = (new_kp, Mina_base.Account.Nonce.zero)
             ; fee
@@ -94,7 +94,7 @@ let%test_module "Fee payer tests" =
             ; current_auth = Permissions.Auth_required.Proof
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions = None
             }
           in
@@ -108,8 +108,8 @@ let%test_module "Fee payer tests" =
                    non-snapp account" =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
-          let fee = Fee.of_int 1_000_000 in
-          let amount = Amount.of_int 10_000_000_000 in
+          let fee = Fee.of_nanomina_int_exn 1_000_000 in
+          let amount = Amount.of_mina_int_exn 10 in
           let spec = List.hd_exn specs in
           let test_spec : Spec.t =
             { sender = spec.sender
@@ -124,7 +124,7 @@ let%test_module "Fee payer tests" =
             ; current_auth = Permissions.Auth_required.Proof
             ; call_data = Snark_params.Tick.Field.zero
             ; events = []
-            ; sequence_events = []
+            ; actions = []
             ; preconditions = None
             }
           in
@@ -136,12 +136,13 @@ let%test_module "Fee payer tests" =
 
     let%test_unit "snapp transaction with non-existent fee payer account" =
       let open Mina_transaction_logic.For_tests in
-      Quickcheck.test ~trials:1 U.gen_snapp_ledger
-        ~f:(fun ({ init_ledger; specs }, new_kp) ->
+      Quickcheck.test ~trials:1
+        Quickcheck.Generator.(tuple2 U.gen_snapp_ledger small_positive_int)
+        ~f:(fun (({ init_ledger; specs }, new_kp), global_slot) ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               let spec = List.hd_exn specs in
-              let fee = Fee.of_int 1_000_000 in
-              let amount = Amount.of_int 10_000_000_000 in
+              let fee = Fee.of_nanomina_int_exn 1_000_000 in
+              let amount = Amount.of_mina_int_exn 10 in
               (*making new_kp the fee-payer for this to fail*)
               let test_spec : Transaction_snark.For_tests.Deploy_snapp_spec.t =
                 { sender = (new_kp, Account.Nonce.zero)
@@ -160,14 +161,17 @@ let%test_module "Fee payer tests" =
                 Transaction_snark.For_tests.deploy_snapp test_spec
                   ~constraint_constants
               in
+              let txn_state_view =
+                Mina_state.Protocol_state.Body.view U.genesis_state_body
+              in
+              let global_slot = Mina_numbers.Global_slot.of_int global_slot in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
               ( match
                   let mask = Ledger.Mask.create ~depth:U.ledger_depth () in
                   let ledger0 = Ledger.register_mask ledger mask in
-                  Ledger.apply_transaction ledger0 ~constraint_constants
-                    ~txn_state_view:
-                      (Mina_state.Protocol_state.Body.view U.genesis_state_body)
-                    (Transaction.Command (Zkapp_command zkapp_command))
+                  Ledger.apply_transactions ledger0 ~constraint_constants
+                    ~global_slot ~txn_state_view
+                    [ Transaction.Command (Zkapp_command zkapp_command) ]
                 with
               | Error _ ->
                   (*TODO : match on exact error*) ()
@@ -175,16 +179,16 @@ let%test_module "Fee payer tests" =
                   failwith "Ledger.apply_transaction should have failed" ) ;
               (*Sparse ledger application fails*)
               match
-                Or_error.try_with (fun () ->
-                    Transaction_snark.zkapp_command_witnesses_exn
-                      ~constraint_constants ~state_body:U.genesis_state_body
-                      ~fee_excess:Amount.Signed.zero (`Ledger ledger)
-                      [ ( `Pending_coinbase_init_stack U.init_stack
-                        , `Pending_coinbase_of_statement
-                            (U.pending_coinbase_state_stack
-                               ~state_body_hash:U.genesis_state_body_hash )
-                        , zkapp_command )
-                      ] )
+                let sparse_ledger =
+                  Sparse_ledger.of_any_ledger
+                    (Ledger.Any_ledger.cast
+                       (module Ledger.Mask.Attached)
+                       ledger )
+                in
+                Sparse_ledger.apply_transaction_first_pass ~constraint_constants
+                  ~global_slot ~txn_state_view sparse_ledger
+                  (Mina_transaction.Transaction.Command
+                     (Zkapp_command zkapp_command) )
               with
               | Ok _a ->
                   failwith "Expected sparse ledger application to fail"

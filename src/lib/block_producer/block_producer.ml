@@ -177,11 +177,11 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
     Protocol_state.body previous_protocol_state
     |> Mina_state.Protocol_state.Body.view
   in
+  let global_slot =
+    Consensus.Data.Block_data.global_slot_since_genesis block_data
+  in
   let supercharge_coinbase =
     let epoch_ledger = Consensus.Data.Block_data.epoch_ledger block_data in
-    let global_slot =
-      Consensus.Data.Block_data.global_slot_since_genesis block_data
-    in
     Staged_ledger.can_apply_supercharged_coinbase_exn ~winner:winner_pk
       ~epoch_ledger ~global_slot
   in
@@ -191,13 +191,12 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       let coinbase_receiver =
         Consensus.Data.Block_data.coinbase_receiver block_data
       in
-
       let diff =
         O1trace.sync_thread "create_staged_ledger_diff" (fun () ->
             (* TODO: handle transaction inclusion failures here *)
             let diff_result =
-              Staged_ledger.create_diff ~constraint_constants staged_ledger
-                ~coinbase_receiver ~logger
+              Staged_ledger.create_diff ~constraint_constants ~global_slot
+                staged_ledger ~coinbase_receiver ~logger
                 ~current_state_view:previous_state_view
                 ~transactions_by_fee:transactions ~get_completed_work
                 ~log_block_creation ~supercharge_coinbase
@@ -236,7 +235,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       match%map
         let%bind.Deferred.Result diff = return diff in
         Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
-          diff ~logger ~current_state_view:previous_state_view
+          ~global_slot diff ~logger ~current_state_view:previous_state_view
           ~state_and_body_hash:
             (previous_protocol_state_hash, previous_protocol_state_body_hash)
           ~coinbase_receiver ~supercharge_coinbase
@@ -296,17 +295,15 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               previous_protocol_state |> Protocol_state.blockchain_state
               |> Blockchain_state.snarked_ledger_hash
             in
-            let next_registers =
+            let ledger_proof_statement =
               match ledger_proof_opt with
               | Some (proof, _) ->
-                  { ( Ledger_proof.statement proof
-                    |> Ledger_proof.statement_target )
-                    with
-                    pending_coinbase_stack = ()
-                  }
+                  Ledger_proof.statement proof
               | None ->
-                  previous_protocol_state |> Protocol_state.blockchain_state
-                  |> Blockchain_state.registers
+                  let state =
+                    previous_protocol_state |> Protocol_state.blockchain_state
+                  in
+                  Blockchain_state.ledger_proof_statement state
             in
             let genesis_ledger_hash =
               previous_protocol_state |> Protocol_state.blockchain_state
@@ -332,8 +329,8 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                  has a different slot from the [scheduled_time]
               *)
               Blockchain_state.create_value ~timestamp:scheduled_time
-                ~registers:next_registers ~genesis_ledger_hash
-                ~staged_ledger_hash:next_staged_ledger_hash ~body_reference
+                ~genesis_ledger_hash ~staged_ledger_hash:next_staged_ledger_hash
+                ~body_reference ~ledger_proof_statement
             in
             let current_time =
               Block_time.now time_controller

@@ -32,7 +32,7 @@ Pipeline.build
             Cmd.run "chmod -R 777 src/libp2p_ipc",
             Cmd.runInDocker
               Cmd.Docker::
-                { image=ContainerImages.minaToolchainBuster
+                { image=ContainerImages.minaToolchain
                 , extraEnv = [ "GO=/usr/lib/go/bin/go" ]
                 } "make -C src/app/libp2p_helper test"
           ],
@@ -47,14 +47,16 @@ Pipeline.build
             Cmd.run "chmod -R 777 src/libp2p_ipc",
             Cmd.runInDocker
               Cmd.Docker::
-                { image=ContainerImages.minaToolchainBuster
+                { image=ContainerImages.minaToolchain
                 , extraEnv = [ "GO=/usr/lib/go/bin/go" ]
                 } "make -C src/app/libp2p_helper test-bs-qc"
           ],
           label = "libp2p bitswap QuickCheck",
           key = "libp2p-bs-qc",
           target = Size.Large,
-          docker = None Docker.Type
+          docker = None Docker.Type,
+          timeout_in_minutes = Some 45
+
         }
     ]
   }

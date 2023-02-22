@@ -339,7 +339,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           *)
           Async.In_thread.run (fun () -> Mina_lib.get_ledger coda lh) )
     ; implement Daemon_rpcs.Get_snarked_ledger.rpc (fun () lh ->
-          Mina_lib.get_snarked_ledger coda lh |> return )
+          Mina_lib.get_snarked_ledger coda lh )
     ; implement Daemon_rpcs.Get_staking_ledger.rpc (fun () which ->
           ( match which with
           | Next ->
@@ -489,10 +489,14 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Snark_worker.Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
         (fun
           ()
-          ((_work_spec, _prover_pk) :
-            Snark_worker.Work.Spec.t * Signature_lib.Public_key.Compressed.t )
+          ((error, _work_spec, _prover_public_key) :
+            Error.t
+            * Snark_worker.Work.Spec.t
+            * Signature_lib.Public_key.Compressed.t )
         ->
-          [%str_log error] Snark_worker.Generating_snark_work_failed ;
+          [%str_log error]
+            (Snark_worker.Generating_snark_work_failed
+               { error = Error_json.error_to_yojson error } ) ;
           Mina_metrics.(Counter.inc_one Snark_work.snark_work_failed_rpc) ;
           Deferred.unit )
     ]

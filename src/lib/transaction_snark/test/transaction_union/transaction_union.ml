@@ -56,6 +56,7 @@ let%test_module "Transaction union tests" =
       let user_command_in_block =
         { Transaction_protocol_state.Poly.transaction = user_command
         ; block_data = state_body
+        ; global_slot = current_global_slot
         }
       in
       let user_command_supply_increase = Currency.Amount.Signed.zero in
@@ -66,8 +67,11 @@ let%test_module "Transaction union tests" =
                 (User_command.Signed_command
                    (Signed_command.forget_check user_command) )
             in
-            Transaction_snark.Statement.Poly.with_empty_local_state ~source
-              ~target ~sok_digest
+            Transaction_snark.Statement.Poly.with_empty_local_state
+              ~source_first_pass_ledger:source ~target_first_pass_ledger:target
+              ~source_second_pass_ledger:target
+              ~target_second_pass_ledger:target ~connecting_ledger_left:target
+              ~connecting_ledger_right:target ~sok_digest
               ~fee_excess:(Or_error.ok_exn (Transaction.fee_excess txn))
               ~supply_increase:user_command_supply_increase
               ~pending_coinbase_stack_state
@@ -79,6 +83,10 @@ let%test_module "Transaction union tests" =
         Public_key.(compress (of_private_key_exn (Private_key.create ())))
       in
       let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
+      let global_slot =
+        Mina_state.Protocol_state.Body.consensus_state state_body
+        |> Consensus.Data.Consensus_state.global_slot_since_genesis
+      in
       let producer = mk_pubkey () in
       let producer_id = Account_id.create producer Token_id.default in
       let receiver = mk_pubkey () in
@@ -88,7 +96,7 @@ let%test_module "Transaction union tests" =
       let pending_coinbase_init = Pending_coinbase.Stack.empty in
       let cb =
         Coinbase.create
-          ~amount:(Currency.Amount.of_int 10_000_000_000)
+          ~amount:(Currency.Amount.of_mina_int_exn 10)
           ~receiver
           ~fee_transfer:
             (Some
@@ -100,15 +108,18 @@ let%test_module "Transaction union tests" =
       let source_stack =
         if carryforward then
           Pending_coinbase.Stack.(
-            push_state state_body_hash pending_coinbase_init)
+            push_state state_body_hash global_slot pending_coinbase_init)
         else pending_coinbase_init
       in
       let pending_coinbase_stack_target =
         U.pending_coinbase_stack_target transaction U.genesis_state_body_hash
-          pending_coinbase_init
+          Mina_numbers.Global_slot.zero pending_coinbase_init
       in
       let txn_in_block =
-        { Transaction_protocol_state.Poly.transaction; block_data = state_body }
+        { Transaction_protocol_state.Poly.transaction
+        ; block_data = state_body
+        ; global_slot
+        }
       in
       Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
           Ledger.create_new_account_exn ledger producer_id
@@ -118,11 +129,17 @@ let%test_module "Transaction union tests" =
               [ producer_id; receiver_id; other_id ]
           in
           let sparse_ledger_after, applied_transaction =
-            Sparse_ledger.apply_transaction
-              ~constraint_constants:U.constraint_constants sparse_ledger
-              ~txn_state_view:
-                (txn_in_block.block_data |> Mina_state.Protocol_state.Body.view)
-              txn_in_block.transaction
+            Result.( >>= )
+              (Sparse_ledger.apply_transaction_first_pass
+                 ~constraint_constants:U.constraint_constants ~global_slot
+                 sparse_ledger
+                 ~txn_state_view:
+                   ( txn_in_block.block_data
+                   |> Mina_state.Protocol_state.Body.view )
+                 txn_in_block.transaction )
+              (fun (sparse_ledger, partially_applied) ->
+                Sparse_ledger.apply_transaction_second_pass sparse_ledger
+                  partially_applied )
             |> Or_error.ok_exn
           in
           let supply_increase =
@@ -136,12 +153,13 @@ let%test_module "Transaction union tests" =
             ~sok_message:
               (Mina_base.Sok_message.create ~fee:Currency.Fee.zero
                  ~prover:Public_key.Compressed.empty )
-            ~source:(Sparse_ledger.merkle_root sparse_ledger)
-            ~target:(Sparse_ledger.merkle_root sparse_ledger_after)
+            ~source_first_pass_ledger:(Sparse_ledger.merkle_root sparse_ledger)
+            ~target_first_pass_ledger:
+              (Sparse_ledger.merkle_root sparse_ledger_after)
             ~init_stack:pending_coinbase_init
             ~pending_coinbase_stack_state:
               { source = source_stack; target = pending_coinbase_stack_target }
-            ~zkapp_account1:None ~zkapp_account2:None ~supply_increase )
+            ~supply_increase )
 
     let%test_unit "coinbase with new state body hash" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -164,7 +182,7 @@ let%test_module "Transaction union tests" =
               let t1 =
                 U.Wallet.user_command_with_wallet wallets ~sender:1 ~receiver:0
                   8_000_000_000
-                  (Fee.of_int (Random.int 20 * 1_000_000_000))
+                  (Fee.of_mina_int_exn @@ Random.int 20)
                   Account.Nonce.zero
                   (Signed_command_memo.create_by_digesting_string_exn
                      (Test_util.arbitrary_string
@@ -174,7 +192,7 @@ let%test_module "Transaction union tests" =
                 Mina_state.Protocol_state.Body.consensus_state state_body
                 |> Consensus.Data.Consensus_state.global_slot_since_genesis
               in
-              let target =
+              let target_first_pass_ledger =
                 Ledger.merkle_root_after_user_command_exn ledger
                   ~txn_global_slot:current_global_slot t1
               in
@@ -192,7 +210,7 @@ let%test_module "Transaction union tests" =
               let pending_coinbase_stack = Pending_coinbase.Stack.empty in
               let pending_coinbase_stack_target =
                 U.pending_coinbase_stack_target (Command (Signed_command t1))
-                  state_body_hash pending_coinbase_stack
+                  state_body_hash current_global_slot pending_coinbase_stack
               in
               let pending_coinbase_stack_state =
                 { Transaction_snark.Pending_coinbase_stack_state.source =
@@ -210,14 +228,18 @@ let%test_module "Transaction union tests" =
               in
               Transaction_snark.check_user_command ~constraint_constants
                 ~sok_message
-                ~source:(Ledger.merkle_root ledger)
-                ~target ~init_stack:pending_coinbase_stack
+                ~source_first_pass_ledger:(Ledger.merkle_root ledger)
+                ~target_first_pass_ledger ~init_stack:pending_coinbase_stack
                 ~pending_coinbase_stack_state
                 ~supply_increase:user_command_supply_increase
-                { transaction = t1; block_data = state_body }
+                { transaction = t1
+                ; block_data = state_body
+                ; global_slot = current_global_slot
+                }
                 (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
-    let account_fee = Fee.to_int constraint_constants.account_creation_fee
+    let account_fee =
+      Fee.to_nanomina_int constraint_constants.account_creation_fee
 
     let%test_unit "account creation fee - user commands" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -244,7 +266,9 @@ let%test_module "Transaction union tests" =
                     let uc =
                       U.Wallet.user_command ~fee_payer:sender
                         ~receiver_pk:(Account.public_key receiver.account)
-                        amount (Fee.of_int txn_fee) nonce memo
+                        amount
+                        (Fee.of_nanomina_int_exn txn_fee)
+                        nonce memo
                     in
                     (Account.Nonce.succ nonce, txns @ [ uc ]) )
               in
@@ -263,7 +287,7 @@ let%test_module "Transaction union tests" =
                     ledger ) ;
               U.check_balance
                 (Account.identifier sender.account)
-                ( Balance.to_int sender.account.balance
+                ( Balance.to_nanomina_int sender.account.balance
                 - (amount + txn_fee) * txns_per_receiver * List.length receivers
                 )
                 ledger ) )
@@ -287,7 +311,7 @@ let%test_module "Transaction union tests" =
                       @@ One_or_two.map receiver ~f:(fun receiver ->
                              Fee_transfer.Single.create
                                ~receiver_pk:receiver.account.public_key
-                               ~fee:(Currency.Fee.of_int fee)
+                               ~fee:(Currency.Fee.of_nanomina_int_exn fee)
                                ~fee_token:receiver.account.token_id )
                     in
                     txns @ [ ft ] )
@@ -310,7 +334,9 @@ let%test_module "Transaction union tests" =
           let other = wallets.(1) in
           let dummy_account = wallets.(2) in
           let reward = 10_000_000_000 in
-          let fee = Fee.to_int constraint_constants.account_creation_fee in
+          let fee =
+            Fee.to_nanomina_int constraint_constants.account_creation_fee
+          in
           let coinbase_count = 3 in
           let ft_count = 2 in
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
@@ -325,7 +351,7 @@ let%test_module "Transaction union tests" =
                   ~f:(fun (fts, cbs) _ ->
                     let cb =
                       Coinbase.create
-                        ~amount:(Currency.Amount.of_int reward)
+                        ~amount:(Currency.Amount.of_nanomina_int_exn reward)
                         ~receiver:receiver.account.public_key
                         ~fee_transfer:(List.hd fts)
                       |> Or_error.ok_exn
@@ -364,7 +390,15 @@ let%test_module "Transaction union tests" =
           (*let state_body = Lazy.force state_body in
             let state_body_hash = Lazy.force state_body_hash in*)
           let state_body_hash1, state_body1 = state_hash_and_body1 in
+          let global_slot1 =
+            Mina_state.Protocol_state.Body.consensus_state state_body1
+            |> Consensus.Data.Consensus_state.global_slot_since_genesis
+          in
           let state_body_hash2, state_body2 = state_hash_and_body2 in
+          let global_slot2 =
+            Mina_state.Protocol_state.Body.consensus_state state_body2
+            |> Consensus.Data.Consensus_state.global_slot_since_genesis
+          in
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               Array.iter wallets ~f:(fun { account; private_key = _ } ->
                   Ledger.create_new_account_exn ledger
@@ -378,13 +412,13 @@ let%test_module "Transaction union tests" =
               let t1 =
                 U.Wallet.user_command_with_wallet wallets ~sender:0 ~receiver:1
                   8_000_000_000
-                  (Fee.of_int (Random.int 20 * 1_000_000_000))
+                  (Fee.of_mina_int_exn @@ Random.int 20)
                   Account.Nonce.zero memo
               in
               let t2 =
                 U.Wallet.user_command_with_wallet wallets ~sender:1 ~receiver:2
                   8_000_000_000
-                  (Fee.of_int (Random.int 20 * 1_000_000_000))
+                  (Fee.of_mina_int_exn @@ Random.int 20)
                   Account.Nonce.zero memo
               in
               let sok_digest =
@@ -408,7 +442,8 @@ let%test_module "Transaction union tests" =
               let pending_coinbase_stack_state1 =
                 (* No coinbase to add to the stack. *)
                 let stack_with_state =
-                  Pending_coinbase.Stack.push_state state_body_hash1 init_stack1
+                  Pending_coinbase.Stack.push_state state_body_hash1
+                    global_slot1 init_stack1
                 in
                 (* Since protocol state body is added once per block, the
                    source would already have the state if [carryforward=true]
@@ -444,7 +479,7 @@ let%test_module "Transaction union tests" =
                 let previous_stack = pending_coinbase_stack_state1.pc.target in
                 let stack_with_state2 =
                   Pending_coinbase.Stack.(
-                    push_state state_body_hash2 previous_stack)
+                    push_state state_body_hash2 global_slot2 previous_stack)
                 in
                 (* No coinbase to add. *)
                 let source_stack, target_stack, init_stack, state_body2 =
@@ -511,10 +546,11 @@ let%test_module "Transaction union tests" =
               in
               Async.Thread_safe.block_on_async (fun () ->
                   T.verify_against_digest proof13 )
-              |> Result.ok_exn ) )
+              |> Result.ok_exn |> Or_error.ok_exn ) )
 
-    let%test "base_and_merge: transactions in one block (t1,t2 in b1), \
-              carryforward the state from a previous transaction t0 in b1" =
+    let%test_unit "base_and_merge: transactions in one block (t1,t2 in b1), \
+                   carryforward the state from a previous transaction t0 in b1"
+        =
       let state_hash_and_body1 = (state_body_hash, state_body) in
       test_base_and_merge ~state_hash_and_body1
         ~state_hash_and_body2:state_hash_and_body1 ~carryforward1:true
@@ -522,16 +558,17 @@ let%test_module "Transaction union tests" =
 
     (* No new state body, carryforward the stack from the previous transaction*)
 
-    let%test "base_and_merge: transactions in one block (t1,t2 in b1), don't \
-              carryforward the state from a previous transaction t0 in b1" =
+    let%test_unit "base_and_merge: transactions in one block (t1,t2 in b1), \
+                   don't carryforward the state from a previous transaction t0 \
+                   in b1" =
       let state_hash_and_body1 = (state_body_hash, state_body) in
       test_base_and_merge ~state_hash_and_body1
         ~state_hash_and_body2:state_hash_and_body1 ~carryforward1:false
         ~carryforward2:true
 
-    let%test "base_and_merge: transactions in two different blocks (t1,t2 in \
-              b1, b2 resp.), carryforward the state from a previous \
-              transaction t0 in b1" =
+    let%test_unit "base_and_merge: transactions in two different blocks (t1,t2 \
+                   in b1, b2 resp.), carryforward the state from a previous \
+                   transaction t0 in b1" =
       let state_hash_and_body1 =
         let open Staged_ledger_diff in
         let state_body0 =
@@ -552,9 +589,9 @@ let%test_module "Transaction union tests" =
 
     (*t2 is in a new state, therefore do not carryforward the previous state*)
 
-    let%test "base_and_merge: transactions in two different blocks (t1,t2 in \
-              b1, b2 resp.), don't carryforward the state from a previous \
-              transaction t0 in b1" =
+    let%test_unit "base_and_merge: transactions in two different blocks (t1,t2 \
+                   in b1, b2 resp.), don't carryforward the state from a \
+                   previous transaction t0 in b1" =
       let state_hash_and_body1 =
         let state_body0 =
           let open Staged_ledger_diff in
@@ -574,7 +611,9 @@ let%test_module "Transaction union tests" =
         ~carryforward1:false ~carryforward2:false
 
     let create_account pk token balance =
-      Account.create (Account_id.create pk token) (Balance.of_int balance)
+      Account.create
+        (Account_id.create pk token)
+        (Balance.of_nanomina_int_exn balance)
 
     let test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
         ~fee_payer_pk ~fee_token ?memo ?valid_until ?nonce body =
@@ -840,7 +879,7 @@ let%test_module "Transaction union tests" =
               let accounts =
                 [| create_account fee_payer_pk fee_token 20_000_000_000 |]
               in
-              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let fee = Fee.of_mina_int_exn @@ random_int_incl 2 15 in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account source_account
                   , `Receiver_account receiver_account ) =
@@ -880,7 +919,7 @@ let%test_module "Transaction union tests" =
                  ; create_account receiver_pk token_id 30_000_000_000
                 |]
               in
-              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let fee = Fee.of_mina_int_exn @@ random_int_incl 2 15 in
               let ( `Fee_payer_account fee_payer_account
                   , `Source_account source_account
                   , `Receiver_account receiver_account ) =
@@ -914,12 +953,12 @@ let%test_module "Transaction union tests" =
               (Test_util.arbitrary_string
                  ~len:Signed_command_memo.max_digestible_string_length )
           in
-          let balance = Balance.of_int 100_000_000_000_000 in
-          let initial_minimum_balance = Balance.of_int 80_000_000_000_000 in
+          let balance = Balance.of_mina_int_exn 100_000 in
+          let initial_minimum_balance = Balance.of_mina_int_exn 80_000 in
           let cliff_time = Mina_numbers.Global_slot.of_int 1000 in
-          let cliff_amount = Amount.of_int 10000 in
+          let cliff_amount = Amount.of_nanomina_int_exn 10_000 in
           let vesting_period = Mina_numbers.Global_slot.of_int 10 in
-          let vesting_increment = Amount.of_int 1 in
+          let vesting_increment = Amount.of_nanomina_int_exn 1 in
           let txn_global_slot = Mina_numbers.Global_slot.of_int 1002 in
           let sender =
             { sender with
@@ -945,7 +984,9 @@ let%test_module "Transaction union tests" =
                   ~f:(fun (nonce, txns) receiver ->
                     let uc =
                       U.Wallet.user_command_with_wallet wallets ~sender:0
-                        ~receiver amount (Fee.of_int txn_fee) nonce memo
+                        ~receiver amount
+                        (Fee.of_nanomina_int_exn txn_fee)
+                        nonce memo
                     in
                     (Account.Nonce.succ nonce, txns @ [ uc ]) )
               in
@@ -964,7 +1005,7 @@ let%test_module "Transaction union tests" =
                     ledger ) ;
               U.check_balance
                 (Account.identifier sender.account)
-                ( Balance.to_int sender.account.balance
+                ( Balance.to_nanomina_int sender.account.balance
                 - (amount + txn_fee) * txns_per_receiver * List.length receivers
                 )
                 ledger ) )
@@ -1855,12 +1896,12 @@ let%test_module "Transaction union tests" =
           in
           let timed_account pk =
             let account_id = Account_id.create pk Token_id.default in
-            let balance = Balance.of_int 100_000_000_000_000 in
-            let initial_minimum_balance = Balance.of_int 80_000_000_000 in
+            let balance = Balance.of_mina_int_exn 100_000 in
+            let initial_minimum_balance = Balance.of_mina_int_exn 80 in
             let cliff_time = Mina_numbers.Global_slot.of_int 2 in
-            let cliff_amount = Amount.of_int 5_000_000_000 in
+            let cliff_amount = Amount.of_mina_int_exn 5 in
             let vesting_period = Mina_numbers.Global_slot.of_int 2 in
-            let vesting_increment = Amount.of_int 40_000_000_000 in
+            let vesting_increment = Amount.of_mina_int_exn 40 in
             Or_error.ok_exn
             @@ Account.create_timed account_id balance ~initial_minimum_balance
                  ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
@@ -1871,11 +1912,13 @@ let%test_module "Transaction union tests" =
           let ft1, ft2 =
             let single1 =
               Fee_transfer.Single.create ~receiver_pk:receivers.(0)
-                ~fee:(Currency.Fee.of_int fee) ~fee_token:Token_id.default
+                ~fee:(Currency.Fee.of_nanomina_int_exn fee)
+                ~fee_token:Token_id.default
             in
             let single2 =
               Fee_transfer.Single.create ~receiver_pk:receivers.(1)
-                ~fee:(Currency.Fee.of_int fee) ~fee_token:Token_id.default
+                ~fee:(Currency.Fee.of_nanomina_int_exn fee)
+                ~fee_token:Token_id.default
             in
             ( Fee_transfer.create single1 (Some single2) |> Or_error.ok_exn
             , Fee_transfer.create single1 None |> Or_error.ok_exn )
@@ -1883,14 +1926,14 @@ let%test_module "Transaction union tests" =
           let coinbase_with_ft, coinbase_wo_ft =
             let ft =
               Coinbase.Fee_transfer.create ~receiver_pk:receivers.(0)
-                ~fee:(Currency.Fee.of_int fee)
+                ~fee:(Currency.Fee.of_nanomina_int_exn fee)
             in
             ( Coinbase.create
-                ~amount:(Currency.Amount.of_int 10_000_000_000)
+                ~amount:(Currency.Amount.of_mina_int_exn 10)
                 ~receiver:receivers.(1) ~fee_transfer:(Some ft)
               |> Or_error.ok_exn
             , Coinbase.create
-                ~amount:(Currency.Amount.of_int 10_000_000_000)
+                ~amount:(Currency.Amount.of_mina_int_exn 10)
                 ~receiver:receivers.(1) ~fee_transfer:None
               |> Or_error.ok_exn )
           in
@@ -1938,7 +1981,7 @@ let%test_module "legacy transactions using zkApp accounts" =
       let zkapp_pk = Signature_lib.Public_key.compress new_kp.public_key in
       Transaction_snark.For_tests.create_trivial_zkapp_account ?permissions ~vk
         ~ledger zkapp_pk ;
-      let txn_fee = Fee.of_int 1000000 in
+      let txn_fee = Fee.of_nanomina_int_exn 1_000_000 in
       let amount = 100 in
       (*send from a zkApp account*)
       let signed_command1 =
@@ -2089,7 +2132,7 @@ let%test_module "legacy transactions using zkApp accounts" =
       let snapp_pk = Signature_lib.Public_key.compress new_kp.public_key in
       Transaction_snark.For_tests.create_trivial_zkapp_account ?permissions ~vk
         ~ledger snapp_pk ;
-      let txn_fee = Fee.of_int 1000000 in
+      let txn_fee = Fee.of_nanomina_int_exn 1_000_000 in
       let sender_kp, sender_nonce = spec.sender in
       (*Delegator is a zkapp account*)
       let stake_delegation1 =
@@ -2210,7 +2253,7 @@ let%test_module "legacy transactions using zkApp accounts" =
       let snapp_pk = Signature_lib.Public_key.compress new_kp.public_key in
       Transaction_snark.For_tests.create_trivial_zkapp_account ?permissions ~vk
         ~ledger snapp_pk ;
-      let fee = Fee.of_int 1000000 in
+      let fee = Fee.of_nanomina_int_exn 1_000_000 in
       let amount = U.constraint_constants.coinbase_amount in
       (*send coinbase reward to a zkApp account*)
       let coinbase1 =

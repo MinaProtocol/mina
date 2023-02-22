@@ -303,8 +303,9 @@ val base_jobs_on_earlier_tree :
 on a new tree*)
 val next_on_new_tree : ('merge, 'base) State.t -> bool
 
-(** All the 'ds (in the order in which they were added) for which scan results are yet to computed*)
-val pending_data : ('merge, 'base) State.t -> 'base list
+(** All the 'ds (in the order in which they were added) for each tree for which
+    scan results are yet to computed*)
+val pending_data : ('merge, 'base) State.t -> 'base list list
 
 (**update tree level metrics*)
 val update_metrics : ('merge, 'base) State.t -> unit Or_error.t

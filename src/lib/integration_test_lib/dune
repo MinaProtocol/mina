@@ -32,7 +32,7 @@
    graph_algorithms
    block_producer
    transition_frontier
-   coda_runtime_config
+   mina_runtime_config
    mina_base
    mina_lib
    genesis_constants

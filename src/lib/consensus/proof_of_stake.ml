@@ -137,8 +137,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Epoch_seed = struct
       include Mina_base.Epoch_seed
 
-      type _unused = unit constraint t = Stable.Latest.t
-
       let initial : t = of_hash Outside_hash_image.t
 
       let update (seed : t) vrf_result =
@@ -673,6 +671,19 @@ module Make_str (A : Wire_types.Concrete) = struct
             `All_seen
         | nel ->
             `Unseen (Public_key.Compressed.Set.of_list nel)
+
+      module For_tests = struct
+        type nonrec snapshot_identifier = snapshot_identifier =
+          | Staking_epoch_snapshot
+          | Next_epoch_snapshot
+
+        let set_snapshot = set_snapshot
+
+        (* if all we're testing is the ledger sync, empty delegatee table sufficient *)
+        let snapshot_of_ledger (ledger : Snapshot.Ledger_snapshot.t) :
+            Snapshot.t =
+          { ledger; delegatee_table = Public_key.Compressed.Table.create () }
+      end
     end
 
     module Epoch_ledger = struct
@@ -885,8 +896,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                     , `Int (Mina_base.Account.Index.to_int delegator) )
                   ; ( "delegator_pk"
                     , Public_key.Compressed.to_yojson account.public_key )
-                  ; ("balance", `Int (Balance.to_int account.balance))
-                  ; ("amount", `Int (Amount.to_int total_stake))
+                  ; ("balance", `Int (Balance.to_nanomina_int account.balance))
+                  ; ("amount", `Int (Amount.to_nanomina_int total_stake))
                   ; ( "result"
                     , `String
                         (* use sexp representation; int might be too small *)
@@ -1089,7 +1100,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             end
           end]
 
-          type _unused = unit constraint Stable.Latest.t = Staking.Value.t
+          let (_ : (Stable.Latest.t, Staking.Value.t) Type_equal.t) =
+            Type_equal.T
         end
       end
 
@@ -2355,7 +2367,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; curr_slot = Segment_id.to_int slot
         ; global_slot_since_genesis =
             Mina_numbers.Global_slot.to_int t.global_slot_since_genesis
-        ; total_currency = Amount.to_int t.total_currency
+        ; total_currency = Amount.to_nanomina_int t.total_currency
         }
 
       let curr_global_slot (t : Value.t) = t.curr_global_slot
@@ -2413,9 +2425,19 @@ module Make_str (A : Wire_types.Concrete) = struct
             if increase_epoch_count then Length.succ t.epoch_count
             else t.epoch_count
           in
+          let global_slot_since_genesis =
+            Mina_numbers.Global_slot.(
+              add
+                ( sub t.global_slot_since_genesis (curr_global_slot t)
+                |> Option.value_exn )
+                new_global_slot)
+          in
           { t with
             epoch_count = new_epoch_count
-          ; curr_global_slot = new_global_slot
+          ; curr_global_slot =
+              Global_slot.For_tests.of_global_slot t.curr_global_slot
+                new_global_slot
+          ; global_slot_since_genesis
           }
       end
 
@@ -2587,193 +2609,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Hooks = struct
     open Data
 
-    module Rpcs = struct
-      open Async
-
-      [%%versioned_rpc
-      module Get_epoch_ledger = struct
-        module Master = struct
-          let name = "get_epoch_ledger"
-
-          module T = struct
-            type query = Mina_base.Ledger_hash.t
-
-            type response = (Mina_ledger.Sparse_ledger.t, string) Result.t
-          end
-
-          module Caller = T
-          module Callee = T
-        end
-
-        include Master.T
-
-        let sent_counter = Mina_metrics.Network.get_epoch_ledger_rpcs_sent
-
-        let received_counter =
-          Mina_metrics.Network.get_epoch_ledger_rpcs_received
-
-        let failed_request_counter =
-          Mina_metrics.Network.get_epoch_ledger_rpc_requests_failed
-
-        let failed_response_counter =
-          Mina_metrics.Network.get_epoch_ledger_rpc_responses_failed
-
-        module M = Versioned_rpc.Both_convert.Plain.Make (Master)
-        include M
-
-        include Perf_histograms.Rpc.Plain.Extend (struct
-          include M
-          include Master
-        end)
-
-        module V2 = struct
-          module T = struct
-            type query = Mina_base.Ledger_hash.Stable.V1.t
-
-            type response =
-              ( Mina_ledger.Sparse_ledger.Stable.V2.t
-              , string )
-              Core_kernel.Result.Stable.V1.t
-
-            let query_of_caller_model = Fn.id
-
-            let callee_model_of_query = Fn.id
-
-            let response_of_callee_model = Fn.id
-
-            let caller_model_of_response = Fn.id
-          end
-
-          module T' =
-            Perf_histograms.Rpc.Plain.Decorate_bin_io
-              (struct
-                include M
-                include Master
-              end)
-              (T)
-
-          include T'
-          include Register (T')
-        end
-
-        let implementation ~context:(module Context : CONTEXT) ~local_state
-            ~genesis_ledger_hash conn ~version:_ ledger_hash =
-          let open Context in
-          let open Mina_base in
-          let open Local_state in
-          let open Snapshot in
-          Deferred.create (fun ivar ->
-              [%log info]
-                ~metadata:
-                  [ ("peer", Network_peer.Peer.to_yojson conn)
-                  ; ("ledger_hash", Mina_base.Ledger_hash.to_yojson ledger_hash)
-                  ]
-                "Serving epoch ledger query with hash $ledger_hash from $peer" ;
-              let response =
-                if
-                  Ledger_hash.equal ledger_hash
-                    (Frozen_ledger_hash.to_ledger_hash genesis_ledger_hash)
-                then Error "refusing to serve genesis ledger"
-                else
-                  let candidate_snapshots =
-                    [ !local_state.Data.staking_epoch_snapshot
-                    ; !local_state.Data.next_epoch_snapshot
-                    ]
-                  in
-                  let res =
-                    List.find_map candidate_snapshots ~f:(fun snapshot ->
-                        (* if genesis epoch ledger is different from genesis ledger*)
-                        match snapshot.ledger with
-                        | Genesis_epoch_ledger genesis_epoch_ledger ->
-                            if
-                              Ledger_hash.equal ledger_hash
-                                (Mina_ledger.Ledger.merkle_root
-                                   genesis_epoch_ledger )
-                            then
-                              Some
-                                (Error "refusing to serve genesis epoch ledger")
-                            else None
-                        | Ledger_db ledger ->
-                            if
-                              Ledger_hash.equal ledger_hash
-                                (Mina_ledger.Ledger.Db.merkle_root ledger)
-                            then
-                              Some
-                                (Ok
-                                   ( Mina_ledger.Sparse_ledger.of_any_ledger
-                                   @@ Mina_ledger.Ledger.Any_ledger.cast
-                                        (module Mina_ledger.Ledger.Db)
-                                        ledger ) )
-                            else None )
-                  in
-                  Option.value res ~default:(Error "epoch ledger not found")
-              in
-              Result.iter_error response ~f:(fun err ->
-                  Mina_metrics.Counter.inc_one failed_response_counter ;
-                  [%log info]
-                    ~metadata:
-                      [ ("peer", Network_peer.Peer.to_yojson conn)
-                      ; ("error", `String err)
-                      ; ( "ledger_hash"
-                        , Mina_base.Ledger_hash.to_yojson ledger_hash )
-                      ]
-                    "Failed to serve epoch ledger query with hash $ledger_hash \
-                     from $peer: $error" ) ;
-              if Ivar.is_full ivar then [%log error] "Ivar.fill bug is here!" ;
-              Ivar.fill ivar response )
-      end]
-
-      open Network_peer.Rpc_intf
-
-      type ('query, 'response) rpc =
-        | Get_epoch_ledger
-            : (Get_epoch_ledger.query, Get_epoch_ledger.response) rpc
-
-      type rpc_handler =
-        | Rpc_handler :
-            { rpc : ('q, 'r) rpc
-            ; f : ('q, 'r) rpc_fn
-            ; cost : 'q -> int
-            ; budget : int * [ `Per of Core.Time.Span.t ]
-            }
-            -> rpc_handler
-
-      type query =
-        { query :
-            'q 'r.
-               Network_peer.Peer.t
-            -> ('q, 'r) rpc
-            -> 'q
-            -> 'r Network_peer.Rpc_intf.rpc_response Deferred.t
-        }
-
-      let implementation_of_rpc :
-          type q r. (q, r) rpc -> (q, r) rpc_implementation = function
-        | Get_epoch_ledger ->
-            (module Get_epoch_ledger)
-
-      let match_handler :
-          type q r.
-          rpc_handler -> (q, r) rpc -> do_:((q, r) rpc_fn -> 'a) -> 'a option =
-       fun handler rpc ~do_ ->
-        match (rpc, handler) with
-        | Get_epoch_ledger, Rpc_handler { rpc = Get_epoch_ledger; f; _ } ->
-            Some (do_ f)
-
-      let rpc_handlers ~context:(module Context : CONTEXT) ~local_state
-          ~genesis_ledger_hash =
-        [ Rpc_handler
-            { rpc = Get_epoch_ledger
-            ; f =
-                Get_epoch_ledger.implementation
-                  ~context:(module Context)
-                  ~local_state ~genesis_ledger_hash
-            ; cost = (fun _ -> 1)
-            ; budget = (2, `Per Core.Time.Span.minute)
-            }
-        ]
-    end
-
     let is_genesis_epoch ~(constants : Constants.t) time =
       Epoch.(equal (of_time_exn ~constants time) zero)
 
@@ -2908,7 +2743,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                    } ) )
 
     let sync_local_state ~context:(module Context : CONTEXT) ~trust_system
-        ~local_state ~random_peers ~(query_peer : Rpcs.query) requested_syncs =
+        ~local_state ~glue_sync_ledger requested_syncs =
       let open Context in
       let open Local_state in
       let open Snapshot in
@@ -2922,7 +2757,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ] ;
       let sync { snapshot_id; expected_root = target_ledger_hash } =
         (* if requested last epoch ledger is equal to the current epoch ledger
-           then we don't need make a rpc call to the peers. *)
+           then we don't need to sync the ledger to the peers. *)
         if
           equal_snapshot_identifier snapshot_id Staking_epoch_snapshot
           && Mina_base.(
@@ -2952,70 +2787,83 @@ module Make_str (A : Wire_types.Concrete) = struct
                 } ;
               Deferred.Or_error.ok_unit )
         else
-          let%bind peers = random_peers 5 in
-          Deferred.List.fold peers
-            ~init:
-              (Or_error.error_string "Failed to sync epoch ledger: No peers")
-            ~f:(fun acc peer ->
-              match acc with
+          let ledger_hash_json =
+            Mina_base.Ledger_hash.to_yojson target_ledger_hash
+          in
+          [%log info] "Syncing epoch ledger with hash $target_ledger_hash"
+            ~metadata:[ ("target_ledger_hash", ledger_hash_json) ] ;
+          (* start with an existing epoch ledger, which may be faster
+             than syncing with an empty ledger, since ledgers accumulate
+             new leaves in increasing index order
+          *)
+          let%bind.Deferred.Or_error db_ledger =
+            let db_ledger_of_snapshot snapshot =
+              match snapshot.ledger with
+              | Ledger_snapshot.Ledger_db ledger ->
+                  Ok ledger
+              | Ledger_snapshot.Genesis_epoch_ledger ledger ->
+                  let module Ledger_transfer =
+                    Mina_ledger.Ledger_transfer.Make
+                      (Mina_ledger.Ledger)
+                      (Mina_ledger.Ledger.Db)
+                  in
+                  let fresh_db_ledger =
+                    Mina_ledger.Ledger.Db.create
+                      ~depth:Context.constraint_constants.ledger_depth ()
+                  in
+                  Ledger_transfer.transfer_accounts ~src:ledger
+                    ~dest:fresh_db_ledger
+            in
+            match snapshot_id with
+            | Staking_epoch_snapshot ->
+                return
+                @@ db_ledger_of_snapshot !local_state.staking_epoch_snapshot
+            | Next_epoch_snapshot ->
+                return @@ db_ledger_of_snapshot !local_state.next_epoch_snapshot
+          in
+          let sync_ledger =
+            Mina_ledger.Sync_ledger.Db.create ~logger ~trust_system db_ledger
+          in
+          let query_reader =
+            Mina_ledger.Sync_ledger.Db.query_reader sync_ledger
+          in
+          let response_writer =
+            Mina_ledger.Sync_ledger.Db.answer_writer sync_ledger
+          in
+          glue_sync_ledger ~preferred:[] query_reader response_writer ;
+          match%bind
+            Mina_ledger.Sync_ledger.Db.fetch sync_ledger target_ledger_hash
+              ~data:() ~equal:(fun () () -> true)
+          with
+          | `Ok ledger -> (
+              [%log info]
+                "Succeeded in syncing epoch ledger with hash \
+                 $target_ledger_hash from peers"
+                ~metadata:[ ("target_ledger_hash", ledger_hash_json) ] ;
+              let sparse_ledger =
+                Mina_ledger.Sparse_ledger.of_any_ledger
+                  (Mina_ledger.Ledger.Any_ledger.cast
+                     (module Mina_ledger.Ledger.Db)
+                     ledger )
+              in
+              assert (
+                Mina_base.Ledger_hash.equal target_ledger_hash
+                  (Mina_ledger.Sparse_ledger.merkle_root sparse_ledger) ) ;
+              match
+                reset_snapshot
+                  ~context:(module Context)
+                  local_state snapshot_id ~sparse_ledger
+              with
               | Ok () ->
                   Deferred.Or_error.ok_unit
-              | Error _ -> (
-                  match%bind
-                    query_peer.query peer Rpcs.Get_epoch_ledger
-                      (Mina_base.Frozen_ledger_hash.to_ledger_hash
-                         target_ledger_hash )
-                  with
-                  | Connected { data = Ok (Ok sparse_ledger); _ } -> (
-                      match
-                        reset_snapshot
-                          ~context:(module Context)
-                          local_state snapshot_id ~sparse_ledger
-                      with
-                      | Ok () ->
-                          (*Don't fail if recording fails*)
-                          don't_wait_for
-                            Trust_system.(
-                              record trust_system logger peer
-                                Actions.(Epoch_ledger_provided, None)) ;
-                          Deferred.Or_error.ok_unit
-                      | Error e ->
-                          [%log faulty_peer_without_punishment]
-                            ~metadata:
-                              [ ("peer", Network_peer.Peer.to_yojson peer)
-                              ; ("error", Error_json.error_to_yojson e)
-                              ]
-                            "Peer $peer failed to serve requested epoch \
-                             ledger: $error" ;
-                          return (Error e) )
-                  | Connected { data = Ok (Error err); _ } ->
-                      (* TODO figure out punishments here. *)
-                      [%log faulty_peer_without_punishment]
-                        ~metadata:
-                          [ ("peer", Network_peer.Peer.to_yojson peer)
-                          ; ("error", `String err)
-                          ]
-                        "Peer $peer failed to serve requested epoch ledger: \
-                         $error" ;
-                      return (Or_error.error_string err)
-                  | Connected { data = Error err; _ } ->
-                      [%log faulty_peer_without_punishment]
-                        ~metadata:
-                          [ ("peer", Network_peer.Peer.to_yojson peer)
-                          ; ("error", `String (Error.to_string_mach err))
-                          ]
-                        "Peer $peer failed to serve requested epoch ledger: \
-                         $error" ;
-                      return (Error err)
-                  | Failed_to_connect err ->
-                      [%log faulty_peer_without_punishment]
-                        ~metadata:
-                          [ ("peer", Network_peer.Peer.to_yojson peer)
-                          ; ("error", Error_json.error_to_yojson err)
-                          ]
-                        "Failed to connect to $peer to retrieve epoch ledger: \
-                         $error" ;
-                      return (Error err) ) )
+              | Error e ->
+                  [%log error]
+                    "Could not reset snapshot from synced epoch ledger"
+                    ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+                  return (Error e) )
+          | `Target_changed _ ->
+              [%log error] "Target changed when syncing epoch ledger" ;
+              return (Or_error.error_string "Epoch ledger target changed")
       in
       match requested_syncs with
       | One required_sync ->
@@ -3755,7 +3603,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Global_slot.slot_number global_slot
         in
         let supply_increase =
-          Currency.Amount.(Signed.of_unsigned (of_int 42))
+          Currency.Amount.(Signed.of_unsigned (of_nanomina_int_exn 42))
         in
         (* setup ledger, needed to compute producer_vrf_result here and handler below *)
         let open Mina_base in
@@ -3968,8 +3816,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; ledger = Genesis_epoch_ledger ledger
           }
         in
-        let balance = Balance.to_int account.balance in
-        let total_stake_int = Currency.Amount.to_int total_stake in
+        let balance = Balance.to_nanomina_int account.balance in
+        let total_stake_int = Currency.Amount.to_nanomina_int total_stake in
         let stake_fraction =
           float_of_int balance /. float_of_int total_stake_int
         in
@@ -4089,7 +3937,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         Option.value_exn
           Amount.(
             genesis_currency
-            + of_int (height * to_int constraint_constants.coinbase_amount))
+            + of_nanomina_int_exn
+                (height * to_nanomina_int constraint_constants.coinbase_amount))
 
       (* TODO: Deprecate this in favor of just returning a constant in the monad from the outside. *)
       let opt_gen opt ~gen =
@@ -4177,7 +4026,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let gen_spot ?root_epoch_position
           ?(slot_fill_rate = default_slot_fill_rate)
           ?(slot_fill_rate_delta = default_slot_fill_rate_delta)
-          ?(genesis_currency = Currency.Amount.of_int 200000)
+          ?(genesis_currency = Currency.Amount.of_nanomina_int_exn 200_000)
           ?gen_staking_epoch_length ?gen_next_epoch_length
           ?gen_curr_epoch_position ?staking_start_checkpoint
           ?staking_lock_checkpoint ?next_start_checkpoint ?next_lock_checkpoint

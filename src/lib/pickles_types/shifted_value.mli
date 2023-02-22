@@ -15,6 +15,8 @@ module type Field_intf = sig
 
   val inv : t -> t
 
+  val zero : t
+
   val one : t
 
   val of_int : int -> t

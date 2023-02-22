@@ -6,38 +6,8 @@ module Sc = Kimchi_backend_common.Scalar_challenge
 
 type 'f impl = (module Snarky_backendless.Snark_intf.Run with type field = 'f)
 
-module Basic = struct
-  type (_, _, _) t =
-    | Field : ('field1, 'field2, < field1 : 'field1 ; field2 : 'field2 ; .. >) t
-    | Bool : ('bool1, 'bool2, < bool1 : 'bool1 ; bool2 : 'bool2 ; .. >) t
-    | Digest
-        : ( 'digest1
-          , 'digest2
-          , < digest1 : 'digest1 ; digest2 : 'digest2 ; .. > )
-          t
-    | Challenge
-        : ( 'challenge1
-          , 'challenge2
-          , < challenge1 : 'challenge1 ; challenge2 : 'challenge2 ; .. > )
-          t
-    | Bulletproof_challenge
-        : ( 'bp_chal1
-          , 'bp_chal2
-          , < bulletproof_challenge1 : 'bp_chal1
-            ; bulletproof_challenge2 : 'bp_chal2
-            ; .. > )
-          t
-    | Branch_data
-        : ( 'branch_data1
-          , 'branch_data2
-          , < branch_data1 : 'branch_data1 ; branch_data2 : 'branch_data2 ; .. >
-          )
-          t
-end
-
-open Basic
-
-type ('a, 'b, 'c) basic = ('a, 'b, 'c) Basic.t =
+type ('a, 'b, 'c) basic =
+  | Unit : (unit, unit, < .. >) basic
   | Field
       : ('field1, 'field2, < field1 : 'field1 ; field2 : 'field2 ; .. >) basic
   | Bool : ('bool1, 'bool2, < bool1 : 'bool1 ; bool2 : 'bool2 ; .. >) basic
@@ -75,9 +45,9 @@ end
 
 module rec T : sig
   type (_, _, _) t =
-    | B : ('a, 'b, 'env) Basic.t -> ('a, 'b, 'env) t
+    | B : ('a, 'b, 'env) basic -> ('a, 'b, 'env) t
     | Scalar :
-        ('a, 'b, (< challenge1 : 'a ; challenge2 : 'b ; .. > as 'env)) Basic.t
+        ('a, 'b, (< challenge1 : 'a ; challenge2 : 'b ; .. > as 'env)) basic
         -> ('a Sc.t, 'b Sc.t, 'env) t
     | Vector :
         ('t1, 't2, 'env) t * 'n Nat.t
@@ -94,13 +64,19 @@ module rec T : sig
         ; bool : (module Bool_intf with type var = 'bool)
         }
         -> ('a1 option, ('a2, 'bool) Plonk_types.Opt.t, 'env) t
+    | Opt_unflagged :
+        { inner : ('a1, 'a2, (< bool1 : bool ; bool2 : 'bool ; .. > as 'env)) t
+        ; flag : Plonk_types.Opt.Flag.t
+        ; dummy1 : 'a1
+        ; dummy2 : 'a2
+        }
+        -> ('a1 option, 'a2 option, 'env) t
+    | Constant : 'a * ('a -> 'a -> unit) * ('a, 'b, 'env) t -> ('a, 'b, 'env) t
 end =
   T
 
-include T
-
 type ('scalar, 'env) pack =
-  { pack : 'a 'b. ('a, 'b, 'env) Basic.t -> 'b -> 'scalar array }
+  { pack : 'a 'b. ('a, 'b, 'env) basic -> 'a option -> 'b -> 'scalar array }
 
 let rec pack :
     type t v env.
@@ -108,39 +84,78 @@ let rec pack :
     -> one:'scalar
     -> ('scalar, env) pack
     -> (t, v, env) T.t
+    -> t option
     -> v
     -> 'scalar array =
- fun ~zero ~one p spec t ->
+ fun ~zero ~one p spec t_constant_opt t ->
   match spec with
   | B spec ->
-      p.pack spec t
+      p.pack spec t_constant_opt t
   | Scalar chal ->
+      let t_constant_opt =
+        Option.map t_constant_opt ~f:(fun { Sc.inner = x } -> x)
+      in
       let { Sc.inner = t } = t in
-      p.pack chal t
+      p.pack chal t_constant_opt t
   | Vector (spec, _) ->
-      Array.concat_map (Vector.to_array t) ~f:(pack ~zero ~one p spec)
+      let t_constant_opt = Option.map ~f:Vector.to_array t_constant_opt in
+      let t = Vector.to_array t in
+      pack ~zero ~one p (Array (spec, Array.length t)) t_constant_opt t
   | Struct [] ->
       [||]
   | Struct (spec :: specs) ->
       let (hd :: tl) = t in
-      let hd = pack ~zero ~one p spec hd in
-      Array.append hd (pack ~zero ~one p (Struct specs) tl)
+      let hd_constant_opt, tl_constant_opt =
+        match t_constant_opt with
+        | None ->
+            (None, None)
+        | Some (hd :: tl) ->
+            (Some hd, Some tl)
+      in
+      let hd = pack ~zero ~one p spec hd_constant_opt hd in
+      Array.append hd (pack ~zero ~one p (Struct specs) tl_constant_opt tl)
   | Array (spec, _) ->
-      Array.concat_map t ~f:(pack ~zero ~one p spec)
-  | Opt { inner; flag; dummy1 = _; dummy2 } -> (
+      Array.concat_mapi t ~f:(fun i t ->
+          let t_constant_opt =
+            Option.map t_constant_opt ~f:(fun t_const -> t_const.(i))
+          in
+          pack ~zero ~one p spec t_constant_opt t )
+  | Opt { inner; flag; dummy1; dummy2 } -> (
       match t with
       | None ->
-          Array.append [| zero |] (pack ~zero ~one p inner dummy2)
+          let t_constant_opt = Option.map t_constant_opt ~f:(fun _ -> dummy1) in
+          Array.append [| zero |]
+            (pack ~zero ~one p inner t_constant_opt dummy2)
       | Some x ->
-          Array.append [| one |] (pack ~zero ~one p inner x)
+          let t_constant_opt =
+            Option.map ~f:(fun x -> Option.value_exn x) t_constant_opt
+          in
+          Array.append [| one |] (pack ~zero ~one p inner t_constant_opt x)
       | Maybe (b, x) ->
-          Array.append (p.pack Bool b) (pack ~zero ~one p inner x) )
+          let b_constant_opt = Option.map ~f:Option.is_some t_constant_opt in
+          let x_constant_opt =
+            Option.map ~f:(Option.value ~default:dummy1) t_constant_opt
+          in
+          Array.append
+            (p.pack Bool b_constant_opt b)
+            (pack ~zero ~one p inner x_constant_opt x) )
+  | Opt_unflagged { inner; flag; dummy1; dummy2 } -> (
+      match t with
+      | None ->
+          let t_constant_opt = Option.map t_constant_opt ~f:(fun _ -> dummy1) in
+          pack ~zero ~one p inner t_constant_opt dummy2
+      | Some x ->
+          let t_constant_opt =
+            Option.map ~f:(fun x -> Option.value_exn x) t_constant_opt
+          in
+          pack ~zero ~one p inner t_constant_opt x )
+  | Constant (x, _, inner) ->
+      pack ~zero ~one p inner (Some x) t
 
 type ('f, 'env) typ =
   { typ :
       'var 'value.
-         ('value, 'var, 'env) Basic.t
-      -> ('var, 'value, 'f) Snarky_backendless.Typ.t
+      ('value, 'var, 'env) basic -> ('var, 'value, 'f) Snarky_backendless.Typ.t
   }
 
 let rec typ :
@@ -178,6 +193,38 @@ let rec typ :
         (* Always use the same "maybe" layout which is a boolean and then the value *)
         Plonk_types.Opt.constant_layout_typ bool flag ~dummy:dummy1
           ~dummy_var:dummy2 ~true_ ~false_ (typ t inner)
+    | Opt_unflagged { inner; flag; dummy1; dummy2 } -> (
+        match flag with
+        | Plonk_types.Opt.Flag.No ->
+            let open Snarky_backendless.Typ in
+            unit ()
+            |> Snarky_backendless.Typ.transport
+                 ~there:(function Some _ -> assert false | None -> ())
+                 ~back:(fun () -> None)
+            |> Snarky_backendless.Typ.transport_var
+                 ~there:(function Some _ -> assert false | None -> ())
+                 ~back:(fun x -> None)
+        | Plonk_types.Opt.Flag.(Yes | Maybe) ->
+            typ t inner
+            |> Snarky_backendless.Typ.transport
+                 ~there:(function Some x -> x | None -> dummy1)
+                 ~back:(fun x -> Some x)
+            |> Snarky_backendless.Typ.transport_var
+                 ~there:(function Some x -> x | None -> dummy2)
+                 ~back:(fun x -> Some x) )
+    | Constant (x, assert_eq, spec) ->
+        let (Typ typ) = typ t spec in
+        let constant_var =
+          let fields, aux = typ.value_to_fields x in
+          let fields =
+            Array.map fields ~f:(fun x -> Snarky_backendless.Cvar.Constant x)
+          in
+          typ.var_of_fields (fields, aux)
+        in
+        let open Snarky_backendless.Typ in
+        unit ()
+        |> transport ~there:(fun y -> assert_eq x y) ~back:(fun () -> x)
+        |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> constant_var)
 
 type 'env exists = T : ('t1, 't2, 'env) T.t -> 'env exists
 
@@ -193,8 +240,7 @@ module ETyp = struct
 end
 
 type ('f, 'env) etyp =
-  { etyp :
-      'var 'value. ('value, 'var, 'env) Basic.t -> ('var, 'value, 'f) ETyp.t
+  { etyp : 'var 'value. ('value, 'var, 'env) basic -> ('var, 'value, 'f) ETyp.t
   }
 
 let rec etyp :
@@ -253,6 +299,37 @@ let rec etyp :
               ~false_:(f_bool' B.false_) bool flag a
           , f
           , f' )
+    | Opt_unflagged { inner; flag; dummy1; dummy2 } ->
+        let (T (typ, f, f_inv)) = etyp e inner in
+        let f x = Some (f x) in
+        let f_inv = function None -> f_inv dummy2 | Some x -> f_inv x in
+        let typ =
+          typ
+          |> Snarky_backendless.Typ.transport
+               ~there:(Option.value ~default:dummy1) ~back:(fun x -> Some x)
+        in
+        T (typ, f, f_inv)
+    | Constant (x, assert_eq, spec) ->
+        let (T (Typ typ, f, f')) = etyp e spec in
+        let constant_var =
+          let fields, aux = typ.value_to_fields x in
+          let fields =
+            Array.map fields ~f:(fun x -> Snarky_backendless.Cvar.Constant x)
+          in
+          typ.var_of_fields (fields, aux)
+        in
+        (* We skip any constraints that would be added here, but we *do* use
+           the underlying [Typ.t] to make sure that we allocate public inputs
+           correctly.
+        *)
+        T
+          ( Typ
+              { typ with
+                check =
+                  (fun _ -> Snarky_backendless.Checked_runner.Simple.return ())
+              }
+          , (fun _ -> f constant_var)
+          , f' )
 
 module Common (Impl : Snarky_backendless.Snark_intf.Run) = struct
   module Digest = D.Make (Impl)
@@ -287,11 +364,16 @@ let pack_basic (type field other_field other_field_var)
   let open C in
   let pack :
       type a b.
-         (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) Basic.t
+         (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
+      -> a option
       -> b
       -> [ `Field of other_field_var | `Packed_bits of Field.t * int ] array =
-   fun basic x ->
+   fun basic x_constant_opt x ->
+    (* TODO *)
+    ignore x_constant_opt ;
     match basic with
+    | Unit ->
+        [||]
     | Field ->
         [| `Field x |]
     | Bool ->
@@ -306,7 +388,7 @@ let pack_basic (type field other_field other_field_var)
              , Branch_data.length_in_bits )
         |]
     | Bulletproof_challenge ->
-        let { Bulletproof_challenge.prechallenge = { Sc.inner = pre } } = x in
+        let { Sc.inner = pre } = Bulletproof_challenge.pack x in
         [| `Packed_bits (pre, Challenge.length) |]
   in
   { pack }
@@ -316,6 +398,7 @@ let pack (type f) ((module Impl) as impl : f impl) t =
   pack (pack_basic impl) t
     ~zero:(`Packed_bits (Field.zero, 1))
     ~one:(`Packed_bits (Field.one, 1))
+    None
 
 let typ_basic (type field other_field other_field_var)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
@@ -325,10 +408,12 @@ let typ_basic (type field other_field other_field_var)
   let open C in
   let typ :
       type a b.
-         (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) Basic.t
+         (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
       -> (b, a) Impl.Typ.t =
    fun basic ->
     match basic with
+    | Unit ->
+        Typ.unit
     | Field ->
         field
     | Bool ->
@@ -374,8 +459,10 @@ let packed_typ_basic (type field other_field other_field_var)
   end in
   let etyp :
       type a b.
-         (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) Basic.t
+         (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
       -> (b, a, field) ETyp.t = function
+    | Unit ->
+        T (Typ.unit, Fn.id, Fn.id)
     | Field ->
         field
     | Bool ->
@@ -388,13 +475,11 @@ let packed_typ_basic (type field other_field other_field_var)
         T (Branch_data.packed_typ (module Impl), Fn.id, Fn.id)
     | Bulletproof_challenge ->
         let typ =
-          let there { Bulletproof_challenge.prechallenge = { Sc.inner = pre } }
-              =
+          let there bp_challenge =
+            let { Sc.inner = pre } = Bulletproof_challenge.pack bp_challenge in
             pre
           in
-          let back pre =
-            { Bulletproof_challenge.prechallenge = { Sc.inner = pre } }
-          in
+          let back pre = Bulletproof_challenge.unpack { Sc.inner = pre } in
           Typ.transport Challenge.typ ~there ~back
           |> Typ.transport_var ~there ~back
         in

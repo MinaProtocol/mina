@@ -21,14 +21,13 @@
    integers
    ppx_inline_test.config
    uri
-   topological_sort
    ;;local libraries
    mina_wire_types
    kimchi_backend
    child_processes
    precomputed_values
    coda_genesis_ledger
-   coda_runtime_config
+   mina_runtime_config
    sgn
    mina_base.util
    kimchi_backend.pasta

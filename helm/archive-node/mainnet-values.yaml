@@ -1,0 +1,45 @@
+testnetName: "mainnet"
+
+archive:
+  replicas: 3
+  hostPort: "10999"
+  image: "gcr.io/o1labs-192920/mina-archive:1.3.1.2-25388a0-bullseye"
+  # remoteSchemaFile needs to be just the script name, not a url.  remoteSchemaAuxFiles needs to be a list of urls of scripts, one of these urls needs to be the url of the main sql script that invokes the other ones.  sorry it's confusing
+  remoteSchemaFile: "create_schema.sql"
+  remoteSchemaAuxFiles:
+    - "https://raw.githubusercontent.com/MinaProtocol/mina/compatible/src/app/archive/create_schema.sql"
+  postgresHost:  '{{ .Release.Name }}-postgresql'
+  postgresUri: postgres://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@{{ tpl .Values.archive.postgresHost . }}:{{ .Values.archive.ports.postgres }}/{{ .Values.postgresql.auth.database }}
+  ports:
+    server: "3086"
+    postgres: "5432"
+    metrics: "10002"
+  enableLocalDaemon: false
+  enablePostgresDB: true
+  enableDumpCronjob: true
+  initFromDump: true
+
+postgresql:
+  primary:
+    name: "archive_balances_migrated"
+    persistence:
+      enabled: true
+      size: "100Gi"
+      storageClass: "ssd-retain"
+    initdb:
+      user: "mina"
+      password: "zu9rooquah3sie3ooquee6ohxoow9eivae1ahyeibaPeegaiCeish0beek6hooph"
+  auth:
+    username: "mina"
+    password: "zu9rooquah3sie3ooquee6ohxoow9eivae1ahyeibaPeegaiCeish0beek6hooph"
+    database: "archive_balances_migrated"
+    enablePostgresUser: false
+
+nodeSelector:
+  preemptible: false
+
+healthcheck:
+  enabled: true
+  failureThreshold: 60
+  periodSeconds: 5
+  initialDelaySeconds: 30

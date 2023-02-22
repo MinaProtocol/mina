@@ -600,16 +600,26 @@ module Types = struct
       ~doc:
         "Transition from a source ledger to a target ledger with some fee \
          excess and increase in supply " ~fields:(fun _ ->
-        [ field "sourceLedgerHash" ~typ:(non_null ledger_hash)
-            ~doc:"Base58Check-encoded hash of the source ledger"
+        [ field "sourceFirstPassLedgerHash" ~typ:(non_null ledger_hash)
+            ~doc:"Base58Check-encoded hash of the source first-pass ledger"
             ~args:Arg.[]
-            ~resolve:(fun _ { Transaction_snark.Statement.source; _ } ->
-              source.ledger )
-        ; field "targetLedgerHash" ~typ:(non_null ledger_hash)
-            ~doc:"Base58Check-encoded hash of the target ledger"
+            ~resolve:(fun _ { Transaction_snark.Statement.Poly.source; _ } ->
+              source.first_pass_ledger )
+        ; field "targetFirstPassLedgerHash" ~typ:(non_null ledger_hash)
+            ~doc:"Base58Check-encoded hash of the target first-pass ledger"
             ~args:Arg.[]
-            ~resolve:(fun _ { Transaction_snark.Statement.target; _ } ->
-              target.ledger )
+            ~resolve:(fun _ { Transaction_snark.Statement.Poly.target; _ } ->
+              target.first_pass_ledger )
+        ; field "sourceSecondPassLedgerHash" ~typ:(non_null ledger_hash)
+            ~doc:"Base58Check-encoded hash of the source second-pass ledger"
+            ~args:Arg.[]
+            ~resolve:(fun _ { Transaction_snark.Statement.Poly.source; _ } ->
+              source.second_pass_ledger )
+        ; field "targetSecondPassLedgerHash" ~typ:(non_null ledger_hash)
+            ~doc:"Base58Check-encoded hash of the target second-pass ledger"
+            ~args:Arg.[]
+            ~resolve:(fun _ { Transaction_snark.Statement.Poly.target; _ } ->
+              target.second_pass_ledger )
         ; field "feeExcess" ~typ:(non_null signed_fee)
             ~doc:
               "Total transaction fee that is not accounted for in the \
@@ -904,7 +914,6 @@ module Types = struct
       let to_full_account
           { Account.Poly.public_key
           ; token_id
-          ; token_permissions
           ; token_symbol
           ; nonce
           ; balance
@@ -916,7 +925,6 @@ module Types = struct
           ; zkapp
           } =
         let open Option.Let_syntax in
-        let%bind token_permissions = token_permissions in
         let%bind token_symbol = token_symbol in
         let%bind nonce = nonce in
         let%bind receipt_chain_hash = receipt_chain_hash in
@@ -924,7 +932,6 @@ module Types = struct
         let%map permissions = permissions in
         { Account.Poly.public_key
         ; token_id
-        ; token_permissions
         ; token_symbol
         ; nonce
         ; balance = balance.AnnotatedBalance.total
@@ -939,7 +946,6 @@ module Types = struct
       let of_full_account ?breadcrumb
           { Account.Poly.public_key
           ; token_id
-          ; token_permissions
           ; token_symbol
           ; nonce
           ; balance
@@ -952,7 +958,6 @@ module Types = struct
           } =
         { Account.Poly.public_key
         ; token_id
-        ; token_permissions = Some token_permissions
         ; token_symbol = Some token_symbol
         ; nonce = Some nonce
         ; balance =
@@ -988,7 +993,6 @@ module Types = struct
             Account.
               { Poly.public_key = Account_id.public_key account_id
               ; token_id = Account_id.token_id account_id
-              ; token_permissions = None
               ; token_symbol = None
               ; nonce = None
               ; delegate = None
@@ -1013,7 +1017,6 @@ module Types = struct
       { account :
           ( Public_key.Compressed.t
           , Token_id.t
-          , Token_permissions.t option
           , Account.Token_symbol.t option
           , AnnotatedBalance.t
           , Account.Nonce.t option
@@ -1089,6 +1092,10 @@ module Types = struct
               ~doc:"Authorization required to receive tokens"
               ~args:Arg.[]
               ~resolve:(fun _ permission -> permission.Permissions.Poly.receive)
+          ; field "access" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to access the account"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission -> permission.Permissions.Poly.access)
           ; field "setDelegate" ~typ:(non_null auth_required)
               ~doc:"Authorization required to set the delegate"
               ~args:Arg.[]
@@ -1135,6 +1142,11 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ permission ->
                 permission.Permissions.Poly.set_voting_for )
+          ; field "setTiming" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to set the timing of the account"
+              ~args:Arg.[]
+              ~resolve:(fun _ permission ->
+                permission.Permissions.Poly.set_timing )
           ] )
 
     let account_vk =
@@ -1162,8 +1174,13 @@ module Types = struct
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.public_key )
+             ; field "tokenId" ~typ:(non_null token_id)
+                 ~doc:"The token associated with this account"
+                 ~args:Arg.[]
+                 ~resolve:(fun _ { account; _ } -> account.Account.Poly.token_id)
              ; field "token" ~typ:(non_null token_id)
                  ~doc:"The token associated with this account"
+                 ~deprecated:(Deprecated (Some "Use tokenId"))
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } -> account.Account.Poly.token_id)
              ; field "timing" ~typ:(non_null account_timing)
@@ -1349,26 +1366,6 @@ module Types = struct
                     isn't tracked by the queried daemon"
                  ~args:Arg.[]
                  ~resolve:(fun _ { locked; _ } -> locked)
-             ; field "isTokenOwner" ~typ:bool
-                 ~doc:"True if this account owns its associated token"
-                 ~args:Arg.[]
-                 ~resolve:(fun _ { account; _ } ->
-                   match%map.Option account.token_permissions with
-                   | Token_owned _ ->
-                       true
-                   | Not_owned _ ->
-                       false )
-             ; field "isDisabled" ~typ:bool
-                 ~doc:
-                   "True if this account has been disabled by the owner of the \
-                    associated token"
-                 ~args:Arg.[]
-                 ~resolve:(fun _ { account; _ } ->
-                   match%map.Option account.token_permissions with
-                   | Token_owned _ ->
-                       false
-                   | Not_owned { account_disabled } ->
-                       account_disabled )
              ; field "index" ~typ:int
                  ~doc:
                    "The index of this account in the ledger, or null if this \
@@ -1411,7 +1408,9 @@ module Types = struct
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.permissions )
              ; field "tokenSymbol" ~typ:string
-                 ~doc:"The token symbol associated with this account"
+                 ~doc:
+                   "The symbol for the token owned by this account, if there \
+                    is one"
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.token_symbol )
@@ -3471,6 +3470,9 @@ module Mutations = struct
                 in
                 let applied =
                   Ledger.apply_zkapp_command_unchecked ~constraint_constants
+                    ~global_slot:
+                      ( Transition_frontier.Breadcrumb.consensus_state breadcrumb
+                      |> Consensus.Data.Consensus_state.curr_global_slot )
                     ~state_view ledger zkapp_command
                 in
                 (* rearrange data to match result type of `send_zkapp_command` *)
@@ -3528,8 +3530,8 @@ module Mutations = struct
            * updating Rosetta's construction API to handle the changes *)
           (sprintf
              !"Invalid user command. Fee %s is less than the minimum fee, %s."
-             (Currency.Fee.to_formatted_string fee)
-             (Currency.Fee.to_formatted_string Signed_command.minimum_fee) )
+             (Currency.Fee.to_mina_string fee)
+             (Currency.Fee.to_mina_string Signed_command.minimum_fee) )
     in
     let%map memo =
       Option.value_map memo ~default:(Ok Signed_command_memo.empty)
@@ -4020,7 +4022,7 @@ module Queries = struct
           | None ->
               []
         in
-        let txns =
+        let txns : Transaction_hash.User_command_with_valid_signature.t list =
           (* Transactions as identified by IDs.
              This is a little redundant, but it makes our API more
              consistent.
@@ -4028,21 +4030,45 @@ module Queries = struct
           match txns_opt with
           | Some txns ->
               List.filter_map txns ~f:(fun serialized_txn ->
-                  Signed_command.of_base64 serialized_txn
-                  |> Result.map ~f:(fun signed_command ->
-                         (* These commands get piped through [forget_check]
-                            below; this is just to make the types work
-                            without extra unnecessary mapping in the other
-                            branches above.
-                         *)
-                         let (`If_this_is_used_it_should_have_a_comment_justifying_it
-                               cmd ) =
-                           User_command.to_valid_unsafe
-                             (Signed_command signed_command)
-                         in
-                         Transaction_hash.User_command_with_valid_signature
-                         .create cmd )
-                  |> Result.ok )
+                  (* base64 could be a signed command or zkapp command *)
+                  match Signed_command.of_base64 serialized_txn with
+                  | Ok signed_command ->
+                      let user_cmd =
+                        User_command.Signed_command signed_command
+                      in
+                      (* The command gets piped through [forget_check]
+                         below; this is just to make the types work
+                         without extra unnecessary mapping in the other
+                         branches above.
+                      *)
+                      let (`If_this_is_used_it_should_have_a_comment_justifying_it
+                            valid_cmd ) =
+                        User_command.to_valid_unsafe user_cmd
+                      in
+                      Some
+                        (Transaction_hash.User_command_with_valid_signature
+                         .create valid_cmd )
+                  | Error _ -> (
+                      match Zkapp_command.of_base64 serialized_txn with
+                      | Ok zkapp_command ->
+                          let user_cmd =
+                            User_command.Zkapp_command zkapp_command
+                          in
+                          (* The command gets piped through [forget_check]
+                             below; this is just to make the types work
+                             without extra unnecessary mapping in the other
+                             branches above.
+                          *)
+                          let (`If_this_is_used_it_should_have_a_comment_justifying_it
+                                valid_cmd ) =
+                            User_command.to_valid_unsafe user_cmd
+                          in
+                          Some
+                            (Transaction_hash.User_command_with_valid_signature
+                             .create valid_cmd )
+                      | Error _ ->
+                          (* invalid base64 for a transaction *)
+                          None ) )
           | None ->
               []
         in
@@ -4078,10 +4104,8 @@ module Queries = struct
         let resource_pool =
           Network_pool.Transaction_pool.resource_pool transaction_pool
         in
-        let signed_cmds =
-          get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
-        in
-        List.filter_map signed_cmds ~f:(fun txn ->
+        let cmds = get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt in
+        List.filter_map cmds ~f:(fun txn ->
             let cmd_with_hash =
               Transaction_hash.User_command_with_valid_signature.forget_check
                 txn
@@ -4116,10 +4140,8 @@ module Queries = struct
         let resource_pool =
           Network_pool.Transaction_pool.resource_pool transaction_pool
         in
-        let signed_cmds =
-          get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
-        in
-        List.filter_map signed_cmds ~f:(fun txn ->
+        let cmds = get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt in
+        List.filter_map cmds ~f:(fun txn ->
             let cmd_with_hash =
               Transaction_hash.User_command_with_valid_signature.forget_check
                 txn
@@ -4307,21 +4329,22 @@ module Queries = struct
             [] )
 
   let token_owner =
-    field "tokenOwner" ~doc:"Find the account ID that owns a given token"
-      ~typ:Types.account_id
+    field "tokenOwner" ~doc:"Find the account that owns a given token"
+      ~typ:Types.AccountObj.account
       ~args:
         Arg.
-          [ arg "tokenId" ~doc:"Token ID to find the owner for"
+          [ arg "tokenId" ~doc:"Token ID to find the owning account for"
               ~typ:(non_null Types.Input.TokenId.arg_typ)
           ]
       ~resolve:(fun { ctx = mina; _ } () token ->
-        mina |> Mina_lib.best_tip |> Participating_state.active
-        |> Option.bind ~f:(fun tip ->
-               let ledger =
-                 Transition_frontier.Breadcrumb.staged_ledger tip
-                 |> Staged_ledger.ledger
-               in
-               Ledger.token_owner ledger token ) )
+        let open Option.Let_syntax in
+        let%bind tip = Mina_lib.best_tip mina |> Participating_state.active in
+        let ledger =
+          Transition_frontier.Breadcrumb.staged_ledger tip
+          |> Staged_ledger.ledger
+        in
+        let%map account_id = Ledger.token_owner ledger token in
+        Types.AccountObj.get_best_ledger_account mina account_id )
 
   let transaction_status =
     result_field2 "transactionStatus" ~doc:"Get the status of a transaction"

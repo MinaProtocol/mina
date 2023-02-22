@@ -277,6 +277,7 @@ module Metadata = struct
     val ( / ) : t -> t -> t
   end
 
+  (* Invariant: fees is not empty *)
   let suggest_fee (type a) (module F : Field_like with type t = a) fees =
     let len = Array.length fees in
     let med = fees.(len / 2) in
@@ -344,13 +345,16 @@ module Metadata = struct
           | None ->
               M.fail (Errors.create `Chain_info_missing)
         in
-        Amount_of.mina
-          (suggest_fee
-             ( module struct
-               include Unsigned_extended.UInt64
-               include Infix
-             end )
-             fees)
+        if Array.is_empty fees then
+          Amount_of.mina (Mina_currency.Fee.to_uint64 Signed_command.minimum_fee)
+        else
+          Amount_of.mina
+            (suggest_fee
+               ( module struct
+                   include Unsigned_extended.UInt64
+                   include Infix
+                 end )
+               fees)
       in
       (* minimum fee : Pull this from the compile constants *)
       let amount_metadata =
@@ -541,7 +545,7 @@ module Payloads = struct
                      partial_user_command.User_command_info.Partial.source
                      partial_user_command.User_command_info.Partial.token)
             ; hex_bytes = Hex.Safe.to_hex unsigned_transaction_string
-            ; signature_type = Some "schnorr_poseidon"
+            ; signature_type = Some `Schnorr_poseidon
             }
           ]
       }
@@ -687,6 +691,11 @@ module Parse = struct
   end
 
   module Impl (M : Monad_fail.S) = struct
+    let check_sufficient_fee (type a) (payment : a -> Transaction.Unsigned.Rendered.Payment.t option) (transaction : a) : (unit, Errors.t) Result.t = 
+      match payment transaction with
+    | Some pay -> if Transaction.Unsigned.Rendered.Payment.is_fee_sufficient pay then Ok () else  Result.fail @@ Errors.create `Transaction_submit_fee_small
+    | None -> Ok ()
+
     let handle ~(env : Env.T(M).t) (req : Construction_parse_request.t) =
       let open M.Let_syntax in
       let%bind json =
@@ -705,6 +714,10 @@ module Parse = struct
               Transaction.Signed.Rendered.of_yojson json
               |> Result.map_error ~f:(fun e ->
                      Errors.create (`Json_parse (Some e)))
+              |> env.lift
+            in
+            let%bind () =
+              check_sufficient_fee Transaction.Signed.Rendered.(fun a -> a.payment) signed_rendered_transaction
               |> env.lift
             in
             let%bind signed_transaction =
@@ -732,11 +745,18 @@ module Parse = struct
               ]
             , meta_of_command signed_transaction.command)
         | false ->
-            let%map unsigned_transaction =
+            let%bind unsigned_rendered_transaction =
               Transaction.Unsigned.Rendered.of_yojson json
               |> Result.map_error ~f:(fun e ->
-                     Errors.create (`Json_parse (Some e)))
-              |> Result.bind ~f:Transaction.Unsigned.of_rendered
+                    Errors.create (`Json_parse (Some e)))
+              |> env.lift
+            in
+            let%bind () =
+              check_sufficient_fee Transaction.Unsigned.Rendered.(fun a -> a.payment) unsigned_rendered_transaction
+              |> env.lift
+            in
+            let%map unsigned_transaction =
+             Transaction.Unsigned.of_rendered unsigned_rendered_transaction
               |> env.lift
             in
             ( User_command_info.to_operations ~failure_status:None
@@ -824,27 +844,25 @@ end
 module Submit = struct
   module Sql = struct
     module Transaction_exists = struct
-      type t =
-        { nonce: int64
-        ; source: string
-        ; receiver: string
-        ; amount: int64
-        ; fee: int64
+      type params =
+        { nonce : int64
+        ; source : string
+        ; receiver : string
+        ; amount : string
+        ; fee : string
         }
       [@@deriving hlist]
 
-      let typ =
+      let params_typ =
         let open Mina_caqti.Type_spec in
-        let spec =
-          Caqti_type.[int64; string; string; int64; int64]
-        in
-        let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
-        let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+        let spec = Caqti_type.[ int64; string; string; string; string ] in
+        let encode t = Ok (hlist_to_tuple spec (params_to_hlist t)) in
+        let decode t = Ok (params_of_hlist (tuple_to_hlist spec t)) in
         Caqti_type.custom ~encode ~decode (to_rep spec)
 
       let query =
         Caqti_request.find_opt
-          typ
+          params_typ
           Caqti_type.string
           {sql| SELECT uc.id FROM user_commands uc
                 INNER JOIN public_keys AS pks ON pks.id = uc.source_id
@@ -862,12 +880,12 @@ module Submit = struct
           { nonce = (UInt32.to_int64 nonce)
           ; source
           ; receiver
-          ; amount = (UInt64.to_int64 amount)
-          ; fee = (UInt64.to_int64 fee) }
+          ; amount = UInt64.to_string amount
+          ; fee = UInt64.to_string fee
+          }
         |> Deferred.Result.map ~f:Option.is_some
     end
   end
-
 
   module Env = struct
     module T (M : Monad_fail.S) = struct

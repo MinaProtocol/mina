@@ -20,17 +20,17 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
         Account_id.create fee_payer_pk Token_id.default )
   in
   let (initial_balance : Currency.Balance.t) =
-    Currency.Balance.of_int 1_000_000_000_000_000
+    Currency.Balance.of_mina_int_exn 1_000_000
   in
   let (fee_payer_accounts : Account.t array) =
     if is_timed then
       let initial_minimum_balance =
-        Currency.Balance.of_int 1_000_000_000_000_000
+        Currency.Balance.of_mina_int_exn 1_000_000
       in
       let cliff_time = Mina_numbers.Global_slot.of_int 1_000 in
       let cliff_amount = Currency.Amount.zero in
       let vesting_period = Mina_numbers.Global_slot.of_int 10 in
-      let vesting_increment = Currency.Amount.of_int 100_000_000_000 in
+      let vesting_increment = Currency.Amount.of_mina_int_exn 100 in
       Array.map fee_payer_account_ids ~f:(fun fee_payer_account_id ->
           Account.create_timed fee_payer_account_id initial_balance
             ~initial_minimum_balance ~cliff_time ~cliff_amount ~vesting_period
@@ -97,13 +97,14 @@ let generate_zkapp_commands_and_apply_them_consecutively ~trials
     mk_ledgers_and_fee_payers ~num_of_fee_payers:trials ()
   in
   let account_state_tbl = Account_id.Table.create () in
+  let global_slot = Mina_numbers.Global_slot.of_int 1 in
   Test_util.with_randomness 123456789 (fun () ->
       let test i =
         Quickcheck.test ~trials:1
           (Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
-             ~protocol_state_view:U.genesis_state_view ~account_state_tbl
-             ~fee_payer_keypair:fee_payer_keypairs.(i) ~max_account_updates
-             ~keymap ~ledger ~vk () )
+             ~global_slot ~protocol_state_view:U.genesis_state_view
+             ~account_state_tbl ~fee_payer_keypair:fee_payer_keypairs.(i)
+             ~max_account_updates ~keymap ~ledger ~vk () )
           ~f:(fun zkapp_command_dummy_auths ->
             let open Async in
             Thread_safe.block_on_async_exn (fun () ->
@@ -126,8 +127,8 @@ let generate_zkapp_commands_and_apply_them_consecutively ~trials
                                |> Option.value_exn |> Account.to_yojson ) ) )
                     ]
                   "generated zkapp_command" ;
-                U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] )
-            )
+                U.check_zkapp_command_with_merges_exn ~global_slot ledger
+                  [ zkapp_command ] ) )
       in
       for i = 0 to trials - 1 do
         test i
@@ -140,9 +141,10 @@ let generate_zkapp_commands_and_apply_them_freshly ~trials ~max_account_updates
         let ledger, fee_payer_keypairs, keymap =
           mk_ledgers_and_fee_payers ~num_of_fee_payers:trials ()
         in
+        let global_slot = Mina_numbers.Global_slot.of_int 2 in
         Quickcheck.test ~trials:1
           (Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
-             ~protocol_state_view:U.genesis_state_view
+             ~global_slot ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i) ~max_account_updates
              ~keymap ~ledger ~vk () )
           ~f:(fun zkapp_command_dummy_auths ->
@@ -152,8 +154,8 @@ let generate_zkapp_commands_and_apply_them_freshly ~trials ~max_account_updates
                   Zkapp_command_builder.replace_authorizations ~prover ~keymap
                     zkapp_command_dummy_auths
                 in
-                U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] )
-            )
+                U.check_zkapp_command_with_merges_exn ~global_slot ledger
+                  [ zkapp_command ] ) )
       in
       for i = 0 to trials - 1 do
         test i
@@ -166,9 +168,11 @@ let mk_invalid_test ~trials ~max_account_updates ~type_of_failure
         let ledger, fee_payer_keypairs, keymap =
           mk_ledgers_and_fee_payers ~num_of_fee_payers:trials ()
         in
+        let global_slot = Mina_numbers.Global_slot.of_int 3 in
         Quickcheck.test ~trials:1
           (Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
-             ~failure:type_of_failure ~protocol_state_view:U.genesis_state_view
+             ~global_slot ~failure:type_of_failure
+             ~protocol_state_view:U.genesis_state_view
              ~fee_payer_keypair:fee_payer_keypairs.(i) ~max_account_updates
              ~keymap ~ledger ~vk () )
           ~f:(fun zkapp_command_dummy_auths ->
@@ -184,7 +188,7 @@ let mk_invalid_test ~trials ~max_account_updates ~type_of_failure
                   "generated zkapp_command" ;
                 U.check_zkapp_command_with_merges_exn
                   ~expected_failure:expected_failure_status ledger
-                  [ zkapp_command ] ~state_body:U.genesis_state_body ) )
+                  [ zkapp_command ] ~global_slot ) )
       in
       for i = 0 to trials - 1 do
         test i
@@ -214,7 +218,8 @@ let test_timed_account ~trials ~max_account_updates () =
                   "generated zkapp_command" ;
                 U.check_zkapp_command_with_merges_exn
                   ~expected_failure:
-                    Transaction_status.Failure.Source_minimum_balance_violation
+                    ( Transaction_status.Failure.Source_minimum_balance_violation
+                    , Pass_1 )
                   ledger [ zkapp_command ] ~state_body:U.genesis_state_body ) )
       in
       for i = 0 to trials - 1 do
@@ -240,26 +245,28 @@ let () =
            ~max_account_updates () ;
          mk_invalid_test ~trials ~max_account_updates
            ~type_of_failure:Invalid_protocol_state_precondition
-           ~expected_failure_status:Protocol_state_precondition_unsatisfied ;
+           ~expected_failure_status:
+             (Protocol_state_precondition_unsatisfied, Pass_2) ;
          mk_invalid_test ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `App_state)
-           ~expected_failure_status:Update_not_permitted_app_state ;
+           ~expected_failure_status:(Update_not_permitted_app_state, Pass_2) ;
          mk_invalid_test ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `Verification_key)
-           ~expected_failure_status:Update_not_permitted_verification_key ;
+           ~expected_failure_status:
+             (Update_not_permitted_verification_key, Pass_2) ;
          mk_invalid_test ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `Zkapp_uri)
-           ~expected_failure_status:Update_not_permitted_zkapp_uri ;
+           ~expected_failure_status:(Update_not_permitted_zkapp_uri, Pass_2) ;
          mk_invalid_test ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `Token_symbol)
-           ~expected_failure_status:Update_not_permitted_token_symbol ;
+           ~expected_failure_status:(Update_not_permitted_token_symbol, Pass_2) ;
          mk_invalid_test ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `Voting_for)
-           ~expected_failure_status:Update_not_permitted_voting_for ;
+           ~expected_failure_status:(Update_not_permitted_voting_for, Pass_2) ;
          mk_invalid_test ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `Send)
-           ~expected_failure_status:Update_not_permitted_balance ;
+           ~expected_failure_status:(Update_not_permitted_balance, Pass_2) ;
          mk_invalid_test ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `Receive)
-           ~expected_failure_status:Update_not_permitted_balance ;
+           ~expected_failure_status:(Update_not_permitted_balance, Pass_2) ;
          test_timed_account ~trials ~max_account_updates ())

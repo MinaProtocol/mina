@@ -7,18 +7,23 @@ use crate::{
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use array_init::array_init;
-use commitment_dlog::commitment::{CommitmentCurve, PolyComm};
-use commitment_dlog::evaluation_proof::OpeningProof;
 use groupmap::GroupMap;
-use kimchi::proof::{ProofEvaluations, ProverCommitments, ProverProof, RecursionChallenge};
-use kimchi::prover::caml::CamlProverProof;
 use kimchi::prover_index::ProverIndex;
 use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
+use kimchi::{
+    proof::{
+        PointEvaluations, ProofEvaluations, ProverCommitments, ProverProof, RecursionChallenge,
+    },
+    verifier::Context,
+};
+use kimchi::{prover::caml::CamlProverProof, verifier_index::VerifierIndex};
 use mina_curves::pasta::{Fp, Fq, Pallas, PallasParameters};
-use oracle::{
+use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
+use poly_commitment::commitment::{CommitmentCurve, PolyComm};
+use poly_commitment::evaluation_proof::OpeningProof;
 use std::convert::TryInto;
 
 #[ocaml_gen::func]
@@ -30,7 +35,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
     prev_sgs: Vec<CamlGPallas>,
 ) -> Result<CamlProverProof<CamlGPallas, CamlFq>, ocaml::Error> {
     {
-        let ptr: &mut commitment_dlog::srs::SRS<Pallas> =
+        let ptr: &mut poly_commitment::srs::SRS<Pallas> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
         ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }
@@ -62,6 +67,9 @@ pub fn caml_pasta_fq_plonk_proof_create(
         .expect("the witness should be a column of 15 vectors");
     let index: &ProverIndex<Pallas> = &index.as_ref().0;
 
+    // public input
+    let public_input = witness[0][0..index.cs.public].to_vec();
+
     // NB: This method is designed only to be used by tests. However, since creating a new reference will cause `drop` to be called on it once we are done with it. Since `drop` calls `caml_shutdown` internally, we *really, really* do not want to do this, but we have no other way to get at the active runtime.
     // TODO: There's actually a way to get a handle to the runtime as a function argument. Switch
     // to doing this instead.
@@ -75,7 +83,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
             DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
         >(&group_map, witness, &[], index, prev, None)
         .map_err(|e| ocaml::Error::Error(e.into()))?;
-        Ok(proof.into())
+        Ok((proof, public_input).into())
     })
 }
 
@@ -87,11 +95,19 @@ pub fn caml_pasta_fq_plonk_proof_verify(
 ) -> bool {
     let group_map = <Pallas as CommitmentCurve>::Map::setup();
 
+    let (proof, public_input) = proof.into();
+    let verifier_index = index.into();
+    let context = Context {
+        verifier_index: &verifier_index,
+        proof: &proof,
+        public_input: &public_input,
+    };
+
     batch_verify::<
         Pallas,
         DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
         DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
-    >(&group_map, &[(&index.into(), &proof.into())].to_vec())
+    >(&group_map, &[context])
     .is_ok()
 }
 
@@ -104,16 +120,27 @@ pub fn caml_pasta_fq_plonk_proof_batch_verify(
     let ts: Vec<_> = indexes
         .into_iter()
         .zip(proofs.into_iter())
-        .map(|(i, p)| (i.into(), p.into()))
+        .map(|(caml_index, caml_proof)| {
+            let verifier_index: VerifierIndex<Pallas> = caml_index.into();
+            let (proof, public_input): (ProverProof<_>, Vec<_>) = caml_proof.into();
+            (verifier_index, proof, public_input)
+        })
         .collect();
-    let ts: Vec<_> = ts.iter().map(|(i, p)| (i, p)).collect();
+    let ts_ref: Vec<_> = ts
+        .iter()
+        .map(|(verifier_index, proof, public_input)| Context {
+            verifier_index,
+            proof,
+            public_input,
+        })
+        .collect();
     let group_map = GroupMap::<Fp>::setup();
 
     batch_verify::<
         Pallas,
         DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
         DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
-    >(&group_map, &ts)
+    >(&group_map, &ts_ref)
     .is_ok()
 }
 
@@ -132,7 +159,7 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq>
         chals: vec![Fq::one(), Fq::one()],
         comm: comm(),
     };
-    let prev_challenges = vec![prev.clone(), prev.clone(), prev.clone()];
+    let prev_challenges = vec![prev.clone(), prev.clone(), prev];
 
     let g = Pallas::prime_subgroup_generator();
     let proof = OpeningProof {
@@ -142,16 +169,21 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq>
         delta: g,
         sg: g,
     };
-    let proof_evals = ProofEvaluations {
-        w: array_init(|_| vec![Fq::one()]),
-        z: vec![Fq::one()],
-        s: array_init(|_| vec![Fq::one()]),
-        lookup: None,
-        generic_selector: vec![Fq::one()],
-        poseidon_selector: vec![Fq::one()],
+    let eval = || PointEvaluations {
+        zeta: vec![Fq::one()],
+        zeta_omega: vec![Fq::one()],
     };
-    let evals = [proof_evals.clone(), proof_evals];
+    let evals = ProofEvaluations {
+        w: array_init(|_| eval()),
+        coefficients: array_init(|_| eval()),
+        z: eval(),
+        s: array_init(|_| eval()),
+        lookup: None,
+        generic_selector: eval(),
+        poseidon_selector: eval(),
+    };
 
+    let public = vec![Fq::one(), Fq::one()];
     let dlogproof = ProverProof {
         commitments: ProverCommitments {
             w_comm: array_init(|_| comm()),
@@ -162,11 +194,10 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq>
         proof,
         evals,
         ft_eval1: Fq::one(),
-        public: vec![Fq::one(), Fq::one()],
         prev_challenges,
     };
 
-    dlogproof.into()
+    (dlogproof, public).into()
 }
 
 #[ocaml_gen::func]

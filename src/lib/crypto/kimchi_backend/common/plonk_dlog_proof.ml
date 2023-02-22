@@ -229,24 +229,31 @@ module Make (Inputs : Inputs_intf) = struct
     ; challenge_polynomial_commitment = g t.sg
     }
 
+  let lookup_eval_of_backend
+      ({ sorted; aggreg; table; runtime } : 'f Kimchi_types.lookup_evaluations)
+      : _ Pickles_types.Plonk_types.Evals.Lookup.t =
+    { sorted; aggreg; table; runtime }
+
+  let eval_of_backend
+      ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+        Evaluations_backend.t ) : _ Pickles_types.Plonk_types.Evals.t =
+    { w = tuple15_to_vec w
+    ; coefficients = tuple15_to_vec coefficients
+    ; z
+    ; s = tuple6_to_vec s
+    ; generic_selector
+    ; poseidon_selector
+    ; lookup = Option.map ~f:lookup_eval_of_backend lookup
+    }
+
   let of_backend (t : Backend.t) : t =
     let proof = opening_proof_of_backend_exn t.proof in
-    let e1, e2 = t.evals in
     let evals =
-      let open Pickles_types.Plonk_types.Evals in
-      { w = Vector.zip (tuple15_to_vec e1.w) (tuple15_to_vec e2.w)
-      ; s = Vector.zip (tuple6_to_vec e1.s) (tuple6_to_vec e2.s)
-      ; z = (e1.z, e2.z)
-      ; generic_selector = (e1.generic_selector, e2.generic_selector)
-      ; poseidon_selector = (e1.poseidon_selector, e2.poseidon_selector)
-      ; lookup =
-          Option.map2 e1.lookup e2.lookup ~f:(fun l1 l2 ->
-              { Lookup.aggreg = (l1.aggreg, l2.aggreg)
-              ; table = (l1.table, l2.table)
-              ; sorted = Array.map2_exn l1.sorted l2.sorted ~f:Tuple2.create
-              ; runtime = Option.map2 l1.runtime l2.runtime ~f:Tuple2.create
-              } )
-      }
+      let evals_to_tuple
+          ({ zeta; zeta_omega } : _ Kimchi_types.point_evaluations) =
+        (zeta, zeta_omega)
+      in
+      Plonk_types.Evals.map ~f:evals_to_tuple (eval_of_backend t.evals)
     in
     let wo x : Inputs.Curve.Affine.t array =
       match Poly_comm.of_backend_without_degree_bound x with
@@ -280,6 +287,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let eval_to_backend
       { Pickles_types.Plonk_types.Evals.w
+      ; coefficients
       ; z
       ; s
       ; generic_selector
@@ -287,6 +295,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; lookup
       } : Evaluations_backend.t =
     { w = tuple15_of_vec w
+    ; coefficients = tuple15_of_vec coefficients
     ; z
     ; s = tuple6_of_vec s
     ; generic_selector
@@ -311,6 +320,9 @@ module Make (Inputs : Inputs_intf) = struct
     let g x = G.Affine.to_backend (Pickles_types.Or_infinity.Finite x) in
     let pcwo t = Poly_comm.to_backend (`Without_degree_bound t) in
     let lr = Array.map lr ~f:(fun (x, y) -> (g x, g y)) in
+    let evals_of_tuple (zeta, zeta_omega) : _ Kimchi_types.point_evaluations =
+      { zeta; zeta_omega }
+    in
     { commitments =
         { w_comm = tuple15_of_vec (Pickles_types.Vector.map ~f:pcwo w_comm)
         ; z_comm = pcwo z_comm
@@ -329,9 +341,7 @@ module Make (Inputs : Inputs_intf) = struct
         ; z2 = z_2
         ; sg = g challenge_polynomial_commitment
         }
-    ; evals =
-        ( eval_to_backend (Plonk_types.Evals.map ~f:fst evals)
-        , eval_to_backend (Plonk_types.Evals.map ~f:snd evals) )
+    ; evals = eval_to_backend (Plonk_types.Evals.map ~f:evals_of_tuple evals)
     ; ft_eval1
     ; public = primary_input
     ; prev_challenges =

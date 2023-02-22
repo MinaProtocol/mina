@@ -1,14 +1,14 @@
-use commitment_dlog::commitment::{shift_scalar, PolyComm};
 use kimchi::circuits::scalars::RandomOracles;
 use kimchi::proof::ProverProof;
 use kimchi::verifier_index::VerifierIndex as DlogVerifierIndex;
-use oracle::{
+use mina_poseidon::{
     self,
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
     FqSponge,
 };
 use paste::paste;
+use poly_commitment::commitment::{shift_scalar, PolyComm};
 use wasm_bindgen::prelude::*;
 // use wasm_bindgen::convert::{IntoWasmAbi, FromWasmAbi};
 use crate::wasm_vector::WasmVector;
@@ -36,7 +36,7 @@ macro_rules! impl_oracles {
 
         paste! {
             use crate::wasm_flat_vector::WasmFlatVector;
-            use oracle::sponge::ScalarChallenge;
+            use mina_poseidon::sponge::ScalarChallenge;
 
             #[wasm_bindgen]
             #[derive(Clone, Copy)]
@@ -206,10 +206,10 @@ macro_rules! impl_oracles {
                         .commitment
                 };
 
-                let proof: ProverProof<$G> = proof.into();
+                let (proof, public_input): (ProverProof<$G>, Vec<$F>) = proof.into();
 
                 let oracles_result =
-                    proof.oracles::<DefaultFqSponge<$curve_params, PlonkSpongeConstantsKimchi>, DefaultFrSponge<$F, PlonkSpongeConstantsKimchi>>(&index, &p_comm).map_err(|e| JsValue::from_str(&format!("oracles_create: {}", e)))?;
+                    proof.oracles::<DefaultFqSponge<$curve_params, PlonkSpongeConstantsKimchi>, DefaultFrSponge<$F, PlonkSpongeConstantsKimchi>>(&index, &p_comm,&public_input).map_err(|e| JsValue::from_str(&format!("oracles_create: {}", e)))?;
 
                 let (mut sponge, combined_inner_product, p_eval, digest, oracles) = (
                     oracles_result.fq_sponge,

@@ -28,58 +28,9 @@ it creates a more predictable/reproducible testing environment. Check
 
 To run `rosetta-cli` we will also require an archive node, so when
 running the sandbox node, we need to add `--archive-address 3086`
-option, specifying the port on which the archive will listen
-(we will set it up in a moment).
-
-Archive node
-------------
-
-Archive node stores history of the ledger in a PostgreSQL database, so
-we need to provide such a database for it to run. It can be installed
-natively, using a method appropriate for the underlying OS, or an
-[official Postgres Docker image](https://hub.docker.com/_/postgres)
-may be used. For instance:
-
-```shell
-$ docker run -d -p 5432:5432 \
-    -e "POSTGRES_DB=archive" \
-    -e "POSTGRES_HOST_AUTH_METHOD=trust" \
-    -e "POSTGRES_USER=pguser" \
-    --name mina-archive-db
-    postgres
-```
-
-The environment variables `POSTGRES_DB` and `POSTGRES_USER` should
-contain names of the database itself and the postgres user allowed
-to access it. These names will reappear later when configuring the
-archive itself.
-
-Next the database schema must be put in place:
-
-```shell
-$ psql -h localhost archive -f src/app/archive/create_schema.sql
-```
-
-Note: the database name `archive` should be identical to
-`POSTGRES_DB` above. Finally we can start the archive itself:
-
-```shell
-$ "_build/default/src/app/archive/archive.exe" run \
-    --postgres-uri "postgres://localhost:5432/archive" \
-    --server-port 3086
-```
-Note that the `--server-port` param should be equal to the one we set
-previously for the node. As the node starts producing blocks, we
-should see those blocks appear in archive's logs too.
-
-Also note that archive can only know about the blocks that were
-produced when it was running. This limitation also applies to
-archive nodes on real networks. Once a block falls off the running
-frontier, it is never sent over the network again, so archive nodes
-have no way of filling gaps in their history. This poses a problem
-for `rosetta-cli`, which expects to fetch the full blockchain's
-history from the Rosetta API and will fail if it encounters such a
-gap.
+option, specifying the port on which the archive will listen.
+For the instructions on how to set up the archive, see
+`src/app/archive/README/md`.
 
 Rosetta server
 --------------
@@ -102,6 +53,9 @@ which specifies the address of the database has the following form:
 Note that since we set up the database to *trust* its connections,
 the `<password>` part is not really necessary and the connection will
 succeed even if the password is wrong.
+
+See `src/app/rosetta/README.md` for more information on how to set up
+Rosetta server.
 
 Rosetta CLI tool
 ----------------
@@ -149,3 +103,25 @@ The tests can be run with the following command:
 ```shell
 $ rosetta-cli --configuration-file config.json check:data
 ```
+
+This command investigates block after block checks:
+1. whether Rosetta returns well formed information about
+   each block;
+2. tracks balances of all the accounts it can discover
+   and compares them to the balances returned by Rosetta;
+   fails in case of finding a discrepancy.
+   
+**NOTE**: this check will never stop unless `"end_conditions"` field
+is specified in the `config.json`, in `data` section (see the
+example mentioned above). For example an end condition:
+`"index": 50` will make `rosetta-cli to check first 50 blocks. 
+
+**IMPORTANT** as of version 0.8.2 of `rosetta-sdk-go`, rosetta-cli
+is unable to run the `mina.ros` file, which will only work with
+[Mina Foundation's fork](https://github.com/MinaProtocol/rosetta-sdk-go/tree/pallas_signer_stake_delegation).
+Therefore, whenever it is required to run the Construction API
+tests against v.0.8.2 of `rosetta-sdk-go`, `mina-no-delegation-tests.ros`
+config should be used for that instead of `mina.ros`, which is used
+in the CI. `mina-no-delegation-tests.ros` should be deleted once
+[PR #464](https://github.com/coinbase/rosetta-sdk-go/pull/464) to
+`rosetta-sdk-go` is merged.

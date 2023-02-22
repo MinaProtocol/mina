@@ -1212,7 +1212,7 @@ let poseidon =
 
         val events = Js.string (zkapp_events :> string)
 
-        val sequenceEvents = Js.string (zkapp_sequence_events :> string)
+        val sequenceEvents = Js.string (zkapp_actions :> string)
 
         val body = Js.string (zkapp_body :> string)
 
@@ -1571,15 +1571,11 @@ module Circuit = struct
     let digest =
       Backend.R1CS_constraint_system.digest cs |> Md5.to_hex |> Js.string
     in
-    (* TODO: to_json doesn't return anything; call into kimchi instead *)
     let json =
       Js.Unsafe.(
         fun_call
           global ##. JSON##.parse
-          [| inject
-               ( Backend.R1CS_constraint_system.to_json cs
-               |> Yojson.Safe.to_string |> Js.string )
-          |])
+          [| inject (Backend.R1CS_constraint_system.to_json cs |> Js.string) |])
     in
     object%js
       val rows = rows
@@ -1960,7 +1956,7 @@ module Choices = struct
         (fun ~self ->
           let prevs = prevs ~self in
           { Pickles.Inductive_rule.identifier = Js.to_string rule##.identifier
-          ; uses_lookup = false
+          ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
           ; prevs
           ; main =
               (fun { public_input } ->
@@ -2307,7 +2303,8 @@ let pickles_compile (choices : pickles_rule_js Js.js_array Js.t)
   let verify (public_input_js : public_input_js) (proof : _ Pickles.Proof.t) =
     let public_input = Public_input.(public_input_js |> of_js |> to_constant) in
     Proof.verify_promise [ (public_input, proof) ]
-    |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
+    |> Promise.map ~f:(fun x -> Js.bool (Or_error.is_ok x))
+    |> Promise_js_helpers.to_js
   in
   object%js
     val provers = Obj.magic provers
@@ -2375,12 +2372,23 @@ let verify (public_input : public_input_js) (proof : proof)
           (Error.to_string_hum err) ()
   in
   Pickles.Side_loaded.verify_promise ~typ [ (vk, public_input, proof) ]
-  |> Promise.map ~f:Js.bool |> Promise_js_helpers.to_js
+  |> Promise.map ~f:(fun x -> Js.bool (Or_error.is_ok x))
+  |> Promise_js_helpers.to_js
 
 let dummy_base64_proof () =
   let n2 = Pickles_types.Nat.N2.n in
   let proof = Pickles.Proof.dummy n2 n2 n2 ~domain_log2:15 in
   Proof2.to_base64 proof |> Js.string
+
+let dummy_verification_key () =
+  let vk = Pickles.Side_loaded.Verification_key.dummy in
+  object%js
+    val data = Pickles.Side_loaded.Verification_key.to_base64 vk |> Js.string
+
+    val hash =
+      Mina_base.Zkapp_account.digest_vk vk
+      |> Field.Constant.to_string |> Js.string
+  end
 
 let pickles =
   object%js
@@ -2391,6 +2399,8 @@ let pickles =
     val verify = verify
 
     val dummyBase64Proof = dummy_base64_proof
+
+    val dummyVerificationKey = dummy_verification_key
 
     val proofToBase64 = proof_to_base64
 
@@ -2906,7 +2916,9 @@ module Ledger = struct
     check_account_update_signatures txn ;
     let ledger = l##.value in
     let application_result =
-      T.apply_zkapp_command_unchecked ~state_view:network_state
+      T.apply_zkapp_command_unchecked
+        ~global_slot:network_state.global_slot_since_genesis
+        ~state_view:network_state
         ~constraint_constants:
           { Genesis_constants.Constraint_constants.compiled with
             account_creation_fee = Currency.Fee.of_string account_creation_fee
@@ -3209,8 +3221,10 @@ let test =
             command |> Js.to_string |> Yojson.Safe.from_string
             |> Signed_command.Stable.V1.of_yojson |> ok_exn
           in
+          let b58 = Signed_command.to_base58_check_v1 command in
           Mina_transaction.Transaction_hash.(
-            command |> hash_signed_command_v1 |> to_base58_check |> Js.string)
+            b58 |> digest_string |> to_base58_check)
+          |> Js.string
 
         method serializeCommon (command : Js.js_string Js.t) =
           let command : Signed_command_payload.Common.t =
@@ -3233,7 +3247,7 @@ let test =
             command |> Js.to_string |> Yojson.Safe.from_string
             |> Signed_command.Stable.V1.of_yojson |> ok_exn
           in
-          Signed_command.Base58_check_v1.to_base58_check command |> Js.string
+          Signed_command.to_base58_check_v1 command |> Js.string
 
         method examplePayment =
           let kp = keypair () in
