@@ -2654,22 +2654,6 @@ module Ledger = struct
     json |> Yojson.Safe.to_string |> Js.string
 
   module To_js = struct
-    let field x = to_js_field @@ Field.constant x
-
-    let boolean b = new%js bool_constr (As_bool.of_js_bool @@ Js.bool b)
-
-    let uint32 n =
-      object%js
-        val value =
-          Unsigned.UInt32.to_string n |> Field.Constant.of_string |> field
-      end
-
-    let uint64 n =
-      object%js
-        val value =
-          Unsigned.UInt64.to_string n |> Field.Constant.of_string |> field
-      end
-
     let public_key (pk : Signature_lib.Public_key.Compressed.t) : public_key =
       object%js
         val x = to_js_field_unchecked pk.x
@@ -2679,140 +2663,10 @@ module Ledger = struct
             (As_bool.of_boolean @@ Boolean.var_of_value pk.is_odd)
       end
 
-    let token_id (token_id : Mina_base.Token_id.t) =
-      token_id |> Mina_base.Token_id.to_field_unsafe |> field
-
     let private_key (sk : Signature_lib.Private_key.t) = to_js_scalar sk
-
-    let signature (sg : Signature_lib.Schnorr.Chunked.Signature.t) =
-      let r, s = sg in
-      object%js
-        val r = to_js_field_unchecked r
-
-        val s = to_js_scalar s
-      end
 
     let option (transform : 'a -> 'b) (x : 'a option) =
       Js.Optdef.option (Option.map x ~f:transform)
-
-    let app_state s =
-      let xs = new%js Js.array_empty in
-      Pickles_types.Vector.iter s ~f:(fun x -> ignore (xs##push (field x))) ;
-      xs
-
-    let verification_key (vk : Mina_base__Verification_key_wire.Stable.V1.t) =
-      object%js
-        val data =
-          Js.string (Pickles.Side_loaded.Verification_key.to_base64 vk.data)
-
-        val hash = vk.hash |> Field.Constant.to_string |> Js.string
-      end
-
-    let zkapp_account (a : Mina_base.Zkapp_account.t) : zkapp_account =
-      object%js
-        val appState = app_state a.app_state
-
-        val verificationKey = option verification_key a.verification_key
-
-        val zkappVersion = Mina_numbers.Zkapp_version.to_int a.zkapp_version
-
-        val sequenceState = app_state a.sequence_state
-
-        val lastSequenceSlot =
-          Mina_numbers.Global_slot.to_int a.last_sequence_slot
-
-        val provedState = boolean a.proved_state
-
-        val zkappUri = Js.string a.zkapp_uri
-      end
-
-    let permissions (p : Mina_base.Permissions.t) : permissions =
-      object%js
-        val editState =
-          Js.string (Mina_base.Permissions.Auth_required.to_string p.edit_state)
-
-        val send =
-          Js.string (Mina_base.Permissions.Auth_required.to_string p.send)
-
-        val receive =
-          Js.string (Mina_base.Permissions.Auth_required.to_string p.receive)
-
-        val setDelegate =
-          Js.string
-            (Mina_base.Permissions.Auth_required.to_string p.set_delegate)
-
-        val setPermissions =
-          Js.string
-            (Mina_base.Permissions.Auth_required.to_string p.set_permissions)
-
-        val setVerificationKey =
-          Js.string
-            (Mina_base.Permissions.Auth_required.to_string
-               p.set_verification_key )
-
-        val setZkappUri =
-          Js.string
-            (Mina_base.Permissions.Auth_required.to_string p.set_zkapp_uri)
-
-        val editSequenceState =
-          Js.string
-            (Mina_base.Permissions.Auth_required.to_string p.edit_sequence_state)
-
-        val setTokenSymbol =
-          Js.string
-            (Mina_base.Permissions.Auth_required.to_string p.set_token_symbol)
-
-        val incrementNonce =
-          Js.string
-            (Mina_base.Permissions.Auth_required.to_string p.increment_nonce)
-
-        val setVotingFor =
-          Js.string
-            (Mina_base.Permissions.Auth_required.to_string p.set_voting_for)
-      end
-
-    let timing (t : Mina_base.Account_timing.t) : timing =
-      let t = Mina_base.Account_timing.to_record t in
-      object%js
-        val isTimed = boolean t.is_timed
-
-        val initialMinimumBalance =
-          uint64 @@ Currency.Balance.to_uint64 t.initial_minimum_balance
-
-        val cliffTime = uint32 t.cliff_time
-
-        val cliffAmount = uint64 @@ Currency.Amount.to_uint64 t.cliff_amount
-
-        val vestingPeriod = uint32 t.vesting_period
-
-        val vestingIncrement =
-          uint64 @@ Currency.Amount.to_uint64 t.vesting_increment
-      end
-
-    let account (a : Mina_base.Account.t) : account =
-      object%js
-        val publicKey = public_key a.public_key
-
-        val tokenId = token_id a.token_id
-
-        val tokenSymbol = Js.string a.token_symbol
-
-        val balance = uint64 (Currency.Balance.to_uint64 a.balance)
-
-        val nonce = uint32 (Mina_numbers.Account_nonce.to_uint32 a.nonce)
-
-        val receiptChainHash = field (a.receipt_chain_hash :> Impl.field)
-
-        val delegate = option public_key a.delegate
-
-        val votingFor = field (a.voting_for :> Impl.field)
-
-        val timing = timing a.timing
-
-        val permissions = permissions a.permissions
-
-        val zkapp = option zkapp_account a.zkapp
-      end
   end
 
   module Account_update = Mina_base.Account_update
@@ -3093,22 +2947,20 @@ module Ledger = struct
         add_account_exn l a##.publicKey (Js.to_string a##.balance) ) ;
     new%js ledger_constr l
 
-  let get_account l (pk : public_key) (token : field_class Js.t) :
-      account Js.optdef =
-    let loc = L.location_of_account l##.value (account_id pk token) in
-    let account = Option.bind loc ~f:(L.get l##.value) in
-    To_js.option To_js.account account
-
   let account_to_json =
     let deriver = Mina_base.Account.deriver @@ Fields_derivers_zkapps.o () in
     let to_json' = Fields_derivers_zkapps.to_json deriver in
-    let to_json (account : Mina_base.Account.t) =
-      account |> to_json' |> Yojson.Safe.to_string |> Js.string
+    let to_json (account : Mina_base.Account.t) : Js.Unsafe.any =
+      let str = account |> to_json' |> Yojson.Safe.to_string |> Js.string in
+      let json =
+        Js.Unsafe.(fun_call global ##. JSON##.parse [| inject str |])
+      in
+      json
     in
     to_json
 
-  let get_account_new l (pk : public_key) (token : field_class Js.t) :
-      Js.js_string Js.t Js.optdef =
+  let get_account l (pk : public_key) (token : field_class Js.t) :
+      Js.Unsafe.any Js.optdef =
     let loc = L.location_of_account l##.value (account_id pk token) in
     let account = Option.bind loc ~f:(L.get l##.value) in
     To_js.option account_to_json account
@@ -3146,22 +2998,14 @@ module Ledger = struct
       | Error err ->
           raise_error (Error.to_string_hum err)
     in
-    let T.Transaction_applied.Zkapp_command_applied.{ accounts; command; _ } =
-      applied
-    in
-    let () =
-      match command.status with
-      | Applied ->
-          ()
-      | Failed failures ->
-          raise_error
-            ( Mina_base.Transaction_status.Failure.Collection.to_yojson failures
-            |> Yojson.Safe.to_string )
-    in
-    let account_list =
-      List.map accounts ~f:(fun (_, a) -> To_js.option To_js.account a)
-    in
-    Js.array @@ Array.of_list account_list
+    let T.Transaction_applied.Zkapp_command_applied.{ command; _ } = applied in
+    match command.status with
+    | Applied ->
+        ()
+    | Failed failures ->
+        raise_error
+          ( Mina_base.Transaction_status.Failure.Collection.to_yojson failures
+          |> Yojson.Safe.to_string )
 
   let apply_json_transaction l (tx_json : Js.js_string Js.t)
       (account_creation_fee : Js.js_string Js.t)
@@ -3415,7 +3259,6 @@ module Ledger = struct
       end ) ;
 
     method_ "getAccount" get_account ;
-    method_ "getAccountNew" get_account_new ;
     method_ "addAccount" add_account ;
     method_ "applyJsonTransaction" apply_json_transaction
 end
