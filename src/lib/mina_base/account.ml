@@ -890,33 +890,13 @@ let gen_timed =
 let deriver obj =
   let open Fields_derivers_zkapps in
   let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
-  let token_permissions = ( !. ) ~skip_data:() skip in
   let receipt_chain_hash =
     needs_custom_js ~js_type:field ~name:"ReceiptChainHash" field
   in
   finish "Account" ~t_toplevel_annots:Poly.t_toplevel_annots
   @@ Poly.Fields.make_creator ~public_key:!.public_key
-       ~token_id:!.Token_id.deriver ~token_permissions ~token_symbol:!.string
-       ~balance:!.balance ~nonce:!.uint32
-       ~receipt_chain_hash:!.receipt_chain_hash
-       ~delegate:!.(option ~js_type:Or_undefined (public_key @@ o ()))
-       ~voting_for:!.field ~timing:!.Timing.deriver
-       ~permissions:!.Permissions.deriver
-       ~zkapp:!.(option ~js_type:Or_undefined (Zkapp_account.deriver @@ o ()))
-       obj
-
-let deriver obj =
-  let open Fields_derivers_zkapps in
-  let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
-  let token_permissions = ( !. ) ~skip_data:() skip in
-  let receipt_chain_hash =
-    needs_custom_js ~js_type:field ~name:"ReceiptChainHash" field
-  in
-  finish "Account" ~t_toplevel_annots:Poly.t_toplevel_annots
-  @@ Poly.Fields.make_creator ~public_key:!.public_key
-       ~token_id:!.Token_id.deriver ~token_permissions ~token_symbol:!.string
-       ~balance:!.balance ~nonce:!.uint32
-       ~receipt_chain_hash:!.receipt_chain_hash
+       ~token_id:!.Token_id.deriver ~token_symbol:!.string ~balance:!.balance
+       ~nonce:!.uint32 ~receipt_chain_hash:!.receipt_chain_hash
        ~delegate:!.(option ~js_type:Or_undefined (public_key @@ o ()))
        ~voting_for:!.field ~timing:!.Timing.deriver
        ~permissions:!.Permissions.deriver
