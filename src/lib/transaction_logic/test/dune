@@ -2,19 +2,23 @@
  (name transaction_logic_tests)
  (libraries
    ;; opam libraries
-   ppx_inline_test.config
-   core
+   async_kernel
+   async_unix
    base
    base.base_internalhash_types
+   core
    core_kernel
    integers
+   ppx_inline_test.config
    sexplib0
    yojson
    ;; local libraries
-   kimchi_backend_common
-   data_hash_lib
    currency
+   data_hash_lib
    genesis_constants
+   kimchi_backend_common
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    mina_base
    mina_base_import
    mina_transaction
@@ -22,13 +26,16 @@
    mina_numbers
    mina_ledger
    mina_wire_types
-   random_oracle
+   monad_lib
    pasta_bindings
+   pickles
    pickles.backend
+   random_oracle
    sgn
    sgn_type
    signature_lib
    snark_params
+   zkapp_command_builder
    )
 (library_flags -linkall)
 (inline_tests)
