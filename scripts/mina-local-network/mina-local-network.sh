@@ -192,19 +192,19 @@ check-db-connection() {
       echo "Connection to database successful!"
       ;;
     1)
-      echo -n "The server is rejecting connections (for example during startup)"
+      echo "The database server is rejecting connections (for example during startup)"
       exit 1
       ;;
     2)
-      echo -n "There was no response from server to the connection attempt"
+      echo "There was no response from the database server to the connection attempt"
       exit 1
       ;;
     3)
-      echo -n "No attempt was made (for example due to invalid parameters)"
+      echo "No attempt to contact the database server was made (for example due to invalid parameters)"
       exit 1
       ;;
     *)
-      echo -n "Unknown issue when connecting to database"
+      echo "Unknown issue when connecting to database"
       exit 1
       ;;
   esac
