@@ -2,7 +2,6 @@ open Core_kernel
 open Currency
 open Mina_base
 open Mina_numbers
-open Signature_lib
 open Helpers
 module Transaction_logic = Mina_transaction_logic.Make (Ledger)
 
@@ -22,13 +21,23 @@ let constraint_constants =
 type zk_cmd_result =
   Transaction_logic.Transaction_applied.Zkapp_command_applied.t
   * Amount.Signed.t
-[@@deriving sexp]
+      [@@deriving sexp]
+
+let balance_to_fee = Fn.compose Amount.to_fee Balance.to_amount
 
 let%test_module "Test transaction logic." =
   ( module struct
-    let run_zkapp_cmd known_accounts cmd =
+    let run_zkapp_cmd ~fee_payer ~fee ~accounts txns =
       let open Result.Let_syntax in
-      let%bind ledger = test_ledger known_accounts in
+      let unsigned_cmd =
+        zkapp_cmd ~noncemap:(noncemap accounts) ~fee:(fee_payer, fee) txns
+      in
+      let keymap = keymap accounts in
+      let cmd =
+        Async_unix.Thread_safe.block_on_async_exn (fun () ->
+            Zkapp_command_builder.replace_authorizations ~keymap unsigned_cmd )
+      in
+      let%bind ledger = test_ledger accounts in
       let%map txn, (_, amt) =
         Transaction_logic.apply_zkapp_command_unchecked ~constraint_constants
           ~global_slot:Global_slot.(of_int 120)
@@ -36,44 +45,28 @@ let%test_module "Test transaction logic." =
       in
       (txn, amt)
 
-    let%test_unit "Two accounts transaction happy path." =
+    let%test_unit "Many transactions between distinct accounts." =
       Quickcheck.test
         (let open Quickcheck in
-        let open Generator.Let_syntax in
-        let%bind accounts =
-          Test_account.gen
-          |> Generator.list_with_length 2
-          |> Generator.filter
-               ~f:
-                 (List.exists
-                    ~f:Balance.(fun a -> a.Test_account.balance > zero) )
-        in
-        let%bind txn = Test_transaction.gen accounts in
-        let sender =
-          List.find_exn accounts ~f:(fun a ->
-              Public_key.Compressed.equal a.pk txn.sender )
-        in
-        let sender_fee_cap =
-          Balance.(sender.balance - txn.amount)
-          |> Option.value_map ~default:Fee.zero
-               ~f:(Fn.compose Amount.to_fee Balance.to_amount)
-        in
-        let%map fee = Fee.(gen_incl zero sender_fee_cap) in
-        let unsigned_cmd =
-          zkapp_cmd ~noncemap:(noncemap accounts) ~fee:(txn.sender, fee) [ txn ]
-        in
-        let keymap = keymap accounts in
-        let cmd =
-          Async_unix.Thread_safe.block_on_async_exn (fun () ->
-              Zkapp_command_builder.replace_authorizations ~keymap unsigned_cmd )
-        in
-        (accounts, cmd))
-        ~f:(fun (accounts, cmd) ->
+         let open Quickcheck.Generator.Let_syntax in
+         let%bind accs_and_txns =
+           Generator.list_non_empty gen_account_pair_and_txn
+           (* Generating too many transactions makes this test take too much time. *)
+           |> Generator.filter ~f:(fun l -> List.length l < 4)
+         in
+         let (account_pairs, txns) = List.unzip accs_and_txns in
+         let accounts = List.concat_map account_pairs ~f:(fun (a, b) -> [a; b]) in
+         (* Select a receiver to pay the fee. *)
+         let%bind fee_payer = Generator.of_list @@ List.map ~f:snd account_pairs in
+         let%map fee = Fee.(gen_incl zero @@ balance_to_fee fee_payer.balance) in
+         (fee_payer.pk, fee, accounts, txns))
+        ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: zk_cmd_result Or_error.t]
             (function
               | Ok (txn, _) ->
                   Transaction_status.(equal txn.command.status Applied)
               | Error _ ->
                   false )
-            (run_zkapp_cmd accounts cmd) )
-  end )
+            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
+    end )
+

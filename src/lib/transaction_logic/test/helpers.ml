@@ -82,10 +82,17 @@ let rec iter_result ~f = function
       let%bind () = f x in
       iter_result ~f xs
 
+let bin_log n =
+  let rec find candidate =
+    if Int.pow 2 candidate >= n then candidate else find (Int.succ candidate)
+  in
+  find 0
+
 let test_ledger accounts =
   let open Result.Let_syntax in
   let open Test_account in
-  let ledger = Ledger.empty ~depth:3 () in
+  let depth = bin_log @@ List.length accounts in
+  let ledger = Ledger.empty ~depth () in
   let%map () =
     iter_result accounts ~f:(fun a ->
         let acc_id = Account_id.create a.pk Token_id.default in
@@ -231,3 +238,20 @@ let build_zkapp_cmd ~fee transactions :
 
 let zkapp_cmd ~noncemap ~fee transactions =
   Monad_lib.State.eval_state (build_zkapp_cmd ~fee transactions) noncemap
+
+let gen_account_pair_and_txn =
+  let open Quickcheck in
+  let open Generator.Let_syntax in
+  let%bind sender = Generator.filter ~f:Test_account.non_empty Test_account.gen in
+  let%bind receiver = Test_account.gen in
+  let max_amt =
+    let sender_balance = Balance.to_amount sender.balance in
+    let receiver_capacity =
+      Amount.(max_int - Balance.to_amount receiver.balance)
+    in
+    Amount.min sender_balance
+      (Option.value ~default:sender_balance receiver_capacity)
+  in
+  let%map amount = Amount.(gen_incl zero max_amt) in
+  let txn = Test_transaction.{ sender = sender.pk; receiver = receiver.pk; amount } in
+  ((sender, receiver), txn)
