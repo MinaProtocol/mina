@@ -95,6 +95,8 @@ in
 
   kimchi-rust = rustChannelFromToolchainFileOf
     ../src/lib/crypto/kimchi_bindings/wasm/rust-toolchain.toml;
+
+  # TODO: raise issue on nixpkgs and remove workaround when fix is applied
   kimchi-rust-wasm = (final.kimchi-rust.rust.override {
     targets = [ "wasm32-unknown-unknown" ];
     # rust-src is needed for -Zbuild-std
