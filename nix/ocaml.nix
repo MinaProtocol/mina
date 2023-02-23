@@ -83,7 +83,8 @@ let
       # Also passes the version information to the executable.
       wrapMina = let
         commit_sha1 = inputs.self.sourceInfo.rev or "<dirty>";
-        commit_date = inputs.flockenzeit.lib.RFC-5322 inputs.self.sourceInfo.lastModified or 0;
+        commit_date = inputs.flockenzeit.lib.RFC-5322
+          inputs.self.sourceInfo.lastModified or 0;
       in package:
       { deps ? [ pkgs.gnutar pkgs.gzip ], }:
       pkgs.runCommand "${package.name}-release" {

@@ -56,13 +56,22 @@
         ref = r: "[34;1m${r}[31;1m";
         command = c: "[37;1m${c}[31;1m";
       in lib.warnIf (!builtins.all (x: x)
-        (map (x: builtins.pathExists ./${x} && builtins.readDir ./${x} != { }) submodules)) ''
-          Some submodules are missing, you may get errors. Consider one of the following:
-          - run ${command "nix/pin.sh"} and use "${ref "mina"}" flake ref, e.g. ${command "nix develop mina"} or ${command "nix build mina"};
-          - use "${ref "git+file://$PWD?submodules=1"}";
-          - use "${ref "git+https://github.com/minaprotocol/mina?submodules=1"}";
-          - use non-flake commands like ${command "nix-build"} and ${command "nix-shell"}.
-        '';
+        (map (x: builtins.pathExists ./${x} && builtins.readDir ./${x} != { })
+          submodules)) ''
+            Some submodules are missing, you may get errors. Consider one of the following:
+            - run ${command "nix/pin.sh"} and use "${
+              ref "mina"
+            }" flake ref, e.g. ${command "nix develop mina"} or ${
+              command "nix build mina"
+            };
+            - use "${ref "git+file://$PWD?submodules=1"}";
+            - use "${
+              ref "git+https://github.com/minaprotocol/mina?submodules=1"
+            }";
+            - use non-flake commands like ${command "nix-build"} and ${
+              command "nix-shell"
+            }.
+          '';
     in {
       overlays = {
         misc = import ./nix/misc.nix;
@@ -213,14 +222,13 @@
               label = "Run ${test} integration test";
               depends_on = [ "push_mina-image-full" ]
                 ++ lib.optional with-archive "push_mina-archive-image-full";
-              "if" = ''build.pull_request.labels includes "nix-integration-tests"'';
+              "if" =
+                ''build.pull_request.labels includes "nix-integration-tests"'';
               retry = {
-                automatic = [
-                  {
-                    exit_status = "*";
-                    limit = 3;
-                  }
-                ];
+                automatic = [{
+                  exit_status = "*";
+                  limit = 3;
+                }];
               };
             };
         in {

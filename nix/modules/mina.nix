@@ -66,9 +66,7 @@ inputs:
           type = nullOr path;
           default = null;
         };
-        libp2p-keypair = lib.mkOption {
-          type = path;
-        };
+        libp2p-keypair = lib.mkOption { type = path; };
 
         waitForRpc = lib.mkOption {
           type = bool;
