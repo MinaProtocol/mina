@@ -242,7 +242,9 @@ let zkapp_cmd ~noncemap ~fee transactions =
 let gen_account_pair_and_txn =
   let open Quickcheck in
   let open Generator.Let_syntax in
-  let%bind sender = Generator.filter ~f:Test_account.non_empty Test_account.gen in
+  let%bind sender =
+    Generator.filter ~f:Test_account.non_empty Test_account.gen
+  in
   let%bind receiver = Test_account.gen in
   let max_amt =
     let sender_balance = Balance.to_amount sender.balance in
@@ -253,5 +255,7 @@ let gen_account_pair_and_txn =
       (Option.value ~default:sender_balance receiver_capacity)
   in
   let%map amount = Amount.(gen_incl zero max_amt) in
-  let txn = Test_transaction.{ sender = sender.pk; receiver = receiver.pk; amount } in
+  let txn =
+    Test_transaction.{ sender = sender.pk; receiver = receiver.pk; amount }
+  in
   ((sender, receiver), txn)
