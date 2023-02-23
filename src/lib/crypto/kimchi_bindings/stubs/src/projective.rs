@@ -1,16 +1,17 @@
-use ark_ec::{AffineCurve, ProjectiveCurve};
+use ark_ec::{AffineRepr, CurveGroup, Group};
 use ark_ff::UniformRand;
 use paste::paste;
 use rand::rngs::StdRng;
+use std::ops::Mul;
 
 macro_rules! impl_projective {
-    ($name: ident, $GroupProjective: ty, $CamlG: ty, $CamlScalarField: ty, $BaseField: ty, $CamlBaseField: ty, $Projective: ty) => {
+    ($name: ident, $GroupProjective: ty, $CamlG: ty, $CamlScalarField: ty, $ScalarField:ty, $BaseField: ty, $CamlBaseField: ty, $Projective: ty) => {
 
         paste! {
             #[ocaml_gen::func]
             #[ocaml::func]
             pub fn [<caml_ $name:snake _one>]() -> $GroupProjective {
-                $Projective::prime_subgroup_generator().into()
+                $Projective::generator().into()
             }
 
             #[ocaml_gen::func]
@@ -53,7 +54,7 @@ macro_rules! impl_projective {
                 x: ocaml::Pointer<$GroupProjective>,
                 y: $CamlScalarField,
             ) -> $GroupProjective {
-                let y: ark_ff::BigInteger256 = y.0.into();
+                let y: $ScalarField = y.0.into();
                 x.as_ref().mul(&y).into()
             }
 
@@ -98,7 +99,7 @@ macro_rules! impl_projective {
             #[ocaml_gen::func]
             #[ocaml::func]
             pub fn [<caml_ $name:snake _of_affine>](x: $CamlG) -> $GroupProjective {
-                Into::<GAffine>::into(x).into_projective().into()
+                Into::<GAffine>::into(x).into_group().into()
             }
 
             #[ocaml_gen::func]
@@ -120,13 +121,16 @@ macro_rules! impl_projective {
 pub mod pallas {
     use super::*;
     use crate::arkworks::{CamlFp, CamlFq, CamlGPallas, CamlGroupProjectivePallas};
-    use mina_curves::pasta::{curves::pallas::ProjectivePallas, Fp, Pallas as GAffine};
+    use mina_curves::pasta::{
+        curves::pallas::Projective as ProjectivePallas, Fp, Fq, Pallas as GAffine,
+    };
 
     impl_projective!(
         pallas,
         CamlGroupProjectivePallas,
         CamlGPallas,
         CamlFq,
+        Fq,
         Fp,
         CamlFp,
         ProjectivePallas
@@ -136,13 +140,16 @@ pub mod pallas {
 pub mod vesta {
     use super::*;
     use crate::arkworks::{CamlFp, CamlFq, CamlGVesta, CamlGroupProjectiveVesta};
-    use mina_curves::pasta::{curves::vesta::ProjectiveVesta, Fq, Vesta as GAffine};
+    use mina_curves::pasta::{
+        curves::vesta::Projective as ProjectiveVesta, Fp, Fq, Vesta as GAffine,
+    };
 
     impl_projective!(
         vesta,
         CamlGroupProjectiveVesta,
         CamlGVesta,
         CamlFp,
+        Fp,
         Fq,
         CamlFq,
         ProjectiveVesta

@@ -4,8 +4,7 @@ use kimchi::{
 };
 
 /// Converts the linearization of the kimchi circuit polynomial into a printable string.
-pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
-) -> (String, Vec<(String, String)>) {
+pub fn linearization_strings<F: ark_ff::PrimeField>() -> (String, Vec<(String, String)>) {
     let evaluated_cols = linearization_columns::<F>(None);
     let (linearization, _powers_of_alpha) = constraints_expr::<F>(None, true);
 

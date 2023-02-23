@@ -4,7 +4,7 @@ use crate::{
     plonk_verifier_index::{CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex},
     srs::fq::CamlFqSrs,
 };
-use ark_ec::AffineCurve;
+use ark_ec::AffineRepr;
 use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use kimchi::circuits::constraints::FeatureFlags;
@@ -220,7 +220,7 @@ pub fn caml_pasta_fq_plonk_verifier_index_shifts(log2_size: ocaml::Int) -> Vec<C
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierIndex {
     fn comm() -> CamlPolyComm<CamlGPallas> {
-        let g: CamlGPallas = Pallas::prime_subgroup_generator().into();
+        let g: CamlGPallas = Pallas::generator().into();
         CamlPolyComm {
             shifted: Some(g),
             unshifted: vec![g, g, g],

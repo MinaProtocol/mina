@@ -1,4 +1,4 @@
-use ark_ec::AffineCurve;
+use ark_ec::AffineRepr;
 use kimchi::circuits::lookup::index::LookupSelectors;
 use kimchi::circuits::lookup::lookups::{LookupFeatures, LookupInfo};
 use kimchi::verifier_index::LookupVerifierIndex;
@@ -35,7 +35,7 @@ pub struct CamlLookupSelectors<T> {
 
 impl<G, CamlPolyComm> From<LookupSelectors<PolyComm<G>>> for CamlLookupSelectors<CamlPolyComm>
 where
-    G: AffineCurve + CommitmentCurve,
+    G: AffineRepr + CommitmentCurve,
     CamlPolyComm: From<PolyComm<G>>,
 {
     fn from(val: LookupSelectors<PolyComm<G>>) -> Self {
@@ -53,7 +53,7 @@ where
 
 impl<G, CamlPolyComm> From<CamlLookupSelectors<CamlPolyComm>> for LookupSelectors<PolyComm<G>>
 where
-    G: AffineCurve + CommitmentCurve,
+    G: AffineRepr + CommitmentCurve,
     PolyComm<G>: From<CamlPolyComm>,
 {
     fn from(val: CamlLookupSelectors<CamlPolyComm>) -> Self {
@@ -118,7 +118,7 @@ pub struct CamlLookupVerifierIndex<PolyComm> {
 
 impl<G, CamlPolyComm> From<LookupVerifierIndex<G>> for CamlLookupVerifierIndex<CamlPolyComm>
 where
-    G: AffineCurve + CommitmentCurve,
+    G: AffineRepr + CommitmentCurve,
     CamlPolyComm: From<PolyComm<G>>,
 {
     fn from(li: LookupVerifierIndex<G>) -> Self {
@@ -144,7 +144,7 @@ where
 
 impl<G, CamlPolyComm> From<CamlLookupVerifierIndex<CamlPolyComm>> for LookupVerifierIndex<G>
 where
-    G: AffineCurve + CommitmentCurve,
+    G: AffineRepr + CommitmentCurve,
     PolyComm<G>: From<CamlPolyComm>,
 {
     fn from(li: CamlLookupVerifierIndex<CamlPolyComm>) -> Self {
