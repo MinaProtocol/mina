@@ -845,7 +845,7 @@ type t =
   ; snark_coordinators : Node.t Core.String.Map.t
   ; snark_workers : Node.t Core.String.Map.t
   ; archive_nodes : Node.t Core.String.Map.t
-  ; nodes_by_pod_id : Node.t Core.String.Map.t
+        (* ; nodes_by_pod_id : Node.t Core.String.Map.t *)
   ; testnet_log_filter : string
   ; genesis_keypairs : Network_keypair.t Core.String.Map.t
   }
@@ -878,19 +878,25 @@ let all_nodes { seeds; block_producers; snark_coordinators; archive_nodes; _ } =
 
 (* all_pods returns everything in the network.  remember that snark_workers will never initialize and will never sync, and aren't supposed to *)
 (* TODO snark workers and snark coordinators have the same key name, but different workload ids*)
-let all_pods { nodes_by_pod_id; _ } = Core.String.Map.data nodes_by_pod_id
+let all_pods t =
+  List.concat
+    [ Core.String.Map.to_alist t.seeds
+    ; Core.String.Map.to_alist t.block_producers
+    ; Core.String.Map.to_alist t.snark_coordinators
+    ; Core.String.Map.to_alist t.snark_workers
+    ; Core.String.Map.to_alist t.archive_nodes
+    ]
+  |> Core.String.Map.of_alist_exn
 
 (* all_non_seed_pods returns everything in the network except seed nodes *)
-let all_non_seed_pods { nodes_by_pod_id; seeds; _ } =
-  let seedlist = Core.String.Map.keys seeds in
-  let rec remove_all_keys_in_list mp lst =
-    match lst with
-    | [] ->
-        mp
-    | hd :: tl ->
-        remove_all_keys_in_list (Core.String.Map.remove mp hd) tl
-  in
-  Core.String.Map.data (remove_all_keys_in_list nodes_by_pod_id seedlist)
+let all_non_seed_pods t =
+  List.concat
+    [ Core.String.Map.to_alist t.block_producers
+    ; Core.String.Map.to_alist t.snark_coordinators
+    ; Core.String.Map.to_alist t.snark_workers
+    ; Core.String.Map.to_alist t.archive_nodes
+    ]
+  |> Core.String.Map.of_alist_exn
 
 let genesis_keypairs { genesis_keypairs; _ } = genesis_keypairs
 
@@ -900,19 +906,29 @@ let genesis_keypairs { genesis_keypairs; _ } = genesis_keypairs
    let extra_genesis_keypairs { extra_genesis_keypairs; _ } =
      extra_genesis_keypairs *)
 
-let lookup_node_by_pod_id t = Map.find t.nodes_by_pod_id
+(* let lookup_node_by_pod_id t = Map.find t.nodes_by_pod_id
 
-let all_pod_ids t = Map.keys t.nodes_by_pod_id
+      *)
+let lookup_node_by_pod_id t id =
+  let pods = all_pods t |> Core.Map.to_alist in
+  List.fold pods ~init:None ~f:(fun acc (node_name, node) ->
+      match acc with
+      | Some acc ->
+          Some acc
+      | None ->
+          if String.equal id node.pod_id then Some (node_name, node) else None )
+
+(* let all_pod_ids t = Map.keys t.nodes_by_pod_id *)
+
+let all_pod_ids t =
+  let pods = all_pods t |> Core.Map.to_alist in
+  List.fold pods ~init:[] ~f:(fun acc (_, node) -> List.cons node.pod_id acc)
 
 let initialize_infra ~logger network =
   let open Malleable_error.Let_syntax in
   let poll_interval = Time.Span.of_sec 15.0 in
   let max_polls = 40 (* 10 mins *) in
-  let all_pods_set =
-    all_pods network
-    |> List.map ~f:(fun { pod_id; _ } -> pod_id)
-    |> String.Set.of_list
-  in
+  let all_pods_set = all_pod_ids network |> String.Set.of_list in
   let kube_get_pods () =
     Integration_test_lib.Util.run_cmd_or_error_timeout ~timeout_seconds:60 "/"
       "kubectl"

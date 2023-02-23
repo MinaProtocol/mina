@@ -130,6 +130,23 @@ module Network_config = struct
     (* see ./src/app/test_executive/README.md for information regarding the namespace name format and length restrictions *)
     let testnet_name = "it-" ^ user ^ "-" ^ git_commit ^ "-" ^ test_name in
 
+    (* check to make sure the test writer hasn't accidentally created duplicate names of accounts and keys *)
+    let key_names_list =
+      List.map genesis_ledger ~f:(fun acct -> acct.account_name)
+    in
+    if List.contains_dup ~compare:String.compare key_names_list then
+      failwith
+        "All accounts in genesis ledger must have unique names.  Check to make \
+         sure you are not using the same account_name more than once" ;
+    let all_nodes_names_list =
+      List.map block_producers ~f:(fun acct -> acct.node_name)
+      @ match snark_coordinator with None -> [] | Some n -> [ n.node_name ]
+    in
+    if List.contains_dup ~compare:String.compare all_nodes_names_list then
+      failwith
+        "All nodes in testnet must have unique names.  Check to make sure you \
+         are not using the same node_name more than once" ;
+
     (* GENERATE ACCOUNTS AND KEYPAIRS *)
     (* let num_block_producers = List.length block_producers in *)
     let keypairs =
@@ -290,7 +307,18 @@ module Network_config = struct
     let block_producer_configs =
       List.map block_producers ~f:(fun node ->
           let _, key_tup =
-            String.Map.find_exn genesis_ledger_accounts node.account_name
+            match String.Map.find genesis_ledger_accounts node.account_name with
+            | Some acct ->
+                acct
+            | None ->
+                let failstring =
+                  Format.sprintf
+                    "Failing because the account key of all initial block \
+                     producers must be in the genesis ledger.  name of Node: \
+                     %s.  name of Account which does not exist: %s"
+                    node.node_name node.account_name
+                in
+                failwith failstring
           in
           block_producer_config node.node_name
             (mk_net_keypair node.account_name key_tup) )
@@ -314,14 +342,25 @@ module Network_config = struct
       match snark_coordinator with
       | None ->
           None
-      | Some conf ->
+      | Some node ->
           let network_kp =
-            String.Map.find_exn genesis_keypairs conf.account_name
+            match String.Map.find genesis_keypairs node.account_name with
+            | Some acct ->
+                acct
+            | None ->
+                let failstring =
+                  Format.sprintf
+                    "Failing because the account key of all initial snark \
+                     coordinators must be in the genesis ledger.  name of \
+                     Node: %s.  name of Account which does not exist: %s"
+                    node.node_name node.account_name
+                in
+                failwith failstring
           in
           Some
-            { name = conf.node_name
+            { name = node.node_name
             ; public_key = network_kp.public_key_file
-            ; worker_nodes = conf.worker_nodes
+            ; worker_nodes = node.worker_nodes
             }
     in
 
@@ -729,6 +768,11 @@ module Network_manager = struct
         Network_config.to_terraform network_config
         |> Terraform.to_string
         |> Out_channel.output_string ch ) ;
+    [%log info]
+      "Writing out the genesis keys (in case you want to use them manually) to \
+       testnet dir %s"
+      testnet_dir ;
+    (* TODO: write out the keypair files into the file system *)
     [%log info] "Initializing terraform" ;
     let open Malleable_error.Let_syntax in
     let%bind (_ : string) = run_cmd_or_hard_error t "terraform" [ "init" ] in
@@ -780,15 +824,21 @@ module Network_manager = struct
         ~init:(Malleable_error.return Core.String.Map.empty)
         ~f:func_for_fold
     in
-    let all_nodes =
-      seeds @ block_producers @ snark_coordinators @ snark_workers
-      @ archive_nodes
-    in
-    let nodes_by_pod_id =
-      all_nodes
-      |> List.map ~f:(fun node -> (node.pod_id, node))
-      |> String.Map.of_alist_exn
-    in
+    (* let merge_func ~(key:string) (dat:[ `Both of Kubernetes_network.Node.t * Kubernetes_network.Node.t | `Left of Kubernetes_network.Node.t | `Right of Kubernetes_network.Node.t ]) : Kubernetes_network.Node.t option =
+         None
+       in
+       let all_nodes =
+         List.fold [seeds; block_producers;snark_coordinators;snark_workers;archive_nodes] ~init:Core.String.Map.empty ~f:(Core.String.Map.merge ~f:merge_func)
+       in *)
+    (* let all_nodes =
+         seeds @ block_producers @ snark_coordinators @ snark_workers
+         @ archive_nodes
+       in *)
+    (* let nodes_by_pod_id =
+
+         Core.String.Map.mapi all_nodes ~f:(fun ~key ~data -> (data.pod_id,(data, key) ))
+
+       in *)
     let network =
       { Kubernetes_network.namespace = t.namespace
       ; constants = t.constants
@@ -796,8 +846,7 @@ module Network_manager = struct
       ; block_producers
       ; snark_coordinators
       ; snark_workers
-      ; archive_nodes
-      ; nodes_by_pod_id
+      ; archive_nodes (* ; all_nodes *)
       ; testnet_log_filter = t.testnet_log_filter
       ; genesis_keypairs = t.genesis_keypairs
       }
@@ -809,10 +858,13 @@ module Network_manager = struct
     [%log info] "Network deployed" ;
     [%log info] "testnet namespace: %s" t.namespace ;
     [%log info] "snark coordinators: %s"
-      (nodes_to_string network.snark_coordinators) ;
-    [%log info] "snark workers: %s" (nodes_to_string network.snark_workers) ;
-    [%log info] "block producers: %s" (nodes_to_string network.block_producers) ;
-    [%log info] "archive nodes: %s" (nodes_to_string network.archive_nodes) ;
+      (nodes_to_string (Core.String.Map.data network.snark_coordinators)) ;
+    [%log info] "snark workers: %s"
+      (nodes_to_string (Core.String.Map.data network.snark_workers)) ;
+    [%log info] "block producers: %s"
+      (nodes_to_string (Core.String.Map.data network.block_producers)) ;
+    [%log info] "archive nodes: %s"
+      (nodes_to_string (Core.String.Map.data network.archive_nodes)) ;
     network
 
   let destroy t =
