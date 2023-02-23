@@ -250,7 +250,7 @@ module Poly = struct
         ; permissions : 'permissions
         ; zkapp : 'zkapp_opt
         }
-      [@@deriving sexp, equal, compare, hash, yojson, fields, hlist]
+      [@@deriving sexp, equal, compare, hash, yojson, fields, hlist, annot]
 
       let to_latest = Fn.id
     end
@@ -886,3 +886,19 @@ let gen_timed =
       failwith @@ Error.to_string_hum e
   | Ok a ->
       return a
+
+let deriver obj =
+  let open Fields_derivers_zkapps in
+  let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
+  let receipt_chain_hash =
+    needs_custom_js ~js_type:field ~name:"ReceiptChainHash" field
+  in
+  finish "Account" ~t_toplevel_annots:Poly.t_toplevel_annots
+  @@ Poly.Fields.make_creator ~public_key:!.public_key
+       ~token_id:!.Token_id.deriver ~token_symbol:!.string ~balance:!.balance
+       ~nonce:!.uint32 ~receipt_chain_hash:!.receipt_chain_hash
+       ~delegate:!.(option ~js_type:Or_undefined (public_key @@ o ()))
+       ~voting_for:!.field ~timing:!.Timing.deriver
+       ~permissions:!.Permissions.deriver
+       ~zkapp:!.(option ~js_type:Or_undefined (Zkapp_account.deriver @@ o ()))
+       obj
