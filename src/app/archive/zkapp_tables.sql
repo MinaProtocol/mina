@@ -63,8 +63,8 @@ CREATE TABLE zkapp_states
 , element7                 int              NOT NULL REFERENCES zkapp_field(id)
 );
 
-/* like zkapp_states, but for sequence states */
-CREATE TABLE zkapp_sequence_states
+/* like zkapp_states, but for action states */
+CREATE TABLE zkapp_action_states
 ( id                       serial           PRIMARY KEY
 , element0                 int              NOT NULL REFERENCES zkapp_field(id)
 , element1                 int              NOT NULL REFERENCES zkapp_field(id)
@@ -105,7 +105,7 @@ CREATE TABLE zkapp_permissions
 , set_permissions          zkapp_auth_required_type    NOT NULL
 , set_verification_key     zkapp_auth_required_type    NOT NULL
 , set_zkapp_uri            zkapp_auth_required_type    NOT NULL
-, edit_sequence_state      zkapp_auth_required_type    NOT NULL
+, edit_action_state      zkapp_auth_required_type    NOT NULL
 , set_token_symbol         zkapp_auth_required_type    NOT NULL
 , increment_nonce          zkapp_auth_required_type    NOT NULL
 , set_voting_for           zkapp_auth_required_type    NOT NULL
@@ -161,7 +161,7 @@ CREATE TABLE zkapp_account_precondition_values
 , receipt_chain_hash       text
 , delegate_id              int                    REFERENCES public_keys(id)
 , state_id                 int        NOT NULL    REFERENCES zkapp_states_nullable(id)
-, sequence_state_id        int                    REFERENCES zkapp_field(id)
+, action_state_id        int                    REFERENCES zkapp_field(id)
 , proved_state             boolean
 , is_new                   boolean
 );
@@ -181,8 +181,8 @@ CREATE TABLE zkapp_accounts
 , app_state_id         int     NOT NULL  REFERENCES zkapp_states(id)
 , verification_key_id  int               REFERENCES zkapp_verification_keys(id)
 , zkapp_version        bigint  NOT NULL
-, sequence_state_id    int     NOT NULL  REFERENCES zkapp_sequence_states(id)
-, last_sequence_slot   bigint  NOT NULL
+, action_state_id    int     NOT NULL  REFERENCES zkapp_action_states(id)
+, last_action_slot   bigint  NOT NULL
 , proved_state         bool    NOT NULL
 , zkapp_uri_id         int     NOT NULL  REFERENCES zkapp_uris(id)
 );
