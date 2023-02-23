@@ -19,6 +19,8 @@ struct
           ; set_voting_for = Proof
           }
     }
+
+  let is_non_zkapp_update = true
 end
 
 let%test_module "Update account permissions" =
