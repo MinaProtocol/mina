@@ -27,18 +27,8 @@ end
 module Shape = struct
   include Shape
 
-  let rec sexp_of_t = function
-    | Node l ->
-        let rec sexp_of_t_aux (i, t) =
-          Sexp.List [ Sexp.Atom (Int.to_string i); sexp_of_t t ]
-        in
-        Sexp.List (List.map ~f:sexp_of_t_aux l)
-
-  let rec compare (Node l_x) (Node l_y) =
-    List.compare
-      (fun (i_x, s_x) (i_y, s_y) ->
-        match Int.compare i_x i_y with 0 -> compare s_x s_y | n -> n )
-      l_x l_y
+  type t = Zkapp_command.Call_forest.Shape.t = Node of (int * t) list
+  [@@deriving sexp, compare]
 end
 
 let gen account_update_gen account_update_digest_gen digest_gen =
