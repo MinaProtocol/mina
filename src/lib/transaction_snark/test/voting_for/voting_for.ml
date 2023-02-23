@@ -14,6 +14,8 @@ struct
         Zkapp_basic.Set_or_keep.Set
           (Async.Quickcheck.random_value State_hash.gen)
     }
+
+  let is_non_zkapp_update = true
 end
 
 let%test_module "Update account voting-for" =
