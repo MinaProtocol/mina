@@ -37,41 +37,33 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "block-producer1-key"
+        [ { account_name = "untimed_node_a-key"
           ; balance = "400000"
-          ; timing = Untimed
+          ; timing = Untimed (* 400_000_000_000_000 *)
           }
-        ; { account_name = "block-producer2-key"
+        ; { account_name = "untimed_node_b-key"
           ; balance = "300000"
-          ; timing = Untimed
+          ; timing = Untimed (* 300_000_000_000_000 *)
           }
-        ; { account_name = "block-producer3-key"
+        ; { account_name = "timed_node_c-key"
           ; balance = "30000"
           ; timing =
               make_timing ~min_balance:10_000_000_000_000 ~cliff_time:8
                 ~cliff_amount:0 ~vesting_period:4
                 ~vesting_increment:5_000_000_000_000
+              (* 30_000_000_000_000 mina is the total.  initially, the balance will be 10k mina.  after 8 global slots, the cliff is hit, although the cliff amount is 0.  4 slots after that, 5_000_000_000_000 mina will vest, and 4 slots after that another 5_000_000_000_000 will vest, and then twice again, for a total of 30k mina all fully liquid and unlocked at the end of the schedule*)
           }
         ; { account_name = "snark-node-key"
           ; balance = "1000"
           ; timing = Untimed
           }
-        ; { account_name = "extra1"; balance = "1000"; timing = Untimed }
-        ; { account_name = "extra2"; balance = "1000"; timing = Untimed }
+        ; { account_name = "fish1"; balance = "1000"; timing = Untimed }
+        ; { account_name = "fish2"; balance = "1000"; timing = Untimed }
         ]
     ; block_producers =
-        [ { node_name = "block-producer1"
-          ; account_name = "block-producer1-key"
-          }
-          (* 400_000_000_000_000 *)
-        ; { node_name = "block-producer2"
-          ; account_name = "block-producer2-key"
-          }
-          (* 300_000_000_000_000 *)
-        ; { node_name = "block-producer3"
-          ; account_name = "block-producer3-key"
-          }
-          (* 30_000_000_000_000 mina is the total.  initially, the balance will be 10k mina.  after 8 global slots, the cliff is hit, although the cliff amount is 0.  4 slots after that, 5_000_000_000_000 mina will vest, and 4 slots after that another 5_000_000_000_000 will vest, and then twice again, for a total of 30k mina all fully liquid and unlocked at the end of the schedule*)
+        [ { node_name = "untimed_node_a"; account_name = "untimed_node_a-key" }
+        ; { node_name = "untimed_node_b"; account_name = "untimed_node_b-key" }
+        ; { node_name = "timed_node_c"; account_name = "timed_node_c-key" }
         ]
     ; snark_coordinator =
         Some
@@ -94,26 +86,48 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_nodes = Network.all_nodes network in
-    let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
-    let[@warning "-8"] [ untimed_node_a; untimed_node_b; timed_node_c ] =
-      Network.block_producers network
+    let%bind () =
+      wait_for t
+        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
+    in
+    (* let[@warning "-8"] [ untimed_node_a; untimed_node_b; timed_node_c ] =
+         Network.block_producers network
+       in *)
+    let untimed_node_a =
+      Core.String.Map.find_exn
+        (Network.block_producers network)
+        "untimed_node_a"
+    in
+    let untimed_node_b =
+      Core.String.Map.find_exn
+        (Network.block_producers network)
+        "untimed_node_b"
+    in
+    let timed_node_c =
+      Core.String.Map.find_exn (Network.block_producers network) "timed_node_c"
+    in
+    (* let[@warning "-8"] [ fish1; fish2 ] =
+         Network.extra_genesis_keypairs network
+       in *)
+    let fish1 =
+      Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1"
+    in
+    let fish2 =
+      Core.String.Map.find_exn (Network.genesis_keypairs network) "fish2"
     in
     [%log info] "extra genesis keypairs: %s"
-      (List.to_string (Network.extra_genesis_keypairs network)
+      (List.to_string [ fish1.keypair; fish2.keypair ]
          ~f:(fun { Signature_lib.Keypair.public_key; _ } ->
            public_key |> Signature_lib.Public_key.to_bigstring
            |> Bigstring.to_string ) ) ;
-    let[@warning "-8"] [ fish1; fish2 ] =
-      Network.extra_genesis_keypairs network
-    in
     (* create a signed txn which we'll use to make a successfull txn, and then a replay attack *)
     let amount = Currency.Amount.of_mina_string_exn "10" in
     let fee = Currency.Fee.of_mina_string_exn "1" in
     let test_constants = Engine.Network.constraint_constants network in
     let receiver_pub_key =
-      fish1.public_key |> Signature_lib.Public_key.compress
+      fish1.keypair.public_key |> Signature_lib.Public_key.compress
     in
-    let sender_kp = fish2 in
+    let sender_kp = fish2.keypair in
     let sender_pub_key =
       sender_kp.public_key |> Signature_lib.Public_key.compress
     in
@@ -462,7 +476,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section_hard "running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
-           (List.hd_exn @@ Network.archive_nodes network)
+           (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
        in
        check_replayer_logs ~logger logs )
 end
