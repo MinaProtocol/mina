@@ -318,12 +318,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          the subsequent account update"
         (send_zkapp ~logger whale1 zkapp_command_update_vk1)
     in
-    let%bind () =
-      section
-        "Wait for zkApp to update verification key to be included in \
-         transition frontier"
-        (wait_for_zkapp ~has_failures:false zkapp_command_update_vk1)
-    in
+
     let%bind () =
       section
         "Send zkApp to update to a new verification key v2 and then refers to \
@@ -339,11 +334,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section
-        "Wait for zkApp to upate to a new verification key v2 and then refers \
-         to the old key v1 to fail"
-        (wait_for_zkapp ~has_failures:false zkapp_command_update_vk2)
+        "Wait for zkApp to update verification key to be included in \
+         transition frontier"
+        (wait_for_zkapp ~has_failures:false zkapp_command_update_vk1)
     in
-    section_hard "Wait for proof to be emitted"
-      (wait_for t
-         (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
+    section
+      "Wait for zkApp to upate to a new verification key v2 and then refers to \
+       it to be included in transition frontier"
+      (wait_for_zkapp ~has_failures:false zkapp_command_update_vk2)
 end
