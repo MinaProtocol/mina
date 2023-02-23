@@ -12,6 +12,7 @@ import {
   Mina,
   verify,
   AccountUpdate,
+  UInt32,
 } from "snarkyjs";
 
 await isReady;
@@ -61,7 +62,7 @@ if (command === "deploy") {
   let feePayerAddress = feePayerKey.toPublicKey();
   addCachedAccount({
     publicKey: feePayerKey.toPublicKey(),
-    nonce: feePayerNonce,
+    nonce: UInt32.from(feePayerNonce),
   });
 
   let { verificationKey } = await SimpleZkapp.compile();
