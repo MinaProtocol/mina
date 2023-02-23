@@ -22,6 +22,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; block_producers = [ { balance = "1000"; timing = Untimed } ]
+    ; num_archive_nodes = 1
     }
 
   let run network t =
