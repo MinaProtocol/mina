@@ -339,6 +339,10 @@ subfolder. The exceptions are `flake.nix` which defines inputs and combines the
 expressions from `nix/`, `flake.lock` which locks the input versions, and
 `default.nix` with `shell.nix`, which provide compatibility with pre-flake Nix.
 
+### Using a formatter
+
+For consistency's sake use [nixfmt](https://github.com/serokell/nixfmt).
+
 ### Updating inputs
 
 If you wish to update all the inputs of this flake, run `nix flake update` . If
