@@ -194,4 +194,84 @@ let%test_module "Fee payer tests" =
                   failwith "Expected sparse ledger application to fail"
               | Error _e ->
                   () ) )
+
+    let test_empty_update ?(new_account = true) test_spec init_ledger
+        (zkapp_kp : Keypair.t) =
+      let open Mina_transaction_logic.For_tests in
+      let get_account ledger id =
+        let location =
+          Option.value_exn (Ledger.location_of_account ledger id)
+        in
+        Option.value_exn (Ledger.get ledger location)
+      in
+      Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              let open Async.Deferred.Let_syntax in
+              (*Create non-zkapp accounts*)
+              Init_ledger.init ~zkapp:false
+                (module Ledger.Ledger_inner)
+                init_ledger ledger ;
+              let zkapp_acc_id =
+                Account_id.create
+                  (Public_key.compress zkapp_kp.public_key)
+                  Token_id.default
+              in
+              let%bind zkapp_command =
+                let zkapp_prover_and_vk = (zkapp_prover, vk) in
+                Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk
+                  ~constraint_constants test_spec
+              in
+              ( if new_account then
+                ignore
+                  ( Option.value_map
+                      ~f:(fun location ->
+                        Some (Option.value_exn (Ledger.get ledger location)) )
+                      ~default:None
+                      (Ledger.location_of_account ledger zkapp_acc_id)
+                    : Account.t option )
+              else
+                let account = get_account ledger zkapp_acc_id in
+                assert (Option.is_none account.zkapp) ) ;
+              let%map () =
+                U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ]
+              in
+
+              let account = get_account ledger zkapp_acc_id in
+              assert (Option.is_none account.zkapp) ) )
+
+    let%test_unit "unchanged zkapp field when zkapp update is noop" =
+      Quickcheck.test ~trials:1 U.gen_snapp_ledger
+        ~f:(fun ({ init_ledger; specs }, new_kp) ->
+          let fee = Fee.of_nanomina_int_exn 1_000_000 in
+          let amount =
+            Amount.of_fee U.constraint_constants.account_creation_fee
+          in
+          let spec = List.hd_exn specs in
+          let new_account_spec : Spec.t =
+            { sender = spec.sender
+            ; fee
+            ; fee_payer = None
+            ; receivers = []
+            ; amount
+            ; zkapp_account_keypairs = [ new_kp ]
+            ; memo
+            ; new_zkapp_account = true
+            ; snapp_update = Account_update.Update.dummy
+            ; current_auth = Permissions.Auth_required.Signature
+            ; call_data = Snark_params.Tick.Field.zero
+            ; events = []
+            ; actions = []
+            ; preconditions = None
+            }
+          in
+          test_empty_update new_account_spec init_ledger new_kp ;
+          let existing_account_spec =
+            { new_account_spec with
+              amount = Amount.zero
+            ; zkapp_account_keypairs = [ fst spec.sender ]
+            ; new_zkapp_account = false
+            }
+          in
+          test_empty_update ~new_account:false existing_account_spec init_ledger
+            (fst spec.sender) )
   end )
