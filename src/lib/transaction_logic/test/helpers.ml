@@ -11,17 +11,30 @@ module Test_account = struct
     { pk : Public_key.Compressed.t
     ; sk : Private_key.t
     ; nonce : Account_nonce.t
+    ; balance : Balance.t
     }
+  [@@deriving equal]
 
   let to_keypair { pk; sk; _ } = (pk, sk)
 
-  let make ?nonce pk sk =
+  let make ?nonce ?(balance = Balance.zero) pk sk =
     { pk = Public_key.Compressed.of_base58_check_exn pk
     ; sk = Private_key.of_base58_check_exn sk
+    ; balance
     ; nonce =
         Option.value_map ~f:Account_nonce.of_int ~default:Account_nonce.zero
           nonce
     }
+
+  let non_empty { balance; _ } = Balance.(balance > zero)
+
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind sk = Private_key.gen in
+    let pk = Public_key.(compress @@ of_private_key_exn sk) in
+    let%bind balance = Balance.gen in
+    let%map nonce = Account_nonce.gen in
+    { pk; sk; nonce; balance }
 end
 
 let epoch_seed = Epoch_seed.of_decimal_string "500"
@@ -51,17 +64,10 @@ let protocol_state : Zkapp_precondition.Protocol_state.View.t =
     ; next_epoch_data = epoch_data
     }
 
-let alice =
-  Test_account.make "B62qoFwCfztCrpPF6RENap3izXZ5rawhhrgw6ebFfCiDNfPdoRSvrxG"
-    "EKEbiLkgvBrJBpfu9UuGXtgRj2KJXAjnFoMD5M7wnrQnVsHvhTjY"
-
-let bob =
-  Test_account.make "B62qq5YioU3zPgdob8WAiKo7niwbHM24dmAkfT6LJQcbAPjZZaRDjZ6"
-    "EKED5bxVo9nWnLuQA22kkQf3Qw4XUgyZZNXQFpa33XExs3yUwUeA"
-
-let keymap : Private_key.t Public_key.Compressed.Map.t =
+let keymap (accounts : Test_account.t list) :
+    Private_key.t Public_key.Compressed.Map.t =
   Public_key.Compressed.Map.of_alist_exn
-  @@ List.map ~f:Test_account.to_keypair [ alice; bob ]
+  @@ List.map ~f:Test_account.to_keypair accounts
 
 let noncemap (accounts : Test_account.t list) :
     Account_nonce.t Public_key.Compressed.Map.t =
@@ -78,20 +84,49 @@ let rec iter_result ~f = function
 
 let test_ledger accounts =
   let open Result.Let_syntax in
+  let open Test_account in
   let ledger = Ledger.empty ~depth:3 () in
   let%map () =
-    iter_result accounts ~f:(fun (public_key, balance) ->
-        let acc_id = Account_id.create public_key Token_id.default in
+    iter_result accounts ~f:(fun a ->
+        let acc_id = Account_id.create a.pk Token_id.default in
         let account = Account.initialize acc_id in
-        Ledger.create_new_account ledger acc_id { account with balance } )
+        Ledger.create_new_account ledger acc_id
+          { account with balance = a.balance; nonce = a.nonce } )
   in
   ledger
 
-type transaction =
-  { sender : Public_key.Compressed.t
-  ; receiver : Public_key.Compressed.t
-  ; amount : Amount.t
-  }
+module Test_transaction = struct
+  type t =
+    { sender : Public_key.Compressed.t
+    ; receiver : Public_key.Compressed.t
+    ; amount : Amount.t
+    }
+
+  let gen known_accounts =
+    let open Quickcheck in
+    let open Generator.Let_syntax in
+    let open Test_account in
+    let eligible_senders =
+      List.filter ~f:Test_account.non_empty known_accounts
+    in
+    let%bind sender = Generator.of_list eligible_senders in
+    let eligible_receivers =
+      List.filter
+        ~f:(fun a -> not Public_key.Compressed.(equal a.pk sender.pk))
+        known_accounts
+    in
+    let%bind receiver = Generator.of_list eligible_receivers in
+    let max_amt =
+      let sender_balance = Balance.to_amount sender.balance in
+      let receiver_capacity =
+        Amount.(max_int - Balance.to_amount receiver.balance)
+      in
+      Amount.min sender_balance
+        (Option.value ~default:sender_balance receiver_capacity)
+    in
+    let%map amount = Amount.(gen_incl zero max_amt) in
+    { sender = sender.pk; receiver = receiver.pk; amount }
+end
 
 let get_nonce_exn (pk : Public_key.Compressed.t) :
     ( Account_nonce.t
@@ -129,10 +164,11 @@ let update_body ~auth_kind ~account amount =
         }
     }
 
-let mk_txn ~auth:(auth_kind, auth) (t : transaction) =
+let mk_txn ~auth:(auth_kind, auth) (t : Test_transaction.t) =
   let open Monad_lib.State.Let_syntax in
   let open With_stack_hash in
   let open Zkapp_command.Call_forest.Tree in
+  let open Test_transaction in
   let%bind sender_decrease_body =
     update_body ~auth_kind ~account:t.sender
       Amount.Signed.(negate @@ of_unsigned t.amount)
