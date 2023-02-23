@@ -82,11 +82,20 @@ const waitParams = {
 // parse command line; for local testing, use random keys as fallback
 let [feePayerKeyBase58, graphql_uri] = process.argv.slice(2);
 
-if (!graphql_uri) throw Error("Graphql uri is undefined, aborting");
-if (!feePayerKeyBase58) throw Error("Fee payer key is undefined, aborting");
+let isLocal = false;
 
-let LocalNetwork = Mina.Network(graphql_uri);
-Mina.setActiveInstance(LocalNetwork);
+if (feePayerKeyBase58 === "local") {
+  isLocal = true;
+  let LocalNetwork = Mina.LocalBlockchain(graphql_uri);
+  Mina.setActiveInstance(LocalNetwork);
+  let { privateKey } = LocalNetwork.testAccounts[0];
+  feePayerKeyBase58 = privateKey.toBase58();
+} else {
+  if (!graphql_uri) throw Error("Graphql uri is undefined, aborting");
+  if (!feePayerKeyBase58) throw Error("Fee payer key is undefined, aborting");
+  let LocalNetwork = Mina.Network(graphql_uri);
+  Mina.setActiveInstance(LocalNetwork);
+}
 
 let zkappKey = PrivateKey.random();
 let zkappAddress = zkappKey.toPublicKey();
@@ -94,15 +103,17 @@ let zkappAddress = zkappKey.toPublicKey();
 let feePayerKey = PrivateKey.fromBase58(feePayerKeyBase58);
 let feePayerAddress = feePayerKey.toPublicKey();
 
-let res = await fetchAccount({
-  publicKey: feePayerAddress,
-});
-if (res.error) {
-  throw Error(
-    `The fee payer account needs to be funded in order for the script to succeed! Please provide the private key of an already funded account. ${feePayerAddress.toBase58()}, ${feePayerKeyBase58}\n\n${
-      error.message
-    }`
-  );
+if (!isLocal) {
+  let res = await fetchAccount({
+    publicKey: feePayerAddress,
+  });
+  if (res.error) {
+    throw Error(
+      `The fee payer account needs to be funded in order for the script to succeed! Please provide the private key of an already funded account. ${feePayerAddress.toBase58()}, ${feePayerKeyBase58}\n\n${
+        res.error.message
+      }`
+    );
+  }
 }
 
 // a special account that is allowed to pull out half of the zkapp balance, once
@@ -136,11 +147,11 @@ let tx = await Mina.transaction(
 await tx.prove();
 await (await tx.sign([feePayerKey, zkappKey]).send()).wait(waitParams);
 
-await fetchAccount({ publicKey: zkappAddress });
+if (!isLocal) await fetchAccount({ publicKey: zkappAddress });
 let zkappAccount = Mina.getAccount(zkappAddress);
 
 // we deployed the contract with an initial state of 1
-expectAssertEquals(zkappAccount.appState[0], Field(1));
+expectAssertEquals(zkappAccount.zkapp.appState[0], Field(1));
 
 // the fresh zkapp account shouldn't have any funds
 expectAssertEquals(zkappAccount.balance, UInt64.from(0));
@@ -155,7 +166,7 @@ tx = await Mina.transaction(
 await tx.prove();
 await (await tx.sign([feePayerKey]).send()).wait(waitParams);
 
-await fetchAccount({ publicKey: zkappAddress });
+if (!isLocal) await fetchAccount({ publicKey: zkappAddress });
 zkappAccount = Mina.getAccount(zkappAddress);
 
 // we deposit 10_000_000_000 funds into the zkapp account
@@ -181,14 +192,14 @@ tx = await Mina.transaction(
 await tx.prove();
 await (await tx.sign([feePayerKey]).send()).wait(waitParams);
 
-await fetchAccount({ publicKey: zkappAddress });
+if (!isLocal) await fetchAccount({ publicKey: zkappAddress });
 zkappAccount = Mina.getAccount(zkappAddress);
 
 // no balance change expected
 expectAssertEquals(zkappAccount.balance, UInt64.from(initialBalance));
 
 // we updated the zkapp state to 131
-expectAssertEquals(zkappAccount.appState[0], Field(131));
+expectAssertEquals(zkappAccount.zkapp.appState[0], Field(131));
 
 console.log("payout 1\n");
 tx = await Mina.transaction(
@@ -201,7 +212,7 @@ tx = await Mina.transaction(
 await tx.prove();
 await (await tx.sign([feePayerKey]).send()).wait(waitParams);
 
-await fetchAccount({ publicKey: zkappAddress });
+if (!isLocal) await fetchAccount({ publicKey: zkappAddress });
 zkappAccount = Mina.getAccount(zkappAddress);
 
 // we withdraw (payout) half of the initial balance
@@ -211,7 +222,6 @@ console.log("payout 2 (expected to fail)\n");
 tx = await Mina.transaction(
   { sender: feePayerAddress, fee: 100_000_000 },
   () => {
-    AccountUpdate.fundNewAccount(feePayerAddress);
     zkapp.payout(privilegedKey);
   }
 );
@@ -222,7 +232,7 @@ let txId = await tx.sign([feePayerKey]).send();
 await txId.wait(waitParams);
 
 // although we just checked above that the tx failed, I just would like to double-check that anyway (cross checking logic)
-await fetchAccount({ publicKey: zkappAddress });
+if (!isLocal) await fetchAccount({ publicKey: zkappAddress });
 zkappAccount = Mina.getAccount(zkappAddress);
 
 // checking that state hasn't changed - we expect the tx to fail so the state should equal previous state
