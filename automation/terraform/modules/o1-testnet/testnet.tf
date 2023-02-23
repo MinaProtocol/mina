@@ -119,4 +119,6 @@ module "kubernetes_testnet" {
   make_report_discord_webhook_url = var.make_report_discord_webhook_url
   make_report_accounts            = var.make_report_accounts
   seed_peers_url                  = var.seed_peers_url
+
+  zkapps_dashboard_key = var.zkapps_dashboard_key
 }
