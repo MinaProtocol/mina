@@ -36,14 +36,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let bp_original_balance = Currency.Amount.of_mina_string_exn "1000" in
     let coinbase_reward = Currency.Amount.of_mina_string_exn "720" in
     let%bind () =
-      section_hard "wait for nodes to initialize"
-        (Malleable_error.List.iter
-           ( Network.seeds network
-           @ Network.block_producers network
-           @ Network.snark_coordinators network )
-           ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize) )
-    in
-    let%bind () =
       section_hard "wait for 1 block to be produced"
         (wait_for t (Wait_condition.blocks_to_be_produced 1))
     in
