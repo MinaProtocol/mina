@@ -2,6 +2,7 @@
  (name zkapps_examples)
  (libraries
    ;; opam libraries
+   base
    async_kernel
    core_kernel
    ;; local libraries
@@ -11,7 +12,10 @@
    kimchi_backend
    kimchi_backend_common
    kimchi_pasta
+   kimchi_backend.pasta.basic
    mina_base
+   mina_base.import
+   mina_ledger
    pickles
    pickles.backend
    pickles_types

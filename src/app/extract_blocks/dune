@@ -18,9 +18,11 @@
    uri
    async.async_command
    ;; local libraries
+   mina_wire_types
    mina_base
    mina_base.import
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    pasta_bindings
    pickles
    pickles_types
@@ -42,4 +44,4 @@
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_coda ppx_let ppx_hash ppx_compare ppx_sexp_conv h_list.ppx)))
+ (preprocess (pps ppx_version ppx_mina ppx_let ppx_hash ppx_compare ppx_sexp_conv h_list.ppx)))

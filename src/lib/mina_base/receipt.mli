@@ -9,8 +9,8 @@ module Signed_command_elt : sig
   type t = Signed_command_payload of Signed_command.Payload.t
 end
 
-module Parties_elt : sig
-  type t = Parties_commitment of Random_oracle.Digest.t
+module Zkapp_command_elt : sig
+  type t = Zkapp_command_commitment of Random_oracle.Digest.t
 end
 
 module Chain_hash : sig
@@ -28,7 +28,8 @@ module Chain_hash : sig
 
   val cons_signed_command_payload : Signed_command_elt.t -> t -> t
 
-  val cons_parties_commitment : Mina_numbers.Index.t -> Parties_elt.t -> t -> t
+  val cons_zkapp_command_commitment :
+    Mina_numbers.Index.t -> Zkapp_command_elt.t -> t -> t
 
   [%%ifdef consensus_mechanism]
 
@@ -39,8 +40,8 @@ module Chain_hash : sig
       type t = Signed_command_payload of Transaction_union_payload.var
     end
 
-    module Parties_elt : sig
-      type t = Parties_commitment of Random_oracle.Checked.Digest.t
+    module Zkapp_command_elt : sig
+      type t = Zkapp_command_commitment of Random_oracle.Checked.Digest.t
     end
 
     val constant : t -> var
@@ -53,8 +54,8 @@ module Chain_hash : sig
 
     val cons_signed_command_payload : Signed_command_elt.t -> t -> t Checked.t
 
-    val cons_parties_commitment :
-      Mina_numbers.Index.Checked.t -> Parties_elt.t -> t -> t Checked.t
+    val cons_zkapp_command_commitment :
+      Mina_numbers.Index.Checked.t -> Zkapp_command_elt.t -> t -> t Checked.t
   end
 
   [%%endif]

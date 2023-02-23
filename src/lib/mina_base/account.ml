@@ -219,13 +219,15 @@ module Token_symbol = struct
   [%%endif]
 end
 
+(* the `token_symbol` describes a token id owned by the account id
+   from this account, not the token id used by this account
+*)
 module Poly = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
       type ( 'pk
            , 'id
-           , 'token_permissions
            , 'token_symbol
            , 'amount
            , 'nonce
@@ -234,12 +236,10 @@ module Poly = struct
            , 'state_hash
            , 'timing
            , 'permissions
-           , 'zkapp_opt
-           , 'zkapp_uri )
+           , 'zkapp_opt )
            t =
         { public_key : 'pk
         ; token_id : 'id
-        ; token_permissions : 'token_permissions
         ; token_symbol : 'token_symbol
         ; balance : 'amount
         ; nonce : 'nonce
@@ -249,39 +249,10 @@ module Poly = struct
         ; timing : 'timing
         ; permissions : 'permissions
         ; zkapp : 'zkapp_opt
-        ; zkapp_uri : 'zkapp_uri
         }
       [@@deriving sexp, equal, compare, hash, yojson, fields, hlist]
 
       let to_latest = Fn.id
-    end
-
-    module V1 = struct
-      type ( 'pk
-           , 'tid
-           , 'token_permissions
-           , 'amount
-           , 'nonce
-           , 'receipt_chain_hash
-           , 'delegate
-           , 'state_hash
-           , 'timing
-           , 'permissions
-           , 'snapp_opt )
-           t =
-        { public_key : 'pk
-        ; token_id : 'tid
-        ; token_permissions : 'token_permissions
-        ; balance : 'amount
-        ; nonce : 'nonce
-        ; receipt_chain_hash : 'receipt_chain_hash
-        ; delegate : 'delegate
-        ; voting_for : 'state_hash
-        ; timing : 'timing
-        ; permissions : 'permissions
-        ; snapp : 'snapp_opt
-        }
-      [@@deriving sexp, equal, compare, hash, yojson, fields, hlist]
     end
   end]
 end
@@ -312,8 +283,7 @@ module Binable_arg = struct
     module V2 = struct
       type t =
         ( Public_key.Compressed.Stable.V1.t
-        , Token_id.Stable.V1.t
-        , Token_permissions.Stable.V1.t
+        , Token_id.Stable.V2.t
         , Token_symbol.Stable.V1.t
         , Balance.Stable.V1.t
         , Nonce.Stable.V1.t
@@ -322,8 +292,7 @@ module Binable_arg = struct
         , State_hash.Stable.V1.t
         , Timing.Stable.V1.t
         , Permissions.Stable.V2.t
-        , Zkapp_account.Stable.V2.t option
-        , string )
+        , Zkapp_account.Stable.V2.t option )
         (* TODO: Cache the digest of this? *)
         Poly.Stable.V2.t
       [@@deriving sexp, equal, hash, compare, yojson]
@@ -368,7 +337,6 @@ let identifier ({ public_key; token_id; _ } : t) =
 type value =
   ( Public_key.Compressed.t
   , Token_id.t
-  , Token_permissions.t
   , Token_symbol.t
   , Balance.t
   , Nonce.t
@@ -377,8 +345,7 @@ type value =
   , State_hash.t
   , Timing.t
   , Permissions.t
-  , Zkapp_account.t option
-  , string )
+  , Zkapp_account.t option )
   Poly.t
 [@@deriving sexp]
 
@@ -393,7 +360,6 @@ let initialize account_id : t =
   in
   { public_key
   ; token_id
-  ; token_permissions = Token_permissions.default
   ; token_symbol = ""
   ; balance = Balance.zero
   ; nonce = Nonce.zero
@@ -403,7 +369,6 @@ let initialize account_id : t =
   ; timing = Timing.Untimed
   ; permissions = Permissions.user_default
   ; zkapp = None
-  ; zkapp_uri = ""
   }
 
 let hash_zkapp_account_opt = function
@@ -411,38 +376,6 @@ let hash_zkapp_account_opt = function
       Lazy.force Zkapp_account.default_digest
   | Some (a : Zkapp_account.t) ->
       Zkapp_account.digest a
-
-(* This preimage cannot be attained by any string, due to the trailing [true]
-   added below.
-*)
-let zkapp_uri_non_preimage =
-  lazy (Random_oracle_input.Chunked.field_elements [| Field.zero; Field.zero |])
-
-let hash_zkapp_uri_opt (zkapp_uri_opt : string option) =
-  let input =
-    match zkapp_uri_opt with
-    | Some zkapp_uri ->
-        (* We use [length*8 + 1] to pass a final [true] after the end of the
-           string, to ensure that trailing null bytes don't alias in the hash
-           preimage.
-        *)
-        let bits = Array.create ~len:((String.length zkapp_uri * 8) + 1) true in
-        String.foldi zkapp_uri ~init:() ~f:(fun i () c ->
-            let c = Char.to_int c in
-            (* Insert the bits into [bits], LSB order. *)
-            for j = 0 to 7 do
-              (* [Int.test_bit c j] *)
-              bits.((i * 8) + j) <- Int.bit_and c (1 lsl j) <> 0
-            done ) ;
-        Random_oracle_input.Chunked.packeds
-          (Array.map ~f:(fun b -> (field_of_bool b, 1)) bits)
-    | None ->
-        Lazy.force zkapp_uri_non_preimage
-  in
-  Random_oracle.pack_input input
-  |> Random_oracle.hash ~init:Hash_prefix_states.zkapp_uri
-
-let hash_zkapp_uri (zkapp_uri : string) = hash_zkapp_uri_opt (Some zkapp_uri)
 
 let delegate_opt = Option.value ~default:Public_key.Compressed.empty
 
@@ -452,14 +385,12 @@ let to_input (t : t) =
   Poly.Fields.fold ~init:[]
     ~public_key:(f Public_key.Compressed.to_input)
     ~token_id:(f Token_id.to_input) ~balance:(f Balance.to_input)
-    ~token_permissions:(f Token_permissions.to_input)
     ~token_symbol:(f Token_symbol.to_input) ~nonce:(f Nonce.to_input)
     ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
     ~delegate:(f (Fn.compose Public_key.Compressed.to_input delegate_opt))
     ~voting_for:(f State_hash.to_input) ~timing:(f Timing.to_input)
     ~zkapp:(f (Fn.compose field hash_zkapp_account_opt))
     ~permissions:(f Permissions.to_input)
-    ~zkapp_uri:(f (Fn.compose field hash_zkapp_uri))
   |> List.reduce_exn ~f:append
 
 let crypto_hash_prefix = Hash_prefix.account
@@ -473,7 +404,6 @@ let crypto_hash t =
 type var =
   ( Public_key.Compressed.var
   , Token_id.Checked.t
-  , Token_permissions.var
   , Token_symbol.var
   , Balance.var
   , Nonce.Checked.t
@@ -482,36 +412,31 @@ type var =
   , State_hash.var
   , Timing.var
   , Permissions.Checked.t
-  , Field.Var.t * Zkapp_account.t option As_prover.Ref.t
-  (* TODO: This is a hack that lets us avoid unhashing zkApp accounts when we don't need to *)
-  , string Data_as_hash.t )
+    (* TODO: This is a hack that lets us avoid unhashing zkApp accounts when we don't need to *)
+  , Field.Var.t * Zkapp_account.t option As_prover.Ref.t )
   Poly.t
 
 let identifier_of_var ({ public_key; token_id; _ } : var) =
   Account_id.Checked.create public_key token_id
 
 let typ' zkapp =
-  let spec =
-    Data_spec.
-      [ Public_key.Compressed.typ
-      ; Token_id.typ
-      ; Token_permissions.typ
-      ; Token_symbol.typ
-      ; Balance.typ
-      ; Nonce.typ
-      ; Receipt.Chain_hash.typ
-      ; Typ.transport Public_key.Compressed.typ ~there:delegate_opt
-          ~back:(fun delegate ->
-            if Public_key.Compressed.(equal empty) delegate then None
-            else Some delegate )
-      ; State_hash.typ
-      ; Timing.typ
-      ; Permissions.typ
-      ; zkapp
-      ; Data_as_hash.typ ~hash:hash_zkapp_uri
-      ]
-  in
-  Typ.of_hlistable spec ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+  Typ.of_hlistable
+    [ Public_key.Compressed.typ
+    ; Token_id.typ
+    ; Token_symbol.typ
+    ; Balance.typ
+    ; Nonce.typ
+    ; Receipt.Chain_hash.typ
+    ; Typ.transport Public_key.Compressed.typ ~there:delegate_opt
+        ~back:(fun delegate ->
+          if Public_key.Compressed.(equal empty) delegate then None
+          else Some delegate )
+    ; State_hash.typ
+    ; Timing.typ
+    ; Permissions.typ
+    ; zkapp
+    ]
+    ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
     ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
 let typ : (var, value) Typ.t =
@@ -531,7 +456,6 @@ let typ : (var, value) Typ.t =
 let var_of_t
     ({ public_key
      ; token_id
-     ; token_permissions
      ; token_symbol
      ; balance
      ; nonce
@@ -541,12 +465,10 @@ let var_of_t
      ; timing
      ; permissions
      ; zkapp
-     ; zkapp_uri
      } :
       value ) =
   { Poly.public_key = Public_key.Compressed.var_of_t public_key
   ; token_id = Token_id.Checked.constant token_id
-  ; token_permissions = Token_permissions.var_of_t token_permissions
   ; token_symbol = Token_symbol.var_of_value token_symbol
   ; balance = Balance.var_of_t balance
   ; nonce = Nonce.Checked.constant nonce
@@ -556,7 +478,6 @@ let var_of_t
   ; timing = Timing.var_of_t timing
   ; permissions = Permissions.Checked.constant permissions
   ; zkapp = Field.Var.constant (hash_zkapp_account_opt zkapp)
-  ; zkapp_uri = Field.Var.constant (hash_zkapp_uri zkapp_uri)
   }
 
 module Checked = struct
@@ -564,7 +485,6 @@ module Checked = struct
     type t =
       ( Public_key.Compressed.var
       , Token_id.Checked.t
-      , Token_permissions.var
       , Token_symbol.var
       , Balance.var
       , Nonce.Checked.t
@@ -573,8 +493,7 @@ module Checked = struct
       , State_hash.var
       , Timing.var
       , Permissions.Checked.t
-      , Zkapp_account.Checked.t
-      , string Data_as_hash.t )
+      , Zkapp_account.Checked.t )
       Poly.t
 
     let typ : (t, Stable.Latest.t) Typ.t =
@@ -594,12 +513,11 @@ module Checked = struct
          ~public_key:(f Public_key.Compressed.Checked.to_input)
          ~token_id:(f Token_id.Checked.to_input)
          ~token_symbol:(f Token_symbol.var_to_input)
-         ~token_permissions:(f Token_permissions.var_to_input)
          ~balance:(f Balance.var_to_input) ~nonce:(f Nonce.Checked.to_input)
          ~receipt_chain_hash:(f Receipt.Chain_hash.var_to_input)
          ~delegate:(f Public_key.Compressed.Checked.to_input)
          ~voting_for:(f State_hash.var_to_input)
-         ~timing:(f Timing.var_to_input) ~zkapp_uri:(f Data_as_hash.to_input) )
+         ~timing:(f Timing.var_to_input) )
 
   let digest t =
     make_checked (fun () ->
@@ -665,17 +583,37 @@ module Checked = struct
     (*Note: Untimed accounts will always have zero min balance*)
     Boolean.not zero_min_balance
 
-  let has_permission ~to_ (account : var) =
+  let has_permission ?signature_verifies ~to_ (account : var) =
+    let signature_verifies =
+      match signature_verifies with
+      | Some signature_verifies ->
+          signature_verifies
+      | None -> (
+          match to_ with
+          | `Send ->
+              Boolean.true_
+          | `Receive ->
+              Boolean.false_
+          | `Set_delegate ->
+              Boolean.true_
+          | `Access ->
+              failwith
+                "Account.Checked.has_permission: signature_verifies argument \
+                 must be given for access permission" )
+    in
     match to_ with
     | `Send ->
         Permissions.Auth_required.Checked.eval_no_proof account.permissions.send
-          ~signature_verifies:Boolean.true_
+          ~signature_verifies
     | `Receive ->
         Permissions.Auth_required.Checked.eval_no_proof
-          account.permissions.receive ~signature_verifies:Boolean.false_
+          account.permissions.receive ~signature_verifies
     | `Set_delegate ->
         Permissions.Auth_required.Checked.eval_no_proof
-          account.permissions.set_delegate ~signature_verifies:Boolean.true_
+          account.permissions.set_delegate ~signature_verifies
+    | `Access ->
+        Permissions.Auth_required.Checked.eval_no_proof
+          account.permissions.access ~signature_verifies
 end
 
 [%%endif]
@@ -685,7 +623,6 @@ let digest = crypto_hash
 let empty =
   { Poly.public_key = Public_key.Compressed.empty
   ; token_id = Token_id.default
-  ; token_permissions = Token_permissions.default
   ; token_symbol = Token_symbol.default
   ; balance = Balance.zero
   ; nonce = Nonce.zero
@@ -697,7 +634,6 @@ let empty =
       Permissions.user_default
       (* TODO: This should maybe be Permissions.empty *)
   ; zkapp = None
-  ; zkapp_uri = ""
   }
 
 let empty_digest = digest empty
@@ -711,7 +647,6 @@ let create account_id balance =
   in
   { Poly.public_key
   ; token_id
-  ; token_permissions = Token_permissions.default
   ; token_symbol = Token_symbol.default
   ; balance
   ; nonce = Nonce.zero
@@ -721,7 +656,6 @@ let create account_id balance =
   ; timing = Timing.Untimed
   ; permissions = Permissions.user_default
   ; zkapp = None
-  ; zkapp_uri = ""
   }
 
 let create_timed account_id balance ~initial_minimum_balance ~cliff_time
@@ -741,7 +675,6 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
     Or_error.return
       { Poly.public_key
       ; token_id
-      ; token_permissions = Token_permissions.default
       ; token_symbol = Token_symbol.default
       ; balance
       ; nonce = Nonce.zero
@@ -758,7 +691,6 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
             ; vesting_period
             ; vesting_increment
             }
-      ; zkapp_uri = ""
       }
 
 (* no vesting after cliff time + 1 slot *)
@@ -836,17 +768,33 @@ let has_locked_tokens ~global_slot (account : t) =
       in
       Balance.(curr_min_balance > zero)
 
-let has_permission ~to_ (account : t) =
+let has_permission ~control ~to_ (account : t) =
   match to_ with
+  | `Access ->
+      Permissions.Auth_required.check account.permissions.access control
   | `Send ->
-      Permissions.Auth_required.check account.permissions.send
-        Control.Tag.Signature
+      Permissions.Auth_required.check account.permissions.send control
   | `Receive ->
-      Permissions.Auth_required.check account.permissions.receive
-        Control.Tag.None_given
+      Permissions.Auth_required.check account.permissions.receive control
   | `Set_delegate ->
-      Permissions.Auth_required.check account.permissions.set_delegate
-        Control.Tag.Signature
+      Permissions.Auth_required.check account.permissions.set_delegate control
+
+let liquid_balance_at_slot ~global_slot (account : t) =
+  match account.timing with
+  | Untimed ->
+      account.balance
+  | Timed
+      { initial_minimum_balance
+      ; cliff_time
+      ; cliff_amount
+      ; vesting_period
+      ; vesting_increment
+      } ->
+      Balance.sub_amount account.balance
+        (Balance.to_amount
+           (min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount
+              ~vesting_period ~vesting_increment ~initial_minimum_balance ) )
+      |> Option.value_exn
 
 let gen =
   let open Quickcheck.Let_syntax in

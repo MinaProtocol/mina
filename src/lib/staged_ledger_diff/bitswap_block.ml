@@ -155,12 +155,16 @@ let blocks_of_data ~max_block_size data =
   ( Blake2.Map.of_alist_exn (Hashtbl.to_alist blocks)
   , Queue.dequeue_exn link_queue )
 
-let parse_block block =
-  if Bigstring.length block < 2 then Or_error.error_string "block too short"
+let parse_block ~hash block =
+  let error =
+    Fn.compose Or_error.error_string
+    @@ sprintf "parsing block %s: %s" (Blake2.to_hex hash)
+  in
+  if Bigstring.length block < 2 then error "block too short"
   else
     let num_links = Bigstring.get_uint16_le block ~pos:0 in
     if Bigstring.length block < 2 + (num_links * link_size) then
-      Or_error.error_string "block has invalid number of links"
+      error "block has invalid number of links"
     else
       let links =
         List.init num_links ~f:(fun i ->
@@ -173,31 +177,38 @@ let parse_block block =
       in
       Ok (links, data)
 
+let iter_links ~find_block ~report_chunk link_queue =
+  with_return (fun { return } ->
+      while Queue.length link_queue > 0 do
+        let hash = Queue.dequeue_exn link_queue in
+        let block =
+          match find_block hash with
+          | None ->
+              return
+                ( Or_error.error_string
+                @@ sprintf "required block %s not found"
+                @@ Blake2.to_hex hash )
+          | Some data ->
+              data
+        in
+        let successive_links, chunk =
+          match parse_block ~hash block with
+          | Error error ->
+              return (Error error)
+          | Ok x ->
+              x
+        in
+        Queue.enqueue_all link_queue successive_links ;
+        report_chunk chunk
+      done ;
+      Ok () )
+
 let data_of_blocks blocks root_hash =
   let links = Queue.of_list [ root_hash ] in
   let chunks = Queue.create () in
   let%map.Or_error () =
-    with_return (fun { return } ->
-        while Queue.length links > 0 do
-          let hash = Queue.dequeue_exn links in
-          let block =
-            match Map.find blocks hash with
-            | None ->
-                return (Or_error.error_string "required block not found")
-            | Some data ->
-                data
-          in
-          let successive_links, chunk =
-            match parse_block block with
-            | Error error ->
-                return (Error error)
-            | Ok x ->
-                x
-          in
-          List.iter successive_links ~f:(Queue.enqueue links) ;
-          Queue.enqueue chunks chunk
-        done ;
-        Ok () )
+    iter_links links ~report_chunk:(Queue.enqueue chunks)
+      ~find_block:(Map.find blocks)
   in
   let total_data_size = Queue.sum (module Int) chunks ~f:Bigstring.length in
   let data = Bigstring.create total_data_size in
@@ -231,7 +242,7 @@ let%test_module "bitswap blocks" =
       let max_links_per_block = max_links_per_block ~max_block_size in
       let rec crawl hash =
         let block = Map.find_exn blocks hash in
-        let links, chunk = Or_error.ok_exn (parse_block block) in
+        let links, chunk = Or_error.ok_exn (parse_block ~hash block) in
         ( match List.length links with
         | 0 ->
             let size = Bigstring.length chunk in

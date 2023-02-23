@@ -15,14 +15,16 @@
    base
    sexplib0
    ;; local libraries
+   genesis_constants
    sgn
    pickles_types
    pickles
    data_hash_lib
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    mina_numbers
    mina_compile_config
-   parties_builder
+   zkapp_command_builder
    signature_lib
    mina_ledger
    mina_base

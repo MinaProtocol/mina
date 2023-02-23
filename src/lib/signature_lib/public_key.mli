@@ -4,17 +4,14 @@ open Core_kernel
 open Snark_params
 open Tick
 
-type t = Field.t * Field.t [@@deriving sexp, hash]
-
-include Codable.S with type t := t
-
+[%%versioned:
 module Stable : sig
   module V1 : sig
-    type nonrec t = t [@@deriving bin_io, sexp, compare, hash, yojson, version]
-  end
+    [@@@with_all_version_tags]
 
-  module Latest = V1
-end
+    type t = Field.t * Field.t [@@deriving sexp, hash, compare, yojson]
+  end
+end]
 
 include Comparable.S_binable with type t := t
 
@@ -37,7 +34,9 @@ module Compressed : sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type ('field, 'boolean) t = { x : 'field; is_odd : 'boolean }
+        type ('field, 'boolean) t =
+              ('field, 'boolean) Mina_wire_types.Public_key.Compressed.Poly.V1.t =
+          { x : 'field; is_odd : 'boolean }
       end
     end]
   end
@@ -45,6 +44,8 @@ module Compressed : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
+      [@@@with_all_version_tags]
+
       type t = (Field.t, bool) Poly.t [@@deriving sexp, equal, compare, hash]
 
       include Codable.S with type t := t

@@ -13,19 +13,23 @@ use ark_ec::AffineCurve;
 use ark_ff::One;
 use array_init::array_init;
 use kimchi::circuits::wires::COLUMNS;
+use kimchi::verifier::Context;
 // use std::path::Path;
 use commitment_dlog::{
     commitment::{CommitmentCurve, PolyComm},
     evaluation_proof::OpeningProof,
 };
 use groupmap::GroupMap;
-use kimchi::proof::{ProofEvaluations, ProverCommitments, ProverProof, RecursionChallenge};
+use kimchi::proof::{
+    PointEvaluations, ProofEvaluations, ProverCommitments, ProverProof, RecursionChallenge,
+};
 use kimchi::prover_index::ProverIndex;
 use kimchi::verifier::batch_verify;
-use oracle::{
+use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
+use serde::{Deserialize, Serialize};
 
 #[wasm_bindgen]
 extern "C" {
@@ -78,131 +82,63 @@ macro_rules! impl_proof {
                 }
             }
 
-            #[wasm_bindgen]
             #[derive(Clone)]
-            pub struct [<Wasm $field_name:camel ProofEvaluations>] {
-                #[wasm_bindgen(skip)]
-                pub w: Vec<Vec<$F>>,
-                #[wasm_bindgen(skip)]
-                pub z: WasmFlatVector<$WasmF>,
-                #[wasm_bindgen(skip)]
-                pub s: Vec<Vec<$F>>,
-                #[wasm_bindgen(skip)]
-                pub generic_selector: WasmFlatVector<$WasmF>,
-                #[wasm_bindgen(skip)]
-                pub poseidon_selector: WasmFlatVector<$WasmF>,
-                // TODO: Lookup
-            }
+            pub struct [<Wasm $field_name:camel ProofEvaluations>](
+                ProofEvaluations<PointEvaluations<Vec<$F>>>
+            );
             type WasmProofEvaluations = [<Wasm $field_name:camel ProofEvaluations>];
 
-            #[wasm_bindgen]
-            impl [<Wasm $field_name:camel ProofEvaluations>] {
-                #[wasm_bindgen(constructor)]
-                pub fn new(
-                    w: WasmVecVecF,
-                    z: WasmFlatVector<$WasmF>,
-                    s: WasmVecVecF,
-                    generic_selector: WasmFlatVector<$WasmF>,
-                    poseidon_selector: WasmFlatVector<$WasmF>) -> Self {
-                    WasmProofEvaluations { w: w.0, z, s: s.0, generic_selector, poseidon_selector }
-                }
-
-                #[wasm_bindgen(getter)]
-                pub fn w(&self) -> WasmVecVecF {
-                    [<WasmVecVec $field_name:camel>](self.w.clone())
-                }
-
-                #[wasm_bindgen(getter)]
-                pub fn z(&self) -> WasmFlatVector<$WasmF> {
-                    self.z.clone()
-                }
-
-                #[wasm_bindgen(getter)]
-                pub fn s(&self) -> WasmVecVecF {
-                    [<WasmVecVec $field_name:camel>](self.s.clone())
-                }
-
-                #[wasm_bindgen(getter)]
-                pub fn generic_selector(&self) -> WasmFlatVector<$WasmF> {
-                    self.generic_selector.clone()
-                }
-
-                #[wasm_bindgen(getter)]
-                pub fn poseidon_selector(&self) -> WasmFlatVector<$WasmF> {
-                    self.poseidon_selector.clone()
-                }
-
-                #[wasm_bindgen(setter)]
-                pub fn set_w(&mut self, x: WasmVecVecF) {
-                    self.w = x.0
-                }
-                #[wasm_bindgen(setter)]
-                pub fn set_s(&mut self, x: WasmVecVecF) {
-                    self.s = x.0
-                }
-                #[wasm_bindgen(setter)]
-                pub fn set_z(&mut self, x: WasmFlatVector<$WasmF>) {
-                    self.z = x
-                }
-                #[wasm_bindgen(setter)]
-                pub fn set_generic_selector(&mut self, x: WasmFlatVector<$WasmF>) {
-                    self.generic_selector = x
-                }
-                #[wasm_bindgen(setter)]
-                pub fn set_poseidon_selector(&mut self, x: WasmFlatVector<$WasmF>) {
-                    self.poseidon_selector = x
+            impl wasm_bindgen::describe::WasmDescribe for WasmProofEvaluations {
+                fn describe() {
+                    <JsValue as wasm_bindgen::describe::WasmDescribe>::describe()
                 }
             }
 
-            impl From<&WasmProofEvaluations> for ProofEvaluations<Vec<$F>> {
+            impl wasm_bindgen::convert::FromWasmAbi for WasmProofEvaluations {
+                type Abi = <JsValue as wasm_bindgen::convert::FromWasmAbi>::Abi;
+                unsafe fn from_abi(js: Self::Abi) -> Self {
+                    let js: JsValue = wasm_bindgen::convert::FromWasmAbi::from_abi(js);
+                    Self(
+                        ProofEvaluations::deserialize(
+                            crate::wasm_ocaml_serde::de::Deserializer::from(js),
+                        )
+                        .unwrap(),
+                    )
+                }
+            }
+
+            impl wasm_bindgen::convert::IntoWasmAbi for WasmProofEvaluations {
+                type Abi = <JsValue as wasm_bindgen::convert::IntoWasmAbi>::Abi;
+                fn into_abi(self) -> Self::Abi {
+                    let js = self
+                        .0
+                        .serialize(&crate::wasm_ocaml_serde::ser::Serializer::new())
+                        .unwrap();
+                    wasm_bindgen::convert::IntoWasmAbi::into_abi(js)
+                }
+            }
+
+            impl From<&WasmProofEvaluations> for ProofEvaluations<PointEvaluations<Vec<$F>>> {
                 fn from(x: &WasmProofEvaluations) -> Self {
-                    ProofEvaluations {
-                        w: array_init(|i| x.w[i].clone()),
-                        s: array_init(|i| x.s[i].clone()),
-                        z: x.z.iter().map(|a| a.clone().into()).collect(),
-                        generic_selector: x.generic_selector.iter().map(|a| a.clone().into()).collect(),
-                        poseidon_selector: x.poseidon_selector.iter().map(|a| a.clone().into()).collect(),
-                        // TODO
-                        lookup: None
-                    }
+                    x.0.clone()
                 }
             }
 
-            impl From<WasmProofEvaluations> for ProofEvaluations<Vec<$F>> {
+            impl From<WasmProofEvaluations> for ProofEvaluations<PointEvaluations<Vec<$F>>> {
                 fn from(x: WasmProofEvaluations) -> Self {
-                    ProofEvaluations {
-                        w: array_init(|i| x.w[i].clone()),
-                        s: array_init(|i| x.s[i].clone()),
-                        z: x.z.into_iter().map(Into::into).collect(),
-                        generic_selector: x.generic_selector.into_iter().map(Into::into).collect(),
-                        poseidon_selector: x.poseidon_selector.into_iter().map(Into::into).collect(),
-                        // TODO
-                        lookup: None
-                    }
+                    x.0
                 }
             }
 
-            impl From<&ProofEvaluations<Vec<$F>>> for WasmProofEvaluations {
-                fn from(x: &ProofEvaluations<Vec<$F>>) -> Self {
-                    WasmProofEvaluations {
-                        w: x.w.to_vec(),
-                        s: x.s.to_vec(),
-                        z: x.z.iter().map(|a| a.clone().into()).collect(),
-                        generic_selector: x.generic_selector.iter().map(|a| a.clone().into()).collect(),
-                        poseidon_selector: x.poseidon_selector.iter().map(|a| a.clone().into()).collect(),
-                    }
+            impl From<&ProofEvaluations<PointEvaluations<Vec<$F>>>> for WasmProofEvaluations {
+                fn from(x: &ProofEvaluations<PointEvaluations<Vec<$F>>>) -> Self {
+                    Self(x.clone())
                 }
             }
 
-            impl From<ProofEvaluations<Vec<$F>>> for WasmProofEvaluations {
-                fn from(x: ProofEvaluations<Vec<$F>>) -> Self {
-                    WasmProofEvaluations {
-                        w: x.w.to_vec(),
-                        s: x.s.to_vec(),
-                        z: x.z.into_iter().map(Into::into).collect(),
-                        generic_selector: x.generic_selector.into_iter().map(Into::into).collect(),
-                        poseidon_selector: x.poseidon_selector.into_iter().map(Into::into).collect(),
-                    }
+            impl From<ProofEvaluations<PointEvaluations<Vec<$F>>>> for WasmProofEvaluations {
+                fn from(x: ProofEvaluations<PointEvaluations<Vec<$F>>>) -> Self {
+                    Self(x)
                 }
             }
 
@@ -260,8 +196,8 @@ macro_rules! impl_proof {
                 }
             }
 
-            impl From<&ProverCommitments<GAffine>> for WasmProverCommitments {
-                fn from(x: &ProverCommitments<GAffine>) -> Self {
+            impl From<&ProverCommitments<$G>> for WasmProverCommitments {
+                fn from(x: &ProverCommitments<$G>) -> Self {
                     WasmProverCommitments {
                         w_comm: x.w_comm.iter().map(Into::into).collect(),
                         z_comm: x.z_comm.clone().into(),
@@ -270,8 +206,8 @@ macro_rules! impl_proof {
                 }
             }
 
-            impl From<ProverCommitments<GAffine>> for WasmProverCommitments {
-                fn from(x: ProverCommitments<GAffine>) -> Self {
+            impl From<ProverCommitments<$G>> for WasmProverCommitments {
+                fn from(x: ProverCommitments<$G>) -> Self {
                     WasmProverCommitments {
                         w_comm: x.w_comm.iter().map(Into::into).collect(),
                         z_comm: x.z_comm.into(),
@@ -280,7 +216,7 @@ macro_rules! impl_proof {
                 }
             }
 
-            impl From<&WasmProverCommitments> for ProverCommitments<GAffine> {
+            impl From<&WasmProverCommitments> for ProverCommitments<$G> {
                 fn from(x: &WasmProverCommitments) -> Self {
                     ProverCommitments {
                         w_comm: array_init(|i| x.w_comm[i].clone().into()),
@@ -292,7 +228,7 @@ macro_rules! impl_proof {
                 }
             }
 
-            impl From<WasmProverCommitments> for ProverCommitments<GAffine> {
+            impl From<WasmProverCommitments> for ProverCommitments<$G> {
                 fn from(x: WasmProverCommitments) -> Self {
                     ProverCommitments {
                         w_comm: array_init(|i| (&x.w_comm[i]).into()),
@@ -429,9 +365,7 @@ macro_rules! impl_proof {
                 pub proof: WasmOpeningProof,
                 // OCaml doesn't have sized arrays, so we have to convert to a tuple..
                 #[wasm_bindgen(skip)]
-                pub evals0: WasmProofEvaluations,
-                #[wasm_bindgen(skip)]
-                pub evals1: WasmProofEvaluations,
+                pub evals: WasmProofEvaluations,
                 pub ft_eval1: $WasmF,
                 #[wasm_bindgen(skip)]
                 pub public: WasmFlatVector<$WasmF>,
@@ -442,8 +376,8 @@ macro_rules! impl_proof {
             }
             type WasmProverProof = [<Wasm $field_name:camel ProverProof>];
 
-            impl From<&ProverProof<$G>> for WasmProverProof {
-                fn from(x: &ProverProof<$G>) -> Self {
+            impl From<(&ProverProof<$G>, &Vec<$F>)> for WasmProverProof {
+                fn from((x, public): (&ProverProof<$G>, &Vec<$F>)) -> Self {
                     let (scalars, comms) =
                         x.prev_challenges
                             .iter()
@@ -454,19 +388,18 @@ macro_rules! impl_proof {
                     WasmProverProof {
                         commitments: x.commitments.clone().into(),
                         proof: x.proof.clone().into(),
-                        evals0: x.evals[0].clone().into(),
-                        evals1: x.evals[1].clone().into(),
+                        evals: x.evals.clone().into(),
                         ft_eval1: x.ft_eval1.clone().into(),
-                        public: x.public.clone().into_iter().map(Into::into).collect(),
+                        public: public.clone().into_iter().map(Into::into).collect(),
                         prev_challenges_scalars: scalars,
                         prev_challenges_comms: comms,
                     }
                 }
             }
 
-            impl From<ProverProof<$G>> for WasmProverProof {
-                fn from(x: ProverProof<$G>) -> Self {
-                    let ProverProof {ft_eval1, commitments, proof, evals: [evals0, evals1], public, prev_challenges} = x;
+            impl From<(ProverProof<$G>, Vec<$F>)> for WasmProverProof {
+                fn from((x, public): (ProverProof<$G>, Vec<$F>)) -> Self {
+                    let ProverProof {ft_eval1, commitments, proof, evals , prev_challenges} = x;
                     let (scalars, comms) =
                         prev_challenges
                             .into_iter()
@@ -475,8 +408,7 @@ macro_rules! impl_proof {
                     WasmProverProof {
                         commitments: commitments.into(),
                         proof: proof.into(),
-                        evals0: evals0.into(),
-                        evals1: evals1.into(),
+                        evals: evals.into(),
                         ft_eval1: ft_eval1.clone().into(),
                         public: public.into_iter().map(Into::into).collect(),
                         prev_challenges_scalars: scalars,
@@ -485,13 +417,12 @@ macro_rules! impl_proof {
                 }
             }
 
-            impl From<&WasmProverProof> for ProverProof<$G> {
+            impl From<&WasmProverProof> for (ProverProof<$G>, Vec<$F>) {
                 fn from(x: &WasmProverProof) -> Self {
-                    ProverProof {
+                    let proof = ProverProof {
                         commitments: x.commitments.clone().into(),
                         proof: x.proof.clone().into(),
-                        evals: [x.evals0.clone().into(), x.evals1.clone().into()],
-                        public: x.public.clone().into_iter().map(Into::into).collect(),
+                        evals: x.evals.clone().into(),
                         prev_challenges:
                             (&x.prev_challenges_scalars)
                                 .into_iter()
@@ -504,17 +435,18 @@ macro_rules! impl_proof {
                                 })
                                 .collect(),
                         ft_eval1: x.ft_eval1.clone().into()
-                    }
+                    };
+                    let public = x.public.clone().into_iter().map(Into::into).collect();
+                    (proof, public)
                 }
             }
 
-            impl From<WasmProverProof> for ProverProof<$G> {
+            impl From<WasmProverProof> for (ProverProof<$G>, Vec<$F>) {
                 fn from(x: WasmProverProof) -> Self {
-                    ProverProof {
+                    let proof =ProverProof {
                         commitments: x.commitments.into(),
                         proof: x.proof.into(),
-                        evals: [x.evals0.into(), x.evals1.into()],
-                        public: x.public.into_iter().map(Into::into).collect(),
+                        evals: x.evals.into(),
                         prev_challenges:
                             (x.prev_challenges_scalars)
                                 .into_iter()
@@ -527,7 +459,9 @@ macro_rules! impl_proof {
                                 })
                                 .collect(),
                         ft_eval1: x.ft_eval1.into()
-                    }
+                    };
+                    let public = x.public.into_iter().map(Into::into).collect();
+                    (proof, public)
                 }
             }
 
@@ -537,8 +471,7 @@ macro_rules! impl_proof {
                 pub fn new(
                     commitments: WasmProverCommitments,
                     proof: WasmOpeningProof,
-                    evals0: WasmProofEvaluations,
-                    evals1: WasmProofEvaluations,
+                    evals: WasmProofEvaluations,
                     ft_eval1: $WasmF,
                     public_: WasmFlatVector<$WasmF>,
                     prev_challenges_scalars: WasmVecVecF,
@@ -546,8 +479,7 @@ macro_rules! impl_proof {
                     WasmProverProof {
                         commitments,
                         proof,
-                        evals0,
-                        evals1,
+                        evals,
                         ft_eval1,
                         public: public_,
                         prev_challenges_scalars: prev_challenges_scalars.0,
@@ -564,12 +496,8 @@ macro_rules! impl_proof {
                     self.proof.clone()
                 }
                 #[wasm_bindgen(getter)]
-                pub fn evals0(&self) -> WasmProofEvaluations {
-                    self.evals0.clone()
-                }
-                #[wasm_bindgen(getter)]
-                pub fn evals1(&self) -> WasmProofEvaluations {
-                    self.evals1.clone()
+                pub fn evals(&self) -> WasmProofEvaluations {
+                    self.evals.clone()
                 }
                 #[wasm_bindgen(getter)]
                 pub fn public_(&self) -> WasmFlatVector<$WasmF> {
@@ -593,12 +521,8 @@ macro_rules! impl_proof {
                     self.proof = proof
                 }
                 #[wasm_bindgen(setter)]
-                pub fn set_evals0(&mut self, evals0: WasmProofEvaluations) {
-                    self.evals0 = evals0
-                }
-                #[wasm_bindgen(setter)]
-                pub fn set_evals1(&mut self, evals1: WasmProofEvaluations) {
-                    self.evals1 = evals1
+                pub fn set_evals(&mut self, evals: WasmProofEvaluations) {
+                    self.evals = evals
                 }
                 #[wasm_bindgen(setter)]
                 pub fn set_public_(&mut self, public_: WasmFlatVector<$WasmF>) {
@@ -612,6 +536,13 @@ macro_rules! impl_proof {
                 pub fn set_prev_challenges_comms(&mut self, prev_challenges_comms: WasmVector<$WasmPolyComm>) {
                     self.prev_challenges_comms = prev_challenges_comms
                 }
+
+                #[wasm_bindgen]
+                pub fn serialize(&self) -> String {
+                    let (proof, _public_input) = self.into();
+                    let serialized = rmp_serde::to_vec(&proof).unwrap();
+                    base64::encode(serialized)
+                }
             }
 
             #[wasm_bindgen]
@@ -621,19 +552,20 @@ macro_rules! impl_proof {
                 prev_challenges: WasmFlatVector<$WasmF>,
                 prev_sgs: WasmVector<$WasmG>,
             ) -> WasmProverProof {
+                console_error_panic_hook::set_once();
                 {
-                    let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
+                    let ptr: &mut commitment_dlog::srs::SRS<$G> =
                         unsafe { &mut *(std::sync::Arc::as_ptr(&index.0.as_ref().srs) as *mut _) };
                     ptr.add_lagrange_basis(index.0.as_ref().cs.domain.d1);
                 }
-                let prev: Vec<RecursionChallenge<GAffine>> = {
+                let prev: Vec<RecursionChallenge<$G>> = {
                     if prev_challenges.is_empty() {
                         Vec::new()
                     } else {
                         let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
                         prev_sgs
                             .into_iter()
-                            .map(Into::<GAffine>::into)
+                            .map(Into::<$G>::into)
                             .enumerate()
                             .map(|(i, sg)| {
                                 let chals =
@@ -641,7 +573,7 @@ macro_rules! impl_proof {
                                         .iter()
                                         .map(|a| a.clone().into())
                                         .collect();
-                                let comm = PolyComm::<GAffine> {
+                                let comm = PolyComm::<$G> {
                                     unshifted: vec![sg],
                                     shifted: None,
                                 };
@@ -657,22 +589,7 @@ macro_rules! impl_proof {
 
                 let index: &ProverIndex<$G> = &index.0.as_ref();
 
-
-                // let mut vec = index.linearization.index_terms.iter().map(|i| format!("{:?}", i)).collect::<Vec<_>>();
-                // vec.sort_by(|s, t| s.cmp(&t));
-                // console_log(&format!("{:?}", vec));
-
-                // print witness
-                // for (i, w) in witness.iter().enumerate() {
-                //     let st = w.iter().map(|f| format!("{}", f)).collect::<Vec<_>>().join("\n");
-                //     console_log(&format!("witness {}\n{}\n", i, st));
-                // }
-
-                // verify witness
-                // this seems to throw in general
-                // console_log(&"verifying witness!");
-                // index.cs.verify(&witness).expect("incorrect witness");
-                // console_log(&"verifying witness ok");
+                let public_input = witness[0][0..index.cs.public].to_vec();
 
                 // Release the runtime lock so that other threads can run using it while we generate the proof.
                 let group_map = GroupMap::<_>::setup();
@@ -681,7 +598,7 @@ macro_rules! impl_proof {
                     DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
                 >(&group_map, witness, &[], index, prev, None);
                 return match maybe_proof {
-                    Ok(proof) => proof.into(),
+                    Ok(proof) => (proof, public_input).into(),
                     Err(err) => {
                         log(&err.to_string());
                         panic!("thrown an error")
@@ -695,13 +612,15 @@ macro_rules! impl_proof {
                 proof: WasmProverProof,
             ) -> bool {
                 let group_map = <$G as CommitmentCurve>::Map::setup();
+                let verifier_index = &index.into();
+                let (proof, public_input) = &proof.into();
                 batch_verify::<
                     $G,
                     DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
                     DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
                 >(
                     &group_map,
-                    &[(&index.into(), &proof.into())]
+                    &[Context { verifier_index, proof, public_input }]
                 ).is_ok()
             }
 
@@ -729,9 +648,9 @@ macro_rules! impl_proof {
                 let ts: Vec<_> = indexes
                     .into_iter()
                     .zip(proofs.into_iter())
-                    .map(|(i, p)| (i.into(), p.into()))
+                    .map(|(index, proof)| (index.into(), proof.into()))
                     .collect();
-                let ts: Vec<_> = ts.iter().map(|(i, p)| (i, p)).collect();
+                let ts: Vec<_> = ts.iter().map(|(verifier_index, (proof, public_input))| Context { verifier_index, proof, public_input}).collect();
                 let group_map = GroupMap::<_>::setup();
 
                 batch_verify::<
@@ -766,15 +685,19 @@ macro_rules! impl_proof {
                     delta: g,
                     sg: g,
                 };
-                let proof_evals = ProofEvaluations {
-                    w: array_init(|_| vec![$F::one()]),
-                    z: vec![$F::one()],
-                    s: array_init(|_| vec![$F::one()]),
-                    lookup: None,
-                    generic_selector: vec![$F::one()],
-                    poseidon_selector: vec![$F::one()],
+                let eval = || PointEvaluations {
+                    zeta: vec![$F::one()],
+                    zeta_omega: vec![$F::one()],
                 };
-                let evals = [proof_evals.clone(), proof_evals];
+                let evals = ProofEvaluations {
+                    w: array_init(|_| eval()),
+                    coefficients: array_init(|_| eval()),
+                    z: eval(),
+                    s: array_init(|_| eval()),
+                    lookup: None,
+                    generic_selector: eval(),
+                    poseidon_selector: eval(),
+                };
 
                 let dlogproof = ProverProof {
                     commitments: ProverCommitments {
@@ -786,11 +709,11 @@ macro_rules! impl_proof {
                     proof,
                     evals,
                     ft_eval1: $F::one(),
-                    public: vec![$F::one(), $F::one()],
                     prev_challenges,
                 };
 
-                dlogproof.into()
+                let public = vec![$F::one(), $F::one()];
+                (dlogproof, public).into()
             }
 
             #[wasm_bindgen]
@@ -809,7 +732,7 @@ pub mod fp {
     use crate::pasta_fp_plonk_index::WasmPastaFpPlonkIndex;
     use crate::plonk_verifier_index::fp::WasmFpPlonkVerifierIndex as WasmPlonkVerifierIndex;
     use crate::poly_comm::vesta::WasmFpPolyComm as WasmPolyComm;
-    use mina_curves::pasta::{fp::Fp, vesta::Vesta as GAffine};
+    use mina_curves::pasta::{Fp, Vesta as GAffine};
 
     impl_proof!(
         caml_pasta_fp_plonk_proof,
@@ -820,8 +743,8 @@ pub mod fp {
         WasmPolyComm,
         WasmSrs,
         GAffineOther,
-        oracle::pasta::fp_kimchi,
-        oracle::pasta::fq_kimchi,
+        mina_poseidon::pasta::fp_kimchi,
+        mina_poseidon::pasta::fq_kimchi,
         WasmPastaFpPlonkIndex,
         WasmPlonkVerifierIndex,
         Fp
@@ -834,7 +757,7 @@ pub mod fq {
     use crate::pasta_fq_plonk_index::WasmPastaFqPlonkIndex;
     use crate::plonk_verifier_index::fq::WasmFqPlonkVerifierIndex as WasmPlonkVerifierIndex;
     use crate::poly_comm::pallas::WasmFqPolyComm as WasmPolyComm;
-    use mina_curves::pasta::{fq::Fq, pallas::Pallas as GAffine};
+    use mina_curves::pasta::{Fq, Pallas as GAffine};
 
     impl_proof!(
         caml_pasta_fq_plonk_proof,
@@ -845,8 +768,8 @@ pub mod fq {
         WasmPolyComm,
         WasmSrs,
         GAffineOther,
-        oracle::pasta::fq_kimchi,
-        oracle::pasta::fp_kimchi,
+        mina_poseidon::pasta::fq_kimchi,
+        mina_poseidon::pasta::fp_kimchi,
         WasmPastaFqPlonkIndex,
         WasmPlonkVerifierIndex,
         Fq

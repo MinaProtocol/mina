@@ -19,6 +19,7 @@ type block_sink_config =
   ; time_controller : Block_time.Controller.t
   ; log_gossip_heard : bool
   ; consensus_constants : Consensus.Constants.t
+  ; genesis_constants : Genesis_constants.t
   }
 
 val create :

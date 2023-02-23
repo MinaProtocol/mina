@@ -39,7 +39,7 @@
  (preprocess
   (pps
    ppx_annot
-   ppx_coda
+   ppx_mina
    ppx_version
    ppx_let
    ppx_assert

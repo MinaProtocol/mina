@@ -20,7 +20,9 @@ module Closed_interval = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'a t = { lower : 'a; upper : 'a }
+      type 'a t =
+            'a Mina_wire_types.Mina_base.Zkapp_precondition.Closed_interval.V1.t =
+        { lower : 'a; upper : 'a }
       [@@deriving annot, sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
@@ -153,19 +155,6 @@ module Numeric = struct
         ; to_input
         ; to_input_checked = Checked.to_input
         }
-
-    let time =
-      Block_time.
-        { equal
-        ; compare
-        ; lte_checked = run Checked.( <= )
-        ; eq_checked = run Checked.( = )
-        ; zero
-        ; max_value
-        ; typ = Checked.typ
-        ; to_input
-        ; to_input_checked = Checked.to_input
-        }
   end
 
   open Tc
@@ -178,12 +167,18 @@ module Numeric = struct
     end
   end]
 
-  let deriver name inner obj =
+  let deriver name inner range_max obj =
     let closed_interval obj' = Closed_interval.deriver ~name inner obj' in
-    Or_ignore.deriver_implicit closed_interval obj
+    Or_ignore.deriver_interval ~range_max closed_interval obj
 
   module Derivers = struct
     open Fields_derivers_zkapps.Derivers
+
+    let range_uint32 =
+      Unsigned_extended.UInt32.(to_string zero, to_string max_int)
+
+    let range_uint64 =
+      Unsigned_extended.UInt64.(to_string zero, to_string max_int)
 
     let block_time_inner obj =
       let ( ^^ ) = Fn.compose in
@@ -192,19 +187,17 @@ module Numeric = struct
         ~to_string:(Unsigned_extended.UInt64.to_string ^^ Block_time.to_uint64)
         obj
 
-    let nonce obj = deriver "Nonce" uint32 obj
+    let nonce obj = deriver "Nonce" uint32 range_uint32 obj
 
-    let balance obj = deriver "Balance" balance obj
+    let balance obj = deriver "Balance" balance range_uint64 obj
 
-    let amount obj = deriver "CurrencyAmount" amount obj
+    let amount obj = deriver "CurrencyAmount" amount range_uint64 obj
 
-    let length obj = deriver "Length" uint32 obj
+    let length obj = deriver "Length" uint32 range_uint32 obj
 
-    let global_slot obj = deriver "GlobalSlot" uint32 obj
+    let global_slot obj = deriver "GlobalSlot" uint32 range_uint32 obj
 
-    let token_id obj = deriver "TokenId" Token_id.deriver obj
-
-    let block_time obj = deriver "BlockTime" block_time_inner obj
+    let block_time obj = deriver "BlockTime" block_time_inner range_uint64 obj
   end
 
   let%test_module "Numeric" =
@@ -226,7 +219,7 @@ module Numeric = struct
         let deriver obj =
           let open Fields_derivers_zkapps.Derivers in
           let ( !. ) = ( !. ) ~t_fields_annots in
-          Fields.make_creator obj ~foo:!.(deriver "Int" int)
+          Fields.make_creator obj ~foo:!.(deriver "Int" int ("0", "1000"))
           |> finish "T" ~t_toplevel_annots
       end
 
@@ -240,12 +233,16 @@ module Numeric = struct
   let gen gen_a compare_a = Or_ignore.gen (Closed_interval.gen gen_a compare_a)
 
   let to_input { zero; max_value; to_input; _ } (t : 'a t) =
-    Closed_interval.to_input ~f:to_input
+    Flagged_option.to_input'
+      ~f:(Closed_interval.to_input ~f:to_input)
+      ~field_of_bool
       ( match t with
-      | Check x ->
-          x
       | Ignore ->
-          { lower = zero; upper = max_value } )
+          { is_some = false
+          ; data = { Closed_interval.lower = zero; upper = max_value }
+          }
+      | Check x ->
+          { is_some = true; data = x } )
 
   module Checked = struct
     type 'a t = 'a Closed_interval.t Or_ignore.Checked.t
@@ -264,14 +261,13 @@ module Numeric = struct
       let is_constant ({ lower; upper } : _ Closed_interval.t) =
         lower = upper
       in
-      Or_ignore.Checked.map t ~f_implicit:is_constant
-        ~f_explicit:(fun { is_some; data } ->
-          Boolean.( &&& ) is_some (is_constant data) )
+      Boolean.( &&& )
+        (Or_ignore.Checked.is_check t)
+        (is_constant (Or_ignore.Checked.data t))
   end
 
-  let typ { equal = eq; zero; max_value; typ; _ } =
-    Or_ignore.typ_implicit (Closed_interval.typ typ)
-      ~equal:(Closed_interval.equal eq)
+  let typ { zero; max_value; typ; _ } =
+    Or_ignore.typ (Closed_interval.typ typ)
       ~ignore:{ Closed_interval.lower = zero; upper = max_value }
 
   let check ~label { compare; _ } (t : 'a t) (x : 'a) =
@@ -319,7 +315,7 @@ module Eq_data = struct
           { typ
           ; equal
           ; equal_checked = run Checked.equal
-          ; default = Lazy.force Zkapp_account.Sequence_events.empty_hash
+          ; default = Zkapp_account.Actions.empty_state_element
           ; to_input = field
           ; to_input_checked = field
           }
@@ -402,17 +398,13 @@ module Eq_data = struct
         }
   end
 
-  let to_input ~explicit { Tc.default; to_input; _ } (t : _ t) =
-    if explicit then
-      Flagged_option.to_input' ~f:to_input ~field_of_bool
-        ( match t with
-        | Ignore ->
-            { is_some = false; data = default }
-        | Check data ->
-            { is_some = true; data } )
-    else to_input (match t with Ignore -> default | Check x -> x)
-
-  let to_input_explicit tc = to_input ~explicit:true tc
+  let to_input { Tc.default; to_input; _ } (t : _ t) =
+    Flagged_option.to_input' ~f:to_input ~field_of_bool
+      ( match t with
+      | Ignore ->
+          { is_some = false; data = default }
+      | Check data ->
+          { is_some = true; data } )
 
   let to_input_checked { Tc.to_input_checked; _ } (t : _ Checked.t) =
     Checked.to_input t ~f:to_input_checked
@@ -428,28 +420,18 @@ module Eq_data = struct
         if equal x y then Ok ()
         else Or_error.errorf "Equality check failed: %s" label
 
-  let typ_implicit { Tc.equal; default = ignore; typ; _ } =
-    typ_implicit ~equal ~ignore typ
-
-  let typ_explicit { Tc.default = ignore; typ; _ } = typ_explicit ~ignore typ
+  let typ { Tc.default = ignore; typ = t; _ } = typ ~ignore t
 end
 
-module Hash = struct
-  include Eq_data
-
-  let to_input tc = to_input ~explicit:true tc
-
-  let typ = typ_explicit
-end
+module Hash = Eq_data
 
 module Leaf_typs = struct
   let public_key () =
-    Public_key.Compressed.(
-      Or_ignore.typ_explicit ~ignore:invalid_public_key typ)
+    Public_key.Compressed.(Or_ignore.typ ~ignore:invalid_public_key typ)
 
   open Eq_data.Tc
 
-  let field = Eq_data.typ_explicit field
+  let field = Eq_data.typ field
 
   let receipt_chain_hash = Hash.typ receipt_chain_hash
 
@@ -462,8 +444,6 @@ module Leaf_typs = struct
   open Numeric.Tc
 
   let length = Numeric.typ length
-
-  let time = Numeric.typ time
 
   let amount = Numeric.typ amount
 
@@ -480,7 +460,7 @@ module Account = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Zkapp_precondition.Account.V2.t =
         { balance : Balance.Stable.V1.t Numeric.Stable.V1.t
         ; nonce : Account_nonce.Stable.V1.t Numeric.Stable.V1.t
         ; receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t Hash.Stable.V1.t
@@ -544,18 +524,21 @@ module Account = struct
   let deriver obj =
     let open Fields_derivers_zkapps in
     let ( !. ) = ( !. ) ~t_fields_annots in
+    let sequence_state =
+      with_checked ~checked:field ~name:"SequenceState" field
+    in
     Fields.make_creator obj ~balance:!.Numeric.Derivers.balance
       ~nonce:!.Numeric.Derivers.nonce
       ~receipt_chain_hash:!.(Or_ignore.deriver field)
       ~delegate:!.(Or_ignore.deriver public_key)
       ~state:!.(Zkapp_state.deriver @@ Or_ignore.deriver field)
-      ~sequence_state:!.(Or_ignore.deriver_implicit field)
+      ~sequence_state:!.(Or_ignore.deriver sequence_state)
       ~proved_state:!.(Or_ignore.deriver bool)
       ~is_new:!.(Or_ignore.deriver bool)
     |> finish "AccountPrecondition" ~t_toplevel_annots
 
   let%test_unit "json roundtrip" =
-    let b = Balance.of_int 1000 in
+    let b = Balance.of_nanomina_int_exn 1000 in
     let predicate : t =
       { accept with
         balance = Or_ignore.Check { Closed_interval.lower = b; upper = b }
@@ -583,13 +566,12 @@ module Account = struct
       [ Numeric.(to_input Tc.balance balance)
       ; Numeric.(to_input Tc.nonce nonce)
       ; Hash.(to_input Tc.receipt_chain_hash receipt_chain_hash)
-      ; Eq_data.(to_input_explicit (Tc.public_key ()) delegate)
+      ; Eq_data.(to_input (Tc.public_key ()) delegate)
       ; Vector.reduce_exn ~f:append
-          (Vector.map state ~f:Eq_data.(to_input_explicit Tc.field))
-      ; Eq_data.(to_input ~explicit:false (Lazy.force Tc.sequence_state))
-          sequence_state
-      ; Eq_data.(to_input_explicit Tc.boolean) proved_state
-      ; Eq_data.(to_input_explicit Tc.boolean) is_new
+          (Vector.map state ~f:Eq_data.(to_input Tc.field))
+      ; Eq_data.(to_input (Lazy.force Tc.sequence_state)) sequence_state
+      ; Eq_data.(to_input Tc.boolean) proved_state
+      ; Eq_data.(to_input Tc.boolean) is_new
       ]
 
   let digest t =
@@ -701,18 +683,18 @@ module Account = struct
           (pack_input (to_input t)))
   end
 
-  let typ () : (Checked.t, Stable.Latest.t) Typ.t =
+  let typ () : (Checked.t, t) Typ.t =
     let open Leaf_typs in
     Typ.of_hlistable
       [ balance
       ; nonce
       ; receipt_chain_hash
       ; public_key ()
-      ; Zkapp_state.typ (Or_ignore.typ_explicit Field.typ ~ignore:Field.zero)
-      ; Or_ignore.typ_implicit Field.typ ~equal:Field.equal
-          ~ignore:(Lazy.force Zkapp_account.Sequence_events.empty_hash)
-      ; Or_ignore.typ_explicit Boolean.typ ~ignore:false
-      ; Or_ignore.typ_explicit Boolean.typ ~ignore:false
+      ; Zkapp_state.typ (Or_ignore.typ Field.typ ~ignore:Field.zero)
+      ; Or_ignore.typ Field.typ
+          ~ignore:Zkapp_account.Actions.empty_state_element
+      ; Or_ignore.typ Boolean.typ ~ignore:false
+      ; Or_ignore.typ Boolean.typ ~ignore:false
       ]
       ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
@@ -743,44 +725,41 @@ module Account = struct
             (Option.value ~default:tc.default a.delegate)) )
     ]
     @
-    match a.zkapp with
-    | None ->
-        []
-    | Some zkapp ->
-        [ ( Transaction_status.Failure
-            .Account_sequence_state_precondition_unsatisfied
-          , match
-              List.find (Vector.to_list zkapp.sequence_state) ~f:(fun state ->
-                  Eq_data.(
-                    check
-                      (Lazy.force Tc.sequence_state)
-                      ~label:"" sequence_state state)
-                  |> Or_error.is_ok )
-            with
-            | None ->
-                Error (Error.createf "Sequence state mismatch")
-            | Some _ ->
-                Ok () )
-        ]
-        @ List.mapi
-            Vector.(to_list (zip state zkapp.app_state))
-            ~f:(fun i (c, v) ->
-              let failure =
-                Transaction_status.Failure
-                .Account_app_state_precondition_unsatisfied
-                  i
-              in
-              ( failure
-              , Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v) ) )
-        @ [ ( Transaction_status.Failure
-              .Account_proved_state_precondition_unsatisfied
-            , Eq_data.(
-                check ~label:"proved_state" Tc.boolean proved_state
-                  zkapp.proved_state) )
-          ]
-        @ [ ( Transaction_status.Failure.Account_is_new_precondition_unsatisfied
-            , Eq_data.(check ~label:"is_new" Tc.boolean is_new new_account) )
-          ]
+    let zkapp = Option.value ~default:Zkapp_account.default a.zkapp in
+    [ ( Transaction_status.Failure
+        .Account_sequence_state_precondition_unsatisfied
+      , match
+          List.find (Vector.to_list zkapp.sequence_state) ~f:(fun state ->
+              Eq_data.(
+                check
+                  (Lazy.force Tc.sequence_state)
+                  ~label:"" sequence_state state)
+              |> Or_error.is_ok )
+        with
+        | None ->
+            Error (Error.createf "Sequence state mismatch")
+        | Some _ ->
+            Ok () )
+    ]
+    @ List.mapi
+        Vector.(to_list (zip state zkapp.app_state))
+        ~f:(fun i (c, v) ->
+          let failure =
+            Transaction_status.Failure
+            .Account_app_state_precondition_unsatisfied
+              i
+          in
+          (failure, Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v))
+          )
+    @ [ ( Transaction_status.Failure
+          .Account_proved_state_precondition_unsatisfied
+        , Eq_data.(
+            check ~label:"proved_state" Tc.boolean proved_state
+              zkapp.proved_state) )
+      ]
+    @ [ ( Transaction_status.Failure.Account_is_new_precondition_unsatisfied
+        , Eq_data.(check ~label:"is_new" Tc.boolean is_new new_account) )
+      ]
 
   let check ~new_account ~check t a =
     List.iter
@@ -932,18 +911,25 @@ module Protocol_state = struct
     module Stable = struct
       module V1 = struct
         type ( 'snarked_ledger_hash
-             , 'time
              , 'length
              , 'vrf_output
              , 'global_slot
              , 'amount
              , 'epoch_data )
              t =
+              ( 'snarked_ledger_hash
+              , 'length
+              , 'vrf_output
+              , 'global_slot
+              , 'amount
+              , 'epoch_data )
+              Mina_wire_types.Mina_base.Zkapp_precondition.Protocol_state.Poly
+              .V1
+              .t =
           { (* TODO:
                We should include staged ledger hash again! It only changes once per
                block. *)
             snarked_ledger_hash : 'snarked_ledger_hash
-          ; timestamp : 'time
           ; blockchain_length : 'length
                 (* TODO: This previously had epoch_count but I removed it as I believe it is redundant
                    with global_slot_since_hard_fork.
@@ -953,11 +939,12 @@ module Protocol_state = struct
                    should be equivalent to
 
                    global_slot_since_hard_fork in [slots_per_epoch * a, slots_per_epoch * b]
+
+                   TODO: Now that we removed global_slot_since_hard_fork, maybe we want to add epoch_count back
                 *)
           ; min_window_density : 'length
           ; last_vrf_output : 'vrf_output [@skip]
           ; total_currency : 'amount
-          ; global_slot_since_hard_fork : 'global_slot
           ; global_slot_since_genesis : 'global_slot
           ; staking_epoch_data : 'epoch_data
           ; next_epoch_data : 'epoch_data
@@ -972,7 +959,6 @@ module Protocol_state = struct
     module V1 = struct
       type t =
         ( Frozen_ledger_hash.Stable.V1.t Hash.Stable.V1.t
-        , Block_time.Stable.V1.t Numeric.Stable.V1.t
         , Length.Stable.V1.t Numeric.Stable.V1.t
         , unit (* TODO *)
         , Global_slot.Stable.V1.t Numeric.Stable.V1.t
@@ -993,11 +979,9 @@ module Protocol_state = struct
     let last_vrf_output = ( !. ) ~skip_data:() skip in
     Poly.Fields.make_creator obj
       ~snarked_ledger_hash:!.(Or_ignore.deriver field)
-      ~timestamp:!.Numeric.Derivers.block_time
       ~blockchain_length:!.Numeric.Derivers.length
       ~min_window_density:!.Numeric.Derivers.length ~last_vrf_output
       ~total_currency:!.Numeric.Derivers.amount
-      ~global_slot_since_hard_fork:!.Numeric.Derivers.global_slot
       ~global_slot_since_genesis:!.Numeric.Derivers.global_slot
       ~staking_epoch_data:!.Epoch_data.deriver
       ~next_epoch_data:!.Epoch_data.deriver
@@ -1007,7 +991,6 @@ module Protocol_state = struct
     let open Quickcheck.Let_syntax in
     (* TODO: pass in ledger hash, next available token *)
     let snarked_ledger_hash = Zkapp_basic.Or_ignore.Ignore in
-    let%bind timestamp = Numeric.gen Block_time.gen Block_time.compare in
     let%bind blockchain_length = Numeric.gen Length.gen Length.compare in
     let max_min_window_density =
       Genesis_constants.for_unit_tests.protocol.slots_per_sub_window
@@ -1025,21 +1008,16 @@ module Protocol_state = struct
     let%bind total_currency =
       Numeric.gen Currency.Amount.gen Currency.Amount.compare
     in
-    let%bind global_slot_since_hard_fork =
-      Numeric.gen Global_slot.gen Global_slot.compare
-    in
     let%bind global_slot_since_genesis =
       Numeric.gen Global_slot.gen Global_slot.compare
     in
     let%bind staking_epoch_data = Epoch_data.gen in
     let%map next_epoch_data = Epoch_data.gen in
     { Poly.snarked_ledger_hash
-    ; timestamp
     ; blockchain_length
     ; min_window_density
     ; last_vrf_output
     ; total_currency
-    ; global_slot_since_hard_fork
     ; global_slot_since_genesis
     ; staking_epoch_data
     ; next_epoch_data
@@ -1047,12 +1025,10 @@ module Protocol_state = struct
 
   let to_input
       ({ snarked_ledger_hash
-       ; timestamp
        ; blockchain_length
        ; min_window_density
        ; last_vrf_output
        ; total_currency
-       ; global_slot_since_hard_fork
        ; global_slot_since_genesis
        ; staking_epoch_data
        ; next_epoch_data
@@ -1063,11 +1039,9 @@ module Protocol_state = struct
     let length = Numeric.(to_input Tc.length) in
     List.reduce_exn ~f:append
       [ Hash.(to_input Tc.field snarked_ledger_hash)
-      ; Numeric.(to_input Tc.time timestamp)
       ; length blockchain_length
       ; length min_window_density
       ; Numeric.(to_input Tc.amount total_currency)
-      ; Numeric.(to_input Tc.global_slot global_slot_since_hard_fork)
       ; Numeric.(to_input Tc.global_slot global_slot_since_genesis)
       ; Epoch_data.to_input staking_epoch_data
       ; Epoch_data.to_input next_epoch_data
@@ -1084,7 +1058,6 @@ module Protocol_state = struct
       module V1 = struct
         type t =
           ( Frozen_ledger_hash.Stable.V1.t
-          , Block_time.Stable.V1.t
           , Length.Stable.V1.t
           , unit (* TODO *)
           , Global_slot.Stable.V1.t
@@ -1107,7 +1080,6 @@ module Protocol_state = struct
     module Checked = struct
       type t =
         ( Frozen_ledger_hash.var
-        , Block_time.Checked.t
         , Length.Checked.t
         , unit (* TODO *)
         , Global_slot.Checked.t
@@ -1120,12 +1092,42 @@ module Protocol_state = struct
           Epoch_data.Poly.t )
         Poly.t
     end
+
+    let epoch_data_deriver obj =
+      let open Fields_derivers_zkapps.Derivers in
+      let ledger obj' =
+        let ( !. ) =
+          ( !. ) ~t_fields_annots:Epoch_ledger.Poly.t_fields_annots
+        in
+        Epoch_ledger.Poly.Fields.make_creator obj' ~hash:!.field
+          ~total_currency:!.amount
+        |> finish "EpochLedger"
+             ~t_toplevel_annots:Epoch_ledger.Poly.t_toplevel_annots
+      in
+      let ( !. ) = ( !. ) ~t_fields_annots:Epoch_data.Poly.t_fields_annots in
+      Epoch_data.Poly.Fields.make_creator obj ~ledger:!.ledger ~seed:!.field
+        ~start_checkpoint:!.field ~lock_checkpoint:!.field
+        ~epoch_length:!.uint32
+      |> finish "EpochData" ~t_toplevel_annots:Epoch_data.Poly.t_toplevel_annots
+
+    let deriver obj =
+      let open Fields_derivers_zkapps.Derivers in
+      let ( !. ) ?skip_data =
+        ( !. ) ?skip_data ~t_fields_annots:Poly.t_fields_annots
+      in
+      let last_vrf_output = ( !. ) ~skip_data:() skip in
+      Poly.Fields.make_creator obj ~snarked_ledger_hash:!.field
+        ~blockchain_length:!.uint32 ~min_window_density:!.uint32
+        ~last_vrf_output ~total_currency:!.amount
+        ~global_slot_since_genesis:!.uint32
+        ~staking_epoch_data:!.epoch_data_deriver
+        ~next_epoch_data:!.epoch_data_deriver
+      |> finish "NetworkView" ~t_toplevel_annots:Poly.t_toplevel_annots
   end
 
   module Checked = struct
     type t =
       ( Frozen_ledger_hash.var Hash.Checked.t
-      , Block_time.Checked.t Numeric.Checked.t
       , Length.Checked.t Numeric.Checked.t
       , unit (* TODO *)
       , Global_slot.Checked.t Numeric.Checked.t
@@ -1135,12 +1137,10 @@ module Protocol_state = struct
 
     let to_input
         ({ snarked_ledger_hash
-         ; timestamp
          ; blockchain_length
          ; min_window_density
          ; last_vrf_output
          ; total_currency
-         ; global_slot_since_hard_fork
          ; global_slot_since_genesis
          ; staking_epoch_data
          ; next_epoch_data
@@ -1151,11 +1151,9 @@ module Protocol_state = struct
       let length = Numeric.(Checked.to_input Tc.length) in
       List.reduce_exn ~f:append
         [ Hash.(to_input_checked Tc.frozen_ledger_hash snarked_ledger_hash)
-        ; Numeric.(Checked.to_input Tc.time timestamp)
         ; length blockchain_length
         ; length min_window_density
         ; Numeric.(Checked.to_input Tc.amount total_currency)
-        ; Numeric.(Checked.to_input Tc.global_slot global_slot_since_hard_fork)
         ; Numeric.(Checked.to_input Tc.global_slot global_slot_since_genesis)
         ; Epoch_data.Checked.to_input staking_epoch_data
         ; Epoch_data.Checked.to_input next_epoch_data
@@ -1169,12 +1167,10 @@ module Protocol_state = struct
     let check
         (* Bind all the fields explicity so we make sure they are all used. *)
           ({ snarked_ledger_hash
-           ; timestamp
            ; blockchain_length
            ; min_window_density
            ; last_vrf_output
            ; total_currency
-           ; global_slot_since_hard_fork
            ; global_slot_since_genesis
            ; staking_epoch_data
            ; next_epoch_data
@@ -1202,14 +1198,11 @@ module Protocol_state = struct
       Boolean.all
         ( [ Hash.(check_checked Tc.ledger_hash)
               snarked_ledger_hash s.snarked_ledger_hash
-          ; Numeric.(Checked.check Tc.time) timestamp s.timestamp
           ; Numeric.(Checked.check Tc.length)
               blockchain_length s.blockchain_length
           ; Numeric.(Checked.check Tc.length)
               min_window_density s.min_window_density
           ; Numeric.(Checked.check Tc.amount) total_currency s.total_currency
-          ; Numeric.(Checked.check Tc.global_slot)
-              global_slot_since_hard_fork s.global_slot_since_hard_fork
           ; Numeric.(Checked.check Tc.global_slot)
               global_slot_since_genesis s.global_slot_since_genesis
           ]
@@ -1223,7 +1216,6 @@ module Protocol_state = struct
     let state_hash = Hash.(typ Tc.state_hash) in
     let epoch_seed = Hash.(typ Tc.epoch_seed) in
     let length = Numeric.(typ Tc.length) in
-    let time = Numeric.(typ Tc.time) in
     let amount = Numeric.(typ Tc.amount) in
     let global_slot = Numeric.(typ Tc.global_slot) in
     let epoch_data =
@@ -1242,12 +1234,10 @@ module Protocol_state = struct
     in
     Typ.of_hlistable
       [ frozen_ledger_hash
-      ; time
       ; length
       ; length
       ; Typ.unit
       ; amount
-      ; global_slot
       ; global_slot
       ; epoch_data
       ; epoch_data
@@ -1265,12 +1255,10 @@ module Protocol_state = struct
 
   let accept : t =
     { snarked_ledger_hash = Ignore
-    ; timestamp = Ignore
     ; blockchain_length = Ignore
     ; min_window_density = Ignore
     ; last_vrf_output = ()
     ; total_currency = Ignore
-    ; global_slot_since_hard_fork = Ignore
     ; global_slot_since_genesis = Ignore
     ; staking_epoch_data = epoch_data
     ; next_epoch_data = epoch_data
@@ -1278,13 +1266,11 @@ module Protocol_state = struct
 
   let valid_until time : t =
     { snarked_ledger_hash = Ignore
-    ; timestamp = Check time
     ; blockchain_length = Ignore
     ; min_window_density = Ignore
     ; last_vrf_output = ()
     ; total_currency = Ignore
-    ; global_slot_since_hard_fork = Ignore
-    ; global_slot_since_genesis = Ignore
+    ; global_slot_since_genesis = Check time
     ; staking_epoch_data = epoch_data
     ; next_epoch_data = epoch_data
     }
@@ -1298,12 +1284,10 @@ module Protocol_state = struct
   let check
       (* Bind all the fields explicity so we make sure they are all used. *)
         ({ snarked_ledger_hash
-         ; timestamp
          ; blockchain_length
          ; min_window_density
          ; last_vrf_output
          ; total_currency
-         ; global_slot_since_hard_fork
          ; global_slot_since_genesis
          ; staking_epoch_data
          ; next_epoch_data
@@ -1347,9 +1331,6 @@ module Protocol_state = struct
         snarked_ledger_hash s.snarked_ledger_hash
     in
     let%bind () =
-      Numeric.(check ~label:"timestamp" Tc.time) timestamp s.timestamp
-    in
-    let%bind () =
       Numeric.(check ~label:"blockchain_length" Tc.length)
         blockchain_length s.blockchain_length
     in
@@ -1364,10 +1345,6 @@ module Protocol_state = struct
         total_currency s.total_currency
     in
     let%bind () =
-      Numeric.(check ~label:"curr_global_slot" Tc.global_slot)
-        global_slot_since_hard_fork s.global_slot_since_hard_fork
-    in
-    let%bind () =
       Numeric.(check ~label:"global_slot_since_genesis" Tc.global_slot)
         global_slot_since_genesis s.global_slot_since_genesis
     in
@@ -1378,6 +1355,40 @@ module Protocol_state = struct
       epoch_data "next_epoch_data" next_epoch_data s.next_epoch_data
     in
     ()
+end
+
+module Valid_while = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Global_slot.Stable.V1.t Numeric.Stable.V1.t
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let deriver = Numeric.Derivers.global_slot
+
+  let gen = Numeric.gen Global_slot.gen Global_slot.compare
+
+  let typ = Numeric.(typ Tc.global_slot)
+
+  let to_input valid_while = Numeric.(to_input Tc.global_slot valid_while)
+
+  let check (valid_while : t) global_slot =
+    Numeric.(check ~label:"valid_while_precondition" Tc.global_slot)
+      valid_while global_slot
+
+  module Checked = struct
+    type t = Global_slot.Checked.t Numeric.Checked.t
+
+    let check (valid_while : t) global_slot =
+      Numeric.(Checked.check Tc.global_slot) valid_while global_slot
+
+    let to_input valid_while =
+      Numeric.(Checked.to_input Tc.global_slot valid_while)
+  end
 end
 
 module Account_type = struct
@@ -1601,7 +1612,7 @@ let to_input ({ self_predicate; other; fee_payer; protocol_state_predicate } : t
   List.reduce_exn ~f:append
     [ Account.to_input self_predicate
     ; Other.to_input other
-    ; Eq_data.(to_input_explicit (Tc.public_key ())) fee_payer
+    ; Eq_data.(to_input (Tc.public_key ())) fee_payer
     ; Protocol_state.to_input protocol_state_predicate
     ]
 
@@ -1643,6 +1654,6 @@ let typ () : (Checked.t, Stable.Latest.t) Typ.t =
   Poly.typ
     [ Account.typ ()
     ; Other.typ ()
-    ; Eq_data.(typ_explicit (Tc.public_key ()))
+    ; Eq_data.(typ (Tc.public_key ()))
     ; Protocol_state.typ
     ]

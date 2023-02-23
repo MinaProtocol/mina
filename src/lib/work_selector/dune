@@ -42,7 +42,7 @@
    mina_ledger
    ppx_version.runtime)
  (preprocess
-  (pps ppx_coda ppx_version ppx_assert ppx_base ppx_let ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot
+  (pps ppx_mina ppx_version ppx_assert ppx_base ppx_let ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot
        ppx_custom_printf ppx_inline_test ppx_optcomp))
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../config.mlh)

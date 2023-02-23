@@ -2,7 +2,7 @@ use ark_poly::UVPolynomial;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Evaluations};
 use commitment_dlog::{
     commitment::{b_poly_coefficients, caml::CamlPolyComm},
-    srs::{endos, SRS},
+    srs::SRS,
 };
 use paste::paste;
 use serde::{Deserialize, Serialize};
@@ -62,14 +62,10 @@ macro_rules! impl_srs {
                 }
 
                 // TODO: shouldn't we just error instead of returning None?
-                let mut srs = match SRS::<$G>::deserialize(&mut rmp_serde::Deserializer::new(reader)) {
+                let srs = match SRS::<$G>::deserialize(&mut rmp_serde::Deserializer::new(reader)) {
                     Ok(srs) => srs,
                     Err(_) => return Ok(None),
                 };
-
-                let (endo_q, endo_r) = endos::<$G>();
-                srs.endo_q = endo_q;
-                srs.endo_r = endo_r;
 
                 Ok(Some($name::new(srs)))
             }
@@ -87,11 +83,14 @@ macro_rules! impl_srs {
                         .unwrap()
                 })?;
 
-                let evals = (0..domain_size)
-                    .map(|j| if i == j { <$F as ark_ff::One>::one() } else { <$F as ark_ff::Zero>::zero() })
-                    .collect();
-                let p = Evaluations::<$F>::from_vec_and_domain(evals, x_domain).interpolate();
-                Ok(srs.commit_non_hiding(&p, None).into())
+                {
+                    // We're single-threaded, so it's safe to grab this pointer as mutable.
+                    // Do not try this at home.
+                    let srs = unsafe { &mut *((&**srs as *const SRS<$G>) as *mut SRS<$G>) as &mut SRS<$G> };
+                    srs.add_lagrange_basis(x_domain);
+                }
+
+                Ok(srs.lagrange_bases[&x_domain.size()][i as usize].clone().into())
             }
 
             #[ocaml_gen::func]
@@ -100,7 +99,7 @@ macro_rules! impl_srs {
                 srs: $name,
                 log2_size: ocaml::Int,
             ) {
-                let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
+                let ptr: &mut commitment_dlog::srs::SRS<$G> =
                     unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
                 let domain = EvaluationDomain::<$F>::new(1 << (log2_size as usize)).expect("invalid domain size");
                 ptr.add_lagrange_basis(domain);
@@ -180,15 +179,15 @@ macro_rules! impl_srs {
 pub mod fp {
     use super::*;
     use crate::arkworks::{CamlFp, CamlGVesta};
-    use mina_curves::pasta::{fp::Fp, vesta::Vesta as GAffine};
+    use mina_curves::pasta::{Fp, Vesta};
 
-    impl_srs!(CamlFpSrs, CamlFp, CamlGVesta, Fp, GAffine);
+    impl_srs!(CamlFpSrs, CamlFp, CamlGVesta, Fp, Vesta);
 }
 
 pub mod fq {
     use super::*;
     use crate::arkworks::{CamlFq, CamlGPallas};
-    use mina_curves::pasta::{fq::Fq, pallas::Pallas as GAffine};
+    use mina_curves::pasta::{Fq, Pallas};
 
-    impl_srs!(CamlFqSrs, CamlFq, CamlGPallas, Fq, GAffine);
+    impl_srs!(CamlFqSrs, CamlFq, CamlGPallas, Fq, Pallas);
 }

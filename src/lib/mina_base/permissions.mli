@@ -7,7 +7,12 @@ module Auth_required : sig
   [%%versioned:
   module Stable : sig
     module V2 : sig
-      type t = None | Either | Proof | Signature | Impossible
+      type t = Mina_wire_types.Mina_base.Permissions.Auth_required.V2.t =
+        | None
+        | Either
+        | Proof
+        | Signature
+        | Impossible
       [@@deriving sexp, equal, compare, hash, yojson, enum]
     end
   end]
@@ -17,6 +22,10 @@ module Auth_required : sig
   val to_input : t -> Field.t Random_oracle_input.Chunked.t
 
   val check : t -> Control.Tag.t -> bool
+
+  val to_string : t -> string
+
+  val of_string : string -> t
 
   [%%ifdef consensus_mechanism]
 
@@ -47,7 +56,9 @@ module Poly : sig
   module Stable : sig
     module V2 : sig
       type 'controller t =
+            'controller Mina_wire_types.Mina_base.Permissions.Poly.V2.t =
         { edit_state : 'controller
+        ; access : 'controller
         ; send : 'controller
         ; receive : 'controller (* TODO: Consider having fee *)
         ; set_delegate : 'controller
@@ -58,6 +69,7 @@ module Poly : sig
         ; set_token_symbol : 'controller
         ; increment_nonce : 'controller
         ; set_voting_for : 'controller
+        ; set_timing : 'controller
         }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end

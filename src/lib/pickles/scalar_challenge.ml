@@ -120,12 +120,11 @@ let to_field_checked' (type f) ?(num_bits = num_bits)
   done ;
   with_label __LOC__ (fun () ->
       assert_
-        [ { annotation = Some __LOC__
-          ; basic =
-              Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
-                T (EC_endoscalar { state = Array.of_list_rev !state }))
-          }
-        ] ) ;
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
+              T (EC_endoscalar { state = Array.of_list_rev !state }))
+        } ) ;
   (!a, !b, !n)
 
 let to_field_checked (type f) ?num_bits
@@ -158,6 +157,13 @@ let test (type f)
   let open Impl in
   let module T = Internal_Basic in
   let n = 128 in
+  let module Field_constant = struct
+    include Field.Constant
+
+    type nonrec bool = bool
+
+    let if_ b ~then_ ~else_ = if b then then_ () else else_ ()
+  end in
   Quickcheck.test ~trials:10
     (Quickcheck.Generator.list_with_length n Bool.quickcheck_generator)
     ~f:(fun xs ->
@@ -174,7 +180,7 @@ let test (type f)
                   (SC.create (Impl.Field.pack s)) ) )
           (fun s ->
             to_field_constant
-              (module Field.Constant)
+              (module Field_constant)
               ~endo
               (SC.create (Challenge.Constant.of_bits s)) )
           xs
@@ -287,18 +293,17 @@ struct
     let xs, ys = !acc in
     with_label __LOC__ (fun () ->
         assert_
-          [ { annotation = Some __LOC__
-            ; basic =
-                Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
-                  T
-                    (EC_endoscale
-                       { xs
-                       ; ys
-                       ; n_acc = !n_acc
-                       ; state = Array.of_list_rev !rounds_rev
-                       } ))
-            }
-          ] ) ;
+          { annotation = Some __LOC__
+          ; basic =
+              Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
+                T
+                  (EC_endoscale
+                     { xs
+                     ; ys
+                     ; n_acc = !n_acc
+                     ; state = Array.of_list_rev !rounds_rev
+                     } ))
+          } ) ;
     with_label __LOC__ (fun () -> Field.Assert.equal !n_acc scalar) ;
     !acc
 

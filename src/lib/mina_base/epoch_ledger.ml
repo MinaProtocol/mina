@@ -7,6 +7,9 @@ module Poly = struct
   module Stable = struct
     module V1 = struct
       type ('ledger_hash, 'amount) t =
+            ( 'ledger_hash
+            , 'amount )
+            Mina_wire_types.Mina_base.Epoch_ledger.Poly.V1.t =
         { hash : 'ledger_hash; total_currency : 'amount }
       [@@deriving annot, sexp, equal, compare, hash, yojson, hlist, fields]
     end
@@ -32,12 +35,11 @@ let to_input ({ hash; total_currency } : Value.t) =
 
 type var = (Frozen_ledger_hash0.var, Amount.var) Poly.t
 
-let data_spec = Data_spec.[ Frozen_ledger_hash0.typ; Amount.typ ]
-
 let typ : (var, Value.t) Typ.t =
-  Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
-    ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
-    ~value_of_hlist:Poly.of_hlist
+  Typ.of_hlistable
+    [ Frozen_ledger_hash0.typ; Amount.typ ]
+    ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+    ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
 let var_to_input ({ Poly.hash; total_currency } : var) =
   let total_currency = Amount.var_to_input total_currency in

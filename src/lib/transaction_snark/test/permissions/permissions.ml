@@ -5,10 +5,11 @@ struct
   let test_description = "permissions"
 
   let failure_expected =
-    Mina_base.Transaction_status.Failure.Update_not_permitted_permissions
+    ( Mina_base.Transaction_status.Failure.Update_not_permitted_permissions
+    , Transaction_snark_tests.Util.Pass_2 )
 
   let snapp_update =
-    { Party.Update.dummy with
+    { Account_update.Update.dummy with
       permissions =
         Zkapp_basic.Set_or_keep.Set
           { Permissions.user_default with

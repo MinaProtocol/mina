@@ -20,6 +20,16 @@ type Structured_log_events.t +=
   | Rebroadcast_transition of { state_hash : State_hash.t }
   [@@deriving register_event]
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
 exception Snark_worker_error of int
 
 exception Snark_worker_signal_interrupt of Signal.t
@@ -91,21 +101,24 @@ val get_current_nonce :
 val add_transactions :
      t
   -> User_command_input.t list
-  -> ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+  -> ( [ `Broadcasted | `Not_broadcasted ]
+     * Network_pool.Transaction_pool.Resource_pool.Diff.t
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
      Deferred.Or_error.t
 
 val add_full_transactions :
      t
   -> User_command.t list
-  -> ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+  -> ( [ `Broadcasted | `Not_broadcasted ]
+     * Network_pool.Transaction_pool.Resource_pool.Diff.t
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
      Deferred.Or_error.t
 
-val add_snapp_transactions :
+val add_zkapp_transactions :
      t
-  -> Parties.t list
-  -> ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+  -> Zkapp_command.t list
+  -> ( [ `Broadcasted | `Not_broadcasted ]
+     * Network_pool.Transaction_pool.Resource_pool.Diff.t
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
      Deferred.Or_error.t
 
@@ -115,6 +128,8 @@ val get_inferred_nonce_from_transaction_pool_and_ledger :
   t -> Account_id.t -> Account.Nonce.t option Participating_state.t
 
 val active_or_bootstrapping : t -> unit Participating_state.t
+
+val get_node_state : t -> Node_error_service.node_state Deferred.t
 
 val best_staged_ledger : t -> Staged_ledger.t Participating_state.t
 
@@ -181,7 +196,8 @@ val transition_frontier :
 
 val get_ledger : t -> State_hash.t option -> Account.t list Or_error.t
 
-val get_snarked_ledger : t -> State_hash.t option -> Account.t list Or_error.t
+val get_snarked_ledger :
+  t -> State_hash.t option -> Account.t list Deferred.Or_error.t
 
 val wallets : t -> Secrets.Wallets.t
 
@@ -202,3 +218,5 @@ val net : t -> Mina_networking.t
 val runtime_config : t -> Runtime_config.t
 
 val verifier : t -> Verifier.t
+
+val genesis_ledger : t -> Mina_ledger.Ledger.t Lazy.t

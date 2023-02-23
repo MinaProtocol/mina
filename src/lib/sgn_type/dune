@@ -12,4 +12,6 @@
    bin_prot.shape
    base.caml
    ppx_version.runtime
+   ;; local libraries
+   mina_wire_types
 ))

@@ -5,6 +5,6 @@
  (inline_tests)
  (libraries core yojson logger core_kernel)
  (preprocess
-  (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson))
+  (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))
  (synopsis "Logging library"))

@@ -23,9 +23,8 @@ struct
 
   let to_input_legacy (t : var) =
     let to_bits (t : var) =
-      with_label
-        (sprintf "to_bits: %s" __LOC__)
-        (Field.Checked.choose_preimage_var t ~length:N.length_in_bits)
+      with_label (sprintf "to_bits: %s" __LOC__) (fun () ->
+          Field.Checked.choose_preimage_var t ~length:N.length_in_bits )
     in
     Checked.map (to_bits t) ~f:(fun bits ->
         Random_oracle.Input.Legacy.bitstring bits )
@@ -208,6 +207,8 @@ struct
 
   let sub x y = if x < y then None else Some (N.sub x y)
 
+  let to_field n = Bigint.to_field (Bigint.of_bignum_bigint (N.to_bigint n))
+
   [%%ifdef consensus_mechanism]
 
   module Checked = Make_checked (N) (Bits)
@@ -224,8 +225,7 @@ struct
   let of_bits = Bits.of_bits
 
   let to_input (t : t) =
-    Random_oracle.Input.Chunked.packed
-      (Field.project (to_bits t), N.length_in_bits)
+    Random_oracle.Input.Chunked.packed (to_field t, N.length_in_bits)
 
   let to_input_legacy t = Random_oracle.Input.Legacy.bitstring (to_bits t)
 
@@ -255,6 +255,8 @@ module Make32 () : UInt32 = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
+      [@@@with_all_version_tags]
+
       type t = UInt32.Stable.V1.t
       [@@deriving sexp, equal, compare, hash, yojson]
 
@@ -289,6 +291,8 @@ module Make64 () : UInt64 = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
+      [@@@with_all_version_tags]
+
       type t = UInt64.Stable.V1.t
       [@@deriving sexp, equal, compare, hash, yojson]
 

@@ -8,6 +8,7 @@ module Fee_transfer_type = struct
   module Stable = struct
     module V1 = struct
       type t = Fee_transfer | Fee_transfer_via_coinbase
+      [@@deriving quickcheck, compare, sexp]
 
       let to_latest = Fn.id
     end
@@ -74,7 +75,7 @@ let participants
   let user_command_set =
     List.fold commands ~init:empty ~f:(fun set user_command ->
         union set
-          (of_list @@ User_command.accounts_accessed user_command.data.data) )
+          (of_list @@ User_command.accounts_referenced user_command.data.data) )
   in
   let fee_transfer_participants =
     List.fold fee_transfers ~init:empty ~f:(fun set (ft, _) ->
@@ -93,7 +94,7 @@ let participant_pks
     List.fold commands ~init:empty ~f:(fun set user_command ->
         union set @@ of_list
         @@ List.map ~f:Account_id.public_key
-        @@ User_command.accounts_accessed user_command.data.data )
+        @@ User_command.accounts_referenced user_command.data.data )
   in
   let fee_transfer_participants =
     List.fold fee_transfers ~init:empty ~f:(fun set (ft, _) ->
@@ -150,7 +151,7 @@ let of_transition block tracked_participants
       | { data = Command command; status } -> (
           let command = (command :> User_command.t) in
           let should_include_transaction command participants =
-            List.exists (User_command.accounts_accessed command)
+            List.exists (User_command.accounts_referenced command)
               ~f:(fun account_id ->
                 Public_key.Compressed.Set.mem participants
                   (Account_id.public_key account_id) )

@@ -5,6 +5,11 @@ module Inputs = Prod.Inputs
 module Worker = struct
   include Functor.Make (Inputs)
 
+  type Structured_log_events.t +=
+    | Generating_snark_work_failed of { error : Yojson.Safe.t }
+    [@@deriving
+      register_event { msg = "Failed to generate SNARK work: $error" }]
+
   module Rpcs_versioned = struct
     open Core_kernel
     open Signature_lib
@@ -72,6 +77,36 @@ module Worker = struct
 
         include T
         include Rpcs.Submit_work.Register (T)
+      end
+
+      module Latest = V2
+    end]
+
+    [%%versioned_rpc
+    module Failed_to_generate_snark = struct
+      module V2 = struct
+        module T = struct
+          type query =
+            Core_kernel.Error.Stable.V2.t
+            * ( Transaction_witness.Stable.V2.t
+              , Inputs.Ledger_proof.Stable.V2.t )
+              Snark_work_lib.Work.Single.Spec.Stable.V2.t
+              Snark_work_lib.Work.Spec.Stable.V1.t
+            * Public_key.Compressed.Stable.V1.t
+
+          type response = unit
+
+          let query_of_caller_model = Fn.id
+
+          let callee_model_of_query = Fn.id
+
+          let response_of_callee_model = Fn.id
+
+          let caller_model_of_response = Fn.id
+        end
+
+        include T
+        include Rpcs.Failed_to_generate_snark.Register (T)
       end
 
       module Latest = V2

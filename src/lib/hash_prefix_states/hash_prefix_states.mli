@@ -53,21 +53,21 @@ val zkapp_precondition_account : Field.t State.t
 
 val zkapp_precondition_protocol_state : Field.t State.t
 
-val party_account_precondition : Field.t State.t
+val account_update_account_precondition : Field.t State.t
 
-val party : Field.t State.t
+val account_update : Field.t State.t
 
-val party_cons : Field.t State.t
+val account_update_cons : Field.t State.t
 
-val party_node : Field.t State.t
+val account_update_node : Field.t State.t
 
-val party_stack_frame : Field.t State.t
+val account_update_stack_frame : Field.t State.t
 
-val party_stack_frame_cons : Field.t State.t
+val account_update_stack_frame_cons : Field.t State.t
 
 val receipt_chain_signed_command : Field.t Legacy.State.t
 
-val receipt_chain_parties : Field.t State.t
+val receipt_chain_zkapp_command : Field.t State.t
 
 val receipt_chain_zkapp : Field.t State.t
 
@@ -93,7 +93,7 @@ val zkapp_event : Field.t State.t
 
 val zkapp_events : Field.t State.t
 
-val zkapp_sequence_events : Field.t State.t
+val zkapp_actions : Field.t State.t
 
 val zkapp_memo : Field.t State.t
 

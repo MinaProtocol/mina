@@ -59,15 +59,9 @@ module Json_layout = struct
           ; vesting_period : Mina_numbers.Global_slot.t
           ; vesting_increment : Currency.Amount.t
           }
-        [@@deriving yojson, dhall_type, sexp]
+        [@@deriving yojson, fields, dhall_type, sexp]
 
-        let fields =
-          [| "initial_minimum_balance"
-           ; "cliff_time"
-           ; "cliff_amount"
-           ; "vesting_period"
-           ; "vesting_increment"
-          |]
+        let fields = Fields.names |> Array.of_list
 
         let of_yojson json = of_yojson_generic ~fields of_yojson json
       end
@@ -113,6 +107,7 @@ module Json_layout = struct
           { edit_state : Auth_required.t [@default None]
           ; send : Auth_required.t [@default None]
           ; receive : Auth_required.t [@default None]
+          ; access : Auth_required.t [@default None]
           ; set_delegate : Auth_required.t [@default None]
           ; set_permissions : Auth_required.t [@default None]
           ; set_verification_key : Auth_required.t [@default None]
@@ -121,36 +116,11 @@ module Json_layout = struct
           ; set_token_symbol : Auth_required.t [@default None]
           ; increment_nonce : Auth_required.t [@default None]
           ; set_voting_for : Auth_required.t [@default None]
+          ; set_timing : Auth_required.t [@default None]
           }
-        [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
+        [@@deriving yojson, fields, dhall_type, sexp, bin_io_unversioned]
 
-        let fields =
-          [| "edit_state"
-           ; "send"
-           ; "receive"
-           ; "set_delegate"
-           ; "set_permissions"
-           ; "set_verification_key"
-           ; "set_zkapp_uri"
-           ; "edit_sequence_state"
-           ; "set_token_symbol"
-           ; "increment_nonce"
-           ; "set_voting_for"
-          |]
-
-        let of_yojson json = of_yojson_generic ~fields of_yojson json
-      end
-
-      module Token_permissions = struct
-        type t =
-          { token_owned : bool [@default false]
-          ; account_disabled : bool [@default false]
-          ; disable_new_accounts : bool [@default false]
-          }
-        [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
-
-        let fields =
-          [| "token_owned"; "account_disabled"; "disable_new_accounts" |]
+        let fields = Fields.names |> Array.of_list
 
         let of_yojson json = of_yojson_generic ~fields of_yojson json
       end
@@ -182,12 +152,12 @@ module Json_layout = struct
           let dhall_type = Ppx_dhall_type.Dhall_type.Text
 
           let to_yojson t =
-            `String (Pickles.Side_loaded.Verification_key.to_base58_check t)
+            `String (Pickles.Side_loaded.Verification_key.to_base64 t)
 
           let of_yojson = function
             | `String s ->
                 let vk_or_err =
-                  Pickles.Side_loaded.Verification_key.of_base58_check s
+                  Pickles.Side_loaded.Verification_key.of_base64 s
                 in
                 Result.map_error vk_or_err ~f:Error.to_string_hum
             | _ ->
@@ -206,35 +176,28 @@ module Json_layout = struct
         end
 
         type t =
-          { state : Field.t list
-          ; verification_key : Verification_key.t option
+          { app_state : Field.t list
+          ; verification_key : Verification_key.t option [@default None]
           ; zkapp_version : Zkapp_version.t
           ; sequence_state : Field.t list
           ; last_sequence_slot : int
           ; proved_state : bool
+          ; zkapp_uri : string
           }
-        [@@deriving sexp, dhall_type, yojson, bin_io_unversioned]
+        [@@deriving sexp, fields, dhall_type, yojson, bin_io_unversioned]
 
-        let fields =
-          [| "state"
-           ; "verification_key"
-           ; "zkapp_version"
-           ; "sequence_state"
-           ; "last_sequence_slot"
-           ; "proved_state"
-          |]
+        let fields = Fields.names |> Array.of_list
 
         let of_yojson json = of_yojson_generic ~fields of_yojson json
       end
 
       type t =
-        { pk : string option [@default None]
+        { pk : string
         ; sk : string option [@default None]
         ; balance : Currency.Balance.t
         ; delegate : string option [@default None]
         ; timing : Timed.t option [@default None]
         ; token : string option [@default None]
-        ; token_permissions : Token_permissions.t option [@default None]
         ; nonce : Mina_numbers.Account_nonce.t
               [@default Mina_numbers.Account_nonce.zero]
         ; receipt_chain_hash : string option [@default None]
@@ -242,44 +205,26 @@ module Json_layout = struct
         ; zkapp : Zkapp_account.t option [@default None]
         ; permissions : Permissions.t option [@default None]
         ; token_symbol : string option [@default None]
-        ; zkapp_uri : string option [@default None]
         }
-      [@@deriving sexp, yojson, dhall_type]
+      [@@deriving sexp, fields, yojson, dhall_type]
 
-      let fields =
-        [| "pk"
-         ; "sk"
-         ; "balance"
-         ; "delegate"
-         ; "timing"
-         ; "token"
-         ; "token_permissions"
-         ; "nonce"
-         ; "receipt_chain_hash"
-         ; "voting_for"
-         ; "zkapp"
-         ; "permissions"
-         ; "token_symbol"
-         ; "zkapp_uri"
-        |]
+      let fields = Fields.names |> Array.of_list
 
       let of_yojson json = of_yojson_generic ~fields of_yojson json
 
       let default : t =
-        { pk = None
+        { pk = Signature_lib.Public_key.Compressed.(to_base58_check empty)
         ; sk = None
         ; balance = Currency.Balance.zero
         ; delegate = None
         ; timing = None
         ; token = None
-        ; token_permissions = None
         ; nonce = Mina_numbers.Account_nonce.zero
         ; receipt_chain_hash = None
         ; voting_for = None
         ; zkapp = None
         ; permissions = None
         ; token_symbol = None
-        ; zkapp_uri = None
         }
     end
 
@@ -300,16 +245,9 @@ module Json_layout = struct
       ; name : string option [@default None]
       ; add_genesis_winner : bool option [@default None]
       }
-    [@@deriving yojson, dhall_type]
+    [@@deriving yojson, fields, dhall_type]
 
-    let fields =
-      [| "accounts"
-       ; "num_accounts"
-       ; "balances"
-       ; "hash"
-       ; "name"
-       ; "add_genesis_winner"
-      |]
+    let fields = Fields.names |> Array.of_list
 
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
@@ -323,6 +261,9 @@ module Json_layout = struct
         }
       [@@deriving yojson, dhall_type]
 
+      (* we don't deriving the field names here, because the first one differs from the
+         field in the record type
+      *)
       let fields = [| "2_to_the"; "txns_per_second_x10" |]
 
       let alternates = [| ("two_to_the", "2_to_the"); ("log_2", "2_to_the") |]
@@ -346,19 +287,9 @@ module Json_layout = struct
       ; account_creation_fee : Currency.Fee.t option [@default None]
       ; fork : Fork_config.t option [@default None]
       }
-    [@@deriving yojson, dhall_type]
+    [@@deriving yojson, fields, dhall_type]
 
-    let fields =
-      [| "level"
-       ; "sub_windows_per_window"
-       ; "ledger_depth"
-       ; "work_delay"
-       ; "block_window_duration_ms"
-       ; "transaction_capacity"
-       ; "coinbase_amount"
-       ; "supercharged_coinbase_factor"
-       ; "account_creation_fee"
-      |]
+    let fields = Fields.names |> Array.of_list
 
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
@@ -371,16 +302,9 @@ module Json_layout = struct
       ; slots_per_sub_window : int option [@default None]
       ; genesis_state_timestamp : string option [@default None]
       }
-    [@@deriving yojson, dhall_type]
+    [@@deriving yojson, fields, dhall_type]
 
-    let fields =
-      [| "k"
-       ; "delta"
-       ; "slots_per_epoch"
-       ; "slots_per_sub_window"
-       ; "sub_window_per_window"
-       ; "genesis_state_timestamp"
-      |]
+    let fields = Fields.names |> Array.of_list
 
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
@@ -389,11 +313,16 @@ module Json_layout = struct
     type t =
       { txpool_max_size : int option [@default None]
       ; peer_list_url : string option [@default None]
-      ; transaction_expiry_hr : int option [@default None]
+      ; zkapp_proof_update_cost : float option [@default None]
+      ; zkapp_signed_single_update_cost : float option [@default None]
+      ; zkapp_signed_pair_update_cost : float option [@default None]
+      ; zkapp_transaction_cost_limit : float option [@default None]
+      ; max_event_elements : int option [@default None]
+      ; max_action_elements : int option [@default None]
       }
-    [@@deriving yojson, dhall_type]
+    [@@deriving yojson, fields, dhall_type]
 
-    let fields = [| "txpool_max_size"; "peer_list_url" |]
+    let fields = Fields.names |> Array.of_list
 
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
@@ -401,9 +330,9 @@ module Json_layout = struct
   module Epoch_data = struct
     module Data = struct
       type t = { accounts : Accounts.t; seed : string }
-      [@@deriving yojson, dhall_type]
+      [@@deriving yojson, fields, dhall_type]
 
-      let fields = [| "accounts"; "seed" |]
+      let fields = Fields.names |> Array.of_list
 
       let of_yojson json = of_yojson_generic ~fields of_yojson json
     end
@@ -412,9 +341,9 @@ module Json_layout = struct
       { staking : Data.t
       ; next : (Data.t option[@default None]) (*If None then next = staking*)
       }
-    [@@deriving yojson, dhall_type]
+    [@@deriving yojson, fields, dhall_type]
 
-    let fields = [| "staking"; "next" |]
+    let fields = Fields.names |> Array.of_list
 
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
@@ -426,9 +355,9 @@ module Json_layout = struct
     ; ledger : Ledger.t option [@default None]
     ; epoch_data : Epoch_data.t option [@default None]
     }
-  [@@deriving yojson, dhall_type]
+  [@@deriving yojson, fields, dhall_type]
 
-  let fields = [| "daemon"; "ledger"; "genesis"; "proof"; "epoch_data" |]
+  let fields = Fields.names |> Array.of_list
 
   let of_yojson json = of_yojson_generic ~fields of_yojson json
 end
@@ -484,24 +413,21 @@ module Accounts = struct
     end
 
     module Permissions = Json_layout.Accounts.Single.Permissions
-    module Token_permissions = Json_layout.Accounts.Single.Token_permissions
     module Zkapp_account = Json_layout.Accounts.Single.Zkapp_account
 
     type t = Json_layout.Accounts.Single.t =
-      { pk : string option
+      { pk : string
       ; sk : string option
       ; balance : Currency.Balance.Stable.Latest.t
       ; delegate : string option
       ; timing : Timed.t option
       ; token : string option
-      ; token_permissions : Token_permissions.t option
       ; nonce : Mina_numbers.Account_nonce.Stable.Latest.t
       ; receipt_chain_hash : string option
       ; voting_for : string option
       ; zkapp : Zkapp_account.t option
       ; permissions : Permissions.t option
       ; token_symbol : string option
-      ; zkapp_uri : string option
       }
     [@@deriving bin_io_unversioned, sexp]
 
@@ -519,20 +445,18 @@ module Accounts = struct
   end
 
   type single = Single.t =
-    { pk : string option
+    { pk : string
     ; sk : string option
     ; balance : Currency.Balance.t
     ; delegate : string option
     ; timing : Single.Timed.t option
     ; token : string option
-    ; token_permissions : Single.Token_permissions.t option
     ; nonce : Mina_numbers.Account_nonce.t
     ; receipt_chain_hash : string option
     ; voting_for : string option
     ; zkapp : Single.Zkapp_account.t option
     ; permissions : Single.Permissions.t option
     ; token_symbol : string option
-    ; zkapp_uri : string option
     }
 
   type t = Single.t list [@@deriving bin_io_unversioned]
@@ -842,7 +766,12 @@ module Daemon = struct
   type t = Json_layout.Daemon.t =
     { txpool_max_size : int option
     ; peer_list_url : string option
-    ; transaction_expiry_hr : int option
+    ; zkapp_proof_update_cost : float option [@default None]
+    ; zkapp_signed_single_update_cost : float option [@default None]
+    ; zkapp_signed_pair_update_cost : float option [@default None]
+    ; zkapp_transaction_cost_limit : float option [@default None]
+    ; max_event_elements : int option [@default None]
+    ; max_action_elements : int option [@default None]
     }
   [@@deriving bin_io_unversioned]
 
@@ -860,9 +789,22 @@ module Daemon = struct
     { txpool_max_size =
         opt_fallthrough ~default:t1.txpool_max_size t2.txpool_max_size
     ; peer_list_url = opt_fallthrough ~default:t1.peer_list_url t2.peer_list_url
-    ; transaction_expiry_hr =
-        opt_fallthrough ~default:t1.transaction_expiry_hr
-          t2.transaction_expiry_hr
+    ; zkapp_proof_update_cost =
+        opt_fallthrough ~default:t1.zkapp_proof_update_cost
+          t2.zkapp_proof_update_cost
+    ; zkapp_signed_single_update_cost =
+        opt_fallthrough ~default:t1.zkapp_signed_single_update_cost
+          t2.zkapp_signed_single_update_cost
+    ; zkapp_signed_pair_update_cost =
+        opt_fallthrough ~default:t1.zkapp_signed_pair_update_cost
+          t2.zkapp_signed_pair_update_cost
+    ; zkapp_transaction_cost_limit =
+        opt_fallthrough ~default:t1.zkapp_transaction_cost_limit
+          t2.zkapp_transaction_cost_limit
+    ; max_event_elements =
+        opt_fallthrough ~default:t1.max_event_elements t2.max_event_elements
+    ; max_action_elements =
+        opt_fallthrough ~default:t1.max_action_elements t2.max_action_elements
     }
 end
 

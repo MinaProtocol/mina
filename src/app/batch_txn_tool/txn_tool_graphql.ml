@@ -102,7 +102,7 @@ let get_account_data ~public_key ~graphql_target_node =
   | Some acc -> (
       match acc.nonce with
       | Some s ->
-          return (int_of_string s)
+          return s
       | None ->
           Deferred.Or_error.errorf "Account with %s somehow doesnt have a nonce"
             (Public_key.Compressed.to_string pk) )

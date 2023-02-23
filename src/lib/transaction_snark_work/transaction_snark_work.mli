@@ -47,7 +47,7 @@ end
        H(all_statements_in_bundle || fee || public_key)
 *)
 
-type t =
+type t = Mina_wire_types.Transaction_snark_work.V2.t =
   { fee : Fee.t
   ; proofs : Ledger_proof.t One_or_two.t
   ; prover : Public_key.Compressed.t
@@ -62,7 +62,7 @@ val statement : t -> Statement.t
 
 module Stable : sig
   module V2 : sig
-    type t [@@deriving sexp, compare, bin_io, yojson, version]
+    type t [@@deriving equal, sexp, compare, bin_io, yojson, version]
   end
 end
 with type V2.t = t

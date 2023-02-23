@@ -5,6 +5,7 @@
    ;; opam libraries
    bin_prot.shape sexplib0 base.caml core_kernel
    ;; local libraries
+   mina_wire_types
    ppx_version.runtime
  )
  (instrumentation

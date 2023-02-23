@@ -23,7 +23,7 @@ Pipeline.build
           S.strictlyStart (S.contains "dockerfiles/stages/2-"),
           S.strictlyStart (S.contains "dockerfiles/stages/3-"),
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaToolchainArtifact"),
-          S.strictly (S.contains "src/opam.export")
+          S.strictly (S.contains "opam.export")
         ],
         path = "Release",
         name = "MinaToolchainArtifact"
@@ -64,19 +64,7 @@ Pipeline.build
 
       in
 
-      DockerImage.generateStep toolchainStretchSpec,
-
-      -- mina-toolchain Ubuntu 20.04 "Focal Fossa" Toolchain
-      let toolchainFocalSpec = DockerImage.ReleaseSpec::{
-        service="mina-toolchain",
-        deb_codename="focal",
-        extra_args="--no-cache",
-        step_key="toolchain-focal-docker-image"
-      }
-
-      in
-
-      DockerImage.generateStep toolchainFocalSpec
+      DockerImage.generateStep toolchainStretchSpec
 
     ]
   }

@@ -1,0 +1,83 @@
+{
+ "network": {
+  "blockchain": "mina",
+  "network": "debug"
+ },
+ "online_url": "http://localhost:PLACEHOLDER_ROSETTA_ONLINE_PORT",
+ "data_directory": "",
+ "http_timeout": 10,
+ "max_retries": 5,
+ "retry_elapsed_time": 0,
+ "max_online_connections": 120,
+ "max_sync_concurrency": 64,
+ "tip_delay": 300,
+ "max_reorg_depth": 100,
+ "log_configuration": false,
+ "compression_disabled": false,
+ "l0_in_memory_enabled": false,
+ "all_in_memory_enabled": false,
+ "error_stack_trace_disabled": false,
+ "coin_supported": false,
+ "construction": {
+ "prefunded_accounts":[
+   {
+     "privkey": "PLACEHOLDER_PREFUNDED_PRIVKEY",
+     "account_identifier":{
+     "address": "PLACEHOLDER_PREFUNDED_ADDRESS",
+     "metadata": {"token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"}
+     },
+     "curve_type":"pallas",
+     "currency":{"symbol":"MINA", "decimals":9}
+   }
+   ],
+   "offline_url":                "http://localhost:PLACEHOLDER_ROSETTA_OFFLINE_PORT",
+   "max_offline_connections":    4,
+   "force_retry":                false,
+   "stale_depth":                3,
+   "broadcast_limit":            0,
+   "ignore_broadcast_failures":  false,
+   "clear_broadcasts":           false,
+   "broadcast_behind_tip":       false,
+   "block_broadcast_limit":      0,
+   "rebroadcast_all":            false,
+   "constructor_dsl_file":       "mina.ros",
+   "status_port":                2079,
+   "results_output_file":        "output.log",
+   "quiet":                      false,
+   "initial_balance_fetch_disabled": false,
+   "end_conditions": {
+     "create_account":      10,
+     "transfer_payment":    20,
+     "transfer_delegation": 5
+   }
+ },
+ "data": {
+  "active_reconciliation_concurrency": 16,
+  "inactive_reconciliation_concurrency": 4,
+  "inactive_reconciliation_frequency": 250,
+  "log_blocks": false,
+  "log_transactions": false,
+  "log_balance_changes": false,
+  "log_reconciliations": false,
+  "ignore_reconciliation_error": false,
+  "exempt_accounts": "",
+  "bootstrap_balances": "",
+  "interesting_accounts": "",
+  "reconciliation_disabled": false,
+  "reconciliation_drain_disabled": false,
+  "inactive_discrepancy_search_disabled": false,
+  "balance_tracking_disabled": false,
+  "coin_tracking_disabled": false,
+  "status_port": 9090,
+  "results_output_file": "",
+  "pruning_block_disabled": false,
+  "pruning_balance_disabled": false,
+  "initial_balance_fetch_disabled": false,
+  "end_conditions": {
+    "reconciliation_coverage": {
+      "tip": true
+    }
+  }
+ },
+ "perf": null
+}

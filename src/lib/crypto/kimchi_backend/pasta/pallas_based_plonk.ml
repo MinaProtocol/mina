@@ -1,22 +1,20 @@
 open Core_kernel
 open Kimchi_backend_common
-open Basic
+open Kimchi_pasta_basic
 module Field = Fq
 module Curve = Pallas
 
 module Bigint = struct
-  module R = struct
-    include Field.Bigint
+  include Field.Bigint
 
-    let of_data _ = failwith __LOC__
+  let of_data _ = failwith __LOC__
 
-    let to_field = Field.of_bigint
+  let to_field = Field.of_bigint
 
-    let of_field = Field.to_bigint
-  end
+  let of_field = Field.to_bigint
 end
 
-let field_size : Bigint.R.t = Field.size
+let field_size : Bigint.t = Field.size
 
 module Verification_key = struct
   type t =
@@ -34,35 +32,19 @@ end
 
 (* TODO: change name *)
 module R1CS_constraint_system =
-  Plonk_constraint_system.Make
-    (Field)
-    (Kimchi_bindings.Protocol.Gates.Vector.Fq)
-    (struct
-      let params =
-        Sponge.Params.(
-          map pasta_q_kimchi ~f:(fun x ->
-              Field.of_bigint (Bigint256.of_decimal_string x) ))
-    end)
+  Kimchi_pasta_constraint_system.Pallas_constraint_system
 
-module Var = Var
-
-let lagrange : int -> _ Kimchi_types.poly_comm array =
-  Memo.general ~hashable:Int.hashable (fun domain_log2 ->
-      Array.map
-        Precomputed.Lagrange_precomputations.(
-          pallas.(index_of_domain_log2 domain_log2))
-        ~f:(fun unshifted ->
-          { Kimchi_types.unshifted =
-              Array.map unshifted ~f:(fun (x, y) -> Kimchi_types.Finite (x, y))
-          ; shifted = None
-          } ) )
+let lagrange srs domain_log2 : _ Kimchi_types.poly_comm array =
+  let domain_size = Int.pow 2 domain_log2 in
+  Array.init domain_size ~f:(fun i ->
+      Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment srs domain_size i )
 
 let with_lagrange f (vk : Verification_key.t) =
-  f (lagrange vk.domain.log_size_of_group) vk
+  f (lagrange vk.srs vk.domain.log_size_of_group) vk
 
 let with_lagranges f (vks : Verification_key.t array) =
   let lgrs =
-    Array.map vks ~f:(fun vk -> lagrange vk.domain.log_size_of_group)
+    Array.map vks ~f:(fun vk -> lagrange vk.srs vk.domain.log_size_of_group)
   in
   f lgrs vks
 

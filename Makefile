@@ -32,25 +32,6 @@ GITLONGHASH := $(shell git rev-parse HEAD)
 LIBP2P_HELPER_SIG := $(shell cd src/app/libp2p_helper ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
 
 ########################################
-## Git hooks
-
-git_hooks: $(wildcard scripts/git_hooks/*)
-	@case "$$(file .git | cut -d: -f2)" in \
-	' ASCII text') \
-	    echo 'refusing to install git hooks in worktree' \
-	    break;; \
-	' directory') \
-	    for f in $^; do \
-	      [ ! -f ".git/hooks/$$(basename $$f)" ] && ln -s ../../$$f .git/hooks/; \
-	    done; \
-	    break;; \
-	*) \
-	    echo 'unhandled case when installing git hooks' \
-	    exit 1 \
-	    break;; \
-	esac
-
-########################################
 ## Code
 
 all: clean build
@@ -70,7 +51,20 @@ ocaml_version:
 ocaml_word_size:
 	@if ! ocamlopt -config | grep "word_size:" | grep $(WORD_SIZE); then echo "invalid machine word size, expected $(WORD_SIZE)" ; exit 1; fi
 
-ocaml_checks: ocaml_version ocaml_word_size
+
+# Checks that the current opam switch contains the packages from opam.export at the same version.
+# This check is disabled in the pure nix environment (that does not use opam).
+check_opam_switch:
+ifneq ($(DISABLE_CHECK_OPAM_SWITCH), true)
+    ifeq (, $(shell which check_opam_switch))
+	$(warning The check_opam_switch binary was not found in the PATH.)
+	$(error The current opam switch should likely be updated by running: "opam switch import opam.export")
+    else
+	check_opam_switch opam.export
+    endif
+endif
+
+ocaml_checks: ocaml_version ocaml_word_size check_opam_switch
 
 libp2p_helper:
 	make -C src/app/libp2p_helper
@@ -80,22 +74,26 @@ genesis_ledger: ocaml_checks
 	ulimit -s 65532 && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir $(GENESIS_DIR)
 	$(info Genesis ledger and genesis proof generated)
 
-build: ocaml_checks git_hooks reformat-diff libp2p_helper
+# checks that every OCaml packages in the project build without issues
+check: ocaml_checks libp2p_helper
+	dune build @src/check
+
+build: ocaml_checks reformat-diff libp2p_helper
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
-build_all_sigs: ocaml_checks git_hooks reformat-diff libp2p_helper
+build_all_sigs: ocaml_checks reformat-diff libp2p_helper
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe src/app/cli/src/mina_testnet_signatures.exe src/app/cli/src/mina_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
-build_archive: ocaml_checks git_hooks reformat-diff
+build_archive: ocaml_checks reformat-diff
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
-build_archive_all_sigs: ocaml_checks git_hooks reformat-diff
+build_archive_all_sigs: ocaml_checks reformat-diff
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/archive/archive_testnet_signatures.exe src/app/archive/archive_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
@@ -117,7 +115,7 @@ build_intgtest: ocaml_checks
 
 client_sdk: ocaml_checks
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune b src/lib/crypto/kimchi_bindings/js/node_js && dune b src/app/client_sdk/client_sdk.bc.js
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/client_sdk.bc.js
 	$(info Build complete)
 
 client_sdk_test_sigs: ocaml_checks
@@ -136,7 +134,7 @@ mina_signer: ocaml_checks
 	&& dune b src/lib/crypto/kimchi_bindings/js/node_js \
 	&& dune b src/app/client_sdk/client_sdk.bc.js \
 	&& (cd frontend/mina-signer; \
-	([ -d node_modules ] || npm i) && npm run copy-jsoo && npm run copy-wasm && npm run build; \
+	([ -d node_modules ] || npm i) && npm run copy-jsoo && npm run build; \
 	cd ../..)
 	$(info Build complete)
 
@@ -217,7 +215,7 @@ update-graphql:
 ########################################
 ## Lint
 
-reformat: ocaml_checks git_hooks
+reformat: ocaml_checks
 	dune exec --profile=$(DUNE_PROFILE) src/app/reformat/reformat.exe -- -path .
 
 reformat-diff:
@@ -253,6 +251,9 @@ deb_optimized:
 	@mkdir -p /tmp/artifacts
 	@cp _build/mina*.deb /tmp/artifacts/.
 
+test_executive_deb:
+	./scripts/rebuild_test_executive_deb.sh
+
 build_pv_keys: ocaml_checks
 	$(info Building keys)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
@@ -284,16 +285,13 @@ genesis-ledger-ocaml:
 ## Tests
 
 test-ppx:
-	$(MAKE) -C src/lib/ppx_coda/tests
-
-web:
-	./scripts/web.sh
+	$(MAKE) -C src/lib/ppx_mina/tests
 
 ########################################
 ## Benchmarks
 
 benchmarks: ocaml_checks
-	dune build src/app/benchmarks/main.exe
+	dune build src/app/benchmarks/benchmarks.exe
 
 ########################################
 # Coverage testing and output

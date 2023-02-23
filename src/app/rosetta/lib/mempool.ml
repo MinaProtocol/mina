@@ -1,3 +1,4 @@
+module Scalars = Graphql_lib.Scalars
 module Serializing = Graphql_lib.Serializing
 
 module Get_all_transactions =
@@ -9,7 +10,7 @@ module Get_all_transactions =
         chainId
       }
       pooledUserCommands(publicKey: null) {
-        hash
+        hash @ppxCustom(module: "Scalars.String_json")
       }
     }
 |}]
@@ -24,28 +25,27 @@ module Get_transactions_by_hash =
         peers { host }
       }
       pooledUserCommands(hashes: $hashes) {
-        hash
-        amount @ppxCustom(module: "Serializing.UInt64")
-        fee @ppxCustom(module: "Serializing.UInt64")
+        hash @ppxCustom(module: "Scalars.String_json")
+        amount @ppxCustom(module: "Scalars.UInt64")
+        fee @ppxCustom(module: "Scalars.UInt64")
         kind
         feeToken @ppxCustom(module: "Serializing.Token_s")
-        validUntil @ppxCustom(module: "Serializing.Optional_uint32")
+        validUntil @ppxCustom(module: "Scalars.UInt32")
         memo
         feePayer {
-          publicKey
+          publicKey @ppxCustom(module: "Scalars.JSON")
         }
         nonce
         receiver {
-          publicKey
+          publicKey @ppxCustom(module: "Scalars.JSON")
         }
         source {
-          publicKey
+          publicKey @ppxCustom(module: "Scalars.JSON")
         }
-        token  @ppxCustom(module: "Serializing.Token_s")
+        token @ppxCustom(module: "Serializing.Token_s")
       }
     }
 |}]
-let _ = Decoders.uint32
 
 (* Avoid shadowing graphql_ppx functions *)
 open Core_kernel
@@ -248,7 +248,7 @@ module Transaction = struct
       ; fee_token= obj.feeToken
       ; nonce= Unsigned.UInt32.of_int obj.nonce
       ; amount= Some obj.amount
-      ; valid_until= obj.validUntil
+      ; valid_until= Some obj.validUntil
       ; memo = if String.equal obj.memo "" then None else Some obj.memo
       ; failure_status= None
       ; hash= obj.hash }
@@ -280,7 +280,8 @@ module Transaction = struct
           { Transaction.transaction_identifier=
               {Transaction_identifier.hash= req.transaction_identifier.hash}
           ; operations= user_command_info |> User_command_info.to_operations'
-          ; metadata= None }
+          ; metadata= None
+          ; related_transactions= [] }
       ; metadata= None }
   end
 

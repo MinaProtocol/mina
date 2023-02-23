@@ -79,19 +79,16 @@ let to_input (t : value) =
 
 type var = (T.Checked.t, T.Checked.t, Block_time.Checked.t) Poly.t
 
-let data_spec =
-  Data_spec.
+let typ =
+  Typ.of_hlistable
     [ T.Checked.typ
     ; T.Checked.typ
     ; T.Checked.typ
     ; T.Checked.typ
     ; Block_time.Checked.typ
     ]
-
-let typ =
-  Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
-    ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
-    ~value_of_hlist:Poly.of_hlist
+    ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+    ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
 let var_to_input (var : var) =
   let k = T.Checked.to_input var.k
@@ -114,8 +111,8 @@ let%test_unit "value = var" =
   let test protocol_constants =
     let open Snarky_backendless in
     let p_var =
-      let%map p = exists typ ~compute:(As_prover.return protocol_constants) in
-      As_prover.read typ p
+      let%map p = exists typ ~compute:(As_prover0.return protocol_constants) in
+      As_prover0.read typ p
     in
     let res = Or_error.ok_exn (run_and_check p_var) in
     [%test_eq: Value.t] res protocol_constants ;

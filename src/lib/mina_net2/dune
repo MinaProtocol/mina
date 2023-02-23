@@ -21,6 +21,7 @@
    base.caml
    base.base_internalhash_types
    splittable_random
+   integers
    ;; local libraries
    blake2
    error_json
@@ -34,7 +35,8 @@
    o1trace
    staged_ledger_diff
    ppx_version.runtime
+   consensus
  )
  (inline_tests)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_let ppx_deriving_yojson)))
+ (preprocess (pps ppx_mina ppx_version ppx_jane ppx_deriving.std ppx_let ppx_deriving_yojson)))

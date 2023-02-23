@@ -8,6 +8,14 @@ open Mina_transaction
 
 let mina_archive_container_id = "archive"
 
+let mina_archive_username = "mina"
+
+let mina_archive_pw = "zo3moong7moog4Iep7eNgo3iecaesahH"
+
+let postgres_url =
+  Printf.sprintf "postgres://%s:%s@archive-1-postgresql:5432/archive"
+    mina_archive_username mina_archive_pw
+
 let node_password = "naughty blue worm"
 
 type config =
@@ -21,32 +29,39 @@ let base_kube_args { cluster; namespace; _ } =
   [ "--cluster"; cluster; "--namespace"; namespace ]
 
 module Node = struct
-  type info =
+  type pod_info =
     { network_keypair : Network_keypair.t option
-    ; has_archive_container : bool
     ; primary_container_id : string
+          (* this is going to be probably either "mina" or "worker" *)
+    ; has_archive_container : bool
+          (* archive pods have a "mina" container and an "archive" container alongside *)
     }
 
-  type t = { app_id : string; pod_id : string; info : info; config : config }
+  type t =
+    { app_id : string; pod_id : string; pod_info : pod_info; config : config }
 
   let id { pod_id; _ } = pod_id
 
-  let network_keypair { info = { network_keypair; _ }; _ } = network_keypair
+  let network_keypair { pod_info = { network_keypair; _ }; _ } = network_keypair
 
   let base_kube_args t = [ "--cluster"; t.cluster; "--namespace"; t.namespace ]
 
-  let get_logs_in_container ?container_id { pod_id; config; info; _ } =
+  let get_logs_in_container ?container_id { pod_id; config; pod_info; _ } =
     let container_id =
-      Option.value container_id ~default:info.primary_container_id
+      Option.value container_id ~default:pod_info.primary_container_id
     in
     let%bind cwd = Unix.getcwd () in
     Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code:13 cwd "kubectl"
       (base_kube_args config @ [ "logs"; "-c"; container_id; pod_id ])
 
-  let run_in_container ?(exit_code = 10) ?container_id ~cmd t =
-    let { pod_id; config; info; _ } = t in
+  let run_in_container ?(exit_code = 10) ?container_id ?override_with_pod_id
+      ~cmd t =
+    let { config; pod_info; _ } = t in
+    let pod_id =
+      match override_with_pod_id with Some pid -> pid | None -> t.pod_id
+    in
     let container_id =
-      Option.value container_id ~default:info.primary_container_id
+      Option.value container_id ~default:pod_info.primary_container_id
     in
     let%bind cwd = Unix.getcwd () in
     Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code cwd "kubectl"
@@ -55,9 +70,9 @@ module Node = struct
       @ cmd )
 
   let cp_string_to_container_file ?container_id ~str ~dest t =
-    let { pod_id; config; info; _ } = t in
+    let { pod_id; config; pod_info; _ } = t in
     let container_id =
-      Option.value container_id ~default:info.primary_container_id
+      Option.value container_id ~default:pod_info.primary_container_id
     in
     let tmp_file, oc =
       Caml.Filename.open_temp_file ~temp_dir:Filename.temp_dir_name
@@ -90,14 +105,14 @@ module Node = struct
     ; ("pod_id", `String node.pod_id)
     ]
 
-  module Serializing = Graphql_lib.Serializing
+  module Scalars = Graphql_lib.Scalars
 
   module Graphql = struct
     let ingress_uri node =
       let host =
-        Printf.sprintf "%s.graphql.test.o1test.net" node.config.testnet_name
+        sprintf "%s.graphql.test.o1test.net" node.config.testnet_name
       in
-      let path = Printf.sprintf "/%s/graphql" node.app_id in
+      let path = sprintf "/%s/graphql" node.app_id in
       Uri.make ~scheme:"http" ~host ~path ~port:80 ()
 
     module Client = Graphql_lib.Client.Make (struct
@@ -115,7 +130,9 @@ module Node = struct
     ({|
       mutation ($password: String!, $public_key: PublicKey!) @encoders(module: "Encoders"){
         unlockAccount(input: {password: $password, publicKey: $public_key }) {
-          public_key: publicKey @ppxCustom(module: "Serializing.Public_key")
+          account {
+            public_key: publicKey
+          }
         }
       }
     |}
@@ -189,6 +206,8 @@ module Node = struct
 
     (* TODO: temporary version *)
     module Send_test_zkapp = Generated_graphql_queries.Send_test_zkapp
+    module Pooled_zkapp_commands =
+      Generated_graphql_queries.Pooled_zkapp_commands
 
     module Query_peer_id =
     [%graphql
@@ -211,10 +230,10 @@ module Node = struct
     {|
       query ($max_length: Int) @encoders(module: "Encoders"){
         bestChain (maxLength: $max_length) {
-          stateHash
+          stateHash @ppxCustom(module: "Graphql_lib.Scalars.String_json")
           commandTransactionCount
           creatorAccount {
-            publicKey
+            publicKey @ppxCustom(module: "Graphql_lib.Scalars.JSON")
           }
         }
       }
@@ -241,9 +260,9 @@ module Node = struct
     {|
       query ($public_key: PublicKey!, $token: UInt64) {
         account (publicKey : $public_key, token : $token) {
-          balance { liquid @ppxCustom(module: "Serializing.Balance")
-                    locked @ppxCustom(module: "Serializing.Balance")
-                    total @ppxCustom(module: "Serializing.Balance")
+          balance { liquid
+                    locked
+                    total
                   }
           delegate
           nonce
@@ -252,19 +271,21 @@ module Node = struct
                         incrementNonce
                         receive
                         send
+                        access
                         setDelegate
                         setPermissions
                         setZkappUri
                         setTokenSymbol
                         setVerificationKey
                         setVotingFor
+                        setTiming
                       }
           sequenceEvents
           zkappState
           zkappUri
-          timing { cliffTime
+          timing { cliffTime @ppxCustom(module: "Graphql_lib.Scalars.JSON")
                    cliffAmount
-                   vestingPeriod
+                   vestingPeriod @ppxCustom(module: "Graphql_lib.Scalars.JSON")
                    vestingIncrement
                    initialMinimumBalance
                  }
@@ -435,12 +456,11 @@ module Node = struct
     | Some acc ->
         return
           { nonce =
-              acc.nonce
-              |> Option.value_exn
-                   ~message:
-                     "the nonce from get_balance is None, which should be \
-                      impossible"
-              |> Mina_numbers.Account_nonce.of_string
+              Option.value_exn
+                ~message:
+                  "the nonce from get_balance is None, which should be \
+                   impossible"
+                acc.nonce
           ; total_balance = acc.balance.total
           ; liquid_balance_opt = acc.balance.liquid
           ; locked_balance_opt = acc.balance.locked
@@ -472,6 +492,7 @@ module Node = struct
     ; increment_nonce = to_auth_required account_permissions.incrementNonce
     ; receive = to_auth_required account_permissions.receive
     ; send = to_auth_required account_permissions.send
+    ; access = to_auth_required account_permissions.access
     ; set_delegate = to_auth_required account_permissions.setDelegate
     ; set_permissions = to_auth_required account_permissions.setPermissions
     ; set_zkapp_uri = to_auth_required account_permissions.setZkappUri
@@ -479,6 +500,7 @@ module Node = struct
     ; set_verification_key =
         to_auth_required account_permissions.setVerificationKey
     ; set_voting_for = to_auth_required account_permissions.setVotingFor
+    ; set_timing = to_auth_required account_permissions.setTiming
     }
 
   let graphql_uri node = Graphql.ingress_uri node |> Uri.to_string
@@ -499,7 +521,7 @@ module Node = struct
     | None ->
         fail (Error.of_string "Could not get account from ledger")
 
-  (* return a Party.Update.t with all fields `Set` to the
+  (* return a Account_update.Update.t with all fields `Set` to the
      value in the account, or `Keep` if value unavailable,
      as if this update had been applied to the account
   *)
@@ -514,9 +536,7 @@ module Node = struct
           match account.zkappState with
           | Some strs ->
               let fields =
-                Array.to_list strs
-                |> Base.List.map ~f:(fun s ->
-                       Set (Pickles.Backend.Tick.Field.of_string s) )
+                Array.to_list strs |> Base.List.map ~f:(fun s -> Set s)
               in
               return (Mina_base.Zkapp_state.V.of_list_exn fields)
           | None ->
@@ -530,25 +550,16 @@ module Node = struct
         in
         let%bind delegate =
           match account.delegate with
-          | Some (`String s) ->
-              return
-                (Set (Signature_lib.Public_key.Compressed.of_base58_check_exn s))
-          | Some json ->
-              fail
-                (Error.of_string
-                   (sprintf "Expected string encoding of delegate, got %s"
-                      (Yojson.Basic.to_string json) ) )
+          | Some s ->
+              return (Set s)
           | None ->
               fail (Error.of_string "Expected delegate in account")
         in
         let%bind verification_key =
           match account.verificationKey with
           | Some vk_obj ->
-              let data =
-                Pickles.Side_loaded.Verification_key.of_base58_check_exn
-                  vk_obj.verificationKey
-              in
-              let hash = Pickles.Backend.Tick.Field.of_string vk_obj.hash in
+              let data = vk_obj.verificationKey in
+              let hash = vk_obj.hash in
               return (Set ({ data; hash } : _ With_hash.t))
           | None ->
               fail
@@ -597,15 +608,7 @@ module Node = struct
           | None, None, None, None, None ->
               return @@ Keep
           | Some amt, Some tm, Some period, Some incr, Some bal ->
-              let%bind cliff_amount =
-                match amt with
-                | `String s ->
-                    return @@ Currency.Amount.of_string s
-                | _ ->
-                    fail
-                      (Error.of_string
-                         "Expected string for cliff amount in account timing" )
-              in
+              let cliff_amount = amt in
               let%bind cliff_time =
                 match tm with
                 | `String s ->
@@ -624,26 +627,8 @@ module Node = struct
                       (Error.of_string
                          "Expected string for vesting period in account timing" )
               in
-              let%bind vesting_increment =
-                match incr with
-                | `String s ->
-                    return @@ Currency.Amount.of_string s
-                | _ ->
-                    fail
-                      (Error.of_string
-                         "Expected string for vesting increment in account \
-                          timing" )
-              in
-              let%bind initial_minimum_balance =
-                match bal with
-                | `String s ->
-                    return @@ Currency.Balance.of_string s
-                | _ ->
-                    fail
-                      (Error.of_string
-                         "Expected string for vesting increment in account \
-                          timing" )
-              in
+              let vesting_increment = incr in
+              let initial_minimum_balance = bal in
               return
                 (Set
                    ( { initial_minimum_balance
@@ -652,14 +637,14 @@ module Node = struct
                      ; vesting_period
                      ; vesting_increment
                      }
-                     : Mina_base.Party.Update.Timing_info.t ) )
+                     : Mina_base.Account_update.Update.Timing_info.t ) )
           | _ ->
               fail (Error.of_string "Some pieces of account timing are missing")
         in
         let%bind voting_for =
           match account.votingFor with
           | Some s ->
-              return @@ Set (Mina_base.State_hash.of_base58_check_exn s)
+              return @@ Set s
           | None ->
               fail (Error.of_string "Expected voting-for state hash in account")
         in
@@ -673,7 +658,7 @@ module Node = struct
             ; timing
             ; voting_for
             }
-            : Mina_base.Party.Update.t )
+            : Mina_base.Account_update.Update.t )
     | None ->
         fail (Error.of_string "Could not get account from ledger")
 
@@ -682,6 +667,9 @@ module Node = struct
     ; hash : Transaction_hash.t
     ; nonce : Mina_numbers.Account_nonce.t
     }
+
+  let transaction_id_to_string id =
+    Yojson.Basic.to_string (Graphql_lib.Scalars.TransactionId.serialize id)
 
   (* if we expect failure, might want retry_on_graphql_error to be false *)
   let send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
@@ -716,8 +704,8 @@ module Node = struct
     let%map sent_payment_obj = send_payment_graphql () in
     let return_obj = sent_payment_obj.sendPayment.payment in
     let res =
-      { id = return_obj.id
-      ; hash = Transaction_hash.of_base58_check_exn return_obj.hash
+      { id = transaction_id_to_string return_obj.id
+      ; hash = return_obj.hash
       ; nonce = Mina_numbers.Account_nonce.of_int return_obj.nonce
       }
     in
@@ -734,19 +722,20 @@ module Node = struct
     send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let send_zkapp ~logger (t : t) ~(parties : Mina_base.Parties.t) =
+  let send_zkapp ~logger (t : t) ~(zkapp_command : Mina_base.Zkapp_command.t) =
     [%log info] "Sending a zkapp"
       ~metadata:
         [ ("namespace", `String t.config.namespace)
         ; ("pod_id", `String (id t))
         ] ;
     let open Deferred.Or_error.Let_syntax in
-    let parties_json =
-      Mina_base.Parties.to_json parties |> Yojson.Safe.to_basic
+    let zkapp_command_json =
+      Mina_base.Zkapp_command.to_json zkapp_command |> Yojson.Safe.to_basic
     in
     let send_zkapp_graphql () =
       let send_zkapp_obj =
-        Graphql.Send_test_zkapp.(make @@ makeVariables ~parties:parties_json ())
+        Graphql.Send_test_zkapp.(
+          make @@ makeVariables ~zkapp_command:zkapp_command_json ())
       in
       exec_graphql_request ~logger ~node:t ~query_name:"send_zkapp_graphql"
         send_zkapp_obj
@@ -763,20 +752,80 @@ module Node = struct
                   | None ->
                       acc
                   | Some f ->
-                      ( Int.of_string (Option.value_exn f.index)
-                      , Array.map
-                          ~f:(fun s ->
-                            Mina_base.Transaction_status.Failure.of_string s
-                            |> Result.ok_or_failwith )
-                          f.failures
-                        |> Array.to_list |> List.rev )
-                      :: acc )
+                      let t =
+                        ( Option.value_exn f.index
+                        , f.failures |> Array.to_list |> List.rev )
+                      in
+                      t :: acc )
             |> Mina_base.Transaction_status.Failure.Collection.Display.to_yojson
             |> Yojson.Safe.to_string )
     in
-    let zkapp_id = sent_zkapp_obj.internalSendZkapp.zkapp.id in
+    let zkapp_id =
+      transaction_id_to_string sent_zkapp_obj.internalSendZkapp.zkapp.id
+    in
     [%log info] "Sent zkapp" ~metadata:[ ("zkapp_id", `String zkapp_id) ] ;
     return zkapp_id
+
+  let get_pooled_zkapp_commands ~logger (t : t)
+      ~(pk : Signature_lib.Public_key.Compressed.t) =
+    [%log info] "Retrieving zkapp_commands from transaction pool"
+      ~metadata:
+        [ ("namespace", `String t.config.namespace)
+        ; ("pod_id", `String (id t))
+        ; ("pub_key", Signature_lib.Public_key.Compressed.to_yojson pk)
+        ] ;
+    let open Deferred.Or_error.Let_syntax in
+    let get_pooled_zkapp_commands_graphql () =
+      let get_pooled_zkapp_commands =
+        Graphql.Pooled_zkapp_commands.(
+          make
+          @@ makeVariables ~public_key:(Graphql_lib.Encoders.public_key pk) ())
+      in
+      exec_graphql_request ~logger ~node:t
+        ~query_name:"get_pooled_zkapp_commands" get_pooled_zkapp_commands
+    in
+    let%bind zkapp_pool_obj = get_pooled_zkapp_commands_graphql () in
+    let%bind () =
+      match zkapp_pool_obj.pooledZkappCommands with
+      | [||] ->
+          return ()
+      | zkapp_commands ->
+          Deferred.Or_error.errorf "Zkapp failed, reasons: %s"
+            ( Array.fold ~init:[] zkapp_commands
+                ~f:(fun failures zkapp_command ->
+                  match zkapp_command.failureReason with
+                  | None ->
+                      failures
+                  | Some f ->
+                      let inner_failures =
+                        Array.fold ~init:[] f ~f:(fun failures failure ->
+                            match failure with
+                            | None ->
+                                failures
+                            | Some f ->
+                                ( Option.value_exn f.index
+                                , f.failures |> Array.to_list |> List.rev )
+                                :: failures )
+                      in
+                      List.map inner_failures ~f:(fun f -> f :: failures)
+                      |> List.concat )
+            |> Mina_base.Transaction_status.Failure.Collection.Display.to_yojson
+            |> Yojson.Safe.to_string )
+    in
+
+    let transaction_ids =
+      Array.map zkapp_pool_obj.pooledZkappCommands ~f:(fun zkapp_command ->
+          zkapp_command.id |> Transaction_id.to_base64 )
+      |> Array.to_list
+    in
+    [%log info] "Retrieved zkapp_commands from transaction pool"
+      ~metadata:
+        [ ("namespace", `String t.config.namespace)
+        ; ("pod_id", `String (id t))
+        ; ( "transaction ids"
+          , `List (List.map ~f:(fun t -> `String t) transaction_ids) )
+        ] ;
+    return transaction_ids
 
   let send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee =
     [%log info] "Sending stake delegation" ~metadata:(logger_metadata t) ;
@@ -811,8 +860,8 @@ module Node = struct
     let%map result_obj = send_delegation_graphql () in
     let return_obj = result_obj.sendDelegation.delegation in
     let res =
-      { id = return_obj.id
-      ; hash = Transaction_hash.of_base58_check_exn return_obj.hash
+      { id = transaction_id_to_string return_obj.id
+      ; hash = return_obj.hash
       ; nonce = Mina_numbers.Account_nonce.of_int return_obj.nonce
       }
     in
@@ -855,8 +904,8 @@ module Node = struct
     let%map sent_payment_obj = send_payment_graphql () in
     let return_obj = sent_payment_obj.sendPayment.payment in
     let res =
-      { id = return_obj.id
-      ; hash = Transaction_hash.of_base58_check_exn return_obj.hash
+      { id = transaction_id_to_string return_obj.id
+      ; hash = return_obj.hash
       ; nonce = Mina_numbers.Account_nonce.of_int return_obj.nonce
       }
     in
@@ -905,22 +954,40 @@ module Node = struct
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let dump_archive_data ~logger (t : t) ~data_file =
-    (* this function won't work if t doesn't happen to be an archive node *)
-    if not t.info.has_archive_container then
+    (* this function won't work if `t` doesn't happen to be an archive node *)
+    if not t.pod_info.has_archive_container then
       failwith
         "No archive container found.  One can only dump archive data of an \
          archive node." ;
     let open Malleable_error.Let_syntax in
-    [%log info] "Dumping archive data from (node: %s, container: %s)" t.pod_id
-      mina_archive_container_id ;
+    let postgresql_pod_id = t.app_id ^ "-postgresql-0" in
+    let postgresql_container_id = "postgresql" in
+    (* Some quick clarification on the archive nodes:
+         An archive node archives all blocks as they come through, but does not produce blocks.
+         An archive node uses postgresql as storage, the postgresql db needs to be separately brought up and is sort of it's own thing infra wise
+         Archive nodes can be run side-by-side with an actual mina node
+
+       in the integration test framework, every archive node will have it's own single postgresql instance.
+       thus in the integration testing framework there will always be a one to one correspondence between archive node and postgresql db.
+       however more generally, it's entirely possible for a mina user/operator set up multiple archive nodes to be backed by a single postgresql database.
+       But for now we will assume that we don't need to test that
+
+       The integration test framework creates kubenetes deployments or "workloads" as they are called in GKE, but Nodes are mainly tracked by pod_id
+
+       A postgresql workload in the integration test framework will always have 1 managed pod,
+         whose pod_id is simply the app id/workload name of the archive node appended with "-postgresql-0".
+         so if the archive node is called "archive-1", then the corresponding postgresql managed pod will be called "archive-1-postgresql-0".
+       That managed pod will have exactly 1 container, and it will be called simply "postgresql"
+
+       It's rather hardcoded but this was just the simplest way to go, as our kubernetes_network tracks Nodes, ie MINA nodes.  a postgresql db is hard to account for
+       It's possible to run pg_dump from the archive node instead of directly reaching out to the postgresql pod, and that's what we used to do but there were occasionally version mismatches between the pg_dump on the archive node and the postgresql on the postgresql db
+    *)
+    [%log info] "Dumping archive data from (node: %s, container: %s)"
+      postgresql_pod_id postgresql_container_id ;
     let%map data =
-      run_in_container t ~container_id:mina_archive_container_id
-        ~cmd:
-          [ "pg_dump"
-          ; "--create"
-          ; "--no-owner"
-          ; "postgres://postgres:foobar@archive-1-postgresql:5432/archive"
-          ]
+      run_in_container t ~container_id:postgresql_container_id
+        ~override_with_pod_id:postgresql_pod_id
+        ~cmd:[ "pg_dump"; "--create"; "--no-owner"; postgres_url ]
     in
     [%log info] "Dumping archive data to file %s" data_file ;
     Out_channel.with_file data_file ~f:(fun out_ch ->
@@ -949,7 +1016,7 @@ module Node = struct
       ~cmd:
         [ "mina-replayer"
         ; "--archive-uri"
-        ; "postgres://postgres:foobar@archive-1-postgresql:5432/archive"
+        ; postgres_url
         ; "--input-file"
         ; dest
         ; "--output-file"
@@ -960,7 +1027,7 @@ module Node = struct
   let dump_mina_logs ~logger (t : t) ~log_file =
     let open Malleable_error.Let_syntax in
     [%log info] "Dumping container logs from (node: %s, container: %s)" t.pod_id
-      t.info.primary_container_id ;
+      t.pod_info.primary_container_id ;
     let%map logs = get_logs_in_container t in
     [%log info] "Dumping container log to file %s" log_file ;
     Out_channel.with_file log_file ~f:(fun out_ch ->
@@ -970,7 +1037,7 @@ module Node = struct
     let open Malleable_error.Let_syntax in
     [%log info]
       "Dumping precomputed blocks from logs for (node: %s, container: %s)"
-      t.pod_id t.info.primary_container_id ;
+      t.pod_id t.pod_info.primary_container_id ;
     let%bind logs = get_logs_in_container t in
     (* kubectl logs may include non-log output, like "Using password from environment variable" *)
     let log_lines =
@@ -1081,10 +1148,16 @@ module Node = struct
         }
 end
 
-module Workload = struct
-  type t = { workload_id : string; node_info : Node.info list }
+module Workload_to_deploy = struct
+  type t = { workload_id : string; pod_info : Node.pod_info list }
 
-  let get_nodes t ~config =
+  let construct_workload workload_id pod_info : t = { workload_id; pod_info }
+
+  let cons_pod_info ?network_keypair ?(has_archive_container = false)
+      primary_container_id : Node.pod_info =
+    { network_keypair; has_archive_container; primary_container_id }
+
+  let get_nodes_from_workload t ~config =
     let%bind cwd = Unix.getcwd () in
     let open Malleable_error.Let_syntax in
     let%bind app_id =
@@ -1108,13 +1181,14 @@ module Workload = struct
       |> List.filter ~f:(Fn.compose not String.is_empty)
       |> List.map ~f:(String.substr_replace_first ~pattern:"pod/" ~with_:"")
     in
-    if List.length t.node_info <> List.length pod_ids then
+    if Stdlib.List.compare_lengths t.pod_info pod_ids <> 0 then
       failwithf
         "Unexpected number of replicas in kubernetes deployment for workload \
          %s: expected %d, got %d"
-        t.workload_id (List.length t.node_info) (List.length pod_ids) () ;
-    List.zip_exn t.node_info pod_ids
-    |> List.map ~f:(fun (info, pod_id) -> { Node.app_id; pod_id; info; config })
+        t.workload_id (List.length t.pod_info) (List.length pod_ids) () ;
+    List.zip_exn t.pod_info pod_ids
+    |> List.map ~f:(fun (pod_info, pod_id) ->
+           { Node.app_id; pod_id; pod_info; config } )
 end
 
 type t =
@@ -1206,7 +1280,7 @@ let initialize_infra ~logger network =
     result_str |> String.split_lines
     |> List.map ~f:(fun line ->
            let parts = String.split line ~on:':' in
-           assert (List.length parts = 2) ;
+           assert (Mina_stdlib.List.Length.Compare.(parts = 2)) ;
            (List.nth_exn parts 0, List.nth_exn parts 1) )
     |> List.filter ~f:(fun (pod_name, _) ->
            String.Set.mem all_pods_set pod_name )

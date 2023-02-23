@@ -70,6 +70,10 @@ module type S = sig
 
     val to_bits : t -> bool list
 
+    val to_base58_check : t -> string
+
+    val of_base58_check_exn : string -> t
+
     val gen : t Quickcheck.Generator.t
   end
 
@@ -139,14 +143,18 @@ module type S = sig
 
     val push_coinbase : Coinbase.t -> t -> t
 
-    val push_state : State_body_hash.t -> t -> t
+    val push_state : State_body_hash.t -> Mina_numbers.Global_slot.t -> t -> t
 
     module Checked : sig
       type t = var
 
       val push_coinbase : Coinbase_data.var -> t -> t Tick.Checked.t
 
-      val push_state : State_body_hash.var -> t -> t Tick.Checked.t
+      val push_state :
+           State_body_hash.var
+        -> Mina_numbers.Global_slot.Checked.var
+        -> t
+        -> t Tick.Checked.t
 
       val if_ : Boolean.var -> then_:t -> else_:t -> t Tick.Checked.t
 
@@ -160,7 +168,12 @@ module type S = sig
   end
 
   module State_stack : sig
-    type t
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t
+      end
+    end]
   end
 
   module Update : sig
@@ -275,6 +288,7 @@ module type S = sig
       -> coinbase_receiver:Public_key.Compressed.var
       -> supercharge_coinbase:Boolean.var
       -> State_body_hash.var
+      -> Mina_numbers.Global_slot.Checked.t
       -> var Tick.Checked.t
 
     (**

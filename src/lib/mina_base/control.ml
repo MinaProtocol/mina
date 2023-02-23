@@ -8,7 +8,7 @@ open Core_kernel
 [%%versioned
 module Stable = struct
   module V2 = struct
-    type t =
+    type t = Mina_wire_types.Mina_base.Control.V2.t =
       | Proof of Pickles.Side_loaded.Proof.Stable.V2.t
       | Signature of Signature.Stable.V1.t
       | None_given
@@ -69,9 +69,27 @@ end]
 [%%endif]
 
 module Tag = struct
-  type t = Proof | Signature | None_given [@@deriving equal, compare, sexp]
+  type t = Signature | Proof | None_given [@@deriving equal, compare, sexp]
 
   let gen = Quickcheck.Generator.of_list [ Proof; Signature; None_given ]
+
+  let to_string = function
+    | Signature ->
+        "Signature"
+    | Proof ->
+        "Proof"
+    | None_given ->
+        "None_given"
+
+  let of_string_exn = function
+    | "Signature" ->
+        Signature
+    | "Proof" ->
+        Proof
+    | "None_given" ->
+        None_given
+    | s ->
+        failwithf "String %s does not denote a control tag" s ()
 end
 
 let tag : t -> Tag.t = function
@@ -111,8 +129,8 @@ module As_record = struct
     let open Fields_derivers_zkapps in
     let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj
-      ~proof:!.(option ~js_type:`Or_undefined @@ proof @@ o ())
-      ~signature:!.(option ~js_type:`Or_undefined @@ signature_deriver @@ o ())
+      ~proof:!.(option ~js_type:Or_undefined @@ proof @@ o ())
+      ~signature:!.(option ~js_type:Or_undefined @@ signature_deriver @@ o ())
     |> finish "Control" ~t_toplevel_annots
 end
 

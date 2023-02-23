@@ -891,7 +891,6 @@ module Rpcs = struct
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
-    | Consensus_rpc : ('q, 'r) Consensus.Hooks.Rpcs.rpc -> ('q, 'r) rpc
 
   type rpc_handler =
     | Rpc_handler :
@@ -924,8 +923,6 @@ module Rpcs = struct
         (module Ban_notify)
     | Get_best_tip ->
         (module Get_best_tip)
-    | Consensus_rpc rpc ->
-        Consensus.Hooks.Rpcs.implementation_of_rpc rpc
 
   let match_handler :
       type q r.
@@ -933,7 +930,7 @@ module Rpcs = struct
       -> (q, r) rpc
       -> do_:((q, r) Rpc_intf.rpc_fn -> 'a)
       -> 'a option =
-   fun (Rpc_handler { rpc = impl_rpc; f; cost; budget }) rpc ~do_ ->
+   fun (Rpc_handler { rpc = impl_rpc; f; cost = _; budget = _ }) rpc ~do_ ->
     match (rpc, impl_rpc) with
     | Get_some_initial_peers, Get_some_initial_peers ->
         Some (do_ f)
@@ -976,12 +973,6 @@ module Rpcs = struct
         Some (do_ f)
     | Get_best_tip, _ ->
         None
-    | Consensus_rpc rpc_a, Consensus_rpc rpc_b ->
-        Consensus.Hooks.Rpcs.match_handler
-          (Rpc_handler { rpc = rpc_b; f; cost; budget })
-          rpc_a ~do_
-    | Consensus_rpc _, _ ->
-        None
 end
 
 module Sinks = Sinks
@@ -1000,6 +991,7 @@ module Config = struct
     ; consensus_local_state : Consensus.Data.Local_state.t
     ; genesis_ledger_hash : Ledger_hash.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
+    ; precomputed_values : Precomputed_values.t
     ; creatable_gossip_net : Gossip_net.Any.creatable
     ; is_seed : bool
     ; log_gossip_heard : log_gossip_heard
@@ -1066,7 +1058,10 @@ let create (config : Config.t) ~sinks
     ~(get_transition_knowledge :
           Rpcs.Get_transition_knowledge.query Envelope.Incoming.t
        -> Rpcs.Get_transition_knowledge.response Deferred.t ) =
-  let logger = config.logger in
+  let module Context = struct
+    let logger = config.logger
+  end in
+  let open Context in
   let run_for_rpc_result conn data ~f action_msg msg_args =
     let data_in_envelope = wrap_rpc_data_in_envelope conn data in
     let sender = Envelope.Incoming.sender data_in_envelope in
@@ -1382,14 +1377,6 @@ let create (config : Config.t) ~sinks
         ; cost = unit
         }
     ]
-    @ Consensus.Hooks.Rpcs.(
-        List.map
-          (rpc_handlers ~logger:config.logger
-             ~local_state:config.consensus_local_state
-             ~genesis_ledger_hash:
-               (Frozen_ledger_hash.of_ledger_hash config.genesis_ledger_hash) )
-          ~f:(fun (Rpc_handler { rpc; f; cost; budget }) ->
-            Rpcs.(Rpc_handler { rpc = Consensus_rpc rpc; f; cost; budget }) ))
   in
   let%map gossip_net =
     O1trace.thread "gossip_net" (fun () ->
@@ -1511,8 +1498,7 @@ let broadcast_snark_pool_diff t diff =
          } ) ;
   Gossip_net.Any.broadcast_snark_pool_diff t.gossip_net diff
 
-(* TODO: Don't copy and paste *)
-let find_map' xs ~f =
+let find_map xs ~f =
   let open Async in
   let ds = List.map xs ~f in
   let filter ~f =
@@ -1569,7 +1555,7 @@ let try_non_preferred_peers (type b) t input peers ~rpc :
            "None of randomly-chosen peers can handle the request" )
     else
       let current_peers, remaining_peers = List.split_n peers num_peers in
-      find_map' current_peers ~f:(fun peer ->
+      find_map current_peers ~f:(fun peer ->
           let%bind response_or_error =
             query_peer t peer.Peer.peer_id rpc input
           in

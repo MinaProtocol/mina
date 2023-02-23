@@ -10,7 +10,7 @@ module T = struct
 
   type t =
     { validated_transition : Mina_block.Validated.t
-    ; staged_ledger : Staged_ledger.t [@sexp.opaque]
+    ; staged_ledger : (Staged_ledger.t[@sexp.opaque])
     ; just_emitted_a_proof : bool
     ; transition_receipt_time : Time.t option
     }
@@ -277,7 +277,7 @@ module For_tests = struct
           (Option.value_exn (Mina_ledger.Ledger.get ledger account_location))
             .nonce
         in
-        let send_amount = Currency.Amount.of_int 1000000001 in
+        let send_amount = Currency.Amount.of_nanomina_int_exn 1_000_000_001 in
         let sender_account_amount =
           sender_account.Account.Poly.balance |> Currency.Balance.to_amount
         in
@@ -324,7 +324,7 @@ module For_tests = struct
         let prover = Public_key.compress public_key in
         Some
           Transaction_snark_work.Checked.
-            { fee = Fee.of_int 1
+            { fee = Fee.of_nanomina_int_exn 1
             ; proofs =
                 One_or_two.map stmts ~f:(fun statement ->
                     Ledger_proof.create ~statement
@@ -347,8 +347,9 @@ module For_tests = struct
           , Option.value_exn prev_state_hashes.state_body_hash ) )
       in
       let coinbase_receiver = largest_account_public_key in
-      let staged_ledger_diff =
+      let staged_ledger_diff, _invalid_txns =
         Staged_ledger.create_diff parent_staged_ledger ~logger
+          ~global_slot:current_state_view.global_slot_since_genesis
           ~constraint_constants:precomputed_values.constraint_constants
           ~coinbase_receiver ~current_state_view ~supercharge_coinbase
           ~transactions_by_fee:transactions ~get_completed_work
@@ -364,6 +365,7 @@ module For_tests = struct
                , `Pending_coinbase_update _ ) =
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger
+            ~global_slot:current_state_view.global_slot_since_genesis
             ~coinbase_receiver ~logger staged_ledger_diff
             ~constraint_constants:precomputed_values.constraint_constants
             ~current_state_view ~state_and_body_hash ~supercharge_coinbase
@@ -377,17 +379,14 @@ module For_tests = struct
         parent_breadcrumb |> block |> Mina_block.header
         |> Mina_block.Header.protocol_state
       in
-      let previous_registers =
+      let previous_ledger_proof_stmt =
         previous_protocol_state |> Protocol_state.blockchain_state
-        |> Blockchain_state.registers
+        |> Blockchain_state.ledger_proof_statement
       in
-      let next_registers =
+      let ledger_proof_statement =
         Option.value_map ledger_proof_opt
-          ~f:(fun (proof, _) ->
-            { (Ledger_proof.statement proof |> Ledger_proof.statement_target) with
-              pending_coinbase_stack = ()
-            } )
-          ~default:previous_registers
+          ~f:(fun (proof, _) -> Ledger_proof.statement proof)
+          ~default:previous_ledger_proof_stmt
       in
       let genesis_ledger_hash =
         previous_protocol_state |> Protocol_state.blockchain_state
@@ -396,15 +395,18 @@ module For_tests = struct
       let next_blockchain_state =
         Blockchain_state.create_value
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)
-          ~registers:next_registers ~staged_ledger_hash:next_staged_ledger_hash
-          ~genesis_ledger_hash
+          ~staged_ledger_hash:next_staged_ledger_hash ~genesis_ledger_hash
           ~body_reference:(Body.compute_reference body)
+          ~ledger_proof_statement
       in
       let previous_state_hashes =
         Protocol_state.hashes previous_protocol_state
       in
       let consensus_state =
-        make_next_consensus_state ~snarked_ledger_hash:previous_registers.ledger
+        make_next_consensus_state
+          ~snarked_ledger_hash:
+            (Blockchain_state.snarked_ledger_hash
+               (Protocol_state.blockchain_state previous_protocol_state) )
           ~previous_protocol_state:
             With_hash.
               { data = previous_protocol_state; hash = previous_state_hashes }
@@ -437,7 +439,8 @@ module For_tests = struct
         in
         Mina_block.Validated.unsafe_of_trusted_block
           ~delta_block_chain_proof:
-            (Non_empty_list.singleton previous_state_hashes.state_hash)
+            (Mina_stdlib.Nonempty_list.singleton
+               previous_state_hashes.state_hash )
           (`This_block_is_trusted_to_be_safe block)
       in
       let transition_receipt_time = Some (Time.now ()) in
@@ -465,7 +468,7 @@ module For_tests = struct
           failwithf !"Invalid staged ledger hash: %{sexp:Error.t}" e ()
 
   let gen_non_deferred ?logger ~precomputed_values ~verifier ?trust_system
-      ~accounts_with_secret_keys =
+      ~accounts_with_secret_keys () =
     let open Quickcheck.Generator.Let_syntax in
     let%map make_deferred =
       gen ?logger ~verifier ~precomputed_values ?trust_system

@@ -62,7 +62,7 @@ struct
           with type length = Max_proofs_verified.n
            and type ns = max_local_max_proof_verifieds )
       ~(prevs_length : (prev_vars, prevs_length) Length.t) ~self ~step_domains
-      ~uses_lookup ~self_dlog_plonk_index
+      ~feature_flags ~self_dlog_plonk_index
       ~(public_input :
          ( var
          , value
@@ -81,7 +81,8 @@ struct
         , (_, Max_proofs_verified.n) Vector.t )
         P.Base.Step.t
       * ret_value
-      * auxiliary_value )
+      * auxiliary_value
+      * (int, prevs_length) Vector.t )
       Promise.t =
     let _, prev_vars_length = branch_data.proofs_verified in
     let T = Length.contr prev_vars_length prevs_length in
@@ -102,10 +103,11 @@ struct
         ( Challenge.Constant.t
         , Challenge.Constant.t Scalar_challenge.t
         , Tick.Field.t Shifted_value.Type1.t
-        , ( Challenge.Constant.t Scalar_challenge.t
-          , Tick.Field.t Shifted_value.Type1.t )
+        , Tick.Field.t Shifted_value.Type1.t option
+        , Challenge.Constant.t Scalar_challenge.t
           Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
           option
+        , bool
         , Digest.Constant.t
         , Digest.Constant.t
         , Digest.Constant.t
@@ -115,7 +117,8 @@ struct
         Wrap.Statement.In_circuit.t
     end in
     let challenge_polynomial =
-      Tock.Field.(Wrap_verifier.challenge_polynomial ~add ~mul ~one)
+      let open Backend.Tock.Field in
+      Wrap_verifier.challenge_polynomial ~add ~mul ~one
     in
     let expand_proof :
         type var value local_max_proofs_verified m.
@@ -132,16 +135,20 @@ struct
            * ( value
              , local_max_proofs_verified
              , m )
-             Per_proof_witness.Constant.No_app_state.t =
+             Per_proof_witness.Constant.No_app_state.t
+           * [ `Actual_wrap_domain of int ] =
      fun dlog_vk dlog_index app_state (T t) tag ~must_verify ->
       let t =
         { t with
           statement =
             { t.statement with
-              pass_through = { t.statement.pass_through with app_state }
+              messages_for_next_step_proof =
+                { t.statement.messages_for_next_step_proof with app_state }
             }
         }
       in
+      let data = Types_map.lookup_basic tag in
+      let feature_flags = data.feature_flags in
       let plonk0 = t.statement.proof_state.deferred_values.plonk in
       let plonk =
         let domain =
@@ -172,11 +179,33 @@ struct
           ; beta = Challenge.Constant.to_tick_field plonk0.beta
           ; gamma = Challenge.Constant.to_tick_field plonk0.gamma
           ; joint_combiner = Option.map ~f:to_field plonk0.joint_combiner
+          ; feature_flags = plonk0.feature_flags
           }
         in
         let env =
+          let module Env_bool = struct
+            type t = bool
+
+            let true_ = true
+
+            let false_ = false
+
+            let ( &&& ) = ( && )
+
+            let ( ||| ) = ( || )
+
+            let any = List.exists ~f:Fn.id
+          end in
+          let module Env_field = struct
+            include Tick.Field
+
+            type bool = Env_bool.t
+
+            let if_ (b : bool) ~then_ ~else_ = if b then then_ () else else_ ()
+          end in
           Plonk_checks.scalars_env
-            (module Tick.Field)
+            (module Env_bool)
+            (module Env_field)
             ~srs_length_log2:Common.Max_degree.step_log2
             ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
             ~field_of_hex:(fun s ->
@@ -190,18 +219,24 @@ struct
             plonk_minimal combined_evals
         in
         time "plonk_checks" (fun () ->
+            let module Field = struct
+              include Tick.Field
+
+              type nonrec bool = bool
+            end in
             Plonk_checks.Type1.derive_plonk
-              (module Tick.Field)
-              ~env ~shift:Shifts.tick1 plonk_minimal combined_evals )
+              (module Field)
+              ~feature_flags ~env ~shift:Shifts.tick1 plonk_minimal
+              combined_evals )
       in
-      let data = Types_map.lookup_basic tag in
       let (module Local_max_proofs_verified) = data.max_proofs_verified in
       let T = Local_max_proofs_verified.eq in
       let statement = t.statement in
       let prev_challenges =
-        (* TODO: This is redone in the call to Wrap_reduced_me_only.prepare *)
+        (* TODO: This is redone in the call to Reduced_messages_for_next_proof_over_same_field.Wrap.prepare *)
         Vector.map ~f:Ipa.Wrap.compute_challenges
-          statement.proof_state.me_only.old_bulletproof_challenges
+          statement.proof_state.messages_for_next_wrap_proof
+            .old_bulletproof_challenges
       in
       let prev_statement_with_hashes :
           ( _
@@ -212,17 +247,20 @@ struct
           , _
           , _
           , _
+          , _
+          , _
           , _ )
           Wrap.Statement.In_circuit.t =
-        { pass_through =
+        { messages_for_next_step_proof =
             (let to_field_elements =
                let (Typ typ) = data.public_input in
                fun x -> fst (typ.value_to_fields x)
              in
              (* TODO: Only do this hashing when necessary *)
-             Common.hash_step_me_only
-               (Reduced_me_only.Step.prepare ~dlog_plonk_index:dlog_index
-                  statement.pass_through )
+             Common.hash_messages_for_next_step_proof
+               (Reduced_messages_for_next_proof_over_same_field.Step.prepare
+                  ~dlog_plonk_index:dlog_index
+                  statement.messages_for_next_step_proof )
                ~app_state:to_field_elements )
         ; proof_state =
             { statement.proof_state with
@@ -235,18 +273,28 @@ struct
                     ; beta = plonk0.beta
                     ; gamma = plonk0.gamma
                     ; lookup =
-                        Option.map (Opt.to_option plonk.lookup) ~f:(fun l ->
-                            { l with
-                              joint_combiner =
+                        Option.map (Opt.to_option_unsafe plonk.lookup)
+                          ~f:(fun l ->
+                            { Composition_types.Wrap.Proof_state.Deferred_values
+                              .Plonk
+                              .In_circuit
+                              .Lookup
+                              .joint_combiner =
                                 Option.value_exn plonk0.joint_combiner
                             } )
+                    ; optional_column_scalars =
+                        Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+                        .In_circuit
+                        .Optional_column_scalars
+                        .map ~f:Opt.to_option plonk.optional_column_scalars
                     }
                 }
-            ; me_only =
-                Wrap_hack.hash_dlog_me_only Local_max_proofs_verified.n
+            ; messages_for_next_wrap_proof =
+                Wrap_hack.hash_messages_for_next_wrap_proof
+                  Local_max_proofs_verified.n
                   { old_bulletproof_challenges = prev_challenges
                   ; challenge_polynomial_commitment =
-                      statement.proof_state.me_only
+                      statement.proof_state.messages_for_next_wrap_proof
                         .challenge_polynomial_commitment
                   }
             }
@@ -259,9 +307,9 @@ struct
         in
         O.create dlog_vk
           ( Vector.map2
-              (Vector.extend_exn
-                 statement.pass_through.challenge_polynomial_commitments
-                 Local_max_proofs_verified.n
+              (Vector.extend_front_exn
+                 statement.messages_for_next_step_proof
+                   .challenge_polynomial_commitments Local_max_proofs_verified.n
                  (Lazy.force Dummy.Ipa.Wrap.sg) )
               (* This should indeed have length Max_proofs_verified... No! It should have type Max_proofs_verified_a. That is, the max_proofs_verified specific to a proof of this type...*)
               prev_challenges
@@ -286,6 +334,8 @@ struct
             Option.map
               ~f:(Scalar_challenge.map ~f:Challenge.Constant.of_tock_field)
               (O.joint_combiner_chal o)
+        ; feature_flags =
+            t.statement.proof_state.deferred_values.plonk.feature_flags
         }
       in
       let xi = scalar_chal O.v in
@@ -308,8 +358,7 @@ struct
         let joint_combiner = O.joint_combiner o
       end in
       let w =
-        Tock.Field.domain_generator
-          ~log2_size:(Domain.log2_size data.wrap_domains.h)
+        Tock.Field.domain_generator ~log2_size:dlog_vk.domain.log_size_of_group
       in
       let zetaw = Tock.Field.mul As_field.zeta w in
       let new_bulletproof_challenges, b =
@@ -328,9 +377,7 @@ struct
         in
         let prechals =
           Vector.of_list_and_length_exn
-            ( Array.map prechals ~f:(fun x ->
-                  { Bulletproof_challenge.prechallenge = x } )
-            |> Array.to_list )
+            (Array.map prechals ~f:Bulletproof_challenge.unpack |> Array.to_list)
             Tock.Rounds.n
         in
         (prechals, b)
@@ -342,18 +389,21 @@ struct
       let witness : _ Per_proof_witness.Constant.No_app_state.t =
         { app_state = ()
         ; proof_state =
-            { prev_statement_with_hashes.proof_state with me_only = () }
+            { prev_statement_with_hashes.proof_state with
+              messages_for_next_wrap_proof = ()
+            }
         ; prev_proof_evals = t.prev_evals
         ; prev_challenge_polynomial_commitments =
-            Vector.extend_exn
-              t.statement.pass_through.challenge_polynomial_commitments
-              Local_max_proofs_verified.n
+            Vector.extend_front_exn
+              t.statement.messages_for_next_step_proof
+                .challenge_polynomial_commitments Local_max_proofs_verified.n
               (Lazy.force Dummy.Ipa.Wrap.sg)
             (* TODO: This computation is also redone elsewhere. *)
         ; prev_challenges =
-            Vector.extend_exn
-              (Vector.map t.statement.pass_through.old_bulletproof_challenges
-                 ~f:Ipa.Step.compute_challenges )
+            Vector.extend_front_exn
+              (Vector.map
+                 t.statement.messages_for_next_step_proof
+                   .old_bulletproof_challenges ~f:Ipa.Step.compute_challenges )
               Local_max_proofs_verified.n Dummy.Ipa.Step.challenges_computed
         ; wrap_proof =
             { opening =
@@ -365,7 +415,8 @@ struct
       let tock_domain =
         Plonk_checks.domain
           (module Tock.Field)
-          data.wrap_domains.h ~shifts:Common.tock_shifts
+          (Pow_2_roots_of_unity dlog_vk.domain.log_size_of_group)
+          ~shifts:Common.tock_shifts
           ~domain_generator:Backend.Tock.Field.domain_generator
       in
       let tock_combined_evals =
@@ -383,8 +434,29 @@ struct
         }
       in
       let tock_env =
+        let module Env_bool = struct
+          type t = bool
+
+          let true_ = true
+
+          let false_ = false
+
+          let ( &&& ) = ( && )
+
+          let ( ||| ) = ( || )
+
+          let any = List.exists ~f:Fn.id
+        end in
+        let module Env_field = struct
+          include Tock.Field
+
+          type bool = Env_bool.t
+
+          let if_ (b : bool) ~then_ ~else_ = if b then then_ () else else_ ()
+        end in
         Plonk_checks.scalars_env
-          (module Tock.Field)
+          (module Env_bool)
+          (module Env_field)
           ~domain:tock_domain ~srs_length_log2:Common.Max_degree.wrap_log2
           ~field_of_hex:(fun s ->
             Kimchi_pasta.Pasta.Bigint256.of_hex_string s
@@ -419,7 +491,7 @@ struct
           Plonk_checks.Type2.ft_eval0
             (module Tock.Field)
             ~domain:tock_domain ~env:tock_env tock_plonk_minimal
-            tock_combined_evals x_hat_1 ~lookup_constant_term_part:None
+            tock_combined_evals x_hat_1
         in
         let open Tock.Field in
         combine ~which_eval:`Fst ~ft_eval:ft_eval0 As_field.zeta
@@ -427,8 +499,14 @@ struct
       in
       let chal = Challenge.Constant.of_tock_field in
       let plonk =
-        Plonk_checks.Type2.derive_plonk
-          (module Tock.Field)
+        let module Field = struct
+          include Tock.Field
+
+          type nonrec bool = bool
+        end in
+        (* Wrap proof, no features *)
+        Plonk_checks.Type2.derive_plonk ~feature_flags:Plonk_types.Features.none
+          (module Field)
           ~env:tock_env ~shift:Shifts.tock2 tock_plonk_minimal
           tock_combined_evals
       in
@@ -444,11 +522,19 @@ struct
                 ; beta = chal plonk0.beta
                 ; gamma = chal plonk0.gamma
                 ; lookup =
-                    Option.map (Opt.to_option plonk.lookup) ~f:(fun l ->
-                        { l with
-                          joint_combiner =
+                    Option.map (Opt.to_option_unsafe plonk.lookup) ~f:(fun l ->
+                        { Composition_types.Wrap.Proof_state.Deferred_values
+                          .Plonk
+                          .In_circuit
+                          .Lookup
+                          .joint_combiner =
                             Option.value_exn plonk0.joint_combiner
                         } )
+                ; optional_column_scalars =
+                    Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+                    .In_circuit
+                    .Optional_column_scalars
+                    .map ~f:Opt.to_option plonk.optional_column_scalars
                 }
             ; combined_inner_product = shifted_value combined_inner_product
             ; xi
@@ -461,7 +547,8 @@ struct
         }
       , prev_statement_with_hashes
       , x_hat
-      , witness )
+      , witness
+      , `Actual_wrap_domain dlog_vk.domain.log_size_of_group )
     in
     let challenge_polynomial_commitments = ref None in
     let unfinalized_proofs = ref None in
@@ -471,13 +558,15 @@ struct
     let prev_proofs = ref None in
     let return_value = ref None in
     let auxiliary_value = ref None in
+    let actual_wrap_domains = ref None in
     let compute_prev_proof_parts prev_proof_requests =
       let ( challenge_polynomial_commitments'
           , unfinalized_proofs'
           , statements_with_hashes'
           , x_hats'
           , witnesses'
-          , prev_proofs' ) =
+          , prev_proofs'
+          , actual_wrap_domains' ) =
         let rec go :
             type vars values ns ms k.
                (vars, values, ns, ms) H4.T(Tag).t
@@ -493,11 +582,12 @@ struct
                  , ns
                  , ms )
                  H3.T(Per_proof_witness.Constant.No_app_state).t
-               * (ns, ns) H2.T(Proof).t =
+               * (ns, ns) H2.T(Proof).t
+               * (int, k) Vector.t =
          fun ts prev_proof_stmts l ->
           match (ts, prev_proof_stmts, l) with
           | [], [], Z ->
-              ([], [], [], [], [], [])
+              ([], [], [], [], [], [], [])
           | ( t :: ts
             , { public_input = app_state
               ; proof = p
@@ -512,10 +602,16 @@ struct
                   let d = Types_map.lookup_basic t in
                   (d.wrap_vk, d.wrap_key)
               in
-              let `Sg sg, u, s, x, w =
+              let `Sg sg, u, s, x, w, `Actual_wrap_domain domain =
                 expand_proof dlog_vk dlog_index app_state p t ~must_verify
-              and sgs, us, ss, xs, ws, ps = go ts prev_proof_stmts l in
-              (sg :: sgs, u :: us, s :: ss, x :: xs, w :: ws, p :: ps)
+              and sgs, us, ss, xs, ws, ps, domains = go ts prev_proof_stmts l in
+              ( sg :: sgs
+              , u :: us
+              , s :: ss
+              , x :: xs
+              , w :: ws
+              , p :: ps
+              , domain :: domains )
           | _, _ :: _, _ ->
               .
           | _, [], _ ->
@@ -528,14 +624,16 @@ struct
       statements_with_hashes := Some statements_with_hashes' ;
       x_hats := Some x_hats' ;
       witnesses := Some witnesses' ;
-      prev_proofs := Some prev_proofs'
+      prev_proofs := Some prev_proofs' ;
+      actual_wrap_domains := Some actual_wrap_domains'
     in
+    let unfinalized_proofs = lazy (Option.value_exn !unfinalized_proofs) in
     let unfinalized_proofs_extended =
       lazy
-        (Vector.extend
-           (Option.value_exn !unfinalized_proofs)
+        (Vector.extend_front
+           (Lazy.force unfinalized_proofs)
            lte Max_proofs_verified.n
-           (Unfinalized.Constant.dummy ()) )
+           (Lazy.force Unfinalized.Constant.dummy) )
     in
     let module Extract = struct
       module type S = sig
@@ -563,7 +661,8 @@ struct
         (Option.value_exn !prev_proofs)
         branch_data.rule.prevs prev_values_length
     in
-    let next_statement_me_only : _ Reduced_me_only.Step.t Lazy.t =
+    let messages_for_next_step_proof :
+        _ Reduced_messages_for_next_proof_over_same_field.Step.t Lazy.t =
       lazy
         (let old_bulletproof_challenges =
            extract_from_proofs
@@ -593,12 +692,13 @@ struct
          ; old_bulletproof_challenges
          } )
     in
-    let next_me_only_prepared =
+    let messages_for_next_step_proof_prepared =
       lazy
-        (Reduced_me_only.Step.prepare ~dlog_plonk_index:self_dlog_plonk_index
-           (Lazy.force next_statement_me_only) )
+        (Reduced_messages_for_next_proof_over_same_field.Step.prepare
+           ~dlog_plonk_index:self_dlog_plonk_index
+           (Lazy.force messages_for_next_step_proof) )
     in
-    let pass_through_padded =
+    let messages_for_next_wrap_proof_padded =
       let rec pad :
           type n k maxes pvals lws lhs.
              (Digest.Constant.t, k) Vector.t
@@ -614,20 +714,23 @@ struct
         | x :: xs, _ :: ms, S n ->
             x :: pad xs ms n
         | [], m :: ms, S n ->
-            let t : _ Types.Wrap.Proof_state.Me_only.t =
+            let t : _ Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t =
               { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
               ; old_bulletproof_challenges =
                   Vector.init Max_proofs_verified.n ~f:(fun _ ->
                       Dummy.Ipa.Wrap.challenges_computed )
               }
             in
-            Wrap_hack.hash_dlog_me_only Max_proofs_verified.n t :: pad [] ms n
+            Wrap_hack.hash_messages_for_next_wrap_proof Max_proofs_verified.n t
+            :: pad [] ms n
       in
       lazy
-        (pad
-           (Vector.map (Option.value_exn !statements_with_hashes) ~f:(fun s ->
-                s.proof_state.me_only ) )
-           Maxes.maxes Maxes.length )
+        (Vector.rev
+           (pad
+              (Vector.map
+                 (Vector.rev (Option.value_exn !statements_with_hashes))
+                 ~f:(fun s -> s.proof_state.messages_for_next_wrap_proof) )
+              Maxes.maxes Maxes.length ) )
     in
     let handler (Snarky_backendless.Request.With { request; respond } as r) =
       let k x = respond (Provide x) in
@@ -648,9 +751,22 @@ struct
           auxiliary_value := Some res ;
           k ()
       | Req.Unfinalized_proofs ->
-          k (Lazy.force unfinalized_proofs_extended)
-      | Req.Pass_through ->
-          k (Lazy.force pass_through_padded)
+          k (Lazy.force unfinalized_proofs)
+      | Req.Messages_for_next_wrap_proof ->
+          k (Lazy.force messages_for_next_wrap_proof_padded)
+      | Req.Wrap_domain_indices ->
+          let all_possible_domains = Wrap_verifier.all_possible_domains () in
+          let wrap_domain_indices =
+            Vector.map (Option.value_exn !actual_wrap_domains)
+              ~f:(fun domain_size ->
+                let domain_index =
+                  Vector.foldi ~init:0 all_possible_domains
+                    ~f:(fun j acc (Pow_2_roots_of_unity domain) ->
+                      if Int.equal domain domain_size then j else acc )
+                in
+                Pickles_base.Proofs_verified.of_int domain_index )
+          in
+          k wrap_domain_indices
       | _ -> (
           match handler with
           | Some f ->
@@ -666,14 +782,15 @@ struct
                type res = Tick.Curve.Affine.t
 
                let f (T t : _ P.t) =
-                 t.statement.proof_state.me_only.challenge_polynomial_commitment
+                 t.statement.proof_state.messages_for_next_wrap_proof
+                   .challenge_polynomial_commitment
              end )
          in
          (* emphatically NOT padded with dummies *)
          Vector.(
            map2 to_fold_in
-             (Lazy.force next_me_only_prepared).old_bulletproof_challenges
-             ~f:(fun commitment chals ->
+             (Lazy.force messages_for_next_step_proof_prepared)
+               .old_bulletproof_challenges ~f:(fun commitment chals ->
                { Tick.Proof.Challenge_polynomial.commitment
                ; challenges = Vector.to_array chals
                } )
@@ -682,28 +799,44 @@ struct
     let%map.Promise (next_proof : Tick.Proof.t), next_statement_hashed =
       let (T (input, _conv, conv_inv)) =
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-          ~wrap_rounds:Tock.Rounds.n ~uses_lookup
+          ~wrap_rounds:Tock.Rounds.n ~feature_flags
       in
       let { Domains.h } =
         List.nth_exn (Vector.to_list step_domains) branch_data.index
       in
       ksprintf Common.time "step-prover %d (%d)" branch_data.index
-        (Domain.size h) (fun () ->
-          Impls.Step.generate_witness_conv
-            ~f:(fun { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs }
-                    next_statement_hashed ->
-              let%map.Promise proof =
-                Backend.Tick.Proof.create_async ~primary:public_inputs
-                  ~auxiliary:auxiliary_inputs
-                  ~message:(Lazy.force prev_challenge_polynomial_commitments)
-                  pk
-              in
-              (proof, next_statement_hashed) )
-            [] ~return_typ:input
-            (fun () ->
-              Impls.Step.handle
-                (fun () -> conv_inv (branch_data.main ~step_domains ()))
-                handler ) )
+        (Domain.size h)
+        (fun () ->
+          let promise_or_error =
+            (* Use a try_with to give an informative backtrace.
+               If we don't do this, the backtrace will be obfuscated by the
+               Promise, and it's significantly harder to track down errors.
+               This only applies to errors in the 'witness generation' stage;
+               proving errors are emitted inside the promise, and are therefore
+               unaffected.
+            *)
+            Or_error.try_with ~backtrace:true (fun () ->
+                Impls.Step.generate_witness_conv
+                  ~f:(fun { Impls.Step.Proof_inputs.auxiliary_inputs
+                          ; public_inputs
+                          } next_statement_hashed ->
+                    let%map.Promise proof =
+                      Backend.Tick.Proof.create_async ~primary:public_inputs
+                        ~auxiliary:auxiliary_inputs
+                        ~message:
+                          (Lazy.force prev_challenge_polynomial_commitments)
+                        pk
+                    in
+                    (proof, next_statement_hashed) )
+                  ~input_typ:Impls.Step.Typ.unit ~return_typ:input
+                  (fun () () ->
+                    Impls.Step.handle
+                      (fun () -> conv_inv (branch_data.main ~step_domains ()))
+                      handler ) )
+          in
+          (* Re-raise any captured errors, complete with their backtrace. *)
+          Or_error.ok_exn promise_or_error )
+        ()
     in
     let prev_evals =
       extract_from_proofs
@@ -714,29 +847,33 @@ struct
             (t.proof.openings.evals, t.proof.openings.ft_eval1)
         end )
     in
-    let pass_through =
-      let rec go : type a a. (a, a) H2.T(P).t -> a H1.T(P.Base.Me_only.Wrap).t =
+    let messages_for_next_wrap_proof =
+      let rec go :
+          type a a.
+             (a, a) H2.T(P).t
+          -> a H1.T(P.Base.Messages_for_next_proof_over_same_field.Wrap).t =
         function
         | [] ->
             []
         | T t :: tl ->
-            t.statement.proof_state.me_only :: go tl
+            t.statement.proof_state.messages_for_next_wrap_proof :: go tl
       in
       go (Option.value_exn !prev_proofs)
     in
     let next_statement : _ Types.Step.Statement.t =
       { proof_state =
           { unfinalized_proofs = Lazy.force unfinalized_proofs_extended
-          ; me_only = Lazy.force next_statement_me_only
+          ; messages_for_next_step_proof =
+              Lazy.force messages_for_next_step_proof
           }
-      ; pass_through
+      ; messages_for_next_wrap_proof
       }
     in
     ( { P.Base.Step.proof = next_proof
       ; statement = next_statement
       ; index = branch_data.index
       ; prev_evals =
-          Vector.extend
+          Vector.extend_front
             (Vector.map2 prev_evals (Option.value_exn !x_hats)
                ~f:(fun (es, ft_eval1) x_hat ->
                  Plonk_types.All_evals.
@@ -747,5 +884,6 @@ struct
             lte Max_proofs_verified.n Dummy.evals
       }
     , Option.value_exn !return_value
-    , Option.value_exn !auxiliary_value )
+    , Option.value_exn !auxiliary_value
+    , Option.value_exn !actual_wrap_domains )
 end

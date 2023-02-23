@@ -84,7 +84,7 @@ module Stable = struct
       ; accounts_created :
           (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
       ; tokens_used :
-          (Token_id.Stable.V1.t * Account_id.Stable.V2.t option) list
+          (Token_id.Stable.V2.t * Account_id.Stable.V2.t option) list
       }
 
     let to_latest = Fn.id
@@ -105,20 +105,26 @@ let of_block ~logger
   let account_ids_accessed = Block.account_ids_accessed block in
   let start = Time.now () in
   let accounts_accessed =
-    List.filter_map account_ids_accessed ~f:(fun acct_id ->
-        try
-          let index = Mina_ledger.Ledger.index_of_account_exn ledger acct_id in
-          let account = Mina_ledger.Ledger.get_at_index_exn ledger index in
-          Some (index, account)
-        with exn ->
-          [%log error]
-            "When computing accounts accessed for precomputed block, exception \
-             when finding account id in staged ledger"
-            ~metadata:
-              [ ("account_id", Account_id.to_yojson acct_id)
-              ; ("exception", `String (Exn.to_string exn))
-              ] ;
-          None )
+    List.filter_map account_ids_accessed ~f:(fun (acct_id, status) ->
+        match status with
+        | `Not_accessed ->
+            None
+        | `Accessed -> (
+            try
+              let index =
+                Mina_ledger.Ledger.index_of_account_exn ledger acct_id
+              in
+              let account = Mina_ledger.Ledger.get_at_index_exn ledger index in
+              Some (index, account)
+            with exn ->
+              [%log error]
+                "When computing accounts accessed for precomputed block, \
+                 exception when finding account id in staged ledger"
+                ~metadata:
+                  [ ("account_id", Account_id.to_yojson acct_id)
+                  ; ("exception", `String (Exn.to_string exn))
+                  ] ;
+              None ) )
   in
   let header = Block.header block in
   let accounts_accessed_time = Time.now () in
@@ -142,7 +148,9 @@ let of_block ~logger
   in
   let tokens_used =
     let unique_tokens =
-      List.map account_ids_accessed ~f:Account_id.token_id
+      (* a token is used regardless of status *)
+      List.map account_ids_accessed ~f:(fun (acct_id, _status) ->
+          Account_id.token_id acct_id )
       |> List.dedup_and_sort ~compare:Token_id.compare
     in
     List.map unique_tokens ~f:(fun token_id ->
@@ -175,8 +183,8 @@ let of_block ~logger
     If the underlying types change, you should write a conversion, or add
     optional fields and handle them appropriately.
 *)
-(* But if you really need to update it, see output of CLI command:
-   `dune exec dump_blocks 2> block.txt` *)
+(* But if you really need to update it, you can generate new samples using:
+   `dune exec dump_blocks 1> block.txt` *)
 let%test_unit "Sexp serialization is stable" =
   let serialized_block = Sample_precomputed_block.sample_block_sexp in
   ignore @@ t_of_sexp @@ Sexp.of_string serialized_block
@@ -192,7 +200,7 @@ let%test_unit "Sexp serialization roundtrips" =
     optional fields and handle them appropriately.
 *)
 (* But if you really need to update it, see output of CLI command:
-   `dune exec dump_blocks 2> block.txt` *)
+   `dune exec dump_blocks 1> block.txt` *)
 let%test_unit "JSON serialization is stable" =
   let serialized_block = Sample_precomputed_block.sample_block_json in
   match of_yojson @@ Yojson.Safe.from_string serialized_block with

@@ -16,6 +16,144 @@ let with_versioned_json = "with_versioned_json"
 
 let no_toplevel_latest_type_str = "no_toplevel_latest_type"
 
+let ty_decl_to_string =
+  let buf = Buffer.create 2048 in
+  let formatter =
+    Versioned_util.diff_formatter @@ Format.formatter_of_buffer buf
+  in
+  (* filter attributes from types *)
+  let filter_attrs =
+    object (self)
+      inherit Ast_traverse.map
+
+      method! core_type ty =
+        { ty with
+          ptyp_desc = self#core_type_desc ty.ptyp_desc
+        ; ptyp_attributes = []
+        }
+
+      method! core_type_desc ty_desc =
+        match ty_desc with
+        | Ptyp_arrow (arg, ty_from, ty_to) ->
+            Ptyp_arrow (arg, self#core_type ty_from, self#core_type ty_to)
+        | Ptyp_tuple tys ->
+            Ptyp_tuple (List.map tys ~f:self#core_type)
+        | Ptyp_constr (loc, tys) ->
+            Ptyp_constr (loc, List.map tys ~f:self#core_type)
+        | Ptyp_class (loc, tys) ->
+            Ptyp_class (loc, List.map tys ~f:self#core_type)
+        | Ptyp_alias (ty, label) ->
+            Ptyp_alias (self#core_type ty, label)
+        | Ptyp_object (fields, closed) ->
+            let fields' =
+              List.map fields ~f:(fun field ->
+                  let pof_desc =
+                    match field.pof_desc with
+                    | Otag (label, ty) ->
+                        Otag (label, self#core_type ty)
+                    | Oinherit ty ->
+                        Oinherit (self#core_type ty)
+                  in
+                  let pof_attributes = [] in
+                  { field with pof_desc; pof_attributes } )
+            in
+            Ptyp_object (fields', closed)
+        | Ptyp_poly (parms, ty) ->
+            Ptyp_poly (parms, self#core_type ty)
+        | Ptyp_package (mod_name, with_types) ->
+            let with_types' =
+              List.map with_types ~f:(fun (loc, ty) ->
+                  (loc, self#core_type ty) )
+            in
+            Ptyp_package (mod_name, with_types')
+        | Ptyp_variant (fields, closed, labels) ->
+            let fields' =
+              List.map fields ~f:(fun field ->
+                  let prf_desc =
+                    match field.prf_desc with
+                    | Rtag (label, const, tys) ->
+                        Rtag (label, const, List.map tys ~f:self#core_type)
+                    | Rinherit ty ->
+                        Rinherit (self#core_type ty)
+                  in
+                  { field with prf_desc; prf_attributes = [] } )
+            in
+            Ptyp_variant (fields', closed, labels)
+        | Ptyp_any | Ptyp_var _ ->
+            ty_desc
+        | Ptyp_extension _ ->
+            (* punting on very unlikely case *)
+            ty_desc
+
+      method! type_kind =
+        function
+        | Ptype_abstract ->
+            Ptype_abstract
+        | Ptype_variant ctors ->
+            let ctors' =
+              List.map ctors ~f:(fun ctor ->
+                  let pcd_args =
+                    match ctor.pcd_args with
+                    | Pcstr_tuple tys ->
+                        Pcstr_tuple (List.map tys ~f:self#core_type)
+                    | Pcstr_record labels ->
+                        Pcstr_record
+                          (List.map labels ~f:(fun label ->
+                               { label with
+                                 pld_type = self#core_type label.pld_type
+                               ; pld_attributes = []
+                               } ) )
+                  in
+                  let pcd_res = Option.map ctor.pcd_res ~f:self#core_type in
+                  { ctor with pcd_args; pcd_res; pcd_attributes = [] } )
+            in
+            Ptype_variant ctors'
+        | Ptype_record labels ->
+            Ptype_record
+              (List.map labels ~f:(fun label ->
+                   { label with
+                     pld_type = self#core_type label.pld_type
+                   ; pld_attributes = []
+                   } ) )
+        | Ptype_open ->
+            Ptype_open
+
+      method! type_declaration ty_decl =
+        let ptype_params =
+          List.map ty_decl.ptype_params ~f:(fun (ty, var_inj) ->
+              (self#core_type ty, var_inj) )
+        in
+        let ptype_manifest =
+          Option.map ty_decl.ptype_manifest ~f:self#core_type
+        in
+        let ptype_kind = self#type_kind ty_decl.ptype_kind in
+        { ty_decl with
+          ptype_params
+        ; ptype_manifest
+        ; ptype_cstrs = []
+        ; ptype_kind
+        ; ptype_attributes = []
+        }
+    end
+  in
+  let filter_type_manifests type_decl =
+    match type_decl.ptype_kind with
+    | Ptype_abstract | Ptype_open ->
+        type_decl
+    | Ptype_variant _ | Ptype_record _ ->
+        { type_decl with ptype_manifest = None }
+  in
+  fun ty_decl ->
+    Buffer.clear buf ;
+    let ty_decl' =
+      ty_decl |> filter_attrs#type_declaration |> filter_type_manifests
+    in
+    Pprintast.type_declaration formatter ty_decl' ;
+    Format.pp_print_flush formatter () ;
+    let s = Buffer.contents buf in
+    (* formatter replaces initial newline with space, removed here *)
+    String.sub s ~pos:1 ~len:(String.length s - 1)
+
 (* option to `deriving version' *)
 type version_option = No_version_option | Binable | Rpc [@@deriving equal]
 
@@ -102,8 +240,8 @@ let erase_stable_versions =
   object
     inherit Ast_traverse.map as super
 
-    method! core_type typ =
-      match typ.ptyp_desc with
+    method! core_type ty =
+      match ty.ptyp_desc with
       | Ptyp_constr
           ({ txt = Ldot (Ldot (Ldot (lid, "Stable"), vn), "t"); loc }, typs)
         when try
@@ -111,19 +249,19 @@ let erase_stable_versions =
                true
              with _ -> false ->
           (* Erase [.Stable.Vn.t] to [.t] *)
-          let typ =
-            { typ with
+          let ty =
+            { ty with
               ptyp_desc = Ptyp_constr ({ txt = Ldot (lid, "t"); loc }, typs)
             }
           in
-          super#core_type typ
+          super#core_type ty
       | _ ->
-          super#core_type typ
+          super#core_type ty
 
-    method! type_declaration typ =
-      let typ = super#type_declaration typ in
+    method! type_declaration ty_decl =
+      let ty_decl = super#type_declaration ty_decl in
       let ptype_attributes : attributes =
-        List.filter_map typ.ptype_attributes
+        List.filter_map ty_decl.ptype_attributes
           ~f:(fun ({ attr_name; attr_payload = payload; attr_loc } as attr) ->
             if String.equal attr_name.txt "deriving" then
               let remove_derivers = [| "bin_io"; "version" |] in
@@ -199,20 +337,20 @@ let erase_stable_versions =
                   Some attr
             else Some attr )
       in
-      { typ with
+      { ty_decl with
         ptype_attributes
       ; ptype_manifest =
           Some
-            (Ast_helper.Typ.constr ~loc:typ.ptype_loc
+            (Ast_helper.Typ.constr ~loc:ty_decl.ptype_loc
                { Location.txt = Longident.parse "Stable.Latest.t"
-               ; loc = typ.ptype_loc
+               ; loc = ty_decl.ptype_loc
                }
-               (List.map ~f:fst typ.ptype_params) )
+               (List.map ~f:fst ty_decl.ptype_params) )
       }
   end
 
 let mk_all_version_tags_type_decl =
-  object
+  object (self)
     inherit Ast_traverse.map as super
 
     method! core_type typ =
@@ -273,7 +411,8 @@ let mk_all_version_tags_type_decl =
                                 , "t" )
                           ; loc
                           }
-                        , params )
+                        , List.map params ~f:(fun param -> self#core_type param)
+                        )
                   }
             | Some m ->
                 Some m
@@ -298,8 +437,9 @@ let mk_all_version_tags_type_decl =
   end
 
 let version_type ~version_option ~all_version_tagged ~top_version_tag
-    ~json_version_tag version stri =
+    ~json_version_tag ~modl_stri version stri =
   let loc = stri.pstr_loc in
+  let (module Ast_builder) = Ast_builder.make loc in
   let find_t_stri stri =
     let is_t_stri stri =
       match stri.pstr_desc with
@@ -326,6 +466,75 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
             "Expected a module containing a type t."
   in
   let t_stri = find_t_stri stri in
+  let find_include_binable_stri stri =
+    let is_include_binable_stri stri =
+      match stri.pstr_desc with
+      | Pstr_include
+          { pincl_mod =
+              { pmod_desc =
+                  Pmod_apply
+                    ( { pmod_desc =
+                          Pmod_apply
+                            ( { pmod_desc =
+                                  Pmod_ident
+                                    { txt = Ldot (Lident "Binable", of_binable)
+                                    ; _
+                                    }
+                              ; _
+                              }
+                            , { pmod_desc = Pmod_ident _; _ } )
+                      ; _
+                      }
+                    , _ )
+              ; _
+              }
+          ; _
+          }
+        when List.mem
+               [ "Of_binable"
+               ; "Of_binable_without_uuid"
+               ; "Of_binable1"
+               ; "Of_binable1_without_uuid"
+               ; "Of_binable2"
+               ; "Of_binable2_without_uuid"
+               ; "Of_binable3"
+               ; "Of_binable3_without_uuid"
+               ]
+               of_binable ~equal:String.equal ->
+          true
+      | _ ->
+          false
+    in
+    if is_include_binable_stri stri then stri
+    else
+      match stri.pstr_desc with
+      | Pstr_module { pmb_expr = { pmod_desc = Pmod_structure str; _ }; _ } -> (
+          match List.find str ~f:is_include_binable_stri with
+          | Some stri ->
+              stri
+          | None ->
+              Location.raise_errorf ~loc:stri.pstr_loc
+                "Expected module to include a Binable functor application." )
+      | _ ->
+          Location.raise_errorf ~loc:stri.pstr_loc
+            "Expected a module including a Binable functor application."
+  in
+  let make_all_tags_binable_include =
+    object
+      inherit Ast_traverse.map
+
+      method! longident longident =
+        match longident with
+        | Ldot (Ldot (lid, "Stable"), vn)
+          when try
+                 validate_module_version vn loc ;
+                 true
+               with _ -> false ->
+            Ldot (Ldot (Ldot (lid, "Stable"), vn), with_all_version_tags_module)
+        | _ ->
+            longident
+    end
+  in
   let t, params =
     let subst_type t_stri =
       (* NOTE: Can't use [Ast_pattern] here; it rejects attributes attached to
@@ -356,7 +565,6 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
     subst_type t_stri
   in
   let empty_params = List.is_empty params in
-  let (module Ast_builder) = Ast_builder.make loc in
   let extra_stris =
     let arg_names = List.mapi params ~f:(fun i _ -> sprintf "x%i" i) in
     let apply_args =
@@ -413,7 +621,10 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
     let deriving_bin_io =
       lazy (create_attr ~loc (Located.mk "deriving") (PStr [ [%stri bin_io] ]))
     in
-    let make_tag_module typ_decl mod_name =
+    let make_tag_module ?bin_io_include typ_decl mod_name =
+      (* if bin_io_include is given, then we use that to generate the
+         bin_io functions, instead of using `deriving bin_io` on `typ`
+      *)
       let t_tagged =
         (* type `t_tagged` is a record containing a version and an instance of `typ`,
            when serializing, take a `typ`, add the version number
@@ -551,25 +762,99 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
               , bin_t )]
         ]
       in
+      let include_str =
+        match bin_io_include with
+        | Some stri ->
+            (* the include generates bin_io functions for `t`, but we need them
+               for `typ`
+            *)
+            stri
+            :: [%str
+                 let bin_read_typ = bin_read_t
+
+                 let __bin_read_typ__ = __bin_read_t__
+
+                 let bin_reader_typ = bin_reader_t
+
+                 let bin_size_typ = bin_size_t
+
+                 let bin_shape_typ = bin_shape_t
+
+                 let bin_write_typ = bin_write_t
+
+                 let bin_writer_typ = bin_writer_t
+
+                 let bin_typ = bin_t
+
+                 let (_ : _) =
+                   ( bin_read_typ
+                   , __bin_read_typ__
+                   , bin_reader_typ
+                   , bin_size_typ
+                   , bin_shape_typ
+                   , bin_write_typ
+                   , bin_writer_typ
+                   , bin_typ )]
+        | None ->
+            []
+      in
       [ pstr_module
           (module_binding
              ~name:(some_loc (Located.mk mod_name))
              ~expr:
                (pmod_structure
-                  ( [ pstr_type Recursive [ typ_decl ]
-                    ; pstr_type Recursive [ t_tagged ]
-                    ; pstr_type Recursive [ t ]
-                    ; create
-                    ]
-                  @ bin_io_t ) ) )
+                  ( pstr_type Recursive [ typ_decl ]
+                  :: ( include_str
+                     @ [ pstr_type Recursive [ t_tagged ]
+                       ; pstr_type Recursive [ t ]
+                       ]
+                     @ (create :: bin_io_t) ) ) ) )
       ]
     in
     let all_version_tag_modules =
       if not all_version_tagged then []
-      else (
-        if equal_version_option version_option Binable then
-          Location.raise_errorf ~loc
-            "Cannot all-tag types in %%versioned_binable modules" ;
+      else if equal_version_option version_option Binable then
+        (* the With_all_version_tags module contains the same Binable functor invocation,
+           except the serializing argument is itself an With_all_version_tags module
+
+           if we had
+
+           include Binable.Of_binable_without_uuid
+             (M.Stable.V1)
+             (struct ... end)
+
+           we generate
+
+           include Binable.Of_binable_without_uuid
+             (M.Stable.V1.With_all_version_tags)
+             (struct ... end)
+
+           and we add the tag for the current version by
+           shadowing the the bin_io functions from that include
+
+           that way, the serialized data gets all version tags
+
+           the type t is the same as in the surrounding module
+
+           we don't add an additional version tag for the original module
+           (because we didn't do so for %%versioned_binable, when we
+           had all version tags by default)
+        *)
+        let include_binable_stri = find_include_binable_stri modl_stri in
+        let typ_decl =
+          (* type `typ` is equal to the type `t` from the surrounding module *)
+          type_declaration ~name:(Located.mk "typ") ~params ~cstrs:[]
+            ~private_:Public
+            ~manifest:
+              (Some (ptyp_constr (Located.lident "t") (List.map ~f:fst params)))
+            ~kind:Ptype_abstract
+        in
+        let include_binable_all_version_tags =
+          make_all_tags_binable_include#structure_item include_binable_stri
+        in
+        make_tag_module ~bin_io_include:include_binable_all_version_tags
+          typ_decl with_all_version_tags_module
+      else
         let typ_decl =
           (* type `typ` is equal to `t` from the surrounding versioned type; but all contained
              occurrences of the form `M.Stable.Vn.t` become `M.Stable.Vn.With_all_version_tags.t`, so
@@ -583,7 +868,7 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
               Location.raise_errorf ~loc
                 "Expected type declaration for type `typ`"
         in
-        make_tag_module typ_decl with_all_version_tags_module )
+        make_tag_module typ_decl with_all_version_tags_module
     in
     let top_version_tag_modules =
       if not top_version_tag then []
@@ -616,16 +901,18 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
     let register_shape =
       let open Ast_builder in
       match t_stri.pstr_desc with
-      | Pstr_type (_, [ { ptype_name; ptype_params; _ } ]) ->
+      | Pstr_type (_, [ ty_decl ]) ->
           (* incomplete shape if there are type parameters *)
-          if List.is_empty ptype_params then
+          if List.is_empty ty_decl.ptype_params then
+            let ty_decl_str = ty_decl_to_string ty_decl in
             [%str
               let (_ : _) =
                 let path =
                   Core_kernel.sprintf "%s:%s.%s" __FILE__ __FUNCTION__
-                    [%e estring ptype_name.txt]
+                    [%e estring ty_decl.ptype_name.txt]
                 in
-                Ppx_version_runtime.Shapes.register path bin_shape_t]
+                Ppx_version_runtime.Shapes.register path bin_shape_t
+                  [%e estring ty_decl_str]]
           else []
       | _ ->
           failwith "Expected single type declaration in structure item"
@@ -678,14 +965,14 @@ let is_attr_sigitem_with_name name = function
       false
 
 let convert_module_stri ~version_option ~top_version_tag ~json_version_tag
-    last_version stri =
+    last_version modl_stri =
   let module_pattern =
     Ast_pattern.(
       pstr_module (module_binding ~name:(some __') ~expr:(pmod_structure __')))
   in
-  let loc = stri.pstr_loc in
+  let loc = modl_stri.pstr_loc in
   let name, str =
-    Ast_pattern.parse module_pattern loc stri
+    Ast_pattern.parse module_pattern loc modl_stri
       ~on_error:(fun () ->
         Location.raise_errorf ~loc
           "Expected a statement of the form `module Vn = struct ... end`." )
@@ -732,8 +1019,8 @@ let convert_module_stri ~version_option ~top_version_tag ~json_version_tag
         (type_stri, type_stri, str)
   in
   let should_convert, type_str, extra_stris =
-    version_type ~version_option version stri ~all_version_tagged
-      ~top_version_tag ~json_version_tag
+    version_type ~version_option version ~modl_stri ~all_version_tagged
+      ~top_version_tag ~json_version_tag stri
   in
   (* TODO: If [should_convert] then look for [to_latest]. *)
   let open Ast_builder.Default in
@@ -1099,21 +1386,25 @@ let version_module ~loc ~path:_ ~version_option modname modbody =
     raise exn
 
 let convert_rpc_version (stri : structure_item) =
-  let register_shapes =
+  let register_shapes query_ty_decl response_ty_decl =
     let (module Ast_builder) = Ast_builder.make stri.pstr_loc in
     let open Ast_builder in
+    let query_ty_decl_str = ty_decl_to_string query_ty_decl in
+    let response_ty_decl_str = ty_decl_to_string response_ty_decl in
     [%str
       let (_ : _) =
         let query_path =
           Core_kernel.sprintf "%s:%s.%s" __FILE__ __FUNCTION__
             [%e estring "query"]
         in
-        Ppx_version_runtime.Shapes.register query_path bin_shape_query ;
+        Ppx_version_runtime.Shapes.register query_path bin_shape_query
+          [%e estring query_ty_decl_str] ;
         let response_path =
           Core_kernel.sprintf "%s:%s.%s" __FILE__ __FUNCTION__
             [%e estring "response"]
         in
-        Ppx_version_runtime.Shapes.register response_path bin_shape_response]
+        Ppx_version_runtime.Shapes.register response_path bin_shape_response
+          [%e estring response_ty_decl_str]]
   in
   let add_derivers_to_types = function
     | { pstr_desc = Pstr_type (rec_flag, [ ty_decl ]); pstr_loc }
@@ -1155,6 +1446,22 @@ let convert_rpc_version (stri : structure_item) =
           let str_items_with_derivers =
             List.map str_items ~f:add_derivers_to_types
           in
+          let ty_decls =
+            List.filter_map str_items_with_derivers ~f:(fun stri ->
+                match stri.pstr_desc with
+                | Pstr_type (Recursive, [ ty_decl ]) ->
+                    Some ty_decl
+                | _ ->
+                    None )
+          in
+          let query_ty_decl =
+            List.find_exn ty_decls ~f:(fun ty_decl ->
+                String.equal ty_decl.ptype_name.txt "query" )
+          in
+          let response_ty_decl =
+            List.find_exn ty_decls ~f:(fun ty_decl ->
+                String.equal ty_decl.ptype_name.txt "response" )
+          in
           let pmb_expr_with_derivers =
             { mod_expr with
               pmod_desc =
@@ -1167,7 +1474,9 @@ let convert_rpc_version (stri : structure_item) =
                               { inner_mod_expr with
                                 pmod_desc =
                                   Pmod_structure
-                                    (str_items_with_derivers @ register_shapes)
+                                    ( str_items_with_derivers
+                                    @ register_shapes query_ty_decl
+                                        response_ty_decl )
                               }
                           }
                     }

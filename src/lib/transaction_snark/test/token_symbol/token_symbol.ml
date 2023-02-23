@@ -5,10 +5,11 @@ struct
   let test_description = "token_symbol"
 
   let failure_expected =
-    Mina_base.Transaction_status.Failure.Update_not_permitted_token_symbol
+    ( Mina_base.Transaction_status.Failure.Update_not_permitted_token_symbol
+    , Transaction_snark_tests.Util.Pass_2 )
 
   let snapp_update =
-    { Party.Update.dummy with
+    { Account_update.Update.dummy with
       token_symbol = Zkapp_basic.Set_or_keep.Set "Zoozoo"
     }
 end

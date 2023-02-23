@@ -21,6 +21,8 @@ struct
 
   let to_decimal_string (t : Field.t) = Field.to_string t
 
+  let of_decimal_string (s : string) = Field.of_string s
+
   let to_bytes t =
     Fold_lib.(Fold.bool_t_to_string (Fold.of_list (Field.unpack t)))
 
@@ -71,7 +73,7 @@ struct
       >>| fun x -> (x :> Boolean.var list)
     else Field.Checked.unpack ~length:length_in_bits
 
-  let%snarkydef var_to_bits t =
+  let%snarkydef_ var_to_bits t =
     match t.bits with
     | Some bits ->
         return (bits :> Boolean.var list)

@@ -13,4 +13,5 @@
    ;; local libraries
    blake2
    snarky.backendless
+   mina_stdlib
 ))

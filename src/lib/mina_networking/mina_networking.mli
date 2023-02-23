@@ -142,7 +142,6 @@ module Rpcs : sig
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
-    | Consensus_rpc : ('q, 'r) Consensus.Hooks.Rpcs.rpc -> ('q, 'r) rpc
 
   include Rpc_intf.Rpc_interface_intf with type ('q, 'r) rpc := ('q, 'r) rpc
 end
@@ -164,6 +163,7 @@ module Config : sig
     ; consensus_local_state : Consensus.Data.Local_state.t
     ; genesis_ledger_hash : Ledger_hash.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
+    ; precomputed_values : Precomputed_values.t
     ; creatable_gossip_net : Gossip_net.Any.creatable
     ; is_seed : bool
     ; log_gossip_heard : log_gossip_heard

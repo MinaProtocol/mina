@@ -168,11 +168,12 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                       ~f:(fun { pld_name = { txt = name; _ }; pld_type; _ } acc ->
                         Ppx_deriving_yojson.wrap_runtime
                         @@ [%expr
+                             let module Result = Core_kernel.Result in
                              match
                                Core_kernel.Map.find args_list [%e estring name]
                              with
                              | Some [%p pvar name] ->
-                                 Core_kernel.Result.bind
+                                 Result.bind
                                    ([%e
                                       of_yojson
                                         ~path:(split_path @ [ ctor; name ])
@@ -180,7 +181,7 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                                       [%e evar name] )
                                    ~f:(fun [%p pvar name] -> [%e acc])
                              | None ->
-                                 Core_kernel.Result.fail
+                                 Result.fail
                                    [%e
                                      estring
                                        (sprintf "%s, parse: missing argument %s"

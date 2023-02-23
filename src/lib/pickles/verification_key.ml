@@ -5,22 +5,45 @@ open Kimchi_pasta.Pasta
 
 module Verifier_index_json = struct
   module Lookup = struct
-    type lookups_used = Kimchi_types.VerifierIndex.Lookup.lookups_used =
-      | Single
-      | Joint
-    [@@deriving yojson]
-
     type 't lookup_selectors =
           't Kimchi_types.VerifierIndex.Lookup.lookup_selectors =
-      { lookup_gate : 't option }
+      { lookup : 't option }
+    [@@deriving yojson]
+
+    type lookup_pattern = Kimchi_types.lookup_pattern =
+      | Xor
+      | ChaChaFinal
+      | Lookup
+      | RangeCheck
+      | ForeignFieldMul
+    [@@deriving yojson]
+
+    type lookup_patterns = Kimchi_types.lookup_patterns =
+      { xor : bool
+      ; chacha_final : bool
+      ; lookup : bool
+      ; range_check : bool
+      ; foreign_field_mul : bool
+      }
+    [@@deriving yojson]
+
+    type lookup_features = Kimchi_types.lookup_features =
+      { patterns : lookup_patterns
+      ; joint_lookup_used : bool
+      ; uses_runtime_tables : bool
+      }
+    [@@deriving yojson]
+
+    type lookup_info = Kimchi_types.VerifierIndex.Lookup.lookup_info =
+      { max_per_row : int; max_joint_size : int; features : lookup_features }
     [@@deriving yojson]
 
     type 'polyComm t = 'polyComm Kimchi_types.VerifierIndex.Lookup.t =
-      { lookup_used : lookups_used
+      { joint_lookup_used : bool
       ; lookup_table : 'polyComm array
       ; lookup_selectors : 'polyComm lookup_selectors
       ; table_ids : 'polyComm option
-      ; max_joint_size : int
+      ; lookup_info : lookup_info
       ; runtime_tables_selector : 'polyComm option
       }
     [@@deriving yojson]
@@ -48,7 +71,6 @@ module Verifier_index_json = struct
         ('fr, 'sRS, 'polyComm) Kimchi_types.VerifierIndex.verifier_index =
     { domain : 'fr domain
     ; max_poly_size : int
-    ; max_quot_size : int
     ; public : int
     ; prev_challenges : int
     ; srs : 'sRS
@@ -120,8 +142,6 @@ module Stable = struct
     let of_repr srs { Repr.commitments = c; data = d } =
       let t : Impls.Wrap.Verification_key.t =
         let log2_size = Int.ceil_log2 d.constraints in
-        let d = Domain.Pow_2_roots_of_unity log2_size in
-        let max_quot_size = Common.max_quot_size_int (Domain.size d) in
         let public =
           let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
           let (Typ typ) = input in
@@ -132,7 +152,6 @@ module Stable = struct
             ; group_gen = Backend.Tock.Field.domain_generator ~log2_size
             }
         ; max_poly_size = 1 lsl Nat.to_int Rounds.Wrap.n
-        ; max_quot_size
         ; public
         ; prev_challenges = 2 (* Due to Wrap_hack *)
         ; srs

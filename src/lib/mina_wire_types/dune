@@ -1,9 +1,26 @@
+; We want modules defined in subdirectories (such as mina_base) to be available
+; in the top level.
+(include_subdirs unqualified)
+
 (library
   (name mina_wire_types)
   (public_name mina_wire_types)
-  (libraries integers)
-  (preprocess (pps ppx_version))
+  (libraries
+    ; Keep these dependencies to an absolute minimum
+    integers
+    pasta_bindings
+    pickles_types
+    kimchi_types
+    kimchi_bindings
+    kimchi_backend.pasta
+    kimchi_backend.pasta.basic
+    blake2
+    )
+  (preprocessor_deps ../../config.mlh)
+  (preprocess (pps ppx_version ppx_optcomp))
   (instrumentation (backend bisect_ppx))
+  (flags -w -22) ; Allow using versioned types outside of ppx
   )
 
+; Include index.mld in generated doc
 (documentation (package mina_wire_types))

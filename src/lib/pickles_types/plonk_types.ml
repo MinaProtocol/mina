@@ -19,10 +19,22 @@ module Permuts = Nat.N7
 module Permuts_vec = Vector.Vector_7
 
 module Opt = struct
+  [@@@warning "-4"]
+
   type ('a, 'bool) t = Some of 'a | None | Maybe of 'bool * 'a
   [@@deriving sexp, compare, yojson, hash, equal]
 
-  let to_option : ('a, _) t -> 'a option = function
+  let to_option : ('a, bool) t -> 'a option = function
+    | Some x ->
+        Some x
+    | Maybe (true, x) ->
+        Some x
+    | Maybe (false, _x) ->
+        None
+    | None ->
+        None
+
+  let to_option_unsafe : ('a, 'bool) t -> 'a option = function
     | Some x ->
         Some x
     | Maybe (_, x) ->
@@ -36,7 +48,7 @@ module Opt = struct
     | Maybe (_, x) ->
         x
     | None ->
-        failwith "Opt.value_exn"
+        invalid_arg "Opt.value_exn"
 
   let of_option (t : 'a option) : ('a, 'bool) t =
     match t with None -> None | Some x -> Some x
@@ -53,28 +65,6 @@ module Opt = struct
         Some (f x)
     | Maybe (b, x) ->
         Maybe (b, f x)
-
-  let map2_exn (type a b c bool) (t1 : (a, bool) t) (t2 : (b, bool) t)
-      ~(f : a -> b -> c) =
-    match (t1, t2) with
-    | None, None ->
-        None
-    | Some x1, Some x2 ->
-        Some (f x1 x2)
-    | Some x1, Maybe (b2, x2) ->
-        Maybe (b2, f x1 x2)
-    | Maybe (b1, x1), Some x2 ->
-        Maybe (b1, f x1 x2)
-    | Maybe (_b1, _x1), Maybe (_b2, _x2) ->
-        failwith "Opt.map2_exn: (Maybe, Maybe)"
-    | Some _, None ->
-        failwith "Opt.map2_exn: (Some, None)"
-    | None, Some _ ->
-        failwith "Opt.map2_exn: (None, Some)"
-    | Maybe _, None ->
-        failwith "Opt.map2_exn: (Maybe, None)"
-    | None, Maybe _ ->
-        failwith "Opt.map2_exn: (None, Maybe)"
 
   open Snarky_backendless
 
@@ -127,7 +117,7 @@ module Opt = struct
         (* No need to boolean constrain in the No or Yes case *)
         match flag with
         | No | Yes ->
-            fun _ -> Checked.return ()
+            fun _ -> Checked_runner.Simple.return ()
         | Maybe ->
             bool_typ.check
       in
@@ -163,6 +153,8 @@ module Opt = struct
   module Early_stop_sequence = struct
     (* A sequence that should be considered to have stopped at
        the first No flag *)
+    (* TODO: The documentation above makes it sound like the type below is too
+       generic: we're not guaranteed to have flags in there *)
     type nonrec ('a, 'bool) t = ('a, 'bool) t list
 
     let fold (type a bool acc res)
@@ -185,8 +177,185 @@ module Opt = struct
   end
 end
 
-module Lookup_config = struct
-  type t = { lookup : Opt.Flag.t; runtime : Opt.Flag.t }
+module Features = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'bool t =
+        { chacha : 'bool
+        ; range_check0 : 'bool
+        ; range_check1 : 'bool
+        ; foreign_field_add : 'bool
+        ; foreign_field_mul : 'bool
+        ; xor : 'bool
+        ; rot : 'bool
+        ; lookup : 'bool
+        ; runtime_tables : 'bool
+        }
+      [@@deriving sexp, compare, yojson, hash, equal, hlist]
+    end
+  end]
+
+  type options = Opt.Flag.t t
+
+  type flags = bool t
+
+  let to_data
+      { chacha
+      ; range_check0
+      ; range_check1
+      ; foreign_field_add
+      ; foreign_field_mul
+      ; xor
+      ; rot
+      ; lookup
+      ; runtime_tables
+      } : _ Hlist.HlistId.t =
+    [ chacha
+    ; range_check0
+    ; range_check1
+    ; foreign_field_add
+    ; foreign_field_mul
+    ; xor
+    ; rot
+    ; lookup
+    ; runtime_tables
+    ]
+
+  let of_data
+      ([ chacha
+       ; range_check0
+       ; range_check1
+       ; foreign_field_add
+       ; foreign_field_mul
+       ; xor
+       ; rot
+       ; lookup
+       ; runtime_tables
+       ] :
+        _ Hlist.HlistId.t ) =
+    { chacha
+    ; range_check0
+    ; range_check1
+    ; foreign_field_add
+    ; foreign_field_mul
+    ; xor
+    ; rot
+    ; lookup
+    ; runtime_tables
+    }
+
+  let typ bool
+      ~feature_flags:
+        { chacha
+        ; range_check0
+        ; range_check1
+        ; foreign_field_add
+        ; foreign_field_mul
+        ; xor
+        ; rot
+        ; lookup
+        ; runtime_tables
+        } =
+    (* TODO: This should come from snarky. *)
+    let constant (type var value)
+        (typ : (var, value, _) Snarky_backendless.Typ.t) (x : value) : var =
+      let (Typ typ) = typ in
+      let fields, aux = typ.value_to_fields x in
+      let fields =
+        Array.map ~f:(fun x -> Snarky_backendless.Cvar.Constant x) fields
+      in
+      typ.var_of_fields (fields, aux)
+    in
+    let constant_typ ~there value =
+      let open Snarky_backendless.Typ in
+      unit ()
+      |> transport ~there ~back:(fun () -> value)
+      |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> constant bool value)
+    in
+    let bool_typ_of_flag = function
+      | Opt.Flag.Yes ->
+          constant_typ
+            ~there:(function true -> () | false -> assert false)
+            true
+      | Opt.Flag.No ->
+          constant_typ
+            ~there:(function false -> () | true -> assert false)
+            false
+      | Opt.Flag.Maybe ->
+          bool
+    in
+    Snarky_backendless.Typ.of_hlistable
+      [ bool_typ_of_flag chacha
+      ; bool_typ_of_flag range_check0
+      ; bool_typ_of_flag range_check1
+      ; bool_typ_of_flag foreign_field_add
+      ; bool_typ_of_flag foreign_field_mul
+      ; bool_typ_of_flag xor
+      ; bool_typ_of_flag rot
+      ; bool_typ_of_flag lookup
+      ; bool_typ_of_flag runtime_tables
+      ]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
+
+  let none =
+    { chacha = Opt.Flag.No
+    ; range_check0 = Opt.Flag.No
+    ; range_check1 = Opt.Flag.No
+    ; foreign_field_add = Opt.Flag.No
+    ; foreign_field_mul = Opt.Flag.No
+    ; xor = Opt.Flag.No
+    ; rot = Opt.Flag.No
+    ; lookup = Opt.Flag.No
+    ; runtime_tables = Opt.Flag.No
+    }
+
+  let none_bool =
+    { chacha = false
+    ; range_check0 = false
+    ; range_check1 = false
+    ; foreign_field_add = false
+    ; foreign_field_mul = false
+    ; xor = false
+    ; rot = false
+    ; lookup = false
+    ; runtime_tables = false
+    }
+
+  let map
+      { chacha
+      ; range_check0
+      ; range_check1
+      ; foreign_field_add
+      ; foreign_field_mul
+      ; rot
+      ; xor
+      ; lookup
+      ; runtime_tables
+      } ~f =
+    { chacha = f chacha
+    ; range_check0 = f range_check0
+    ; range_check1 = f range_check1
+    ; foreign_field_add = f foreign_field_add
+    ; foreign_field_mul = f foreign_field_mul
+    ; xor = f xor
+    ; rot = f rot
+    ; lookup = f lookup
+    ; runtime_tables = f runtime_tables
+    }
+
+  let map2 x1 x2 ~f =
+    { chacha = f x1.chacha x2.chacha
+    ; range_check0 = f x1.range_check0 x2.range_check0
+    ; range_check1 = f x1.range_check1 x2.range_check1
+    ; foreign_field_add = f x1.foreign_field_add x2.foreign_field_add
+    ; foreign_field_mul = f x1.foreign_field_mul x2.foreign_field_mul
+    ; xor = f x1.xor x2.xor
+    ; rot = f x1.rot x2.rot
+    ; lookup = f x1.lookup x2.lookup
+    ; runtime_tables = f x1.runtime_tables x2.runtime_tables
+    }
 end
 
 module Evals = struct
@@ -244,20 +413,21 @@ module Evals = struct
         (f, bool) In_circuit.t =
       { sorted; aggreg; table; runtime = Opt.of_option runtime }
 
-    let typ impl e ~runtime ~dummy =
+    let typ impl e ~runtime_tables ~dummy =
       Snarky_backendless.Typ.of_hlistable
         [ Snarky_backendless.Typ.array ~length:sorted_length e
         ; e
         ; e
-        ; Opt.typ impl runtime e ~dummy
+        ; Opt.typ impl runtime_tables e ~dummy
         ]
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
 
-    let opt_typ impl ({ lookup; runtime } : Lookup_config.t) ~dummy:z elt =
+    let opt_typ impl ({ lookup; runtime_tables; _ } : Opt.Flag.t Features.t)
+        ~dummy:z elt =
       Opt.typ impl lookup
-        ~dummy:(dummy z ~runtime:(Opt.Flag.equal runtime Yes))
-        (typ impl ~runtime ~dummy:z elt)
+        ~dummy:(dummy z ~runtime:(not (Opt.Flag.equal runtime_tables No)))
+        (typ impl ~runtime_tables ~dummy:z elt)
   end
 
   [%%versioned
@@ -265,6 +435,7 @@ module Evals = struct
     module V2 = struct
       type 'a t =
         { w : 'a Columns_vec.Stable.V1.t
+        ; coefficients : 'a Columns_vec.Stable.V1.t
         ; z : 'a
         ; s : 'a Permuts_minus_1_vec.Stable.V1.t
         ; generic_selector : 'a
@@ -276,10 +447,13 @@ module Evals = struct
   end]
 
   let to_absorption_sequence
-      { w; z; s; generic_selector; poseidon_selector; lookup } : _ list =
+      { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+      _ list =
     let always_present =
       [ z; generic_selector; poseidon_selector ]
-      @ Vector.to_list w @ Vector.to_list s
+      @ Vector.to_list w
+      @ Vector.to_list coefficients
+      @ Vector.to_list s
     in
     let lookup =
       match lookup with
@@ -293,6 +467,7 @@ module Evals = struct
   module In_circuit = struct
     type ('f, 'bool) t =
       { w : 'f Columns_vec.t
+      ; coefficients : 'f Columns_vec.t
       ; z : 'f
       ; s : 'f Permuts_minus_1_vec.t
       ; generic_selector : 'f
@@ -302,9 +477,10 @@ module Evals = struct
     [@@deriving hlist, fields]
 
     let map (type bool a b)
-        ({ w; z; s; generic_selector; poseidon_selector; lookup } : (a, bool) t)
-        ~(f : a -> b) : (b, bool) t =
+        ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+          (a, bool) t ) ~(f : a -> b) : (b, bool) t =
       { w = Vector.map w ~f
+      ; coefficients = Vector.map coefficients ~f
       ; z = f z
       ; s = Vector.map s ~f
       ; generic_selector = f generic_selector
@@ -312,12 +488,15 @@ module Evals = struct
       ; lookup = Opt.map ~f:(Lookup.In_circuit.map ~f) lookup
       }
 
-    let to_list { w; z; s; generic_selector; poseidon_selector; lookup } =
+    let to_list
+        { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } =
       let some x = Opt.Some x in
       let always_present =
         List.map ~f:some
           ( [ z; generic_selector; poseidon_selector ]
-          @ Vector.to_list w @ Vector.to_list s )
+          @ Vector.to_list w
+          @ Vector.to_list coefficients
+          @ Vector.to_list s )
       in
       let with_lookup ~f (lookup : _ Lookup.In_circuit.t) =
         always_present
@@ -339,11 +518,13 @@ module Evals = struct
           with_lookup ~f:(fun x -> Maybe (b, x)) lookup
 
     let to_absorption_sequence
-        { w; z; s; generic_selector; poseidon_selector; lookup } :
+        { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
         _ Opt.Early_stop_sequence.t =
       let always_present =
         [ z; generic_selector; poseidon_selector ]
-        @ Vector.to_list w @ Vector.to_list s
+        @ Vector.to_list w
+        @ Vector.to_list coefficients
+        @ Vector.to_list s
       in
       let some x = Opt.Some x in
       let lookup =
@@ -363,9 +544,10 @@ module Evals = struct
   end
 
   let to_in_circuit (type bool a)
-      ({ w; z; s; generic_selector; poseidon_selector; lookup } : a t) :
-      (a, bool) In_circuit.t =
+      ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+        a t ) : (a, bool) In_circuit.t =
     { w
+    ; coefficients
     ; z
     ; s
     ; generic_selector
@@ -374,9 +556,10 @@ module Evals = struct
     }
 
   let map (type a b)
-      ({ w; z; s; generic_selector; poseidon_selector; lookup } : a t)
-      ~(f : a -> b) : b t =
+      ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+        a t ) ~(f : a -> b) : b t =
     { w = Vector.map w ~f
+    ; coefficients = Vector.map coefficients ~f
     ; z = f z
     ; s = Vector.map s ~f
     ; generic_selector = f generic_selector
@@ -386,14 +569,13 @@ module Evals = struct
 
   let map2 (type a b c) (t1 : a t) (t2 : b t) ~(f : a -> b -> c) : c t =
     { w = Vector.map2 t1.w t2.w ~f
+    ; coefficients = Vector.map2 t1.coefficients t2.coefficients ~f
     ; z = f t1.z t2.z
     ; s = Vector.map2 t1.s t2.s ~f
     ; generic_selector = f t1.generic_selector t2.generic_selector
     ; poseidon_selector = f t1.poseidon_selector t2.poseidon_selector
     ; lookup = Option.map2 t1.lookup t2.lookup ~f:(Lookup.map2 ~f)
     }
-
-  let w_s_len, w_s_add_proof = Columns.add Permuts_minus_1.n
 
   (*
       This is in the same order as the evaluations in the opening proof:
@@ -415,10 +597,13 @@ module Evals = struct
      - lookup runtime
   *)
 
-  let to_list { w; z; s; generic_selector; poseidon_selector; lookup } =
+  let to_list
+      { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } =
     let always_present =
       [ z; generic_selector; poseidon_selector ]
-      @ Vector.to_list w @ Vector.to_list s
+      @ Vector.to_list w
+      @ Vector.to_list coefficients
+      @ Vector.to_list s
     in
     match lookup with
     | None ->
@@ -438,6 +623,7 @@ module Evals = struct
     let lookup_typ = Lookup.opt_typ Impl.Boolean.typ lookup_config e ~dummy in
     Typ.of_hlistable
       [ Vector.typ e Columns.n
+      ; Vector.typ e Columns.n
       ; e
       ; Vector.typ e Permuts_minus_1.n
       ; e
@@ -482,6 +668,8 @@ module All_evals = struct
         ~var_of_hlist:In_circuit.of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
   end
+
+  [@@@warning "-4"]
 
   [%%versioned
   module Stable = struct
@@ -529,6 +717,8 @@ module All_evals = struct
 end
 
 module Openings = struct
+  [@@@warning "-4"] (* Deals with the 2 sexp-deriving types below *)
+
   module Bulletproof = struct
     [%%versioned
     module Stable = struct
@@ -575,22 +765,7 @@ module Poly_comm = struct
       end
     end]
 
-    let map { unshifted; shifted } ~f =
-      { unshifted = Array.map ~f unshifted; shifted = f shifted }
-
     let padded_array_typ0 = padded_array_typ
-
-    let padded_array_typ elt ~length ~dummy ~bool =
-      let open Snarky_backendless.Typ in
-      array ~length (tuple2 bool elt)
-      |> transport
-           ~there:(fun a ->
-             let a = Array.map a ~f:(fun x -> (true, x)) in
-             let n = Array.length a in
-             if n > length then failwithf "Expected %d <= %d" n length () ;
-             Array.append a (Array.create ~len:(length - n) (false, dummy)) )
-           ~back:(fun a ->
-             Array.filter_map a ~f:(fun (b, g) -> if b then Some g else None) )
 
     let typ (type f g g_var bool_var)
         (g : (g_var, g, f) Snarky_backendless.Typ.t) ~length
@@ -619,8 +794,6 @@ module Poly_comm = struct
         type 'g t = 'g array [@@deriving sexp, compare, yojson, hash, equal]
       end
     end]
-
-    let typ g ~length = Snarky_backendless.Typ.array ~length g
   end
 end
 
@@ -649,38 +822,27 @@ module Messages = struct
 
     let sorted_length = 5
 
-    let dummy ~runtime z =
+    let dummy ~runtime_tables z =
       { aggreg = z
       ; sorted = Array.create ~len:sorted_length z
-      ; runtime = Option.some_if runtime z
+      ; runtime = Option.some_if runtime_tables z
       }
 
-    let map { sorted; aggreg; runtime } ~f =
-      { sorted = Array.map ~f sorted
-      ; aggreg = f aggreg
-      ; runtime = Option.map ~f runtime
-      }
-
-    let map2 t1 t2 ~f =
-      { sorted = Array.map2_exn ~f t1.sorted t2.sorted
-      ; aggreg = f t1.aggreg t2.aggreg
-      ; runtime = Option.map2 ~f t1.runtime t2.runtime
-      }
-
-    let typ bool_typ e ~runtime ~dummy =
+    let typ bool_typ e ~runtime_tables ~dummy =
       Snarky_backendless.Typ.of_hlistable
         [ Snarky_backendless.Typ.array ~length:sorted_length e
         ; e
-        ; Opt.typ bool_typ runtime e ~dummy
+        ; Opt.typ bool_typ runtime_tables e ~dummy
         ]
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
 
-    let opt_typ bool_typ ~(lookup : Opt.Flag.t) ~(runtime : Opt.Flag.t) ~dummy:z
-        elt =
+    let opt_typ bool_typ ~(lookup : Opt.Flag.t) ~(runtime_tables : Opt.Flag.t)
+        ~dummy:z elt =
       Opt.typ bool_typ lookup
-        ~dummy:(dummy z ~runtime:Opt.Flag.(equal runtime Yes))
-        (typ bool_typ ~runtime ~dummy:z elt)
+        ~dummy:
+          (dummy z ~runtime_tables:Opt.Flag.(not (equal runtime_tables No)))
+        (typ bool_typ ~runtime_tables ~dummy:z elt)
   end
 
   [%%versioned
@@ -709,7 +871,7 @@ module Messages = struct
 
   let typ (type n f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) g
-      ({ lookup; runtime } : Lookup_config.t) ~dummy
+      ({ lookup; runtime_tables; _ } : Opt.Flag.t Features.t) ~dummy
       ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t) ~bool
       =
     let open Snarky_backendless.Typ in
@@ -722,7 +884,7 @@ module Messages = struct
         ~dummy_group_element:dummy ~bool
     in
     let lookup =
-      Lookup.opt_typ Impl.Boolean.typ ~lookup ~runtime ~dummy:[| dummy |]
+      Lookup.opt_typ Impl.Boolean.typ ~lookup ~runtime_tables ~dummy:[| dummy |]
         (wo [ 1 ])
     in
     of_hlistable
@@ -753,6 +915,4 @@ module Shifts = struct
       type 'field t = 'field array [@@deriving sexp, compare, yojson, equal]
     end
   end]
-
-  let map = Array.map
 end

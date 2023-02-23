@@ -32,6 +32,8 @@ let to_bytes = `Use_to_base58_check_or_raw_hash_bytes
 
 let to_decimal_string = to_decimal_string
 
+let of_decimal_string = of_decimal_string
+
 (* Data hash versioned boilerplate below *)
 
 [%%versioned
@@ -54,7 +56,7 @@ module Stable = struct
   end
 end]
 
-type _unused = unit constraint t = Stable.Latest.t
+let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
 
 let deriver obj =
   Fields_derivers_zkapps.iso_string obj ~name:"StateHash" ~js_type:Field

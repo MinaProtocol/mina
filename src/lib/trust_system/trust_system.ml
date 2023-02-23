@@ -172,6 +172,9 @@ module Actions = struct
         (show_action action, [])
     | Some (fmt, metadata) ->
         (sprintf !"%s (%s)" (show_action action) fmt, metadata)
+
+  let is_reason_for_heartbeat (a, _) =
+    match a with Sent_useful_gossip | Fulfilled_request -> true | _ -> false
 end
 
 module Banned_status = Banned_status

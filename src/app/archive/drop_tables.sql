@@ -10,7 +10,7 @@ DROP TABLE blocks_user_commands;
 
 DROP TABLE blocks_zkapp_commands;
 
-DROP TABLE zkapp_party_failures;
+DROP TABLE zkapp_account_update_failures;
 
 DROP TABLE accounts_accessed;
 
@@ -36,11 +36,13 @@ DROP TABLE zkapp_commands;
 
 DROP TABLE zkapp_fee_payer_body;
 
-DROP TABLE zkapp_other_party;
+DROP TABLE zkapp_account_update;
 
-DROP TABLE zkapp_other_party_body;
+DROP TABLE zkapp_account_update_body;
 
-DROP TYPE call_type_type;
+DROP TYPE may_use_token;
+
+DROP TYPE authorization_kind_type;
 
 DROP TABLE zkapp_updates;
 
@@ -48,7 +50,7 @@ DROP TABLE zkapp_network_precondition;
 
 DROP TABLE zkapp_account_precondition;
 
-DROP TABLE zkapp_precondition_accounts;
+DROP TABLE zkapp_account_precondition_values;
 
 DROP TABLE zkapp_accounts;
 
@@ -58,11 +60,13 @@ DROP TABLE zkapp_epoch_ledger;
 
 DROP TABLE zkapp_permissions;
 
-DROP TABLE zkapp_state_data_array;
+DROP TABLE zkapp_field_array;
+
+DROP TABLE zkapp_states_nullable;
 
 DROP TABLE zkapp_states;
 
-DROP TABLE zkapp_state_data;
+DROP TABLE zkapp_field;
 
 DROP TABLE zkapp_timing_info;
 
@@ -78,13 +82,9 @@ DROP TABLE zkapp_global_slot_bounds;
 
 DROP TABLE zkapp_nonce_bounds;
 
-DROP TABLE zkapp_timestamp_bounds;
-
 DROP TABLE zkapp_token_id_bounds;
 
 DROP TYPE zkapp_auth_required_type;
-
-DROP TYPE zkapp_authorization_kind_type;
 
 DROP TYPE zkapp_precondition_type;
 

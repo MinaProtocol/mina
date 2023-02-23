@@ -15,10 +15,9 @@ type t = (Payload.t, Public_key.t, Signature.t) t_
 type var = (Payload.var, Public_key.var, Signature.var) t_
 
 let typ : (var, t) Typ.t =
-  let spec =
-    Data_spec.[ Payload.typ; Public_key.typ; Schnorr.Chunked.Signature.typ ]
-  in
-  Typ.of_hlistable spec ~var_to_hlist:t__to_hlist ~var_of_hlist:t__of_hlist
+  Typ.of_hlistable
+    [ Payload.typ; Public_key.typ; Schnorr.Chunked.Signature.typ ]
+    ~var_to_hlist:t__to_hlist ~var_of_hlist:t__of_hlist
     ~value_to_hlist:t__to_hlist ~value_of_hlist:t__of_hlist
 
 (** For SNARK purposes, we inject [Transaction.t]s into a single-variant 'tagged-union' record capable of
@@ -61,7 +60,6 @@ let of_transaction : Signed_command.t Transaction.Poly.t -> t = function
               ; token_id = Token_id.default
               ; amount
               ; tag = Tag.Coinbase
-              ; token_locked = false
               }
           }
       ; signer = Public_key.decompress_exn other_pk
@@ -86,7 +84,6 @@ let of_transaction : Signed_command.t Transaction.Poly.t -> t = function
                 ; token_id
                 ; amount = Amount.of_fee fee1
                 ; tag = Tag.Fee_transfer
-                ; token_locked = false
                 }
             }
         ; signer = Public_key.decompress_exn pk2

@@ -530,16 +530,21 @@ let proof obj : _ Unified_input.t =
     | Error _err ->
         raise_invalid_scalar `Proof s
   in
-  iso_string obj ~name:"SnappProof" ~js_type:String
+  iso_string obj ~name:"ZkappProof" ~js_type:String
     ~to_string:Pickles.Side_loaded.Proof.to_base64 ~of_string
 
 let verification_key_with_hash obj =
   let verification_key obj =
+    let of_string s =
+      match Pickles.Side_loaded.Verification_key.of_base64 s with
+      | Ok vk ->
+          vk
+      | Error _err ->
+          raise_invalid_scalar `Verification_key s
+    in
     Pickles.Side_loaded.Verification_key.(
       iso_string obj ~name:"VerificationKey" ~js_type:String
-        ~to_string:to_base58_check
-        ~of_string:(except ~f:of_base58_check_exn `Verification_key)
-        ~doc:"Verification key in Base58Check format")
+        ~to_string:to_base64 ~of_string ~doc:"Verification key in Base64 format")
   in
   let ( !. ) =
     ( !. ) ~t_fields_annots:With_hash.Stable.Latest.t_fields_annots
@@ -605,7 +610,7 @@ let%test_module "Test" =
 
       let derived inner init =
         iso ~map:of_option ~contramap:to_option
-          ((option ~js_type:`Flagged_option @@ inner @@ o ()) (o ()))
+          ((option ~js_type:Flagged_option @@ inner @@ o ()) (o ()))
           init
     end
 

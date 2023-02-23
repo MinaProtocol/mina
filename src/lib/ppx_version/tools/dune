@@ -20,7 +20,7 @@
    ppx_deriving_yojson
    base_quickcheck.ppx_quickcheck
    ;; local derivers
-   ppx_coda
+   ppx_mina
    h_list.ppx
    ppx_annot
    ppx_dhall_type
@@ -50,7 +50,7 @@
    ppx_deriving_yojson
    base_quickcheck.ppx_quickcheck
    ;; local derivers
-   ppx_coda
+   ppx_mina
    h_list.ppx
    ppx_annot
    ppx_dhall_type

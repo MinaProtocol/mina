@@ -18,6 +18,8 @@ val zero : Field.t
 
 val to_decimal_string : t -> string
 
+val of_decimal_string : string -> t
+
 [%%versioned:
 module Stable : sig
   [@@@no_toplevel_latest_type]

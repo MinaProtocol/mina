@@ -51,6 +51,7 @@ inputs: pkgs: {
     buildPhase = "make check-format";
     installPhase = "touch $out";
     meta.checkDescription = "that OCaml code is formatted properly";
+    DISABLE_CHECK_OPAM_SWITCH = "true";
   };
 
   # todo: libp2p_ipc
