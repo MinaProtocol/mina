@@ -40,7 +40,7 @@ Pipeline.build
       in
 
       JobSpec::{
-        dirtyWhen = [] : List S.Type,
+        dirtyWhen = unitDirtyWhen,
         path = "Test",
         name = "FuzzyZkappTest"
       },
