@@ -1,35 +1,27 @@
 open Core_kernel
 open Signature_lib
 open Mina_base
-open Mina_base.Zkapp_command.Call_forest
+open Zkapp_command.Call_forest
 
 (* TODO: move generators to the library once the code isn't actively being
      worked on *)
 module Tree = struct
   include Tree
 
-  module Stable = struct
-    include Stable
+  let gen account_update_gen account_update_digest_gen digest_gen =
+    let open Quickcheck.Generator.Let_syntax in
+    Quickcheck.Generator.fixed_point (fun self ->
+        let%bind calls_length = Quickcheck.Generator.small_non_negative_int in
+        let%map account_update = account_update_gen
+        and account_update_digest = account_update_digest_gen
+        and digest = digest_gen
+        and calls =
+          Quickcheck.Generator.list_with_length calls_length
+            (With_stack_hash.quickcheck_generator self digest_gen)
+        in
+        { account_update; account_update_digest; calls } )
 
-    module V1 = struct
-      include V1
-
-      let gen account_update_gen account_update_digest_gen digest_gen =
-        let open Quickcheck.Generator.Let_syntax in
-        Quickcheck.Generator.fixed_point (fun self ->
-            let%bind calls_length =
-              Quickcheck.Generator.small_non_negative_int
-            in
-            let%map account_update = account_update_gen
-            and account_update_digest = account_update_digest_gen
-            and digest = digest_gen
-            and calls =
-              Quickcheck.Generator.list_with_length calls_length
-                (With_stack_hash.quickcheck_generator self digest_gen)
-            in
-            { account_update; account_update_digest; calls } )
-    end
-  end
+  let quickcheck_generator = gen
 end
 
 module Shape = struct
@@ -53,8 +45,7 @@ let gen account_update_gen account_update_digest_gen digest_gen =
   let open Quickcheck.Generator.Let_syntax in
   Quickcheck.Generator.list
     (With_stack_hash.Stable.V1.quickcheck_generator
-       (Tree.Stable.V1.gen account_update_gen account_update_digest_gen
-          digest_gen )
+       (Tree.gen account_update_gen account_update_digest_gen digest_gen)
        digest_gen )
 
 module Tree_test = struct
@@ -137,7 +128,7 @@ module Tree_test = struct
   let%test_unit "mapi_with_trees preserves shape" =
     let open Quickcheck.Generator.Let_syntax in
     Quickcheck.test
-      (Tree.Stable.V1.gen Int.quickcheck_generator Int.quickcheck_generator
+      (Tree.gen Int.quickcheck_generator Int.quickcheck_generator
          Int.quickcheck_generator ) ~f:(fun tree ->
         let tree' = Tree.mapi_with_trees tree ~f:(fun _ _ _ -> ()) in
         ignore @@ Tree.fold2_exn tree tree' ~init:() ~f:(fun _ _ _ -> ()) )
@@ -168,7 +159,7 @@ module Tree_test = struct
     let open Quickcheck.Generator.Let_syntax in
     Quickcheck.test
       ( Quickcheck.Generator.tuple2 Int.quickcheck_generator
-      @@ Tree.Stable.V1.gen Int.quickcheck_generator Int.quickcheck_generator
+      @@ Tree.gen Int.quickcheck_generator Int.quickcheck_generator
            Int.quickcheck_generator )
       ~f:(fun (i, tree) ->
         let _, tree' = Tree.mapi' ~i tree ~f:(fun _ _ -> ()) in
