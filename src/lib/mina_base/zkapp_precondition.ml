@@ -525,7 +525,7 @@ module Account = struct
     let open Fields_derivers_zkapps in
     let ( !. ) = ( !. ) ~t_fields_annots in
     let sequence_state =
-      with_checked ~checked:field ~name:"SequenceState" field
+      needs_custom_js ~js_type:field ~name:"SequenceState" field
     in
     Fields.make_creator obj ~balance:!.Numeric.Derivers.balance
       ~nonce:!.Numeric.Derivers.nonce
