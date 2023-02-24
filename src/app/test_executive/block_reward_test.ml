@@ -39,30 +39,29 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "wait for 1 block to be produced"
         (wait_for t (Wait_condition.blocks_to_be_produced 1))
     in
-      section
-        "check that the account balances are what we expect after the block \
-         has been produced"
-        (let%bind { total_balance = bp_balance; _ } =
-           Network.Node.must_get_account_data ~logger untimed_node_a
-             ~account_id:bp_pk_account_id
-         in
-         (* TODO, the intg test framework is ignoring test_constants.coinbase_amount for whatever reason, so hardcoding this until that is fixed *)
-         let bp_expected =
-           Currency.Amount.add bp_original_balance coinbase_reward
-           |> Option.value_exn
-         in
-         [%log info] "bp_expected: %s"
-           (Currency.Amount.to_mina_string bp_expected) ;
-         [%log info] "bp_balance: %s"
-           (Currency.Balance.to_mina_string bp_balance) ;
-         if
-           Currency.Amount.( = )
-             (Currency.Balance.to_amount bp_balance)
-             bp_expected
-         then Malleable_error.return ()
-         else
-           Malleable_error.soft_error_format ~value:()
-             "Error with account balances.  bp balance is %d and should be %d"
-             (Currency.Balance.to_nanomina_int bp_balance)
-             (Currency.Amount.to_nanomina_int bp_expected) )
+    section
+      "check that the account balances are what we expect after the block has \
+       been produced"
+      (let%bind { total_balance = bp_balance; _ } =
+         Network.Node.must_get_account_data ~logger untimed_node_a
+           ~account_id:bp_pk_account_id
+       in
+       (* TODO, the intg test framework is ignoring test_constants.coinbase_amount for whatever reason, so hardcoding this until that is fixed *)
+       let bp_expected =
+         Currency.Amount.add bp_original_balance coinbase_reward
+         |> Option.value_exn
+       in
+       [%log info] "bp_expected: %s"
+         (Currency.Amount.to_mina_string bp_expected) ;
+       [%log info] "bp_balance: %s" (Currency.Balance.to_mina_string bp_balance) ;
+       if
+         Currency.Amount.( = )
+           (Currency.Balance.to_amount bp_balance)
+           bp_expected
+       then Malleable_error.return ()
+       else
+         Malleable_error.soft_error_format ~value:()
+           "Error with account balances.  bp balance is %d and should be %d"
+           (Currency.Balance.to_nanomina_int bp_balance)
+           (Currency.Amount.to_nanomina_int bp_expected) )
 end
