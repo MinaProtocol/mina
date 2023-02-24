@@ -19,13 +19,26 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Test_config in
     { default with
       requires_graphql = true
+    ; genesis_ledger =
+        [ { account_name = "node_a-key"; balance = "9999999"; timing = Untimed }
+        ; { account_name = "empty_bp-key"; balance = "0"; timing = Untimed }
+        ; { account_name = "snark_node-key"; balance = "0"; timing = Untimed }
+        ; { account_name = "fish1"; balance = "1000"; timing = Untimed }
+        ]
     ; block_producers =
-        { Wallet.balance = "9999999"; timing = Untimed }
-        :: List.init 4 ~f:(const { Wallet.balance = "0"; timing = Untimed })
-    ; num_snark_workers = 25
-    ; extra_genesis_accounts =
-        [ { balance = "1000"; timing = Untimed } ]
-        (* ; aux_account_balance = Some "1000" *)
+        [ { node_name = "node_a"; account_name = "node_a-key" }
+        ; { node_name = "empty_node_1"; account_name = "empty_bp-key" }
+        ; { node_name = "empty_node_2"; account_name = "empty_bp-key" }
+        ; { node_name = "empty_node_3"; account_name = "empty_bp-key" }
+        ; { node_name = "empty_node_4"; account_name = "empty_bp-key" }
+        ]
+        (* ; num_snark_workers = 25 *)
+    ; snark_coordinator =
+        Some
+          { node_name = "snark_node"
+          ; account_name = "snark_node-key"
+          ; worker_nodes = 25
+          }
     ; txpool_max_size = 10_000_000
     ; snark_worker_fee = "0.0001"
     }
@@ -64,13 +77,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let window_ms =
       (Network.constraint_constants network).block_window_duration_ms
     in
+    let all_nodes = Network.all_nodes network in
     let%bind () =
-      section_hard "wait for nodes to initialize"
-        (Malleable_error.List.iter
-           ( Network.seeds network
-           @ Network.block_producers network
-           @ Network.snark_coordinators network )
-           ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize) )
+      wait_for t
+        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
     in
     let%bind () =
       section_hard "wait for 3 blocks to be produced (warm-up)"
