@@ -106,7 +106,9 @@ let test_ledger accounts =
 type nonces = Account_nonce.t Public_key.Compressed.Map.t
 
 type account_update =
-  ((Account_update.t, Digest.Account_update.t, Digest.Forest.t) Call_forest.tree, Digest.Forest.t) With_stack_hash.t
+  ( (Account_update.t, Digest.Account_update.t, Digest.Forest.t) Call_forest.tree
+  , Digest.Forest.t )
+  With_stack_hash.t
 
 type transaction = < updates : (account_update list, nonces) Monad_lib.State.t >
 
@@ -150,4 +152,3 @@ let build_zkapp_cmd ~fee transactions :
 
 let zkapp_cmd ~noncemap ~fee transactions =
   Monad_lib.State.eval_state (build_zkapp_cmd ~fee transactions) noncemap
-

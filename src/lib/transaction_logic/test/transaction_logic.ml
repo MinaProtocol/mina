@@ -24,6 +24,10 @@ type zk_cmd_result =
   * Amount.Signed.t
 [@@deriving sexp]
 
+(* The function under test is quite slow, so keep the trials count low
+   so that tests finish in a reasonable amount of time. *)
+let trials = 10
+
 let balance_to_fee = Fn.compose Amount.to_fee Balance.to_amount
 
 let%test_module "Test transaction logic." =
@@ -47,7 +51,7 @@ let%test_module "Test transaction logic." =
       (txn, amt)
 
     let%test_unit "Many transactions between distinct accounts." =
-      Quickcheck.test
+      Quickcheck.test ~trials
         (let open Quickcheck in
         let open Quickcheck.Generator.Let_syntax in
         let%bind accs_and_txns =
@@ -75,7 +79,7 @@ let%test_module "Test transaction logic." =
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
     let%test_unit "Fee payer must be able to pay the fee." =
-      Quickcheck.test
+      Quickcheck.test ~trials
         (let open Quickcheck in
         let open Generator.Let_syntax in
         let%bind (sender, receiver), txn =
@@ -107,5 +111,67 @@ let%test_module "Test transaction logic." =
               | Error e ->
                   String.is_substring (Error.to_string_hum e)
                     ~substring:"Overflow" )
+            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
+
+    let%test_unit "Currency cannot be created out of thin air." =
+      Quickcheck.test ~trials
+        (let open Quickcheck in
+        let open Generator.Let_syntax in
+        let%bind account =
+          Generator.filter
+            ~f:Balance.(fun a -> a.balance < max_int)
+            Test_account.gen
+        in
+        let max_amount =
+          Balance.(max_int - to_amount account.balance)
+          |> Option.value_map ~default:Amount.zero ~f:Balance.to_amount
+        in
+        let%bind unsigned_amount =
+          Amount.(gen_incl (of_nanomina_int_exn 1) max_amount)
+        in
+        let amount = Amount.Signed.of_unsigned unsigned_amount in
+        let update = Single.make ~account:account.pk amount in
+        let%map fee = Fee.(gen_incl zero (balance_to_fee account.balance)) in
+        (account.pk, fee, [ account ], [ (update :> transaction) ]))
+        ~f:(fun (fee_payer, fee, accounts, txns) ->
+          [%test_pred: zk_cmd_result Or_error.t]
+            (function
+              | Ok (txn, _) ->
+                  Transaction_status.(
+                    equal txn.command.status
+                      (Failed [ []; [ Invalid_fee_excess ] ]))
+              | Error _ ->
+                  false )
+            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
+
+    let%test_unit "Currency cannot be destroyed." =
+      Quickcheck.test ~trials
+        (let open Quickcheck in
+        let open Generator.Let_syntax in
+        let%bind unsigned_amount =
+          Amount.(gen_incl (of_nanomina_int_exn 1) max_int)
+        in
+        let%bind account =
+          Generator.filter
+            ~f:Amount.(fun a -> Balance.to_amount a.balance >= unsigned_amount)
+            Test_account.gen
+        in
+        let amount = Amount.Signed.(negate @@ of_unsigned unsigned_amount) in
+        let update = Single.make ~account:account.pk amount in
+        let max_fee =
+          Balance.(account.balance - unsigned_amount)
+          |> Option.value_map ~default:Fee.zero ~f:balance_to_fee
+        in
+        let%map fee = Fee.(gen_incl zero max_fee) in
+        (account.pk, fee, [ account ], [ (update :> transaction) ]))
+        ~f:(fun (fee_payer, fee, accounts, txns) ->
+          [%test_pred: zk_cmd_result Or_error.t]
+            (function
+              | Ok (txn, _) ->
+                  Transaction_status.(
+                    equal txn.command.status
+                      (Failed [ []; [ Invalid_fee_excess ] ]))
+              | Error _ ->
+                  false )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
   end )
