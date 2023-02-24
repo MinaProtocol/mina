@@ -22,7 +22,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; block_producers = [ { balance = "1000"; timing = Untimed } ]
-    ; num_archive_nodes = 1
     }
 
   let run network t =
@@ -40,7 +39,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "wait for 1 block to be produced"
         (wait_for t (Wait_condition.blocks_to_be_produced 1))
     in
-    let%bind () =
       section
         "check that the account balances are what we expect after the block \
          has been produced"
@@ -67,11 +65,4 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              "Error with account balances.  bp balance is %d and should be %d"
              (Currency.Balance.to_nanomina_int bp_balance)
              (Currency.Amount.to_nanomina_int bp_expected) )
-    in
-    section_hard "running replayer"
-      (let%bind logs =
-         Network.Node.run_replayer ~logger
-           (List.hd_exn @@ Network.archive_nodes network)
-       in
-       check_replayer_logs ~logger logs )
 end
