@@ -92,8 +92,8 @@ struct
   let deriver obj =
     let open Fields_derivers_zkapps in
     let events = list @@ array field (o ()) in
-    with_checked
-      ~checked:(Data_as_hash.deriver events)
+    needs_custom_js
+      ~js_type:(Data_as_hash.deriver events)
       ~name:Inputs.deriver_name events obj
 end
 
@@ -240,7 +240,7 @@ module Poly = struct
         ; proved_state : 'bool
         ; zkapp_uri : 'zkapp_uri
         }
-      [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
+      [@@deriving sexp, equal, compare, hash, yojson, hlist, fields, annot]
     end
   end]
 end
@@ -450,3 +450,21 @@ let hash_zkapp_account_opt' = function
       Lazy.force default_digest
   | Some (a : t) ->
       digest a
+
+let sequence_state_deriver obj =
+  let open Fields_derivers_zkapps.Derivers in
+  let list_5 = list ~static_length:5 (field @@ o ()) in
+  let open Pickles_types.Vector.Vector_5 in
+  iso ~map:of_list_exn ~contramap:to_list (list_5 (o ())) obj
+
+let deriver obj =
+  let open Fields_derivers_zkapps in
+  let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
+  finish "ZkappAccount" ~t_toplevel_annots:Poly.t_toplevel_annots
+  @@ Poly.Fields.make_creator
+       ~app_state:!.(Zkapp_state.deriver field)
+       ~verification_key:
+         !.(option ~js_type:Or_undefined (verification_key_with_hash @@ o ()))
+       ~zkapp_version:!.uint32 ~sequence_state:!.sequence_state_deriver
+       ~last_sequence_slot:!.global_slot ~proved_state:!.bool
+       ~zkapp_uri:!.string obj
