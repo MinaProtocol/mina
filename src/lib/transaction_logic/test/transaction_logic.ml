@@ -3,6 +3,7 @@ open Currency
 open Mina_base
 open Mina_numbers
 open Helpers
+open Update_utils
 module Transaction_logic = Mina_transaction_logic.Make (Ledger)
 
 module Zk_result = struct
@@ -50,7 +51,7 @@ let%test_module "Test transaction logic." =
         (let open Quickcheck in
         let open Quickcheck.Generator.Let_syntax in
         let%bind accs_and_txns =
-          Generator.list_non_empty gen_account_pair_and_txn
+          Generator.list_non_empty Simple_txn.gen_account_pair_and_txn
           (* Generating too many transactions makes this test take too much time. *)
           |> Generator.filter ~f:(fun l -> List.length l < 4)
         in
@@ -63,7 +64,7 @@ let%test_module "Test transaction logic." =
           Generator.of_list @@ List.map ~f:snd account_pairs
         in
         let%map fee = Fee.(gen_incl zero @@ balance_to_fee fee_payer.balance) in
-        (fee_payer.pk, fee, accounts, txns))
+        (fee_payer.pk, fee, accounts, (txns :> transaction list)))
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: zk_cmd_result Or_error.t]
             (function
@@ -78,14 +79,14 @@ let%test_module "Test transaction logic." =
         (let open Quickcheck in
         let open Generator.Let_syntax in
         let%bind (sender, receiver), txn =
-          gen_account_pair_and_txn
+          Simple_txn.gen_account_pair_and_txn
           |> Generator.filter
                ~f:Balance.(fun ((a, _), _) -> a.balance < max_int)
         in
         let accounts = [ sender; receiver ] in
         (* Make sure that fee is too high. *)
         let min_fee =
-          Balance.(sender.balance - txn.amount)
+          Balance.(sender.balance - txn#amount)
           |> Option.value_map ~default:Fee.zero ~f:balance_to_fee
           |> Fee.(fun f -> f + of_nanomina_int_exn 1)
           |> Option.value ~default:Fee.max_int
@@ -95,7 +96,7 @@ let%test_module "Test transaction logic." =
           |> Option.value ~default:Fee.max_int
         in
         let%map fee = Fee.(gen_incl min_fee max_fee) in
-        (sender.pk, fee, accounts, [ txn ]))
+        (sender.pk, fee, accounts, [ (txn :> transaction) ]))
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: zk_cmd_result Or_error.t]
             (function
