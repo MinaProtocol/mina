@@ -1,8 +1,8 @@
-use ark_ec::{AffineCurve, ProjectiveCurve};
+use ark_ec::{AffineRepr, CurveGroup, Group};
 use ark_ff::UniformRand;
 use paste::paste;
 use rand::rngs::StdRng;
-
+use std::ops::Mul;
 use wasm_bindgen::prelude::*;
 
 macro_rules! impl_projective {
@@ -17,7 +17,7 @@ macro_rules! impl_projective {
         paste! {
             #[wasm_bindgen]
             pub fn [<caml_ $name:snake _one>]() -> $GroupProjective {
-                $Projective::prime_subgroup_generator().into()
+                $Projective::generator().into()
             }
 
             #[wasm_bindgen]
@@ -55,8 +55,7 @@ macro_rules! impl_projective {
                 x: &$GroupProjective,
                 y: $CamlScalarField,
             ) -> $GroupProjective {
-                let y: ark_ff::BigInteger256 = y.0.into();
-                x.as_ref().mul(&y).into()
+                x.as_ref().mul(&y.0).into()
             }
 
             #[wasm_bindgen]
@@ -96,7 +95,7 @@ macro_rules! impl_projective {
 
             #[wasm_bindgen]
             pub fn [<caml_ $name:snake _of_affine>](x: $CamlG) -> $GroupProjective {
-                Into::<GAffine>::into(x).into_projective().into()
+                Into::<GAffine>::into(x).into_group().into()
             }
 
             #[wasm_bindgen]

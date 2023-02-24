@@ -1,4 +1,4 @@
-use ark_ff::{BigInteger as ark_BigInteger, BigInteger256, FromBytes, ToBytes};
+use ark_ff::{BigInteger as ark_BigInteger, BigInteger256};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use num_bigint::BigUint;
 use std::cmp::Ordering::{Equal, Greater, Less};
@@ -29,7 +29,7 @@ impl FromWasmAbi for WasmBigInteger256 {
     type Abi = <Vec<u8> as FromWasmAbi>::Abi;
     unsafe fn from_abi(js: Self::Abi) -> Self {
         let bytes: Vec<u8> = FromWasmAbi::from_abi(js);
-        WasmBigInteger256(BigInteger256(FromBytes::read(bytes.as_slice()).unwrap()))
+        WasmBigInteger256(BigInteger256::deserialize_compressed(bytes.as_slice()).unwrap())
     }
 }
 
@@ -37,7 +37,7 @@ impl IntoWasmAbi for WasmBigInteger256 {
     type Abi = <Vec<u8> as FromWasmAbi>::Abi;
     fn into_abi(self) -> Self::Abi {
         let mut bytes: Vec<u8> = vec![];
-        self.0.write(&mut bytes).unwrap();
+        self.0.serialize_compressed(&mut bytes).unwrap();
         bytes.into_abi()
     }
 }
@@ -54,7 +54,7 @@ pub fn of_biguint(x: &BigUint) -> BigInteger256 {
     let limbs = bytes.as_ptr();
     let limbs = limbs as *const [u64; BIGINT256_NUM_LIMBS as usize];
     let limbs = unsafe { &(*limbs) };
-    BigInteger256(*limbs)
+    ark_ff::BigInt(*limbs)
 }
 
 #[wasm_bindgen]
@@ -119,7 +119,7 @@ pub fn caml_bigint_256_test_bit(x: WasmBigInteger256, i: i32) -> bool {
 #[wasm_bindgen]
 pub fn caml_bigint_256_to_bytes(x: WasmBigInteger256) -> Vec<u8> {
     let mut serialized_bytes = vec![];
-    x.0.serialize(&mut serialized_bytes)
+    x.0.serialize_compressed(&mut serialized_bytes)
         .expect("serialize failed");
     serialized_bytes
 }
@@ -130,7 +130,9 @@ pub fn caml_bigint_256_of_bytes(x: &[u8]) -> WasmBigInteger256 {
     if x.len() != len {
         panic!("caml_bigint_256_of_bytes");
     };
-    WasmBigInteger256(BigInteger256::deserialize(&mut &x[..]).expect("deserialization error"))
+    WasmBigInteger256(
+        BigInteger256::deserialize_compressed(&mut &x[..]).expect("deserialization error"),
+    )
 }
 
 #[wasm_bindgen]

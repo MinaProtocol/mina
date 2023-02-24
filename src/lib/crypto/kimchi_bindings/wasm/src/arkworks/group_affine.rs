@@ -53,13 +53,21 @@ impl From<&AffineVesta> for WasmGVesta {
 
 impl From<WasmGVesta> for AffineVesta {
     fn from(point: WasmGVesta) -> Self {
-        AffineVesta::new(point.x.into(), point.y.into(), point.infinity)
+        if point.infinity {
+            AffineVesta::identity()
+        } else {
+            AffineVesta::new(point.x.into(), point.y.into())
+        }
     }
 }
 
 impl From<&WasmGVesta> for AffineVesta {
     fn from(point: &WasmGVesta) -> Self {
-        AffineVesta::new(point.x.into(), point.y.into(), point.infinity)
+        if point.infinity {
+            AffineVesta::identity()
+        } else {
+            AffineVesta::new(point.x.into(), point.y.into())
+        }
     }
 }
 
@@ -87,13 +95,21 @@ impl From<&AffinePallas> for WasmGPallas {
 
 impl From<WasmGPallas> for AffinePallas {
     fn from(point: WasmGPallas) -> Self {
-        AffinePallas::new(point.x.into(), point.y.into(), point.infinity)
+        if point.infinity {
+            AffinePallas::identity()
+        } else {
+            AffinePallas::new(point.x.into(), point.y.into())
+        }
     }
 }
 
 impl From<&WasmGPallas> for AffinePallas {
     fn from(point: &WasmGPallas) -> Self {
-        AffinePallas::new(point.x.into(), point.y.into(), point.infinity)
+        if point.infinity {
+            AffinePallas::identity()
+        } else {
+            AffinePallas::new(point.x.into(), point.y.into())
+        }
     }
 }
 
@@ -118,7 +134,7 @@ pub fn caml_vesta_affine_one() -> WasmGVesta {
 /*
 #[wasm_bindgen]
 pub fn caml_pasta_pallas_one() -> WasmPallasGProjective {
-    ProjectivePallas::prime_subgroup_generator().into()
+    ProjectivePallas::generator().into()
 }
 
 #[wasm_bindgen]
@@ -184,7 +200,7 @@ pub fn caml_pasta_pallas_to_affine(x: &WasmPallasGProjective) -> WasmPallasGAffi
 
 #[wasm_bindgen]
 pub fn caml_pasta_pallas_of_affine(x: &WasmPallasGAffine) -> WasmPallasGProjective {
-    Into::<GAffine>::into(x).into_projective().into()
+    Into::<GAffine>::into(x).into_group().into()
 }
 
 #[wasm_bindgen]
@@ -199,6 +215,6 @@ pub fn caml_pasta_pallas_affine_deep_copy(x: &WasmPallasGAffine) -> WasmPallasGA
 
 #[wasm_bindgen]
 pub fn caml_pasta_pallas_affine_one() -> WasmPallasGAffine {
-    GAffine::prime_subgroup_generator().into()
+    GAffine::generator().into()
 }
 */
