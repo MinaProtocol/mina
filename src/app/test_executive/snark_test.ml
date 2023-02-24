@@ -20,19 +20,31 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   (* TODO: test snark work *)
   let config =
     let open Test_config in
-    let open Test_config.Wallet in
     { default with
       requires_graphql = true
-    ; block_producers =
-        [ { balance = "400000"; timing = Untimed } (* 400_000_000_000_000 *)
-        ; { balance = "300000"; timing = Untimed } (* 300_000_000_000_000 *)
+    ; genesis_ledger =
+        [ { account_name = "node_a-key"; balance = "400000"; timing = Untimed }
+        ; { account_name = "node_b-key"; balance = "300000"; timing = Untimed }
+        ; { account_name = "fish1"; balance = "1000"; timing = Untimed }
+        ; { account_name = "fish2"; balance = "1000"; timing = Untimed }
+        ; { account_name = "snark_node-key"
+          ; balance = "1000"
+          ; timing = Untimed
+          }
         ]
-    ; extra_genesis_accounts =
-        [ { balance = "1000"; timing = Untimed }
-        ; { balance = "1000"; timing = Untimed }
+    ; block_producers =
+        [ { node_name = "node_a"; account_name = "node_a-key" }
+          (* 400_000_000_000_000 *)
+        ; { node_name = "node_b"; account_name = "node_b-key" }
+          (* 300_000_000_000_000 *)
         ]
     ; num_archive_nodes = 0
-    ; num_snark_workers = 4
+    ; snark_coordinator =
+        Some
+          { node_name = "snark_node"
+          ; account_name = "snark_node-key"
+          ; worker_nodes = 4
+          }
     ; snark_worker_fee = "0.0001"
     ; proof_config =
         { proof_config_default with
@@ -42,72 +54,48 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
     }
 
-  (*
-     TODO, new config format should look like
-
-       let config =
-         let open Test_config in
-         let open Test_config.Wallet in
-         { default with
-           requires_graphql = true
-         ; genesis_ledger = [
-               { key_name = "bp1_key"; balance = "400000"; timing = Untimed }
-             ; { key_name = "bp2_key"; balance = "300000"; timing = Untimed }
-             ; { key_name = "extra1_key"; balance = "1000"; timing = Untimed }
-             ; { key_name = "extra2_key"; balance = "1000"; timing = Untimed }
-             ; { key_name = "snark_worker1_key"; balance = "10"; timing = Untimed }
-         ]
-         ; block_producers =
-             [ { node_name = "bp1"; node_key_name = "bp1_key" }
-             ; { node_name = "bp2"; node_key_name = "bp2_key" }
-             ]
-         ; num_archive_nodes = 0
-         ; snark_workers = [
-               { node_name = "snark_worker"; node_key_name = "snark_worker1_key"; replicas = 4 }
-         ]
-         ; snark_worker_fee = "0.0001"
-         ; proof_config =
-             { proof_config_default with
-               work_delay = Some 1
-             ; transaction_capacity =
-                 Some Runtime_config.Proof_keys.Transaction_capacity.small
-             }
-         }
-  *)
-
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_nodes = Network.all_nodes network in
-    let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
-    let[@warning "-8"] [ untimed_node_a; untimed_node_b ] =
-      Network.block_producers network
+    let%bind () =
+      wait_for t
+        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
+    in
+    let node_a =
+      Core.String.Map.find_exn (Network.block_producers network) "node_a"
+    in
+    let node_b =
+      Core.String.Map.find_exn (Network.block_producers network) "node_b"
+    in
+    let fish1 =
+      Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1"
+    in
+    let fish2 =
+      Core.String.Map.find_exn (Network.genesis_keypairs network) "fish2"
     in
     [%log info] "extra genesis keypairs: %s"
-      (List.to_string (Network.extra_genesis_keypairs network)
+      (List.to_string [ fish1.keypair; fish2.keypair ]
          ~f:(fun { Signature_lib.Keypair.public_key; _ } ->
            public_key |> Signature_lib.Public_key.to_bigstring
            |> Bigstring.to_string ) ) ;
-    let[@warning "-8"] [ fish1; fish2 ] =
-      Network.extra_genesis_keypairs network
-    in
     let amount = Currency.Amount.of_formatted_string "10" in
     let fee = Currency.Fee.of_formatted_string "1" in
     let receiver_pub_key =
-      fish1.public_key |> Signature_lib.Public_key.compress
+      fish1.keypair.public_key |> Signature_lib.Public_key.compress
     in
     let sender_kp = fish2 in
     let sender_pub_key =
-      sender_kp.public_key |> Signature_lib.Public_key.compress
+      sender_kp.keypair.public_key |> Signature_lib.Public_key.compress
     in
     (* let snark_worker_pk = Test_config.default.snark_worker_public_key in *)
     let%bind () =
       section_hard
         "send out a bunch more txns to fill up the snark ledger, then wait for \
          proofs to be emitted"
-        (let receiver = untimed_node_a in
+        (let receiver = node_a in
          let%bind receiver_pub_key = pub_key_of_node receiver in
-         let sender = untimed_node_b in
+         let sender = node_b in
          let%bind sender_pub_key = pub_key_of_node sender in
          let%bind _ =
            (*
@@ -152,7 +140,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       (let%bind hash =
          let%map { hash; _ } =
            Engine.Network.Node.must_send_payment ~logger ~sender_pub_key
-             ~receiver_pub_key ~amount ~fee untimed_node_b
+             ~receiver_pub_key ~amount ~fee node_b
          in
          hash
        in
