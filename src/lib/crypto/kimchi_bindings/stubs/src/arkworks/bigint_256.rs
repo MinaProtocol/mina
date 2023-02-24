@@ -221,7 +221,7 @@ pub fn caml_bigint_256_of_bytes(x: &[u8]) -> Result<CamlBigInteger256, ocaml::Er
     if x.len() != len {
         ocaml::Error::failwith("caml_bigint_256_of_bytes")?;
     };
-    let result = BigInteger256::deserialize_compressed(&mut &*x)
+    let result = BigInteger256::deserialize_compressed(x)
         .map_err(|_| ocaml::Error::Message("deserialization error"))?;
     Ok(CamlBigInteger256(result))
 }
@@ -251,5 +251,28 @@ mod tests {
         let x2: BigUint = y.into();
         assert!(x2 == x);
         println!("biguint.to_string: {}", x2.to_string());
+    }
+
+    #[test]
+    fn serialization() {
+        let x = 10000.to_biguint().unwrap();
+        let x = BigInteger256::try_from(x).unwrap();
+
+        debug_assert_eq!(std::mem::size_of::<BigInteger256>(), 32);
+        let mut bytes = [0u8; std::mem::size_of::<BigInteger256>()];
+        x.serialize_compressed(&mut bytes[..]).unwrap();
+
+        println!("bytes: {:?}", bytes);
+        assert_eq!(
+            bytes,
+            [
+                16u8, 39, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0
+            ]
+        );
+
+        let y = BigInteger256::deserialize_compressed(&bytes[..]).unwrap();
+
+        assert_eq!(x, y);
     }
 }

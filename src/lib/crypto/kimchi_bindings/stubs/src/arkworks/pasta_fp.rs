@@ -330,3 +330,28 @@ pub fn caml_pasta_fp_of_bytes(x: &[u8]) -> Result<CamlFp, ocaml::Error> {
 pub fn caml_pasta_fp_deep_copy(x: CamlFp) -> CamlFp {
     x
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use ark_serialize::CanonicalDeserialize;
+
+    #[test]
+    fn test_field_serialization() {
+        let x = Fp::from(10_000);
+        debug_assert_eq!(std::mem::size_of::<Fp>(), 32);
+        let mut bytes = [0u8; std::mem::size_of::<Fp>()];
+        x.serialize_compressed(&mut bytes[..]).unwrap();
+        println!("{:?}", bytes);
+        assert_eq!(
+            bytes,
+            [
+                16u8, 39, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0
+            ]
+        );
+        let y = Fp::deserialize_compressed(&bytes[..]).unwrap();
+        assert_eq!(x, y);
+    }
+}
