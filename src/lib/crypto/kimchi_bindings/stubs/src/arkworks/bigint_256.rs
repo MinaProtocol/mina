@@ -218,11 +218,21 @@ pub fn caml_bigint_256_to_bytes(
 #[ocaml::func]
 pub fn caml_bigint_256_of_bytes(x: &[u8]) -> Result<CamlBigInteger256, ocaml::Error> {
     let len = std::mem::size_of::<BigInteger256>();
-    if x.len() != len {
-        ocaml::Error::failwith("caml_bigint_256_of_bytes")?;
+
+    let result = if x.len() > len {
+        return Err(ocaml::Error::Message(
+            "caml_bigint_256_of_bytes called with input too big",
+        ));
+    } else if x.len() == len {
+        BigInteger256::deserialize_compressed(x)
+            .map_err(|_| ocaml::Error::Message("deserialization error"))?
+    } else {
+        let mut padded = x.to_vec();
+        padded.extend(std::iter::repeat(0u8).take(len - x.len()));
+        BigInteger256::deserialize_compressed(&padded[..])
+            .map_err(|_| ocaml::Error::Message("deserialization error"))?
     };
-    let result = BigInteger256::deserialize_compressed(x)
-        .map_err(|_| ocaml::Error::Message("deserialization error"))?;
+
     Ok(CamlBigInteger256(result))
 }
 

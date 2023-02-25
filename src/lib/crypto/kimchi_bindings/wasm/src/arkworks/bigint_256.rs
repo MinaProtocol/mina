@@ -127,12 +127,18 @@ pub fn caml_bigint_256_to_bytes(x: WasmBigInteger256) -> Vec<u8> {
 #[wasm_bindgen]
 pub fn caml_bigint_256_of_bytes(x: &[u8]) -> WasmBigInteger256 {
     let len = std::mem::size_of::<WasmBigInteger256>();
-    if x.len() != len {
-        panic!("caml_bigint_256_of_bytes");
+
+    let res = if x.len() > len {
+        panic!("caml_bigint_256_of_bytes called with input too big");
+    } else if x.len() == len {
+        BigInteger256::deserialize_compressed(&x[..]).expect("deserialization error")
+    } else {
+        let mut padded = x.to_vec();
+        padded.extend(std::iter::repeat(0u8).take(len - x.len()));
+        BigInteger256::deserialize_compressed(&padded[..]).expect("deserialization error")
     };
-    WasmBigInteger256(
-        BigInteger256::deserialize_compressed(&mut &x[..]).expect("deserialization error"),
-    )
+
+    WasmBigInteger256(res)
 }
 
 #[wasm_bindgen]
