@@ -5,7 +5,7 @@ use crate::srs::fq::WasmFqSrs as WasmSrs;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::linearization::expr_linearization;
 use kimchi::prover_index::ProverIndex;
-use mina_curves::pasta::{Fq, Pallas as GAffine, PallasParameters, Vesta as GAffineOther};
+use mina_curves::pasta::{Fq, Pallas as GAffine, PallasConfig, Vesta as GAffineOther};
 use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -79,7 +79,9 @@ pub fn caml_pasta_fq_plonk_index_create(
 
     let mut index = ProverIndex::<GAffine>::create(cs, endo_q, srs.0.clone());
     // Compute and cache the verifier index digest
-    index.compute_verifier_index_digest::<DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>>();
+    index
+        .compute_verifier_index_digest::<DefaultFqSponge<PallasConfig, PlonkSpongeConstantsKimchi>>(
+        );
 
     // create index
     Ok(WasmPastaFqPlonkIndex(Box::new(index)))
