@@ -44,6 +44,7 @@ case "${MINA_DEB_CODENAME}" in
     ;;
 esac
 
+echo "--- Building test executive debian package"
 
 rm -rf "${BUILDDIR}"
 
@@ -87,3 +88,4 @@ echo "------------------------------------------------------------"
 fakeroot dpkg-deb --build "${BUILDDIR}" mina-test-executive_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
 
+echo "--- Built mina-test-executive_${MINA_DEB_VERSION}.deb"

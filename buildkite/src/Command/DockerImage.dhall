@@ -39,7 +39,7 @@ let ReleaseSpec = {
     opam_deps = (../Constants/ContainerImages.dhall).minaOpamDeps,
     builder = (../Constants/ContainerImages.dhall).minaBuilder,
     extra_args = [] : List Text,
-    step_key = "daemon-devnet-docker-image"
+    step_key = "daemon-berkeley-bullseye"
   }
 }
 

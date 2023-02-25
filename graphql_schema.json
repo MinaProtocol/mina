@@ -1122,6 +1122,22 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "setTiming",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": [
@@ -1281,6 +1297,20 @@
             },
             {
               "name": "setVotingFor",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "setTiming",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -2676,11 +2706,27 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "CallTypeInput",
+          "name": "MayUseTokenInput",
           "description": null,
           "fields": [
             {
-              "name": "isDelegateCall",
+              "name": "parentsOwnToken",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "inheritFromParent",
               "description": null,
               "args": [],
               "type": {
@@ -2698,7 +2744,7 @@
           ],
           "inputFields": [
             {
-              "name": "isDelegateCall",
+              "name": "parentsOwnToken",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -2706,6 +2752,122 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "inheritFromParent",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "AuthorizationKindStructuredInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "isSigned",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "isProved",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "verificationKeyHash",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Field",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "isSigned",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "isProved",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "verificationKeyHash",
+              "description": null,
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Field",
                   "ofType": null
                 }
               },
@@ -2942,7 +3104,7 @@
               "deprecationReason": null
             },
             {
-              "name": "callType",
+              "name": "mayUseToken",
               "description": null,
               "args": [],
               "type": {
@@ -2950,7 +3112,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "CallTypeInput",
+                  "name": "MayUseTokenInput",
                   "ofType": null
                 }
               },
@@ -2965,8 +3127,8 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "AuthorizationKind",
+                  "kind": "INPUT_OBJECT",
+                  "name": "AuthorizationKindStructuredInput",
                   "ofType": null
                 }
               },
@@ -3172,14 +3334,14 @@
               "defaultValue": null
             },
             {
-              "name": "callType",
+              "name": "mayUseToken",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "INPUT_OBJECT",
-                  "name": "CallTypeInput",
+                  "name": "MayUseTokenInput",
                   "ofType": null
                 }
               },
@@ -3192,8 +3354,8 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "AuthorizationKind",
+                  "kind": "INPUT_OBJECT",
+                  "name": "AuthorizationKindStructuredInput",
                   "ofType": null
                 }
               },
@@ -3215,7 +3377,7 @@
               "args": [],
               "type": {
                 "kind": "SCALAR",
-                "name": "SnappProof",
+                "name": "ZkappProof",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -3240,7 +3402,7 @@
               "description": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "SnappProof",
+                "name": "ZkappProof",
                 "ofType": null
               },
               "defaultValue": null
@@ -6185,8 +6347,9 @@
             "Transition from a source ledger to a target ledger with some fee excess and increase in supply ",
           "fields": [
             {
-              "name": "sourceLedgerHash",
-              "description": "Base58Check-encoded hash of the source ledger",
+              "name": "sourceFirstPassLedgerHash",
+              "description":
+                "Base58Check-encoded hash of the source first-pass ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6201,8 +6364,43 @@
               "deprecationReason": null
             },
             {
-              "name": "targetLedgerHash",
-              "description": "Base58Check-encoded hash of the target ledger",
+              "name": "targetFirstPassLedgerHash",
+              "description":
+                "Base58Check-encoded hash of the target first-pass ledger",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "LedgerHash",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "sourceSecondPassLedgerHash",
+              "description":
+                "Base58Check-encoded hash of the source second-pass ledger",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "LedgerHash",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "targetSecondPassLedgerHash",
+              "description":
+                "Base58Check-encoded hash of the target second-pass ledger",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6633,7 +6831,7 @@
         },
         {
           "kind": "SCALAR",
-          "name": "SnappProof",
+          "name": "ZkappProof",
           "description": null,
           "fields": null,
           "inputFields": null,
@@ -6652,7 +6850,7 @@
               "args": [],
               "type": {
                 "kind": "SCALAR",
-                "name": "SnappProof",
+                "name": "ZkappProof",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -6677,22 +6875,87 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "AuthorizationKind",
+          "kind": "OBJECT",
+          "name": "AuthorizationKindStructured",
           "description": null,
-          "fields": null,
+          "fields": [
+            {
+              "name": "isSigned",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "isProved",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "verificationKeyHash",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Field",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
           "inputFields": null,
-          "interfaces": null,
+          "interfaces": [],
           "enumValues": null,
           "possibleTypes": null
         },
         {
           "kind": "OBJECT",
-          "name": "CallType",
+          "name": "MayUseToken",
           "description": null,
           "fields": [
             {
-              "name": "isDelegateCall",
+              "name": "parentsOwnToken",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "inheritFromParent",
               "description": null,
               "args": [],
               "type": {
@@ -7645,6 +7908,22 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "setTiming",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "AuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -8034,7 +8313,7 @@
               "deprecationReason": null
             },
             {
-              "name": "callType",
+              "name": "mayUseToken",
               "description": null,
               "args": [],
               "type": {
@@ -8042,7 +8321,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "CallType",
+                  "name": "MayUseToken",
                   "ofType": null
                 }
               },
@@ -8057,8 +8336,8 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "AuthorizationKind",
+                  "kind": "OBJECT",
+                  "name": "AuthorizationKindStructured",
                   "ofType": null
                 }
               },
@@ -10601,49 +10880,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "OBJECT",
-          "name": "AccountId",
-          "description": null,
-          "fields": [
-            {
-              "name": "publicKey",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "PublicKey",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "tokenId",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "SCALAR",
           "name": "InetAddr",
           "description": "network address",
@@ -11134,6 +11370,23 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "setTiming",
+              "description":
+                "Authorization required to set the timing of the account",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "AccountAuthRequired",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -11417,7 +11670,7 @@
               "deprecationReason": null
             },
             {
-              "name": "token",
+              "name": "tokenId",
               "description": "The token associated with this account",
               "args": [],
               "type": {
@@ -11431,6 +11684,22 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "token",
+              "description": "The token associated with this account",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": true,
+              "deprecationReason": "Use tokenId"
             },
             {
               "name": "timing",
@@ -11460,19 +11729,6 @@
                   "name": "AnnotatedBalance",
                   "ofType": null
                 }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "genesis_balance",
-              "description":
-                "The amount of MINA owned by the account at Genesis",
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "AnnotatedBalance",
-                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -11644,23 +11900,6 @@
               "deprecationReason": null
             },
             {
-              "name": "isTokenOwner",
-              "description": "True if this account owns its associated token",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "isDeprecated": true,
-              "deprecationReason": null
-            },
-            {
-              "name": "isDisabled",
-              "description":
-                "True if this account has been disabled by the owner of the associated token",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "isDeprecated": true,
-              "deprecationReason": null
-            },
-            {
               "name": "index",
               "description":
                 "The index of this account in the ledger, or null if this account does not yet have a known position in the best tip ledger",
@@ -11723,7 +11962,8 @@
             },
             {
               "name": "tokenSymbol",
-              "description": "The token symbol associated with this account",
+              "description":
+                "The symbol for the token owned by this account, if there is one",
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
@@ -13367,11 +13607,11 @@
             },
             {
               "name": "tokenOwner",
-              "description": "Find the account ID that owns a given token",
+              "description": "Find the account that owns a given token",
               "args": [
                 {
                   "name": "tokenId",
-                  "description": "Token ID to find the owner for",
+                  "description": "Token ID to find the owning account for",
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,
@@ -13384,11 +13624,7 @@
                   "defaultValue": null
                 }
               ],
-              "type": {
-                "kind": "OBJECT",
-                "name": "AccountId",
-                "ofType": null
-              },
+              "type": { "kind": "OBJECT", "name": "Account", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },

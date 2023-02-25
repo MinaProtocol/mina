@@ -768,8 +768,8 @@ module T = struct
         let check (t : t) : unit =
           List.iter t.account_updates ~f:(fun p ->
               assert (
-                Account_update.Call_type.equal
-                  p.elt.account_update.body.call_type Call ) )
+                Account_update.May_use_token.equal
+                  p.elt.account_update.body.may_use_token No ) )
 
         let of_graphql_repr (t : Graphql_repr.t) : t =
           { fee_payer = t.fee_payer
@@ -912,7 +912,7 @@ let to_simple (t : t) : Simple.t =
                  ; use_full_commitment = b.use_full_commitment
                  ; implicit_account_creation_fee =
                      b.implicit_account_creation_fee
-                 ; call_type = b.call_type
+                 ; may_use_token = b.may_use_token
                  ; call_depth = depth
                  ; authorization_kind = b.authorization_kind
                  }
@@ -929,7 +929,7 @@ let%test_unit "wire embedded in graphql" =
   Quickcheck.test ~shrinker:Wire.shrinker Wire.gen ~f:(fun w ->
       [%test_eq: Wire.t] (Wire.of_graphql_repr (Wire.to_graphql_repr w)) w )
 
-let zkapp_command (t : t) : _ Call_forest.t =
+let all_account_updates (t : t) : _ Call_forest.t =
   let p = t.fee_payer in
   let body = Account_update.Body.of_fee_payer p.body in
   let fee_payer : Account_update.t =
@@ -972,10 +972,19 @@ let fee_token (_t : t) = Token_id.default
 let fee_payer (t : t) =
   Account_id.create t.fee_payer.body.public_key (fee_token t)
 
+let extract_vks (t : t) : Verification_key_wire.t List.t =
+  account_updates t
+  |> Call_forest.fold ~init:[] ~f:(fun acc (p : Account_update.t) ->
+         match Account_update.verification_key_update_to_option p with
+         | Zkapp_basic.Set_or_keep.Set (Some vk) ->
+             vk :: acc
+         | _ ->
+             acc )
+
 let account_updates_list (t : t) : Account_update.t list =
   Call_forest.fold t.account_updates ~init:[] ~f:(Fn.flip List.cons) |> List.rev
 
-let zkapp_command_list (t : t) : Account_update.t list =
+let all_account_updates_list (t : t) : Account_update.t list =
   Call_forest.fold t.account_updates
     ~init:[ Account_update.of_fee_payer (fee_payer_account_update t) ]
     ~f:(Fn.flip List.cons)
@@ -1072,15 +1081,18 @@ end
 
 let check_authorization (p : Account_update.t) : unit Or_error.t =
   match (p.authorization, p.body.authorization_kind) with
-  | None_given, None_given | Proof _, Proof | Signature _, Signature ->
+  | None_given, None_given | Proof _, Proof _ | Signature _, Signature ->
       Ok ()
   | _ ->
       let err =
+        let expected =
+          Account_update.Authorization_kind.to_control_tag
+            p.body.authorization_kind
+        in
+        let got = Control.tag p.authorization in
         Error.create "Authorization kind does not match the authorization"
-          [ ("expected", p.body.authorization_kind)
-          ; ("got", Control.tag p.authorization)
-          ]
-          [%sexp_of: (string * Account_update.Authorization_kind.t) list]
+          [ ("expected", expected); ("got", got) ]
+          [%sexp_of: (string * Control.Tag.t) list]
       in
       Error err
 
@@ -1104,12 +1116,47 @@ module Verifiable : sig
     end
   end]
 
-  val create :
-       T.t
-    -> ledger:'a
+  val find_vk_via_ledger :
+       ledger:'a
     -> get:('a -> 'b -> Account.t option)
     -> location_of_account:('a -> Account_id.t -> 'b option)
+    -> Zkapp_basic.F.t
+    -> Account_id.t
+    -> (Verification_key_wire.t, Error.t) Result.t
+
+  val create :
+       T.t
+    -> status:Transaction_status.t
+    -> find_vk:
+         (   Zkapp_basic.F.t
+          -> Account_id.t
+          -> (Verification_key_wire.t, Error.t) Result.t )
     -> t Or_error.t
+
+  module Any : sig
+    (** creates verifiables from a list of commands that caches verification
+        keys and permits _any_ vks that have been seen earlier in the list. *)
+    val create_all :
+         T.t With_status.t list
+      -> find_vk:
+           (   Zkapp_basic.F.t
+            -> Account_id.t
+            -> (Verification_key_wire.t, Error.t) Result.t )
+      -> t With_status.t list Or_error.t
+  end
+
+  module Last : sig
+    (** creates verifiables from a list of commands that caches verification
+        keys and permits only the _last_ vk that has been seen earlier in the
+        list. *)
+    val create_all :
+         T.t With_status.t list
+      -> find_vk:
+           (   Zkapp_basic.F.t
+            -> Account_id.t
+            -> (Verification_key_wire.t, Error.t) Result.t )
+      -> t With_status.t list Or_error.t
+  end
 end = struct
   [%%versioned
   module Stable = struct
@@ -1130,6 +1177,34 @@ end = struct
     end
   end]
 
+  let ok_if_vk_hash_expected ~got ~expected =
+    if not @@ Zkapp_basic.F.equal (With_hash.hash got) expected then
+      Error
+        (Error.create "Expected vk hash doesn't match hash in vk we received"
+           [ ("expected_vk_hash", expected)
+           ; ("got_vk_hash", With_hash.hash got)
+           ]
+           [%sexp_of: (string * Zkapp_basic.F.t) list] )
+    else Ok got
+
+  let find_vk_via_ledger ~ledger ~get ~location_of_account expected_vk_hash
+      account_id =
+    match
+      let open Option.Let_syntax in
+      let%bind location = location_of_account ledger account_id in
+      let%bind (account : Account.t) = get ledger location in
+      let%bind zkapp = account.zkapp in
+      zkapp.verification_key
+    with
+    | Some vk ->
+        ok_if_vk_hash_expected ~got:vk ~expected:expected_vk_hash
+    | None ->
+        let err =
+          Error.create "No verification key found for proved account update"
+            ("account_id", account_id) [%sexp_of: string * Account_id.t]
+        in
+        Error err
+
   (* Ensures that there's a verification_key available for all account_updates
    * and creates a valid command associating the correct keys with each
    * account_id.
@@ -1138,27 +1213,9 @@ end = struct
    * subsequent account_updates use the replaced key instead of looking in the
    * ledger for the key (ie set by a previous transaction).
    *)
-  let create ({ fee_payer; account_updates; memo } : T.t) ~ledger ~get
-      ~location_of_account : t Or_error.t =
+  let create ({ fee_payer; account_updates; memo } : T.t)
+      ~(status : Transaction_status.t) ~find_vk : t Or_error.t =
     With_return.with_return (fun { return } ->
-        let find_vk account_id =
-          match
-            let open Option.Let_syntax in
-            let%bind location = location_of_account ledger account_id in
-            let%bind (account : Account.t) = get ledger location in
-            let%bind zkapp = account.zkapp in
-            zkapp.verification_key
-          with
-          | Some vk ->
-              vk
-          | None ->
-              let err =
-                Error.create
-                  "No verification key found for proved account update"
-                  ("account_id", account_id) [%sexp_of: string * Account_id.t]
-              in
-              return (Error err)
-        in
         let tbl = Account_id.Table.create () in
         let vks_overridden =
           (* Keep track of the verification keys that have been set so far
@@ -1184,40 +1241,135 @@ end = struct
                 | Error _ as err ->
                     return err
               in
-              if Control.(Tag.equal Tag.Proof (Control.tag p.authorization))
-              then (
-                let prioritized_vk =
-                  (* only lookup _past_ vk setting, ie exclude the new one we
-                   * potentially set in this account_update (use the non-'
-                   * vks_overrided) . *)
-                  match Account_id.Map.find !vks_overridden account_id with
-                  | Some (Some vk) ->
-                      vk
-                  | Some None ->
-                      (* we explicitly have erased the key *)
-                      let err =
-                        Error.create
-                          "No verification key found for proved account \
-                           update: the verification key was removed by a \
-                           previous account update"
-                          ("account_id", account_id)
-                          [%sexp_of: string * Account_id.t]
-                      in
-                      return (Error err)
+              match
+                ( p.body.authorization_kind
+                , phys_equal status Transaction_status.Applied )
+              with
+              | Proof vk_hash, true -> (
+                  let prioritized_vk =
+                    (* only lookup _past_ vk setting, ie exclude the new one we
+                     * potentially set in this account_update (use the non-'
+                     * vks_overrided) . *)
+                    match Account_id.Map.find !vks_overridden account_id with
+                    | Some (Some vk) -> (
+                        match
+                          ok_if_vk_hash_expected ~got:vk ~expected:vk_hash
+                        with
+                        | Ok vk ->
+                            Some vk
+                        | Error err ->
+                            return (Error err) )
+                    | Some None ->
+                        (* we explicitly have erased the key *)
+                        let err =
+                          Error.create
+                            "No verification key found for proved account \
+                             update: the verification key was removed by a \
+                             previous account update"
+                            ("account_id", account_id)
+                            [%sexp_of: string * Account_id.t]
+                        in
+                        return (Error err)
+                    | None -> (
+                        (* we haven't set anything; lookup the vk in the fallback *)
+                        match find_vk vk_hash account_id with
+                        | Error e ->
+                            return (Error e)
+                        | Ok vk ->
+                            Some vk )
+                  in
+                  match prioritized_vk with
+                  | Some prioritized_vk ->
+                      Account_id.Table.update tbl account_id ~f:(fun _ ->
+                          With_hash.hash prioritized_vk ) ;
+                      (* return the updated overrides *)
+                      vks_overridden := vks_overriden' ;
+                      (p, Some prioritized_vk)
                   | None ->
-                      (* we haven't set anything; lookup the vk in the ledger *)
-                      find_vk account_id
-                in
-                Account_id.Table.update tbl account_id ~f:(fun _ ->
-                    With_hash.hash prioritized_vk ) ;
-                (* return the updated overrides *)
-                vks_overridden := vks_overriden' ;
-                (p, Some prioritized_vk) )
-              else (
-                vks_overridden := vks_overriden' ;
-                (p, None) ) )
+                      (* The transaction failed, so we allow the vk to be missing. *)
+                      (p, None) )
+              | _ ->
+                  vks_overridden := vks_overriden' ;
+                  (p, None) )
         in
         Ok { fee_payer; account_updates; memo } )
+
+  module Map_cache = struct
+    type 'a t = 'a Zkapp_basic.F_map.Map.t
+
+    let empty = Zkapp_basic.F_map.Map.empty
+
+    let find = Zkapp_basic.F_map.Map.find
+
+    let set = Zkapp_basic.F_map.Map.set
+  end
+
+  module Singleton_cache = struct
+    type 'a t = (Zkapp_basic.F.t * 'a) option
+
+    let empty = None
+
+    let find t key =
+      match t with
+      | None ->
+          None
+      | Some (k, v) ->
+          if Zkapp_basic.F.equal key k then Some v else None
+
+    let set _ ~key ~data = Some (key, data)
+  end
+
+  module Make_create_all (Cache : sig
+    type 'a t
+
+    val empty : 'a t
+
+    val find : 'a t -> Zkapp_basic.F.t -> 'a option
+
+    val set : 'a t -> key:Zkapp_basic.F.t -> data:'a -> 'a t
+  end) =
+  struct
+    let create_all (cmds : T.t With_status.t list)
+        ~(find_vk :
+              Zkapp_basic.F.t
+           -> Account_id.t
+           -> (Verification_key_wire.t, Error.t) Result.t ) :
+        t With_status.t list Or_error.t =
+      Or_error.try_with (fun () ->
+          snd (* remove the helper cache we folded with *)
+            (List.fold_map cmds ~init:Cache.empty
+               ~f:(fun
+                    (running_cache : Verification_key_wire.t Cache.t)
+                    { data = cmd; status }
+                  ->
+                 let verified_cmd : t =
+                   create cmd ~status ~find_vk:(fun vk_hash account_id ->
+                       (* first we check if there's anything in the running
+                          cache within this chunk so far *)
+                       match Cache.find running_cache vk_hash with
+                       | None ->
+                           (* before falling back to the find_vk *)
+                           find_vk vk_hash account_id
+                       | Some vk ->
+                           Ok vk )
+                   |> Or_error.ok_exn
+                 in
+                 let running_cache' =
+                   List.fold (extract_vks cmd) ~init:running_cache
+                     ~f:(fun acc vk ->
+                       Cache.set acc ~key:(With_hash.hash vk) ~data:vk )
+                 in
+                 (running_cache', { With_status.data = verified_cmd; status }) )
+            ) )
+  end
+
+  module Any = struct
+    include Make_create_all (Map_cache)
+  end
+
+  module Last = struct
+    include Make_create_all (Singleton_cache)
+  end
 end
 
 let of_verifiable (t : Verifiable.t) : t =
@@ -1288,24 +1440,10 @@ let weight (zkapp_command : t) : int =
     ]
 
 module type Valid_intf = sig
-  module Verification_key_hash : sig
-    [%%versioned:
-    module Stable : sig
-      module V1 : sig
-        type t = Zkapp_basic.F.Stable.V1.t
-        [@@deriving sexp, compare, equal, hash, yojson]
-      end
-    end]
-  end
-
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t = private
-        { zkapp_command : T.Stable.V1.t
-        ; verification_keys :
-            (Account_id.Stable.V2.t * Verification_key_hash.Stable.V1.t) list
-        }
+      type t = private { zkapp_command : T.Stable.V1.t }
       [@@deriving sexp, compare, equal, hash, yojson]
     end
   end]
@@ -1315,12 +1453,14 @@ module type Valid_intf = sig
 
   val to_valid :
        T.t
-    -> ledger:'a
-    -> get:('a -> 'b -> Account.t option)
-    -> location_of_account:('a -> Account_id.t -> 'b option)
+    -> status:Transaction_status.t
+    -> find_vk:
+         (   Zkapp_basic.F.t
+          -> Account_id.t
+          -> (Verification_key_wire.t, Error.t) Result.t )
     -> t Or_error.t
 
-  val of_verifiable : Verifiable.t -> t Or_error.t
+  val of_verifiable : Verifiable.t -> t
 
   val forget : t -> T.t
 end
@@ -1347,54 +1487,25 @@ struct
   module Stable = struct
     module V1 = struct
       type t = Mina_wire_types.Mina_base.Zkapp_command.Valid.V1.t =
-        { zkapp_command : S.V1.t
-        ; verification_keys :
-            (Account_id.Stable.V2.t * Verification_key_hash.Stable.V1.t) list
-        }
+        { zkapp_command : S.V1.t }
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  let create ~verification_keys zkapp_command : t =
-    { zkapp_command; verification_keys }
+  let create zkapp_command : t = { zkapp_command }
 
-  let of_verifiable (t : Verifiable.t) : t Or_error.t =
-    let open Or_error.Let_syntax in
-    let tbl = Account_id.Table.create () in
-    let%map () =
-      Call_forest.fold t.account_updates ~init:(Ok ())
-        ~f:(fun acc (p, vk_opt) ->
-          let%bind _ok = acc in
-          let account_id = Account_update.account_id p in
-          let%bind () = check_authorization p in
-          if Control.(Tag.equal Tag.Proof (Control.tag p.authorization)) then
-            let%map { With_hash.hash; _ } =
-              match vk_opt with
-              | Some vk ->
-                  Ok vk
-              | None ->
-                  Or_error.errorf
-                    "Verification key required for proof, but was not given"
-            in
-            Account_id.Table.update tbl account_id ~f:(fun _ -> hash)
-          else acc )
-    in
-    { zkapp_command = of_verifiable t
-    ; verification_keys = Account_id.Table.to_alist tbl
-    }
+  let of_verifiable (t : Verifiable.t) : t = { zkapp_command = of_verifiable t }
 
   let to_valid_unsafe (t : T.t) :
       [> `If_this_is_used_it_should_have_a_comment_justifying_it of t ] =
-    `If_this_is_used_it_should_have_a_comment_justifying_it
-      (create t ~verification_keys:[])
+    `If_this_is_used_it_should_have_a_comment_justifying_it (create t)
 
   let forget (t : t) : T.t = t.zkapp_command
 
-  let to_valid (t : T.t) ~ledger ~get ~location_of_account : t Or_error.t =
-    Verifiable.create t ~ledger ~get ~location_of_account
-    |> Or_error.bind ~f:of_verifiable
+  let to_valid (t : T.t) ~status ~find_vk : t Or_error.t =
+    Verifiable.create t ~status ~find_vk |> Or_error.map ~f:of_verifiable
 end
 
 [%%define_locally Stable.Latest.(of_yojson, to_yojson)]
@@ -1476,6 +1587,8 @@ module Make_update_group (Input : sig
 
   type spec
 
+  type connecting_ledger_hash
+
   val zkapp_segment_of_controls : Control.t list -> spec
 end) : sig
   module Zkapp_command_intermediate_state : sig
@@ -1486,12 +1599,15 @@ end) : sig
       ; spec : Input.spec
       ; state_before : state
       ; state_after : state
+      ; connecting_ledger : Input.connecting_ledger_hash
       }
   end
 
   val group_by_zkapp_command_rev :
-       Account_update.t list list
-    -> (Input.global_state * Input.local_state) list list
+       t list
+    -> (Input.global_state * Input.local_state * Input.connecting_ledger_hash)
+       list
+       list
     -> Zkapp_command_intermediate_state.t list
 end = struct
   open Input
@@ -1504,18 +1620,19 @@ end = struct
       ; spec : spec
       ; state_before : state
       ; state_after : state
+      ; connecting_ledger : connecting_ledger_hash
       }
   end
 
   (** [group_by_zkapp_command_rev zkapp_commands stmtss] identifies before/after pairs of
-      statements, corresponding to zkapp_command in [zkapp_commands] which minimize the
+      statements, corresponding to account updates for each zkapp_command in [zkapp_commands] which minimize the
       number of snark proofs needed to prove all of the zkapp_command.
 
-      This function is intended to take the zkapp_command from multiple transactions as
-      its input, which may be converted from a [Zkapp_command.t list] using
-      [List.map ~f:Zkapp_command.zkapp_command]. The [stmtss] argument should be a list of
-      the same length, with 1 more state than the number of zkapp_command for each
-      transaction.
+      This function is intended to take multiple zkapp transactions as
+      its input, which is then converted to a [Account_update.t list list] using
+      [List.map ~f:Zkapp_command.zkapp_command]. The [stmtss] argument should
+      be a list of the same length, with 1 more state than the number of
+      zkapp_command for each transaction.
 
       For example, two transactions made up of zkapp_command [[p1; p2; p3]] and
       [[p4; p5]] should have the statements [[[s0; s1; s2; s3]; [s3; s4; s5]]],
@@ -1528,15 +1645,23 @@ end = struct
       will need to be passed as part of the snark witness while applying that
       pair.
   *)
-  let group_by_zkapp_command_rev (zkapp_commands : Account_update.t list list)
-      (stmtss : (global_state * local_state) list list) :
-      Zkapp_command_intermediate_state.t list =
+  let group_by_zkapp_command_rev (zkapp_commands : t list)
+      (stmtss : (global_state * local_state * connecting_ledger_hash) list list)
+      : Zkapp_command_intermediate_state.t list =
     let intermediate_state ~kind ~spec ~before ~after =
+      let global_before, local_before, _ = before in
+      let global_after, local_after, connecting_ledger = after in
       { Zkapp_command_intermediate_state.kind
       ; spec
-      ; state_before = { global = fst before; local = snd before }
-      ; state_after = { global = fst after; local = snd after }
+      ; state_before = { global = global_before; local = local_before }
+      ; state_after = { global = global_after; local = local_after }
+      ; connecting_ledger
       }
+    in
+    let zkapp_account_updatess =
+      []
+      :: List.map zkapp_commands ~f:(fun (zkapp_command : t) ->
+             all_account_updates_list zkapp_command )
     in
     let rec group_by_zkapp_command_rev
         (zkapp_commands : Account_update.t list list) stmtss acc =
@@ -1563,7 +1688,7 @@ end = struct
       | ( ({ authorization = Proof _ as a1; _ } :: zkapp_command)
           :: zkapp_commands
         , (before :: (after :: _ as stmts)) :: stmtss ) ->
-          (* This account_update contains a proof, don't pair it with other zkapp_command. *)
+          (* This account_update contains a proof, don't pair it with other account updates. *)
           group_by_zkapp_command_rev
             (zkapp_command :: zkapp_commands)
             (stmts :: stmtss)
@@ -1576,7 +1701,7 @@ end = struct
              :: zkapp_commands
         , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
           (* This account_update is part of a new transaction, and contains a proof, don't
-             pair it with other zkapp_command.
+             pair it with other account updates.
           *)
           group_by_zkapp_command_rev
             (zkapp_command :: zkapp_commands)
@@ -1778,7 +1903,7 @@ end = struct
             "group_by_zkapp_command_rev: No statements given for transaction \
              after next"
     in
-    group_by_zkapp_command_rev zkapp_commands stmtss []
+    group_by_zkapp_command_rev zkapp_account_updatess stmtss []
 end
 
 (*Transaction_snark.Zkapp_command_segment.Basic.t*)
@@ -1788,6 +1913,8 @@ module Update_group = Make_update_group (struct
   type local_state = unit
 
   type global_state = unit
+
+  type connecting_ledger_hash = unit
 
   type spec = possible_segments
 
@@ -1830,9 +1957,9 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
     |> fun (updates, ev, sev) -> (List.rev updates, ev, sev)
   in
   let groups =
-    Update_group.group_by_zkapp_command_rev ([] :: [ all_updates ])
-      ( [ ((), ()) ]
-      :: [ ((), ()) :: List.map all_updates ~f:(fun _ -> ((), ())) ] )
+    Update_group.group_by_zkapp_command_rev [ t ]
+      ( [ ((), (), ()) ]
+      :: [ ((), (), ()) :: List.map all_updates ~f:(fun _ -> ((), (), ())) ] )
   in
   let proof_segments, signed_singles, signed_pairs =
     List.fold ~init:(0, 0, 0) groups
@@ -1891,10 +2018,54 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
     in
     Error (Error.of_string err_msg)
 
+let get_transaction_commitments (zkapp_command : t) =
+  let memo_hash = Signed_command_memo.hash zkapp_command.memo in
+  let fee_payer_hash =
+    Account_update.of_fee_payer zkapp_command.fee_payer
+    |> Digest.Account_update.create
+  in
+  let account_updates_hash = account_updates_hash zkapp_command in
+  let txn_commitment = Transaction_commitment.create ~account_updates_hash in
+  let full_txn_commitment =
+    Transaction_commitment.create_complete txn_commitment ~memo_hash
+      ~fee_payer_hash
+  in
+  (txn_commitment, full_txn_commitment)
+
 let inner_query =
   lazy
     (Option.value_exn ~message:"Invariant: All projectable derivers are Some"
        Fields_derivers_zkapps.(inner_query (deriver @@ Derivers.o ())) )
+
+module For_tests = struct
+  let replace_vks t vk =
+    { t with
+      account_updates =
+        Call_forest.map t.account_updates ~f:(fun (p : Account_update.t) ->
+            { p with
+              body =
+                { p.body with
+                  update =
+                    { p.body.update with
+                      verification_key =
+                        (* replace dummy vks in vk Setting *)
+                        ( match p.body.update.verification_key with
+                        | Set _vk ->
+                            Set vk
+                        | Keep ->
+                            Keep )
+                    }
+                ; authorization_kind =
+                    (* replace dummy vk hashes in authorization kind *)
+                    ( match p.body.authorization_kind with
+                    | Proof _vk_hash ->
+                        Proof (With_hash.hash vk)
+                    | ak ->
+                        ak )
+                }
+            } )
+    }
+end
 
 let%test_module "Test" =
   ( module struct

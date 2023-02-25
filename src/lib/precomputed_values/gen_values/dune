@@ -19,7 +19,7 @@
    base.caml
    sexplib0
    ;; local libraries
-   coda_runtime_config
+   mina_runtime_config
    consensus
    transaction_snark
    mina_state

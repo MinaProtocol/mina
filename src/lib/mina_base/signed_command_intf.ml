@@ -174,8 +174,6 @@ module type S = sig
 
   val check_valid_keys : t -> bool
 
-  module Base58_check_v1 : Codable.Base58_check_intf with type t := t_v1
-
   module For_tests : sig
     (** the signature kind is an argument, to match `sign`, but ignored *)
     val fake_sign :
@@ -210,6 +208,8 @@ module type S = sig
   val filter_by_participant : t list -> Public_key.Compressed.t -> t list
 
   val of_base58_check_exn_v1 : string -> t_v1 Or_error.t
+
+  val to_base58_check_v1 : t_v1 -> string
 
   include Codable.Base64_intf with type t := t
 end
@@ -263,6 +263,8 @@ module type Full = sig
         , Signature.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving compare, sexp, hash, yojson]
+
+      val to_latest : t -> Latest.t
     end
   end]
 

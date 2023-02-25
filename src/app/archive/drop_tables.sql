@@ -40,7 +40,7 @@ DROP TABLE zkapp_account_update;
 
 DROP TABLE zkapp_account_update_body;
 
-DROP TYPE call_type;
+DROP TYPE may_use_token;
 
 DROP TYPE authorization_kind_type;
 
@@ -60,13 +60,13 @@ DROP TABLE zkapp_epoch_ledger;
 
 DROP TABLE zkapp_permissions;
 
-DROP TABLE zkapp_state_data_array;
+DROP TABLE zkapp_field_array;
 
 DROP TABLE zkapp_states_nullable;
 
 DROP TABLE zkapp_states;
 
-DROP TABLE zkapp_state_data;
+DROP TABLE zkapp_field;
 
 DROP TABLE zkapp_timing_info;
 

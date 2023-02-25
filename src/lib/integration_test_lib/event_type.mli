@@ -122,7 +122,7 @@ module Gossip : sig
 end
 
 module Snark_work_failed : sig
-  type t = unit
+  type t = { error : Yojson.Safe.t }
 
   include Event_type_intf with type t := t
 end

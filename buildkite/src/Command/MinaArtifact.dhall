@@ -38,40 +38,18 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         DockerImage.generateStep minaBuilderSpec,
 
-        -- daemon devnet image
-        let daemonDevnetSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion,
-          service="mina-daemon",
-          network="devnet",
-          deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="daemon-devnet-${DebianVersions.lowerName debVersion}"
-        }
-        in
-        DockerImage.generateStep daemonDevnetSpec,
-
         -- daemon berkeley image
         let daemonBerkeleySpec = DockerImage.ReleaseSpec::{
           deps=DebianVersions.dependsOn debVersion,
           service="mina-daemon",
           network="berkeley",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="daemon-berkeley-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="daemon-berkeley-${DebianVersions.lowerName debVersion}"
         }
 
         in
 
         DockerImage.generateStep daemonBerkeleySpec,
-
-        -- daemon mainnet image
-        let daemonMainnetSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion,
-          service="mina-daemon",
-          network="mainnet",
-          deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="daemon-mainnet-${DebianVersions.lowerName debVersion}"
-        }
-        in
-        DockerImage.generateStep daemonMainnetSpec,
 
         -- test_executive image
         let testExecutiveSpec = DockerImage.ReleaseSpec::{
@@ -108,7 +86,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
           deps=DebianVersions.dependsOn debVersion,
           service="mina-zkapp-test-transaction",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="zkapp-test-transaction-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="zkapp-test-transaction-${DebianVersions.lowerName debVersion}"
         }
 
         in

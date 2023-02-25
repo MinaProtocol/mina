@@ -1,6 +1,6 @@
 use ark_ec::{msm::VariableBaseMSM, ProjectiveCurve};
 use ark_ff::{batch_inversion, One, PrimeField, UniformRand, Zero};
-use commitment_dlog::{
+use poly_commitment::{
     commitment::{b_poly_coefficients, CommitmentCurve},
     srs::SRS,
 };
@@ -87,7 +87,7 @@ pub fn batch_dlog_accumulator_generate<G: CommitmentCurve>(
         .into_par_iter()
         .chunks(rounds)
         .map(|chals| {
-            let chals: Vec<G::ScalarField> = chals.into_iter().map(|x| *x).collect();
+            let chals: Vec<G::ScalarField> = chals.into_iter().copied().collect();
             let scalars: Vec<_> = b_poly_coefficients(&chals)
                 .into_iter()
                 .map(|x| x.into_repr())

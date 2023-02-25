@@ -1,3 +1,4 @@
+open Pickles_types
 module Impl = Impls.Step
 
 module One_hot_vector : module type of One_hot_vector.Make (Impls.Step)
@@ -23,12 +24,15 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       ( challenge
       , scalar_challenge
       , Impl.Field.t Pickles_types.Shifted_value.Type1.t
-      , ( ( scalar_challenge
-          , Impl.Field.t Pickles_types.Shifted_value.Type1.t )
+      , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
+        , Impl.Boolean.var )
+        Pickles_types.Plonk_types.Opt.t
+      , ( scalar_challenge
           Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup
           .t
         , Impl.Boolean.var )
         Pickles_types.Plonk_types.Opt.t
+      , Impl.Boolean.var
       , unit
       , Import.Digest.Make(Impl).t
       , scalar_challenge Import.Bulletproof_challenge.t
@@ -81,11 +85,12 @@ module Constant : sig
         ( challenge
         , scalar_challenge
         , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
-        , ( scalar_challenge
-          , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t )
+        , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t option
+        , scalar_challenge
           Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup
           .t
           option
+        , bool
         , unit
         , Import.Digest.Constant.t
         , scalar_challenge Import.Bulletproof_challenge.t
@@ -113,7 +118,7 @@ module Constant : sig
 end
 
 val typ :
-     lookup:Pickles_types.Plonk_types.Opt.Flag.t
+     feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
   -> ('avar, 'aval) Impl.Typ.t
   -> 'n Pickles_types.Nat.t
   -> 'm Pickles_types.Nat.t

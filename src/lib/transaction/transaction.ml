@@ -58,6 +58,19 @@ type 'command t_ = 'command Poly.t =
   | Fee_transfer of Fee_transfer.t
   | Coinbase of Coinbase.t
 
+let to_valid_unsafe :
+    t -> [ `If_this_is_used_it_should_have_a_comment_justifying_it of Valid.t ]
+    = function
+  | Command t ->
+      let (`If_this_is_used_it_should_have_a_comment_justifying_it t') =
+        User_command.to_valid_unsafe t
+      in
+      `If_this_is_used_it_should_have_a_comment_justifying_it (Command t')
+  | Fee_transfer t ->
+      `If_this_is_used_it_should_have_a_comment_justifying_it (Fee_transfer t)
+  | Coinbase t ->
+      `If_this_is_used_it_should_have_a_comment_justifying_it (Coinbase t)
+
 let forget : Valid.t -> t = function
   | Command t ->
       Command (User_command.forget_check t)

@@ -60,7 +60,8 @@ let%test_module "Valid_while precondition tests" =
                     (Signature_lib.Public_key.compress new_kp.public_key) ;
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states ~zkapp_prover
+                    Transaction_snark.For_tests.update_states
+                      ~zkapp_prover_and_vk:(zkapp_prover, vk)
                       ~constraint_constants
                       (create_spec specs new_kp global_slot)
                   in
@@ -81,12 +82,14 @@ let%test_module "Valid_while precondition tests" =
                     (Signature_lib.Public_key.compress new_kp.public_key) ;
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states ~zkapp_prover
+                    Transaction_snark.For_tests.update_states
+                      ~zkapp_prover_and_vk:(zkapp_prover, vk)
                       ~constraint_constants
                       (create_spec specs new_kp global_slot)
                   in
                   U.check_zkapp_command_with_merges_exn
-                    ~expected_failure:Valid_while_precondition_unsatisfied
+                    ~expected_failure:
+                      (Valid_while_precondition_unsatisfied, U.Pass_2)
                     ~global_slot:Mina_numbers.Global_slot.zero ledger
                     [ zkapp_command ] ) ) )
   end )
@@ -285,7 +288,7 @@ let%test_module "Protocol state precondition tests" =
                             ; valid_while = Ignore
                             }
                         ; use_full_commitment = false
-                        ; call_type = Call
+                        ; may_use_token = No
                         ; authorization_kind = Signature
                         }
                         (*To be updated later*)
@@ -319,7 +322,7 @@ let%test_module "Protocol state precondition tests" =
                             ; valid_while = Ignore
                             }
                         ; use_full_commitment = true
-                        ; call_type = Call
+                        ; may_use_token = No
                         ; authorization_kind = Signature
                         }
                     ; authorization =
@@ -386,15 +389,18 @@ let%test_module "Protocol state precondition tests" =
                     init_ledger ledger ;
                   U.check_zkapp_command_with_merges_exn
                     ~expected_failure:
-                      Transaction_status.Failure
-                      .Protocol_state_precondition_unsatisfied ~state_body
-                    ledger
+                      ( Transaction_status.Failure
+                        .Protocol_state_precondition_unsatisfied
+                      , U.Pass_2 )
+                    ~state_body ledger
                     [ zkapp_command_with_valid_fee_payer ] ) ) )
   end )
 
 let%test_module "Account precondition tests" =
   ( module struct
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
+
+    let zkapp_prover_and_vk = (zkapp_prover, vk)
 
     let constraint_constants = U.constraint_constants
 
@@ -516,13 +522,13 @@ let%test_module "Account precondition tests" =
                   Mina_transaction_logic.For_tests.Init_ledger.init
                     (module Mina_ledger.Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  (*create a snapp account*)
+                  (*create a zkAapp account*)
                   Transaction_snark.For_tests.create_trivial_zkapp_account ~vk
                     ~ledger snapp_pk ;
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states ~zkapp_prover
-                      ~constraint_constants test_spec
+                    Transaction_snark.For_tests.update_states
+                      ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   U.check_zkapp_command_with_merges_exn ~state_body ledger
                     [ zkapp_command ] ) ) )
@@ -583,8 +589,8 @@ let%test_module "Account precondition tests" =
                     }
                   in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states ~zkapp_prover
-                      ~constraint_constants test_spec
+                    Transaction_snark.For_tests.update_states
+                      ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   U.check_zkapp_command_with_merges_exn ~state_body ledger
                     [ zkapp_command ] ) ) )
@@ -638,8 +644,8 @@ let%test_module "Account precondition tests" =
                   in
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states ~zkapp_prover
-                      ~constraint_constants test_spec
+                    Transaction_snark.For_tests.update_states
+                      ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   Mina_transaction_logic.For_tests.Init_ledger.init
                     (module Mina_ledger.Ledger.Ledger_inner)
@@ -652,9 +658,10 @@ let%test_module "Account precondition tests" =
                     ~ledger snapp_pk ;
                   U.check_zkapp_command_with_merges_exn
                     ~expected_failure:
-                      Transaction_status.Failure
-                      .Account_nonce_precondition_unsatisfied ~state_body ledger
-                    [ zkapp_command ] ) ) )
+                      ( Transaction_status.Failure
+                        .Account_nonce_precondition_unsatisfied
+                      , U.Pass_2 )
+                    ~state_body ledger [ zkapp_command ] ) ) )
 
     let%test_unit "invalid account predicate in fee payer" =
       let state_body = U.genesis_state_body in
@@ -703,7 +710,7 @@ let%test_module "Account precondition tests" =
                         ; valid_while = Ignore
                         }
                     ; use_full_commitment = false
-                    ; call_type = Call
+                    ; may_use_token = No
                     ; authorization_kind = Signature
                     }
                     (*To be updated later*)
@@ -734,7 +741,7 @@ let%test_module "Account precondition tests" =
                         ; valid_while = Ignore
                         }
                     ; use_full_commitment = true
-                    ; call_type = Call
+                    ; may_use_token = No
                     ; authorization_kind = Signature
                     }
                 ; authorization =

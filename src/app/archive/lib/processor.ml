@@ -230,8 +230,8 @@ module Account_identifiers = struct
       id
 end
 
-module Zkapp_state_data = struct
-  let table_name = "zkapp_state_data"
+module Zkapp_field = struct
+  let table_name = "zkapp_field"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (fp : Pickles.Backend.Tick.Field.t) =
@@ -248,15 +248,15 @@ module Zkapp_state_data = struct
       id
 end
 
-module Zkapp_state_data_array = struct
-  let table_name = "zkapp_state_data_array"
+module Zkapp_field_array = struct
+  let table_name = "zkapp_field_array"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (fps : Pickles.Backend.Tick.Field.t array) =
     let open Deferred.Result.Let_syntax in
     let%bind (element_ids : int array) =
       Mina_caqti.deferred_result_list_map (Array.to_list fps)
-        ~f:(Zkapp_state_data.add_if_doesn't_exist (module Conn))
+        ~f:(Zkapp_field.add_if_doesn't_exist (module Conn))
       >>| Array.of_list
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -308,7 +308,7 @@ module Zkapp_states_nullable = struct
       Mina_caqti.deferred_result_list_map (Vector.to_list fps)
         ~f:
           ( Mina_caqti.add_if_some
-          @@ Zkapp_state_data.add_if_doesn't_exist (module Conn) )
+          @@ Zkapp_field.add_if_doesn't_exist (module Conn) )
     in
     let t =
       match element_ids with
@@ -369,7 +369,7 @@ module Zkapp_states = struct
     let open Deferred.Result.Let_syntax in
     let%bind (element_ids : int list) =
       Mina_caqti.deferred_result_list_map (Vector.to_list fps)
-        ~f:(Zkapp_state_data.add_if_doesn't_exist (module Conn))
+        ~f:(Zkapp_field.add_if_doesn't_exist (module Conn))
     in
     let t =
       match element_ids with
@@ -427,7 +427,7 @@ module Zkapp_sequence_states = struct
     let open Deferred.Result.Let_syntax in
     let%bind (element_ids : int list) =
       Mina_caqti.deferred_result_list_map (Vector.to_list fps) ~f:(fun field ->
-          Zkapp_state_data.add_if_doesn't_exist (module Conn) field )
+          Zkapp_field.add_if_doesn't_exist (module Conn) field )
     in
     let t =
       match element_ids with
@@ -448,13 +448,35 @@ module Zkapp_sequence_states = struct
       id
 end
 
+module Zkapp_verification_key_hashes = struct
+  type t = int array
+
+  let typ = Caqti_type.string
+
+  let table_name = "zkapp_verification_key_hashes"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      (verification_key_hash : Pickles.Backend.Tick.Field.t) =
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name
+      ~cols:([ "value" ], typ)
+      (module Conn)
+      (Pickles.Backend.Tick.Field.to_string verification_key_hash)
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int Caqti_type.string
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "value" ]) )
+      id
+end
+
 module Zkapp_verification_keys = struct
-  type t = { verification_key : string; hash : string }
+  type t = { verification_key : string; hash_id : int }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ string; string ]
+      Caqti_type.[ string; int ]
 
   let table_name = "zkapp_verification_keys"
 
@@ -463,11 +485,14 @@ module Zkapp_verification_keys = struct
         ( Pickles.Side_loaded.Verification_key.t
         , Pickles.Backend.Tick.Field.t )
         With_hash.t ) =
+    let open Deferred.Result.Let_syntax in
     let verification_key =
       Pickles.Side_loaded.Verification_key.to_base64 vk.data
     in
-    let hash = Pickles.Backend.Tick.Field.to_string vk.hash in
-    let value = { hash; verification_key } in
+    let%bind hash_id =
+      Zkapp_verification_key_hashes.add_if_doesn't_exist (module Conn) vk.hash
+    in
+    let value = { verification_key; hash_id } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
@@ -523,12 +548,14 @@ module Zkapp_permissions = struct
     ; set_token_symbol : Permissions.Auth_required.t
     ; increment_nonce : Permissions.Auth_required.t
     ; set_voting_for : Permissions.Auth_required.t
+    ; set_timing : Permissions.Auth_required.t
     }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       [ auth_required_typ
+      ; auth_required_typ
       ; auth_required_typ
       ; auth_required_typ
       ; auth_required_typ
@@ -558,6 +585,7 @@ module Zkapp_permissions = struct
       ; set_token_symbol = perms.set_token_symbol
       ; increment_nonce = perms.increment_nonce
       ; set_voting_for = perms.set_voting_for
+      ; set_timing = perms.set_timing
       }
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -844,7 +872,7 @@ module Zkapp_account_precondition_values = struct
     in
     let%bind sequence_state_id =
       Mina_caqti.add_if_zkapp_check
-        (Zkapp_state_data.add_if_doesn't_exist (module Conn))
+        (Zkapp_field.add_if_doesn't_exist (module Conn))
         acct.sequence_state
     in
     let receipt_chain_hash =
@@ -1423,7 +1451,7 @@ module Zkapp_events = struct
     let open Deferred.Result.Let_syntax in
     let%bind (element_ids : int array) =
       Mina_caqti.deferred_result_list_map events
-        ~f:(Zkapp_state_data_array.add_if_doesn't_exist (module Conn))
+        ~f:(Zkapp_field_array.add_if_doesn't_exist (module Conn))
       >>| Array.of_list
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -1455,8 +1483,9 @@ module Zkapp_account_update_body = struct
     ; zkapp_valid_while_precondition_id : int option
     ; use_full_commitment : bool
     ; implicit_account_creation_fee : bool
-    ; call_type : string
+    ; may_use_token : string
     ; authorization_kind : string
+    ; verification_key_hash_id : int option
     }
   [@@deriving fields, hlist]
 
@@ -1478,6 +1507,7 @@ module Zkapp_account_update_body = struct
         ; bool
         ; string
         ; string
+        ; option int
         ]
 
   let table_name = "zkapp_account_update_body"
@@ -1500,7 +1530,7 @@ module Zkapp_account_update_body = struct
       Zkapp_events.add_if_doesn't_exist (module Conn) body.actions
     in
     let%bind call_data_id =
-      Zkapp_state_data.add_if_doesn't_exist (module Conn) body.call_data
+      Zkapp_field.add_if_doesn't_exist (module Conn) body.call_data
     in
     let%bind zkapp_network_precondition_id =
       Zkapp_network_precondition.add_if_doesn't_exist
@@ -1528,9 +1558,24 @@ module Zkapp_account_update_body = struct
     let call_depth = body.call_depth in
     let use_full_commitment = body.use_full_commitment in
     let implicit_account_creation_fee = body.implicit_account_creation_fee in
-    let call_type = Account_update.Call_type.to_string body.call_type in
+    let may_use_token =
+      Account_update.May_use_token.to_string body.may_use_token
+    in
     let authorization_kind =
-      Account_update.Authorization_kind.to_string body.authorization_kind
+      Account_update.Authorization_kind.to_control_tag body.authorization_kind
+      |> Control.Tag.to_string
+    in
+    let%bind verification_key_hash_id =
+      match body.authorization_kind with
+      | Account_update.Authorization_kind.Proof vk_hash ->
+          let%map id =
+            Zkapp_verification_key_hashes.add_if_doesn't_exist
+              (module Conn)
+              vk_hash
+          in
+          Some id
+      | _ ->
+          return None
     in
     let value =
       { account_identifier_id
@@ -1546,8 +1591,9 @@ module Zkapp_account_update_body = struct
       ; zkapp_valid_while_precondition_id
       ; use_full_commitment
       ; implicit_account_creation_fee
-      ; call_type
+      ; may_use_token
       ; authorization_kind
+      ; verification_key_hash_id
       }
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -1555,8 +1601,8 @@ module Zkapp_account_update_body = struct
       ~tannot:(function
         | "events_ids" | "actions_ids" ->
             Some "int[]"
-        | "call_type" ->
-            Some "call_type"
+        | "may_use_token" ->
+            Some "may_use_token"
         | "authorization_kind" ->
             Some "authorization_kind_type"
         | _ ->

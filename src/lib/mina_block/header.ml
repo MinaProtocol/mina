@@ -20,7 +20,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     module V2 = struct
       type t = A.V2.t =
         { protocol_state : Protocol_state.Value.Stable.V2.t
-        ; protocol_state_proof : Proof.Stable.V2.t [@sexp.opaque]
+        ; protocol_state_proof : (Proof.Stable.V2.t[@sexp.opaque])
         ; delta_block_chain_proof :
             (* TODO: abstract *)
             State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list

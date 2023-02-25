@@ -42,12 +42,14 @@ module Wrap : sig
       module Plonk : sig
         module Minimal : sig
           module V1 : sig
-            type ('challenge, 'scalar_challenge) t =
+            type ('challenge, 'scalar_challenge, 'bool) t =
               { alpha : 'scalar_challenge
               ; beta : 'challenge
               ; gamma : 'challenge
               ; zeta : 'scalar_challenge
               ; joint_combiner : 'scalar_challenge option
+              ; feature_flags :
+                  'bool Pickles_types.Plonk_types.Features.Stable.V1.t
               }
           end
         end
@@ -121,6 +123,7 @@ module Wrap : sig
         type ( 'challenge
              , 'scalar_challenge
              , 'fp
+             , 'feature_flags
              , 'messages_for_next_wrap_proof
              , 'digest
              , 'messages_for_next_step_proof
@@ -128,7 +131,8 @@ module Wrap : sig
              , 'index )
              t =
           ( ( 'challenge
-            , 'scalar_challenge )
+            , 'scalar_challenge
+            , 'feature_flags )
             Proof_state.Deferred_values.Plonk.Minimal.V1.t
           , 'scalar_challenge
           , 'fp

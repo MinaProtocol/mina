@@ -81,16 +81,12 @@ module Make_str (A : Wire_types.Concrete) = struct
   end
 
   module Stack_id : sig
-    (* using %%versioned here results in unused definitions *)
+    [%%versioned:
     module Stable : sig
       module V1 : sig
-        type t [@@deriving bin_io, sexp, to_yojson, compare, version]
+        type t [@@deriving sexp, yojson, compare, equal]
       end
-
-      module Latest = V1
-    end
-
-    type t = Stable.Latest.t [@@deriving sexp, compare, equal, yojson]
+    end]
 
     val of_int : int -> t
 
@@ -107,7 +103,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = int [@@deriving sexp, yojson, compare]
+        type t = int [@@deriving sexp, yojson, compare, equal]
 
         let to_latest = Fn.id
       end
@@ -175,7 +171,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
-    type _unused = unit constraint t = Stable.Latest.t
+    let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
 
     let push (h : t) cb =
       let coinbase = Coinbase_data.of_coinbase cb in
@@ -235,7 +231,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
-    type _unused = unit constraint t = Stable.Latest.t
+    let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
 
     let dummy = of_hash Outside_hash_image.t
   end
@@ -388,7 +384,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
-    type _unused = unit constraint t = Stable.Latest.t
+    let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
 
     let merge ~height (h1 : t) (h2 : t) =
       Random_oracle.hash
@@ -558,13 +554,14 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
-    type _unused = unit
-      constraint
-        t =
-        ( Hash_versioned.t
-        , Stack_id.t
-        , Stack_versioned.t )
-        Sparse_ledger_lib.Sparse_ledger.T.t
+    let (_ :
+          ( t
+          , ( Hash_versioned.t
+            , Stack_id.t
+            , Stack_versioned.t )
+            Sparse_ledger_lib.Sparse_ledger.T.t )
+          Type_equal.t ) =
+      Type_equal.T
   end
 
   module T = struct
@@ -586,8 +583,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       type t = Stack_versioned.t [@@deriving yojson, equal, compare, sexp, hash]
 
-      type _unused = unit
-        constraint t = (Coinbase_stack.t, State_stack.t) Poly.t
+      let (_ : (t, (Coinbase_stack.t, State_stack.t) Poly.t) Type_equal.t) =
+        Type_equal.T
 
       type var = (Coinbase_stack.var, State_stack.var) Poly.t
 
@@ -735,9 +732,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
 
     module Hash = struct
-      type t = Hash_builder.t [@@deriving equal, compare, sexp, yojson, hash]
-
-      type _unused = unit constraint t = Hash_versioned.t
+      type t = Hash_builder.t constraint t = Hash_versioned.t
+      [@@deriving equal, compare, sexp, yojson, hash]
 
       type var = Hash_builder.var
 
@@ -761,10 +757,12 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Merkle_tree = struct
       type t = Merkle_tree_versioned.t [@@deriving sexp, to_yojson]
 
-      type _unused = unit
-        constraint
-          t =
-          (Hash.t, Stack_id.t, Stack.t) Sparse_ledger_lib.Sparse_ledger.T.t
+      let (_ :
+            ( t
+            , (Hash.t, Stack_id.t, Stack.t) Sparse_ledger_lib.Sparse_ledger.T.t
+            )
+            Type_equal.t ) =
+        Type_equal.T
 
       module M = Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Stack_id) (Stack)
 
@@ -1284,13 +1282,13 @@ module Make_str (A : Wire_types.Concrete) = struct
         Poly_versioned.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
-      let to_latest = Fn.id
+      let (_ : (t, T.t) Type_equal.t) = Type_equal.T
 
-      type _unused = unit constraint t = T.t
+      let to_latest = Fn.id
     end
   end]
 
-  type _unused = unit constraint Stable.Latest.t = t
+  let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
 
   let%test_unit "add stack + remove stack = initial tree " =
     let constraint_constants =

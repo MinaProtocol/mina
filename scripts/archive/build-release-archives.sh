@@ -43,6 +43,8 @@ case "${MINA_DEB_CODENAME}" in
     ;;
 esac
 
+echo "--- Building Mina archive package"
+
 PROJECT="mina-archive"
 BUILDDIR="deb_build"
 
@@ -93,3 +95,5 @@ find "${BUILDDIR}"
 echo "------------------------------------------------------------"
 dpkg-deb --build "${BUILDDIR}" ${PROJECT}_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
+
+echo "--- Built ${PROJECT}_${MINA_DEB_VERSION}.deb"
