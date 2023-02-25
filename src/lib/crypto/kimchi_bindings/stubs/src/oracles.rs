@@ -111,7 +111,7 @@ macro_rules! impl_oracles {
 pub mod fp {
     use super::*;
     use crate::arkworks::{CamlFp, CamlGVesta};
-    use mina_curves::pasta::{Fp, Vesta, VestaParameters};
+    use mina_curves::pasta::{Fp, Vesta, VestaConfig};
 
     impl_oracles!(
         CamlFp,
@@ -119,7 +119,7 @@ pub mod fp {
         CamlGVesta,
         Vesta,
         CamlPastaFpPlonkVerifierIndex,
-        VestaParameters
+        VestaConfig
     );
 }
 
@@ -130,7 +130,7 @@ pub mod fq {
         oracles::CamlOracles,
         pasta_fq_plonk_verifier_index::CamlPastaFqPlonkVerifierIndex,
     };
-    use mina_curves::pasta::{Fq, Pallas, PallasParameters};
+    use mina_curves::pasta::{Fq, Pallas, PallasConfig};
 
     impl_oracles!(
         CamlFq,
@@ -138,6 +138,6 @@ pub mod fq {
         CamlGPallas,
         Pallas,
         CamlPastaFqPlonkVerifierIndex,
-        PallasParameters
+        PallasConfig
     );
 }

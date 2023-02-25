@@ -2,7 +2,7 @@ use crate::{gate_vector::fq::CamlPastaFqPlonkGateVectorPtr, srs::fq::CamlFqSrs};
 use ark_poly::EvaluationDomain;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::{linearization::expr_linearization, prover_index::ProverIndex};
-use mina_curves::pasta::{Fq, Pallas, PallasParameters, Vesta};
+use mina_curves::pasta::{Fq, Pallas, PallasConfig, Vesta};
 use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -82,7 +82,9 @@ pub fn caml_pasta_fq_plonk_index_create(
     // create index
     let mut index = ProverIndex::<Pallas>::create(cs, endo_q, srs.clone());
     // Compute and cache the verifier index digest
-    index.compute_verifier_index_digest::<DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>>();
+    index
+        .compute_verifier_index_digest::<DefaultFqSponge<PallasConfig, PlonkSpongeConstantsKimchi>>(
+        );
 
     Ok(CamlPastaFqPlonkIndex(Box::new(index)))
 }

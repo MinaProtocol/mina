@@ -18,7 +18,7 @@ use kimchi::{
     verifier::Context,
 };
 use kimchi::{prover::caml::CamlProverProof, verifier_index::VerifierIndex};
-use mina_curves::pasta::{Fp, Fq, Pallas, Vesta, VestaParameters};
+use mina_curves::pasta::{Fp, Fq, Pallas, Vesta, VestaConfig};
 use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
@@ -27,7 +27,7 @@ use poly_commitment::commitment::{CommitmentCurve, PolyComm};
 use poly_commitment::evaluation_proof::OpeningProof;
 use std::convert::TryInto;
 
-type EFqSponge = DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>;
+type EFqSponge = DefaultFqSponge<VestaConfig, PlonkSpongeConstantsKimchi>;
 type EFrSponge = DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>;
 
 #[ocaml_gen::func]
@@ -799,7 +799,7 @@ pub fn caml_pasta_fp_plonk_proof_verify(
 
     batch_verify::<
         Vesta,
-        DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>,
+        DefaultFqSponge<VestaConfig, PlonkSpongeConstantsKimchi>,
         DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>,
     >(&group_map, &[context])
     .is_ok()
@@ -832,7 +832,7 @@ pub fn caml_pasta_fp_plonk_proof_batch_verify(
 
     batch_verify::<
         Vesta,
-        DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>,
+        DefaultFqSponge<VestaConfig, PlonkSpongeConstantsKimchi>,
         DefaultFrSponge<Fp, PlonkSpongeConstantsKimchi>,
     >(&group_map, &ts_ref)
     .is_ok()

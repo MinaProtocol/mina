@@ -17,7 +17,7 @@ use kimchi::{
     verifier::Context,
 };
 use kimchi::{prover::caml::CamlProverProof, verifier_index::VerifierIndex};
-use mina_curves::pasta::{Fp, Fq, Pallas, PallasParameters};
+use mina_curves::pasta::{Fp, Fq, Pallas, PallasConfig};
 use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
@@ -79,7 +79,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
     runtime.releasing_runtime(|| {
         let group_map = GroupMap::<Fp>::setup();
         let proof = ProverProof::create_recursive::<
-            DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
+            DefaultFqSponge<PallasConfig, PlonkSpongeConstantsKimchi>,
             DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
         >(&group_map, witness, &[], index, prev, None)
         .map_err(|e| ocaml::Error::Error(e.into()))?;
@@ -105,7 +105,7 @@ pub fn caml_pasta_fq_plonk_proof_verify(
 
     batch_verify::<
         Pallas,
-        DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
+        DefaultFqSponge<PallasConfig, PlonkSpongeConstantsKimchi>,
         DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
     >(&group_map, &[context])
     .is_ok()
@@ -138,7 +138,7 @@ pub fn caml_pasta_fq_plonk_proof_batch_verify(
 
     batch_verify::<
         Pallas,
-        DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
+        DefaultFqSponge<PallasConfig, PlonkSpongeConstantsKimchi>,
         DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
     >(&group_map, &ts_ref)
     .is_ok()
