@@ -75,6 +75,9 @@ module type Intf = sig
 
   val to_hex_string : t -> string
 
+  val of_hex : string -> t
+
+  (** Same as [of_hex] but expects the string to start with "0x". *)
   val of_hex_string : string -> t
 
   val of_numeral : string -> base:int -> t

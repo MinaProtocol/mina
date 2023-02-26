@@ -43,6 +43,8 @@ module type Intf = sig
 
   val to_hex_string : t -> string
 
+  val of_hex : string -> t
+
   val of_hex_string : string -> t
 
   val of_numeral : string -> base:int -> t
