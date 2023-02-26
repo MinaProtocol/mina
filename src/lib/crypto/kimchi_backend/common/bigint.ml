@@ -24,6 +24,8 @@ module type Bindings = sig
   val to_bytes : t -> Bytes.t
 
   val of_bytes : Bytes.t -> t
+
+  val of_hex : string -> t
 end
 
 module type Intf = sig
@@ -41,7 +43,7 @@ module type Intf = sig
 
   val to_hex_string : t -> string
 
-  val of_hex_string : ?reverse:bool -> string -> t
+  val of_hex_string : string -> t
 
   val of_numeral : string -> base:int -> t
 end
@@ -66,12 +68,10 @@ module Make
 
   let sexp_of_t t = to_hex_string t |> Sexp.of_string
 
-  let of_hex_string ?(reverse = true) s =
+  let of_hex_string s =
     assert (Char.equal s.[0] '0' && Char.equal s.[1] 'x') ;
     let s = String.drop_prefix s 2 in
-    Option.try_with (fun () -> Hex.decode ~init:Bytes.init ~reverse s)
-    |> Option.value_exn ~here:[%here]
-    |> of_bytes
+    of_hex s
 
   let%test_unit "hex test" =
     let bytes =

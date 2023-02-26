@@ -22,6 +22,8 @@ module type Bindings = sig
   val to_bytes : t -> bytes
 
   val of_bytes : bytes -> t
+
+  val of_hex : string -> t
 end
 
 module type Intf = sig
@@ -73,7 +75,7 @@ module type Intf = sig
 
   val to_hex_string : t -> string
 
-  val of_hex_string : ?reverse:bool -> string -> t
+  val of_hex_string : string -> t
 
   val of_numeral : string -> base:int -> t
 end
@@ -132,7 +134,7 @@ module Make : functor
 
   val to_hex_string : t -> string
 
-  val of_hex_string : ?reverse:bool -> string -> t
+  val of_hex_string : string -> t
 
   val of_numeral : string -> base:int -> t
 end
