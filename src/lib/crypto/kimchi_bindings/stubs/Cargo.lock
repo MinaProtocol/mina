@@ -1161,6 +1161,7 @@ dependencies = [
  "ark-serialize",
  "array-init",
  "groupmap",
+ "hex",
  "kimchi",
  "libc",
  "mina-curves",

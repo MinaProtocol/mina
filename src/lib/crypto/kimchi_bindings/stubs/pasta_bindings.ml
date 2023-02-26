@@ -25,6 +25,8 @@ module BigInt256 = struct
 
   external of_bytes : bytes -> t = "caml_bigint_256_of_bytes"
 
+  external of_hex : string -> t = "caml_bigint_256_of_hex"
+
   external deep_copy : t -> t = "caml_bigint_256_deep_copy"
 end
 

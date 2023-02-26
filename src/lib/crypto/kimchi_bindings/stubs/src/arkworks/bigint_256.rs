@@ -214,9 +214,7 @@ pub fn caml_bigint_256_to_bytes(
     res
 }
 
-#[ocaml_gen::func]
-#[ocaml::func]
-pub fn caml_bigint_256_of_bytes(x: &[u8]) -> Result<CamlBigInteger256, ocaml::Error> {
+fn bigint_of_bytes(x: &[u8]) -> Result<CamlBigInteger256, ocaml::Error> {
     let len = std::mem::size_of::<BigInteger256>();
 
     let result = if x.len() > len {
@@ -234,6 +232,27 @@ pub fn caml_bigint_256_of_bytes(x: &[u8]) -> Result<CamlBigInteger256, ocaml::Er
     };
 
     Ok(CamlBigInteger256(result))
+}
+
+#[ocaml_gen::func]
+#[ocaml::func]
+pub fn caml_bigint_256_of_hex(x: String) -> Result<CamlBigInteger256, ocaml::Error> {
+    let bytes = hex::decode(&x).map_err(|e| {
+        ocaml::Error::Error(
+            format!(
+                "caml_bigint_256_of_hex was given an invalid hex string: {}; {e}",
+                x
+            )
+            .into(),
+        )
+    })?;
+
+    bigint_of_bytes(&bytes)
+}
+#[ocaml_gen::func]
+#[ocaml::func]
+pub fn caml_bigint_256_of_bytes(x: &[u8]) -> Result<CamlBigInteger256, ocaml::Error> {
+    bigint_of_bytes(x)
 }
 
 #[ocaml_gen::func]
