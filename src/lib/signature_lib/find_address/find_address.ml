@@ -132,7 +132,7 @@ let min_value_compressed = Public_key.Compressed.to_base58_check min_value
 let max_value : Public_key.Compressed.t =
   { x =
       Kimchi_backend.Pasta.Basic.Bigint256.of_hex_string
-        "0x0FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+        "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF0F"
       |> Kimchi_backend.Pasta.Basic.Fp.of_bigint
   ; is_odd = true
   }
