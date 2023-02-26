@@ -304,4 +304,19 @@ mod tests {
 
         assert_eq!(x, y);
     }
+
+    #[test]
+    fn test_le_byte_order() {
+        let x = 1.to_biguint().unwrap();
+        let x = BigInteger256::try_from(x).unwrap();
+        let mut bytes = vec![];
+        x.serialize_compressed(&mut bytes).unwrap();
+        assert_eq!(
+            bytes,
+            [
+                1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0
+            ]
+        );
+    }
 }
