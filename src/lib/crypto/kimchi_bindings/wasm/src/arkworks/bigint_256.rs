@@ -124,8 +124,7 @@ pub fn caml_bigint_256_to_bytes(x: WasmBigInteger256) -> Vec<u8> {
     serialized_bytes
 }
 
-#[wasm_bindgen]
-pub fn caml_bigint_256_of_bytes(x: &[u8]) -> WasmBigInteger256 {
+fn bigint_of_bytes(x: &[u8]) -> WasmBigInteger256 {
     let len = std::mem::size_of::<WasmBigInteger256>();
 
     let res = if x.len() > len {
@@ -139,6 +138,23 @@ pub fn caml_bigint_256_of_bytes(x: &[u8]) -> WasmBigInteger256 {
     };
 
     WasmBigInteger256(res)
+}
+
+#[wasm_bindgen]
+pub fn caml_bigint_256_of_hex(x: String) -> WasmBigInteger256 {
+    let bytes = hex::decode(&x).unwrap_or_else(|e| {
+        panic!(
+            "caml_bigint_256_of_hex was given an invalid hex string: {}; {e}",
+            x
+        )
+    });
+
+    bigint_of_bytes(&bytes)
+}
+
+#[wasm_bindgen]
+pub fn caml_bigint_256_of_bytes(x: &[u8]) -> WasmBigInteger256 {
+    bigint_of_bytes(x)
 }
 
 #[wasm_bindgen]

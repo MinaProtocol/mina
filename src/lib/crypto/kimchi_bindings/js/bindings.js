@@ -83,6 +83,12 @@ var caml_bigint_256_of_bytes = function (ocaml_bytes) {
     return plonk_wasm.caml_bigint_256_of_bytes(caml_bytes_to_uint8array(ocaml_bytes));
 };
 
+// Provides: caml_bigint_256_of_hex
+// Requires: plonk_wasm, caml_bytes_to_uint8array
+var caml_bigint_256_of_hex = function (s) {
+    return plonk_wasm.caml_bigint_256_of_hex(caml_jsstring_of_string(s));
+};
+
 // Provides: caml_bigint_256_deep_copy
 // Requires: plonk_wasm
 var caml_bigint_256_deep_copy = plonk_wasm.caml_bigint_256_deep_copy

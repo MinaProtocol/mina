@@ -38,8 +38,9 @@ mina-poseidon = { path = "../../proof-systems/poseidon" }
 kimchi = { path = "../../proof-systems/kimchi", features = ["wasm_types"] }
 
 array-init = "2.0.0"
-base64 = "0.13.0"
+base64 = "0.21.0"
 getrandom = { version = "0.2", features = ["js"] }
+hex = "0.4.3"
 num-bigint = { version = "0.4.0" }
 paste = "1.0.5"
 rand = { version = "0.8.0" }

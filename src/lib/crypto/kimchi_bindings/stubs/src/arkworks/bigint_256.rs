@@ -249,6 +249,7 @@ pub fn caml_bigint_256_of_hex(x: String) -> Result<CamlBigInteger256, ocaml::Err
 
     bigint_of_bytes(&bytes)
 }
+
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_bigint_256_of_bytes(x: &[u8]) -> Result<CamlBigInteger256, ocaml::Error> {
