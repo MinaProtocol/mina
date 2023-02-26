@@ -9,6 +9,7 @@
   minaArchive                 = "gcr.io/o1labs-192920/mina-archive:\\\${MINA_DOCKER_TAG}",
   minaDaemonDevnet            = "gcr.io/o1labs-192920/mina-daemon:\\\${MINA_DOCKER_TAG}-devnet",
   minaDaemonMainnet           = "gcr.io/o1labs-192920/mina-daemon:\\\${MINA_DOCKER_TAG}-mainnet",
+  minaDaemonBerkeley          = "gcr.io/o1labs-192920/mina-daemon:\\\${MINA_DOCKER_TAG}-berkeley",
   minaTestExecutive           = "gcr.io/o1labs-192920/mina-test-executive:\\\${MINA_DOCKER_TAG}",
   minaBuilder                 = "gcr.io/o1labs-192920/mina-builder:\\\${MINA_DEB_CODENAME}-\\\${BUILDKITE_COMMIT}",
   minaOpamDeps                = "gcr.io/o1labs-192920/mina-opam-deps:\\\${MINA_DEB_CODENAME}-20aa18425de3e013e965d6f40c923d9379801dfa",
