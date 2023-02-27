@@ -142,3 +142,11 @@ let build_zkapp_cmd ~fee transactions :
 
 let zkapp_cmd ~noncemap ~fee transactions =
   Monad_lib.State.eval_state (build_zkapp_cmd ~fee transactions) noncemap
+
+module Pred = struct
+  let pure ?(with_error = Fn.const false) ~f result =
+    match Result.map result ~f with Ok b -> b | Error e -> with_error e
+
+  let result ?(with_error = Fn.const false) ~f result =
+    match Result.bind result ~f with Ok b -> b | Error e -> with_error e
+end
