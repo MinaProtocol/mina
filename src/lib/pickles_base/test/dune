@@ -1,0 +1,18 @@
+(tests
+ (names main)
+ (flags
+  (:standard -warn-error +a)
+  -open Core_kernel)
+ (preprocess (pps ppx_jane))
+ (libraries
+   ; Opam
+  core_kernel
+  alcotest
+  ; Mina
+  pickles_base
+  pickles_types
+  )
+ (action (run %{test}))) 
+
+
+
