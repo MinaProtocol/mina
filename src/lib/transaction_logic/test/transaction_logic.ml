@@ -6,23 +6,16 @@ open Helpers
 open Update_utils
 module Transaction_logic = Mina_transaction_logic.Make (Ledger)
 
-module Zk_result = struct
-  type t =
-    Transaction_logic.Transaction_applied.Zkapp_command_applied.t
-    * Amount.Signed.t
-    * bool
-  [@@deriving sexp]
-end
-
 let constraint_constants =
   { Genesis_constants.Constraint_constants.for_unit_tests with
     account_creation_fee = Fee.of_mina_int_exn 1
   }
 
 type zk_cmd_result =
-  Transaction_logic.Transaction_applied.Zkapp_command_applied.t
-  * Amount.Signed.t
-[@@deriving sexp]
+  Transaction_logic.Transaction_applied.Zkapp_command_applied.t * Ledger.t
+
+let sexp_of_zk_cmd_result (txn, _) =
+  Transaction_logic.Transaction_applied.Zkapp_command_applied.sexp_of_t txn
 
 (* The function under test is quite slow, so keep the trials count low
    so that tests finish in a reasonable amount of time. *)
@@ -43,18 +36,20 @@ let balance_to_fee = Fn.compose Amount.to_fee Balance.to_amount
    validate them. *)
 let%test_module "Test transaction logic." =
   ( module struct
+    open Transaction_logic.Transaction_applied.Zkapp_command_applied
+
     let run_zkapp_cmd ~fee_payer ~fee ~accounts txns =
       let open Result.Let_syntax in
       let cmd =
         zkapp_cmd ~noncemap:(noncemap accounts) ~fee:(fee_payer, fee) txns
       in
       let%bind ledger = test_ledger accounts in
-      let%map txn, (_, amt) =
+      let%map txn, _ =
         Transaction_logic.apply_zkapp_command_unchecked ~constraint_constants
           ~global_slot:Global_slot.(of_int 120)
           ~state_view:protocol_state ledger cmd
       in
-      (txn, amt)
+      (txn, ledger)
 
     let%test_unit "Many transactions between distinct accounts." =
       Quickcheck.test ~trials
@@ -77,11 +72,8 @@ let%test_module "Test transaction logic." =
         (fee_payer.pk, fee, accounts, (txns :> transaction list)))
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: zk_cmd_result Or_error.t]
-            (function
-              | Ok (txn, _) ->
-                  Transaction_status.(equal txn.command.status Applied)
-              | Error _ ->
-                  false )
+            (Pred.pure ~f:(fun (txn, _) ->
+                 Transaction_status.equal txn.command.status Applied ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
     let%test_unit "Fee payer must be able to pay the fee." =
@@ -109,14 +101,13 @@ let%test_module "Test transaction logic." =
         (sender.pk, fee, accounts, [ (txn :> transaction) ]))
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: zk_cmd_result Or_error.t]
-            (function
-              | Ok (txn, _) ->
-                  Transaction_status.(
-                    equal txn.command.status
-                      (Failed [ []; [ Overflow ]; [ Cancelled ] ]))
-              | Error e ->
-                  String.is_substring (Error.to_string_hum e)
-                    ~substring:"Overflow" )
+            (Pred.pure
+               ~with_error:(fun e ->
+                 String.is_substring (Error.to_string_hum e)
+                   ~substring:"Overflow" )
+               ~f:(fun (txn, _) ->
+                 Transaction_status.equal txn.command.status
+                   (Failed [ []; [ Overflow ]; [ Cancelled ] ]) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
     let%test_unit "Currency cannot be created out of thin air." =
@@ -141,13 +132,9 @@ let%test_module "Test transaction logic." =
         (account.pk, fee, [ account ], [ (update :> transaction) ]))
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: zk_cmd_result Or_error.t]
-            (function
-              | Ok (txn, _) ->
-                  Transaction_status.(
-                    equal txn.command.status
-                      (Failed [ []; [ Invalid_fee_excess ] ]))
-              | Error _ ->
-                  false )
+            (Pred.pure ~f:(fun (txn, _) ->
+                 Transaction_status.equal txn.command.status
+                   (Failed [ []; [ Invalid_fee_excess ] ]) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
     let%test_unit "Currency cannot be destroyed." =
@@ -172,12 +159,8 @@ let%test_module "Test transaction logic." =
         (account.pk, fee, [ account ], [ (update :> transaction) ]))
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: zk_cmd_result Or_error.t]
-            (function
-              | Ok (txn, _) ->
-                  Transaction_status.(
-                    equal txn.command.status
-                      (Failed [ []; [ Invalid_fee_excess ] ]))
-              | Error _ ->
-                  false )
+            (Pred.pure ~f:(fun (txn, _) ->
+                 Transaction_status.equal txn.command.status
+                   (Failed [ []; [ Invalid_fee_excess ] ]) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
-    end )
+  end )
