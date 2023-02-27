@@ -19,6 +19,7 @@ let update_body ~account amount =
     ; implicit_account_creation_fee = true
     ; may_use_token = No
     ; authorization_kind = Signature
+    ; use_full_commitment = true
     ; preconditions =
         { network = Zkapp_precondition.Protocol_state.accept
         ; account = Account_precondition.Nonce nonce
