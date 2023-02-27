@@ -10,17 +10,13 @@ module Ledger = Mina_ledger.Ledger.Ledger_inner
 module Test_account = struct
   type t =
     { pk : Public_key.Compressed.t
-    ; sk : Private_key.t
     ; nonce : Account_nonce.t
     ; balance : Balance.t
     }
   [@@deriving equal]
 
-  let to_keypair { pk; sk; _ } = (pk, sk)
-
-  let make ?nonce ?(balance = Balance.zero) pk sk =
+  let make ?nonce ?(balance = Balance.zero) pk =
     { pk = Public_key.Compressed.of_base58_check_exn pk
-    ; sk = Private_key.of_base58_check_exn sk
     ; balance
     ; nonce =
         Option.value_map ~f:Account_nonce.of_int ~default:Account_nonce.zero
@@ -31,11 +27,10 @@ module Test_account = struct
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
-    let%bind sk = Private_key.gen in
-    let pk = Public_key.(compress @@ of_private_key_exn sk) in
+    let%bind pk = Public_key.Compressed.gen in
     let%bind balance = Balance.gen in
     let%map nonce = Account_nonce.gen in
-    { pk; sk; nonce; balance }
+    { pk; nonce; balance }
 end
 
 let epoch_seed = Epoch_seed.of_decimal_string "500"
@@ -64,11 +59,6 @@ let protocol_state : Zkapp_precondition.Protocol_state.View.t =
     ; staking_epoch_data = epoch_data
     ; next_epoch_data = epoch_data
     }
-
-let keymap (accounts : Test_account.t list) :
-    Private_key.t Public_key.Compressed.Map.t =
-  Public_key.Compressed.Map.of_alist_exn
-  @@ List.map ~f:Test_account.to_keypair accounts
 
 let noncemap (accounts : Test_account.t list) :
     Account_nonce.t Public_key.Compressed.Map.t =

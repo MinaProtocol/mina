@@ -30,17 +30,23 @@ let trials = 10
 
 let balance_to_fee = Fn.compose Amount.to_fee Balance.to_amount
 
+(* This module tests the "pure" transaction logic implemented in this library.
+   By "pure" we mean that ZK SNARKs aren't used for verification, instead all
+   signatures and proofs are assumed to be valid. These verification details
+   are provided by the functor parameters (Inputs module) and a full-featured
+   implementation leveraging ZK SNARKs is given in transaction_snark library.
+
+   As a consequence, we don't bother with constructing correct signatures or
+   proofs here. We just give dummy signatures because this implementation
+   accepts anything anyway. Note, however, that this implementation DOES check
+   whether SOME signature or proof is given whenever required. It just doesn't
+   validate them. *)
 let%test_module "Test transaction logic." =
   ( module struct
     let run_zkapp_cmd ~fee_payer ~fee ~accounts txns =
       let open Result.Let_syntax in
-      let unsigned_cmd =
-        zkapp_cmd ~noncemap:(noncemap accounts) ~fee:(fee_payer, fee) txns
-      in
-      let keymap = keymap accounts in
       let cmd =
-        Async_unix.Thread_safe.block_on_async_exn (fun () ->
-            Zkapp_command_builder.replace_authorizations ~keymap unsigned_cmd )
+        zkapp_cmd ~noncemap:(noncemap accounts) ~fee:(fee_payer, fee) txns
       in
       let%bind ledger = test_ledger accounts in
       let%map txn, (_, amt) =
@@ -174,4 +180,4 @@ let%test_module "Test transaction logic." =
               | Error _ ->
                   false )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
-  end )
+    end )
