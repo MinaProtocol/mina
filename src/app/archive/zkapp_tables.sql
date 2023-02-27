@@ -130,7 +130,7 @@ CREATE TABLE zkapp_uris
 CREATE TABLE zkapp_updates
 ( id                       serial           PRIMARY KEY
 , app_state_id             int              NOT NULL REFERENCES zkapp_states_nullable(id)
-, delegate_id              int              REFERENCES public_keys(id)
+, delegate_id              int              REFERENCES account_identifiers(id)
 , verification_key_id      int              REFERENCES zkapp_verification_keys(id)
 , permissions_id           int              REFERENCES zkapp_permissions(id)
 , zkapp_uri_id             int              REFERENCES zkapp_uris(id)
@@ -159,7 +159,7 @@ CREATE TABLE zkapp_account_precondition_values
 , balance_id               int                    REFERENCES zkapp_balance_bounds(id)
 , nonce_id                 int                    REFERENCES zkapp_nonce_bounds(id)
 , receipt_chain_hash       text
-, delegate_id              int                    REFERENCES public_keys(id)
+, delegate_id              int                    REFERENCES account_identifiers(id)
 , state_id                 int        NOT NULL    REFERENCES zkapp_states_nullable(id)
 , sequence_state_id        int                    REFERENCES zkapp_field(id)
 , proved_state             boolean

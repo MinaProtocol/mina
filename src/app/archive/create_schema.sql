@@ -137,8 +137,8 @@ CREATE TABLE blocks
 , state_hash                   text   NOT NULL UNIQUE
 , parent_id                    int                    REFERENCES blocks(id)
 , parent_hash                  text   NOT NULL
-, creator_id                   int    NOT NULL        REFERENCES public_keys(id)
-, block_winner_id              int    NOT NULL        REFERENCES public_keys(id)
+, creator_id                   int    NOT NULL        REFERENCES account_identifiers(id)
+, block_winner_id              int    NOT NULL        REFERENCES account_identifiers(id)
 , snarked_ledger_hash_id       int    NOT NULL        REFERENCES snarked_ledger_hashes(id)
 , staking_epoch_data_id        int    NOT NULL        REFERENCES epoch_data(id)
 , next_epoch_data_id           int    NOT NULL        REFERENCES epoch_data(id)
@@ -168,7 +168,7 @@ CREATE TABLE accounts_accessed
 , balance                 text    NOT NULL
 , nonce                   bigint  NOT NULL
 , receipt_chain_hash      text    NOT NULL
-, delegate_id             int               REFERENCES public_keys(id)
+, delegate_id             int               REFERENCES account_identifiers(id)
 , voting_for_id           int     NOT NULL  REFERENCES voting_for(id)
 , timing_id               int               REFERENCES timing_info(id)
 , permissions_id          int     NOT NULL  REFERENCES zkapp_permissions(id)

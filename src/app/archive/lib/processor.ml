@@ -706,9 +706,15 @@ module Zkapp_updates = struct
       |> Zkapp_states_nullable.add_if_doesn't_exist (module Conn)
     in
     let%bind delegate_id =
+      let account_id =
+        let open Zkapp_basic in
+        Option.map (Set_or_keep.to_option update.delegate) ~f:(fun pk ->
+            Account_id.create pk Token_id.default )
+        |> Set_or_keep.of_option
+      in
       Mina_caqti.add_if_zkapp_set
-        (Public_key.add_if_doesn't_exist (module Conn))
-        update.delegate
+        (Account_identifiers.add_if_doesn't_exist (module Conn))
+        account_id
     in
     let%bind verification_key_id =
       Mina_caqti.add_if_zkapp_set
@@ -862,9 +868,15 @@ module Zkapp_account_precondition_values = struct
         acct.nonce
     in
     let%bind delegate_id =
+      let account_id =
+        let open Zkapp_basic in
+        Option.map (Or_ignore.to_option acct.delegate) ~f:(fun pk ->
+            Account_id.create pk Token_id.default )
+        |> Or_ignore.of_option
+      in
       Mina_caqti.add_if_zkapp_check
-        (Public_key.add_if_doesn't_exist (module Conn))
-        acct.delegate
+        (Account_identifiers.add_if_doesn't_exist (module Conn))
+        account_id
     in
     let%bind state_id =
       Vector.map ~f:Zkapp_basic.Or_ignore.to_option acct.state
@@ -2595,9 +2607,13 @@ module Accounts_accessed = struct
           account.receipt_chain_hash |> Receipt.Chain_hash.to_base58_check
         in
         let%bind delegate_id =
+          let account_id =
+            Option.map account.delegate ~f:(fun pk ->
+                Account_id.create pk Token_id.default )
+          in
           Mina_caqti.add_if_some
-            (Public_key.add_if_doesn't_exist (module Conn))
-            account.delegate
+            (Account_identifiers.add_if_doesn't_exist (module Conn))
+            account_id
         in
         let%bind voting_for_id =
           Voting_for.add_if_doesn't_exist (module Conn) account.voting_for
@@ -2772,14 +2788,18 @@ module Block = struct
             ~state_hash:(Protocol_state.previous_state_hash protocol_state)
         in
         let%bind creator_id =
-          Public_key.add_if_doesn't_exist
-            (module Conn)
-            (Consensus.Data.Consensus_state.block_creator consensus_state)
+          let pk =
+            Consensus.Data.Consensus_state.block_creator consensus_state
+          in
+          let account_id = Account_id.create pk Token_id.default in
+          Account_identifiers.add_if_doesn't_exist (module Conn) account_id
         in
         let%bind block_winner_id =
-          Public_key.add_if_doesn't_exist
-            (module Conn)
-            (Consensus.Data.Consensus_state.block_stake_winner consensus_state)
+          let pk =
+            Consensus.Data.Consensus_state.block_stake_winner consensus_state
+          in
+          let account_id = Account_id.create pk Token_id.default in
+          Account_identifiers.add_if_doesn't_exist (module Conn) account_id
         in
         let%bind snarked_ledger_hash_id =
           Snarked_ledger_hash.add_if_doesn't_exist
@@ -3134,10 +3154,14 @@ module Block = struct
             find_opt (module Conn) ~state_hash:block.parent_hash
           in
           let%bind creator_id =
-            Public_key.add_if_doesn't_exist (module Conn) block.creator
+            let account_id = Account_id.create block.creator Token_id.default in
+            Account_identifiers.add_if_doesn't_exist (module Conn) account_id
           in
           let%bind block_winner_id =
-            Public_key.add_if_doesn't_exist (module Conn) block.block_winner
+            let account_id =
+              Account_id.create block.block_winner Token_id.default
+            in
+            Account_identifiers.add_if_doesn't_exist (module Conn) account_id
           in
           let%bind snarked_ledger_hash_id =
             Snarked_ledger_hash.add_if_doesn't_exist

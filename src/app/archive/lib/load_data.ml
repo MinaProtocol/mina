@@ -83,6 +83,26 @@ let get_length_bounds pool id =
   in
   Or_ignore.of_option bl_opt
 
+let default_token_id : int option ref = ref None
+
+let check_default_token pool token_id =
+  match !default_token_id with
+  | Some id ->
+      (* once we know the default token id, just compare against it *)
+      assert (id = token_id) ;
+      Deferred.unit
+  | None ->
+      let query_db ~f = Mina_caqti.query ~f pool in
+      let%map ({ value; owner_public_key_id; owner_token_id }
+                : Processor.Token.t ) =
+        query_db ~f:(fun db -> Processor.Token.find_by_id db token_id)
+      in
+      let token = Token_id.of_string value in
+      assert (Token_id.(equal default) token) ;
+      assert (Option.is_none owner_public_key_id) ;
+      assert (Option.is_none owner_token_id) ;
+      default_token_id := Some token_id
+
 let update_of_id pool update_id =
   let open Zkapp_basic in
   let query_db ~f = Mina_caqti.query ~f pool in
@@ -143,12 +163,23 @@ let update_of_id pool update_id =
     Zkapp_state.V.of_list_exn fields
   in
   let%bind delegate =
-    let%map pk_str =
+    let%bind account_id =
       Mina_caqti.get_opt_item delegate_id
-        ~f:(with_pool ~f:Processor.Public_key.find_by_id)
+        ~f:(with_pool ~f:Processor.Account_identifiers.load)
     in
-    Option.map pk_str ~f:Signature_lib.Public_key.Compressed.of_base58_check_exn
-    |> Set_or_keep.of_option
+    match account_id with
+    | None ->
+        return Set_or_keep.Keep
+    | Some { public_key_id; token_id } ->
+        let%bind () = check_default_token pool token_id in
+        let%map pk_str =
+          query_db ~f:(fun db ->
+              Processor.Public_key.find_by_id db public_key_id )
+        in
+        let pk =
+          Signature_lib.Public_key.Compressed.of_base58_check_exn pk_str
+        in
+        Set_or_keep.Set pk
   in
   let%bind verification_key =
     let%bind vk_opt =
@@ -530,15 +561,19 @@ let get_account_update_body ~pool body_id =
             ~f:Receipt.Chain_hash.of_base58_check_exn
           |> Or_ignore.of_option
         in
-        let get_pk id =
-          let%map pk_opt =
-            Option.value_map id ~default:(return None) ~f:(fun id ->
-                let%map pk = pk_of_id id in
-                Some pk )
-          in
-          Or_ignore.of_option pk_opt
+        let%bind delegate =
+          match delegate_id with
+          | None ->
+              return Or_ignore.Ignore
+          | Some id ->
+              let%bind { public_key_id; token_id } =
+                query_db ~f:(fun db ->
+                    Processor.Account_identifiers.load db id )
+              in
+              let%bind () = check_default_token pool token_id in
+              let%map pk = pk_of_id public_key_id in
+              Or_ignore.Check pk
         in
-        let%bind delegate = get_pk delegate_id in
         let%bind state =
           let%bind { element0
                    ; element1
