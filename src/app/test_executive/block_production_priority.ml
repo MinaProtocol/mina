@@ -24,29 +24,36 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "receiver-key"
+        [ { Test_Account.account_name = "receiver-key"
           ; balance = "9999999"
           ; timing = Untimed
           }
         ; { account_name = "empty_bp-key"; balance = "0"; timing = Untimed }
         ; { account_name = "snark_node-key"; balance = "0"; timing = Untimed }
-        ; { account_name = "sender_account1"
-          ; balance = "10000"
-          ; timing = Untimed
-          }
-        ; { account_name = "sender_account2"
-          ; balance = "10000"
-          ; timing = Untimed
-          }
-        ; { account_name = "sender_account3"
-          ; balance = "10000"
-          ; timing = Untimed
-          }
-        ; { account_name = "sender_account4"
-          ; balance = "10000"
-          ; timing = Untimed
-          }
+          (* ; { account_name = "sender_account1"
+               ; balance = "10000"
+               ; timing = Untimed
+               }
+             ; { account_name = "sender_account2"
+               ; balance = "10000"
+               ; timing = Untimed
+               }
+             ; { account_name = "sender_account3"
+               ; balance = "10000"
+               ; timing = Untimed
+               }
+             ; { account_name = "sender_account4"
+               ; balance = "10000"
+               ; timing = Untimed
+               } *)
         ]
+        @ List.init 1000 ~f:(fun i ->
+              let i_str = Int.to_string i in
+              { Test_Account.account_name =
+                  String.concat [ "sender_account"; i_str ]
+              ; balance = "10000"
+              ; timing = Untimed
+              } )
     ; block_producers =
         [ { node_name = "receiver"; account_name = "receiver-key" }
         ; { node_name = "empty_node_1"; account_name = "empty_bp-key" }
@@ -95,28 +102,41 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Core.String.Map.remove (Network.block_producers network) "receiver"
       |> Core.String.Map.data
     in
-    let sender_account1 =
-      Core.String.Map.find_exn
-        (Network.genesis_keypairs network)
-        "sender_account1"
-    in
-    let sender_account2 =
-      Core.String.Map.find_exn
-        (Network.genesis_keypairs network)
-        "sender_account2"
-    in
-    let sender_account3 =
-      Core.String.Map.find_exn
-        (Network.genesis_keypairs network)
-        "sender_account3"
-    in
-    let sender_account4 =
-      Core.String.Map.find_exn
-        (Network.genesis_keypairs network)
-        "sender_account4"
+    (* let sender_account1 =
+         Core.String.Map.find_exn
+           (Network.genesis_keypairs network)
+           "sender_account1"
+       in
+       let sender_account2 =
+         Core.String.Map.find_exn
+           (Network.genesis_keypairs network)
+           "sender_account2"
+       in
+       let sender_account3 =
+         Core.String.Map.find_exn
+           (Network.genesis_keypairs network)
+           "sender_account3"
+       in
+       let sender_account4 =
+         Core.String.Map.find_exn
+           (Network.genesis_keypairs network)
+           "sender_account4"
+       in *)
+    (* let sender_kps =
+         [ sender_account1; sender_account2; sender_account3; sender_account4 ]
+       in *)
+    let rec map_remove_keys map ~(keys : string list) =
+      match keys with
+      | [] ->
+          map
+      | hd :: tl ->
+          map_remove_keys (Core.String.Map.remove map hd) ~keys:tl
     in
     let sender_kps =
-      [ sender_account1; sender_account2; sender_account3; sender_account4 ]
+      map_remove_keys
+        (Network.genesis_keypairs network)
+        ~keys:[ "receiver-key"; "empty_bp-key"; "snark_node-key" ]
+      |> Core.String.Map.data
     in
     let sender_priv_keys =
       List.map sender_kps ~f:(fun kp -> kp.keypair.private_key)
@@ -156,11 +176,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let num_payments = num_slots * window_ms / tx_delay_ms in
          let repeat_count = Unsigned.UInt32.of_int num_payments in
          let repeat_delay_ms = Unsigned.UInt32.of_int tx_delay_ms in
-         [%log info] "will now send %d payments" num_payments ;
-         Malleable_error.List.iter empty_bps ~f:(fun node ->
+         let num_sender_keys = List.length sender_priv_keys in
+         let keys_per_sender = num_sender_keys / List.length empty_bps in
+         [%log info]
+           "will now send %d payments from as many accounts.  %d nodes will \
+            send %d payments each from distinct keys"
+           num_payments (List.length empty_bps) keys_per_sender ;
+         Malleable_error.List.fold ~init:sender_priv_keys empty_bps
+           ~f:(fun keys node ->
+             let keys0, rest = List.split_n keys keys_per_sender in
+             Network.Node.must_send_test_payments ~repeat_count ~repeat_delay_ms
+               ~logger ~senders:keys0 ~receiver_pub_key ~amount ~fee node
+             >>| const rest )
+         >>| const ()
+         (* Malleable_error.List.iter empty_bps ~f:(fun node ->
              Network.Node.must_send_test_payments ~repeat_count ~repeat_delay_ms
                ~logger ~senders:sender_priv_keys ~receiver_pub_key ~amount ~fee
-               node ) )
+               node ) *) )
       (* let%bind () =
          section_hard "spawn transaction sending"
            (let num_senders = List.length senders in
