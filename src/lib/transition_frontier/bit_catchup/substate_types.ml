@@ -2,6 +2,8 @@ open Mina_base
 open Core_kernel
 open Async_kernel
 
+(** Processing status: [Waiting] if processing awaits its turn (to be triggered by a throttle)
+    and [Executing] if it's active. *)
 type processing_status = Executing of { timeout : Time.t } | Waiting
 
 (** Context for a transition that is being processed.
@@ -14,6 +16,7 @@ type 'a processing_context =
       { processing_status : processing_status
       ; interrupt_ivar : unit Ivar.t
       ; downto_ : Mina_numbers.Length.t
+            (** Blockchain length down to which this context performs processing *)
       ; holder : State_hash.t ref
             (** Last transition which held this context *)
       }  (** A deferred action is in progress *)

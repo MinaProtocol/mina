@@ -480,12 +480,11 @@ and restart_failed_ancestor ~state ~actions ~context top_state_hash =
         ~retrieve_immediately:true ~preferred_peers ~timeout ~state hh
     in
     let state_hash = State_hash.With_state_hashes.state_hash hh in
-    let downto_ = Mina_numbers.Length.zero in
     Substate.Processing
       (In_progress
          { processing_status = Executing { timeout }
          ; interrupt_ivar
-         ; downto_
+         ; downto_ = Mina_numbers.Length.zero
          ; holder = ref state_hash
          } )
   in
