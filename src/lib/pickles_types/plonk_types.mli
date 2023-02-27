@@ -14,12 +14,15 @@ module Opt : sig
   **)
   val value_exn : ('a, 'bool) t -> 'a
 
-  (** [value_exn o] is [Some v] when [o] if [Some v] or [Maybe (_, v)], [None]
-      otherwise *)
-  val to_option : ('a, 'bool) t -> 'a option
+  (** [to_option_unsafe o] is [Some v] when [o] if [Some v] or [Maybe (_, v)],
+      [None] otherwise.
+  *)
+  val to_option_unsafe : ('a, 'bool) t -> 'a option
+
+  val to_option : ('a, bool) t -> 'a option
 
   module Flag : sig
-    type t = Yes | No | Maybe
+    type t = Yes | No | Maybe [@@deriving sexp, compare, yojson, hash, equal]
   end
 
   val constant_layout_typ :
@@ -54,6 +57,54 @@ module Opt : sig
   end
 end
 
+module Features : sig
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type 'bool t =
+        { range_check0 : 'bool
+        ; range_check1 : 'bool
+        ; foreign_field_add : 'bool
+        ; foreign_field_mul : 'bool
+        ; xor : 'bool
+        ; rot : 'bool
+        ; lookup : 'bool
+        ; runtime_tables : 'bool
+        }
+      [@@deriving sexp, compare, yojson, hash, equal, hlist]
+    end
+  end]
+
+  (** {2 Type aliases} *)
+
+  type options = Opt.Flag.t t
+
+  type flags = bool t
+
+  val to_data :
+       'a t
+    -> ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
+       Hlist.HlistId.t
+
+  val of_data :
+       ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
+       Hlist.HlistId.t
+    -> 'a t
+
+  val typ :
+       ('var, bool, 'f) Snarky_backendless.Typ.t
+    -> feature_flags:options
+    -> ('var t, bool t, 'f) Snarky_backendless.Typ.t
+
+  val none : options
+
+  val none_bool : flags
+
+  val map : 'a t -> f:('a -> 'b) -> 'b t
+
+  val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t
+end
+
 module Poly_comm : sig
   module Without_degree_bound : sig
     type 'a t = 'a array
@@ -70,10 +121,6 @@ module Permuts_vec = Vector.Vector_7
 module Permuts = Nat.N7
 module Permuts_minus_1 = Nat.N6
 module Permuts_minus_1_vec = Vector.Vector_6
-
-module Lookup_config : sig
-  type t = { lookup : Opt.Flag.t; runtime : Opt.Flag.t }
-end
 
 module Messages : sig
   module Poly : sig
@@ -131,7 +178,7 @@ module Messages : sig
   val typ :
        (module Snarky_backendless.Snark_intf.Run with type field = 'f)
     -> ('a, 'b, 'f) Snarky_backendless.Typ.t
-    -> Lookup_config.t
+    -> Opt.Flag.t Features.t
     -> dummy:'b
     -> commitment_lengths:((int, 'n) Vector.vec, int, int) Poly.t
     -> bool:('c, bool, 'f) Snarky_backendless.Typ.t
@@ -315,7 +362,7 @@ module All_evals : sig
 
   val typ :
        (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-    -> Lookup_config.t
+    -> Opt.Flag.t Features.t
     -> ( ( 'f Snarky_backendless.Cvar.t
          , 'f Snarky_backendless.Cvar.t array
          , 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )

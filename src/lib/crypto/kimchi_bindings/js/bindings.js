@@ -1179,6 +1179,12 @@ var caml_pasta_fp_plonk_gate_vector_get = function (v, i) {
     return caml_plonk_gate_of_rust(plonk_wasm.caml_pasta_fp_plonk_gate_vector_get(v, i));
 };
 
+// Provides: caml_pasta_fp_plonk_gate_vector_len
+// Requires: plonk_wasm
+var caml_pasta_fp_plonk_gate_vector_len = function (v) {
+    return plonk_wasm.caml_pasta_fp_plonk_gate_vector_len(v);
+};
+
 // Provides: caml_pasta_fp_plonk_gate_vector_wrap
 // Requires: plonk_wasm, caml_plonk_wire_to_rust
 var caml_pasta_fp_plonk_gate_vector_wrap = function (v, x, y) {
@@ -1192,6 +1198,11 @@ var caml_pasta_fp_plonk_gate_vector_digest = function (public_input_size, gate_v
     return caml_bytes_of_uint8array(uint8array);
 }
 
+// Provides: caml_pasta_fp_plonk_circuit_serialize
+// Requires: plonk_wasm, caml_string_of_jsstring
+var caml_pasta_fp_plonk_circuit_serialize = function (public_input_size, gate_vector) {
+    return caml_string_of_jsstring(plonk_wasm.caml_pasta_fp_plonk_circuit_serialize(public_input_size, gate_vector));
+}
 
 
 
@@ -1214,6 +1225,12 @@ var caml_pasta_fq_plonk_gate_vector_get = function (v, i) {
     return caml_plonk_gate_of_rust(plonk_wasm.caml_pasta_fq_plonk_gate_vector_get(v, i));
 };
 
+// Provides: caml_pasta_fq_plonk_gate_vector_len
+// Requires: plonk_wasm
+var caml_pasta_fq_plonk_gate_vector_len = function (v) {
+    return plonk_wasm.caml_pasta_fq_plonk_gate_vector_len(v);
+};
+
 // Provides: caml_pasta_fq_plonk_gate_vector_wrap
 // Requires: plonk_wasm, caml_plonk_wire_to_rust
 var caml_pasta_fq_plonk_gate_vector_wrap = function (v, x, y) {
@@ -1227,7 +1244,11 @@ var caml_pasta_fq_plonk_gate_vector_digest = function (public_input_size, gate_v
     return caml_bytes_of_uint8array(uint8array);
 }
 
-
+// Provides: caml_pasta_fq_plonk_circuit_serialize
+// Requires: plonk_wasm, caml_string_of_jsstring
+var caml_pasta_fq_plonk_circuit_serialize = function (public_input_size, gate_vector) {
+    return caml_string_of_jsstring(plonk_wasm.caml_pasta_fq_plonk_circuit_serialize(public_input_size, gate_vector));
+}
 
 
 // Provides: caml_pasta_fp_plonk_index_create
@@ -1420,7 +1441,6 @@ var caml_plonk_verification_evals_to_rust = function (x, klass, poly_comm_class,
     var mul_comm = convert(x[6]);
     var emul_comm = convert(x[7]);
     var endomul_scalar_comm = convert(x[8]);
-    // TODO: Chacha
 
     return new klass(
         sigma_comm,

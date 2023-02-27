@@ -12,8 +12,12 @@ Setup for deploying the testnet
 
 4. The berkeley testnet is currently configured to have 16 whales online (plus another 4 that we could bring online), 2 online fish, 3 seed, 1 snark coordinator with 5 workers connected to it, and 3 archive processes writing to two postgres database (main.tf has these specifications). As long as the keys for these nodes are in `automation/keys`, then the keys will be added and uploaded automatically by terraform.
 
-5. If `berkeley` is already running then destroy it by running `terraform destroy --auto-approve` from the directory `automation/terraform/testnets/berkeley/`. If running for the first time, then run `terraform init`
-Note: You may have to set the env variable `KUBE_CONFIG=~/.kube/config `
+5. If `berkeley` is already running then destroy it by running `terraform destroy --auto-approve` from the directory `automation/terraform/testnets/berkeley/`. If running for the first time, then run `terraform init`.
+
+Note, if it is not already set, you may have to set the env variable to declare the location of your local Kubernetes configuration `export KUBE_CONFIG_PATH=~/.kube/config`. Additionally, if your machine has been using the older built-in kubectl authentication, this Kubernetes auth method has been deprecated by Google. If you receive authentication errors, install the latest `gke-cloud-auth-plugin` with command `gcloud components install gke-gcloud-auth-plugin` (on Mac), and add a new environment variable to enable it `export USE_GKE_GCLOUD_AUTH_PLUGIN=True`.
+
+Source: https://cloud.google.com/blog/products/containers-kubernetes/kubectl-auth-changes-in-gke
+Source: https://github.com/kubernetes/kubectl/issues/1338
 
 6. Deploy the network by running `terraform apply --auto-approve` from `automation/terraform/testnets/berkeley/`.  If the `./keys` dir already exists in the `berkeley` testnet dir, then those keys will be used.  If those folders and files do not exist, then terraform will run the script `automation/scripts/gen-keys-ledger.sh`, and arbitrary completely new keys will be generated, along with a new genesis ledger-- this is probably not what you want to do if you need to use old pre-existing keys.
 

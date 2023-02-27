@@ -5,7 +5,8 @@ struct
   let test_description = "permissions"
 
   let failure_expected =
-    Mina_base.Transaction_status.Failure.Update_not_permitted_permissions
+    ( Mina_base.Transaction_status.Failure.Update_not_permitted_permissions
+    , Transaction_snark_tests.Util.Pass_2 )
 
   let snapp_update =
     { Account_update.Update.dummy with
@@ -18,6 +19,8 @@ struct
           ; set_voting_for = Proof
           }
     }
+
+  let is_non_zkapp_update = true
 end
 
 let%test_module "Update account permissions" =

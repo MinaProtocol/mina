@@ -393,6 +393,11 @@ module F = Snark_params.Tick.Field
 
 [%%endif]
 
+module F_map = struct
+  include Hashable.Make (F)
+  include Comparable.Make (F)
+end
+
 let invalid_public_key : Public_key.Compressed.t =
   { x = F.zero; is_odd = false }
 

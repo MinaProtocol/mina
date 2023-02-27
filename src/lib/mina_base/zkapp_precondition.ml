@@ -525,7 +525,7 @@ module Account = struct
     let open Fields_derivers_zkapps in
     let ( !. ) = ( !. ) ~t_fields_annots in
     let sequence_state =
-      with_checked ~checked:field ~name:"SequenceState" field
+      needs_custom_js ~js_type:field ~name:"SequenceState" field
     in
     Fields.make_creator obj ~balance:!.Numeric.Derivers.balance
       ~nonce:!.Numeric.Derivers.nonce
@@ -1355,6 +1355,40 @@ module Protocol_state = struct
       epoch_data "next_epoch_data" next_epoch_data s.next_epoch_data
     in
     ()
+end
+
+module Valid_while = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Global_slot.Stable.V1.t Numeric.Stable.V1.t
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let deriver = Numeric.Derivers.global_slot
+
+  let gen = Numeric.gen Global_slot.gen Global_slot.compare
+
+  let typ = Numeric.(typ Tc.global_slot)
+
+  let to_input valid_while = Numeric.(to_input Tc.global_slot valid_while)
+
+  let check (valid_while : t) global_slot =
+    Numeric.(check ~label:"valid_while_precondition" Tc.global_slot)
+      valid_while global_slot
+
+  module Checked = struct
+    type t = Global_slot.Checked.t Numeric.Checked.t
+
+    let check (valid_while : t) global_slot =
+      Numeric.(Checked.check Tc.global_slot) valid_while global_slot
+
+    let to_input valid_while =
+      Numeric.(Checked.to_input Tc.global_slot valid_while)
+  end
 end
 
 module Account_type = struct
