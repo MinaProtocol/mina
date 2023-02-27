@@ -1,0 +1,27 @@
+(tests
+ (names main)
+ (flags
+  (:standard -warn-error +a)
+  -open Core_kernel
+  -open Pickles)
+ (preprocess (pps ppx_jane))
+ (libraries
+   ; Opam
+  core_kernel
+  alcotest
+  sexplib0
+  ; Mina
+  pickles
+  pickles.composition_types
+  pickles.backend
+  pickles_base
+  pickles_types
+  kimchi_backend
+  kimchi_backend.pasta
+  kimchi_backend.pasta.basic
+  snarky.backendless
+  )
+ (action (run %{test}))) 
+
+
+

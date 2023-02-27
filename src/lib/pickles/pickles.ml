@@ -43,6 +43,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Dirty = Dirty
   module Cache_handle = Cache_handle
   module Step_main_inputs = Step_main_inputs
+  module Wrap_main_inputs = Wrap_main_inputs
   module Step_verifier = Step_verifier
 
   exception Return_digest = Compile.Return_digest
@@ -2946,3 +2947,4 @@ module Make_str (_ : Wire_types.Concrete) = struct
 end
 
 include Wire_types.Make (Make_sig) (Make_str)
+module Wrap_main_inputs = Wrap_main_inputs
