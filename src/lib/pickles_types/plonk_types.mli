@@ -62,8 +62,7 @@ module Features : sig
   module Stable : sig
     module V1 : sig
       type 'bool t =
-        { chacha : 'bool
-        ; range_check0 : 'bool
+        { range_check0 : 'bool
         ; range_check1 : 'bool
         ; foreign_field_add : 'bool
         ; foreign_field_mul : 'bool
@@ -84,11 +83,11 @@ module Features : sig
 
   val to_data :
        'a t
-    -> ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit)))))))))
+    -> ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
        Hlist.HlistId.t
 
   val of_data :
-       ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit)))))))))
+       ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
        Hlist.HlistId.t
     -> 'a t
 

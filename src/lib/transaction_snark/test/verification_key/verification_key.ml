@@ -19,6 +19,8 @@ struct
     { Account_update.Update.dummy with
       verification_key = Zkapp_basic.Set_or_keep.Set new_verification_key
     }
+
+  let is_non_zkapp_update = false
 end
 
 let%test_module "Update account verification key" =
