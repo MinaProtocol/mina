@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Create a portable Coda build by rewriting the dynamic library loading to look
 # in the current working directory.

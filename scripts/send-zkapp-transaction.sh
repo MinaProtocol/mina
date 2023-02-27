@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Argument 1: is the query selector for the zkapp_command
 # Argument 2: is the zkApp command json

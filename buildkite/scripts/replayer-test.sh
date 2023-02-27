@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 TEST_DIR=/workdir/src/app/replayer/test
 PGPASSWORD=arbitraryduck

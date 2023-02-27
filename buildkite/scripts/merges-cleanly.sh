@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 BRANCH=$1
 CURRENT=$(git branch --show-current)

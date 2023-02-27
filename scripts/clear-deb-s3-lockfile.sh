@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=unstable}
 MINA_DEB_RELEASE=${MINA_DEB_RELEASE:=main}

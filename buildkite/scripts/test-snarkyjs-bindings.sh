@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 export NODE_OPTIONS="--enable-source-maps --stack-trace-limit=1000"
 

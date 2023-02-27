@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -eo pipefail
 
 export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH

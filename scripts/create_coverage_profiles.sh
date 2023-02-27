@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # create coverage profiles in _coverage
 # see Makefile targets coverage-* to display results

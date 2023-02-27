@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 status=0
 rfc_ids=$(ls rfcs/*.md | cut -d/ -f2 | cut -d- -f1 | sort -n)

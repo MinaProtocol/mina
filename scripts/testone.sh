@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 
 # File assumes tat you are running the program at the program at the root directory of the coda repo

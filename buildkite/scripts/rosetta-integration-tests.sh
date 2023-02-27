@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # These tests use the mina-dev binary, as rosetta-cli assumes we use a testnet.
 # See https://github.com/coinbase/rosetta-sdk-go/blob/master/keys/signer_pallas.go#L222

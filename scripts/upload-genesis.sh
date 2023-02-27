@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 GENESIS_DIR="/tmp/coda_cache_dir/"
 
