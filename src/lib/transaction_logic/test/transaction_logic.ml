@@ -4,7 +4,7 @@ open Mina_base
 open Mina_numbers
 open Signature_lib
 open Helpers
-open Update_utils
+open Account_update_utils
 
 let constraint_constants =
   { Genesis_constants.Constraint_constants.for_unit_tests with
@@ -214,5 +214,28 @@ let%test_module "Test transaction logic." =
                         | (Some _, Some updt) ->
                            Option.equal Public_key.Compressed.equal updt.delegate (Some delegate_pk)
                         | _ -> false)) )
+            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
+
+    (* It is assumed here that the account is indeed an zkApp account. Presumably
+       it's being checked elsewhere. If there's no zkApp associated with the
+       account, this update succeeds, but does nothing. For the moment we're ignoring
+       the fact that the account isn't being updated. We'll revisit and strengthen
+        this test after some refactoring. *)
+        let%test_unit "Zkapp URI can be set." =
+      Quickcheck.test ~trials
+        (let open Quickcheck in
+        let open Generator.Let_syntax in
+        let%bind account = Test_account.gen in
+        let%bind uri = String.gen_with_length 64 Char.gen_alphanum in
+        let txn =
+          Alter_account.make ~account:account.pk
+            { Account_update.Update.noop with zkapp_uri = Set uri }
+        in
+        let%map fee = Fee.(gen_incl zero (balance_to_fee account.balance)) in
+        (account.pk, fee, [ account ], [ (txn :> transaction) ]))
+        ~f:(fun (fee_payer, fee, accounts, txns) ->
+          [%test_pred: Zk_cmd_result.t Or_error.t]
+            (Pred.pure ~f:(fun (txn, _) ->
+                 Transaction_status.equal txn.command.status Applied) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
   end )
