@@ -10,8 +10,6 @@ case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
     exit 0 ;;
 esac
 
-git config --global --add safe.directory /workdir
-
 mkdir -p /root/libp2p-keys/
 # Pre-generated random password for this quick test
 export MINA_LIBP2P_PASS=eithohShieshichoh8uaJ5iefo1reiRudaekohG7AeCeib4XuneDet2uGhu7lahf
@@ -47,7 +45,7 @@ sleep 2m
 mina client status
 if [ $(mina advanced get-peers | wc -l) -gt 0 ]; then
     echo "Found some peers"
-el0se
+else
     echo "No peers found"
     exit 1
 fi
