@@ -29,8 +29,10 @@ module Checked = struct
 
   let wrap = Checked_map.wrap
 
-  let to_group (type f) (module M : Snark_intf.Run with type field = f) ~params
-      t =
+  let to_group (type f field_var)
+      (module M : Snark_intf.Run
+        with type field = f
+         and type field_var = field_var ) ~params t =
     let module G =
       Checked_map.Make
         (M)

@@ -330,18 +330,33 @@ module H1 : sig
   module Typ : functor
     (Impl : sig
        type field
+
+       type field_var
+
+       type state
      end)
     (A : T1)
     (Var : T1)
     (Val : T1)
     (_ : sig
        val f :
-         'a A.t -> ('a Var.t, 'a Val.t, Impl.field) Snarky_backendless.Typ.t
+            'a A.t
+         -> ( 'a Var.t
+            , 'a Val.t
+            , Impl.field
+            , Impl.field_var
+            , Impl.state )
+            Snarky_backendless.Typ.t
      end)
     -> sig
     val f :
          'xs T(A).t
-      -> ('xs T(Var).t, 'xs T(Val).t, Impl.field) Snarky_backendless.Typ.t
+      -> ( 'xs T(Var).t
+         , 'xs T(Val).t
+         , Impl.field
+         , Impl.field_var
+         , Impl.state )
+         Snarky_backendless.Typ.t
   end
 end
 
@@ -406,8 +421,13 @@ module H2 : sig
     (Impl : sig
        type field
 
+       type field_var
+
+       type state
+
        module Typ : sig
-         type ('var, 'value) t = ('var, 'value, field) Snarky_backendless.Typ.t
+         type ('var, 'value) t =
+           ('var, 'value, field, field_var, state) Snarky_backendless.Typ.t
        end
      end)
     -> sig
@@ -415,7 +435,9 @@ module H2 : sig
          ('vars, 'values) T(Impl.Typ).t
       -> ( 'vars H1.T(Id).t
          , 'values H1.T(Id).t
-         , Impl.field )
+         , Impl.field
+         , Impl.field_var
+         , Impl.state )
          Snarky_backendless.Typ.t
   end
 end
@@ -792,6 +814,10 @@ module H4 : sig
   module Typ : functor
     (Impl : sig
        type field
+
+       type field_var
+
+       type state
      end)
     (A : T4)
     (Var : T3)
@@ -801,34 +827,39 @@ module H4 : sig
             ('var, 'value, 'n1, 'n2) A.t
          -> ( ('var, 'n1, 'n2) Var.t
             , ('value, 'n1, 'n2) Val.t
-            , Impl.field )
+            , Impl.field
+            , Impl.field_var
+            , Impl.state )
             Snarky_backendless.Typ.t
      end)
     -> sig
     val transport :
-         ('a, 'b, 'c) Snarky_backendless.Typ.t
+         ('a, 'b, 'c, 'field_var, 'state) Snarky_backendless.Typ.t
       -> there:('d -> 'b)
       -> back:('b -> 'd)
-      -> ('a, 'd, 'c) Snarky_backendless.Typ.t
+      -> ('a, 'd, 'c, 'field_var, 'state) Snarky_backendless.Typ.t
 
     val transport_var :
-         ('a, 'b, 'c) Snarky_backendless.Typ.t
+         ('a, 'b, 'c, 'field_var, 'state) Snarky_backendless.Typ.t
       -> there:('d -> 'a)
       -> back:('a -> 'd)
-      -> ('d, 'b, 'c) Snarky_backendless.Typ.t
+      -> ('d, 'b, 'c, 'field_var, 'state) Snarky_backendless.Typ.t
 
     val tuple2 :
-         ('a, 'b, 'c) Snarky_backendless.Typ.t
-      -> ('d, 'e, 'c) Snarky_backendless.Typ.t
-      -> ('a * 'd, 'b * 'e, 'c) Snarky_backendless.Typ.t
+         ('a, 'b, 'c, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('d, 'e, 'c, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('a * 'd, 'b * 'e, 'c, 'field_var, 'state) Snarky_backendless.Typ.t
 
-    val unit : unit -> (unit, unit, 'a) Snarky_backendless.Typ.t
+    val unit :
+      unit -> (unit, unit, 'a, 'field_var, 'state) Snarky_backendless.Typ.t
 
     val f :
          ('vars, 'values, 'ns1, 'ns2) T(A).t
       -> ( ('vars, 'ns1, 'ns2) H3.T(Var).t
          , ('values, 'ns1, 'ns2) H3.T(Val).t
-         , Impl.field )
+         , Impl.field
+         , Impl.field_var
+         , Impl.state )
          Snarky_backendless.Typ.t
   end
 end
@@ -932,6 +963,10 @@ module H6 : sig
   module Typ : functor
     (Impl : sig
        type field
+
+       type field_var
+
+       type state
      end)
     (A : T6)
     (Var : T4)
@@ -941,34 +976,39 @@ module H6 : sig
             ('var, 'value, 'ret_var, 'ret_value, 'n1, 'n2) A.t
          -> ( ('var, 'ret_var, 'n1, 'n2) Var.t
             , ('value, 'ret_value, 'n1, 'n2) Val.t
-            , Impl.field )
+            , Impl.field
+            , Impl.field_var
+            , Impl.state )
             Snarky_backendless.Typ.t
      end)
     -> sig
     val transport :
-         ('a, 'b, 'c) Snarky_backendless.Typ.t
+         ('a, 'b, 'c, 'field_var, 'state) Snarky_backendless.Typ.t
       -> there:('d -> 'b)
       -> back:('b -> 'd)
-      -> ('a, 'd, 'c) Snarky_backendless.Typ.t
+      -> ('a, 'd, 'c, 'field_var, 'state) Snarky_backendless.Typ.t
 
     val transport_var :
-         ('a, 'b, 'c) Snarky_backendless.Typ.t
+         ('a, 'b, 'c, 'field_var, 'state) Snarky_backendless.Typ.t
       -> there:('d -> 'a)
       -> back:('a -> 'd)
-      -> ('d, 'b, 'c) Snarky_backendless.Typ.t
+      -> ('d, 'b, 'c, 'field_var, 'state) Snarky_backendless.Typ.t
 
     val tuple2 :
-         ('a, 'b, 'c) Snarky_backendless.Typ.t
-      -> ('d, 'e, 'c) Snarky_backendless.Typ.t
-      -> ('a * 'd, 'b * 'e, 'c) Snarky_backendless.Typ.t
+         ('a, 'b, 'c, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('d, 'e, 'c, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('a * 'd, 'b * 'e, 'c, 'field_var, 'state) Snarky_backendless.Typ.t
 
-    val unit : unit -> (unit, unit, 'a) Snarky_backendless.Typ.t
+    val unit :
+      unit -> (unit, unit, 'a, 'field_var, 'state) Snarky_backendless.Typ.t
 
     val f :
          ('vars, 'values, 'ret_vars, 'ret_values, 'ns1, 'ns2) T(A).t
       -> ( ('vars, 'ret_vars, 'ns1, 'ns2) H4.T(Var).t
          , ('values, 'ret_values, 'ns1, 'ns2) H4.T(Val).t
-         , Impl.field )
+         , Impl.field
+         , Impl.field_var
+         , Impl.state )
          Snarky_backendless.Typ.t
   end
 end

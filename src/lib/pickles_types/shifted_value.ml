@@ -67,8 +67,8 @@ module type S = sig
   end]
 
   val typ :
-       ('a, 'b, 'f) Snarky_backendless.Typ.t
-    -> ('a t, 'b t, 'f) Snarky_backendless.Typ.t
+       ('a, 'b, 'f, 'v, 's) Snarky_backendless.Typ.t
+    -> ('a t, 'b t, 'f, 'v, 's) Snarky_backendless.Typ.t
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
 
