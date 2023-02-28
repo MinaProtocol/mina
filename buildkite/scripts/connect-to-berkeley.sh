@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -eo pipefail
+set -e
 
 case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
   rampup|berkeley|release/2.0.0)
