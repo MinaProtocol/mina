@@ -133,13 +133,7 @@ module Network_config = struct
     in
     let user_len = Int.min 5 (String.length user_sanitized) in
     let user = String.sub user_sanitized ~pos:0 ~len:user_len in
-    let git_commit_unsanitized = Mina_version.commit_id_short in
-    let git_commit =
-      if String.is_substring git_commit_unsanitized ~substring:"[DIRTY]" then
-        String.sub git_commit_unsanitized ~pos:7
-          ~len:(String.length git_commit_unsanitized)
-      else git_commit_unsanitized
-    in
+    let git_commit = Mina_version.commit_id_short in
     (* see ./src/app/test_executive/README.md for information regarding the namespace name format and length restrictions *)
     let testnet_name = "it-" ^ user ^ "-" ^ git_commit ^ "-" ^ test_name in
 
@@ -337,9 +331,15 @@ module Network_config = struct
             (mk_net_keypair node.account_name key_tup) )
     in
     let mina_archive_schema = "create_schema.sql" in
+    let long_commit_id =
+      if String.is_substring Mina_version.commit_id ~substring:"[DIRTY]" then
+        String.sub Mina_version.commit_id ~pos:7
+          ~len:(String.length Mina_version.commit_id - 7)
+      else Mina_version.commit_id
+    in
     let mina_archive_base_url =
-      "https://raw.githubusercontent.com/MinaProtocol/mina/"
-      ^ Mina_version.commit_id ^ "/src/app/archive/"
+      "https://raw.githubusercontent.com/MinaProtocol/mina/" ^ long_commit_id
+      ^ "/src/app/archive/"
     in
     let mina_archive_schema_aux_files =
       [ mina_archive_base_url ^ "create_schema.sql" ]
