@@ -53,6 +53,9 @@ pub mod pasta_fq_poseidon;
 /// Linearization helpers
 pub mod linearization;
 
+/// Snarky-related types and functions
+pub mod snarky;
+
 /// Handy re-exports
 pub use {
     kimchi::circuits::{

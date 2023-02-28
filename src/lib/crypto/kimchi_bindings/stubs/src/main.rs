@@ -23,6 +23,7 @@ use wires_15_stubs::{
         CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex,
     },
     projective::{pallas::*, vesta::*},
+    snarky::*,
     srs::{fp::*, fq::*},
     CamlCircuitGate,
     CamlLookupCommitments,
@@ -46,6 +47,7 @@ fn main() {
 
     let header = "(* This file is generated automatically with ocaml_gen. *)\n";
 
+    // types from kimchi
     if let Some(kimchi_types) = args.get(1) {
         let mut file = File::create(kimchi_types).expect("could not create output file");
         write!(file, "{}", header).unwrap();
@@ -59,6 +61,8 @@ fn main() {
             generate_types_bindings(&mut w, env);
         });
     };
+
+    // types for the pasta curves
     if let Some(pasta_bindings) = args.get(2) {
         let mut file = File::create(pasta_bindings).expect("could not create output file");
         write!(file, "{}", header).unwrap();
@@ -72,6 +76,8 @@ fn main() {
             generate_pasta_bindings(&mut w, env);
         });
     }
+
+    // kimchi-related functions
     if let Some(kimchi_bindings) = args.get(3) {
         let mut file = File::create(kimchi_bindings).expect("could not create output file");
         write!(file, "{}", header).unwrap();
@@ -83,6 +89,21 @@ fn main() {
         write!(w, "{}", header).unwrap();
         decl_module!(w, env, "Kimchi_bindings", {
             generate_kimchi_bindings(&mut w, env);
+        });
+    }
+
+    // snarky-related types and functions
+    if let Some(snarky_bindings) = args.get(4) {
+        let mut file = File::create(snarky_bindings).expect("could not create output file");
+        write!(file, "{}", header).unwrap();
+        let _ = env.new_module("Snarky_bindings");
+        generate_snarky_bindings(&mut file, env);
+        let _ = env.parent();
+    } else {
+        let mut w = std::io::stdout();
+        write!(w, "{}", header).unwrap();
+        decl_module!(w, env, "Snarky_bindings", {
+            generate_snarky_bindings(&mut w, env);
         });
     }
 }
@@ -470,6 +491,40 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_dummy => "dummy");
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_deep_copy => "deep_copy");
             });
+        });
+    });
+}
+
+fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
+    decl_fake_generic!(T1, 0);
+    decl_fake_generic!(T2, 1);
+    decl_fake_generic!(T3, 2);
+
+    decl_module!(w, env, "Fp", {
+        decl_module!(w, env, "Cvar", {
+            decl_type!(w, env, CamlFpVar => "t");
+        });
+
+        decl_module!(w, env, "ConstraintSystem", {
+            decl_type!(w, env, CamlFpCS => "t");
+        });
+
+        decl_module!(w, env, "State", {
+            decl_type!(w, env, CamlFpState => "t");
+        });
+    });
+
+    decl_module!(w, env, "Fq", {
+        decl_module!(w, env, "Cvar", {
+            decl_type!(w, env, CamlFqVar => "t");
+        });
+
+        decl_module!(w, env, "ConstraintSystem", {
+            decl_type!(w, env, CamlFqCS => "t");
+        });
+
+        decl_module!(w, env, "State", {
+            decl_type!(w, env, CamlFqState => "t");
         });
     });
 }
