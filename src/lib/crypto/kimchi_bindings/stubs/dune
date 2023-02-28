@@ -137,6 +137,11 @@
   (pps ppx_version ppx_inline_test))
  (implements pasta_bindings.backend))
 
+(library
+ (public_name snarky_bindings)
+ (name snarky_bindings)
+ (modules snarky_bindings))
+
 ;;
 ;; generate the OCaml bindings
 ;;

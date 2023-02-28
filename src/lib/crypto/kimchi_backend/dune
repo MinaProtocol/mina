@@ -21,6 +21,7 @@
   pasta_bindings
   snarkette
   snarky.backendless
+  snarky_bindings
   key_cache
   hex
   kimchi_backend.common
