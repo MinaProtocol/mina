@@ -13,7 +13,7 @@ let Cmd = ../Lib/Cmds.dhall in
           Cmd.runInDocker
             Cmd.Docker::{
               image = (../Constants/ContainerImages.dhall).minaDaemonBerkeley,
-              entrypoint = " --entrypoint=/bin/sh"
+              entrypoint = " --entrypoint=/usr/bin/dumb-init"
             }
             "./buildkite/scripts/connect-to-berkeley.sh"
         ],
