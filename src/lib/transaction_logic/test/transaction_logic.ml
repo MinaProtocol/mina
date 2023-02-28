@@ -4,18 +4,11 @@ open Mina_base
 open Mina_numbers
 open Helpers
 open Update_utils
-module Transaction_logic = Mina_transaction_logic.Make (Ledger)
 
 let constraint_constants =
   { Genesis_constants.Constraint_constants.for_unit_tests with
     account_creation_fee = Fee.of_mina_int_exn 1
   }
-
-type zk_cmd_result =
-  Transaction_logic.Transaction_applied.Zkapp_command_applied.t * Ledger.t
-
-let sexp_of_zk_cmd_result (txn, _) =
-  Transaction_logic.Transaction_applied.Zkapp_command_applied.sexp_of_t txn
 
 (* The function under test is quite slow, so keep the trials count low
    so that tests finish in a reasonable amount of time. *)
@@ -71,9 +64,10 @@ let%test_module "Test transaction logic." =
         let%map fee = Fee.(gen_incl zero @@ balance_to_fee fee_payer.balance) in
         (fee_payer.pk, fee, accounts, (txns :> transaction list)))
         ~f:(fun (fee_payer, fee, accounts, txns) ->
-          [%test_pred: zk_cmd_result Or_error.t]
-            (Pred.pure ~f:(fun (txn, _) ->
-                 Transaction_status.equal txn.command.status Applied ) )
+          [%test_pred: Zk_cmd_result.t Or_error.t]
+            (Pred.pure ~f:(fun (txn, ledger) ->
+                 Transaction_status.equal txn.command.status Applied
+                 && Pred.verify_balance_changes ~txn ~ledger accounts ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
     let%test_unit "Fee payer must be able to pay the fee." =
@@ -100,7 +94,7 @@ let%test_module "Test transaction logic." =
         let%map fee = Fee.(gen_incl min_fee max_fee) in
         (sender.pk, fee, accounts, [ (txn :> transaction) ]))
         ~f:(fun (fee_payer, fee, accounts, txns) ->
-          [%test_pred: zk_cmd_result Or_error.t]
+          [%test_pred: Zk_cmd_result.t Or_error.t]
             (Pred.pure
                ~with_error:(fun e ->
                  String.is_substring (Error.to_string_hum e)
@@ -131,7 +125,7 @@ let%test_module "Test transaction logic." =
         let%map fee = Fee.(gen_incl zero (balance_to_fee account.balance)) in
         (account.pk, fee, [ account ], [ (update :> transaction) ]))
         ~f:(fun (fee_payer, fee, accounts, txns) ->
-          [%test_pred: zk_cmd_result Or_error.t]
+          [%test_pred: Zk_cmd_result.t Or_error.t]
             (Pred.pure ~f:(fun (txn, _) ->
                  Transaction_status.equal txn.command.status
                    (Failed [ []; [ Invalid_fee_excess ] ]) ) )
@@ -158,9 +152,37 @@ let%test_module "Test transaction logic." =
         let%map fee = Fee.(gen_incl zero max_fee) in
         (account.pk, fee, [ account ], [ (update :> transaction) ]))
         ~f:(fun (fee_payer, fee, accounts, txns) ->
-          [%test_pred: zk_cmd_result Or_error.t]
+          [%test_pred: Zk_cmd_result.t Or_error.t]
             (Pred.pure ~f:(fun (txn, _) ->
                  Transaction_status.equal txn.command.status
                    (Failed [ []; [ Invalid_fee_excess ] ]) ) )
+            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
+
+    let%test_unit "Token_id of the account can be altered." =
+      Quickcheck.test ~trials
+        (let open Quickcheck in
+        let open Generator.Let_syntax in
+        let%bind account = Test_account.gen in
+        let%bind token = String.gen_with_length 12 Char.gen_print in
+        let txn =
+          Alter_account.make ~account:account.pk
+            { Account_update.Update.noop with token_symbol = Set token }
+        in
+        let%map fee = Fee.(gen_incl zero (balance_to_fee account.balance)) in
+        (account.pk, fee, [ account ], [ (txn :> transaction) ]))
+        ~f:(fun (fee_payer, fee, accounts, txns) ->
+          [%test_pred: Zk_cmd_result.t Or_error.t]
+            (Pred.pure ~f:(fun (txn, ledger) ->
+                 Transaction_status.equal txn.command.status Applied
+                 && Pred.verify_account_updates (List.hd_exn accounts) ~txn
+                      ~ledger ~f:(fun balance_change -> function
+                      | Some orig, Some updt ->
+                          Pred.verify_balance_change ~balance_change orig updt
+                          && not
+                               Account.Poly.(
+                                 Account.Token_symbol.equal orig.token_symbol
+                                   updt.token_symbol)
+                      | _ ->
+                          false ) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
   end )

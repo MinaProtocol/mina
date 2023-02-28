@@ -5,14 +5,15 @@ open Signature_lib
 
 let dummy_auth = Control.Signature Signature.dummy
 
-let update_body ~account amount =
+let update_body ?(update = Account_update.Update.noop) ~account amount =
   let open Monad_lib.State.Let_syntax in
   let open Account_update in
   let%map nonce = Helpers.get_nonce_exn account in
+  let account_update = update in
   Body.
     { dummy with
       public_key = account
-    ; update = Account_update.Update.noop
+    ; update = account_update
     ; token_id = Token_id.default
     ; balance_change = amount
     ; increment_nonce = true
@@ -123,6 +124,23 @@ module Single = struct
         let open Monad_lib.State.Let_syntax in
         let open Account_update in
         let%map body = update_body ~account amount in
+        [ update { body; authorization = dummy_auth } ]
+    end
+end
+
+module Alter_account = struct
+  let make ~account ?(amount = Amount.Signed.zero) state_update =
+    object
+      method account : Public_key.Compressed.t = account
+
+      method amount : Amount.Signed.t = amount
+
+      method update : Account_update.Update.t = state_update
+
+      method updates =
+        let open Monad_lib.State.Let_syntax in
+        let open Account_update in
+        let%map body = update_body ~update:state_update ~account amount in
         [ update { body; authorization = dummy_auth } ]
     end
 end
