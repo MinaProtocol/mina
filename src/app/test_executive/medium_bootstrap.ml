@@ -22,14 +22,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       k = 2
     ; requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "node_a-key"; balance = "1000"; timing = Untimed }
-        ; { account_name = "node_b-key"; balance = "1000"; timing = Untimed }
-        ; { account_name = "node_c-key"; balance = "0"; timing = Untimed }
+        [ { account_name = "node-a-key"; balance = "1000"; timing = Untimed }
+        ; { account_name = "node-b-key"; balance = "1000"; timing = Untimed }
+        ; { account_name = "node-c-key"; balance = "0"; timing = Untimed }
         ]
     ; block_producers =
-        [ { node_name = "node_a"; account_name = "node_a-key" }
-        ; { node_name = "node_b"; account_name = "node_b-key" }
-        ; { node_name = "node_c"; account_name = "node_c-key" }
+        [ { node_name = "node-a"; account_name = "node-a-key" }
+        ; { node_name = "node-b"; account_name = "node-b-key" }
+        ; { node_name = "node-c"; account_name = "node-c-key" }
         ]
     }
 
@@ -52,17 +52,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       wait_for t
         (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
     in
-    (* let[@warning "-8"] [ node_a; node_b; node_c ] =
+    (* let[@warning "-8"] [ node-a; node-b; node-c ] =
          Network.block_producers network
        in *)
     let node_a =
-      Core.String.Map.find_exn (Network.block_producers network) "node_a"
+      Core.String.Map.find_exn (Network.block_producers network) "node-a"
     in
     let node_b =
-      Core.String.Map.find_exn (Network.block_producers network) "node_b"
+      Core.String.Map.find_exn (Network.block_producers network) "node-b"
     in
     let node_c =
-      Core.String.Map.find_exn (Network.block_producers network) "node_c"
+      Core.String.Map.find_exn (Network.block_producers network) "node-c"
     in
     let%bind () =
       section "blocks are produced"

@@ -109,7 +109,10 @@ locals {
         runWithUserAgent     = config.run_with_user_agent
         runWithBots          = config.run_with_bots
         enableGossipFlooding = config.enable_gossip_flooding
-        privateKeySecret     = config.private_key_secret
+        keypairName = config.keypair_name
+        privateKey     = config.private_key
+        publicKey     = config.private_key
+        privateKeyPW     = config.privkey_password
         # libp2pSecret         = config.libp2p_secret
         enablePeerExchange   = config.enable_peer_exchange
         isolated             = config.isolated
@@ -166,10 +169,12 @@ locals {
       mina        = local.daemon
       healthcheck = local.healthcheck_vars
 
-      coordinatorName = "snark-coordinator-${lower(substr(snark.snark_worker_public_key,-6,-1))}"
-      workerName = "snark-worker-${lower(substr(snark.snark_worker_public_key,-6,-1))}"
+      # coordinatorName = "snark-coordinator-${lower(substr(snark.snark_worker_public_key,-6,-1))}"
+      coordinatorName = snark.snark_coordinator_name
+      # workerName = "snark-worker-${lower(substr(snark.snark_worker_public_key,-6,-1))}"
+      workerName = "${snark.snark_coordinator_name}-worker"
       workerReplicas = snark.snark_worker_replicas
-      coordinatorHostName = "snark-coordinator-${lower(substr(snark.snark_worker_public_key,-6,-1))}.${var.testnet_name}"
+      coordinatorHostName = "${snark.snark_coordinator_name}.${var.testnet_name}"
       coordinatorRpcPort = 8301
       coordinatorHostPort = snark.snark_coordinators_host_port
       publicKey =snark.snark_worker_public_key

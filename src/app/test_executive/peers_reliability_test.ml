@@ -21,14 +21,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "node_a-key"; balance = "1000"; timing = Untimed }
-        ; { account_name = "node_b-key"; balance = "1000"; timing = Untimed }
-        ; { account_name = "node_c-key"; balance = "0"; timing = Untimed }
+        [ { account_name = "node-a-key"; balance = "1000"; timing = Untimed }
+        ; { account_name = "node-b-key"; balance = "1000"; timing = Untimed }
+        ; { account_name = "node-c-key"; balance = "0"; timing = Untimed }
         ]
     ; block_producers =
-        [ { node_name = "node_a"; account_name = "node_a-key" }
-        ; { node_name = "node_b"; account_name = "node_b-key" }
-        ; { node_name = "node_c"; account_name = "node_c-key" }
+        [ { node_name = "node-a"; account_name = "node-a-key" }
+        ; { node_name = "node-b"; account_name = "node-b-key" }
+        ; { node_name = "node-c"; account_name = "node-c-key" }
         ]
     }
 
@@ -49,13 +49,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
     in
     let node_a =
-      Core.String.Map.find_exn (Network.block_producers network) "node_a"
+      Core.String.Map.find_exn (Network.block_producers network) "node-a"
     in
     let node_b =
-      Core.String.Map.find_exn (Network.block_producers network) "node_b"
+      Core.String.Map.find_exn (Network.block_producers network) "node-b"
     in
     let node_c =
-      Core.String.Map.find_exn (Network.block_producers network) "node_c"
+      Core.String.Map.find_exn (Network.block_producers network) "node-c"
     in
     (* witness the node_c frontier load on initialization *)
     let%bind () =

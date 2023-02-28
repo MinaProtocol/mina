@@ -28,8 +28,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; balance = "9999999"
           ; timing = Untimed
           }
-        ; { account_name = "empty_bp-key"; balance = "0"; timing = Untimed }
-        ; { account_name = "snark_node-key"; balance = "0"; timing = Untimed }
+        ; { account_name = "empty-bp-key"; balance = "0"; timing = Untimed }
+        ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
           (* ; { account_name = "sender_account1"
                ; balance = "10000"
                ; timing = Untimed
@@ -50,21 +50,21 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         @ List.init 1000 ~f:(fun i ->
               let i_str = Int.to_string i in
               { Test_Account.account_name =
-                  String.concat [ "sender_account"; i_str ]
+                  String.concat [ "sender-account"; i_str ]
               ; balance = "10000"
               ; timing = Untimed
               } )
     ; block_producers =
         [ { node_name = "receiver"; account_name = "receiver-key" }
-        ; { node_name = "empty_node_1"; account_name = "empty_bp-key" }
-        ; { node_name = "empty_node_2"; account_name = "empty_bp-key" }
-        ; { node_name = "empty_node_3"; account_name = "empty_bp-key" }
-        ; { node_name = "empty_node_4"; account_name = "empty_bp-key" }
+        ; { node_name = "empty_node-1"; account_name = "empty-bp-key" }
+        ; { node_name = "empty_node-2"; account_name = "empty-bp-key" }
+        ; { node_name = "empty_node-3"; account_name = "empty-bp-key" }
+        ; { node_name = "empty_node-4"; account_name = "empty-bp-key" }
         ]
     ; snark_coordinator =
         Some
-          { node_name = "snark_node"
-          ; account_name = "snark_node-key"
+          { node_name = "snark-node"
+          ; account_name = "snark-node-key"
           ; worker_nodes = 25
           }
     ; txpool_max_size = 10_000_000
@@ -135,7 +135,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let sender_kps =
       map_remove_keys
         (Network.genesis_keypairs network)
-        ~keys:[ "receiver-key"; "empty_bp-key"; "snark_node-key" ]
+        ~keys:[ "receiver-key"; "empty-bp-key"; "snark-node-key" ]
       |> Core.String.Map.data
     in
     let sender_priv_keys =

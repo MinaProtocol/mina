@@ -185,7 +185,10 @@ variable "block_producer_configs" {
     object({
       name                   = string,
       class                  = string,
-      private_key_secret     = string,
+      keypair_name     = string,
+      private_key            = string,
+      public_key             = string,
+      privkey_password = string,
       external_port          = number,
       libp2p_secret          = string,
       enable_gossip_flooding = bool,

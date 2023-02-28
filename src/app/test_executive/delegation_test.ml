@@ -20,12 +20,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "node_a-key"; balance = "1000"; timing = Untimed }
-        ; { account_name = "node_b-key"; balance = "1000"; timing = Untimed }
+        [ { account_name = "node-a-key"; balance = "1000"; timing = Untimed }
+        ; { account_name = "node-b-key"; balance = "1000"; timing = Untimed }
         ]
     ; block_producers =
-        [ { node_name = "node_a"; account_name = "node_a-key" }
-        ; { node_name = "node_b"; account_name = "node_b-key" }
+        [ { node_name = "node-a"; account_name = "node-a-key" }
+        ; { node_name = "node-b"; account_name = "node-b-key" }
         ]
     }
 
@@ -41,10 +41,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     (* let[@warning "-8"] [ node_a; node_b ] = Network.block_producers network in *)
     let node_a =
-      Core.String.Map.find_exn (Network.block_producers network) "node_a"
+      Core.String.Map.find_exn (Network.block_producers network) "node-a"
     in
     let node_b =
-      Core.String.Map.find_exn (Network.block_producers network) "node_b"
+      Core.String.Map.find_exn (Network.block_producers network) "node-b"
     in
     let%bind () =
       section "Delegate all mina currency from node_b to node_a"

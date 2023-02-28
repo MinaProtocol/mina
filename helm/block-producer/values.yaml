@@ -47,7 +47,11 @@ blockProducerConfigs:
   - name: "test-1"
     runWithUserAgent: false
     runWithBots: false
-    privateKeySecret: "yolo"
+    # privateKeySecret: "yolo"
+    keypairName: ""
+    privateKey : ""
+    publicKey : ""
+    privateKeyPW : ""
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
@@ -56,7 +60,10 @@ blockProducerConfigs:
   - name: "test-2"
     runWithUserAgent: true
     runWithBots: false
-    privateKeySecret: "yolo"
+    # privateKeySecret: "yolo"
+    privateKey : ""
+    publicKey : ""
+    privateKeyPW : ""
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
@@ -65,7 +72,10 @@ blockProducerConfigs:
   - name: "test-3"
     runWithUserAgent: false
     runWithBots: true
-    privateKeySecret: "yolo"
+    # privateKeySecret: "yolo"
+    privateKey : ""
+    publicKey : ""
+    privateKeyPW : ""
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
@@ -75,7 +85,10 @@ blockProducerConfigs:
   - name: "test-4"
     runWithUserAgent: true
     runWithBots: true
-    privateKeySecret: "yolo"
+    # privateKeySecret: "yolo"
+    privateKey : ""
+    publicKey : ""
+    privateKeyPW : ""
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false

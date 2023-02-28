@@ -23,26 +23,26 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "node_a-key"; balance = "400000"; timing = Untimed }
-        ; { account_name = "node_b-key"; balance = "300000"; timing = Untimed }
+        [ { account_name = "node-a-key"; balance = "400000"; timing = Untimed }
+        ; { account_name = "node-b-key"; balance = "300000"; timing = Untimed }
         ; { account_name = "fish1"; balance = "1000"; timing = Untimed }
         ; { account_name = "fish2"; balance = "1000"; timing = Untimed }
-        ; { account_name = "snark_node-key"
+        ; { account_name = "snark-node-key"
           ; balance = "1000"
           ; timing = Untimed
           }
         ]
     ; block_producers =
-        [ { node_name = "node_a"; account_name = "node_a-key" }
+        [ { node_name = "node-a"; account_name = "node-a-key" }
           (* 400_000_000_000_000 *)
-        ; { node_name = "node_b"; account_name = "node_b-key" }
+        ; { node_name = "node-b"; account_name = "node-b-key" }
           (* 300_000_000_000_000 *)
         ]
     ; num_archive_nodes = 0
     ; snark_coordinator =
         Some
-          { node_name = "snark_node"
-          ; account_name = "snark_node-key"
+          { node_name = "snark-node"
+          ; account_name = "snark-node-key"
           ; worker_nodes = 4
           }
     ; snark_worker_fee = "0.0001"
@@ -63,10 +63,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
     in
     let node_a =
-      Core.String.Map.find_exn (Network.block_producers network) "node_a"
+      Core.String.Map.find_exn (Network.block_producers network) "node-a"
     in
     let node_b =
-      Core.String.Map.find_exn (Network.block_producers network) "node_b"
+      Core.String.Map.find_exn (Network.block_producers network) "node-b"
     in
     let fish1 =
       Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1"

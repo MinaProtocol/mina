@@ -3,13 +3,13 @@ resource "kubernetes_secret" "mina_account_keypairs" {
   for_each = {for config in var.block_producer_configs : config.name => config}
 
   metadata {
-    name      = each.value.keypair_secret
+    name      = each.value.keypair.keypair_name
     namespace = var.testnet_name
   }
 
   data = {
-    pub = each.value.public_key
-    key = each.value.private_key
+    pub = each.value.keypair.public_key
+    key = each.value.keypair.private_key
   }
 }
 

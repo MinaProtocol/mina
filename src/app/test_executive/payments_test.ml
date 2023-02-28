@@ -37,15 +37,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "untimed_node_a-key"
+        [ { account_name = "untimed-node-a-key"
           ; balance = "400000"
           ; timing = Untimed (* 400_000_000_000_000 *)
           }
-        ; { account_name = "untimed_node_b-key"
+        ; { account_name = "untimed-node-b-key"
           ; balance = "300000"
           ; timing = Untimed (* 300_000_000_000_000 *)
           }
-        ; { account_name = "timed_node_c-key"
+        ; { account_name = "timed-node-c-key"
           ; balance = "30000"
           ; timing =
               make_timing ~min_balance:10_000_000_000_000 ~cliff_time:8
@@ -53,7 +53,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ~vesting_increment:5_000_000_000_000
               (* 30_000_000_000_000 mina is the total.  initially, the balance will be 10k mina.  after 8 global slots, the cliff is hit, although the cliff amount is 0.  4 slots after that, 5_000_000_000_000 mina will vest, and 4 slots after that another 5_000_000_000_000 will vest, and then twice again, for a total of 30k mina all fully liquid and unlocked at the end of the schedule*)
           }
-        ; { account_name = "snark_node-key"
+        ; { account_name = "snark-node-key"
           ; balance = "1000"
           ; timing = Untimed
           }
@@ -61,14 +61,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; { account_name = "fish2"; balance = "1000"; timing = Untimed }
         ]
     ; block_producers =
-        [ { node_name = "untimed_node_a"; account_name = "untimed_node_a-key" }
-        ; { node_name = "untimed_node_b"; account_name = "untimed_node_b-key" }
-        ; { node_name = "timed_node_c"; account_name = "timed_node_c-key" }
+        [ { node_name = "untimed-node-a"; account_name = "untimed-node-a-key" }
+        ; { node_name = "untimed-node-b"; account_name = "untimed-node-b-key" }
+        ; { node_name = "timed-node-c"; account_name = "timed-node-c-key" }
         ]
     ; snark_coordinator =
         Some
-          { node_name = "snark_node"
-          ; account_name = "snark_node-key"
+          { node_name = "snark-node"
+          ; account_name = "snark-node-key"
           ; worker_nodes = 4
           }
     ; snark_worker_fee = "0.0001"
@@ -96,15 +96,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let untimed_node_a =
       Core.String.Map.find_exn
         (Network.block_producers network)
-        "untimed_node_a"
+        "untimed-node-a"
     in
     let untimed_node_b =
       Core.String.Map.find_exn
         (Network.block_producers network)
-        "untimed_node_b"
+        "untimed-node-b"
     in
     let timed_node_c =
-      Core.String.Map.find_exn (Network.block_producers network) "timed_node_c"
+      Core.String.Map.find_exn (Network.block_producers network) "timed-node-c"
     in
     (* let[@warning "-8"] [ fish1; fish2 ] =
          Network.extra_genesis_keypairs network
