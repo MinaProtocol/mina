@@ -1,8 +1,8 @@
 use ark_ec::AffineCurve;
-use commitment_dlog::{commitment::CommitmentCurve, PolyComm};
 use kimchi::circuits::lookup::index::LookupSelectors;
 use kimchi::circuits::lookup::lookups::{LookupFeatures, LookupInfo};
 use kimchi::verifier_index::LookupVerifierIndex;
+use poly_commitment::{commitment::CommitmentCurve, PolyComm};
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
 pub struct CamlPlonkDomain<Fr> {
@@ -20,7 +20,6 @@ pub struct CamlPlonkVerificationEvals<PolyComm> {
     pub mul_comm: PolyComm,
     pub emul_comm: PolyComm,
     pub endomul_scalar_comm: PolyComm,
-    pub chacha_comm: Option<Vec<PolyComm>>,
 }
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Enum)]
@@ -42,7 +41,6 @@ where
     fn from(val: LookupSelectors<PolyComm<G>>) -> Self {
         let LookupSelectors {
             xor: _,
-            chacha_final: _,
             lookup,
             range_check: _,
             ffmul: _,
@@ -62,7 +60,6 @@ where
         let CamlLookupSelectors { lookup } = val;
         LookupSelectors {
             xor: None,
-            chacha_final: None,
             lookup: lookup.map(From::from),
             range_check: None,
             ffmul: None,

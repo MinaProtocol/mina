@@ -68,14 +68,10 @@ module Scan_state : sig
     -> Mina_state.Protocol_state.value State_hash.With_state_hashes.t list
        Or_error.t
 
-  (** Apply transactions coorresponding to the last emitted proof based on the 
-    two-pass system- first pass includes legacy transactions and zkapp payments
-    and the second pass includes account updates. [ignore_incomplete] is to
-    ignore the account updates that were not completed in a single scan state
-    tree corresponding to a proof. Set this to true when applying transactions
-    to get the snarked ledger corresponding to a proof.
+  (** Apply transactions corresponding to the last emitted proof based on the 
+    two-pass system to get snarked ledger- first pass includes legacy transactions and zkapp payments and the second pass includes account updates. This ignores any account updates if a blocks transactions were split among two trees.
     *)
-  val apply_last_proof_transactions_sync :
+  val get_snarked_ledger_sync :
        ledger:Ledger.t
     -> get_protocol_state:
          (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)
@@ -99,7 +95,10 @@ module Scan_state : sig
     -> t
     -> unit Or_error.t
 
-  val apply_last_proof_transactions_async :
+  (** Apply transactions corresponding to the last emitted proof based on the 
+    two-pass system to get snarked ledger- first pass includes legacy transactions and zkapp payments and the second pass includes account updates. This ignores any account updates if a blocks transactions were split among two trees.
+    *)
+  val get_snarked_ledger_async :
        ?async_batch_size:int
     -> ledger:Ledger.t
     -> get_protocol_state:

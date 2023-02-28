@@ -298,3 +298,8 @@ variable "seed_peers_url" {
   type    = string
   default = ""
 }
+
+variable "zkapps_dashboard_key" {
+  type    = string
+  default = ""
+}

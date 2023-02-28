@@ -70,11 +70,11 @@ pub fn caml_pasta_fp_plonk_index_create(
     };
 
     // endo
-    let (endo_q, _endo_r) = commitment_dlog::srs::endos::<Pallas>();
+    let (endo_q, _endo_r) = poly_commitment::srs::endos::<Pallas>();
 
     // Unsafe if we are in a multi-core ocaml
     {
-        let ptr: &mut commitment_dlog::srs::SRS<Vesta> =
+        let ptr: &mut poly_commitment::srs::SRS<Vesta> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
         ptr.add_lagrange_basis(cs.domain.d1);
     }
