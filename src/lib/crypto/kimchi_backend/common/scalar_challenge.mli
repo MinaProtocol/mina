@@ -92,8 +92,8 @@ val create : 'a -> 'a t
 
 (* pickles required *)
 val typ :
-     ('a, 'b, 'c) Snarky_backendless.Typ.t
-  -> ('a t, 'b t, 'c) Snarky_backendless.Typ.t
+     ('var, 'value, 'field, 'field_var, 'state) Snarky_backendless.Typ.t
+  -> ('var t, 'value t, 'field, 'field_var, 'state) Snarky_backendless.Typ.t
 
 (* pickles required *)
 val map : 'a t -> f:('a -> 'b) -> 'b t

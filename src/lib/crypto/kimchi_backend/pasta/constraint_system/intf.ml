@@ -36,7 +36,7 @@ module type Full = sig
   val add_constraint :
        ?label:string
     -> t
-    -> (fp Snarky_backendless.Cvar.t, fp) Snarky_backendless.Constraint.basic
+    -> ('cvar, fp) Snarky_backendless.Constraint.basic
     -> unit
 
   val compute_witness : t -> (int -> fp) -> fp array array

@@ -50,8 +50,8 @@ module Scalar_challenge : sig
   val create : 'a -> 'a t
 
   val typ :
-       ('a, 'b, 'c) Snarky_backendless.Typ.t
-    -> ('a t, 'b t, 'c) Snarky_backendless.Typ.t
+       ('var, 'value, 'field, 'field_var, 'state) Snarky_backendless.Typ.t
+    -> ('var t, 'value t, 'field, 'field_var, 'state) Snarky_backendless.Typ.t
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
 end
