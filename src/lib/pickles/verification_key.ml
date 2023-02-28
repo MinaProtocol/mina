@@ -12,7 +12,6 @@ module Verifier_index_json = struct
 
     type lookup_pattern = Kimchi_types.lookup_pattern =
       | Xor
-      | ChaChaFinal
       | Lookup
       | RangeCheck
       | ForeignFieldMul
@@ -20,7 +19,6 @@ module Verifier_index_json = struct
 
     type lookup_patterns = Kimchi_types.lookup_patterns =
       { xor : bool
-      ; chacha_final : bool
       ; lookup : bool
       ; range_check : bool
       ; foreign_field_mul : bool
@@ -63,7 +61,6 @@ module Verifier_index_json = struct
     ; mul_comm : 'polyComm
     ; emul_comm : 'polyComm
     ; endomul_scalar_comm : 'polyComm
-    ; chacha_comm : 'polyComm array option
     }
   [@@deriving yojson]
 
@@ -170,7 +167,6 @@ module Stable = struct
              ; emul_comm = g c.emul_comm
              ; complete_add_comm = g c.complete_add_comm
              ; endomul_scalar_comm = g c.endomul_scalar_comm
-             ; chacha_comm = None
              } )
         ; shifts = Common.tock_shifts ~log2_size
         ; lookup_index = None

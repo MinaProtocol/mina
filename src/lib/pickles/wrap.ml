@@ -601,15 +601,6 @@ let%test_module "gate finalization" =
           }
       end) )
 
-    let%test_module "chacha" =
-      ( module Make (struct
-        let example =
-          no_public_input Kimchi_bindings.Protocol.Proof.Fp.example_with_chacha
-
-        let actual_feature_flags =
-          { Plonk_types.Features.none_bool with chacha = true; lookup = true }
-      end) )
-
     let%test_module "xor" =
       ( module Make (struct
         let example =
@@ -908,11 +899,7 @@ let wrap
                           (* TODO: This assumes that wrap circuits do not use
                              optional gates.
                           *)
-                          { chacha0 = None
-                          ; chacha1 = None
-                          ; chacha2 = None
-                          ; chacha_final = None
-                          ; range_check0 = None
+                          { range_check0 = None
                           ; range_check1 = None
                           ; foreign_field_add = None
                           ; foreign_field_mul = None

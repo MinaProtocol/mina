@@ -31,11 +31,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let block_producer_nodes = Network.block_producers network in
+    let all_nodes = Network.all_nodes network in
     let%bind () =
-      Malleable_error.List.iter block_producer_nodes
+      Malleable_error.List.iter all_nodes
         ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize)
     in
+    let block_producer_nodes = Network.block_producers network in
     let node = List.hd_exn block_producer_nodes in
     let constraint_constants =
       Genesis_constants.Constraint_constants.compiled

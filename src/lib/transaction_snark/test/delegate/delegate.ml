@@ -16,6 +16,8 @@ struct
     { Account_update.Update.dummy with
       delegate = Zkapp_basic.Set_or_keep.Set pk
     }
+
+  let is_non_zkapp_update = true
 end
 
 let%test_module "Update account delegate" =

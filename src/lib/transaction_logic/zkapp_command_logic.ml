@@ -1571,8 +1571,6 @@ module Make (Inputs : Inputs_intf) = struct
       in
       (a, local_state)
     in
-    (* Reset zkApp state to [None] if it is unmodified. *)
-    let a = Account.unmake_zkapp a in
     (* Update zkApp URI. *)
     let a, local_state =
       let zkapp_uri = Account_update.Update.zkapp_uri account_update in
@@ -1591,6 +1589,11 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_zkapp_uri zkapp_uri a in
       (a, local_state)
     in
+    (* At this point, all possible changes have been made to the zkapp
+       part of an account. Reset zkApp state to [None] if that part
+       is unmodified.
+    *)
+    let a = Account.unmake_zkapp a in
     (* Update token symbol. *)
     let a, local_state =
       let token_symbol = Account_update.Update.token_symbol account_update in
