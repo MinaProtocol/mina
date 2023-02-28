@@ -6,6 +6,15 @@ open Currency
 open Signature_lib
 open Zkapp_command
 module Ledger = Mina_ledger.Ledger.Ledger_inner
+module Transaction_logic = Mina_transaction_logic.Make (Ledger)
+
+module Zk_cmd_result = struct
+  type t =
+    Transaction_logic.Transaction_applied.Zkapp_command_applied.t * Ledger.t
+
+  let sexp_of_t (txn, _) =
+    Transaction_logic.Transaction_applied.Zkapp_command_applied.sexp_of_t txn
+end
 
 module Test_account = struct
   type t =
@@ -24,6 +33,8 @@ module Test_account = struct
     }
 
   let non_empty { balance; _ } = Balance.(balance > zero)
+
+  let account_id { pk; _ } = Account_id.create pk Token_id.default
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
@@ -86,7 +97,7 @@ let test_ledger accounts =
   let ledger = Ledger.empty ~depth () in
   let%map () =
     iter_result accounts ~f:(fun a ->
-        let acc_id = Account_id.create a.pk Token_id.default in
+        let acc_id = account_id a in
         let account = Account.initialize acc_id in
         Ledger.create_new_account ledger acc_id
           { account with balance = a.balance; nonce = a.nonce } )
@@ -143,10 +154,75 @@ let build_zkapp_cmd ~fee transactions :
 let zkapp_cmd ~noncemap ~fee transactions =
   Monad_lib.State.eval_state (build_zkapp_cmd ~fee transactions) noncemap
 
+let add_to_balance balance amount =
+  let open Option.Let_syntax in
+  let b = Balance.to_amount balance in
+  let%bind Signed_poly.{ magnitude; sgn } =
+    Amount.Signed.(of_unsigned b + amount)
+  in
+  match sgn with
+  | Pos ->
+      Some (Balance.of_uint64 @@ Amount.to_uint64 magnitude)
+  | Neg ->
+      None
+
 module Pred = struct
   let pure ?(with_error = Fn.const false) ~f result =
     match Result.map result ~f with Ok b -> b | Error e -> with_error e
 
   let result ?(with_error = Fn.const false) ~f result =
     match Result.bind result ~f with Ok b -> b | Error e -> with_error e
+
+  let verify_account_updates ~(ledger : Ledger.t)
+      ~(txn : Transaction_logic.Transaction_applied.Zkapp_command_applied.t)
+      ~(f : Amount.Signed.t -> Account.t option * Account.t option -> bool)
+      (account : Test_account.t) =
+    let account_id = Test_account.account_id account in
+    let outdated =
+      List.find_map txn.accounts ~f:(fun (aid, a) ->
+          if Account_id.equal aid account_id then a else None )
+    in
+    let updated =
+      let open Option.Let_syntax in
+      let%bind loc = Ledger.location_of_account ledger account_id in
+      Ledger.get ledger loc
+    in
+    let fee =
+      if
+        Public_key.Compressed.equal account.pk
+          txn.command.data.fee_payer.body.public_key
+      then
+        Signed_poly.
+          { magnitude =
+              Amount.of_uint64
+              @@ Fee.to_uint64 txn.command.data.fee_payer.body.fee
+          ; sgn = Sgn.Neg
+          }
+      else Amount.Signed.zero
+    in
+    let balance_updates =
+      Call_forest.fold txn.command.data.account_updates ~init:Amount.Signed.zero
+        ~f:(fun acc upd ->
+          if Public_key.Compressed.equal account.pk upd.body.public_key then
+            Option.value_exn @@ Amount.Signed.add acc upd.body.balance_change
+          else acc )
+    in
+    let balance_change =
+      Amount.Signed.(balance_updates + fee) |> Option.value_exn
+    in
+    f balance_change (outdated, updated)
+
+  let verify_balance_change ~balance_change orig updt =
+    let open Account.Poly in
+    add_to_balance orig.balance balance_change
+    |> Option.value_map ~default:false ~f:(Balance.equal updt.balance)
+
+  let verify_balance_changes ~txn ~ledger accounts =
+    List.for_all accounts
+      ~f:
+        (verify_account_updates ~txn ~ledger ~f:(fun balance_change -> function
+           | Some orig, Some updt ->
+               verify_balance_change ~balance_change orig updt
+           | _ ->
+               false ) )
 end
