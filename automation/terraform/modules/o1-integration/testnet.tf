@@ -37,11 +37,12 @@ module "kubernetes_testnet" {
 
   archive_node_count   = var.archive_node_count
 
-  snark_coordinators = var.snark_worker_replicas <= 0 ? [] : [
+  snark_coordinators = var.snark_coordinator_config == null ? [] :[ 
     {
-      snark_worker_replicas = var.snark_worker_replicas
+      snark_coordinator_name = var.snark_coordinator_config.name
+      snark_worker_replicas = var.snark_coordinator_config.worker_nodes
       snark_worker_fee      = var.snark_worker_fee
-      snark_worker_public_key = var.snark_worker_public_key
+      snark_worker_public_key = var.snark_coordinator_config.public_key
       snark_coordinators_host_port = local.snark_worker_host_port
     }
   ]
@@ -50,10 +51,13 @@ module "kubernetes_testnet" {
   block_producer_configs  = [
     for index, config in var.block_producer_configs : {
       name                   = config.name
-      id                     = config.id
+      # id                     = config.id
       class                  = "test",
       external_port          = local.block_producer_starting_host_port + index
-      private_key_secret     = config.keypair_secret
+      keypair_name     = config.keypair.keypair_name
+      private_key     = config.keypair.private_key
+      public_key     = config.keypair.public_key
+      privkey_password     = config.keypair.privkey_password
       libp2p_secret          = config.libp2p_secret
       isolated               = false
       enable_gossip_flooding = false

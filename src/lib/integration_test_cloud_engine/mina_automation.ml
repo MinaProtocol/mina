@@ -25,12 +25,19 @@ module Network_config = struct
   type block_producer_config =
     { name : string (* ; id : string *)
     ; keypair : Network_keypair.t
-    ; public_key : string
-    ; private_key : string
-    ; keypair_secret : string
     ; libp2p_secret : string
     }
   [@@deriving to_yojson]
+
+  (* type block_producer_config_tf =
+       { name : string (* ; id : string *)
+       ; keypair : Network_keypair.t
+       ; public_key : string
+       ; private_key : string
+       ; keypair_secret : string
+       ; libp2p_secret : string
+       }
+     [@@deriving to_yojson] *)
 
   type snark_coordinator_config =
     { name : string
@@ -126,7 +133,13 @@ module Network_config = struct
     in
     let user_len = Int.min 5 (String.length user_sanitized) in
     let user = String.sub user_sanitized ~pos:0 ~len:user_len in
-    let git_commit = Mina_version.commit_id_short in
+    let git_commit_unsanitized = Mina_version.commit_id_short in
+    let git_commit =
+      if String.is_substring git_commit_unsanitized ~substring:"[DIRTY]" then
+        String.sub git_commit_unsanitized ~pos:7
+          ~len:(String.length git_commit_unsanitized)
+      else git_commit_unsanitized
+    in
     (* see ./src/app/test_executive/README.md for information regarding the namespace name format and length restrictions *)
     let testnet_name = "it-" ^ user ^ "-" ^ git_commit ^ "-" ^ test_name in
 
@@ -289,18 +302,18 @@ module Network_config = struct
       { constraints = constraint_constants; genesis = genesis_constants }
     in
     (* BLOCK PRODUCER CONFIG *)
-    let mk_net_keypair secret_name (pk, sk) =
+    let mk_net_keypair keypair_name (pk, sk) =
       let keypair =
         { Keypair.public_key = Public_key.decompress_exn pk; private_key = sk }
       in
-      Network_keypair.create_network_keypair ~keypair ~secret_name
+      Network_keypair.create_network_keypair ~keypair_name ~keypair
     in
     let block_producer_config name keypair =
       { name (* ; id = Int.to_string index *)
       ; keypair
-      ; keypair_secret = keypair.secret_name
-      ; public_key = keypair.public_key_file
-      ; private_key = keypair.private_key_file
+        (* ; keypair_secret = keypair.keypair_secret
+           ; public_key = keypair.public_key_file
+           ; private_key = keypair.private_key_file *)
       ; libp2p_secret = ""
       }
     in
@@ -359,7 +372,7 @@ module Network_config = struct
           in
           Some
             { name = node.node_name
-            ; public_key = network_kp.public_key_file
+            ; public_key = network_kp.public_key
             ; worker_nodes = node.worker_nodes
             }
     in
@@ -644,12 +657,12 @@ module Network_manager = struct
           let snark_worker_workloads =
             if config.worker_nodes > 0 then
               Core.String.Map.of_alist_exn
-                (List.init config.worker_nodes ~f:(fun i ->
-                     ( config.name ^ "-worker-" ^ Core.Int.to_string i
-                     , Kubernetes_network.Workload_to_deploy.construct_workload
-                         (config.name ^ "-worker-" ^ Core.Int.to_string i)
-                         (Kubernetes_network.Workload_to_deploy.cons_pod_info
-                            "worker" ) ) ) )
+                [ ( config.name ^ "-worker"
+                  , Kubernetes_network.Workload_to_deploy.construct_workload
+                      (config.name ^ "-worker")
+                      (Kubernetes_network.Workload_to_deploy.cons_pod_info
+                         "worker" ) )
+                ]
             else Core.String.Map.of_alist_exn []
           in
           (snark_coordinator_workloads, snark_worker_workloads)

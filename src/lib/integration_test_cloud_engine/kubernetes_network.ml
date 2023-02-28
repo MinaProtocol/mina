@@ -38,27 +38,36 @@ module Node = struct
     }
 
   type t =
-    { app_id : string; pod_id : string; pod_info : pod_info; config : config }
+    { app_id : string
+    ; pod_ids : string list
+    ; pod_info : pod_info
+    ; config : config
+    }
 
-  let id { pod_id; _ } = pod_id
+  let id { pod_ids; _ } = List.hd_exn pod_ids
 
   let network_keypair { pod_info = { network_keypair; _ }; _ } = network_keypair
 
   let base_kube_args t = [ "--cluster"; t.cluster; "--namespace"; t.namespace ]
 
-  let get_logs_in_container ?container_id { pod_id; config; pod_info; _ } =
+  let get_logs_in_container ?container_id { pod_ids; config; pod_info; _ } =
     let container_id =
       Option.value container_id ~default:pod_info.primary_container_id
     in
     let%bind cwd = Unix.getcwd () in
     Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code:13 cwd "kubectl"
-      (base_kube_args config @ [ "logs"; "-c"; container_id; pod_id ])
+      ( base_kube_args config
+      @ [ "logs"; "-c"; container_id; List.hd_exn pod_ids ] )
 
   let run_in_container ?(exit_code = 10) ?container_id ?override_with_pod_id
       ~cmd t =
     let { config; pod_info; _ } = t in
     let pod_id =
-      match override_with_pod_id with Some pid -> pid | None -> t.pod_id
+      match override_with_pod_id with
+      | Some pid ->
+          pid
+      | None ->
+          List.hd_exn t.pod_ids
     in
     let container_id =
       Option.value container_id ~default:pod_info.primary_container_id
@@ -70,7 +79,7 @@ module Node = struct
       @ cmd )
 
   let cp_string_to_container_file ?container_id ~str ~dest t =
-    let { pod_id; config; pod_info; _ } = t in
+    let { pod_ids; config; pod_info; _ } = t in
     let container_id =
       Option.value container_id ~default:pod_info.primary_container_id
     in
@@ -81,7 +90,9 @@ module Node = struct
     Out_channel.output_string oc str ;
     Out_channel.close oc ;
     let%bind cwd = Unix.getcwd () in
-    let dest_file = sprintf "%s/%s:%s" config.namespace pod_id dest in
+    let dest_file =
+      sprintf "%s/%s:%s" config.namespace (List.hd_exn pod_ids) dest
+    in
     Integration_test_lib.Util.run_cmd_or_error cwd "kubectl"
       (base_kube_args config @ [ "cp"; "-c"; container_id; tmp_file; dest_file ])
 
@@ -102,7 +113,7 @@ module Node = struct
   let logger_metadata node =
     [ ("namespace", `String node.config.namespace)
     ; ("app_id", `String node.app_id)
-    ; ("pod_id", `String node.pod_id)
+    ; ("pod_id", `String (List.hd_exn node.pod_ids))
     ]
 
   module Scalars = Graphql_lib.Scalars
@@ -635,7 +646,7 @@ module Node = struct
 
   let run_replayer ~logger (t : t) =
     [%log info] "Running replayer on archived data (node: %s, container: %s)"
-      t.pod_id mina_archive_container_id ;
+      (List.hd_exn t.pod_ids) mina_archive_container_id ;
     let open Malleable_error.Let_syntax in
     let%bind accounts =
       run_in_container t
@@ -666,8 +677,8 @@ module Node = struct
 
   let dump_mina_logs ~logger (t : t) ~log_file =
     let open Malleable_error.Let_syntax in
-    [%log info] "Dumping container logs from (node: %s, container: %s)" t.pod_id
-      t.pod_info.primary_container_id ;
+    [%log info] "Dumping container logs from (node: %s, container: %s)"
+      (List.hd_exn t.pod_ids) t.pod_info.primary_container_id ;
     let%map logs = get_logs_in_container t in
     [%log info] "Dumping container log to file %s" log_file ;
     Out_channel.with_file log_file ~f:(fun out_ch ->
@@ -677,7 +688,7 @@ module Node = struct
     let open Malleable_error.Let_syntax in
     [%log info]
       "Dumping precomputed blocks from logs for (node: %s, container: %s)"
-      t.pod_id t.pod_info.primary_container_id ;
+      (List.hd_exn t.pod_ids) t.pod_info.primary_container_id ;
     let%bind logs = get_logs_in_container t in
     (* kubectl logs may include non-log output, like "Using password from environment variable" *)
     let log_lines =
@@ -821,17 +832,11 @@ module Workload_to_deploy = struct
       |> List.filter ~f:(Fn.compose not String.is_empty)
       |> List.map ~f:(String.substr_replace_first ~pattern:"pod/" ~with_:"")
     in
-    (* we have a strict 1 workload to 1 pod setup. *)
-    if not (Int.equal (List.length pod_ids) 1) then
-      failwithf
-        "Unexpected number of pods in a the kubernetes workload %s: there are \
-         %d pods in this workload, but in the Lucy GKE infrastructure engine \
-         there should always be exactly 1 pod per workload"
-        t.workload_id (List.length pod_ids) () ;
-
-    let pod_id = List.hd_exn pod_ids in
+    (* we have a strict 1 workload to 1 pod setup, except the snark workers. *)
+    (* elsewhere in the code I'm simply using List.hd_exn which is not ideal but enabled by the fact that in all relevant cases, there's only going to be 1 pod id in pod_ids *)
+    (* TODO fix this^ and have a more elegant solution *)
     let pod_info = t.pod_info in
-    { Node.app_id; pod_id; pod_info; config }
+    { Node.app_id; pod_ids; pod_info; config }
   (* List.zip_exn t.pod_info pod_ids
      |> List.map ~f:(fun (pod_info, pod_id) ->
             { Node.app_id; pod_id; pod_info; config } ) *)
@@ -916,13 +921,16 @@ let lookup_node_by_pod_id t id =
       | Some acc ->
           Some acc
       | None ->
-          if String.equal id node.pod_id then Some (node_name, node) else None )
+          if String.equal id (List.hd_exn node.pod_ids) then
+            Some (node_name, node)
+          else None )
 
 (* let all_pod_ids t = Map.keys t.nodes_by_pod_id *)
 
 let all_pod_ids t =
   let pods = all_pods t |> Core.Map.to_alist in
-  List.fold pods ~init:[] ~f:(fun acc (_, node) -> List.cons node.pod_id acc)
+  List.fold pods ~init:[] ~f:(fun acc (_, node) ->
+      List.cons (List.hd_exn node.pod_ids) acc )
 
 let initialize_infra ~logger network =
   let open Malleable_error.Let_syntax in

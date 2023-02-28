@@ -23,7 +23,7 @@ locals {
     archiveAddress     = null
   }
 
-  snark_coordinator_name = "snark-coordinator-${lower(substr(var.snark_worker_public_key, -6, -1))}"
+  #snark_coordinator_name = "snark-coordinator-${lower(substr(var.snark_worker_public_key, -6, -1))}"
 
   default_archive_node = {
     image                   = var.mina_archive_image

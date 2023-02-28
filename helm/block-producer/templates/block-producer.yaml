@@ -112,7 +112,7 @@ spec:
           - name: CODA_PUBLIC_KEY
             valueFrom:
               secretKeyRef:
-                name: {{ $config.privateKeySecret }}
+                name: {{ $config.keypairName }}
                 key: pub
           - name: MINA_PRIVKEY_PASS
             value: {{ $.Values.mina.privkeyPass | quote }}
@@ -288,7 +288,7 @@ spec:
       volumes:
       - name: private-keys
         secret:
-          secretName: {{ $config.privateKeySecret }}
+          secretName: {{ $config.keypairName }}
           defaultMode: 256
           items:
           - key: key

@@ -19,16 +19,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "node_a-key"; balance = "4000"; timing = Untimed }
-        ; { account_name = "node_b-key"; balance = "9000"; timing = Untimed }
-        ; { account_name = "node_c-key"; balance = "8000"; timing = Untimed }
-        ; { account_name = "node_d-key"; balance = "17000"; timing = Untimed }
+        [ { account_name = "node-a-key"; balance = "4000"; timing = Untimed }
+        ; { account_name = "node-b-key"; balance = "9000"; timing = Untimed }
+        ; { account_name = "node-c-key"; balance = "8000"; timing = Untimed }
+        ; { account_name = "node-d-key"; balance = "17000"; timing = Untimed }
         ]
     ; block_producers =
-        [ { node_name = "node_a"; account_name = "node_a-key" }
-        ; { node_name = "node_b"; account_name = "node_b-key" }
-        ; { node_name = "node_c"; account_name = "node_c-key" }
-        ; { node_name = "node_d"; account_name = "node_d-key" }
+        [ { node_name = "node-a"; account_name = "node-a-key" }
+        ; { node_name = "node-b"; account_name = "node-b-key" }
+        ; { node_name = "node-c"; account_name = "node-c-key" }
+        ; { node_name = "node-d"; account_name = "node-d-key" }
         ]
     ; num_archive_nodes = 1
     ; log_precomputed_blocks = true
