@@ -2,6 +2,7 @@ open Core_kernel
 open Currency
 open Mina_base
 open Mina_numbers
+open Signature_lib
 open Helpers
 open Update_utils
 
@@ -158,12 +159,15 @@ let%test_module "Test transaction logic." =
                    (Failed [ []; [ Invalid_fee_excess ] ]) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
-    let%test_unit "Token_id of the account can be altered." =
+    let%test_unit "Token_symbol of the account can be altered." =
       Quickcheck.test ~trials
         (let open Quickcheck in
         let open Generator.Let_syntax in
         let%bind account = Test_account.gen in
-        let%bind token = String.gen_with_length 12 Char.gen_print in
+        (* The symbol is limited to 6 characters, but this limit is being
+           enforced elsewhere and, unfortunately we cannot see this function
+           fail if the symbol exceeds that limit.*)
+        let%bind token = String.gen_with_length 6 Char.gen_uppercase in
         let txn =
           Alter_account.make ~account:account.pk
             { Account_update.Update.noop with token_symbol = Set token }
@@ -184,5 +188,31 @@ let%test_module "Test transaction logic." =
                                    updt.token_symbol)
                       | _ ->
                           false ) ) )
+            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
+
+    let%test_unit "Delegate of an account can be set." =
+      Quickcheck.test ~trials
+        (let open Quickcheck in
+        let open Generator.Let_syntax in
+        let%bind delegator = Test_account.gen in
+        let%bind delegate = Test_account.gen in
+        let txn =
+          Alter_account.make ~account:delegator.pk
+            { Account_update.Update.noop with delegate = Set delegate.pk }
+        in
+        let%map fee = Fee.(gen_incl zero (balance_to_fee delegate.balance)) in
+        (delegate.pk, fee, [ delegator; delegate ], [ (txn :> transaction) ]))
+        ~f:(fun (fee_payer, fee, accounts, txns) ->
+          [%test_pred: Zk_cmd_result.t Or_error.t]
+            (Pred.pure ~f:(fun (txn, ledger) ->
+                 let delegator = List.hd_exn accounts in
+                 let delegate_pk =
+                   (Option.value_exn @@ List.nth accounts 1).pk
+                 in
+                 Transaction_status.equal txn.command.status Applied
+                 && Pred.verify_account_updates delegator ~txn ~ledger ~f:(fun _ -> function
+                        | (Some _, Some updt) ->
+                           Option.equal Public_key.Compressed.equal updt.delegate (Some delegate_pk)
+                        | _ -> false)) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
   end )
