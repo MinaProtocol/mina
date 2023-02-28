@@ -479,13 +479,11 @@ and restart_failed_ancestor ~state ~actions ~context top_state_hash =
       launch_ancestry_retrieval ~actions ~context ~cancel_child_contexts:Fn.id
         ~retrieve_immediately:true ~preferred_peers ~timeout ~state hh
     in
-    let state_hash = State_hash.With_state_hashes.state_hash hh in
     Substate.Processing
       (In_progress
          { processing_status = Executing { timeout }
          ; interrupt_ivar
          ; downto_ = Mina_numbers.Length.zero
-         ; holder = ref state_hash
          } )
   in
   let f st =
@@ -653,7 +651,6 @@ and add_received ~context ~actions ~state ~gossip_data ~received ?body:body_opt
               { processing_status = Executing { timeout }
               ; interrupt_ivar
               ; downto_ = Mina_numbers.Length.zero
-              ; holder = ref state_hash
               } ) ;
       Misc.add_orphan ~state transition_meta ;
       actions.Misc.mark_processed_and_promote non_invalid_children

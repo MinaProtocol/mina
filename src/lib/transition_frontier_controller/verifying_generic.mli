@@ -37,23 +37,43 @@ module Make : functor (F : F) -> sig
     -> State_hash.t
     -> Transition_state.t list
 
-  (** Update status to [Substate.Processing (Substate.Done _)]. 
-      
-      If [reuse_ctx] is [true], if there is an [Substate.In_progress] context and
-      there is an unprocessed ancestor covered by this active progress, action won't
-      be interrupted and it will be assigned to the first unprocessed ancestor.
+  (** Pass processing context to the next unprocessed state.
+      If the next unprocessed state is in [Substate.Processing (Substate.In_progress )]
+      status or if it's below context's [downto_] field, context is canceled
+      and no transition gets updated.
 
-      If [baton] is set to [true] in the transition being updated the baton will be
-      passed to the next transition with [Substate.Processing (Substate.In_progress _)]
-      and transitions in between will get restarted.  *)
+      If [baton] is set to [true], next's baton will also be set to [true]
+      (and be left as it is otherwise).
+
+      Returns true if the context was succesfully passed to some ancestor
+  *)
+  val pass_ctx_to_next_unprocessed :
+       logger:Logger.t
+    -> transition_states:Transition_states.t
+    -> dsu:Processed_skipping.Dsu.t
+    -> baton:bool
+    -> State_hash.t
+    -> F.processing_result Substate_types.processing_context option
+    -> bool
+
+  (** Given [res] and [state_hash], update corresponding transition to status
+      [Processing (Done res)] (if it exists in transition states, is of the
+      expected state and has status either [Processing] or [Failed]).
+
+      Baton of the state is set to [false].
+      
+      Returns a tuple of state, previous baton value and optional processing
+      context (if status was [Processing ctx]) or [None] if
+      [state_hash] didn't meet conditions above. *)
   val update_to_processing_done :
        logger:Logger.t
     -> transition_states:Transition_states.t
     -> state_hash:State_hash.t
-    -> dsu:Processed_skipping.Dsu.t
-    -> ?reuse_ctx:bool
     -> F.processing_result
-    -> Transition_state.t list option
+    -> ( Transition_state.t
+       * bool
+       * F.processing_result Substate_types.processing_context option )
+       option
 
   (** Update status to [Substate.Failed].
 

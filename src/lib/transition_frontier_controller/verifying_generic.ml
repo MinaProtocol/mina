@@ -58,54 +58,6 @@ module Make (F : F) = struct
     | _ ->
         collected
 
-  (** Try to reuse processing context to handle some of 
-      ancestors due for restart.
-      
-      Function takes a list of ancestors due to restart (in parent-first order)
-      and returns a prefix of it with transitions that can't be covered
-      by the processing context provided.
-
-      If some transitions can be handled with given context, top transition
-      will be assigned to this context and
-      [Substate.Processing (Substate.In_progress ctx)] status.
-      *)
-  let try_to_reuse ~logger ~transition_states ts ctx =
-    match ctx with
-    | Substate.In_progress { downto_; interrupt_ivar; holder; _ } ->
-        let for_restart, for_reuse =
-          List.split_while ts ~f:(fun st ->
-              let meta = Transition_state.State_functions.transition_meta st in
-              Mina_numbers.Length.(meta.blockchain_length < downto_) )
-        in
-        let res_opt =
-          let%bind.Option st = List.last for_reuse in
-          let meta = Transition_state.State_functions.transition_meta st in
-          let%map.Option { substate; _ } = F.to_data st in
-          holder := meta.state_hash ;
-          let status = Substate.Processing ctx in
-          let metadata =
-            Substate.add_error_if_failed ~tag:"old_status_error" substate.status
-            @@ Substate.add_error_if_failed ~tag:"new_status_error" status
-            @@ [ ("state_hash", State_hash.to_yojson meta.state_hash) ]
-          in
-          [%log debug]
-            "Updating status of $state_hash from %s to %s (state: %s), setting \
-             baton to false"
-            (Substate.name_of_status substate.status)
-            (Substate.name_of_status status)
-            (Transition_state.State_functions.name st)
-            ~metadata ;
-          Transition_states.update transition_states
-            (F.update
-               { substate = { substate with status }; baton = false }
-               st )
-        in
-        if Option.is_none res_opt then
-          Async_kernel.Ivar.fill_if_empty interrupt_ivar () ;
-        for_restart
-    | _ ->
-        ts
-
   (** Collect transitions that are either in [Substate.Processing Substate.Dependent]
       or in [Substate.Failed] statuses and set [baton] to [true] for the next
       ancestor in [Substate.Processing (Substate.In_progress _)] status.
@@ -131,10 +83,15 @@ module Make (F : F) = struct
       If the next unprocessed state is in [Substate.Processing (Substate.In_progress )]
       status or if it's below context's [downto_] field, context is canceled
       and no transition gets updated.
+
+      If [baton] is set to [true], next's baton will also be set to [true]
+      (and be left as it is otherwise).
+
+      Returns true if the context was succesfully passed to some ancestor
   *)
-  let pass_ctx_to_next_unprocessed ~logger ~transition_states ~dsu parent_hash
-      ctx_opt =
-    Option.iter ~f:Fn.id
+  let pass_ctx_to_next_unprocessed ~logger ~transition_states ~dsu ~baton
+      parent_hash ctx_opt =
+    Option.is_some
     @@ let%bind.Option ctx = ctx_opt in
        let%bind.Option parent =
          Transition_states.find transition_states parent_hash
@@ -143,12 +100,14 @@ module Make (F : F) = struct
          Processed_skipping.next_unprocessed ~logger ~state_functions
            ~transition_states ~dsu parent
        in
-       let%map.Option { substate; _ } = F.to_data next in
+       let%bind.Option { substate; baton = baton_prev } = F.to_data next in
+       let baton = baton || baton_prev in
        let next_meta = Transition_state.State_functions.transition_meta next in
        match (ctx, substate.status) with
        | Substate.In_progress { interrupt_ivar; _ }, Processing (In_progress _)
          ->
-           Async_kernel.Ivar.fill_if_empty interrupt_ivar ()
+           Async_kernel.Ivar.fill_if_empty interrupt_ivar () ;
+           None
        | In_progress { downto_; _ }, _
          when Mina_numbers.Length.(next_meta.blockchain_length >= downto_) ->
            let status = Substate.Processing ctx in
@@ -160,39 +119,39 @@ module Make (F : F) = struct
            in
            [%log debug]
              "Updating status of $state_hash from %s to %s (state: %s), \
-              setting baton to false"
+              setting baton to %s (prev baton: %s)"
              (Substate.name_of_status substate.status)
              (Substate.name_of_status status)
              (Transition_state.State_functions.name next)
+             (Bool.to_string baton)
+             (Bool.to_string baton_prev)
              ~metadata ;
            Transition_states.update transition_states
-             (F.update
-                { substate = { substate with status }; baton = false }
-                next )
+             (F.update { substate = { substate with status }; baton } next) ;
+           Some ()
+       | In_progress { interrupt_ivar; _ }, _ ->
+           Async_kernel.Ivar.fill_if_empty interrupt_ivar () ;
+           None
        | _ ->
-           ()
+           None
 
-  (** Update status to [Substate.Processing (Substate.Done _)]. 
+  (** Given [res] and [state_hash], update corresponding transition to status
+      [Processing (Done res)] (if it exists in transition states, is of the
+      expected state and has status either [Processing] or [Failed]).
+
+      Baton of the state is set to [false].
       
-      If [reuse_ctx] is [true], if there is an [Substate.In_progress] context and
-      there is an unprocessed ancestor covered by this active progress, action won't
-      be interrupted and it will be assigned to the first unprocessed ancestor.
-
-      If [reuse_ctx] is [false] and [Substate.In_progress] context exists, it will be ignored.
-
-      If [baton] is set to [true] in the transition being updated, the baton will
-      be passed to the next transition with [Substate.Processing (Substate.In_progress _)]
-      and transitions in between will get restarted.  *)
-  let update_to_processing_done ~logger ~transition_states ~state_hash ~dsu
-      ?(reuse_ctx = false) res =
+      Returns a tuple of state, previous baton value and optional processing
+      context (if status was [Processing ctx]) or [None] if
+      [state_hash] didn't meet conditions above. *)
+  let update_to_processing_done ~logger ~transition_states ~state_hash res =
     let%bind.Option st = Transition_states.find transition_states state_hash in
     let%bind.Option { substate; baton } = F.to_data st in
-    let meta = Transition_state.State_functions.transition_meta st in
     let%map.Option ctx_opt =
       match substate.status with
-      | Processing ctx when reuse_ctx ->
+      | Processing ctx ->
           Some (Some ctx)
-      | Processing _ | Failed _ ->
+      | Failed _ ->
           Some None
       | _ ->
           None
@@ -212,18 +171,7 @@ module Make (F : F) = struct
       ~metadata ;
     Transition_states.update transition_states
       (F.update { substate = { substate with status }; baton = false } st) ;
-    if baton then
-      let deps =
-        collect_dependent_and_pass_the_baton_by_hash ~logger ~dsu
-          ~transition_states meta.parent_state_hash
-      in
-      Option.value_map
-        ~f:(try_to_reuse ~logger ~transition_states deps)
-        ~default:deps ctx_opt
-    else (
-      pass_ctx_to_next_unprocessed ~logger ~transition_states ~dsu
-        meta.parent_state_hash ctx_opt ;
-      [] )
+    (st, baton, ctx_opt)
 
   (** Update status to [Substate.Failed].
 
@@ -262,53 +210,85 @@ module Make (F : F) = struct
   (** [upon_f] is a callback to be executed upon completion of
   blockchain proof verification (or a failure).
 *)
-  let rec upon_f ~context ~transition_states ~state_hashes ~holder (actions, res)
-      =
+  let rec upon_f ~context ~transition_states ~state_hashes (actions, res) =
     let (module Context : CONTEXT) = context in
-    let top_state_hash = !holder in
-    let fail e =
-      (* Top state hash will be set to Failed only if it was Processing/Failed before this point *)
-      update_to_failed ~logger:Context.logger ~dsu:Context.processed_dsu
-        ~transition_states ~state_hash:top_state_hash e
-      |> Option.iter
-           ~f:
-             (start ~context
-                ~actions:(Async_kernel.Deferred.return actions)
-                ~transition_states )
+    let logger = Context.logger in
+    let top_state_hash () =
+      List.find
+        (List.rev @@ Mina_stdlib.Nonempty_list.to_list state_hashes)
+        ~f:(fun state_hash ->
+          Option.is_some
+          @@ let%bind.Option st =
+               Transition_states.find transition_states state_hash
+             in
+             let%bind.Option { substate; _ } = F.to_data st in
+             match substate.status with
+             | Processing (In_progress _) | Failed _ ->
+                 Some ()
+             | _ ->
+                 None )
     in
-    let fail_if_unequal_lengths = function
-      | List.Or_unequal_lengths.Ok a ->
-          a
-      | Unequal_lengths ->
-          fail
-            (Error.of_string "result length is unequal to state hashes length")
+    let fail e =
+      match top_state_hash () with
+      | None ->
+          ()
+      | Some state_hash ->
+          (* Top state hash will be set to Failed only if it was Processing/Failed before this point *)
+          update_to_failed ~logger ~dsu:Context.processed_dsu ~transition_states
+            ~state_hash e
+          |> Option.iter
+               ~f:
+                 (start ~context
+                    ~actions:(Async_kernel.Deferred.return actions)
+                    ~transition_states )
+    in
+    let f (acc, baton_prev) state_hash res =
+      Option.value ~default:(acc, baton_prev)
+        (let%map.Option st, baton, _ctx_opt =
+           update_to_processing_done ~logger ~transition_states ~state_hash res
+         in
+         (st :: acc, baton || baton_prev) )
     in
     match res with
     | Result.Error () ->
         fail (Error.of_string "interrupted")
-    | Result.Ok (Result.Ok lst) ->
-        List.iter2 (Mina_stdlib.Nonempty_list.to_list state_hashes) lst
-          ~f:(fun state_hash res ->
-            let for_restart_opt =
-              update_to_processing_done ~logger:Context.logger
-                ~transition_states ~state_hash ~dsu:Context.processed_dsu
-                ~reuse_ctx:State_hash.(state_hash <> top_state_hash)
-                res
+    | Result.Ok (Result.Ok lst) -> (
+        match
+          List.fold2 ~init:([], false)
+            (Mina_stdlib.Nonempty_list.to_list state_hashes)
+            lst ~f
+        with
+        | List.Or_unequal_lengths.Ok (updated_states_rev, baton) ->
+            let bottom_parent_hash_opt, updated_hashes =
+              List.fold updated_states_rev ~init:(None, [])
+                ~f:(fun (_, acc) st ->
+                  let meta =
+                    Transition_state.State_functions.transition_meta st
+                  in
+                  (Some meta.parent_state_hash, meta.state_hash :: acc) )
             in
-            Option.iter for_restart_opt ~f:(fun for_restart ->
-                start ~context
-                  ~actions:(Async_kernel.Deferred.return actions)
-                  ~transition_states for_restart ;
-                actions.Misc.mark_processed_and_promote [ state_hash ]
-                  ~reason:("verified " ^ F.data_name) ) )
-        |> fail_if_unequal_lengths
-    | Ok (Error (`Invalid_proof e)) ->
+            if baton then
+              Option.iter bottom_parent_hash_opt ~f:(fun bottom_parent_hash ->
+                  collect_dependent_and_pass_the_baton_by_hash ~logger
+                    ~transition_states ~dsu:Context.processed_dsu
+                    bottom_parent_hash
+                  |> start ~context
+                       ~actions:(Async_kernel.Deferred.return actions)
+                       ~transition_states ) ;
+            actions.Misc.mark_processed_and_promote updated_hashes
+              ~reason:("verified " ^ F.data_name)
+        | Unequal_lengths ->
+            fail
+              (Error.of_string "result length is unequal to state hashes length")
+        )
+    | Result.Ok (Error (`Invalid_proof e)) ->
         (* We mark invalid only the top header because it is the only one for which
            we can be sure it's invalid. *)
-        actions.Misc.mark_invalid
-          ~error:(Error.tag ~tag:("invalid " ^ F.data_name) e)
-          top_state_hash
-    | Ok (Error (`Verifier_error e)) ->
+        Option.iter (top_state_hash ())
+          ~f:
+            (actions.Misc.mark_invalid
+               ~error:(Error.tag ~tag:("invalid " ^ F.data_name) e) )
+    | Result.Ok (Error (`Verifier_error e)) ->
         fail e
     | Ok (Error `Late_to_start) ->
         ()
@@ -318,7 +298,6 @@ module Make (F : F) = struct
     let top_state_hash =
       (Transition_state.State_functions.transition_meta top_state).state_hash
     in
-    let holder = ref top_state_hash in
     let state_hashes = Mina_stdlib.Nonempty_list.map ~f:get_state_hash states in
     let bottom_state = Mina_stdlib.Nonempty_list.head states in
     let downto_ =
@@ -327,7 +306,7 @@ module Make (F : F) = struct
     in
     let module I = Interruptible.Make () in
     let process_f () = F.verify ~context (module I) states in
-    let upon_f = upon_f ~context ~transition_states ~state_hashes ~holder in
+    let upon_f = upon_f ~context ~transition_states ~state_hashes in
     let processing_status =
       controlling_bandwidth ~resource:`Verifier ~context ~actions
         ~transition_states ~state_hash:top_state_hash ~process_f ~upon_f
@@ -335,7 +314,7 @@ module Make (F : F) = struct
         (module I)
     in
     Substate.In_progress
-      { interrupt_ivar = I.interrupt_ivar; processing_status; downto_; holder }
+      { interrupt_ivar = I.interrupt_ivar; processing_status; downto_ }
 
   and start_batch ~context ~actions ~transition_states states =
     let (module Context : CONTEXT) = context in

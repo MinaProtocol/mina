@@ -106,11 +106,7 @@ let building_breadcrumb_status ~context ~actions ~transition_states ~received
   in
   Substate.Processing
     (In_progress
-       { interrupt_ivar = I.interrupt_ivar
-       ; processing_status
-       ; downto_
-       ; holder = ref state_hash
-       } )
+       { interrupt_ivar = I.interrupt_ivar; processing_status; downto_ } )
 
 let get_parent ~transition_states ~context meta =
   let (module Context : CONTEXT) = context in
