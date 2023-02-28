@@ -30,7 +30,8 @@
   (<> %{env:RUST_TARGET_FEATURE_OPTIMISATIONS=y} n))
  (targets rustflags.sexp)
  (action
-  (with-stdout-to rustflags.sexp
+  (with-stdout-to
+   rustflags.sexp
    (echo "-C target-feature=+bmi2,+adx"))))
 
 (rule
@@ -38,7 +39,8 @@
   (= %{env:RUST_TARGET_FEATURE_OPTIMISATIONS=y} n))
  (targets rustflags.sexp)
  (action
-  (with-stdout-to rustflags.sexp
+  (with-stdout-to
+   rustflags.sexp
    (echo "-C target-feature=-bmi2,-adx"))))
 
 ;;
@@ -142,7 +144,11 @@
 ;; note: to build Mina, nix will set `MARLIN_PLONK_STUBS` and ignore this rule
 
 (rule
- (targets kimchi_types.ml pasta_bindings.ml kimchi_bindings.ml)
+ (targets
+  kimchi_types.ml
+  pasta_bindings.ml
+  kimchi_bindings.ml
+  snarky_bindings.ml)
  (enabled_if
   (= %{env:MARLIN_PLONK_STUBS=n} n))
  (mode promote)
@@ -167,7 +173,11 @@
 ;; this is used by nix
 
 (rule
- (targets kimchi_types.ml pasta_bindings.ml kimchi_bindings.ml)
+ (targets
+  kimchi_types.ml
+  pasta_bindings.ml
+  kimchi_bindings.ml
+  snarky_bindings.ml)
  (enabled_if
   (<> %{env:MARLIN_PLONK_STUBS=n} n))
  (mode promote)
