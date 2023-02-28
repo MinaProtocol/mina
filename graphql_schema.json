@@ -10880,49 +10880,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "OBJECT",
-          "name": "AccountId",
-          "description": null,
-          "fields": [
-            {
-              "name": "publicKey",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "PublicKey",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "tokenId",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "TokenId",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "SCALAR",
           "name": "InetAddr",
           "description": "network address",
@@ -11713,7 +11670,7 @@
               "deprecationReason": null
             },
             {
-              "name": "token",
+              "name": "tokenId",
               "description": "The token associated with this account",
               "args": [],
               "type": {
@@ -11727,6 +11684,22 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "token",
+              "description": "The token associated with this account",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": true,
+              "deprecationReason": "Use tokenId"
             },
             {
               "name": "timing",
@@ -11756,19 +11729,6 @@
                   "name": "AnnotatedBalance",
                   "ofType": null
                 }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "genesis_balance",
-              "description":
-                "The amount of MINA owned by the account at Genesis",
-              "args": [],
-              "type": {
-                "kind": "OBJECT",
-                "name": "AnnotatedBalance",
-                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -11940,23 +11900,6 @@
               "deprecationReason": null
             },
             {
-              "name": "isTokenOwner",
-              "description": "True if this account owns its associated token",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "isDeprecated": true,
-              "deprecationReason": null
-            },
-            {
-              "name": "isDisabled",
-              "description":
-                "True if this account has been disabled by the owner of the associated token",
-              "args": [],
-              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
-              "isDeprecated": true,
-              "deprecationReason": null
-            },
-            {
               "name": "index",
               "description":
                 "The index of this account in the ledger, or null if this account does not yet have a known position in the best tip ledger",
@@ -12019,7 +11962,8 @@
             },
             {
               "name": "tokenSymbol",
-              "description": "The token symbol associated with this account",
+              "description":
+                "The symbol for the token owned by this account, if there is one",
               "args": [],
               "type": { "kind": "SCALAR", "name": "String", "ofType": null },
               "isDeprecated": false,
@@ -13663,11 +13607,11 @@
             },
             {
               "name": "tokenOwner",
-              "description": "Find the account ID that owns a given token",
+              "description": "Find the account that owns a given token",
               "args": [
                 {
                   "name": "tokenId",
-                  "description": "Token ID to find the owner for",
+                  "description": "Token ID to find the owning account for",
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,
@@ -13680,11 +13624,7 @@
                   "defaultValue": null
                 }
               ],
-              "type": {
-                "kind": "OBJECT",
-                "name": "AccountId",
-                "ofType": null
-              },
+              "type": { "kind": "OBJECT", "name": "Account", "ofType": null },
               "isDeprecated": false,
               "deprecationReason": null
             },

@@ -128,10 +128,6 @@ type nonrec gate_type =
   | VarBaseMul
   | EndoMul
   | EndoMulScalar
-  | ChaCha0
-  | ChaCha1
-  | ChaCha2
-  | ChaChaFinal
   | Lookup
   | CairoClaim
   | CairoInstruction
@@ -144,20 +140,10 @@ type nonrec gate_type =
   | Xor16
   | Rot64
 
-type nonrec lookup_pattern =
-  | Xor
-  | ChaChaFinal
-  | Lookup
-  | RangeCheck
-  | ForeignFieldMul
+type nonrec lookup_pattern = Xor | Lookup | RangeCheck | ForeignFieldMul
 
 type nonrec lookup_patterns =
-  { xor : bool
-  ; chacha_final : bool
-  ; lookup : bool
-  ; range_check : bool
-  ; foreign_field_mul : bool
-  }
+  { xor : bool; lookup : bool; range_check : bool; foreign_field_mul : bool }
 
 type nonrec lookup_features =
   { patterns : lookup_patterns
@@ -166,7 +152,6 @@ type nonrec lookup_features =
   }
 
 type nonrec feature_flag =
-  | ChaCha
   | RangeCheck0
   | RangeCheck1
   | ForeignFieldAdd
@@ -199,11 +184,7 @@ module VerifierIndex = struct
     type nonrec lookups_used = Single | Joint
 
     type nonrec lookup_info =
-      { kinds : lookup_pattern array
-      ; max_per_row : int
-      ; max_joint_size : int
-      ; uses_runtime_tables : bool
-      }
+      { max_per_row : int; max_joint_size : int; features : lookup_features }
 
     type nonrec 't lookup_selectors = { lookup : 't option } [@@boxed]
 
@@ -228,7 +209,6 @@ module VerifierIndex = struct
     ; mul_comm : 'poly_comm
     ; emul_comm : 'poly_comm
     ; endomul_scalar_comm : 'poly_comm
-    ; chacha_comm : 'poly_comm array option
     }
 
   type nonrec ('fr, 'srs, 'poly_comm) verifier_index =

@@ -342,11 +342,13 @@ struct
   let assert_eq_deferred_values
       (m1 :
         ( 'a
-        , Inputs.Impl.Field.t Import.Scalar_challenge.t )
+        , Inputs.Impl.Field.t Import.Scalar_challenge.t
+        , _ )
         Types.Step.Proof_state.Deferred_values.Plonk.Minimal.t )
       (m2 :
         ( Inputs.Impl.Field.t
-        , Inputs.Impl.Field.t Import.Scalar_challenge.t )
+        , Inputs.Impl.Field.t Import.Scalar_challenge.t
+        , _ )
         Types.Step.Proof_state.Deferred_values.Plonk.Minimal.t ) =
     let open Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal in
     let chal c1 c2 = Field.Assert.equal c1 c2 in
@@ -509,6 +511,8 @@ struct
          ( _
          , _
          , _ Shifted_value.Type2.t
+         , _
+         , _
          , _ )
          Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t ) =
     with_label "incrementally_verify_proof" (fun () ->
@@ -631,8 +635,15 @@ struct
           ; gamma = plonk.gamma
           ; zeta = plonk.zeta
           ; joint_combiner
+          ; feature_flags = plonk.feature_flags
           }
-          { alpha; beta; gamma; zeta; joint_combiner } ;
+          { alpha
+          ; beta
+          ; gamma
+          ; zeta
+          ; joint_combiner
+          ; feature_flags = plonk.feature_flags
+          } ;
         (sponge_digest_before_evaluations, bulletproof_challenges) )
 
   let compute_challenges ~scalar chals =
@@ -831,7 +842,7 @@ struct
         (struct
           let constant_term = Plonk_checks.Scalars.Tick.constant_term
 
-          let index_terms = Plonk_checks.Scalars.Tick_with_lookup.index_terms
+          let index_terms = Plonk_checks.Scalars.Tick.index_terms
         end)
   end
 
@@ -873,7 +884,7 @@ struct
      Meaning it needs opt sponge. *)
   let finalize_other_proof (type b branches)
       (module Proofs_verified : Nat.Add.Intf with type n = b)
-      ~(step_uses_lookup : Plonk_types.Opt.Flag.t)
+      ~(feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
       ~(step_domains :
          [ `Known of (Domains.t, branches) Vector.t | `Side_loaded ] )
       ~(* TODO: Add "actual proofs verified" so that proofs don't
@@ -891,7 +902,9 @@ struct
         , Field.t Shifted_value.Type1.t
         , _
         , _
-        , Field.Constant.t Branch_data.Checked.t )
+        , _
+        , Field.Constant.t Branch_data.Checked.t
+        , _ )
         Types.Wrap.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
     let open Vector in
@@ -964,7 +977,9 @@ struct
     in
     let xi = scalar xi in
     let r = scalar (Import.Scalar_challenge.create r_actual) in
-    let plonk_minimal = Plonk.to_minimal plonk ~to_option:Opt.to_option in
+    let plonk_minimal =
+      Plonk.to_minimal plonk ~to_option:Opt.to_option_unsafe
+    in
     let combined_evals =
       let n = Int.ceil_log2 Max_degree.step in
       let zeta_n : Field.t = pow2_pow plonk.zeta n in
@@ -977,8 +992,28 @@ struct
     in
     let env =
       with_label "scalars_env" (fun () ->
+          let module Env_bool = struct
+            include Boolean
+
+            type t = Boolean.var
+          end in
+          let module Env_field = struct
+            include Field
+
+            type bool = Env_bool.t
+
+            let if_ (b : bool) ~then_ ~else_ =
+              match Impl.Field.to_constant (b :> t) with
+              | Some x ->
+                  (* We have a constant, only compute the branch we care about. *)
+                  if Impl.Field.Constant.(equal one) x then then_ ()
+                  else else_ ()
+              | None ->
+                  if_ b ~then_:(then_ ()) ~else_:(else_ ())
+          end in
           Plonk_checks.scalars_env
-            (module Field)
+            (module Env_bool)
+            (module Env_field)
             ~srs_length_log2:Common.Max_degree.step_log2
             ~endo:(Impl.Field.constant Endo.Step_inner_curve.base)
             ~mds:sponge_params.mds
@@ -996,23 +1031,6 @@ struct
         with_label "ft_eval0" (fun () ->
             Plonk_checks.ft_eval0
               (module Field)
-              ~lookup_constant_term_part:
-                ( match step_uses_lookup with
-                | No ->
-                    None
-                | Yes ->
-                    Some Plonk_checks.tick_lookup_constant_term_part
-                | Maybe -> (
-                    match plonk.lookup with
-                    | Maybe ((b : Boolean.var), _) ->
-                        Some
-                          (fun env ->
-                            Field.(
-                              (b :> t)
-                              * Plonk_checks.tick_lookup_constant_term_part env)
-                            )
-                    | None | Some _ ->
-                        assert false ) )
               ~env ~domain plonk_minimal combined_evals evals1.public_input )
       in
       print_fp "ft_eval0" ft_eval0 ;
@@ -1076,7 +1094,7 @@ struct
     in
     let plonk_checks_passed =
       with_label "plonk_checks_passed" (fun () ->
-          Plonk_checks.checked
+          Plonk_checks.checked ~feature_flags
             (module Impl)
             ~env ~shift:shift1 plonk combined_evals )
     in
@@ -1168,12 +1186,13 @@ struct
     Boolean.false_
 
   let verify ~proofs_verified ~is_base_case ~sg_old ~sponge_after_index
-      ~lookup_parameters ~(proof : Wrap_proof.Checked.t) ~srs ~wrap_domain
-      ~wrap_verification_key statement
+      ~lookup_parameters ~feature_flags ~(proof : Wrap_proof.Checked.t) ~srs
+      ~wrap_domain ~wrap_verification_key statement
       (unfinalized :
         ( _
         , _
         , _ Shifted_value.Type2.t
+        , _
         , _
         , _
         , _
@@ -1186,9 +1205,10 @@ struct
             (module Impl)
             (Types.Wrap.Statement.In_circuit.spec
                (module Impl)
-               lookup_parameters )
+               lookup_parameters feature_flags )
             (Types.Wrap.Statement.In_circuit.to_data
-               ~option_map:Plonk_types.Opt.map statement ) )
+               ~option_map:Plonk_types.Opt.map statement
+               ~to_opt:Plonk_types.Opt.to_option_unsafe ) )
       |> Array.map ~f:(function
            | `Field (Shifted_value.Type1.Shifted_value x) ->
                `Field x

@@ -12,18 +12,28 @@ module Verifier_index_json = struct
 
     type lookup_pattern = Kimchi_types.lookup_pattern =
       | Xor
-      | ChaChaFinal
       | Lookup
       | RangeCheck
       | ForeignFieldMul
     [@@deriving yojson]
 
-    type lookup_info = Kimchi_types.VerifierIndex.Lookup.lookup_info =
-      { kinds : lookup_pattern array
-      ; max_per_row : int
-      ; max_joint_size : int
+    type lookup_patterns = Kimchi_types.lookup_patterns =
+      { xor : bool
+      ; lookup : bool
+      ; range_check : bool
+      ; foreign_field_mul : bool
+      }
+    [@@deriving yojson]
+
+    type lookup_features = Kimchi_types.lookup_features =
+      { patterns : lookup_patterns
+      ; joint_lookup_used : bool
       ; uses_runtime_tables : bool
       }
+    [@@deriving yojson]
+
+    type lookup_info = Kimchi_types.VerifierIndex.Lookup.lookup_info =
+      { max_per_row : int; max_joint_size : int; features : lookup_features }
     [@@deriving yojson]
 
     type 'polyComm t = 'polyComm Kimchi_types.VerifierIndex.Lookup.t =
@@ -51,7 +61,6 @@ module Verifier_index_json = struct
     ; mul_comm : 'polyComm
     ; emul_comm : 'polyComm
     ; endomul_scalar_comm : 'polyComm
-    ; chacha_comm : 'polyComm array option
     }
   [@@deriving yojson]
 
@@ -158,7 +167,6 @@ module Stable = struct
              ; emul_comm = g c.emul_comm
              ; complete_add_comm = g c.complete_add_comm
              ; endomul_scalar_comm = g c.endomul_scalar_comm
-             ; chacha_comm = None
              } )
         ; shifts = Common.tock_shifts ~log2_size
         ; lookup_index = None

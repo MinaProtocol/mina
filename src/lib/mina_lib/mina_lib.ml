@@ -659,8 +659,8 @@ let get_snarked_ledger t state_hash_opt =
                 in
                 partial_txn
               in
-              Staged_ledger.Scan_state.apply_last_proof_transactions_async
-                ~ledger ~get_protocol_state ~apply_first_pass ~apply_second_pass
+              Staged_ledger.Scan_state.get_snarked_ledger_async ~ledger
+                ~get_protocol_state ~apply_first_pass ~apply_second_pass
                 ~apply_first_pass_sparse_ledger
                 (Staged_ledger.scan_state
                    (Transition_frontier.Breadcrumb.staged_ledger b) )
@@ -866,7 +866,7 @@ let best_chain ?max_length t =
   let best_tip_path = Transition_frontier.best_tip_path ?max_length frontier in
   match max_length with
   | Some max_length
-    when Mina_stdlib.List.Length.Compare.(best_tip_path > max_length) ->
+    when Mina_stdlib.List.Length.Compare.(best_tip_path >= max_length) ->
       (* The [best_tip_path] has already been truncated to the correct length,
          we skip adding the root to stay below the maximum.
       *)

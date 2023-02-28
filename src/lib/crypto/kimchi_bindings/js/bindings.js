@@ -1441,7 +1441,6 @@ var caml_plonk_verification_evals_to_rust = function (x, klass, poly_comm_class,
     var mul_comm = convert(x[6]);
     var emul_comm = convert(x[7]);
     var endomul_scalar_comm = convert(x[8]);
-    // TODO: Chacha
 
     return new klass(
         sigma_comm,

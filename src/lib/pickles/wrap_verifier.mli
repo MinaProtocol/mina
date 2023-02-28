@@ -92,7 +92,11 @@ val incrementally_verify_proof :
        ( Wrap_main_inputs.Impl.Field.t
        , Wrap_main_inputs.Impl.Field.t Import.Scalar_challenge.t
        , Wrap_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-       , 'd )
+       , ( Wrap_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
+         , Wrap_main_inputs.Impl.Boolean.var )
+         Pickles_types.Plonk_types.Opt.t
+       , 'd
+       , Wrap_main_inputs.Impl.Boolean.var )
        Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
   -> Wrap_main_inputs.Impl.Field.t
      * ( [> `Success of Wrap_main_inputs.Impl.Boolean.var ]
@@ -105,7 +109,8 @@ val finalize_other_proof :
        < generator : Wrap_main_inputs.Impl.Field.t
        ; shifts : Wrap_main_inputs.Impl.Field.t array
        ; vanishing_polynomial :
-           Wrap_main_inputs.Impl.Field.t -> Wrap_main_inputs.Impl.Field.t
+              Wrap_main_inputs.Impl.field Snarky_backendless__.Cvar.t
+           -> Wrap_main_inputs.Impl.field Snarky_backendless__.Cvar.t
        ; .. >
   -> sponge:Wrap_main_inputs.Sponge.t
   -> old_bulletproof_challenges:
@@ -117,6 +122,11 @@ val finalize_other_proof :
        Import.Scalar_challenge.t
      , Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
        Pickles_types.Shifted_value.Type2.t
+     , ( Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
+         Pickles_types.Shifted_value.Type2.t
+       , Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
+         Snarky_backendless.Boolean.t )
+       Composition_types.Opt.t
      , Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
        Snarky_backendless.Boolean.t
      , ( Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
@@ -126,7 +136,7 @@ val finalize_other_proof :
        Pickles_types.Vector.t )
      Import.Types.Step.Proof_state.Deferred_values.In_circuit.t
   -> ( Wrap_main_inputs.Impl.Field.t
-     , Wrap_main_inputs.Impl.Field.t Core_kernel.Array.t
+     , Wrap_main_inputs.Impl.Field.t Array.t
      , Wrap_main_inputs.Impl.Boolean.var )
      Pickles_types.Plonk_types.All_evals.In_circuit.t
   -> Wrap_main_inputs.Impl.Boolean.var

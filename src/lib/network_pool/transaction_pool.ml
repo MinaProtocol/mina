@@ -653,17 +653,18 @@ struct
             Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
             |> Option.is_some )
       in
-      [%log' info t.logger]
-        "Locally generated commands $cmds dropped because they conflicted with \
-         a committed command."
-        ~metadata:
-          [ ( "cmds"
-            , `List
-                (List.map commit_conflicts_locally_generated
-                   ~f:
-                     Transaction_hash.User_command_with_valid_signature
-                     .to_yojson ) )
-          ] ;
+      if not (List.is_empty commit_conflicts_locally_generated) then
+        [%log' info t.logger]
+          "Locally generated commands $cmds dropped because they conflicted \
+           with a committed command."
+          ~metadata:
+            [ ( "cmds"
+              , `List
+                  (List.map commit_conflicts_locally_generated
+                     ~f:
+                       Transaction_hash.User_command_with_valid_signature
+                       .to_yojson ) )
+            ] ;
       [%log' debug t.logger]
         !"Finished handling diff. Old pool size %i, new pool size %i. Dropped \
           %i commands during backtracking to maintain max size."
@@ -904,7 +905,7 @@ struct
     module Diff = struct
       type t = User_command.t list [@@deriving sexp, yojson]
 
-      type _unused = unit constraint t = Diff_versioned.t
+      let (_ : (t, Diff_versioned.t) Type_equal.t) = Type_equal.T
 
       module Diff_error = struct
         type t = Diff_versioned.Diff_error.t =
@@ -951,7 +952,7 @@ struct
         type t = (User_command.t * Diff_error.t) list
         [@@deriving sexp, yojson, compare]
 
-        type _unused = unit constraint t = Diff_versioned.Rejected.t
+        let (_ : (t, Diff_versioned.Rejected.t) Type_equal.t) = Type_equal.T
       end
 
       type rejected = Rejected.t [@@deriving sexp, yojson, compare]

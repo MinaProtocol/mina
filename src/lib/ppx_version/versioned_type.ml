@@ -169,8 +169,9 @@ module Printing = struct
       List.map type_decls_filtered_attrs ~f:filter_type_manifests
     in
     let stri = type_decls_to_stri type_decls_filtered_manifests in
-    Pprintast.structure_item Versioned_util.diff_formatter stri ;
-    Format.pp_print_flush Versioned_util.diff_formatter () ;
+    let formatter = Versioned_util.diff_formatter Format.std_formatter in
+    Pprintast.structure_item formatter stri ;
+    Format.pp_print_flush formatter () ;
     printf "\n%!" ;
     []
 

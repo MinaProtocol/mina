@@ -176,11 +176,24 @@ let%snarkydef_ step ~(logger : Logger.t)
     in
     (t, previous_state_hash, previous_blockchain_proof_input, body)
   in
+  let%bind txn_stmt_ledger_hashes_didn't_change =
+    txn_statement_ledger_hashes_equal
+      (previous_state |> Protocol_state.blockchain_state).ledger_proof_statement
+      { txn_snark with sok_digest = () }
+  in
+  let%bind supply_increase =
+    (* only increase the supply if the txn statement represents a new ledger transition *)
+    Currency.Amount.(
+      Signed.Checked.if_ txn_stmt_ledger_hashes_didn't_change
+        ~then_:
+          (Signed.create_var ~magnitude:(var_of_t zero) ~sgn:Sgn.Checked.pos)
+        ~else_:txn_snark.supply_increase)
+  in
   let%bind `Success updated_consensus_state, consensus_state =
     with_label __LOC__ (fun () ->
         Consensus_state_hooks.next_state_checked ~constraint_constants
           ~prev_state:previous_state ~prev_state_hash:previous_state_hash
-          transition txn_snark.supply_increase )
+          transition supply_increase )
   in
   let global_slot =
     Consensus.Data.Consensus_state.global_slot_since_genesis_var consensus_state
@@ -226,16 +239,6 @@ let%snarkydef_ step ~(logger : Logger.t)
     (t, is_base_case)
   in
   let%bind txn_snark_should_verify, success =
-    let%bind txn_stmt_ledger_hashes_didn't_change =
-      txn_statement_ledger_hashes_equal
-        (previous_state |> Protocol_state.blockchain_state)
-          .ledger_proof_statement
-        { txn_snark with sok_digest = () }
-    and supply_increase_is_zero =
-      Currency.Amount.(
-        Signed.Checked.equal txn_snark.supply_increase
-          (Signed.Checked.of_unsigned (var_of_t zero)))
-    in
     let%bind new_pending_coinbase_hash, deleted_stack, no_coinbases_popped =
       let coinbase_receiver =
         Consensus.Data.Consensus_state.coinbase_receiver_var consensus_state
@@ -295,11 +298,7 @@ let%snarkydef_ step ~(logger : Logger.t)
       >>= Boolean.all
     in
     let%bind nothing_changed =
-      Boolean.all
-        [ txn_stmt_ledger_hashes_didn't_change
-        ; supply_increase_is_zero
-        ; no_coinbases_popped
-        ]
+      Boolean.all [ txn_stmt_ledger_hashes_didn't_change; no_coinbases_popped ]
     in
     let%bind correct_coinbase_status =
       let new_root =
@@ -423,7 +422,7 @@ let rule ~proof_level ~constraint_constants transaction_snark self :
         ; public_output = ()
         ; auxiliary_output = ()
         } )
-  ; uses_lookup = false
+  ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
   }
 
 module type S = sig
@@ -480,7 +479,7 @@ end) : S = struct
 
   let tag, cache_handle, p, Pickles.Provers.[ step ] =
     Pickles.compile () ~cache:Cache_dir.cache ~public_input:(Input typ)
-      ~auxiliary_typ:Typ.unit ~override_wrap_domain:N1
+      ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N2)
       ~name:"blockchain-snark"

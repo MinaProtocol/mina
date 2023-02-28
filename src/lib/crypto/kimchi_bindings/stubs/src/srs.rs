@@ -1,10 +1,10 @@
 use ark_poly::UVPolynomial;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Evaluations};
-use commitment_dlog::{
+use paste::paste;
+use poly_commitment::{
     commitment::{b_poly_coefficients, caml::CamlPolyComm},
     srs::SRS,
 };
-use paste::paste;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -99,7 +99,7 @@ macro_rules! impl_srs {
                 srs: $name,
                 log2_size: ocaml::Int,
             ) {
-                let ptr: &mut commitment_dlog::srs::SRS<$G> =
+                let ptr: &mut poly_commitment::srs::SRS<$G> =
                     unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
                 let domain = EvaluationDomain::<$F>::new(1 << (log2_size as usize)).expect("invalid domain size");
                 ptr.add_lagrange_basis(domain);
