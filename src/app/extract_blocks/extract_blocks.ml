@@ -4,7 +4,6 @@ open Core_kernel
 open Async
 open Mina_base
 open Mina_transaction
-open Signature_lib
 open Archive_lib
 
 let epoch_data_of_raw_epoch_data ~pool (raw_epoch_data : Processor.Epoch_data.t)
@@ -123,6 +122,7 @@ let fill_in_accounts_accessed pool block_state_hash =
 
 let fill_in_accounts_created pool block_state_hash =
   let query_db = Mina_caqti.query pool in
+  let pk_of_id = Load_data.pk_of_id pool in
   let open Deferred.Let_syntax in
   let%bind block_id =
     query_db ~f:(fun db -> Processor.Block.find db ~state_hash:block_state_hash)
@@ -141,13 +141,7 @@ let fill_in_accounts_created pool block_state_hash =
         query_db ~f:(fun db ->
             Processor.Account_identifiers.load db account_identifier_id )
       in
-      let%bind pk =
-        let%map pk_str =
-          query_db ~f:(fun db ->
-              Processor.Public_key.find_by_id db public_key_id )
-        in
-        Public_key.Compressed.of_base58_check_exn pk_str
-      in
+      let%bind pk = pk_of_id public_key_id in
       let%bind token_id =
         let%map { value; _ } =
           query_db ~f:(fun db -> Processor.Token.find_by_id db token_id)
@@ -160,6 +154,7 @@ let fill_in_accounts_created pool block_state_hash =
 
 let fill_in_tokens_used pool block_state_hash =
   let query_db = Mina_caqti.query pool in
+  let pk_of_id = Load_data.pk_of_id pool in
   let open Deferred.Let_syntax in
   let%bind block_id =
     query_db ~f:(fun db -> Processor.Block.find db ~state_hash:block_state_hash)
@@ -171,13 +166,7 @@ let fill_in_tokens_used pool block_state_hash =
     | None, None ->
         return (token_id, None)
     | Some owner_pk_id, Some owner_tok_id ->
-        let%bind owner_pk =
-          let%map pk_str =
-            query_db ~f:(fun db ->
-                Processor.Public_key.find_by_id db owner_pk_id )
-          in
-          Public_key.Compressed.of_base58_check_exn pk_str
-        in
+        let%bind owner_pk = pk_of_id owner_pk_id in
         let%bind owner_token_id =
           let%map owner_token =
             query_db ~f:(fun db -> Processor.Token.find_by_id db owner_tok_id)
