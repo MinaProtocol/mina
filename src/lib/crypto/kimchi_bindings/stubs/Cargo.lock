@@ -195,31 +195,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "commitment_dlog"
-version = "0.1.0"
-dependencies = [
- "ark-ec",
- "ark-ff",
- "ark-poly",
- "ark-serialize",
- "blake2",
- "groupmap",
- "itertools",
- "mina-curves",
- "mina-poseidon",
- "o1-utils",
- "ocaml",
- "ocaml-gen",
- "once_cell",
- "rand",
- "rand_core",
- "rayon",
- "serde",
- "serde_with",
- "thiserror",
-]
-
-[[package]]
 name = "const-random"
 version = "0.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -498,7 +473,6 @@ dependencies = [
  "ark-poly",
  "ark-serialize",
  "blake2",
- "commitment_dlog",
  "disjoint-set",
  "groupmap",
  "hex",
@@ -513,6 +487,7 @@ dependencies = [
  "ocaml",
  "ocaml-gen",
  "once_cell",
+ "poly-commitment",
  "rand",
  "rand_core",
  "rayon",
@@ -786,6 +761,31 @@ checksum = "cc8bed3549e0f9b0a2a78bf7c0018237a2cdf085eecbbc048e52612438e4e9d0"
 dependencies = [
  "thiserror",
  "ucd-trie",
+]
+
+[[package]]
+name = "poly-commitment"
+version = "0.1.0"
+dependencies = [
+ "ark-ec",
+ "ark-ff",
+ "ark-poly",
+ "ark-serialize",
+ "blake2",
+ "groupmap",
+ "itertools",
+ "mina-curves",
+ "mina-poseidon",
+ "o1-utils",
+ "ocaml",
+ "ocaml-gen",
+ "once_cell",
+ "rand",
+ "rand_core",
+ "rayon",
+ "serde",
+ "serde_with",
+ "thiserror",
 ]
 
 [[package]]
@@ -1188,7 +1188,6 @@ dependencies = [
  "ark-poly",
  "ark-serialize",
  "array-init",
- "commitment_dlog",
  "groupmap",
  "kimchi",
  "libc",
@@ -1200,6 +1199,7 @@ dependencies = [
  "ocaml-gen",
  "once_cell",
  "paste",
+ "poly-commitment",
  "rand",
  "rayon",
  "rmp-serde 0.15.5",

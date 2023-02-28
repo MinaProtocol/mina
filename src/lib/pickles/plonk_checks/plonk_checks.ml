@@ -119,8 +119,7 @@ type 'bool all_feature_flags =
 
 let expand_feature_flags (type boolean)
     (module B : Bool_intf with type t = boolean)
-    ({ chacha
-     ; range_check0
+    ({ range_check0
      ; range_check1
      ; foreign_field_add = _
      ; foreign_field_mul
@@ -131,17 +130,15 @@ let expand_feature_flags (type boolean)
      } as features :
       boolean Plonk_types.Features.t ) : boolean all_feature_flags =
   let lookup_tables =
-    lazy
-      (B.any
-         [ chacha; range_check0; range_check1; foreign_field_mul; xor; rot ] )
+    lazy (B.any [ range_check0; range_check1; foreign_field_mul; xor; rot ])
   in
   let lookup_pattern_range_check =
     (* RangeCheck, Rot gates use RangeCheck lookup pattern *)
     lazy B.(range_check0 ||| range_check1 ||| rot)
   in
   let lookup_pattern_xor =
-    (* Xor, ChaCha gates use Xor lookup pattern *)
-    lazy (B.( ||| ) xor chacha)
+    (* Xor lookup pattern *)
+    lazy xor
   in
   (* Make sure these stay up-to-date with the layouts!! *)
   let table_width_3 =
@@ -222,8 +219,6 @@ let lookup_tables_used feature_flags =
 let get_feature_flag (feature_flags : _ all_feature_flags)
     (feature : Kimchi_types.feature_flag) =
   match feature with
-  | ChaCha ->
-      Some feature_flags.features.chacha
   | RangeCheck0 ->
       Some feature_flags.features.range_check0
   | RangeCheck1 ->
@@ -260,8 +255,6 @@ let get_feature_flag (feature_flags : _ all_feature_flags)
       Some feature_flags.features.lookup
   | LookupPattern Xor ->
       Some (Lazy.force feature_flags.lookup_pattern_xor)
-  | LookupPattern ChaChaFinal ->
-      Some feature_flags.features.chacha
   | LookupPattern RangeCheck ->
       Some (Lazy.force feature_flags.lookup_pattern_range_check)
   | LookupPattern ForeignFieldMul ->
@@ -306,8 +299,7 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
         get_eval (Opt.value_exn e.lookup).aggreg
     | LookupRuntimeTable ->
         get_eval (Opt.value_exn (Opt.value_exn e.lookup).runtime)
-    | LookupKindIndex (Lookup | Xor | ChaChaFinal | RangeCheck | ForeignFieldMul)
-      ->
+    | LookupKindIndex (Lookup | Xor | RangeCheck | ForeignFieldMul) ->
         failwith "Lookup kind index should have been linearized away"
     | LookupRuntimeSelector ->
         failwith "Lookup runtime selector should have been linearized away"
@@ -515,19 +507,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
             | Some joint_combiner ->
                 Some { joint_combiner } )
         ; optional_column_scalars =
-            { chacha0 =
-                compute_feature (Index ChaCha0) feature_flags.chacha
-                  actual_feature_flags.chacha
-            ; chacha1 =
-                compute_feature (Index ChaCha1) feature_flags.chacha
-                  actual_feature_flags.chacha
-            ; chacha2 =
-                compute_feature (Index ChaCha2) feature_flags.chacha
-                  actual_feature_flags.chacha
-            ; chacha_final =
-                compute_feature (Index ChaChaFinal) feature_flags.chacha
-                  actual_feature_flags.chacha
-            ; range_check0 =
+            { range_check0 =
                 compute_feature (Index RangeCheck0) feature_flags.range_check0
                   actual_feature_flags.range_check0
             ; range_check1 =

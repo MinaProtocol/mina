@@ -121,7 +121,7 @@ val latest_ledger_proof :
     tree corresponding to a proof. Set this to true when applying transactions
     to get the snarked ledger corresponding to a proof.
     *)
-val apply_last_proof_transactions_sync :
+val get_snarked_ledger_sync :
      ledger:Ledger.t
   -> get_protocol_state:
        (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)
@@ -145,7 +145,7 @@ val apply_last_proof_transactions_sync :
   -> t
   -> unit Or_error.t
 
-val apply_last_proof_transactions_async :
+val get_snarked_ledger_async :
      ?async_batch_size:int
   -> ledger:Ledger.t
   -> get_protocol_state:
@@ -170,16 +170,14 @@ val apply_last_proof_transactions_async :
   -> t
   -> unit Deferred.Or_error.t
 
-(** Apply all the currently staged transaction to snarked ledger based on the 
-    two-pass system- first pass includes legacy transactions and zkapp payments
-    and the second pass includes account updates. [ignore_incomplete] is to
-    ignore the account updates that were not completed in a single scan state
-    tree corresponding to a proof. Set this to true when applying transactions
-    to get the snarked ledger corresponding to a proof.
-    Returns the target first pass ledger after all the transactions have been
-    applied
+(** Apply all the staged transactions to snarked ledger based on the 
+    two-pass system to obtain the staged ledger- first pass includes legacy 
+    transactions and zkapp payments and the second pass includes account 
+    updates.
+    Returns the target first pass ledger hash after all the transactions have 
+    been applied
     *)
-val apply_staged_transactions_async :
+val get_staged_ledger_async :
      ?async_batch_size:int
   -> ledger:Ledger.t
   -> get_protocol_state:

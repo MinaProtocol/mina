@@ -15,6 +15,8 @@ struct
         Vector.init Zkapp_state.Max_state_size.n ~f:(fun i ->
             Zkapp_basic.Set_or_keep.Set (Snark_params.Tick.Field.of_int i) )
     }
+
+  let is_non_zkapp_update = false
 end
 
 let%test_module "Update account app_state" =
