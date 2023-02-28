@@ -145,6 +145,21 @@ module Tree_test = struct
          [ node 1 [ node 0 []; node 2 [ node 3 [] ] ]; node 2 [] ]
          ~f:(fun _ x _ -> x * 2) )
 
+  let%test_unit "mapi_forest_with_trees is distributive" =
+    Quickcheck.test
+      (gen Int.quickcheck_generator Int.quickcheck_generator
+         Int.quickcheck_generator ) ~f:(fun forest ->
+        let f_1 = ( + ) 2 in
+        let f_2 = ( * ) 3 in
+        let forest_1 =
+          Tree.mapi_forest_with_trees ~f:(fun _ x _ -> f_1 x)
+          @@ Tree.mapi_forest_with_trees forest ~f:(fun _ x _ -> f_2 x)
+        in
+        let forest_2 =
+          Tree.mapi_forest_with_trees forest ~f:(fun _ x _ -> f_1 @@ f_2 x)
+        in
+        [%test_eq: (int, int, int) t] forest_1 forest_2 )
+
   let%test_unit "mapi' preserves shape" =
     let open Quickcheck.Generator.Let_syntax in
     Quickcheck.test
@@ -169,6 +184,19 @@ module Tree_test = struct
       (Tree.mapi_forest' ~i:3
          [ node 1 [ node 0 []; node 2 [ node 3 [] ] ] ]
          ~f:(fun i x -> i + x) )
+
+  (* map_forest (f_1 @@ f_2) forest <=> map_forest f_1 @@ map_forest f_2 *)
+  let%test_unit "map_forest is distributive" =
+    Quickcheck.test
+      (gen Int.quickcheck_generator Int.quickcheck_generator
+         Int.quickcheck_generator ) ~f:(fun forest ->
+        let f_1 = ( + ) 2 in
+        let f_2 = ( * ) 3 in
+        let forest_1 =
+          Tree.map_forest ~f:f_1 @@ Tree.map_forest forest ~f:f_2
+        in
+        let forest_2 = Tree.mapi_forest forest ~f:(fun _ x -> f_1 @@ f_2 x) in
+        [%test_eq: (int, int, int) t] forest_1 forest_2 )
 
   let%test_unit "deferred_map_forest f x is equivalent to map_forest f x" =
     Quickcheck.test
