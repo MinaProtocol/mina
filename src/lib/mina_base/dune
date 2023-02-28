@@ -72,6 +72,8 @@
    o1trace
    merkle_ledger
    merkle_mask
+   splittable_random
+   storage
    syncable_ledger
    merkle_address
    rocksdb
