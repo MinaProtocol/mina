@@ -399,12 +399,7 @@ let get_fee_payer_body ~pool body_id =
   let%bind { public_key_id; fee; valid_until; nonce } =
     query_db ~f:(fun db -> Processor.Zkapp_fee_payer_body.load db body_id)
   in
-  let%bind public_key_str =
-    query_db ~f:(fun db -> Processor.Public_key.find_by_id db public_key_id)
-  in
-  let public_key =
-    Signature_lib.Public_key.Compressed.of_base58_check_exn public_key_str
-  in
+  let%bind public_key = pk_of_id pool public_key_id in
   let fee = Currency.Fee.of_string fee in
   let valid_until =
     let open Option.Let_syntax in
