@@ -19,7 +19,7 @@ chmod -R 0700 /root/libp2p-keys/
 
 # Restart in the background
 mina daemon \
-  --peer-list-url "https://storage.googleapis.com/seed-lists/${TESTNET_NAME}_seeds.txt" \
+  --peer-list-url "https://storage.googleapis.com/seed-lists/berkeley_seeds.txt" \
   --libp2p-keypair "/root/libp2p-keys/key" \
 & # -background
 
