@@ -422,7 +422,6 @@ let out_of_circuit_pure_function () =
 
 (** This should be an impure function, and as such needs to be run within an API function (e.g. generate_witness, constraint_system). Otherwise it is expected to fail. *)
 let out_of_circuit_impure_function () =
-  printf "out_of_circuit_impure_function: %s\n" (Impl.dump ()) ;
   let one =
     Impl.exists Impl.Field.typ ~compute:(fun _ -> Impl.Field.Constant.one)
   in
