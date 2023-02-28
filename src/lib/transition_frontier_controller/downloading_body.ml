@@ -132,11 +132,7 @@ and make_download_body_ctx ~preferred_peers ~body_opt ~header ~transition_states
           (module I)
       in
       Substate.In_progress
-        { interrupt_ivar = I.interrupt_ivar
-        ; processing_status
-        ; downto_
-        ; holder = ref state_hash
-        }
+        { interrupt_ivar = I.interrupt_ivar; processing_status; downto_ }
 
 (** Restart a failed ancestor. This function takes a transition state of ancestor and
     restarts the downloading process for it. *)

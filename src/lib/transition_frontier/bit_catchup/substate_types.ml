@@ -17,8 +17,6 @@ type 'a processing_context =
       ; interrupt_ivar : unit Ivar.t
       ; downto_ : Mina_numbers.Length.t
             (** Blockchain length down to which this context performs processing *)
-      ; holder : State_hash.t ref
-            (** Last transition which held this context *)
       }  (** A deferred action is in progress *)
   | Dependent
       (** A deferred action is to be handled by a gossiped descendant

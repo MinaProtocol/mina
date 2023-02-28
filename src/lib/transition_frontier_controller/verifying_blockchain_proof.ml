@@ -92,6 +92,25 @@ let promote_to ~context ~actions ~header ~transition_states ~substate:s
     ; baton = false
     }
 
+let update_to_processing_done_on_gossip ~context ~actions ~transition_states
+    ~state_hash ~dsu res =
+  let (module Context : CONTEXT) = context in
+  let logger = Context.logger in
+  let%map.Option st, _, ctx_opt =
+    update_to_processing_done ~logger ~transition_states ~state_hash res
+  in
+  let meta = Transition_state.State_functions.transition_meta st in
+  let passed_ctx =
+    pass_ctx_to_next_unprocessed ~logger ~transition_states ~dsu ~baton:true
+      meta.parent_state_hash ctx_opt
+  in
+  if not passed_ctx then
+    collect_dependent_and_pass_the_baton_by_hash ~logger ~dsu ~transition_states
+      meta.parent_state_hash
+    |> start ~context
+         ~actions:(Async_kernel.Deferred.return actions)
+         ~transition_states
+
 (** Mark the transition in [Verifying_blockchain_proof] processed.
 
    This function is called when a gossip for the transition is received.
@@ -107,12 +126,10 @@ let make_processed ~context ~actions ~transition_states header =
   let (module Context : CONTEXT) = context in
   let state_hash = state_hash_of_header_with_validation header in
   Option.value ~default:()
-  @@ let%map.Option for_restart =
-       update_to_processing_done ~logger:Context.logger ~transition_states
-         ~state_hash ~dsu:Context.processed_dsu ~reuse_ctx:true header
+  @@ let%map.Option () =
+       update_to_processing_done_on_gossip ~context ~actions ~transition_states
+         ~state_hash ~dsu:Context.processed_dsu header
      in
-     start ~context
-       ~actions:(Async_kernel.Deferred.return actions)
-       ~transition_states for_restart ;
+
      actions.Misc.mark_processed_and_promote [ state_hash ]
        ~reason:"gossip received"

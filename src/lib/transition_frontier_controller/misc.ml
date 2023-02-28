@@ -23,8 +23,6 @@ as the result of [mark_processed].
    1. Order of [state_hashes] respects parent-child relationship and parent always comes first
    2. Respective substates for states from [processed] are in [Processing (Done _)] status
 
-  Post-condition: list returned respects parent-child relationship and parent always comes first 
-
 This is a recursive function that is called recursively when a transition
 is promoted multiple times or upon completion of deferred action.
 *)
