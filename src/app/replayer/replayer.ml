@@ -255,10 +255,7 @@ let cache_fee_transfer_via_coinbase pool (internal_cmd : Sql.Internal_command.t)
     =
   match internal_cmd.typ with
   | "fee_transfer_via_coinbase" ->
-      let%map receiver_acct_id =
-        Load_data.account_identifier_of_id pool internal_cmd.receiver_id
-      in
-      let receiver_pk = Account_id.public_key receiver_acct_id in
+      let%map receiver_pk = Load_data.pk_of_id pool internal_cmd.receiver_id in
       let fee =
         Currency.Fee.of_uint64 (Unsigned.UInt64.of_int64 internal_cmd.fee)
       in
@@ -278,11 +275,8 @@ module User_command_helpers = struct
         Sql.User_command.t ) : Signed_command_payload.Body.t Deferred.t =
     let open Signed_command_payload.Body in
     let open Deferred.Let_syntax in
-    let account_identifier_of_id = Load_data.account_identifier_of_id pool in
-    let%bind source_account_id = account_identifier_of_id source_id in
-    let%map receiver_account_id = account_identifier_of_id receiver_id in
-    let source_pk = Account_id.public_key source_account_id in
-    let receiver_pk = Account_id.public_key receiver_account_id in
+    let%bind source_pk = Load_data.pk_of_id pool source_id in
+    let%map receiver_pk = Load_data.pk_of_id pool receiver_id in
     let amount =
       Option.map amount
         ~f:(Fn.compose Currency.Amount.of_uint64 Unsigned.UInt64.of_int64)
@@ -319,13 +313,9 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
   let fee_transfer_of_cmd (cmd : Sql.Internal_command.t) =
     if not (String.equal cmd.typ "fee_transfer") then
       failwithf "Expected fee transfer, got: %s" cmd.typ () ;
-    let account_identifier_of_id = Load_data.account_identifier_of_id pool in
-    let%map receiver_account_identifier =
-      account_identifier_of_id cmd.receiver_id
-    in
     let fee = Currency.Fee.of_uint64 (Unsigned.UInt64.of_int64 cmd.fee) in
-    let receiver_pk = Account_id.public_key receiver_account_identifier in
-    let fee_token = Account_id.token_id receiver_account_identifier in
+    let%map receiver_pk = Load_data.pk_of_id pool cmd.receiver_id in
+    let fee_token = Token_id.default in
     Fee_transfer.Single.create ~receiver_pk ~fee ~fee_token
   in
   match ics with
@@ -378,11 +368,8 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
                transfer"
               ic.global_slot_since_genesis ic.sequence_no
               ic.secondary_sequence_no ;
-          let%map receiver_account_id =
-            Load_data.account_identifier_of_id pool ic.receiver_id
-          in
-          let receiver_pk = Account_id.public_key receiver_account_id in
-          match Coinbase.create ~amount ~receiver:receiver_pk ~fee_transfer with
+          let%map receiver = Load_data.pk_of_id pool ic.receiver_id in
+          match Coinbase.create ~amount ~receiver ~fee_transfer with
           | Ok cb ->
               (Some (Mina_transaction.Transaction.Coinbase cb), ics)
           | Error err ->
@@ -399,10 +386,8 @@ let user_command_to_transaction ~logger ~pool ~ledger (cmd : Sql.User_command.t)
     "Converting user command (%s) with nonce %Ld, global slot since genesis \
      %Ld, and sequence number %d to transaction"
     cmd.typ cmd.nonce cmd.global_slot_since_genesis cmd.sequence_no ;
-  let account_identifier_of_id = Load_data.account_identifier_of_id pool in
   let%bind body = User_command_helpers.body_of_sql_user_cmd pool cmd in
-  let%bind fee_payer_account_id = account_identifier_of_id cmd.fee_payer_id in
-  let fee_payer_pk = Account_id.public_key fee_payer_account_id in
+  let%bind fee_payer_pk = Load_data.pk_of_id pool cmd.fee_payer_id in
   let memo = Signed_command_memo.of_base58_check_exn cmd.memo in
   let valid_until =
     Option.map cmd.valid_until ~f:(fun slot ->
@@ -520,7 +505,7 @@ let zkapp_command_to_transaction ~logger ~pool (cmd : Sql.Zkapp_command.t) :
   (* use dummy authorizations *)
   let%bind (fee_payer : Account_update.Fee_payer.t) =
     let%map (body : Account_update.Body.Fee_payer.t) =
-      Archive_lib.Load_data.get_fee_payer_body ~pool cmd.zkapp_fee_payer_body_id
+      Load_data.get_fee_payer_body ~pool cmd.zkapp_fee_payer_body_id
     in
     ({ body; authorization = Signature.dummy } : Account_update.Fee_payer.t)
   in
