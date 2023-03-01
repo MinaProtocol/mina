@@ -4,12 +4,8 @@ open Mina_base
 open Mina_numbers
 open Signature_lib
 open Helpers
-open Account_update_utils
-
-let constraint_constants =
-  { Genesis_constants.Constraint_constants.for_unit_tests with
-    account_creation_fee = Fee.of_mina_int_exn 1
-  }
+open Protocol_config_examples
+open Zkapp_cmd_builder
 
 (* The function under test is quite slow, so keep the trials count low
    so that tests finish in a reasonable amount of time. *)
@@ -66,9 +62,9 @@ let%test_module "Test transaction logic." =
         (fee_payer.pk, fee, accounts, (txns :> transaction list)))
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
-            (Pred.pure ~f:(fun (txn, ledger) ->
+            (Predicates.pure ~f:(fun (txn, ledger) ->
                  Transaction_status.equal txn.command.status Applied
-                 && Pred.verify_balance_changes ~txn ~ledger accounts ) )
+                 && Predicates.verify_balance_changes ~txn ~ledger accounts ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
     let%test_unit "Fee payer must be able to pay the fee." =
@@ -96,7 +92,7 @@ let%test_module "Test transaction logic." =
         (sender.pk, fee, accounts, [ (txn :> transaction) ]))
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
-            (Pred.pure
+            (Predicates.pure
                ~with_error:(fun e ->
                  String.is_substring (Error.to_string_hum e)
                    ~substring:"Overflow" )
@@ -127,7 +123,7 @@ let%test_module "Test transaction logic." =
         (account.pk, fee, [ account ], [ (update :> transaction) ]))
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
-            (Pred.pure ~f:(fun (txn, _) ->
+            (Predicates.pure ~f:(fun (txn, _) ->
                  Transaction_status.equal txn.command.status
                    (Failed [ []; [ Invalid_fee_excess ] ]) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
@@ -154,7 +150,7 @@ let%test_module "Test transaction logic." =
         (account.pk, fee, [ account ], [ (update :> transaction) ]))
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
-            (Pred.pure ~f:(fun (txn, _) ->
+            (Predicates.pure ~f:(fun (txn, _) ->
                  Transaction_status.equal txn.command.status
                    (Failed [ []; [ Invalid_fee_excess ] ]) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
@@ -176,12 +172,13 @@ let%test_module "Test transaction logic." =
         (account.pk, fee, [ account ], [ (txn :> transaction) ]))
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
-            (Pred.pure ~f:(fun (txn, ledger) ->
+            (Predicates.pure ~f:(fun (txn, ledger) ->
                  Transaction_status.equal txn.command.status Applied
-                 && Pred.verify_account_updates (List.hd_exn accounts) ~txn
-                      ~ledger ~f:(fun balance_change -> function
+                 && Predicates.verify_account_updates (List.hd_exn accounts)
+                      ~txn ~ledger ~f:(fun balance_change -> function
                       | Some orig, Some updt ->
-                          Pred.verify_balance_change ~balance_change orig updt
+                          Predicates.verify_balance_change ~balance_change orig
+                            updt
                           && not
                                Account.Poly.(
                                  Account.Token_symbol.equal orig.token_symbol
@@ -204,16 +201,19 @@ let%test_module "Test transaction logic." =
         (delegate.pk, fee, [ delegator; delegate ], [ (txn :> transaction) ]))
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
-            (Pred.pure ~f:(fun (txn, ledger) ->
+            (Predicates.pure ~f:(fun (txn, ledger) ->
                  let delegator = List.hd_exn accounts in
                  let delegate_pk =
                    (Option.value_exn @@ List.nth accounts 1).pk
                  in
                  Transaction_status.equal txn.command.status Applied
-                 && Pred.verify_account_updates delegator ~txn ~ledger ~f:(fun _ -> function
-                        | (Some _, Some updt) ->
-                           Option.equal Public_key.Compressed.equal updt.delegate (Some delegate_pk)
-                        | _ -> false)) )
+                 && Predicates.verify_account_updates delegator ~txn ~ledger
+                      ~f:(fun _ -> function
+                      | Some _, Some updt ->
+                          Option.equal Public_key.Compressed.equal updt.delegate
+                            (Some delegate_pk)
+                      | _ ->
+                          false ) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
     (* It is assumed here that the account is indeed an zkApp account. Presumably
@@ -221,7 +221,7 @@ let%test_module "Test transaction logic." =
        account, this update succeeds, but does nothing. For the moment we're ignoring
        the fact that the account isn't being updated. We'll revisit and strengthen
         this test after some refactoring. *)
-        let%test_unit "Zkapp URI can be set." =
+    let%test_unit "Zkapp URI can be set." =
       Quickcheck.test ~trials
         (let open Quickcheck in
         let open Generator.Let_syntax in
@@ -235,7 +235,7 @@ let%test_module "Test transaction logic." =
         (account.pk, fee, [ account ], [ (txn :> transaction) ]))
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
-            (Pred.pure ~f:(fun (txn, _) ->
-                 Transaction_status.equal txn.command.status Applied) )
+            (Predicates.pure ~f:(fun (txn, _) ->
+                 Transaction_status.equal txn.command.status Applied ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
   end )

@@ -1,14 +1,40 @@
 open! Core_kernel
 open Currency
 open Mina_base
+open Mina_numbers
 open Signature_lib
+open Zkapp_command
+
+type nonces = Account_nonce.t Public_key.Compressed.Map.t
+
+type account_update =
+  ( (Account_update.t, Digest.Account_update.t, Digest.Forest.t) Call_forest.tree
+  , Digest.Forest.t )
+  With_stack_hash.t
+
+type transaction = < updates : (account_update list, nonces) Monad_lib.State.t >
 
 let dummy_auth = Control.Signature Signature.dummy
+
+let get_nonce_exn (pk : Public_key.Compressed.t) :
+    ( Account_nonce.t
+    , Account_nonce.t Public_key.Compressed.Map.t )
+    Monad_lib.State.t =
+  let open Monad_lib in
+  let open State.Let_syntax in
+  let%bind nonce =
+    State.getf (fun m -> Public_key.Compressed.Map.find_exn m pk)
+  in
+  let%map () =
+    State.modify ~f:(fun m ->
+        Public_key.Compressed.Map.set m ~key:pk ~data:(Account_nonce.succ nonce) )
+  in
+  nonce
 
 let update_body ?(update = Account_update.Update.noop) ~account amount =
   let open Monad_lib.State.Let_syntax in
   let open Account_update in
-  let%map nonce = Helpers.get_nonce_exn account in
+  let%map nonce = get_nonce_exn account in
   let account_update = update in
   Body.
     { dummy with
@@ -49,8 +75,7 @@ module Simple_txn = struct
 
       method amount : Amount.t = amount
 
-      method updates
-          : (Helpers.account_update list, Helpers.nonces) Monad_lib.State.t =
+      method updates : (account_update list, nonces) Monad_lib.State.t =
         let open Monad_lib.State.Let_syntax in
         let%bind sender_decrease_body =
           update_body ~account:sender
@@ -72,7 +97,7 @@ module Simple_txn = struct
     let open Quickcheck in
     let open Generator.Let_syntax in
     let make_txn = make in
-    let open Helpers.Test_account in
+    let open Test_account in
     let eligible_senders = List.filter ~f:non_empty known_accounts in
     let%bind sender = Generator.of_list eligible_senders in
     let eligible_receivers =
@@ -95,7 +120,6 @@ module Simple_txn = struct
   let gen_account_pair_and_txn =
     let open Quickcheck in
     let open Generator.Let_syntax in
-    let open Helpers in
     let%bind sender =
       Generator.filter ~f:Test_account.non_empty Test_account.gen
     in
@@ -144,3 +168,29 @@ module Alter_account = struct
         [ update { body; authorization = dummy_auth } ]
     end
 end
+
+let mk_updates (t : transaction) = t#updates
+
+let fee_payer_body (account, amount) =
+  let open Monad_lib in
+  let open State.Let_syntax in
+  let open Account_update.Body.Fee_payer in
+  let%map nonce = get_nonce_exn account in
+  { public_key = account; fee = amount; valid_until = None; nonce }
+
+let build_zkapp_cmd ~fee transactions :
+    ( Zkapp_command.t
+    , Account_nonce.t Public_key.Compressed.Map.t )
+    Monad_lib.State.t =
+  let open Monad_lib in
+  let open State.Let_syntax in
+  let%bind body = fee_payer_body fee in
+  let%map updates = State.concat_map_m ~f:mk_updates transactions in
+  Zkapp_command.
+    { fee_payer = { body; authorization = Signature.dummy }
+    ; account_updates = updates
+    ; memo = Signed_command_memo.dummy
+    }
+
+let zkapp_cmd ~noncemap ~fee transactions =
+  Monad_lib.State.eval_state (build_zkapp_cmd ~fee transactions) noncemap
