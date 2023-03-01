@@ -16,9 +16,6 @@ module Fp = struct
 
     external sub : t -> t -> t = "fp_var_sub"
 
-    external linear_combination : (Pasta_bindings.Fp.t * t) array -> t
-      = "fp_var_linear_combination"
-
     external sum : t array -> t = "fp_var_sum"
 
     external to_constant : t -> Pasta_bindings.Fp.t option
@@ -66,9 +63,6 @@ module Fq = struct
     external scale : t -> Pasta_bindings.Fq.t -> t = "fq_var_scale"
 
     external sub : t -> t -> t = "fq_var_sub"
-
-    external linear_combination : (Pasta_bindings.Fq.t * t) array -> t
-      = "fq_var_linear_combination"
 
     external sum : t array -> t = "fq_var_sum"
 
