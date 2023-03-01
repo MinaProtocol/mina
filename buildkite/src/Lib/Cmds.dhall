@@ -49,6 +49,7 @@ let module = \(environment : List Text) ->
       "\\\$BUILDKITE_BUILD_CHECKOUT_PATH"
     let sharedDir : Text = "/var/buildkite/shared"
     in
+    { line = "source ./buildkite/scripts/export-git-env-vars.sh && docker run -it --rm --init --volume ${sharedDir}:/shared --volume ${outerDir}:/workdir --workdir /workdir${envVars}${if docker.privileged then " --privileged" else ""}${docker.entrypoint} ${docker.image} /bin/sh -c '${inner.line}'"
     , readable = Optional/map Text Text (\(readable : Text) -> "Docker@${docker.image} ( ${readable} )") inner.readable
     }
 
