@@ -216,7 +216,7 @@ let%test_module "Test transaction logic." =
                           false ) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
-    (* It is assumed here that the account is indeed an zkApp account. Presumably
+    (* It is assumed here that the account is indeed a zkApp account. Presumably
        it's being checked elsewhere. If there's no zkApp associated with the
        account, this update succeeds, but does nothing. For the moment we're ignoring
        the fact that the account isn't being updated. We'll revisit and strengthen
@@ -225,17 +225,29 @@ let%test_module "Test transaction logic." =
       Quickcheck.test ~trials
         (let open Quickcheck in
         let open Generator.Let_syntax in
-        let%bind account = Test_account.gen in
-        let%bind uri = String.gen_with_length 64 Char.gen_alphanum in
+        let%bind account = Test_account.gen_with_zkapp in
+        let%bind uri =
+          Generator.filter Zkapp_account.gen_uri ~f:(fun uri ->
+              Option.value_map account.zkapp ~default:true ~f:(fun zkapp ->
+                  not @@ String.equal uri zkapp.zkapp_uri ) )
+        in
         let txn =
           Alter_account.make ~account:account.pk
             { Account_update.Update.noop with zkapp_uri = Set uri }
         in
         let%map fee = Fee.(gen_incl zero (balance_to_fee account.balance)) in
-        (account.pk, fee, [ account ], [ (txn :> transaction) ]))
-        ~f:(fun (fee_payer, fee, accounts, txns) ->
+        (account.pk, fee, [ account ], [ (txn :> transaction) ], uri))
+        ~f:(fun (fee_payer, fee, accounts, txns, uri) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
-            (Predicates.pure ~f:(fun (txn, _) ->
-                 Transaction_status.equal txn.command.status Applied ) )
+            (Predicates.pure ~f:(fun (txn, ledger) ->
+                 let account = List.hd_exn accounts in
+                 Transaction_status.equal txn.command.status Applied
+                 && Predicates.verify_account_updates ~txn ~ledger account
+                      ~f:(fun _ -> function
+                      | Some _, Some updt ->
+                          Option.value_map updt.zkapp ~default:false
+                            ~f:(fun zkapp -> String.equal uri zkapp.zkapp_uri)
+                      | _ ->
+                          false ) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
   end )
