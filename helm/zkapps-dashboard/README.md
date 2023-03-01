@@ -150,10 +150,6 @@ When adding the new postgres datasource, as long as "zkapps" is included within 
 
 <br />
 
-<img src="_img/grafana.png" alt="zkApps dashboard">
-
-<br />
-
 ## Future Work
 
 <br />
