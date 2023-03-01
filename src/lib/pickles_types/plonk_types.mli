@@ -384,7 +384,7 @@ module All_evals : sig
        , ('f, 'f array) t
        , 'f
        , 'field_var
-       , (unit, 'f) Snarky_backendless.Checked_runner.Simple.t )
+       , (unit, 'state) Snarky_backendless.Checked_runner.Simple.t )
        Snarky_backendless.Types.Typ.typ
 end
 
