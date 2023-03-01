@@ -56,7 +56,11 @@ module Rules = struct
         input
 
     let rule : _ Pickles.Inductive_rule.t =
-      { identifier = "Initialize zkapp"; prevs = []; main; uses_lookup = false }
+      { identifier = "Initialize zkapp"
+      ; prevs = []
+      ; main
+      ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+      }
   end
 
   (** Rule to mint tokens. *)
@@ -109,6 +113,7 @@ module Rules = struct
                 ~may_use_token:
                   (Account_update.May_use_token.Checked.constant
                      Parents_own_token )
+                ()
             in
             account_update#set_balance_change
               Currency.Amount.Signed.Checked.(of_unsigned amount_to_mint) ;
@@ -136,7 +141,11 @@ module Rules = struct
         input
 
     let rule : _ Pickles.Inductive_rule.t =
-      { identifier = "Mint token"; prevs = []; main; uses_lookup = false }
+      { identifier = "Mint token"
+      ; prevs = []
+      ; main
+      ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+      }
   end
 
   (** Rule to transfer tokens. *)
@@ -492,7 +501,7 @@ module Rules = struct
         { identifier = "Transfer tokens"
         ; prevs = [ self; self ]
         ; main
-        ; uses_lookup = false
+        ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
         }
 
       let handler
@@ -579,7 +588,7 @@ module Rules = struct
       { identifier = "Transfer tokens"
       ; prevs = [ prev; prev ]
       ; main
-      ; uses_lookup = false
+      ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
       }
 
     let handler (public_key : Public_key.Compressed.t) (token_id : Token_id.t)

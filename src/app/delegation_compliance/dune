@@ -33,7 +33,7 @@
    mina_ledger
    mina_state
    genesis_ledger_helper
-   coda_runtime_config
+   mina_runtime_config
    currency
    coda_genesis_ledger
    mina_base.import

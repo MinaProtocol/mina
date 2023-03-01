@@ -10,6 +10,8 @@ module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 
 let%test_module "Access permission tests" =
   ( module struct
+    let () = Backtrace.elide := false
+
     let sk = Private_key.create ()
 
     let pk = Public_key.of_private_key_exn sk
@@ -33,16 +35,20 @@ let%test_module "Access permission tests" =
 
     let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
 
+    let vk_hash = Mina_base.Verification_key_wire.digest_vk vk
+
     let ({ account_update; _ } : _ Zkapp_command.Call_forest.tree), () =
       Async.Thread_safe.block_on_async_exn prover
 
     let memo = Signed_command_memo.empty
 
     let run_test ?expected_failure auth_kind access_permission =
-      let account_update =
+      let account_update : Account_update.t =
         match auth_kind with
-        | Account_update.Authorization_kind.Proof ->
-            account_update
+        | Account_update.Authorization_kind.Proof _ ->
+            { body = { account_update.body with authorization_kind = auth_kind }
+            ; authorization = account_update.authorization
+            }
         | Account_update.Authorization_kind.Signature ->
             { body =
                 { account_update.body with
@@ -69,15 +75,7 @@ let%test_module "Access permission tests" =
             { Account_update.Update.dummy with
               permissions =
                 Set { Permissions.user_default with access = access_permission }
-            ; verification_key =
-                Set
-                  { data = vk
-                  ; hash =
-                      (* TODO: This function should live in
-                         [Side_loaded_verification_key].
-                      *)
-                      Zkapp_account.digest_vk vk
-                  }
+            ; verification_key = Set { data = vk; hash = vk_hash }
             }
         ; preconditions =
             { Account_update.Preconditions.network =
@@ -187,31 +185,40 @@ let%test_module "Access permission tests" =
 
     let%test_unit "None_given with None" = run_test None_given None
 
-    let%test_unit "Proof with None" = run_test Proof None
+    let%test_unit "Proof with None" = run_test (Proof vk_hash) None
 
     let%test_unit "Signature with None" = run_test Signature None
 
     let%test_unit "None_given with Either" =
-      run_test ~expected_failure:Update_not_permitted_access None_given Either
+      run_test
+        ~expected_failure:(Update_not_permitted_access, Pass_2)
+        None_given Either
 
-    let%test_unit "Proof with Either" = run_test Proof Either
+    let%test_unit "Proof with Either" = run_test (Proof vk_hash) Either
 
     let%test_unit "Signature with Either" = run_test Signature Either
 
     let%test_unit "None_given with Proof" =
-      run_test ~expected_failure:Update_not_permitted_access None_given Proof
+      run_test
+        ~expected_failure:(Update_not_permitted_access, Pass_2)
+        None_given Proof
 
-    let%test_unit "Proof with Proof" = run_test Proof Proof
+    let%test_unit "Proof with Proof" = run_test (Proof vk_hash) Proof
 
     let%test_unit "Signature with Proof" =
-      run_test ~expected_failure:Update_not_permitted_access Signature Proof
+      run_test
+        ~expected_failure:(Update_not_permitted_access, Pass_2)
+        Signature Proof
 
     let%test_unit "None_given with Signature" =
-      run_test ~expected_failure:Update_not_permitted_access None_given
-        Signature
+      run_test
+        ~expected_failure:(Update_not_permitted_access, Pass_2)
+        None_given Signature
 
     let%test_unit "Proof with Signature" =
-      run_test ~expected_failure:Update_not_permitted_access Proof Signature
+      run_test
+        ~expected_failure:(Update_not_permitted_access, Pass_2)
+        (Proof vk_hash) Signature
 
     let%test_unit "Signature with Signature" = run_test Signature Signature
   end )

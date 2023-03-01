@@ -12,6 +12,7 @@
    core_kernel
    base64
    yojson
+   integers
    ;; local libraries
    random_oracle_input
    pickles.backend

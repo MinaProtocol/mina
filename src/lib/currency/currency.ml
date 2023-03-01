@@ -949,7 +949,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
-    type _unused = unit constraint Signed.t = (t, Sgn.t) Signed_poly.t
+    let (_ : (Signed.t, (t, Sgn.t) Signed_poly.t) Type_equal.t) = Type_equal.T
   end
 
   module Amount = struct

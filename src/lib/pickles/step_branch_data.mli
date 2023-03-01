@@ -1,3 +1,5 @@
+open Pickles_types
+
 type ( 'a_var
      , 'a_value
      , 'ret_var
@@ -48,6 +50,7 @@ type ( 'a_var
               and type proofs_verified = 'proofs_verified
               and type return_value = 'ret_value
               and type statement = 'a_value )
+      ; feature_flags : bool Plonk_types.Features.t
       }
       -> ( 'a_var
          , 'a_value
@@ -67,7 +70,8 @@ val create :
      index:int
   -> self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
   -> wrap_domains:Import.Domains.t
-  -> step_uses_lookup:Pickles_types.Plonk_types.Opt.Flag.t
+  -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+  -> actual_feature_flags:bool Plonk_types.Features.t
   -> max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t
   -> proofs_verifieds:(int, 'branches) Pickles_types.Vector.t
   -> branches:'branches Pickles_types.Nat.t

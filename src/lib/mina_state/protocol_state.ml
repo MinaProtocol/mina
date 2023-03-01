@@ -135,7 +135,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; consensus_state
         ; constants
         } =
-      let blockchain_state = Blockchain_state.var_to_input blockchain_state in
+      let%map blockchain_state =
+        Blockchain_state.var_to_input blockchain_state
+      in
       let constants = Protocol_constants_checked.var_to_input constants in
       let consensus_state =
         Consensus.Data.Consensus_state.var_to_input consensus_state
@@ -146,7 +148,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         |> append constants)
 
     let hash_checked (t : var) =
-      let input = var_to_input t in
+      let%bind input = var_to_input t in
       make_checked (fun () ->
           Random_oracle.Checked.(
             hash ~init:Hash_prefix.protocol_state_body (pack_input input)
@@ -158,7 +160,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         Zkapp_precondition.Protocol_state.View.Checked.t =
       let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
       let cs : Consensus.Data.Consensus_state.var = t.consensus_state in
-      { snarked_ledger_hash = t.blockchain_state.registers.ledger
+      { snarked_ledger_hash =
+          Blockchain_state.snarked_ledger_hash t.blockchain_state
       ; blockchain_length = C.blockchain_length_var cs
       ; min_window_density = C.min_window_density_var cs
       ; last_vrf_output = ()
@@ -178,7 +181,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     let view (t : Value.t) : Zkapp_precondition.Protocol_state.View.t =
       let module C = Consensus.Proof_of_stake.Exported.Consensus_state in
       let cs = t.consensus_state in
-      { snarked_ledger_hash = t.blockchain_state.registers.ledger
+      { snarked_ledger_hash =
+          Blockchain_state.snarked_ledger_hash t.blockchain_state
       ; blockchain_length = C.blockchain_length cs
       ; min_window_density = C.min_window_density cs
       ; last_vrf_output = ()

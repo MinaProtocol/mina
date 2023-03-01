@@ -2,8 +2,8 @@ use crate::wasm_flat_vector::WasmFlatVector;
 use crate::wasm_vector::WasmVector;
 use ark_poly::UVPolynomial;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Evaluations};
-use commitment_dlog::{commitment::b_poly_coefficients, srs::SRS};
 use paste::paste;
+use poly_commitment::{commitment::b_poly_coefficients, srs::SRS};
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 use std::{
@@ -75,7 +75,7 @@ macro_rules! impl_srs {
                 srs: &[<Wasm $field_name:camel Srs>],
                 log2_size: i32,
             ) {
-                let ptr: &mut commitment_dlog::srs::SRS<$G> =
+                let ptr: &mut poly_commitment::srs::SRS<$G> =
                     unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
                 let domain = EvaluationDomain::<$F>::new(1 << (log2_size as usize)).expect("invalid domain size");
                 ptr.add_lagrange_basis(domain);
@@ -134,11 +134,15 @@ macro_rules! impl_srs {
                     JsValue::from_str("caml_pasta_fp_urs_lagrange_commitment")
                 })?;
 
-                let evals = (0..domain_size)
-                    .map(|j| if i == j { <$F as ark_ff::One>::one() } else { <$F as ark_ff::Zero>::zero() })
-                    .collect();
-                let p = Evaluations::<$F>::from_vec_and_domain(evals, x_domain).interpolate();
-                Ok(srs.commit_non_hiding(&p, None).into())
+                {
+                    // We're single-threaded, so it's safe to grab this pointer as mutable.
+                    // Do not try this at home.
+                    let ptr: &mut poly_commitment::srs::SRS<$G> =
+                        unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
+                    ptr.add_lagrange_basis(x_domain);
+                }
+
+                Ok(srs.lagrange_bases[&x_domain.size()][i as usize].clone().into())
             }
 
             #[wasm_bindgen]

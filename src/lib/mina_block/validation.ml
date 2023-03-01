@@ -338,16 +338,16 @@ let validate_proofs ~verifier ~genesis_state_hash tvs =
     match to_verify with
     | [] ->
         (* Skip calling the verifier, nothing here to verify. *)
-        return (Ok true)
+        return (Ok (Ok ()))
     | _ ->
         Verifier.verify_blockchain_snarks verifier to_verify
   with
-  | Ok verified ->
-      if verified then
-        Ok
-          (List.map tvs ~f:(fun (t, validation) ->
-               (t, Unsafe.set_valid_proof validation) ) )
-      else Error `Invalid_proof
+  | Ok (Ok ()) ->
+      Ok
+        (List.map tvs ~f:(fun (t, validation) ->
+             (t, Unsafe.set_valid_proof validation) ) )
+  | Ok (Error err) ->
+      Error (`Invalid_proof err)
   | Error e ->
       Error (`Verifier_error e)
 
@@ -462,7 +462,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
     ~precomputed_values ~verifier ~parent_staged_ledger ~parent_protocol_state
     (t, validation) =
   let target_hash_of_ledger_proof =
-    Fn.compose Registers.ledger
+    Fn.compose Registers.second_pass_ledger
     @@ Fn.compose Ledger_proof.statement_target Ledger_proof.statement
   in
   let block = With_hash.data t in

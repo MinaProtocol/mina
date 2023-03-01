@@ -77,13 +77,13 @@ macro_rules! impl_projective {
 
             #[wasm_bindgen]
             pub extern "C" fn [<caml_ $name:snake _endo_base>]() -> $CamlBaseField {
-                let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffine>();
+                let (endo_q, _endo_r) = poly_commitment::srs::endos::<GAffine>();
                 endo_q.into()
             }
 
             #[wasm_bindgen]
             pub extern "C" fn [<caml_ $name:snake _endo_scalar>]() -> $CamlScalarField {
-                let (_endo_q, endo_r) = commitment_dlog::srs::endos::<GAffine>();
+                let (_endo_q, endo_r) = poly_commitment::srs::endos::<GAffine>();
                 endo_r.into()
             }
 

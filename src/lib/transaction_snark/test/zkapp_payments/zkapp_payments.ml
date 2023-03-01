@@ -145,30 +145,31 @@ let%test_module "Zkapp payments tests" =
 
     let%test_unit "zkapps-based payment" =
       let open Mina_transaction_logic.For_tests in
-      Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
+      Quickcheck.test ~trials:2 (Test_spec.mk_gen ~num_transactions:3 ())
+        ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-              let zkapp_command = account_update_send (List.hd_exn specs) in
-              Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              ignore
-                ( U.apply_zkapp_command ledger [ zkapp_command ]
-                  : Sparse_ledger.t ) ) )
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  let zkapp_command = account_update_send (List.hd_exn specs) in
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
 
     let%test_unit "Consecutive zkapps-based payments" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:2 Test_spec.gen ~f:(fun { init_ledger; specs } ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-              let zkapp_commands =
-                List.map
-                  ~f:(fun s ->
-                    let use_full_commitment =
-                      Quickcheck.random_value Bool.quickcheck_generator
-                    in
-                    account_update_send ~use_full_commitment s )
-                  specs
-              in
-              Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              ignore
-                (U.apply_zkapp_command ledger zkapp_commands : Sparse_ledger.t) ) )
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  let zkapp_commands =
+                    List.map
+                      ~f:(fun s ->
+                        account_update_send ~double_sender_nonce:false s )
+                      specs
+                  in
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  U.check_zkapp_command_with_merges_exn ledger zkapp_commands ) ) )
 
     let%test_unit "multiple transfers from one account" =
       let open Mina_transaction_logic.For_tests in
@@ -192,6 +193,7 @@ let%test_module "Zkapp payments tests" =
                          (Amount.of_fee
                             constraint_constants.account_creation_fee ) )
                   in
+                  (*Make payments to two existing accounts (senders from the spec) and a new account*)
                   let test_spec : Spec.t =
                     { sender = spec.sender
                     ; fee
@@ -199,7 +201,10 @@ let%test_module "Zkapp payments tests" =
                     ; receivers =
                         (new_receiver, new_receiver_amount)
                         :: ( List.take specs (receiver_count - 1)
-                           |> List.map ~f:(fun s -> (s.receiver, amount)) )
+                           |> List.map ~f:(fun s ->
+                                  ( Signature_lib.Public_key.compress
+                                      (fst s.sender).public_key
+                                  , amount ) ) )
                     ; amount = total_amount
                     ; zkapp_account_keypairs = []
                     ; memo
@@ -281,6 +286,7 @@ let%test_module "Zkapp payments tests" =
                     Transaction_snark.For_tests.multiple_transfers test_spec
                   in
                   U.check_zkapp_command_with_merges_exn
-                    ~expected_failure:Transaction_status.Failure.Overflow ledger
-                    [ zkapp_command ] ) ) )
+                    ~expected_failure:
+                      (Transaction_status.Failure.Overflow, Pass_2)
+                    ledger [ zkapp_command ] ) ) )
   end )

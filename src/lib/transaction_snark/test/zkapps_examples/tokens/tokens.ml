@@ -408,7 +408,8 @@ let%test_module "Tokens test" =
         |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
         |> Zkapp_command.Call_forest.cons
              (Account_updates.deploy ~balance_change:(fee_to_create_signed 2))
-        |> test_zkapp_command ~expected_failure:Update_not_permitted_access
+        |> test_zkapp_command
+             ~expected_failure:(Update_not_permitted_access, Pass_2)
              ~fee_payer_pk:pk ~signers ~initialize_ledger ~finalize_ledger
       in
       ignore account
