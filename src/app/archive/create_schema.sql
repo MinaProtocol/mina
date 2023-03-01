@@ -69,9 +69,9 @@ CREATE TYPE transaction_status AS ENUM ('applied', 'failed');
 CREATE TABLE user_commands
 ( id             serial              PRIMARY KEY
 , command_type   user_command_type   NOT NULL
-, fee_payer_id   int                 NOT NULL REFERENCES account_identifiers(id)
-, source_id      int                 NOT NULL REFERENCES account_identifiers(id)
-, receiver_id    int                 NOT NULL REFERENCES account_identifiers(id)
+, fee_payer_id   int                 NOT NULL REFERENCES public_keys(id)
+, source_id      int                 NOT NULL REFERENCES public_keys(id)
+, receiver_id    int                 NOT NULL REFERENCES public_keys(id)
 , nonce          bigint              NOT NULL
 , amount         text
 , fee            text                NOT NULL
@@ -85,7 +85,7 @@ CREATE TYPE internal_command_type AS ENUM ('fee_transfer_via_coinbase', 'fee_tra
 CREATE TABLE internal_commands
 ( id            serial                PRIMARY KEY
 , command_type  internal_command_type NOT NULL
-, receiver_id   int                   NOT NULL REFERENCES account_identifiers(id)
+, receiver_id   int                   NOT NULL REFERENCES public_keys(id)
 , fee           text                  NOT NULL
 , hash          text                  NOT NULL
 , UNIQUE (hash,command_type)

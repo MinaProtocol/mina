@@ -25,9 +25,9 @@ module User_command = struct
       type t =
         { sequence_no : int
         ; command_type : string
-        ; fee_payer : Account_id.Stable.V2.t
-        ; source : Account_id.Stable.V2.t
-        ; receiver : Account_id.Stable.V2.t
+        ; fee_payer : Public_key.Compressed.Stable.V1.t
+        ; source : Public_key.Compressed.Stable.V1.t
+        ; receiver : Public_key.Compressed.Stable.V1.t
         ; nonce : Account.Nonce.Stable.V1.t
         ; amount : Currency.Amount.Stable.V1.t option
         ; fee : Currency.Fee.Stable.V1.t
@@ -57,7 +57,7 @@ module Internal_command = struct
         { sequence_no : int
         ; secondary_sequence_no : int
         ; command_type : string
-        ; receiver : Account_id.Stable.V2.t
+        ; receiver : Public_key.Compressed.Stable.V1.t
         ; fee : Currency.Fee.Stable.V1.t
         ; hash : Transaction_hash.Stable.V1.t
               [@to_yojson Transaction_hash.to_yojson]
