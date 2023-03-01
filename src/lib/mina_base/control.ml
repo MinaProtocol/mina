@@ -69,9 +69,27 @@ end]
 [%%endif]
 
 module Tag = struct
-  type t = Proof | Signature | None_given [@@deriving equal, compare, sexp]
+  type t = Signature | Proof | None_given [@@deriving equal, compare, sexp]
 
   let gen = Quickcheck.Generator.of_list [ Proof; Signature; None_given ]
+
+  let to_string = function
+    | Signature ->
+        "Signature"
+    | Proof ->
+        "Proof"
+    | None_given ->
+        "None_given"
+
+  let of_string_exn = function
+    | "Signature" ->
+        Signature
+    | "Proof" ->
+        Proof
+    | "None_given" ->
+        None_given
+    | s ->
+        failwithf "String %s does not denote a control tag" s ()
 end
 
 let tag : t -> Tag.t = function

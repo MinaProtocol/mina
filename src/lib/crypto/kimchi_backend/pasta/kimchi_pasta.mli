@@ -18,8 +18,8 @@ module Pallas_based_plonk : sig
 end
 
 module Vesta_based_plonk : sig
-  module Field = Basic.Fp
-  module Curve = Basic.Vesta
+  module Field = Vesta_based_plonk.Field
+  module Curve = Vesta_based_plonk.Curve
   module Bigint = Vesta_based_plonk.Bigint
 
   val field_size : Pasta_bindings.BigInt256.t
@@ -41,18 +41,4 @@ module Pasta : sig
   module Fq = Basic.Fq
   module Vesta = Basic.Vesta
   module Pallas = Basic.Pallas
-  module Precomputed = Precomputed
-end
-
-module Precomputed : sig
-  module Lagrange_precomputations : sig
-    (* pickles required *)
-    val index_of_domain_log2 : int -> int
-
-    (* pickles required *)
-    val vesta : (Pasta_bindings.Fq.t * Pasta_bindings.Fq.t) array array array
-
-    (* pickles required *)
-    val pallas : (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t) array array array
-  end
 end

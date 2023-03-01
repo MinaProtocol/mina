@@ -62,6 +62,7 @@ let%test_module "Initialize state test" =
                   { edit_state = Proof
                   ; send = Proof
                   ; receive = Proof
+                  ; access = None
                   ; set_delegate = Proof
                   ; set_permissions = Proof
                   ; set_verification_key = Proof
@@ -70,6 +71,7 @@ let%test_module "Initialize state test" =
                   ; set_token_symbol = Proof
                   ; increment_nonce = Proof
                   ; set_voting_for = Proof
+                  ; set_timing = Proof
                   }
             }
         ; use_full_commitment = true
@@ -77,6 +79,7 @@ let%test_module "Initialize state test" =
             { Account_update.Preconditions.network =
                 Zkapp_precondition.Protocol_state.accept
             ; account = Accept
+            ; valid_while = Ignore
             }
         ; authorization_kind = Signature
         }
@@ -115,7 +118,7 @@ let%test_module "Initialize state test" =
         { body =
             { Account_update.Body.Fee_payer.dummy with
               public_key = pk_compressed
-            ; fee = Currency.Fee.(of_int 100)
+            ; fee = Currency.Fee.(of_nanomina_int_exn 100)
             }
         ; authorization = Signature.dummy
         }
@@ -171,7 +174,8 @@ let%test_module "Initialize state test" =
           let account =
             Account.create account_id
               Currency.Balance.(
-                Option.value_exn (add_amount zero (Currency.Amount.of_int 500)))
+                Option.value_exn
+                  (add_amount zero (Currency.Amount.of_nanomina_int_exn 500)))
           in
           let _, loc =
             Ledger.get_or_create_account ledger account_id account
@@ -240,7 +244,8 @@ let%test_module "Initialize state test" =
              Update_state_account_update.account_update
         |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
         |> test_zkapp_command
-             ~expected_failure:Account_proved_state_precondition_unsatisfied
+             ~expected_failure:
+               (Account_proved_state_precondition_unsatisfied, Pass_2)
       in
       assert (Option.is_none (Option.value_exn account).zkapp)
 
@@ -253,7 +258,8 @@ let%test_module "Initialize state test" =
              Initialize_account_update.account_update
         |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
         |> test_zkapp_command
-             ~expected_failure:Account_proved_state_precondition_unsatisfied
+             ~expected_failure:
+               (Account_proved_state_precondition_unsatisfied, Pass_2)
       in
       assert (Option.is_none (Option.value_exn account).zkapp)
 
@@ -268,7 +274,8 @@ let%test_module "Initialize state test" =
              Initialize_account_update.account_update
         |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
         |> test_zkapp_command
-             ~expected_failure:Account_proved_state_precondition_unsatisfied
+             ~expected_failure:
+               (Account_proved_state_precondition_unsatisfied, Pass_2)
       in
       assert (Option.is_none (Option.value_exn account).zkapp)
 

@@ -37,16 +37,14 @@ module Operations = struct
 end
 
 module Digest = struct
-  open Field
-
-  type nonrec t = t
+  type t = Field.t
 
   let to_bits ?length x =
     match length with
     | None ->
-        unpack x
+        Field.unpack x
     | Some length ->
-        List.take (unpack x) length
+        List.take (Field.unpack x) length
 end
 
 include Sponge.Make_hash (Random_oracle_permutation)

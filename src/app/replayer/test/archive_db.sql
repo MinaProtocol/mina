@@ -1052,11 +1052,9 @@ ALTER SEQUENCE public.zkapp_length_bounds_id_seq OWNED BY public.zkapp_length_bo
 CREATE TABLE public.zkapp_network_precondition (
     id integer NOT NULL,
     snarked_ledger_hash_id integer,
-    timestamp_id integer,
     blockchain_length_id integer,
     min_window_density_id integer,
     total_currency_id integer,
-    curr_global_slot_since_hard_fork integer,
     global_slot_since_genesis integer,
     staking_epoch_data_id integer,
     next_epoch_data_id integer
@@ -1146,11 +1144,12 @@ CREATE TABLE public.zkapp_account_update_body (
     balance_change text NOT NULL,
     increment_nonce boolean NOT NULL,
     events_id integer NOT NULL,
-    sequence_events_id integer NOT NULL,
+    actions_id integer NOT NULL,
     call_data_id integer NOT NULL,
     call_depth integer NOT NULL,
     zkapp_network_precondition_id integer NOT NULL,
     zkapp_account_precondition_id integer NOT NULL,
+    zkapp_valid_while_precondition_id integer NOT NULL,
     use_full_commitment boolean NOT NULL,
     caller public.call_type NOT NULL,
     authorization_kind public.authorization_kind_type NOT NULL
@@ -1255,6 +1254,7 @@ CREATE TABLE public.zkapp_permissions (
     set_token_symbol public.zkapp_auth_required_type NOT NULL,
     increment_nonce public.zkapp_auth_required_type NOT NULL,
     set_voting_for public.zkapp_auth_required_type NOT NULL
+    set_timing public.zkapp_auth_required_type NOT NULL
 );
 
 
@@ -1508,42 +1508,6 @@ CREATE SEQUENCE public.zkapp_states_nullable_id_seq
 --
 
 ALTER SEQUENCE public.zkapp_states_nullable_id_seq OWNED BY public.zkapp_states_nullable.id;
-
-
---
--- Name: zkapp_timestamp_bounds; Type: TABLE; Schema: public;
---
-
-CREATE TABLE public.zkapp_timestamp_bounds (
-    id integer NOT NULL,
-    timestamp_lower_bound text NOT NULL,
-    timestamp_upper_bound text NOT NULL
-);
-
-
-
-
---
--- Name: zkapp_timestamp_bounds_id_seq; Type: SEQUENCE; Schema: public;
---
-
-CREATE SEQUENCE public.zkapp_timestamp_bounds_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-
-
---
--- Name: zkapp_timestamp_bounds_id_seq; Type: SEQUENCE OWNED BY; Schema: public;
---
-
-ALTER SEQUENCE public.zkapp_timestamp_bounds_id_seq OWNED BY public.zkapp_timestamp_bounds.id;
-
 
 --
 -- Name: zkapp_timing_info; Type: TABLE; Schema: public;
@@ -1964,14 +1928,6 @@ ALTER TABLE ONLY public.zkapp_states ALTER COLUMN id SET DEFAULT nextval('public
 --
 
 ALTER TABLE ONLY public.zkapp_states_nullable ALTER COLUMN id SET DEFAULT nextval('public.zkapp_states_nullable_id_seq'::regclass);
-
-
---
--- Name: zkapp_timestamp_bounds id; Type: DEFAULT; Schema: public;
---
-
-ALTER TABLE ONLY public.zkapp_timestamp_bounds ALTER COLUMN id SET DEFAULT nextval('public.zkapp_timestamp_bounds_id_seq'::regclass);
-
 
 --
 -- Name: zkapp_timing_info id; Type: DEFAULT; Schema: public;
@@ -2563,8 +2519,8 @@ COPY public.zkapp_length_bounds (id, length_lower_bound, length_upper_bound) FRO
 -- Data for Name: zkapp_network_precondition; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.zkapp_network_precondition (id, snarked_ledger_hash_id, timestamp_id, blockchain_length_id, min_window_density_id, total_currency_id, curr_global_slot_since_hard_fork, global_slot_since_genesis, staking_epoch_data_id, next_epoch_data_id) FROM stdin;
-1	\N	\N	\N	\N	\N	\N	\N	1	1
+COPY public.zkapp_network_precondition (id, snarked_ledger_hash_id, blockchain_length_id, min_window_density_id, total_currency_id, global_slot_since_genesis, staking_epoch_data_id, next_epoch_data_id) FROM stdin;
+1	\N	\N	\N	\N	\N	1	1
 \.
 
 
@@ -2591,10 +2547,10 @@ COPY public.zkapp_account_update (id, body_id, authorization_kind) FROM stdin;
 -- Data for Name: zkapp_account_update_body; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.zkapp_account_update_body (id, account_identifier_id, update_id, balance_change, increment_nonce, events_id, sequence_events_id, call_data_id, call_depth, zkapp_network_precondition_id, zkapp_account_precondition_id, use_full_commitment, caller, authorization_kind) FROM stdin;
-1	5	1	-10000000000	t	1	1	1	0	1	1	f	call	Signature
-2	7	2	9000000000	f	1	1	1	0	1	2	t	call	Signature
-3	7	3	0	f	1	1	1	0	1	2	t	call	Proof
+COPY public.zkapp_account_update_body (id, account_identifier_id, update_id, balance_change, increment_nonce, events_id, actions_id, call_data_id, call_depth, zkapp_network_precondition_id, zkapp_account_precondition_id, zkapp_valid_while_precondition_id, use_full_commitment, caller, authorization_kind) FROM stdin;
+1	5	1	-10000000000	t	1	1	1	0	1	1	1   f	call	Signature
+2	7	2	9000000000	f	1	1	1	0	1	2	1   t	call	Signature
+3	7	3	0	f	1	1	1	0	1	2	1   t	call	Proof
 \.
 
 
@@ -2610,12 +2566,12 @@ COPY public.zkapp_account_update_failures (id, index, failures) FROM stdin;
 -- Data for Name: zkapp_permissions; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.zkapp_permissions (id, edit_state, send, receive, set_delegate, set_permissions, set_verification_key, set_zkapp_uri, edit_sequence_state, set_token_symbol, increment_nonce, set_voting_for) FROM stdin;
-1	signature	signature	none	signature	proof	signature	none	signature	signature	none	none
-2	signature	signature	signature	signature	signature	signature	none	none	none	none	none
-3	signature	signature	none	signature	signature	signature	none	none	none	none	none
-4	signature	signature	proof	signature	signature	signature	none	none	none	none	none
-5	proof	signature	none	signature	signature	signature	signature	proof	signature	signature	signature
+COPY public.zkapp_permissions (id, edit_state, send, receive, set_delegate, set_permissions, set_verification_key, set_zkapp_uri, edit_sequence_state, set_token_symbol, increment_nonce, set_voting_for, set_timing) FROM stdin;
+1	signature	signature	none	signature	proof	signature	none	signature	signature	none	none    none
+2	signature	signature	signature	signature	signature	signature	none	none	none	none	none    none
+3	signature	signature	none	signature	signature	signature	none	none	none	none	none    none
+4	signature	signature	proof	signature	signature	signature	none	none	none	none	none    none
+5	proof	signature	none	signature	signature	signature	signature	proof	signature	signature	signature   signature
 \.
 
 
@@ -3971,15 +3927,6 @@ ALTER TABLE ONLY public.zkapp_fee_payer_body
 ALTER TABLE ONLY public.zkapp_network_precondition
     ADD CONSTRAINT zkapp_network_precondition_blockchain_length_id_fkey FOREIGN KEY (blockchain_length_id) REFERENCES public.zkapp_length_bounds(id);
 
-
---
--- Name: zkapp_network_precondition zkapp_network_precondition_curr_global_slot_since_hard_for_fkey; Type: FK CONSTRAINT; Schema: public;
---
-
-ALTER TABLE ONLY public.zkapp_network_precondition
-    ADD CONSTRAINT zkapp_network_precondition_curr_global_slot_since_hard_for_fkey FOREIGN KEY (curr_global_slot_since_hard_fork) REFERENCES public.zkapp_global_slot_bounds(id);
-
-
 --
 -- Name: zkapp_network_precondition zkapp_network_precondition_global_slot_since_genesis_fkey; Type: FK CONSTRAINT; Schema: public;
 --
@@ -4018,15 +3965,6 @@ ALTER TABLE ONLY public.zkapp_network_precondition
 
 ALTER TABLE ONLY public.zkapp_network_precondition
     ADD CONSTRAINT zkapp_network_precondition_staking_epoch_data_id_fkey FOREIGN KEY (staking_epoch_data_id) REFERENCES public.zkapp_epoch_data(id);
-
-
---
--- Name: zkapp_network_precondition zkapp_network_precondition_timestamp_id_fkey; Type: FK CONSTRAINT; Schema: public;
---
-
-ALTER TABLE ONLY public.zkapp_network_precondition
-    ADD CONSTRAINT zkapp_network_precondition_timestamp_id_fkey FOREIGN KEY (timestamp_id) REFERENCES public.zkapp_timestamp_bounds(id);
-
 
 --
 -- Name: zkapp_network_precondition zkapp_network_precondition_total_currency_id_fkey; Type: FK CONSTRAINT; Schema: public;
@@ -4069,11 +4007,11 @@ ALTER TABLE ONLY public.zkapp_account_update
 
 
 --
--- Name: zkapp_account_update_body zkapp_account_update_body_sequence_events_id_fkey; Type: FK CONSTRAINT; Schema: public;
+-- Name: zkapp_account_update_body zkapp_account_update_body_actions_id_fkey; Type: FK CONSTRAINT; Schema: public;
 --
 
 ALTER TABLE ONLY public.zkapp_account_update_body
-    ADD CONSTRAINT zkapp_account_update_body_sequence_events_id_fkey FOREIGN KEY (sequence_events_id) REFERENCES public.zkapp_events(id);
+    ADD CONSTRAINT zkapp_account_update_body_actions_id_fkey FOREIGN KEY (actions_id) REFERENCES public.zkapp_events(id);
 
 
 --
@@ -4098,6 +4036,14 @@ ALTER TABLE ONLY public.zkapp_account_update_body
 
 ALTER TABLE ONLY public.zkapp_account_update_body
     ADD CONSTRAINT zkapp_account_update_body_zkapp_network_precondition_id_fkey FOREIGN KEY (zkapp_network_precondition_id) REFERENCES public.zkapp_network_precondition(id);
+
+
+--
+-- Name: zkapp_account_update_body zkapp_account_update_body_zkapp_valid_while_precondition_id_fkey; Type: FK CONSTRAINT; Schema: public;
+--
+
+ALTER TABLE ONLY public.zkapp_account_update_body
+    ADD CONSTRAINT zkapp_account_update_body_zkapp_valid_while_precondition_id_fkey FOREIGN KEY (zkapp_valid_while_precondition_id) REFERENCES public.zkapp_global_slot_bounds(id);
 
 
 --

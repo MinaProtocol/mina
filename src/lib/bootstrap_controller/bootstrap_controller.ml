@@ -420,8 +420,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                             t.current_root |> Validation.block |> header
                             |> Header.protocol_state
                             |> Protocol_state.blockchain_state
-                            |> Blockchain_state.registers
-                            |> Registers.local_state)
+                            |> Blockchain_state.snarked_local_state)
                         ~verifier ~constraint_constants ~scan_state
                         ~snarked_ledger:temp_mask ~expected_merkle_root
                         ~pending_coinbases ~get_state
@@ -524,19 +523,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                       Consensus.Hooks.sync_local_state
                         ~context:(module Context)
                         ~local_state:consensus_local_state ~trust_system
-                        ~random_peers:(fun n ->
-                          (* This port is completely made up but we only use the peer_id when doing a query, so it shouldn't matter. *)
-                          let%map peers =
-                            Mina_networking.random_peers t.network n
-                          in
-                          sender :: peers )
-                        ~query_peer:
-                          { Consensus.Hooks.Rpcs.query =
-                              (fun peer rpc query ->
-                                Mina_networking.(
-                                  query_peer t.network peer.peer_id
-                                    (Rpcs.Consensus_rpc rpc) query) )
-                          }
+                        ~glue_sync_ledger:
+                          (Mina_networking.glue_sync_ledger t.network)
                         sync_jobs
                     in
                     (true, result) )
@@ -939,8 +927,8 @@ let%test_module "Bootstrap_controller tests" =
               let snarked_local_state =
                 Transition_frontier.root frontier
                 |> Transition_frontier.Breadcrumb.protocol_state
-                |> Protocol_state.blockchain_state |> Blockchain_state.registers
-                |> Registers.local_state
+                |> Protocol_state.blockchain_state
+                |> Blockchain_state.snarked_local_state
               in
               let scan_state = Staged_ledger.scan_state staged_ledger in
               let get_state hash =

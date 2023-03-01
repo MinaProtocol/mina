@@ -2,6 +2,9 @@
  (inline_tests)
  (name pickles)
  (public_name pickles)
+ (modules_without_implementation
+   full_signature
+   type)
  (flags -warn-error -22+34+33+27)
  (instrumentation
   (backend bisect_ppx))
@@ -44,7 +47,6 @@
    snarky_group_map
    sponge
    pickles.pseudo
-   pickles.precomputed
    pickles.limb_vector
    pickles_base
    kimchi_backend

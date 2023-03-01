@@ -38,17 +38,33 @@ module type Basic = sig
 
   val to_string : t -> string
 
-  val of_formatted_string : string -> t
+  val of_mina_string_exn : string -> t
 
-  val to_formatted_string : t -> string
-
-  val of_int : int -> t
-
-  val to_int : t -> int
+  val to_mina_string : t -> string
 
   val to_uint64 : t -> uint64
 
   val of_uint64 : uint64 -> t
+
+  (* The functions below are unsafe, because they could overflow or
+     underflow. They perform appropriate checks to guard against this
+     and either raise Currency_overflow exception or return None
+     depending on the error-handling strategy.
+
+     It is advisable to use nanomina and mina wherever possible and
+     limit the use of _exn veriants to places where a fixed value is
+     being converted and hence overflow cannot happen. *)
+  val of_mina_int_exn : int -> t
+
+  val of_nanomina_int_exn : int -> t
+
+  val of_mina_int : int -> t option
+
+  val of_nanomina_int : int -> t option
+
+  val to_mina_int : t -> int
+
+  val to_nanomina_int : t -> int
 
   [%%ifdef consensus_mechanism]
 

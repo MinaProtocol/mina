@@ -98,16 +98,17 @@ module type S = sig
     -> Transaction_snark_work.Checked.t option
 
   val load :
-       config:Resource_pool.Config.t
+       ?allow_multiple_instances_for_tests:bool
+    -> config:Resource_pool.Config.t
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
-    -> expiry_ns:Time_ns.Span.t
     -> frontier_broadcast_pipe:
          transition_frontier option Broadcast_pipe.Reader.t
     -> log_gossip_heard:bool
     -> on_remote_push:(unit -> unit Deferred.t)
+    -> unit
     -> (t * Remote_sink.t * Local_sink.t) Deferred.t
 end
 
@@ -383,8 +384,7 @@ struct
         Deferred.don't_wait_for tf_deferred
 
       let create ~constraint_constants ~consensus_constants:_ ~time_controller:_
-          ~expiry_ns:_ ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer
-          =
+          ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
         let t =
           { snark_tables =
               { all = Statement_table.create ()
@@ -436,8 +436,8 @@ struct
                   Gauge.set Snark_work.snark_pool_size
                     (Float.of_int @@ Hashtbl.length t.snark_tables.all) ;
                   Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
-                    ( fee.Mina_base.Fee_with_prover.fee |> Currency.Fee.to_int
-                    |> Float.of_int )) ;
+                    ( fee.Mina_base.Fee_with_prover.fee
+                    |> Currency.Fee.to_nanomina_int |> Float.of_int )) ;
                 `Added )
               else
                 let origin =
@@ -521,7 +521,10 @@ struct
           let prover_permitted_to_receive =
             let open Option.Let_syntax in
             let%map account = account_opt in
-            Mina_base.Account.has_permission ~to_:`Receive account
+            Mina_base.Account.has_permission
+              ~control:Mina_base.Control.Tag.None_given ~to_:`Access account
+            && Mina_base.Account.has_permission
+                 ~control:Mina_base.Control.Tag.None_given ~to_:`Receive account
           in
           if
             not (fee_is_sufficient t ~fee ~account_exists:prover_account_exists)
@@ -671,10 +674,10 @@ struct
 
   let loaded = ref false
 
-  let load ~config ~logger ~constraint_constants ~consensus_constants
-      ~time_controller ~expiry_ns ~frontier_broadcast_pipe ~log_gossip_heard
-      ~on_remote_push =
-    if !loaded then
+  let load ?(allow_multiple_instances_for_tests = false) ~config ~logger
+      ~constraint_constants ~consensus_constants ~time_controller
+      ~frontier_broadcast_pipe ~log_gossip_heard ~on_remote_push () =
+    if (not allow_multiple_instances_for_tests) && !loaded then
       failwith
         "Snark_pool.load should only be called once. It has been called twice." ;
     loaded := true ;
@@ -701,8 +704,8 @@ struct
           res
       | Error _e ->
           create ~config ~logger ~constraint_constants ~consensus_constants
-            ~time_controller ~expiry_ns ~frontier_broadcast_pipe
-            ~log_gossip_heard ~on_remote_push
+            ~time_controller ~frontier_broadcast_pipe ~log_gossip_heard
+            ~on_remote_push
     in
     store_periodically (resource_pool pool) ;
     (pool, r_sink, l_sink)
@@ -776,10 +779,6 @@ let%test_module "random set test" =
 
     let time_controller = Block_time.Controller.basic ~logger
 
-    let expiry_ns =
-      Time_ns.Span.of_hr
-        (Float.of_int precomputed_values.genesis_constants.transaction_expiry_hr)
-
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
@@ -829,7 +828,7 @@ let%test_module "random set test" =
       let open Deferred.Let_syntax in
       let mock_pool, _r_sink, _l_sink =
         Mock_snark_pool.create ~config ~logger ~constraint_constants
-          ~consensus_constants ~time_controller ~expiry_ns
+          ~consensus_constants ~time_controller
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
         (* |>  *)
@@ -1006,7 +1005,7 @@ let%test_module "random set test" =
           in
           let network_pool, _, _ =
             Mock_snark_pool.create ~config ~constraint_constants
-              ~consensus_constants ~time_controller ~expiry_ns ~logger
+              ~consensus_constants ~time_controller ~logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
           in
@@ -1018,7 +1017,7 @@ let%test_module "random set test" =
                         ~seed:(`Deterministic "test proof")
                         Transaction_snark.Statement.gen ) )
             ; fee =
-                { fee = Currency.Fee.of_int 0
+                { fee = Currency.Fee.zero
                 ; prover = Signature_lib.Public_key.Compressed.empty
                 }
             }
@@ -1064,7 +1063,7 @@ let%test_module "random set test" =
               , Priced_proof.
                   { proof = One_or_two.map ~f:mk_dummy_proof work
                   ; fee =
-                      { fee = Currency.Fee.of_int 0
+                      { fee = Currency.Fee.zero
                       ; prover = Signature_lib.Public_key.Compressed.empty
                       }
                   } )
@@ -1077,7 +1076,7 @@ let%test_module "random set test" =
             in
             let network_pool, remote_sink, local_sink =
               Mock_snark_pool.create ~logger ~config ~constraint_constants
-                ~consensus_constants ~time_controller ~expiry_ns
+                ~consensus_constants ~time_controller
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
                 ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
             in
@@ -1162,7 +1161,7 @@ let%test_module "random set test" =
           let network_pool, _, _ =
             Mock_snark_pool.create ~logger:(Logger.null ()) ~config
               ~constraint_constants ~consensus_constants ~time_controller
-              ~expiry_ns ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
           in
           let resource_pool = Mock_snark_pool.resource_pool network_pool in

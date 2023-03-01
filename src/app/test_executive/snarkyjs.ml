@@ -15,9 +15,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let initial_fee_payer_balance = Currency.Balance.of_formatted_string "8000000"
+  let initial_fee_payer_balance = Currency.Balance.of_mina_string_exn "8000000"
 
-  let zkapp_target_balance = Currency.Balance.of_formatted_string "10"
+  let zkapp_target_balance = Currency.Balance.of_mina_string_exn "10"
 
   let config =
     let open Test_config in
@@ -25,8 +25,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; block_producers =
-        [ { balance =
-              Currency.Balance.to_formatted_string initial_fee_payer_balance
+        [ { balance = Currency.Balance.to_mina_string initial_fee_payer_balance
           ; timing = Untimed
           }
         ]
@@ -62,8 +61,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let block_producer_nodes = Network.block_producers network in
     let node = List.hd_exn block_producer_nodes in
-    let%bind my_pk = Util.pub_key_of_node node in
-    let%bind my_sk = Util.priv_key_of_node node in
+    let%bind my_pk = pub_key_of_node node in
+    let%bind my_sk = priv_key_of_node node in
     let my_account_id =
       Mina_base.Account_id.create my_pk Mina_base.Token_id.default
     in

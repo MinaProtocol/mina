@@ -99,11 +99,7 @@ module Valid : sig
   end
 
   module V1 : sig
-    type t =
-      { zkapp_command : V1.t
-      ; verification_keys :
-          (Mina_base_account_id.V2.t * Verification_key_hash.V1.t) list
-      }
+    type t = { zkapp_command : V1.t }
   end
 end
 

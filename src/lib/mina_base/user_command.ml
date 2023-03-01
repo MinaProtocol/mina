@@ -159,28 +159,63 @@ module Verifiable = struct
         Account_update.Fee_payer.account_id p.fee_payer
 end
 
-let to_verifiable (t : t) ~ledger ~get ~location_of_account : Verifiable.t =
-  let find_vk (p : Account_update.t) =
-    let ( ! ) x = Option.value_exn x in
-    let id = Account_update.account_id p in
-    Option.try_with (fun () ->
-        let account : Account.t =
-          !(get ledger !(location_of_account ledger id))
-        in
-        !(!(account.zkapp).verification_key) )
-  in
+let to_verifiable (t : t) ~status ~find_vk : Verifiable.t Or_error.t =
   match t with
   | Signed_command c ->
-      Signed_command c
-  | Zkapp_command { fee_payer; account_updates; memo } ->
-      Zkapp_command
-        { fee_payer
-        ; account_updates =
-            account_updates
-            |> Zkapp_command.Call_forest.map ~f:(fun account_update ->
-                   (account_update, find_vk account_update) )
-        ; memo
-        }
+      Ok (Signed_command c)
+  | Zkapp_command cmd ->
+      Zkapp_command.Verifiable.create ~status ~find_vk cmd
+      |> Or_error.map ~f:(fun cmd -> Zkapp_command cmd)
+
+module Make_to_all_verifiable (Strategy : sig
+  val create_all :
+       Zkapp_command.t With_status.t list
+    -> find_vk:
+         (   Zkapp_basic.F.t
+          -> Account_id.t
+          -> (Verification_key_wire.t, Error.t) Result.t )
+    -> Zkapp_command.Verifiable.t With_status.t list Or_error.t
+end) =
+struct
+  let to_all_verifiable (ts : t With_status.t list) ~find_vk :
+      Verifiable.t With_status.t list Or_error.t =
+    let open Or_error.Let_syntax in
+    (* First we tag everything with its index *)
+    let its = List.mapi ts ~f:(fun i x -> (i, x)) in
+    (* then we partition out the zkapp commands *)
+    let izk_cmds, is_cmds =
+      List.partition_map its ~f:(fun (i, cmd) ->
+          match cmd.data with
+          | Zkapp_command c ->
+              First (i, { cmd with data = c })
+          | Signed_command c ->
+              Second (i, { cmd with data = c }) )
+    in
+    (* then unzip the indices *)
+    let ixs, zk_cmds = List.unzip izk_cmds in
+    (* then we verify the zkapp commands *)
+    let%map vzk_cmds = Strategy.create_all ~find_vk zk_cmds in
+    (* rezip indices *)
+    let ivzk_cmds = List.zip_exn ixs vzk_cmds in
+    (* Put them back in with a sort by index (un-partition) *)
+    let ivs =
+      List.map is_cmds ~f:(fun (i, cmd) ->
+          (i, { cmd with data = Signed_command cmd.data }) )
+      @ List.map ivzk_cmds ~f:(fun (i, cmd) ->
+            (i, { cmd with data = Zkapp_command cmd.data }) )
+      |> List.sort ~compare:(fun (i, _) (j, _) -> i - j)
+    in
+    (* Drop the indices *)
+    List.unzip ivs |> snd
+end
+
+module Any = struct
+  include Make_to_all_verifiable (Zkapp_command.Verifiable.Any)
+end
+
+module Last = struct
+  include Make_to_all_verifiable (Zkapp_command.Verifiable.Last)
+end
 
 let of_verifiable (t : Verifiable.t) : t =
   match t with
@@ -200,14 +235,17 @@ let minimum_fee = Mina_compile_config.minimum_user_command_fee
 
 let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
 
-let accounts_accessed (t : t) (status : Transaction_status.t) =
+(* always `Accessed` for fee payer *)
+let accounts_accessed (t : t) (status : Transaction_status.t) :
+    (Account_id.t * [ `Accessed | `Not_accessed ]) list =
   match t with
   | Signed_command x ->
-      Signed_command.accounts_accessed x status
+      Signed_command.account_access_statuses x status
   | Zkapp_command ps ->
-      Zkapp_command.accounts_accessed ps status
+      Zkapp_command.account_access_statuses ps status
 
-let accounts_referenced (t : t) = accounts_accessed t Applied
+let accounts_referenced (t : t) =
+  List.map (accounts_accessed t Applied) ~f:(fun (acct_id, _status) -> acct_id)
 
 let fee_payer (t : t) =
   match t with
@@ -225,6 +263,12 @@ let applicable_at_nonce (t : t) =
       Zkapp_command.applicable_at_nonce p
 
 let expected_target_nonce t = Account.Nonce.succ (applicable_at_nonce t)
+
+let extract_vks : t -> Verification_key_wire.t List.t = function
+  | Signed_command _ ->
+      []
+  | Zkapp_command cmd ->
+      Zkapp_command.extract_vks cmd
 
 (** The target nonce is what the nonce of the fee payer will be after a user command is successfully applied. *)
 let target_nonce_on_success (t : t) =
@@ -245,10 +289,16 @@ let valid_until (t : t) =
   match t with
   | Signed_command x ->
       Signed_command.valid_until x
-  | Zkapp_command _ ->
-      Mina_numbers.Global_slot.max_value
+  | Zkapp_command { fee_payer; _ } -> (
+      match fee_payer.Account_update.Fee_payer.body.valid_until with
+      | Some valid_until ->
+          valid_until
+      | None ->
+          Mina_numbers.Global_slot.max_value )
 
 module Valid = struct
+  type t_ = t
+
   [%%versioned
   module Stable = struct
     module V2 = struct
@@ -265,14 +315,19 @@ module Valid = struct
   module Gen = Gen_make (Signed_command.With_valid_signature)
 end
 
-let check ~ledger ~get ~location_of_account (t : t) : Valid.t option =
+let check_verifiable (t : Verifiable.t) : Valid.t Or_error.t =
   match t with
-  | Signed_command x ->
-      Option.map (Signed_command.check x) ~f:(fun c -> Signed_command c)
+  | Signed_command x -> (
+      match Signed_command.check x with
+      | Some c ->
+          Ok (Signed_command c)
+      | None ->
+          Or_error.error_string "Invalid signature" )
   | Zkapp_command p ->
-      Option.map
-        (Zkapp_command.Valid.to_valid ~ledger ~get ~location_of_account p)
-        ~f:(fun p -> Zkapp_command p)
+      Ok (Zkapp_command (Zkapp_command.Valid.of_verifiable p))
+
+let check ~status ~find_vk (t : t) : Valid.t Or_error.t =
+  to_verifiable ~status ~find_vk t |> Or_error.bind ~f:check_verifiable
 
 let forget_check (t : Valid.t) : t =
   match t with

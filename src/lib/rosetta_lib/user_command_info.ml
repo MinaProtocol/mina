@@ -48,6 +48,7 @@ module Op = struct
               |> Option.bind ~f:(fun relate ->
                      List.findi plan ~f:(fun _ a -> a_eq relate a.label) )
               |> Option.map ~f:(fun (i, _) -> [ operation_identifier i ])
+              |> Option.value ~default:[]
             in
             let%map a =
               f ~related_operations
@@ -290,8 +291,10 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
       let open Result.Let_syntax in
       let%bind { amount; _ } = find_kind `Fee_payment ops in
       match amount with
-      | Some x ->
+      | Some x when Amount_of.compare_to_int64 x 0L < 1 ->
           V.return (Amount_of.negated x)
+      | Some _ ->
+          V.fail Fee_not_negative
       | None ->
           V.fail Amount_not_some
     in

@@ -20,6 +20,16 @@ type Structured_log_events.t +=
   | Rebroadcast_transition of { state_hash : State_hash.t }
   [@@deriving register_event]
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
 exception Snark_worker_error of int
 
 exception Snark_worker_signal_interrupt of Signal.t
@@ -186,7 +196,8 @@ val transition_frontier :
 
 val get_ledger : t -> State_hash.t option -> Account.t list Or_error.t
 
-val get_snarked_ledger : t -> State_hash.t option -> Account.t list Or_error.t
+val get_snarked_ledger :
+  t -> State_hash.t option -> Account.t list Deferred.Or_error.t
 
 val wallets : t -> Secrets.Wallets.t
 
@@ -207,3 +218,5 @@ val net : t -> Mina_networking.t
 val runtime_config : t -> Runtime_config.t
 
 val verifier : t -> Verifier.t
+
+val genesis_ledger : t -> Mina_ledger.Ledger.t Lazy.t

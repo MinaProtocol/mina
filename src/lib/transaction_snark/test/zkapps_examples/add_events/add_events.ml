@@ -51,6 +51,7 @@ let%test_module "Add events test" =
                   { edit_state = Proof
                   ; send = Proof
                   ; receive = Proof
+                  ; access = None
                   ; set_delegate = Proof
                   ; set_permissions = Proof
                   ; set_verification_key = Proof
@@ -59,6 +60,7 @@ let%test_module "Add events test" =
                   ; set_token_symbol = Proof
                   ; increment_nonce = Proof
                   ; set_voting_for = Proof
+                  ; set_timing = Proof
                   }
             }
         ; use_full_commitment = true
@@ -66,6 +68,7 @@ let%test_module "Add events test" =
             { Account_update.Preconditions.network =
                 Zkapp_precondition.Protocol_state.accept
             ; account = Accept
+            ; valid_while = Ignore
             }
         ; authorization_kind = Signature
         }
@@ -106,7 +109,7 @@ let%test_module "Add events test" =
         { body =
             { Account_update.Body.Fee_payer.dummy with
               public_key = pk_compressed
-            ; fee = Currency.Fee.(of_int 100)
+            ; fee = Currency.Fee.(of_nanomina_int_exn 100)
             }
         ; authorization = Signature.dummy
         }
@@ -160,7 +163,7 @@ let%test_module "Add events test" =
       in
       Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
           let account =
-            Account.create account_id Currency.Balance.(of_int 500)
+            Account.create account_id Currency.Balance.(of_nanomina_int_exn 500)
           in
           let _, loc =
             Ledger.get_or_create_account ledger account_id account

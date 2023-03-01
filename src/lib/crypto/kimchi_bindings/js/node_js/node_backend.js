@@ -16,6 +16,9 @@
 // Provides: worker_threads
 var worker_threads = require("worker_threads");
 
+// Provides: os
+var os = require("os");
+
 // Note: this is never used, but necessary to prevent a bug in Firefox
 // (https://bugzilla.mozilla.org/show_bug.cgi?id=1702191) where it collects
 // Web Workers that have a shared WebAssembly memory with the main thread,
@@ -94,8 +97,30 @@ var startWorkers = (function() {
 
 /* node_backend.js */
 
+// Return the most efficient number of workers for the platform we're running
+// on. This is required because of an issue with Apple silicon that's outlined
+// here: https://bugs.chromium.org/p/chromium/issues/detail?id=1228686
+// Provides: get_efficient_num_workers
+// Requires: os
+function get_efficient_num_workers() {
+  var cpus = os.cpus();
+  var num_cpus = cpus.length;
+  var cpu_model = cpus[0].model;
+
+  var num_workers =
+    {
+      "Apple M1": 2,
+      "Apple M1 Pro": num_cpus === 10 ? 3 : 2,
+      "Apple M1 Max": 3,
+      "Apple M1 Ultra": 7,
+      "Apple M2": 2,
+    }[cpu_model] || num_cpus - 1;
+
+  return num_workers;
+}
+
 // Provides: plonk_wasm
-// Requires: worker_threads, startWorkers, wasm_ready
+// Requires: worker_threads, startWorkers, wasm_ready, get_efficient_num_workers
 var plonk_wasm = (function() {
     // Expose this globally so that it can be referenced from WASM.
     joo_global_object.startWorkers = startWorkers;
@@ -116,7 +141,7 @@ var plonk_wasm = (function() {
     // global scope, yet not attached to the global object, so we can't access
     // it differently.
     if (worker_threads.isMainThread) {
-        plonk_wasm.initThreadPool(require('os').cpus().length - 1, __filename);
+        plonk_wasm.initThreadPool(get_efficient_num_workers(), __filename);
     } else {
         wasm_ready(plonk_wasm);
     }

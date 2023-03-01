@@ -76,10 +76,10 @@ let get_balance_graphql =
          | Some account ->
              if Token_id.(equal default) token then
                printf "Balance: %s mina\n"
-                 (Currency.Balance.to_formatted_string account.balance.total)
+                 (Currency.Balance.to_mina_string account.balance.total)
              else
                printf "Balance: %s tokens\n"
-                 (Currency.Balance.to_formatted_string account.balance.total)
+                 (Currency.Balance.to_mina_string account.balance.total)
          | None ->
              printf "There are no funds in this account\n" ) )
 
@@ -101,7 +101,7 @@ let get_tokens_graphql =
          in
          printf "Accounts are held for token IDs:\n" ;
          Array.iter response.accounts ~f:(fun account ->
-             printf "%s " (Token_id.to_string account.token) ) ) )
+             printf "%s " (Token_id.to_string account.tokenId) ) ) )
 
 let get_time_offset_graphql =
   Command.async
@@ -454,8 +454,8 @@ let batch_send_payments =
               Public_key.(
                 Compressed.to_base58_check (compress keypair.public_key))
           ; valid_until = Some (Mina_numbers.Global_slot.random ())
-          ; amount = Currency.Amount.of_int (Random.int 100)
-          ; fee = Currency.Fee.of_int (Random.int 100)
+          ; amount = Currency.Amount.of_nanomina_int_exn (Random.int 100)
+          ; fee = Currency.Fee.of_nanomina_int_exn (Random.int 100)
           }
         in
         eprintf "Could not read payments from %s.\n" payments_path ;
@@ -584,7 +584,7 @@ let cancel_transaction_graphql =
            Currency.Fee.of_uint64 (fee + replace_fee)
          in
          printf "Fee to cancel transaction is %s coda.\n"
-           (Currency.Fee.to_formatted_string cancel_fee) ;
+           (Currency.Fee.to_mina_string cancel_fee) ;
          let cancel_query =
            let input =
              Mina_graphql.Types.Input.SendPaymentInput.make_input
@@ -877,8 +877,7 @@ let currency_in_ledger =
          List.iter tokens ~f:(fun token ->
              let total =
                Token_id.Table.find_exn currency_tbl token
-               |> Currency.Balance.of_uint64
-               |> Currency.Balance.to_formatted_string
+               |> Currency.Balance.of_uint64 |> Currency.Balance.to_mina_string
              in
              if Token_id.equal token Token_id.default then
                Format.printf "MINA: %s@." total
@@ -1039,8 +1038,14 @@ let pending_snark_work =
                           ; fee_excess =
                               to_signed_fee_exn f.sign f.fee_magnitude
                           ; supply_increase = w.supply_increase
-                          ; source_ledger_hash = w.source_ledger_hash
-                          ; target_ledger_hash = w.target_ledger_hash
+                          ; source_first_pass_ledger_hash =
+                              w.source_first_pass_ledger_hash
+                          ; target_first_pass_ledger_hash =
+                              w.target_first_pass_ledger_hash
+                          ; source_second_pass_ledger_hash =
+                              w.source_second_pass_ledger_hash
+                          ; target_second_pass_ledger_hash =
+                              w.target_second_pass_ledger_hash
                           } ) )
                     response.pendingSnarkWork )
              in
@@ -1153,8 +1158,9 @@ let set_snark_work_fee =
            ~f:(fun response ->
              printf
                !"Updated snark work fee: %i\nOld snark work fee: %i\n"
-               (Currency.Fee.to_int fee)
-               (Currency.Fee.to_int response.setSnarkWorkFee.lastFee) ) )
+               (Currency.Fee.to_nanomina_int fee)
+               (Currency.Fee.to_nanomina_int response.setSnarkWorkFee.lastFee) )
+         )
 
 let import_key =
   Command.async
@@ -1405,7 +1411,7 @@ let list_accounts =
                        \  Locked: %b\n"
                        (i + 1)
                        (Public_key.Compressed.to_base58_check w.public_key)
-                       (Currency.Balance.to_formatted_string w.balance.total)
+                       (Currency.Balance.to_mina_string w.balance.total)
                        (Option.value ~default:true w.locked) ) ;
                  Ok () )
          | Error (`Failed_request _ as err) ->
@@ -1563,7 +1569,7 @@ let generate_libp2p_keypair_do privkey_path =
         match%bind
           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
             ~pids:(Child_processes.Termination.create_pid_table ())
-            ~on_peer_connected:ignore ~on_peer_disconnected:ignore
+            ~on_peer_connected:ignore ~on_peer_disconnected:ignore ()
         with
         | Ok net ->
             let%bind me = Mina_net2.generate_random_keypair net in
@@ -1746,7 +1752,7 @@ let compile_time_constants =
              ; ("k", `Int (Unsigned.UInt32.to_int consensus_constants.k))
              ; ( "coinbase"
                , `String
-                   (Currency.Amount.to_formatted_string
+                   (Currency.Amount.to_mina_string
                       precomputed_values.constraint_constants.coinbase_amount )
                )
              ; ( "block_window_duration_ms"
@@ -2013,28 +2019,43 @@ let receipt_chain_hash =
        transaction ID"
     (let%map_open previous_hash =
        flag "--previous-hash"
-         ~doc:"Previous receipt chain hash, base58check encoded"
+         ~doc:"HASH Previous receipt chain hash, Base58Check-encoded"
          (required string)
      and transaction_id =
-       flag "--transaction-id" ~doc:"Transaction ID, base64-encoded"
-         (required string)
+       flag "--transaction-id"
+         ~doc:"TRANSACTION_ID Transaction ID, Base64-encoded" (required string)
+     and index =
+       flag "--index"
+         ~doc:
+           "NN For a zkApp, 0 for fee payer or 1-based index of account update"
+         (optional string)
      in
      fun () ->
        let previous_hash =
          Receipt.Chain_hash.of_base58_check_exn previous_hash
        in
-       (* What we call transaction IDs in GraphQL are just base64-encoded
-          transactions. It's easy to handle, and we return it from the
-          transaction commands above, so lets use this format.
-
-          TODO: handle zkApps, issue #11431
-       *)
-       let transaction =
-         Signed_command.of_base64 transaction_id |> Or_error.ok_exn
-       in
        let hash =
-         Receipt.Chain_hash.cons_signed_command_payload
-           (Signed_command_payload transaction.payload) previous_hash
+         match index with
+         | None ->
+             let signed_cmd =
+               Signed_command.of_base64 transaction_id |> Or_error.ok_exn
+             in
+             Receipt.Chain_hash.cons_signed_command_payload
+               (Signed_command_payload signed_cmd.payload) previous_hash
+         | Some n ->
+             let zkapp_cmd =
+               Zkapp_command.of_base64 transaction_id |> Or_error.ok_exn
+             in
+             let receipt_elt =
+               let _txn_commitment, full_txn_commitment =
+                 Zkapp_command.get_transaction_commitments zkapp_cmd
+               in
+               Receipt.Zkapp_command_elt.Zkapp_command_commitment
+                 full_txn_commitment
+             in
+             let account_update_index = Mina_numbers.Index.of_string n in
+             Receipt.Chain_hash.cons_zkapp_command_commitment
+               account_update_index receipt_elt previous_hash
        in
        printf "%s\n" (Receipt.Chain_hash.to_base58_check hash) )
 
