@@ -179,6 +179,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       (* TODO: This is a pain. *)
       { body = body vk; authorization = Signature Signature.dummy }
     in
+    (*
     let reset_permissions : Account_update.t =
       let body =
         { Account_update.Body.dummy with
@@ -193,6 +194,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       { body; authorization = Signature Signature.dummy }
     in
+    *)
     let zkapp_command_create_account =
       let memo =
         Signed_command_memo.create_from_string_exn "Zkapp create account"
@@ -276,7 +278,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let call_forest1 =
       []
-      |> Zkapp_command.Call_forest.cons reset_permissions
       |> Zkapp_command.Call_forest.cons_tree account_update1
       |> Zkapp_command.Call_forest.cons (update_vk vk1)
     in
@@ -286,7 +287,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let call_forest2 =
       []
-      |> Zkapp_command.Call_forest.cons reset_permissions
       |> Zkapp_command.Call_forest.cons_tree account_update1
       |> Zkapp_command.Call_forest.cons (update_vk vk2)
     in
@@ -296,7 +296,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let call_forest_update_vk2 =
       []
-      |> Zkapp_command.Call_forest.cons reset_permissions
       |> Zkapp_command.Call_forest.cons_tree account_update2
       |> Zkapp_command.Call_forest.cons (update_vk vk2)
     in
