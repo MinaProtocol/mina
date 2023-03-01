@@ -16,14 +16,29 @@ module Fp = struct
 
     external sub : t -> t -> t = "fp_var_sub"
 
-    external sum : t array -> t = "fp_var_sum"
-
     external to_constant : t -> Pasta_bindings.Fp.t option
       = "fp_var_to_constant"
   end
 
   module Constraint_system = struct
     type nonrec t
+
+    external create : unit -> t = "fp_cs_create"
+
+    external add_constraint : string option -> t -> int -> unit
+      = "fp_cs_add_constraint"
+
+    external finalize : t -> unit = "fp_cs_finalize"
+
+    external digest : t -> bytes = "fp_cs_digest"
+
+    external get_rows_len : t -> int = "fp_cs_get_rows_len"
+
+    external set_auxiliary_input_size : t -> int -> unit
+      = "fp_cs_set_auxiliary_input_size"
+
+    external set_primary_input_size : t -> int -> unit
+      = "fp_cs_set_primary_input_size"
 
     external get_primary_input_size : t -> int = "fp_cs_get_primary_input_size"
 
@@ -64,14 +79,29 @@ module Fq = struct
 
     external sub : t -> t -> t = "fq_var_sub"
 
-    external sum : t array -> t = "fq_var_sum"
-
     external to_constant : t -> Pasta_bindings.Fq.t option
       = "fq_var_to_constant"
   end
 
   module Constraint_system = struct
     type nonrec t
+
+    external create : unit -> t = "fq_cs_create"
+
+    external add_constraint : string option -> t -> int -> unit
+      = "fq_cs_add_constraint"
+
+    external finalize : t -> unit = "fq_cs_finalize"
+
+    external digest : t -> bytes = "fq_cs_digest"
+
+    external get_rows_len : t -> int = "fq_cs_get_rows_len"
+
+    external set_auxiliary_input_size : t -> int -> unit
+      = "fq_cs_set_auxiliary_input_size"
+
+    external set_primary_input_size : t -> int -> unit
+      = "fq_cs_set_primary_input_size"
 
     external get_primary_input_size : t -> int = "fq_cs_get_primary_input_size"
 

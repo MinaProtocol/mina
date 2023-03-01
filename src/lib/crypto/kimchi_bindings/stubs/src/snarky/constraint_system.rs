@@ -1,5 +1,5 @@
-use kimchi::snarky::constraint_system::SnarkyConstraintSystem;
-use mina_curves::pasta::{Fp, Fq};
+use kimchi::snarky::{constants::Constants, constraint_system::SnarkyConstraintSystem};
+use mina_curves::pasta::{Fp, Fq, Pallas, Vesta};
 
 use crate::{
     field_vector::{fp::CamlFpVector, fq::CamlFqVector},
@@ -19,6 +19,35 @@ impl_custom!(CamlFqCS, SnarkyConstraintSystem<Fq>);
 
 // Fp
 impl_functions! {
+    pub fn fp_cs_create() -> CamlFpCS {
+        let constants = Constants::new::<Vesta>();
+        CamlFpCS(SnarkyConstraintSystem::create(constants))
+    }
+
+    pub fn fp_cs_add_constraint(label: Option<String>, mut cs: ocaml::Pointer<CamlFpCS>, constraint: usize) {
+        unimplemented!();
+    }
+
+    pub fn fp_cs_finalize(mut cs: ocaml::Pointer<CamlFpCS>) {
+        cs.as_mut().0.finalize();
+    }
+
+    pub fn fp_cs_digest(cs: &CamlFpCS) -> [u8; 32] {
+        cs.digest()
+    }
+
+    pub fn fp_cs_get_rows_len(cs: &CamlFpCS) -> usize {
+        cs.get_rows_len()
+    }
+
+    pub fn fp_cs_set_auxiliary_input_size(mut cs: ocaml::Pointer<CamlFpCS>, size: usize) {
+        cs.as_mut().0.set_auxiliary_input_size(size);
+    }
+
+    pub fn fp_cs_set_primary_input_size(mut cs: ocaml::Pointer<CamlFpCS>, size: usize) {
+        cs.as_mut().0.set_primary_input_size(size);
+    }
+
     pub fn fp_cs_get_primary_input_size(cs: &CamlFpCS) -> usize {
         cs.get_primary_input_size()
     }
@@ -42,6 +71,35 @@ impl_functions! {
 
 // Fq
 impl_functions! {
+
+    pub fn fq_cs_create() -> CamlFqCS {
+        let constants = Constants::new::<Pallas>();
+        CamlFqCS(SnarkyConstraintSystem::create(constants))
+    }
+
+    pub fn fq_cs_add_constraint(label: Option<String>, mut cs: ocaml::Pointer<CamlFqCS>, constraint: usize) {
+        unimplemented!();
+    }
+
+    pub fn fq_cs_finalize(mut cs: ocaml::Pointer<CamlFqCS>) {
+        cs.as_mut().0.finalize();
+    }
+
+    pub fn fq_cs_digest(cs: &CamlFqCS) -> [u8; 32] {
+        cs.digest()
+    }
+
+    pub fn fq_cs_get_rows_len(cs: &CamlFqCS) -> usize {
+        cs.get_rows_len()
+    }
+
+    pub fn fq_cs_set_auxiliary_input_size(mut cs: ocaml::Pointer<CamlFqCS>, size: usize) {
+        cs.as_mut().0.set_auxiliary_input_size(size);
+    }
+
+    pub fn fq_cs_set_primary_input_size(mut cs: ocaml::Pointer<CamlFqCS>, size: usize) {
+        cs.as_mut().0.set_primary_input_size(size);
+    }
     pub fn fq_cs_get_primary_input_size(cs: &CamlFqCS) -> usize {
         cs.get_primary_input_size()
     }
