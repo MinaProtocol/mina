@@ -217,6 +217,11 @@ let setup_daemon logger =
   and enable_tracing =
     flag "--tracing" ~aliases:[ "tracing" ] no_arg
       ~doc:"Trace into $config-directory/trace/$pid.trace"
+  and enable_internal_tracing =
+    flag "--internal-tracing" ~aliases:[ "internal-tracing" ] no_arg
+      ~doc:
+        "Enables internal tracing into \
+         $config-directory/internal-tracing/internal-trace.jsonl"
   and insecure_rest_server =
     flag "--insecure-rest-server" ~aliases:[ "insecure-rest-server" ] no_arg
       ~doc:
@@ -509,6 +514,13 @@ let setup_daemon logger =
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-oversized-logs.log"
                ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate ) ;
+        (* Consumer for `[%log internal]` logging used for internal tracing *)
+        Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
+          ~processor:Internal_tracing.For_logger.processor
+          ~transport:
+            (Internal_tracing.For_logger.json_lines_rotate_transport
+               ~directory:(conf_dir ^ "/internal-tracing")
+               () ) ;
         let version_metadata =
           [ ("commit", `String Mina_version.commit_id)
           ; ("branch", `String Mina_version.branch)
@@ -1124,6 +1136,8 @@ let setup_daemon logger =
               ~default:Cli_lib.Default.stop_time stop_time
           in
           if enable_tracing then Mina_tracing.start conf_dir |> don't_wait_for ;
+          if enable_internal_tracing then
+            Internal_tracing.toggle ~logger `Enabled ;
           let seed_peer_list_url =
             Option.value_map seed_peer_list_url ~f:Option.some
               ~default:
