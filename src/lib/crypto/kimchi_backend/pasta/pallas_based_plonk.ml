@@ -30,10 +30,6 @@ module Verification_key = struct
   let shifts (t : t) : Field.t array = t.shifts
 end
 
-(* TODO: change name *)
-module R1CS_constraint_system =
-  Kimchi_pasta_constraint_system.Pallas_constraint_system
-
 let lagrange srs domain_log2 : _ Kimchi_types.poly_comm array =
   let domain_size = Int.pow 2 domain_log2 in
   Array.init domain_size ~f:(fun i ->
@@ -62,7 +58,7 @@ module Keypair = Dlog_plonk_based_keypair.Make (struct
   module Scalar_field = Field
   module Verifier_index = Kimchi_bindings.Protocol.VerifierIndex.Fq
   module Gate_vector = Kimchi_bindings.Protocol.Gates.Vector.Fq
-  module Constraint_system = R1CS_constraint_system
+  module Constraint_system = Snarky_bindings.Fq.Constraint_system
 end)
 
 module Proof = Plonk_dlog_proof.Make (struct
@@ -84,29 +80,13 @@ module Proof = Plonk_dlog_proof.Make (struct
 
     let create_aux ~f:create (pk : Keypair.t) primary auxiliary prev_chals
         prev_comms =
-      (* external values contains [1, primary..., auxiliary ] *)
-      let external_values i =
-        let open Field.Vector in
-        if i = 0 then Field.one
-        else if i - 1 < length primary then get primary (i - 1)
-        else get auxiliary (i - 1 - length primary)
-      in
-
-      (* compute witness *)
-      let computed_witness =
-        R1CS_constraint_system.compute_witness pk.cs external_values
-      in
-      let num_rows = Array.length computed_witness.(0) in
-
-      (* convert to Rust vector *)
+      (* Compute witness. *)
       let witness_cols =
-        Array.init Kimchi_backend_common.Constants.columns ~f:(fun col ->
-            let witness = Field.Vector.create () in
-            for row = 0 to num_rows - 1 do
-              Field.Vector.emplace_back witness computed_witness.(col).(row)
-            done ;
-            witness )
+        Snarky_bindings.Fq.Constraint_system.compute_witness pk.cs primary
+          auxiliary
       in
+
+      (* Pass eveyrthing to the given [create] closure. *)
       create pk.index witness_cols prev_chals prev_comms
 
     let create_async (pk : Keypair.t) primary auxiliary prev_chals prev_comms =

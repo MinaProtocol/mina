@@ -8,13 +8,17 @@ module Pallas_based_plonk = struct
   let field_size = Pallas_based_plonk.field_size
 
   module Verification_key = Pallas_based_plonk.Verification_key
-  module R1CS_constraint_system = Pallas_based_plonk.R1CS_constraint_system
   module Rounds_vector = Pallas_based_plonk.Rounds_vector
   module Rounds = Pallas_based_plonk.Rounds
   module Keypair = Pallas_based_plonk.Keypair
   module Proof = Pallas_based_plonk.Proof
   module Proving_key = Pallas_based_plonk.Proving_key
   module Oracles = Pallas_based_plonk.Oracles
+
+  (* stuff we get from bindings *)
+  module Cvar = Snarky_bindings.Fq.Cvar
+  module Run_state = Snarky_bindings.Fq.State
+  module R1CS_constraint_system = Snarky_bindings.Fq.Constraint_system
 end
 
 module Vesta_based_plonk = struct
@@ -25,13 +29,17 @@ module Vesta_based_plonk = struct
   let field_size = Vesta_based_plonk.field_size
 
   module Verification_key = Vesta_based_plonk.Verification_key
-  module R1CS_constraint_system = Vesta_based_plonk.R1CS_constraint_system
   module Rounds_vector = Vesta_based_plonk.Rounds_vector
   module Rounds = Vesta_based_plonk.Rounds
   module Keypair = Vesta_based_plonk.Keypair
   module Proof = Vesta_based_plonk.Proof
   module Proving_key = Vesta_based_plonk.Proving_key
   module Oracles = Vesta_based_plonk.Oracles
+
+  (* stuff we get from bindings *)
+  module Cvar = Snarky_bindings.Fp.Cvar
+  module Run_state = Snarky_bindings.Fp.State
+  module R1CS_constraint_system = Snarky_bindings.Fp.Constraint_system
 end
 
 module Pasta = struct
