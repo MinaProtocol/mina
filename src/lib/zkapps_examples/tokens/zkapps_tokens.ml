@@ -317,7 +317,7 @@ module Rules = struct
     end
 
     let dummy_proof =
-      lazy (Pickles.Proof.dummy Nat.N1.n Nat.N1.n Nat.N2.n ~domain_log2:15)
+      lazy (Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15)
 
     let next_account_update
         ({ forest; pending_forests; check_may_use_token } : State.Circuit.t) :
@@ -461,7 +461,7 @@ module Rules = struct
       type _ Snarky_backendless.Request.t +=
         | Prove :
             bool * Statement.Value.t
-            -> (Nat.N1.n, Nat.N1.n) Pickles.Proof.t Snarky_backendless.Request.t
+            -> (Nat.N2.n, Nat.N2.n) Pickles.Proof.t Snarky_backendless.Request.t
 
       let main
           { Pickles.Inductive_rule.public_input =
@@ -490,20 +490,28 @@ module Rules = struct
               Prove (proof_must_verify, state) )
         in
         { Pickles.Inductive_rule.previous_proof_statements =
-            [ { public_input = recursive_input; proof; proof_must_verify } ]
+            [ { public_input = recursive_input; proof; proof_must_verify }
+            ; (* dummy to avoid pickles bug *)
+              { public_input = recursive_input
+              ; proof =
+                  exists (Typ.Internal.ref ()) ~compute:(fun () ->
+                      Lazy.force dummy_proof )
+              ; proof_must_verify = Boolean.false_
+              }
+            ]
         ; public_output = ()
         ; auxiliary_output = ()
         }
 
       let rule self : _ Pickles.Inductive_rule.t =
         { identifier = "Transfer tokens"
-        ; prevs = [ self ]
+        ; prevs = [ self; self ]
         ; main
         ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
         }
 
       let handler
-          (prove : Statement.Value.t -> (Nat.N1.n, Nat.N1.n) Pickles.Proof.t)
+          (prove : Statement.Value.t -> (Nat.N2.n, Nat.N2.n) Pickles.Proof.t)
           (Snarky_backendless.Request.With { request; respond }) =
         match request with
         | Prove (should_prove, statement) ->
@@ -569,14 +577,22 @@ module Rules = struct
             Recursive.Prove (proof_must_verify, state) )
       in
       { Pickles.Inductive_rule.previous_proof_statements =
-          [ { public_input = recursive_input; proof; proof_must_verify } ]
+          [ { public_input = recursive_input; proof; proof_must_verify }
+          ; (* dummy to avoid pickles bug *)
+            { public_input = recursive_input
+            ; proof =
+                exists (Typ.Internal.ref ()) ~compute:(fun () ->
+                    Lazy.force dummy_proof )
+            ; proof_must_verify = Boolean.false_
+            }
+          ]
       ; public_output = account_update
       ; auxiliary_output = ()
       }
 
     let rule prev : _ Pickles.Inductive_rule.t =
       { identifier = "Transfer tokens"
-      ; prevs = [ prev ]
+      ; prevs = [ prev; prev ]
       ; main
       ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
       }
@@ -585,7 +601,7 @@ module Rules = struct
         (call_forest : Zkapp_call_forest.t)
         (may_use_token : Account_update.May_use_token.t)
         (prove :
-          Recursive.Statement.Value.t -> (Nat.N1.n, Nat.N1.n) Pickles.Proof.t )
+          Recursive.Statement.Value.t -> (Nat.N2.n, Nat.N2.n) Pickles.Proof.t )
         (Snarky_backendless.Request.With { request; respond }) =
       match request with
       | Public_key ->
@@ -613,7 +629,7 @@ module Transfer_recursive = struct
          ~public_input:(Input Rules.Transfer.Recursive.Statement.typ)
          ~auxiliary_typ:Impl.Typ.unit
          ~branches:(module Nat.N1)
-         ~max_proofs_verified:(module Nat.N1)
+         ~max_proofs_verified:(module Nat.N2)
          ~name:"transfer recurse"
          ~constraint_constants:
            Genesis_constants.Constraint_constants.(
@@ -644,7 +660,7 @@ let lazy_compiled =
     (Zkapps_examples.compile () ~cache:Cache_dir.cache
        ~auxiliary_typ:Impl.Typ.unit
        ~branches:(module Nat.N3)
-       ~max_proofs_verified:(module Nat.N1)
+       ~max_proofs_verified:(module Nat.N2)
        ~name:"tokens"
        ~constraint_constants:
          Genesis_constants.Constraint_constants.(to_snark_keys_header compiled)
@@ -665,7 +681,7 @@ let p_module = Lazy.map lazy_compiled ~f:(fun (_, _, p_module, _) -> p_module)
 module P = struct
   type statement = Zkapp_statement.t
 
-  type t = (Nat.N1.n, Nat.N1.n) Pickles.Proof.t
+  type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
 
   module type Proof_intf =
     Pickles.Proof_intf with type statement = statement and type t = t
