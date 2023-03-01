@@ -101,9 +101,9 @@ let deploy_test_zkapps ~ledger ~port
         let spec =
           { Transaction_snark.For_tests.Deploy_snapp_spec.sender =
               (account_creator_keypair, !account_creator_nonce)
-          ; fee = Currency.Fee.of_formatted_string "1.0"
+          ; fee = Currency.Fee.of_mina_string_exn "1.0"
           ; fee_payer = Some (fee_payer_keypair, !fee_payer_nonce)
-          ; amount = Currency.Amount.of_formatted_string "2000.0"
+          ; amount = Currency.Amount.of_mina_string_exn "2000.0"
           ; zkapp_account_keypairs = [ kp ]
           ; memo = Signed_command_memo.empty
           ; new_zkapp_account = true
