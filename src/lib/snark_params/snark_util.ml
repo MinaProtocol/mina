@@ -69,9 +69,13 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
                     Bigint.(
                       compare (of_field (Field.of_int i)) (of_field n) < 0) ) ))
     in
+    let sum terms =
+      List.fold terms ~init:(Field.Var.constant Field.zero) ~f:(fun acc t ->
+          Field.Var.add acc t )
+    in
     let%map () =
       Field.Checked.Assert.equal
-        (Field.Var.sum (bs :> Field.Var.t list))
+        (sum (bs :> Field.Var.t list))
         (* This can't overflow since the field is huge *)
         n
     and () = assert_decreasing bs in

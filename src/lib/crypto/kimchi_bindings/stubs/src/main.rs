@@ -516,8 +516,6 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
 
             decl_func!(w, env, fp_var_sub => "sub");
 
-            decl_func!(w, env, fp_var_sum => "sum");
-
             decl_func!(w, env, fp_var_to_constant => "to_constant");
         });
 
@@ -555,8 +553,6 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_func!(w, env, fq_var_scale => "scale");
 
             decl_func!(w, env, fq_var_sub => "sub");
-
-            decl_func!(w, env, fq_var_sum => "sum");
 
             decl_func!(w, env, fq_var_to_constant => "to_constant");
         });

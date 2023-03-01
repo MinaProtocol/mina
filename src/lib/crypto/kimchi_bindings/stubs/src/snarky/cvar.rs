@@ -42,12 +42,6 @@ macro_rules! impl_cvar_methods {
                 $CamlFVar(&var1.0 - &var2.0)
             }
 
-            pub fn [<$name:snake _var_sum>](cvars: Vec<&$CamlFVar>) -> $CamlFVar {
-                let cvars: Vec<_> = cvars.into_iter().map(|t| &t.0).collect();
-                let res = CVar::sum(&cvars);
-                $CamlFVar(res)
-            }
-
             pub fn [<$name:snake _var_to_constant>](var: &$CamlFVar) -> Option<$CamlF> {
                 match &var.0 {
                     CVar::Constant(c) => Some($CamlF(*c)),
