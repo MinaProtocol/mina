@@ -376,6 +376,12 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           Mina_tracing.start (Mina_lib.config coda).conf_dir )
     ; implement Daemon_rpcs.Stop_tracing.rpc (fun () () ->
           Mina_tracing.stop () ; Deferred.unit )
+    ; implement Daemon_rpcs.Start_internal_tracing.rpc (fun () () ->
+          Internal_tracing.toggle ~logger `Enabled ;
+          Deferred.unit )
+    ; implement Daemon_rpcs.Stop_internal_tracing.rpc (fun () () ->
+          Internal_tracing.toggle ~logger `Disabled ;
+          Deferred.unit )
     ; implement Daemon_rpcs.Visualization.Frontier.rpc (fun () filename ->
           return (Mina_lib.visualize_frontier ~filename coda) )
     ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
