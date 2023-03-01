@@ -119,7 +119,7 @@ let%test_module "Tokens test" =
       in
       ignore account
 
-    let%test_unit "Initialize, mint, transfer one fails" =
+    let%test_unit "Proof aborts if token balance changes do not sum to 0" =
       let subtree =
         []
         |> Zkapp_command.Call_forest.cons
