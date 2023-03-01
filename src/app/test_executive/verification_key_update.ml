@@ -151,7 +151,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ; permissions =
                 Set
                   { edit_state = Proof
-                  ; send = Proof
+                  ; send = Signature
                   ; receive = Proof
                   ; set_delegate = Proof
                   ; set_permissions = Signature
@@ -161,7 +161,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                   ; set_token_symbol = Proof
                   ; increment_nonce = Proof
                   ; set_voting_for = Proof
-                  ; access = Proof
+                  ; access = None
                   ; set_timing = Signature
                   }
             }
@@ -179,22 +179,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       (* TODO: This is a pain. *)
       { body = body vk; authorization = Signature Signature.dummy }
     in
-    (*
-    let reset_permissions : Account_update.t =
-      let body =
-        { Account_update.Body.dummy with
-          public_key = zkapp_pk
-        ; update =
-            { Account_update.Update.dummy with
-              permissions = Set Permissions.user_default
-            }
-        ; use_full_commitment = true
-        ; authorization_kind = Signature
-        }
-      in
-      { body; authorization = Signature Signature.dummy }
-    in
-    *)
     let zkapp_command_create_account =
       let memo =
         Signed_command_memo.create_from_string_exn "Zkapp create account"
