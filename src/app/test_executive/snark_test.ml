@@ -1,5 +1,7 @@
 open Core
 open Integration_test_lib
+open Mina_base
+open Async
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
@@ -81,42 +83,83 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            |> Bigstring.to_string ) ) ;
     let amount = Currency.Amount.of_formatted_string "10" in
     let fee = Currency.Fee.of_formatted_string "1" in
+    let test_constants = Engine.Network.constraint_constants network in
     let receiver_pub_key =
       fish1.keypair.public_key |> Signature_lib.Public_key.compress
     in
-    let sender_kp = fish2 in
     let sender_pub_key =
-      sender_kp.keypair.public_key |> Signature_lib.Public_key.compress
+      fish2.keypair.public_key |> Signature_lib.Public_key.compress
+    in
+    let txn_body =
+      Signed_command_payload.Body.Payment
+        { source_pk = sender_pub_key
+        ; receiver_pk = receiver_pub_key
+        ; token_id = Token_id.default
+        ; amount
+        }
+    in
+    let%bind { nonce = sender_current_nonce; _ } =
+      Network.Node.must_get_account_data ~logger node_b
+        ~public_key:sender_pub_key
+    in
+    let user_command_input =
+      User_command_input.create ~fee ~nonce:sender_current_nonce
+        ~fee_token:(Signed_command_payload.Body.token txn_body)
+        ~fee_payer_pk:sender_pub_key ~valid_until:None
+        ~memo:(Signed_command_memo.create_from_string_exn "")
+        ~body:txn_body ~signer:sender_pub_key
+        ~sign_choice:(User_command_input.Sign_choice.Keypair fish2.keypair) ()
+    in
+    [%log info] "user_command_input: $user_command"
+      ~metadata:
+        [ ( "user_command"
+          , User_command_input.Stable.Latest.to_yojson user_command_input )
+        ] ;
+    let%bind txn_signed =
+      User_command_input.to_user_command
+        ~get_current_nonce:(fun _ -> failwith "get_current_nonce, don't call me")
+        ~nonce_map:
+          (Account_id.Map.of_alist_exn
+             [ ( Account_id.create sender_pub_key
+                   (Signed_command_payload.Body.token txn_body)
+               , (sender_current_nonce, sender_current_nonce) )
+             ] )
+        ~get_account:(fun _ -> `Bootstrapping)
+        ~constraint_constants:test_constants ~logger user_command_input
+      |> Deferred.bind ~f:Malleable_error.or_hard_error
+    in
+    let (signed_cmmd, _)
+          : Signed_command.t
+            * (Unsigned.uint32 * Unsigned.uint32) Account_id.Map.t =
+      txn_signed
     in
     (* let snark_worker_pk = Test_config.default.snark_worker_public_key in *)
     let%bind () =
-      section_hard
-        "send out a bunch more txns to fill up the snark ledger, then wait for \
-         proofs to be emitted"
-        (let receiver = node_a in
-         let%bind receiver_pub_key = pub_key_of_node receiver in
-         let sender = node_b in
-         let%bind sender_pub_key = pub_key_of_node sender in
-         let%bind _ =
-           (*
-            To fill up a `small` transaction capacity with work delay of 1,
-            there needs to be 12 total txns sent.
-
-            Calculation is as follows:
-            Max number trees in the scan state is
-              `(transaction_capacity_log+1) * (work_delay+1)`
-            and for 2^2 transaction capacity and work delay 1 it is
-              `(2+1)*(1+1)=6`.
-            Per block there can be 2 transactions included (other two slots would be for a coinbase and fee transfers).
-            In the initial state of the network, the scan state waits till all the trees are filled before emitting a proof from the first tree.
-            Hence, 6*2 = 12 transactions untill we get the first snarked ledger.
-*)
-           send_payments ~logger ~sender_pub_key ~receiver_pub_key
-             ~amount:Currency.Amount.one ~fee ~node:sender 12
+      section "send a single signed payment between 2 fish accounts"
+        (let%bind { hash; _ } =
+           Network.Node.must_send_payment_with_raw_sig node_b ~logger
+             ~sender_pub_key:
+               (Signed_command_payload.Body.source_pk signed_cmmd.payload.body)
+             ~receiver_pub_key:
+               (Signed_command_payload.Body.receiver_pk signed_cmmd.payload.body)
+             ~amount:
+               ( Signed_command_payload.amount signed_cmmd.payload
+               |> Option.value_exn )
+             ~fee:(Signed_command_payload.fee signed_cmmd.payload)
+             ~nonce:signed_cmmd.payload.common.nonce
+             ~memo:
+               (Signed_command_memo.to_raw_bytes_exn
+                  signed_cmmd.payload.common.memo )
+             ~token:(Signed_command_payload.token signed_cmmd.payload)
+             ~valid_until:signed_cmmd.payload.common.valid_until
+             ~raw_signature:
+               (Mina_base.Signature.Raw.encode signed_cmmd.signature)
          in
          wait_for t
-           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
+           (Wait_condition.signed_command_to_be_included_in_frontier
+              ~txn_hash:hash ~node_included_in:(`Node node_b) ) )
     in
+
     (* let%bind () =
          section_hard "check snark worker's account balance"
            (let%bind { total_balance = snark_worker_balance; _ } =
@@ -136,15 +179,30 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 (Currency.Amount.to_int snark_worker_expected)
                 (Currency.Fee.to_int fee) )
        in *)
-    section_hard "dfasdfdasf"
-      (let%bind hash =
-         let%map { hash; _ } =
-           Engine.Network.Node.must_send_payment ~logger ~sender_pub_key
-             ~receiver_pub_key ~amount ~fee node_b
-         in
-         hash
+    section_hard
+      "send out a bunch more txns to fill up the snark ledger, then wait for \
+       proofs to be emitted"
+      (let receiver = node_a in
+       let%bind receiver_pub_key = pub_key_of_node receiver in
+       let sender = node_b in
+       let%bind sender_pub_key = pub_key_of_node sender in
+       let%bind _ =
+         (*
+            To fill up a `small` transaction capacity with work delay of 1,
+            there needs to be 12 total txns sent.
+
+            Calculation is as follows:
+            Max number trees in the scan state is
+              `(transaction_capacity_log+1) * (work_delay+1)`
+            and for 2^2 transaction capacity and work delay 1 it is
+              `(2+1)*(1+1)=6`.
+            Per block there can be 2 transactions included (other two slots would be for a coinbase and fee transfers).
+            In the initial state of the network, the scan state waits till all the trees are filled before emitting a proof from the first tree.
+            Hence, 6*2 = 12 transactions untill we get the first snarked ledger.
+*)
+         send_payments ~logger ~sender_pub_key ~receiver_pub_key
+           ~amount:Currency.Amount.one ~fee ~node:sender 12
        in
-       Dsl.wait_for t
-         (Dsl.Wait_condition.signed_command_to_be_included_in_frontier
-            ~txn_hash:hash ~node_included_in:`Any_node ) )
+       wait_for t
+         (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
 end
