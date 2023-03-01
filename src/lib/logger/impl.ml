@@ -3,7 +3,16 @@ open Core_kernel
 let max_log_line_length = 1 lsl 20
 
 module Level = struct
-  type t = Spam | Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
+  type t =
+    | Spam
+    | Trace
+    | Debug
+    | Info
+    | Warn
+    | Error
+    | Faulty_peer
+    | Fatal
+    | Internal
   [@@deriving sexp, equal, compare, show { with_path = false }, enumerate]
 
   let of_string str =
@@ -143,6 +152,8 @@ module Processor = struct
   end
 
   type t = T : (module S with type t = 't) * 't -> t
+
+  let create m t = T (m, t)
 
   module Raw = struct
     type t = Level.t
@@ -300,7 +311,7 @@ let extend t metadata =
 let change_id { null; metadata; id = _ } ~id = { null; metadata; id }
 
 let make_message (t : t) ~level ~module_ ~location ~metadata ~message ~event_id
-    =
+    ~merge_global_metadata =
   let global_metadata' =
     let m = !global_metadata in
     let key_cmp (k1, _) (k2, _) = String.compare k1 k2 in
@@ -316,9 +327,11 @@ let make_message (t : t) ~level ~module_ ~location ~metadata ~message ~event_id
   ; source = Some (Source.create ~module_ ~location)
   ; message
   ; metadata =
-      Metadata.extend
-        (Metadata.merge (Metadata.of_alist_exn global_metadata') t.metadata)
-        metadata
+      ( if merge_global_metadata then Metadata.extend t.metadata metadata
+      else
+        Metadata.extend
+          (Metadata.merge (Metadata.of_alist_exn global_metadata') t.metadata)
+          metadata )
   ; event_id
   }
 
@@ -353,6 +366,7 @@ let log t ~level ~module_ ~location ?tags ?(metadata = []) ?event_id fmt =
   let f message =
     raw t
     @@ make_message t ~level ~module_ ~location ~metadata ~message ~event_id
+         ~merge_global_metadata:(Level.equal level Level.Internal)
   in
   ksprintf f fmt
 
@@ -367,6 +381,8 @@ type 'a log_function =
   -> 'a
 
 let trace = log ~level:Trace
+
+let internal = log ~level:Internal
 
 let debug = log ~level:Debug
 
@@ -401,6 +417,7 @@ module Structured = struct
     let metadata = add_tags_to_metadata (str_metadata @ metadata) tags in
     raw t
     @@ make_message t ~level ~module_ ~location ~metadata ~message ~event_id
+         ~merge_global_metadata:(Level.equal level Level.Internal)
 
   let trace = log ~level:Trace
 
