@@ -461,6 +461,7 @@ let reset_frontier_dependencies_validation (transition_with_hash, validation) =
 let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
     ~precomputed_values ~verifier ~parent_staged_ledger ~parent_protocol_state
     (t, validation) =
+  [%log internal] "Validate_staged_ledger_diff" ;
   let target_hash_of_ledger_proof =
     Fn.compose Registers.second_pass_ledger
     @@ Fn.compose Ledger_proof.statement_target Ledger_proof.statement
