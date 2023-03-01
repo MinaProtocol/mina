@@ -129,7 +129,13 @@ module Rules = struct
             in
             ( { Zkapp_call_forest.Checked.account_update =
                   { data = final_update; hash = digest }
-              ; control = Prover_value.create (fun () -> Control.None_given)
+              ; control =
+                  (* NB: This is a Prover_value.t because the circuit never has
+                     (or indeed needs) access to the control, but we still want
+                     to be able to reconstruct the command outside the circuit
+                     when it has finished.
+                  *)
+                  Prover_value.create (fun () -> Control.None_given)
               }
             , calls )
           in
