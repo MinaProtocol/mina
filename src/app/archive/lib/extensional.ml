@@ -14,7 +14,7 @@ module User_command = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      (* for `typ` and `status`, a string is enough
+      (* for `command_type` and `status`, a string is enough
          in any case, there aren't existing string conversions for the
          original OCaml types
 
@@ -50,7 +50,7 @@ module Internal_command = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      (* for `typ`, a string is enough
+      (* for `command_type`, a string is enough
          no existing string conversion for the original OCaml type
       *)
       type t =
@@ -110,11 +110,13 @@ module Block = struct
         ; parent_hash : State_hash.Stable.V1.t
         ; creator : Public_key.Compressed.Stable.V1.t
         ; block_winner : Public_key.Compressed.Stable.V1.t
+        ; last_vrf_output : string
         ; snarked_ledger_hash : Frozen_ledger_hash.Stable.V1.t
         ; staking_epoch_data : Mina_base.Epoch_data.Value.Stable.V1.t
         ; next_epoch_data : Mina_base.Epoch_data.Value.Stable.V1.t
         ; min_window_density : Mina_numbers.Length.Stable.V1.t
         ; total_currency : Currency.Amount.Stable.V1.t
+        ; sub_window_densities : Mina_numbers.Length.Stable.V1.t list
         ; ledger_hash : Ledger_hash.Stable.V1.t
         ; height : Unsigned_extended.UInt32.Stable.V1.t
         ; global_slot_since_hard_fork : Mina_numbers.Global_slot.Stable.V1.t

@@ -9,6 +9,9 @@ type _ Caqti_type.field +=
   | Array_nullable_int : int option array Caqti_type.field
 
 type _ Caqti_type.field +=
+  | Array_nullable_int64 : int64 option array Caqti_type.field
+
+type _ Caqti_type.field +=
   | Array_nullable_string : string option array Caqti_type.field
 
 module Type_spec = struct
@@ -138,6 +141,23 @@ let array_int_typ : int array Caqti_type.t =
     >>| Array.of_list
   in
   Caqti_type.custom array_nullable_int_typ ~encode ~decode
+
+(* this type may require type annotations in queries, eg.
+   `SELECT id FROM zkapp_states WHERE element_ids = ?::int[]`
+*)
+let array_nullable_int64_typ : int64 option array Caqti_type.t =
+  Caqti_type.field Array_nullable_int64
+
+let array_int64_typ : int64 array Caqti_type.t =
+  let open Result.Let_syntax in
+  let encode xs = return @@ Array.map ~f:Option.some xs in
+  let decode xs =
+    Option.all (Array.to_list xs)
+    |> Result.of_option
+         ~error:"Failed to decode int array, encountered NULL value"
+    >>| Array.of_list
+  in
+  Caqti_type.custom array_nullable_int64_typ ~encode ~decode
 
 (* this type may require type annotations in queries, e.g.
    `SELECT id FROM zkapp_states WHERE element_ids = ?::string[]`
