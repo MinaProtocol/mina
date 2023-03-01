@@ -143,7 +143,7 @@ let array_int_typ : int array Caqti_type.t =
   Caqti_type.custom array_nullable_int_typ ~encode ~decode
 
 (* this type may require type annotations in queries, eg.
-   `SELECT id FROM zkapp_states WHERE element_ids = ?::int[]`
+   `SELECT id FROM zkapp_states WHERE element_ids = ?::int64[]`
 *)
 let array_nullable_int64_typ : int64 option array Caqti_type.t =
   Caqti_type.field Array_nullable_int64
