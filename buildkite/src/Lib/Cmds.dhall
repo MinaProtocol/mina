@@ -110,7 +110,7 @@ let tests =
 
   let dockerExample = assert :
   { line =
-"source ./buildkite/scripts/export-git-env-vars.sh && docker run -it --rm --init --volume /var/buildkite/shared:/shared --volume \$BUILDKITE_BUILD_CHECKOUT_PATH:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag /bin/sh -c 'echo hello'"
+"source ./buildkite/scripts/export-git-env-vars.sh && docker run -it --rm --init --volume /var/buildkite/shared:/shared --volume \\\$BUILDKITE_BUILD_CHECKOUT_PATH:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag /bin/sh -c 'echo hello'"
   , readable =
     Some "Docker@foo/bar:tag ( echo hello )"
   }
