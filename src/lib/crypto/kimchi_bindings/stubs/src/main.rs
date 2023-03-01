@@ -507,6 +507,14 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
 
         decl_module!(w, env, "Constraint_system", {
             decl_type!(w, env, CamlFpCS => "t");
+
+            decl_func!(w, env, fp_cs_get_primary_input_size => "get_primary_input_size");
+
+            decl_func!(w, env, fp_cs_get_prev_challenges => "get_prev_challenges");
+
+            decl_func!(w, env, fp_cs_set_prev_challenges => "set_prev_challenges");
+
+            decl_func!(w, env, fp_cs_finalize_and_get_gates => "finalize_and_get_gates");
         });
 
         decl_module!(w, env, "State", {
@@ -521,6 +529,14 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
 
         decl_module!(w, env, "Constraint_system", {
             decl_type!(w, env, CamlFqCS => "t");
+
+            decl_func!(w, env, fq_cs_get_primary_input_size => "get_primary_input_size");
+
+            decl_func!(w, env, fq_cs_get_prev_challenges => "get_prev_challenges");
+
+            decl_func!(w, env, fq_cs_set_prev_challenges => "set_prev_challenges");
+
+            decl_func!(w, env, fq_cs_finalize_and_get_gates => "finalize_and_get_gates");
         });
 
         decl_module!(w, env, "State", {
