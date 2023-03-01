@@ -16,6 +16,13 @@ macro_rules! impl_wrapper {
                 &self.0
             }
         }
+
+        unsafe impl<'a> ocaml::FromValue<'a> for &$name {
+            fn from_value(value: ocaml::Value) -> Self {
+                let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(value);
+                x.as_ref()
+            }
+        }
     };
 }
 
