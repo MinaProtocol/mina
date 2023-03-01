@@ -505,7 +505,7 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_type!(w, env, CamlFpVar => "t");
         });
 
-        decl_module!(w, env, "ConstraintSystem", {
+        decl_module!(w, env, "Constraint_system", {
             decl_type!(w, env, CamlFpCS => "t");
         });
 
@@ -519,7 +519,7 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_type!(w, env, CamlFqVar => "t");
         });
 
-        decl_module!(w, env, "ConstraintSystem", {
+        decl_module!(w, env, "Constraint_system", {
             decl_type!(w, env, CamlFqCS => "t");
         });
 

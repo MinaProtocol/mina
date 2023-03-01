@@ -5,7 +5,7 @@ module Fp = struct
     type nonrec t
   end
 
-  module ConstraintSystem = struct
+  module Constraint_system = struct
     type nonrec t
   end
 
@@ -19,7 +19,7 @@ module Fq = struct
     type nonrec t
   end
 
-  module ConstraintSystem = struct
+  module Constraint_system = struct
     type nonrec t
   end
 
