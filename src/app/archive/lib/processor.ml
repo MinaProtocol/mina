@@ -2760,7 +2760,9 @@ module Block = struct
             (Consensus.Data.Consensus_state.block_stake_winner consensus_state)
         in
         let last_vrf_output =
+          (* encode as hex, Postgresql won't accept arbitrary bitstrings *)
           Consensus.Data.Consensus_state.last_vrf_output consensus_state
+          |> Hex.Safe.to_hex
         in
         let%bind snarked_ledger_hash_id =
           Snarked_ledger_hash.add_if_doesn't_exist
@@ -2815,7 +2817,12 @@ module Block = struct
             (Caqti_request.find typ Caqti_type.int
                (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                   ~tannot:(function
-                    | "chain_status" -> Some "chain_status_type" | _ -> None )
+                    | "chain_status" ->
+                        Some "chain_status_type"
+                    | "sub_window_densities" ->
+                        Some "bigint[]"
+                    | _ ->
+                        None )
                   ~cols:Fields.names () ) )
             { state_hash = hash |> State_hash.to_base58_check
             ; parent_id
@@ -3128,7 +3135,10 @@ module Block = struct
           let%bind block_winner_id =
             Public_key.add_if_doesn't_exist (module Conn) block.block_winner
           in
-          let last_vrf_output = block.last_vrf_output in
+          let last_vrf_output =
+            (* already encoded as hex *)
+            block.last_vrf_output
+          in
           let%bind snarked_ledger_hash_id =
             Snarked_ledger_hash.add_if_doesn't_exist
               (module Conn)
@@ -3152,7 +3162,7 @@ module Block = struct
                       min_window_density, sub_window_densities, total_currency,
                       ledger_hash, height, global_slot_since_hard_fork,
                       global_slot_since_genesis, timestamp, chain_status)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::bigint[], ?, ?, ?, ?, ?, ?::chain_status_type)
                      RETURNING id
                |sql} )
             { state_hash = block.state_hash |> State_hash.to_base58_check

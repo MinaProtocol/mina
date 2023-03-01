@@ -47,7 +47,10 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   let open Deferred.Let_syntax in
   let%bind creator = pk_of_id block.creator_id in
   let%bind block_winner = pk_of_id block.block_winner_id in
-  let last_vrf_output = block.last_vrf_output in
+  let last_vrf_output =
+    (* keep hex encoding *)
+    block.last_vrf_output
+  in
   let%bind snarked_ledger_hash_str =
     query_db ~f:(fun db ->
         Processor.Snarked_ledger_hash.find_by_id db block.snarked_ledger_hash_id )

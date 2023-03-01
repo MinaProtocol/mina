@@ -132,6 +132,7 @@ CREATE TABLE epoch_data
 
 CREATE TYPE chain_status_type AS ENUM ('canonical', 'orphaned', 'pending');
 
+/* last_vrf_output is a sequence of hex-digit pairs derived from a bitstring */
 CREATE TABLE blocks
 ( id                           serial   PRIMARY KEY
 , state_hash                   text     NOT NULL UNIQUE

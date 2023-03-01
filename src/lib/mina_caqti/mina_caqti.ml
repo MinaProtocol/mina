@@ -109,6 +109,22 @@ let () =
   in
   define_coding Array_nullable_int { get_coding }
 
+(* register coding for nullable int64 arrays *)
+let () =
+  let open Caqti_type.Field in
+  let rep = Caqti_type.String in
+  let encode, decode =
+    make_coding ~elem_to_string:Int64.to_string ~elem_of_string:Int64.of_string
+  in
+  let get_coding : type a. _ -> a t -> a coding =
+   fun _ -> function
+    | Array_nullable_int64 ->
+        Coding { rep; encode; decode }
+    | _ ->
+        assert false
+  in
+  define_coding Array_nullable_int64 { get_coding }
+
 (* register coding for nullable string arrays *)
 let () =
   let open Caqti_type.Field in
@@ -154,7 +170,7 @@ let array_int64_typ : int64 array Caqti_type.t =
   let decode xs =
     Option.all (Array.to_list xs)
     |> Result.of_option
-         ~error:"Failed to decode int array, encountered NULL value"
+         ~error:"Failed to decode int64 array, encountered NULL value"
     >>| Array.of_list
   in
   Caqti_type.custom array_nullable_int64_typ ~encode ~decode
