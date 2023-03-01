@@ -243,7 +243,7 @@ CREATE TABLE zkapp_network_precondition
 
 CREATE TABLE zkapp_fee_payer_body
 ( id                                    serial    PRIMARY KEY
-, account_identifier_id                 int       NOT NULL REFERENCES account_identifiers(id)
+, public_key_id                         int       NOT NULL REFERENCES public_keys(id)
 , fee                                   text      NOT NULL
 , valid_until                           bigint
 , nonce                                 bigint    NOT NULL

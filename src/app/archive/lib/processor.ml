@@ -1648,7 +1648,7 @@ end
 
 module Zkapp_fee_payer_body = struct
   type t =
-    { account_identifier_id : int
+    { public_key_id : int
     ; fee : string
     ; valid_until : int64 option
     ; nonce : int64
@@ -1664,11 +1664,8 @@ module Zkapp_fee_payer_body = struct
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (body : Account_update.Body.Fee_payer.t) =
     let open Deferred.Result.Let_syntax in
-    let account_identifier =
-      Account_id.create body.public_key Token_id.default
-    in
-    let%bind account_identifier_id =
-      Account_identifiers.add_if_doesn't_exist (module Conn) account_identifier
+    let%bind public_key_id =
+      Public_key.add_if_doesn't_exist (module Conn) body.public_key
     in
     let valid_until =
       let open Option.Let_syntax in
@@ -1680,7 +1677,7 @@ module Zkapp_fee_payer_body = struct
       |> Unsigned.UInt32.to_int64
     in
     let fee = Currency.Fee.to_string body.fee in
-    let value = { account_identifier_id; fee; valid_until; nonce } in
+    let value = { public_key_id; fee; valid_until; nonce } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
@@ -1799,24 +1796,15 @@ module User_command = struct
       let open Deferred.Result.Let_syntax in
       let%bind fee_payer_id =
         let pk = Signed_command.fee_payer_pk t in
-        let token_id = Signed_command.fee_token t in
-        assert (Token_id.(equal default) token_id) ;
-        let acct_id = Account_id.create pk token_id in
-        Account_identifiers.add_if_doesn't_exist (module Conn) acct_id
+        Public_key.add_if_doesn't_exist (module Conn) pk
       in
       let%bind source_id =
         let pk = Signed_command.source_pk t in
-        let token_id = Signed_command.token t in
-        assert (Token_id.(equal default) token_id) ;
-        let acct_id = Account_id.create pk token_id in
-        Account_identifiers.add_if_doesn't_exist (module Conn) acct_id
+        Public_key.add_if_doesn't_exist (module Conn) pk
       in
       let%map receiver_id =
         let pk = Signed_command.receiver_pk t in
-        let token_id = Signed_command.token t in
-        assert (Token_id.(equal default) token_id) ;
-        let acct_id = Account_id.create pk token_id in
-        Account_identifiers.add_if_doesn't_exist (module Conn) acct_id
+        Public_key.add_if_doesn't_exist (module Conn) pk
       in
       { fee_payer_id; source_id; receiver_id }
 
@@ -1876,19 +1864,13 @@ module User_command = struct
       | None ->
           let open Deferred.Result.Let_syntax in
           let%bind fee_payer_id =
-            Account_identifiers.add_if_doesn't_exist
-              (module Conn)
-              user_cmd.fee_payer
+            Public_key.add_if_doesn't_exist (module Conn) user_cmd.fee_payer
           in
           let%bind source_id =
-            Account_identifiers.add_if_doesn't_exist
-              (module Conn)
-              user_cmd.source
+            Public_key.add_if_doesn't_exist (module Conn) user_cmd.source
           in
           let%bind receiver_id =
-            Account_identifiers.add_if_doesn't_exist
-              (module Conn)
-              user_cmd.receiver
+            Public_key.add_if_doesn't_exist (module Conn) user_cmd.receiver
           in
           Conn.find
             (Caqti_request.find typ Caqti_type.int
@@ -2037,9 +2019,7 @@ module Internal_command = struct
         return internal_command_id
     | None ->
         let%bind receiver_id =
-          Account_identifiers.add_if_doesn't_exist
-            (module Conn)
-            internal_cmd.receiver
+          Public_key.add_if_doesn't_exist (module Conn) internal_cmd.receiver
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
@@ -2101,12 +2081,8 @@ module Fee_transfer = struct
         return internal_command_id
     | None ->
         let%bind receiver_id =
-          let account_id =
-            Account_id.create
-              (Fee_transfer.Single.receiver_pk t)
-              Token_id.default
-          in
-          Account_identifiers.add_if_doesn't_exist (module Conn) account_id
+          let pk = Fee_transfer.Single.receiver_pk t in
+          Public_key.add_if_doesn't_exist (module Conn) pk
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
@@ -2151,10 +2127,8 @@ module Coinbase = struct
         return internal_command_id
     | None ->
         let%bind receiver_id =
-          let account_id =
-            Account_id.create (Coinbase.receiver_pk t) Token_id.default
-          in
-          Account_identifiers.add_if_doesn't_exist (module Conn) account_id
+          let pk = Coinbase.receiver_pk t in
+          Public_key.add_if_doesn't_exist (module Conn) pk
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
