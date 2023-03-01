@@ -508,8 +508,6 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
 
             decl_func!(w, env, fp_var_constant => "constant");
 
-            decl_func!(w, env, fp_var_to_constant_and_terms => "to_constant_and_terms");
-
             decl_func!(w, env, fp_var_add => "add");
 
             decl_func!(w, env, fp_var_negate => "negate");
@@ -517,8 +515,6 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_func!(w, env, fp_var_scale => "scale");
 
             decl_func!(w, env, fp_var_sub => "sub");
-
-            decl_func!(w, env, fp_var_linear_combination => "linear_combination");
 
             decl_func!(w, env, fp_var_sum => "sum");
 
@@ -552,8 +548,6 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
 
             decl_func!(w, env, fq_var_constant => "constant");
 
-            decl_func!(w, env, fq_var_to_constant_and_terms => "to_constant_and_terms");
-
             decl_func!(w, env, fq_var_add => "add");
 
             decl_func!(w, env, fq_var_negate => "negate");
@@ -561,8 +555,6 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_func!(w, env, fq_var_scale => "scale");
 
             decl_func!(w, env, fq_var_sub => "sub");
-
-            decl_func!(w, env, fq_var_linear_combination => "linear_combination");
 
             decl_func!(w, env, fq_var_sum => "sum");
 

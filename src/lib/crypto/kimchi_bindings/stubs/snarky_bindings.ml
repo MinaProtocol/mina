@@ -8,10 +8,6 @@ module Fp = struct
 
     external constant : Pasta_bindings.Fp.t -> t = "fp_var_constant"
 
-    external to_constant_and_terms :
-      t -> Pasta_bindings.Fp.t option * (Pasta_bindings.Fp.t * int) array
-      = "fp_var_to_constant_and_terms"
-
     external add : t -> t -> t = "fp_var_add"
 
     external negate : t -> t = "fp_var_negate"
@@ -62,10 +58,6 @@ module Fq = struct
     external of_index_unsafe : int -> t = "fq_var_of_index_unsafe"
 
     external constant : Pasta_bindings.Fq.t -> t = "fq_var_constant"
-
-    external to_constant_and_terms :
-      t -> Pasta_bindings.Fq.t option * (Pasta_bindings.Fq.t * int) array
-      = "fq_var_to_constant_and_terms"
 
     external add : t -> t -> t = "fq_var_add"
 

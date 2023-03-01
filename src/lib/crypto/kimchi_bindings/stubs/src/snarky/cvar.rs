@@ -26,11 +26,6 @@ macro_rules! impl_cvar_methods {
                 $CamlFVar(CVar::Constant(cst.0))
             }
 
-            pub fn [<$name:snake _var_to_constant_and_terms>](var: &$CamlFVar) -> (Option<$CamlF>, Vec<($CamlF, usize)>) {
-                let (cst, terms) = var.0.to_constant_and_terms();
-                (cst.map(|c| $CamlF(c)), terms.into_iter().map(|(c, i)| ($CamlF(c), i)).collect())
-            }
-
             pub fn [<$name:snake _var_add>](var1: &$CamlFVar, var2: &$CamlFVar) -> $CamlFVar {
                 $CamlFVar(&var1.0 + &var2.0)
             }
@@ -45,14 +40,6 @@ macro_rules! impl_cvar_methods {
 
             pub fn [<$name:snake _var_sub>](var1: &$CamlFVar, var2: &$CamlFVar) -> $CamlFVar {
                 $CamlFVar(&var1.0 - &var2.0)
-            }
-
-            pub fn [<$name:snake _var_linear_combination>](
-                terms: Vec<($CamlF, &$CamlFVar)>,
-            ) -> $CamlFVar {
-                let terms: Vec<_> = terms.into_iter().map(|(a, b)| (a.0, b.0.clone())).collect();
-                let res = CVar::linear_combination(            &terms);
-                $CamlFVar(res)
             }
 
             pub fn [<$name:snake _var_sum>](cvars: Vec<&$CamlFVar>) -> $CamlFVar {
