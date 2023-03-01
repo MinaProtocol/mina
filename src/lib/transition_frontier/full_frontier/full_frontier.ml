@@ -349,7 +349,6 @@ let calculate_root_transition_diff t heir =
 
 let move_root ({ context = (module Context); _ } as t) ~new_root_hash
     ~new_root_protocol_states ~garbage ~enable_epoch_ledger_sync =
-  let open Context in
   (* The transition frontier at this point in time has the following mask topology:
    *
    *   (`s` represents a snarked ledger, `m` represents a mask)
@@ -475,22 +474,37 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
           (Ledger.Mask.create ~depth:(Ledger.Any_ledger.M.depth s) ())
       in
       (* STEP 5 *)
-      Mina_stdlib.Nonempty_list.iter
-        (Option.value_exn
-           (Staged_ledger.proof_txns_with_state_hashes
-              (Breadcrumb.staged_ledger new_root_node.breadcrumb) ) )
-        ~f:(fun (txn, state_hash) ->
-          (*Validate transactions against the protocol state associated with the transaction*)
-          let txn_state_view =
-            find_protocol_state t state_hash
-            |> Option.value_exn |> Protocol_state.body
-            |> Protocol_state.Body.view
-          in
-          ignore
-            ( Or_error.ok_exn
-                (Ledger.apply_transaction ~constraint_constants ~txn_state_view
-                   mt txn.data )
-              : Ledger.Transaction_applied.t ) ) ;
+      (*Validate transactions against the protocol state associated with the transaction*)
+      let apply_first_pass =
+        Ledger.apply_transaction_first_pass
+          ~constraint_constants:Context.constraint_constants
+      in
+      let apply_second_pass = Ledger.apply_transaction_second_pass in
+      let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
+          sparse_ledger txn =
+        let open Or_error.Let_syntax in
+        let%map _ledger, partial_txn =
+          Mina_ledger.Sparse_ledger.apply_transaction_first_pass
+            ~constraint_constants:Context.constraint_constants ~txn_state_view
+            ~global_slot sparse_ledger txn
+        in
+        partial_txn
+      in
+      let get_protocol_state state_hash =
+        match find_protocol_state t state_hash with
+        | Some s ->
+            Ok s
+        | None ->
+            Or_error.errorf "Failed to find protocol state for hash %s"
+              (State_hash.to_base58_check state_hash)
+      in
+      Or_error.ok_exn
+        ( Staged_ledger.Scan_state.get_snarked_ledger_sync ~ledger:mt
+            ~get_protocol_state ~apply_first_pass ~apply_second_pass
+            ~apply_first_pass_sparse_ledger
+            (Staged_ledger.scan_state
+               (Breadcrumb.staged_ledger new_root_node.breadcrumb) )
+          : unit Or_error.t ) ;
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)

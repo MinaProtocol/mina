@@ -131,6 +131,7 @@ module Repr = struct
     module V2 = struct
       type 'g t =
         { max_proofs_verified : Proofs_verified.Stable.V1.t
+        ; actual_wrap_domain_size : Proofs_verified.Stable.V1.t
         ; wrap_index : 'g Plonk_verification_key_evals.Stable.V2.t
         }
       [@@deriving sexp, equal, compare, yojson]
@@ -148,6 +149,7 @@ module Poly = struct
             , 'vk )
             Mina_wire_types.Pickles_base.Side_loaded_verification_key.Poly.V2.t =
         { max_proofs_verified : 'proofs_verified
+        ; actual_wrap_domain_size : 'proofs_verified
         ; wrap_index : 'g Plonk_verification_key_evals.Stable.V2.t
         ; wrap_vk : 'vk option
         }
@@ -188,11 +190,17 @@ let wrap_index_to_input (type gs f) (g : gs -> f array) t =
 let to_input (type a) ~(field_of_int : int -> a) :
     (a * a, _, _) Poly.t -> a Random_oracle_input.Chunked.t =
   let open Random_oracle_input.Chunked in
-  fun Poly.{ max_proofs_verified; wrap_index; wrap_vk = _ } :
-      _ Random_oracle_input.Chunked.t ->
+  fun Poly.
+        { max_proofs_verified
+        ; actual_wrap_domain_size
+        ; wrap_index
+        ; wrap_vk = _
+        } : _ Random_oracle_input.Chunked.t ->
     List.reduce_exn ~f:append
       [ Proofs_verified.One_hot.to_input ~zero:(field_of_int 0)
           ~one:(field_of_int 1) max_proofs_verified
+      ; Proofs_verified.One_hot.to_input ~zero:(field_of_int 0)
+          ~one:(field_of_int 1) actual_wrap_domain_size
       ; wrap_index_to_input
           (Fn.compose Array.of_list (fun (x, y) -> [ x; y ]))
           wrap_index

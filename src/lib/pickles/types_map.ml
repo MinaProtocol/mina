@@ -18,7 +18,7 @@ module Basic = struct
     ; wrap_domains : Domains.t
     ; wrap_key : Tick.Inner_curve.Affine.t Plonk_verification_key_evals.t
     ; wrap_vk : Impls.Wrap.Verification_key.t
-    ; step_uses_lookup : Plonk_types.Opt.Flag.t
+    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
     }
 end
 
@@ -38,7 +38,7 @@ module Side_loaded = struct
     type ('var, 'value, 'n1, 'n2) t =
       { max_proofs_verified : (module Nat.Add.Intf with type n = 'n1)
       ; public_input : ('var, 'value) Impls.Step.Typ.t
-      ; step_uses_lookup : Plonk_types.Opt.Flag.t
+      ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
       ; branches : 'n2 Nat.t
       }
   end
@@ -53,7 +53,7 @@ module Side_loaded = struct
 
   let to_basic
       { permanent =
-          { max_proofs_verified; public_input; branches; step_uses_lookup }
+          { max_proofs_verified; public_input; branches; feature_flags }
       ; ephemeral
       } =
     let wrap_key, wrap_vk =
@@ -71,7 +71,7 @@ module Side_loaded = struct
     ; branches
     ; wrap_domains = Common.wrap_domains ~proofs_verified
     ; wrap_key
-    ; step_uses_lookup
+    ; feature_flags
     }
 end
 
@@ -84,7 +84,7 @@ module Compiled = struct
           (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
-    ; step_uses_lookup : Plonk_types.Opt.Flag.t
+    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
     }
 
   (* This is the data associated to an inductive proof system with statement type
@@ -101,7 +101,7 @@ module Compiled = struct
     ; wrap_vk : Impls.Wrap.Verification_key.t Lazy.t
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
-    ; step_uses_lookup : Plonk_types.Opt.Flag.t
+    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
     }
 
   type packed =
@@ -116,7 +116,7 @@ module Compiled = struct
       ; wrap_domains
       ; step_domains
       ; wrap_key
-      ; step_uses_lookup
+      ; feature_flags
       } =
     { Basic.max_proofs_verified
     ; wrap_domains
@@ -124,7 +124,7 @@ module Compiled = struct
     ; branches = Vector.length step_domains
     ; wrap_key = Lazy.force wrap_key
     ; wrap_vk = Lazy.force wrap_vk
-    ; step_uses_lookup
+    ; feature_flags
     }
 end
 
@@ -142,13 +142,13 @@ module For_step = struct
         | `Side_loaded of
           Impls.Step.field Pickles_base.Proofs_verified.One_hot.Checked.t ]
     ; step_domains : [ `Known of (Domains.t, 'branches) Vector.t | `Side_loaded ]
-    ; step_uses_lookup : Plonk_types.Opt.Flag.t
+    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
     }
 
   let of_side_loaded (type a b c d e f)
       ({ ephemeral
        ; permanent =
-           { branches; max_proofs_verified; public_input; step_uses_lookup }
+           { branches; max_proofs_verified; public_input; feature_flags }
        } :
         (a, b, c, d) Side_loaded.t ) : (a, b, c, d) t =
     let index =
@@ -164,9 +164,9 @@ module For_step = struct
     ; public_input
     ; proofs_verifieds = `Side_loaded
     ; wrap_key = index.wrap_index
-    ; wrap_domain = `Side_loaded index.max_proofs_verified
+    ; wrap_domain = `Side_loaded index.actual_wrap_domain_size
     ; step_domains = `Side_loaded
-    ; step_uses_lookup
+    ; feature_flags
     }
 
   let of_compiled
@@ -177,7 +177,7 @@ module For_step = struct
        ; wrap_key
        ; wrap_domains
        ; step_domains
-       ; step_uses_lookup
+       ; feature_flags
        } :
         _ Compiled.t ) =
     { branches
@@ -190,7 +190,7 @@ module For_step = struct
           ~f:Step_main_inputs.Inner_curve.constant
     ; wrap_domain = `Known wrap_domains.h
     ; step_domains = `Known step_domains
-    ; step_uses_lookup
+    ; feature_flags
     }
 end
 
@@ -250,14 +250,15 @@ let public_input :
   | Side_loaded ->
       (lookup_side_loaded tag.id).permanent.public_input
 
-let uses_lookup :
-    type var value. (var, value, _, _) Tag.t -> Plonk_types.Opt.Flag.t =
+let feature_flags :
+    type var value.
+    (var, value, _, _) Tag.t -> Plonk_types.Opt.Flag.t Plonk_types.Features.t =
  fun tag ->
   match tag.kind with
   | Compiled ->
-      (lookup_compiled tag.id).step_uses_lookup
+      (lookup_compiled tag.id).feature_flags
   | Side_loaded ->
-      (lookup_side_loaded tag.id).permanent.step_uses_lookup
+      (lookup_side_loaded tag.id).permanent.feature_flags
 
 let value_to_field_elements :
     type a. (_, a, _, _) Tag.t -> a -> Tick.Field.t array =

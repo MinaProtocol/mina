@@ -8,12 +8,13 @@ let
       # override stdenv.targetPlatform here, if neccesary
     };
   toolchainHashes = {
-    "1.63.0" = "sha256-KXx+ID0y4mg2B3LHp7IyaiMrdexF6octADnAtFIOjrY=";
+    "1.67.0" = "sha256-riZUc+R9V35c/9e8KJUE+8pzpXyl0lRXt3ZkKlxoY0g=";
     "nightly-2022-09-12" =
-      "sha256-Q1pMbQAO5omjvS4ECozBsujielyjQigHg1eJx3Ly26A=";
+      "sha256-MM8fdvveBEWzpwjH7u6C0F7qSWGPIMpfZWLgVxSqtxY=";
     # copy this line with the correct toolchain name
     "placeholder" = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
   };
+  # rust-toolchain.toml -> { rustc, cargo, rust-analyzer, ... }
   rustChannelFromToolchainFileOf = file:
     with final.lib;
     let
@@ -71,6 +72,7 @@ in {
     ];
     sourceRoot = "source/lib/crypto/kimchi_bindings/stubs";
     nativeBuildInputs = [ final.ocamlPackages_mina.ocaml ];
+    buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
     cargoLock = let fixupLockFile = path: builtins.readFile path;
     in {
       lockFileContents =
@@ -122,6 +124,7 @@ in {
         [ openssl ] ++ lib.optionals stdenv.isDarwin [
           curl
           darwin.apple_sdk.frameworks.Security
+          libiconv
         ];
 
       checkInputs = [ final.nodejs ];
@@ -138,6 +141,7 @@ in {
     ];
     sourceRoot = "source/lib/crypto/kimchi_bindings/wasm";
     nativeBuildInputs = [ final.wasm-pack wasm-bindgen-cli ];
+    buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
     cargoLock.lockFile = lock;
     cargoLock.outputHashes = narHashesFromCargoLock lock;
 
@@ -164,6 +168,14 @@ in {
     dontCargoCheck = true;
     installPhase = ":";
     cargoBuildFeatures = [ "nodejs" ];
+  };
+
+  # Jobs/Lint/Rust.dhall
+  trace-tool = final.rustPlatform.buildRustPackage rec {
+    pname = "trace-tool";
+    version = "0.1.0";
+    src = ../src/app/trace-tool;
+    cargoLock.lockFile = ../src/app/trace-tool/Cargo.lock;
   };
 }
 

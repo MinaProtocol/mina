@@ -1,7 +1,9 @@
 { lib, dockerTools, buildEnv, ocamlPackages_mina, runCommand, dumb-init
 , coreutils, bashInteractive, python3, libp2p_helper, procps, postgresql, curl
-, jq, stdenv, rsync, bash, gnutar, gzip }:
+, jq, stdenv, rsync, bash, gnutar, gzip, currentTime, flockenzeit }:
 let
+  created = flockenzeit.lib.ISO-8601 currentTime;
+
   mkdir = name:
     runCommand "mkdir-${name}" { } "mkdir -p $out${lib.escapeShellArg name}";
 
@@ -47,6 +49,7 @@ let
 
   mkFullImage = name: packages: dockerTools.streamLayeredImage {
     name = "${name}-full";
+    inherit created;
     contents = [
       dumb-init
       coreutils
@@ -71,6 +74,7 @@ let
 in {
   mina-image-slim = dockerTools.streamLayeredImage {
     name = "mina";
+    inherit created;
     contents = [ ocamlPackages_mina.mina.out ];
   };
   mina-image-full = mkFullImage "mina" (with ocamlPackages_mina; [

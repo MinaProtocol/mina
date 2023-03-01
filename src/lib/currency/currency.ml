@@ -350,7 +350,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let typ : (var, t) Typ.t =
       let (Typ typ) = Field.typ in
       Typ.transport
-        (Typ { typ with check = (fun x -> make_checked_ast @@ range_check x) })
+        (Typ { typ with check = range_check })
         ~there:to_field ~back:of_field
 
     [%%endif]
@@ -949,7 +949,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
-    type _unused = unit constraint Signed.t = (t, Sgn.t) Signed_poly.t
+    let (_ : (Signed.t, (t, Sgn.t) Signed_poly.t) Type_equal.t) = Type_equal.T
   end
 
   module Amount = struct

@@ -345,6 +345,7 @@ module Poly = struct
       type 'controller t =
             'controller Mina_wire_types.Mina_base.Permissions.Poly.V2.t =
         { edit_state : 'controller
+        ; access : 'controller
         ; send : 'controller
         ; receive : 'controller
         ; set_delegate : 'controller
@@ -355,6 +356,7 @@ module Poly = struct
         ; set_token_symbol : 'controller
         ; increment_nonce : 'controller
         ; set_voting_for : 'controller
+        ; set_timing : 'controller
         }
       [@@deriving annot, sexp, equal, compare, hash, yojson, hlist, fields]
     end
@@ -368,6 +370,7 @@ module Poly = struct
       ~receive:(f controller) ~set_zkapp_uri:(f controller)
       ~edit_sequence_state:(f controller) ~set_token_symbol:(f controller)
       ~increment_nonce:(f controller) ~set_voting_for:(f controller)
+      ~set_timing:(f controller) ~access:(f controller)
     |> List.rev
     |> List.reduce_exn ~f:Random_oracle.Input.Chunked.append
 end
@@ -405,6 +408,13 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
   let%bind set_token_symbol = auth_required_gen in
   let%bind increment_nonce = auth_required_gen in
   let%bind set_voting_for = auth_required_gen in
+  let%bind set_timing = auth_required_gen in
+  let%bind access =
+    (* Access permission is significantly more restrictive, do not arbitrarily
+       set it when tests may not be intending to exercise it.
+    *)
+    Auth_required.gen_for_none_given_authorization
+  in
   return
     { Poly.edit_state
     ; send
@@ -417,6 +427,8 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
     ; set_token_symbol
     ; increment_nonce
     ; set_voting_for
+    ; set_timing
+    ; access
     }
 
 [%%ifdef consensus_mechanism]
@@ -436,7 +448,7 @@ module Checked = struct
     Poly.Fields.map ~edit_state:c ~send:c ~receive:c ~set_delegate:c
       ~set_permissions:c ~set_verification_key:c ~set_zkapp_uri:c
       ~edit_sequence_state:c ~set_token_symbol:c ~increment_nonce:c
-      ~set_voting_for:c
+      ~set_voting_for:c ~set_timing:c ~access:c
 
   let constant (t : Stable.Latest.t) : t =
     let open Core_kernel.Field in
@@ -444,13 +456,15 @@ module Checked = struct
     Poly.Fields.map ~edit_state:a ~send:a ~receive:a ~set_delegate:a
       ~set_permissions:a ~set_verification_key:a ~set_zkapp_uri:a
       ~edit_sequence_state:a ~set_token_symbol:a ~increment_nonce:a
-      ~set_voting_for:a
+      ~set_voting_for:a ~set_timing:a ~access:a
 end
 
 let typ =
   let open Poly.Stable.Latest in
   Typ.of_hlistable
     [ Auth_required.typ
+    ; Auth_required.typ
+    ; Auth_required.typ
     ; Auth_required.typ
     ; Auth_required.typ
     ; Auth_required.typ
@@ -481,12 +495,15 @@ let user_default : t =
   ; set_token_symbol = Signature
   ; increment_nonce = Signature
   ; set_voting_for = Signature
+  ; set_timing = Signature
+  ; access = None
   }
 
 let empty : t =
   { edit_state = None
   ; send = None
   ; receive = None
+  ; access = None
   ; set_delegate = None
   ; set_permissions = None
   ; set_verification_key = None
@@ -495,6 +512,7 @@ let empty : t =
   ; set_token_symbol = None
   ; increment_nonce = None
   ; set_voting_for = None
+  ; set_timing = None
   }
 
 (* deriving-fields-related stuff *)
@@ -512,7 +530,8 @@ let deriver obj =
     ~set_permissions:!.auth_required ~set_verification_key:!.auth_required
     ~set_zkapp_uri:!.auth_required ~edit_sequence_state:!.auth_required
     ~set_token_symbol:!.auth_required ~increment_nonce:!.auth_required
-    ~set_voting_for:!.auth_required
+    ~set_voting_for:!.auth_required ~set_timing:!.auth_required
+    ~access:!.auth_required
   |> finish "Permissions" ~t_toplevel_annots:Poly.t_toplevel_annots
 
 let%test_unit "json roundtrip" =
@@ -529,6 +548,7 @@ let%test_unit "json value" =
     (user_default |> to_json full |> Yojson.Safe.to_string)
     ( {json|{
         editState: "Signature",
+        access: "None",
         send: "Signature",
         receive: "None",
         setDelegate: "Signature",
@@ -538,6 +558,7 @@ let%test_unit "json value" =
         editSequenceState: "Signature",
         setTokenSymbol: "Signature",
         incrementNonce: "Signature",
-        setVotingFor: "Signature"
+        setVotingFor: "Signature",
+        setTiming: "Signature"
       }|json}
     |> Yojson.Safe.from_string |> Yojson.Safe.to_string )

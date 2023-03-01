@@ -7,7 +7,6 @@ import {
   PrivateKey,
   SmartContract,
   Mina,
-  deploy,
   isReady,
   shutdown,
   signFeePayer,
@@ -51,7 +50,10 @@ toc();
 
 // deploy transaction
 tic("create deploy transaction");
-let zkappCommandJsonDeploy = await deploy(SimpleZkapp, { zkappKey });
+let tx = await Mina.transaction(() => {
+  new SimpleZkapp(zkappAddress).deploy();
+});
+let zkappCommandJsonDeploy = tx.sign([zkappKey]).toJSON();
 toc();
 
 // update transaction

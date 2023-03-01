@@ -61,20 +61,17 @@ module Step = struct
       let other_mod = Wrap_impl.Bigint.to_bignum_bigint Constant.size in
       let values = forbidden_shifted_values ~size_in_bits ~modulus:other_mod in
       let f x =
+        let open Option.Let_syntax in
         let hi = test_bit x (Field.size_in_bits - 1) in
         let lo = B.shift_right x 1 in
-        let lo =
-          (* IMPORTANT: in practice we should filter such values
-             see: https://github.com/MinaProtocol/mina/pull/9324/commits/82b14cd7f11fb938ab6d88aac19516bd7ea05e94
-             but the circuit needs to remain the same, which is to use 0 when a value is larger than the modulus here (tested by the unit test below)
-          *)
+        let%map lo =
           let modulus = Impl.Field.size in
-          if B.compare modulus lo <= 0 then Tick.Field.zero
-          else Impl.Bigint.(to_field (of_bignum_bigint lo))
+          if B.compare modulus lo <= 0 then None
+          else Some Impl.Bigint.(to_field (of_bignum_bigint lo))
         in
         (lo, hi)
       in
-      values |> List.map ~f
+      values |> List.filter_map ~f
 
     let%test_unit "preserve circuit behavior for Step" =
       let expected_list =
@@ -114,10 +111,9 @@ module Step = struct
         Boolean.( && ) x_eq b_eq
       in
       let (Typ typ_unchecked) = typ_unchecked in
-      make_checked_ast
-      @@ let%bind () = run_checked_ast @@ typ_unchecked.check t in
-         Checked.List.map forbidden_shifted_values ~f:(equal t)
-         >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
+      let%bind () = typ_unchecked.check t in
+      Checked.List.map forbidden_shifted_values ~f:(equal t)
+      >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
 
     let typ : _ Snarky_backendless.Typ.t =
       let (Typ typ_unchecked) = typ_unchecked in
@@ -129,7 +125,7 @@ module Step = struct
   module Digest = Digest.Make (Impl)
   module Challenge = Challenge.Make (Impl)
 
-  let input ~proofs_verified ~wrap_rounds ~uses_lookup =
+  let input ~proofs_verified ~wrap_rounds ~feature_flags =
     let open Types.Step.Statement in
     let lookup :
         ( Challenge.Constant.t
@@ -137,7 +133,7 @@ module Step = struct
         , Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
         , Other_field.t Pickles_types.Shifted_value.Type2.t )
         Types.Wrap.Lookup_parameters.t =
-      { use = uses_lookup
+      { use = Plonk_checks.lookup_tables_used feature_flags
       ; zero =
           { value =
               { challenge = Limb_vector.Challenge.Constant.zero
@@ -150,27 +146,36 @@ module Step = struct
           }
       }
     in
-    let spec = spec (module Impl) proofs_verified wrap_rounds lookup in
+    let spec =
+      spec (module Impl) proofs_verified wrap_rounds lookup feature_flags
+    in
     let (T (typ, f, f_inv)) =
       Spec.packed_typ
         (module Impl)
         (T
            ( Shifted_value.Type2.typ Other_field.typ_unchecked
            , (fun (Shifted_value.Type2.Shifted_value x as t) ->
-               Impl.run_checked_ast (Other_field.check x) ;
+               Impl.run_checked (Other_field.check x) ;
                t )
            , Fn.id ) )
         spec
     in
     let typ =
       Typ.transport typ
-        ~there:(to_data ~option_map:Option.map)
-        ~back:(of_data ~option_map:Option.map)
+        ~there:(to_data ~option_map:Option.map ~to_opt:Fn.id)
+        ~back:
+          (of_data ~feature_flags ~option_map:Option.map
+             ~of_opt:Plonk_types.Opt.to_option )
     in
     Spec.ETyp.T
       ( typ
-      , (fun x -> of_data ~option_map:Plonk_types.Opt.map (f x))
-      , fun x -> f_inv (to_data ~option_map:Plonk_types.Opt.map x) )
+      , (fun x ->
+          of_data ~feature_flags ~option_map:Plonk_types.Opt.map (f x)
+            ~of_opt:Fn.id )
+      , fun x ->
+          f_inv
+            (to_data ~option_map:Plonk_types.Opt.map x
+               ~to_opt:Plonk_types.Opt.to_option_unsafe ) )
 end
 
 module Wrap = struct
@@ -206,21 +211,15 @@ module Wrap = struct
       let values = forbidden_shifted_values ~size_in_bits ~modulus:other_mod in
       let f x =
         let modulus = Impl.Field.size in
-        (* IMPORTANT: in practice we should filter such values
-           see: https://github.com/MinaProtocol/mina/pull/9324/commits/82b14cd7f11fb938ab6d88aac19516bd7ea05e94
-           but the circuit needs to remain the same, which is to use 0 when a value is larger than the modulus here (tested by the unit test below)
-        *)
-        if B.compare modulus x <= 0 then Wrap_field.zero
-        else Impl.Bigint.(to_field (of_bignum_bigint x))
+        if B.compare modulus x <= 0 then None
+        else Some Impl.Bigint.(to_field (of_bignum_bigint x))
       in
-      values |> List.map ~f
+      values |> List.filter_map ~f
 
     let%test_unit "preserve circuit behavior for Wrap" =
       let expected_list =
         [ "91120631062839412180561524743370440705"
         ; "91120631062839412180561524743370440706"
-        ; "0"
-        ; "0"
         ]
       in
       let str_list =
@@ -239,10 +238,9 @@ module Wrap = struct
         let open Internal_Basic in
         let open Let_syntax in
         let equal x1 x2 = Field.Checked.equal x1 (Field.Var.constant x2) in
-        make_checked_ast
-        @@ let%bind () = run_checked_ast @@ t0.check t in
-           Checked.List.map forbidden_shifted_values ~f:(equal t)
-           >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
+        let%bind () = t0.check t in
+        Checked.List.map forbidden_shifted_values ~f:(equal t)
+        >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
       in
       (typ_unchecked, check)
 
@@ -279,18 +277,27 @@ module Wrap = struct
         (T
            ( Shifted_value.Type1.typ fp
            , (fun (Shifted_value x as t) ->
-               Impl.run_checked_ast (Other_field.check x) ;
+               Impl.run_checked (Other_field.check x) ;
                t )
            , Fn.id ) )
-        (In_circuit.spec (module Impl) lookup)
+        (* Wrap circuit: no features needed. *)
+        (In_circuit.spec (module Impl) lookup Plonk_types.Features.none)
     in
+    let feature_flags = Plonk_types.Features.none in
     let typ =
       Typ.transport typ
-        ~there:(In_circuit.to_data ~option_map:Option.map)
-        ~back:(In_circuit.of_data ~option_map:Option.map)
+        ~there:(In_circuit.to_data ~option_map:Option.map ~to_opt:Fn.id)
+        ~back:
+          (In_circuit.of_data ~feature_flags ~option_map:Option.map
+             ~of_opt:Plonk_types.Opt.to_option )
     in
     Spec.ETyp.T
       ( typ
-      , (fun x -> In_circuit.of_data ~option_map:Plonk_types.Opt.map (f x))
-      , fun x -> f_inv (In_circuit.to_data ~option_map:Plonk_types.Opt.map x) )
+      , (fun x ->
+          In_circuit.of_data ~feature_flags ~option_map:Plonk_types.Opt.map
+            (f x) ~of_opt:Fn.id )
+      , fun x ->
+          f_inv
+            (In_circuit.to_data ~option_map:Plonk_types.Opt.map x
+               ~to_opt:Plonk_types.Opt.to_option_unsafe ) )
 end

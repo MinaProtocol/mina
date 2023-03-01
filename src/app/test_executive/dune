@@ -8,8 +8,11 @@
    yojson
    core_kernel
    cmdliner
+   base.base_internalhash_types
    base.caml
    async_unix
+   unsigned_extended
+   stdio
    ;; local libraries
    mina_wire_types
    with_hash
@@ -29,7 +32,7 @@
    mina_transaction
    file_system
    currency
-   coda_runtime_config
+   mina_runtime_config
    secrets
    integration_test_cloud_engine
    mina_generators
@@ -45,6 +48,8 @@
    integers
    user_command_input
    participating_state
+   graph_algorithms
+   visualization
    sgn
    zkapp_command_builder
    network_pool

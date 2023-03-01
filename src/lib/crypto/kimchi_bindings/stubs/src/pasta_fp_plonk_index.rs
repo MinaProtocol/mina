@@ -70,11 +70,11 @@ pub fn caml_pasta_fp_plonk_index_create(
     };
 
     // endo
-    let (endo_q, _endo_r) = commitment_dlog::srs::endos::<Pallas>();
+    let (endo_q, _endo_r) = poly_commitment::srs::endos::<Pallas>();
 
     // Unsafe if we are in a multi-core ocaml
     {
-        let ptr: &mut commitment_dlog::srs::SRS<Vesta> =
+        let ptr: &mut poly_commitment::srs::SRS<Vesta> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
         ptr.add_lagrange_basis(cs.domain.d1);
     }
@@ -146,8 +146,7 @@ pub fn caml_pasta_fp_plonk_index_read(
     let mut t = ProverIndex::<Vesta>::deserialize(&mut rmp_serde::Deserializer::new(r))?;
     t.srs = srs.clone();
 
-    let (linearization, powers_of_alpha) =
-        expr_linearization(false, false, None, false, false, true);
+    let (linearization, powers_of_alpha) = expr_linearization(Some(&t.cs.feature_flags), true);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;
 

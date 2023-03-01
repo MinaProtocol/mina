@@ -1152,6 +1152,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                 (Lazy.force precomputed_values.constraint_system_digests)
               ~protocol_major_version
           in
+          [%log info] "Daemon will use chain id %s" chain_id ;
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
               { timeout = Time.Span.of_sec 3.
@@ -1420,7 +1421,8 @@ let dump_type_shapes =
   in
   Command.basic ~summary:"Print serialization shapes of versioned types"
     (Command.Param.map max_depth_flag ~f:(fun max_depth () ->
-         Ppx_version_runtime.Shapes.iteri ~f:(fun ~key:path ~data:shape ->
+         Ppx_version_runtime.Shapes.iteri
+           ~f:(fun ~key:path ~data:(shape, ty_decl) ->
              let open Bin_prot.Shape in
              let canonical = eval shape in
              let digest = Canonical.to_digest canonical |> Digest.to_hex in
@@ -1452,7 +1454,8 @@ let dump_type_shapes =
                in
                Sexp.to_string summary_sexp
              in
-             Core_kernel.printf "%s, %s, %s\n" path digest shape_summary ) ) )
+             Core_kernel.printf "%s, %s, %s, %s\n" path digest shape_summary
+               ty_decl ) ) )
 
 [%%if force_updates]
 
@@ -1678,11 +1681,12 @@ let internal_commands logger =
                 Verifier.verify_blockchain_snarks verifier input
           in
           match result with
-          | Ok true ->
+          | Ok (Ok ()) ->
               printf "Proofs verified successfully" ;
               exit 0
-          | Ok false ->
-              printf "Proofs failed to verify" ;
+          | Ok (Error err) ->
+              printf "Proofs failed to verify:\n%s\n"
+                (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err)) ;
               exit 1
           | Error err ->
               printf "Failed while verifying proofs:\n%s"
@@ -1751,9 +1755,9 @@ let mina_commands logger =
   let group =
     List.map
       ~f:(fun (module T) -> (T.name, T.command))
-      ( [ (module Coda_shared_state_test)
-        ; (module Coda_transitive_peers_test)
-        ; (module Coda_change_snark_worker_test)
+      ( [ (* (module Coda_shared_state_test)
+             ; (module Coda_transitive_peers_test) *)
+          (module Coda_change_snark_worker_test)
         ]
         : (module Integration_test) list )
   in

@@ -1,6 +1,7 @@
 type 'f impl = (module Snarky_backendless.Snark_intf.Run with type field = 'f)
 
 type (_, _, _) basic =
+  | Unit : (unit, unit, < .. >) basic
   | Field
       : ('field1, 'field2, < field1 : 'field1 ; field2 : 'field2 ; .. >) basic
   | Bool : ('bool1, 'bool2, < bool1 : 'bool1 ; bool2 : 'bool2 ; .. >) basic
@@ -69,6 +70,14 @@ module rec T : sig
            , ('a2, 'bool) Pickles_types.Plonk_types.Opt.t
            , (< bool1 : bool ; bool2 : 'bool ; .. > as 'env) )
            t
+    | Opt_unflagged :
+        { inner : ('a1, 'a2, (< bool1 : bool ; bool2 : 'bool ; .. > as 'env)) t
+        ; flag : Pickles_types.Plonk_types.Opt.Flag.t
+        ; dummy1 : 'a1
+        ; dummy2 : 'a2
+        }
+        -> ('a1 option, 'a2 option, 'env) t
+    | Constant : 'a * ('a -> 'a -> unit) * ('a, 'b, 'env) t -> ('a, 'b, 'env) t
 end
 
 val typ :
@@ -77,7 +86,7 @@ val typ :
   -> ( 'b
      , 'c
      , 'a
-     , (unit, 'a) Snarky_backendless.Checked_ast.t )
+     , (unit, 'a) Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
      Snarky_backendless.Types.Typ.t
   -> ( 'd
      , 'e

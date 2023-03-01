@@ -68,11 +68,11 @@ pub fn caml_pasta_fq_plonk_index_create(
     };
 
     // endo
-    let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
+    let (endo_q, _endo_r) = poly_commitment::srs::endos::<GAffineOther>();
 
     // Unsafe if we are in a multi-core ocaml
     {
-        let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
+        let ptr: &mut poly_commitment::srs::SRS<GAffine> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
         ptr.add_lagrange_basis(cs.domain.d1);
     }
@@ -134,8 +134,7 @@ pub fn caml_pasta_fq_plonk_index_read(
     let mut t = ProverIndex::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))
         .map_err(|err| JsValue::from_str(&format!("caml_pasta_fq_plonk_index_read: {}", err)))?;
     t.srs = srs.0.clone();
-    let (linearization, powers_of_alpha) =
-        expr_linearization(false, false, None, false, false, true);
+    let (linearization, powers_of_alpha) = expr_linearization(Some(&t.cs.feature_flags), true);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;
 
