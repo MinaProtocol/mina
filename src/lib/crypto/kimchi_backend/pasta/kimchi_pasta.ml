@@ -16,7 +16,22 @@ module Pallas_based_plonk = struct
   module Oracles = Pallas_based_plonk.Oracles
 
   (* stuff we get from bindings *)
-  module Cvar = Snarky_bindings.Fq.Cvar
+  module Cvar = struct
+    include Snarky_bindings.Fq.Cvar
+
+    module Unsafe = struct
+      let of_index = of_index_unsafe
+    end
+
+    let eval _ _ = failwith "TODO"
+
+    let ( + ) = add
+
+    let ( - ) = sub
+
+    let ( * ) c x = scale x c
+  end
+
   module Run_state = Snarky_bindings.Fq.State
   module R1CS_constraint_system = Snarky_bindings.Fq.Constraint_system
 end
@@ -37,7 +52,22 @@ module Vesta_based_plonk = struct
   module Oracles = Vesta_based_plonk.Oracles
 
   (* stuff we get from bindings *)
-  module Cvar = Snarky_bindings.Fp.Cvar
+  module Cvar = struct
+    include Snarky_bindings.Fp.Cvar
+
+    module Unsafe = struct
+      let of_index = of_index_unsafe
+    end
+
+    let eval _ _ = failwith "TODO"
+
+    let ( + ) = add
+
+    let ( - ) = sub
+
+    let ( * ) c x = scale x c
+  end
+
   module Run_state = Snarky_bindings.Fp.State
   module R1CS_constraint_system = Snarky_bindings.Fp.Constraint_system
 end
