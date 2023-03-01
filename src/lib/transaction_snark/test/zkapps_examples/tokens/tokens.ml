@@ -273,7 +273,6 @@ let%test_module "Tokens test" =
                                Zkapps_examples.mk_update_body (fst mint_to_keys)
                                  ~use_full_commitment:true
                                  ~balance_change:(int_to_amount (-15))
-                                 ~token_id:Token_id.default
                                  ~may_use_token:Parents_own_token
                            }
                       (* Blind call, should be skipped. *)
@@ -284,7 +283,7 @@ let%test_module "Tokens test" =
                                Zkapps_examples.mk_update_body (fst mint_to_keys)
                                  ~use_full_commitment:true
                                  ~balance_change:(int_to_amount 15)
-                                 ~token_id:Token_id.default ~may_use_token:No
+                                 ~may_use_token:No
                            }
                       (* Blind call, should be skipped. *)
                       |> Zkapp_command.Call_forest.cons
@@ -294,7 +293,7 @@ let%test_module "Tokens test" =
                                Zkapps_examples.mk_update_body (fst mint_to_keys)
                                  ~use_full_commitment:true
                                  ~balance_change:(int_to_amount (-15))
-                                 ~token_id:Token_id.default ~may_use_token:No
+                                 ~may_use_token:No
                            }
                       (* Minting by delegate call should be ignored by the sum
                          check.
@@ -323,7 +322,7 @@ let%test_module "Tokens test" =
                  Zkapps_examples.mk_update_body (fst mint_to_keys)
                    ~use_full_commitment:true
                    ~balance_change:(int_to_amount (-15))
-                   ~token_id:Token_id.default ~may_use_token:Inherit_from_parent
+                   ~may_use_token:Inherit_from_parent
              }
         |> Zkapp_command.Call_forest.cons
              { Account_update.authorization = Control.Signature Signature.dummy
@@ -343,7 +342,7 @@ let%test_module "Tokens test" =
              ; body =
                  Zkapps_examples.mk_update_body (fst mint_to_keys)
                    ~use_full_commitment:true ~balance_change:(int_to_amount 30)
-                   ~token_id:Token_id.default ~may_use_token:No
+                   ~may_use_token:No
              }
         |> Zkapp_command.Call_forest.cons_tree
              ( fst @@ Async.Thread_safe.block_on_async_exn
@@ -376,7 +375,7 @@ let%test_module "Tokens test" =
                  Zkapps_examples.mk_update_body (fst mint_to_keys)
                    ~use_full_commitment:true
                    ~balance_change:(int_to_amount (-30))
-                   ~token_id:Token_id.default ~may_use_token:Inherit_from_parent
+                   ~may_use_token:Inherit_from_parent
              }
         |> Zkapp_command.Call_forest.cons
              { Account_update.authorization = Control.Signature Signature.dummy
@@ -396,7 +395,7 @@ let%test_module "Tokens test" =
              ; body =
                  Zkapps_examples.mk_update_body (fst mint_to_keys)
                    ~use_full_commitment:true ~balance_change:(int_to_amount 30)
-                   ~token_id:Token_id.default ~may_use_token:No
+                   ~may_use_token:No
              }
         |> Zkapp_command.Call_forest.cons ~calls:subtree
              { Account_update.authorization = Control.None_given
