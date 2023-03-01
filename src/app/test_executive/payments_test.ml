@@ -127,9 +127,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let receiver_pub_key =
       fish1.keypair.public_key |> Signature_lib.Public_key.compress
     in
-    let sender_kp = fish2.keypair in
     let sender_pub_key =
-      sender_kp.public_key |> Signature_lib.Public_key.compress
+      fish2.keypair.public_key |> Signature_lib.Public_key.compress
     in
     (* hardcoded copy of extra_genesis_accounts[0] and extra_genesis_accounts[1], update here if they change *)
     let receiver_original_balance =
@@ -154,7 +153,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~fee_payer_pk:sender_pub_key ~valid_until:None
         ~memo:(Signed_command_memo.create_from_string_exn "")
         ~body:txn_body ~signer:sender_pub_key
-        ~sign_choice:(User_command_input.Sign_choice.Keypair sender_kp) ()
+        ~sign_choice:(User_command_input.Sign_choice.Keypair fish2.keypair) ()
     in
     [%log info] "user_command_input: $user_command"
       ~metadata:
@@ -181,7 +180,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     (* setup complete *)
     let%bind () =
-      section "send a single payment between 2 untimed accounts"
+      section "send a single signed payment between 2 fish accounts"
         (let%bind { hash; _ } =
            Network.Node.must_send_payment_with_raw_sig untimed_node_b ~logger
              ~sender_pub_key:
