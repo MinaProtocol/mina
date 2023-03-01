@@ -141,7 +141,7 @@
  (public_name snarky_bindings)
  (name snarky_bindings)
  (modules snarky_bindings)
- (libraries kimchi_bindings))
+ (libraries kimchi_bindings pasta_bindings))
 
 ;;
 ;; generate the OCaml bindings
