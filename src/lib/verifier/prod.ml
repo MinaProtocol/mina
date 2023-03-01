@@ -530,6 +530,32 @@ let verify_transaction_snarks { worker; logger } ts =
         ~metadata:(("result", res_json) :: metadata) ;
       res )
 
+(* Wrappers for internal_tracing *)
+
+let wrap_verify_snarks_with_trace ~checkpoint_before ~checkpoint_after
+    verify_function t to_verify =
+  let logger = t.logger in
+  let count = List.length to_verify in
+  let open Deferred.Let_syntax in
+  [%log internal] checkpoint_before ~metadata:[ ("count", `Int count) ] ;
+  let%map result = verify_function t to_verify in
+  [%log internal] checkpoint_after ;
+  ( match result with
+  | Error err | Ok (Error err) ->
+      [%log internal] "@metadata"
+        ~metadata:[ ("failure", `String (Error.to_string_hum err)) ]
+  | _ ->
+      () ) ;
+  result
+
+let verify_blockchain_snarks =
+  wrap_verify_snarks_with_trace ~checkpoint_before:"Verify_blockchain_snarks"
+    ~checkpoint_after:"Verify_blockchain_snarks_done" verify_blockchain_snarks
+
+let verify_transaction_snarks =
+  wrap_verify_snarks_with_trace ~checkpoint_before:"Verify_transaction_snarks"
+    ~checkpoint_after:"Verify_transaction_snarks_done" verify_transaction_snarks
+
 let verify_commands { worker; logger } ts =
   O1trace.thread "dispatch_user_command_verification" (fun () ->
       with_retry ~logger (fun () ->

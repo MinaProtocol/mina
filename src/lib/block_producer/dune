@@ -65,6 +65,7 @@
    kimchi_backend
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
+   internal_tracing
  )
  (preprocess
   (pps ppx_mina ppx_version ppx_jane ppx_register_event))
