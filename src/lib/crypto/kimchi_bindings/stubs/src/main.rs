@@ -515,6 +515,8 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_func!(w, env, fp_cs_set_prev_challenges => "set_prev_challenges");
 
             decl_func!(w, env, fp_cs_finalize_and_get_gates => "finalize_and_get_gates");
+
+            decl_func!(w, env, fp_cs_compute_witness => "compute_witness");
         });
 
         decl_module!(w, env, "State", {
@@ -537,6 +539,8 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_func!(w, env, fq_cs_set_prev_challenges => "set_prev_challenges");
 
             decl_func!(w, env, fq_cs_finalize_and_get_gates => "finalize_and_get_gates");
+
+            decl_func!(w, env, fq_cs_compute_witness => "compute_witness");
         });
 
         decl_module!(w, env, "State", {
