@@ -11,3 +11,6 @@ pub mod shared_rwlock;
 
 #[macro_use]
 pub mod custom;
+
+#[macro_use]
+pub mod functions;
