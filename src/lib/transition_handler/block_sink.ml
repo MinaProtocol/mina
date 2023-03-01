@@ -56,6 +56,20 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
       let%bind () = on_push () in
       Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
       let state = Envelope.Incoming.data e in
+      let state_hash =
+        Mina_block.(
+          state |> header |> Header.protocol_state |> Protocol_state.hashes)
+          .state_hash
+      in
+      let blockchain_length = Mina_block.blockchain_length state in
+      Internal_tracing.with_state_hash state_hash
+      @@ fun () ->
+      [%log internal] "@block_metadata"
+        ~metadata:
+          [ ( "blockchain_length"
+            , Mina_numbers.Length.to_yojson blockchain_length )
+          ] ;
+      [%log internal] "External_block_received" ;
       let processing_start_time =
         Block_time.(now time_controller |> to_time_exn)
       in
@@ -99,6 +113,10 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
             ~score:1
         with
         | `Capacity_exceeded ->
+            Internal_tracing.with_state_hash state_hash
+            @@ fun () ->
+            [%log internal] "Failure"
+              ~metadata:[ ("reason", `String "Capacity_exceeded") ] ;
             [%log warn] "$sender has sent many blocks. This is very unusual."
               ~metadata:[ ("sender", Envelope.Sender.to_yojson sender) ] ;
             Mina_net2.Validation_callback.fire_if_not_already_fired cb `Reject ;

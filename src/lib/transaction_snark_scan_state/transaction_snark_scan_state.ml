@@ -1327,7 +1327,7 @@ let all_work_pairs t
 
 let update_metrics t = Parallel_scan.update_metrics t.scan_state
 
-let fill_work_and_enqueue_transactions t transactions work =
+let fill_work_and_enqueue_transactions t ~logger transactions work =
   let open Or_error.Let_syntax in
   let fill_in_transaction_snark_work tree (works : Transaction_snark_work.t list)
       : (Ledger_proof.t * Sok_message.t) list Or_error.t =
@@ -1350,10 +1350,19 @@ let fill_work_and_enqueue_transactions t transactions work =
     incomplete_txns_from_recent_proof_tree t
   in
   let%bind work_list = fill_in_transaction_snark_work t.scan_state work in
+  let added_works = List.length work in
+  let merge_jobs_created = List.length work_list in
   let%bind proof_opt, updated_scan_state =
     Parallel_scan.update t.scan_state ~completed_jobs:work_list
       ~data:transactions
   in
+  [%log internal] "@metadata"
+    ~metadata:
+      [ ("scan_state_added_works", `Int added_works)
+      ; ("total_proofs", `Int (total_proofs work))
+      ; ("merge_jobs_created", `Int merge_jobs_created)
+      ; ("emitted_proof", `Bool (Option.is_some proof_opt))
+      ] ;
   let%map result_opt, scan_state' =
     Option.value_map
       ~default:

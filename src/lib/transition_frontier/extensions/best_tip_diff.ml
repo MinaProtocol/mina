@@ -11,6 +11,8 @@ module T = struct
     ; reorg_best_tip : bool
     }
 
+  let name = "best_tip_diff"
+
   module Log_event = struct
     type t =
       { protocol_state : Mina_state.Protocol_state.Value.t
