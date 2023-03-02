@@ -2075,12 +2075,27 @@ module Make (L : Ledger_intf.S) :
       List.map original_account_states
         ~f:(Tuple2.map_snd ~f:(Option.map ~f:snd))
     in
-    (*update local and global state ledger to second pass ledger*)
+    (* Warning: This is an abstraction leak / hack.
+       Here, we update global second pass ledger to be the input ledger, and
+       then update the local ledger to be the input ledger *IF AND ONLY IF*
+       there are more transaction segments to be processed in this pass.
+
+       TODO: Remove this, and uplift the logic into the call in staged ledger.
+    *)
     let global_state = { c.global_state with second_pass_ledger = ledger } in
     let local_state =
-      { c.local_state with
-        ledger = Global_state.second_pass_ledger global_state
-      }
+      if List.is_empty c.local_state.stack_frame.Stack_frame.calls then
+        (* Don't mess with the local state; we've already finished the
+           transaction after the fee payer.
+        *)
+        c.local_state
+      else
+        (* Install the ledger that should already be in the local state, but
+           may not be in some situations depending on who the caller is.
+        *)
+        { c.local_state with
+          ledger = Global_state.second_pass_ledger global_state
+        }
     in
     let start = (global_state, local_state) in
     match step_all (f init start) start with
