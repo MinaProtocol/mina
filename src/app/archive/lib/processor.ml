@@ -2678,10 +2678,12 @@ module Block = struct
     ; parent_hash : string
     ; creator_id : int
     ; block_winner_id : int
+    ; last_vrf_output : string
     ; snarked_ledger_hash_id : int
     ; staking_epoch_data_id : int
     ; next_epoch_data_id : int
     ; min_window_density : int64
+    ; sub_window_densities : int64 array
     ; total_currency : string
     ; ledger_hash : string
     ; height : int64
@@ -2700,10 +2702,12 @@ module Block = struct
         ; string
         ; int
         ; int
+        ; string
         ; int
         ; int
         ; int
         ; int64
+        ; Mina_caqti.array_int64_typ
         ; string
         ; string
         ; int64
@@ -2755,6 +2759,11 @@ module Block = struct
             (module Conn)
             (Consensus.Data.Consensus_state.block_stake_winner consensus_state)
         in
+        let last_vrf_output =
+          (* encode as hex, Postgresql won't accept arbitrary bitstrings *)
+          Consensus.Data.Consensus_state.last_vrf_output consensus_state
+          |> Hex.Safe.to_hex
+        in
         let%bind snarked_ledger_hash_id =
           Snarked_ledger_hash.add_if_doesn't_exist
             (module Conn)
@@ -2801,12 +2810,19 @@ module Block = struct
             Chain_status.(to_string Canonical)
           else Chain_status.(to_string Pending)
         in
+        let consensus_state = Protocol_state.consensus_state protocol_state in
+        let blockchain_state = Protocol_state.blockchain_state protocol_state in
         let%bind block_id =
           Conn.find
             (Caqti_request.find typ Caqti_type.int
                (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                   ~tannot:(function
-                    | "chain_status" -> Some "chain_status_type" | _ -> None )
+                    | "chain_status" ->
+                        Some "chain_status_type"
+                    | "sub_window_densities" ->
+                        Some "bigint[]"
+                    | _ ->
+                        None )
                   ~cols:Fields.names () ) )
             { state_hash = hash |> State_hash.to_base58_check
             ; parent_id
@@ -2815,20 +2831,26 @@ module Block = struct
                 |> State_hash.to_base58_check
             ; creator_id
             ; block_winner_id
+            ; last_vrf_output
             ; snarked_ledger_hash_id
             ; staking_epoch_data_id
             ; next_epoch_data_id
             ; min_window_density =
-                Protocol_state.consensus_state protocol_state
+                consensus_state
                 |> Consensus.Data.Consensus_state.min_window_density
                 |> Mina_numbers.Length.to_uint32 |> Unsigned.UInt32.to_int64
+            ; sub_window_densities =
+                consensus_state
+                |> Consensus.Data.Consensus_state.sub_window_densities
+                |> List.map ~f:(fun length ->
+                       Mina_numbers.Length.to_uint32 length
+                       |> Unsigned.UInt32.to_int64 )
+                |> Array.of_list
             ; total_currency =
-                Protocol_state.consensus_state protocol_state
-                |> Consensus.Data.Consensus_state.total_currency
+                consensus_state |> Consensus.Data.Consensus_state.total_currency
                 |> Currency.Amount.to_string
             ; ledger_hash =
-                Protocol_state.blockchain_state protocol_state
-                |> Blockchain_state.staged_ledger_hash
+                blockchain_state |> Blockchain_state.staged_ledger_hash
                 |> Staged_ledger_hash.ledger_hash |> Ledger_hash.to_base58_check
             ; height
             ; global_slot_since_hard_fork
@@ -2837,8 +2859,8 @@ module Block = struct
                 |> Consensus.Data.Consensus_state.global_slot_since_genesis
                 |> Unsigned.UInt32.to_int64
             ; timestamp =
-                Protocol_state.blockchain_state protocol_state
-                |> Blockchain_state.timestamp |> Block_time.to_string_exn
+                blockchain_state |> Blockchain_state.timestamp
+                |> Block_time.to_string_exn
             ; chain_status
             }
         in
@@ -3113,6 +3135,10 @@ module Block = struct
           let%bind block_winner_id =
             Public_key.add_if_doesn't_exist (module Conn) block.block_winner
           in
+          let last_vrf_output =
+            (* already encoded as hex *)
+            block.last_vrf_output
+          in
           let%bind snarked_ledger_hash_id =
             Snarked_ledger_hash.add_if_doesn't_exist
               (module Conn)
@@ -3130,13 +3156,13 @@ module Block = struct
             (Caqti_request.find typ Caqti_type.int
                {sql| INSERT INTO blocks
                      (state_hash, parent_id, parent_hash,
-                      creator_id, block_winner_id,
+                      creator_id, block_winner_id,last_vrf_output,
                       snarked_ledger_hash_id, staking_epoch_data_id,
                       next_epoch_data_id,
-                      min_window_density, total_currency,
+                      min_window_density, sub_window_densities, total_currency,
                       ledger_hash, height, global_slot_since_hard_fork,
                       global_slot_since_genesis, timestamp, chain_status)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::bigint[], ?, ?, ?, ?, ?, ?::chain_status_type)
                      RETURNING id
                |sql} )
             { state_hash = block.state_hash |> State_hash.to_base58_check
@@ -3144,12 +3170,19 @@ module Block = struct
             ; parent_hash = block.parent_hash |> State_hash.to_base58_check
             ; creator_id
             ; block_winner_id
+            ; last_vrf_output
             ; snarked_ledger_hash_id
             ; staking_epoch_data_id
             ; next_epoch_data_id
             ; min_window_density =
                 block.min_window_density |> Mina_numbers.Length.to_uint32
                 |> Unsigned.UInt32.to_int64
+            ; sub_window_densities =
+                block.sub_window_densities
+                |> List.map ~f:(fun length ->
+                       Mina_numbers.Length.to_uint32 length
+                       |> Unsigned.UInt32.to_int64 )
+                |> Array.of_list
             ; total_currency = Currency.Amount.to_string block.total_currency
             ; ledger_hash = block.ledger_hash |> Ledger_hash.to_base58_check
             ; height = block.height |> Unsigned.UInt32.to_int64
