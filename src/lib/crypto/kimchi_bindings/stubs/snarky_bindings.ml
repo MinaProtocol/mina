@@ -158,6 +158,41 @@ module Fp = struct
 
   module State = struct
     type nonrec t
+
+    external make :
+         int
+      -> Kimchi_bindings.FieldVectors.Fp.t
+      -> int
+      -> Kimchi_bindings.FieldVectors.Fp.t
+      -> Constraint_system.t option
+      -> bool
+      -> bool
+      -> unit = "fp_state_make"
+
+    external add_legacy_constraint : t -> Cvar.t Constraints.r1cs -> unit
+      = "fp_state_add_legacy_constraint"
+
+    external add_kimchi_constraint :
+      t -> (Cvar.t, Pasta_bindings.Fp.t) Constraints.kimchi -> unit
+      = "fp_state_add_kimchi_constraint"
+
+    external get_variable_value : t -> int -> Pasta_bindings.Fp.t
+      = "fp_state_get_variable_value"
+
+    external store_field_elt : t -> Pasta_bindings.Fp.t -> Cvar.t
+      = "fp_state_store_field_elt"
+
+    external alloc_var : t -> Cvar.t = "fp_state_alloc_var"
+
+    external has_witness : t -> bool = "fp_state_has_witness"
+
+    external as_prover : t -> bool = "fp_state_as_prover"
+
+    external set_as_prover : t -> bool -> unit = "fp_state_set_as_prover"
+
+    external eval_constraints : t -> bool = "fp_state_eval_constraints"
+
+    external next_auxiliary : t -> int = "fp_state_next_auxiliary"
   end
 end
 

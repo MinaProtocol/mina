@@ -32,8 +32,6 @@ module Pallas_based_plonk = struct
     let ( * ) c x = scale x c
   end
 
-  module Run_state = Snarky_bindings.Fq.State
-
   module R1CS_constraint_system = struct
     include Snarky_bindings.Fq.Constraint_system
 
@@ -41,6 +39,10 @@ module Pallas_based_plonk = struct
     let digest sys =
       let bytes = digest sys in
       Core_kernel.Md5.digest_bytes bytes
+  end
+
+  module Run_state = struct
+    include Snarky_bindings.Fq.State
 
     include
       Kimchi_backend_common.Constraints.Make (Field) (Cvar)
