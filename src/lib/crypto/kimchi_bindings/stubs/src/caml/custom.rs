@@ -7,7 +7,7 @@ macro_rules! impl_wrapper {
     };
     ($name: ident, $typ: ty, $($trait: ident),*) => {
         #[derive(ocaml_gen::CustomType, $($trait),*)]
-        pub struct $name($typ);
+        pub struct $name(pub $typ);
 
         impl std::ops::Deref for $name {
             type Target = $typ;

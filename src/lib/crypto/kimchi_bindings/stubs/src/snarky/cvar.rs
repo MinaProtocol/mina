@@ -8,18 +8,43 @@ use crate::arkworks::{CamlFp, CamlFq};
 // Wrapper types
 //
 
-impl_custom!(CamlFpVar, CVar<Fp>, Debug, Clone);
-impl_custom!(CamlFqVar, CVar<Fq>, Debug, Clone);
+impl_custom!(CamlFpVar, FieldVar<Fp>, Debug, Clone);
 
-impl From<&CamlFpVar> for CVar<Fp> {
+impl From<&CamlFpVar> for FieldVar<Fp> {
     fn from(var: &CamlFpVar) -> Self {
         var.0.clone()
     }
 }
 
-impl From<&CamlFqVar> for CVar<Fq> {
+impl From<&FieldVar<Fp>> for CamlFpVar {
+    fn from(var: &FieldVar<Fp>) -> Self {
+        CamlFpVar(var.clone())
+    }
+}
+
+impl From<FieldVar<Fp>> for CamlFpVar {
+    fn from(var: FieldVar<Fp>) -> Self {
+        CamlFpVar(var)
+    }
+}
+
+impl_custom!(CamlFqVar, FieldVar<Fq>, Debug, Clone);
+
+impl From<&CamlFqVar> for FieldVar<Fq> {
     fn from(var: &CamlFqVar) -> Self {
         var.0.clone()
+    }
+}
+
+impl From<&FieldVar<Fq>> for CamlFqVar {
+    fn from(var: &FieldVar<Fq>) -> Self {
+        CamlFqVar(var.clone())
+    }
+}
+
+impl From<FieldVar<Fq>> for CamlFqVar {
+    fn from(var: FieldVar<Fq>) -> Self {
+        CamlFqVar(var)
     }
 }
 
@@ -31,11 +56,11 @@ macro_rules! impl_cvar_methods {
     ($name: ident, $CamlFVar: ty, $CamlF: ty) => {
         paste! { impl_functions! {
             pub fn [<$name:snake _var_of_index_unsafe>](idx: usize) -> $CamlFVar {
-                $CamlFVar(CVar::Var(idx))
+                $CamlFVar(FieldVar::Var(idx))
             }
 
             pub fn [<$name:snake _var_constant>](cst: $CamlF) -> $CamlFVar {
-                $CamlFVar(CVar::Constant(cst.0))
+                $CamlFVar(FieldVar::Constant(cst.0))
             }
 
             pub fn [<$name:snake _var_add>](var1: &$CamlFVar, var2: &$CamlFVar) -> $CamlFVar {
@@ -56,7 +81,7 @@ macro_rules! impl_cvar_methods {
 
             pub fn [<$name:snake _var_to_constant>](var: &$CamlFVar) -> Option<$CamlF> {
                 match &var.0 {
-                    CVar::Constant(c) => Some($CamlF(*c)),
+                    FieldVar::Constant(c) => Some($CamlF(*c)),
                     _ => None,
                 }
             }

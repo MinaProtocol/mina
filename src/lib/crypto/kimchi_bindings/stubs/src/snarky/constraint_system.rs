@@ -4,7 +4,7 @@ use kimchi::snarky::{
         caml::{convert_basic_constraint, convert_constraint},
         BasicSnarkyConstraint, KimchiConstraint, SnarkyConstraintSystem,
     },
-    prelude::CVar,
+    prelude::FieldVar,
 };
 use mina_curves::pasta::{Fp, Fq, Pallas, Vesta};
 
@@ -35,12 +35,12 @@ impl_functions! {
     }
 
     pub fn fp_cs_add_legacy_constraint(mut cs: ocaml::Pointer<CamlFpCS>, constraint: ocaml::Pointer<BasicSnarkyConstraint<CamlFpVar>>) {
-        let constraint: BasicSnarkyConstraint<CVar<Fp>> = convert_basic_constraint(constraint.as_ref());
+        let constraint: BasicSnarkyConstraint<FieldVar<Fp>> = convert_basic_constraint(constraint.as_ref());
         cs.as_mut().0.add_basic_snarky_constraint(constraint);
     }
 
     pub fn fp_cs_add_kimchi_constraint(mut cs: ocaml::Pointer<CamlFpCS>, constraint: ocaml::Pointer<KimchiConstraint<CamlFpVar, CamlFp>>) {
-        let constraint: KimchiConstraint<CVar<Fp>, Fp> = convert_constraint(constraint.as_ref());
+        let constraint: KimchiConstraint<FieldVar<Fp>, Fp> = convert_constraint(constraint.as_ref());
         cs.as_mut().0.add_constraint(constraint);
     }
 
@@ -94,12 +94,12 @@ impl_functions! {
     }
 
     pub fn fq_cs_add_legacy_constraint(mut cs: ocaml::Pointer<CamlFqCS>, constraint: ocaml::Pointer<BasicSnarkyConstraint<CamlFqVar>>) {
-        let constraint: BasicSnarkyConstraint<CVar<Fq>> = convert_basic_constraint(constraint.as_ref());
+        let constraint: BasicSnarkyConstraint<FieldVar<Fq>> = convert_basic_constraint(constraint.as_ref());
         cs.as_mut().0.add_basic_snarky_constraint(constraint);
     }
 
     pub fn fq_cs_add_kimchi_constraint(mut cs: ocaml::Pointer<CamlFqCS>, constraint: ocaml::Pointer<KimchiConstraint<CamlFqVar, CamlFq>>) {
-        let constraint: KimchiConstraint<CVar<Fq>, Fq> = convert_constraint(constraint.as_ref());
+        let constraint: KimchiConstraint<FieldVar<Fq>, Fq> = convert_constraint(constraint.as_ref());
         cs.as_mut().0.add_constraint(constraint);
     }
 

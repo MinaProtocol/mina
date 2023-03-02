@@ -530,19 +530,12 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_module!(w, env, "Fp", {
         decl_module!(w, env, "Cvar", {
             decl_type!(w, env, CamlFpVar => "t");
-
             decl_func!(w, env, fp_var_of_index_unsafe => "of_index_unsafe");
-
             decl_func!(w, env, fp_var_constant => "constant");
-
             decl_func!(w, env, fp_var_add => "add");
-
             decl_func!(w, env, fp_var_negate => "negate");
-
             decl_func!(w, env, fp_var_scale => "scale");
-
             decl_func!(w, env, fp_var_sub => "sub");
-
             decl_func!(w, env, fp_var_to_constant => "to_constant");
         });
 
@@ -550,34 +543,36 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_type!(w, env, CamlFpCS => "t");
 
             decl_func!(w, env, fp_cs_create => "create");
-
             decl_func!(w, env, fp_cs_add_legacy_constraint => "add_legacy_constraint");
-
             decl_func!(w, env, fp_cs_add_kimchi_constraint => "add_kimchi_constraint");
-
             decl_func!(w, env, fp_cs_finalize => "finalize");
-
             decl_func!(w, env, fp_cs_digest => "digest");
-
             decl_func!(w, env, fp_cs_get_rows_len => "get_rows_len");
-
             decl_func!(w, env, fp_cs_set_auxiliary_input_size => "set_auxiliary_input_size");
-
             decl_func!(w, env, fp_cs_set_primary_input_size => "set_primary_input_size");
-
             decl_func!(w, env, fp_cs_get_primary_input_size => "get_primary_input_size");
-
             decl_func!(w, env, fp_cs_get_prev_challenges => "get_prev_challenges");
-
             decl_func!(w, env, fp_cs_set_prev_challenges => "set_prev_challenges");
-
             decl_func!(w, env, fp_cs_finalize_and_get_gates => "finalize_and_get_gates");
-
             decl_func!(w, env, fp_cs_compute_witness => "compute_witness");
         });
 
         decl_module!(w, env, "State", {
             decl_type!(w, env, CamlFpState => "t");
+
+            decl_func!(w, env, fp_state_make => "make");
+            decl_func!(w, env, fp_state_add_legacy_constraint => "add_legacy_constraint");
+            decl_func!(w, env, fp_state_add_kimchi_constraint => "add_kimchi_constraint");
+            decl_func!(w, env, fp_state_get_variable_value => "get_variable_value");
+            decl_func!(w, env, fp_state_store_field_elt => "store_field_elt");
+            decl_func!(w, env, fp_state_alloc_var => "alloc_var");
+            decl_func!(w, env, fp_state_has_witness => "has_witness");
+            decl_func!(w, env, fp_state_as_prover => "as_prover");
+            decl_func!(w, env, fp_state_set_as_prover => "set_as_prover");
+            //            decl_func!(w, env, fp_state_stack => "stack");
+            //            decl_func!(w, env, fp_state_set_stack => "set_stack");
+            decl_func!(w, env, fp_state_eval_constraints => "eval_constraints");
+            decl_func!(w, env, fp_state_next_auxiliary => "next_auxiliary");
         });
     });
 
@@ -586,52 +581,47 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_type!(w, env, CamlFqVar => "t");
 
             decl_func!(w, env, fq_var_of_index_unsafe => "of_index_unsafe");
-
             decl_func!(w, env, fq_var_constant => "constant");
-
             decl_func!(w, env, fq_var_add => "add");
-
             decl_func!(w, env, fq_var_negate => "negate");
-
             decl_func!(w, env, fq_var_scale => "scale");
-
             decl_func!(w, env, fq_var_sub => "sub");
-
             decl_func!(w, env, fq_var_to_constant => "to_constant");
         });
 
         decl_module!(w, env, "Constraint_system", {
             decl_type!(w, env, CamlFqCS => "t");
-
             decl_func!(w, env, fq_cs_create => "create");
-
             decl_func!(w, env, fq_cs_add_legacy_constraint => "add_legacy_constraint");
-
             decl_func!(w, env, fq_cs_add_kimchi_constraint => "add_kimchi_constraint");
-
             decl_func!(w, env, fq_cs_finalize => "finalize");
-
             decl_func!(w, env, fq_cs_digest => "digest");
-
             decl_func!(w, env, fq_cs_get_rows_len => "get_rows_len");
-
             decl_func!(w, env, fq_cs_set_auxiliary_input_size => "set_auxiliary_input_size");
-
             decl_func!(w, env, fq_cs_set_primary_input_size => "set_primary_input_size");
-
             decl_func!(w, env, fq_cs_get_primary_input_size => "get_primary_input_size");
-
             decl_func!(w, env, fq_cs_get_prev_challenges => "get_prev_challenges");
-
             decl_func!(w, env, fq_cs_set_prev_challenges => "set_prev_challenges");
-
             decl_func!(w, env, fq_cs_finalize_and_get_gates => "finalize_and_get_gates");
-
             decl_func!(w, env, fq_cs_compute_witness => "compute_witness");
         });
 
         decl_module!(w, env, "State", {
             decl_type!(w, env, CamlFqState => "t");
+
+            // decl_func!(w, env, fq_state_make => "make");
+            // decl_func!(w, env, fq_state_add_legacy_constraint => "add_legacy_constraint");
+            // decl_func!(w, env, fq_state_add_kimchi_constraint => "add_kimchi_constraint");
+            // decl_func!(w, env, fq_state_get_variable_value => "get_variable_value");
+            // decl_func!(w, env, fq_state_store_field_elt => "store_field_elt");
+            // decl_func!(w, env, fq_state_alloc_var => "alloc_var");
+            // decl_func!(w, env, fq_state_has_witness => "has_witness");
+            // decl_func!(w, env, fq_state_as_prover => "as_prover");
+            // decl_func!(w, env, fq_state_set_as_prover => "set_as_prover");
+            // decl_func!(w, env, fq_state_stack => "stack");
+            // decl_func!(w, env, fq_state_set_stack => "set_stack");
+            // decl_func!(w, env, fq_state_eval_constraints => "eval_constraints");
+            // decl_func!(w, env, fq_state_next_auxiliary => "next_auxiliary");
         });
     });
 }
