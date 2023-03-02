@@ -250,4 +250,78 @@ let%test_module "Test transaction logic." =
                       | _ ->
                           false ) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
+
+    let%test_unit "Timing of an account can be changed." =
+      Quickcheck.test ~trials
+        (let open Quickcheck in
+        let open Generator.Let_syntax in
+        let%bind account =
+          Generator.filter Test_account.gen
+            ~f:Balance.(fun a -> a.balance > zero)
+        in
+        let%bind timing = Account.gen_timing account.balance in
+        let timing_info =
+          Account.Timing.of_record timing
+          |> Account_update.Update.Timing_info.of_account_timing
+          |> Option.value_exn
+          (* Timing is guaranteed to return a proper timing. *)
+        in
+        let txn =
+          Alter_account.make ~account:account.pk
+            { Account_update.Update.noop with timing = Set timing_info }
+        in
+        (* Fee can't result in the balance falling below the set minimum. *)
+        let max_fee =
+          Fee.(
+            balance_to_fee account.balance
+            - balance_to_fee timing.initial_minimum_balance)
+          |> Option.value ~default:Fee.zero
+        in
+        let%map fee = Fee.(gen_incl zero max_fee) in
+        (account.pk, fee, [ account ], [ (txn :> transaction) ], timing))
+        ~f:(fun (fee_payer, fee, accounts, txns, timing) ->
+          [%test_pred: Zk_cmd_result.t Or_error.t]
+            (Predicates.pure ~f:(fun (txn, ledger) ->
+                 let account = List.hd_exn accounts in
+                 Transaction_status.equal txn.command.status Applied
+                 && Predicates.verify_account_updates account ~txn ~ledger
+                      ~f:(fun _ -> function
+                      | Some orig, Some updt ->
+                          let open Account.Timing in
+                          equal orig.timing Untimed
+                          && equal updt.timing (Account.Timing.of_record timing)
+                      | _ ->
+                          false ) ) )
+            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
+
+    let%test_unit "Initial minimum balance cannot be set below the actual \
+                   balance." =
+      Quickcheck.test ~trials
+        (let open Quickcheck in
+        let open Generator.Let_syntax in
+        let%bind timing = Account.gen_timing Balance.max_int in
+        let%map account =
+          Generator.filter Test_account.gen
+            ~f:
+              Balance.(
+                fun a ->
+                  timing.initial_minimum_balance > a.balance && a.balance > zero)
+        in
+        let timing_info =
+          Account.Timing.of_record timing
+          |> Account_update.Update.Timing_info.of_account_timing
+          |> Option.value_exn
+          (* Timing is guaranteed to return a proper timing. *)
+        in
+        let txn =
+          Alter_account.make ~account:account.pk
+            { Account_update.Update.noop with timing = Set timing_info }
+        in
+        (account.pk, Fee.zero, [ account ], [ (txn :> transaction) ]))
+        ~f:(fun (fee_payer, fee, accounts, txns) ->
+          [%test_pred: Zk_cmd_result.t Or_error.t]
+            (Predicates.pure ~f:(fun (txn, _ledger) ->
+                 Transaction_status.equal txn.command.status
+                   (Failed [ []; [ Source_minimum_balance_violation ] ]) ) )
+            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
   end )
