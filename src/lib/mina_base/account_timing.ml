@@ -78,6 +78,13 @@ module As_record = struct
     |> finish "AccountTiming" ~t_toplevel_annots
 end
 
+type as_record =
+  ( bool
+  , Global_slot.Stable.V1.t
+  , Balance.Stable.V1.t
+  , Amount.Stable.V1.t )
+  As_record.t
+
 (* convert sum type to record format, useful for to_bits and typ *)
 let to_record t =
   match t with
@@ -123,6 +130,17 @@ let of_record
       ; cliff_amount
       ; vesting_period
       ; vesting_increment
+      }
+  else Untimed
+
+let of_record (r : as_record) : t =
+  if r.is_timed then
+    Timed
+      { initial_minimum_balance = r.initial_minimum_balance
+      ; cliff_time = r.cliff_time
+      ; cliff_amount = r.cliff_amount
+      ; vesting_period = r.vesting_period
+      ; vesting_increment = r.vesting_increment
       }
   else Untimed
 
