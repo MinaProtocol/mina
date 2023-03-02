@@ -1597,7 +1597,8 @@ let internal_commands logger =
                        Genesis_constants.Constraint_constants.compiled ()
                  in
                  let sok_message =
-                   { Mina_base.Sok_message.fee = Currency.Fee.of_int 0
+                   { Mina_base.Sok_message.fee =
+                       Currency.Fee.of_nanomina_int_exn 0
                    ; prover = Quickcheck.random_value Public_key.Compressed.gen
                    }
                  in
