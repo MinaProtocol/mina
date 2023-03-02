@@ -2411,9 +2411,11 @@ module Make_str (A : Wire_types.Concrete) = struct
       Poly.
         ( blockchain_length
         , min_window_density
+        , sub_window_densities
         , total_currency
         , global_slot_since_genesis
         , block_stake_winner
+        , last_vrf_output
         , block_creator
         , coinbase_receiver )]
 
