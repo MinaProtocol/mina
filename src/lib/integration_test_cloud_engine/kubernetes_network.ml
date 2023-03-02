@@ -266,7 +266,7 @@ module Node = struct
                   }
           delegate
           nonce
-          permissions { editSequenceState
+          permissions { editActionState
                         editState
                         incrementNonce
                         receive
@@ -280,7 +280,7 @@ module Node = struct
                         setVotingFor
                         setTiming
                       }
-          sequenceEvents
+          actionState
           zkappState
           zkappUri
           timing { cliffTime @ppxCustom(module: "Graphql_lib.Scalars.JSON")
@@ -486,8 +486,7 @@ module Node = struct
           Signature
     in
     let open Graphql.Account in
-    { edit_sequence_state =
-        to_auth_required account_permissions.editSequenceState
+    { edit_action_state = to_auth_required account_permissions.editActionState
     ; edit_state = to_auth_required account_permissions.editState
     ; increment_nonce = to_auth_required account_permissions.incrementNonce
     ; receive = to_auth_required account_permissions.receive
