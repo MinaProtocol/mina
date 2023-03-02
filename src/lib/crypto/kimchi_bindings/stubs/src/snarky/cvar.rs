@@ -11,6 +11,18 @@ use crate::arkworks::{CamlFp, CamlFq};
 impl_custom!(CamlFpVar, CVar<Fp>, Debug, Clone);
 impl_custom!(CamlFqVar, CVar<Fq>, Debug, Clone);
 
+impl From<&CamlFpVar> for CVar<Fp> {
+    fn from(var: &CamlFpVar) -> Self {
+        var.0.clone()
+    }
+}
+
+impl From<&CamlFqVar> for CVar<Fq> {
+    fn from(var: &CamlFqVar) -> Self {
+        var.0.clone()
+    }
+}
+
 //
 // Methods
 //

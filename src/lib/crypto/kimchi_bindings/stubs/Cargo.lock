@@ -3347,6 +3347,7 @@ dependencies = [
  "ark-serialize",
  "array-init",
  "groupmap",
+ "itertools",
  "kimchi",
  "libc",
  "mina-curves",

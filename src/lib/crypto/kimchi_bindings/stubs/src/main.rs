@@ -1,8 +1,15 @@
-use kimchi::circuits::{
-    expr::FeatureFlag,
-    lookup::lookups::{LookupFeatures, LookupPattern, LookupPatterns},
-};
 use kimchi::proof::{caml::CamlRecursionChallenge, PointEvaluations};
+use kimchi::snarky::constraint_system::{
+    BasicInput, EcAddCompleteInput, EcEndoscaleInput, EndoscaleRound, EndoscaleScalarRound,
+    KimchiConstraint, PoseidonInput, ScaleRound,
+};
+use kimchi::{
+    circuits::{
+        expr::FeatureFlag,
+        lookup::lookups::{LookupFeatures, LookupPattern, LookupPatterns},
+    },
+    snarky::constraint_system::BasicSnarkyConstraint,
+};
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
 use std::fs::File;
 use std::io::Write;
@@ -500,6 +507,26 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_fake_generic!(T2, 1);
     decl_fake_generic!(T3, 2);
 
+    writeln!(w, "(** The constraints exposed by Kimchi. *)").unwrap();
+    decl_module!(w, env, "Constraints", {
+        writeln!(w, "(** The legacy R1CS constraints. *)").unwrap();
+        decl_type!(w, env, BasicSnarkyConstraint<T1> => "r1cs");
+
+        writeln!(w, "(** The inputs to the different custom gates. *)").unwrap();
+        decl_module!(w, env, "Inputs", {
+            decl_type!(w, env, BasicInput<T1, T2> => "generic");
+            decl_type!(w, env, PoseidonInput<T1> => "poseidon_input");
+            decl_type!(w, env, EcAddCompleteInput<T1> => "ec_add");
+            decl_type!(w, env, EndoscaleRound<T1> => "ec_endoscale_round");
+            decl_type!(w, env, ScaleRound<T1> => "ec_scale_round");
+            decl_type!(w, env, EcEndoscaleInput<T1> => "ec_endoscale");
+            decl_type!(w, env, EndoscaleScalarRound<T1> => "ec_endoscale_scalar_round");
+        });
+
+        writeln!(w, "(** The custom gates exposed by Kimchi. *)").unwrap();
+        decl_type!(w, env, KimchiConstraint<T1, T2> => "kimchi");
+    });
+
     decl_module!(w, env, "Fp", {
         decl_module!(w, env, "Cvar", {
             decl_type!(w, env, CamlFpVar => "t");
@@ -524,7 +551,9 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
 
             decl_func!(w, env, fp_cs_create => "create");
 
-            decl_func!(w, env, fp_cs_add_constraint => "add_constraint");
+            decl_func!(w, env, fp_cs_add_legacy_constraint => "add_legacy_constraint");
+
+            decl_func!(w, env, fp_cs_add_kimchi_constraint => "add_kimchi_constraint");
 
             decl_func!(w, env, fp_cs_finalize => "finalize");
 
@@ -576,7 +605,9 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
 
             decl_func!(w, env, fq_cs_create => "create");
 
-            decl_func!(w, env, fq_cs_add_constraint => "add_constraint");
+            decl_func!(w, env, fq_cs_add_legacy_constraint => "add_legacy_constraint");
+
+            decl_func!(w, env, fq_cs_add_kimchi_constraint => "add_kimchi_constraint");
 
             decl_func!(w, env, fq_cs_finalize => "finalize");
 

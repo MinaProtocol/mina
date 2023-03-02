@@ -1,4 +1,98 @@
 (* This file is generated automatically with ocaml_gen. *)
+(** The constraints exposed by Kimchi. *)
+
+module Constraints = struct
+  (** The legacy R1CS constraints. *)
+  type nonrec 'var r1cs =
+    | Boolean of 'var
+    | Equal of 'var * 'var
+    | Square of 'var * 'var
+    | R1CS of 'var * 'var * 'var
+        (** The inputs to the different custom gates. *)
+
+  module Inputs = struct
+    type nonrec ('var, 'field) generic =
+      { l : 'field * 'var
+      ; r : 'field * 'var
+      ; o : 'field * 'var
+      ; m : 'field
+      ; c : 'field
+      }
+
+    type nonrec 'var poseidon_input =
+      { states : 'var array array; last : 'var array }
+
+    type nonrec 'var ec_add =
+      { p1 : 'var * 'var
+      ; p2 : 'var * 'var
+      ; p3 : 'var * 'var
+      ; inf : 'var
+      ; same_x : 'var
+      ; slope : 'var
+      ; inf_z : 'var
+      ; x21_inv : 'var
+      }
+
+    type nonrec 'a ec_endoscale_round =
+      { xt : 'a
+      ; yt : 'a
+      ; xp : 'a
+      ; yp : 'a
+      ; n_acc : 'a
+      ; xr : 'a
+      ; yr : 'a
+      ; s1 : 'a
+      ; s3 : 'a
+      ; b1 : 'a
+      ; b2 : 'a
+      ; b3 : 'a
+      ; b4 : 'a
+      }
+
+    type nonrec 'a ec_scale_round =
+      { accs : ('a * 'a) array
+      ; bits : 'a array
+      ; ss : 'a array
+      ; base : 'a * 'a
+      ; n_prev : 'a
+      ; n_next : 'a
+      }
+
+    type nonrec 'var ec_endoscale =
+      { state : 'var ec_endoscale_round array
+      ; xs : 'var
+      ; ys : 'var
+      ; n_acc : 'var
+      }
+
+    type nonrec 'a ec_endoscale_scalar_round =
+      { n0 : 'a
+      ; n8 : 'a
+      ; a0 : 'a
+      ; b0 : 'a
+      ; a8 : 'a
+      ; b8 : 'a
+      ; x0 : 'a
+      ; x1 : 'a
+      ; x2 : 'a
+      ; x3 : 'a
+      ; x4 : 'a
+      ; x5 : 'a
+      ; x6 : 'a
+      ; x7 : 'a
+      }
+  end
+
+  (** The custom gates exposed by Kimchi. *)
+  type nonrec ('var, 'field) kimchi =
+    | Basic of ('var, 'field) Inputs.generic
+    | Poseidon of 'var array array
+    | Poseidon2 of 'var Inputs.poseidon_input
+    | EcAddComplete of 'var Inputs.ec_add
+    | EcScale of 'var Inputs.ec_scale_round array
+    | EcEndoscale of 'var Inputs.ec_endoscale
+    | EcEndoscalar of 'var Inputs.ec_endoscale_scalar_round array
+end
 
 module Fp = struct
   module Cvar = struct
@@ -25,8 +119,12 @@ module Fp = struct
 
     external create : unit -> t = "fp_cs_create"
 
-    external add_constraint : string option -> t -> int -> unit
-      = "fp_cs_add_constraint"
+    external add_legacy_constraint : t -> Cvar.t Constraints.r1cs -> unit
+      = "fp_cs_add_legacy_constraint"
+
+    external add_kimchi_constraint :
+      t -> (Cvar.t, Pasta_bindings.Fp.t) Constraints.kimchi -> unit
+      = "fp_cs_add_kimchi_constraint"
 
     external finalize : t -> unit = "fp_cs_finalize"
 
@@ -88,8 +186,12 @@ module Fq = struct
 
     external create : unit -> t = "fq_cs_create"
 
-    external add_constraint : string option -> t -> int -> unit
-      = "fq_cs_add_constraint"
+    external add_legacy_constraint : t -> Cvar.t Constraints.r1cs -> unit
+      = "fq_cs_add_legacy_constraint"
+
+    external add_kimchi_constraint :
+      t -> (Cvar.t, Pasta_bindings.Fq.t) Constraints.kimchi -> unit
+      = "fq_cs_add_kimchi_constraint"
 
     external finalize : t -> unit = "fq_cs_finalize"
 
