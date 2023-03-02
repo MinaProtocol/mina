@@ -16,9 +16,7 @@ let domains (type field)
   let domains2 sys : Domains.t =
     let open Domain in
     let public_input_size =
-      Set_once.get_exn
-        (Impl.R1CS_constraint_system.get_public_input_size sys)
-        [%here]
+      Impl.R1CS_constraint_system.get_primary_input_size sys
     in
     let rows =
       zk_rows + public_input_size + Impl.R1CS_constraint_system.get_rows_len sys
