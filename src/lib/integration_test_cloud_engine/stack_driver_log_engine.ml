@@ -294,6 +294,16 @@ let parse_event_from_log_entry ~logger ~network log_entry =
         (Option.value
            (Option.( >>| ) msg.event_id Structured_log_events.string_of_id)
            ~default:"<NONE>" ) ;
+
+      if
+        String.equal "db06cb5030f39e86e84b30d033f3bc5c"
+          (Option.value
+             (Option.( >>| ) msg.event_id Structured_log_events.string_of_id)
+             ~default:"<NONE>" )
+      then
+        [%log info]
+          "parse_event_from_log_entry, received Added_breadcrumb structured \
+           event" (* ~metadata:[ ("msg", Logger.Message.to_yojson msg) ] *) ;
       match msg.event_id with
       | Some _ ->
           Event_type.parse_daemon_event msg
@@ -340,6 +350,7 @@ let create ~logger ~(network : Kubernetes_network.t) =
     in
     String.concat filters ~sep:"\n"
   in
+  [%log info] "log_filter: %s" log_filter ;
   let%map subscription =
     Subscription.create_with_retry ~logger ~name:network.namespace
       ~filter:log_filter
