@@ -19,7 +19,7 @@ resource "kubernetes_ingress" "testnet_graphql_ingress" {
 
   spec {
     rule {
-      host = "${local.graphql_ingress_dns}"
+      host = local.graphql_ingress_dns
       http {
         dynamic "path" {
           for_each = concat(

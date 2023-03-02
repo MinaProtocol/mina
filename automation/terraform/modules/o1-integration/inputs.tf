@@ -1,6 +1,6 @@
-# provider "google" {
-#   alias = "gke"
-# }
+provider "google" {
+  alias = "gke"
+}
 
 variable "deploy_graphql_ingress" {
   type = bool
