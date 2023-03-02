@@ -128,10 +128,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       fish2.keypair.public_key |> Signature_lib.Public_key.compress
     in
     (* hardcoded copy of extra_genesis_accounts[0] and extra_genesis_accounts[1], update here if they change *)
-    let receiver_original_balance =
-      Currency.Amount.of_formatted_string "1000"
-    in
-    let sender_original_balance = Currency.Amount.of_formatted_string "1000" in
+    let receiver_original_balance = Currency.Amount.of_formatted_string "100" in
+    let sender_original_balance = Currency.Amount.of_formatted_string "100" in
     let txn_body =
       Signed_command_payload.Body.Payment
         { source_pk = sender_pub_key
