@@ -204,7 +204,6 @@ end = struct
     type var = (Group.var, Discrete_log_equality.var) t_
 
     let typ : (var, t) Impl.Typ.t =
-      let open Snarky_backendless.H_list in
       Impl.Typ.of_hlistable
         [ Discrete_log_equality.typ; Group.typ ]
         ~var_to_hlist:(fun { discrete_log_equality; scaled_message_hash } ->
