@@ -33,7 +33,21 @@ module Pallas_based_plonk = struct
   end
 
   module Run_state = Snarky_bindings.Fq.State
-  module R1CS_constraint_system = Snarky_bindings.Fq.Constraint_system
+
+  module R1CS_constraint_system = struct
+    include Snarky_bindings.Fq.Constraint_system
+
+    (* TODO: not really elegant, might want to just change the type to bytes and use what we're being given instead of converting to md5 *)
+    let digest sys =
+      let bytes = digest sys in
+      Core_kernel.Md5.digest_bytes bytes
+
+    include
+      Kimchi_backend_common.Constraints.Make (Field) (Cvar)
+        (struct
+          type nonrec t = t
+        end)
+  end
 end
 
 module Vesta_based_plonk = struct
@@ -69,7 +83,21 @@ module Vesta_based_plonk = struct
   end
 
   module Run_state = Snarky_bindings.Fp.State
-  module R1CS_constraint_system = Snarky_bindings.Fp.Constraint_system
+
+  module R1CS_constraint_system = struct
+    include Snarky_bindings.Fp.Constraint_system
+
+    (* TODO: not really elegant, might want to just change the type to bytes and use what we're being given instead of converting to md5 *)
+    let digest sys =
+      let bytes = digest sys in
+      Core_kernel.Md5.digest_bytes bytes
+
+    include
+      Kimchi_backend_common.Constraints.Make (Field) (Cvar)
+        (struct
+          type nonrec t = t
+        end)
+  end
 end
 
 module Pasta = struct

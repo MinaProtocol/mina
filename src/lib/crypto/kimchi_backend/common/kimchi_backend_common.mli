@@ -1,6 +1,7 @@
 module Bigint = Bigint
 module Field = Field
 module Curve = Curve
+module Constraints = Constraints
 module Poly_comm = Poly_comm
 module Dlog_plonk_based_keypair = Dlog_plonk_based_keypair
 module Constants = Constants
