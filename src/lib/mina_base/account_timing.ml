@@ -67,7 +67,7 @@ module As_record = struct
     ; vesting_period : 'slot
     ; vesting_increment : 'amount
     }
-  [@@deriving hlist, fields, annot]
+  [@@deriving equal, hlist, fields, annot]
 
   let deriver obj =
     let open Fields_derivers_zkapps.Derivers in
