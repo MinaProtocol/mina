@@ -23,11 +23,13 @@ module "kubernetes_testnet" {
   log_level             = "Trace"
   log_snark_work_gossip = true
 
-  additional_peers = [local.seed_peer.multiaddr]
+  #make sure everyone has the seed peer's multiaddress
+  additional_peers = ["/dns4/seed.${var.testnet_name}/tcp/${local.seed_external_port}/p2p/12D3KooWCoGWacXE4FRwAX8VqhnWVKhz5TTEecWEuGmiNrDt2XLf"]
   runtime_config   = var.runtime_config
 
   seed_zone   = "us-west1-a"
   seed_region = "us-west1"
+  seed_external_port = local.seed_external_port
   seed_configs = [local.seed_config]
 
   archive_configs = local.archive_node_configs
@@ -47,7 +49,7 @@ module "kubernetes_testnet" {
     }
   ]
 
-  block_producer_key_pass = "naughty blue worm"
+  # block_producer_key_pass = "naughty blue worm"
   block_producer_configs  = [
     for index, config in var.block_producer_configs : {
       name                   = config.name

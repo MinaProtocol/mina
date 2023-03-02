@@ -53,12 +53,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ~vesting_increment:5_000_000_000_000
               (* 30_000_000_000_000 mina is the total.  initially, the balance will be 10k mina.  after 8 global slots, the cliff is hit, although the cliff amount is 0.  4 slots after that, 5_000_000_000_000 mina will vest, and 4 slots after that another 5_000_000_000_000 will vest, and then twice again, for a total of 30k mina all fully liquid and unlocked at the end of the schedule*)
           }
-        ; { account_name = "snark-node-key"
-          ; balance = "1000"
-          ; timing = Untimed
-          }
-        ; { account_name = "fish1"; balance = "1000"; timing = Untimed }
-        ; { account_name = "fish2"; balance = "1000"; timing = Untimed }
+        ; { account_name = "snark-node-key"; balance = "100"; timing = Untimed }
+        ; { account_name = "fish1"; balance = "100"; timing = Untimed }
+        ; { account_name = "fish2"; balance = "100"; timing = Untimed }
         ]
     ; block_producers =
         [ { node_name = "untimed-node-a"; account_name = "untimed-node-a-key" }
@@ -69,7 +66,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Some
           { node_name = "snark-node"
           ; account_name = "snark-node-key"
-          ; worker_nodes = 4
+          ; worker_nodes = 8
           }
     ; snark_worker_fee = "0.0001"
     ; num_archive_nodes = 1

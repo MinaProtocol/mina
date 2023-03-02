@@ -27,12 +27,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; genesis_ledger =
         [ { account_name = "node-a-key"; balance = "400000"; timing = Untimed }
         ; { account_name = "node-b-key"; balance = "300000"; timing = Untimed }
-        ; { account_name = "fish1"; balance = "1000"; timing = Untimed }
-        ; { account_name = "fish2"; balance = "1000"; timing = Untimed }
-        ; { account_name = "snark-node-key"
-          ; balance = "1000"
-          ; timing = Untimed
-          }
+        ; { account_name = "fish1"; balance = "100"; timing = Untimed }
+        ; { account_name = "fish2"; balance = "100"; timing = Untimed }
+        ; { account_name = "snark-node-key"; balance = "100"; timing = Untimed }
         ]
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
@@ -45,7 +42,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Some
           { node_name = "snark-node"
           ; account_name = "snark-node-key"
-          ; worker_nodes = 4
+          ; worker_nodes = 8
           }
     ; snark_worker_fee = "0.0001"
     ; proof_config =
