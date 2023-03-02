@@ -569,8 +569,6 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_func!(w, env, fp_state_has_witness => "has_witness");
             decl_func!(w, env, fp_state_as_prover => "as_prover");
             decl_func!(w, env, fp_state_set_as_prover => "set_as_prover");
-            //            decl_func!(w, env, fp_state_stack => "stack");
-            //            decl_func!(w, env, fp_state_set_stack => "set_stack");
             decl_func!(w, env, fp_state_eval_constraints => "eval_constraints");
             decl_func!(w, env, fp_state_next_auxiliary => "next_auxiliary");
         });
@@ -609,19 +607,17 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
         decl_module!(w, env, "State", {
             decl_type!(w, env, CamlFqState => "t");
 
-            // decl_func!(w, env, fq_state_make => "make");
-            // decl_func!(w, env, fq_state_add_legacy_constraint => "add_legacy_constraint");
-            // decl_func!(w, env, fq_state_add_kimchi_constraint => "add_kimchi_constraint");
-            // decl_func!(w, env, fq_state_get_variable_value => "get_variable_value");
-            // decl_func!(w, env, fq_state_store_field_elt => "store_field_elt");
-            // decl_func!(w, env, fq_state_alloc_var => "alloc_var");
-            // decl_func!(w, env, fq_state_has_witness => "has_witness");
-            // decl_func!(w, env, fq_state_as_prover => "as_prover");
-            // decl_func!(w, env, fq_state_set_as_prover => "set_as_prover");
-            // decl_func!(w, env, fq_state_stack => "stack");
-            // decl_func!(w, env, fq_state_set_stack => "set_stack");
-            // decl_func!(w, env, fq_state_eval_constraints => "eval_constraints");
-            // decl_func!(w, env, fq_state_next_auxiliary => "next_auxiliary");
+            decl_func!(w, env, fq_state_make => "make");
+            decl_func!(w, env, fq_state_add_legacy_constraint => "add_legacy_constraint");
+            decl_func!(w, env, fq_state_add_kimchi_constraint => "add_kimchi_constraint");
+            decl_func!(w, env, fq_state_get_variable_value => "get_variable_value");
+            decl_func!(w, env, fq_state_store_field_elt => "store_field_elt");
+            decl_func!(w, env, fq_state_alloc_var => "alloc_var");
+            decl_func!(w, env, fq_state_has_witness => "has_witness");
+            decl_func!(w, env, fq_state_as_prover => "as_prover");
+            decl_func!(w, env, fq_state_set_as_prover => "set_as_prover");
+            decl_func!(w, env, fq_state_eval_constraints => "eval_constraints");
+            decl_func!(w, env, fq_state_next_auxiliary => "next_auxiliary");
         });
     });
 }

@@ -84,8 +84,6 @@ module Vesta_based_plonk = struct
     let ( * ) c x = scale x c
   end
 
-  module Run_state = Snarky_bindings.Fp.State
-
   module R1CS_constraint_system = struct
     include Snarky_bindings.Fp.Constraint_system
 
@@ -93,6 +91,10 @@ module Vesta_based_plonk = struct
     let digest sys =
       let bytes = digest sys in
       Core_kernel.Md5.digest_bytes bytes
+  end
+
+  module Run_state = struct
+    include Snarky_bindings.Fp.State
 
     include
       Kimchi_backend_common.Constraints.Make (Field) (Cvar)
