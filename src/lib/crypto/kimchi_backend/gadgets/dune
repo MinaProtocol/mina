@@ -3,7 +3,7 @@
  (name kimchi_gadgets)
  (public_name kimchi_backend.gadgets)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane))
+ (preprocess (pps ppx_version ppx_jane))
  (libraries
   ;; opam libraries
   core_kernel
