@@ -653,17 +653,18 @@ struct
             Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
             |> Option.is_some )
       in
-      [%log' info t.logger]
-        "Locally generated commands $cmds dropped because they conflicted with \
-         a committed command."
-        ~metadata:
-          [ ( "cmds"
-            , `List
-                (List.map commit_conflicts_locally_generated
-                   ~f:
-                     Transaction_hash.User_command_with_valid_signature
-                     .to_yojson ) )
-          ] ;
+      if not (List.is_empty commit_conflicts_locally_generated) then
+        [%log' info t.logger]
+          "Locally generated commands $cmds dropped because they conflicted \
+           with a committed command."
+          ~metadata:
+            [ ( "cmds"
+              , `List
+                  (List.map commit_conflicts_locally_generated
+                     ~f:
+                       Transaction_hash.User_command_with_valid_signature
+                       .to_yojson ) )
+            ] ;
       [%log' debug t.logger]
         !"Finished handling diff. Old pool size %i, new pool size %i. Dropped \
           %i commands during backtracking to maintain max size."

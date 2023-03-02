@@ -1648,7 +1648,7 @@ end
 
 module Zkapp_fee_payer_body = struct
   type t =
-    { account_identifier_id : int
+    { public_key_id : int
     ; fee : string
     ; valid_until : int64 option
     ; nonce : int64
@@ -1664,11 +1664,8 @@ module Zkapp_fee_payer_body = struct
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (body : Account_update.Body.Fee_payer.t) =
     let open Deferred.Result.Let_syntax in
-    let account_identifier =
-      Account_id.create body.public_key Token_id.default
-    in
-    let%bind account_identifier_id =
-      Account_identifiers.add_if_doesn't_exist (module Conn) account_identifier
+    let%bind public_key_id =
+      Public_key.add_if_doesn't_exist (module Conn) body.public_key
     in
     let valid_until =
       let open Option.Let_syntax in
@@ -1680,7 +1677,7 @@ module Zkapp_fee_payer_body = struct
       |> Unsigned.UInt32.to_int64
     in
     let fee = Currency.Fee.to_string body.fee in
-    let value = { account_identifier_id; fee; valid_until; nonce } in
+    let value = { public_key_id; fee; valid_until; nonce } in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
@@ -1799,24 +1796,15 @@ module User_command = struct
       let open Deferred.Result.Let_syntax in
       let%bind fee_payer_id =
         let pk = Signed_command.fee_payer_pk t in
-        let token_id = Signed_command.fee_token t in
-        assert (Token_id.(equal default) token_id) ;
-        let acct_id = Account_id.create pk token_id in
-        Account_identifiers.add_if_doesn't_exist (module Conn) acct_id
+        Public_key.add_if_doesn't_exist (module Conn) pk
       in
       let%bind source_id =
         let pk = Signed_command.source_pk t in
-        let token_id = Signed_command.token t in
-        assert (Token_id.(equal default) token_id) ;
-        let acct_id = Account_id.create pk token_id in
-        Account_identifiers.add_if_doesn't_exist (module Conn) acct_id
+        Public_key.add_if_doesn't_exist (module Conn) pk
       in
       let%map receiver_id =
         let pk = Signed_command.receiver_pk t in
-        let token_id = Signed_command.token t in
-        assert (Token_id.(equal default) token_id) ;
-        let acct_id = Account_id.create pk token_id in
-        Account_identifiers.add_if_doesn't_exist (module Conn) acct_id
+        Public_key.add_if_doesn't_exist (module Conn) pk
       in
       { fee_payer_id; source_id; receiver_id }
 
@@ -1876,19 +1864,13 @@ module User_command = struct
       | None ->
           let open Deferred.Result.Let_syntax in
           let%bind fee_payer_id =
-            Account_identifiers.add_if_doesn't_exist
-              (module Conn)
-              user_cmd.fee_payer
+            Public_key.add_if_doesn't_exist (module Conn) user_cmd.fee_payer
           in
           let%bind source_id =
-            Account_identifiers.add_if_doesn't_exist
-              (module Conn)
-              user_cmd.source
+            Public_key.add_if_doesn't_exist (module Conn) user_cmd.source
           in
           let%bind receiver_id =
-            Account_identifiers.add_if_doesn't_exist
-              (module Conn)
-              user_cmd.receiver
+            Public_key.add_if_doesn't_exist (module Conn) user_cmd.receiver
           in
           Conn.find
             (Caqti_request.find typ Caqti_type.int
@@ -2037,9 +2019,7 @@ module Internal_command = struct
         return internal_command_id
     | None ->
         let%bind receiver_id =
-          Account_identifiers.add_if_doesn't_exist
-            (module Conn)
-            internal_cmd.receiver
+          Public_key.add_if_doesn't_exist (module Conn) internal_cmd.receiver
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
@@ -2101,12 +2081,8 @@ module Fee_transfer = struct
         return internal_command_id
     | None ->
         let%bind receiver_id =
-          let account_id =
-            Account_id.create
-              (Fee_transfer.Single.receiver_pk t)
-              Token_id.default
-          in
-          Account_identifiers.add_if_doesn't_exist (module Conn) account_id
+          let pk = Fee_transfer.Single.receiver_pk t in
+          Public_key.add_if_doesn't_exist (module Conn) pk
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
@@ -2151,10 +2127,8 @@ module Coinbase = struct
         return internal_command_id
     | None ->
         let%bind receiver_id =
-          let account_id =
-            Account_id.create (Coinbase.receiver_pk t) Token_id.default
-          in
-          Account_identifiers.add_if_doesn't_exist (module Conn) account_id
+          let pk = Coinbase.receiver_pk t in
+          Public_key.add_if_doesn't_exist (module Conn) pk
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
@@ -2704,10 +2678,12 @@ module Block = struct
     ; parent_hash : string
     ; creator_id : int
     ; block_winner_id : int
+    ; last_vrf_output : string
     ; snarked_ledger_hash_id : int
     ; staking_epoch_data_id : int
     ; next_epoch_data_id : int
     ; min_window_density : int64
+    ; sub_window_densities : int64 array
     ; total_currency : string
     ; ledger_hash : string
     ; height : int64
@@ -2726,10 +2702,12 @@ module Block = struct
         ; string
         ; int
         ; int
+        ; string
         ; int
         ; int
         ; int
         ; int64
+        ; Mina_caqti.array_int64_typ
         ; string
         ; string
         ; int64
@@ -2781,6 +2759,11 @@ module Block = struct
             (module Conn)
             (Consensus.Data.Consensus_state.block_stake_winner consensus_state)
         in
+        let last_vrf_output =
+          (* encode as hex, Postgresql won't accept arbitrary bitstrings *)
+          Consensus.Data.Consensus_state.last_vrf_output consensus_state
+          |> Hex.Safe.to_hex
+        in
         let%bind snarked_ledger_hash_id =
           Snarked_ledger_hash.add_if_doesn't_exist
             (module Conn)
@@ -2827,12 +2810,19 @@ module Block = struct
             Chain_status.(to_string Canonical)
           else Chain_status.(to_string Pending)
         in
+        let consensus_state = Protocol_state.consensus_state protocol_state in
+        let blockchain_state = Protocol_state.blockchain_state protocol_state in
         let%bind block_id =
           Conn.find
             (Caqti_request.find typ Caqti_type.int
                (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                   ~tannot:(function
-                    | "chain_status" -> Some "chain_status_type" | _ -> None )
+                    | "chain_status" ->
+                        Some "chain_status_type"
+                    | "sub_window_densities" ->
+                        Some "bigint[]"
+                    | _ ->
+                        None )
                   ~cols:Fields.names () ) )
             { state_hash = hash |> State_hash.to_base58_check
             ; parent_id
@@ -2841,20 +2831,26 @@ module Block = struct
                 |> State_hash.to_base58_check
             ; creator_id
             ; block_winner_id
+            ; last_vrf_output
             ; snarked_ledger_hash_id
             ; staking_epoch_data_id
             ; next_epoch_data_id
             ; min_window_density =
-                Protocol_state.consensus_state protocol_state
+                consensus_state
                 |> Consensus.Data.Consensus_state.min_window_density
                 |> Mina_numbers.Length.to_uint32 |> Unsigned.UInt32.to_int64
+            ; sub_window_densities =
+                consensus_state
+                |> Consensus.Data.Consensus_state.sub_window_densities
+                |> List.map ~f:(fun length ->
+                       Mina_numbers.Length.to_uint32 length
+                       |> Unsigned.UInt32.to_int64 )
+                |> Array.of_list
             ; total_currency =
-                Protocol_state.consensus_state protocol_state
-                |> Consensus.Data.Consensus_state.total_currency
+                consensus_state |> Consensus.Data.Consensus_state.total_currency
                 |> Currency.Amount.to_string
             ; ledger_hash =
-                Protocol_state.blockchain_state protocol_state
-                |> Blockchain_state.staged_ledger_hash
+                blockchain_state |> Blockchain_state.staged_ledger_hash
                 |> Staged_ledger_hash.ledger_hash |> Ledger_hash.to_base58_check
             ; height
             ; global_slot_since_hard_fork
@@ -2863,8 +2859,8 @@ module Block = struct
                 |> Consensus.Data.Consensus_state.global_slot_since_genesis
                 |> Unsigned.UInt32.to_int64
             ; timestamp =
-                Protocol_state.blockchain_state protocol_state
-                |> Blockchain_state.timestamp |> Block_time.to_string_exn
+                blockchain_state |> Blockchain_state.timestamp
+                |> Block_time.to_string_exn
             ; chain_status
             }
         in
@@ -3139,6 +3135,10 @@ module Block = struct
           let%bind block_winner_id =
             Public_key.add_if_doesn't_exist (module Conn) block.block_winner
           in
+          let last_vrf_output =
+            (* already encoded as hex *)
+            block.last_vrf_output
+          in
           let%bind snarked_ledger_hash_id =
             Snarked_ledger_hash.add_if_doesn't_exist
               (module Conn)
@@ -3156,13 +3156,13 @@ module Block = struct
             (Caqti_request.find typ Caqti_type.int
                {sql| INSERT INTO blocks
                      (state_hash, parent_id, parent_hash,
-                      creator_id, block_winner_id,
+                      creator_id, block_winner_id,last_vrf_output,
                       snarked_ledger_hash_id, staking_epoch_data_id,
                       next_epoch_data_id,
-                      min_window_density, total_currency,
+                      min_window_density, sub_window_densities, total_currency,
                       ledger_hash, height, global_slot_since_hard_fork,
                       global_slot_since_genesis, timestamp, chain_status)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::bigint[], ?, ?, ?, ?, ?, ?::chain_status_type)
                      RETURNING id
                |sql} )
             { state_hash = block.state_hash |> State_hash.to_base58_check
@@ -3170,12 +3170,19 @@ module Block = struct
             ; parent_hash = block.parent_hash |> State_hash.to_base58_check
             ; creator_id
             ; block_winner_id
+            ; last_vrf_output
             ; snarked_ledger_hash_id
             ; staking_epoch_data_id
             ; next_epoch_data_id
             ; min_window_density =
                 block.min_window_density |> Mina_numbers.Length.to_uint32
                 |> Unsigned.UInt32.to_int64
+            ; sub_window_densities =
+                block.sub_window_densities
+                |> List.map ~f:(fun length ->
+                       Mina_numbers.Length.to_uint32 length
+                       |> Unsigned.UInt32.to_int64 )
+                |> Array.of_list
             ; total_currency = Currency.Amount.to_string block.total_currency
             ; ledger_hash = block.ledger_hash |> Ledger_hash.to_base58_check
             ; height = block.height |> Unsigned.UInt32.to_int64

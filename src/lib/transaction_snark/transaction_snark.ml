@@ -605,8 +605,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let side_loaded =
       let feature_flags =
         let open Pickles_types.Plonk_types in
-        { Features.chacha = Opt.Flag.No
-        ; range_check0 = Opt.Flag.Maybe
+        { Features.range_check0 = Opt.Flag.Maybe
         ; range_check1 = Opt.Flag.Maybe
         ; foreign_field_add = Opt.Flag.Maybe
         ; foreign_field_mul = Opt.Flag.Maybe

@@ -2411,9 +2411,11 @@ module Make_str (A : Wire_types.Concrete) = struct
       Poly.
         ( blockchain_length
         , min_window_density
+        , sub_window_densities
         , total_currency
         , global_slot_since_genesis
         , block_stake_winner
+        , last_vrf_output
         , block_creator
         , coinbase_receiver )]
 
@@ -2425,9 +2427,19 @@ module Make_str (A : Wire_types.Concrete) = struct
             if increase_epoch_count then Length.succ t.epoch_count
             else t.epoch_count
           in
+          let global_slot_since_genesis =
+            Mina_numbers.Global_slot.(
+              add
+                ( sub t.global_slot_since_genesis (curr_global_slot t)
+                |> Option.value_exn )
+                new_global_slot)
+          in
           { t with
             epoch_count = new_epoch_count
-          ; curr_global_slot = new_global_slot
+          ; curr_global_slot =
+              Global_slot.For_tests.of_global_slot t.curr_global_slot
+                new_global_slot
+          ; global_slot_since_genesis
           }
       end
 

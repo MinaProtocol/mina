@@ -6,6 +6,7 @@ let () =
     `Assoc
       [ ("ZkappCommand", layout Zkapp_command.deriver)
       ; ("AccountUpdate", layout Account_update.Graphql_repr.deriver)
+      ; ("Account", layout Account.deriver)
       ]
   in
 

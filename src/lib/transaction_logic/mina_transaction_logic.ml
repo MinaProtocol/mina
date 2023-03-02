@@ -2562,7 +2562,7 @@ module For_tests = struct
   module Init_ledger = struct
     type t = (Keypair.t * int64) array [@@deriving sexp]
 
-    let init (type l) (module L : Ledger_intf.S with type t = l)
+    let init ?(zkapp = true) (type l) (module L : Ledger_intf.S with type t = l)
         (init_ledger : t) (l : L.t) =
       Array.iter init_ledger ~f:(fun (kp, amount) ->
           let _tag, account, loc =
@@ -2589,14 +2589,16 @@ module For_tests = struct
             }
           in
           let zkapp =
-            Some
-              { Zkapp_account.default with
-                verification_key =
-                  Some
-                    { With_hash.hash = Zkapp_basic.F.zero
-                    ; data = Side_loaded_verification_key.dummy
-                    }
-              }
+            if zkapp then
+              Some
+                { Zkapp_account.default with
+                  verification_key =
+                    Some
+                      { With_hash.hash = Zkapp_basic.F.zero
+                      ; data = Side_loaded_verification_key.dummy
+                      }
+                }
+            else None
           in
           L.set l loc
             { account with
