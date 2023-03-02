@@ -112,15 +112,15 @@ end
 (** Circuit requests, to get values and run code outside of the snark. *)
 type _ Snarky_backendless.Request.t +=
   | Public_key : Public_key.Compressed.t Snarky_backendless.Request.t
-  | Self_call_type : Account_update.Call_type.t Snarky_backendless.Request.t
+  | Self_call_type : Account_update.May_use_token.t Snarky_backendless.Request.t
   | Old_state : Field.Constant.t Snarky_backendless.Request.t
   | (* TODO: Tweak pickles so this can be an explicit input. *)
       Get_call_input :
       Call_data.Input.Constant.t Snarky_backendless.Request.t
   | Increase_amount : Field.Constant.t Snarky_backendless.Request.t
-  | Call_type : Account_update.Call_type.t Snarky_backendless.Request.t
+  | Call_type : Account_update.May_use_token.t Snarky_backendless.Request.t
   | Execute_call :
-      (Account_update.Call_type.t * Call_data.Input.Constant.t)
+      (Account_update.May_use_token.t * Call_data.Input.Constant.t)
       -> ( Call_data.Output.Constant.t
          * Zkapp_call_forest.account_update
          * Zkapp_call_forest.t )
@@ -131,7 +131,7 @@ type _ Snarky_backendless.Request.t +=
     The particular details of the called account update are determined by the handler
     for the [Execute_call] request.
 *)
-let execute_call ~call_type account_update old_state =
+let execute_call ~may_use_token account_update old_state =
   let call_inputs = { Call_data.Input.Circuit.old_state } in
   let call_outputs, called_account_update, sub_calls =
     exists
@@ -139,9 +139,11 @@ let execute_call ~call_type account_update old_state =
          (Zkapp_call_forest.Checked.account_update_typ ())
          Zkapp_call_forest.typ )
       ~request:(fun () ->
-        let call_type = As_prover.read Account_update.Call_type.typ call_type in
+        let may_use_token =
+          As_prover.read Account_update.May_use_token.typ may_use_token
+        in
         let input = As_prover.read Call_data.Input.typ call_inputs in
-        Execute_call (call_type, input) )
+        Execute_call (may_use_token, input) )
   in
   let () =
     (* Check that previous account update's call data is consistent. *)
@@ -152,9 +154,9 @@ let execute_call ~call_type account_update old_state =
       called_account_update.account_update.data.call_data
   in
   let () =
-    (* Check that the call_type is the one that we specified *)
-    Account_update.Call_type.Checked.assert_equal call_type
-      called_account_update.account_update.data.call_type
+    (* Check that the may_use_token is the one that we specified *)
+    Account_update.May_use_token.Checked.assert_equal may_use_token
+      called_account_update.account_update.data.may_use_token
   in
   account_update#register_call called_account_update sub_calls ;
   call_outputs.new_state
@@ -195,7 +197,11 @@ module Rules = struct
         input
 
     let rule : _ Pickles.Inductive_rule.t =
-      { identifier = "Initialize snapp"; prevs = []; main; uses_lookup = false }
+      { identifier = "Initialize snapp"
+      ; prevs = []
+      ; main
+      ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+      }
   end
 
   (** Rule to update the zkApp state.
@@ -210,9 +216,10 @@ module Rules = struct
   module Update_state = struct
     (** The request handler for the rule. *)
     let handler (public_key : Public_key.Compressed.t)
-        (old_state : Field.Constant.t) (call_type : Account_update.Call_type.t)
+        (old_state : Field.Constant.t)
+        (may_use_token : Account_update.May_use_token.t)
         (execute_call :
-             Account_update.Call_type.t
+             Account_update.May_use_token.t
           -> Call_data.Input.Constant.t
           -> Call_data.Output.Constant.t
              * Zkapp_call_forest.account_update
@@ -224,9 +231,9 @@ module Rules = struct
       | Old_state ->
           respond (Provide old_state)
       | Call_type ->
-          respond (Provide call_type)
-      | Execute_call (call_type, input) ->
-          respond (Provide (execute_call call_type input))
+          respond (Provide may_use_token)
+      | Execute_call (may_use_token, input) ->
+          respond (Provide (execute_call may_use_token input))
       | _ ->
           respond Unhandled
 
@@ -236,18 +243,25 @@ module Rules = struct
       in
       Zkapps_examples.wrap_main ~public_key
         (fun account_update ->
-          let call_type =
-            exists Account_update.Call_type.typ ~request:(fun () -> Call_type)
+          let may_use_token =
+            exists Account_update.May_use_token.typ ~request:(fun () ->
+                Call_type )
           in
           let old_state = exists Field.typ ~request:(fun () -> Old_state) in
-          let new_state = execute_call ~call_type account_update old_state in
+          let new_state =
+            execute_call ~may_use_token account_update old_state
+          in
           account_update#assert_state_proved ;
           account_update#set_state 0 new_state ;
           None )
         input
 
     let rule : _ Pickles.Inductive_rule.t =
-      { identifier = "Update state"; prevs = []; main; uses_lookup = false }
+      { identifier = "Update state"
+      ; prevs = []
+      ; main
+      ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+      }
   end
 
   (** Callable zkApp addition rule.
@@ -268,7 +282,7 @@ module Rules = struct
     (** The request handler for the rule. *)
     let handler (public_key : Public_key.Compressed.t)
         (call_input : Call_data.Input.Constant.t)
-        (self_call_type : Account_update.Call_type.t)
+        (self_call_type : Account_update.May_use_token.t)
         (increase_amount : Field.Constant.t)
         (Snarky_backendless.Request.With { request; respond }) =
       match request with
@@ -284,13 +298,14 @@ module Rules = struct
           respond Unhandled
 
     let main input =
-      let call_type =
-        exists Account_update.Call_type.typ ~request:(fun () -> Self_call_type)
+      let may_use_token =
+        exists Account_update.May_use_token.typ ~request:(fun () ->
+            Self_call_type )
       in
       let public_key =
         exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
       in
-      Zkapps_examples.wrap_main ~public_key ~call_type
+      Zkapps_examples.wrap_main ~public_key ~may_use_token
         (fun account_update ->
           let input =
             exists Call_data.Input.typ ~request:(fun () -> Get_call_input)
@@ -309,7 +324,11 @@ module Rules = struct
         input
 
     let rule : _ Pickles.Inductive_rule.t =
-      { identifier = "Add method"; prevs = []; main; uses_lookup = false }
+      { identifier = "Add method"
+      ; prevs = []
+      ; main
+      ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
+      }
   end
 
   (** Callable zkApp addition-and-call rule.
@@ -334,10 +353,10 @@ module Rules = struct
     let handler (public_key : Public_key.Compressed.t)
         (add_and_call_input : Call_data.Input.Constant.t)
         (increase_amount : Field.Constant.t)
-        (self_call_type : Account_update.Call_type.t)
-        (call_type : Account_update.Call_type.t)
+        (self_call_type : Account_update.May_use_token.t)
+        (may_use_token : Account_update.May_use_token.t)
         (execute_call :
-             Account_update.Call_type.t
+             Account_update.May_use_token.t
           -> Call_data.Input.Constant.t
           -> Call_data.Output.Constant.t
              * Zkapp_call_forest.account_update
@@ -350,23 +369,24 @@ module Rules = struct
           respond (Provide add_and_call_input)
       | Increase_amount ->
           respond (Provide increase_amount)
-      | Execute_call (call_type, input) ->
-          respond (Provide (execute_call call_type input))
+      | Execute_call (may_use_token, input) ->
+          respond (Provide (execute_call may_use_token input))
       | Self_call_type ->
           respond (Provide self_call_type)
       | Call_type ->
-          respond (Provide call_type)
+          respond (Provide may_use_token)
       | _ ->
           respond Unhandled
 
     let main input =
-      let call_type =
-        exists Account_update.Call_type.typ ~request:(fun () -> Self_call_type)
+      let may_use_token =
+        exists Account_update.May_use_token.typ ~request:(fun () ->
+            Self_call_type )
       in
       let public_key =
         exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
       in
-      Zkapps_examples.wrap_main ~public_key ~call_type
+      Zkapps_examples.wrap_main ~public_key ~may_use_token
         (fun account_update ->
           let ({ Call_data.Input.Circuit.old_state } as call_inputs) =
             exists Call_data.Input.typ ~request:(fun () -> Get_call_input)
@@ -378,11 +398,12 @@ module Rules = struct
             exists Field.typ ~request:(fun () -> Increase_amount)
           in
           let intermediate_state = Field.add old_state increase_amount in
-          let call_type =
-            exists Account_update.Call_type.typ ~request:(fun () -> Call_type)
+          let may_use_token =
+            exists Account_update.May_use_token.typ ~request:(fun () ->
+                Call_type )
           in
           let new_state =
-            execute_call ~call_type account_update intermediate_state
+            execute_call ~may_use_token account_update intermediate_state
           in
           let call_outputs =
             { Call_data.Output.Circuit.blinding_value; new_state }
@@ -399,7 +420,7 @@ module Rules = struct
       { identifier = "Add-and-call method"
       ; prevs = []
       ; main
-      ; uses_lookup = false
+      ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
       }
   end
 end

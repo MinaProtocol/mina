@@ -295,17 +295,15 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               previous_protocol_state |> Protocol_state.blockchain_state
               |> Blockchain_state.snarked_ledger_hash
             in
-            let next_registers =
+            let ledger_proof_statement =
               match ledger_proof_opt with
               | Some (proof, _) ->
-                  { ( Ledger_proof.statement proof
-                    |> Ledger_proof.statement_target )
-                    with
-                    pending_coinbase_stack = ()
-                  }
+                  Ledger_proof.statement proof
               | None ->
-                  previous_protocol_state |> Protocol_state.blockchain_state
-                  |> Blockchain_state.registers
+                  let state =
+                    previous_protocol_state |> Protocol_state.blockchain_state
+                  in
+                  Blockchain_state.ledger_proof_statement state
             in
             let genesis_ledger_hash =
               previous_protocol_state |> Protocol_state.blockchain_state
@@ -331,8 +329,8 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                  has a different slot from the [scheduled_time]
               *)
               Blockchain_state.create_value ~timestamp:scheduled_time
-                ~registers:next_registers ~genesis_ledger_hash
-                ~staged_ledger_hash:next_staged_ledger_hash ~body_reference
+                ~genesis_ledger_hash ~staged_ledger_hash:next_staged_ledger_hash
+                ~body_reference ~ledger_proof_statement
             in
             let current_time =
               Block_time.now time_controller

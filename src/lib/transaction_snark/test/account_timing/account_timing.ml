@@ -10,10 +10,10 @@ open Mina_base
    mina_base/account_timing.ml module for details.
 
    This module tests that checked and unchecked computations for timed
-   accounts always yield the same results.*)
+   accounts always yield the same results. *)
 let%test_module "account timing check" =
   ( module struct
-    open Transaction_snark.Transaction_validator.For_tests
+    open Mina_ledger.Ledger.For_tests
 
     let account_with_default_vesting_schedule ?(token = Token_id.default)
         ?(initial_minimum_balance = Balance.of_mina_int_exn 10_000)
@@ -328,12 +328,13 @@ let%test_module "account timing check" =
             failwith "Expected signed user command"
       in
       let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
-      let sparse_ledger_after, txn_applied =
-        Mina_ledger.Sparse_ledger.apply_transaction ~constraint_constants
+      let sparse_ledger_after, txns_applied =
+        Mina_ledger.Sparse_ledger.apply_transactions ~constraint_constants
           ~global_slot:txn_global_slot ~txn_state_view sparse_ledger_before
-          transaction
+          [ transaction ]
         |> Or_error.ok_exn
       in
+      let txn_applied = List.hd_exn txns_applied in
       let coinbase_stack_target =
         let stack_with_state =
           Pending_coinbase.Stack.(
@@ -351,14 +352,16 @@ let%test_module "account timing check" =
         |> Or_error.ok_exn
       in
       Transaction_snark.check_transaction ~constraint_constants ~sok_message
-        ~source:(Mina_ledger.Sparse_ledger.merkle_root sparse_ledger_before)
-        ~target:(Mina_ledger.Sparse_ledger.merkle_root sparse_ledger_after)
+        ~source_first_pass_ledger:
+          (Mina_ledger.Sparse_ledger.merkle_root sparse_ledger_before)
+        ~target_first_pass_ledger:
+          (Mina_ledger.Sparse_ledger.merkle_root sparse_ledger_after)
         ~init_stack:Pending_coinbase.Stack.empty
         ~pending_coinbase_stack_state:
           { source = Pending_coinbase.Stack.empty
           ; target = coinbase_stack_target
           }
-        ~zkapp_account1:None ~zkapp_account2:None ~supply_increase
+        ~supply_increase
         { Transaction_protocol_state.Poly.block_data = state_body
         ; transaction = validated_transaction
         ; global_slot = txn_global_slot
@@ -816,7 +819,12 @@ let%test_module "account timing check" =
            there are also a couple of fixed cases.
 
            Check out how available_funds are computed in order to learn
-           the mechanics of a timed account. *)
+           the mechanics of a timed account.
+
+           The module Account_timing in transaction_lib tests tests the
+           raw rules of account timing. See that for the invariants that
+           should hold. Here, timed accounts' behaviour is tested within
+           a ledger building actual transactions. *)
         type t =
           { balance : Currency.Balance.t
           ; init_min_bal : Currency.Balance.t
@@ -2019,8 +2027,9 @@ let%test_module "account timing check" =
                 ledger_init_state ;
               Transaction_snark_tests.Util.check_zkapp_command_with_merges_exn
                 ~expected_failure:
-                  Transaction_status.Failure
-                  .Update_not_permitted_timing_existing_account ledger
+                  ( Transaction_status.Failure.Update_not_permitted_timing
+                  , Pass_2 )
+                ledger
                 [ create_timed_account_zkapp_command ] ) )
 
     let%test_unit "zkApp command, change untimed account to timed" =
@@ -2175,7 +2184,8 @@ let%test_module "account timing check" =
                   Transaction_snark_tests.Util
                   .check_zkapp_command_with_merges_exn
                     ~expected_failure:
-                      Transaction_status.Failure
-                      .Update_not_permitted_timing_existing_account ledger
+                      ( Transaction_status.Failure.Update_not_permitted_timing
+                      , Pass_2 )
+                    ledger
                     [ update_timing_zkapp_command ] ) ) )
   end )

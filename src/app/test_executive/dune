@@ -32,7 +32,7 @@
    mina_transaction
    file_system
    currency
-   coda_runtime_config
+   mina_runtime_config
    secrets
    integration_test_cloud_engine
    mina_generators

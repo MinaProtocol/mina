@@ -8,17 +8,17 @@ open Blockchain_snark
 
 type invalid = Common.invalid [@@deriving bin_io_unversioned, to_yojson]
 
-let invalid_to_string = Common.invalid_to_string
+let invalid_to_error = Common.invalid_to_error
 
 type ledger_proof = Ledger_proof.Prod.t
 
 module Worker_state = struct
   module type S = sig
     val verify_blockchain_snarks :
-      (Protocol_state.Value.t * Proof.t) list -> bool Deferred.t
+      (Protocol_state.Value.t * Proof.t) list -> unit Or_error.t Deferred.t
 
     val verify_commands :
-         Mina_base.User_command.Verifiable.t list
+         Mina_base.User_command.Verifiable.t With_status.t list
       -> [ `Valid of Mina_base.User_command.Valid.t
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
@@ -30,7 +30,7 @@ module Worker_state = struct
          Deferred.t
 
     val verify_transaction_snarks :
-      (Transaction_snark.t * Sok_message.t) list -> bool Deferred.t
+      (Transaction_snark.t * Sok_message.t) list -> unit Or_error.t Deferred.t
 
     val get_blockchain_verification_key : unit -> Pickles.Verification_key.t
   end
@@ -67,7 +67,8 @@ module Worker_state = struct
                let proof_level = proof_level
              end)
 
-             let verify_commands (cs : User_command.Verifiable.t list) :
+             let verify_commands
+                 (cs : User_command.Verifiable.t With_status.t list) :
                  _ list Deferred.t =
                let cs = List.map cs ~f:Common.check in
                let to_verify =
@@ -78,8 +79,10 @@ module Worker_state = struct
                        xs
                    | `Invalid_keys _
                    | `Invalid_signature _
-                   | `Invalid_proof
-                   | `Missing_verification_key _ ->
+                   | `Invalid_proof _
+                   | `Missing_verification_key _
+                   | `Unexpected_verification_key _
+                   | `Mismatched_authorization_kind _ ->
                        [] )
                in
                let%map all_verified =
@@ -89,15 +92,20 @@ module Worker_state = struct
                  | `Valid c ->
                      `Valid c
                  | `Valid_assuming (c, xs) ->
-                     if all_verified then `Valid c else `Valid_assuming xs
+                     if Or_error.is_ok all_verified then `Valid c
+                     else `Valid_assuming xs
                  | `Invalid_keys keys ->
                      `Invalid_keys keys
                  | `Invalid_signature keys ->
                      `Invalid_signature keys
-                 | `Invalid_proof ->
-                     `Invalid_proof
+                 | `Invalid_proof err ->
+                     `Invalid_proof err
                  | `Missing_verification_key keys ->
-                     `Missing_verification_key keys )
+                     `Missing_verification_key keys
+                 | `Unexpected_verification_key keys ->
+                     `Unexpected_verification_key keys
+                 | `Mismatched_authorization_kind keys ->
+                     `Mismatched_authorization_kind keys )
 
              let verify_blockchain_snarks = B.Proof.verify
 
@@ -130,15 +138,19 @@ module Worker_state = struct
                        `Invalid_keys keys
                    | `Invalid_signature keys ->
                        `Invalid_signature keys
-                   | `Invalid_proof ->
-                       `Invalid_proof
+                   | `Invalid_proof err ->
+                       `Invalid_proof err
                    | `Missing_verification_key keys ->
-                       `Missing_verification_key keys )
+                       `Missing_verification_key keys
+                   | `Unexpected_verification_key keys ->
+                       `Unexpected_verification_key keys
+                   | `Mismatched_authorization_kind keys ->
+                       `Mismatched_authorization_kind keys )
                |> Deferred.return
 
-             let verify_blockchain_snarks _ = Deferred.return true
+             let verify_blockchain_snarks _ = Deferred.return (Ok ())
 
-             let verify_transaction_snarks _ = Deferred.return true
+             let verify_transaction_snarks _ = Deferred.return (Ok ())
 
              let vk =
                lazy
@@ -167,12 +179,12 @@ module Worker = struct
     module F = Rpc_parallel.Function
 
     type 'w functions =
-      { verify_blockchains : ('w, Blockchain.t list, bool) F.t
+      { verify_blockchains : ('w, Blockchain.t list, unit Or_error.t) F.t
       ; verify_transaction_snarks :
-          ('w, (Transaction_snark.t * Sok_message.t) list, bool) F.t
+          ('w, (Transaction_snark.t * Sok_message.t) list, unit Or_error.t) F.t
       ; verify_commands :
           ( 'w
-          , User_command.Verifiable.t list
+          , User_command.Verifiable.t With_status.t list
           , [ `Valid of User_command.Valid.t
             | `Valid_assuming of
               ( Pickles.Side_loaded.Verification_key.t
@@ -228,7 +240,7 @@ module Worker = struct
         { verify_blockchains =
             f
               ( [%bin_type_class: Blockchain.Stable.Latest.t list]
-              , Bool.bin_t
+              , [%bin_type_class: unit Or_error.t]
               , verify_blockchains )
         ; verify_transaction_snarks =
             f
@@ -236,11 +248,14 @@ module Worker = struct
                   ( Transaction_snark.Stable.Latest.t
                   * Sok_message.Stable.Latest.t )
                   list]
-              , Bool.bin_t
+              , [%bin_type_class: unit Or_error.t]
               , verify_transaction_snarks )
         ; verify_commands =
             f
-              ( [%bin_type_class: User_command.Verifiable.Stable.Latest.t list]
+              ( [%bin_type_class:
+                  User_command.Verifiable.Stable.Latest.t
+                  With_status.Stable.Latest.t
+                  list]
               , [%bin_type_class:
                   [ `Valid of User_command.Valid.Stable.Latest.t
                   | `Valid_assuming of
@@ -502,11 +517,17 @@ let verify_transaction_snarks { worker; logger } ts =
               ~f:Worker.functions.verify_transaction_snarks ~arg:ts
             |> Deferred.Or_error.map ~f:(fun x -> `Continue x) )
       in
+      let res_json =
+        match res with
+        | Ok (Ok ()) ->
+            `String "ok"
+        | Error err ->
+            Error_json.error_to_yojson (Error.tag ~tag:"Verifier issue" err)
+        | Ok (Error err) ->
+            Error_json.error_to_yojson err
+      in
       [%log trace] "verify $n transaction_snarks (after)!"
-        ~metadata:
-          ( ( "result"
-            , `String (Sexp.to_string ([%sexp_of: bool Or_error.t] res)) )
-          :: metadata ) ;
+        ~metadata:(("result", res_json) :: metadata) ;
       res )
 
 let verify_commands { worker; logger } ts =

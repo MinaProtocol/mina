@@ -281,11 +281,6 @@ let%test_module "Archive node unit tests" =
             Strict_pipe.create ~name:"archive"
               (Buffered (`Capacity 100, `Overflow Crash))
           in
-          let processor_deferred_computation =
-            Processor.run
-              ~constraint_constants:precomputed_values.constraint_constants pool
-              reader ~logger ~delete_older_than:None
-          in
           let diffs =
             List.map
               ~f:(fun breadcrumb ->
@@ -296,7 +291,11 @@ let%test_module "Archive node unit tests" =
           in
           List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
           Strict_pipe.Writer.close writer ;
-          let%bind () = processor_deferred_computation in
+          let%bind () =
+            Processor.run
+              ~constraint_constants:precomputed_values.constraint_constants pool
+              reader ~logger ~delete_older_than:None
+          in
           match%map
             Mina_caqti.deferred_result_list_fold breadcrumbs ~init:()
               ~f:(fun () breadcrumb ->

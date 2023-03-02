@@ -54,7 +54,7 @@ let deploy_account_update_body : Account_update.Body.t =
       ; account = Accept
       ; valid_while = Ignore
       }
-  ; call_type = Call
+  ; may_use_token = No
   ; use_full_commitment = true
   ; authorization_kind = Signature
   }
@@ -141,11 +141,12 @@ let zkapp_command : Zkapp_command.t =
 
 let () =
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
-      let (_ : _) =
-        Ledger.get_or_create_account ledger account_id
-          (Account.create account_id
-             Currency.Balance.(
-               Option.value_exn
-                 (add_amount zero (Currency.Amount.of_nanomina_int_exn 500))) )
-      in
-      ignore (apply_zkapp_command ledger [ zkapp_command ] : Sparse_ledger.t) )
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          let (_ : _) =
+            Ledger.get_or_create_account ledger account_id
+              (Account.create account_id
+                 Currency.Balance.(
+                   Option.value_exn
+                     (add_amount zero (Currency.Amount.of_nanomina_int_exn 500))) )
+          in
+          check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) )

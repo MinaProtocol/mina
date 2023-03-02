@@ -186,8 +186,6 @@ module Pasta : sig
     module Pallas = Kimchi_pasta.Pasta.Pallas
   end
 
-  module Precomputed = Kimchi_pasta.Precomputed
-
   (* pickles required *)
   module Vesta_based_plonk : sig
     (* all pickles required *)

@@ -60,9 +60,11 @@ let tests : test list =
   ; ("medium-bootstrap", (module Medium_bootstrap.Make : Intf.Test.Functor_intf))
   ; ("zkapps", (module Zkapps.Make : Intf.Test.Functor_intf))
   ; ("zkapps-timing", (module Zkapps_timing.Make : Intf.Test.Functor_intf))
+  ; ("zkapps-nonce", (module Zkapps_nonce_test.Make : Intf.Test.Functor_intf))
   ; ( "opt-block-prod"
     , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
   ; ("snarkyjs", (module Snarkyjs.Make : Intf.Test.Functor_intf))
+  ; ("block-reward", (module Block_reward_test.Make : Intf.Test.Functor_intf))
   ]
 
 let report_test_errors ~log_error_set ~internal_error_set =

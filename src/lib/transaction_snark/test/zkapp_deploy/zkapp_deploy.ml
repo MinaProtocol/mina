@@ -176,5 +176,6 @@ let%test_module "zkApp deploy tests" =
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
                   U.check_zkapp_command_with_merges_exn ledger
-                    ~expected_failure:Invalid_fee_excess [ zkapp_command ] ) ) )
+                    ~expected_failure:(Invalid_fee_excess, Pass_2)
+                    [ zkapp_command ] ) ) )
   end )

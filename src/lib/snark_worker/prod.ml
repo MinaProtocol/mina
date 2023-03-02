@@ -111,7 +111,6 @@ module Inputs = struct
                                   ~global_slot:w.block_global_slot
                                   ~state_body:w.protocol_state_body
                                   ~fee_excess:Currency.Amount.Signed.zero
-                                  (`Sparse_ledger w.ledger)
                                   [ ( `Pending_coinbase_init_stack w.init_stack
                                     , `Pending_coinbase_of_statement
                                         { Transaction_snark
@@ -121,9 +120,13 @@ module Inputs = struct
                                         ; target =
                                             input.target.pending_coinbase_stack
                                         }
+                                    , `Sparse_ledger w.first_pass_ledger
+                                    , `Sparse_ledger w.second_pass_ledger
+                                    , `Connecting_ledger_hash
+                                        input.connecting_ledger_left
                                     , zkapp_command )
                                   ]
-                                |> fst |> List.rev )
+                                |> List.rev )
                             |> Result.map_error ~f:(fun e ->
                                    Error.createf
                                      !"Failed to generate inputs for \
@@ -266,7 +269,8 @@ module Inputs = struct
                                 }
                                 ~init_stack:w.init_stack
                                 (unstage
-                                   (Mina_ledger.Sparse_ledger.handler w.ledger) ) ) )
+                                   (Mina_ledger.Sparse_ledger.handler
+                                      w.first_pass_ledger ) ) ) )
               | Merge (_, proof1, proof2) ->
                   process (fun () -> M.merge ~sok_digest proof1 proof2) ) )
       | Check | None ->

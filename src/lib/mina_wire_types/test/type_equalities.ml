@@ -198,10 +198,6 @@ module Mina_base = struct
       (O.Account_update.Body.Events'.Stable)
       (W.Account_update.Body.Events')
   include Assert_equal0V1 (O.Ledger_hash.Stable) (W.Ledger_hash)
-  include
-    Assert_equal0V1
-      (O.Zkapp_command.Valid.Verification_key_hash.Stable)
-      (W.Zkapp_command.Valid.Verification_key_hash)
 
   include
     Assert_equal0V1
@@ -341,6 +337,12 @@ module Mina_state = struct
       (W.Protocol_state.Body.Value)
   include
     Assert_equal0V2 (O.Protocol_state.Value.Stable) (W.Protocol_state.Value)
+  include
+    Assert_equal0V2 (O.Snarked_ledger_state.Stable) (W.Snarked_ledger_state)
+  include
+    Assert_equal0V2
+      (O.Snarked_ledger_state.With_sok.Stable)
+      (W.Snarked_ledger_state.With_sok)
 end
 
 module Mina_transaction_logic = struct
@@ -359,8 +361,6 @@ end
 module Transaction_snark = struct
   module O = Transaction_snark
   module W = WT.Transaction_snark
-  include Assert_equal0V2 (O.Statement.Stable) (W.Statement)
-  include Assert_equal0V2 (O.Statement.With_sok.Stable) (W.Statement.With_sok)
   include Assert_equal0V2 (O.Stable) (W)
 end
 

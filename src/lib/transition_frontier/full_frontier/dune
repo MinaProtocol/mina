@@ -51,6 +51,7 @@
    pickles
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
+   mina_transaction_logic
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_mina ppx_version ppx_deriving.std ppx_deriving_yojson)))

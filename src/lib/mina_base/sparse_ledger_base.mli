@@ -9,7 +9,7 @@ module Stable : sig
       , Account_id.Stable.V2.t
       , Account.Stable.V2.t )
       Sparse_ledger_lib.Sparse_ledger.T.Stable.V2.t
-    [@@deriving sexp, to_yojson]
+    [@@deriving sexp, yojson]
 
     val to_latest : t -> t
   end
@@ -19,7 +19,8 @@ type sparse_ledger = t
 
 module Global_state : sig
   type t =
-    { ledger : sparse_ledger
+    { first_pass_ledger : sparse_ledger
+    ; second_pass_ledger : sparse_ledger
     ; fee_excess : Currency.Amount.Signed.t
     ; supply_increase : Currency.Amount.Signed.t
     ; protocol_state : Zkapp_precondition.Protocol_state.View.t

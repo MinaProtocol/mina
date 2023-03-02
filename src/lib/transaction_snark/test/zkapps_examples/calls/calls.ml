@@ -84,7 +84,7 @@ let%test_module "Composability test" =
     (** The type of call to dispatch. *)
     type calls_kind =
       | Add_and_call of
-          Account_update.Call_type.t
+          Account_update.May_use_token.t
           * Snark_params.Tick.Run.Field.Constant.t
           * calls_kind
       | Add of Snark_params.Tick.Run.Field.Constant.t
@@ -122,6 +122,7 @@ let%test_module "Composability test" =
                   ; set_token_symbol = Proof
                   ; increment_nonce = Proof
                   ; set_voting_for = Proof
+                  ; set_timing = Proof
                   }
             }
         ; use_full_commitment = true
@@ -182,7 +183,7 @@ let%test_module "Composability test" =
                 ; hash = tree.account_update_digest
                 }
               , tree.calls )
-          | Add_and_call (call_type, increase_amount, calls_kind) ->
+          | Add_and_call (may_use_token, increase_amount, calls_kind) ->
               (* Execute the 'add-and-call' rule *)
               let handler =
                 (* Build the handler for the call in 'add-and-call' rule by
@@ -191,7 +192,7 @@ let%test_module "Composability test" =
                 *)
                 let execute_call = make_call calls_kind in
                 Zkapps_calls.Rules.Add_and_call.handler pk_compressed input
-                  increase_amount caller call_type execute_call
+                  increase_amount caller may_use_token execute_call
               in
               let tree, aux =
                 Async.Thread_safe.block_on_async_exn
@@ -214,7 +215,6 @@ let%test_module "Composability test" =
     end
 
     let test_zkapp_command ?expected_failure zkapp_command =
-      let memo = Signed_command_memo.empty in
       let transaction_commitment : Zkapp_command.Transaction_commitment.t =
         (* TODO: This is a pain. *)
         let account_updates_hash =
@@ -231,6 +231,7 @@ let%test_module "Composability test" =
         ; authorization = Signature.dummy
         }
       in
+      let memo = Signed_command_memo.empty in
       let memo_hash = Signed_command_memo.hash memo in
       let full_commitment =
         Zkapp_command.Transaction_commitment.create_complete
@@ -327,26 +328,39 @@ let%test_module "Composability test" =
         ~f:(fun x -> assert (Snark_params.Tick.Field.(equal zero) x))
         zkapp_state
 
-    let%test_unit "Initialize and update nonrecursive" = test_recursive 1 Call
-
-    let%test_unit "Initialize and update single recursive" =
-      test_recursive 2 Call
-
-    let%test_unit "Initialize and update double recursive" =
-      test_recursive 3 Call
-
-    let%test_unit "Initialize and update triple recursive" =
-      test_recursive 4 Call
-
     let%test_unit "Initialize and update nonrecursive" =
-      test_recursive 1 Delegate_call
+      test_recursive 1 Parents_own_token
 
     let%test_unit "Initialize and update single recursive" =
-      test_recursive 2 Delegate_call
+      test_recursive 2 Parents_own_token
 
     let%test_unit "Initialize and update double recursive" =
-      test_recursive 3 Delegate_call
+      test_recursive 3 Parents_own_token
 
     let%test_unit "Initialize and update triple recursive" =
-      test_recursive 4 Delegate_call
+      test_recursive 4 Parents_own_token
+
+    let%test_unit "Initialize and update nonrecursive delegate" =
+      test_recursive 1 Inherit_from_parent
+
+    let%test_unit "Initialize and update single recursive delegate" =
+      test_recursive 2 Inherit_from_parent
+
+    let%test_unit "Initialize and update double recursive delegate" =
+      test_recursive 3 Inherit_from_parent
+
+    let%test_unit "Initialize and update triple recursive delegate" =
+      test_recursive 4 Inherit_from_parent
+
+    let%test_unit "Initialize and update nonrecursive blind" =
+      test_recursive 1 No
+
+    let%test_unit "Initialize and update single recursive blind" =
+      test_recursive 2 No
+
+    let%test_unit "Initialize and update double recursive blind" =
+      test_recursive 3 No
+
+    let%test_unit "Initialize and update triple recursive blind" =
+      test_recursive 4 No
   end )

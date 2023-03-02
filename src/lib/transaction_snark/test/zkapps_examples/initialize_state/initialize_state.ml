@@ -71,6 +71,7 @@ let%test_module "Initialize state test" =
                   ; set_token_symbol = Proof
                   ; increment_nonce = Proof
                   ; set_voting_for = Proof
+                  ; set_timing = Proof
                   }
             }
         ; use_full_commitment = true
@@ -243,7 +244,8 @@ let%test_module "Initialize state test" =
              Update_state_account_update.account_update
         |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
         |> test_zkapp_command
-             ~expected_failure:Account_proved_state_precondition_unsatisfied
+             ~expected_failure:
+               (Account_proved_state_precondition_unsatisfied, Pass_2)
       in
       assert (Option.is_none (Option.value_exn account).zkapp)
 
@@ -256,7 +258,8 @@ let%test_module "Initialize state test" =
              Initialize_account_update.account_update
         |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
         |> test_zkapp_command
-             ~expected_failure:Account_proved_state_precondition_unsatisfied
+             ~expected_failure:
+               (Account_proved_state_precondition_unsatisfied, Pass_2)
       in
       assert (Option.is_none (Option.value_exn account).zkapp)
 
@@ -271,7 +274,8 @@ let%test_module "Initialize state test" =
              Initialize_account_update.account_update
         |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
         |> test_zkapp_command
-             ~expected_failure:Account_proved_state_precondition_unsatisfied
+             ~expected_failure:
+               (Account_proved_state_precondition_unsatisfied, Pass_2)
       in
       assert (Option.is_none (Option.value_exn account).zkapp)
 
