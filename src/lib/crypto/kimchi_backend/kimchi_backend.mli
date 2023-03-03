@@ -165,16 +165,18 @@ module Pasta : sig
     val field_size : Pasta_bindings.BigInt256.t
 
     module Verification_key = Kimchi_pasta.Pallas_based_plonk.Verification_key
-
-    module R1CS_constraint_system =
-      Kimchi_pasta.Pallas_based_plonk.R1CS_constraint_system
-
     module Rounds_vector = Kimchi_pasta.Pallas_based_plonk.Rounds_vector
     module Rounds = Kimchi_pasta.Pallas_based_plonk.Rounds
     module Keypair = Kimchi_pasta.Pallas_based_plonk.Keypair
     module Proof = Kimchi_pasta.Pallas_based_plonk.Proof
     module Proving_key = Kimchi_pasta.Pallas_based_plonk.Proving_key
     module Oracles = Kimchi_pasta.Pallas_based_plonk.Oracles
+    module Cvar = Kimchi_pasta.Pallas_based_plonk.Cvar
+
+    module R1CS_constraint_system =
+      Kimchi_pasta.Pallas_based_plonk.R1CS_constraint_system
+
+    module Run_state = Kimchi_pasta.Pallas_based_plonk.Run_state
   end
 
   (* module Pasta = Kimchi_pasta.Pasta *)
@@ -196,13 +198,23 @@ module Pasta : sig
     val field_size : Pasta_bindings.BigInt256.t
 
     module Verification_key = Kimchi_pasta.Vesta_based_plonk.Verification_key
-    module R1CS_constraint_system =
-      Kimchi_pasta.Vesta_based_plonk.R1CS_constraint_system
     module Rounds_vector = Kimchi_pasta.Vesta_based_plonk.Rounds_vector
     module Rounds = Kimchi_pasta.Vesta_based_plonk.Rounds
     module Keypair = Kimchi_pasta.Vesta_based_plonk.Keypair
     module Proof = Kimchi_pasta.Vesta_based_plonk.Proof
     module Proving_key = Kimchi_pasta.Vesta_based_plonk.Proving_key
     module Oracles = Kimchi_pasta.Vesta_based_plonk.Oracles
+    module Cvar = Kimchi_pasta.Vesta_based_plonk.Cvar
+    module R1CS_constraint_system =
+      Kimchi_pasta.Vesta_based_plonk.R1CS_constraint_system
+    module Run_state = Kimchi_pasta.Vesta_based_plonk.Run_state
   end
 end
+
+(* module Tick : sig end
+
+   module Tock : sig end
+
+   module Step_impl : module type of Snarky_backendless.Snark.Run.Make (Tick)
+
+   module Wrap_impl : module type of Snarky_backendless.Snark.Run.Make (Tock) *)
