@@ -94,14 +94,18 @@ class Agent(object):
             tx_amount = Currency("1.0")
             fee_amount = Currency("0.3")
             self.seen_accounts.add(to_account)
+            just_added = True
         else :
             tx_amount = Currency.random(self.min_tx_amount, self.max_tx_amount)
             fee_amount = Currency.random(self.min_fee_amount, self.max_fee_amount)
+            just_added = False
         try: 
             response = self.coda.send_payment(to_account, self.public_key, tx_amount, fee_amount, memo="BeepBoop")
         except Exception as e: 
             print("Error sending transaction...", e)
             TRANSACTION_ERRORS.inc()
+            if just_added :
+              self.seen_accounts.remove(to_account)
             return None
         if not response.get("errors", None):
             print("Sent a Transaction {}".format(response))
