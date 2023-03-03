@@ -43,12 +43,9 @@ module Pallas_based_plonk = struct
 
   module Run_state = struct
     include Snarky_bindings.Fq.State
-
     include
       Kimchi_backend_common.Constraints.Make (Field) (Cvar)
-        (struct
-          type nonrec t = t
-        end)
+        (Snarky_bindings.Fq.State)
   end
 end
 
@@ -95,12 +92,9 @@ module Vesta_based_plonk = struct
 
   module Run_state = struct
     include Snarky_bindings.Fp.State
-
     include
       Kimchi_backend_common.Constraints.Make (Field) (Cvar)
-        (struct
-          type nonrec t = t
-        end)
+        (Snarky_bindings.Fp.State)
   end
 end
 

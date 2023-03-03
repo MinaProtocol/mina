@@ -525,7 +525,18 @@ module Plonk_constraint = struct
   include Snarky_backendless.Constraint.Add_kind (T)
 end
 
-module Make (Field : T) (Field_var : T) (State : T) = struct
+module Make
+    (Field : T)
+    (Field_var : T) (State : sig
+      type t
+
+      val add_legacy_constraint :
+        t -> Field_var.t Snarky_bindings.Constraints.r1cs -> unit
+
+      val add_kimchi_constraint :
+        t -> (Field_var.t, Field.t) Snarky_bindings.Constraints.kimchi -> unit
+    end) =
+struct
   let add_kimchi_constraint _ =
     failwith "call Impl.add_kimchi_constraint with the right type"
 

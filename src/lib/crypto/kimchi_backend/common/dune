@@ -36,6 +36,7 @@
   kimchi_types
   pasta_bindings
   sponge
+  snarky_bindings
   allocation_functor
   snarky.intf
   promise
