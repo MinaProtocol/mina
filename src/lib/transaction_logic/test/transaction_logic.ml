@@ -294,8 +294,11 @@ let%test_module "Test transaction logic." =
                           false ) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
-    let%test_unit "Initial minimum balance cannot be set below the actual \
-                   balance." =
+    (* More generally, a command will always fail if would make it so that
+       the current account's balance would become less than the current
+       minimum balance. We don't need to test it extensively here; tests in
+       account_timing.ml verify these rules already. *)
+    let%test_unit "Minimum balance cannot be set below the actual balance." =
       Quickcheck.test ~trials
         (let open Quickcheck in
         let open Generator.Let_syntax in
@@ -323,5 +326,55 @@ let%test_module "Test transaction logic." =
             (Predicates.pure ~f:(fun (txn, _ledger) ->
                  Transaction_status.equal txn.command.status
                    (Failed [ []; [ Source_minimum_balance_violation ] ]) ) )
+            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
+
+    let%test_unit "The account's voting choice can be changed." =
+      Quickcheck.test ~trials
+        (let open Quickcheck.Generator.Let_syntax in
+        let%bind account = Test_account.gen in
+        let%bind state_hash = State_hash.gen in
+        let txn =
+          Alter_account.make ~account:account.pk
+            { Account_update.Update.noop with voting_for = Set state_hash }
+        in
+        let%map fee = Fee.(gen_incl zero (balance_to_fee account.balance)) in
+        (account.pk, fee, [ account ], [ (txn :> transaction) ], state_hash))
+        ~f:(fun (fee_payer, fee, accounts, txns, voting_choice) ->
+          [%test_pred: Zk_cmd_result.t Or_error.t]
+            (Predicates.pure ~f:(fun (txn, ledger) ->
+                 let account = List.hd_exn accounts in
+                 Transaction_status.equal txn.command.status Applied
+                 && Predicates.verify_account_updates account ~ledger ~txn
+                      ~f:(fun _ -> function
+                      | Some orig, Some updt ->
+                          let open State_hash in
+                          equal orig.voting_for zero
+                          && equal updt.voting_for voting_choice
+                      | _ ->
+                          false ) ) )
+            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
+
+    let%test_unit "The account's permissions can be changed." =
+      Quickcheck.test ~trials
+        (let open Quickcheck.Generator.Let_syntax in
+        let%bind account = Test_account.gen in
+        let%bind perms = Permissions.gen ~auth_tag:Proof in
+        let txn =
+          Alter_account.make ~account:account.pk
+            { Account_update.Update.noop with permissions = Set perms }
+        in
+        let%map fee = Fee.(gen_incl zero (balance_to_fee account.balance)) in
+        (account.pk, fee, [ account ], [ (txn :> transaction) ], perms))
+        ~f:(fun (fee_payer, fee, accounts, txns, perms) ->
+          [%test_pred: Zk_cmd_result.t Or_error.t]
+            (Predicates.pure ~f:(fun (txn, ledger) ->
+                 let account = List.hd_exn accounts in
+                 Transaction_status.equal txn.command.status Applied
+                 && Predicates.verify_account_updates account ~txn ~ledger
+                      ~f:(fun _ -> function
+                      | Some _, Some updt ->
+                          Permissions.equal updt.permissions perms
+                      | _ ->
+                          false ) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
   end )
