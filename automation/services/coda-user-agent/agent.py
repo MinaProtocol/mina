@@ -91,8 +91,8 @@ class Agent(object):
             return None
 
         if not to_account in self.seen_accounts :
-            tx_amount = Currency("1.0")
-            fee_amount = Currency("0.3")
+            tx_amount = Currency("1.25")
+            fee_amount = Currency("0.25")
             self.seen_accounts.add(to_account)
             just_added = True
         else :
