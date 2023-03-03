@@ -63,7 +63,7 @@ sleep 2m
 mina client status
 if [ $(mina advanced get-peers | wc -l) -gt 0 ]; then
     echo "Found some peers"
-el0se
+else
     echo "No peers found"
     exit 1
 fi
