@@ -76,6 +76,8 @@ class Agent(object):
     seen_accounts = set()
 
     def send_transaction(self):
+        global seen_accounts
+
         print("---Sending Transaction---")
         try: 
             to_account = self.get_to_account()
