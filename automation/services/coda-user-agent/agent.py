@@ -71,6 +71,10 @@ class Agent(object):
         print("Unlocked Wallet!")
         return response
 
+    # new accounts should be sent at least 1 Mina
+    # after an account has been created, amount can be anything
+    seen_accounts = set()
+
     def send_transaction(self):
         print("---Sending Transaction---")
         try: 
@@ -86,7 +90,12 @@ class Agent(object):
             print(e)
             return None
 
-        tx_amount = Currency.random(self.min_tx_amount, self.max_tx_amount)
+        if not to_account in seen_accounts :
+            tx_amount = Currency("1.0")
+            seen_accounts.add(to_account)
+        else :
+            tx_amount = Currency.random(self.min_tx_amount, self.max_tx_amount)
+
         fee_amount = Currency.random(self.min_fee_amount, self.max_fee_amount)
         try: 
             response = self.coda.send_payment(to_account, self.public_key, tx_amount, fee_amount, memo="BeepBoop")
