@@ -256,8 +256,7 @@ let%test_module "Test transaction logic." =
         (let open Quickcheck in
         let open Generator.Let_syntax in
         let%bind account =
-          Generator.filter Test_account.gen
-            ~f:Balance.(fun a -> a.balance > zero)
+          Generator.filter Test_account.gen ~f:Test_account.non_empty
         in
         let%bind timing = Account.gen_timing account.balance in
         let timing_info =
@@ -376,5 +375,50 @@ let%test_module "Test transaction logic." =
                           Permissions.equal updt.permissions perms
                       | _ ->
                           false ) ) )
+            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
+
+    let%test_unit "After permissions were set to proof-only, signatures are \
+                   insufficient authorization for making transactions." =
+      Quickcheck.test ~trials
+        (let open Quickcheck in
+        let open Generator.Let_syntax in
+        let%bind sender =
+          Generator.filter Test_account.gen ~f:Test_account.non_empty
+        in
+        let%bind receiver = Test_account.gen in
+        let%bind perms = Permissions.gen ~auth_tag:Proof in
+        let%bind amount =
+          Amount.(
+            gen_incl (of_nanomina_int_exn 1) Balance.(to_amount sender.balance))
+        in
+        let alter_perms =
+          Alter_account.make ~account:sender.pk
+            { Account_update.Update.noop with
+              (* These settings actually matter for this scenario, so they must
+                 be fixed. We try to increment nonces in the process, so that
+                 must *not* require authorisation or we will see more errors
+                 than expected. *)
+              permissions =
+                Set { perms with send = Proof; increment_nonce = None }
+            }
+        in
+        let mina_transfer =
+          Simple_txn.make ~sender:sender.pk ~receiver:receiver.pk amount
+        in
+        let txns =
+          [ (alter_perms :> transaction); (mina_transfer :> transaction) ]
+        in
+        let%map fee = Fee.(gen_incl zero (balance_to_fee receiver.balance)) in
+        (receiver.pk, fee, [ sender; receiver ], txns))
+        ~f:(fun (fee_payer, fee, accounts, txns) ->
+          [%test_pred: Zk_cmd_result.t Or_error.t]
+            (Predicates.pure ~f:(fun (txn, _ledger) ->
+                 Transaction_status.equal txn.command.status
+                   (Failed
+                      [ []
+                      ; [ Cancelled ]
+                      ; [ Update_not_permitted_balance ]
+                      ; [ Cancelled ]
+                      ] ) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
   end )
