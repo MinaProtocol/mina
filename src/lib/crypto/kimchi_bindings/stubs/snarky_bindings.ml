@@ -198,6 +198,8 @@ module Fp = struct
     external next_auxiliary : t -> int = "fp_state_next_auxiliary"
 
     external system : t -> Constraint_system.t option = "fp_state_system"
+
+    external finalize : t -> unit = "fp_state_finalize"
   end
 end
 
@@ -305,5 +307,7 @@ module Fq = struct
     external next_auxiliary : t -> int = "fq_state_next_auxiliary"
 
     external system : t -> Constraint_system.t option = "fq_state_system"
+
+    external finalize : t -> unit = "fq_state_finalize"
   end
 end
