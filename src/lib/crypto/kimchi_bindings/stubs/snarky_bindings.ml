@@ -132,9 +132,6 @@ module Fp = struct
 
     external get_rows_len : t -> int = "fp_cs_get_rows_len"
 
-    external set_auxiliary_input_size : t -> int -> unit
-      = "fp_cs_set_auxiliary_input_size"
-
     external set_primary_input_size : t -> int -> unit
       = "fp_cs_set_primary_input_size"
 
@@ -162,12 +159,18 @@ module Fp = struct
     external make :
          int
       -> Kimchi_bindings.FieldVectors.Fp.t
-      -> int
       -> Kimchi_bindings.FieldVectors.Fp.t
-      -> Constraint_system.t option
       -> bool
       -> bool
-      -> unit = "fp_state_make"
+      -> t = "fp_state_make"
+
+    external make_system :
+         int
+      -> Kimchi_bindings.FieldVectors.Fp.t
+      -> Kimchi_bindings.FieldVectors.Fp.t
+      -> bool
+      -> bool
+      -> t = "fp_state_make_system"
 
     external add_legacy_constraint : t -> Cvar.t Constraints.r1cs -> unit
       = "fp_state_add_legacy_constraint"
@@ -193,6 +196,8 @@ module Fp = struct
     external eval_constraints : t -> bool = "fp_state_eval_constraints"
 
     external next_auxiliary : t -> int = "fp_state_next_auxiliary"
+
+    external system : t -> Constraint_system.t option = "fp_state_system"
   end
 end
 
@@ -234,9 +239,6 @@ module Fq = struct
 
     external get_rows_len : t -> int = "fq_cs_get_rows_len"
 
-    external set_auxiliary_input_size : t -> int -> unit
-      = "fq_cs_set_auxiliary_input_size"
-
     external set_primary_input_size : t -> int -> unit
       = "fq_cs_set_primary_input_size"
 
@@ -264,12 +266,18 @@ module Fq = struct
     external make :
          int
       -> Kimchi_bindings.FieldVectors.Fq.t
-      -> int
       -> Kimchi_bindings.FieldVectors.Fq.t
-      -> Constraint_system.t option
       -> bool
       -> bool
-      -> unit = "fq_state_make"
+      -> t = "fq_state_make"
+
+    external make_system :
+         int
+      -> Kimchi_bindings.FieldVectors.Fq.t
+      -> Kimchi_bindings.FieldVectors.Fq.t
+      -> bool
+      -> bool
+      -> t = "fq_state_make_system"
 
     external add_legacy_constraint : t -> Cvar.t Constraints.r1cs -> unit
       = "fq_state_add_legacy_constraint"
@@ -295,5 +303,7 @@ module Fq = struct
     external eval_constraints : t -> bool = "fq_state_eval_constraints"
 
     external next_auxiliary : t -> int = "fq_state_next_auxiliary"
+
+    external system : t -> Constraint_system.t option = "fq_state_system"
   end
 end

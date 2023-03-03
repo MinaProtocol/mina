@@ -48,8 +48,8 @@ impl_functions! {
         cs.as_mut().0.finalize();
     }
 
-    pub fn fp_cs_digest(cs: &CamlFpCS) -> [u8; 32] {
-        cs.digest()
+    pub fn fp_cs_digest(mut cs: ocaml::Pointer<CamlFpCS>) -> [u8; 32] {
+        cs.as_mut().0.digest()
     }
 
     pub fn fp_cs_get_rows_len(cs: &CamlFpCS) -> usize {
@@ -103,8 +103,8 @@ impl_functions! {
         cs.as_mut().0.finalize();
     }
 
-    pub fn fq_cs_digest(cs: &CamlFqCS) -> [u8; 32] {
-        cs.digest()
+    pub fn fq_cs_digest(mut cs: ocaml::Pointer<CamlFqCS>) -> [u8; 32] {
+        cs.as_mut().0.digest()
     }
 
     pub fn fq_cs_get_rows_len(cs: &CamlFqCS) -> usize {

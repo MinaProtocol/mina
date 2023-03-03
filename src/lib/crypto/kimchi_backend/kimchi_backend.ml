@@ -14,6 +14,8 @@ end
 
 (* The following is mostly unused, but we do this to test that we can instantiate snarky with the backend here (instead of failing later) *)
 
+(* TODO: there's actually a tests.ml file doing this, delete this *)
+
 module Tests = struct
   module Tick = struct
     include Pasta.Vesta_based_plonk

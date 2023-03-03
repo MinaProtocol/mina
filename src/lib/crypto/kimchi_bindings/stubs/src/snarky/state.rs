@@ -5,7 +5,7 @@ use kimchi::snarky::{
     },
     prelude::*,
 };
-use mina_curves::pasta::{Fp, Fq};
+use mina_curves::pasta::{Fp, Fq, Pallas, Vesta};
 
 use crate::{
     arkworks::{CamlFp, CamlFq},
@@ -27,16 +27,33 @@ impl_custom!(CamlFqState, RunState<Fq>);
 
 // Fp
 impl_functions! {
+
     pub fn fp_state_make(
         num_inputs: usize,
         input: CamlFpVector,
-        next_auxiliary: usize,
         aux: CamlFpVector,
-        system: Option<&CamlFpCS>,
         eval_constraints: bool,
         with_witness: bool,
-    ) {
-        todo!()
+    ) -> CamlFpState {
+        let public_output_size = 0;
+        let mut state = RunState::new::<Vesta>(num_inputs, public_output_size, false);
+        state.eval_constraints = eval_constraints;
+        state.has_witness = with_witness;
+        CamlFpState(state)
+    }
+
+    pub fn fp_state_make_system(
+        num_inputs: usize,
+        input: CamlFpVector,
+        aux: CamlFpVector,
+        eval_constraints: bool,
+        with_witness: bool,
+    ) -> CamlFpState {
+        let public_output_size = 0;
+        let mut state = RunState::new::<Vesta>(num_inputs, public_output_size, true);
+        state.eval_constraints = eval_constraints;
+        state.has_witness = with_witness;
+        CamlFpState(state)
     }
 
     pub fn fp_state_add_legacy_constraint(
@@ -97,6 +114,14 @@ impl_functions! {
     pub fn fp_state_next_auxiliary(state: &CamlFpState) -> usize {
         state.0.next_var
     }
+
+    pub fn fp_state_system(state: &CamlFpState) -> Option<CamlFpCS> {
+        state.system.clone().map(|x| CamlFpCS(x))
+    }
+
+    pub fn fp_state_finalize(mut state: ocaml::Pointer<CamlFpState>) {
+        state.as_mut().0.system.as_mut().map(|x| x.finalize());
+    }
 }
 
 // Fq
@@ -104,14 +129,29 @@ impl_functions! {
     pub fn fq_state_make(
         num_inputs: usize,
         input: CamlFqVector,
-        next_auxiliary: usize,
         aux: CamlFqVector,
-        system: Option<&CamlFqCS>,
         eval_constraints: bool,
         with_witness: bool,
-        as_prover: bool,
-    ) {
-        todo!()
+    ) -> CamlFqState {
+        let public_output_size = 0;
+        let mut state = RunState::new::<Pallas>(num_inputs, public_output_size, false);
+        state.eval_constraints = eval_constraints;
+        state.has_witness = with_witness;
+        CamlFqState(state)
+    }
+
+    pub fn fq_state_make_system(
+        num_inputs: usize,
+        input: CamlFqVector,
+        aux: CamlFqVector,
+        eval_constraints: bool,
+        with_witness: bool,
+    ) -> CamlFqState {
+        let public_output_size = 0;
+        let mut state = RunState::new::<Pallas>(num_inputs, public_output_size, true);
+        state.eval_constraints = eval_constraints;
+        state.has_witness = with_witness;
+        CamlFqState(state)
     }
 
     pub fn fq_state_add_legacy_constraint(
@@ -171,5 +211,13 @@ impl_functions! {
 
     pub fn fq_state_next_auxiliary(state: &CamlFqState) -> usize {
         state.0.next_var
+    }
+
+    pub fn fq_state_system(state: &CamlFqState) -> Option<CamlFqCS> {
+        state.system.clone().map(|x| CamlFqCS(x))
+    }
+
+    pub fn fq_state_finalize(mut state: ocaml::Pointer<CamlFqState>) {
+        state.as_mut().0.system.as_mut().map(|x| x.finalize());
     }
 }
