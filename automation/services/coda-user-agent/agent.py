@@ -76,8 +76,6 @@ class Agent(object):
     seen_accounts = set()
 
     def send_transaction(self):
-        global seen_accounts
-
         print("---Sending Transaction---")
         try: 
             to_account = self.get_to_account()
@@ -92,9 +90,9 @@ class Agent(object):
             print(e)
             return None
 
-        if not to_account in seen_accounts :
+        if not to_account in self.seen_accounts :
             tx_amount = Currency("1.0")
-            seen_accounts.add(to_account)
+            self.seen_accounts.add(to_account)
         else :
             tx_amount = Currency.random(self.min_tx_amount, self.max_tx_amount)
 
