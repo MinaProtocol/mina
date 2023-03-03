@@ -393,11 +393,11 @@ module type S = sig
     -> Signed_command.t
     -> Transaction_applied.Signed_command_applied.t Or_error.t
 
-  val update_sequence_state :
+  val update_action_state :
        Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
     -> Zkapp_account.Actions.t
     -> txn_global_slot:Global_slot.t
-    -> last_sequence_slot:Global_slot.t
+    -> last_action_slot:Global_slot.t
     -> Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t * Global_slot.t
 
   val apply_zkapp_command_unchecked :
@@ -1447,8 +1447,8 @@ module Make (L : Ledger_intf.S) :
         let set_zkapp_uri : t -> Controller.t =
          fun a -> a.permissions.set_zkapp_uri
 
-        let edit_sequence_state : t -> Controller.t =
-         fun a -> a.permissions.edit_sequence_state
+        let edit_action_state : t -> Controller.t =
+         fun a -> a.permissions.edit_action_state
 
         let set_token_symbol : t -> Controller.t =
          fun a -> a.permissions.set_token_symbol
@@ -1549,15 +1549,15 @@ module Make (L : Ledger_intf.S) :
         | Some zkapp ->
             Option.map zkapp.verification_key ~f:With_hash.hash
 
-      let last_sequence_slot (a : t) = (get_zkapp a).last_sequence_slot
+      let last_action_slot (a : t) = (get_zkapp a).last_action_slot
 
-      let set_last_sequence_slot last_sequence_slot (a : t) =
-        set_zkapp a ~f:(fun zkapp -> { zkapp with last_sequence_slot })
+      let set_last_action_slot last_action_slot (a : t) =
+        set_zkapp a ~f:(fun zkapp -> { zkapp with last_action_slot })
 
-      let sequence_state (a : t) = (get_zkapp a).sequence_state
+      let action_state (a : t) = (get_zkapp a).action_state
 
-      let set_sequence_state sequence_state (a : t) =
-        set_zkapp a ~f:(fun zkapp -> { zkapp with sequence_state })
+      let set_action_state action_state (a : t) =
+        set_zkapp a ~f:(fun zkapp -> { zkapp with action_state })
 
       let zkapp_uri (a : t) =
         Option.value_map a.zkapp ~default:"" ~f:(fun zkapp -> zkapp.zkapp_uri)
@@ -1913,13 +1913,13 @@ module Make (L : Ledger_intf.S) :
 
   module M = Zkapp_command_logic.Make (Inputs)
 
-  let update_sequence_state sequence_state actions ~txn_global_slot
-      ~last_sequence_slot =
-    let sequence_state', last_sequence_slot' =
-      M.update_sequence_state sequence_state actions ~txn_global_slot
-        ~last_sequence_slot
+  let update_action_state action_state actions ~txn_global_slot
+      ~last_action_slot =
+    let action_state', last_action_slot' =
+      M.update_action_state action_state actions ~txn_global_slot
+        ~last_action_slot
     in
-    (sequence_state', last_sequence_slot')
+    (action_state', last_action_slot')
 
   (* apply zkapp command fee payer's while stubbing out the second pass ledger
      CAUTION: If you use the intermediate local states, you MUST update the
@@ -2580,7 +2580,7 @@ module For_tests = struct
             ; set_permissions = Either
             ; set_verification_key = Either
             ; set_zkapp_uri = Either
-            ; edit_sequence_state = Either
+            ; edit_action_state = Either
             ; set_token_symbol = Either
             ; increment_nonce = Either
             ; set_voting_for = Either
