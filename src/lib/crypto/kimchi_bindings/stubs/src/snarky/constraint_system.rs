@@ -56,10 +56,6 @@ impl_functions! {
         cs.get_rows_len()
     }
 
-    pub fn fp_cs_set_auxiliary_input_size(mut cs: ocaml::Pointer<CamlFpCS>, size: usize) {
-        cs.as_mut().0.set_auxiliary_input_size(size);
-    }
-
     pub fn fp_cs_set_primary_input_size(mut cs: ocaml::Pointer<CamlFpCS>, size: usize) {
         cs.as_mut().0.set_primary_input_size(size);
     }
@@ -113,10 +109,6 @@ impl_functions! {
 
     pub fn fq_cs_get_rows_len(cs: &CamlFqCS) -> usize {
         cs.get_rows_len()
-    }
-
-    pub fn fq_cs_set_auxiliary_input_size(mut cs: ocaml::Pointer<CamlFqCS>, size: usize) {
-        cs.as_mut().0.set_auxiliary_input_size(size);
     }
 
     pub fn fq_cs_set_primary_input_size(mut cs: ocaml::Pointer<CamlFqCS>, size: usize) {

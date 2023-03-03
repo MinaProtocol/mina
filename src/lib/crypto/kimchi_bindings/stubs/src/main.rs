@@ -548,7 +548,6 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_func!(w, env, fp_cs_finalize => "finalize");
             decl_func!(w, env, fp_cs_digest => "digest");
             decl_func!(w, env, fp_cs_get_rows_len => "get_rows_len");
-            decl_func!(w, env, fp_cs_set_auxiliary_input_size => "set_auxiliary_input_size");
             decl_func!(w, env, fp_cs_set_primary_input_size => "set_primary_input_size");
             decl_func!(w, env, fp_cs_get_primary_input_size => "get_primary_input_size");
             decl_func!(w, env, fp_cs_get_prev_challenges => "get_prev_challenges");
@@ -595,7 +594,6 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_func!(w, env, fq_cs_finalize => "finalize");
             decl_func!(w, env, fq_cs_digest => "digest");
             decl_func!(w, env, fq_cs_get_rows_len => "get_rows_len");
-            decl_func!(w, env, fq_cs_set_auxiliary_input_size => "set_auxiliary_input_size");
             decl_func!(w, env, fq_cs_set_primary_input_size => "set_primary_input_size");
             decl_func!(w, env, fq_cs_get_primary_input_size => "get_primary_input_size");
             decl_func!(w, env, fq_cs_get_prev_challenges => "get_prev_challenges");

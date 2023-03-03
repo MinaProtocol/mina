@@ -12,7 +12,7 @@ use crate::{
     field_vector::{fp::CamlFpVector, fq::CamlFqVector},
 };
 
-use super::{CamlFpCS, CamlFpVar, CamlFqVar, CamlFqCS};
+use super::{CamlFpCS, CamlFpVar, CamlFqCS, CamlFqVar};
 
 //
 // Data structures
@@ -109,6 +109,7 @@ impl_functions! {
         system: Option<&CamlFqCS>,
         eval_constraints: bool,
         with_witness: bool,
+        as_prover: bool,
     ) {
         todo!()
     }

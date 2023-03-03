@@ -260,5 +260,40 @@ module Fq = struct
 
   module State = struct
     type nonrec t
+
+    external make :
+         int
+      -> Kimchi_bindings.FieldVectors.Fq.t
+      -> int
+      -> Kimchi_bindings.FieldVectors.Fq.t
+      -> Constraint_system.t option
+      -> bool
+      -> bool
+      -> unit = "fq_state_make"
+
+    external add_legacy_constraint : t -> Cvar.t Constraints.r1cs -> unit
+      = "fq_state_add_legacy_constraint"
+
+    external add_kimchi_constraint :
+      t -> (Cvar.t, Pasta_bindings.Fq.t) Constraints.kimchi -> unit
+      = "fq_state_add_kimchi_constraint"
+
+    external get_variable_value : t -> int -> Pasta_bindings.Fq.t
+      = "fq_state_get_variable_value"
+
+    external store_field_elt : t -> Pasta_bindings.Fq.t -> Cvar.t
+      = "fq_state_store_field_elt"
+
+    external alloc_var : t -> Cvar.t = "fq_state_alloc_var"
+
+    external has_witness : t -> bool = "fq_state_has_witness"
+
+    external as_prover : t -> bool = "fq_state_as_prover"
+
+    external set_as_prover : t -> bool -> unit = "fq_state_set_as_prover"
+
+    external eval_constraints : t -> bool = "fq_state_eval_constraints"
+
+    external next_auxiliary : t -> int = "fq_state_next_auxiliary"
   end
 end
