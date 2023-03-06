@@ -16,17 +16,19 @@ end
 
 (* TODO: there's actually a tests.ml file doing this, delete this *)
 
-module Tick = struct
-  include Pasta.Vesta_based_plonk
-  module Inner_curve = Pasta.Pasta.Pallas
-end
+module Impls = struct
+  module Tick = struct
+    include Pasta.Vesta_based_plonk
+    module Inner_curve = Pasta.Pasta.Pallas
+  end
 
-module Tock = struct
-  include Pasta.Pallas_based_plonk
-  module Inner_curve = Pasta.Pasta.Vesta
-end
+  module Tock = struct
+    include Pasta.Pallas_based_plonk
+    module Inner_curve = Pasta.Pasta.Vesta
+  end
 
-module Step_impl_monad = Snarky_backendless.Snark.Make (Tick)
-module Wrap_impl_monad = Snarky_backendless.Snark.Make (Tock)
-module Step_impl = Snarky_backendless.Snark.Run.Make (Tick)
-module Wrap_impl = Snarky_backendless.Snark.Run.Make (Tock)
+  module Step_impl_monad = Snarky_backendless.Snark.Make (Tick)
+  module Wrap_impl_monad = Snarky_backendless.Snark.Make (Tock)
+  module Step_impl = Snarky_backendless.Snark.Run.Make (Tick)
+  module Wrap_impl = Snarky_backendless.Snark.Run.Make (Tock)
+end

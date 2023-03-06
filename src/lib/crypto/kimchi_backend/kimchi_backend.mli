@@ -207,10 +207,23 @@ module Pasta : sig
   end
 end
 
-(* module Tick : sig end
+(** Instantiations of Snarky with the pasta curves. *)
+module Impls : sig
+  module Tick : sig
+    include module type of Pasta.Vesta_based_plonk
 
-   module Tock : sig end
+    module Inner_curve = Pasta.Pasta.Pallas
+  end
 
-   module Step_impl : module type of Snarky_backendless.Snark.Run.Make (Tick)
+  module Tock : sig
+    include module type of Pasta.Pallas_based_plonk
 
-   module Wrap_impl : module type of Snarky_backendless.Snark.Run.Make (Tock) *)
+    module Inner_curve = Pasta.Pasta.Vesta
+  end
+
+  (** Instantiation of Snarky on the Tick / Step / Vesta curve. *)
+  module Step_impl : module type of Snarky_backendless.Snark.Run.Make (Tick)
+
+  (** Instantiation of Snarky on the Tock / Wrap / Pallas curve. *)
+  module Wrap_impl : module type of Snarky_backendless.Snark.Run.Make (Tock)
+end
