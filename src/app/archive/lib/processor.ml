@@ -406,7 +406,7 @@ module Zkapp_states = struct
       id
 end
 
-module Zkapp_sequence_states = struct
+module Zkapp_action_states = struct
   type t =
     { element0 : int
     ; element1 : int
@@ -420,7 +420,7 @@ module Zkapp_sequence_states = struct
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.[ int; int; int; int; int ]
 
-  let table_name = "zkapp_sequence_states"
+  let table_name = "zkapp_action_states"
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (fps : (Pickles.Backend.Tick.Field.t, 'n) Vector.vec) =
@@ -434,7 +434,7 @@ module Zkapp_sequence_states = struct
       | [ element0; element1; element2; element3; element4 ] ->
           { element0; element1; element2; element3; element4 }
       | _ ->
-          failwith "Invalid number of sequence state elements"
+          failwith "Invalid number of action state elements"
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
       ~table_name ~cols:(Fields.names, typ)
@@ -544,7 +544,7 @@ module Zkapp_permissions = struct
     ; set_permissions : Permissions.Auth_required.t
     ; set_verification_key : Permissions.Auth_required.t
     ; set_zkapp_uri : Permissions.Auth_required.t
-    ; edit_sequence_state : Permissions.Auth_required.t
+    ; edit_action_state : Permissions.Auth_required.t
     ; set_token_symbol : Permissions.Auth_required.t
     ; increment_nonce : Permissions.Auth_required.t
     ; set_voting_for : Permissions.Auth_required.t
@@ -581,7 +581,7 @@ module Zkapp_permissions = struct
       ; set_permissions = perms.set_permissions
       ; set_verification_key = perms.set_verification_key
       ; set_zkapp_uri = perms.set_zkapp_uri
-      ; edit_sequence_state = perms.edit_sequence_state
+      ; edit_action_state = perms.edit_action_state
       ; set_token_symbol = perms.set_token_symbol
       ; increment_nonce = perms.increment_nonce
       ; set_voting_for = perms.set_voting_for
@@ -827,7 +827,7 @@ module Zkapp_account_precondition_values = struct
     ; receipt_chain_hash : string option
     ; delegate_id : int option
     ; state_id : int
-    ; sequence_state_id : int option
+    ; action_state_id : int option
     ; proved_state : bool option
     ; is_new : bool option
     }
@@ -870,10 +870,10 @@ module Zkapp_account_precondition_values = struct
       Vector.map ~f:Zkapp_basic.Or_ignore.to_option acct.state
       |> Zkapp_states_nullable.add_if_doesn't_exist (module Conn)
     in
-    let%bind sequence_state_id =
+    let%bind action_state_id =
       Mina_caqti.add_if_zkapp_check
         (Zkapp_field.add_if_doesn't_exist (module Conn))
-        acct.sequence_state
+        acct.action_state
     in
     let receipt_chain_hash =
       Zkapp_basic.Or_ignore.to_option acct.receipt_chain_hash
@@ -887,7 +887,7 @@ module Zkapp_account_precondition_values = struct
       ; receipt_chain_hash
       ; delegate_id
       ; state_id
-      ; sequence_state_id
+      ; action_state_id
       ; proved_state
       ; is_new
       }
@@ -2430,8 +2430,8 @@ module Zkapp_account = struct
     { app_state_id : int
     ; verification_key_id : int option
     ; zkapp_version : int64
-    ; sequence_state_id : int
-    ; last_sequence_slot : int64
+    ; action_state_id : int
+    ; last_action_slot : int64
     ; proved_state : bool
     ; zkapp_uri_id : int
     }
@@ -2448,8 +2448,8 @@ module Zkapp_account = struct
     let ({ app_state
          ; verification_key
          ; zkapp_version
-         ; sequence_state
-         ; last_sequence_slot
+         ; action_state
+         ; last_action_slot
          ; proved_state
          ; zkapp_uri
          }
@@ -2467,11 +2467,11 @@ module Zkapp_account = struct
           Some id )
     in
     let zkapp_version = zkapp_version |> Unsigned.UInt32.to_int64 in
-    let%bind sequence_state_id =
-      Zkapp_sequence_states.add_if_doesn't_exist (module Conn) sequence_state
+    let%bind action_state_id =
+      Zkapp_action_states.add_if_doesn't_exist (module Conn) action_state
     in
-    let last_sequence_slot =
-      Mina_numbers.Global_slot.to_uint32 last_sequence_slot
+    let last_action_slot =
+      Mina_numbers.Global_slot.to_uint32 last_action_slot
       |> Unsigned.UInt32.to_int64
     in
     let%bind zkapp_uri_id =
@@ -2483,8 +2483,8 @@ module Zkapp_account = struct
       { app_state_id
       ; verification_key_id
       ; zkapp_version
-      ; sequence_state_id
-      ; last_sequence_slot
+      ; action_state_id
+      ; last_action_slot
       ; proved_state
       ; zkapp_uri_id
       }

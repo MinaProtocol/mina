@@ -123,8 +123,7 @@ module type Signed_intf = sig
 
   val gen : t Quickcheck.Generator.t
 
-  val create :
-    magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) Signed_poly.t
+  val create : magnitude:magnitude -> sgn:Sgn.t -> t
 
   val sgn : t -> Sgn.t
 

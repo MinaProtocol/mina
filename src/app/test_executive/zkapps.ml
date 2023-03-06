@@ -174,7 +174,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let new_permissions : Permissions.t =
         { Permissions.user_default with
           edit_state = Permissions.Auth_required.Proof
-        ; edit_sequence_state = Proof
+        ; edit_action_state = Proof
         ; set_delegate = Proof
         ; set_verification_key = Proof
         ; set_permissions = Proof
