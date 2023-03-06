@@ -32,33 +32,15 @@ impl_functions! {
 
     pub fn fp_state_make(
         num_inputs: usize,
-        input: CamlFpVector,
-        aux: CamlFpVector,
         eval_constraints: bool,
-        with_witness: bool,
+        system: bool,
     ) -> CamlFpState {
-        todo!(); // input & aux
         let public_output_size = 0;
-        let mut state = RunState::new::<Vesta>(num_inputs, public_output_size, false);
+        let mut state = RunState::new::<Vesta>(num_inputs, public_output_size, system);
         state.eval_constraints = eval_constraints;
-        state.has_witness = with_witness;
         CamlFpState(state)
     }
 
-    pub fn fp_state_make_system(
-        num_inputs: usize,
-        input: CamlFpVector,
-        aux: CamlFpVector,
-        eval_constraints: bool,
-        with_witness: bool,
-    ) -> CamlFpState {
-        todo!(); // input & aux
-        let public_output_size = 0;
-        let mut state = RunState::new::<Vesta>(num_inputs, public_output_size, true);
-        state.eval_constraints = eval_constraints;
-        state.has_witness = with_witness;
-        CamlFpState(state)
-    }
 
     pub fn fp_state_add_legacy_constraint(
         mut state: ocaml::Pointer<CamlFpState>,
@@ -129,7 +111,7 @@ impl_functions! {
 
 
     pub fn fp_state_set_public_inputs(mut state : ocaml::Pointer<CamlFpState>, inputs : CamlFpVector) {
-        state.as_mut().0.set_public_inputs(inputs.0.to_vec());
+        state.as_mut().0.generate_witness_init(inputs.0.to_vec());
     }
 
     pub fn fp_state_get_private_inputs(state : &CamlFpState) -> CamlFpVector {
@@ -141,31 +123,12 @@ impl_functions! {
 impl_functions! {
     pub fn fq_state_make(
         num_inputs: usize,
-        input: CamlFqVector,
-        aux: CamlFqVector,
         eval_constraints: bool,
-        with_witness: bool,
+        system: bool,
     ) -> CamlFqState {
-        todo!(); // input & aux
         let public_output_size = 0;
-        let mut state = RunState::new::<Pallas>(num_inputs, public_output_size, false);
+        let mut state = RunState::new::<Pallas>(num_inputs, public_output_size, system);
         state.eval_constraints = eval_constraints;
-        state.has_witness = with_witness;
-        CamlFqState(state)
-    }
-
-    pub fn fq_state_make_system(
-        num_inputs: usize,
-        input: CamlFqVector,
-        aux: CamlFqVector,
-        eval_constraints: bool,
-        with_witness: bool,
-    ) -> CamlFqState {
-        todo!(); // input & aux
-        let public_output_size = 0;
-        let mut state = RunState::new::<Pallas>(num_inputs, public_output_size, true);
-        state.eval_constraints = eval_constraints;
-        state.has_witness = with_witness;
         CamlFqState(state)
     }
 
@@ -237,7 +200,7 @@ impl_functions! {
     }
 
     pub fn fq_state_set_public_inputs(mut state : ocaml::Pointer<CamlFqState>, inputs : CamlFqVector) {
-        state.as_mut().0.set_public_inputs(inputs.0.to_vec());
+        state.as_mut().0.generate_witness_init(inputs.0.to_vec());
     }
 
     pub fn fq_state_get_private_inputs(state : &CamlFqState) -> CamlFqVector {

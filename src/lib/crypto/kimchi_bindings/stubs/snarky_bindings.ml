@@ -158,21 +158,7 @@ module Fp = struct
   module State = struct
     type nonrec t
 
-    external make :
-         int
-      -> Kimchi_bindings.FieldVectors.Fp.t
-      -> Kimchi_bindings.FieldVectors.Fp.t
-      -> bool
-      -> bool
-      -> t = "fp_state_make"
-
-    external make_system :
-         int
-      -> Kimchi_bindings.FieldVectors.Fp.t
-      -> Kimchi_bindings.FieldVectors.Fp.t
-      -> bool
-      -> bool
-      -> t = "fp_state_make_system"
+    external make : int -> bool -> bool -> t = "fp_state_make"
 
     external add_legacy_constraint : t -> Cvar.t Constraints.r1cs -> unit
       = "fp_state_add_legacy_constraint"
@@ -275,21 +261,7 @@ module Fq = struct
   module State = struct
     type nonrec t
 
-    external make :
-         int
-      -> Kimchi_bindings.FieldVectors.Fq.t
-      -> Kimchi_bindings.FieldVectors.Fq.t
-      -> bool
-      -> bool
-      -> t = "fq_state_make"
-
-    external make_system :
-         int
-      -> Kimchi_bindings.FieldVectors.Fq.t
-      -> Kimchi_bindings.FieldVectors.Fq.t
-      -> bool
-      -> bool
-      -> t = "fq_state_make_system"
+    external make : int -> bool -> bool -> t = "fq_state_make"
 
     external add_legacy_constraint : t -> Cvar.t Constraints.r1cs -> unit
       = "fq_state_add_legacy_constraint"

@@ -559,7 +559,6 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_type!(w, env, CamlFpState => "t");
 
             decl_func!(w, env, fp_state_make => "make");
-            decl_func!(w, env, fp_state_make_system => "make_system");
             decl_func!(w, env, fp_state_add_legacy_constraint => "add_legacy_constraint");
             decl_func!(w, env, fp_state_add_kimchi_constraint => "add_kimchi_constraint");
             decl_func!(w, env, fp_state_get_variable_value => "get_variable_value");
@@ -611,7 +610,6 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_type!(w, env, CamlFqState => "t");
 
             decl_func!(w, env, fq_state_make => "make");
-            decl_func!(w, env, fq_state_make_system => "make_system");
             decl_func!(w, env, fq_state_add_legacy_constraint => "add_legacy_constraint");
             decl_func!(w, env, fq_state_add_kimchi_constraint => "add_kimchi_constraint");
             decl_func!(w, env, fq_state_get_variable_value => "get_variable_value");
