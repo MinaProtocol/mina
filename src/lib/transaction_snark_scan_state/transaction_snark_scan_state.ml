@@ -1032,8 +1032,28 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
     | Partially_applied partially_applied_txns ->
         apply_txns_second_pass partially_applied_txns ~k
   in
-  let rec apply_txns previous_incomplete
+  let rec apply_txns (previous_incomplete : Previous_incomplete_txns.t)
       (ordered_txns : _ Transactions_ordered.Poly.t list) =
+    let previous_incomplete =
+      (*filter out any non-zkapp transactions for second pass application*)
+      match previous_incomplete with
+      | Previous_incomplete_txns.Unapplied txns ->
+          Previous_incomplete_txns.Unapplied
+            (List.filter txns ~f:(fun txn ->
+                 match
+                   (Ledger.Transaction_applied.transaction
+                      txn.transaction_with_info )
+                     .data
+                 with
+                 | Command (Zkapp_command _) ->
+                     true
+                 | _ ->
+                     false ) )
+      | Partially_applied txns ->
+          Partially_applied
+            (List.filter txns ~f:(fun (_, t) ->
+                 match t with Zkapp_command _ -> true | _ -> false ) )
+    in
     match ordered_txns with
     | [] ->
         apply_previous_incomplete_txns previous_incomplete ~k:(fun () ->
