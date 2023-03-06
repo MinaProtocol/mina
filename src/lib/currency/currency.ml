@@ -1034,6 +1034,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
           val to_fee : var -> Fee.var
 
+          val to_field : var -> Field.Var.t
+
           module Unsafe : sig
             val of_field : Field.Var.t -> t
           end
@@ -1102,6 +1104,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
         let to_fee (t : var) : Fee.var = t
 
+        let to_field = Fn.id
+
         module Unsafe = struct
           let of_field : Field.Var.t -> var = Fn.id
         end
@@ -1160,6 +1164,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     module Checked = struct
       include Amount.Checked
+
+      let to_field = Fn.id
 
       module Unsafe = struct
         let of_field (x : Field.Var.t) : var = x
