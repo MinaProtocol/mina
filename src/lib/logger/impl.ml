@@ -24,7 +24,7 @@ module Time = struct
   let of_yojson json =
     json |> Yojson.Safe.Util.to_string |> fun s -> Ok (Time.of_string s)
 
-  let pretty_to_string timestamp =
+  let pp ppf timestamp =
     (* This used to be
        [Core.Time.format timestamp "%Y-%m-%d %H:%M:%S UTC"
         ~zone:Time.Zone.utc]
@@ -35,14 +35,11 @@ module Time = struct
     let zone = Time.Zone.utc in
     let date, time = Time.to_date_ofday ~zone timestamp in
     let time_parts = Time.Ofday.to_parts time in
-    let fmt_2_chars () i =
-      let s = string_of_int i in
-      if Int.(i < 10) then "0" ^ s else s
-    in
-    Stdlib.Format.sprintf "%i-%a-%a %a:%a:%a UTC" (Date.year date) fmt_2_chars
+    Format.fprintf ppf "%i-%02d-%02d %02d:%02d:%02d UTC" (Date.year date)
       (Date.month date |> Month.to_int)
-      fmt_2_chars (Date.day date) fmt_2_chars time_parts.hr fmt_2_chars
-      time_parts.min fmt_2_chars time_parts.sec
+      (Date.day date) time_parts.hr time_parts.min time_parts.sec
+
+  let pretty_to_string timestamp = Format.asprintf "%a" pp timestamp
 
   let pretty_to_string_ref = ref pretty_to_string
 
