@@ -91,16 +91,6 @@ pub mod fp {
     ) -> [u8; 32] {
         Circuit::new(usize::try_from(public_input_size).unwrap(), &v.as_ref().0).digest()
     }
-
-    #[ocaml_gen::func]
-    #[ocaml::func]
-    pub fn caml_pasta_fp_plonk_circuit_serialize(
-        public_input_size: isize,
-        v: CamlPastaFpPlonkGateVectorPtr,
-    ) -> String {
-        let circuit = Circuit::new(usize::try_from(public_input_size).unwrap(), &v.as_ref().0);
-        serde_json::to_string(&circuit).expect("couldn't serialize constraints")
-    }
 }
 
 //
@@ -183,15 +173,5 @@ pub mod fq {
         v: CamlPastaFqPlonkGateVectorPtr,
     ) -> [u8; 32] {
         Circuit::new(usize::try_from(public_input_size).unwrap(), &v.as_ref().0).digest()
-    }
-
-    #[ocaml_gen::func]
-    #[ocaml::func]
-    pub fn caml_pasta_fq_plonk_circuit_serialize(
-        public_input_size: isize,
-        v: CamlPastaFqPlonkGateVectorPtr,
-    ) -> String {
-        let circuit = Circuit::new(usize::try_from(public_input_size).unwrap(), &v.as_ref().0);
-        serde_json::to_string(&circuit).expect("couldn't serialize constraints")
     }
 }
