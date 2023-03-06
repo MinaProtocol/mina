@@ -497,8 +497,7 @@ let gen : t Quickcheck.Generator.t =
   { app_state
   ; verification_key = None
   ; zkapp_version
-  ; action_state =
-      Pickles_types.(Vector.of_list_and_length_exn seq_state five)
+  ; action_state = Pickles_types.(Vector.of_list_and_length_exn seq_state five)
   ; last_action_slot = Mina_numbers.Global_slot.zero
   ; proved_state = false
   ; zkapp_uri

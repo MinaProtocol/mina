@@ -66,6 +66,21 @@ let update body =
   ; stack_hash = Zkapp_command.Call_forest.Digest.Forest.empty
   }
 
+let gen_balance_split ?limit balance =
+  let open Quickcheck.Generator.Let_syntax in
+  let rec generate ?limit acc remaining =
+    if Amount.(equal remaining zero) then return acc
+    else if Option.value_map ~default:false ~f:(Int.( <= ) 1) limit then
+      return (remaining :: acc)
+    else
+      let%bind amt = Amount.(gen_incl (of_nanomina_int_exn 1) remaining) in
+      generate
+        ?limit:(Option.map ~f:Int.pred limit)
+        (amt :: acc)
+        Amount.(Option.value ~default:zero (remaining - amt))
+  in
+  generate ?limit [] (Balance.to_amount balance)
+
 module Simple_txn = struct
   let make ~sender ~receiver amount =
     object
