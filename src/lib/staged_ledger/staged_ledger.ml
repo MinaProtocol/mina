@@ -2795,6 +2795,37 @@ let%test_module "staged ledger tests" =
       assert (List.length cmds = total_cmds) ;
       return (ledger_init_state, cmds, List.map ~f:Option.some cmds_per_iter)
 
+    let gen_all_user_commands_below_capacity () =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind ledger, zkapps, iters_zkapps = gen_zkapps_below_capacity () in
+      let%bind ledger_init_state, cmds, iters_signed_commands =
+        gen_below_capacity ()
+      in
+      Ledger.apply_initial_ledger_state ledger ledger_init_state ;
+      let iters = iters_zkapps @ iters_signed_commands in
+      let%map cmds =
+        let rec go zkapps payments acc =
+          match (zkapps, payments) with
+          | [], [] ->
+              return acc
+          | [], payments ->
+              return (payments @ acc)
+          | zkapps, [] ->
+              return (zkapps @ acc)
+          | zkapps, payments ->
+              let%bind n = Int.gen_incl 1 transaction_capacity in
+              let%bind take_zkapps = Quickcheck.Generator.bool in
+              if take_zkapps then
+                let take_list, leave_list = List.split_n zkapps n in
+                go leave_list payments (List.rev take_list @ acc)
+              else
+                let take_list, leave_list = List.split_n payments n in
+                go zkapps leave_list (List.rev take_list @ acc)
+        in
+        go zkapps cmds []
+      in
+      (ledger, List.rev cmds, iters)
+
     let%test_unit "Max throughput-ledger proof count-fixed blocks" =
       let expected_proof_count = 3 in
       Quickcheck.test
@@ -2882,6 +2913,20 @@ let%test_module "staged ledger tests" =
               test_simple ~global_slot account_ids zkapps iters sl
                 ~expected_proof_count:(Some expected_proof_count)
                 ~check_snarked_ledger_transition:true test_mask ~snarked_ledger
+                `Many_provers stmt_to_work_random_prover ) )
+
+    let%test_unit "Random number of commands (zkapp + signed command)" =
+      Quickcheck.test
+        Quickcheck.Generator.(
+          tuple2 (gen_all_user_commands_below_capacity ()) small_positive_int)
+        ~trials:3
+        ~f:(fun ((ledger, cmds, iters), global_slot) ->
+          async_with_given_ledger ledger (fun ~snarked_ledger sl test_mask ->
+              let account_ids =
+                Ledger.accounts ledger |> Account_id.Set.to_list
+              in
+              test_simple ~global_slot account_ids cmds iters sl test_mask
+                ~snarked_ledger ~check_snarked_ledger_transition:true
                 `Many_provers stmt_to_work_random_prover ) )
 
     let%test_unit "Be able to include random number of commands" =
@@ -3171,7 +3216,7 @@ let%test_module "staged ledger tests" =
       else None
 
     (** Like test_simple but with a random number of completed jobs available.
-               *)
+                   *)
 
     let test_random_number_of_proofs :
            global_slot:int
@@ -3355,7 +3400,7 @@ let%test_module "staged ledger tests" =
           )
 
     (** Like test_random_number_of_proofs but with random proof fees.
-               *)
+                   *)
     let test_random_proof_fee :
            global_slot:int
         -> Ledger.init_state

@@ -110,14 +110,14 @@
           ],
           "verification_key": null,
           "snapp_version": "0",
-          "sequence_state": [
+          "action_state": [
             "13474767002023316877791367175498367355298038424545738388029053206239354049137",
             "13474767002023316877791367175498367355298038424545738388029053206239354049137",
             "13474767002023316877791367175498367355298038424545738388029053206239354049137",
             "13474767002023316877791367175498367355298038424545738388029053206239354049137",
             "13474767002023316877791367175498367355298038424545738388029053206239354049137"
           ],
-          "last_sequence_slot": 0,
+          "last_action_slot": 0,
           "proved_state": false
         },
         "permissions": {
@@ -128,7 +128,7 @@
           "set_permissions": "proof",
           "set_verification_key": "signature",
           "set_snapp_uri": "signature",
-          "edit_sequence_state": "signature",
+          "edit_action_state": "signature",
           "set_token_symbol": "signature"
         },
         "token_symbol": "",
