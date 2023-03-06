@@ -1052,8 +1052,28 @@ module Account_precondition = struct
     [%test_eq: t] account_precondition
       (account_precondition |> Fd.to_json full |> Fd.of_json full)
 
+  let%test_unit "json roundtrip Full with ignore" =
+    let account_precondition = Full Zkapp_precondition.Account.accept in
+    let module Fd = Fields_derivers_zkapps.Derivers in
+    let full = deriver (Fd.o ()) in
+    [%test_eq: t] account_precondition
+      (account_precondition |> Fd.to_json full |> Fd.of_json full)
+
   let%test_unit "json roundtrip nonce" =
     let account_precondition : t = Nonce (Account_nonce.of_int 928472) in
+    let module Fd = Fields_derivers_zkapps.Derivers in
+    let full = deriver (Fd.o ()) in
+    [%test_eq: t] account_precondition
+      (account_precondition |> Fd.to_json full |> Fd.of_json full)
+
+  let%test_unit "json roundtrip Full with nonce" =
+    let n = Account_nonce.of_int 4321 in
+    let account_precondition : t =
+      Full
+        { Zkapp_precondition.Account.accept with
+          nonce = Check { lower = n; upper = n }
+        }
+    in
     let module Fd = Fields_derivers_zkapps.Derivers in
     let full = deriver (Fd.o ()) in
     [%test_eq: t] account_precondition
