@@ -35,3 +35,9 @@ let gen_with_zkapp =
   let open Quickcheck.Generator.Let_syntax in
   let%map account = gen and zkapp = Zkapp_account.gen in
   { account with zkapp = Some zkapp }
+
+let gen_empty =
+  let open Quickcheck.Generator.Let_syntax in
+  let%bind pk = Public_key.Compressed.gen in
+  let%map nonce = Account_nonce.gen in
+  { pk; nonce; balance = Balance.zero; zkapp = None }
