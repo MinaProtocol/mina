@@ -1297,7 +1297,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             let if_ b ~then_ ~else_ =
               run_checked (Amount.Signed.Checked.if_ b ~then_ ~else_)
 
-            let is_pos (t : t) =
+            let is_non_neg (t : t) =
               Sgn.Checked.is_pos
                 (run_checked (Currency.Amount.Signed.Checked.sgn t))
 
