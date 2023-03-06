@@ -983,11 +983,25 @@ module Account_precondition = struct
         | Full of Zkapp_precondition.Account.Stable.V2.t
         | Nonce of Account.Nonce.Stable.V1.t
         | Accept
-      [@@deriving sexp, equal, yojson, hash, compare]
+      [@@deriving sexp, yojson, hash, compare]
 
       let to_latest = Fn.id
+
+      let to_full = function
+        | Full s ->
+            s
+        | Nonce n ->
+            { Zkapp_precondition.Account.accept with
+              nonce = Check { lower = n; upper = n }
+            }
+        | Accept ->
+            Zkapp_precondition.Account.accept
+
+      let equal p q = Zkapp_precondition.Account.equal (to_full p) (to_full q)
     end
   end]
+
+  [%%define_locally Stable.Latest.(to_full, equal)]
 
   let gen : t Quickcheck.Generator.t =
     Quickcheck.Generator.variant3 Zkapp_precondition.Account.gen
@@ -999,16 +1013,6 @@ module Account_precondition = struct
              Nonce x
          | `C () ->
              Accept )
-
-  let to_full = function
-    | Full s ->
-        s
-    | Nonce n ->
-        { Zkapp_precondition.Account.accept with
-          nonce = Check { lower = n; upper = n }
-        }
-    | Accept ->
-        Zkapp_precondition.Account.accept
 
   let of_full (p : Zkapp_precondition.Account.t) =
     let module A = Zkapp_precondition.Account in
