@@ -552,6 +552,7 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_func!(w, env, fp_cs_set_prev_challenges => "set_prev_challenges");
             decl_func!(w, env, fp_cs_finalize_and_get_gates => "finalize_and_get_gates");
             decl_func!(w, env, fp_cs_compute_witness => "compute_witness");
+            decl_func!(w, env, fp_cs_to_json => "to_json");
         });
 
         decl_module!(w, env, "State", {
@@ -571,6 +572,8 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_func!(w, env, fp_state_next_auxiliary => "next_auxiliary");
             decl_func!(w, env, fp_state_system => "system");
             decl_func!(w, env, fp_state_finalize => "finalize");
+            decl_func!(w, env, fp_state_set_public_inputs => "set_public_inputs");
+            decl_func!(w, env, fp_state_get_private_inputs => "get_private_inputs");
         });
     });
 
@@ -601,6 +604,7 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_func!(w, env, fq_cs_set_prev_challenges => "set_prev_challenges");
             decl_func!(w, env, fq_cs_finalize_and_get_gates => "finalize_and_get_gates");
             decl_func!(w, env, fq_cs_compute_witness => "compute_witness");
+            decl_func!(w, env, fq_cs_to_json => "to_json");
         });
 
         decl_module!(w, env, "State", {
@@ -620,6 +624,8 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_func!(w, env, fq_state_next_auxiliary => "next_auxiliary");
             decl_func!(w, env, fq_state_system => "system");
             decl_func!(w, env, fq_state_finalize => "finalize");
+            decl_func!(w, env, fq_state_set_public_inputs => "set_public_inputs");
+            decl_func!(w, env, fq_state_get_private_inputs => "get_private_inputs");
         });
     });
 }

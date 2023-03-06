@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use kimchi::snarky::{
     constraint_system::{
         caml::{convert_basic_constraint, convert_constraint},
@@ -124,6 +126,15 @@ impl_functions! {
     pub fn fp_state_finalize(mut state: ocaml::Pointer<CamlFpState>) {
         state.as_mut().0.system.as_mut().map(|x| x.finalize());
     }
+
+
+    pub fn fp_state_set_public_inputs(mut state : ocaml::Pointer<CamlFpState>, inputs : CamlFpVector) {
+        state.as_mut().0.set_public_inputs(inputs.0.to_vec());
+    }
+
+    pub fn fp_state_get_private_inputs(state : &CamlFpState) -> CamlFpVector {
+        CamlFpVector(Rc::new(state.0.get_private_inputs()))
+    }
 }
 
 // Fq
@@ -223,5 +234,13 @@ impl_functions! {
 
     pub fn fq_state_finalize(mut state: ocaml::Pointer<CamlFqState>) {
         state.as_mut().0.system.as_mut().map(|x| x.finalize());
+    }
+
+    pub fn fq_state_set_public_inputs(mut state : ocaml::Pointer<CamlFqState>, inputs : CamlFqVector) {
+        state.as_mut().0.set_public_inputs(inputs.0.to_vec());
+    }
+
+    pub fn fq_state_get_private_inputs(state : &CamlFqState) -> CamlFqVector {
+        CamlFqVector(Rc::new(state.0.get_private_inputs()))
     }
 }

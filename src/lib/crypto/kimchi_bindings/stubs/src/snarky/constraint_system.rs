@@ -1,10 +1,13 @@
-use kimchi::snarky::{
-    constants::Constants,
-    constraint_system::{
-        caml::{convert_basic_constraint, convert_constraint},
-        BasicSnarkyConstraint, KimchiConstraint, SnarkyConstraintSystem,
+use kimchi::{
+    circuits::gate::Circuit,
+    snarky::{
+        constants::Constants,
+        constraint_system::{
+            caml::{convert_basic_constraint, convert_constraint},
+            BasicSnarkyConstraint, KimchiConstraint, SnarkyConstraintSystem,
+        },
+        prelude::FieldVar,
     },
-    prelude::FieldVar,
 };
 use mina_curves::pasta::{Fp, Fq, Pallas, Vesta};
 
@@ -79,6 +82,12 @@ impl_functions! {
     pub fn fp_cs_compute_witness(mut cs: ocaml::Pointer<CamlFpCS>, primary: ocaml::Pointer<CamlFpVector>, auxiliary: ocaml::Pointer<CamlFpVector>) -> Vec<CamlFpVector> {
         cs.as_mut().0.compute_witness_for_ocaml(primary.as_ref(), auxiliary.as_ref()).into_iter().map(|v| CamlFpVector(v.into())).collect()
     }
+
+    pub fn fp_cs_to_json(mut cs: ocaml::Pointer<CamlFpCS>) -> String {
+        let cs = &mut cs.as_mut().0;
+        let circuit = Circuit::new(cs.get_primary_input_size(), cs.finalize_and_get_gates());
+        serde_json::to_string(&circuit).expect("couldn't serialize constraint system")
+    }
 }
 
 // Fq
@@ -132,5 +141,11 @@ impl_functions! {
 
     pub fn fq_cs_compute_witness(mut cs: ocaml::Pointer<CamlFqCS>, primary: ocaml::Pointer<CamlFqVector>, auxiliary: ocaml::Pointer<CamlFqVector>) -> Vec<CamlFqVector> {
         cs.as_mut().0.compute_witness_for_ocaml(primary.as_ref(), auxiliary.as_ref()).into_iter().map(|v| CamlFqVector(v.into())).collect()
+    }
+
+    pub fn fq_cs_to_json(mut cs: ocaml::Pointer<CamlFqCS>) -> String {
+        let cs = &mut cs.as_mut().0;
+        let circuit = Circuit::new(cs.get_primary_input_size(), cs.finalize_and_get_gates());
+        serde_json::to_string(&circuit).expect("couldn't serialize constraint system")
     }
 }

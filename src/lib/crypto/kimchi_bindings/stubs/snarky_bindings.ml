@@ -151,6 +151,8 @@ module Fp = struct
       -> Kimchi_bindings.FieldVectors.Fp.t
       -> Kimchi_bindings.FieldVectors.Fp.t
       -> Kimchi_bindings.FieldVectors.Fp.t array = "fp_cs_compute_witness"
+
+    external to_json : t -> string = "fp_cs_to_json"
   end
 
   module State = struct
@@ -200,6 +202,12 @@ module Fp = struct
     external system : t -> Constraint_system.t option = "fp_state_system"
 
     external finalize : t -> unit = "fp_state_finalize"
+
+    external set_public_inputs : t -> Kimchi_bindings.FieldVectors.Fp.t -> unit
+      = "fp_state_set_public_inputs"
+
+    external get_private_inputs : t -> Kimchi_bindings.FieldVectors.Fp.t
+      = "fp_state_get_private_inputs"
   end
 end
 
@@ -260,6 +268,8 @@ module Fq = struct
       -> Kimchi_bindings.FieldVectors.Fq.t
       -> Kimchi_bindings.FieldVectors.Fq.t
       -> Kimchi_bindings.FieldVectors.Fq.t array = "fq_cs_compute_witness"
+
+    external to_json : t -> string = "fq_cs_to_json"
   end
 
   module State = struct
@@ -309,5 +319,11 @@ module Fq = struct
     external system : t -> Constraint_system.t option = "fq_state_system"
 
     external finalize : t -> unit = "fq_state_finalize"
+
+    external set_public_inputs : t -> Kimchi_bindings.FieldVectors.Fq.t -> unit
+      = "fq_state_set_public_inputs"
+
+    external get_private_inputs : t -> Kimchi_bindings.FieldVectors.Fq.t
+      = "fq_state_get_private_inputs"
   end
 end
