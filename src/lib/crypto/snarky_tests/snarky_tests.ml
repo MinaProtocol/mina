@@ -20,12 +20,10 @@ let compare_with obtained filepath =
     failwith "circuit compilation has changed" )
 
 let check_json ~input_typ ~return_typ ~circuit filename () =
-  let cs : Impl.R1CS_constraint_system.t =
+  let cs : Impl.Constraint_system.t =
     Impl.constraint_system ~input_typ ~return_typ circuit
   in
-  let serialized_json =
-    Kimchi_backend.Pasta.Vesta_based_plonk.R1CS_constraint_system.to_json cs
-  in
+  let serialized_json = Impl.Constraint_system.to_json cs in
   compare_with serialized_json filename
 
 (* monadic API tests *)
@@ -54,10 +52,10 @@ module MonadicAPI = struct
   let get_hash_of_circuit () =
     let input_typ = Impl.Typ.tuple2 Impl.Boolean.typ Impl.Boolean.typ in
     let return_typ = Impl.Typ.unit in
-    let cs : Impl.R1CS_constraint_system.t =
+    let cs : Impl.Constraint_system.t =
       Impl.constraint_system ~input_typ ~return_typ main
     in
-    let digest = Md5.to_hex (Impl.R1CS_constraint_system.digest cs) in
+    let digest = Md5.to_hex (Impl.Constraint_system.digest cs) in
     Format.printf "expected:\n%s\n\n" expected ;
     Format.printf "obtained:\n%s\n" digest ;
     assert (String.(digest = expected))
@@ -286,10 +284,10 @@ let circuit_tests =
 let get_hash_of_circuit () =
   let input_typ = Impl.Typ.tuple2 Impl.Boolean.typ Impl.Boolean.typ in
   let return_typ = Impl.Typ.unit in
-  let cs : Impl.R1CS_constraint_system.t =
+  let cs : Impl.Constraint_system.t =
     Impl.constraint_system ~input_typ ~return_typ BooleanCircuit.main
   in
-  let digest = Md5.to_hex (Impl.R1CS_constraint_system.digest cs) in
+  let digest = Md5.to_hex (Impl.Constraint_system.digest cs) in
   Format.printf "expected:\n%s\n\n" expected ;
   Format.printf "obtained:\n%s\n" digest ;
   assert (String.(digest = expected))
@@ -316,22 +314,18 @@ module As_prover_circuits = struct
 
   let return_typ = Impl.Typ.unit
 
-  let get_id =
-    Snarky_backendless.Cvar.(
-      function Var v -> v | _ -> failwith "should have been a var")
-
   let main as_prover vars
       ((b1, b2, b3) : Impl.Field.t * Impl.Field.t * Impl.Field.t) () =
     let abc = Impl.Field.(b1 + b2 + b3) in
-    assert (get_id b1 = 1) ;
     if as_prover then
       Impl.as_prover (fun _ ->
+          (* we assume here that the index of the first variable is 0 *)
           let f acc e =
-            let var = Snarky_backendless.Cvar.Unsafe.of_index e in
+            let var = Impl.Field.Unsafe.of_index e in
             let v = Impl.As_prover.read_var var in
             Impl.Field.Constant.(acc + v)
           in
-          let l = List.range 1 (vars + 1) in
+          let l = List.range 0 vars in
           let total : Impl.field =
             List.fold l ~init:Impl.Field.Constant.one ~f
           in
@@ -377,10 +371,10 @@ module As_prover_circuits = struct
     (* test that as_prover doesn't affect constraints *)
     let as_prover_does_nothing () =
       let get_hash as_prov =
-        let cs : Impl.R1CS_constraint_system.t =
+        let cs : Impl.Constraint_system.t =
           Impl.constraint_system ~input_typ ~return_typ (main as_prov 3)
         in
-        Md5.to_hex (Impl.R1CS_constraint_system.digest cs)
+        Md5.to_hex (Impl.Constraint_system.digest cs)
       in
 
       let digest1 = get_hash true in
