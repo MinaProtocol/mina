@@ -47,10 +47,9 @@ module Prefix_mask : sig
   val back : bool vec2 -> t
 
   val typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-    -> ( 'f Checked.t
-       , t
-       , 'f
-       , (unit, 'f) Snarky_backendless.Checked_runner.Simple.t )
-       Snarky_backendless__.Types.Typ.t
+       (module Snarky_backendless.Snark_intf.Run
+          with type field = 'f
+           and type field_var = 'field_var
+           and type run_state = 'state )
+    -> ('f Checked.t, t, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
 end

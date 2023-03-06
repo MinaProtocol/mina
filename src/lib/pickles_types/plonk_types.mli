@@ -102,9 +102,17 @@ module Features : sig
     -> 'a t
 
   val typ :
-       ('var, bool, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+       (module Snarky_backendless.Snark_intf.Run
+          with type field = 'f
+           and type field_var = 'field_var
+           and type run_state = 'state )
     -> feature_flags:options
-    -> ('var t, bool t, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+    -> ( 'field_var Snarky_backendless.Boolean.t t
+       , bool t
+       , 'f
+       , 'field_var
+       , 'state )
+       Snarky_backendless.Typ.t
 
   val none : options
 
@@ -186,13 +194,16 @@ module Messages : sig
   end
 
   val typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+       (module Snarky_backendless.Snark_intf.Run
+          with type field = 'f
+           and type field_var = 'field_var
+           and type run_state = 'state )
     -> ('a, 'b, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
     -> Opt.Flag.t Features.t
     -> dummy:'b
     -> commitment_lengths:((int, 'n) Vector.vec, int, int) Poly.t
     -> bool:('c, bool, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
-    -> ( ('a, 'cvar Snarky_backendless.Boolean.t) In_circuit.t
+    -> ( ('a, 'field_var Snarky_backendless.Boolean.t) In_circuit.t
        , 'b t
        , 'f
        , 'field_var
@@ -290,13 +301,13 @@ module Openings : sig
          , 'b
          , 'c
          , 'field_var
-         , (unit, 'c) Snarky_backendless.Checked_runner.Simple.t )
+         , (unit, 'state) Snarky_backendless.Checked_runner.Simple.t )
          Snarky_backendless.Types.Typ.typ
       -> ( 'd
          , 'e
          , 'c
          , 'field_var
-         , (unit, 'c) Snarky_backendless.Checked_runner.Simple.t )
+         , (unit, 'state) Snarky_backendless.Checked_runner.Simple.t )
          Snarky_backendless.Types.Typ.typ
       -> length:int
       -> ( ('d, 'a) t
@@ -378,9 +389,15 @@ module All_evals : sig
   val map : ('a, 'b) t -> f1:('a -> 'c) -> f2:('b -> 'd) -> ('c, 'd) t
 
   val typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+       (module Snarky_backendless.Snark_intf.Run
+          with type field = 'f
+           and type field_var = 'field_var
+           and type run_state = 'state )
     -> Opt.Flag.t Features.t
-    -> ( ('cvar, 'cvar array, 'cvar Snarky_backendless.Boolean.t) In_circuit.t
+    -> ( ( 'field_var
+         , 'field_var array
+         , 'field_var Snarky_backendless.Boolean.t )
+         In_circuit.t
        , ('f, 'f array) t
        , 'f
        , 'field_var

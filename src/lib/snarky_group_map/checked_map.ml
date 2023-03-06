@@ -37,8 +37,9 @@ module Aux (Impl : Snarky_backendless.Snark_intf.Run) = struct
     (sqrt_exn (Field.if_ is_square ~then_:x ~else_:(Field.scale x m)), is_square)
 end
 
-let wrap (type f state) ((module Impl) : (f, state) Snarky_backendless.Snark0.m)
-    ~potential_xs ~y_squared =
+let wrap (type f field_var)
+    ((module Impl) : (f, field_var) Snarky_backendless.Snark0.m) ~potential_xs
+    ~y_squared =
   let open Impl in
   let module A = Aux (Impl) in
   let open A in

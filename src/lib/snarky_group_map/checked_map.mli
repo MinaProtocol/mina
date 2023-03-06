@@ -2,7 +2,7 @@ open Core_kernel
 open Snarky_backendless
 
 val wrap :
-     ('f, 'state) Snark.m
+     ('f, 'cvar) Snark.m
   -> potential_xs:('input -> 'cvar * 'cvar * 'cvar)
   -> y_squared:(x:'cvar -> 'cvar)
   -> ('input -> 'cvar * 'cvar) Staged.t

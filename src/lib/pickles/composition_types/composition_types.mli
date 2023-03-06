@@ -3,8 +3,8 @@ module Opt = Plonk_types.Opt
 
 type ('a, 'b) opt := ('a, 'b) Opt.t
 
-type ('var, 'value, 'field, 'checked) snarky_typ :=
-  ('var, 'value, 'field, 'checked) Snarky_backendless.Types.Typ.t
+type ('var, 'value, 'field, 'field_var, 'checked) snarky_typ :=
+  ('var, 'value, 'field, 'field_var, 'checked) Snarky_backendless.Types.Typ.t
 
 (** {2 Module aliases} *)
 
@@ -89,11 +89,12 @@ module Wrap : sig
                  ( 'a
                  , 'b
                  , 'f
+                 , 'field_var
                  , ( unit
-                   , 'f )
+                   , 'state )
                    Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
                  Snarky_backendless.Types.Typ.t
-              -> ('a t, 'b t, 'f) Snarky_backendless.Typ.t
+              -> ('a t, 'b t, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
           end
 
           module Optional_column_scalars : sig
@@ -170,20 +171,22 @@ module Wrap : sig
                  ( 'c
                  , 'd
                  , 'f
+                 , 'field_var
                  , ( unit
-                   , 'f )
+                   , 'state )
                    Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
                  Snarky_backendless.Types.Typ.t
-            -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
+            -> scalar_challenge:
+                 ('e, 'b, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
             -> bool:
-                 ( ('f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
-                    as
-                    'boolean )
+                 ( ('field_var Snarky_backendless.Boolean.t as 'boolean)
                  , bool
-                 , 'f )
+                 , 'f
+                 , 'field_var
+                 , 'state )
                  Snarky_backendless.Typ.t
             -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
-            -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
+            -> ('fp, 'a, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
             -> ( ( 'c
                  , 'e Scalar_challenge.t
                  , 'fp
@@ -198,7 +201,9 @@ module Wrap : sig
                  , 'b Scalar_challenge.t Lookup.t option
                  , bool )
                  t
-               , 'f )
+               , 'f
+               , 'field_var
+               , 'state )
                Snarky_backendless.Typ.t
         end
 
@@ -340,40 +345,43 @@ module Wrap : sig
         [@@deriving sexp, compare, yojson, hash, equal]
 
         val typ :
-             (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+             (module Snarky_backendless.Snark_intf.Run
+                with type field = 'f
+                 and type field_var = 'field_var
+                 and type run_state = 'state )
           -> dummy_scalar:'a
           -> dummy_scalar_challenge:'b Scalar_challenge.t
           -> challenge:
                ( 'c
                , 'd
                , 'f
+               , 'field_var
                , ( unit
-                 , 'f )
+                 , 'state )
                  Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
                snarky_typ
-          -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
+          -> scalar_challenge:
+               ('e, 'b, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
           -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
-          -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
+          -> ('fp, 'a, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
           -> ( 'g
              , 'h
              , 'f
+             , 'field_var
              , ( unit
-               , 'f )
+               , 'state )
                Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
              snarky_typ
           -> ( ( ( 'c
                  , 'e Scalar_challenge.t
                  , 'fp
                  , ( 'fp
-                   , 'f Snarky_backendless.Cvar.t
-                     Snarky_backendless__Snark_intf.Boolean0.t )
+                   , 'field_var Snarky_backendless__Snark_intf.Boolean0.t )
                    Plonk_types.Opt.t
                  , ( 'e Scalar_challenge.t Plonk.In_circuit.Lookup.t
-                   , 'f Snarky_backendless.Cvar.t
-                     Snarky_backendless__Snark_intf.Boolean0.t )
+                   , 'field_var Snarky_backendless__Snark_intf.Boolean0.t )
                    Plonk_types.Opt.t
-                 , 'f Snarky_backendless.Cvar.t
-                   Snarky_backendless__Snark_intf.Boolean0.t )
+                 , 'field_var Snarky_backendless__Snark_intf.Boolean0.t )
                  Plonk.In_circuit.t
                , 'e Scalar_challenge.t
                , 'fp
@@ -396,7 +404,9 @@ module Wrap : sig
                  Vector.vec
                , 'h )
                Stable.Latest.t
-             , 'f )
+             , 'f
+             , 'field_var
+             , 'state )
              Snarky_backendless.Typ.t
       end
 
@@ -509,14 +519,18 @@ module Wrap : sig
            ( 'a
            , 'b
            , 'c
-           , (unit, 'c) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
-           )
+           , 'field_var
+           , ( unit
+             , 'state )
+             Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
            snarky_typ
-        -> ('d, 'e, 'c) Snarky_backendless.Typ.t
+        -> ('d, 'e, 'c, 'field_var, 'state) Snarky_backendless.Typ.t
         -> length:'f Nat.nat
         -> ( ('a, ('d, 'f) Vector.vec) t
            , ('b, ('e, 'f) Vector.vec) t
-           , 'c )
+           , 'c
+           , 'field_var
+           , 'state )
            Snarky_backendless.Typ.t
     end
 
@@ -577,30 +591,38 @@ module Wrap : sig
              ( 'c
              , 'd
              , 'f
+             , 'field_var
              , ( unit
-               , 'f )
+               , 'state )
                Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
              snarky_typ
-        -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
+        -> scalar_challenge:
+             ('e, 'b, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
         -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
-        -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
+        -> ('fp, 'a, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
         -> ( 'g
            , 'h
            , 'f
-           , (unit, 'f) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
-           )
+           , 'field_var
+           , ( unit
+             , 'state )
+             Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
            snarky_typ
         -> ( 'i
            , 'j
            , 'f
-           , (unit, 'f) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
-           )
+           , 'field_var
+           , ( unit
+             , 'state )
+             Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
            snarky_typ
         -> ( 'k
            , 'l
            , 'f
-           , (unit, 'f) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
-           )
+           , 'field_var
+           , ( unit
+             , 'state )
+             Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
            snarky_typ
         -> ( ( ( 'c
                , 'e Scalar_challenge.t
@@ -610,8 +632,7 @@ module Wrap : sig
                    Deferred_values.Plonk.In_circuit.Lookup.t
                  , 'boolean )
                  Plonk_types.Opt.t
-               , ('f Snarky_backendless.Cvar.t
-                  Snarky_backendless__Snark_intf.Boolean0.t
+               , ('field_var Snarky_backendless__Snark_intf.Boolean0.t
                   as
                   'boolean ) )
                Deferred_values.Plonk.In_circuit.t
@@ -641,7 +662,9 @@ module Wrap : sig
                Vector.vec
              , 'l )
              Stable.Latest.t
-           , 'f )
+           , 'f
+           , 'field_var
+           , 'state )
            Snarky_backendless.Typ.t
     end
 
@@ -684,24 +707,30 @@ module Wrap : sig
       -> 'f Core_kernel.Array.t
 
     val typ :
-         ('a, 'b, 'c) Snarky_backendless.Typ.t
-      -> ('d, 'e, 'c) Snarky_backendless.Typ.t
+         ('a, 'b, 'c, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('d, 'e, 'c, 'field_var, 'state) Snarky_backendless.Typ.t
       -> ( 'f
          , 'g
          , 'c
-         , (unit, 'c) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
-         )
+         , 'field_var
+         , ( unit
+           , 'state )
+           Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
          snarky_typ
       -> ( 'h
          , 'i
          , 'c
-         , (unit, 'c) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
-         )
+         , 'field_var
+         , ( unit
+           , 'state )
+           Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
          snarky_typ
       -> 'j Nat.nat
       -> ( ('a, 'f, ('d, 'j) Vector.vec, 'h) t
          , ('b, 'g, ('e, 'j) Vector.vec, 'i) t
-         , 'c )
+         , 'c
+         , 'field_var
+         , 'state )
          Snarky_backendless.Typ.t
   end
 
@@ -716,13 +745,10 @@ module Wrap : sig
       -> ('a, 'b, 'c, 'd) t
       -> ( ('a Scalar_challenge.t * unit) Hlist.HlistId.t option
          , ( ('b Scalar_challenge.t * unit) Hlist.HlistId.t
-           , 'f Snarky_backendless.Cvar.t
-             Snarky_backendless__Snark_intf.Boolean0.t )
+           , 'field_var Snarky_backendless__Snark_intf.Boolean0.t )
            opt
          , < bool1 : bool
-           ; bool2 :
-               'f Snarky_backendless.Cvar.t
-               Snarky_backendless__Snark_intf.Boolean0.t
+           ; bool2 : 'field_var Snarky_backendless__Snark_intf.Boolean0.t
            ; challenge1 : 'a
            ; challenge2 : 'b
            ; field1 : 'c
@@ -941,10 +967,7 @@ module Wrap : sig
              flat_repr
            , < bool1 : bool
              ; bool2 :
-                 ('a Snarky_backendless.Cvar.t
-                  Snarky_backendless__Snark_intf.Boolean0.t
-                  as
-                  'bool2 )
+                 ('field_var Snarky_backendless__Snark_intf.Boolean0.t as 'bool2)
              ; branch_data1 : 'branch_data1
              ; branch_data2 : 'branch_data2
              ; bulletproof_challenge1 : 'bulletproof_challenge1
@@ -1233,7 +1256,7 @@ module Step : sig
                ; digest1 : 'digest1
                ; digest2 : 'digest2
                ; field1 : 'field1
-               ; field2 : ('f Snarky_backendless.Cvar.t as 'field2)
+               ; field2 : ('field_var as 'field2)
                ; .. > )
              Spec.T.t
 
@@ -1288,10 +1311,12 @@ module Step : sig
         -> ( 'b
            , 'c
            , 'a
-           , (unit, 'a) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
-           )
+           , 'field_var
+           , ( unit
+             , 'state )
+             Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
            snarky_typ
-        -> assert_16_bits:('a Snarky_backendless.Cvar.t -> unit)
+        -> assert_16_bits:('field_var -> unit)
         -> zero:
              ( Limb_vector.Challenge.Constant.t
              , 'a Limb_vector.Challenge.t
@@ -1302,23 +1327,18 @@ module Step : sig
         -> ( ( 'a Limb_vector.Challenge.t
              , 'a Limb_vector.Challenge.t Scalar_challenge.t
              , 'b
-             , ( 'b
-               , 'a Snarky_backendless.Cvar.t
-                 Snarky_backendless__Snark_intf.Boolean0.t )
-               Opt.t
+             , ('b, 'field_var Snarky_backendless__Snark_intf.Boolean0.t) Opt.t
              , ( 'a Limb_vector.Challenge.t Scalar_challenge.t Hlist0.Id.t
                  Deferred_values.Plonk.In_circuit.Lookup.t
-               , 'a Snarky_backendless.Cvar.t
-                 Snarky_backendless__Snark_intf.Boolean0.t )
+               , 'field_var Snarky_backendless__Snark_intf.Boolean0.t )
                Opt.t
              , ( 'a Limb_vector.Challenge.t Scalar_challenge.t
                  Bulletproof_challenge.t
                , Backend.Tock.Rounds.n )
                Vector.t
                Hlist0.Id.t
-             , 'a Snarky_backendless.Cvar.t
-             , 'a Snarky_backendless.Cvar.t
-               Snarky_backendless__Snark_intf.Boolean0.t )
+             , 'field_var
+             , 'field_var Snarky_backendless__Snark_intf.Boolean0.t )
              In_circuit.t
            , ( Limb_vector.Challenge.Constant.t
              , Limb_vector.Challenge.Constant.t Scalar_challenge.t
@@ -1335,7 +1355,9 @@ module Step : sig
              , (Limb_vector.Constant.Hex64.t, Digest.Limbs.n) Vector.t
              , bool )
              In_circuit.t
-           , 'a )
+           , 'a
+           , 'field_var
+           , 'state )
            Snarky_backendless.Typ.t
     end
 
@@ -1368,38 +1390,37 @@ module Step : sig
          , 'a Hlist0.Id.t
          , 'b Hlist0.Id.t )
          Zero_values.t
-      -> assert_16_bits:('f Snarky_backendless.Cvar.t -> unit)
+      -> assert_16_bits:('field_var -> unit)
       -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, 'n) Vector.t
       -> ( 'b
          , 'a
          , 'f
-         , (unit, 'f) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
-         )
+         , 'field_var
+         , ( unit
+           , 'state )
+           Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
          snarky_typ
       -> ( ( ( ( 'f Limb_vector.Challenge.t
                , 'f Limb_vector.Challenge.t Scalar_challenge.t
                , 'b
                , ( 'b
-                 , 'f Snarky_backendless.Cvar.t
-                   Snarky_backendless__Snark_intf.Boolean0.t )
+                 , 'field_var Snarky_backendless__Snark_intf.Boolean0.t )
                  Opt.t
                , ( 'f Limb_vector.Challenge.t Scalar_challenge.t
                    Deferred_values.Plonk.In_circuit.Lookup.t
-                 , 'f Snarky_backendless.Cvar.t
-                   Snarky_backendless__Snark_intf.Boolean0.t )
+                 , 'field_var Snarky_backendless__Snark_intf.Boolean0.t )
                  Opt.t
                , ( 'f Limb_vector.Challenge.t Scalar_challenge.t
                    Bulletproof_challenge.t
                  , Backend.Tock.Rounds.n )
                  Vector.t
                  Hlist0.Id.t
-               , 'f Snarky_backendless.Cvar.t
-               , 'f Snarky_backendless.Cvar.t
-                 Snarky_backendless__Snark_intf.Boolean0.t )
+               , 'field_var
+               , 'field_var Snarky_backendless__Snark_intf.Boolean0.t )
                Per_proof.In_circuit.t
              , 'n )
              Vector.t
-           , 'f Snarky_backendless.Cvar.t )
+           , 'field_var )
            t
          , ( ( ( Limb_vector.Challenge.Constant.t
                , Limb_vector.Challenge.Constant.t Scalar_challenge.t
@@ -1420,7 +1441,9 @@ module Step : sig
              Vector.t
            , (Limb_vector.Constant.Hex64.t, Digest.Limbs.n) Vector.t )
            t
-         , 'f )
+         , 'f
+         , 'field_var
+         , 'state )
          Snarky_backendless.Typ.t
   end
 
@@ -1539,15 +1562,13 @@ module Step : sig
                  * ( ('e, Nat.N2.n) Vector.t
                    * ( ('e Scalar_challenge.t, Nat.N3.n) Vector.t
                      * ( ('k, 'c) Vector.t
-                       * ( ( 'a Snarky_backendless.Cvar.t
-                             Snarky_backendless__Snark_intf.Boolean0.t
+                       * ( ( 'field_var Snarky_backendless__Snark_intf.Boolean0.t
                            , Nat.N1.n )
                            Vector.t
-                         * ( 'a Snarky_backendless.Cvar.t
-                             Snarky_backendless__Snark_intf.Boolean0.t
+                         * ( 'field_var Snarky_backendless__Snark_intf.Boolean0.t
                              vec8
                            * ( ( ('e Scalar_challenge.t * unit) Hlist.HlistId.t
-                               , 'a Snarky_backendless.Cvar.t
+                               , 'field_var
                                  Snarky_backendless__Snark_intf.Boolean0.t )
                                Plonk_types.Opt.t
                              * ('g option vec8 * unit) ) ) ) ) ) ) ) )
@@ -1557,9 +1578,7 @@ module Step : sig
            * ('j * (('j, 'b) Vector.t * unit)) )
            Hlist.HlistId.t
          , < bool1 : bool
-           ; bool2 :
-               'a Snarky_backendless.Cvar.t
-               Snarky_backendless__Snark_intf.Boolean0.t
+           ; bool2 : 'field_var Snarky_backendless__Snark_intf.Boolean0.t
            ; bulletproof_challenge1 : 'i
            ; bulletproof_challenge2 : 'k
            ; challenge1 : 'd
@@ -1574,8 +1593,7 @@ module Step : sig
 end
 
 module Challenges_vector : sig
-  type 'n t =
-    (Backend.Tock.Field.t Snarky_backendless.Cvar.t Wrap_bp_vec.t, 'n) Vector.t
+  type 'n t = (Backend.Tock.field_var Wrap_bp_vec.t, 'n) Vector.t
 
   module Constant : sig
     type 'n t = (Backend.Tock.Field.t Wrap_bp_vec.t, 'n) Vector.t
