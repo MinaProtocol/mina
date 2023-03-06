@@ -35,6 +35,7 @@ impl_functions! {
         eval_constraints: bool,
         with_witness: bool,
     ) -> CamlFpState {
+        todo!(); // input & aux
         let public_output_size = 0;
         let mut state = RunState::new::<Vesta>(num_inputs, public_output_size, false);
         state.eval_constraints = eval_constraints;
@@ -49,6 +50,7 @@ impl_functions! {
         eval_constraints: bool,
         with_witness: bool,
     ) -> CamlFpState {
+        todo!(); // input & aux
         let public_output_size = 0;
         let mut state = RunState::new::<Vesta>(num_inputs, public_output_size, true);
         state.eval_constraints = eval_constraints;
@@ -79,7 +81,7 @@ impl_functions! {
     }
 
     pub fn fp_state_get_variable_value(state: &CamlFpState, var: usize) -> CamlFp {
-        todo!()
+        CamlFp(state.read_var_idx(var))
     }
 
     pub fn fp_state_store_field_elt(
@@ -133,6 +135,7 @@ impl_functions! {
         eval_constraints: bool,
         with_witness: bool,
     ) -> CamlFqState {
+        todo!(); // input & aux
         let public_output_size = 0;
         let mut state = RunState::new::<Pallas>(num_inputs, public_output_size, false);
         state.eval_constraints = eval_constraints;
@@ -147,6 +150,7 @@ impl_functions! {
         eval_constraints: bool,
         with_witness: bool,
     ) -> CamlFqState {
+        todo!(); // input & aux
         let public_output_size = 0;
         let mut state = RunState::new::<Pallas>(num_inputs, public_output_size, true);
         state.eval_constraints = eval_constraints;
@@ -177,7 +181,7 @@ impl_functions! {
     }
 
     pub fn fq_state_get_variable_value(state: &CamlFqState, var: usize) -> CamlFq {
-        todo!()
+        CamlFq(state.read_var_idx(var))
     }
 
     pub fn fq_state_store_field_elt(
