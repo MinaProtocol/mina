@@ -421,4 +421,70 @@ let%test_module "Test transaction logic." =
                       ; [ Cancelled ]
                       ] ) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
+
+    let%test_unit "All updates must succeed or none is applied." =
+      (* But the fee is still paid. *)
+      Quickcheck.test ~trials
+        (let open Quickcheck in
+        let open Generator.Let_syntax in
+        let%bind sender =
+          Generator.filter Test_account.gen ~f:Test_account.non_empty
+        in
+        let%bind amounts = gen_balance_split ~limit:2 sender.balance in
+        let amount1 = List.hd_exn amounts in
+        let fee =
+          List.nth amounts 1
+          |> Option.value_map ~default:Fee.zero ~f:Amount.to_fee
+        in
+        let%bind amount2 = Amount.(gen_incl (of_nanomina_int_exn 1) max_int) in
+        let%bind receiver1 = Test_account.gen_empty in
+        let%map receiver2 = Test_account.gen_empty in
+        let txn1 =
+          Simple_txn.make ~sender:sender.pk ~receiver:receiver1.pk amount1
+        in
+        let txn2 =
+          Simple_txn.make ~sender:sender.pk ~receiver:receiver2.pk amount2
+        in
+        ( sender.pk
+        , fee
+        , [ sender; receiver1; receiver2 ]
+        , ([ txn1; txn2 ] :> transaction list) ))
+        ~f:(fun (fee_payer, fee, accounts, txns) ->
+          [%test_pred: Zk_cmd_result.t Or_error.t]
+            (Predicates.pure ~f:(fun (txn, ledger) ->
+                 Transaction_status.equal txn.command.status
+                   (Failed
+                      [ []
+                      ; [ Cancelled ]
+                      ; [ Cancelled ]
+                      ; [ Overflow ]
+                      ; [ Cancelled ]
+               ] ) 
+             && Predicates.verify_balances_unchanged ~txn ~ledger accounts) )
+            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
+
+    let%test_unit "If fee can't be paid, operation results in an error." =
+      Quickcheck.test ~trials
+        (let open Quickcheck in
+         let open Generator.Let_syntax in
+         let%bind delegator =
+           Generator.filter Test_account.gen ~f:Balance.(fun a -> a.balance < max_int)
+         in
+         let%bind delegate = Test_account.gen in
+        let txn =
+          Alter_account.make ~account:delegator.pk
+            { Account_update.Update.noop with delegate = Set delegate.pk }
+        in
+        let min_fee =
+          Balance.(delegator.balance + Amount.of_nanomina_int_exn 1)
+          |> Option.value_map ~f:balance_to_fee ~default:Fee.max_int
+        in
+        let%map fee = Fee.(gen_incl min_fee max_int) in
+        (delegator.pk, fee, [ delegator; delegate ], [ (txn :> transaction) ]))
+        ~f:(fun (fee_payer, fee, accounts, txns) ->
+          [%test_pred: Zk_cmd_result.t Or_error.t]
+            (function
+             | Ok _ -> false
+             | Error e -> String.is_substring ~substring:"Overflow" (Error.to_string_hum e) )
+            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns))
   end )
