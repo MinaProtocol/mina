@@ -327,13 +327,13 @@ struct
     let module Constraints = Snarky_log.Constraints (Impls.Step.Internal_Basic) in
     let log =
       let weight =
-        let sys = Backend.Tick.R1CS_constraint_system.create () in
+        let sys = Backend.Tick.Constraint_system.create () in
         fun ({ annotation; basic } : Impls.Step.Constraint.t) ->
           let prev =
             Kimchi_pasta_constraint_system.Vesta_constraint_system.next_row sys
           in
-          Backend.Tick.R1CS_constraint_system.add_constraint sys
-            ?label:annotation basic ;
+          Backend.Tick.Constraint_system.add_constraint sys ?label:annotation
+            basic ;
           let next =
             Kimchi_pasta_constraint_system.Vesta_constraint_system.next_row sys
           in
@@ -347,12 +347,12 @@ struct
   let log_wrap main typ name id =
     let module Constraints = Snarky_log.Constraints (Impls.Wrap.Internal_Basic) in
     let log =
-      let sys = Backend.Tock.R1CS_constraint_system.create () in
+      let sys = Backend.Tock.Constraint_system.create () in
       let weight ({ annotation; basic } : Impls.Wrap.Constraint.t) =
         let prev =
           Kimchi_pasta_constraint_system.Pallas_constraint_system.next_row sys
         in
-        Backend.Tock.R1CS_constraint_system.add_constraint sys ?label:annotation
+        Backend.Tock.Constraint_system.add_constraint sys ?label:annotation
           basic ;
         let next =
           Kimchi_pasta_constraint_system.Pallas_constraint_system.next_row sys
@@ -593,16 +593,14 @@ struct
                 raise
                   (Return_digest
                      ( constraint_system ~input_typ:Typ.unit ~return_typ:typ main
-                     |> R1CS_constraint_system.digest ) ) ;
+                     |> Constraint_system.digest ) ) ;
 
               let k_p =
                 lazy
                   (let cs =
                      constraint_system ~input_typ:Typ.unit ~return_typ:typ main
                    in
-                   let cs_hash =
-                     Md5.to_hex (R1CS_constraint_system.digest cs)
-                   in
+                   let cs_hash = Md5.to_hex (Constraint_system.digest cs) in
                    ( Type_equal.Id.uid self.id
                    , snark_keys_header
                        { type_ = "step-proving-key"
@@ -619,7 +617,7 @@ struct
                 | None ->
                     lazy
                       (let id, _header, index, cs = Lazy.force k_p in
-                       let digest = R1CS_constraint_system.digest cs in
+                       let digest = Constraint_system.digest cs in
                        ( id
                        , snark_keys_header
                            { type_ = "step-verification-key"
@@ -685,7 +683,7 @@ struct
                ~return_typ:(Snarky_backendless.Typ.unit ())
                main
            in
-           let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
+           let cs_hash = Md5.to_hex (Constraint_system.digest cs) in
            ( self_id
            , snark_keys_header
                { type_ = "wrap-proving-key"; identifier = name }
@@ -697,7 +695,7 @@ struct
         | None ->
             lazy
               (let id, _header, cs = Lazy.force disk_key_prover in
-               let digest = R1CS_constraint_system.digest cs in
+               let digest = Constraint_system.digest cs in
                ( id
                , snark_keys_header
                    { type_ = "wrap-verification-key"; identifier = name }

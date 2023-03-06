@@ -7,7 +7,7 @@ module Step : sig
         Core_kernel.Type_equal.Id.Uid.t
         * Snark_keys_header.t
         * int
-        * Backend.Tick.R1CS_constraint_system.t
+        * Backend.Tick.Constraint_system.t
     end
 
     module Verification : sig
@@ -42,7 +42,7 @@ module Wrap : sig
       type t =
         Core_kernel.Type_equal.Id.Uid.t
         * Snark_keys_header.t
-        * Backend.Tock.R1CS_constraint_system.t
+        * Backend.Tock.Constraint_system.t
     end
 
     module Verification : sig

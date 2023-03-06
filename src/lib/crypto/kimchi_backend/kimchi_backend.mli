@@ -172,10 +172,7 @@ module Pasta : sig
     module Proving_key = Kimchi_pasta.Pallas_based_plonk.Proving_key
     module Oracles = Kimchi_pasta.Pallas_based_plonk.Oracles
     module Cvar = Kimchi_pasta.Pallas_based_plonk.Cvar
-
-    module R1CS_constraint_system =
-      Kimchi_pasta.Pallas_based_plonk.R1CS_constraint_system
-
+    module Constraint_system = Kimchi_pasta.Pallas_based_plonk.Constraint_system
     module Run_state = Kimchi_pasta.Pallas_based_plonk.Run_state
   end
 
@@ -205,8 +202,7 @@ module Pasta : sig
     module Proving_key = Kimchi_pasta.Vesta_based_plonk.Proving_key
     module Oracles = Kimchi_pasta.Vesta_based_plonk.Oracles
     module Cvar = Kimchi_pasta.Vesta_based_plonk.Cvar
-    module R1CS_constraint_system =
-      Kimchi_pasta.Vesta_based_plonk.R1CS_constraint_system
+    module Constraint_system = Kimchi_pasta.Vesta_based_plonk.Constraint_system
     module Run_state = Kimchi_pasta.Vesta_based_plonk.Run_state
   end
 end

@@ -452,7 +452,7 @@ end
 let verify ts ~key = Pickles.verify (module Nat.N2) (module Statement) key ts
 
 let constraint_system_digests ~proof_level ~constraint_constants () =
-  let digest = Tick.R1CS_constraint_system.digest in
+  let digest = Tick.Constraint_system.digest in
   [ ( "blockchain-step"
     , digest
         (let main x =

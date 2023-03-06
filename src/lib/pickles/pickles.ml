@@ -1243,7 +1243,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 (let cs =
                    constraint_system ~input_typ:Typ.unit ~return_typ:typ main
                  in
-                 let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
+                 let cs_hash = Md5.to_hex (Constraint_system.digest cs) in
                  ( Type_equal.Id.uid self.id
                  , snark_keys_header
                      { type_ = "step-proving-key"
@@ -1256,7 +1256,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             let k_v =
               lazy
                 (let id, _header, index, cs = Lazy.force k_p in
-                 let digest = R1CS_constraint_system.digest cs in
+                 let digest = Constraint_system.digest cs in
                  ( id
                  , snark_keys_header
                      { type_ = "step-verification-key"
@@ -1323,7 +1323,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 (let cs =
                    constraint_system ~input_typ:typ ~return_typ:Typ.unit main
                  in
-                 let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
+                 let cs_hash = Md5.to_hex (Constraint_system.digest cs) in
                  ( self_id
                  , snark_keys_header
                      { type_ = "wrap-proving-key"; identifier = "" }
@@ -1333,7 +1333,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             let disk_key_verifier =
               lazy
                 (let id, _header, cs = Lazy.force disk_key_prover in
-                 let digest = R1CS_constraint_system.digest cs in
+                 let digest = Constraint_system.digest cs in
                  ( id
                  , snark_keys_header
                      { type_ = "wrap-verification-key"; identifier = "" }

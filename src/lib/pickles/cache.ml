@@ -7,7 +7,7 @@ module Step = struct
         Type_equal.Id.Uid.t
         * Snark_keys_header.t
         * int
-        * Backend.Tick.R1CS_constraint_system.t
+        * Backend.Tick.Constraint_system.t
 
       let to_string : t -> _ = function
         | _id, header, n, h ->
@@ -144,7 +144,7 @@ module Wrap = struct
       type t =
         Type_equal.Id.Uid.t
         * Snark_keys_header.t
-        * Backend.Tock.R1CS_constraint_system.t
+        * Backend.Tock.Constraint_system.t
 
       let to_string : t -> _ = function
         | _id, header, h ->

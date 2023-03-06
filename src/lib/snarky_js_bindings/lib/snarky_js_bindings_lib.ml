@@ -1569,13 +1569,13 @@ module Circuit = struct
       Kimchi_pasta_constraint_system.Vesta_constraint_system.get_rows_len cs
     in
     let digest =
-      Backend.R1CS_constraint_system.digest cs |> Md5.to_hex |> Js.string
+      Backend.Constraint_system.digest cs |> Md5.to_hex |> Js.string
     in
     let json =
       Js.Unsafe.(
         fun_call
           global ##. JSON##.parse
-          [| inject (Backend.R1CS_constraint_system.to_json cs |> Js.string) |])
+          [| inject (Backend.Constraint_system.to_json cs |> Js.string) |])
     in
     object%js
       val rows = rows

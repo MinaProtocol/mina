@@ -3482,7 +3482,7 @@ module Make_str (A : Wire_types.Concrete) = struct
            "Transaction_snark.verify: Mismatched sok_message" )
 
   let constraint_system_digests ~constraint_constants () =
-    let digest = Tick.R1CS_constraint_system.digest in
+    let digest = Tick.Constraint_system.digest in
     [ ( "transaction-merge"
       , digest
           Merge.(

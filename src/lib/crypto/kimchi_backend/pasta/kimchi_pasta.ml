@@ -32,7 +32,7 @@ module Pallas_based_plonk = struct
     let ( * ) c x = scale x c
   end
 
-  module R1CS_constraint_system = struct
+  module Constraint_system = struct
     include Snarky_bindings.Fq.Constraint_system
 
     (* TODO: not really elegant, might want to just change the type to bytes and use what we're being given instead of converting to md5 *)
@@ -81,7 +81,7 @@ module Vesta_based_plonk = struct
     let ( * ) c x = scale x c
   end
 
-  module R1CS_constraint_system = struct
+  module Constraint_system = struct
     include Snarky_bindings.Fp.Constraint_system
 
     (* TODO: not really elegant, might want to just change the type to bytes and use what we're being given instead of converting to md5 *)
