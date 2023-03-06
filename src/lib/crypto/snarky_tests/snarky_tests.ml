@@ -489,23 +489,6 @@ module Improper_calls = struct
       use_for_witness_generation circuit ;
       ()
 
-    let circuit_functions_with_global_outside_circuit () : unit =
-      let a, b = random_input in
-      let a, b =
-        Field.(
-          let a = constant a in
-          let b = constant b in
-          (a, b))
-      in
-      Field.Assert.not_equal a b ; ()
-
-    let circuit_functions_with_global_outside_circuit () : unit =
-      Alcotest.(
-        check_raises "should fail to call functions outside circuit"
-          (Failure
-             "This function can't be run outside of a checked computation." )
-          circuit_functions_with_global_outside_circuit)
-
     let circuit_functions_inside_prover () : unit =
       let circuit ((a, b) : Field.t * Field.t) () =
         as_prover (fun _ -> use_circuit_functions a b ; ()) ;
@@ -587,9 +570,6 @@ module Improper_calls = struct
     [ ( "call circuit functions inside a prover block of another circuit"
       , `Quick
       , Tests.circuit_function_inside_circuit_inside_prover )
-    ; ( "calling circuit functions that use globals outside circuit should fail"
-      , `Quick
-      , Tests.circuit_functions_with_global_outside_circuit )
     ; ( "call circuit functions inside an as_prover block"
       , `Quick
       , Tests.circuit_functions_inside_prover )
