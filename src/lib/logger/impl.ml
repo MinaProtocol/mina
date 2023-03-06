@@ -182,14 +182,15 @@ module Processor = struct
                   err ) ;
             None
         | Ok (str, extra) ->
-            let formatted_extra =
-              extra
-              |> List.map ~f:(fun (k, v) -> "\n\t" ^ k ^ ": " ^ v)
-              |> String.concat ~sep:""
+            let msg =
+              (* The previously existing \t has been changed to 2 spaces. *)
+              Format.asprintf "@[<v 2>%a [%a] %s@,%a@]" Time.pp msg.timestamp
+                Level.pp msg.level str
+                (Format.pp_print_list ~pp_sep:Format.pp_print_cut
+                   (fun ppf (k, v) -> Format.fprintf ppf "%s: %s" k v) )
+                extra
             in
-            let time = Time.pretty_to_string msg.timestamp in
-            Some
-              (time ^ " [" ^ Level.show msg.level ^ "] " ^ str ^ formatted_extra)
+            Some msg
   end
 
   let raw ?(log_level = Level.Spam) () = T ((module Raw), Raw.create ~log_level)
