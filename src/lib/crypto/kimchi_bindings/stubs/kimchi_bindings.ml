@@ -1,5 +1,9 @@
 (* This file is generated automatically with ocaml_gen. *)
 
+module RustHelpers = struct
+  external init_rust_panic_hook : unit -> unit = "init_rust_panic_hook"
+end
+
 module FieldVectors = struct
   module Fp = struct
     type nonrec t

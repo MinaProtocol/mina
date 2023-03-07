@@ -13,6 +13,9 @@ extern crate libc;
 #[macro_use]
 pub mod caml;
 
+/// Rust helpers
+pub mod rust;
+
 /// Arkworks types
 pub mod arkworks;
 

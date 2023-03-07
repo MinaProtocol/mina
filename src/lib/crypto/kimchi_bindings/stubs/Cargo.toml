@@ -13,6 +13,7 @@ crate-type = ["lib", "staticlib"]
 
 [dependencies]
 array-init = "2.0.0"
+backtrace = "0.3.67"
 rmp-serde = "0.15.5"
 itertools = "0.10.5"
 libc = { version = "0.2.0" }
