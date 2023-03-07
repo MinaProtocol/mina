@@ -3,7 +3,7 @@
 set -eo pipefail
 
 case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
-  rampup|berkeley)
+  rampup|berkeley|release/2.0.0)
   ;;
   *)
     echo "Not pulling against rampup, not running the connect test"

@@ -58,6 +58,19 @@ type 'command t_ = 'command Poly.t =
   | Fee_transfer of Fee_transfer.t
   | Coinbase of Coinbase.t
 
+let to_valid_unsafe :
+    t -> [ `If_this_is_used_it_should_have_a_comment_justifying_it of Valid.t ]
+    = function
+  | Command t ->
+      let (`If_this_is_used_it_should_have_a_comment_justifying_it t') =
+        User_command.to_valid_unsafe t
+      in
+      `If_this_is_used_it_should_have_a_comment_justifying_it (Command t')
+  | Fee_transfer t ->
+      `If_this_is_used_it_should_have_a_comment_justifying_it (Fee_transfer t)
+  | Coinbase t ->
+      `If_this_is_used_it_should_have_a_comment_justifying_it (Coinbase t)
+
 let forget : Valid.t -> t = function
   | Command t ->
       Command (User_command.forget_check t)
@@ -82,32 +95,36 @@ let expected_supply_increase = function
   | Coinbase t ->
       Coinbase.expected_supply_increase t
 
-let public_keys : t -> _ = function
-  | Command (Signed_command cmd) ->
-      [ Signed_command.fee_payer_pk cmd
-      ; Signed_command.source_pk cmd
-      ; Signed_command.receiver_pk cmd
-      ]
-  | Command (Zkapp_command t) ->
-      Zkapp_command.accounts_referenced t |> List.map ~f:Account_id.public_key
-  | Fee_transfer ft ->
-      Fee_transfer.receiver_pks ft
-  | Coinbase cb ->
-      Coinbase.accounts_accessed cb |> List.map ~f:Account_id.public_key
+let public_keys (t : t) =
+  let account_ids =
+    match t with
+    | Command (Signed_command cmd) ->
+        Signed_command.accounts_referenced cmd
+    | Command (Zkapp_command t) ->
+        Zkapp_command.accounts_referenced t
+    | Fee_transfer ft ->
+        Fee_transfer.receivers ft
+    | Coinbase cb ->
+        Coinbase.accounts_referenced cb
+  in
+  List.map account_ids ~f:Account_id.public_key
 
-let accounts_accessed (t : t) (status : Transaction_status.t) =
+let account_access_statuses (t : t) (status : Transaction_status.t) =
   match t with
   | Command (Signed_command cmd) ->
-      Signed_command.accounts_accessed cmd status
+      Signed_command.account_access_statuses cmd status
   | Command (Zkapp_command t) ->
-      Zkapp_command.accounts_accessed t status
+      Zkapp_command.account_access_statuses t status
   | Fee_transfer ft ->
       assert (Transaction_status.equal Applied status) ;
-      Fee_transfer.receivers ft
+      List.map (Fee_transfer.receivers ft) ~f:(fun acct_id ->
+          (acct_id, `Accessed) )
   | Coinbase cb ->
-      Coinbase.accounts_accessed cb
+      Coinbase.account_access_statuses cb status
 
-let accounts_referenced (t : t) = accounts_accessed t Applied
+let accounts_referenced (t : t) =
+  List.map (account_access_statuses t Applied) ~f:(fun (acct_id, _status) ->
+      acct_id )
 
 let fee_payer_pk (t : t) =
   match t with

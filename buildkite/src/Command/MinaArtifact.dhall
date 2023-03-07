@@ -13,19 +13,6 @@ let Size = ./Size.dhall
 let Libp2p = ./Libp2pHelperBuild.dhall
 let DockerImage = ./DockerImage.dhall
 let DebianVersions = ../Constants/DebianVersions.dhall
-let dirtyWhen = [
-  S.strictlyStart (S.contains "src"),
-  S.strictlyStart (S.contains "automation"),
-  S.strictly (S.contains "Makefile"),
-  S.strictlyStart (S.contains "buildkite/src/Command/MinaArtifact"),
-  S.exactly "buildkite/scripts/build-artifact" "sh",
-  S.exactly "buildkite/scripts/connect-to-mainnet-on-compatible" "sh",
-  S.strictlyStart (S.contains "buildkite/src/Jobs/Test"),
-  S.strictlyStart (S.contains "buildkite/src/Command"),
-  S.strictlyStart (S.contains "dockerfiles"),
-  S.strictlyStart (S.contains "scripts")
-]
-
 
 in
 
@@ -33,7 +20,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
     Pipeline.Config::{
       spec =
         JobSpec::{
-          dirtyWhen = dirtyWhen,
+          dirtyWhen = DebianVersions.dirtyWhen debVersion,
           path = "Release",
           name = "MinaArtifact${DebianVersions.capitalName debVersion}"
         },
@@ -74,6 +61,16 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         DockerImage.generateStep daemonBerkeleySpec,
 
+        -- test_executive image
+        let testExecutiveSpec = DockerImage.ReleaseSpec::{
+          deps=DebianVersions.dependsOn debVersion,
+          service="mina-test-executive",
+          deb_codename="${DebianVersions.lowerName debVersion}",
+          step_key="test-executive-${DebianVersions.lowerName debVersion}-docker-image"
+        }
+        in
+        DockerImage.generateStep testExecutiveSpec,
+
         -- archive image
         let archiveSpec = DockerImage.ReleaseSpec::{
           deps=DebianVersions.dependsOn debVersion,
@@ -81,10 +78,19 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="archive-${DebianVersions.lowerName debVersion}-docker-image"
         }
+        in
+        DockerImage.generateStep archiveSpec,
 
+        -- rosetta image
+        let rosettaSpec = DockerImage.ReleaseSpec::{
+          service="mina-rosetta",
+          extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --cache-from ${DebianVersions.toolchainImage debVersion}",
+          deb_codename="${DebianVersions.lowerName debVersion}",
+          step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image"
+        }
         in
 
-        DockerImage.generateStep archiveSpec,
+        DockerImage.generateStep rosettaSpec,
 
         -- ZkApp test transaction image
         let zkappTestTxnSpec = DockerImage.ReleaseSpec::{
@@ -106,7 +112,6 @@ in
   bullseye  = pipeline DebianVersions.DebVersion.Bullseye
   , buster  = pipeline DebianVersions.DebVersion.Buster
   , stretch = pipeline DebianVersions.DebVersion.Stretch
-  , bionic = pipeline DebianVersions.DebVersion.Bionic
   , focal   = pipeline DebianVersions.DebVersion.Focal
-  , dirtyWhen = dirtyWhen
+  , bionic  = pipeline DebianVersions.DebVersion.Bionic
 }

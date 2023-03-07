@@ -47,11 +47,13 @@ type ( 'a_var
           (module Requests.Step.S
              with type statement = 'a_value
               and type max_proofs_verified = 'max_proofs_verified
+              and type proofs_verified = 'proofs_verified
               and type prev_values = 'prev_values
               and type local_signature = 'local_widths
               and type local_branches = 'local_heights
               and type return_value = 'ret_value
               and type auxiliary_value = 'auxiliary_value )
+      ; feature_flags : bool Plonk_types.Features.t
       }
       -> ( 'a_var
          , 'a_value
@@ -72,7 +74,8 @@ let create
     (type branches max_proofs_verified local_signature local_branches var value
     a_var a_value ret_var ret_value prev_vars prev_values ) ~index
     ~(self : (var, value, max_proofs_verified, branches) Tag.t) ~wrap_domains
-    ~(step_uses_lookup : Pickles_types.Plonk_types.Opt.Flag.t)
+    ~(feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
+    ~(actual_feature_flags : bool Plonk_types.Features.t)
     ~(max_proofs_verified : max_proofs_verified Nat.t)
     ~(proofs_verifieds : (int, branches) Vector.t) ~(branches : branches Nat.t)
     ~(public_input :
@@ -139,7 +142,7 @@ let create
         ; proofs_verifieds
         ; wrap_domains
         ; step_domains
-        ; step_uses_lookup
+        ; feature_flags
         }
       ~public_input ~auxiliary_typ ~self_branches:branches ~proofs_verified
       ~local_signature:widths ~local_signature_length ~local_branches:heights
@@ -155,7 +158,7 @@ let create
     in
     let etyp =
       Impls.Step.input ~proofs_verified:max_proofs_verified
-        ~wrap_rounds:Backend.Tock.Rounds.n ~uses_lookup:No
+        ~wrap_rounds:Backend.Tock.Rounds.n ~feature_flags
       (* TODO *)
     in
     Fix_domains.domains
@@ -172,4 +175,5 @@ let create
     ; domains = own_domains
     ; main = step
     ; requests
+    ; feature_flags = actual_feature_flags
     }

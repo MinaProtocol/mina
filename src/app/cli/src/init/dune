@@ -28,10 +28,12 @@
    async.async_command
    async_rpc_kernel
    base.caml
+   base.base_internalhash_types
    graphql-cohttp
    cohttp-async
    graphql-async
    ;;local libraries
+   snark_profiler_lib
    archive_lib
    mina_wire_types
    perf_histograms
@@ -90,7 +92,7 @@
    participating_state
    staged_ledger
    mina_commands
-   coda_runtime_config
+   mina_runtime_config
    coda_genesis_ledger
    mina_networking
    sgn

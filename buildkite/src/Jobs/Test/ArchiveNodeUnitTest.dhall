@@ -34,7 +34,7 @@ Pipeline.build
       [ Command.build
           Command.Config::
             { commands =
-              RunInToolchain.runInToolchainBuster
+              RunInToolchain.runInToolchain
                 [ "POSTGRES_PASSWORD=${password}"
                 , "POSTGRES_USER=${user}"
                 , "POSTGRES_DB=${db}"

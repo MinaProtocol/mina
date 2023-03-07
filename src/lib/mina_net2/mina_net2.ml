@@ -222,7 +222,7 @@ let configure t ~me ~external_maddr ~maddrs ~network_id ~metrics_port
       ~peer_exchange ~peer_protection_ratio ~min_connections ~max_connections
       ~validation_queue_size
       ~gating_config:(gating_config_to_helper_format initial_gating_config)
-      ~topic_config
+      ~topic_config ()
   in
   let%map _ =
     Libp2p_helper.do_rpc t.helper
@@ -541,8 +541,8 @@ let handle_push_message t push_message =
   | Undefined n ->
       Libp2p_ipc.undefined_union ~context:"DaemonInterface.PushMessage" n
 
-let create ~all_peers_seen_metric ~logger ~pids ~conf_dir ~on_peer_connected
-    ~on_peer_disconnected =
+let create ?(allow_multiple_instances = false) ~all_peers_seen_metric ~logger
+    ~pids ~conf_dir ~on_peer_connected ~on_peer_disconnected () =
   let open Deferred.Or_error.Let_syntax in
   let push_message_handler =
     ref (fun _msg ->
@@ -551,9 +551,10 @@ let create ~all_peers_seen_metric ~logger ~pids ~conf_dir ~on_peer_connected
   in
   let%bind helper =
     O1trace.thread "manage_libp2p_helper_subprocess" (fun () ->
-        Libp2p_helper.spawn ~logger ~pids ~conf_dir
+        Libp2p_helper.spawn ~allow_multiple_instances ~logger ~pids ~conf_dir
           ~handle_push_message:(fun _helper msg ->
-            Deferred.return (!push_message_handler msg) ) )
+            Deferred.return (!push_message_handler msg) )
+          () )
   in
   let t =
     { helper

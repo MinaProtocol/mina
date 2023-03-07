@@ -159,29 +159,28 @@ module Account_update_under_construction = struct
           ~f:(Fn.flip Zkapp_account.Events.push_to_data_as_hash)
     end
 
-    module Sequence_events = struct
-      type t = { sequence_events : Field.t array list }
+    module Actions = struct
+      type t = { actions : Field.t array list }
 
-      let create () = { sequence_events = [] }
+      let create () = { actions = [] }
 
-      let add_sequence_events t sequence_events : t =
-        { sequence_events = t.sequence_events @ sequence_events }
+      let add_actions t actions : t = { actions = t.actions @ actions }
 
-      let to_zkapp_command_sequence_events ({ sequence_events } : t) :
-          Zkapp_account.Sequence_events.var =
+      let to_zkapp_command_actions ({ actions } : t) : Zkapp_account.Actions.var
+          =
         let open Core_kernel in
         let empty_var : Zkapp_account.Events.var =
-          exists ~compute:(fun () -> []) Zkapp_account.Sequence_events.typ
+          exists ~compute:(fun () -> []) Zkapp_account.Actions.typ
         in
-        (* matches fold_right in Zkapp_account.Sequence_events.hash *)
-        List.fold_right sequence_events ~init:empty_var
-          ~f:(Fn.flip Zkapp_account.Sequence_events.push_to_data_as_hash)
+        (* matches fold_right in Zkapp_account.Actions.hash *)
+        List.fold_right actions ~init:empty_var
+          ~f:(Fn.flip Zkapp_account.Actions.push_to_data_as_hash)
     end
 
     type t =
       { public_key : Public_key.Compressed.var
       ; token_id : Token_id.Checked.t
-      ; caller : Token_id.Checked.t
+      ; may_use_token : Account_update.May_use_token.Checked.t
       ; account_condition : Account_condition.t
       ; update : Update.t
       ; rev_calls :
@@ -190,20 +189,23 @@ module Account_update_under_construction = struct
           list
       ; call_data : Field.t option
       ; events : Events.t
-      ; sequence_events : Sequence_events.t
+      ; actions : Actions.t
+      ; vk_hash : Field.t
       }
 
-    let create ~public_key ?(token_id = Token_id.(Checked.constant default))
-        ?(caller = token_id) () =
+    let create ~public_key ~vk_hash
+        ?(token_id = Token_id.(Checked.constant default))
+        ?(may_use_token = Account_update.May_use_token.Checked.constant No) () =
       { public_key
       ; token_id
-      ; caller
+      ; may_use_token
       ; account_condition = Account_condition.create ()
       ; update = Update.create ()
       ; rev_calls = []
       ; call_data = None
       ; events = Events.create ()
-      ; sequence_events = Sequence_events.create ()
+      ; actions = Actions.create ()
+      ; vk_hash
       }
 
     let to_account_update_and_calls (t : t) :
@@ -226,18 +228,15 @@ module Account_update_under_construction = struct
         ; increment_nonce = Boolean.false_
         ; call_data = Option.value ~default:Field.zero t.call_data
         ; events = Events.to_zkapp_command_events t.events
-        ; sequence_events =
-            Sequence_events.to_zkapp_command_sequence_events t.sequence_events
+        ; actions = Actions.to_zkapp_command_actions t.actions
         ; preconditions =
             { Account_update.Preconditions.Checked.network =
                 var_of_t Zkapp_precondition.Protocol_state.typ
                   { snarked_ledger_hash = Ignore
-                  ; timestamp = Ignore
                   ; blockchain_length = Ignore
                   ; min_window_density = Ignore
                   ; last_vrf_output = ()
                   ; total_currency = Ignore
-                  ; global_slot_since_hard_fork = Ignore
                   ; global_slot_since_genesis = Ignore
                   ; staking_epoch_data =
                       { ledger =
@@ -261,11 +260,20 @@ module Account_update_under_construction = struct
                       }
                   }
             ; account = Account_condition.to_predicate t.account_condition
+            ; valid_while = var_of_t Zkapp_precondition.Valid_while.typ Ignore
             }
         ; use_full_commitment = Boolean.false_
-        ; caller = t.caller
+        ; implicit_account_creation_fee =
+            (* Probably shouldn't hard-code this logic, but :shrug:, it's a
+               reasonable test.
+            *)
+            Token_id.(Checked.equal t.token_id (Checked.constant default))
+        ; may_use_token = t.may_use_token
         ; authorization_kind =
-            { is_signed = Boolean.false_; is_proved = Boolean.true_ }
+            { is_signed = Boolean.false_
+            ; is_proved = Boolean.true_
+            ; verification_key_hash = t.vk_hash
+            }
         }
       in
       let calls =
@@ -301,19 +309,16 @@ module Account_update_under_construction = struct
     let add_events events (t : t) =
       { t with events = Events.add_events t.events events }
 
-    let add_sequence_events sequence_events (t : t) =
-      { t with
-        sequence_events =
-          Sequence_events.add_sequence_events t.sequence_events sequence_events
-      }
+    let add_actions actions (t : t) =
+      { t with actions = Actions.add_actions t.actions actions }
   end
 end
 
-class account_update ~public_key ?token_id ?caller =
+class account_update ~public_key ~vk_hash ?token_id ?may_use_token =
   object
     val mutable account_update =
-      Account_update_under_construction.In_circuit.create ~public_key ?token_id
-        ?caller ()
+      Account_update_under_construction.In_circuit.create ~public_key ~vk_hash
+        ?token_id ?may_use_token ()
 
     method assert_state_proved =
       account_update <-
@@ -350,10 +355,10 @@ class account_update ~public_key ?token_id ?caller =
         Account_update_under_construction.In_circuit.add_events events
           account_update
 
-    method add_sequence_events sequence_events =
+    method add_actions actions =
       account_update <-
-        Account_update_under_construction.In_circuit.add_sequence_events
-          sequence_events account_update
+        Account_update_under_construction.In_circuit.add_actions actions
+          account_update
 
     method account_update_under_construction = account_update
   end
@@ -425,9 +430,11 @@ let to_account_update (account_update : account_update) :
 open Pickles_types
 open Hlist
 
-let wrap_main ~public_key ?token_id ?caller f
-    { Pickles.Inductive_rule.public_input = () } =
-  let account_update = new account_update ~public_key ?token_id ?caller in
+let wrap_main ~public_key ?token_id ?may_use_token f
+    { Pickles.Inductive_rule.public_input = vk_hash } =
+  let account_update =
+    new account_update ~public_key ~vk_hash ?token_id ?may_use_token
+  in
   let auxiliary_output = f account_update in
   { Pickles.Inductive_rule.previous_proof_statements = []
   ; public_output = account_update
@@ -461,8 +468,8 @@ let compile :
              , prev_valuess
              , widthss
              , heightss
-             , unit
-             , unit
+             , Field.t
+             , Field.Constant.t
              , account_update
              , unit (* TODO: Remove? *)
              , auxiliary_var
@@ -493,6 +500,7 @@ let compile :
          H3_2.T(Pickles.Prover).t =
  fun ?self ?cache ?disk_keys ~auxiliary_typ ~branches ~max_proofs_verified ~name
      ~constraint_constants ~choices () ->
+  let vk_hash = ref None in
   let choices ~self =
     let rec go :
         type prev_varss prev_valuess widthss heightss.
@@ -500,8 +508,8 @@ let compile :
            , prev_valuess
            , widthss
            , heightss
-           , unit
-           , unit
+           , Field.t
+           , Field.Constant.t
            , account_update
            , unit
            , auxiliary_var
@@ -520,17 +528,21 @@ let compile :
            H4_6.T(Pickles.Inductive_rule).t = function
       | [] ->
           []
-      | { identifier; prevs; main; uses_lookup } :: choices ->
+      | { identifier; prevs; main; feature_flags } :: choices ->
           { identifier
           ; prevs
-          ; uses_lookup
+          ; feature_flags
           ; main =
-              (fun main_input ->
+              (fun { Pickles.Inductive_rule.public_input = () } ->
+                let vk_hash =
+                  exists Field.typ ~compute:(fun () ->
+                      Lazy.force @@ Option.value_exn !vk_hash )
+                in
                 let { Pickles.Inductive_rule.previous_proof_statements
                     ; public_output = account_update_under_construction
                     ; auxiliary_output
                     } =
-                  main main_input
+                  main { Pickles.Inductive_rule.public_input = vk_hash }
                 in
                 let public_output, account_update_tree =
                   to_account_update account_update_under_construction
@@ -549,6 +561,13 @@ let compile :
       ~public_input:(Output Zkapp_statement.typ)
       ~auxiliary_typ:Typ.(Prover_value.typ () * auxiliary_typ)
       ~branches ~max_proofs_verified ~name ~constraint_constants ~choices
+  in
+  let () =
+    vk_hash :=
+      Some
+        ( lazy
+          ( Zkapp_account.digest_vk
+          @@ Pickles.Side_loaded.Verification_key.of_compiled tag ) )
   in
   let provers =
     let rec go :

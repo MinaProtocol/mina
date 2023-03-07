@@ -2,6 +2,8 @@
 
 # Script collects binaries and keys and builds deb archives.
 
+echo "--- Setting up the envrionment to build debian packages..."
+
 set -euo pipefail
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
@@ -23,7 +25,10 @@ cd "${SCRIPTPATH}/../_build"
 # Set dependencies based on debian release
 SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata"
 case "${MINA_DEB_CODENAME}" in
-  bullseye)
+  bookworm|jammy)
+    DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8"
+    ;;
+  bullseye|focal)
     DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8"
     ;;
   buster)
@@ -31,9 +36,6 @@ case "${MINA_DEB_CODENAME}" in
     ;;
   stretch|bionic)
     DAEMON_DEPS=", libffi6, libjemalloc1, libpq-dev, libprocps6"
-    ;;
-  focal)
-    DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8"
     ;;
   *)
     echo "Unknown Debian codename provided: ${MINA_DEB_CODENAME}"; exit 1
@@ -56,7 +58,8 @@ create_control_file() {
   # Make sure the directory exists
   mkdir -p "${BUILDDIR}/DEBIAN"
 
-  # Also make the binary directory that all packages need
+  # Also clean/create the binary directory that all packages need
+  rm -rf "${BUILDDIR}/usr/local/bin"
   mkdir -p "${BUILDDIR}/usr/local/bin"
 
   # Create the control file itself
@@ -102,6 +105,8 @@ build_deb() {
   ls -lh ${1}_*.deb
   echo "deleting BUILDDIR ${BUILDDIR}"
   rm -rf "${BUILDDIR}"
+
+  echo "--- Built ${1}_${MINA_DEB_VERSION}.deb"
 }
 
 # Function to DRY copying config files into daemon packages
@@ -115,7 +120,7 @@ copy_common_daemon_configs() {
 
   # Copy shared binaries
   cp ../src/app/libp2p_helper/result/bin/libp2p_helper "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
-  cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
+  # cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
   cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/mina-create-genesis"
   cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
   cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
@@ -164,7 +169,7 @@ if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
 then
 
   echo "------------------------------------------------------------"
-  echo "Building generate keypair deb:"
+  echo "--- Building generate keypair deb:"
 
   create_control_file mina-generate-keypair "${SHARED_DEPS}" 'Utility to regenerate mina private public keys in new format'
 
@@ -182,7 +187,7 @@ if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
 then
 
   echo "------------------------------------------------------------"
-  echo "Building mainnet deb without keys:"
+  echo "--- Building mainnet deb without keys:"
 
   create_control_file mina-mainnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
 
@@ -198,7 +203,7 @@ if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
 then
 
   echo "------------------------------------------------------------"
-  echo "Building testnet signatures deb without keys:"
+  echo "--- Building testnet signatures deb without keys:"
 
   copy_control_file mina-devnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network'
 
@@ -211,7 +216,7 @@ fi # only builds on mainnet-like branches
 
 ##################################### ZKAPP TEST TXN #######################################
 echo "------------------------------------------------------------"
-echo "Building Mina Berkeley ZkApp test transaction tool:"
+echo "--- Building Mina Berkeley ZkApp test transaction tool:"
 
 create_control_file mina-zkapp-test-transaction "${SHARED_DEPS}${DAEMON_DEPS}" 'Utility to generate ZkApp transactions in Mina GraphQL format'
 
@@ -224,7 +229,7 @@ build_deb mina-zkapp-test-transaction
 
 ##################################### BERKELEY PACKAGE #######################################
 echo "------------------------------------------------------------"
-echo "Building Mina Berkeley testnet signatures deb without keys:"
+echo "--- Building Mina Berkeley testnet signatures deb without keys:"
 
 mkdir -p "${BUILDDIR}/DEBIAN"
 create_control_file mina-berkeley "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'

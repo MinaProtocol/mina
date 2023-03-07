@@ -875,32 +875,7 @@ let _ =
          let vbmul3 =
            mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (rand_fields 20)
          in
-         let endomul1 =
-           mk_wires ChaCha0 6 (6, 0) (6, 1) (6, 2) (rand_fields 30)
-         in
-         let endomul2 =
-           mk_wires ChaCha1 7 (7, 0) (7, 1) (7, 2) (rand_fields 31)
-         in
-         let endomul3 =
-           mk_wires ChaCha2 8 (8, 0) (8, 1) (8, 2) (rand_fields 32)
-         in
-         let endomul4 =
-           mk_wires ChaChaFinal 9 (9, 0) (9, 1) (9, 2) (rand_fields 33)
-         in
-         let all =
-           [ zero
-           ; generic
-           ; add1
-           ; add2
-           ; vbmul1
-           ; vbmul2
-           ; vbmul3
-           ; endomul1
-           ; endomul2
-           ; endomul3
-           ; endomul4
-           ]
-         in
+         let all = [ zero; generic; add1; add2; vbmul1; vbmul2; vbmul3 ] in
          let test_vec vec =
            List.iter (add vec) all ;
            List.iteri (fun i x -> assert (eq x (get vec i))) all ;
@@ -987,32 +962,7 @@ let _ =
            let vbmul3 =
              mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (rand_fields 20)
            in
-           let endomul1 =
-             mk_wires ChaCha0 6 (6, 0) (6, 1) (6, 2) (rand_fields 30)
-           in
-           let endomul2 =
-             mk_wires ChaCha1 7 (7, 0) (7, 1) (7, 2) (rand_fields 31)
-           in
-           let endomul3 =
-             mk_wires ChaCha2 8 (8, 0) (8, 1) (8, 2) (rand_fields 32)
-           in
-           let endomul4 =
-             mk_wires ChaChaFinal 9 (9, 0) (9, 1) (9, 2) (rand_fields 33)
-           in
-           let all =
-             [ zero
-             ; generic
-             ; add1
-             ; add2
-             ; vbmul1
-             ; vbmul2
-             ; vbmul3
-             ; endomul1
-             ; endomul2
-             ; endomul3
-             ; endomul4
-             ]
-           in
+           let all = [ zero; generic; add1; add2; vbmul1; vbmul2; vbmul3 ] in
            List.iter (add vec) all ;
            vec
          in
@@ -1042,18 +992,14 @@ let verification_evals_to_list
     ; mul_comm : 'PolyComm
     ; emul_comm : 'PolyComm
     ; endomul_scalar_comm : 'PolyComm
-    ; chacha_comm : 'PolyComm array option
     } =
   generic_comm :: psm_comm :: complete_add_comm :: mul_comm :: emul_comm
   :: endomul_scalar_comm
-  :: ( Array.append sigma_comm coefficients_comm
-     |> Array.append (Option.value ~default:[||] chacha_comm)
-     |> Array.to_list )
+  :: (Array.append sigma_comm coefficients_comm |> Array.to_list)
 
 let eq_verifier_index ~field_equal ~other_field_equal
     { VerifierIndex.domain = { log_size_of_group = i1_1; group_gen = f1 }
     ; max_poly_size = i1_2
-    ; max_quot_size = i1_3
     ; srs = _
     ; evals = evals1
     ; shifts = shifts1
@@ -1063,7 +1009,6 @@ let eq_verifier_index ~field_equal ~other_field_equal
     }
     { VerifierIndex.domain = { log_size_of_group = i2_1; group_gen = f2 }
     ; max_poly_size = i2_2
-    ; max_quot_size = i2_3
     ; srs = _
     ; evals = evals2
     ; shifts = shifts2
@@ -1071,7 +1016,7 @@ let eq_verifier_index ~field_equal ~other_field_equal
     ; public = public2
     ; prev_challenges = prev_challenges2
     } =
-  i1_1 = i2_1 && field_equal f1 f2 && i1_2 = i2_2 && i1_3 = i2_3
+  i1_1 = i2_1 && field_equal f1 f2 && i1_2 = i2_2
   && List.for_all2
        (eq_poly_comm ~field_equal:other_field_equal)
        (verification_evals_to_list evals1)

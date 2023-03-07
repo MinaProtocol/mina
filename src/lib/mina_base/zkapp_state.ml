@@ -29,13 +29,9 @@ module V = struct
   let to_list = Vector.to_list
 end
 
-let () =
-  let _f :
-      type a.
-      unit -> (a V.t, a Vector.With_length(Max_state_size).t) Type_equal.t =
-   fun () -> Type_equal.T
-  in
-  ()
+let _type_equal :
+    type a. (a V.t, a Vector.With_length(Max_state_size).t) Type_equal.t =
+  Type_equal.T
 
 let typ t = Vector.typ t Max_state_size.n
 
@@ -56,11 +52,7 @@ module Value = struct
 
   type t = Zkapp_basic.F.t V.t [@@deriving sexp, equal, yojson, hash, compare]
 
-  let () =
-    let _f : unit -> (t, Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
+  let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
 end
 
 let to_input (t : _ V.t) ~f =

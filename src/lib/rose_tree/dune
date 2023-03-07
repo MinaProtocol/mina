@@ -7,7 +7,7 @@
    async_kernel
    result
    ;; local libraries
-   non_empty_list
+   mina_stdlib
 )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson)))

@@ -55,7 +55,7 @@ module Make (Inputs : Inputs_intf) :
 
   type t =
     { uuid : Uuid.Stable.V1.t
-    ; kvdb : Kvdb.t [@sexp.opaque]
+    ; kvdb : (Kvdb.t[@sexp.opaque])
     ; depth : int
     ; directory : string
     ; detached_parent_signal : Detached_parent_signal.t
@@ -532,7 +532,9 @@ module Make (Inputs : Inputs_intf) :
       let last_location_key_value =
         (Account_location.last_location_key (), last_location)
       in
-      let key_to_location_list = Non_empty_list.to_list key_to_location_list in
+      let key_to_location_list =
+        Mina_stdlib.Nonempty_list.to_list key_to_location_list
+      in
       let account_tokens =
         List.fold ~init:Key.Map.empty key_to_location_list
           ~f:(fun map (aid, _) ->
@@ -556,13 +558,10 @@ module Make (Inputs : Inputs_intf) :
       set_bin_batch mdb Account.bin_size_t Account.bin_write_t
         addresses_and_accounts ;
       let token_owner_changes =
-        List.filter_map addresses_and_accounts ~f:(fun (_, account) ->
-            if Account.token_owner account then
-              let aid = Account.identifier account in
-              Some
-                (Tokens.Owner.serialize_kv ~ledger_depth:mdb.depth
-                   (Account_id.token_id aid, aid) )
-            else None )
+        List.map addresses_and_accounts ~f:(fun (_, account) ->
+            let aid = Account.identifier account in
+            Tokens.Owner.serialize_kv ~ledger_depth:mdb.depth
+              (Account_id.derive_token_id ~owner:aid, aid) )
       in
       Kvdb.set_batch mdb.kvdb ~remove_keys:[]
         ~key_data_pairs:token_owner_changes

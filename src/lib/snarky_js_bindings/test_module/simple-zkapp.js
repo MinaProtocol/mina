@@ -12,6 +12,7 @@ import {
   Mina,
   verify,
   AccountUpdate,
+  UInt32,
 } from "snarkyjs";
 
 await isReady;
@@ -61,7 +62,7 @@ if (command === "deploy") {
   let feePayerAddress = feePayerKey.toPublicKey();
   addCachedAccount({
     publicKey: feePayerKey.toPublicKey(),
-    nonce: feePayerNonce,
+    nonce: UInt32.from(feePayerNonce),
   });
 
   let { verificationKey } = await SimpleZkapp.compile();
@@ -97,11 +98,11 @@ if (command === "deploy") {
 
 if (command === "update") {
   // snarkyjs part
+  let { verificationKey } = await SimpleZkapp.compile();
   addCachedAccount({
     publicKey: zkappAddress,
-    zkapp: { appState: [initialState, 0, 0, 0, 0, 0, 0, 0] },
+    zkapp: { appState: [initialState, 0, 0, 0, 0, 0, 0, 0], verificationKey },
   });
-  let { verificationKey } = await SimpleZkapp.compile();
   let transaction = await Mina.transaction(() => {
     new SimpleZkapp(zkappAddress).update(Field(2));
   });

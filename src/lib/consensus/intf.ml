@@ -38,7 +38,11 @@ module type Blockchain_state = sig
          , 'snarked_ledger_hash
          , 'local_state
          , 'time
-         , 'body_ref )
+         , 'body_reference
+         , 'signed_amount
+         , 'pending_coinbase_stack
+         , 'fee_excess
+         , 'sok_digest )
          t
     [@@deriving sexp]
   end
@@ -49,7 +53,11 @@ module type Blockchain_state = sig
       , Frozen_ledger_hash.t
       , Mina_transaction_logic.Zkapp_command_logic.Local_state.Value.t
       , Block_time.t
-      , Body_reference.t )
+      , Body_reference.t
+      , Amount.Signed.t
+      , Pending_coinbase.Stack_versioned.Stable.V1.t
+      , Fee_excess.Stable.V1.t
+      , unit )
       Poly.t
     [@@deriving sexp]
   end
@@ -59,21 +67,26 @@ module type Blockchain_state = sig
     , Frozen_ledger_hash.var
     , Mina_transaction_logic.Zkapp_command_logic.Local_state.Checked.t
     , Block_time.Checked.t
-    , Body_reference.var )
+    , Body_reference.var
+    , Currency.Amount.Signed.var
+    , Pending_coinbase.Stack.var
+    , Fee_excess.var
+    , unit )
     Poly.t
 
   val staged_ledger_hash :
-    ('staged_ledger_hash, _, _, _, _) Poly.t -> 'staged_ledger_hash
+    ('staged_ledger_hash, _, _, _, _, _, _, _, _) Poly.t -> 'staged_ledger_hash
 
   val snarked_ledger_hash :
-    (_, 'frozen_ledger_hash, _, _, _) Poly.t -> 'frozen_ledger_hash
+    (_, 'frozen_ledger_hash, _, _, _, _, _, _, _) Poly.t -> 'frozen_ledger_hash
 
   val genesis_ledger_hash :
-    (_, 'frozen_ledger_hash, _, _, _) Poly.t -> 'frozen_ledger_hash
+    (_, 'frozen_ledger_hash, _, _, _, _, _, _, _) Poly.t -> 'frozen_ledger_hash
 
-  val timestamp : (_, _, _, 'time, _) Poly.t -> 'time
+  val timestamp : (_, _, _, 'time, _, _, _, _, _) Poly.t -> 'time
 
-  val body_reference : (_, _, _, _, 'body_reference) Poly.t -> 'body_reference
+  val body_reference :
+    (_, _, _, _, 'body_reference, _, _, _, _) Poly.t -> 'body_reference
 end
 
 module type Protocol_state = sig
@@ -291,6 +304,8 @@ module type S = sig
   module Data : sig
     module Local_state : sig
       module Snapshot : sig
+        type t
+
         module Ledger_snapshot : sig
           type t =
             | Genesis_epoch_ledger of Mina_ledger.Ledger.t
@@ -339,6 +354,20 @@ module type S = sig
         -> Signature_lib.Public_key.Compressed.Set.t
         -> Block_time.t
         -> unit
+
+      module For_tests : sig
+        type snapshot_identifier =
+          | Staking_epoch_snapshot
+          | Next_epoch_snapshot
+
+        (* set epoch ledgers in local state for testing
+           relies on persnickety imperative code that should not be exposed more generally
+        *)
+        val set_snapshot : t -> snapshot_identifier -> Snapshot.t -> unit
+
+        (* snapshot with empty delegatee table *)
+        val snapshot_of_ledger : Snapshot.Ledger_snapshot.t -> Snapshot.t
+      end
     end
 
     module Vrf : sig
@@ -622,25 +651,6 @@ module type S = sig
   module Hooks : sig
     open Data
 
-    module Rpcs : sig
-      include Network_peer.Rpc_intf.Rpc_interface_intf
-
-      val rpc_handlers :
-           context:(module CONTEXT)
-        -> local_state:Local_state.t
-        -> genesis_ledger_hash:Frozen_ledger_hash.t
-        -> rpc_handler list
-
-      type query =
-        { query :
-            'q 'r.
-               Network_peer.Peer.t
-            -> ('q, 'r) rpc
-            -> 'q
-            -> 'r Network_peer.Rpc_intf.rpc_response Deferred.t
-        }
-    end
-
     (* Check whether we are in the genesis epoch *)
     val is_genesis_epoch : constants:Constants.t -> Block_time.t -> bool
 
@@ -668,7 +678,7 @@ module type S = sig
            Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
       -> select_status
 
-    (*Data required to evaluate VRFs for an epoch*)
+    (** Data required to evaluate VRFs for an epoch *)
     val get_epoch_data_for_vrf :
          constants:Constants.t
       -> Unix_timestamp.t
@@ -728,13 +738,24 @@ module type S = sig
 
     (**
      * Synchronize local state over the network.
+
+     * [glue_sync_ledger] is [Mina_networking.glue_sync_ledger], with the [Mina_networking.t] argument
+       already supplied
      *)
     val sync_local_state :
          context:(module CONTEXT)
       -> trust_system:Trust_system.t
       -> local_state:Local_state.t
-      -> random_peers:(int -> Network_peer.Peer.t list Deferred.t)
-      -> query_peer:Rpcs.query
+      -> glue_sync_ledger:
+           (   preferred:Network_peer.Peer.t list
+            -> (Frozen_ledger_hash.t * Mina_ledger.Sync_ledger.Query.t)
+               Pipe_lib.Linear_pipe.Reader.t
+            -> ( Frozen_ledger_hash.t
+               * Mina_ledger.Sync_ledger.Query.t
+               * Mina_ledger.Sync_ledger.Answer.t
+                 Network_peer.Envelope.Incoming.t )
+               Pipe.Writer.t
+            -> unit )
       -> local_state_sync
       -> unit Deferred.Or_error.t
 

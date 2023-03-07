@@ -52,6 +52,17 @@ let of_nat (type n) (n : n Pickles_types.Nat.t) : t =
   | S _ ->
       failwithf "Proofs_verified.of_nat: got %d" (to_int n) ()
 
+let of_int (n : int) : t =
+  match n with
+  | 0 ->
+      N0
+  | 1 ->
+      N1
+  | 2 ->
+      N2
+  | _ ->
+      failwithf "Proofs_verified.of_int: got %d" n ()
+
 type 'f boolean = 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
 
 type 'a vec2 = ('a, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
@@ -65,18 +76,18 @@ module Prefix_mask = struct
     | N0 ->
         [ false; false ]
     | N1 ->
-        [ true; false ]
+        [ false; true ]
     | N2 ->
         [ true; true ]
 
   let[@warning "-40-42"] back : bool vec2 -> proofs_verified = function
     | [ false; false ] ->
         N0
-    | [ true; false ] ->
+    | [ false; true ] ->
         N1
     | [ true; true ] ->
         N2
-    | [ false; true ] ->
+    | [ true; false ] ->
         invalid_arg "Prefix_mask.back: invalid mask [false; true]"
 
   let typ (type f)

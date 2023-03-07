@@ -113,9 +113,61 @@ module N19 : I with type 'a plus_n = 'a N18.plus_n s
 
 module N20 : I with type 'a plus_n = 'a N19.plus_n s
 
-module N26 : I with type 'a plus_n = 'a N18.plus_n N8.plus_n
+module N21 : I with type 'a plus_n = 'a N20.plus_n s
 
-module N48 : I with type 'a plus_n = 'a N26.plus_n N18.plus_n N4.plus_n
+module N22 : I with type 'a plus_n = 'a N21.plus_n s
+
+module N23 : I with type 'a plus_n = 'a N22.plus_n s
+
+module N24 : I with type 'a plus_n = 'a N23.plus_n s
+
+module N25 : I with type 'a plus_n = 'a N24.plus_n s
+
+module N26 : I with type 'a plus_n = 'a N25.plus_n s
+
+module N27 : I with type 'a plus_n = 'a N26.plus_n s
+
+module N28 : I with type 'a plus_n = 'a N27.plus_n s
+
+module N29 : I with type 'a plus_n = 'a N28.plus_n s
+
+module N30 : I with type 'a plus_n = 'a N29.plus_n s
+
+module N31 : I with type 'a plus_n = 'a N30.plus_n s
+
+module N32 : I with type 'a plus_n = 'a N31.plus_n s
+
+module N33 : I with type 'a plus_n = 'a N32.plus_n s
+
+module N34 : I with type 'a plus_n = 'a N33.plus_n s
+
+module N35 : I with type 'a plus_n = 'a N34.plus_n s
+
+module N36 : I with type 'a plus_n = 'a N35.plus_n s
+
+module N37 : I with type 'a plus_n = 'a N36.plus_n s
+
+module N38 : I with type 'a plus_n = 'a N37.plus_n s
+
+module N39 : I with type 'a plus_n = 'a N38.plus_n s
+
+module N40 : I with type 'a plus_n = 'a N39.plus_n s
+
+module N41 : I with type 'a plus_n = 'a N40.plus_n s
+
+module N42 : I with type 'a plus_n = 'a N41.plus_n s
+
+module N43 : I with type 'a plus_n = 'a N42.plus_n s
+
+module N44 : I with type 'a plus_n = 'a N43.plus_n s
+
+module N45 : I with type 'a plus_n = 'a N44.plus_n s
+
+module N46 : I with type 'a plus_n = 'a N45.plus_n s
+
+module N47 : I with type 'a plus_n = 'a N46.plus_n s
+
+module N48 : I with type 'a plus_n = 'a N47.plus_n s
 
 module Empty : sig
   type t = T of t

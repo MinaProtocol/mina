@@ -410,7 +410,9 @@ module Options = struct
               (* If we implement the /call endpoint we'll need to list its supported methods here *)
           ; call_methods= []
           ; balance_exemptions= []
-          ; mempool_coins= false } }
+          ; mempool_coins= false
+          ; block_hash_case = Some `Case_sensitive
+          ; transaction_hash_case = Some `Case_sensitive } }
   end
 
   module Real = Impl (Deferred.Result)
@@ -433,7 +435,9 @@ module Options = struct
                    ; timestamp_start_index= None
                    ; call_methods= []
                    ; balance_exemptions= []
-                   ; mempool_coins= false } } )
+                   ; mempool_coins= false
+                   ; block_hash_case= Some `Case_sensitive
+                   ; transaction_hash_case= Some `Case_sensitive } } )
     end )
 end
 

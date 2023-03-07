@@ -5,7 +5,7 @@ metadata:
   labels:
     app: {{ template "archive-node.fullname" . }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.archive.replicas }}
   selector:
     matchLabels:
       app: {{ template "archive-node.fullname" . }}
@@ -15,7 +15,6 @@ spec:
         app: {{ template "archive-node.fullname" . }}
         testnet: {{ .Values.testnetName }}
         role: archive-node
-        version: {{ trunc 6 (split ":" .Values.mina.image)._1 | trimSuffix "-" }}
         {{- if .Values.archive.enableLocalDaemon }}
         syncStatus: INIT
         {{- end }}
@@ -24,6 +23,7 @@ spec:
         prometheus.io/port: {{ .Values.archive.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
+      {{- if .Values.archive.enableLocalDaemon }}
       initContainers:
       - name: libp2p-perms
         image: {{ $.Values.mina.image | quote }}
@@ -37,8 +37,9 @@ spec:
         env:
           - name: MINA_LIBP2P_PASS
             value: {{ $.Values.mina.privkeyPass | quote }}
+      {{- end}}
       containers:
-{{- if .Values.archive.enableLocalDaemon }}
+      {{- if .Values.archive.enableLocalDaemon }}
       - name: mina
         resources:
           limits:
@@ -103,23 +104,23 @@ spec:
           value: {{ $.Values.mina.privkeyPass | quote }}
         ports:
         - name: client-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ .Values.mina.ports.client }}
         - name: graphql-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ .Values.mina.ports.graphql }}
         - name: metrics-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ .Values.mina.ports.metrics }}
         - name: external-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ .Values.mina.ports.p2p }}
           hostPort: {{ .Values.mina.ports.p2p }}
 {{$name := include "archive-node.fullname" . }}
 {{$data := dict "name" $name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.daemon.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
-        volumeMounts: 
+        volumeMounts:
         - name: config-dir
           mountPath: /root/.mina-config
         {{- if .Values.mina.runtimeConfig }}
@@ -132,7 +133,7 @@ spec:
       # Archive Process
       - name: archive
         image: {{ .Values.archive.image }}
-        args: [ 
+        args: [
           "mina-archive",
           "run",
           "-metrics-port", "{{ .Values.archive.ports.metrics }}",
@@ -157,7 +158,7 @@ spec:
           protocol: TCP
           containerPort: {{ .Values.archive.ports.postgres }}
         - name: metrics-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ .Values.archive.ports.metrics }}
 {{- include "healthcheck.archive.allChecks" . | indent 8 }}
 {{- include "nodeSelector.preemptible" .Values | indent 6 }}

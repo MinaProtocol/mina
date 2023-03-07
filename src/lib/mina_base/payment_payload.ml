@@ -77,7 +77,7 @@ let var_of_t ({ source_pk; receiver_pk; amount } : t) : var =
 
 [%%endif]
 
-let gen_aux ?source_pk ~max_amount =
+let gen_aux ?source_pk max_amount =
   let open Quickcheck.Generator.Let_syntax in
   let%bind source_pk =
     match source_pk with
@@ -90,6 +90,6 @@ let gen_aux ?source_pk ~max_amount =
   let%map amount = Amount.gen_incl Amount.zero max_amount in
   Poly.{ source_pk; receiver_pk; amount }
 
-let gen ?source_pk ~max_amount = gen_aux ?source_pk ~max_amount
+let gen ?source_pk max_amount = gen_aux ?source_pk max_amount
 
-let gen_default_token ?source_pk ~max_amount = gen_aux ?source_pk ~max_amount
+let gen_default_token ?source_pk max_amount = gen_aux ?source_pk max_amount
