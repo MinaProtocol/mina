@@ -62,5 +62,5 @@ let deriver obj =
   Fields_derivers_zkapps.(
     iso_string ~name:"StateHash" ~js_type:Field ~to_string:to_base58_check
       ~of_string:of_base58_check_exn
-    |> with_checked ~name:"StateHash" ~checked:field)
+    |> needs_custom_js ~name:"StateHash" ~js_type:field)
     obj
