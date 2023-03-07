@@ -33,10 +33,11 @@ let add (type f)
       sum )
 
 let%test_unit "generic add gadget" =
+  Printf.printf "generic_add gadget test\n" ;
   (* Import the gadget test runner *)
   let open Kimchi_gadgets_test_runner in
   (* Initialize the SRS cache. *)
-  let () = Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] in
+  (* TODO: lazy let () = Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] in *)
 
   (* Helper to test generic add gate gadget
    *   Inputs operands and expected output: left_input + right_input = sum
@@ -47,7 +48,7 @@ let%test_unit "generic add gadget" =
       let _proof_keypair, _proof =
         Runner.generate_and_verify_proof (fun () ->
             let open Runner.Impl in
-            (* Set up snary variables for inputs and outputs *)
+            (* Set up snarky variables for inputs and outputs *)
             let left_input =
               exists Field.typ ~compute:(fun () ->
                   Field.Constant.of_int left_input )
