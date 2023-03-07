@@ -164,7 +164,10 @@ module Wrap : sig
             -> ('a, 'b, 'f, ('f, 'e) Opt.t, ('d Lookup.t, 'e) Opt.t, 'bool) t
 
           val typ :
-               'f Spec.impl
+               (module Snarky_backendless.Snark_intf.Run
+                  with type field = 'f
+                   and type field_var = 'field_var
+                   and type run_state = 'state )
             -> dummy_scalar:'a
             -> dummy_scalar_challenge:'b Scalar_challenge.t
             -> challenge:
@@ -584,7 +587,10 @@ module Wrap : sig
       [@@deriving sexp, compare, yojson, hash, equal]
 
       val typ :
-           (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+           (module Snarky_backendless.Snark_intf.Run
+              with type field = 'f
+               and type field_var = 'field_var
+               and type run_state = 'state )
         -> dummy_scalar:'a
         -> dummy_scalar_challenge:'b Scalar_challenge.t
         -> challenge:
@@ -741,7 +747,10 @@ module Wrap : sig
       }
 
     val opt_spec :
-         'f Spec.impl
+         (module Snarky_backendless.Snark_intf.Run
+            with type field = 'f
+             and type field_var = 'field_var
+             and type run_state = 'state )
       -> ('a, 'b, 'c, 'd) t
       -> ( ('a Scalar_challenge.t * unit) Hlist.HlistId.t option
          , ( ('b Scalar_challenge.t * unit) Hlist.HlistId.t
@@ -936,7 +945,10 @@ module Wrap : sig
       (** A layout of the raw data in a statement, which is needed for
           representing it inside the circuit. *)
       val spec :
-           'a Spec.impl
+           (module Snarky_backendless.Snark_intf.Run
+              with type field = 'a
+               and type field_var = 'field_var
+               and type run_state = 'state )
         -> ( 'challenge1
            , 'challenge2
            , 'field1 Hlist0.Id.t
@@ -1219,7 +1231,10 @@ module Step : sig
         (** A layout of the raw data in this value, which is needed for
           representing it inside the circuit. *)
         val spec :
-             'f Spec.impl
+             (module Snarky_backendless.Snark_intf.Run
+                with type field = 'f
+                 and type field_var = 'field_var
+                 and type run_state = 'state )
           -> 'num_bulletproof_challenges Nat.t
           -> ( 'challenge1
              , 'challenge2
@@ -1307,7 +1322,10 @@ module Step : sig
       end
 
       val typ :
-           'a Spec.impl
+           (module Snarky_backendless.Snark_intf.Run
+              with type field = 'a
+               and type field_var = 'field_var
+               and type run_state = 'state )
         -> ( 'b
            , 'c
            , 'a
@@ -1384,7 +1402,10 @@ module Step : sig
       Hlist.HlistId.t
 
     val typ :
-         'f Spec.impl
+         (module Snarky_backendless.Snark_intf.Run
+            with type field = 'f
+             and type field_var = 'field_var
+             and type run_state = 'state )
       -> ( Limb_vector.Challenge.Constant.t
          , 'f Limb_vector.Challenge.t
          , 'a Hlist0.Id.t
@@ -1537,7 +1558,10 @@ module Step : sig
          t
 
     val spec :
-         'a Spec.impl
+         (module Snarky_backendless.Snark_intf.Run
+            with type field = 'a
+             and type field_var = 'field_var
+             and type run_state = 'state )
       -> 'b Nat.t
       -> 'c Nat.t
       -> ('d, 'e, 'f Hlist0.Id.t, 'g Hlist0.Id.t) Wrap.Lookup_parameters.t

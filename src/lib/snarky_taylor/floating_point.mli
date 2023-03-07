@@ -2,32 +2,42 @@ open Snarky_backendless
 open Snark
 open Snarky_integer
 
-type 'f t
+type 'field_var t
 
-val constant : m:'f m -> value:Bigint.t -> precision:int -> 'f t
+val constant :
+  m:('f, 'field_var) m -> value:Bigint.t -> precision:int -> 'field_var t
 
-val powers : m:'f m -> 'f t -> int -> 'f t array
+val powers : m:('f, 'field_var) m -> 'field_var t -> int -> 'field_var t array
 
-val mul : m:'f m -> 'f t -> 'f t -> 'f t
+val mul : m:('f, 'field_var) m -> 'field_var t -> 'field_var t -> 'field_var t
 
-val add : m:'f m -> 'f t -> 'f t -> 'f t
+val add : m:('f, 'field_var) m -> 'field_var t -> 'field_var t -> 'field_var t
 
-val sub : m:'f m -> 'f t -> 'f t -> 'f t
+val sub : m:('f, 'field_var) m -> 'field_var t -> 'field_var t -> 'field_var t
 
-val add_signed : m:'f m -> 'f t -> [ `Pos | `Neg ] * 'f t -> 'f t
+val add_signed :
+     m:('f, 'field_var) m
+  -> 'field_var t
+  -> [ `Pos | `Neg ] * 'field_var t
+  -> 'field_var t
 
 val of_quotient :
-     m:'f m
+     m:('f, 'field_var) m
   -> precision:int
-  -> top:'f Integer.t
-  -> bottom:'f Integer.t
+  -> top:('f, 'field_var) Integer.t
+  -> bottom:('f, 'field_var) Integer.t
   -> top_is_less_than_bottom:unit
-  -> 'f t
+  -> 'field_var t
 
-val of_bits : m:'f m -> 'f Cvar.t Boolean.t list -> precision:int -> 'f t
+val of_bits :
+     m:('f, 'field_var) m
+  -> 'field_var Boolean.t list
+  -> precision:int
+  -> 'field_var t
 
 val precision : _ t -> int
 
-val to_bignum : m:'f m -> 'f t -> unit -> Bignum.t
+val to_bignum : m:('f, 'field_var) m -> 'field_var t -> unit -> Bignum.t
 
-val le : m:'f m -> 'f t -> 'f t -> 'f Cvar.t Boolean.t
+val le :
+  m:('f, 'field_var) m -> 'field_var t -> 'field_var t -> 'field_var Boolean.t

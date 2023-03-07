@@ -7,7 +7,7 @@ module Spec = Spec
 module Opt = Plonk_types.Opt
 open Core_kernel
 
-type 'f impl = 'f Spec.impl
+type ('f, 'field_var) impl = ('f, 'field_var) Snarky_backendless.Snark0.m
 
 let index_to_field_elements =
   Pickles_base.Side_loaded_verification_key.index_to_field_elements
@@ -225,7 +225,7 @@ module Wrap = struct
                   | Plonk_types.Opt.Flag.No, _ ->
                       Plonk_types.Opt.None )
 
-            let spec (type f) ((module Impl) : f impl) (zero : _ Zero_values.t)
+            let spec (type f field_var) ((module Impl) : (f, field_var) impl) (zero : _ Zero_values.t)
                 (feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
                 =
               let opt_spec flag =

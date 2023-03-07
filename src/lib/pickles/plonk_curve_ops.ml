@@ -1,6 +1,5 @@
 open Core_kernel
-
-open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
+open Kimchi_backend_common.Constraints.Plonk_constraint
 
 let seal i = Tuple_lib.Double.map ~f:(Util.seal i)
 
@@ -47,7 +46,7 @@ let add_fast (type f)
       assert_
         { annotation = Some __LOC__
         ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+            Kimchi_backend_common.Constraints.Plonk_constraint.T
               (EC_add_complete
                  { p1; p2; p3; inf; same_x; slope = s; inf_z; x21_inv } )
         } ;
@@ -127,7 +126,7 @@ struct
     assert_
       { annotation = Some __LOC__
       ; basic =
-          Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+          Kimchi_backend_common.Constraints.Plonk_constraint.T
             (EC_scale { state = Array.of_list_rev !rounds_rev })
       } ;
     (* TODO: Return n_acc ? *)
@@ -202,7 +201,7 @@ struct
     assert_
       { annotation = Some __LOC__
       ; basic =
-          Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+          Kimchi_backend_common.Constraints.Plonk_constraint.T
             (EC_scale { state = Array.of_list_rev !rounds_rev })
       } ;
     Field.Assert.equal !n_acc scalar ;

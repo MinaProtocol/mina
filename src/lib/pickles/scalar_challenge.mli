@@ -10,18 +10,20 @@ val to_field_constant :
 
 val to_field_checked' :
      ?num_bits:int
-  -> (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> 'f Snarky_backendless.Cvar.t Import.Scalar_challenge.t
-  -> 'f Snarky_backendless.Cvar.t
-     * 'f Snarky_backendless.Cvar.t
-     * 'f Snarky_backendless.Cvar.t
+  -> (module Snarky_backendless.Snark_intf.Run
+        with type field = 'f
+         and type field_var = 'field_var )
+  -> 'field_var Import.Scalar_challenge.t
+  -> 'field_var * 'field_var * 'field_var
 
 val to_field_checked :
      ?num_bits:int
-  -> (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+  -> (module Snarky_backendless.Snark_intf.Run
+        with type field = 'f
+         and type field_var = 'field_var )
   -> endo:'f
-  -> 'f Snarky_backendless.Cvar.t Import.Scalar_challenge.t
-  -> 'f Snarky_backendless.Cvar.t
+  -> 'field_var Import.Scalar_challenge.t
+  -> 'field_var
 
 val test : 'f Import.Spec.impl -> endo:'f -> unit
 
@@ -50,12 +52,11 @@ module Make : functor
 
   val num_bits : int
 
-  val seal :
-    Impl.field Snarky_backendless.Cvar.t -> Impl.field Snarky_backendless.Cvar.t
+  val seal : Impl.field_var -> Impl.field_var
 
   val endo :
        ?num_bits:int
-    -> Impl.field Snarky_backendless.Cvar.t Tuple_lib.Double.t
+    -> Impl.field_var Tuple_lib.Double.t
     -> Impl.Field.t Import.Scalar_challenge.t
     -> G.t
 

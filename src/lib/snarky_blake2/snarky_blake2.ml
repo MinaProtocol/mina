@@ -37,7 +37,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) :
     let xorrot t1 t2 k = xor t1 t2 >>| Fn.flip UInt32.rotr k in
     let sum terms =
       List.fold terms ~init:(Impl.Field.Var.constant Field.zero)
-        ~f:(fun acc t -> Impl.Field.add acc t)
+        ~f:(fun acc t -> Impl.Field.Var.add acc t)
     in
     let%bind () = a := sum [ v.(a); v.(b); x ] in
     let%bind () = d := xorrot v.(d) v.(a) r1 in

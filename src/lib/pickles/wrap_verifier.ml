@@ -760,8 +760,7 @@ struct
                 in
                 (* acc' = y + pt_n * acc *)
                 let pt_n_acc = Field.(pt_to_n * acc) in
-                let open
-                  Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint in
+                let open Kimchi_backend_common.Constraints.Plonk_constraint in
                 (* 0 = - acc' + y + pt_n_acc *)
                 let open Field.Constant in
                 assert_

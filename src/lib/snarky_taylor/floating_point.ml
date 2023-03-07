@@ -13,7 +13,7 @@ module B = Bigint
     value / 2^precision
 *)
 
-type 'f t = { value : 'f Cvar.t; precision : int }
+type 'field_var t = { value : 'field_var; precision : int }
 
 let precision t = t.precision
 

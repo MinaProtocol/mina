@@ -1,5 +1,3 @@
-type 'f impl = (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-
 type (_, _, _) basic =
   | Unit : (unit, unit, < .. >) basic
   | Field
@@ -84,7 +82,8 @@ val typ :
      assert_16_bits:('field_var -> unit)
   -> (module Snarky_backendless.Snark_intf.Run
         with type field = 'a
-         and type field_var = 'field_var )
+         and type field_var = 'field_var
+         and type run_state = 'state )
   -> ( 'b
      , 'c
      , 'f
@@ -160,7 +159,9 @@ val packed_typ :
   -> ('e, 'd, 'a, 'field_var, 'state) ETyp.t
 
 val pack :
-     'f impl
+     (module Snarky_backendless.Snark_intf.Run
+        with type field = 'f
+         and type field_var = 'field_var )
   -> ( 'a
      , 'b
      , < bool1 : bool

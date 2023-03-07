@@ -110,9 +110,13 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) :
             ceil_log2
               (c + (List.length vars * Unchecked.to_int Unsigned.UInt32.max_int)))
         in
+        let sum terms =
+          List.fold terms ~init:(Field.Var.constant Field.zero) ~f:(fun acc t ->
+              Field.Var.add acc t )
+        in
         let%map bits =
           Field.Checked.choose_preimage_var ~length:max_length
-            (Field.Var.sum
+            (sum
                (Field.Var.constant (Field.of_int c) :: List.map vars ~f:pack) )
         in
         Array.of_list

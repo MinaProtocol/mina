@@ -248,10 +248,16 @@ type ('f, 'env) etyp =
   }
 
 let rec etyp :
-    type f var value env.
-    (f, env) etyp -> (value, var, env) T.t -> (var, value, f) ETyp.t =
+    type f field_var state var value env.
+       (module Snarky_backendless.Snark_intf.Run
+          with type field = f
+           and type field_var = field_var
+           and type run_state = state )
+    -> (f, env) etyp
+    -> (value, var, env) T.t
+    -> (var, value, f) ETyp.t =
   let open Snarky_backendless.Typ in
-  fun e spec ->
+  fun (module Impl) e spec ->
     match spec with
     | B spec ->
         e.etyp spec
@@ -259,10 +265,10 @@ let rec etyp :
         let (T (typ, f, f_inv)) = e.etyp chal in
         T (Sc.typ typ, Sc.map ~f, Sc.map ~f:f_inv)
     | Vector (spec, n) ->
-        let (T (typ, f, f_inv)) = etyp e spec in
+        let (T (typ, f, f_inv)) = etyp (module Impl) e spec in
         T (Vector.typ typ n, Vector.map ~f, Vector.map ~f:f_inv)
     | Array (spec, n) ->
-        let (T (typ, f, f_inv)) = etyp e spec in
+        let (T (typ, f, f_inv)) = etyp (module Impl) e spec in
         T (array ~length:n typ, Array.map ~f, Array.map ~f:f_inv)
     | Struct [] ->
         let open Hlist.HlistId in
@@ -274,8 +280,8 @@ let rec etyp :
           , Fn.id )
     | Struct (spec :: specs) ->
         let open Hlist.HlistId in
-        let (T (t1, f1, f1_inv)) = etyp e spec in
-        let (T (t2, f2, f2_inv)) = etyp e (Struct specs) in
+        let (T (t1, f1, f1_inv)) = etyp (module Impl) e spec in
+        let (T (t2, f2, f2_inv)) = etyp (module Impl) e (Struct specs) in
         T
           ( tuple2 t1 t2
             |> transport
@@ -284,8 +290,8 @@ let rec etyp :
           , (fun (x, xs) -> f1 x :: f2 xs)
           , fun (x :: xs) -> (f1_inv x, f2_inv xs) )
     | Opt { inner; flag; dummy1; dummy2; bool = (module B) } ->
-        let (T (bool, f_bool, f_bool')) = etyp e (B Bool) in
-        let (T (a, f_a, f_a')) = etyp e inner in
+        let (T (bool, f_bool, f_bool')) = etyp (module Impl) e (B Bool) in
+        let (T (a, f_a, f_a')) = etyp (module Impl) e inner in
         let opt_map ~f1 ~f2 (x : _ Plonk_types.Opt.t) : _ Plonk_types.Opt.t =
           match x with
           | None ->
@@ -304,7 +310,7 @@ let rec etyp :
           , f
           , f' )
     | Opt_unflagged { inner; flag; dummy1; dummy2 } ->
-        let (T (typ, f, f_inv)) = etyp e inner in
+        let (T (typ, f, f_inv)) = etyp (module Impl) e inner in
         let f x = Some (f x) in
         let f_inv = function None -> f_inv dummy2 | Some x -> f_inv x in
         let typ =
@@ -314,12 +320,10 @@ let rec etyp :
         in
         T (typ, f, f_inv)
     | Constant (x, assert_eq, spec) ->
-        let (T (Typ typ, f, f')) = etyp e spec in
+        let (T (Typ typ, f, f')) = etyp (module Impl) e spec in
         let constant_var =
           let fields, aux = typ.value_to_fields x in
-          let fields =
-            Array.map fields ~f:(fun x -> Snarky_backendless.Cvar.Constant x)
-          in
+          let fields = Array.map fields ~f:(fun x -> Impl.Cvar.constant x) in
           typ.var_of_fields (fields, aux)
         in
         (* We skip any constraints that would be added here, but we *do* use

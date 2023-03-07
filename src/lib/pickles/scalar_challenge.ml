@@ -122,7 +122,7 @@ let to_field_checked' (type f) ?(num_bits = num_bits)
       assert_
         { annotation = Some __LOC__
         ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
+            Kimchi_backend_common.Constraints.Plonk_constraint.(
               T (EC_endoscalar { state = Array.of_list_rev !state }))
         } ) ;
   (!a, !b, !n)
@@ -295,7 +295,7 @@ struct
         assert_
           { annotation = Some __LOC__
           ; basic =
-              Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
+              Kimchi_backend_common.Constraints.Plonk_constraint.(
                 T
                   (EC_endoscale
                      { xs
