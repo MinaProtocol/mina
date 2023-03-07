@@ -242,18 +242,13 @@ module Inner_curve : sig
     -> t
 
   val ( + ) :
-       Impls.Wrap.field Snarky_backendless.Cvar.t
-       * Impls.Wrap.field Snarky_backendless.Cvar.t
-    -> Impls.Wrap.field Snarky_backendless.Cvar.t
-       * Impls.Wrap.field Snarky_backendless.Cvar.t
-    -> Impls.Wrap.field Snarky_backendless.Cvar.t
-       * Impls.Wrap.field Snarky_backendless.Cvar.t
+       Impls.Wrap.field_var * Impls.Wrap.field_var
+    -> Impls.Wrap.field_var * Impls.Wrap.field_var
+    -> Impls.Wrap.field_var * Impls.Wrap.field_var
 
   val double :
-       Impls.Wrap.field Snarky_backendless.Cvar.t
-       * Impls.Wrap.field Snarky_backendless.Cvar.t
-    -> Impls.Wrap.field Snarky_backendless.Cvar.t
-       * Impls.Wrap.field Snarky_backendless.Cvar.t
+       Impls.Wrap.field_var * Impls.Wrap.field_var
+    -> Impls.Wrap.field_var * Impls.Wrap.field_var
 
   val scale : t -> Inputs.Impl.Boolean.var list -> Inputs.F.t * Inputs.F.t
 

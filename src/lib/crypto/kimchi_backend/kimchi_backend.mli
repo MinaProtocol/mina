@@ -222,8 +222,8 @@ module Impls : sig
   end
 
   (** Instantiation of Snarky on the Tick / Step / Vesta curve. *)
-  module Step_impl : module type of Snarky_backendless.Snark.Run.Make (Tick)
+  module Step : module type of Snarky_backendless.Snark.Run.Make (Tick)
 
   (** Instantiation of Snarky on the Tock / Wrap / Pallas curve. *)
-  module Wrap_impl : module type of Snarky_backendless.Snark.Run.Make (Tock)
+  module Wrap : module type of Snarky_backendless.Snark.Run.Make (Tock)
 end

@@ -81,7 +81,7 @@ end
 val typ :
      assert_16_bits:('field_var -> unit)
   -> (module Snarky_backendless.Snark_intf.Run
-        with type field = 'a
+        with type field = 'f
          and type field_var = 'field_var
          and type run_state = 'state )
   -> ( 'b
@@ -102,10 +102,10 @@ val typ :
            Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; bulletproof_challenge2 :
-           'a Limb_vector.Challenge.t Kimchi_backend_common.Scalar_challenge.t
+           'f Limb_vector.Challenge.t Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; challenge1 : Limb_vector.Challenge.Constant.t
-       ; challenge2 : 'a Limb_vector.Challenge.t
+       ; challenge2 : 'f Limb_vector.Challenge.t
        ; digest1 :
            ( Limb_vector.Constant.Hex64.t
            , Digest.Limbs.n )
@@ -161,7 +161,8 @@ val packed_typ :
 val pack :
      (module Snarky_backendless.Snark_intf.Run
         with type field = 'f
-         and type field_var = 'field_var )
+         and type field_var = 'field_var
+         and type run_state = 'state )
   -> ( 'a
      , 'b
      , < bool1 : bool

@@ -25,7 +25,13 @@ val to_field_checked :
   -> 'field_var Import.Scalar_challenge.t
   -> 'field_var
 
-val test : 'f Import.Spec.impl -> endo:'f -> unit
+val test :
+     (module Snarky_backendless.Snark_intf.Run
+        with type field = 'f
+         and type field_var = 'field_var
+         and type run_state = 'state )
+  -> endo:'f
+  -> unit
 
 module Make : functor
   (Impl : Snarky_backendless.Snark_intf.Run)

@@ -1,14 +1,21 @@
 open Core_kernel
 open Kimchi_backend_common.Constraints.Plonk_constraint
 
-let seal i = Tuple_lib.Double.map ~f:(Util.seal i)
+let seal_double (type field field_var state)
+    (module Impl : Snarky_backendless.Snark_intf.Run
+      with type field = field
+       and type field_var = field_var
+       and type run_state = state ) (x, y) =
+  (Impl.seal x, Impl.seal y)
 
-let add_fast (type f)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-    ?(check_finite = true) ((x1, y1) as p1) ((x2, y2) as p2) :
-    Impl.Field.t * Impl.Field.t =
-  let p1 = seal (module Impl) p1 in
-  let p2 = seal (module Impl) p2 in
+let add_fast (type f field_var state)
+    (module Impl : Snarky_backendless.Snark_intf.Run
+      with type field = f
+       and type field_var = field_var
+       and type run_state = state ) ?(check_finite = true) ((x1, y1) as p1)
+    ((x2, y2) as p2) : Impl.Field.t * Impl.Field.t =
+  let p1 = seal_double (module Impl) p1 in
+  let p2 = seal_double (module Impl) p2 in
   let open Impl in
   let open Field.Constant in
   let bool b = if b then one else zero in
@@ -58,8 +65,6 @@ module Make
 struct
   open Impl
 
-  let seal = seal (module Impl)
-
   let add_fast = add_fast (module Impl)
 
   let bits_per_chunk = 5
@@ -71,7 +76,7 @@ struct
   let scale_fast_msb_bits base
       (Pickles_types.Shifted_value.Type1.Shifted_value
         (bits_msb : Boolean.var array) ) : Field.t * Field.t =
-    let ((x_base, y_base) as base) = seal base in
+    let ((x_base, y_base) as base) = seal_double (module Impl) base in
     let ( !! ) = As_prover.read_var in
     let mk f = exists Field.typ ~compute:f in
     (* MSB bits *)
@@ -139,7 +144,7 @@ struct
   let scale_fast_unpack base
       (Pickles_types.Shifted_value.Type1.Shifted_value (scalar : Field.t))
       ~num_bits : (Field.t * Field.t) * Boolean.var array =
-    let ((x_base, y_base) as base) = seal base in
+    let ((x_base, y_base) as base) = seal_double (module Impl) base in
     let ( !! ) = As_prover.read_var in
     let mk f = exists Field.typ ~compute:f in
     (* MSB bits *)

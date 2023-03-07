@@ -235,16 +235,19 @@ type 'env exists = T : ('t1, 't2, 'env) T.t -> 'env exists
 type generic_spec = { spec : 'env. 'env exists }
 
 module ETyp = struct
-  type ('var, 'value, 'f) t =
+  type ('var, 'value, 'f, 'field_var, 'state) t =
     | T :
         ('inner, 'value, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
         * ('inner -> 'var)
         * ('var -> 'inner)
-        -> ('var, 'value, 'f) t
+        -> ('var, 'value, 'f, 'field_var, 'state) t
 end
 
-type ('f, 'env) etyp =
-  { etyp : 'var 'value. ('value, 'var, 'env) basic -> ('var, 'value, 'f) ETyp.t
+type ('f, 'field_var, 'state, 'env) etyp =
+  { etyp :
+      'var 'value.
+         ('value, 'var, 'env) basic
+      -> ('var, 'value, 'f, 'field_var, 'state) ETyp.t
   }
 
 let rec etyp :
@@ -253,9 +256,9 @@ let rec etyp :
           with type field = f
            and type field_var = field_var
            and type run_state = state )
-    -> (f, env) etyp
+    -> (f, field_var, state, env) etyp
     -> (value, var, env) T.t
-    -> (var, value, f) ETyp.t =
+    -> (var, value, f, field_var, state) ETyp.t =
   let open Snarky_backendless.Typ in
   fun (module Impl) e spec ->
     match spec with
@@ -323,7 +326,7 @@ let rec etyp :
         let (T (Typ typ, f, f')) = etyp (module Impl) e spec in
         let constant_var =
           let fields, aux = typ.value_to_fields x in
-          let fields = Array.map fields ~f:(fun x -> Impl.Cvar.constant x) in
+          let fields = Array.map fields ~f:(fun x -> Impl.Field.constant x) in
           typ.var_of_fields (fields, aux)
         in
         (* We skip any constraints that would be added here, but we *do* use
@@ -358,15 +361,18 @@ module Common (Impl : Snarky_backendless.Snark_intf.Run) = struct
           Challenge.Constant.t Sc.t Bulletproof_challenge.t
       ; bulletproof_challenge2 : Challenge.t Sc.t Bulletproof_challenge.t
       ; branch_data1 : Branch_data.t
-      ; branch_data2 : Impl.field Branch_data.Checked.t
+      ; branch_data2 : (Impl.field, Impl.field_var) Branch_data.Checked.t
       ; .. >
       as
       'a
   end
 end
 
-let pack_basic (type field other_field other_field_var)
-    ((module Impl) : field impl) =
+let pack_basic (type field field_var state other_field other_field_var)
+    (module Impl : Snarky_backendless.Snark_intf.Run
+      with type field = field
+       and type field_var = field_var
+       and type run_state = state ) =
   let open Impl in
   let module C = Common (Impl) in
   let open C in
@@ -401,16 +407,25 @@ let pack_basic (type field other_field other_field_var)
   in
   { pack }
 
-let pack (type f) ((module Impl) as impl : f impl) t =
+let pack (type f field_var state)
+    (module Impl : Snarky_backendless.Snark_intf.Run
+      with type field = f
+       and type field_var = field_var
+       and type run_state = state ) t =
   let open Impl in
-  pack (pack_basic impl) t
+  pack
+    (pack_basic (module Impl))
+    t
     ~zero:(`Packed_bits (Field.zero, 1))
     ~one:(`Packed_bits (Field.one, 1))
     None
 
-let typ_basic (type field other_field other_field_var)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
-    ~assert_16_bits (field : (other_field_var, other_field) Impl.Typ.t) =
+let typ_basic (type field field_var state other_field other_field_var)
+    (module Impl : Snarky_backendless.Snark_intf.Run
+      with type field = field
+       and type field_var = field_var
+       and type run_state = state ) ~assert_16_bits
+    (field : (other_field_var, other_field) Impl.Typ.t) =
   let open Impl in
   let module C = Common (Impl) in
   let open C in
@@ -438,11 +453,14 @@ let typ_basic (type field other_field other_field_var)
   { typ }
 
 let typ ~assert_16_bits impl field t =
-  typ (typ_basic ~assert_16_bits impl field) t
+  typ impl (typ_basic ~assert_16_bits impl field) t
 
-let packed_typ_basic (type field other_field other_field_var)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
-    (field : (other_field_var, other_field, field) ETyp.t) =
+let packed_typ_basic (type field field_var state other_field other_field_var)
+    (module Impl : Snarky_backendless.Snark_intf.Run
+      with type field = field
+       and type field_var = field_var
+       and type run_state = state )
+    (field : (other_field_var, other_field, field, field_var, state) ETyp.t) =
   let open Impl in
   let module Digest = D.Make (Impl) in
   let module Challenge = Limb_vector.Challenge.Make (Impl) in
@@ -468,7 +486,7 @@ let packed_typ_basic (type field other_field other_field_var)
   let etyp :
       type a b.
          (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) basic
-      -> (b, a, field) ETyp.t = function
+      -> (b, a, field, field_var, state) ETyp.t = function
     | Unit ->
         T (Typ.unit, Fn.id, Fn.id)
     | Field ->
@@ -495,4 +513,4 @@ let packed_typ_basic (type field other_field other_field_var)
   in
   { etyp }
 
-let packed_typ impl field t = etyp (packed_typ_basic impl field) t
+let packed_typ impl field t = etyp impl (packed_typ_basic impl field) t

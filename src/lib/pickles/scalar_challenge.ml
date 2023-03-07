@@ -9,9 +9,11 @@ module SC = Scalar_challenge
 let num_bits = 128
 
 (* Has the side effect of checking that [scalar] fits in 128 bits. *)
-let to_field_checked' (type f) ?(num_bits = num_bits)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-    { SC.inner = (scalar : Impl.Field.t) } =
+let to_field_checked' (type f field_var state) ?(num_bits = num_bits)
+    (module Impl : Snarky_backendless.Snark_intf.Run
+      with type field = f
+       and type field_var = field_var
+       and type run_state = state ) { SC.inner = (scalar : Impl.Field.t) } =
   let open Impl in
   let neg_one = Field.Constant.(negate one) in
   let a_func = function
@@ -127,8 +129,11 @@ let to_field_checked' (type f) ?(num_bits = num_bits)
         } ) ;
   (!a, !b, !n)
 
-let to_field_checked (type f) ?num_bits
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) ~endo
+let to_field_checked (type f field_var state) ?num_bits
+    (module Impl : Snarky_backendless.Snark_intf.Run
+      with type field = f
+       and type field_var = field_var
+       and type run_state = state ) ~endo
     ({ SC.inner = (scalar : Impl.Field.t) } as s) =
   let open Impl in
   let a, b, n = to_field_checked' ?num_bits (module Impl) s in
@@ -212,7 +217,7 @@ struct
 
   let num_bits = 128
 
-  let seal = Util.seal (module Impl)
+  let seal = Impl.seal
 
   let endo ?(num_bits = num_bits) t { SC.inner = (scalar : Field.t) } =
     let ( !! ) = As_prover.read_var in

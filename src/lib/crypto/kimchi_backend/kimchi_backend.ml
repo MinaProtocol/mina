@@ -27,8 +27,8 @@ module Impls = struct
     module Inner_curve = Pasta.Pasta.Vesta
   end
 
-  module Step_impl_monad = Snarky_backendless.Snark.Make (Tick)
-  module Wrap_impl_monad = Snarky_backendless.Snark.Make (Tock)
-  module Step_impl = Snarky_backendless.Snark.Run.Make (Tick)
-  module Wrap_impl = Snarky_backendless.Snark.Run.Make (Tock)
+  module Step_monad = Snarky_backendless.Snark.Make (Tick)
+  module Wrap_monad = Snarky_backendless.Snark.Make (Tock)
+  module Step = Snarky_backendless.Snark.Run.Make (Tick)
+  module Wrap = Snarky_backendless.Snark.Run.Make (Tock)
 end

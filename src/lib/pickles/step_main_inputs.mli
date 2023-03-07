@@ -240,18 +240,13 @@ module Inner_curve : sig
     -> Inputs.F.t * Inputs.F.t
 
   val ( + ) :
-       Impls.Step.field Snarky_backendless.Cvar.t
-       * Impls.Step.field Snarky_backendless.Cvar.t
-    -> Impls.Step.field Snarky_backendless.Cvar.t
-       * Impls.Step.field Snarky_backendless.Cvar.t
-    -> Impls.Step.field Snarky_backendless.Cvar.t
-       * Impls.Step.field Snarky_backendless.Cvar.t
+       Impls.Step.field_var * Impls.Step.field_var
+    -> Impls.Step.field_var * Impls.Step.field_var
+    -> Impls.Step.field_var * Impls.Step.field_var
 
   val double :
-       Impls.Step.field Snarky_backendless.Cvar.t
-       * Impls.Step.field Snarky_backendless.Cvar.t
-    -> Impls.Step.field Snarky_backendless.Cvar.t
-       * Impls.Step.field Snarky_backendless.Cvar.t
+       Impls.Step.field_var * Impls.Step.field_var
+    -> Impls.Step.field_var * Impls.Step.field_var
 
   val scale : t -> Inputs.Impl.Boolean.var list -> Inputs.F.t * Inputs.F.t
 

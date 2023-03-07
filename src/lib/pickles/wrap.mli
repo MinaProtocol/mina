@@ -12,27 +12,26 @@ val wrap :
          , Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
          , Impls.Wrap.Impl.Field.t Pickles_types.Shifted_value.Type1.t
          , ( Impls.Wrap.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-           , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
-             Snarky_backendless.Snark_intf.Boolean0.t )
+           , Impls.Wrap.Impl.field_var Snarky_backendless.Snark_intf.Boolean0.t
+           )
            Pickles_types.Plonk_types.Opt.t
          , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
              Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
              .Lookup
              .t
-           , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
-             Snarky_backendless.Snark_intf.Boolean0.t )
+           , Impls.Wrap.Impl.field_var Snarky_backendless.Snark_intf.Boolean0.t
+           )
            Pickles_types.Plonk_types.Opt.t
          , Impls.Wrap.Impl.Boolean.var
-         , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
-         , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
-         , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
-         , ( Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
-             Kimchi_backend_common.Scalar_challenge.t
+         , Impls.Wrap.Impl.field_var
+         , Impls.Wrap.Impl.field_var
+         , Impls.Wrap.Impl.field_var
+         , ( Impls.Wrap.Impl.field_var Kimchi_backend_common.Scalar_challenge.t
              Composition_types.Bulletproof_challenge.t
            , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
            Pickles_types.Vector.t
            Pickles_types.Hlist0.Id.t
-         , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t )
+         , Impls.Wrap.Impl.field_var )
          Import.Types.Wrap.Statement.In_circuit.t
       -> unit )
   -> typ:('a, 'b) Impls.Step.Typ.t

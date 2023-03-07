@@ -2,7 +2,7 @@ open Pickles_types
 open Core_kernel
 open Import
 open Backend
-module Wrap_impl = Kimchi_backend.Impls.Wrap_impl
+module Wrap_impl = Kimchi_backend.Impls.Wrap
 
 (** returns [true] if the [i]th bit of [x] is set to 1 *)
 let test_bit x i = B.(shift_right x i land one = one)

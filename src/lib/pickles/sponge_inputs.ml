@@ -62,8 +62,7 @@ struct
               } )) ;
         t.(Int.(Array.length t - 1)) )
 
-  let add_assign ~state i x =
-    state.(i) <- Util.seal (module Impl) (state.(i) + x)
+  let add_assign ~state i x = state.(i) <- Impl.seal (state.(i) + x)
 
   let copy = Array.copy
 end

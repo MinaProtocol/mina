@@ -1,14 +1,16 @@
 val add_fast :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+     (module Snarky_backendless.Snark_intf.Run
+        with type field = 'f
+         and type field_var = 'field_var )
   -> ?check_finite:bool
-  -> 'f Snarky_backendless.Cvar.t * 'f Snarky_backendless.Cvar.t
-  -> 'f Snarky_backendless.Cvar.t * 'f Snarky_backendless.Cvar.t
-  -> 'f Snarky_backendless.Cvar.t * 'f Snarky_backendless.Cvar.t
+  -> 'field_var * 'field_var
+  -> 'field_var * 'field_var
+  -> 'field_var * 'field_var
 
 module Make
     (Impl : Snarky_backendless.Snark_intf.Run)
     (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t) : sig
-  type var := Impl.field Snarky_backendless.Cvar.t
+  type var := Impl.field_var
 
   type pair := var Tuple_lib.Double.t
 

@@ -27,7 +27,9 @@ module Other_field : sig
     val typ :
       ( Impls.Wrap.Impl.Field.t
       , Backend.Tick.Field.t
-      , Impls.Wrap_impl.Internal_Basic.Field.t )
+      , Impls.Wrap_impl.field
+      , Impls.Wrap_impl.field_var
+      , Impls.Wrap_impl.run_state )
       Snarky_backendless.Typ.t
   end
 end
@@ -51,8 +53,7 @@ val all_possible_domains :
 val num_possible_domains :
   Wrap_hack.Padded_length.n Pickles_types.Nat.s Pickles_types.Nat.t
 
-val assert_n_bits :
-  n:int -> Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t -> unit
+val assert_n_bits : n:int -> Wrap_main_inputs.Impl.field_var -> unit
 
 val incrementally_verify_proof :
      (module Pickles_types.Nat.Add.Intf with type n = 'b)
@@ -109,28 +110,21 @@ val finalize_other_proof :
        < generator : Wrap_main_inputs.Impl.Field.t
        ; shifts : Wrap_main_inputs.Impl.Field.t array
        ; vanishing_polynomial :
-              Wrap_main_inputs.Impl.field Snarky_backendless__.Cvar.t
-           -> Wrap_main_inputs.Impl.field Snarky_backendless__.Cvar.t
+           Wrap_main_inputs.Impl.field_var -> Wrap_main_inputs.Impl.field_var
        ; .. >
   -> sponge:Wrap_main_inputs.Sponge.t
   -> old_bulletproof_challenges:
        ( (Wrap_main_inputs.Impl.Field.t, 'a) Pickles_types.Vector.t
        , 'b )
        Pickles_types.Vector.t
-  -> ( Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
-     , Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
-       Import.Scalar_challenge.t
-     , Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
-       Pickles_types.Shifted_value.Type2.t
-     , ( Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
-         Pickles_types.Shifted_value.Type2.t
-       , Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
-         Snarky_backendless.Boolean.t )
+  -> ( Wrap_main_inputs.Impl.field_var
+     , Wrap_main_inputs.Impl.field_var Import.Scalar_challenge.t
+     , Wrap_main_inputs.Impl.field_var Pickles_types.Shifted_value.Type2.t
+     , ( Wrap_main_inputs.Impl.field_var Pickles_types.Shifted_value.Type2.t
+       , Wrap_main_inputs.Impl.field_var Snarky_backendless.Boolean.t )
        Composition_types.Opt.t
-     , Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
-       Snarky_backendless.Boolean.t
-     , ( Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
-         Import.Scalar_challenge.t
+     , Wrap_main_inputs.Impl.field_var Snarky_backendless.Boolean.t
+     , ( Wrap_main_inputs.Impl.field_var Import.Scalar_challenge.t
          Import.Bulletproof_challenge.t
        , 'c )
        Pickles_types.Vector.t )
@@ -140,9 +134,7 @@ val finalize_other_proof :
      , Wrap_main_inputs.Impl.Boolean.var )
      Pickles_types.Plonk_types.All_evals.In_circuit.t
   -> Wrap_main_inputs.Impl.Boolean.var
-     * ( Wrap_main_inputs.Impl.field Snarky_backendless.Cvar.t
-       , 'c )
-       Pickles_types.Vector.t
+     * (Wrap_main_inputs.Impl.field_var, 'c) Pickles_types.Vector.t
 
 val choose_key :
   'n.

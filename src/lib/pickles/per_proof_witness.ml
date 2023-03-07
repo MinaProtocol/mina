@@ -71,7 +71,7 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       , unit
       , Digest.Make(Impl).t
       , scalar_challenge Types.Bulletproof_challenge.t Types.Step_bp_vec.t
-      , Impl.field Branch_data.Checked.t )
+      , (Impl.field, Impl.field_var) Branch_data.Checked.t )
       Types.Wrap.Proof_state.In_circuit.t
         (** The accumulator state corresponding to the above proof. Contains
       - `deferred_values`: The values necessary for finishing the deferred "scalar field" computations.

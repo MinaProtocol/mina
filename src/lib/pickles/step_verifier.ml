@@ -135,7 +135,9 @@ struct
         let constant_part, non_constant_part =
           List.partition_map (Array.to_list ts) ~f:(fun (t, g) ->
               match t with
-              | `Field (Constant c) | `Packed_bits (Constant c, _) ->
+              | (`Field var | `Packed_bits (var, _))
+                when Option.is_some (Field.to_constant var) ->
+                  let c = Option.value_exn (Field.to_constant var) in
                   First
                     ( if Field.Constant.(equal zero) c then None
                     else if Field.Constant.(equal one) c then Some g

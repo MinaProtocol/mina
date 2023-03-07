@@ -225,7 +225,11 @@ module Wrap = struct
                   | Plonk_types.Opt.Flag.No, _ ->
                       Plonk_types.Opt.None )
 
-            let spec (type f field_var) ((module Impl) : (f, field_var) impl) (zero : _ Zero_values.t)
+            let spec (type f field_var state)
+                (module Impl : Snarky_backendless.Snark_intf.Run
+                  with type field = f
+                   and type field_var = field_var
+                   and type run_state = state ) (zero : _ Zero_values.t)
                 (feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
                 =
               let opt_spec flag =
@@ -791,10 +795,10 @@ module Wrap = struct
       ; use : Opt.Flag.t
       }
 
-    let opt_spec (type f field_var)
+    let opt_spec (type f field_var state)
         (module Impl : Snarky_backendless.Snark_intf.Run
           with type field = f
-           and type field_var = field_var ) { zero = { value; var }; use } =
+           and type field_var = field_var and type run_state = state ) { zero = { value; var }; use } =
       Spec.T.Opt
         { inner = Struct [ Scalar Challenge ]
         ; flag = use
