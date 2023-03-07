@@ -44,4 +44,14 @@ spec:
           - name: "RAYON_NUM_THREADS"
             value: "4"
         imagePullPolicy: Always
+      {{- if $.Values.persist_working_dir }}
+        volumeMounts:
+          - name: working-dir
+            mountPath: /root
+      volumes:
+        - name: working-dir
+          persistentVolumeClaim:
+            claimName: pvc-{{ $.Values.workerName }}
+      {{ end }}
+      
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}

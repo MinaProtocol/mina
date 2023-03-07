@@ -2,6 +2,9 @@ module "kubernetes_testnet" {
   providers = { google = google.gke }
   source    = "../kubernetes/testnet"
 
+  #enable gathering coverage/logs data by attaching pvc to each service 
+  persist_working_dir = true
+
   use_local_charts    = true
   expose_graphql      = var.deploy_graphql_ingress
   healthcheck_enabled = false
@@ -68,6 +71,7 @@ module "kubernetes_testnet" {
       enable_peer_exchange   = true
       enableArchive          = var.archive_node_count > 0
       archiveAddress         = element(local.archive_node_names, index)
+      persist_working_dir    = local.enable_persistence
     }
   ]
 

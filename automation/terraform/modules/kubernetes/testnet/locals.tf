@@ -8,7 +8,26 @@ provider "helm" {
 locals {
   mina_helm_repo = "https://coda-charts.storage.googleapis.com"
 
-  # peers = var.additional_peers
+  peers = var.additional_peers
+  persist_working_dir = var.persist_working_dir
+
+  daemon = {
+    runtimeConfig        = var.runtime_config
+    image                = var.mina_image
+    useCustomEntrypoint  = var.use_custom_entrypoint
+    customEntrypoint     = var.custom_entrypoint
+    privkeyPass          = var.block_producer_key_pass
+    seedPeers            = local.peers
+    logLevel             = var.log_level
+    logSnarkWorkGossip   = var.log_snark_work_gossip
+    logPrecomputedBlocks = var.log_precomputed_blocks
+    logTxnPoolGossip = var.log_txn_pool_gossip
+    uploadBlocksToGCloud = var.upload_blocks_to_gcloud
+    seedPeersURL         = var.seed_peers_url
+    exposeGraphql        = var.expose_graphql
+    cpuRequest = var.cpu_request
+    memRequest= var.mem_request
+  }
 
   healthcheck_vars = {
     enabled             = var.healthcheck_enabled
@@ -40,6 +59,8 @@ locals {
       exposeGraphql        = var.expose_graphql
     }
 
+    healthcheck = local.healthcheck_vars
+    
     seedConfigs = [
       for index, config in var.seed_configs : {
         name             = config.name
@@ -53,27 +74,6 @@ locals {
         archiveAddress   = config.archiveAddress
       }
     ]
-
-    healthcheck = local.healthcheck_vars
-
-  }
-
-  daemon = {
-    runtimeConfig        = var.runtime_config
-    image                = var.mina_image
-    useCustomEntrypoint  = var.use_custom_entrypoint
-    customEntrypoint     = var.custom_entrypoint
-    # privkeyPass          = var.block_producer_key_pass
-    seedPeers            = var.additional_peers
-    logLevel             = var.log_level
-    logSnarkWorkGossip   = var.log_snark_work_gossip
-    logPrecomputedBlocks = var.log_precomputed_blocks
-    logTxnPoolGossip = var.log_txn_pool_gossip
-    uploadBlocksToGCloud = var.upload_blocks_to_gcloud
-    # seedPeersURL         = var.seed_peers_url
-    exposeGraphql        = var.expose_graphql
-    cpuRequest = var.cpu_request
-    memRequest= var.mem_request
   }
 
   block_producer_vars = {
@@ -121,6 +121,7 @@ locals {
         archiveAddress       = config.archiveAddress
       }
     ]
+    persist_working_dir = var.persist_working_dir
   }
 
   archive_vars = [for item in var.archive_configs : {
@@ -162,6 +163,7 @@ locals {
         }
       }
     }
+    persist_working_dir = var.persist_working_dir
   }]
 
   snark_vars = [
@@ -178,12 +180,13 @@ locals {
       coordinatorHostName = "${snark.snark_coordinator_name}.${var.testnet_name}"
       coordinatorRpcPort = 8301
       coordinatorHostPort = snark.snark_coordinators_host_port
-      publicKey =snark.snark_worker_public_key
+      publicKey = snark.snark_worker_public_key
       snarkFee = snark.snark_worker_fee
       workSelectionAlgorithm = "seq"
 
-      workerCpuRequest = var.worker_cpu_request
-      workerMemRequest= var.worker_mem_request
+      workerCpuRequest    = var.worker_cpu_request
+      workerMemRequest    = var.worker_mem_request
+      persist_working_dir = var.persist_working_dir
     }
   ]
 

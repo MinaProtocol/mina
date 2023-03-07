@@ -46,7 +46,7 @@ spec:
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-enable-peer-exchange", "true",
           {{- if $.Values.mina.runtimeConfig }}
-          "-config-file", "/config/daemon.json",
+          "-config-file", "/root/config/daemon.json",
           {{- end }}
           {{- if $.Values.mina.logPrecomputedBlocks }}
           "-log-precomputed-blocks", "true",
@@ -77,7 +77,7 @@ spec:
         - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         - name: GCLOUD_KEYFILE
-          value: "/gcloud/keyfile.json"
+          value: "/root/gcloud/keyfile.json"
         - name: NETWORK_NAME
           value: {{ $.Values.testnetName }}
         - name: GCLOUD_BLOCK_UPLOAD_BUCKET
@@ -104,11 +104,11 @@ spec:
         volumeMounts:
         {{- if $.Values.mina.uploadBlocksToGCloud }}
         - name: gcloud-keyfile
-          mountPath: "/gcloud/"
+          mountPath: "/root/gcloud/"
         {{- end }}
         {{- if $.Values.mina.runtimeConfig }}
         - name: daemon-config
-          mountPath: "/config/"
+          mountPath: "/root/config/"
         {{- end }}
       volumes:
       {{- if $.Values.mina.runtimeConfig }}
