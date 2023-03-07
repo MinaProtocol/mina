@@ -439,7 +439,7 @@ let _create_ledger_and_zkapps_from_generator num_transactions :
     | `Count length ->
         length
     | `Two_from_same ->
-        failwith "Must provide a count when profiling with snapps"
+        failwith "Must provide a count when profiling with zkApps"
   in
   let max_account_updates = 6 in
   printf

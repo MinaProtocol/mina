@@ -25,6 +25,7 @@
    data_hash_lib
    signature_lib
    merkle_ledger
+   mina_block
    mina_compile_config
    mina_ledger
    mina_state

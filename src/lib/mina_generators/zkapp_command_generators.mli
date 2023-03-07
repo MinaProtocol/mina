@@ -32,6 +32,27 @@ val gen_protocol_state_precondition :
      Zkapp_precondition.Protocol_state.View.t
   -> Zkapp_precondition.Protocol_state.t Quickcheck.Generator.t
 
+val gen_account_update_from :
+     ?global_slot:Mina_numbers.Global_slot.t
+  -> ?update:Account_update.Update.t option
+  -> ?failure:failure
+  -> ?new_account:bool
+  -> ?zkapp_account:bool
+  -> ?account_id:Account_id.t
+  -> ?token_id:Token_id.t
+  -> ?may_use_token:Account_update.May_use_token.t
+  -> ?permissions_auth:Control.Tag.t
+  -> ?required_balance_change:Currency.Amount.Signed.t
+  -> zkapp_account_ids:Account_id.t list
+  -> authorization:Control.t
+  -> account_ids_seen:Account_id.t Hash_set.t
+  -> available_public_keys:unit Signature_lib.Public_key.Compressed.Table.t
+  -> account_state_tbl:(Account.t * role) Account_id.Table.t
+  -> ?protocol_state_view:Zkapp_precondition.Protocol_state.View.t
+  -> ?vk:(Side_loaded_verification_key.t, State_hash.t) With_hash.Stable.V1.t
+  -> unit
+  -> Account_update.Simple.t Quickcheck.Generator.t
+
 (** `gen_zkapp_command_from` generates a zkapp_command and record the change of accounts accordingly
     in `account_state_tbl`. Note that `account_state_tbl` is optional. If it's not provided
     then it would be computed from the ledger. If you plan to generate several zkapp_command,

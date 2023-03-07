@@ -12,17 +12,18 @@ let print_heap_usage name v =
 
 let main () =
   let open Values in
-  print_heap_usage "Account.t (w/ zkapp)" account ;
+  (*   print_heap_usage "Account.t (w/ zkapp)" account ; *)
   print_heap_usage "Zkapp_command.t" zkapp_command ;
-  print_heap_usage "Ledger.Db.path.t" merkle_path ;
-  print_heap_usage "Protocol_state.t" protocol_state ;
-  print_heap_usage "Pending_coinbase.t" pending_coinbase ;
-  print_heap_usage "Staged_ledger_diff.t (payments)" staged_ledger_diff ;
-  print_heap_usage "Parallel_scan.Base.t (coinbase)"
-    scan_state_base_node_coinbase ;
-  print_heap_usage "Parallel_scan.Base.t (payment)" scan_state_base_node_payment ;
-  print_heap_usage "Parallel_scan.Base.t (zkApp)" scan_state_base_node_zkapp ;
-  print_heap_usage "Parallel_scan.Merge.t" scan_state_merge_node ;
+  (* print_heap_usage "Ledger.Db.path.t" merkle_path ;
+     print_heap_usage "Protocol_state.t" protocol_state ;
+     print_heap_usage "Pending_coinbase.t" pending_coinbase ;
+     print_heap_usage "Staged_ledger_diff.t (payments)" staged_ledger_diff ;
+     print_heap_usage "Parallel_scan.Base.t (coinbase)"
+       scan_state_base_node_coinbase ;
+     print_heap_usage "Parallel_scan.Base.t (payment)" scan_state_base_node_payment ;
+     print_heap_usage "Parallel_scan.Base.t (zkApp)" scan_state_base_node_zkapp ;
+       print_heap_usage "Parallel_scan.Merge.t" scan_state_merge_node ; *)
+  (*  print_heap_usage "Block.t (maximum zkApp sizes)" block_max_zkapps ; *)
   Deferred.unit
 
 let () =

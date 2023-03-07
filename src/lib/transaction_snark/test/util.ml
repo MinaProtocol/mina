@@ -374,6 +374,9 @@ let test_snapp_update ?expected_failure ?state_body ?snapp_permissions ~vk
             Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk
               ~constraint_constants test_spec
           in
+          Format.eprintf "ZKAPP: %s@."
+            ( Zkapp_command.to_yojson zkapp_command
+            |> Yojson.Safe.pretty_to_string ) ;
           check_zkapp_command_with_merges_exn ?expected_failure ?state_body
             ledger [ zkapp_command ] ) )
 
