@@ -744,7 +744,10 @@ let block_max_apps =
       let cb1, cb2 = Quickcheck.random_value cbs_gen in
       Staged_ledger_diff.At_most_two.Two (Some (cb1, Some cb2))
     in
-    let internal_command_statuses = Obj.magic 42 in
+    let internal_command_statuses =
+      let open Mina_base.Transaction_status in
+      [ Applied; Applied ]
+    in
     { completed_works; commands; coinbase; internal_command_statuses }
   in
   ()
