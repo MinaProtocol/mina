@@ -16,7 +16,7 @@ $ cargo run
 If you follow the command with up to 3 `output_file` arguments it will write the result to the corresponding `output_file`s:
 
 ```shell
-$ cargo run ./kimchi_types.ml ./pasta_bindings.ml ./kimchi_bindings.ml
+$ cargo run ./kimchi_types.ml ./pasta_bindings.ml ./kimchi_bindings.ml ./snarky_bindings.ml
 ```
 
 ## Some OCaml-rs guidelines
