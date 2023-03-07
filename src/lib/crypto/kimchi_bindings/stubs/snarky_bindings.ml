@@ -194,6 +194,8 @@ module Fp = struct
 
     external get_private_inputs : t -> Kimchi_bindings.FieldVectors.Fp.t
       = "fp_state_get_private_inputs"
+
+    external seal : t -> Cvar.t -> Cvar.t = "fp_state_seal"
   end
 end
 
@@ -297,5 +299,7 @@ module Fq = struct
 
     external get_private_inputs : t -> Kimchi_bindings.FieldVectors.Fq.t
       = "fq_state_get_private_inputs"
+
+    external seal : t -> Cvar.t -> Cvar.t = "fq_state_seal"
   end
 end

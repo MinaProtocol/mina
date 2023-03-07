@@ -578,6 +578,7 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_func!(w, env, fp_state_finalize => "finalize");
             decl_func!(w, env, fp_state_set_public_inputs => "set_public_inputs");
             decl_func!(w, env, fp_state_get_private_inputs => "get_private_inputs");
+            decl_func!(w, env, fp_state_seal => "seal");
         });
     });
 
@@ -629,6 +630,7 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_func!(w, env, fq_state_finalize => "finalize");
             decl_func!(w, env, fq_state_set_public_inputs => "set_public_inputs");
             decl_func!(w, env, fq_state_get_private_inputs => "get_private_inputs");
+            decl_func!(w, env, fq_state_seal => "seal");
         });
     });
 }

@@ -511,7 +511,7 @@ let () =
     Js.Unsafe.set field_class (Js.string name) (Js.wrap_callback f)
   in
   method_ "seal"
-    (let seal = Pickles.Util.seal (module Impl) in
+    (let seal = Impl.seal in
      fun (this : field_class Js.t) : field_class Js.t -> mk (seal this##.value)
     ) ;
   method_ "rangeCheckHelper"

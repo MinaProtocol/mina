@@ -214,7 +214,7 @@ module Legacy = struct
       module Operations = struct
         open Field
 
-        let seal = Pickles.Util.seal (module Impl)
+        let seal = Impl.seal
 
         let add_assign ~state i x = state.(i) <- seal (state.(i) + x)
 

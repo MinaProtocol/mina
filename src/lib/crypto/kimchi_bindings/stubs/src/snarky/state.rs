@@ -117,6 +117,11 @@ impl_functions! {
     pub fn fp_state_get_private_inputs(state : ocaml::Pointer<CamlFpState>) -> CamlFpVector {
         CamlFpVector(Rc::new(state.as_ref().get_private_inputs()))
     }
+
+    pub fn fp_state_seal(mut state: ocaml::Pointer<CamlFpState>, var: CamlFpVar) -> CamlFpVar {
+        let sealed_var = var.0.seal(&mut state.as_mut().0, "seal");
+        CamlFpVar(sealed_var)
+    }
 }
 
 // Fq
@@ -205,5 +210,10 @@ impl_functions! {
 
     pub fn fq_state_get_private_inputs(state : ocaml::Pointer<CamlFqState>) -> CamlFqVector {
         CamlFqVector(Rc::new(state.as_ref().get_private_inputs()))
+    }
+
+    pub fn fq_state_seal(mut state: ocaml::Pointer<CamlFqState>, var: CamlFqVar) -> CamlFqVar {
+        let sealed_var = var.0.seal(&mut state.as_mut().0, "seal");
+        CamlFqVar(sealed_var)
     }
 }

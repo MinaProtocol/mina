@@ -62,18 +62,6 @@ let ones_vector :
   in
   go Boolean.true_ 0 n
 
-let seal (type f)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-    (x : Impl.Field.t) : Impl.Field.t =
-  let open Impl in
-  match Field.to_constant_and_terms x with
-  | None, [ (x, i) ] when Field.Constant.(equal x one) ->
-      Snarky_backendless.Cvar.Var i
-  | Some c, [] ->
-      Field.constant c
-  | _ ->
-      let y = exists Field.typ ~compute:As_prover.(fun () -> read_var x) in
-      Field.Assert.equal x y ; y
 
 let lowest_128_bits (type f) ~constrain_low_bits ~assert_128_bits
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) x =
