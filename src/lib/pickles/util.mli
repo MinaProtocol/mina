@@ -19,11 +19,6 @@ val ones_vector :
   -> 'n Pickles_types.Nat.t
   -> ('field_var Snarky_backendless.Boolean.t, 'n) Pickles_types.Vector.t
 
-val seal :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> 'field_var
-  -> 'field_var
-
 val lowest_128_bits :
      constrain_low_bits:bool
   -> assert_128_bits:('field_var -> unit)
