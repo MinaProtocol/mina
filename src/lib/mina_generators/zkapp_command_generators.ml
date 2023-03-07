@@ -623,7 +623,7 @@ let gen_account_update_body_components (type a b c d) ?global_slot
     ~account_state_tbl ?vk ?failure ?(new_account = false)
     ?(zkapp_account = false) ?(is_fee_payer = false) ?available_public_keys
     ?permissions_auth ?(required_balance_change : a option) ?protocol_state_view
-    ~zkapp_account_ids
+    ?num_event_elements ?num_action_elements ~zkapp_account_ids
     ~(gen_balance_change : Account.t -> a Quickcheck.Generator.t)
     ~(gen_use_full_commitment :
           account_precondition:Account_update.Account_precondition.t
@@ -773,8 +773,31 @@ let gen_account_update_body_components (type a b c d) ?global_slot
     let%bind list_len = Int.gen_uniform_incl 0 max_list_len in
     Quickcheck.Generator.list_with_length list_len array_gen
   in
-  let%bind events = field_array_list_gen ~max_array_len:2 ~max_list_len:1 in
-  let%bind actions = field_array_list_gen ~max_array_len:2 ~max_list_len:1 in
+  let field_array_singleton_list_gen ~array_len =
+    let array_gen =
+      let%map fields =
+        Quickcheck.Generator.list_with_length array_len
+          Snark_params.Tick.Field.gen
+      in
+      Array.of_list fields
+    in
+    let list_len = 1 in
+    Quickcheck.Generator.list_with_length list_len array_gen
+  in
+  let%bind events =
+    match num_event_elements with
+    | None ->
+        field_array_list_gen ~max_array_len:2 ~max_list_len:1
+    | Some n ->
+        field_array_singleton_list_gen ~array_len:n
+  in
+  let%bind actions =
+    match num_action_elements with
+    | None ->
+        field_array_list_gen ~max_array_len:2 ~max_list_len:1
+    | Some n ->
+        field_array_singleton_list_gen ~array_len:n
+  in
   let%bind call_data = Snark_params.Tick.Field.gen in
   let first_use_of_account =
     let account_id = Account_id.create public_key token_id in
@@ -971,9 +994,9 @@ let gen_account_update_body_components (type a b c d) ?global_slot
 
 let gen_account_update_from ?global_slot ?(update = None) ?failure
     ?(new_account = false) ?(zkapp_account = false) ?account_id ?token_id
-    ?may_use_token ?permissions_auth ?required_balance_change ~zkapp_account_ids
-    ~authorization ~account_ids_seen ~available_public_keys ~account_state_tbl
-    ?protocol_state_view ?vk () =
+    ?may_use_token ?num_event_elements ?num_action_elements ?permissions_auth
+    ?required_balance_change ~zkapp_account_ids ~authorization ~account_ids_seen
+    ~available_public_keys ~account_state_tbl ?protocol_state_view ?vk () =
   let open Quickcheck.Let_syntax in
   let increment_nonce =
     (* permissions_auth is used to generate updated permissions consistent with a contemplated authorization;
@@ -991,7 +1014,7 @@ let gen_account_update_from ?global_slot ?(update = None) ?failure
   in
   let%bind body_components =
     gen_account_update_body_components ?global_slot ~update ?failure
-      ~new_account ~zkapp_account
+      ?num_event_elements ?num_action_elements ~new_account ~zkapp_account
       ~increment_nonce:(increment_nonce, increment_nonce)
       ?permissions_auth ?account_id ?token_id ?may_use_token
       ?protocol_state_view ?vk ~zkapp_account_ids ~account_ids_seen

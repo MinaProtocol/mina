@@ -621,24 +621,41 @@ let block_max_apps =
       let authorization = Mina_base.Signature.dummy in
       { body; authorization }
     in
+    let num_account_updates = 20 in
     let account_updates =
-      let account_update =
-        let authorization : Mina_base.Control.t =
-          Proof Mina_base.Proof.transaction_dummy
-        in
-        let account_ids_seen = Obj.magic 42 in
-        let zkapp_account_ids = Obj.magic 99 in
-        let available_public_keys = Obj.magic 42 in
-        let account_state_tbl = Obj.magic 42 in
-        let open Generator in
-        random_value ~seed:`Nondeterministic
-          (Mina_generators.Zkapp_command_generators.gen_account_update_from
-             ~authorization ~account_ids_seen ~zkapp_account_ids
-             ~available_public_keys ~account_state_tbl () )
+      let rec create_update acc n =
+        if n <= 0 then acc
+        else
+          let account_update =
+            let authorization : Mina_base.Control.t =
+              Proof Mina_base.Proof.transaction_dummy
+            in
+            let account_ids_seen = Obj.magic 42 in
+            let zkapp_account_ids = Obj.magic 99 in
+            let available_public_keys = Obj.magic 42 in
+            let account_state_tbl = Obj.magic 42 in
+            let num_event_elements =
+              Genesis_constants.compiled.max_event_elements
+            in
+            let num_action_elements =
+              Genesis_constants.compiled.max_action_elements
+            in
+            let simple_update =
+              random_value ~seed:`Nondeterministic
+                (Mina_generators.Zkapp_command_generators
+                 .gen_account_update_from ~num_event_elements
+                   ~num_action_elements ~authorization ~account_ids_seen
+                   ~zkapp_account_ids ~available_public_keys ~account_state_tbl
+                   () )
+            in
+            Mina_base.Account_update.of_simple simple_update
+          in
+          let acc' =
+            Mina_base.Zkapp_command.Call_forest.cons account_update acc
+          in
+          create_update acc' (n - 1)
       in
-      Mina_base.Zkapp_command.Call_forest.cons
-        (Mina_base.Account_update.of_simple account_update)
-        []
+      create_update [] num_account_updates
     in
     let memo =
       let open Mina_base.Signed_command_memo in

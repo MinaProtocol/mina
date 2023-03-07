@@ -41,6 +41,8 @@ val gen_account_update_from :
   -> ?account_id:Account_id.t
   -> ?token_id:Token_id.t
   -> ?may_use_token:Account_update.May_use_token.t
+  -> ?num_event_elements:int
+  -> ?num_action_elements:int
   -> ?permissions_auth:Control.Tag.t
   -> ?required_balance_change:Currency.Amount.Signed.t
   -> zkapp_account_ids:Account_id.t list
