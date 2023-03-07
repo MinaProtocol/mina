@@ -13,7 +13,7 @@ DEFAULT_ONLINE_WHALE_KEYS_DIR = SCRIPT_DIR / "online_whale_keys"
 DEFAULT_OFFLINE_WHALE_KEYS_DIR = SCRIPT_DIR / "offline_whale_keys"
 DEFAULT_OFFLINE_FISH_KEYS_DIR = SCRIPT_DIR / "offline_fish_keys"
 DEFAULT_ONLINE_FISH_KEYS_DIR = SCRIPT_DIR / "online_fish_keys"
-DEFAULT_SNARK_WORKER_KEYS_DIR = SCRIPT_DIR / "snark_worker_keys"
+DEFAULT_SNARK_COORDINATOR_KEYS_DIR = SCRIPT_DIR / "snark_coordinator_keys"
 DEFAULT_SERVICE_KEY_DIR = SCRIPT_DIR / "service_keys"
 
 DEFAULT_SEED_KEY_DIR = SCRIPT_DIR / "seed_libp2p_keys"
@@ -22,7 +22,7 @@ DEFAULT_STAKER_CSV_FILE = SCRIPT_DIR / "staker_public_keys.csv"
 # A list of services to add and the percentage of total stake they should be allocated
 DEFAULT_SERVICES = {"faucet": 100000 * (10**9),
                     "echo": 100 * (10**9),
-                    "snark_worker": 5 * (10**9)}
+                    "snark_coordinator": 5 * (10**9)}
 
 
 def encode_nanominas(nanominas):
@@ -75,10 +75,10 @@ def encode_nanominas(nanominas):
     '--staker-csv-file',
     help='Location of a CSV file detailing Discord Username and Public Key for Stakers.'
 )
-# Snark Worker Account Params
-@click.option('--snark-worker-accounts-directory',
-              default=DEFAULT_SNARK_WORKER_KEYS_DIR.absolute(),
-              help='Directory where Snark Worker Account Keys will be stored.')
+# Snark Coordinator Account Params
+@click.option('--snark-coordinator-accounts-directory',
+              default=DEFAULT_SNARK_COORDINATOR_KEYS_DIR.absolute(),
+              help='Directory where Snark Coordinator Account Keys will be stored.')
 def generate_ledger(generate_remainder,
                     service_accounts_directory,
                     num_whale_accounts,
@@ -88,7 +88,7 @@ def generate_ledger(generate_remainder,
                     online_fish_accounts_directory,
                     offline_fish_accounts_directory,
                     staker_csv_file,
-                    snark_worker_accounts_directory):
+                    snark_coordinator_accounts_directory):
     """
     Generates a Genesis Ledger based on previously generated Service, Snark Worker, Stakers, Whale, Fish, and Block Producer keys.
     If keys are not present on the filesystem at the specified location, they are not generated.
@@ -96,7 +96,7 @@ def generate_ledger(generate_remainder,
 
     ledger_public_keys = {
         "service_keys": [],
-        "snark_worker_keys": [],
+        "snark_coordinator_keys": [],
         "online_whale_keys": [],
         "offline_whale_keys": [],
         "online_fish_keys": [],
@@ -124,20 +124,20 @@ def generate_ledger(generate_remainder,
         })
         fd.close()
 
-    # Try loading Snark Worker keys
-    snark_worker_accounts_directory = Path(snark_worker_accounts_directory)
-    snark_worker_key_files = glob.glob(
-        str(snark_worker_accounts_directory.absolute()) + "/*.pub")
-    print("Processing Snark Worker Keys -- loaded {} snark worker keys".format(
-        len(snark_worker_key_files)))
+    # Try loading Snark Coordinator keys
+    snark_coordinator_accounts_directory = Path(snark_coordinator_accounts_directory)
+    snark_coordinator_key_files = glob.glob(
+        str(snark_coordinator_accounts_directory.absolute()) + "/*.pub")
+    print("Processing Snark Coordinator Keys -- loaded {} snark coordinator keys".format(
+        len(snark_coordinator_key_files)))
     # load Snark Worker Key Contents
-    for snark_worker_key_file in snark_worker_key_files:
-        snark_worker_balance = DEFAULT_SERVICES["snark_worker"]
-        fd = open(snark_worker_key_file, "r")
-        snark_worker_public_key = fd.readline().strip()
-        ledger_public_keys["snark_worker_keys"].append({
-            "public_key": snark_worker_public_key,
-            "balance": snark_worker_balance
+    for snark_coordinator_key_file in snark_coordinator_key_files:
+        snark_coordinator_balance = DEFAULT_SERVICES["snark_coordinator"]
+        fd = open(snark_coordinator_key_file, "r")
+        snark_coordinator_public_key = fd.readline().strip()
+        ledger_public_keys["snark_coordinator_keys"].append({
+            "public_key": snark_coordinator_public_key,
+            "balance": snark_coordinator_balance
         })
         fd.close()
 
@@ -278,19 +278,19 @@ def generate_ledger(generate_remainder,
             "nickname": service["service"]
         })
 
-    # Snark Worker Accounts
-    for snark_worker in ledger_public_keys["snark_worker_keys"]:
+    # Snark Coordinator Accounts
+    for snark_coordinator in ledger_public_keys["snark_coordinator_keys"]:
         ledger.append({
-            "pk": snark_worker["public_key"],
+            "pk": snark_coordinator["public_key"],
             "sk": None,
-            "balance": encode_nanominas(snark_worker["balance"]),
+            "balance": encode_nanominas(snark_coordinator["balance"]),
             "delegate": None
         })
 
         annotated_ledger.append({
-            "pk": snark_worker["public_key"],
+            "pk": snark_coordinator["public_key"],
             "sk": None,
-            "balance": encode_nanominas(snark_worker["balance"]),
+            "balance": encode_nanominas(snark_coordinator["balance"]),
             "delegate": None,
         })
 

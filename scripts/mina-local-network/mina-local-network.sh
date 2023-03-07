@@ -17,7 +17,7 @@ ZKAPP_EXE=_build/default/src/app/zkapp_test_transaction/zkapp_test_transaction.e
 export MINA_PRIVKEY_PASS='naughty blue worm'
 export MINA_LIBP2P_PASS="${MINA_PRIVKEY_PASS}"
 SEED_PEER_KEY="CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
-SNARK_WORKER_PEER_KEY="CAESQFjWdR18zKuCssN+Fi33fah9f5QGebOCc9xTITR8cdoyC+bk+nO9hW3wne6Ky2Om+fetaH3917/iEHnt+UQzH4A=,CAESIAvm5PpzvYVt8J3uistjpvn3rWh9/de/4hB57flEMx+A,12D3KooWAcprha9pvfdwz52F4RuBYjr2HenzLRNt4W9zWXugN1Z9"
+SNARK_COORDINATOR_PEER_KEY="CAESQFjWdR18zKuCssN+Fi33fah9f5QGebOCc9xTITR8cdoyC+bk+nO9hW3wne6Ky2Om+fetaH3917/iEHnt+UQzH4A=,CAESIAvm5PpzvYVt8J3uistjpvn3rWh9/de/4hB57flEMx+A,12D3KooWAcprha9pvfdwz52F4RuBYjr2HenzLRNt4W9zWXugN1Z9"
 
 # ================================================
 # Inputs (set to default values)
@@ -29,6 +29,7 @@ ARCHIVE=false
 LOG_LEVEL="Trace"
 FILE_LOG_LEVEL=${LOG_LEVEL}
 VALUE_TRANSFERS=false
+SNARK_WORKERS_COUNT=1
 ZKAPP_TRANSACTIONS=false
 RESET=false
 UPDATE_GENESIS_TIMESTAMP=false
@@ -38,6 +39,7 @@ TRANSACTION_FREQUENCY=10 # in seconds
 
 SEED_START_PORT=3000
 ARCHIVE_SERVER_PORT=3086
+SNARK_COORDINATOR_START_PORT=7000
 WHALE_START_PORT=4000
 FISH_START_PORT=5000
 NODE_START_PORT=6000
@@ -55,12 +57,14 @@ ARCHIVE_ADDRESS_CLI_ARG=""
 # Globals (assigned during execution of script)
 
 LEDGER_FOLDER=""
-SNARK_WORKER_PUBKEY=""
+SNARK_COORDINATOR_PUBKEY=""
 NODES_FOLDER=""
 CONFIG=""
+SNARK_COORDINATOR_PID=""
 SEED_PID=""
 ARCHIVE_PID=""
 WHALE_PIDS=()
+SNARK_WORKERS_PIDS=()
 FISH_PIDS=()
 NODE_PIDS=()
 
@@ -68,53 +72,55 @@ NODE_PIDS=()
 # Helper functions
 
 help() {
-  echo "-w   |--whales <#>                  | Number of BP Whale Nodes (bigger stake) to spin-up"
-  echo "                                    |   Default: ${WHALES}"
-  echo "-f   |--fish <#>                    | Number of BP Fish Nodes (less stake) to spin-up"
-  echo "                                    |   Default: ${FISH}"
-  echo "-n   |--nodes <#>                   | Nimber of non block-producing nodes to spin-up"
-  echo "                                    |   Default: ${NODES}"
-  echo "-a   |--archive                     | Whether to run the Archive Node (presence of argument)"
-  echo "                                    |   Default: ${ARCHIVE}"
-  echo "-sp  |--seed-start-port <#>         | Seed Node range start port"
-  echo "                                    |   Default: ${SEED_START_PORT}"
-  echo "-swp |--snark-worker-start-port <#> | Snark Worker Node range start port"
-  echo "                                    |   Default: ${SNARK_WORKER_START_PORT}"
-  echo "-wp  |--whale-start-port <#>        | Whale Nodes range start port"
-  echo "                                    |   Default: ${WHALE_START_PORT}"
-  echo "-fp  |--fish-start-port <#>         | Fish Nodes range start port"
-  echo "                                    |   Default: ${FISH_START_PORT}"
-  echo "-np  |--node-start-port <#>         | Non block-producing Nodes range start port"
-  echo "                                    |   Default: ${NODE_START_PORT}"
-  echo "-ap  |--archive-server-port <#>     | Archive Node server port"
-  echo "                                    |   Default: ${ARCHIVE_SERVER_PORT}"
-  echo "-ll  |--log-level <level>           | Console output logging level"
-  echo "                                    |   Default: ${LOG_LEVEL}"
-  echo "-fll |--file-log-level <level>      | File output logging level"
-  echo "                                    |   Default: ${FILE_LOG_LEVEL}"
-  echo "-ph  |--pg-host <host>              | PostgreSQL host"
-  echo "                                    |   Default: ${PG_HOST}"
-  echo "-pp  |--pg-port <#>                 | PostgreSQL port"
-  echo "                                    |   Default: ${PG_PORT}"
-  echo "-pu  |--pg-user <user>              | PostgreSQL user"
-  echo "                                    |   Default: ${PG_USER}"
-  echo "-ppw |--pg-passwd <password>        | PostgreSQL password"
-  echo "                                    |   Default: <empty_string>"
-  echo "-pd  |--pg-db <db>                  | PostgreSQL database name"
-  echo "                                    |   Default: ${PG_DB}"
-  echo "-vt  |--value-transfer-txns         | Whether to execute periodic value transfer transactions (presence of argument)"
-  echo "                                    |   Default: ${VALUE_TRANSFERS}"
-  echo "-zt |--zkapp-transactions           | Whether to execute periodic zkapp transactions (presence of argument)"
-  echo "                                    |   Default: ${ZKAPP_TRANSACTIONS}"
-  echo "-tf  |--transactions-frequency <#>  | Frequency of periodic transactions execution (in seconds)"
-  echo "                                    |   Default: ${TRANSACTION_FREQUENCY}"
-  echo "-sf  |--snark-worker-fee <#>        | SNARK Worker fee"
-  echo "                                    |   Default: ${SNARK_WORKER_FEE}"
-  echo "-r   |--reset                       | Whether to reset the Mina Local Network storage file-system (presence of argument)"
-  echo "                                    |   Default: ${RESET}"
-  echo "-u   |--update-genesis-timestamp    | Whether to update the Genesis Ledger timestamp (presence of argument)"
-  echo "                                    |   Default: ${UPDATE_GENESIS_TIMESTAMP}"
-  echo "-h   |--help                        | Displays this help message"
+  echo "-w   |--whales <#>                       | Number of BP Whale Nodes (bigger stake) to spin-up"
+  echo "                                         |   Default: ${WHALES}"
+  echo "-f   |--fish <#>                         | Number of BP Fish Nodes (less stake) to spin-up"
+  echo "                                         |   Default: ${FISH}"
+  echo "-n   |--nodes <#>                        | Number of non block-producing nodes to spin-up"
+  echo "                                         |   Default: ${NODES}"
+  echo "-a   |--archive                          | Whether to run the Archive Node (presence of argument)"
+  echo "                                         |   Default: ${ARCHIVE}"
+  echo "-sp  |--seed-start-port <#>              | Seed Node range start port"
+  echo "                                         |   Default: ${SEED_START_PORT}"
+  echo "-swp |--snark-coordinator-start-port <#> | Snark Worker Coordinator Node range start port"
+  echo "                                         |   Default: ${SNARK_COORDINATOR_START_PORT}"
+  echo "-swc |--snark-workers-count <#>          | Snark Workers count"
+  echo "                                         |   Default: ${SNARK_WORKERS_COUNT}"
+  echo "-wp  |--whale-start-port <#>             | Whale Nodes range start port"
+  echo "                                         |   Default: ${WHALE_START_PORT}"
+  echo "-fp  |--fish-start-port <#>              | Fish Nodes range start port"
+  echo "                                         |   Default: ${FISH_START_PORT}"
+  echo "-np  |--node-start-port <#>              | Non block-producing Nodes range start port"
+  echo "                                         |   Default: ${NODE_START_PORT}"
+  echo "-ap  |--archive-server-port <#>          | Archive Node server port"
+  echo "                                         |   Default: ${ARCHIVE_SERVER_PORT}"
+  echo "-ll  |--log-level <level>                | Console output logging level"
+  echo "                                         |   Default: ${LOG_LEVEL}"
+  echo "-fll |--file-log-level <level>           | File output logging level"
+  echo "                                         |   Default: ${FILE_LOG_LEVEL}"
+  echo "-ph  |--pg-host <host>                   | PostgreSQL host"
+  echo "                                         |   Default: ${PG_HOST}"
+  echo "-pp  |--pg-port <#>                      | PostgreSQL port"
+  echo "                                         |   Default: ${PG_PORT}"
+  echo "-pu  |--pg-user <user>                   | PostgreSQL user"
+  echo "                                         |   Default: ${PG_USER}"
+  echo "-ppw |--pg-passwd <password>             | PostgreSQL password"
+  echo "                                         |   Default: <empty_string>"
+  echo "-pd  |--pg-db <db>                       | PostgreSQL database name"
+  echo "                                         |   Default: ${PG_DB}"
+  echo "-vt  |--value-transfer-txns              | Whether to execute periodic value transfer transactions (presence of argument)"
+  echo "                                         |   Default: ${VALUE_TRANSFERS}"
+  echo "-zt |--zkapp-transactions                | Whether to execute periodic zkapp transactions (presence of argument)"
+  echo "                                         |   Default: ${ZKAPP_TRANSACTIONS}"
+  echo "-tf  |--transactions-frequency <#>       | Frequency of periodic transactions execution (in seconds)"
+  echo "                                         |   Default: ${TRANSACTION_FREQUENCY}"
+  echo "-sf  |--snark-worker-fee <#>             | SNARK Worker fee"
+  echo "                                         |   Default: ${SNARK_WORKER_FEE}"
+  echo "-r   |--reset                            | Whether to reset the Mina Local Network storage file-system (presence of argument)"
+  echo "                                         |   Default: ${RESET}"
+  echo "-u   |--update-genesis-timestamp         | Whether to update the Genesis Ledger timestamp (presence of argument)"
+  echo "                                         |   Default: ${UPDATE_GENESIS_TIMESTAMP}"
+  echo "-h   |--help                             | Displays this help message"
 
   printf "\n"
   echo "Available logging levels:"
@@ -162,6 +168,21 @@ exec-daemon() {
     $@
 }
 
+# Executes the Mina Snark Worker
+exec-worker-daemon() {
+  COORDINATOR_PORT=${1}
+  shift
+  PROOF_LEVEL="full"
+  SHUTDOWN_ON_DISCONNECT="false"
+  COORDINATOR_HOST_AND_PORT="localhost:${COORDINATOR_PORT}"
+
+  exec ${MINA_EXE} internal snark-worker \
+    -proof-level ${PROOF_LEVEL} \
+    -shutdown-on-disconnect ${SHUTDOWN_ON_DISCONNECT} \
+    -daemon-address ${COORDINATOR_HOST_AND_PORT} \
+  $@
+}
+
 # Executes the Archive node
 exec-archive-node() {
   exec ${ARCHIVE_EXE} run \
@@ -177,6 +198,13 @@ spawn-node() {
   FOLDER=${1}
   shift
   exec-daemon $@ -config-directory ${FOLDER} &>${FOLDER}/log.txt &
+}
+
+# Spawns worker in background
+spawn-worker() {
+  FOLDER=${1}
+  shift
+  exec-worker-daemon $@ -config-directory ${FOLDER} &>${FOLDER}/log.txt &
 }
 
 # Spawns the Archive Node in background
@@ -214,8 +242,12 @@ while [[ "$#" -gt 0 ]]; do
     SEED_START_PORT="${2}"
     shift
     ;;
-  -swp | --snark-worker-start-port)
-    SNARK_WORKER_START_PORT="${2}"
+  -scp | --snark-coordinator-start-port)
+    SNARK_COORDINATOR_START_PORT="${2}"
+    shift
+    ;;
+  -swc | --snark-workers-count)
+    SNARK_WORKERS_COUNT="${2}"
     shift
     ;;
   -wp | --whale-start-port)
@@ -347,7 +379,8 @@ fi
 
 echo "Starting the Network with:"
 echo -e "\t1 seed"
-echo -e "\t1 snark worker"
+echo -e "\t1 snark coordinator"
+echo -e "\t${SNARK_WORKERS_COUNT} snark worker(s)"
 
 if ${ARCHIVE}; then
   echo -e "\t1 archive"
@@ -366,10 +399,10 @@ printf "\n"
 # Create the Genesis Ledger
 
 LEDGER_FOLDER="${HOME}/.mina-network/mina-local-network-${WHALES}-${FISH}-${NODES}"
-
+  
 if ${RESET}; then
   rm -rf ${LEDGER_FOLDER}
-fi
+  fi
 
 if [ ! -d "${LEDGER_FOLDER}" ]; then
   echo "Making the Ledger..."
@@ -381,7 +414,7 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
   clean-dir ${LEDGER_FOLDER}/offline_fish_keys
   clean-dir ${LEDGER_FOLDER}/online_whale_keys
   clean-dir ${LEDGER_FOLDER}/online_fish_keys
-  clean-dir ${LEDGER_FOLDER}/snark_worker_keys
+  clean-dir ${LEDGER_FOLDER}/snark_coordinator_keys
   clean-dir ${LEDGER_FOLDER}/service-keys
   clean-dir ${LEDGER_FOLDER}/libp2p_keys
   clean-dir ${LEDGER_FOLDER}/zkapp_keys
@@ -390,7 +423,7 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
     generate-keypair ${LEDGER_FOLDER}/zkapp_keys/zkapp_account
   fi
 
-  generate-keypair ${LEDGER_FOLDER}/snark_worker_keys/snark_worker_account
+  generate-keypair ${LEDGER_FOLDER}/snark_coordinator_keys/snark_coordinator_account
   for ((i = 0; i < ${FISH}; i++)); do
     generate-keypair ${LEDGER_FOLDER}/offline_fish_keys/offline_fish_account_${i}
     generate-keypair ${LEDGER_FOLDER}/online_fish_keys/online_fish_account_${i}
@@ -417,7 +450,7 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
       sudo chown -R ${USER} ${LEDGER_FOLDER}/online_fish_keys
       sudo chown -R ${USER} ${LEDGER_FOLDER}/offline_whale_keys
       sudo chown -R ${USER} ${LEDGER_FOLDER}/online_whale_keys
-      sudo chown -R ${USER} ${LEDGER_FOLDER}/snark_worker_keys
+      sudo chown -R ${USER} ${LEDGER_FOLDER}/snark_coordinator_keys
       sudo chown -R ${USER} ${LEDGER_FOLDER}/service-keys
       sudo chown -R ${USER} ${LEDGER_FOLDER}/libp2p_keys
     fi
@@ -428,7 +461,7 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
   chmod -R 0700 ${LEDGER_FOLDER}/online_fish_keys
   chmod -R 0700 ${LEDGER_FOLDER}/offline_whale_keys
   chmod -R 0700 ${LEDGER_FOLDER}/online_whale_keys
-  chmod -R 0700 ${LEDGER_FOLDER}/snark_worker_keys
+  chmod -R 0700 ${LEDGER_FOLDER}/snark_coordinator_keys
   chmod -R 0700 ${LEDGER_FOLDER}/service-keys
   chmod -R 0700 ${LEDGER_FOLDER}/libp2p_keys
 
@@ -439,7 +472,7 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
     --offline-fish-accounts-directory ${LEDGER_FOLDER}/offline_fish_keys \
     --online-whale-accounts-directory ${LEDGER_FOLDER}/online_whale_keys \
     --online-fish-accounts-directory ${LEDGER_FOLDER}/online_fish_keys \
-    --snark-worker-accounts-directory ${LEDGER_FOLDER}/snark_worker_keys
+    --snark-coordinator-accounts-directory ${LEDGER_FOLDER}/snark_coordinator_keys
 
   mv -f scripts/mina-local-network/genesis_ledger.json ${LEDGER_FOLDER}/genesis_ledger.json
 
@@ -448,7 +481,7 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
   printf "\n"
 fi
 
-SNARK_WORKER_PUBKEY=$(cat ${LEDGER_FOLDER}/snark_worker_keys/snark_worker_account.pub)
+SNARK_COORDINATOR_PUBKEY=$(cat ${LEDGER_FOLDER}/snark_coordinator_keys/snark_coordinator_account.pub)
 
 # ================================================
 # Update the Genesis State Timestamp
@@ -469,12 +502,14 @@ fi
 
 NODES_FOLDER=${LEDGER_FOLDER}/nodes
 mkdir -p ${NODES_FOLDER}/seed
-mkdir -p ${NODES_FOLDER}/snark_worker
+mkdir -p ${NODES_FOLDER}/snark_coordinator
+mkdir -p ${NODES_FOLDER}/snark_workers
 
 if ${RESET}; then
   clean-dir ${NODES_FOLDER}
   mkdir -p ${NODES_FOLDER}/seed
-  mkdir -p ${NODES_FOLDER}/snark_worker
+  mkdir -p ${NODES_FOLDER}/snark_coordinator
+  mkdir -p ${NODES_FOLDER}/snark_workers
 fi
 
 # ----------
@@ -497,15 +532,34 @@ SEED_PID=$!
 echo 'Waiting for seed to go up...'
 printf "\n"
 
-until ${MINA_EXE} client status -daemon-port ${SEED_START_PORT} &>/dev/null; do
+until ${MINA_EXE} client status -daemon-port ${SEED_START_PORT}  &>/dev/null; do
   sleep 1
 done
 
-# ----------
+#---------- Starting snark coordinator
 
-SNARK_WORKER_FLAGS="-snark-worker-fee ${SNARK_WORKER_FEE} -run-snark-worker ${SNARK_WORKER_PUBKEY} -work-selection seq"
-spawn-node ${NODES_FOLDER}/snark_worker ${SNARK_WORKER_START_PORT} -peer ${SEED_PEER_ID} -libp2p-keypair ${SNARK_WORKER_PEER_KEY} ${SNARK_WORKER_FLAGS} ${ARCHIVE_ADDRESS_CLI_ARG}
-SNARK_WORKER_PID=$!
+SNARK_COORDINATOR_FLAGS="-snark-worker-fee ${SNARK_WORKER_FEE} -run-snark-coordinator ${SNARK_COORDINATOR_PUBKEY} -work-selection seq"
+spawn-node ${NODES_FOLDER}/snark_coordinator ${SNARK_COORDINATOR_START_PORT} -peer ${SEED_PEER_ID} -libp2p-keypair ${SNARK_COORDINATOR_PEER_KEY} ${SNARK_COORDINATOR_FLAGS}
+SNARK_COORDINATOR_PID=$!
+
+echo 'Waiting for snark coordinator to go up...'
+printf "\n"
+
+until ${MINA_EXE} client status -daemon-port ${SNARK_COORDINATOR_START_PORT} &>/dev/null; do
+  sleep 1
+done
+
+#---------- Starting snark workers
+
+echo "Starting the ${SNARK_WORKERS_COUNT} Snark Worker(s)..."
+
+for ((i = 0; i < ${SNARK_WORKERS_COUNT}; i++)); do
+  echo "Starting ${i+1} out of ${SNARK_WORKERS_COUNT} Snark Worker{s}..."
+  FOLDER=${NODES_FOLDER}/snark_workers/worker_${i}
+  mkdir -p ${FOLDER}
+  spawn-worker ${FOLDER} ${SNARK_COORDINATOR_START_PORT}
+  SNARK_WORKERS_PIDS[${i}]=$!
+done
 
 # ----------
 
@@ -551,11 +605,20 @@ echo -e "\t\t  pid ${SEED_PID}"
 echo -e "\t\t  status: ${MINA_EXE} client status -daemon-port ${SEED_START_PORT}"
 echo -e "\t\t  logs: cat ${NODES_FOLDER}/seed/log.txt | ${LOGPROC_EXE}"
 
-echo -e "\tSnark Worker:"
+echo -e "\tSnark Coordinator:"
 echo -e "\t\tInstance #0:"
-echo -e "\t\t  pid ${SNARK_WORKER_PID}"
-echo -e "\t\t  status: ${MINA_EXE} client status -daemon-port ${SNARK_WORKER_START_PORT}"
-echo -e "\t\t  logs: cat ${NODES_FOLDER}/snark_worker/log.txt | ${LOGPROC_EXE}"
+echo -e "\t\t  pid ${SNARK_COORDINATOR_PID}"
+echo -e "\t\t  status: ${MINA_EXE} client status -daemon-port ${SNARK_COORDINATOR_START_PORT}"
+echo -e "\t\t  logs: cat ${NODES_FOLDER}/snark_coordinator/log.txt | ${LOGPROC_EXE}"
+
+if [ "${SNARK_WORKERS_COUNT}" -gt "0" ]; then
+  echo -e "\tSnark Workers:"
+  for ((i = 0; i < ${SNARK_WORKERS_COUNT}; i++)); do
+    echo -e "\t\tInstance #${i}:"
+    echo -e "\t\t  pid ${SNARK_WORKERS_PIDS[${i}]}"
+    echo -e "\t\t  logs: cat ${NODES_FOLDER}/snark_workers/snark_worker_${i}/log.txt | ${LOGPROC_EXE}"
+  done
+fi
 
 if ${ARCHIVE}; then
   echo -e "\tArchive:"
@@ -611,7 +674,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   PUB_KEY=$(cat ${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0.pub)
   REST_SERVER="http://127.0.0.1:$((${FISH_START_PORT} + 1))/graphql"
   
-  echo "Waiting for Node (${REST_SERVER}) to be up to start sending value transfer transactions..."
+  echo "Waiting for Node (${REST_SERVER}) to be up to start sending value transfer transactions..."  
   printf "\n"
 
   until ${MINA_EXE} client status -daemon-port ${FISH_START_PORT} &>/dev/null; do
