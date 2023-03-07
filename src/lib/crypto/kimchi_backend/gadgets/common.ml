@@ -2,7 +2,7 @@
 
 open Core_kernel
 
-(* field_bits_to_field - Create a field elements from contiguous bits of another
+(* field_bits_to_field - Create a field element from contiguous bits of another
  *
  *   Inputs:
  *     field_element: source field element
