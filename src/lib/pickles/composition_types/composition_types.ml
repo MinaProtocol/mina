@@ -745,6 +745,8 @@ module Wrap = struct
           |> Vector.to_list |> Array.concat
         ]
 
+    open Snarky_backendless.H_list
+
     let to_hlist
         { app_state
         ; dlog_plonk_index

@@ -20,6 +20,7 @@ module Domains = Pickles_base.Domains
 
 (** {2 Misc modules}*)
 
+module H_list = Snarky_backendless.H_list
 module Challenge = Limb_vector.Challenge
 module Scalar_challenge = Kimchi_backend_common.Scalar_challenge
 
