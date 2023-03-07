@@ -51,7 +51,6 @@ let verify_account_updates ~(ledger : Helpers.Ledger.t)
     Amount.Signed.(balance_updates + fee) |> Option.value_exn
   in
   f balance_change (outdated, updated)
-  
 
 let add_to_balance balance amount =
   let open Option.Let_syntax in
@@ -84,7 +83,8 @@ let verify_balances_unchanged ~(ledger : Helpers.Ledger.t)
        Helpers.Transaction_logic.Transaction_applied.Zkapp_command_applied.t )
     (accounts : Test_account.t list) =
   let is_fee_payer account =
-    Public_key.Compressed.equal account.Test_account.pk txn.command.data.fee_payer.body.public_key
+    Public_key.Compressed.equal account.Test_account.pk
+      txn.command.data.fee_payer.body.public_key
   in
   let fee =
     let open Amount in
@@ -93,14 +93,15 @@ let verify_balances_unchanged ~(ledger : Helpers.Ledger.t)
   in
   List.for_all accounts ~f:(fun account ->
       verify_account_updates account ~ledger ~txn ~f:(fun _amt -> function
-          | (Some orig, Some updt) when is_fee_payer account ->
-             add_to_balance orig.balance fee 
-             |> Option.value_map
-                  ~default:Balance.(equal updt.balance zero)
-                  ~f:(fun b -> Balance.equal updt.balance b)
-          | (Some orig, Some updt) ->
-             Balance.equal updt.balance orig.balance
-          | (None, None) ->
-             true
-          | _ -> (* Account could have been neither created or destroyed. *)
-             false))
+        | Some orig, Some updt when is_fee_payer account ->
+            add_to_balance orig.balance fee
+            |> Option.value_map
+                 ~default:Balance.(equal updt.balance zero)
+                 ~f:(fun b -> Balance.equal updt.balance b)
+        | Some orig, Some updt ->
+            Balance.equal updt.balance orig.balance
+        | None, None ->
+            true
+        | _ ->
+            (* Account could have been neither created or destroyed. *)
+            false ) )

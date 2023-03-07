@@ -9,7 +9,7 @@ open Zkapp_cmd_builder
 
 (* The function under test is quite slow, so keep the trials count low
    so that tests finish in a reasonable amount of time. *)
-let trials = 10
+let trials = 100
 
 let balance_to_fee = Fn.compose Amount.to_fee Balance.to_amount
 
@@ -220,7 +220,7 @@ let%test_module "Test transaction logic." =
        it's being checked elsewhere. If there's no zkApp associated with the
        account, this update succeeds, but does nothing. For the moment we're ignoring
        the fact that the account isn't being updated. We'll revisit and strengthen
-        this test after some refactoring. *)
+       this test after some refactoring. *)
     let%test_unit "Zkapp URI can be set." =
       Quickcheck.test ~trials
         (let open Quickcheck in
@@ -258,7 +258,24 @@ let%test_module "Test transaction logic." =
         let%bind account =
           Generator.filter Test_account.gen ~f:Test_account.non_empty
         in
-        let%bind timing = Account.gen_timing account.balance in
+        let global_slot = protocol_state.global_slot_since_genesis in
+        let%bind timing =
+          Account.gen_timing account.balance
+          |> Generator.filter
+               ~f:(fun
+                    { cliff_time
+                    ; cliff_amount
+                    ; vesting_period
+                    ; vesting_increment
+                    ; initial_minimum_balance
+                    ; _
+                    }
+                  ->
+                 Account.min_balance_at_slot ~global_slot ~cliff_time
+                   ~cliff_amount ~vesting_period ~vesting_increment
+                   ~initial_minimum_balance
+                 |> Balance.(( < ) zero) )
+        in
         let timing_info =
           Account.Timing.of_record timing
           |> Account_update.Update.Timing_info.of_account_timing
@@ -293,21 +310,30 @@ let%test_module "Test transaction logic." =
                           false ) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
-    (* More generally, a command will always fail if would make it so that
-       the current account's balance would become less than the current
-       minimum balance. We don't need to test it extensively here; tests in
-       account_timing.ml verify these rules already. *)
     let%test_unit "Minimum balance cannot be set below the actual balance." =
       Quickcheck.test ~trials
         (let open Quickcheck in
         let open Generator.Let_syntax in
-        let%bind timing = Account.gen_timing Balance.max_int in
+        let gen_timing =
+          let%map t = Account.gen_timing Balance.max_int in
+          let minimum_balance =
+            Account.min_balance_at_slot
+              ~global_slot:protocol_state.global_slot_since_genesis
+              ~initial_minimum_balance:t.initial_minimum_balance
+              ~vesting_period:t.vesting_period
+              ~vesting_increment:t.vesting_increment ~cliff_time:t.cliff_time
+              ~cliff_amount:t.cliff_amount
+          in
+          (t, minimum_balance)
+        in
+        let%bind timing, minimum_balance =
+          Generator.filter gen_timing
+            ~f:Balance.(fun (_, min_bal) -> min_bal > of_nanomina_int_exn 1)
+        in
         let%map account =
           Generator.filter Test_account.gen
             ~f:
-              Balance.(
-                fun a ->
-                  timing.initial_minimum_balance > a.balance && a.balance > zero)
+              Balance.(fun a -> minimum_balance > a.balance && a.balance > zero)
         in
         let timing_info =
           Account.Timing.of_record timing
@@ -377,6 +403,8 @@ let%test_module "Test transaction logic." =
                           false ) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
+    (* Note that the change to the permissions takes effect immediately and can
+       influence further updates. *)
     let%test_unit "After permissions were set to proof-only, signatures are \
                    insufficient authorization for making transactions." =
       Quickcheck.test ~trials
@@ -385,11 +413,19 @@ let%test_module "Test transaction logic." =
         let%bind sender =
           Generator.filter Test_account.gen ~f:Test_account.non_empty
         in
-        let%bind receiver = Test_account.gen in
+        let%bind receiver =
+          Generator.filter Test_account.gen
+            ~f:Balance.(fun a -> a.balance < max_int)
+        in
         let%bind perms = Permissions.gen ~auth_tag:Proof in
+        let max_amount =
+          let open Balance in
+          max_int - to_amount receiver.balance
+          |> Option.value ~default:(of_nanomina_int_exn 1)
+          |> min sender.balance |> to_amount
+        in
         let%bind amount =
-          Amount.(
-            gen_incl (of_nanomina_int_exn 1) Balance.(to_amount sender.balance))
+          Amount.(gen_incl (of_nanomina_int_exn 1) max_amount)
         in
         let alter_perms =
           Alter_account.make ~account:sender.pk
@@ -459,18 +495,20 @@ let%test_module "Test transaction logic." =
                       ; [ Cancelled ]
                       ; [ Overflow ]
                       ; [ Cancelled ]
-               ] ) 
-             && Predicates.verify_balances_unchanged ~txn ~ledger accounts) )
+                      ] )
+                 && Predicates.verify_balances_unchanged ~txn ~ledger accounts )
+            )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
     let%test_unit "If fee can't be paid, operation results in an error." =
       Quickcheck.test ~trials
         (let open Quickcheck in
-         let open Generator.Let_syntax in
-         let%bind delegator =
-           Generator.filter Test_account.gen ~f:Balance.(fun a -> a.balance < max_int)
-         in
-         let%bind delegate = Test_account.gen in
+        let open Generator.Let_syntax in
+        let%bind delegator =
+          Generator.filter Test_account.gen
+            ~f:Balance.(fun a -> a.balance < max_int)
+        in
+        let%bind delegate = Test_account.gen in
         let txn =
           Alter_account.make ~account:delegator.pk
             { Account_update.Update.noop with delegate = Set delegate.pk }
@@ -484,7 +522,10 @@ let%test_module "Test transaction logic." =
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
             (function
-             | Ok _ -> false
-             | Error e -> String.is_substring ~substring:"Overflow" (Error.to_string_hum e) )
-            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns))
+              | Ok _ ->
+                  false
+              | Error e ->
+                  String.is_substring ~substring:"Overflow"
+                    (Error.to_string_hum e) )
+            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
   end )
