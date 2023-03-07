@@ -1593,7 +1593,7 @@ module Step : sig
 end
 
 module Challenges_vector : sig
-  type 'n t = (Backend.Tock.field_var Wrap_bp_vec.t, 'n) Vector.t
+  type ('field_var, 'n) t = ('field_var Wrap_bp_vec.t, 'n) Vector.t
 
   module Constant : sig
     type 'n t = (Backend.Tock.Field.t Wrap_bp_vec.t, 'n) Vector.t

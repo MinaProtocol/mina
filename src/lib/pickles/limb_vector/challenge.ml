@@ -1,6 +1,6 @@
 open Pickles_types
 
-type 'f t = 'f Snarky_backendless.Cvar.t
+type 'field_var t = 'field_var
 
 module Constant = Constant.Make (Nat.N2)
 
@@ -9,7 +9,7 @@ module type S = sig
 
   open Impl
 
-  type nonrec t = field t
+  type nonrec t = field_var t
 
   module Constant : sig
     type t = Constant.t [@@deriving sexp_of]

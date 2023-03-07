@@ -783,11 +783,17 @@ struct
            = (a00 + s a01 s^2 a02) (s^2 b02)
          = non_residue a01 b02 + non_residue s a02 b02 + s^2 a00 b02 *)
     in
+    let linear_combination (terms : (Field.t * Field.Var.t) list) : Field.Var.t
+        =
+      List.fold terms
+        ~init:Field.(Var.constant zero)
+        ~f:(fun acc (c, t) -> Field.Var.(add acc (scale t c)))
+    in
     let%map () =
       let%map () =
         Fq.assert_r1cs a01
           (Fq.scale b02 Fq3.Params.non_residue)
-          (Field.Var.linear_combination
+          (linear_combination
              [ (Field.one, c00); (Field.negate Fq3.Params.non_residue, v12) ] )
       and () =
         Fq.assert_r1cs a02 (Fq.scale b02 Fq3.Params.non_residue) Fq.(c01 - v10)

@@ -64,14 +64,16 @@ val dlog_pcs_batch :
   -> ('a, 'total, Pickles_types.Nat.z) Pickles_types.Pcs_batch.t
 
 val combined_evaluation :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> xi:'f Snarky_backendless.Cvar.t
-  -> ( 'f Snarky_backendless.Cvar.t
-     , 'f Snarky_backendless.Cvar.t Snarky_backendless.Snark_intf.Boolean0.t )
+     (module Snarky_backendless.Snark_intf.Run
+        with type field = 'f
+         and type field_var = 'field_var )
+  -> xi:'field_var
+  -> ( 'field_var
+     , 'field_var Snarky_backendless.Snark_intf.Boolean0.t )
      Pickles_types.Plonk_types.Opt.t
      array
      list
-  -> 'f Snarky_backendless.Cvar.t
+  -> 'field_var
 
 module Max_degree : sig
   val wrap_log2 : int

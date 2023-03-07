@@ -41,11 +41,13 @@ let rec absorb :
    length n which is all ones until position [first_zero], at which it is zero,
    and zero thereafter. *)
 let ones_vector :
-    type f n.
-       first_zero:f Snarky_backendless.Cvar.t
-    -> (module Snarky_backendless.Snark_intf.Run with type field = f)
+    type f field_var n.
+       first_zero:field_var
+    -> (module Snarky_backendless.Snark_intf.Run
+          with type field = f
+           and type field_var = field_var )
     -> n Nat.t
-    -> (f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t, n) Vector.t =
+    -> (field_var Snarky_backendless.Boolean.t, n) Vector.t =
  fun ~first_zero (module Impl) n ->
   let open Impl in
   let rec go :
@@ -62,9 +64,10 @@ let ones_vector :
   in
   go Boolean.true_ 0 n
 
-
-let lowest_128_bits (type f) ~constrain_low_bits ~assert_128_bits
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) x =
+let lowest_128_bits (type f field_var) ~constrain_low_bits ~assert_128_bits
+    (module Impl : Snarky_backendless.Snark_intf.Run
+      with type field = f
+       and type field_var = field_var ) x =
   let open Impl in
   let pow2 =
     (* 2 ^ n *)

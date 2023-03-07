@@ -11,22 +11,24 @@ val absorb :
   -> unit
 
 val ones_vector :
-  'f 'n.
-     first_zero:'f Snarky_backendless.Cvar.t
-  -> (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+  'f 'field_var 'n.
+     first_zero:'field_var
+  -> (module Snarky_backendless.Snark_intf.Run
+        with type field = 'f
+         and type field_var = 'field_var )
   -> 'n Pickles_types.Nat.t
-  -> ( 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
-     , 'n )
-     Pickles_types.Vector.t
+  -> ('field_var Snarky_backendless.Boolean.t, 'n) Pickles_types.Vector.t
 
 val seal :
      (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> 'f Snarky_backendless.Cvar.t
-  -> 'f Snarky_backendless.Cvar.t
+  -> 'field_var
+  -> 'field_var
 
 val lowest_128_bits :
      constrain_low_bits:bool
-  -> assert_128_bits:('f Snarky_backendless.Cvar.t -> unit)
-  -> (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> 'f Snarky_backendless.Cvar.t
-  -> 'f Snarky_backendless.Cvar.t
+  -> assert_128_bits:('field_var -> unit)
+  -> (module Snarky_backendless.Snark_intf.Run
+        with type field = 'f
+         and type field_var = 'field_var )
+  -> 'field_var
+  -> 'field_var

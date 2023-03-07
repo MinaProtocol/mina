@@ -7,29 +7,36 @@ module Snarkable = struct
     type _ t
 
     val typ :
-         ('var, 'value, 'f) Snarky_backendless.Typ.t
-      -> ('var t, 'value t, 'f) Snarky_backendless.Typ.t
+         ('var, 'value, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var t, 'value t, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
   end
 
   module type S2 = sig
     type (_, _) t
 
     val typ :
-         ('var1, 'value1, 'f) Snarky_backendless.Typ.t
-      -> ('var2, 'value2, 'f) Snarky_backendless.Typ.t
-      -> (('var1, 'var2) t, ('value1, 'value2) t, 'f) Snarky_backendless.Typ.t
+         ('var1, 'value1, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var2, 'value2, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ( ('var1, 'var2) t
+         , ('value1, 'value2) t
+         , 'f
+         , 'field_var
+         , 'state )
+         Snarky_backendless.Typ.t
   end
 
   module type S3 = sig
     type (_, _, _) t
 
     val typ :
-         ('var1, 'value1, 'f) Snarky_backendless.Typ.t
-      -> ('var2, 'value2, 'f) Snarky_backendless.Typ.t
-      -> ('var3, 'value3, 'f) Snarky_backendless.Typ.t
+         ('var1, 'value1, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var2, 'value2, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var3, 'value3, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
       -> ( ('var1, 'var2, 'var3) t
          , ('value1, 'value2, 'value3) t
-         , 'f )
+         , 'f
+         , 'field_var
+         , 'state )
          Snarky_backendless.Typ.t
   end
 
@@ -37,13 +44,15 @@ module Snarkable = struct
     type (_, _, _, _) t
 
     val typ :
-         ('var1, 'value1, 'f) Snarky_backendless.Typ.t
-      -> ('var2, 'value2, 'f) Snarky_backendless.Typ.t
-      -> ('var3, 'value3, 'f) Snarky_backendless.Typ.t
-      -> ('var4, 'value4, 'f) Snarky_backendless.Typ.t
+         ('var1, 'value1, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var2, 'value2, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var3, 'value3, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var4, 'value4, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
       -> ( ('var1, 'var2, 'var3, 'var4) t
          , ('value1, 'value2, 'value3, 'value4) t
-         , 'f )
+         , 'f
+         , 'field_var
+         , 'state )
          Snarky_backendless.Typ.t
   end
 
@@ -51,14 +60,16 @@ module Snarkable = struct
     type (_, _, _, _, _) t
 
     val typ :
-         ('var1, 'value1, 'f) Snarky_backendless.Typ.t
-      -> ('var2, 'value2, 'f) Snarky_backendless.Typ.t
-      -> ('var3, 'value3, 'f) Snarky_backendless.Typ.t
-      -> ('var4, 'value4, 'f) Snarky_backendless.Typ.t
-      -> ('var5, 'value5, 'f) Snarky_backendless.Typ.t
+         ('var1, 'value1, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var2, 'value2, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var3, 'value3, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var4, 'value4, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var5, 'value5, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
       -> ( ('var1, 'var2, 'var3, 'var4, 'var5) t
          , ('value1, 'value2, 'value3, 'value4, 'value5) t
-         , 'f )
+         , 'f
+         , 'field_var
+         , 'state )
          Snarky_backendless.Typ.t
   end
 
@@ -66,15 +77,17 @@ module Snarkable = struct
     type (_, _, _, _, _, _) t
 
     val typ :
-         ('var1, 'value1, 'f) Snarky_backendless.Typ.t
-      -> ('var2, 'value2, 'f) Snarky_backendless.Typ.t
-      -> ('var3, 'value3, 'f) Snarky_backendless.Typ.t
-      -> ('var4, 'value4, 'f) Snarky_backendless.Typ.t
-      -> ('var5, 'value5, 'f) Snarky_backendless.Typ.t
-      -> ('var6, 'value6, 'f) Snarky_backendless.Typ.t
+         ('var1, 'value1, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var2, 'value2, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var3, 'value3, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var4, 'value4, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var5, 'value5, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var6, 'value6, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
       -> ( ('var1, 'var2, 'var3, 'var4, 'var5, 'var6) t
          , ('value1, 'value2, 'value3, 'value4, 'value5, 'value6) t
-         , 'f )
+         , 'f
+         , 'field_var
+         , 'state )
          Snarky_backendless.Typ.t
   end
 
@@ -82,16 +95,18 @@ module Snarkable = struct
     type (_, _, _, _, _, _, _) t
 
     val typ :
-         ('var1, 'value1, 'f) Snarky_backendless.Typ.t
-      -> ('var2, 'value2, 'f) Snarky_backendless.Typ.t
-      -> ('var3, 'value3, 'f) Snarky_backendless.Typ.t
-      -> ('var4, 'value4, 'f) Snarky_backendless.Typ.t
-      -> ('var5, 'value5, 'f) Snarky_backendless.Typ.t
-      -> ('var6, 'value6, 'f) Snarky_backendless.Typ.t
-      -> ('var7, 'value7, 'f) Snarky_backendless.Typ.t
+         ('var1, 'value1, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var2, 'value2, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var3, 'value3, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var4, 'value4, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var5, 'value5, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var6, 'value6, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var7, 'value7, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
       -> ( ('var1, 'var2, 'var3, 'var4, 'var5, 'var6, 'var7) t
          , ('value1, 'value2, 'value3, 'value4, 'value5, 'value6, 'value7) t
-         , 'f )
+         , 'f
+         , 'field_var
+         , 'state )
          Snarky_backendless.Typ.t
   end
 
@@ -99,14 +114,14 @@ module Snarkable = struct
     type (_, _, _, _, _, _, _, _) t
 
     val typ :
-         ('var1, 'value1, 'f) Snarky_backendless.Typ.t
-      -> ('var2, 'value2, 'f) Snarky_backendless.Typ.t
-      -> ('var3, 'value3, 'f) Snarky_backendless.Typ.t
-      -> ('var4, 'value4, 'f) Snarky_backendless.Typ.t
-      -> ('var5, 'value5, 'f) Snarky_backendless.Typ.t
-      -> ('var6, 'value6, 'f) Snarky_backendless.Typ.t
-      -> ('var7, 'value7, 'f) Snarky_backendless.Typ.t
-      -> ('var8, 'value8, 'f) Snarky_backendless.Typ.t
+         ('var1, 'value1, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var2, 'value2, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var3, 'value3, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var4, 'value4, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var5, 'value5, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var6, 'value6, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var7, 'value7, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+      -> ('var8, 'value8, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
       -> ( ('var1, 'var2, 'var3, 'var4, 'var5, 'var6, 'var7, 'var8) t
          , ( 'value1
            , 'value2
@@ -117,7 +132,9 @@ module Snarkable = struct
            , 'value7
            , 'value8 )
            t
-         , 'f )
+         , 'f
+         , 'field_var
+         , 'state )
          Snarky_backendless.Typ.t
   end
 end
@@ -168,9 +185,11 @@ module Group (Impl : Snarky_backendless.Snark_intf.Run) = struct
       val of_affine : field * field -> t
     end
 
-    val typ_unchecked : (t, Constant.t, field) Snarky_backendless.Typ.t
+    val typ_unchecked :
+      (t, Constant.t, field, field_var, run_state) Snarky_backendless.Typ.t
 
-    val typ : (t, Constant.t, field) Snarky_backendless.Typ.t
+    val typ :
+      (t, Constant.t, field, field_var, run_state) Snarky_backendless.Typ.t
 
     val ( + ) : t -> t -> t
 
@@ -294,7 +313,10 @@ module type Statement = sig
   val to_field_elements : t -> field array
 end
 
-module type Statement_var =
-  Statement with type field := Backend.Tick.Field.t Snarky_backendless.Cvar.t
+module type Statement_var = sig
+  type field_var
+
+  include Statement with type field := field_var
+end
 
 module type Statement_value = Statement with type field := Backend.Tick.Field.t

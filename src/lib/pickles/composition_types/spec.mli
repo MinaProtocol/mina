@@ -81,20 +81,23 @@ module rec T : sig
 end
 
 val typ :
-     assert_16_bits:('a Snarky_backendless.Cvar.t -> unit)
-  -> 'a impl
+     assert_16_bits:('field_var -> unit)
+  -> (module Snarky_backendless.Snark_intf.Run
+        with type field = 'a
+         and type field_var = 'field_var )
   -> ( 'b
      , 'c
-     , 'a
-     , (unit, 'a) Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
+     , 'f
+     , 'field_var
+     , (unit, 'state) Snarky_backendless.Checked_runner.Simple.Types.Checked.t
+     )
      Snarky_backendless.Types.Typ.t
   -> ( 'd
      , 'e
      , < bool1 : bool
-       ; bool2 :
-           'a Snarky_backendless.Cvar.t Snarky_backendless.Snark_intf.Boolean0.t
+       ; bool2 : 'field_var Snarky_backendless.Snark_intf.Boolean0.t
        ; branch_data1 : Branch_data.t
-       ; branch_data2 : 'a Branch_data.Checked.t
+       ; branch_data2 : ('f, 'field_var) Branch_data.Checked.t
        ; bulletproof_challenge1 :
            Limb_vector.Challenge.Constant.t
            Kimchi_backend_common.Scalar_challenge.t
@@ -108,61 +111,62 @@ val typ :
            ( Limb_vector.Constant.Hex64.t
            , Digest.Limbs.n )
            Pickles_types.Vector.vec
-       ; digest2 : 'a Snarky_backendless.Cvar.t
+       ; digest2 : 'field_var
        ; field1 : 'c
        ; field2 : 'b
        ; .. > )
      T.t
-  -> ('e, 'd, 'a) Snarky_backendless.Typ.t
+  -> ('e, 'd, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
 
 module ETyp : sig
-  type ('var, 'value, 'f) t =
+  type ('var, 'value, 'f, 'field_var, 'state) t =
     | T :
-        ('inner, 'value, 'f) Snarky_backendless.Typ.t
+        ('inner, 'value, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
         * ('inner -> 'var)
         * ('var -> 'inner)
-        -> ('var, 'value, 'f) t
+        -> ('var, 'value, 'f, 'field_var, 'state) t
 end
 
 val packed_typ :
-     'a impl
-  -> ('b, 'c, 'a) ETyp.t
+     (module Snarky_backendless.Snark_intf.Run
+        with type field = 'a
+         and type field_var = 'field_var
+         and type run_state = 'state )
+  -> ('b, 'c, 'a, 'field_var, 'state) ETyp.t
   -> ( 'd
      , 'e
      , < bool1 : bool
-       ; bool2 :
-           'a Snarky_backendless.Cvar.t Snarky_backendless.Snark_intf.Boolean0.t
+       ; bool2 : 'field_var Snarky_backendless.Snark_intf.Boolean0.t
        ; branch_data1 : Branch_data.t
-       ; branch_data2 : 'a Snarky_backendless.Cvar.t
+       ; branch_data2 : 'field_var
        ; bulletproof_challenge1 :
            Limb_vector.Challenge.Constant.t
            Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; bulletproof_challenge2 :
-           'a Snarky_backendless.Cvar.t Kimchi_backend_common.Scalar_challenge.t
+           'field_var Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; challenge1 : Limb_vector.Challenge.Constant.t
-       ; challenge2 : 'a Snarky_backendless.Cvar.t
+       ; challenge2 : 'field_var
        ; digest1 :
            ( Limb_vector.Constant.Hex64.t
            , Digest.Limbs.n )
            Pickles_types.Vector.vec
-       ; digest2 : 'a Snarky_backendless.Cvar.t
+       ; digest2 : 'field_var
        ; field1 : 'c
        ; field2 : 'b
        ; .. > )
      T.t
-  -> ('e, 'd, 'a) ETyp.t
+  -> ('e, 'd, 'a, 'field_var, 'state) ETyp.t
 
 val pack :
      'f impl
   -> ( 'a
      , 'b
      , < bool1 : bool
-       ; bool2 :
-           'f Snarky_backendless.Cvar.t Snarky_backendless.Snark_intf.Boolean0.t
+       ; bool2 : 'field_var Snarky_backendless.Snark_intf.Boolean0.t
        ; branch_data1 : Branch_data.t
-       ; branch_data2 : 'f Branch_data.Checked.t
+       ; branch_data2 : ('f, 'field_var) Branch_data.Checked.t
        ; bulletproof_challenge1 :
            Limb_vector.Challenge.Constant.t
            Kimchi_backend_common.Scalar_challenge.t
@@ -176,10 +180,10 @@ val pack :
            ( Limb_vector.Constant.Hex64.t
            , Digest.Limbs.n )
            Pickles_types.Vector.vec
-       ; digest2 : 'f Snarky_backendless.Cvar.t
+       ; digest2 : 'field_var
        ; field1 : 'c
        ; field2 : 'd
        ; .. > )
      T.t
   -> 'b
-  -> [ `Field of 'd | `Packed_bits of 'f Snarky_backendless.Cvar.t * int ] array
+  -> [ `Field of 'd | `Packed_bits of 'field_var * int ] array

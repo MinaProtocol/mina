@@ -54,7 +54,7 @@ struct
               As_prover.(fun () -> round_table (Array.map init ~f:read_var))
         in
         t.(0) <- init ;
-        (let open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint in
+        (let open Kimchi_backend_common.Constraints.Plonk_constraint in
         with_label __LOC__ (fun () ->
             Impl.assert_
               { basic = T (Poseidon { state = t })

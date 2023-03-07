@@ -86,33 +86,43 @@ module Make_str (A : Wire_types.Concrete) = struct
         assert false
 
   module Checked = struct
-    type 'f t =
+    type ('f, 'field_var) t =
       { proofs_verified_mask : 'f Proofs_verified.Prefix_mask.Checked.t
-      ; domain_log2 : 'f Snarky_backendless.Cvar.t
+      ; domain_log2 : 'field_var
       }
     [@@deriving hlist]
 
-    let pack (type f)
-        (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-        ({ proofs_verified_mask; domain_log2 } : f t) : Impl.Field.t =
+    let pack (type f field_var)
+        (module Impl : Snarky_backendless.Snark_intf.Run
+          with type field = f
+           and type field_var = field_var )
+        ({ proofs_verified_mask; domain_log2 } : (f, field_var) t) :
+        Impl.Field.t =
       let open Impl.Field in
       let four = of_int 4 in
       (four * domain_log2)
       + pack (Pickles_types.Vector.to_list proofs_verified_mask)
   end
 
-  let packed_typ (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) =
+  let packed_typ (type f field_var state)
+      (module Impl : Snarky_backendless.Snark_intf.Run
+        with type field = f
+         and type field_var = field_var
+         and type run_state = state ) =
     Impl.Typ.transport Impl.Typ.field
       ~there:(pack (module Impl))
       ~back:(unpack (module Impl))
 
-  let typ (type f)
-      (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
+  let typ (type f field_var state)
+      (module Impl : Snarky_backendless.Snark_intf.Run
+        with type field = f
+         and type field_var = field_var
+         and type run_state = state )
       ~(* We actually only need it to be less than 252 bits in order to pack
           the whole branch_data struct safely, but it's cheapest to check that it's
           under 16 bits *)
-      (assert_16_bits : Impl.Field.t -> unit) : (f Checked.t, t) Impl.Typ.t =
+      (assert_16_bits : Impl.Field.t -> unit) :
+      ((f, field_var) Checked.t, t) Impl.Typ.t =
     let open Impl in
     let proofs_verified_mask :
         (f Proofs_verified.Prefix_mask.Checked.t, Proofs_verified.t) Typ.t =

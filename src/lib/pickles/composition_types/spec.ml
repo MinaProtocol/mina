@@ -152,35 +152,40 @@ let rec pack :
   | Constant (x, _, inner) ->
       pack ~zero ~one p inner (Some x) t
 
-type ('f, 'env) typ =
+type ('f, 'env, 'field_var, 'state) typ =
   { typ :
       'var 'value.
-      ('value, 'var, 'env) basic -> ('var, 'value, 'f) Snarky_backendless.Typ.t
+         ('value, 'var, 'env) basic
+      -> ('var, 'value, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
   }
 
 let rec typ :
-    type f var value env.
-       (f, env) typ
+    type f field_var state var value env.
+       (module Snarky_backendless.Snark_intf.Run
+          with type field = f
+           and type field_var = field_var
+           and type run_state = state )
+    -> (f, env, field_var, state) typ
     -> (value, var, env) T.t
-    -> (var, value, f) Snarky_backendless.Typ.t =
+    -> (var, value, f, field_var, state) Snarky_backendless.Typ.t =
   let open Snarky_backendless.Typ in
-  fun t spec ->
+  fun (module Impl) t spec ->
     match spec with
     | B spec ->
         t.typ spec
     | Scalar chal ->
         Sc.typ (t.typ chal)
     | Vector (spec, n) ->
-        Vector.typ (typ t spec) n
+        Vector.typ (typ (module Impl) t spec) n
     | Array (spec, n) ->
-        array ~length:n (typ t spec)
+        array ~length:n (typ (module Impl) t spec)
     | Struct [] ->
         let open Hlist.HlistId in
         transport (unit ()) ~there:(fun [] -> ()) ~back:(fun () -> [])
         |> transport_var ~there:(fun [] -> ()) ~back:(fun () -> [])
     | Struct (spec :: specs) ->
         let open Hlist.HlistId in
-        tuple2 (typ t spec) (typ t (Struct specs))
+        tuple2 (typ (module Impl) t spec) (typ (module Impl) t (Struct specs))
         |> transport
              ~there:(fun (x :: xs) -> (x, xs))
              ~back:(fun (x, xs) -> x :: xs)
@@ -188,11 +193,12 @@ let rec typ :
              ~there:(fun (x :: xs) -> (x, xs))
              ~back:(fun (x, xs) -> x :: xs)
     | Opt { inner; flag; dummy1; dummy2; bool = (module B) } ->
-        let bool = typ t (B Bool) in
+        let bool = typ (module Impl) t (B Bool) in
         let open B in
         (* Always use the same "maybe" layout which is a boolean and then the value *)
         Plonk_types.Opt.constant_layout_typ bool flag ~dummy:dummy1
-          ~dummy_var:dummy2 ~true_ ~false_ (typ t inner)
+          ~dummy_var:dummy2 ~true_ ~false_
+          (typ (module Impl) t inner)
     | Opt_unflagged { inner; flag; dummy1; dummy2 } -> (
         match flag with
         | Plonk_types.Opt.Flag.No ->
@@ -205,7 +211,7 @@ let rec typ :
                  ~there:(function Some _ -> assert false | None -> ())
                  ~back:(fun x -> None)
         | Plonk_types.Opt.Flag.(Yes | Maybe) ->
-            typ t inner
+            typ (module Impl) t inner
             |> Snarky_backendless.Typ.transport
                  ~there:(function Some x -> x | None -> dummy1)
                  ~back:(fun x -> Some x)
@@ -213,12 +219,10 @@ let rec typ :
                  ~there:(function Some x -> x | None -> dummy2)
                  ~back:(fun x -> Some x) )
     | Constant (x, assert_eq, spec) ->
-        let (Typ typ) = typ t spec in
+        let (Typ typ) = typ (module Impl) t spec in
         let constant_var =
           let fields, aux = typ.value_to_fields x in
-          let fields =
-            Array.map fields ~f:(fun x -> Snarky_backendless.Cvar.Constant x)
-          in
+          let fields = Array.map fields ~f:(fun x -> Impl.Field.constant x) in
           typ.var_of_fields (fields, aux)
         in
         let open Snarky_backendless.Typ in
@@ -233,7 +237,7 @@ type generic_spec = { spec : 'env. 'env exists }
 module ETyp = struct
   type ('var, 'value, 'f) t =
     | T :
-        ('inner, 'value, 'f) Snarky_backendless.Typ.t
+        ('inner, 'value, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
         * ('inner -> 'var)
         * ('var -> 'inner)
         -> ('var, 'value, 'f) t

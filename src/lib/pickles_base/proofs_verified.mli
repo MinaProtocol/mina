@@ -20,26 +20,33 @@ val to_int : t -> int
 
 module One_hot : sig
   module Checked : sig
-    type 'f t = ('f, Pickles_types.Nat.N3.n) One_hot_vector.t
+    type 'field_var t = ('field_var, Pickles_types.Nat.N3.n) One_hot_vector.t
 
-    val to_input :
-      'f t -> 'f Snarky_backendless.Cvar.t Random_oracle_input.Chunked.t
+    val to_input : 'field_var t -> 'field_var Random_oracle_input.Chunked.t
   end
 
   val to_input : zero:'a -> one:'a -> t -> 'a Random_oracle_input.Chunked.t
 
   val typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-    -> ('f Checked.t, t, 'f) Snarky_backendless.Typ.t
+       (module Snarky_backendless.Snark_intf.Run
+          with type field = 'f
+           and type field_var = 'field_var
+           and type run_state = 'state )
+    -> ( 'field_var Checked.t
+       , t
+       , 'f
+       , 'field_var
+       , 'state )
+       Snarky_backendless.Typ.t
 end
 
-type 'f boolean = 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
+type 'field_var boolean = 'field_var Snarky_backendless.Boolean.t
 
 type 'a vec2 = ('a, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
 
 module Prefix_mask : sig
   module Checked : sig
-    type 'f t = 'f boolean vec2
+    type 'field_var t = 'field_var boolean vec2
   end
 
   val there : t -> bool vec2
@@ -51,5 +58,10 @@ module Prefix_mask : sig
           with type field = 'f
            and type field_var = 'field_var
            and type run_state = 'state )
-    -> ('f Checked.t, t, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
+    -> ( 'field_var Snarky_backendless.Boolean.t Checked.t
+       , t
+       , 'f
+       , 'field_var
+       , 'state )
+       Snarky_backendless.Typ.t
 end

@@ -4,12 +4,12 @@ module Constant : sig
   type t = int
 end
 
-type ('f, 'n) t =
+type ('field_var, 'n) t =
   private
-  ('f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t, 'n) Vector.t
+  ('field_var Snarky_backendless.Boolean.t, 'n) Vector.t
 
 module T (Impl : Snarky_backendless.Snark_intf.Run) : sig
-  type nonrec 'n t = (Impl.field, 'n) t
+  type nonrec 'n t = (Impl.Boolean.var, 'n) t
 end
 
 module Make (Impl : Snarky_backendless.Snark_intf.Run) : sig

@@ -263,9 +263,11 @@ let ft_comm ~add:( + ) ~scale ~endoscale ~negate
   f_comm + chunked_t_comm
   + negate (scale chunked_t_comm plonk.zeta_to_domain_size)
 
-let combined_evaluation (type f)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-    ~(xi : Impl.Field.t) (without_degree_bound : _ list) =
+let combined_evaluation (type f field_var)
+    (module Impl : Snarky_backendless.Snark_intf.Run
+      with type field = f
+       and type field_var = field_var ) ~(xi : Impl.Field.t)
+    (without_degree_bound : _ list) =
   let open Impl in
   let open Field in
   let mul_and_add ~(acc : Field.t) ~(xi : Field.t)

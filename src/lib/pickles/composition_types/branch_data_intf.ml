@@ -25,25 +25,38 @@ module type S = sig
   end]
 
   module Checked : sig
-    type 'f t =
+    type ('f, 'field_var) t =
       { proofs_verified_mask : 'f Proofs_verified.Prefix_mask.Checked.t
-      ; domain_log2 : 'f Snarky_backendless.Cvar.t
+      ; domain_log2 : 'field_var
       }
 
     val pack :
-         (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-      -> 'f t
-      -> 'f Snarky_backendless.Cvar.t
+         (module Snarky_backendless.Snark_intf.Run
+            with type field = 'f
+             and type field_var = 'field_var )
+      -> ('f, 'field_var) t
+      -> 'field_var
   end
 
   val typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-    -> assert_16_bits:('f Snarky_backendless.Cvar.t -> unit)
-    -> ('f Checked.t, t, 'f) Snarky_backendless.Typ.t
+       (module Snarky_backendless.Snark_intf.Run
+          with type field = 'f
+           and type field_var = 'field_var
+           and type run_state = 'state )
+    -> assert_16_bits:('field_var -> unit)
+    -> ( ('f, 'field_var) Checked.t
+       , t
+       , 'f
+       , 'field_var
+       , 'state )
+       Snarky_backendless.Typ.t
 
   val packed_typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-    -> ('f Snarky_backendless.Cvar.t, t, 'f) Snarky_backendless.Typ.t
+       (module Snarky_backendless.Snark_intf.Run
+          with type field = 'f
+           and type field_var = 'field_var
+           and type run_state = 'state )
+    -> ('field_var, t, 'f, 'field_var, 'state) Snarky_backendless.Typ.t
 
   val length_in_bits : int
 
