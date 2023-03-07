@@ -106,9 +106,8 @@ let%test_module "Test transaction logic." =
         (let open Quickcheck in
         let open Generator.Let_syntax in
         let%bind account =
-          Generator.filter
-            ~f:Balance.(fun a -> a.balance < max_int)
-            Test_account.gen
+          Test_account.gen_constrained_balance ()
+            ~max:Balance.(Option.value_exn @@ max_int - Amount.of_nanomina_int_exn 1)
         in
         let max_amount =
           Balance.(max_int - to_amount account.balance)
@@ -136,9 +135,8 @@ let%test_module "Test transaction logic." =
           Amount.(gen_incl (of_nanomina_int_exn 1) max_int)
         in
         let%bind account =
-          Generator.filter
-            ~f:Amount.(fun a -> Balance.to_amount a.balance >= unsigned_amount)
-            Test_account.gen
+          let min = Balance.of_uint64 @@ Amount.to_uint64 unsigned_amount in
+          Test_account.gen_constrained_balance ~min ()
         in
         let amount = Amount.Signed.(negate @@ of_unsigned unsigned_amount) in
         let update = Single.make ~account:account.pk amount in
@@ -256,7 +254,7 @@ let%test_module "Test transaction logic." =
         (let open Quickcheck in
         let open Generator.Let_syntax in
         let%bind account =
-          Generator.filter Test_account.gen ~f:Test_account.non_empty
+          Test_account.gen_constrained_balance ~min:Balance.(of_nanomina_int_exn 1) ()
         in
         let global_slot = protocol_state.global_slot_since_genesis in
         let%bind timing =
@@ -331,9 +329,9 @@ let%test_module "Test transaction logic." =
             ~f:Balance.(fun (_, min_bal) -> min_bal > of_nanomina_int_exn 1)
         in
         let%map account =
-          Generator.filter Test_account.gen
-            ~f:
-              Balance.(fun a -> minimum_balance > a.balance && a.balance > zero)
+          Test_account.gen_constrained_balance ()
+            ~min:Balance.(of_nanomina_int_exn 1)
+            ~max:Balance.(Option.value ~default:max_int @@ minimum_balance - Amount.of_nanomina_int_exn 1)
         in
         let timing_info =
           Account.Timing.of_record timing
@@ -411,11 +409,12 @@ let%test_module "Test transaction logic." =
         (let open Quickcheck in
         let open Generator.Let_syntax in
         let%bind sender =
-          Generator.filter Test_account.gen ~f:Test_account.non_empty
+          Test_account.gen_constrained_balance ()
+            ~min:Balance.one
         in
         let%bind receiver =
-          Generator.filter Test_account.gen
-            ~f:Balance.(fun a -> a.balance < max_int)
+          Test_account.gen_constrained_balance ()
+            ~max:Balance.(Option.value_exn (max_int - Amount.one))
         in
         let%bind perms = Permissions.gen ~auth_tag:Proof in
         let max_amount =
@@ -464,7 +463,7 @@ let%test_module "Test transaction logic." =
         (let open Quickcheck in
         let open Generator.Let_syntax in
         let%bind sender =
-          Generator.filter Test_account.gen ~f:Test_account.non_empty
+          Test_account.gen_constrained_balance ~min:Balance.one ()
         in
         let%bind amounts = gen_balance_split ~limit:2 sender.balance in
         let amount1 = List.hd_exn amounts in
@@ -505,8 +504,8 @@ let%test_module "Test transaction logic." =
         (let open Quickcheck in
         let open Generator.Let_syntax in
         let%bind delegator =
-          Generator.filter Test_account.gen
-            ~f:Balance.(fun a -> a.balance < max_int)
+          Test_account.gen_constrained_balance ()
+            ~max:Balance.(Option.value_exn (max_int - Amount.one))
         in
         let%bind delegate = Test_account.gen in
         let txn =
@@ -514,7 +513,7 @@ let%test_module "Test transaction logic." =
             { Account_update.Update.noop with delegate = Set delegate.pk }
         in
         let min_fee =
-          Balance.(delegator.balance + Amount.of_nanomina_int_exn 1)
+          Balance.(delegator.balance + Amount.one)
           |> Option.value_map ~f:balance_to_fee ~default:Fee.max_int
         in
         let%map fee = Fee.(gen_incl min_fee max_int) in
