@@ -7,6 +7,10 @@ open Core_kernel
 
 module Impl = Kimchi_backend.Impls.Step_impl
 
+(* to get better stack traces in Rust *)
+
+(* let () = Kimchi_bindings.RustHelpers.init_rust_panic_hook () *)
+
 (* helpers *)
 
 let compare_with obtained filepath =
