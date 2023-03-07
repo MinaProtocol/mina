@@ -13,7 +13,7 @@ let Size = ./Size.dhall
 
 let dockerImage = (../Constants/ContainerImages.dhall).minaToolchain
 
-let fixPermissionsScript = "sudo chown -R opam ."
+let fixPermissionsScript = "sudo chmod -R 777 ."
 
 let Config = {
   Type = {
