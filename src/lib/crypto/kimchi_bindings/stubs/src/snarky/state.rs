@@ -64,8 +64,8 @@ impl_functions! {
         }
     }
 
-    pub fn fp_state_get_variable_value(state: &CamlFpState, var: usize) -> CamlFp {
-        CamlFp(state.read_var_idx(var))
+    pub fn fp_state_get_variable_value(state: ocaml::Pointer<CamlFpState>, var: usize) -> CamlFp {
+        CamlFp(state.as_ref().read_var_idx(var))
     }
 
     pub fn fp_state_store_field_elt(
@@ -81,28 +81,28 @@ impl_functions! {
         state.as_mut().0.alloc_var().into()
     }
 
-    pub fn fp_state_has_witness(state: &CamlFpState) -> bool {
-        state.0.has_witness
+    pub fn fp_state_has_witness(state: ocaml::Pointer<CamlFpState>) -> bool {
+        state.as_ref().has_witness
     }
 
-    pub fn fp_state_as_prover(state: &CamlFpState) -> bool {
-        state.0.as_prover
+    pub fn fp_state_as_prover(state: ocaml::Pointer<CamlFpState>) -> bool {
+        state.as_ref().as_prover
     }
 
     pub fn fp_state_set_as_prover(mut state: ocaml::Pointer<CamlFpState>, b: bool) {
         state.as_mut().0.as_prover = b;
     }
 
-    pub fn fp_state_eval_constraints(state: &CamlFpState) -> bool {
-        state.0.eval_constraints
+    pub fn fp_state_eval_constraints(state: ocaml::Pointer<CamlFpState>) -> bool {
+        state.as_ref().eval_constraints
     }
 
-    pub fn fp_state_next_auxiliary(state: &CamlFpState) -> usize {
-        state.0.next_var
+    pub fn fp_state_next_auxiliary(state: ocaml::Pointer<CamlFpState>) -> usize {
+        state.as_ref().next_var
     }
 
-    pub fn fp_state_system(state: &CamlFpState) -> Option<CamlFpCS> {
-        state.system.clone().map(|x| CamlFpCS(x))
+    pub fn fp_state_system(state: ocaml::Pointer<CamlFpState>) -> Option<CamlFpCS> {
+        state.as_ref().system.clone().map(|x| CamlFpCS(x))
     }
 
     pub fn fp_state_finalize(mut state: ocaml::Pointer<CamlFpState>) {
@@ -114,8 +114,8 @@ impl_functions! {
         state.as_mut().0.generate_witness_init(inputs.0.to_vec());
     }
 
-    pub fn fp_state_get_private_inputs(state : &CamlFpState) -> CamlFpVector {
-        CamlFpVector(Rc::new(state.0.get_private_inputs()))
+    pub fn fp_state_get_private_inputs(state : ocaml::Pointer<CamlFpState>) -> CamlFpVector {
+        CamlFpVector(Rc::new(state.as_ref().get_private_inputs()))
     }
 }
 
@@ -154,8 +154,8 @@ impl_functions! {
         }
     }
 
-    pub fn fq_state_get_variable_value(state: &CamlFqState, var: usize) -> CamlFq {
-        CamlFq(state.read_var_idx(var))
+    pub fn fq_state_get_variable_value(state: ocaml::Pointer<CamlFqState>, var: usize) -> CamlFq {
+        CamlFq(state.as_ref().read_var_idx(var))
     }
 
     pub fn fq_state_store_field_elt(
@@ -171,28 +171,28 @@ impl_functions! {
         state.as_mut().0.alloc_var().into()
     }
 
-    pub fn fq_state_has_witness(state: &CamlFqState) -> bool {
-        state.0.has_witness
+    pub fn fq_state_has_witness(state: ocaml::Pointer<CamlFqState>) -> bool {
+        state.as_ref().has_witness
     }
 
-    pub fn fq_state_as_prover(state: &CamlFqState) -> bool {
-        state.0.as_prover
+    pub fn fq_state_as_prover(state: ocaml::Pointer<CamlFqState>) -> bool {
+        state.as_ref().as_prover
     }
 
     pub fn fq_state_set_as_prover(mut state: ocaml::Pointer<CamlFqState>, b: bool) {
         state.as_mut().0.as_prover = b;
     }
 
-    pub fn fq_state_eval_constraints(state: &CamlFqState) -> bool {
-        state.0.eval_constraints
+    pub fn fq_state_eval_constraints(state: ocaml::Pointer<CamlFqState>) -> bool {
+        state.as_ref().eval_constraints
     }
 
-    pub fn fq_state_next_auxiliary(state: &CamlFqState) -> usize {
-        state.0.next_var
+    pub fn fq_state_next_auxiliary(state: ocaml::Pointer<CamlFqState>) -> usize {
+        state.as_ref().next_var
     }
 
-    pub fn fq_state_system(state: &CamlFqState) -> Option<CamlFqCS> {
-        state.system.clone().map(|x| CamlFqCS(x))
+    pub fn fq_state_system(state: ocaml::Pointer<CamlFqState>) -> Option<CamlFqCS> {
+        state.as_ref().system.clone().map(|x| CamlFqCS(x))
     }
 
     pub fn fq_state_finalize(mut state: ocaml::Pointer<CamlFqState>) {
@@ -203,7 +203,7 @@ impl_functions! {
         state.as_mut().0.generate_witness_init(inputs.0.to_vec());
     }
 
-    pub fn fq_state_get_private_inputs(state : &CamlFqState) -> CamlFqVector {
-        CamlFqVector(Rc::new(state.0.get_private_inputs()))
+    pub fn fq_state_get_private_inputs(state : ocaml::Pointer<CamlFqState>) -> CamlFqVector {
+        CamlFqVector(Rc::new(state.as_ref().get_private_inputs()))
     }
 }

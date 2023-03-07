@@ -55,20 +55,20 @@ impl_functions! {
         cs.as_mut().0.digest()
     }
 
-    pub fn fp_cs_get_rows_len(cs: &CamlFpCS) -> usize {
-        cs.get_rows_len()
+    pub fn fp_cs_get_rows_len(cs: ocaml::Pointer<CamlFpCS>) -> usize {
+        cs.as_ref().get_rows_len()
     }
 
     pub fn fp_cs_set_primary_input_size(mut cs: ocaml::Pointer<CamlFpCS>, size: usize) {
         cs.as_mut().0.set_primary_input_size(size);
     }
 
-    pub fn fp_cs_get_primary_input_size(cs: &CamlFpCS) -> usize {
-        cs.get_primary_input_size()
+    pub fn fp_cs_get_primary_input_size(cs: ocaml::Pointer<CamlFpCS>) -> usize {
+        cs.as_ref().get_primary_input_size()
     }
 
-    pub fn fp_cs_get_prev_challenges(cs: &CamlFpCS) -> Option<usize> {
-        cs.get_prev_challenges()
+    pub fn fp_cs_get_prev_challenges(cs: ocaml::Pointer<CamlFpCS>) -> Option<usize> {
+        cs.as_ref().get_prev_challenges()
     }
 
     pub fn fp_cs_set_prev_challenges(mut cs: ocaml::Pointer<CamlFpCS>, num: usize) {
@@ -116,19 +116,19 @@ impl_functions! {
         cs.as_mut().0.digest()
     }
 
-    pub fn fq_cs_get_rows_len(cs: &CamlFqCS) -> usize {
-        cs.get_rows_len()
+    pub fn fq_cs_get_rows_len(cs: ocaml::Pointer<CamlFqCS>) -> usize {
+        cs.as_ref().get_rows_len()
     }
 
     pub fn fq_cs_set_primary_input_size(mut cs: ocaml::Pointer<CamlFqCS>, size: usize) {
         cs.as_mut().0.set_primary_input_size(size);
     }
-    pub fn fq_cs_get_primary_input_size(cs: &CamlFqCS) -> usize {
-        cs.get_primary_input_size()
+    pub fn fq_cs_get_primary_input_size(cs: ocaml::Pointer<CamlFqCS>) -> usize {
+        cs.as_ref().get_primary_input_size()
     }
 
-    pub fn fq_cs_get_prev_challenges(cs: &CamlFqCS) -> Option<usize> {
-        cs.get_prev_challenges()
+    pub fn fq_cs_get_prev_challenges(cs: ocaml::Pointer<CamlFqCS>) -> Option<usize> {
+        cs.as_ref().get_prev_challenges()
     }
 
     pub fn fq_cs_set_prev_challenges(mut cs: ocaml::Pointer<CamlFqCS>, num: usize) {

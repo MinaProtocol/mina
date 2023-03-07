@@ -14,6 +14,8 @@ macro_rules! impl_vector_old {
                 $name::create(Vec::new())
             }
 
+            // TODO: we should change all of these arguments to receive ocaml::Pointer<$name> to avoid clones
+
             #[ocaml_gen::func]
             #[ocaml::func]
             pub fn [<$name:snake _length>](v: $name) -> ocaml::Int {

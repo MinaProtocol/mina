@@ -8,7 +8,7 @@ use crate::arkworks::{CamlFp, CamlFq};
 // Wrapper types
 //
 
-impl_custom!(CamlFpVar, FieldVar<Fp>, Debug, Clone);
+impl_custom_clone!(CamlFpVar, FieldVar<Fp>, Debug);
 
 impl From<&CamlFpVar> for FieldVar<Fp> {
     fn from(var: &CamlFpVar) -> Self {
@@ -28,7 +28,7 @@ impl From<FieldVar<Fp>> for CamlFpVar {
     }
 }
 
-impl_custom!(CamlFqVar, FieldVar<Fq>, Debug, Clone);
+impl_custom_clone!(CamlFqVar, FieldVar<Fq>, Debug);
 
 impl From<&CamlFqVar> for FieldVar<Fq> {
     fn from(var: &CamlFqVar) -> Self {
@@ -63,23 +63,24 @@ macro_rules! impl_cvar_methods {
                 $CamlFVar(FieldVar::Constant(cst.0))
             }
 
-            pub fn [<$name:snake _var_add>](var1: &$CamlFVar, var2: &$CamlFVar) -> $CamlFVar {
+            pub fn [<$name:snake _var_add>](var1: $CamlFVar, var2: $CamlFVar) -> $CamlFVar {
                 $CamlFVar(&var1.0 + &var2.0)
             }
 
-            pub fn [<$name:snake _var_negate>](var: &$CamlFVar) -> $CamlFVar {
+            pub fn [<$name:snake _var_negate>](var: $CamlFVar) -> $CamlFVar {
                 $CamlFVar(-&var.0)
             }
 
-            pub fn [<$name:snake _var_scale>](var: &$CamlFVar, cst: $CamlF) -> $CamlFVar {
+            pub fn [<$name:snake _var_scale>](var: $CamlFVar, cst: $CamlF) -> $CamlFVar {
                 $CamlFVar(var.0.scale(cst.0))
             }
 
-            pub fn [<$name:snake _var_sub>](var1: &$CamlFVar, var2: &$CamlFVar) -> $CamlFVar {
+            pub fn [<$name:snake _var_sub>](var1: $CamlFVar, var2: $CamlFVar) -> $CamlFVar {
                 $CamlFVar(&var1.0 - &var2.0)
             }
 
-            pub fn [<$name:snake _var_to_constant>](var: &$CamlFVar) -> Option<$CamlF> {
+            pub fn [<$name:snake _var_to_constant>](var: $CamlFVar) -> Option<$CamlF> {
+                println!("var_to_constant: {:?}", var);
                 match &var.0 {
                     FieldVar::Constant(c) => Some($CamlF(*c)),
                     _ => None,
