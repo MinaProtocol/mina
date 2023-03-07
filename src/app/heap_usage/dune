@@ -36,6 +36,7 @@
    pickles
    pickles.backend
    pickles_types
+   protocol_version
    transaction_snark
    transaction_snark_scan_state
    ledger_proof

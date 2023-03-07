@@ -1991,13 +1991,13 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
   let max_event_elements = genesis_constants.max_event_elements in
   let max_action_elements = genesis_constants.max_action_elements in
   (*10.26*np + 10.08*n2 + 9.14*n1 < 69.45*)
-  let zkapp_cost_within_limit =
+  let total_cost =
     Float.(
       (proof_cost * of_int proof_segments)
       + (signed_pair_cost * of_int signed_pairs)
-      + (signed_single_cost * of_int signed_singles)
-      < cost_limit)
+      + (signed_single_cost * of_int signed_singles))
   in
+  let zkapp_cost_within_limit = Float.( < ) total_cost cost_limit in
   let valid_event_elements = num_event_elements <= max_event_elements in
   let valid_action_elements = num_action_elements <= max_action_elements in
   if zkapp_cost_within_limit && valid_event_elements && valid_action_elements
@@ -2005,7 +2005,10 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
   else
     let proof_zkapp_command_err =
       if zkapp_cost_within_limit then None
-      else Some (sprintf "zkapp transaction too expensive")
+      else
+        Some
+          (sprintf "zkApp transaction too expensive (cost: %0.1f, limit: %0.1f)"
+             total_cost cost_limit )
     in
     let events_err =
       if valid_event_elements then None

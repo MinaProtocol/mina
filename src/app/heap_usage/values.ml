@@ -2,6 +2,10 @@
 
 open Core_kernel
 
+[@@@warning "-26-32"]
+
+(*
+
 let sample_pk = Quickcheck.random_value Signature_lib.Public_key.gen
 
 let sample_pk_compressed = Signature_lib.Public_key.compress sample_pk
@@ -254,7 +258,7 @@ let scan_state_merge_node :
     Full { left; right; seq_no = 1; status = Todo }
   in
   ((weight1, weight2), job)
-
+*)
 let protocol_state =
   let ledger_proof_statement =
     Quickcheck.random_value Mina_state.Snarked_ledger_state.gen
@@ -337,7 +341,7 @@ let protocol_state =
          ledger_proof_statement
   in
   Mina_state.Protocol_state.value_of_yojson json |> Result.ok_or_failwith
-
+(*
 let pending_coinbase =
   (* size is fixed, given a particular depth *)
   let depth =
@@ -591,8 +595,10 @@ let merkle_path =
         if n % 2 = 0 then `Left hash else `Right hash )
   in
   path
+*)
 
 let block_max_apps =
+  Protocol_version.(set_current @@ create_exn ~major:1 ~minor:1 ~patch:0) ;
   (* use the protocol state from above *)
   let header =
     Mina_block.Header.create ~protocol_state
@@ -600,7 +606,7 @@ let block_max_apps =
       ~delta_block_chain_proof:(Snark_params.Tick.Field.zero, [])
       ()
   in
-  let mk_big_zkapp account_update_keys : Mina_base.Zkapp_command.t =
+  let mk_big_zkapp () : Mina_base.Zkapp_command.t =
     let open Quickcheck in
     let fee_payer : Mina_base.Account_update.Fee_payer.t =
       let body : Mina_base.Account_update.Body.Fee_payer.t =
@@ -621,7 +627,18 @@ let block_max_apps =
       let authorization = Mina_base.Signature.dummy in
       { body; authorization }
     in
-    let num_account_updates = 20 in
+    let keypairs =
+      List.init 100 ~f:(fun _ -> Signature_lib.Keypair.create ())
+    in
+    let available_public_keys =
+      let module Table = Signature_lib.Public_key.Compressed.Table in
+      let tbl = Table.create () in
+      List.iter keypairs ~f:(fun kp ->
+          let key = Signature_lib.Public_key.compress kp.public_key in
+          ignore (Table.add tbl ~key ~data:()) ) ;
+      tbl
+    in
+    let num_account_updates = 5 in
     let account_updates =
       let rec create_update acc n =
         if n <= 0 then acc
@@ -630,23 +647,27 @@ let block_max_apps =
             let authorization : Mina_base.Control.t =
               Proof Mina_base.Proof.transaction_dummy
             in
-            let account_ids_seen = Obj.magic 42 in
-            let zkapp_account_ids = Obj.magic 99 in
-            let available_public_keys = Obj.magic 42 in
-            let account_state_tbl = Obj.magic 42 in
+            let account_ids_seen = Mina_base.Account_id.Hash_set.create () in
+            let zkapp_account_ids = [] in
+            let account_state_tbl = Mina_base.Account_id.Table.create () in
+            (* pack all events, actions into one account update *)
             let num_event_elements =
-              Genesis_constants.compiled.max_event_elements
+              if n = num_account_updates then
+                Genesis_constants.compiled.max_event_elements
+              else 0
             in
             let num_action_elements =
-              Genesis_constants.compiled.max_action_elements
+              if n = num_account_updates then
+                Genesis_constants.compiled.max_action_elements
+              else 0
             in
             let simple_update =
               random_value ~seed:`Nondeterministic
                 (Mina_generators.Zkapp_command_generators
                  .gen_account_update_from ~num_event_elements
-                   ~num_action_elements ~authorization ~account_ids_seen
-                   ~zkapp_account_ids ~available_public_keys ~account_state_tbl
-                   () )
+                   ~num_action_elements ~new_account:true ~authorization
+                   ~account_ids_seen ~zkapp_account_ids ~available_public_keys
+                   ~account_state_tbl () )
             in
             Mina_base.Account_update.of_simple simple_update
           in
@@ -669,30 +690,70 @@ let block_max_apps =
   in
   let pre_diff_two_coinbases :
       Staged_ledger_diff.Pre_diff_with_at_most_two_coinbase.t =
-    let completed_works = [] in
-    let commands =
-      let coinbase =
-        let cbs_gen =
-          let open Quickcheck.Generator.Let_syntax in
-          let%bind cb1 =
-            Mina_base.Coinbase.Fee_transfer.Gen.gen Currency.Fee.zero
-          in
-          let%map cb2 =
-            Mina_base.Coinbase.Fee_transfer.Gen.gen Currency.Fee.one
-          in
-          (cb1, cb2)
-        in
-        let cb1, cb2 = Quickcheck.random_value cbs_gen in
-        Staged_ledger_diff.At_most_two.Two (Some (cb1, Some cb2))
+    let zkapp_commands =
+      let num_commands =
+        Int.pow 2
+          Genesis_constants.Constraint_constants.compiled
+            .transaction_capacity_log_2
+        - 2
       in
-      let internal_command_statuses = Obj.magic 42 in
-      { completed_works; commands; coinbase; internal_command_statuses }
+      List.init num_commands ~f:(fun _ -> mk_big_zkapp ())
     in
-    let pre_diff_one_coinbase :
-        Staged_ledger_diff.Pre_diff_with_at_most_one_coinbase.t =
-      Obj.magic 42
+    List.iter zkapp_commands ~f:(fun zkapp ->
+        let result =
+          Mina_base.Zkapp_command.valid_size
+            ~genesis_constants:Genesis_constants.compiled zkapp
+        in
+        match result with
+        | Ok () ->
+            ()
+        | Error err ->
+            failwithf "zkApp size check failed: %s" (Error.to_string_hum err) () ) ;
+    let commands =
+      List.map zkapp_commands ~f:(fun zkapp ->
+          let data = Mina_base.User_command.Zkapp_command zkapp in
+          (* make status kinda big *)
+          let status =
+            Mina_base.Transaction_status.Failed
+              (List.init 5 ~f:(fun _ ->
+                   let open Mina_base.Transaction_status.Failure in
+                   [ Receiver_not_present
+                   ; Amount_insufficient_to_create_account
+                   ; Cannot_pay_creation_fee_in_token
+                   ; Source_insufficient_balance
+                   ; Source_minimum_balance_violation
+                   ; Receiver_already_exists
+                   ; Token_owner_not_caller
+                   ; Overflow
+                   ] ) )
+          in
+          ({ data; status } : _ Mina_base.With_status.t) )
     in
-    let diff = (pre_diff_two_coinbases, Some pre_diff_one_coinbase) in
-    Staged_ledger_diff.Body.create { diff }
+    let completed_works = [] in
+    let coinbase =
+      let cbs_gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%bind cb1 =
+          Mina_base.Coinbase.Fee_transfer.Gen.gen Currency.Fee.zero
+        in
+        let%map cb2 =
+          Mina_base.Coinbase.Fee_transfer.Gen.gen Currency.Fee.one
+        in
+        (cb1, cb2)
+      in
+      let cb1, cb2 = Quickcheck.random_value cbs_gen in
+      Staged_ledger_diff.At_most_two.Two (Some (cb1, Some cb2))
+    in
+    let internal_command_statuses = Obj.magic 42 in
+    { completed_works; commands; coinbase; internal_command_statuses }
   in
-  Mina_block.create ~header ~body
+  ()
+(* in
+     let pre_diff_one_coinbase :
+         Staged_ledger_diff.Pre_diff_with_at_most_one_coinbase.t =
+       Obj.magic 42
+     in
+     let diff = (pre_diff_two_coinbases, Some pre_diff_one_coinbase) in
+     Staged_ledger_diff.Body.create { diff }
+   in
+     Mina_block.create ~header ~body *)
