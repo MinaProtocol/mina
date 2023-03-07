@@ -13,7 +13,7 @@ let Size = ./Size.dhall
 
 let dockerImage = (../Constants/ContainerImages.dhall).minaToolchain
 
-let fixPermissionsScript = "sudo chmod -R 777 . && git config --global --add safe.directory ."
+let fixPermissionsScript = "sudo chmod -R 777 . && sudo git config --global --add safe.directory /workdir"
 
 let Config = {
   Type = {
