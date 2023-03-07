@@ -42,7 +42,7 @@ module Account_update_under_construction = struct
                    ; Ignore
                    ; Ignore
                    ]
-               ; sequence_state = Ignore
+               ; action_state = Ignore
                ; proved_state = Ignore
                ; is_new = Ignore
                } )
@@ -177,34 +177,51 @@ module Account_update_under_construction = struct
           ~f:(Fn.flip Zkapp_account.Actions.push_to_data_as_hash)
     end
 
+    module Calls_kind = struct
+      type t =
+        | No_calls
+        | Rev_calls of
+            ( Zkapp_call_forest.Checked.account_update
+            * Zkapp_call_forest.Checked.t )
+            list
+        | Calls of Zkapp_call_forest.Checked.t
+    end
+
+    module Authorization_kind = struct
+      type t = { is_signed : Boolean.var; is_proved : Boolean.var }
+    end
+
     type t =
       { public_key : Public_key.Compressed.var
       ; token_id : Token_id.Checked.t
+      ; balance_change : Currency.Amount.Signed.Checked.t
       ; may_use_token : Account_update.May_use_token.Checked.t
       ; account_condition : Account_condition.t
       ; update : Update.t
-      ; rev_calls :
-          ( Zkapp_call_forest.Checked.account_update
-          * Zkapp_call_forest.Checked.t )
-          list
+      ; calls : Calls_kind.t
       ; call_data : Field.t option
       ; events : Events.t
       ; actions : Actions.t
-      ; vk_hash : Field.t
+      ; authorization_kind : Authorization_kind.t
+      ; vk_hash : Field.t Option.t
       }
 
-    let create ~public_key ~vk_hash
+    let create ~public_key ?vk_hash
         ?(token_id = Token_id.(Checked.constant default))
         ?(may_use_token = Account_update.May_use_token.Checked.constant No) () =
       { public_key
       ; token_id
+      ; balance_change =
+          Amount.Signed.Checked.constant { magnitude = Amount.zero; sgn = Pos }
       ; may_use_token
       ; account_condition = Account_condition.create ()
       ; update = Update.create ()
-      ; rev_calls = []
+      ; calls = No_calls
       ; call_data = None
       ; events = Events.create ()
       ; actions = Actions.create ()
+      ; authorization_kind =
+          { is_signed = Boolean.false_; is_proved = Boolean.true_ }
       ; vk_hash
       }
 
@@ -223,8 +240,7 @@ module Account_update_under_construction = struct
         { public_key = t.public_key
         ; token_id = t.token_id
         ; update = Update.to_zkapp_command_update t.update
-        ; balance_change =
-            var_of_t Amount.Signed.typ { magnitude = Amount.zero; sgn = Pos }
+        ; balance_change = t.balance_change
         ; increment_nonce = Boolean.false_
         ; call_data = Option.value ~default:Field.zero t.call_data
         ; events = Events.to_zkapp_command_events t.events
@@ -270,16 +286,22 @@ module Account_update_under_construction = struct
             Token_id.(Checked.equal t.token_id (Checked.constant default))
         ; may_use_token = t.may_use_token
         ; authorization_kind =
-            { is_signed = Boolean.false_
-            ; is_proved = Boolean.true_
-            ; verification_key_hash = t.vk_hash
+            { is_signed = t.authorization_kind.is_signed
+            ; is_proved = t.authorization_kind.is_proved
+            ; verification_key_hash = Option.value ~default:Field.zero t.vk_hash
             }
         }
       in
       let calls =
-        List.fold_left ~init:(Zkapp_call_forest.Checked.empty ()) t.rev_calls
-          ~f:(fun acc (account_update, calls) ->
-            Zkapp_call_forest.Checked.push ~account_update ~calls acc )
+        match t.calls with
+        | No_calls ->
+            Zkapp_call_forest.Checked.empty ()
+        | Rev_calls rev_calls ->
+            List.fold_left ~init:(Zkapp_call_forest.Checked.empty ()) rev_calls
+              ~f:(fun acc (account_update, calls) ->
+                Zkapp_call_forest.Checked.push ~account_update ~calls acc )
+        | Calls calls ->
+            calls
       in
       (account_update, calls)
 
@@ -302,7 +324,27 @@ module Account_update_under_construction = struct
       { t with update = Update.set_state idx data t.update }
 
     let register_call account_update calls (t : t) =
-      { t with rev_calls = (account_update, calls) :: t.rev_calls }
+      let rev_calls =
+        match t.calls with
+        | No_calls ->
+            []
+        | Rev_calls rev_calls ->
+            rev_calls
+        | Calls _ ->
+            failwith "Cannot append calls to an already-completed tree"
+      in
+      { t with calls = Rev_calls ((account_update, calls) :: rev_calls) }
+
+    let set_calls calls (t : t) =
+      ( match t.calls with
+      | No_calls ->
+          ()
+      | Rev_calls _ ->
+          failwith
+            "Cannot append an already-completed tree to the current calls"
+      | Calls _ ->
+          failwith "Cannot join two already-completed trees" ) ;
+      { t with calls = Calls calls }
 
     let set_call_data call_data (t : t) = { t with call_data = Some call_data }
 
@@ -311,13 +353,18 @@ module Account_update_under_construction = struct
 
     let add_actions actions (t : t) =
       { t with actions = Actions.add_actions t.actions actions }
+
+    let set_balance_change balance_change (t : t) = { t with balance_change }
+
+    let set_authorization_kind authorization_kind (t : t) =
+      { t with authorization_kind }
   end
 end
 
-class account_update ~public_key ~vk_hash ?token_id ?may_use_token =
+class account_update ~public_key ?vk_hash ?token_id ?may_use_token () =
   object
     val mutable account_update =
-      Account_update_under_construction.In_circuit.create ~public_key ~vk_hash
+      Account_update_under_construction.In_circuit.create ~public_key ?vk_hash
         ?token_id ?may_use_token ()
 
     method assert_state_proved =
@@ -350,6 +397,11 @@ class account_update ~public_key ~vk_hash ?token_id ?may_use_token =
         Account_update_under_construction.In_circuit.register_call
           called_account_update sub_calls account_update
 
+    method set_calls calls =
+      account_update <-
+        Account_update_under_construction.In_circuit.set_calls calls
+          account_update
+
     method add_events events =
       account_update <-
         Account_update_under_construction.In_circuit.add_events events
@@ -359,6 +411,16 @@ class account_update ~public_key ~vk_hash ?token_id ?may_use_token =
       account_update <-
         Account_update_under_construction.In_circuit.add_actions actions
           account_update
+
+    method set_balance_change balance_change =
+      account_update <-
+        Account_update_under_construction.In_circuit.set_balance_change
+          balance_change account_update
+
+    method set_authorization_kind authorization_kind =
+      account_update <-
+        Account_update_under_construction.In_circuit.set_authorization_kind
+          authorization_kind account_update
 
     method account_update_under_construction = account_update
   end
@@ -433,7 +495,7 @@ open Hlist
 let wrap_main ~public_key ?token_id ?may_use_token f
     { Pickles.Inductive_rule.public_input = vk_hash } =
   let account_update =
-    new account_update ~public_key ~vk_hash ?token_id ?may_use_token
+    new account_update ~public_key ~vk_hash ?token_id ?may_use_token ()
   in
   let auxiliary_output = f account_update in
   { Pickles.Inductive_rule.previous_proof_statements = []
@@ -619,3 +681,129 @@ let compile :
     go provers
   in
   (tag, cache_handle, proof, provers)
+
+let mk_update_body ?(token_id = Token_id.default)
+    ?(update = Account_update.Update.dummy)
+    ?(balance_change = Amount.Signed.zero) ?(increment_nonce = false)
+    ?(events = []) ?(actions = []) ?(call_data = Field.Constant.zero)
+    ?(preconditions = Account_update.Preconditions.accept)
+    ?(use_full_commitment = false)
+    ?(may_use_token = Account_update.May_use_token.No)
+    ?(authorization_kind = Account_update.Authorization_kind.Signature)
+    ?(implicit_account_creation_fee = false) public_key =
+  { Account_update.Body.public_key
+  ; update
+  ; token_id
+  ; balance_change
+  ; increment_nonce
+  ; events
+  ; actions
+  ; call_data
+  ; preconditions
+  ; use_full_commitment
+  ; may_use_token
+  ; authorization_kind
+  ; implicit_account_creation_fee
+  }
+
+module Deploy_account_update = struct
+  let body ?(balance_change = Account_update.Body.dummy.balance_change)
+      ?(access = Permissions.Auth_required.None) public_key token_id vk :
+      Account_update.Body.t =
+    { Account_update.Body.dummy with
+      public_key
+    ; balance_change
+    ; token_id
+    ; update =
+        { Account_update.Update.dummy with
+          verification_key =
+            Set
+              { data = vk
+              ; hash =
+                  (* TODO: This function should live in
+                     [Side_loaded_verification_key].
+                  *)
+                  Zkapp_account.digest_vk vk
+              }
+        ; permissions =
+            Set
+              { edit_state = Proof
+              ; send = Either
+              ; receive = None
+              ; set_delegate = Proof
+              ; set_permissions = Proof
+              ; set_verification_key = Proof
+              ; set_zkapp_uri = Proof
+              ; edit_action_state = Proof
+              ; set_token_symbol = Proof
+              ; increment_nonce = Proof
+              ; set_voting_for = Proof
+              ; set_timing = Proof
+              ; access
+              }
+        }
+    ; use_full_commitment = true
+    ; preconditions =
+        { Account_update.Preconditions.network =
+            Zkapp_precondition.Protocol_state.accept
+        ; account = Accept
+        ; valid_while = Ignore
+        }
+    ; authorization_kind = Signature
+    }
+
+  let full ?balance_change ?access public_key token_id vk : Account_update.t =
+    (* TODO: This is a pain. *)
+    { body = body ?balance_change ?access public_key token_id vk
+    ; authorization = Signature Signature.dummy
+    }
+end
+
+let insert_signatures pk_compressed sk
+    ({ fee_payer; account_updates; memo } : Zkapp_command.t) : Zkapp_command.t =
+  let transaction_commitment : Zkapp_command.Transaction_commitment.t =
+    (* TODO: This is a pain. *)
+    let account_updates_hash = Zkapp_command.Call_forest.hash account_updates in
+    Zkapp_command.Transaction_commitment.create ~account_updates_hash
+  in
+  let memo_hash = Signed_command_memo.hash memo in
+  let full_commitment =
+    Zkapp_command.Transaction_commitment.create_complete transaction_commitment
+      ~memo_hash
+      ~fee_payer_hash:
+        (Zkapp_command.Call_forest.Digest.Account_update.create
+           (Account_update.of_fee_payer fee_payer) )
+  in
+  let fee_payer =
+    match fee_payer with
+    | { body = { public_key; _ }; _ }
+      when Public_key.Compressed.equal public_key pk_compressed ->
+        { fee_payer with
+          authorization =
+            Schnorr.Chunked.sign sk
+              (Random_oracle.Input.Chunked.field full_commitment)
+        }
+    | fee_payer ->
+        fee_payer
+  in
+  let account_updates =
+    Zkapp_command.Call_forest.map account_updates ~f:(function
+      | ({ body = { public_key; use_full_commitment; _ }
+         ; authorization = Signature _
+         } as account_update :
+          Account_update.t )
+        when Public_key.Compressed.equal public_key pk_compressed ->
+          let commitment =
+            if use_full_commitment then full_commitment
+            else transaction_commitment
+          in
+          { account_update with
+            authorization =
+              Signature
+                (Schnorr.Chunked.sign sk
+                   (Random_oracle.Input.Chunked.field commitment) )
+          }
+      | account_update ->
+          account_update )
+  in
+  { fee_payer; account_updates; memo }

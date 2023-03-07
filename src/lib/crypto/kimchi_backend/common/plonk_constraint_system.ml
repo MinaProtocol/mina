@@ -14,10 +14,6 @@ module Kimchi_gate_type = struct
     | VarBaseMul
     | EndoMul
     | EndoMulScalar
-    | ChaCha0
-    | ChaCha1
-    | ChaCha2
-    | ChaChaFinal
     | Lookup
     | CairoClaim
     | CairoInstruction

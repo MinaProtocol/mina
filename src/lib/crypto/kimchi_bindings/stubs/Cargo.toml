@@ -31,7 +31,7 @@ ark-ec = { version = "0.3.0", features = ["parallel"] }
 ark-poly = { version = "0.3.0", features = ["parallel"] }
 
 # proof-systems
-commitment_dlog = { path = "../../proof-systems/poly-commitment", features = ["ocaml_types"] }
+poly-commitment = { path = "../../proof-systems/poly-commitment", features = ["ocaml_types"] }
 groupmap = { path = "../../proof-systems/groupmap" }
 mina-curves = { path = "../../proof-systems/curves" }
 o1-utils = { path = "../../proof-systems/utils" }

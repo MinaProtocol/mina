@@ -35,7 +35,7 @@ module Get_all_accounts =
 {|
 query ($public_key: PublicKey!) @encoders(module: "Encoders"){
   accounts(publicKey: $public_key) {
-    token
+    tokenId
   }
 }
 |}]

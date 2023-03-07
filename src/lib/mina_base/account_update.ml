@@ -916,14 +916,16 @@ module Update = struct
   let deriver obj =
     let open Fields_derivers_zkapps in
     let ( !. ) = ( !. ) ~t_fields_annots in
-    let string_with_hash =
-      with_checked
-        ~checked:(Data_as_hash.deriver string)
-        ~name:"StringWithHash" string
+    let zkapp_uri =
+      needs_custom_js
+        ~js_type:(Data_as_hash.deriver string)
+        ~name:"ZkappUri" string
     in
     let token_symbol =
-      with_checked
-        ~checked:(js_only (Js_layout.leaf_type (Custom "TokenSymbol")))
+      needs_custom_js
+        ~js_type:
+          (js_record
+             [ ("symbol", js_layout string); ("field", js_layout field) ] )
         ~name:"TokenSymbol" string
     in
     finish "AccountUpdateModification" ~t_toplevel_annots
@@ -932,7 +934,7 @@ module Update = struct
          ~delegate:!.(Set_or_keep.deriver public_key)
          ~verification_key:!.(Set_or_keep.deriver verification_key_with_hash)
          ~permissions:!.(Set_or_keep.deriver Permissions.deriver)
-         ~zkapp_uri:!.(Set_or_keep.deriver string_with_hash)
+         ~zkapp_uri:!.(Set_or_keep.deriver zkapp_uri)
          ~token_symbol:!.(Set_or_keep.deriver token_symbol)
          ~timing:!.(Set_or_keep.deriver Timing_info.deriver)
          ~voting_for:!.(Set_or_keep.deriver State_hash.deriver)
@@ -1078,7 +1080,7 @@ module Account_precondition = struct
           nonce: {lower: "34928", upper: "34928"},
           receiptChainHash: null, delegate: null,
           state: [null,null,null,null,null,null,null,null],
-          sequenceState: null, provedState: null, isNew: null
+          actionState: null, provedState: null, isNew: null
         }|json}
       |> Yojson.Safe.from_string |> Yojson.Safe.to_string )
 

@@ -6,7 +6,7 @@ use paste::paste;
 use std::convert::TryInto;
 use wasm_bindgen::prelude::*;
 // use std::sync::Arc;
-// use commitment_dlog::srs::SRS;
+// use poly_commitment::srs::SRS;
 // use kimchi::index::{expr_linearization, VerifierIndex as DlogVerifierIndex};
 // use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use ark_ec::AffineCurve;
@@ -15,10 +15,6 @@ use array_init::array_init;
 use kimchi::circuits::wires::COLUMNS;
 use kimchi::verifier::Context;
 // use std::path::Path;
-use commitment_dlog::{
-    commitment::{CommitmentCurve, PolyComm},
-    evaluation_proof::OpeningProof,
-};
 use groupmap::GroupMap;
 use kimchi::proof::{
     PointEvaluations, ProofEvaluations, ProverCommitments, ProverProof, RecursionChallenge,
@@ -28,6 +24,10 @@ use kimchi::verifier::batch_verify;
 use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
+};
+use poly_commitment::{
+    commitment::{CommitmentCurve, PolyComm},
+    evaluation_proof::OpeningProof,
 };
 use serde::{Deserialize, Serialize};
 
@@ -554,7 +554,7 @@ macro_rules! impl_proof {
             ) -> WasmProverProof {
                 console_error_panic_hook::set_once();
                 {
-                    let ptr: &mut commitment_dlog::srs::SRS<$G> =
+                    let ptr: &mut poly_commitment::srs::SRS<$G> =
                         unsafe { &mut *(std::sync::Arc::as_ptr(&index.0.as_ref().srs) as *mut _) };
                     ptr.add_lagrange_basis(index.0.as_ref().cs.domain.d1);
                 }
