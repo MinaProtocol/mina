@@ -109,14 +109,14 @@ include
 *)
 val create_new_account_exn : t -> Account_id.t -> Account.t -> unit
 
-(** update sequence state, returned slot is new last sequence slot
+(** update action state, returned slot is new last action slot
     made available here so we can use this logic in the Zkapp_command generators
 *)
-val update_sequence_state :
+val update_action_state :
      Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
   -> Zkapp_account.Actions.t
   -> txn_global_slot:Mina_numbers.Global_slot.t
-  -> last_sequence_slot:Mina_numbers.Global_slot.t
+  -> last_action_slot:Mina_numbers.Global_slot.t
   -> Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
      * Mina_numbers.Global_slot.t
 

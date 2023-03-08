@@ -893,8 +893,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             let set_zkapp_uri : t -> controller =
              fun a -> a.data.permissions.set_zkapp_uri
 
-            let edit_sequence_state : t -> controller =
-             fun a -> a.data.permissions.edit_sequence_state
+            let edit_action_state : t -> controller =
+             fun a -> a.data.permissions.edit_action_state
 
             let set_token_symbol : t -> controller =
              fun a -> a.data.permissions.set_token_symbol
@@ -995,18 +995,18 @@ module Make_str (A : Wire_types.Concrete) = struct
             verification_key a |> Zkapp_basic.Flagged_option.data
             |> Data_as_hash.hash
 
-          let last_sequence_slot (a : t) = a.data.zkapp.last_sequence_slot
+          let last_action_slot (a : t) = a.data.zkapp.last_action_slot
 
-          let set_last_sequence_slot last_sequence_slot ({ data = a; hash } : t)
-              : t =
-            { data = { a with zkapp = { a.zkapp with last_sequence_slot } }
+          let set_last_action_slot last_action_slot ({ data = a; hash } : t) : t
+              =
+            { data = { a with zkapp = { a.zkapp with last_action_slot } }
             ; hash
             }
 
-          let sequence_state (a : t) = a.data.zkapp.sequence_state
+          let action_state (a : t) = a.data.zkapp.action_state
 
-          let set_sequence_state sequence_state ({ data = a; hash } : t) : t =
-            { data = { a with zkapp = { a.zkapp with sequence_state } }; hash }
+          let set_action_state action_state ({ data = a; hash } : t) : t =
+            { data = { a with zkapp = { a.zkapp with action_state } }; hash }
 
           let zkapp_uri (a : t) = a.data.zkapp.zkapp_uri
 
@@ -1297,7 +1297,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             let if_ b ~then_ ~else_ =
               run_checked (Amount.Signed.Checked.if_ b ~then_ ~else_)
 
-            let is_pos (t : t) =
+            let is_non_neg (t : t) =
               Sgn.Checked.is_pos
                 (run_checked (Currency.Amount.Signed.Checked.sgn t))
 
@@ -4491,7 +4491,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 Zkapp_basic.Set_or_keep.Set
                   { Permissions.user_default with
                     edit_state = Permissions.Auth_required.Proof
-                  ; edit_sequence_state = Proof
+                  ; edit_action_state = Proof
                   } )
           }
       in

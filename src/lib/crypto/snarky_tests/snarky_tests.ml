@@ -13,7 +13,6 @@ end)
 (* helpers *)
 
 let compare_with obtained filepath =
-  let (_ : int) = Sys.command "tree" in
   let filepath = "examples/" ^ filepath in
   let expected = In_channel.read_all filepath in
   if String.(trim obtained <> trim expected) then (
@@ -180,7 +179,7 @@ module RangeCircuits = struct
         true
 
   let test_range_gates =
-    QCheck.Test.make ~count:10
+    QCheck.Test.make ~count:100
       ~name:"test range gates during witness generation"
       (* TODO: it'd be nicer to generate actual fields directly, since that domain is most likely smaller *)
       QCheck.(tup3 bool pos_int pos_int)
@@ -402,28 +401,42 @@ end
  * outside-of-circuit tests *
  ****************************)
 
-let out_of_circuit_constant () =
-  let one = Impl.Field.Constant.one in
-  let two = Impl.Field.Constant.of_int 2 in
-  let x = Impl.Field.constant one in
-  let y = Impl.Field.constant two in
-  let _const_mul : Impl.Field.t = Impl.Field.mul x y in
-  ()
-
-let out_of_circuit_constraint () =
+(** This is a pure function and should be runnable from anywhere. *)
+let out_of_circuit_pure_function () =
+  (* mul or addition should work within the Cvar AST *)
   let one = Impl.Field.constant Impl.Field.Constant.one in
   let two = Impl.Field.constant (Impl.Field.Constant.of_int 2) in
-  Impl.Field.Assert.not_equal one two
+  let _mul : Impl.Field.t = Impl.Field.mul one two in
+  let _add : Impl.Field.t = Impl.Field.add one two in
 
-let out_of_circuit_constraint () =
+  (* asserts on constant should be pure *)
+  Impl.Field.Assert.not_equal one two ;
+  Impl.Field.Assert.gt ~bit_length:2 two one ;
+  Impl.Field.Assert.gte ~bit_length:2 two one ;
+  Impl.Field.Assert.lt ~bit_length:2 one two ;
+  Impl.Field.Assert.lte ~bit_length:2 one two ;
+  Impl.Field.Assert.equal one one ;
+  Impl.Field.Assert.non_zero one ;
+  Impl.Field.Assert.not_equal one two ;
+  ()
+
+(** This should be an impure function, and as such needs to be run within an API function (e.g. generate_witness, constraint_system). Otherwise it is expected to fail. *)
+let out_of_circuit_impure_function () =
+  let one =
+    Impl.exists Impl.Field.typ ~compute:(fun _ -> Impl.Field.Constant.one)
+  in
+  let one_cst = Impl.Field.constant Impl.Field.Constant.one in
+  Impl.Field.Assert.equal one one_cst
+
+let out_of_circuit_impure_function () =
   Alcotest.(
     check_raises "should fail to create constraints outside of a circuit"
       (Failure "This function can't be run outside of a checked computation."))
-    out_of_circuit_constraint
+    out_of_circuit_impure_function
 
 let outside_circuit_tests =
-  [ ("out-of-circuit constant", `Quick, out_of_circuit_constant)
-  ; ("out-of-circuit constraint (bad)", `Quick, out_of_circuit_constraint)
+  [ ("out-of-circuit constant", `Quick, out_of_circuit_pure_function)
+  ; ("out-of-circuit constraint (bad)", `Quick, out_of_circuit_impure_function)
   ]
 
 (* run tests *)
@@ -441,9 +454,14 @@ let () =
     List.map ~f:QCheck_alcotest.to_alcotest [ RangeCircuits.test_range_gates ]
   in
   Alcotest.run "Simple snarky tests"
-    [ ("outside of circuit tests", outside_circuit_tests)
+    [ ("outside of circuit tests before", outside_circuit_tests)
     ; ("API tests", api_tests)
     ; ("circuit tests", circuit_tests)
     ; ("As_prover tests", As_prover_circuits.as_prover_tests)
     ; ("range checks", range_checks)
+      (* We run the pure functions before and after other tests,
+         because we've had bugs in the past where it would only work after the global state was initialized by an API function
+         (like generate_witness, or constraint_system).
+      *)
+    ; ("outside of circuit tests after", outside_circuit_tests)
     ]
