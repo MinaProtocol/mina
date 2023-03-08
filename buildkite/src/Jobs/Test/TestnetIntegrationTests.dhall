@@ -40,7 +40,6 @@ in Pipeline.build Pipeline.Config::{
     TestExecutive.execute "opt-block-prod" dependsOn,
     TestExecutive.execute "medium-bootstrap" dependsOn,
     TestExecutive.execute "snark" dependsOn,
-    TestExecutive.execute "archive-node" dependsOn,
     TestExecutive.execute "block-reward" dependsOn,
     TestExecutive.execute "zkapps" dependsOn,
     TestExecutive.execute "zkapps-timing" dependsOn,

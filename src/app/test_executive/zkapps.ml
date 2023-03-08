@@ -31,6 +31,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           }
         ; { account_name = "fish1"; balance = "3000"; timing = Untimed }
         ; { account_name = "fish2"; balance = "3000"; timing = Untimed }
+        ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
         ]
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
