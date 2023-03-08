@@ -5,6 +5,7 @@ open Mina_numbers
 open Signature_lib
 open Helpers
 open Protocol_config_examples
+open Unsigned
 open Zkapp_cmd_builder
 
 (* The function under test is quite slow, so keep the trials count low
@@ -107,7 +108,9 @@ let%test_module "Test transaction logic." =
         let open Generator.Let_syntax in
         let%bind account =
           Test_account.gen_constrained_balance ()
-            ~max:Balance.(Option.value_exn @@ max_int - Amount.of_nanomina_int_exn 1)
+            ~max:
+              Balance.(
+                Option.value_exn @@ (max_int - Amount.of_nanomina_int_exn 1))
         in
         let max_amount =
           Balance.(max_int - to_amount account.balance)
@@ -254,7 +257,9 @@ let%test_module "Test transaction logic." =
         (let open Quickcheck in
         let open Generator.Let_syntax in
         let%bind account =
-          Test_account.gen_constrained_balance ~min:Balance.(of_nanomina_int_exn 1) ()
+          Test_account.gen_constrained_balance
+            ~min:Balance.(of_nanomina_int_exn 1)
+            ()
         in
         let global_slot = protocol_state.global_slot_since_genesis in
         let%bind timing =
@@ -331,7 +336,10 @@ let%test_module "Test transaction logic." =
         let%map account =
           Test_account.gen_constrained_balance ()
             ~min:Balance.(of_nanomina_int_exn 1)
-            ~max:Balance.(Option.value ~default:max_int @@ minimum_balance - Amount.of_nanomina_int_exn 1)
+            ~max:
+              Balance.(
+                Option.value ~default:max_int
+                @@ (minimum_balance - Amount.of_nanomina_int_exn 1))
         in
         let timing_info =
           Account.Timing.of_record timing
@@ -409,8 +417,7 @@ let%test_module "Test transaction logic." =
         (let open Quickcheck in
         let open Generator.Let_syntax in
         let%bind sender =
-          Test_account.gen_constrained_balance ()
-            ~min:Balance.one
+          Test_account.gen_constrained_balance () ~min:Balance.one
         in
         let%bind receiver =
           Test_account.gen_constrained_balance ()
@@ -526,5 +533,142 @@ let%test_module "Test transaction logic." =
               | Error e ->
                   String.is_substring ~substring:"Overflow"
                     (Error.to_string_hum e) )
+            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
+
+    let%test_unit "Funds from a single subtraction can be distributed." =
+      Quickcheck.test ~trials
+        (let open Quickcheck in
+        let open Generator.Let_syntax in
+        let%bind recv_count = Int.gen_incl 15 99 in
+        let%bind sender =
+          Test_account.gen_constrained_balance ()
+            ~min:Balance.(of_nanomina_int_exn recv_count)
+        in
+        let amount =
+          UInt64.Infix.(
+            Balance.to_uint64 sender.balance / UInt64.of_int recv_count)
+          |> Amount.of_uint64
+        in
+        let total = Option.value_exn Amount.(scale amount recv_count) in
+        let%bind receivers =
+          Generator.list_with_length recv_count
+          @@ Test_account.gen_constrained_balance ()
+               ~max:Balance.(Option.value_exn @@ (max_int - amount))
+        in
+        let txns =
+          Single.make ~account:sender.pk
+            Amount.Signed.(negate @@ of_unsigned total)
+          :: List.map receivers ~f:(fun r ->
+                 Single.make ~account:r.pk Amount.Signed.(of_unsigned amount) )
+        in
+        let max_fee =
+          Balance.(sender.balance - total)
+          |> Option.value_map ~f:balance_to_fee ~default:Fee.zero
+        in
+        let%map fee = Fee.(gen_incl zero max_fee) in
+        (sender.pk, fee, sender :: receivers, (txns :> transaction list)))
+        ~f:(fun (fee_payer, fee, accounts, txns) ->
+          [%test_pred: Zk_cmd_result.t Or_error.t]
+            (Predicates.pure ~f:(fun (txn, ledger) ->
+                 Transaction_status.equal txn.command.status Applied
+                 && Predicates.verify_balance_changes ~txn ~ledger accounts ) )
+            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
+
+    let%test_unit "Balance updates are being applied in turn." =
+      (* Balance changes are not being squashed before application. If they did,
+         all balance changes in this transaction would cancel out and it could be
+         applied successfully. *)
+      Quickcheck.test ~trials
+        (let open Quickcheck in
+        let open Generator.Let_syntax in
+        let%bind total_currency =
+          Balance.(gen_incl (of_nanomina_int_exn 4) max_int)
+        in
+        let balance =
+          Balance.(of_uint64 UInt64.(div (to_uint64 total_currency) (of_int 2)))
+        in
+        let%map accounts =
+          Generator.list_with_length 2 Test_account.gen_empty
+        in
+        let alice = { (List.hd_exn accounts) with balance } in
+        let bob = { (List.last_exn accounts) with balance } in
+        (* Transfer more currency than the available total. *)
+        let amount =
+          Amount.Signed.of_unsigned @@ Balance.to_amount total_currency
+        in
+        let txns =
+          List.concat_map [ alice; bob ] ~f:(fun account ->
+              let open Amount.Signed in
+              [ Single.make ~account:account.pk (negate amount)
+              ; Single.make ~account:account.pk amount
+              ] )
+        in
+        (alice.pk, Fee.zero, [ alice; bob ], (txns :> transaction list)))
+        ~f:(fun (fee_payer, fee, accounts, txns) ->
+          [%test_pred: Zk_cmd_result.t Or_error.t]
+            (Predicates.pure ~f:(fun (txn, _ledger) ->
+                 Transaction_status.equal txn.command.status
+                   (Failed
+                      [ []
+                      ; [ Overflow ]
+                      ; [ Overflow ]
+                      ; [ Overflow ]
+                      ; [ Overflow ]
+                      ] ) ) )
+            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
+
+    (* Assign all funds to a single account, then split these funds among two more
+       accounts; then each of these splits their funds among 2 more accounts and so
+       on. These updates are organised into a deep tree instead of a flat list. *)
+    let%test_unit "Account updates can be organised into trees." =
+      Quickcheck.test ~trials:1
+        (let open Quickcheck in
+        let open Generator.Let_syntax in
+        let%map accounts =
+          Generator.list_with_length 127 Test_account.gen_empty
+        in
+        let accounts =
+          match accounts with
+          | [] ->
+              assert false (* can't happen *)
+          | a :: acs ->
+              { a with balance = Balance.max_int } :: acs
+        in
+        let rec gen_txns (funds : Amount.t) :
+            Test_account.t list -> transaction list = function
+          | sender :: receiver1 :: receiver2 :: accs ->
+              let remaining_accounts = List.length accs in
+              let bal_decrease = Amount.Signed.(of_unsigned funds |> negate) in
+              let funds' =
+                UInt64.Infix.(Amount.to_uint64 funds / UInt64.of_int 2)
+                |> Amount.of_uint64
+              in
+              let bal_increase = Amount.Signed.of_unsigned funds' in
+              let children =
+                [ (Single.make ~account:receiver1.pk bal_increase :> transaction)
+                ; (Single.make ~account:receiver2.pk bal_increase :> transaction)
+                ]
+                @ gen_txns funds'
+                    (receiver1 :: List.take accs (remaining_accounts / 2))
+                @ gen_txns funds'
+                    (receiver2 :: List.drop accs (remaining_accounts / 2))
+              in
+              [ ( Txn_tree.make ~account:sender.pk ~amount:bal_decrease
+                    ~children Account_update.Update.noop
+                  :> transaction )
+              ]
+          | _ ->
+              []
+        in
+        let fee_payer = List.hd_exn accounts in
+        let funds =
+          Amount.of_uint64 UInt64.(add one @@ div max_int (of_int 2))
+        in
+        (fee_payer.pk, Fee.zero, accounts, gen_txns funds accounts))
+        ~f:(fun (fee_payer, fee, accounts, txns) ->
+          [%test_pred: Zk_cmd_result.t Or_error.t]
+            (Predicates.pure ~f:(fun (txn, ledger) ->
+                 Transaction_status.equal txn.command.status Applied
+                 && Predicates.verify_balance_changes ~ledger ~txn accounts ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
   end )
