@@ -49,8 +49,8 @@ blockProducerConfigs:
     runWithBots: false
     # privateKeySecret: "yolo"
     keypairName: ""
-    privateKey : ""
-    publicKey : ""
+    # privateKey : ""
+    # publicKey : ""
     privateKeyPW : ""
     isolated: false
     enableGossipFlooding: false
@@ -62,8 +62,8 @@ blockProducerConfigs:
     runWithBots: false
     # privateKeySecret: "yolo"
     keypairName: ""
-    privateKey : ""
-    publicKey : ""
+    # privateKey : ""
+    # publicKey : ""
     privateKeyPW : ""
     isolated: false
     enableGossipFlooding: false
@@ -75,8 +75,8 @@ blockProducerConfigs:
     runWithBots: true
     # privateKeySecret: "yolo"
     keypairName: ""
-    privateKey : ""
-    publicKey : ""
+    # privateKey : ""
+    # publicKey : ""
     privateKeyPW : ""
     isolated: false
     enableGossipFlooding: false
@@ -89,8 +89,8 @@ blockProducerConfigs:
     runWithBots: true
     # privateKeySecret: "yolo"
     keypairName: ""
-    privateKey : ""
-    publicKey : ""
+    # privateKey : ""
+    # publicKey : ""
     privateKeyPW : ""
     isolated: false
     enableGossipFlooding: false

@@ -111,8 +111,8 @@ locals {
         runWithBots          = config.run_with_bots
         enableGossipFlooding = config.enable_gossip_flooding
         keypairName = config.keypair_name
-        privateKey     = config.private_key
-        publicKey     = config.private_key
+        # privateKey     = config.private_key
+        # publicKey     = config.private_key
         privateKeyPW     = config.privkey_password
         # libp2pSecret         = config.libp2p_secret
         enablePeerExchange   = config.enable_peer_exchange
