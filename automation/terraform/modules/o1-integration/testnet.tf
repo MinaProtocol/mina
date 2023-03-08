@@ -57,8 +57,8 @@ module "kubernetes_testnet" {
       class                  = "test",
       external_port          = local.block_producer_starting_host_port + index
       keypair_name     = config.keypair.keypair_name
-      private_key     = config.keypair.private_key
-      public_key     = config.keypair.public_key
+      # private_key     = config.keypair.private_key
+      # public_key     = config.keypair.public_key
       privkey_password     = config.keypair.privkey_password
       libp2p_secret          = config.libp2p_secret
       isolated               = false

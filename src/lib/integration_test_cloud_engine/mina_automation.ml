@@ -372,7 +372,9 @@ module Network_config = struct
           in
           Some
             { name = node.node_name
-            ; public_key = network_kp.public_key
+            ; public_key =
+                Public_key.Compressed.to_base58_check
+                  (Public_key.compress network_kp.keypair.public_key)
             ; worker_nodes = node.worker_nodes
             }
     in

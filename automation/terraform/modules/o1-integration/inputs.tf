@@ -120,7 +120,7 @@ variable "block_producer_configs" {
     object({
       name = string,
       keypair = object({
-        keypair = string, #this is just the public key again, redundantly, because of the way the original ocaml object gets serialized
+        # keypair = string, #this is just the public key again, redundantly, because of the way the original ocaml object gets serialized
         keypair_name = string
         public_key = string
         private_key = string,
