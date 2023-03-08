@@ -1,5 +1,12 @@
 open Core
-module Balance = Currency.Balance
+
+module Balance = struct
+  include Currency.Balance
+
+  let to_int = to_nanomina_int
+
+  let of_int = of_nanomina_int_exn
+end
 
 module Account = struct
   (* want bin_io, not available with Account.t *)
@@ -27,13 +34,6 @@ module Account = struct
   let update_balance t bal = { t with Mina_base.Account.Poly.balance = bal }
 
   let token Mina_base.Account.Poly.{ token_id; _ } = token_id
-
-  let token_owner Mina_base.Account.Poly.{ token_permissions; _ } =
-    match token_permissions with
-    | Mina_base.Token_permissions.Token_owned _ ->
-        true
-    | Not_owned _ ->
-        false
 end
 
 module Receipt = Mina_base.Receipt
@@ -168,8 +168,8 @@ module Token_id = Mina_base.Token_id
 module Account_id = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Mina_base.Account_id.Stable.V1.t
+    module V2 = struct
+      type t = Mina_base.Account_id.Stable.V2.t
       [@@deriving sexp, equal, compare, hash]
 
       let to_latest = Fn.id
@@ -184,6 +184,8 @@ module Account_id = struct
   let token_id = Mina_base.Account_id.token_id
 
   let public_key = Mina_base.Account_id.public_key
+
+  let derive_token_id = Mina_base.Account_id.derive_token_id
 
   (* TODO: Non-default tokens *)
   let gen =
@@ -200,7 +202,15 @@ module Base_inputs = struct
   module Key = Key
   module Account_id = Account_id
   module Token_id = Token_id
-  module Balance = Balance
+
+  module Balance = struct
+    include Balance
+
+    let of_int = of_nanomina_int_exn
+
+    let to_int = to_nanomina_int
+  end
+
   module Account = Account
   module Hash = Hash
 end

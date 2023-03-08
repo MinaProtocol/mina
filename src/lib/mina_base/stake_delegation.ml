@@ -6,7 +6,9 @@ open Signature_lib
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t =
+    [@@@with_all_version_tags]
+
+    type t = Mina_wire_types.Mina_base.Stake_delegation.V1.t =
       | Set_delegate of
           { delegator : Public_key.Compressed.Stable.V1.t
           ; new_delegate : Public_key.Compressed.Stable.V1.t
@@ -36,8 +38,8 @@ let gen_with_delegator delegator =
 let gen =
   Quickcheck.Generator.bind ~f:gen_with_delegator Public_key.Compressed.gen
 
-let to_input = function
+let to_input_legacy = function
   | Set_delegate { delegator; new_delegate } ->
-      Random_oracle.Input.append
-        (Public_key.Compressed.to_input delegator)
-        (Public_key.Compressed.to_input new_delegate)
+      Random_oracle.Input.Legacy.append
+        (Public_key.Compressed.to_input_legacy delegator)
+        (Public_key.Compressed.to_input_legacy new_delegate)

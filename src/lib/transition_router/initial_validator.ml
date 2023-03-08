@@ -10,7 +10,7 @@ open Network_peer
 type validation_error =
   [ `Invalid_time_received of [ `Too_early | `Too_late of int64 ]
   | `Invalid_genesis_protocol_state
-  | `Invalid_proof
+  | `Invalid_proof of Error.t
   | `Invalid_delta_block_chain_proof
   | `Verifier_error of Error.t
   | `Mismatched_protocol_version
@@ -50,7 +50,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
         ]
     | `Invalid_genesis_protocol_state ->
         [ ("reason", `String "invalid genesis state") ]
-    | `Invalid_proof ->
+    | `Invalid_proof err ->
         [ ("reason", `String "invalid proof")
         ; ( "protocol_state"
           , Header.protocol_state (Mina_block.header transition)
@@ -58,6 +58,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
         ; ( "proof"
           , Header.protocol_state_proof @@ Mina_block.header transition
             |> Proof.to_yojson )
+        ; ("error", Error_json.error_to_yojson err)
         ]
     | `Invalid_delta_block_chain_proof ->
         [ ("reason", `String "invalid delta transition chain proof") ]
@@ -75,7 +76,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
     ; ( "time_received"
       , `String
           (Time.to_string_abs
-             (Block_time.to_time time_received)
+             (Block_time.to_time_exn time_received)
              ~zone:Time.Zone.utc ) )
     ]
     @ metadata
@@ -99,7 +100,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
           (error_metadata @ [ ("state_hash", State_hash.to_yojson state_hash) ])
         "Error in verifier verifying blockchain proof for $state_hash: $error" ;
       Deferred.unit
-  | `Invalid_proof ->
+  | `Invalid_proof _ ->
       Mina_metrics.(Counter.inc_one Rejected_blocks.invalid_proof) ;
       Queue.enqueue Transition_frontier.rejected_blocks
         (state_hash, sender, time_received, `Invalid_proof) ;
@@ -218,7 +219,7 @@ module Duplicate_block_detector = struct
             ; ( "time_received"
               , `String
                   (Time.to_string_abs
-                     (Block_time.to_time time_received)
+                     (Block_time.to_time_exn time_received)
                      ~zone:Time.Zone.utc ) )
             ]
           in
@@ -288,10 +289,8 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                             ~time_received )
                     >>= defer
                           (validate_genesis_protocol_state ~genesis_state_hash)
-                    >>= (fun x ->
-                          Interruptible.uninterruptible
-                            (validate_proofs ~verifier ~genesis_state_hash [ x ])
-                          >>| List.hd_exn )
+                    >>= Fn.compose Interruptible.uninterruptible
+                          (validate_single_proof ~verifier ~genesis_state_hash)
                     >>= defer validate_delta_block_chain
                     >>= defer validate_protocol_versions)
                 with
@@ -335,7 +334,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                   ; ( "time_received"
                     , `String
                         (Time.to_string_abs
-                           (Block_time.to_time time_received)
+                           (Block_time.to_time_exn time_received)
                            ~zone:Time.Zone.utc ) )
                   ]
                 in

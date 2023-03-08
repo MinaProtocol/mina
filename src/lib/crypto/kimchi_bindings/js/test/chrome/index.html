@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>hello-wasm example</title>
+  </head>
+  <body>
+    <button id="run_all_tests" disabled=true>Run all tests</button>
+    <button id="discover_tests">Discover tests</button>
+    <div id="discovered_tests"></div>
+    <textarea id="output" style="width:100%" rows="35"></textarea>
+    <script>
+      function log_and_print(x) {
+        console.log(x);
+        document.getElementById("output").value += x + "\n";
+        return new Promise(function(resolve) {
+            // Use setTimeout to ensure that a redraw runs before continuing
+            setTimeout(function() { resolve() }, 0);
+        });
+      };
+      async function run_all_tests() {
+        for (var i in window) {
+          if(i.indexOf("_test") != -1 && typeof window[i] === "object" && typeof window[i].run === "function") {
+            await log_and_print("Running " + i);
+            try{
+              window[i].run();
+              await log_and_print("Done");
+            } catch(e) {
+              await log_and_print("Error:\n" + e);
+            }
+          }
+        };
+      }
+      function discover_tests() {
+        var discovered_tests = document.getElementById("discovered_tests");
+        while (child = discovered_tests.firstChild) {
+          discovered_tests.removeChild(firstChild);
+        };
+        for (var i in window) {
+          if(i.indexOf("_test") != -1 && typeof window[i] === "object" && typeof window[i].run === "function") {
+            var runner = (function(i) {
+                return async function () {
+                  await log_and_print("Running " + i);
+                  try{
+                    window[i].run();
+                    await log_and_print("Done");
+                  } catch(e) {
+                    await log_and_print("Error:\n" + e);
+                  }
+                }
+              })(i);
+            var button = document.createElement("button");
+            button.addEventListener("click", runner);
+            button.appendChild(document.createTextNode(i));
+            discovered_tests.appendChild(button);
+          }
+        };
+      };
+      document.getElementById("discover_tests").addEventListener("click", discover_tests);
+    </script>
+    <script type="module">
+      import init, * as plonk_wasm from "./plonk_wasm.js";
+      window.plonk_wasm = plonk_wasm;
+      await init();
+      plonk_wasm.initThreadPool(navigator.hardwareConcurrency);
+      /* Don't load the script until we're done initialising. */
+      var newScript = document.createElement("script");
+      newScript.src = "./chrome_test.bc.js";
+      document.body.appendChild(newScript);
+      var all_button = document.getElementById("run_all_tests");
+      all_button.addEventListener("click", run_all_tests);
+      all_button.disabled = false
+    </script>
+  </body>
+</html>

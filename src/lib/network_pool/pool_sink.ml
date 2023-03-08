@@ -228,13 +228,21 @@ module Local_sink
      and type unwrapped_t = Diff.verified Envelope.Incoming.t * BC.t
      and type msg :=
       BC.resource_pool_diff
-      * ((BC.resource_pool_diff * BC.rejected_diff) Or_error.t -> unit) =
+      * (   ( [ `Broadcasted | `Not_broadcasted ]
+            * BC.resource_pool_diff
+            * BC.rejected_diff )
+            Or_error.t
+         -> unit ) =
   Base (Diff) (BC)
     (struct
       type raw_msg = BC.resource_pool_diff
 
       type raw_callback =
-        (BC.resource_pool_diff * BC.rejected_diff) Or_error.t -> unit
+           ( [ `Broadcasted | `Not_broadcasted ]
+           * BC.resource_pool_diff
+           * BC.rejected_diff )
+           Or_error.t
+        -> unit
 
       let convert_callback cb = BC.Local cb
 

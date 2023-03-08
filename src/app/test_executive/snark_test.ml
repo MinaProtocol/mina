@@ -78,8 +78,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          ~f:(fun { Signature_lib.Keypair.public_key; _ } ->
            public_key |> Signature_lib.Public_key.to_bigstring
            |> Bigstring.to_string ) ) ;
-    let amount = Currency.Amount.of_formatted_string "10" in
-    let fee = Currency.Fee.of_formatted_string "1" in
+    let amount = Currency.Amount.of_mina_string_exn "10" in
+    let fee = Currency.Fee.of_mina_string_exn "1" in
     let test_constants = Engine.Network.constraint_constants network in
     let receiver_pub_key =
       fish1.keypair.public_key |> Signature_lib.Public_key.compress
@@ -87,21 +87,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let sender_pub_key =
       fish2.keypair.public_key |> Signature_lib.Public_key.compress
     in
+    let sender_account_id = Account_id.create sender_pub_key Token_id.default in
     let txn_body =
       Signed_command_payload.Body.Payment
         { source_pk = sender_pub_key
         ; receiver_pk = receiver_pub_key
-        ; token_id = Token_id.default
         ; amount
         }
     in
     let%bind { nonce = sender_current_nonce; _ } =
       Network.Node.must_get_account_data ~logger node_b
-        ~public_key:sender_pub_key
+        ~account_id:sender_account_id
     in
     let user_command_input =
       User_command_input.create ~fee ~nonce:sender_current_nonce
-        ~fee_token:(Signed_command_payload.Body.token txn_body)
         ~fee_payer_pk:sender_pub_key ~valid_until:None
         ~memo:(Signed_command_memo.create_from_string_exn "")
         ~body:txn_body ~signer:sender_pub_key
@@ -118,7 +117,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~nonce_map:
           (Account_id.Map.of_alist_exn
              [ ( Account_id.create sender_pub_key
-                   (Signed_command_payload.Body.token txn_body)
+             Account_id.Digest.default
                , (sender_current_nonce, sender_current_nonce) )
              ] )
         ~get_account:(fun _ -> `Bootstrapping)
@@ -147,7 +146,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~memo:
                (Signed_command_memo.to_raw_bytes_exn
                   signed_cmmd.payload.common.memo )
-             ~token:(Signed_command_payload.token signed_cmmd.payload)
              ~valid_until:signed_cmmd.payload.common.valid_until
              ~raw_signature:
                (Mina_base.Signature.Raw.encode signed_cmmd.signature)

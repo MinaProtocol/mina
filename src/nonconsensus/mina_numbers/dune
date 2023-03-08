@@ -14,6 +14,7 @@
    base.caml
    result
    ;;local libraries
+   mina_wire_types
    ppx_dhall_type
    bignum_bigint
    fold_lib
@@ -25,6 +26,10 @@
    random_oracle_nonconsensus
    snark_params_nonconsensus
  )
+ (enabled_if
+  (or
+   (= %{profile} nonconsensus_mainnet)
+   (= %{profile} nonconsensus_medium_curves)))
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_version ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_compare ppx_hash ppx_compare ppx_deriving_yojson

@@ -35,7 +35,7 @@ module Get_all_accounts =
 {|
 query ($public_key: PublicKey!) @encoders(module: "Encoders"){
   accounts(publicKey: $public_key) {
-    token
+    tokenId
   }
 }
 |}]
@@ -104,8 +104,10 @@ module Pending_snark_work =
 query pendingSnarkWork {
   pendingSnarkWork {
     workBundle {
-      source_ledger_hash: sourceLedgerHash
-      target_ledger_hash: targetLedgerHash
+      source_first_pass_ledger_hash: sourceFirstPassLedgerHash
+      target_first_pass_ledger_hash: targetFirstPassLedgerHash
+      source_second_pass_ledger_hash: sourceSecondPassLedgerHash
+      target_second_pass_ledger_hash: targetSecondPassLedgerHash
       fee_excess: feeExcess {
         sign
         fee_magnitude: feeMagnitude
@@ -177,61 +179,6 @@ mutation ($sender: PublicKey!,
 }
 |}]
 
-module Send_create_token =
-[%graphql
-{|
-mutation ($sender: PublicKey,
-          $receiver: PublicKey!,
-          $fee: UInt64!,
-          $nonce: UInt32,
-          $memo: String) @encoders(module: "Encoders"){
-  createToken(input:
-    {feePayer: $sender, tokenOwner: $receiver, fee: $fee, nonce: $nonce, memo: $memo}) {
-    createNewToken {
-      id
-    }
-  }
-}
-|}]
-
-module Send_create_token_account =
-[%graphql
-{|
-mutation ($sender: PublicKey,
-          $tokenOwner: PublicKey!,
-          $receiver: PublicKey!,
-          $token: TokenId!,
-          $fee: UInt64!,
-          $nonce: UInt32,
-          $memo: String) @encoders(module: "Encoders"){
-  createTokenAccount(input:
-    {feePayer: $sender, tokenOwner: $tokenOwner, receiver: $receiver, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
-    createNewTokenAccount {
-      id
-    }
-  }
-}
-|}]
-
-module Send_mint_tokens =
-[%graphql
-{|
-mutation ($sender: PublicKey!,
-          $receiver: PublicKey,
-          $token: TokenId!,
-          $amount: UInt64!,
-          $fee: UInt64!,
-          $nonce: UInt32,
-          $memo: String) @encoders(module: "Encoders"){
-  mintTokens(input:
-    {tokenOwner: $sender, receiver: $receiver, token: $token, amount: $amount, fee: $fee, nonce: $nonce, memo: $memo}) {
-    mintTokens {
-      id
-    }
-  }
-}
-|}]
-
 module Export_logs =
 [%graphql
 {|
@@ -241,14 +188,6 @@ mutation ($basename: String) @encoders(module: "Encoders"){
       tarfile
     }
   }
-}
-|}]
-
-module Get_token_owner =
-[%graphql
-{|
-query tokenOwner($token: TokenId!) @encoders(module: "Encoders"){
-  tokenOwner(token: $token)
 }
 |}]
 
@@ -279,13 +218,7 @@ query user_commands($public_key: PublicKey) @encoders(module: "Encoders"){
 }
 |}]
 
-module Next_available_token =
-[%graphql
-{|
-query next_available_token {
-  nextAvailableToken
-}
-|}]
+module Pooled_zkapp_commands = Generated_graphql_queries.Pooled_zkapp_commands
 
 module Time_offset = [%graphql {|
 query time_offset {

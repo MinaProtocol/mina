@@ -1,0 +1,19 @@
+;; Don't build tests automatically
+(vendored_dirs test)
+
+(library
+ (name ppx_version)
+ (public_name ppx_version)
+ (kind ppx_deriver)
+ (libraries
+   ;; opam libs
+   compiler-libs.common
+   ppxlib
+   ppxlib.astlib
+   ppx_derivers
+   ppx_bin_prot
+   base base.caml
+   core_kernel
+   ppx_version.runtime
+   bin_prot)
+ (preprocess (pps ppx_compare ppxlib.metaquot)))

@@ -1,0 +1,51 @@
+(library
+ (inline_tests)
+ (name kimchi_backend_common)
+ (public_name kimchi_backend.common)
+ (flags -warn-error -27)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_version
+   ppx_mina
+   ppx_jane
+   ppx_deriving_yojson
+   ppx_deriving.std
+   h_list.ppx))
+ (libraries
+  ;; opam libraries
+  result
+  async_kernel
+  sexplib0
+  bin_prot.shape
+  integers
+  digestif
+  core_kernel
+  base.caml
+  ppx_inline_test.config
+  bignum.bigint
+  base.base_internalhash_types
+  ;; local libraries
+  tuple_lib
+  snarky.backendless
+  key_cache
+  pickles_types
+  hex
+  kimchi_bindings
+  kimchi_types
+  pasta_bindings
+  sponge
+  allocation_functor
+  snarky.intf
+  promise
+  ppx_version.runtime))
+
+(rule
+ (targets version.ml)
+ (deps
+  (:< gen_version.sh)
+  (source_tree ../../proof-systems)
+  (sandbox none))
+ (action
+  (run %{<} %{targets})))
