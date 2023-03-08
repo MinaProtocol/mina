@@ -61,7 +61,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       wait_for t @@ Wait_condition.persisted_frontier_loaded node_c
     in
-    let%bind () = wait_for t (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes)) in
+    let%bind () =
+      wait_for t
+        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
+    in
     let%bind initial_connectivity_data =
       fetch_connectivity_data ~logger (Core.String.Map.data all_nodes)
     in

@@ -20,25 +20,30 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Test_config in
     { default with
       requires_graphql = true
-      ; genesis_ledger =
-      [ { account_name = "node-a-key"; balance = "8000000000"; timing = Untimed }
-      ; { account_name = "node-b-key"; balance = "1000000000"; timing = Untimed }
-      ; { account_name = "fish1"; balance = "3000"; timing = Untimed }
-      ; { account_name = "fish2"; balance = "3000"; timing = Untimed }
-      ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
-
-      ]
-  ; block_producers =
-      [ { node_name = "node-a"; account_name = "node-a-key" }
-      ; { node_name = "node-b"; account_name = "node-b-key" }
-      ]
+    ; genesis_ledger =
+        [ { account_name = "node-a-key"
+          ; balance = "8000000000"
+          ; timing = Untimed
+          }
+        ; { account_name = "node-b-key"
+          ; balance = "1000000000"
+          ; timing = Untimed
+          }
+        ; { account_name = "fish1"; balance = "3000"; timing = Untimed }
+        ; { account_name = "fish2"; balance = "3000"; timing = Untimed }
+        ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
+        ]
+    ; block_producers =
+        [ { node_name = "node-a"; account_name = "node-a-key" }
+        ; { node_name = "node-b"; account_name = "node-b-key" }
+        ]
     ; num_archive_nodes = 1
     ; snark_coordinator =
-    Some
-      { node_name = "snark-node"
-      ; account_name = "snark-node-key"
-      ; worker_nodes = 2
-      }
+        Some
+          { node_name = "snark-node"
+          ; account_name = "snark-node-key"
+          ; worker_nodes = 2
+          }
     ; snark_worker_fee = "0.0001"
     ; proof_config =
         { proof_config_default with
@@ -85,10 +90,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let block_producer_nodes = Network.block_producers network |> Core.String.Map.data in
-    let node = Core.String.Map.find_exn (Network.block_producers network) "node" in
+    let block_producer_nodes =
+      Network.block_producers network |> Core.String.Map.data
+    in
+    let node =
+      Core.String.Map.find_exn (Network.block_producers network) "node"
+    in
     let fish1_kp =
-      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1").keypair
+      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1")
+        .keypair
     in
     let fish1_pk = Signature_lib.Public_key.compress fish1_kp.public_key in
     let fish1_account_id =
@@ -109,7 +119,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize (Core.String.Map.data (Network.all_nodes network)))
+        (Wait_condition.nodes_to_initialize
+           (Core.String.Map.data (Network.all_nodes network)) )
     in
     let keymap =
       List.fold [ fish1_kp ] ~init:Signature_lib.Public_key.Compressed.Map.empty
@@ -337,7 +348,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
-           (List.hd_exn @@ ( Network.archive_nodes network |> Core.String.Map.data  ))
+           ( List.hd_exn
+           @@ (Network.archive_nodes network |> Core.String.Map.data) )
        in
        check_replayer_logs ~logger logs )
 end

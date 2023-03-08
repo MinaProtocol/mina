@@ -21,21 +21,28 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; genesis_ledger =
-    [ { account_name = "node-a-key"; balance = "8000000000"; timing = Untimed }
-    ; { account_name = "node-b-key"; balance = "1000000000"; timing = Untimed }
-    ; { account_name = "fish1"; balance = "3000"; timing = Untimed }
-    ; { account_name = "fish2"; balance = "3000"; timing = Untimed }
-    ]
+        [ { account_name = "node-a-key"
+          ; balance = "8000000000"
+          ; timing = Untimed
+          }
+        ; { account_name = "node-b-key"
+          ; balance = "1000000000"
+          ; timing = Untimed
+          }
+        ; { account_name = "fish1"; balance = "3000"; timing = Untimed }
+        ; { account_name = "fish2"; balance = "3000"; timing = Untimed }
+        ]
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
-        ; { node_name = "node-b"; account_name = "node-b-key" } ]
+        ; { node_name = "node-b"; account_name = "node-b-key" }
+        ]
     ; num_archive_nodes = 1
     ; snark_coordinator =
-    Some
-      { node_name = "snark-node"
-      ; account_name = "snark-node-key"
-      ; worker_nodes = 2
-      }
+        Some
+          { node_name = "snark-node"
+          ; account_name = "snark-node-key"
+          ; worker_nodes = 2
+          }
     ; snark_worker_fee = "0.0001"
     ; proof_config =
         { proof_config_default with
@@ -121,20 +128,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let block_producer_nodes = Network.block_producers network |> Core.String.Map.data in
+    let block_producer_nodes =
+      Network.block_producers network |> Core.String.Map.data
+    in
     (* TODO: capture snark worker processes' failures *)
     let%bind () =
       section_hard "Wait for nodes to initialize"
         (wait_for t
-           (Wait_condition.nodes_to_initialize @@ (Network.all_nodes network |> Core.String.Map.data )) )
+           ( Wait_condition.nodes_to_initialize
+           @@ (Network.all_nodes network |> Core.String.Map.data) ) )
     in
-    let node = Core.String.Map.find_exn (Network.block_producers network) "node-a" in
+    let node =
+      Core.String.Map.find_exn (Network.block_producers network) "node-a"
+    in
     let constraint_constants = Network.constraint_constants network in
     let fish1_kp =
-      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1").keypair
+      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1")
+        .keypair
     in
     let fish2_kp =
-      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish2").keypair
+      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish2")
+        .keypair
     in
     let num_zkapp_accounts = 3 in
     let zkapp_keypairs =
@@ -837,7 +851,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
-         (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
+           (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
        in
        check_replayer_logs ~logger logs )
 end

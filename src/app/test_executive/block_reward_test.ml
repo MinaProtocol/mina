@@ -21,11 +21,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; genesis_ledger =
-      [ { account_name = "node-key"; balance = "1000"; timing = Untimed }
-      ]
-  ; block_producers =
-      [ { node_name = "node"; account_name = "node-key" }
-      ]
+        [ { account_name = "node-key"; balance = "1000"; timing = Untimed } ]
+    ; block_producers = [ { node_name = "node"; account_name = "node-key" } ]
     }
 
   let run network t =
@@ -36,11 +33,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       wait_for t
         (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
     in
-    let untimed_node_a = Core.String.Map.find_exn
-    (Network.block_producers network)
-    "untimed-node-a"
+    let untimed_node_a =
+      Core.String.Map.find_exn
+        (Network.block_producers network)
+        "untimed-node-a"
     in
-    let bp_keypair  = (Core.String.Map.find_exn (Network.genesis_keypairs network) "node-key").keypair in
+    let bp_keypair =
+      (Core.String.Map.find_exn (Network.genesis_keypairs network) "node-key")
+        .keypair
+    in
     let bp_pk = bp_keypair.public_key |> Signature_lib.Public_key.compress in
     let bp_pk_account_id = Account_id.create bp_pk Token_id.default in
     let bp_original_balance = Currency.Amount.of_mina_string_exn "1000" in

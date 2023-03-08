@@ -159,7 +159,9 @@ module Network_config = struct
     let keypairs =
       List.take
         (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
-        (List.drop (Array.to_list (Lazy.force Key_gen.Sample_keypairs.keypairs)) 1)
+        (List.drop
+           (Array.to_list (Lazy.force Key_gen.Sample_keypairs.keypairs))
+           1 )
         (List.length genesis_ledger)
     in
     (* let module Labeled_accounts = Map.Make(String)
@@ -208,7 +210,7 @@ module Network_config = struct
           let default = Runtime_config.Accounts.Single.default in
           let acct =
             { default with
-              pk = (Public_key.Compressed.to_string pk)
+              pk = Public_key.Compressed.to_string pk
             ; sk = Some (Private_key.to_base58_check sk)
             ; balance =
                 Balance.of_mina_string_exn balance

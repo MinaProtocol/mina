@@ -20,14 +20,24 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "node-a-key"; balance = "8000000000"; timing = Untimed }
-        ; { account_name = "node-b-key"; balance = "1000000000"; timing = Untimed }
-        ; { account_name = "node-c-key"; balance = "1000000000"; timing = Untimed }
+        [ { account_name = "node-a-key"
+          ; balance = "8000000000"
+          ; timing = Untimed
+          }
+        ; { account_name = "node-b-key"
+          ; balance = "1000000000"
+          ; timing = Untimed
+          }
+        ; { account_name = "node-c-key"
+          ; balance = "1000000000"
+          ; timing = Untimed
+          }
         ]
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
-        ; { node_name = "node-c"; account_name = "node-c-key" } ]
+        ; { node_name = "node-c"; account_name = "node-c-key" }
+        ]
     ; num_archive_nodes = 1
     }
 
@@ -39,7 +49,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       wait_for t
         (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
     in
-    let block_producer_nodes = Network.block_producers network |> Core.String.Map.data in
+    let block_producer_nodes =
+      Network.block_producers network |> Core.String.Map.data
+    in
     let node = List.hd_exn block_producer_nodes in
     let constraint_constants =
       Genesis_constants.Constraint_constants.compiled
@@ -635,7 +647,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
-         (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
+           (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
        in
        check_replayer_logs ~logger logs )
 end

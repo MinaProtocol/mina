@@ -90,10 +90,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let sender_account_id = Account_id.create sender_pub_key Token_id.default in
     let txn_body =
       Signed_command_payload.Body.Payment
-        { source_pk = sender_pub_key
-        ; receiver_pk = receiver_pub_key
-        ; amount
-        }
+        { source_pk = sender_pub_key; receiver_pk = receiver_pub_key; amount }
     in
     let%bind { nonce = sender_current_nonce; _ } =
       Network.Node.must_get_account_data ~logger node_b
@@ -116,8 +113,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~get_current_nonce:(fun _ -> failwith "get_current_nonce, don't call me")
         ~nonce_map:
           (Account_id.Map.of_alist_exn
-             [ ( Account_id.create sender_pub_key
-             Account_id.Digest.default
+             [ ( Account_id.create sender_pub_key Account_id.Digest.default
                , (sender_current_nonce, sender_current_nonce) )
              ] )
         ~get_account:(fun _ -> `Bootstrapping)

@@ -14,18 +14,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   type node = Network.Node.t
 
   type dsl = Dsl.t
-  
+
   let config =
     let open Test_config in
     { default with
       requires_graphql = true
-      ; genesis_ledger =
-      [ { account_name = "node-key"; balance = "8000000"; timing = Untimed }
-      ; { account_name = "extra-key"; balance = "10"; timing = Untimed }
-      ]
-  ; block_producers =
-      [ { node_name = "node"; account_name = "node-key" }
-      ]
+    ; genesis_ledger =
+        [ { account_name = "node-key"; balance = "8000000"; timing = Untimed }
+        ; { account_name = "extra-key"; balance = "10"; timing = Untimed }
+        ]
+    ; block_producers = [ { node_name = "node"; account_name = "node-key" } ]
     }
 
   let check_and_print_stout_stderr ~logger process =
@@ -43,7 +41,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let node = Core.String.Map.find_exn (Network.block_producers network) "node" in
+    let node =
+      Core.String.Map.find_exn (Network.block_producers network) "node"
+    in
     let%bind fee_payer_key = priv_key_of_node node in
     let graphql_uri = Network.Node.graphql_uri node in
 
