@@ -2,37 +2,6 @@
 
 open Core_kernel
 
-(* *)
-let field_to_bits_le (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (field_element : Circuit.Field.t) =
-  let open Circuit in
-  let bits =
-    exists
-      (Typ.list ~length:Field.size_in_bits Boolean.typ)
-      ~compute:(fun () ->
-        Field.Constant.unpack @@ As_prover.read Field.typ field_element )
-  in
-  bits
-
-(* Create field element from contiguous bits of another
- *
- *   Inputs:
- *     field_element: source field element
- *     start:         zero-indexed starting bit offset (or -1 to denote the last bit)
- *     stop:          zero-indexed stopping bit index (or -1 to denote the last bit)
- *
- *   Output:
- *     New field element created from bits [start, stop) of field_element input,
- *     placed into the lowest possible bit position, like so
- *
- *        start     stop
- *             \   /
- *       [......xxx.....] field_element
- *       [...........xxx] output
- *       lsb          msb
- *)
-
 (* field_bits_to_field - Create a field element from contiguous bits of another
  *
  *   Inputs:
@@ -52,7 +21,8 @@ let field_to_bits_le (type f)
  *)
 let field_bits_le_to_field (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (field_element : Circuit.Field.t) (start : int) (stop : int) =
+    (field_element : Circuit.Field.t) (start : int) (stop : int) :
+    Circuit.Field.t =
   let open Circuit in
   (* Check range is valid *)
   if stop <> -1 && stop <= start then

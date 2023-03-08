@@ -11,8 +11,8 @@ let xor (type f)
 let open Circuit in
 
    (* Convert to bits *)
-   let input1_bits = Circuit.Field.unpack @@ As_prover.read Field.typ input1 in
-   let input2_bits = Circuit.Field.unpack @@ As_prover.read Field.typ input2 in
+   let input1_bits = Circuit.Field.unpack input1 in
+   let input2_bits = Circuit.Field.unpack input2 in
  
    (* Check real lengths are at most the desired length *)
    assert (List.length input1_bits <= length) ;
@@ -41,14 +41,9 @@ let open Circuit in
     (* Recursively build Xor gadget *) 
     xor_rec input1_bits input2_bits output_bits pad_length
 
-  (* Transform output bits to field; output = input1 xor input2 *)
-  let output = 
-    exists Field.typ ~compute:(fun () ->
-      As_prover.read Field.typ field_bits_le_to_field output_bits 0 length )
-in
-
    (* Convert back to field *)
-   let output = Circuit.Field.project output_bits in
+   let output = exists Field.typ ~compute:(fun () ->
+    Field.Constant.project output_bits) in
 
     output
 
@@ -92,21 +87,21 @@ let rec xor_rec (type f)
           })
   else
   (* Nibbles *)
-  let in1 = field_bits_le_to_field input1 0 length in
-  let in2 = field_bits_le_to_field input2 0 length in
-  let out = field_bits_le_to_field output 0 length in
-  let in1_0 = field_bits_le_to_field input1 0 4 in
-  let in1_1 = field_bits_le_to_field input1 4 8 in
-  let in1_2 = field_bits_le_to_field input1 8 12 in
-  let in1_3 = field_bits_le_to_field input1 12 16 in
-  let in2_0 = field_bits_le_to_field input2 0 4 in
-  let in2_1 = field_bits_le_to_field input2 4 8 in
-  let in2_2 = field_bits_le_to_field input2 8 12 in
-  let in2_3 = field_bits_le_to_field input2 12 16 in
-  let out_0 = field_bits_le_to_field output 0 4 in
-  let out_1 = field_bits_le_to_field output 4 8 in
-  let out_2 = field_bits_le_to_field output 8 12 in
-  let out_3 = field_bits_le_to_field output 12 16 in
+  let in1 = Common.field_bits_le_to_field (module Circuit) input1 0 length in
+  let in2 = Common.field_bits_le_to_field (module Circuit) input2 0 length in
+  let out = Common.field_bits_le_to_field (module Circuit) output 0 length in
+  let in1_0 = Common.field_bits_le_to_field (module Circuit) input1 0 4 in
+  let in1_1 = Common.field_bits_le_to_field (module Circuit) input1 4 8 in
+  let in1_2 = Common.field_bits_le_to_field (module Circuit) input1 8 12 in
+  let in1_3 = Common.field_bits_le_to_field (module Circuit) input1 12 16 in
+  let in2_0 = Common.field_bits_le_to_field (module Circuit) input2 0 4 in
+  let in2_1 = Common.field_bits_le_to_field (module Circuit) input2 4 8 in
+  let in2_2 = Common.field_bits_le_to_field (module Circuit) input2 8 12 in
+  let in2_3 = Common.field_bits_le_to_field (module Circuit) input2 12 16 in
+  let out_0 = Common.field_bits_le_to_field (module Circuit) output 0 4 in
+  let out_1 = Common.field_bits_le_to_field (module Circuit) output 4 8 in
+  let out_2 = Common.field_bits_le_to_field (module Circuit) output 8 12 in
+  let out_3 = Common.field_bits_le_to_field (module Circuit) output 12 16 in
 
   (* If length is more than 0, add the Xor gate *)
   with_label "xor16_gate" (fun () -> 
@@ -134,9 +129,9 @@ let rec xor_rec (type f)
                    } )
           })
           (* Remove least significant 4 nibbles *)
-          let next_in1 = remove in1_0 in1_1 in1_2 in1_3 from in1 in
-          let next_in2 = (in2 - in2_0  - in2_1 * 2^4 - in2_2 * 2^8 - in2_3 * 2^12) / 2^16;
-          let next_out = (out - out_0  - out_1 * 2^4 - out_2 * 2^8 - out_3 * 2^12) / 2^16;
+          let next_in1 = (* i would like to remove the 16 leading bits of the list *) in 
+          let next_in2 = (in2 - in2_0  - in2_1 * 2^4 - in2_2 * 2^8 - in2_3 * 2^12) / 2^16 in
+          let next_out = (out - out_0  - out_1 * 2^4 - out_2 * 2^8 - out_3 * 2^12) / 2^16 in
           (* Next length is 4*4 less bits *)
           let next_length = length - 16 in
 
