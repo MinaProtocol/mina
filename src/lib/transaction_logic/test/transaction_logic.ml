@@ -244,11 +244,19 @@ let%test_module "Test transaction logic." =
 let%test_module "Test stack module" =
   ( module struct
     module Stack = Transaction_logic.For_tests.Stack (Int)
+
     let%test_unit "Ensure pop works on non-empty list." =
-    let s = [1;2;3] in
-    match (Stack.pop s) with 
-      | Some (x,xs) -> assert(Int.equal x 1 && (List.equal (Int.equal) xs [2;3]))
-      | None -> assert(false)
+    Quickcheck.test ~trials 
+    (let open Quickcheck in
+    let open Generator.Let_syntax in
+    let%map stack = Generator.list_non_empty Generator.size in
+    let top = List.hd_exn stack in 
+    let tail = List.tl_exn stack in
+    (stack,top,tail))
+    ~f:(fun (stack,top,tail) -> 
+    match (Stack.pop stack) with 
+      | Some (x,xs) -> assert(Int.equal x top && (List.equal (Int.equal) xs tail))
+      | None -> assert(false)) 
 
     let%test_unit "Ensure pop works on empty list." =
     match (Stack.pop (Stack.empty ())) with 
@@ -256,8 +264,16 @@ let%test_module "Test stack module" =
       | None -> assert(true)
 
     let%test_unit "Ensure push functionality works." =
-      let s = [1;2;3] in
-      let pushed = Stack.push 0 ~onto:s in 
-      assert(List.equal Int.equal pushed [0;1;2;3])
+    Quickcheck.test ~trials 
+    (let open Quickcheck in
+    let open Generator.Let_syntax in
+    let%bind stack = Generator.list_non_empty Generator.size in
+    let%bind stack' = Generator.list_non_empty Generator.size in
+    let pushed = List.fold_right stack' ~init:stack ~f:(fun x s -> Stack.push x ~onto:s) in 
+    let pushed' = List.append stack' stack in
+    return (pushed,pushed'))
+    ~f:(fun (pushed,pushed') -> 
+      assert(List.equal Int.equal pushed pushed')) 
   end )
+
 
