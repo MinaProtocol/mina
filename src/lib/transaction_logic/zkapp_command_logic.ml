@@ -87,9 +87,9 @@ module type Amount_intf = sig
 
     val equal : t -> t -> bool
 
-    val is_pos : t -> bool
-
     val is_neg : t -> bool
+
+    val is_non_neg : t -> bool
 
     val negate : t -> t
 
@@ -532,7 +532,7 @@ module type Account_intf = sig
 
     val set_zkapp_uri : t -> controller
 
-    val edit_sequence_state : t -> controller
+    val edit_action_state : t -> controller
 
     val set_token_symbol : t -> controller
 
@@ -606,13 +606,13 @@ module type Account_intf = sig
 
   val verification_key_hash : t -> verification_key_hash
 
-  val last_sequence_slot : t -> global_slot
+  val last_action_slot : t -> global_slot
 
-  val set_last_sequence_slot : global_slot -> t -> t
+  val set_last_action_slot : global_slot -> t -> t
 
-  val sequence_state : t -> field Pickles_types.Vector.Vector_5.t
+  val action_state : t -> field Pickles_types.Vector.Vector_5.t
 
-  val set_sequence_state : field Pickles_types.Vector.Vector_5.t -> t -> t
+  val set_action_state : field Pickles_types.Vector.Vector_5.t -> t -> t
 
   type zkapp_uri
 
@@ -1038,24 +1038,24 @@ module Make (Inputs : Inputs_intf) = struct
     ; new_call_stack
     }
 
-  let update_sequence_state (sequence_state : _ Pickles_types.Vector.t) actions
-      ~txn_global_slot ~last_sequence_slot =
+  let update_action_state (action_state : _ Pickles_types.Vector.t) actions
+      ~txn_global_slot ~last_action_slot =
     (* Push events to s1. *)
-    let [ s1'; s2'; s3'; s4'; s5' ] = sequence_state in
+    let [ s1'; s2'; s3'; s4'; s5' ] = action_state in
     let is_empty = Actions.is_empty actions in
     let s1_updated = Actions.push_events s1' actions in
     let s1 = Field.if_ is_empty ~then_:s1' ~else_:s1_updated in
     (* Shift along if not empty and last update wasn't this slot *)
-    let is_this_slot = Global_slot.equal txn_global_slot last_sequence_slot in
+    let is_this_slot = Global_slot.equal txn_global_slot last_action_slot in
     let is_empty_or_this_slot = Bool.(is_empty ||| is_this_slot) in
     let s5 = Field.if_ is_empty_or_this_slot ~then_:s5' ~else_:s4' in
     let s4 = Field.if_ is_empty_or_this_slot ~then_:s4' ~else_:s3' in
     let s3 = Field.if_ is_empty_or_this_slot ~then_:s3' ~else_:s2' in
     let s2 = Field.if_ is_empty_or_this_slot ~then_:s2' ~else_:s1' in
-    let last_sequence_slot =
-      Global_slot.if_ is_empty ~then_:last_sequence_slot ~else_:txn_global_slot
+    let last_action_slot =
+      Global_slot.if_ is_empty ~then_:last_action_slot ~else_:txn_global_slot
     in
-    (([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t), last_sequence_slot)
+    (([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t), last_action_slot)
 
   let apply ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(is_start : [ `Yes of _ Start_data.t | `No | `Compute of _ Start_data.t ])
@@ -1418,7 +1418,7 @@ module Make (Inputs : Inputs_intf) = struct
               ~else_:local_state.supply_increase
         }
       in
-      let is_receiver = Amount.Signed.is_pos actual_balance_change in
+      let is_receiver = Amount.Signed.is_non_neg actual_balance_change in
       let local_state =
         let controller =
           Controller.if_ is_receiver
@@ -1544,35 +1544,33 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_verification_key verification_key a in
       (a, local_state)
     in
-    (* Update sequence state. *)
+    (* Update action state. *)
     let a, local_state =
       let actions = Account_update.Update.actions account_update in
-      let last_sequence_slot = Account.last_sequence_slot a in
-      let sequence_state, last_sequence_slot =
-        update_sequence_state (Account.sequence_state a) actions
-          ~txn_global_slot ~last_sequence_slot
+      let last_action_slot = Account.last_action_slot a in
+      let action_state, last_action_slot =
+        update_action_state (Account.action_state a) actions ~txn_global_slot
+          ~last_action_slot
       in
       let is_empty =
-        (* also computed in update_sequence_state, but messy to return it *)
+        (* also computed in update_action_state, but messy to return it *)
         Actions.is_empty actions
       in
       let has_permission =
         Controller.check ~proof_verifies ~signature_verifies
-          (Account.Permissions.edit_sequence_state a)
+          (Account.Permissions.edit_action_state a)
       in
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_sequence_state
+        Local_state.add_check local_state Update_not_permitted_action_state
           Bool.(is_empty ||| has_permission)
       in
       let a =
         a
-        |> Account.set_sequence_state sequence_state
-        |> Account.set_last_sequence_slot last_sequence_slot
+        |> Account.set_action_state action_state
+        |> Account.set_last_action_slot last_action_slot
       in
       (a, local_state)
     in
-    (* Reset zkApp state to [None] if it is unmodified. *)
-    let a = Account.unmake_zkapp a in
     (* Update zkApp URI. *)
     let a, local_state =
       let zkapp_uri = Account_update.Update.zkapp_uri account_update in
@@ -1591,6 +1589,11 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_zkapp_uri zkapp_uri a in
       (a, local_state)
     in
+    (* At this point, all possible changes have been made to the zkapp
+       part of an account. Reset zkApp state to [None] if that part
+       is unmodified.
+    *)
+    let a = Account.unmake_zkapp a in
     (* Update token symbol. *)
     let a, local_state =
       let token_symbol = Account_update.Update.token_symbol account_update in
@@ -1742,7 +1745,7 @@ module Make (Inputs : Inputs_intf) = struct
         assert_ ~pos:__POS__
           ( (not is_start')
           ||| ( account_update_token_is_default
-              &&& Amount.Signed.is_pos local_delta ) )) ;
+              &&& Amount.Signed.is_non_neg local_delta ) )) ;
       let new_local_fee_excess, `Overflow overflow =
         Amount.Signed.add_flagged local_state.excess local_delta
       in

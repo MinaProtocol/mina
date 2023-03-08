@@ -917,13 +917,15 @@ module Update = struct
     let open Fields_derivers_zkapps in
     let ( !. ) = ( !. ) ~t_fields_annots in
     let zkapp_uri =
-      with_checked
-        ~checked:(Data_as_hash.deriver string)
+      needs_custom_js
+        ~js_type:(Data_as_hash.deriver string)
         ~name:"ZkappUri" string
     in
     let token_symbol =
-      with_checked
-        ~checked:(js_only (Js_layout.leaf_type (Custom "TokenSymbol")))
+      needs_custom_js
+        ~js_type:
+          (js_record
+             [ ("symbol", js_layout string); ("field", js_layout field) ] )
         ~name:"TokenSymbol" string
     in
     finish "AccountUpdateModification" ~t_toplevel_annots
@@ -1078,7 +1080,7 @@ module Account_precondition = struct
           nonce: {lower: "34928", upper: "34928"},
           receiptChainHash: null, delegate: null,
           state: [null,null,null,null,null,null,null,null],
-          sequenceState: null, provedState: null, isNew: null
+          actionState: null, provedState: null, isNew: null
         }|json}
       |> Yojson.Safe.from_string |> Yojson.Safe.to_string )
 

@@ -93,7 +93,7 @@ let zkapp_command_with_ledger ?num_keypairs ?max_account_updates
       ; set_permissions = Either
       ; set_verification_key = Either
       ; set_zkapp_uri = Either
-      ; edit_sequence_state = Either
+      ; edit_action_state = Either
       ; set_token_symbol = Either
       ; increment_nonce = Either
       ; set_voting_for = Either
