@@ -94,7 +94,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Network.block_producers network |> Core.String.Map.data
     in
     let node =
-      Core.String.Map.find_exn (Network.block_producers network) "node"
+      Core.String.Map.find_exn (Network.block_producers network) "node-a"
     in
     let fish1_kp =
       (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1")
