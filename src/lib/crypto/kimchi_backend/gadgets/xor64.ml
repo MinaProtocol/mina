@@ -11,31 +11,44 @@ let xor (type f)
 let open Circuit in
 
    (* Convert to bits *)
-   let input1_bits = Circuit.Field.unpack input1 in
-   let input2_bits = Circuit.Field.unpack input2 in
+   let input1_bits = Circuit.Field.unpack @@ As_prover.read Field.typ input1 in
+   let input2_bits = Circuit.Field.unpack @@ As_prover.read Field.typ input2 in
  
    (* Check real lengths are at most the desired length *)
    assert (List.length input1_bits <= length) ;
    assert (List.length input2_bits <= length) ;
  
    (* Pad with zeros in MSB until reaching same length *)
- 
-   (* Witness computation; output = input1 xor input2 *)
-   (* Xor list of bits to obtain output*)
-     (* Witness computation; output = input1 xor input2 *)
-  let output =
-    exists Field.typ ~compute:(fun () ->
-        let input1 = As_prover.read Field.typ input1 in
-        let input2 = As_prover.read Field.typ input2 in
-        Field.Constant.xor input1 input2 )
-  in
+  for _ = List.length input1_bits to length do
+    input1_bits <- input1_bits :: Circuit.Boolean.false_
+  done
+  for _ = List.length input2_bits to length do
+    input2_bits <- input2_bits :: Circuit.Boolean.false_
+  done
+
+  (* Pad with more zeros until the length is a multiple of 16 *)
+  let pad_length = length in
+  while pad_length mod 16 != 0 do
+    input1_bits <- input1_bits :: Circuit.Boolean.false_
+    input2_bits <- input2_bits :: Circuit.Boolean.false_
+    pad_length <- pad_length + 1
+  done
+
+   (* Xor list of bits to obtain output *)
    let output_bits = List.map2_exn input1_bits input2_bits ~f:(fun b1 b2 ->
-       Circuit.Boolean.(b1 lxor b2) ) in
- 
+       b1 lxor b2 ) in
+
+    (* Recursively build Xor gadget *) 
+    xor_rec input1_bits input2_bits output_bits pad_length
+
+  (* Transform output bits to field; output = input1 xor input2 *)
+  let output = 
+    exists Field.typ ~compute:(fun () ->
+      As_prover.read Field.typ field_bits_le_to_field output_bits 0 length )
+in
+
    (* Convert back to field *)
    let output = Circuit.Field.project output_bits in
-
-    xor_rec input1 input2 output length
 
     output
 
@@ -57,18 +70,21 @@ let open Circuit in
 (* Recursively builds Xor *)
 let rec xor_rec (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) (output : Circuit.Field.t) =
+    (input1 : List.Circuit.Boolean) (input2 : List.Circuit.Boolean) (output : Circuit.List.Boolean) (length: int) =
   let open Circuit in
 
-  (* If inputs are zero, add the zero check *)
-  if input1 = Field.zero && input2 = Field.zero then
+  (* If inputs are zero and length is zero, add the zero check *)
+  if length = 0 then
+    assert (input1 = Field.zero) ;
+    assert (input2 = Field.zero) ;
+    assert (output = Field.zero) ;
     with_label "zero_check" (fun () ->
         assert_
           { annotation = Some __LOC__
           ; zero = Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
           (Basic
-             { l = (Field.Constant.one, Field.Constant.zero)
-             ; r = (Field.Constant.zero, Field.Constant.zero)
+             { l = (Field.one, Field.Constant.zero)
+             ; r = (Field.zero, Field.Constant.zero)
              ; o = (Option.value_exn Field.zero, Field.Constant.zero)
              ; m = Field.Constant.zero
              ; c = Field.Constant.one
@@ -76,9 +92,23 @@ let rec xor_rec (type f)
           })
   else
   (* Nibbles *)
-    let in1_nibbles = bits(input1, 0, 4);
-    let in2_nibbles = bits(input2, 0, 4);
-  
+  let in1 = field_bits_le_to_field input1 0 length in
+  let in2 = field_bits_le_to_field input2 0 length in
+  let out = field_bits_le_to_field output 0 length in
+  let in1_0 = field_bits_le_to_field input1 0 4 in
+  let in1_1 = field_bits_le_to_field input1 4 8 in
+  let in1_2 = field_bits_le_to_field input1 8 12 in
+  let in1_3 = field_bits_le_to_field input1 12 16 in
+  let in2_0 = field_bits_le_to_field input2 0 4 in
+  let in2_1 = field_bits_le_to_field input2 4 8 in
+  let in2_2 = field_bits_le_to_field input2 8 12 in
+  let in2_3 = field_bits_le_to_field input2 12 16 in
+  let out_0 = field_bits_le_to_field output 0 4 in
+  let out_1 = field_bits_le_to_field output 4 8 in
+  let out_2 = field_bits_le_to_field output 8 12 in
+  let out_3 = field_bits_le_to_field output 12 16 in
+
+  (* If length is more than 0, add the Xor gate *)
   with_label "xor16_gate" (fun () -> 
         (* Set up Xor gate *)
         assert_
@@ -86,29 +116,32 @@ let rec xor_rec (type f)
           ; xor =
               Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
                 (Xor
-                   { in1 = input1
-                   ; in2 = input2
-                   ; out = output
-                   ; in1_0 = in1_nibbles.(0)
-                   ; in1_1 = in1_nibbles.(1)
-                   ; in1_2 = in1_nibbles.(2)
-                   ; in1_3 = in1_nibbles.(3)
-                   ; in2_0 = in2_nibbles.(0)
-                   ; in2_1 = in2_nibbles.(1)
-                   ; in2_2 = in2_nibbles.(2)
-                   ; in2_3 = in2_nibbles.(3)
-                   ; out_0 = out_nibbles.(0)
-                   ; out_1 = out_nibbles.(1)
-                   ; out_2 = out_nibbles.(2)
-                   ; out_3 = out_nibbles.(3)
+                   { in1 
+                   ; in2 
+                   ; out 
+                   ; in1_0 
+                   ; in1_1
+                   ; in1_2 
+                   ; in1_3
+                   ; in2_0
+                   ; in2_1 
+                   ; in2_2
+                   ; in2_3 
+                   ; out_0 
+                   ; out_1 
+                   ; out_2 
+                   ; out_3 
                    } )
           })
-          let next_in1 = (input1 - in1_0  - in1_1 * 2^4 - in1_2 * 2^8 - in1_3 * 2^12) / 2^16;
-          let next_in2 = (input2 - in2_0  - in2_1 * 2^4 - in2_2 * 2^8 - in2_3 * 2^12) / 2^16;
-          let next_out = (output - out_0  - out_1 * 2^4 - out_2 * 2^8 - out_3 * 2^12) / 2^16;
+          (* Remove least significant 4 nibbles *)
+          let next_in1 = remove in1_0 in1_1 in1_2 in1_3 from in1 in
+          let next_in2 = (in2 - in2_0  - in2_1 * 2^4 - in2_2 * 2^8 - in2_3 * 2^12) / 2^16;
+          let next_out = (out - out_0  - out_1 * 2^4 - out_2 * 2^8 - out_3 * 2^12) / 2^16;
+          (* Next length is 4*4 less bits *)
           let next_length = length - 16 in
+
         (* Recursively call xor on the next nibble *)
-        xor_rec (module Circuit) next_input1 next_input2 next_output new_length
+        xor_rec (module Circuit) next_input1 next_input2 next_output next_length
 
 
 
@@ -142,18 +175,18 @@ let%test_unit "xor16 gadget" =
             in
             (* Use the xor16 gate gadget *)
             let result = xor16 (module Runner.Impl) left_input right_input in
-            Field.Assert.equal sum result ;
+            Field.Assert.equal output result ;
             (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
-            Boolean.Assert.is_true (Field.equal sum sum) )
+            Boolean.Assert.is_true (Field.equal Field.Constant.zero Field.Constant.zero) )
       in
       true
     with _ -> false
   in
 
   (* Positive tests *)
-  assert (Bool.equal (test_generic_add 0 0 0) true) ;
-  assert (Bool.equal (test_generic_add 1 2 3) true) ;
+  assert (Bool.equal (test_xor16 0 0 0) true) ;
+  assert (Bool.equal (test_xor16 43210 56789 29983) true) ;
   (* Negatve tests *)
-  assert (Bool.equal (test_generic_add 1 0 0) false) ;
-  assert (Bool.equal (test_generic_add 2 4 7) false) ;
+  assert (Bool.equal (test_xor16 1 0 0) false) ;
+  assert (Bool.equal (test_xor16 1111 2222 0) false) ;
   ()
