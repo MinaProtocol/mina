@@ -135,7 +135,10 @@ if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
   docker tag "${TAG}" "${HASHTAG}"
   docker push "${HASHTAG}"
 
-  if [[ "${DEB_RELEASE##*=}" = 'stable' ]]; then
+  echo "Release Env Var: \'${DEB_RELEASE}\'"
+  echo "Release: ${DEB_RELEASE##*=}"
+
+  if [[ "${DEB_RELEASE##*=}" = "stable" ]]; then
 
     # tag and push to dockerhub
     docker tag "${TAG}" "minaprotocol/${SERVICE}:${VERSION}"
