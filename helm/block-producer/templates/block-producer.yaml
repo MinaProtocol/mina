@@ -73,6 +73,9 @@ spec:
           mountPath: /libp2p-keys
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
+        env:
+          - name: MINA_LIBP2P_PASS
+            value: {{ $config.privateKeyPW | quote }}
       {{- else -}}
       - name: libp2p-perms
         image: {{ $.Values.mina.image | quote }}
@@ -255,10 +258,10 @@ spec:
           value: "mina_network_block_data"
         - name: MINA_PRIVKEY_PASS
           value: {{ $config.privateKeyPW | quote }}
-        {{- if $config.libp2pSecret }}
+        # {{- if $config.libp2pSecret }}
         - name: MINA_LIBP2P_PASS
           value: {{ $config.privateKeyPW | quote }}
-        {{- end }}
+        # {{- end }}
         - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         ports:
