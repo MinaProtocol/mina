@@ -399,10 +399,10 @@ printf "\n"
 # Create the Genesis Ledger
 
 LEDGER_FOLDER="${HOME}/.mina-network/mina-local-network-${WHALES}-${FISH}-${NODES}"
-  
+
 if ${RESET}; then
   rm -rf ${LEDGER_FOLDER}
-  fi
+fi
 
 if [ ! -d "${LEDGER_FOLDER}" ]; then
   echo "Making the Ledger..."
@@ -532,7 +532,7 @@ SEED_PID=$!
 echo 'Waiting for seed to go up...'
 printf "\n"
 
-until ${MINA_EXE} client status -daemon-port ${SEED_START_PORT}  &>/dev/null; do
+until ${MINA_EXE} client status -daemon-port ${SEED_START_PORT} &>/dev/null; do
   sleep 1
 done
 
@@ -674,7 +674,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   PUB_KEY=$(cat ${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0.pub)
   REST_SERVER="http://127.0.0.1:$((${FISH_START_PORT} + 1))/graphql"
   
-  echo "Waiting for Node (${REST_SERVER}) to be up to start sending value transfer transactions..."  
+  echo "Waiting for Node (${REST_SERVER}) to be up to start sending value transfer transactions..."
   printf "\n"
 
   until ${MINA_EXE} client status -daemon-port ${FISH_START_PORT} &>/dev/null; do
