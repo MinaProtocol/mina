@@ -31,7 +31,7 @@ let gen =
   let%map nonce = Account_nonce.gen in
   { pk; nonce; balance; zkapp = None }
 
-let gen_constrained_balance ?(min = Balance.zero) ?(max = Balance.max_int) ()=
+let gen_constrained_balance ?(min = Balance.zero) ?(max = Balance.max_int) () =
   let open Quickcheck.Generator.Let_syntax in
   let%bind pk = Public_key.Compressed.gen in
   let%bind balance = Balance.gen_incl min max in
