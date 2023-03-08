@@ -39,11 +39,10 @@ TRANSACTION_FREQUENCY=10 # in seconds
 
 SEED_START_PORT=3000
 ARCHIVE_SERVER_PORT=3086
-SNARK_COORDINATOR_START_PORT=7000
+SNARK_COORDINATOR_PORT=7000
 WHALE_START_PORT=4000
 FISH_START_PORT=5000
 NODE_START_PORT=6000
-SNARK_WORKER_START_PORT=7000
 
 PG_HOST="localhost"
 PG_PORT="5432"
@@ -83,7 +82,7 @@ help() {
   echo "-sp  |--seed-start-port <#>              | Seed Node range start port"
   echo "                                         |   Default: ${SEED_START_PORT}"
   echo "-swp |--snark-coordinator-start-port <#> | Snark Worker Coordinator Node range start port"
-  echo "                                         |   Default: ${SNARK_COORDINATOR_START_PORT}"
+  echo "                                         |   Default: ${SNARK_COORDINATOR_PORT}"
   echo "-swc |--snark-workers-count <#>          | Snark Workers count"
   echo "                                         |   Default: ${SNARK_WORKERS_COUNT}"
   echo "-wp  |--whale-start-port <#>             | Whale Nodes range start port"
@@ -243,7 +242,7 @@ while [[ "$#" -gt 0 ]]; do
     shift
     ;;
   -scp | --snark-coordinator-start-port)
-    SNARK_COORDINATOR_START_PORT="${2}"
+    SNARK_COORDINATOR_PORT="${2}"
     shift
     ;;
   -swc | --snark-workers-count)
@@ -539,13 +538,13 @@ done
 #---------- Starting snark coordinator
 
 SNARK_COORDINATOR_FLAGS="-snark-worker-fee ${SNARK_WORKER_FEE} -run-snark-coordinator ${SNARK_COORDINATOR_PUBKEY} -work-selection seq"
-spawn-node ${NODES_FOLDER}/snark_coordinator ${SNARK_COORDINATOR_START_PORT} -peer ${SEED_PEER_ID} -libp2p-keypair ${SNARK_COORDINATOR_PEER_KEY} ${SNARK_COORDINATOR_FLAGS}
+spawn-node ${NODES_FOLDER}/snark_coordinator ${SNARK_COORDINATOR_PORT} -peer ${SEED_PEER_ID} -libp2p-keypair ${SNARK_COORDINATOR_PEER_KEY} ${SNARK_COORDINATOR_FLAGS}
 SNARK_COORDINATOR_PID=$!
 
 echo 'Waiting for snark coordinator to go up...'
 printf "\n"
 
-until ${MINA_EXE} client status -daemon-port ${SNARK_COORDINATOR_START_PORT} &>/dev/null; do
+until ${MINA_EXE} client status -daemon-port ${SNARK_COORDINATOR_PORT} &>/dev/null; do
   sleep 1
 done
 
@@ -557,7 +556,7 @@ for ((i = 0; i < ${SNARK_WORKERS_COUNT}; i++)); do
   echo "Starting ${i+1} out of ${SNARK_WORKERS_COUNT} Snark Worker{s}..."
   FOLDER=${NODES_FOLDER}/snark_workers/worker_${i}
   mkdir -p ${FOLDER}
-  spawn-worker ${FOLDER} ${SNARK_COORDINATOR_START_PORT}
+  spawn-worker ${FOLDER} ${SNARK_COORDINATOR_PORT}
   SNARK_WORKERS_PIDS[${i}]=$!
 done
 
@@ -608,7 +607,7 @@ echo -e "\t\t  logs: cat ${NODES_FOLDER}/seed/log.txt | ${LOGPROC_EXE}"
 echo -e "\tSnark Coordinator:"
 echo -e "\t\tInstance #0:"
 echo -e "\t\t  pid ${SNARK_COORDINATOR_PID}"
-echo -e "\t\t  status: ${MINA_EXE} client status -daemon-port ${SNARK_COORDINATOR_START_PORT}"
+echo -e "\t\t  status: ${MINA_EXE} client status -daemon-port ${SNARK_COORDINATOR_PORT}"
 echo -e "\t\t  logs: cat ${NODES_FOLDER}/snark_coordinator/log.txt | ${LOGPROC_EXE}"
 
 if [ "${SNARK_WORKERS_COUNT}" -gt "0" ]; then
