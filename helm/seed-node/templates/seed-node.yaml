@@ -37,6 +37,9 @@ spec:
           mountPath: /libp2p-keys
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
+        env:
+        - name: MINA_LIBP2P_PASS
+          value: {{ $config.libp2pSecretPassword | quote }}
       {{- else -}}
       - name: libp2p-perms
         image: {{ $.Values.mina.image | quote }}
@@ -122,10 +125,10 @@ spec:
           value: "mina_network_block_data"
         - name: DAEMON_EXTERNAL_PORT
           value: {{ $.Values.mina.ports.p2p | quote }}
-        {{- if $config.libp2pSecret }}
+        # {{- if $config.libp2pSecret }}
         - name: MINA_LIBP2P_PASS
           value: {{ $config.libp2pSecretPassword | quote }}
-        {{- end }}
+        # {{- end }}
         ports:
         - name: client-port
           protocol: TCP
