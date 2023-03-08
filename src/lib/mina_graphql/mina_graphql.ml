@@ -4816,6 +4816,12 @@ module Queries = struct
     ; thread_graph
     ; blockchain_verification_key
     ]
+
+  module Itn = struct
+    (* ITN-specific queries *)
+
+    let queries = []
+  end
 end
 
 let schema =
@@ -4829,3 +4835,8 @@ let schema_limited =
     schema
       [ Queries.daemon_status; Queries.block; Queries.version ]
       ~mutations:[] ~subscriptions:[])
+
+let schema_itn : Mina_lib.t Schema.schema =
+  (*including version because that's the default query*)
+  Graphql_async.Schema.(
+    schema Queries.Itn.queries ~mutations:[] ~subscriptions:[])

@@ -19,6 +19,7 @@ type mina_initialization =
   ; client_trustlist : Unix.Cidr.t list option
   ; rest_server_port : int
   ; limited_graphql_port : int option
+  ; itn_graphql_port : int option
   }
 
 let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants
@@ -145,6 +146,7 @@ let setup_daemon logger =
   and client_port = Flag.Port.Daemon.client
   and rest_server_port = Flag.Port.Daemon.rest_server
   and limited_graphql_port = Flag.Port.Daemon.limited_graphql_server
+  and itn_graphql_port = Flag.Port.Daemon.itn_graphql_server
   and open_limited_graphql_port =
     flag "--open-limited-graphql-port"
       ~aliases:[ "open-limited-graphql-port" ]
@@ -779,6 +781,12 @@ let setup_daemon logger =
             in
             maybe_from_config YJ.Util.to_int_option name value
           in
+          let itn_graphql_port =
+            let ({ value; name } : int option Flag.Types.with_name) =
+              itn_graphql_port
+            in
+            maybe_from_config YJ.Util.to_int_option name value
+          in
           let client_port = get_port client_port in
           let snark_work_fee_flag =
             let json_to_currency_fee_option json =
@@ -1301,7 +1309,12 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
                  ~uptime_submitter_keypair ~stop_time ~node_status_url () )
           in
-          { mina; client_trustlist; rest_server_port; limited_graphql_port }
+          { mina
+          ; client_trustlist
+          ; rest_server_port
+          ; limited_graphql_port
+          ; itn_graphql_port
+          }
         in
         (* Breaks a dependency cycle with monitor initilization and coda *)
         let mina_ref : Mina_lib.t option ref = ref None in
@@ -1324,6 +1337,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ; client_trustlist
                  ; rest_server_port
                  ; limited_graphql_port
+                 ; itn_graphql_port
                  } =
           mina_initialization_deferred ()
         in
@@ -1335,7 +1349,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
              ~f:ignore ) ;
         Mina_run.setup_local_server ?client_trustlist ~rest_server_port
           ~insecure_rest_server ~open_limited_graphql_port ?limited_graphql_port
-          mina ;
+          ?itn_graphql_port mina ;
         let%bind () =
           Option.map metrics_server_port ~f:(fun port ->
               let forward_uri =
