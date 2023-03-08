@@ -258,10 +258,8 @@ spec:
           value: "mina_network_block_data"
         - name: MINA_PRIVKEY_PASS
           value: {{ $config.privateKeyPW | quote }}
-        # {{- if $config.libp2pSecret }}
         - name: MINA_LIBP2P_PASS
           value: {{ $config.privateKeyPW | quote }}
-        # {{- end }}
         - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         ports:
