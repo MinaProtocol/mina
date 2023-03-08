@@ -550,10 +550,7 @@ done
 
 #---------- Starting snark workers
 
-echo "Starting the ${SNARK_WORKERS_COUNT} Snark Worker(s)..."
-
 for ((i = 0; i < ${SNARK_WORKERS_COUNT}; i++)); do
-  echo "Starting ${i+1} out of ${SNARK_WORKERS_COUNT} Snark Worker{s}..."
   FOLDER=${NODES_FOLDER}/snark_workers/worker_${i}
   mkdir -p ${FOLDER}
   spawn-worker ${FOLDER} ${SNARK_COORDINATOR_PORT}
