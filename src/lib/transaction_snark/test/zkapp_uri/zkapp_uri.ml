@@ -12,6 +12,8 @@ struct
     { Account_update.Update.dummy with
       zkapp_uri = Zkapp_basic.Set_or_keep.Set "https://www.minaprotocol.com"
     }
+
+  let is_non_zkapp_update = false
 end
 
 let%test_module "Update account snapp URI" =

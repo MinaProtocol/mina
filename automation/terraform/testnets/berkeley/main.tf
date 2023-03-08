@@ -180,5 +180,10 @@ module "berkeley" {
   make_report_accounts            = local.make_report_accounts
   seed_peers_url                  = "https://storage.googleapis.com/seed-lists/berkeley_seeds.txt"
 
+  # a pass must be set to connect the zkapps dash to grafana
+  # leave empty to lock down the zkapps dashboard
+  
+  # zkapps_dashboard_key = ""
+
 }
 

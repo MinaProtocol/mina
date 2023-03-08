@@ -7,8 +7,6 @@ use crate::srs::fp::CamlFpSrs;
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-use commitment_dlog::commitment::caml::CamlPolyComm;
-use commitment_dlog::{commitment::PolyComm, srs::SRS};
 use kimchi::circuits::constraints::FeatureFlags;
 use kimchi::circuits::lookup::lookups::{LookupFeatures, LookupPatterns};
 use kimchi::circuits::polynomials::permutation::Shifts;
@@ -16,6 +14,8 @@ use kimchi::circuits::polynomials::permutation::{zk_polynomial, zk_w3};
 use kimchi::circuits::wires::{COLUMNS, PERMUTS};
 use kimchi::{linearization::expr_linearization, verifier_index::VerifierIndex};
 use mina_curves::pasta::{Fp, Pallas, Vesta};
+use poly_commitment::commitment::caml::CamlPolyComm;
+use poly_commitment::{commitment::PolyComm, srs::SRS};
 use std::convert::TryInto;
 use std::path::Path;
 
@@ -47,9 +47,6 @@ impl From<VerifierIndex<Vesta>> for CamlPastaFpPlonkVerifierIndex {
                 mul_comm: vi.mul_comm.into(),
                 emul_comm: vi.emul_comm.into(),
                 endomul_scalar_comm: vi.endomul_scalar_comm.into(),
-                chacha_comm: vi
-                    .chacha_comm
-                    .map(|x| x.to_vec().iter().map(Into::into).collect()),
             },
             shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
             lookup_index: vi.lookup_index.map(Into::into),
@@ -63,7 +60,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
         let evals = index.evals;
         let shifts = index.shifts;
 
-        let (endo_q, _endo_r) = commitment_dlog::srs::endos::<Pallas>();
+        let (endo_q, _endo_r) = poly_commitment::srs::endos::<Pallas>();
         let domain = Domain::<Fp>::new(1 << index.domain.log_size_of_group).expect("wrong size");
 
         let coefficients_comm: Vec<PolyComm<Vesta>> =
@@ -75,17 +72,10 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
             .try_into()
             .expect("vector of sigma comm is of wrong size");
 
-        let chacha_comm: Option<Vec<PolyComm<Vesta>>> = evals
-            .chacha_comm
-            .map(|x| x.iter().map(Into::into).collect());
-        let chacha_comm: Option<[_; 4]> =
-            chacha_comm.map(|x| x.try_into().expect("vector of sigma comm is of wrong size"));
-
         let shifts: Vec<Fp> = shifts.iter().map(Into::into).collect();
         let shift: [Fp; PERMUTS] = shifts.try_into().expect("wrong size");
 
         let feature_flags = FeatureFlags {
-            chacha: false,
             range_check0: false,
             range_check1: false,
             foreign_field_add: false,
@@ -95,7 +85,6 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
             lookup_features: LookupFeatures {
                 patterns: LookupPatterns {
                     xor: false,
-                    chacha_final: false,
                     lookup: false,
                     range_check: false,
                     foreign_field_mul: false,
@@ -105,7 +94,7 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
             },
         };
 
-        // TODO chacha, dummy_lookup_value ?
+        // TODO dummy_lookup_value ?
         let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true);
 
         VerifierIndex::<Vesta> {
@@ -131,7 +120,6 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
             emul_comm: evals.emul_comm.into(),
             endomul_scalar_comm: evals.endomul_scalar_comm.into(),
 
-            chacha_comm,
             xor_comm: None,
 
             range_check0_comm: None,
@@ -165,7 +153,7 @@ pub fn read_raw(
     path: String,
 ) -> Result<VerifierIndex<Vesta>, ocaml::Error> {
     let path = Path::new(&path);
-    let (endo_q, _endo_r) = commitment_dlog::srs::endos::<Pallas>();
+    let (endo_q, _endo_r) = poly_commitment::srs::endos::<Pallas>();
     VerifierIndex::<Vesta>::from_file(Some(srs.0), path, offset.map(|x| x as u64), endo_q).map_err(
         |_e| {
             ocaml::Error::invalid_argument("caml_pasta_fp_plonk_verifier_index_raw_read")
@@ -212,7 +200,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_create(
     index: CamlPastaFpPlonkIndexPtr,
 ) -> CamlPastaFpPlonkVerifierIndex {
     {
-        let ptr: &mut commitment_dlog::srs::SRS<Vesta> =
+        let ptr: &mut poly_commitment::srs::SRS<Vesta> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
         ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }
@@ -260,7 +248,6 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
             mul_comm: comm(),
             emul_comm: comm(),
             endomul_scalar_comm: comm(),
-            chacha_comm: None,
         },
         shifts: (0..PERMUTS - 1).map(|_| Fp::one().into()).collect(),
         lookup_index: None,

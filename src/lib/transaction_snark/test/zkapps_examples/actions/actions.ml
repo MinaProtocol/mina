@@ -5,7 +5,7 @@ open Signature_lib
 module Impl = Pickles.Impls.Step
 module Nat = Pickles_types.Nat
 
-let%test_module "Sequence events test" =
+let%test_module "Actions test" =
   ( module struct
     let () = Base.Backtrace.elide := false
 
@@ -25,7 +25,7 @@ let%test_module "Sequence events test" =
         ~auxiliary_typ:Impl.Typ.unit
         ~branches:(module Nat.N2)
         ~max_proofs_verified:(module Nat.N0)
-        ~name:"no sequence events"
+        ~name:"no actions"
         ~constraint_constants:
           (Genesis_constants.Constraint_constants.to_snark_keys_header
              constraint_constants )
@@ -56,7 +56,7 @@ let%test_module "Sequence events test" =
                   ; set_permissions = Proof
                   ; set_verification_key = Proof
                   ; set_zkapp_uri = Proof
-                  ; edit_sequence_state = Proof
+                  ; edit_action_state = Proof
                   ; set_token_symbol = Proof
                   ; increment_nonce = Signature
                   ; set_voting_for = Proof
@@ -177,11 +177,11 @@ let%test_module "Sequence events test" =
 
     let create_ledger () = Ledger.create ~depth:ledger_depth ()
 
-    let seq_state_elts_of_account (account_opt : Account.t option) =
+    let action_state_elts_of_account (account_opt : Account.t option) =
       let zkapp = Option.value_exn (Option.value_exn account_opt).zkapp in
-      let seq_state = zkapp.sequence_state in
-      let last_seq_slot = zkapp.last_sequence_slot in
-      (Pickles_types.Vector.Vector_5.to_list seq_state, last_seq_slot)
+      let action_state = zkapp.action_state in
+      let last_action_slot = zkapp.last_action_slot in
+      (Pickles_types.Vector.Vector_5.to_list action_state, last_action_slot)
 
     let%test_unit "Initialize" =
       let zkapp_command, account =
@@ -215,16 +215,16 @@ let%test_module "Sequence events test" =
       List.iter account_updates0 ~f:(fun account_update ->
           assert (List.is_empty account_update.body.actions) ) ;
       assert (Option.is_some account0) ;
-      (* sequence state unmodified *)
-      let seq_state_elts0, last_seq_slot0 =
-        seq_state_elts_of_account account0
+      (* action state unmodified *)
+      let action_state_elts0, last_action_slot0 =
+        action_state_elts_of_account account0
       in
-      List.iter seq_state_elts0 ~f:(fun elt ->
+      List.iter action_state_elts0 ~f:(fun elt ->
           assert (
             Impl.Field.Constant.equal elt
               Zkapp_account.Actions.empty_state_element ) ) ;
-      (* last seq slot is 0 *)
-      assert (Mina_numbers.Global_slot.(equal zero) last_seq_slot0) ;
+      (* last action slot is 0 *)
+      assert (Mina_numbers.Global_slot.(equal zero) last_action_slot0) ;
       let zkapp_command1, account1 =
         let ledger = create_ledger () in
         []
@@ -241,11 +241,11 @@ let%test_module "Sequence events test" =
       List.iteri account_updates1 ~f:(fun i account_update ->
           if i > 1 then assert (not @@ List.is_empty account_update.body.actions)
           else assert (List.is_empty account_update.body.actions) ) ;
-      let seq_state_elts1, last_seq_slot1 =
-        seq_state_elts_of_account account1
+      let action_state_elts1, last_action_slot1 =
+        action_state_elts_of_account account1
       in
-      (* we changed the 0th sequence state element *)
-      List.iteri seq_state_elts1 ~f:(fun i elt ->
+      (* we changed the 0th action state element *)
+      List.iteri action_state_elts1 ~f:(fun i elt ->
           if i = 0 then
             assert (
               not
@@ -255,8 +255,8 @@ let%test_module "Sequence events test" =
             assert (
               Impl.Field.Constant.equal elt
                 Zkapp_account.Actions.empty_state_element ) ) ;
-      (* last seq slot still 0 *)
-      assert (Mina_numbers.Global_slot.(equal zero) last_seq_slot1)
+      (* last action slot still 0 *)
+      assert (Mina_numbers.Global_slot.(equal zero) last_action_slot1)
 
     let%test_unit "Add sequence events in different slots" =
       let ledger = create_ledger () in
@@ -270,15 +270,15 @@ let%test_module "Sequence events test" =
         |> test_zkapp_command ~global_slot:slot1 ~ledger
       in
       assert (Option.is_some account0) ;
-      let seq_state_elts0, last_seq_slot0 =
-        seq_state_elts_of_account account0
+      let action_state_elts0, last_action_slot0 =
+        action_state_elts_of_account account0
       in
-      (* we changed the 0th sequence state element
+      (* we changed the 0th action state element
          there's a shift, but because the 0th element
          was the default, all other elements remain
          the default
       *)
-      List.iteri seq_state_elts0 ~f:(fun i elt ->
+      List.iteri action_state_elts0 ~f:(fun i elt ->
           if i = 0 then
             assert (
               not
@@ -288,8 +288,8 @@ let%test_module "Sequence events test" =
             assert (
               Impl.Field.Constant.equal elt
                 Zkapp_account.Actions.empty_state_element ) ) ;
-      (* seq slot is 1 *)
-      assert (Mina_numbers.Global_slot.equal slot1 last_seq_slot0) ;
+      (* action slot is 1 *)
+      assert (Mina_numbers.Global_slot.equal slot1 last_action_slot0) ;
       let slot2 = Mina_numbers.Global_slot.of_int 2 in
       let _zkapp_command1, account1 =
         []
@@ -297,13 +297,13 @@ let%test_module "Sequence events test" =
         |> test_zkapp_command ~global_slot:slot2 ~fee_payer_nonce:1 ~ledger
       in
       assert (Option.is_some account1) ;
-      let seq_state_elts1, last_seq_slot1 =
-        seq_state_elts_of_account account1
+      let action_state_elts1, last_action_slot1 =
+        action_state_elts_of_account account1
       in
-      (* we changed the 0th sequence state element
+      (* we changed the 0th action state element
          this time the shift also changes the 1st element
       *)
-      List.iteri seq_state_elts1 ~f:(fun i elt ->
+      List.iteri action_state_elts1 ~f:(fun i elt ->
           if i >= 0 && i <= 1 then
             assert (
               not
@@ -315,12 +315,12 @@ let%test_module "Sequence events test" =
                 Zkapp_account.Actions.empty_state_element ) ) ;
       (* check the shifted elements *)
       for i = 1 to 4 do
-        let last_elt = List.nth_exn seq_state_elts0 (i - 1) in
-        let curr_elt = List.nth_exn seq_state_elts1 i in
+        let last_elt = List.nth_exn action_state_elts0 (i - 1) in
+        let curr_elt = List.nth_exn action_state_elts1 i in
         assert (Impl.Field.Constant.equal last_elt curr_elt)
       done ;
-      (* seq slot is 2 *)
-      assert (Mina_numbers.Global_slot.equal slot2 last_seq_slot1) ;
+      (* action slot is 2 *)
+      assert (Mina_numbers.Global_slot.equal slot2 last_action_slot1) ;
       let slot3 = Mina_numbers.Global_slot.of_int 3 in
       let _zkapp_command2, account2 =
         []
@@ -328,13 +328,13 @@ let%test_module "Sequence events test" =
         |> test_zkapp_command ~global_slot:slot3 ~fee_payer_nonce:2 ~ledger
       in
       assert (Option.is_some account2) ;
-      let seq_state_elts2, last_seq_slot2 =
-        seq_state_elts_of_account account2
+      let action_state_elts2, last_action_slot2 =
+        action_state_elts_of_account account2
       in
-      (* we changed the 0th sequence state element
+      (* we changed the 0th action state element
          the shift also has changed the 1st, 2nd elements
       *)
-      List.iteri seq_state_elts2 ~f:(fun i elt ->
+      List.iteri action_state_elts2 ~f:(fun i elt ->
           if i >= 0 && i <= 2 then
             assert (
               not
@@ -346,10 +346,10 @@ let%test_module "Sequence events test" =
                 Zkapp_account.Actions.empty_state_element ) ) ;
       (* check the shifted elements *)
       for i = 1 to 4 do
-        let last_elt = List.nth_exn seq_state_elts1 (i - 1) in
-        let curr_elt = List.nth_exn seq_state_elts2 i in
+        let last_elt = List.nth_exn action_state_elts1 (i - 1) in
+        let curr_elt = List.nth_exn action_state_elts2 i in
         assert (Impl.Field.Constant.equal last_elt curr_elt)
       done ;
-      (* seq slot is 3 *)
-      assert (Mina_numbers.Global_slot.equal slot3 last_seq_slot2)
+      (* action slot is 3 *)
+      assert (Mina_numbers.Global_slot.equal slot3 last_action_slot2)
   end )

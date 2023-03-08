@@ -182,8 +182,7 @@ module Features = struct
   module Stable = struct
     module V1 = struct
       type 'bool t =
-        { chacha : 'bool
-        ; range_check0 : 'bool
+        { range_check0 : 'bool
         ; range_check1 : 'bool
         ; foreign_field_add : 'bool
         ; foreign_field_mul : 'bool
@@ -201,8 +200,7 @@ module Features = struct
   type flags = bool t
 
   let to_data
-      { chacha
-      ; range_check0
+      { range_check0
       ; range_check1
       ; foreign_field_add
       ; foreign_field_mul
@@ -211,8 +209,7 @@ module Features = struct
       ; lookup
       ; runtime_tables
       } : _ Hlist.HlistId.t =
-    [ chacha
-    ; range_check0
+    [ range_check0
     ; range_check1
     ; foreign_field_add
     ; foreign_field_mul
@@ -223,8 +220,7 @@ module Features = struct
     ]
 
   let of_data
-      ([ chacha
-       ; range_check0
+      ([ range_check0
        ; range_check1
        ; foreign_field_add
        ; foreign_field_mul
@@ -234,8 +230,7 @@ module Features = struct
        ; runtime_tables
        ] :
         _ Hlist.HlistId.t ) =
-    { chacha
-    ; range_check0
+    { range_check0
     ; range_check1
     ; foreign_field_add
     ; foreign_field_mul
@@ -247,8 +242,7 @@ module Features = struct
 
   let typ bool
       ~feature_flags:
-        { chacha
-        ; range_check0
+        { range_check0
         ; range_check1
         ; foreign_field_add
         ; foreign_field_mul
@@ -286,8 +280,7 @@ module Features = struct
           bool
     in
     Snarky_backendless.Typ.of_hlistable
-      [ bool_typ_of_flag chacha
-      ; bool_typ_of_flag range_check0
+      [ bool_typ_of_flag range_check0
       ; bool_typ_of_flag range_check1
       ; bool_typ_of_flag foreign_field_add
       ; bool_typ_of_flag foreign_field_mul
@@ -300,8 +293,7 @@ module Features = struct
       ~value_of_hlist:of_hlist
 
   let none =
-    { chacha = Opt.Flag.No
-    ; range_check0 = Opt.Flag.No
+    { range_check0 = Opt.Flag.No
     ; range_check1 = Opt.Flag.No
     ; foreign_field_add = Opt.Flag.No
     ; foreign_field_mul = Opt.Flag.No
@@ -312,8 +304,7 @@ module Features = struct
     }
 
   let none_bool =
-    { chacha = false
-    ; range_check0 = false
+    { range_check0 = false
     ; range_check1 = false
     ; foreign_field_add = false
     ; foreign_field_mul = false
@@ -324,8 +315,7 @@ module Features = struct
     }
 
   let map
-      { chacha
-      ; range_check0
+      { range_check0
       ; range_check1
       ; foreign_field_add
       ; foreign_field_mul
@@ -334,8 +324,7 @@ module Features = struct
       ; lookup
       ; runtime_tables
       } ~f =
-    { chacha = f chacha
-    ; range_check0 = f range_check0
+    { range_check0 = f range_check0
     ; range_check1 = f range_check1
     ; foreign_field_add = f foreign_field_add
     ; foreign_field_mul = f foreign_field_mul
@@ -346,8 +335,7 @@ module Features = struct
     }
 
   let map2 x1 x2 ~f =
-    { chacha = f x1.chacha x2.chacha
-    ; range_check0 = f x1.range_check0 x2.range_check0
+    { range_check0 = f x1.range_check0 x2.range_check0
     ; range_check1 = f x1.range_check1 x2.range_check1
     ; foreign_field_add = f x1.foreign_field_add x2.foreign_field_add
     ; foreign_field_mul = f x1.foreign_field_mul x2.foreign_field_mul

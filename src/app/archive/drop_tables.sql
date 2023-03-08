@@ -94,7 +94,7 @@ DROP TABLE timing_info;
 
 DROP TABLE account_identifiers;
 
-DROP TABLE zkapp_sequence_states;
+DROP TABLE zkapp_action_states;
 
 DROP TABLE zkapp_uris;
 

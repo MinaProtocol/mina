@@ -250,7 +250,6 @@ module Stable = struct
                    ; emul_comm = g c.emul_comm
                    ; complete_add_comm = g c.complete_add_comm
                    ; endomul_scalar_comm = g c.endomul_scalar_comm
-                   ; chacha_comm = None
                    } )
               ; shifts = Common.tock_shifts ~log2_size
               ; lookup_index = None
