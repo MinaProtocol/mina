@@ -821,3 +821,25 @@ let%test_module "Test transaction logic." =
             )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
   end )
+
+(* This module tests Inputs.Stack *)
+let%test_module "Test stack module" =
+  ( module struct
+    module Stack = Transaction_logic.For_tests.Stack (Int)
+    let%test_unit "Ensure pop works on non-empty list." =
+    let s = [1;2;3] in
+    match (Stack.pop s) with 
+      | Some (x,xs) -> assert(Int.equal x 1 && (List.equal (Int.equal) xs [2;3]))
+      | None -> assert(false)
+
+    let%test_unit "Ensure pop works on empty list." =
+    match (Stack.pop (Stack.empty ())) with 
+      | Some _ -> assert(false)
+      | None -> assert(true)
+
+    let%test_unit "Ensure push functionality works." =
+      let s = [1;2;3] in
+      let pushed = Stack.push 0 ~onto:s in 
+      assert(List.equal Int.equal pushed [0;1;2;3])
+  end )
+
