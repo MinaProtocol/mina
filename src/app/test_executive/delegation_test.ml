@@ -39,7 +39,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       wait_for t
         (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
     in
-    (* let[@warning "-8"] [ node_a; node_b ] = Network.block_producers network in *)
     let node_a =
       Core.String.Map.find_exn (Network.block_producers network) "node-a"
     in

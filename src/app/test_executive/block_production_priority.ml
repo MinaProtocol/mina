@@ -30,22 +30,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           }
         ; { account_name = "empty-bp-key"; balance = "0"; timing = Untimed }
         ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
-          (* ; { account_name = "sender_account1"
-               ; balance = "10000"
-               ; timing = Untimed
-               }
-             ; { account_name = "sender_account2"
-               ; balance = "10000"
-               ; timing = Untimed
-               }
-             ; { account_name = "sender_account3"
-               ; balance = "10000"
-               ; timing = Untimed
-               }
-             ; { account_name = "sender_account4"
-               ; balance = "10000"
-               ; timing = Untimed
-               } *)
         ]
         @ List.init 1000 ~f:(fun i ->
               let i_str = Int.to_string i in
@@ -84,16 +68,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    (* let%bind receiver, senders =
-         match Network.block_producers network with
-         | [] ->
-             Malleable_error.hard_error_string "no block producers"
-         | [ r ] ->
-             (* Sender and receiver are the same node *)
-             return (r, [ r ])
-         | r :: rs ->
-             return (r, rs)
-       in *)
     let receiver =
       Core.String.Map.find_exn (Network.block_producers network) "receiver"
     in
@@ -102,29 +76,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Core.String.Map.remove (Network.block_producers network) "receiver"
       |> Core.String.Map.data
     in
-    (* let sender_account1 =
-         Core.String.Map.find_exn
-           (Network.genesis_keypairs network)
-           "sender_account1"
-       in
-       let sender_account2 =
-         Core.String.Map.find_exn
-           (Network.genesis_keypairs network)
-           "sender_account2"
-       in
-       let sender_account3 =
-         Core.String.Map.find_exn
-           (Network.genesis_keypairs network)
-           "sender_account3"
-       in
-       let sender_account4 =
-         Core.String.Map.find_exn
-           (Network.genesis_keypairs network)
-           "sender_account4"
-       in *)
-    (* let sender_kps =
-         [ sender_account1; sender_account2; sender_account3; sender_account4 ]
-       in *)
     let rec map_remove_keys map ~(keys : string list) =
       match keys with
       | [] ->
@@ -188,39 +139,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              Network.Node.must_send_test_payments ~repeat_count ~repeat_delay_ms
                ~logger ~senders:keys0 ~receiver_pub_key ~amount ~fee node
              >>| const rest )
-         >>| const ()
-         (* Malleable_error.List.iter empty_bps ~f:(fun node ->
-             Network.Node.must_send_test_payments ~repeat_count ~repeat_delay_ms
-               ~logger ~senders:sender_priv_keys ~receiver_pub_key ~amount ~fee
-               node ) *) )
-      (* let%bind () =
-         section_hard "spawn transaction sending"
-           (let num_senders = List.length senders in
-            let sender_keys =
-              List.map ~f:snd
-              @@ List.drop
-                   ( Array.to_list @@ Lazy.force
-                   @@ Mina_base.Sample_keypairs.keypairs )
-                   (num_senders + 2)
-            in
-            let num_sender_keys = List.length sender_keys in
-            let keys_per_sender = num_sender_keys / num_senders in
-            let%bind () =
-              Malleable_error.ok_if_true ~error_type:`Hard
-                ~error:(Error.of_string "not enough sender keys")
-                (keys_per_sender > 0)
-            in
-            let num_payments = num_slots * window_ms / tx_delay_ms in
-            let repeat_count = Unsigned.UInt32.of_int num_payments in
-            let repeat_delay_ms = Unsigned.UInt32.of_int tx_delay_ms in
-            [%log info] "will now send %d payments" num_payments ;
-            Malleable_error.List.fold ~init:sender_keys senders
-              ~f:(fun keys node ->
-                let keys0, rest = List.split_n keys keys_per_sender in
-                Network.Node.must_send_test_payments ~repeat_count ~repeat_delay_ms
-                  ~logger ~senders:keys0 ~receiver_pub_key ~amount ~fee node
-                >>| const rest )
-            >>| const () ) *)
+         >>| const () )
     in
     let%bind () =
       section "wait for payments to be processed"

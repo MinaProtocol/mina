@@ -1197,9 +1197,6 @@ module Workload_to_deploy = struct
     (* TODO fix this^ and have a more elegant solution *)
     let pod_info = t.pod_info in
     { Node.app_id; pod_ids; pod_info; config }
-  (* List.zip_exn t.pod_info pod_ids
-     |> List.map ~f:(fun (pod_info, pod_id) ->
-            { Node.app_id; pod_id; pod_info; config } ) *)
 end
 
 type t =
@@ -1265,15 +1262,6 @@ let all_non_seed_pods t =
 
 let genesis_keypairs { genesis_keypairs; _ } = genesis_keypairs
 
-(* let block_producer_keypairs { block_producer_keypairs; _ } =
-     block_producer_keypairs
-
-   let extra_genesis_keypairs { extra_genesis_keypairs; _ } =
-     extra_genesis_keypairs *)
-
-(* let lookup_node_by_pod_id t = Map.find t.nodes_by_pod_id
-
-      *)
 let lookup_node_by_pod_id t id =
   let pods = all_pods t |> Core.Map.to_alist in
   List.fold pods ~init:None ~f:(fun acc (node_name, node) ->
@@ -1284,8 +1272,6 @@ let lookup_node_by_pod_id t id =
           if String.equal id (List.hd_exn node.pod_ids) then
             Some (node_name, node)
           else None )
-
-(* let all_pod_ids t = Map.keys t.nodes_by_pod_id *)
 
 let all_pod_ids t =
   let pods = all_pods t |> Core.Map.to_alist in

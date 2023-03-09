@@ -50,10 +50,6 @@ variable "runtime_config" {
   type = string
 }
 
-# variable "snark_worker_replicas" {
-#   type = number
-# }
-
 variable "snark_worker_fee" {
   type = string
 }
@@ -120,7 +116,6 @@ variable "block_producer_configs" {
     object({
       name = string,
       keypair = object({
-        # keypair = string, #this is just the public key again, redundantly, because of the way the original ocaml object gets serialized
         keypair_name = string
         public_key = string
         private_key = string,
