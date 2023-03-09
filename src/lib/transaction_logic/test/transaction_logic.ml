@@ -8,8 +8,6 @@ open Protocol_config_examples
 open Unsigned
 open Zkapp_cmd_builder
 
-(* The function under test is quite slow, so keep the trials count low
-   so that tests finish in a reasonable amount of time. *)
 let trials = 100
 
 let balance_to_fee = Fn.compose Amount.to_fee Balance.to_amount
@@ -49,7 +47,7 @@ let%test_module "Test transaction logic." =
         let%bind accs_and_txns =
           Generator.list_non_empty Simple_txn.gen_account_pair_and_txn
           (* Generating too many transactions makes this test take too much time. *)
-          |> Generator.filter ~f:(fun l -> List.length l < 4)
+          |> Generator.filter ~f:(fun l -> List.length l < 10)
         in
         let account_pairs, txns = List.unzip accs_and_txns in
         let accounts =
@@ -409,6 +407,49 @@ let%test_module "Test transaction logic." =
                           false ) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
+    let%test_unit "Zkapp account's state can be changed." =
+      Quickcheck.test ~trials
+        (let open Quickcheck in
+        let open Generator.Let_syntax in
+        let%bind account = Test_account.gen_with_zkapp in
+        let%bind fee = Fee.(gen_incl zero (balance_to_fee account.balance)) in
+        let gen_field =
+          Generator.create (fun ~size:_ ~random:_ -> Zkapp_basic.F.random ())
+        in
+        let%map app_state_update =
+          Generator.list_with_length 8 (Zkapp_basic.Set_or_keep.gen gen_field)
+        in
+        let app_state = Zkapp_state.V.of_list_exn app_state_update in
+        let txn =
+          Alter_account.make ~account:account.pk
+            { Account_update.Update.noop with app_state }
+        in
+        let zk_app_state =
+          (Option.value_exn account.zkapp).app_state |> Zkapp_state.V.to_list
+          |> List.map2_exn app_state_update ~f:(fun update state ->
+                 match update with Keep -> state | Set new_state -> new_state )
+          |> Zkapp_state.V.of_list_exn
+        in
+        (account.pk, fee, [ account ], [ (txn :> transaction) ], zk_app_state))
+        ~f:(fun (fee_payer, fee, accounts, txns, zkapp_state) ->
+          [%test_pred: Zk_cmd_result.t Or_error.t]
+            (Predicates.pure ~f:(fun (txn, ledger) ->
+                 Transaction_status.equal txn.command.status Applied
+                 && List.for_all accounts
+                      ~f:
+                        (Predicates.verify_account_updates ~ledger ~txn
+                           ~f:(fun _ -> function
+                           | _, Some updt ->
+                               let open Zkapp_account in
+                               Option.value_map ~default:false
+                                 ~f:(fun zkapp ->
+                                   Zkapp_state.V.equal Zkapp_basic.F.equal
+                                     zkapp.app_state zkapp_state )
+                                 updt.zkapp
+                           | _ ->
+                               false ) ) ) )
+            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
+
     (* Note that the change to the permissions takes effect immediately and can
        influence further updates. *)
     let%test_unit "After permissions were set to proof-only, signatures are \
@@ -533,6 +574,36 @@ let%test_module "Test transaction logic." =
               | Error e ->
                   String.is_substring ~substring:"Overflow"
                     (Error.to_string_hum e) )
+            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
+
+    let%test_unit "Fee must be payed before account updates are processed." =
+      (* In particular the fee payer cannot pay the fee with funds obtained from
+         account updates. In this scenario, fee is smaller than the amount given
+         to the fee payer; but the fee needs to be paid first. *)
+      Quickcheck.test ~trials
+        (let open Quickcheck in
+        let open Generator.Let_syntax in
+        let%bind fee_payer = Test_account.gen_empty in
+        let%bind account =
+          Test_account.gen_constrained_balance ()
+            ~min:Balance.(of_mina_int_exn 1)
+        in
+        let%bind amount =
+          Amount.(gen_incl one Balance.(to_amount account.balance))
+        in
+        let%map fee = Fee.(gen_incl one Amount.(to_fee amount)) in
+        let txn =
+          Simple_txn.make ~sender:account.pk ~receiver:fee_payer.pk amount
+        in
+        (fee_payer.pk, fee, [ fee_payer; account ], [ (txn :> transaction) ]))
+        ~f:(fun (fee_payer, fee, accounts, txns) ->
+          [%test_pred: Zk_cmd_result.t Or_error.t]
+            (function
+              | Ok _ ->
+                  false
+              | Error e ->
+                  String.is_substring (Error.to_string_hum e)
+                    ~substring:"Overflow" )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
     let%test_unit "Funds from a single subtraction can be distributed." =
@@ -670,5 +741,83 @@ let%test_module "Test transaction logic." =
             (Predicates.pure ~f:(fun (txn, ledger) ->
                  Transaction_status.equal txn.command.status Applied
                  && Predicates.verify_balance_changes ~ledger ~txn accounts ) )
+            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
+
+    let%test_unit "Account updates are applied depth-first." =
+      (* These transactions are constructed such that if they are executed in a
+         specific order, they would work. However, because the tree is processed
+         depth-first, some of the accounts lack funds to be taken away and so
+         some of the updates result in Overflows. *)
+      Quickcheck.test ~trials:1
+        (let open Quickcheck in
+        let open Generator.Let_syntax in
+        let%bind alice =
+          Test_account.gen_constrained_balance ()
+            ~max:Balance.(of_mina_int_exn 10000)
+            ~min:Balance.(of_mina_int_exn 1000)
+        in
+        let%bind bob =
+          Test_account.gen_constrained_balance ()
+            ~min:Balance.(of_mina_int_exn 100)
+            ~max:Balance.(of_mina_int_exn 500)
+        in
+        let%bind caroll = Test_account.gen_empty in
+        let txns =
+          (* The updates are arranged as follows:
+             |- Alice -500 MINA
+             |    |- Bob -600 MINA
+             |    |- Caroll +600 MINA
+             |- Bob +500 MINA
+                  |- Caroll -100 MINA
+                  |- Alice + 100 MINA
+             Hence Bob can't give away 600 MINA to Caroll before he gets his
+             500 MINA from Alice, which only happens in the other branch of the
+             tree that is being processed later. However, even though overflow
+             happens on the second update, it still is applied, which makes Bob's
+             balance very high, so when we try to add to his balance money
+             transferred from Alice, it overflows again That is why we've got
+             2 overflows in the results and not just 1. Caroll on the other hands
+             receives 600 MINA before she gives away 100 MINA, so that one
+             does not overflow. *)
+          [ ( Txn_tree.make ~account:alice.pk
+                ~amount:
+                  Amount.Signed.(
+                    negate @@ of_unsigned @@ Amount.of_mina_int_exn 500)
+                ~children:
+                  [ ( Simple_txn.make ~sender:bob.pk ~receiver:caroll.pk
+                        (Amount.of_mina_int_exn 600)
+                      :> transaction )
+                  ]
+                Account_update.Update.noop
+              :> transaction )
+          ; ( Txn_tree.make ~account:bob.pk
+                ~amount:
+                  Amount.Signed.(of_unsigned @@ Amount.of_mina_int_exn 500)
+                ~children:
+                  [ ( Simple_txn.make ~sender:caroll.pk ~receiver:alice.pk
+                        (Amount.of_mina_int_exn 100)
+                      :> transaction )
+                  ]
+                Account_update.Update.noop
+              :> transaction )
+          ]
+        in
+        let%map fee = Fee.(gen_incl zero (Fee.of_mina_int_exn 500)) in
+        (alice.pk, fee, [ alice; bob; caroll ], txns))
+        ~f:(fun (fee_payer, fee, accounts, txns) ->
+          [%test_pred: Zk_cmd_result.t Or_error.t]
+            (Predicates.pure ~f:(fun (txn, ledger) ->
+                 Transaction_status.equal txn.command.status
+                   (Failed
+                      [ []
+                      ; [ Cancelled ]
+                      ; [ Overflow ]
+                      ; [ Cancelled ]
+                      ; [ Overflow ]
+                      ; [ Cancelled ]
+                      ; [ Cancelled ]
+                      ] )
+                 && Predicates.verify_balances_unchanged ~ledger ~txn accounts )
+            )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
   end )
