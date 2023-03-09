@@ -73,6 +73,7 @@ spec:
       {{ include "sideCar.resources.containerSpec" (dict "resources" $.Values.resources) | nindent 6 }}
       {{ include "sideCar.bpfDebugger.containerSpec" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 6 }}
       {{ include "sideCar.logs.containerSpec" (dict "logs" $.Values.logs "name" $config.name) | nindent 6 }}
+      {{ include "sideCar.internalTrace.containerSpec" (dict "internalTrace" $.Values.internalTrace "name" $config.name) | nindent 6 }}
       - name: mina
         resources:
           requests:
@@ -92,6 +93,9 @@ spec:
           "-config-directory", "/root/.mina-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
+          {{- if $.Values.internalTrace.enable}}
+          "-internal-tracing",
+          {{- end -}}
           {{- if $.Values.mina.exposeGraphql }}
           "-insecure-rest-server",
           {{- end -}}
@@ -288,5 +292,6 @@ spec:
 {{ include "sideCar.resources.service" (dict "name" $config.name "resources" $.Values.resources) }}
 {{ include "sideCar.bpfDebugger.service" (dict "name" $config.name "bpfDebugger" $.Values.bpfDebugger) }}
 {{ include "sideCar.logs.service" (dict "name" $config.name "logs" $.Values.logs) }}
+{{ include "sideCar.internalTrace.service" (dict "name" $config.name "internalTrace" $.Values.internalTrace) }}
 ---
 {{ end }}
