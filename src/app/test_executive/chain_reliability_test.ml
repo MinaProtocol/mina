@@ -17,7 +17,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
-    (* let open Test_config.Wallet in *)
     { default with
       requires_graphql = true
     ; genesis_ledger =
@@ -41,9 +40,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       wait_for t
         (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
     in
-    (* let[@warning "-8"] [ node_a; node_b; node_c ] =
-         Network.block_producers network
-       in *)
     let node_a =
       Core.String.Map.find_exn (Network.block_producers network) "node-a"
     in
