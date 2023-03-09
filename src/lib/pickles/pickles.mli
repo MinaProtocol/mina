@@ -7,3 +7,4 @@ include
      and type ('a, 'b) Proof.t = ('a, 'b) Mina_wire_types.Pickles.Proof.t
 
 module Wrap_main_inputs = Wrap_main_inputs
+module Opt_sponge = Opt_sponge

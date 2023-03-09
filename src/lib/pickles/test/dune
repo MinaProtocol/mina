@@ -5,12 +5,13 @@
   -open Core_kernel
   -open Pickles)
  (preprocess (pps ppx_jane))
+ (package pickles)
  (libraries
-   ; Opam
+   ; Opam libraries
   core_kernel
   alcotest
   sexplib0
-  ; Mina
+  ; Mina libraries
   pickles
   pickles.composition_types
   pickles.backend
@@ -20,6 +21,7 @@
   kimchi_backend.pasta
   kimchi_backend.pasta.basic
   snarky.backendless
+  sponge
   )
  (action (run %{test}))) 
 
