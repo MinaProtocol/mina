@@ -215,23 +215,19 @@ module Engine = struct
 
     val genesis_constants : t -> Genesis_constants.t
 
-    val seeds : t -> Node.t list
+    val seeds : t -> Node.t Core.String.Map.t
 
-    val all_non_seed_pods : t -> Node.t list
+    val all_non_seed_pods : t -> Node.t Core.String.Map.t
 
-    val block_producers : t -> Node.t list
+    val block_producers : t -> Node.t Core.String.Map.t
 
-    val snark_coordinators : t -> Node.t list
+    val snark_coordinators : t -> Node.t Core.String.Map.t
 
-    val archive_nodes : t -> Node.t list
+    val archive_nodes : t -> Node.t Core.String.Map.t
 
-    val all_nodes : t -> Node.t list
+    val all_nodes : t -> Node.t Core.String.Map.t
 
-    val all_keypairs : t -> Signature_lib.Keypair.t list
-
-    val block_producer_keypairs : t -> Signature_lib.Keypair.t list
-
-    val extra_genesis_keypairs : t -> Signature_lib.Keypair.t list
+    val genesis_keypairs : t -> Network_keypair.t Core.String.Map.t
 
     val initialize_infra : logger:Logger.t -> t -> unit Malleable_error.t
   end
