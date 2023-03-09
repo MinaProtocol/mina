@@ -1587,7 +1587,7 @@ let internal_commands logger =
                      ~proof_level:Genesis_constants.Proof_level.compiled
                      ~constraint_constants:
                        Genesis_constants.Constraint_constants.compiled
-                     ~pids:(Pid.Table.create ()) ~conf_dir
+                     ~pids:(Pid.Table.create ()) ~conf_dir ()
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->

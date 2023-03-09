@@ -17,10 +17,13 @@ module type S = sig
 
   val create :
        logger:Logger.t
+    -> ?enable_internal_tracing:bool
+    -> ?internal_trace_filename:string
     -> pids:Child_processes.Termination.t
     -> conf_dir:string
     -> proof_level:Genesis_constants.Proof_level.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> unit
     -> t Deferred.t
 
   val initialized : t -> [ `Initialized ] Deferred.Or_error.t
