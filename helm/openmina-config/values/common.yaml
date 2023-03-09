@@ -1,6 +1,6 @@
 testnetName: testnet
 mina:
-  image: tizoc/mina-daemon:tracing-optional-optimizations-focal-berkeley-current-capture_proof_generation_inputs-1
+  image: tizoc/mina-daemon:edd3c4494e
   snarkCoordinatorImage: binier/mina-snark-worker-rs:latest
   privkeyPass:
   exposeGraphql: true
@@ -74,6 +74,10 @@ bpfDebugger:
 logs:
   enable: true
   image: openmina/mina-logs-service:b5d32468
+
+internalTrace:
+  enable: true
+  image: openmina/mina-internal-trace-consumer:28c40bd
 
 nodeSelector:
   preemptible: false
