@@ -1410,9 +1410,11 @@ let create ?wallets (config : Config.t) =
               (fun () ->
                 O1trace.thread "manage_prover_subprocess" (fun () ->
                     Prover.create ~logger:config.logger
+                      ~enable_internal_tracing:(Internal_tracing.is_enabled ())
+                      ~internal_trace_filename:"prover-internal-trace.jsonl"
                       ~proof_level:config.precomputed_values.proof_level
                       ~constraint_constants ~pids:config.pids
-                      ~conf_dir:config.conf_dir ) )
+                      ~conf_dir:config.conf_dir () ) )
             >>| Result.ok_exn
           in
           let%bind verifier =
