@@ -227,12 +227,6 @@ struct
         "wait_condition check, zkapp_to_be_included_in_frontier, \
          zkapp_command: $zkapp_command "
         ~metadata:[ ("zkapp_command", Zkapp_command.to_yojson zkapp_command) ] ;
-
-      (* [%log' info (Logger.create ())]
-         "wait_condition check, zkapp_to_be_included_in_frontier, breadcrumb_added: $breadcrumb_added "
-         ~metadata:
-           [ ("breadcrumb_added", Event_type.Breadcrumb_added.to_yojson breadcrumb_added) ] ;
-      *)
       [%log' spam (Logger.create ())]
         "wait_condition check, zkapp_to_be_included_in_frontier, user_commands \
          from breadcrumb: $user_commands"
@@ -242,7 +236,6 @@ struct
                 (List.map breadcrumb_added.user_commands
                    ~f:(With_status.to_yojson User_command.Valid.to_yojson) ) )
           ] ;
-
       match zkapp_opt with
       | Some cmd_with_status ->
           [%log' spam (Logger.create ())]
@@ -253,7 +246,6 @@ struct
                 , (With_status.to_yojson User_command.Valid.to_yojson)
                     cmd_with_status )
               ] ;
-
           let actual_status = cmd_with_status.With_status.status in
           let successful =
             match actual_status with
