@@ -33,10 +33,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       wait_for t
         (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
     in
-    let untimed_node_a =
-      Core.String.Map.find_exn
-        (Network.block_producers network)
-        "untimed-node-a"
+    let node =
+      Core.String.Map.find_exn (Network.block_producers network) "node"
     in
     let bp_keypair =
       (Core.String.Map.find_exn (Network.genesis_keypairs network) "node-key")
@@ -54,7 +52,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       "check that the account balances are what we expect after the block has \
        been produced"
       (let%bind { total_balance = bp_balance; _ } =
-         Network.Node.must_get_account_data ~logger untimed_node_a
+         Network.Node.must_get_account_data ~logger node
            ~account_id:bp_pk_account_id
        in
        (* TODO, the intg test framework is ignoring test_constants.coinbase_amount for whatever reason, so hardcoding this until that is fixed *)

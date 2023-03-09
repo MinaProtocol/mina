@@ -44,10 +44,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               (List.map (Core.String.Map.data all_nodes) ~f:(fun n ->
                    `String (Node.id n) ) ) )
         ] ;
-    let%bind () =
-      wait_for t
-        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
-    in
     let node_a =
       Core.String.Map.find_exn (Network.block_producers network) "node-a"
     in
@@ -56,6 +52,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let node_c =
       Core.String.Map.find_exn (Network.block_producers network) "node-c"
+    in
+    let%bind () =
+      wait_for t
+        (Wait_condition.nodes_to_initialize [node_c])
     in
     (* witness the node_c frontier load on initialization *)
     let%bind () =
