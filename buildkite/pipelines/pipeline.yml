@@ -3,6 +3,6 @@ steps:
     label: "Example Test"
   - command: "example.sh"
     label: "Shell script test"
-  - command: "example.py"
+  - command: "python3 example.py"
     label: "Python script test"
   
