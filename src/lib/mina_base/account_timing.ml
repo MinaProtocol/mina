@@ -6,6 +6,15 @@ open Tick
 open Currency
 open Mina_numbers
 
+(* A timed account is an account, which releases its balance to be spent
+   gradually. The process of releasing frozen funds is defined as follows.
+   Until the cliff_time global slot is reached, the initial_minimum_balance
+   of mina is frozen and cannot be spent. At the cliff slot, cliff_amount
+   is released and initial_minimum_balance is effectively lowered by that
+   amount. Next, every vesting_period number of slots, vesting_increment
+   is released, further decreasing the current minimum balance. At some
+   point minimum balance drops to 0, and after that the account behaves
+   like an untimed one. *)
 module Poly = struct
   [%%versioned
   module Stable = struct
@@ -58,7 +67,15 @@ module As_record = struct
     ; vesting_period : 'slot
     ; vesting_increment : 'amount
     }
-  [@@deriving hlist]
+  [@@deriving hlist, fields, annot]
+
+  let deriver obj =
+    let open Fields_derivers_zkapps.Derivers in
+    let ( !. ) = ( !. ) ~t_fields_annots in
+    Fields.make_creator obj ~is_timed:!.bool ~initial_minimum_balance:!.balance
+      ~cliff_time:!.global_slot ~cliff_amount:!.amount
+      ~vesting_period:!.global_slot ~vesting_increment:!.amount
+    |> finish "AccountTiming" ~t_toplevel_annots
 end
 
 (* convert sum type to record format, useful for to_bits and typ *)
@@ -69,14 +86,13 @@ let to_record t =
       let slot_one = Global_slot.(succ zero) in
       let balance_unused = Balance.zero in
       let amount_unused = Amount.zero in
-      As_record.
-        { is_timed = false
-        ; initial_minimum_balance = balance_unused
-        ; cliff_time = slot_unused
-        ; cliff_amount = amount_unused
-        ; vesting_period = slot_one (* avoid division by zero *)
-        ; vesting_increment = amount_unused
-        }
+      { As_record.is_timed = false
+      ; initial_minimum_balance = balance_unused
+      ; cliff_time = slot_unused
+      ; cliff_amount = amount_unused
+      ; vesting_period = slot_one (* avoid division by zero *)
+      ; vesting_increment = amount_unused
+      }
   | Timed
       { initial_minimum_balance
       ; cliff_time
@@ -84,14 +100,31 @@ let to_record t =
       ; vesting_period
       ; vesting_increment
       } ->
-      As_record.
-        { is_timed = true
-        ; initial_minimum_balance
-        ; cliff_time
-        ; cliff_amount
-        ; vesting_period
-        ; vesting_increment
-        }
+      { is_timed = true
+      ; initial_minimum_balance
+      ; cliff_time
+      ; cliff_amount
+      ; vesting_period
+      ; vesting_increment
+      }
+
+let of_record
+    { As_record.is_timed
+    ; initial_minimum_balance
+    ; cliff_time
+    ; cliff_amount
+    ; vesting_period
+    ; vesting_increment
+    } : t =
+  if is_timed then
+    Timed
+      { initial_minimum_balance
+      ; cliff_time
+      ; cliff_amount
+      ; vesting_period
+      ; vesting_increment
+      }
+  else Untimed
 
 let to_input t =
   let As_record.
@@ -139,24 +172,22 @@ let var_to_input
     |]
 
 let var_of_t (t : t) : var =
-  let As_record.
-        { is_timed
-        ; initial_minimum_balance
-        ; cliff_time
-        ; cliff_amount
-        ; vesting_period
-        ; vesting_increment
-        } =
+  let { As_record.is_timed
+      ; initial_minimum_balance
+      ; cliff_time
+      ; cliff_amount
+      ; vesting_period
+      ; vesting_increment
+      } =
     to_record t
   in
-  As_record.
-    { is_timed = Boolean.var_of_value is_timed
-    ; initial_minimum_balance = Balance.var_of_t initial_minimum_balance
-    ; cliff_time = Global_slot.Checked.constant cliff_time
-    ; cliff_amount = Amount.var_of_t cliff_amount
-    ; vesting_period = Global_slot.Checked.constant vesting_period
-    ; vesting_increment = Amount.var_of_t vesting_increment
-    }
+  { is_timed = Boolean.var_of_value is_timed
+  ; initial_minimum_balance = Balance.var_of_t initial_minimum_balance
+  ; cliff_time = Global_slot.Checked.constant cliff_time
+  ; cliff_amount = Amount.var_of_t cliff_amount
+  ; vesting_period = Global_slot.Checked.constant vesting_period
+  ; vesting_increment = Amount.var_of_t vesting_increment
+  }
 
 let untimed_var = var_of_t Untimed
 
@@ -251,13 +282,16 @@ let if_ b ~(then_ : var) ~(else_ : var) =
     Amount.Checked.if_ b ~then_:then_.vesting_increment
       ~else_:else_.vesting_increment
   in
-  As_record.
-    { is_timed
-    ; initial_minimum_balance
-    ; cliff_time
-    ; cliff_amount
-    ; vesting_period
-    ; vesting_increment
-    }
+  { As_record.is_timed
+  ; initial_minimum_balance
+  ; cliff_time
+  ; cliff_amount
+  ; vesting_period
+  ; vesting_increment
+  }
+
+let deriver obj =
+  let open Fields_derivers_zkapps in
+  iso_record ~to_record ~of_record As_record.deriver obj
 
 [%%endif]

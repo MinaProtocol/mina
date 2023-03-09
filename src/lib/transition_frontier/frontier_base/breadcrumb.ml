@@ -10,7 +10,7 @@ module T = struct
 
   type t =
     { validated_transition : Mina_block.Validated.t
-    ; staged_ledger : Staged_ledger.t [@sexp.opaque]
+    ; staged_ledger : (Staged_ledger.t[@sexp.opaque])
     ; just_emitted_a_proof : bool
     ; transition_receipt_time : Time.t option
     }
@@ -349,6 +349,7 @@ module For_tests = struct
       let coinbase_receiver = largest_account_public_key in
       let staged_ledger_diff, _invalid_txns =
         Staged_ledger.create_diff parent_staged_ledger ~logger
+          ~global_slot:current_state_view.global_slot_since_genesis
           ~constraint_constants:precomputed_values.constraint_constants
           ~coinbase_receiver ~current_state_view ~supercharge_coinbase
           ~transactions_by_fee:transactions ~get_completed_work
@@ -364,6 +365,7 @@ module For_tests = struct
                , `Pending_coinbase_update _ ) =
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger
+            ~global_slot:current_state_view.global_slot_since_genesis
             ~coinbase_receiver ~logger staged_ledger_diff
             ~constraint_constants:precomputed_values.constraint_constants
             ~current_state_view ~state_and_body_hash ~supercharge_coinbase
@@ -377,17 +379,14 @@ module For_tests = struct
         parent_breadcrumb |> block |> Mina_block.header
         |> Mina_block.Header.protocol_state
       in
-      let previous_registers =
+      let previous_ledger_proof_stmt =
         previous_protocol_state |> Protocol_state.blockchain_state
-        |> Blockchain_state.registers
+        |> Blockchain_state.ledger_proof_statement
       in
-      let next_registers =
+      let ledger_proof_statement =
         Option.value_map ledger_proof_opt
-          ~f:(fun (proof, _) ->
-            { (Ledger_proof.statement proof |> Ledger_proof.statement_target) with
-              pending_coinbase_stack = ()
-            } )
-          ~default:previous_registers
+          ~f:(fun (proof, _) -> Ledger_proof.statement proof)
+          ~default:previous_ledger_proof_stmt
       in
       let genesis_ledger_hash =
         previous_protocol_state |> Protocol_state.blockchain_state
@@ -396,15 +395,18 @@ module For_tests = struct
       let next_blockchain_state =
         Blockchain_state.create_value
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)
-          ~registers:next_registers ~staged_ledger_hash:next_staged_ledger_hash
-          ~genesis_ledger_hash
+          ~staged_ledger_hash:next_staged_ledger_hash ~genesis_ledger_hash
           ~body_reference:(Body.compute_reference body)
+          ~ledger_proof_statement
       in
       let previous_state_hashes =
         Protocol_state.hashes previous_protocol_state
       in
       let consensus_state =
-        make_next_consensus_state ~snarked_ledger_hash:previous_registers.ledger
+        make_next_consensus_state
+          ~snarked_ledger_hash:
+            (Blockchain_state.snarked_ledger_hash
+               (Protocol_state.blockchain_state previous_protocol_state) )
           ~previous_protocol_state:
             With_hash.
               { data = previous_protocol_state; hash = previous_state_hashes }

@@ -24,7 +24,17 @@ module Opt = struct
   type ('a, 'bool) t = Some of 'a | None | Maybe of 'bool * 'a
   [@@deriving sexp, compare, yojson, hash, equal]
 
-  let to_option : ('a, _) t -> 'a option = function
+  let to_option : ('a, bool) t -> 'a option = function
+    | Some x ->
+        Some x
+    | Maybe (true, x) ->
+        Some x
+    | Maybe (false, _x) ->
+        None
+    | None ->
+        None
+
+  let to_option_unsafe : ('a, 'bool) t -> 'a option = function
     | Some x ->
         Some x
     | Maybe (_, x) ->
@@ -167,8 +177,173 @@ module Opt = struct
   end
 end
 
-module Lookup_config = struct
-  type t = { lookup : Opt.Flag.t; runtime : Opt.Flag.t }
+module Features = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'bool t =
+        { range_check0 : 'bool
+        ; range_check1 : 'bool
+        ; foreign_field_add : 'bool
+        ; foreign_field_mul : 'bool
+        ; xor : 'bool
+        ; rot : 'bool
+        ; lookup : 'bool
+        ; runtime_tables : 'bool
+        }
+      [@@deriving sexp, compare, yojson, hash, equal, hlist]
+    end
+  end]
+
+  type options = Opt.Flag.t t
+
+  type flags = bool t
+
+  let to_data
+      { range_check0
+      ; range_check1
+      ; foreign_field_add
+      ; foreign_field_mul
+      ; xor
+      ; rot
+      ; lookup
+      ; runtime_tables
+      } : _ Hlist.HlistId.t =
+    [ range_check0
+    ; range_check1
+    ; foreign_field_add
+    ; foreign_field_mul
+    ; xor
+    ; rot
+    ; lookup
+    ; runtime_tables
+    ]
+
+  let of_data
+      ([ range_check0
+       ; range_check1
+       ; foreign_field_add
+       ; foreign_field_mul
+       ; xor
+       ; rot
+       ; lookup
+       ; runtime_tables
+       ] :
+        _ Hlist.HlistId.t ) =
+    { range_check0
+    ; range_check1
+    ; foreign_field_add
+    ; foreign_field_mul
+    ; xor
+    ; rot
+    ; lookup
+    ; runtime_tables
+    }
+
+  let typ bool
+      ~feature_flags:
+        { range_check0
+        ; range_check1
+        ; foreign_field_add
+        ; foreign_field_mul
+        ; xor
+        ; rot
+        ; lookup
+        ; runtime_tables
+        } =
+    (* TODO: This should come from snarky. *)
+    let constant (type var value)
+        (typ : (var, value, _) Snarky_backendless.Typ.t) (x : value) : var =
+      let (Typ typ) = typ in
+      let fields, aux = typ.value_to_fields x in
+      let fields =
+        Array.map ~f:(fun x -> Snarky_backendless.Cvar.Constant x) fields
+      in
+      typ.var_of_fields (fields, aux)
+    in
+    let constant_typ ~there value =
+      let open Snarky_backendless.Typ in
+      unit ()
+      |> transport ~there ~back:(fun () -> value)
+      |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> constant bool value)
+    in
+    let bool_typ_of_flag = function
+      | Opt.Flag.Yes ->
+          constant_typ
+            ~there:(function true -> () | false -> assert false)
+            true
+      | Opt.Flag.No ->
+          constant_typ
+            ~there:(function false -> () | true -> assert false)
+            false
+      | Opt.Flag.Maybe ->
+          bool
+    in
+    Snarky_backendless.Typ.of_hlistable
+      [ bool_typ_of_flag range_check0
+      ; bool_typ_of_flag range_check1
+      ; bool_typ_of_flag foreign_field_add
+      ; bool_typ_of_flag foreign_field_mul
+      ; bool_typ_of_flag xor
+      ; bool_typ_of_flag rot
+      ; bool_typ_of_flag lookup
+      ; bool_typ_of_flag runtime_tables
+      ]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
+
+  let none =
+    { range_check0 = Opt.Flag.No
+    ; range_check1 = Opt.Flag.No
+    ; foreign_field_add = Opt.Flag.No
+    ; foreign_field_mul = Opt.Flag.No
+    ; xor = Opt.Flag.No
+    ; rot = Opt.Flag.No
+    ; lookup = Opt.Flag.No
+    ; runtime_tables = Opt.Flag.No
+    }
+
+  let none_bool =
+    { range_check0 = false
+    ; range_check1 = false
+    ; foreign_field_add = false
+    ; foreign_field_mul = false
+    ; xor = false
+    ; rot = false
+    ; lookup = false
+    ; runtime_tables = false
+    }
+
+  let map
+      { range_check0
+      ; range_check1
+      ; foreign_field_add
+      ; foreign_field_mul
+      ; rot
+      ; xor
+      ; lookup
+      ; runtime_tables
+      } ~f =
+    { range_check0 = f range_check0
+    ; range_check1 = f range_check1
+    ; foreign_field_add = f foreign_field_add
+    ; foreign_field_mul = f foreign_field_mul
+    ; xor = f xor
+    ; rot = f rot
+    ; lookup = f lookup
+    ; runtime_tables = f runtime_tables
+    }
+
+  let map2 x1 x2 ~f =
+    { range_check0 = f x1.range_check0 x2.range_check0
+    ; range_check1 = f x1.range_check1 x2.range_check1
+    ; foreign_field_add = f x1.foreign_field_add x2.foreign_field_add
+    ; foreign_field_mul = f x1.foreign_field_mul x2.foreign_field_mul
+    ; xor = f x1.xor x2.xor
+    ; rot = f x1.rot x2.rot
+    ; lookup = f x1.lookup x2.lookup
+    ; runtime_tables = f x1.runtime_tables x2.runtime_tables
+    }
 end
 
 module Evals = struct
@@ -226,20 +401,21 @@ module Evals = struct
         (f, bool) In_circuit.t =
       { sorted; aggreg; table; runtime = Opt.of_option runtime }
 
-    let typ impl e ~runtime ~dummy =
+    let typ impl e ~runtime_tables ~dummy =
       Snarky_backendless.Typ.of_hlistable
         [ Snarky_backendless.Typ.array ~length:sorted_length e
         ; e
         ; e
-        ; Opt.typ impl runtime e ~dummy
+        ; Opt.typ impl runtime_tables e ~dummy
         ]
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
 
-    let opt_typ impl ({ lookup; runtime } : Lookup_config.t) ~dummy:z elt =
+    let opt_typ impl ({ lookup; runtime_tables; _ } : Opt.Flag.t Features.t)
+        ~dummy:z elt =
       Opt.typ impl lookup
-        ~dummy:(dummy z ~runtime:(Opt.Flag.equal runtime Yes))
-        (typ impl ~runtime ~dummy:z elt)
+        ~dummy:(dummy z ~runtime:(not (Opt.Flag.equal runtime_tables No)))
+        (typ impl ~runtime_tables ~dummy:z elt)
   end
 
   [%%versioned
@@ -634,26 +810,27 @@ module Messages = struct
 
     let sorted_length = 5
 
-    let dummy ~runtime z =
+    let dummy ~runtime_tables z =
       { aggreg = z
       ; sorted = Array.create ~len:sorted_length z
-      ; runtime = Option.some_if runtime z
+      ; runtime = Option.some_if runtime_tables z
       }
 
-    let typ bool_typ e ~runtime ~dummy =
+    let typ bool_typ e ~runtime_tables ~dummy =
       Snarky_backendless.Typ.of_hlistable
         [ Snarky_backendless.Typ.array ~length:sorted_length e
         ; e
-        ; Opt.typ bool_typ runtime e ~dummy
+        ; Opt.typ bool_typ runtime_tables e ~dummy
         ]
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
 
-    let opt_typ bool_typ ~(lookup : Opt.Flag.t) ~(runtime : Opt.Flag.t) ~dummy:z
-        elt =
+    let opt_typ bool_typ ~(lookup : Opt.Flag.t) ~(runtime_tables : Opt.Flag.t)
+        ~dummy:z elt =
       Opt.typ bool_typ lookup
-        ~dummy:(dummy z ~runtime:Opt.Flag.(equal runtime Yes))
-        (typ bool_typ ~runtime ~dummy:z elt)
+        ~dummy:
+          (dummy z ~runtime_tables:Opt.Flag.(not (equal runtime_tables No)))
+        (typ bool_typ ~runtime_tables ~dummy:z elt)
   end
 
   [%%versioned
@@ -682,7 +859,7 @@ module Messages = struct
 
   let typ (type n f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) g
-      ({ lookup; runtime } : Lookup_config.t) ~dummy
+      ({ lookup; runtime_tables; _ } : Opt.Flag.t Features.t) ~dummy
       ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t) ~bool
       =
     let open Snarky_backendless.Typ in
@@ -695,7 +872,7 @@ module Messages = struct
         ~dummy_group_element:dummy ~bool
     in
     let lookup =
-      Lookup.opt_typ Impl.Boolean.typ ~lookup ~runtime ~dummy:[| dummy |]
+      Lookup.opt_typ Impl.Boolean.typ ~lookup ~runtime_tables ~dummy:[| dummy |]
         (wo [ 1 ])
     in
     of_hlistable

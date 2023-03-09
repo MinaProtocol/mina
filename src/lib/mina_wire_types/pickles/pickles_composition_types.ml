@@ -54,12 +54,14 @@ module Wrap = struct
       module Plonk = struct
         module Minimal = struct
           module V1 = struct
-            type ('challenge, 'scalar_challenge) t =
+            type ('challenge, 'scalar_challenge, 'bool) t =
               { alpha : 'scalar_challenge
               ; beta : 'challenge
               ; gamma : 'challenge
               ; zeta : 'scalar_challenge
               ; joint_combiner : 'scalar_challenge option
+              ; feature_flags :
+                  'bool Pickles_types.Plonk_types.Features.Stable.V1.t
               }
           end
         end
@@ -133,6 +135,7 @@ module Wrap = struct
         type ( 'challenge
              , 'scalar_challenge
              , 'fp
+             , 'bool
              , 'messages_for_next_wrap_proof
              , 'digest
              , 'messages_for_next_step_proof
@@ -140,7 +143,8 @@ module Wrap = struct
              , 'index )
              t =
           ( ( 'challenge
-            , 'scalar_challenge )
+            , 'scalar_challenge
+            , 'bool )
             Proof_state.Deferred_values.Plonk.Minimal.V1.t
           , 'scalar_challenge
           , 'fp

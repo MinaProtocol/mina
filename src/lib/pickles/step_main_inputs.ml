@@ -24,6 +24,12 @@ let unrelated_g =
 
 open Impl
 
+(* Debug helper to convert step circuit field element to a hex string *)
+let read_step_circuit_field_element_as_hex fe =
+  let prover_fe = As_prover.read Field.typ fe in
+  Kimchi_backend.Pasta.Vesta_based_plonk.(
+    Bigint.to_hex (Field.to_bigint prover_fe))
+
 module Other_field = struct
   type t = Tock.Field.t [@@deriving sexp]
 
@@ -58,12 +64,22 @@ module Sponge = struct
         let params = Tick_field_sponge.params
       end)
 
-  module S = Sponge.Make_sponge (Permutation)
+  module S = Sponge.Make_debug_sponge (struct
+    include Permutation
+    module Circuit = Impls.Step
+
+    (* Optional sponge name used in debug mode *)
+    let sponge_name = "step"
+
+    (* To enable debug mode, set environment variable [sponge_name] to "t", "1" or "true". *)
+    let debug_helper_fn = read_step_circuit_field_element_as_hex
+  end)
+
   include S
 
-  let squeeze_field = squeeze
+  let squeeze_field t = squeeze t
 
-  let squeeze = squeeze
+  let squeeze t = squeeze t
 
   let absorb t input =
     match input with

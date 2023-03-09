@@ -18,11 +18,12 @@ module Failure = struct
       | Signed_command_on_zkapp_account
       | Zkapp_account_not_present
       | Update_not_permitted_balance
-      | Update_not_permitted_timing_existing_account
+      | Update_not_permitted_access
+      | Update_not_permitted_timing
       | Update_not_permitted_delegate
       | Update_not_permitted_app_state
       | Update_not_permitted_verification_key
-      | Update_not_permitted_sequence_state
+      | Update_not_permitted_action_state
       | Update_not_permitted_zkapp_uri
       | Update_not_permitted_token_symbol
       | Update_not_permitted_permissions
@@ -35,11 +36,13 @@ module Failure = struct
       | Account_nonce_precondition_unsatisfied
       | Account_receipt_chain_hash_precondition_unsatisfied
       | Account_delegate_precondition_unsatisfied
-      | Account_sequence_state_precondition_unsatisfied
+      | Account_action_state_precondition_unsatisfied
       | Account_app_state_precondition_unsatisfied of int
       | Account_proved_state_precondition_unsatisfied
       | Account_is_new_precondition_unsatisfied
       | Protocol_state_precondition_unsatisfied
+      | Unexpected_verification_key_hash
+      | Valid_while_precondition_unsatisfied
       | Incorrect_nonce
       | Invalid_fee_excess
       | Cancelled

@@ -128,9 +128,6 @@ module Lookup_parameters = struct
         ; scalar = Shifted_value.Type2.Shifted_value Impls.Wrap.Field.zero
         }
     }
-
-  let tick ~lookup:flag : _ Composition_types.Wrap.Lookup_parameters.t =
-    { use = No; zero = tick_zero }
 end
 
 let finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a = function
@@ -225,23 +222,18 @@ let tock_unpadded_public_input_of_statement prev_statement =
 
 let tock_public_input_of_statement s = tock_unpadded_public_input_of_statement s
 
-let tick_public_input_of_statement ~max_proofs_verified ~uses_lookup
+let tick_public_input_of_statement ~max_proofs_verified ~feature_flags
     (prev_statement : _ Types.Step.Statement.t) =
   let input =
     let (T (input, _conv, _conv_inv)) =
       Impls.Step.input ~proofs_verified:max_proofs_verified
-        ~wrap_rounds:Tock.Rounds.n ~uses_lookup
+        ~wrap_rounds:Tock.Rounds.n ~feature_flags
     in
     Impls.Step.generate_public_input input prev_statement
   in
   List.init
     (Backend.Tick.Field.Vector.length input)
     ~f:(Backend.Tick.Field.Vector.get input)
-
-let max_quot_size ~of_int ~mul:( * ) ~sub:( - ) domain_size =
-  of_int 5 * (domain_size - of_int 1)
-
-let max_quot_size_int = max_quot_size ~of_int:Fn.id ~mul:( * ) ~sub:( - )
 
 let ft_comm ~add:( + ) ~scale ~endoscale ~negate
     ~verification_key:(m : _ Plonk_verification_key_evals.t) ~alpha

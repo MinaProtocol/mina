@@ -1,6 +1,6 @@
-terraform {
-  experiments = [module_variable_optional_attrs]
-}
+# terraform {
+#   experiments = [module_variable_optional_attrs]
+# }
 
 # K8s Cluster Vars
 
@@ -59,6 +59,16 @@ variable "custom_entrypoint" {
 variable "mina_archive_image" {
   type    = string
   default = ""
+}
+
+variable "mina_archive_schema" {
+  type    = string
+  default = ""
+}
+
+variable "mina_archive_schema_aux_files" {
+  type    = list(string)
+  default = []
 }
 
 variable "archive_node_count" {
@@ -338,6 +348,11 @@ variable "upload_blocks_to_gcloud" {
 }
 
 variable "seed_peers_url" {
+  type    = string
+  default = ""
+}
+
+variable "zkapps_dashboard_key" {
   type    = string
   default = ""
 }

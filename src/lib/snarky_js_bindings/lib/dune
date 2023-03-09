@@ -8,6 +8,7 @@
   integers
   sexplib0
   yojson
+  ppx_deriving_yojson.runtime
   ;; local libraries ;;
   mina_wire_types
   mina_base
@@ -16,6 +17,7 @@
   h_list
   pickles
   pickles.backend
+  pickles_base
   pickles.limb_vector
   pickles_types
   kimchi_backend

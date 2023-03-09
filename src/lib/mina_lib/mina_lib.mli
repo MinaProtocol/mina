@@ -196,7 +196,8 @@ val transition_frontier :
 
 val get_ledger : t -> State_hash.t option -> Account.t list Or_error.t
 
-val get_snarked_ledger : t -> State_hash.t option -> Account.t list Or_error.t
+val get_snarked_ledger :
+  t -> State_hash.t option -> Account.t list Deferred.Or_error.t
 
 val wallets : t -> Secrets.Wallets.t
 
@@ -217,3 +218,5 @@ val net : t -> Mina_networking.t
 val runtime_config : t -> Runtime_config.t
 
 val verifier : t -> Verifier.t
+
+val genesis_ledger : t -> Mina_ledger.Ledger.t Lazy.t

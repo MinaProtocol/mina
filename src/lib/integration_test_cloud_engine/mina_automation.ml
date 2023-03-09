@@ -149,7 +149,7 @@ module Network_config = struct
           in
           let default = Runtime_config.Accounts.Single.default in
           { default with
-            pk = Some (Public_key.Compressed.to_string pk)
+            pk = Public_key.Compressed.to_string pk
           ; sk = Some (Private_key.to_base58_check sk)
           ; balance =
               Balance.of_mina_string_exn balance
@@ -184,19 +184,21 @@ module Network_config = struct
               { edit_state = None
               ; send = None
               ; receive = None
+              ; access = None
               ; set_delegate = None
               ; set_permissions = None
               ; set_verification_key = None
               ; set_zkapp_uri = None
-              ; edit_sequence_state = None
+              ; edit_action_state = None
               ; set_token_symbol = None
               ; increment_nonce = None
               ; set_voting_for = None
+              ; set_timing = None
               }
           in
           let default = Runtime_config.Accounts.Single.default in
           { default with
-            pk = Some (Public_key.Compressed.to_string pk)
+            pk = Public_key.Compressed.to_string pk
           ; sk = None
           ; balance =
               Balance.of_mina_string_exn balance
@@ -221,7 +223,7 @@ module Network_config = struct
             ; zkapp_signed_pair_update_cost = None
             ; zkapp_transaction_cost_limit = None
             ; max_event_elements = None
-            ; max_sequence_event_elements = None
+            ; max_action_elements = None
             }
       ; genesis =
           Some
@@ -328,22 +330,11 @@ module Network_config = struct
     [ Block.Terraform
         { Block.Terraform.required_version = ">= 0.12.0"
         ; backend =
-            Backend.S3
-              { Backend.S3.key =
+            Backend.Local
+              { path =
                   "terraform-" ^ network_config.terraform.testnet_name
                   ^ ".tfstate"
-              ; encrypt = true
-              ; region = aws_region
-              ; bucket = "o1labs-terraform-state"
-              ; acl = "bucket-owner-full-control"
               }
-        }
-    ; Block.Provider
-        { Block.Provider.provider = "aws"
-        ; region = aws_region
-        ; zone = None
-        ; project = None
-        ; alias = None
         }
     ; Block.Provider
         { Block.Provider.provider = "google"

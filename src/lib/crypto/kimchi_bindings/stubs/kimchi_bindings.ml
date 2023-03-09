@@ -48,11 +48,16 @@ module Protocol = struct
 
         external get : t -> int -> elt = "caml_pasta_fp_plonk_gate_vector_get"
 
+        external len : t -> int = "caml_pasta_fp_plonk_gate_vector_len"
+
         external wrap : t -> Kimchi_types.wire -> Kimchi_types.wire -> unit
           = "caml_pasta_fp_plonk_gate_vector_wrap"
 
         external digest : int -> t -> bytes
           = "caml_pasta_fp_plonk_gate_vector_digest"
+
+        external to_json : int -> t -> string
+          = "caml_pasta_fp_plonk_circuit_serialize"
       end
 
       module Fq = struct
@@ -66,11 +71,16 @@ module Protocol = struct
 
         external get : t -> int -> elt = "caml_pasta_fq_plonk_gate_vector_get"
 
+        external len : t -> int = "caml_pasta_fq_plonk_gate_vector_len"
+
         external wrap : t -> Kimchi_types.wire -> Kimchi_types.wire -> unit
           = "caml_pasta_fq_plonk_gate_vector_wrap"
 
         external digest : int -> t -> bytes
           = "caml_pasta_fq_plonk_gate_vector_digest"
+
+        external to_json : int -> t -> string
+          = "caml_pasta_fq_plonk_circuit_serialize"
       end
     end
   end
@@ -362,6 +372,57 @@ module Protocol = struct
              , Pasta_bindings.Fp.t )
              Kimchi_types.prover_proof
         = "caml_pasta_fp_plonk_proof_example_with_lookup"
+
+      external example_with_ffadd :
+           SRS.Fp.t
+        -> Index.Fp.t
+           * Pasta_bindings.Fp.t
+           * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
+             , Pasta_bindings.Fp.t )
+             Kimchi_types.prover_proof
+        = "caml_pasta_fp_plonk_proof_example_with_ffadd"
+
+      external example_with_xor :
+           SRS.Fp.t
+        -> Index.Fp.t
+           * (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t)
+           * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
+             , Pasta_bindings.Fp.t )
+             Kimchi_types.prover_proof
+        = "caml_pasta_fp_plonk_proof_example_with_xor"
+
+      external example_with_rot :
+           SRS.Fp.t
+        -> Index.Fp.t
+           * (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t)
+           * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
+             , Pasta_bindings.Fp.t )
+             Kimchi_types.prover_proof
+        = "caml_pasta_fp_plonk_proof_example_with_rot"
+
+      external example_with_foreign_field_mul :
+           SRS.Fp.t
+        -> Index.Fp.t
+           * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
+             , Pasta_bindings.Fp.t )
+             Kimchi_types.prover_proof
+        = "caml_pasta_fp_plonk_proof_example_with_foreign_field_mul"
+
+      external example_with_range_check :
+           SRS.Fp.t
+        -> Index.Fp.t
+           * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
+             , Pasta_bindings.Fp.t )
+             Kimchi_types.prover_proof
+        = "caml_pasta_fp_plonk_proof_example_with_range_check"
+
+      external example_with_range_check0 :
+           SRS.Fp.t
+        -> Index.Fp.t
+           * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
+             , Pasta_bindings.Fp.t )
+             Kimchi_types.prover_proof
+        = "caml_pasta_fp_plonk_proof_example_with_range_check0"
 
       external verify :
            ( Pasta_bindings.Fp.t

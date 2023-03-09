@@ -29,7 +29,8 @@ let
     dyn = "3.5.0";
     fiber = "3.5.0";
     chrome-trace = "3.5.0";
-    ocaml-lsp-server = "1.14.1";
+    ocaml-lsp-server = "1.15.1-4.14";
+    ocamlc-loc = "3.5.0";
     ocaml-system = ocaml;
     ocamlformat-rpc-lib = "0.22.4";
     omd = "1.3.2";
@@ -82,7 +83,7 @@ let
       # Also passes the version information to the executable.
       wrapMina = let
         commit_sha1 = inputs.self.sourceInfo.rev or "<dirty>";
-        commit_date = inputs.self.sourceInfo.lastModifiedDate or "<unknown>";
+        commit_date = inputs.flockenzeit.lib.RFC-5322 inputs.self.sourceInfo.lastModified or 0;
       in package:
       { deps ? [ pkgs.gnutar pkgs.gzip ], }:
       pkgs.runCommand "${package.name}-release" {

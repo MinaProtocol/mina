@@ -16,6 +16,7 @@
    snark_params
    snarky.backendless
    mina_state
+   mina_numbers
    sgn
    ppx_version.runtime
  )

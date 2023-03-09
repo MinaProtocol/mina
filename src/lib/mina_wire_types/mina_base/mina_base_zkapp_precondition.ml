@@ -58,6 +58,12 @@ module Protocol_state = struct
   end
 end
 
+module Valid_while = struct
+  module V1 = struct
+    type t = Mina_numbers.Global_slot.V1.t Numeric.V1.t
+  end
+end
+
 module Account = struct
   module V2 = struct
     type t =
@@ -70,7 +76,7 @@ module Account = struct
       ; state :
           Snark_params.Tick.Field.t Mina_base_zkapp_basic.Or_ignore.V1.t
           Mina_base_zkapp_state.V.V1.t
-      ; sequence_state :
+      ; action_state :
           Snark_params.Tick.Field.t Mina_base_zkapp_basic.Or_ignore.V1.t
       ; proved_state : bool Mina_base_zkapp_basic.Or_ignore.V1.t
       ; is_new : bool Mina_base_zkapp_basic.Or_ignore.V1.t

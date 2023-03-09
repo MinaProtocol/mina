@@ -24,11 +24,12 @@ module Failure = struct
         | Signed_command_on_zkapp_account
         | Zkapp_account_not_present
         | Update_not_permitted_balance
-        | Update_not_permitted_timing_existing_account
+        | Update_not_permitted_access
+        | Update_not_permitted_timing
         | Update_not_permitted_delegate
         | Update_not_permitted_app_state
         | Update_not_permitted_verification_key
-        | Update_not_permitted_sequence_state
+        | Update_not_permitted_action_state
         | Update_not_permitted_zkapp_uri
         | Update_not_permitted_token_symbol
         | Update_not_permitted_permissions
@@ -41,11 +42,13 @@ module Failure = struct
         | Account_nonce_precondition_unsatisfied
         | Account_receipt_chain_hash_precondition_unsatisfied
         | Account_delegate_precondition_unsatisfied
-        | Account_sequence_state_precondition_unsatisfied
+        | Account_action_state_precondition_unsatisfied
         | Account_app_state_precondition_unsatisfied of int
         | Account_proved_state_precondition_unsatisfied
         | Account_is_new_precondition_unsatisfied
         | Protocol_state_precondition_unsatisfied
+        | Unexpected_verification_key_hash
+        | Valid_while_precondition_unsatisfied
         | Incorrect_nonce
         | Invalid_fee_excess
         | Cancelled
@@ -109,11 +112,11 @@ module Failure = struct
       ~local_excess_overflow:add ~local_supply_increase_overflow:add
       ~global_supply_increase_overflow:add ~signed_command_on_zkapp_account:add
       ~zkapp_account_not_present:add ~update_not_permitted_balance:add
-      ~update_not_permitted_timing_existing_account:add
+      ~update_not_permitted_timing:add ~update_not_permitted_access:add
       ~update_not_permitted_delegate:add ~update_not_permitted_app_state:add
       ~update_not_permitted_verification_key:add
-      ~update_not_permitted_sequence_state:add
-      ~update_not_permitted_zkapp_uri:add ~update_not_permitted_token_symbol:add
+      ~update_not_permitted_action_state:add ~update_not_permitted_zkapp_uri:add
+      ~update_not_permitted_token_symbol:add
       ~update_not_permitted_permissions:add ~update_not_permitted_nonce:add
       ~update_not_permitted_voting_for:add
       ~zkapp_command_replay_check_failed:add ~fee_payer_nonce_must_increase:add
@@ -122,12 +125,14 @@ module Failure = struct
       ~account_nonce_precondition_unsatisfied:add
       ~account_receipt_chain_hash_precondition_unsatisfied:add
       ~account_delegate_precondition_unsatisfied:add
-      ~account_sequence_state_precondition_unsatisfied:add
+      ~account_action_state_precondition_unsatisfied:add
       ~account_app_state_precondition_unsatisfied:(fun acc var ->
         List.init 8 ~f:var.constructor @ acc )
       ~account_proved_state_precondition_unsatisfied:add
       ~account_is_new_precondition_unsatisfied:add
-      ~protocol_state_precondition_unsatisfied:add ~incorrect_nonce:add
+      ~protocol_state_precondition_unsatisfied:add
+      ~valid_while_precondition_unsatisfied:add
+      ~unexpected_verification_key_hash:add ~incorrect_nonce:add
       ~invalid_fee_excess:add ~cancelled:add
 
   let gen = Quickcheck.Generator.of_list all
@@ -167,16 +172,18 @@ module Failure = struct
         "Zkapp_account_not_present"
     | Update_not_permitted_balance ->
         "Update_not_permitted_balance"
-    | Update_not_permitted_timing_existing_account ->
-        "Update_not_permitted_timing_existing_account"
+    | Update_not_permitted_access ->
+        "Update_not_permitted_access"
+    | Update_not_permitted_timing ->
+        "Update_not_permitted_timing"
     | Update_not_permitted_delegate ->
         "update_not_permitted_delegate"
     | Update_not_permitted_app_state ->
         "Update_not_permitted_app_state"
     | Update_not_permitted_verification_key ->
         "Update_not_permitted_verification_key"
-    | Update_not_permitted_sequence_state ->
-        "Update_not_permitted_sequence_state"
+    | Update_not_permitted_action_state ->
+        "Update_not_permitted_action_state"
     | Update_not_permitted_zkapp_uri ->
         "Update_not_permitted_zkapp_uri"
     | Update_not_permitted_token_symbol ->
@@ -201,8 +208,8 @@ module Failure = struct
         "Account_receipt_chain_hash_precondition_unsatisfied"
     | Account_delegate_precondition_unsatisfied ->
         "Account_delegate_precondition_unsatisfied"
-    | Account_sequence_state_precondition_unsatisfied ->
-        "Account_sequence_state_precondition_unsatisfied"
+    | Account_action_state_precondition_unsatisfied ->
+        "Account_action_state_precondition_unsatisfied"
     | Account_app_state_precondition_unsatisfied i ->
         sprintf "Account_app_state_%i_precondition_unsatisfied" i
     | Account_proved_state_precondition_unsatisfied ->
@@ -211,6 +218,10 @@ module Failure = struct
         "Account_is_new_precondition_unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
         "Protocol_state_precondition_unsatisfied"
+    | Valid_while_precondition_unsatisfied ->
+        "Valid_while_precondition_unsatisfied"
+    | Unexpected_verification_key_hash ->
+        "Unexpected_verification_key_hash"
     | Incorrect_nonce ->
         "Incorrect_nonce"
     | Invalid_fee_excess ->
@@ -253,16 +264,18 @@ module Failure = struct
         Ok Zkapp_account_not_present
     | "Update_not_permitted_balance" ->
         Ok Update_not_permitted_balance
-    | "Update_not_permitted_timing_existing_account" ->
-        Ok Update_not_permitted_timing_existing_account
+    | "Update_not_permitted_access" ->
+        Ok Update_not_permitted_access
+    | "Update_not_permitted_timing" ->
+        Ok Update_not_permitted_timing
     | "update_not_permitted_delegate" ->
         Ok Update_not_permitted_delegate
     | "Update_not_permitted_app_state" ->
         Ok Update_not_permitted_app_state
     | "Update_not_permitted_verification_key" ->
         Ok Update_not_permitted_verification_key
-    | "Update_not_permitted_sequence_state" ->
-        Ok Update_not_permitted_sequence_state
+    | "Update_not_permitted_action_state" ->
+        Ok Update_not_permitted_action_state
     | "Update_not_permitted_zkapp_uri" ->
         Ok Update_not_permitted_zkapp_uri
     | "Update_not_permitted_token_symbol" ->
@@ -287,14 +300,18 @@ module Failure = struct
         Ok Account_receipt_chain_hash_precondition_unsatisfied
     | "Account_delegate_precondition_unsatisfied" ->
         Ok Account_delegate_precondition_unsatisfied
-    | "Account_sequence_state_precondition_unsatisfied" ->
-        Ok Account_sequence_state_precondition_unsatisfied
+    | "Account_action_state_precondition_unsatisfied" ->
+        Ok Account_action_state_precondition_unsatisfied
     | "Account_proved_state_precondition_unsatisfied" ->
         Ok Account_proved_state_precondition_unsatisfied
     | "Account_is_new_precondition_unsatisfied" ->
         Ok Account_is_new_precondition_unsatisfied
     | "Protocol_state_precondition_unsatisfied" ->
         Ok Protocol_state_precondition_unsatisfied
+    | "Valid_while_precondition_unsatisfied" ->
+        Ok Valid_while_precondition_unsatisfied
+    | "Unexpected_verification_key_hash" ->
+        Ok Unexpected_verification_key_hash
     | "Incorrect_nonce" ->
         Ok Incorrect_nonce
     | "Invalid_fee_excess" ->
@@ -377,8 +394,11 @@ module Failure = struct
     | Update_not_permitted_balance ->
         "The authentication for an account didn't allow the requested update \
          to its balance"
-    | Update_not_permitted_timing_existing_account ->
-        "The timing of an existing account cannot be updated"
+    | Update_not_permitted_access ->
+        "The authentication for an account didn't allow it to be accessed"
+    | Update_not_permitted_timing ->
+        "The authentication for an account didn't allow the requested update \
+         to its timing"
     | Update_not_permitted_delegate ->
         "The authentication for an account didn't allow the requested update \
          to its delegate"
@@ -388,9 +408,9 @@ module Failure = struct
     | Update_not_permitted_verification_key ->
         "The authentication for an account didn't allow the requested update \
          to its verification key"
-    | Update_not_permitted_sequence_state ->
+    | Update_not_permitted_action_state ->
         "The authentication for an account didn't allow the requested update \
-         to its sequence state"
+         to its action state"
     | Update_not_permitted_zkapp_uri ->
         "The authentication for an account didn't allow the requested update \
          to its snapp URI"
@@ -422,9 +442,8 @@ module Failure = struct
          unsatisfied"
     | Account_delegate_precondition_unsatisfied ->
         "The account update's account delegate precondition was unsatisfied"
-    | Account_sequence_state_precondition_unsatisfied ->
-        "The account update's account sequence state precondition was \
-         unsatisfied"
+    | Account_action_state_precondition_unsatisfied ->
+        "The account update's account action state precondition was unsatisfied"
     | Account_app_state_precondition_unsatisfied i ->
         sprintf
           "The account update's account app state (%i) precondition was \
@@ -436,6 +455,11 @@ module Failure = struct
         "The account update's account is-new state precondition was unsatisfied"
     | Protocol_state_precondition_unsatisfied ->
         "The account update's protocol state precondition unsatisfied"
+    | Valid_while_precondition_unsatisfied ->
+        "The account update's valid-until precondition was unsatisfied"
+    | Unexpected_verification_key_hash ->
+        "The account update's verification key hash does not match the \
+         verification key in the ledger account"
     | Incorrect_nonce ->
         "Incorrect nonce"
     | Invalid_fee_excess ->

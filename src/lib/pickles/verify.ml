@@ -39,8 +39,9 @@ let verify_heterogenous (ts : Instance.t list) =
           Ok ()
       | _ ->
           Error
-            (String.concat ~sep:"\n"
-               (List.map !r ~f:(fun lab -> Lazy.force lab)) )
+            ( Error.tag ~tag:"Pickles.verify"
+            @@ Error.of_list
+            @@ List.map !r ~f:(fun lab -> Error.of_string (Lazy.force lab)) )
     in
     ((fun (lab, b) -> if not b then r := lab :: !r), result)
   in
@@ -85,6 +86,9 @@ let verify_heterogenous (ts : Instance.t list) =
         let zeta = sc plonk0.zeta in
         let alpha = sc plonk0.alpha in
         let step_domain = Branch_data.domain branch_data in
+        check
+          ( lazy "domain size is small enough"
+          , Domain.log2_size step_domain <= Nat.to_int Backend.Tick.Rounds.n ) ;
         let w =
           Tick.Field.domain_generator ~log2_size:(Domain.log2_size step_domain)
         in
@@ -98,6 +102,7 @@ let verify_heterogenous (ts : Instance.t list) =
           ; beta = chal plonk0.beta
           ; gamma = chal plonk0.gamma
           ; joint_combiner = Option.map ~f:sc plonk0.joint_combiner
+          ; feature_flags = plonk0.feature_flags
           }
         in
         let tick_combined_evals =
@@ -112,9 +117,39 @@ let verify_heterogenous (ts : Instance.t list) =
             step_domain ~shifts:Common.tick_shifts
             ~domain_generator:Backend.Tick.Field.domain_generator
         in
+        let feature_flags =
+          Plonk_types.Features.map
+            ~f:(function
+              | false ->
+                  Plonk_types.Opt.Flag.No
+              | true ->
+                  Plonk_types.Opt.Flag.Yes )
+            plonk0.feature_flags
+        in
         let tick_env =
+          let module Env_bool = struct
+            type t = bool
+
+            let true_ = true
+
+            let false_ = false
+
+            let ( &&& ) = ( && )
+
+            let ( ||| ) = ( || )
+
+            let any = List.exists ~f:Fn.id
+          end in
+          let module Env_field = struct
+            include Tick.Field
+
+            type bool = Env_bool.t
+
+            let if_ (b : bool) ~then_ ~else_ = if b then then_ () else else_ ()
+          end in
           Plonk_checks.scalars_env
-            (module Tick.Field)
+            (module Env_bool)
+            (module Env_field)
             ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
             ~srs_length_log2:Common.Max_degree.step_log2
             ~field_of_hex:(fun s ->
@@ -124,10 +159,15 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         let plonk =
           let p =
+            let module Field = struct
+              include Tick.Field
+
+              type nonrec bool = bool
+            end in
             Plonk_checks.Type1.derive_plonk
-              (module Tick.Field)
-              ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
-              tick_combined_evals
+              (module Field)
+              ~feature_flags ~shift:Shifts.tick1 ~env:tick_env
+              tick_plonk_minimal tick_combined_evals
           in
           { p with
             zeta = plonk0.zeta
@@ -135,12 +175,17 @@ let verify_heterogenous (ts : Instance.t list) =
           ; beta = plonk0.beta
           ; gamma = plonk0.gamma
           ; lookup =
-              Option.map (Plonk_types.Opt.to_option p.lookup) ~f:(fun l ->
+              Option.map (Plonk_types.Opt.to_option_unsafe p.lookup)
+                ~f:(fun l ->
                   { Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
                     .Lookup
-                    .lookup_gate = l.lookup_gate
-                  ; joint_combiner = Option.value_exn plonk0.joint_combiner
+                    .joint_combiner = Option.value_exn plonk0.joint_combiner
                   } )
+          ; optional_column_scalars =
+              Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+              .In_circuit
+              .Optional_column_scalars
+              .map ~f:Plonk_types.Opt.to_option p.optional_column_scalars
           }
         in
         Timer.clock __LOC__ ;
@@ -320,12 +365,7 @@ let verify_heterogenous (ts : Instance.t list) =
                        .old_bulletproof_challenges ) ) ) ) )
   in
   Common.time "dlog_check" (fun () -> check (lazy "dlog_check", dlog_check)) ;
-  match result () with
-  | Ok () ->
-      true
-  | Error e ->
-      eprintf !"bad verify: %s\n%!" e ;
-      false
+  result ()
 
 let verify (type a return_typ n)
     (max_proofs_verified : (module Nat.Intf with type n = n))

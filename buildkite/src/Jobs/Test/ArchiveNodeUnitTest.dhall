@@ -29,12 +29,12 @@ Pipeline.build
         }
     , steps =
     let outerDir : Text =
-            "/var/buildkite/builds/\\\$BUILDKITE_AGENT_NAME/\\\$BUILDKITE_ORGANIZATION_SLUG/\\\$BUILDKITE_PIPELINE_SLUG"
+            "\\\$BUILDKITE_BUILD_CHECKOUT_PATH"
     in
       [ Command.build
           Command.Config::
             { commands =
-              RunInToolchain.runInToolchainBuster
+              RunInToolchain.runInToolchain
                 [ "POSTGRES_PASSWORD=${password}"
                 , "POSTGRES_USER=${user}"
                 , "POSTGRES_DB=${db}"

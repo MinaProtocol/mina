@@ -56,7 +56,7 @@ let ring_sig_rule (ring_member_pks : Schnorr.Chunked.Public_key.t list) :
         ; public_output = ()
         ; auxiliary_output = ()
         } )
-  ; uses_lookup = false
+  ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
   }
 
 let%test_unit "1-of-1" =
@@ -99,7 +99,7 @@ let%test_unit "1-of-2" =
       |> run_and_check |> Or_error.ok_exn )
 
 (* test a snapp tx with a 3-account_update ring *)
-let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
+let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
   let open Mina_transaction_logic.For_tests in
   let gen =
     let open Quickcheck.Generator.Let_syntax in
@@ -193,16 +193,18 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                 ; token_id = Token_id.default
                 ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
                 ; increment_nonce = true
+                ; implicit_account_creation_fee = true
                 ; events = []
-                ; sequence_events = []
+                ; actions = []
                 ; call_data = Field.zero
                 ; call_depth = 0
                 ; preconditions =
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Nonce (Account.Nonce.succ sender_nonce)
+                    ; valid_while = Ignore
                     }
-                ; caller = Call
+                ; may_use_token = No
                 ; use_full_commitment = false
                 ; authorization_kind = Signature
                 }
@@ -216,18 +218,20 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
                 ; token_id = Token_id.default
                 ; balance_change = Amount.Signed.(of_unsigned amount)
                 ; events = []
-                ; sequence_events = []
+                ; actions = []
                 ; call_data = Field.zero
                 ; call_depth = 0
                 ; increment_nonce = false
+                ; implicit_account_creation_fee = true
                 ; preconditions =
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
                     ; account = Full Zkapp_precondition.Account.accept
+                    ; valid_while = Ignore
                     }
+                ; may_use_token = No
                 ; use_full_commitment = false
-                ; caller = Call
-                ; authorization_kind = Proof
+                ; authorization_kind = Proof (With_hash.hash vk)
                 }
             ; authorization = Proof Mina_base.Proof.transaction_dummy
             }
@@ -246,9 +250,7 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
           let tx_statement : Zkapp_statement.t =
             { account_update =
                 Account_update.Body.digest
-                  (Zkapp_command.add_caller_simple snapp_account_update_data
-                     Token_id.default )
-                    .body
+                  (Account_update.of_simple snapp_account_update_data).body
             ; calls = (Zkapp_command.Digest.Forest.empty :> field)
             }
           in
@@ -327,4 +329,5 @@ let%test_unit "ring-signature snapp tx with 3 zkapp_command" =
             |> Yojson.Safe.pretty_to_string
             |> printf "protocol_state:\n%s\n\n" )
           |> fun () ->
-          ignore (apply_zkapp_command ledger [ zkapp_command ] : Sparse_ledger.t) ) )
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )

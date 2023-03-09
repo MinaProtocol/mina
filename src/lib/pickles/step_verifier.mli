@@ -1,3 +1,5 @@
+open Pickles_types
+
 module Challenge : module type of Import.Challenge.Make (Step_main_inputs.Impl)
 
 module Digest : module type of Import.Digest.Make (Step_main_inputs.Impl)
@@ -44,7 +46,7 @@ type ('a, 'b) vector := ('a, 'b) Pickles_types.Vector.t
 
 val finalize_other_proof :
      (module Pickles_types.Nat.Add.Intf with type n = 'b)
-  -> step_uses_lookup:Pickles_types.Plonk_types.Opt.Flag.t
+  -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
   -> step_domains:
        [ `Known of (Import.Domains.t, 'branches) Pickles_types.Vector.t
        | `Side_loaded ]
@@ -57,9 +59,11 @@ val finalize_other_proof :
      , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
        Import.Scalar_challenge.t
      , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-     , ( ( Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
-           Import.Scalar_challenge.t
-         , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t )
+     , ( Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
+       , Step_main_inputs.Impl.Boolean.var )
+       Composition_types.Opt.t
+     , ( Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
+         Import.Scalar_challenge.t
          Import.Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
        , Step_main_inputs.Impl.Boolean.var )
        Composition_types.Opt.t
@@ -68,7 +72,8 @@ val finalize_other_proof :
          Import.Bulletproof_challenge.t
        , 'c )
        Pickles_types.Vector.t
-     , Step_main_inputs.Impl.Field.Constant.t Import.Branch_data.Checked.t )
+     , Step_main_inputs.Impl.Field.Constant.t Import.Branch_data.Checked.t
+     , Step_main_inputs.Impl.Boolean.var )
      Import.Types.Wrap.Proof_state.Deferred_values.In_circuit.t
   -> ( Step_main_inputs.Impl.Field.t
      , Step_main_inputs.Impl.Field.t Core_kernel.Array.t
@@ -128,7 +133,9 @@ val verify :
        , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
          Pickles_types.Hlist0.Id.t )
        Composition_types.Wrap.Lookup_parameters.t
+  -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
   -> proof:Wrap_proof.Checked.t
+  -> srs:Kimchi_bindings.Protocol.SRS.Fq.t
   -> wrap_domain:
        [ `Known of Import.Domain.t
        | `Side_loaded of
@@ -141,17 +148,18 @@ val verify :
      , Step_main_inputs.Impl.field Limb_vector.Challenge.t
        Composition_types.Scalar_challenge.t
      , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-     , ( ( Step_main_inputs.Impl.field Limb_vector.Challenge.t
-           Composition_types.Scalar_challenge.t
-           Pickles_types.Hlist0.Id.t
-         , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
-           Pickles_types.Hlist0.Id.t )
+     , ( Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
+       , Step_main_inputs.Impl.Boolean.var )
+       Pickles_types.Plonk_types.Opt.t
+     , ( Step_main_inputs.Impl.field Limb_vector.Challenge.t
+         Composition_types.Scalar_challenge.t
          Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
          .Lookup
          .t
        , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
          Snarky_backendless.Snark_intf.Boolean0.t )
        Pickles_types.Plonk_types.Opt.t
+     , Step_main_inputs.Impl.Boolean.var
      , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
      , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
      , Step_main_inputs.Impl.field Snarky_backendless.Cvar.t
@@ -166,6 +174,7 @@ val verify :
   -> ( Step_main_inputs.Impl.Field.t
      , Step_main_inputs.Impl.Field.t Import.Scalar_challenge.t
      , Other_field.t Pickles_types.Shifted_value.Type2.t
+     , _
      , 'c
      , ( Step_main_inputs.Impl.Field.t Import.Scalar_challenge.t
          Import.Bulletproof_challenge.t

@@ -219,13 +219,15 @@ module Token_symbol = struct
   [%%endif]
 end
 
+(* the `token_symbol` describes a token id owned by the account id
+   from this account, not the token id used by this account
+*)
 module Poly = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
       type ( 'pk
            , 'id
-           , 'token_permissions
            , 'token_symbol
            , 'amount
            , 'nonce
@@ -238,7 +240,6 @@ module Poly = struct
            t =
         { public_key : 'pk
         ; token_id : 'id
-        ; token_permissions : 'token_permissions
         ; token_symbol : 'token_symbol
         ; balance : 'amount
         ; nonce : 'nonce
@@ -249,37 +250,9 @@ module Poly = struct
         ; permissions : 'permissions
         ; zkapp : 'zkapp_opt
         }
-      [@@deriving sexp, equal, compare, hash, yojson, fields, hlist]
+      [@@deriving sexp, equal, compare, hash, yojson, fields, hlist, annot]
 
       let to_latest = Fn.id
-    end
-
-    module V1 = struct
-      type ( 'pk
-           , 'tid
-           , 'token_permissions
-           , 'amount
-           , 'nonce
-           , 'receipt_chain_hash
-           , 'delegate
-           , 'state_hash
-           , 'timing
-           , 'permissions
-           , 'snapp_opt )
-           t =
-        { public_key : 'pk
-        ; token_id : 'tid
-        ; token_permissions : 'token_permissions
-        ; balance : 'amount
-        ; nonce : 'nonce
-        ; receipt_chain_hash : 'receipt_chain_hash
-        ; delegate : 'delegate
-        ; voting_for : 'state_hash
-        ; timing : 'timing
-        ; permissions : 'permissions
-        ; snapp : 'snapp_opt
-        }
-      [@@deriving sexp, equal, compare, hash, yojson, fields, hlist]
     end
   end]
 end
@@ -311,7 +284,6 @@ module Binable_arg = struct
       type t =
         ( Public_key.Compressed.Stable.V1.t
         , Token_id.Stable.V2.t
-        , Token_permissions.Stable.V1.t
         , Token_symbol.Stable.V1.t
         , Balance.Stable.V1.t
         , Nonce.Stable.V1.t
@@ -365,7 +337,6 @@ let identifier ({ public_key; token_id; _ } : t) =
 type value =
   ( Public_key.Compressed.t
   , Token_id.t
-  , Token_permissions.t
   , Token_symbol.t
   , Balance.t
   , Nonce.t
@@ -389,7 +360,6 @@ let initialize account_id : t =
   in
   { public_key
   ; token_id
-  ; token_permissions = Token_permissions.default
   ; token_symbol = ""
   ; balance = Balance.zero
   ; nonce = Nonce.zero
@@ -415,7 +385,6 @@ let to_input (t : t) =
   Poly.Fields.fold ~init:[]
     ~public_key:(f Public_key.Compressed.to_input)
     ~token_id:(f Token_id.to_input) ~balance:(f Balance.to_input)
-    ~token_permissions:(f Token_permissions.to_input)
     ~token_symbol:(f Token_symbol.to_input) ~nonce:(f Nonce.to_input)
     ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
     ~delegate:(f (Fn.compose Public_key.Compressed.to_input delegate_opt))
@@ -435,7 +404,6 @@ let crypto_hash t =
 type var =
   ( Public_key.Compressed.var
   , Token_id.Checked.t
-  , Token_permissions.var
   , Token_symbol.var
   , Balance.var
   , Nonce.Checked.t
@@ -455,7 +423,6 @@ let typ' zkapp =
   Typ.of_hlistable
     [ Public_key.Compressed.typ
     ; Token_id.typ
-    ; Token_permissions.typ
     ; Token_symbol.typ
     ; Balance.typ
     ; Nonce.typ
@@ -489,7 +456,6 @@ let typ : (var, value) Typ.t =
 let var_of_t
     ({ public_key
      ; token_id
-     ; token_permissions
      ; token_symbol
      ; balance
      ; nonce
@@ -503,7 +469,6 @@ let var_of_t
       value ) =
   { Poly.public_key = Public_key.Compressed.var_of_t public_key
   ; token_id = Token_id.Checked.constant token_id
-  ; token_permissions = Token_permissions.var_of_t token_permissions
   ; token_symbol = Token_symbol.var_of_value token_symbol
   ; balance = Balance.var_of_t balance
   ; nonce = Nonce.Checked.constant nonce
@@ -520,7 +485,6 @@ module Checked = struct
     type t =
       ( Public_key.Compressed.var
       , Token_id.Checked.t
-      , Token_permissions.var
       , Token_symbol.var
       , Balance.var
       , Nonce.Checked.t
@@ -549,7 +513,6 @@ module Checked = struct
          ~public_key:(f Public_key.Compressed.Checked.to_input)
          ~token_id:(f Token_id.Checked.to_input)
          ~token_symbol:(f Token_symbol.var_to_input)
-         ~token_permissions:(f Token_permissions.var_to_input)
          ~balance:(f Balance.var_to_input) ~nonce:(f Nonce.Checked.to_input)
          ~receipt_chain_hash:(f Receipt.Chain_hash.var_to_input)
          ~delegate:(f Public_key.Compressed.Checked.to_input)
@@ -620,17 +583,37 @@ module Checked = struct
     (*Note: Untimed accounts will always have zero min balance*)
     Boolean.not zero_min_balance
 
-  let has_permission ~to_ (account : var) =
+  let has_permission ?signature_verifies ~to_ (account : var) =
+    let signature_verifies =
+      match signature_verifies with
+      | Some signature_verifies ->
+          signature_verifies
+      | None -> (
+          match to_ with
+          | `Send ->
+              Boolean.true_
+          | `Receive ->
+              Boolean.false_
+          | `Set_delegate ->
+              Boolean.true_
+          | `Access ->
+              failwith
+                "Account.Checked.has_permission: signature_verifies argument \
+                 must be given for access permission" )
+    in
     match to_ with
     | `Send ->
         Permissions.Auth_required.Checked.eval_no_proof account.permissions.send
-          ~signature_verifies:Boolean.true_
+          ~signature_verifies
     | `Receive ->
         Permissions.Auth_required.Checked.eval_no_proof
-          account.permissions.receive ~signature_verifies:Boolean.false_
+          account.permissions.receive ~signature_verifies
     | `Set_delegate ->
         Permissions.Auth_required.Checked.eval_no_proof
-          account.permissions.set_delegate ~signature_verifies:Boolean.true_
+          account.permissions.set_delegate ~signature_verifies
+    | `Access ->
+        Permissions.Auth_required.Checked.eval_no_proof
+          account.permissions.access ~signature_verifies
 end
 
 [%%endif]
@@ -640,7 +623,6 @@ let digest = crypto_hash
 let empty =
   { Poly.public_key = Public_key.Compressed.empty
   ; token_id = Token_id.default
-  ; token_permissions = Token_permissions.default
   ; token_symbol = Token_symbol.default
   ; balance = Balance.zero
   ; nonce = Nonce.zero
@@ -665,7 +647,6 @@ let create account_id balance =
   in
   { Poly.public_key
   ; token_id
-  ; token_permissions = Token_permissions.default
   ; token_symbol = Token_symbol.default
   ; balance
   ; nonce = Nonce.zero
@@ -694,7 +675,6 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
     Or_error.return
       { Poly.public_key
       ; token_id
-      ; token_permissions = Token_permissions.default
       ; token_symbol = Token_symbol.default
       ; balance
       ; nonce = Nonce.zero
@@ -718,6 +698,29 @@ let create_time_locked public_key balance ~initial_minimum_balance ~cliff_time =
   create_timed public_key balance ~initial_minimum_balance ~cliff_time
     ~vesting_period:Global_slot.(succ zero)
     ~vesting_increment:initial_minimum_balance
+
+let initial_minimum_balance Poly.{ timing; _ } =
+  match timing with
+  | Timing.Untimed ->
+      None
+  | Timed t ->
+      Some t.initial_minimum_balance
+
+let cliff_time Poly.{ timing; _ } =
+  match timing with Timing.Untimed -> None | Timed t -> Some t.cliff_time
+
+let cliff_amount Poly.{ timing; _ } =
+  match timing with Timing.Untimed -> None | Timed t -> Some t.cliff_amount
+
+let vesting_increment Poly.{ timing } =
+  match timing with
+  | Timing.Untimed ->
+      None
+  | Timed t ->
+      Some t.vesting_increment
+
+let vesting_period Poly.{ timing; _ } =
+  match timing with Timing.Untimed -> None | Timed t -> Some t.vesting_period
 
 let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
     ~vesting_increment ~initial_minimum_balance =
@@ -788,17 +791,16 @@ let has_locked_tokens ~global_slot (account : t) =
       in
       Balance.(curr_min_balance > zero)
 
-let has_permission ~to_ (account : t) =
+let has_permission ~control ~to_ (account : t) =
   match to_ with
+  | `Access ->
+      Permissions.Auth_required.check account.permissions.access control
   | `Send ->
-      Permissions.Auth_required.check account.permissions.send
-        Control.Tag.Signature
+      Permissions.Auth_required.check account.permissions.send control
   | `Receive ->
-      Permissions.Auth_required.check account.permissions.receive
-        Control.Tag.None_given
+      Permissions.Auth_required.check account.permissions.receive control
   | `Set_delegate ->
-      Permissions.Auth_required.check account.permissions.set_delegate
-        Control.Tag.Signature
+      Permissions.Auth_required.check account.permissions.set_delegate control
 
 let liquid_balance_at_slot ~global_slot (account : t) =
   match account.timing with
@@ -833,17 +835,70 @@ let gen_with_constrained_balance ~low ~high =
 
 let gen_timed =
   let open Quickcheck.Let_syntax in
+  let open Currency in
+  let open Unsigned in
   let%bind public_key = Public_key.Compressed.gen in
   let%bind token_id = Token_id.gen in
   let account_id = Account_id.create public_key token_id in
-  let%bind balance = Currency.Balance.gen in
-  let%bind initial_minimum_balance = Currency.Balance.gen in
-  let%bind cliff_time = Global_slot.gen in
-  let%bind cliff_amount = Amount.gen in
-  (* vesting period must be at least one to avoid division by zero *)
-  let%bind vesting_period =
-    Int.gen_incl 1 100 >>= Fn.compose return Global_slot.of_int
+  let%bind initial_minimum_balance = Balance.(gen_incl one max_int) in
+  let%bind balance = Balance.(gen_incl initial_minimum_balance max_int) in
+  let%bind vesting_schedule_end = Global_slot.(gen_incl (of_int 1) max_value) in
+  let%bind cliff_time =
+    Global_slot.(gen_incl (of_int 1) vesting_schedule_end)
   in
-  let%map vesting_increment = Amount.gen in
-  create_timed account_id balance ~initial_minimum_balance ~cliff_time
-    ~cliff_amount ~vesting_period ~vesting_increment
+  let vesting_slots =
+    let open Global_slot in
+    let open UInt32.Infix in
+    to_uint32 vesting_schedule_end - to_uint32 cliff_time
+  in
+  (* vesting period must be at least one to avoid division by zero *)
+  let%bind vesting_period = Int.gen_incl 1 1000 >>| Global_slot.of_int in
+  (* We need to arrange vesting schedule so that all funds are vested before the
+     maximum global slot, which is 2 ^ 32. *)
+  let vesting_periods_count =
+    Unsigned.UInt32.div vesting_slots vesting_period |> UInt64.of_uint32
+  in
+  let max_cliff_amt =
+    Balance.(initial_minimum_balance - Amount.of_uint64 vesting_periods_count)
+    |> Option.value_map ~f:Balance.to_amount ~default:Amount.zero
+  in
+  let%bind cliff_amount =
+    if UInt32.(compare vesting_slots zero) > 0 then
+      Amount.(gen_incl zero max_cliff_amt)
+    else return @@ Balance.to_amount initial_minimum_balance
+  in
+  let to_vest =
+    Balance.(initial_minimum_balance - cliff_amount)
+    |> Option.value_map ~default:Unsigned.UInt64.zero ~f:Balance.to_uint64
+  in
+  let vesting_increment =
+    if Unsigned.UInt64.(equal vesting_periods_count zero) then Amount.one
+      (* This value does not matter anyway. *)
+    else
+      UInt64.Infix.((to_vest / vesting_periods_count) + UInt64.one)
+      |> Amount.of_uint64
+  in
+  match
+    create_timed account_id balance ~initial_minimum_balance ~cliff_time
+      ~cliff_amount ~vesting_period ~vesting_increment
+  with
+  | Error e ->
+      failwith @@ Error.to_string_hum e
+  | Ok a ->
+      return a
+
+let deriver obj =
+  let open Fields_derivers_zkapps in
+  let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
+  let receipt_chain_hash =
+    needs_custom_js ~js_type:field ~name:"ReceiptChainHash" field
+  in
+  finish "Account" ~t_toplevel_annots:Poly.t_toplevel_annots
+  @@ Poly.Fields.make_creator ~public_key:!.public_key
+       ~token_id:!.Token_id.deriver ~token_symbol:!.string ~balance:!.balance
+       ~nonce:!.uint32 ~receipt_chain_hash:!.receipt_chain_hash
+       ~delegate:!.(option ~js_type:Or_undefined (public_key @@ o ()))
+       ~voting_for:!.field ~timing:!.Timing.deriver
+       ~permissions:!.Permissions.deriver
+       ~zkapp:!.(option ~js_type:Or_undefined (Zkapp_account.deriver @@ o ()))
+       obj

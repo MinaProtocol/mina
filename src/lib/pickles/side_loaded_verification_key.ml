@@ -43,7 +43,7 @@ let input_size ~of_int ~add ~mul w =
   let size a =
     let (T (Typ typ, _conv, _conv_inv)) =
       Impls.Step.input ~proofs_verified:a ~wrap_rounds:Backend.Tock.Rounds.n
-        ~uses_lookup:No
+        ~feature_flags:Plonk_types.Features.none
     in
     typ.size_in_field_elements
   in
@@ -216,7 +216,6 @@ module Stable = struct
             .h
         in
         let log2_size = Import.Domain.log2_size d in
-        let max_quot_size = Common.max_quot_size_int (Import.Domain.size d) in
         let public =
           let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
           let (Typ typ) = input in
@@ -233,7 +232,6 @@ module Stable = struct
                   ; group_gen = Backend.Tock.Field.domain_generator ~log2_size
                   }
               ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
-              ; max_quot_size
               ; public
               ; prev_challenges = 2 (* Due to Wrap_hack *)
               ; srs
@@ -252,7 +250,6 @@ module Stable = struct
                    ; emul_comm = g c.emul_comm
                    ; complete_add_comm = g c.complete_add_comm
                    ; endomul_scalar_comm = g c.endomul_scalar_comm
-                   ; chacha_comm = None
                    } )
               ; shifts = Common.tock_shifts ~log2_size
               ; lookup_index = None
@@ -378,7 +375,8 @@ let%test_unit "input_size" =
         (let (T a) = Nat.of_int n in
          let (T (Typ typ, _conv, _conv_inv)) =
            Impls.Step.input ~proofs_verified:a
-             ~wrap_rounds:Backend.Tock.Rounds.n ~uses_lookup:No
+             ~wrap_rounds:Backend.Tock.Rounds.n
+             ~feature_flags:Plonk_types.Features.none
          in
          typ.size_in_field_elements ) )
 

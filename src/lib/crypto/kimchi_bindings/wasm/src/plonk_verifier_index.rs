@@ -3,9 +3,9 @@ use ark_ec::AffineCurve;
 use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use array_init::array_init;
-use commitment_dlog::srs::SRS;
 use kimchi::circuits::{
     constraints::FeatureFlags,
+    lookup::lookups::{LookupFeatures, LookupPatterns},
     polynomials::permutation::Shifts,
     polynomials::permutation::{zk_polynomial, zk_w3},
     wires::{COLUMNS, PERMUTS},
@@ -13,6 +13,7 @@ use kimchi::circuits::{
 use kimchi::linearization::expr_linearization;
 use kimchi::verifier_index::VerifierIndex as DlogVerifierIndex;
 use paste::paste;
+use poly_commitment::srs::SRS;
 use std::path::Path;
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
@@ -68,8 +69,6 @@ macro_rules! impl_verification_key {
                 pub emul_comm: $WasmPolyComm,
                 #[wasm_bindgen(skip)]
                 pub endomul_scalar_comm: $WasmPolyComm,
-                #[wasm_bindgen(skip)]
-                pub chacha_comm: WasmVector<$WasmPolyComm>,
             }
             type WasmPlonkVerificationEvals = [<Wasm $field_name:camel PlonkVerificationEvals>];
 
@@ -95,7 +94,6 @@ macro_rules! impl_verification_key {
                         mul_comm: mul_comm.clone(),
                         emul_comm: emul_comm.clone(),
                         endomul_scalar_comm: endomul_scalar_comm.clone(),
-                        chacha_comm: (vec![]).into(),
                     }
                 }
 
@@ -178,16 +176,6 @@ macro_rules! impl_verification_key {
                 pub fn set_endomul_scalar_comm(&mut self, x: $WasmPolyComm) {
                     self.endomul_scalar_comm = x;
                 }
-
-                #[wasm_bindgen(getter)]
-                pub fn chacha_comm(&self) -> WasmVector<$WasmPolyComm> {
-                    self.chacha_comm.clone()
-                }
-
-                #[wasm_bindgen(setter)]
-                pub fn set_chacha_comm(&mut self, x: WasmVector<$WasmPolyComm>) {
-                    self.chacha_comm = x;
-                }
             }
 
             #[derive(Clone, Copy)]
@@ -224,7 +212,6 @@ macro_rules! impl_verification_key {
             pub struct [<Wasm $field_name:camel PlonkVerifierIndex>] {
                 pub domain: WasmDomain,
                 pub max_poly_size: i32,
-                pub max_quot_size: i32,
                 pub public_: i32,
                 pub prev_challenges: i32,
                 #[wasm_bindgen(skip)]
@@ -242,7 +229,6 @@ macro_rules! impl_verification_key {
                 pub fn new(
                     domain: &WasmDomain,
                     max_poly_size: i32,
-                    max_quot_size: i32,
                     public_: i32,
                     prev_challenges: i32,
                     srs: &$WasmSrs,
@@ -252,7 +238,6 @@ macro_rules! impl_verification_key {
                     WasmPlonkVerifierIndex {
                         domain: domain.clone(),
                         max_poly_size,
-                        max_quot_size,
                         public_,
                         prev_challenges,
                         srs: srs.clone(),
@@ -292,7 +277,6 @@ macro_rules! impl_verification_key {
                         group_gen: vi.domain.group_gen.into(),
                     },
                     max_poly_size: vi.max_poly_size as i32,
-                    max_quot_size: vi.max_quot_size as i32,
                     public_: vi.public as i32,
                     prev_challenges: vi.prev_challenges as i32,
                     srs: srs.into(),
@@ -305,11 +289,6 @@ macro_rules! impl_verification_key {
                         mul_comm: vi.mul_comm.into(),
                         emul_comm: vi.emul_comm.into(),
                         endomul_scalar_comm: vi.endomul_scalar_comm.into(),
-                        chacha_comm:
-                            match vi.chacha_comm {
-                                None => vec![].into(),
-                                Some(cs) => vec![(&cs[0]).into(), (&cs[1]).into(), (&cs[2]).into(), (&cs[3]).into()].into()
-                            }
                     },
                     shifts:
                         WasmShifts {
@@ -334,7 +313,6 @@ macro_rules! impl_verification_key {
                         group_gen: vi.domain.group_gen.clone().into(),
                     },
                     max_poly_size: vi.max_poly_size as i32,
-                    max_quot_size: vi.max_quot_size as i32,
                     srs: srs.clone().into(),
                     evals: WasmPlonkVerificationEvals {
                         sigma_comm: vi.sigma_comm.iter().map(From::from).collect(),
@@ -345,11 +323,6 @@ macro_rules! impl_verification_key {
                         mul_comm: vi.mul_comm.clone().into(),
                         emul_comm: vi.emul_comm.clone().into(),
                         endomul_scalar_comm: vi.endomul_scalar_comm.clone().into(),
-                        chacha_comm:
-                            match &vi.chacha_comm {
-                                None => vec![].into(),
-                                Some(cs) => vec![cs[0].clone().into(), cs[1].clone().into(), cs[2].clone().into(), cs[3].clone().into()].into()
-                            }
                     },
                     shifts:
                         WasmShifts {
@@ -367,7 +340,6 @@ macro_rules! impl_verification_key {
 
             pub fn of_wasm(
                 max_poly_size: i32,
-                max_quot_size: i32,
                 public_: i32,
                 prev_challenges: i32,
                 log_size_of_group: i32,
@@ -383,17 +355,27 @@ macro_rules! impl_verification_key {
                     // Rc<_>s into weak pointers.
                     SRSValue::Ref(unsafe { &*Rc::into_raw(urs_copy) })
                 }; */
-                let (endo_q, _endo_r) = commitment_dlog::srs::endos::<$GOther>();
+                let (endo_q, _endo_r) = poly_commitment::srs::endos::<$GOther>();
                 let domain = Domain::<$F>::new(1 << log_size_of_group).unwrap();
 
                 let feature_flags =
                     FeatureFlags {
-                        chacha: false,
-                        range_check: false,
+                        range_check0: false,
+                        range_check1: false,
                         foreign_field_add: false,
                         foreign_field_mul: false,
+                        rot: false,
                         xor: false,
-                        lookup_configuration: None,
+                        lookup_features:
+                        LookupFeatures {
+                            patterns: LookupPatterns {
+                                xor: false,
+                                lookup: false,
+                                range_check: false,
+                                foreign_field_mul: false, },
+                            joint_lookup_used:false,
+                            uses_runtime_tables: false,
+                        },
                     };
 
                 let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true);
@@ -414,13 +396,13 @@ macro_rules! impl_verification_key {
 
                         endomul_scalar_comm: (&evals.endomul_scalar_comm).into(),
                         // TODO
-                        chacha_comm: None,
-                        range_check_comm: None,
+                        range_check0_comm: None,
+                        range_check1_comm: None,
                         foreign_field_add_comm: None,
                         foreign_field_mul_comm: None,
+                        rot_comm: None,
                         xor_comm: None,
 
-                        foreign_field_modulus: None,
                         w: {
                             let res = once_cell::sync::OnceCell::new();
                             res.set(zk_w3(domain)).unwrap();
@@ -428,7 +410,6 @@ macro_rules! impl_verification_key {
                         },
                         endo: endo_q,
                         max_poly_size: max_poly_size as usize,
-                        max_quot_size: max_quot_size as usize,
                         public: public_ as usize,
                         prev_challenges: prev_challenges as usize,
                         zkpm: {
@@ -462,7 +443,6 @@ macro_rules! impl_verification_key {
                 fn from(index: WasmPlonkVerifierIndex) -> Self {
                     of_wasm(
                         index.max_poly_size,
-                        index.max_quot_size,
                         index.public_,
                         index.prev_challenges,
                         index.domain.log_size_of_group,
@@ -480,7 +460,7 @@ macro_rules! impl_verification_key {
                 path: String,
             ) -> Result<DlogVerifierIndex<$G>, JsValue> {
                 let path = Path::new(&path);
-                let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
+                let (endo_q, _endo_r) = poly_commitment::srs::endos::<GAffineOther>();
                 DlogVerifierIndex::<$G>::from_file(
                     Some(srs.0.clone()),
                     path,
@@ -555,7 +535,7 @@ macro_rules! impl_verification_key {
                 index: &$WasmIndex,
             ) -> WasmPlonkVerifierIndex {
                 {
-                    let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
+                    let ptr: &mut poly_commitment::srs::SRS<GAffine> =
                         unsafe { &mut *(std::sync::Arc::as_ptr(&index.0.as_ref().srs) as *mut _) };
                     ptr.add_lagrange_basis(index.0.as_ref().cs.domain.d1);
                 }
@@ -598,7 +578,6 @@ macro_rules! impl_verification_key {
                         group_gen: $F::one().into(),
                     },
                     max_poly_size: 0,
-                    max_quot_size: 0,
                     public_: 0,
                     prev_challenges: 0,
                     srs: $WasmSrs(Arc::new(SRS::create(0))),
@@ -611,7 +590,6 @@ macro_rules! impl_verification_key {
                         mul_comm: comm(),
                         emul_comm: comm(),
                         endomul_scalar_comm: comm(),
-                        chacha_comm: vec![].into(),
                     },
                     shifts:
                         WasmShifts {
