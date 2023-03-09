@@ -77,13 +77,14 @@ let%test_unit "generic add gadget" =
   assert (Bool.equal (test_generic_add 2 4 7) false) ;
   ()
 
-(* GENERIC MULTIPLICATION *)
+(* EXAMPLE generic multiplication gate gadget *)
 
 let mul (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
     Circuit.Field.t =
-  (* Witness computation *)
+  let open Circuit in
+  (* Witness computation: prod = left_input + right_input *)
   let prod =
     exists Field.typ ~compute:(fun () ->
         let left_input = As_prover.read Field.typ left_input in
@@ -91,8 +92,8 @@ let mul (type f)
         Field.Constant.mul left_input right_input )
   in
 
-  (* Set up generic gate *)
-  with_label "generic_mul" (fun () ->
+  (* Set up generic mul gate *)
+  with_label "generic_mul_gadget" (fun () ->
       assert_
         { annotation = Some __LOC__
         ; basic =
@@ -100,7 +101,7 @@ let mul (type f)
               (Basic
                  { l = (Field.Constant.zero, left_input)
                  ; r = (Field.Constant.zero, right_input)
-                 ; o = (negate Field.Constant.one, prod)
+                 ; o = (Option.value_exn Field.(to_constant (negate one)), prod)
                  ; m = Field.Constant.one
                  ; c = Field.Constant.zero
                  } )
