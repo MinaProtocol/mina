@@ -22,7 +22,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   (* TODO: test snark work *)
   let config =
     let open Test_config in
-    (* let open Test_config.Wallet in *)
     let make_timing ~min_balance ~cliff_time ~cliff_amount ~vesting_period
         ~vesting_increment : Mina_base.Account_timing.t =
       let open Currency in
@@ -87,9 +86,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       wait_for t
         (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
     in
-    (* let[@warning "-8"] [ untimed_node_a; untimed_node_b; timed_node_c ] =
-         Network.block_producers network
-       in *)
     let untimed_node_a =
       Core.String.Map.find_exn
         (Network.block_producers network)
@@ -103,9 +99,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let timed_node_c =
       Core.String.Map.find_exn (Network.block_producers network) "timed-node-c"
     in
-    (* let[@warning "-8"] [ fish1; fish2 ] =
-         Network.extra_genesis_keypairs network
-       in *)
     let fish1 =
       Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1"
     in

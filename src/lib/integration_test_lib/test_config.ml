@@ -8,8 +8,6 @@ module Container_images = struct
     }
 end
 
-(* module Labeled_keypair = Map.Make(String) *)
-
 module Test_Account = struct
   type t =
     { account_name : string
@@ -71,11 +69,7 @@ let default =
   ; genesis_ledger = []
   ; block_producers = []
   ; snark_coordinator = None
-  ; snark_worker_fee =
-      "0.025"
-      (* ; snark_worker_public_key =
-          (let pk, _ = (Lazy.force Mina_base.Sample_keypairs.keypairs).(0) in
-           Signature_lib.Public_key.Compressed.to_string pk ) *)
+  ; snark_worker_fee = "0.025"
   ; num_archive_nodes = 0
   ; log_precomputed_blocks = false (* ; num_plain_nodes = 0 *)
   ; proof_config = proof_config_default

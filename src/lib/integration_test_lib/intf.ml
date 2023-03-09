@@ -209,8 +209,6 @@ module Engine = struct
 
     type t
 
-    (* val labeled_keypairs : ( Signature_lib.Public_key.Compressed.t * Signature_lib.Private_key.t ) String.Map.t *)
-
     val constants : t -> Test_config.constants
 
     val constraint_constants : t -> Genesis_constants.Constraint_constants.t
