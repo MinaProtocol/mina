@@ -1,8 +1,8 @@
 steps:
   - command: echo "Hello! This is the new pipeline"
     label: "Example Test"
-  - command: "example.sh"
+  - command: "buildkite/pipelines/example.sh"
     label: "Shell script test"
-  - command: "python3 example.py"
+  - command: "python3 ./buildkite/pipelines/example.py"
     label: "Python script test"
   
