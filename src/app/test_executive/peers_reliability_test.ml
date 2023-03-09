@@ -53,11 +53,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let node_c =
       Core.String.Map.find_exn (Network.block_producers network) "node-c"
     in
-    let%bind () = wait_for t (Wait_condition.nodes_to_initialize [ node_c ]) in
     (* witness the node_c frontier load on initialization *)
     let%bind () =
-      wait_for t @@ Wait_condition.persisted_frontier_loaded node_c
+      wait_for t
+      @@ ( Wait_condition.persisted_frontier_loaded node_c
+         |> Wait_condition.with_timeouts
+              ~soft_timeout:
+                (Network_time_span.Literal
+                   (Time.Span.of_ms (20. *. 60. *. 1000.)) )
+              ~hard_timeout:
+                (Network_time_span.Literal
+                   (Time.Span.of_ms (20. *. 60. *. 1000.)) ) )
     in
+    (* let%bind () = wait_for t (Wait_condition.nodes_to_initialize [ node_c ]) in *)
     let%bind () =
       wait_for t
         (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
