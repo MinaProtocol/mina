@@ -33,7 +33,7 @@ let check_json ~input_typ ~return_typ ~circuit filename () =
 (* monadic API tests *)
 
 (** Both the monadic and imperative API will produce the same circuit hash. *)
-let expected = "5357346d161dcccaa547c7999b8148db"
+let expected = "11a23260731ffbc56c21292f5263afdd"
 
 module MonadicAPI = struct
   module Impl = Snarky_backendless.Snark.Make (struct
