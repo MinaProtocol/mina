@@ -8,18 +8,18 @@ let range_check64 (type f)
     (v0 : Circuit.Field.t) =
   let open Circuit in
   (* Create sublimbs *)
-  let v0p2 = Common.field_bits_to_field (module Circuit) v0 52 64 in
-  let v0p3 = Common.field_bits_to_field (module Circuit) v0 40 52 in
-  let v0p4 = Common.field_bits_to_field (module Circuit) v0 28 40 in
-  let v0p5 = Common.field_bits_to_field (module Circuit) v0 16 28 in
-  let v0c0 = Common.field_bits_to_field (module Circuit) v0 14 16 in
-  let v0c1 = Common.field_bits_to_field (module Circuit) v0 12 14 in
-  let v0c2 = Common.field_bits_to_field (module Circuit) v0 10 12 in
-  let v0c3 = Common.field_bits_to_field (module Circuit) v0 8 10 in
-  let v0c4 = Common.field_bits_to_field (module Circuit) v0 6 8 in
-  let v0c5 = Common.field_bits_to_field (module Circuit) v0 4 6 in
-  let v0c6 = Common.field_bits_to_field (module Circuit) v0 2 4 in
-  let v0c7 = Common.field_bits_to_field (module Circuit) v0 0 2 in
+  let v0p2 = Common.field_bits_le_to_field (module Circuit) v0 52 64 in
+  let v0p3 = Common.field_bits_le_to_field (module Circuit) v0 40 52 in
+  let v0p4 = Common.field_bits_le_to_field (module Circuit) v0 28 40 in
+  let v0p5 = Common.field_bits_le_to_field (module Circuit) v0 16 28 in
+  let v0c0 = Common.field_bits_le_to_field (module Circuit) v0 14 16 in
+  let v0c1 = Common.field_bits_le_to_field (module Circuit) v0 12 14 in
+  let v0c2 = Common.field_bits_le_to_field (module Circuit) v0 10 12 in
+  let v0c3 = Common.field_bits_le_to_field (module Circuit) v0 8 10 in
+  let v0c4 = Common.field_bits_le_to_field (module Circuit) v0 6 8 in
+  let v0c5 = Common.field_bits_le_to_field (module Circuit) v0 4 6 in
+  let v0c6 = Common.field_bits_le_to_field (module Circuit) v0 2 4 in
+  let v0c7 = Common.field_bits_le_to_field (module Circuit) v0 0 2 in
 
   (* Generic gate with Zero needed ? *)
 
@@ -82,12 +82,12 @@ let%test_unit "range_check64 gadget" =
 
   (* Positive tests *)
   (* assert (Bool.equal (test_range_check64 "0") true) ;
-  assert (Bool.equal (test_range_check64 "4294967") true) ;
-  assert (Bool.equal (test_range_check64 "18446744073709551615") true) ; *)
+     assert (Bool.equal (test_range_check64 "4294967") true) ;
+     assert (Bool.equal (test_range_check64 "18446744073709551615") true) ; *)
   (* Negative tests *)
   (* assert (Bool.equal (test_range_check64 "18446744073709551616") false) ;
-  assert (
-    Bool.equal
-      (test_range_check64 "170141183460469231731687303715884105728")
-      false ) ; *)
+     assert (
+       Bool.equal
+         (test_range_check64 "170141183460469231731687303715884105728")
+         false ) ; *)
   ()
