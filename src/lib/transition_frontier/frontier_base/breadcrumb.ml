@@ -10,7 +10,7 @@ module T = struct
 
   type t =
     { validated_transition : Mina_block.Validated.t
-    ; staged_ledger : Staged_ledger.t [@sexp.opaque]
+    ; staged_ledger : (Staged_ledger.t[@sexp.opaque])
     ; just_emitted_a_proof : bool
     ; transition_receipt_time : Time.t option
     }

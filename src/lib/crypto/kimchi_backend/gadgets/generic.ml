@@ -2,8 +2,7 @@ open Core_kernel
 
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
-(* GENERIC ADDITION *)
-
+(* EXAMPLE generic addition gate gadget *)
 let add (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :

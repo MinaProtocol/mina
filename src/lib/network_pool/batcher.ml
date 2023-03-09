@@ -31,16 +31,17 @@ type ('init, 'partially_validated, 'result) t =
   ; weight : 'init -> int
   ; max_weight_per_call : int option
   ; verifier :
-         (* The batched verifier may make partial progress on its input so that we can
-            save time when it is re-verified in a smaller batch in the case that a batch
-            fails to verify. *)
-         [ `Init of 'init | `Partially_validated of 'partially_validated ] list
-      -> [ `Valid of 'result
-         | Verifier.invalid
-         | `Potentially_invalid of 'partially_validated * Error.t ]
-         list
-         Deferred.Or_error.t
-        [@sexp.opaque]
+      (   (* The batched verifier may make partial progress on its input so that we can
+             save time when it is re-verified in a smaller batch in the case that a batch
+             fails to verify.
+          *)
+          [ `Init of 'init | `Partially_validated of 'partially_validated ] list
+       -> [ `Valid of 'result
+          | Verifier.invalid
+          | `Potentially_invalid of 'partially_validated * Error.t ]
+          list
+          Deferred.Or_error.t
+      [@sexp.opaque] )
   }
 [@@deriving sexp]
 

@@ -120,9 +120,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "Wait for nodes to initialize"
         (wait_for t
-           (Wait_condition.nodes_to_initialize
-              ( Network.seeds network @ block_producer_nodes
-              @ Network.snark_coordinators network ) ) )
+           (Wait_condition.nodes_to_initialize @@ Network.all_nodes network) )
     in
     let node = List.hd_exn block_producer_nodes in
     let constraint_constants = Network.constraint_constants network in
@@ -176,7 +174,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let new_permissions : Permissions.t =
         { Permissions.user_default with
           edit_state = Permissions.Auth_required.Proof
-        ; edit_sequence_state = Proof
+        ; edit_action_state = Proof
         ; set_delegate = Proof
         ; set_verification_key = Proof
         ; set_permissions = Proof
