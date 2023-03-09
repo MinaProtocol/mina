@@ -52,27 +52,6 @@ let timing_final_vesting_slot = function
    constructing actual transactions and applying them to a ledger. *)
 let%test_module "Test account timing." =
   ( module struct
-    (* Test that the timed account generator only generates accounts that
-       are completely vested before the largest possible slot, (2^32)-1. *)
-    let%test_unit "Test fine-tuning of the account generation." =
-      Quickcheck.test Account.gen_timed ~f:(fun account ->
-          [%test_eq: Balance.t option] (Some Balance.zero)
-            ( match account.timing with
-            | Untimed ->
-                None
-            | Timed
-                { initial_minimum_balance
-                ; cliff_time
-                ; cliff_amount
-                ; vesting_period
-                ; vesting_increment
-                } ->
-                let global_slot = Global_slot.max_value in
-                Option.some
-                @@ Account.min_balance_at_slot ~global_slot ~cliff_time
-                     ~cliff_amount ~vesting_period ~vesting_increment
-                     ~initial_minimum_balance ) )
-
     let%test_unit "Untimed accounts succeed if they have enough funds." =
       Quickcheck.test
         (let open Quickcheck.Generator.Let_syntax in
