@@ -12,7 +12,7 @@ let%test_module "valid_size" =
           ; slots_per_epoch = 5
           ; slots_per_sub_window = 5
           ; delta = 5
-          ; genesis_state_timestamp = 100L
+          ; genesis_state_timestamp = Genesis_constants.of_time (Time.now ())
           }
       ; txpool_max_size = 5
       ; num_accounts = Some 1
