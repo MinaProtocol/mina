@@ -1,7 +1,7 @@
 // test proving a basic circuit
 
 import snarkyjs from "./snarkyjs.js";
-await snarkyjs.snarky_ready;
+await snarkyjs.snarkyReady;
 let { Poseidon, Circuit, Field } = snarkyjs;
 
 export { basicCircuit };

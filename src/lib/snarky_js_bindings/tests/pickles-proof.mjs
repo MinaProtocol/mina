@@ -1,7 +1,7 @@
 // test creating a recursive proof with pickles
 
 import snarkyjs from "./snarkyjs.js";
-await snarkyjs.snarky_ready;
+await snarkyjs.snarkyReady;
 let { Circuit, Field, Pickles, Poseidon } = snarkyjs;
 
 export { picklesProof };
