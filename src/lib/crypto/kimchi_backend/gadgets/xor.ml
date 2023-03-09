@@ -193,8 +193,8 @@ let%test_unit "xor16 gadget" =
   assert (Bool.equal (test_xor zero zero zero 4) true) ;
   assert (Bool.equal (test_xor Field.of_int 43210 Field.of_int 56789 Field.of_int 29983 16) true) ;
   assert (Bool.equal (test_xor Field.of_int 767430 Field.of_int 974317 Field.of_int 354347  20) true) ;
-  (* 0x5A5A5A5A5A5A5A5A xor 0xA5A5A5A5A5A5A5A5 = 0xFFFFFFFFFFFFFF*)
-  assert (Bool.equal (test_xor Common.field_from_base10 "0750096245555160156" Common.field_from_base10 "54015628281582163911" Common.field_from_base10 "51615590737044764481"  64) true) ;
+  (* 0x5A5A5A5A5A5A5A5A xor 0xA5A5A5A5A5A5A5A5 = 0xFFFFFFFFFFFFFFFF*)
+  assert (Bool.equal (test_xor Common.field_from_base10 "6510615555426900570" Common.field_from_base10 "18446744073709551615" Common.field_from_base10 "72057594037927935"  64) true) ;
   (* Negatve tests *)
   assert (Bool.equal (test_xor 1 0 0 1) false) ;
   assert (Bool.equal (test_xor 1111 2222 0 16) false) ;
