@@ -71,12 +71,28 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Test_config in
     { default with
       requires_graphql = true
+    ; genesis_ledger =
+        [ { account_name = "whale1-key"
+          ; balance = "9000000000"
+          ; timing = Untimed
+          }
+        ; { account_name = "whale2-key"
+          ; balance = "1000000000"
+          ; timing = Untimed
+          }
+        ; { account_name = "snark-node-key"; balance = "100"; timing = Untimed }
+        ]
     ; block_producers =
-        [ { balance = "9000000000"; timing = Untimed }
-        ; { balance = "1000000000"; timing = Untimed }
+        [ { node_name = "whale1"; account_name = "whale1-key" }
+        ; { node_name = "whale2"; account_name = "whale2-key" }
         ]
     ; num_archive_nodes = 1
-    ; num_snark_workers = 2
+    ; snark_coordinator =
+        Some
+          { node_name = "snark-node"
+          ; account_name = "snark-node-key"
+          ; worker_nodes = 2
+          }
     ; snark_worker_fee = "0.0001"
     }
 
@@ -84,15 +100,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let run network t =
     let open Malleable_error.Let_syntax in
-    let block_producer_nodes = Network.block_producers network in
     let%bind () =
       section_hard "Wait for nodes to initialize"
         (wait_for t
            (Wait_condition.nodes_to_initialize
-              ( Network.seeds network @ block_producer_nodes
-              @ Network.snark_coordinators network ) ) )
+              (Core.String.Map.data (Network.all_nodes network)) ) )
     in
-    let whale1 = List.hd_exn block_producer_nodes in
+    let whale1 =
+      Core.String.Map.find_exn (Network.block_producers network) "whale1"
+    in
     let%bind whale1_pk = pub_key_of_node whale1 in
     let%bind whale1_sk = priv_key_of_node whale1 in
     let constraint_constants = Network.constraint_constants network in
