@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Base against origin/compatible by default, but use pull-request base otherwise
 BASE=${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-compatible}
