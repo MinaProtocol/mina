@@ -52,8 +52,11 @@ let%test_unit "helper field_bits_le_to_field" =
   Printf.printf "field_bits_le_to_field test\n" ;
   (* Import the gadget test runner *)
   let open Kimchi_gadgets_test_runner in
-  (* TODO: lazy? Initialize the SRS cache. *)
-  let () = Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] in
+  (* Initialize the SRS cache. *)
+  let () =
+    try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+  in
+
   let _proof_keypair, _proof =
     Runner.generate_and_verify_proof (fun () ->
         let open Runner.Impl in

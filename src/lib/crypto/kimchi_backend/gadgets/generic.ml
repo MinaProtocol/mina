@@ -37,13 +37,15 @@ let%test_unit "generic add gadget" =
   (* Import the gadget test runner *)
   let open Kimchi_gadgets_test_runner in
   (* Initialize the SRS cache. *)
-  (* TODO: lazy let () = Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] in *)
+  let () =
+    try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+  in
 
   (* Helper to test generic add gate gadget
    *   Inputs operands and expected output: left_input + right_input = sum
    *   Returns true if constraints are satisfied, false otherwise.
    *)
-  let test_generic_add left_input right_input sum =
+  let test_generic_add left_input right_input sum : bool =
     try
       let _proof_keypair, _proof =
         Runner.generate_and_verify_proof (fun () ->
@@ -67,7 +69,11 @@ let%test_unit "generic add gadget" =
             Boolean.Assert.is_true (Field.equal sum sum) )
       in
       true
-    with _ -> false
+    with exn ->
+      Format.eprintf "Error: %s@." (Exn.to_string exn) ;
+      Printexc.print_backtrace Stdlib.stdout ;
+      Stdlib.(flush stdout) ;
+      false
   in
 
   (* Positive tests *)

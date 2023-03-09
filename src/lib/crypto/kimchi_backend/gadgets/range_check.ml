@@ -57,12 +57,14 @@ let%test_unit "range_check64 gadget" =
   (* Import the gadget test runner *)
   let open Kimchi_gadgets_test_runner in
   (* Initialize the SRS cache. *)
-  (* TODO: lazy? let () = Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] in *)
+  let () =
+    try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+  in
 
   (* Helper to test range_check64 gadget
    *   Input: value to be range checked in [0, 2^64)
    *)
-  let _test_range_check64 base10 =
+  let _test_range_check64 base10 : bool =
     try
       let _proof_keypair, _proof =
         Runner.generate_and_verify_proof (fun () ->
@@ -73,16 +75,19 @@ let%test_unit "range_check64 gadget" =
             in
             range_check64 (module Runner.Impl) value ;
             (* Padding *)
-            Field.Assert.equal value value ;
             Boolean.Assert.is_true (Field.equal value value) )
       in
       true
-    with _ -> false
+    with exn ->
+      Format.eprintf "Error: %s@." (Exn.to_string exn) ;
+      Printexc.print_backtrace Stdlib.stdout ;
+      Stdlib.(flush stdout) ;
+      false
   in
 
   (* Positive tests *)
-  (* assert (Bool.equal (test_range_check64 "0") true) ;
-     assert (Bool.equal (test_range_check64 "4294967") true) ;
+  (* assert (Bool.equal (test_range_check64 "0") true) ; *)
+  (* assert (Bool.equal (test_range_check64 "4294967") true) ;
      assert (Bool.equal (test_range_check64 "18446744073709551615") true) ; *)
   (* Negative tests *)
   (* assert (Bool.equal (test_range_check64 "18446744073709551616") false) ;
