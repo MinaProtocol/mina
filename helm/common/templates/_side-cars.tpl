@@ -272,3 +272,54 @@ spec:
     targetPort: "http-logs"
 {{- end }}
 {{- end }}
+
+
+{{/*
+Side-Car - InternalTraceService: container
+*/}}
+{{- define "sideCar.internalTrace.containerSpec" }}
+{{- if .internalTrace.enable }}
+- name: internal-trace
+  image: {{ .internalTrace.image }}
+  imagePullPolicy: Always
+  args: ["serve", "--trace-file", "/mina-logs/internal-tracing/internal-trace.jsonl", "--port", "8000"]
+  env:
+  - name: POD
+    valueFrom:
+      fieldRef:
+        fieldPath: metadata.name
+  - name: NAMESPACE
+    valueFrom:
+      fieldRef:
+        fieldPath: metadata.namespace
+  ports:
+  - name: trace-graphql
+    protocol: TCP
+    containerPort: 8000
+  volumeMounts:
+  - mountPath: /mina-logs
+    name: {{ template "sideCar.logs.minaLogsVolumeName" }}
+{{- end }}
+{{- end }}
+
+{{/*
+Side-Car - LogService: service definition
+*/}}
+{{- define "sideCar.internalTrace.service" }}
+{{- if .internalTrace.enable }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .name }}-internal-trace-graphql
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ .name }}
+  ports:
+  - name: trace-graphql
+    protocol: TCP
+    port: 80
+    targetPort: "trace-graphql"
+{{- end }}
+{{- end }}
