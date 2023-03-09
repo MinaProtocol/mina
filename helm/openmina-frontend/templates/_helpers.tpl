@@ -57,6 +57,10 @@ http {
            set $upstream {{ $node }}-graphql.{{ $namespace }}.svc.cluster.local;
            proxy_pass http://$upstream/graphql;
         }
+        location /{{ $node }}/internal-trace/graphql {
+           set $upstream {{ $node }}-internal-trace-graphql.{{ $namespace }}.svc.cluster.local;
+           proxy_pass http://$upstream/graphql;
+        }
         location /{{ $node }}/resources {
            set $upstream {{ $node }}-resources.{{ $namespace }}.svc.cluster.local;
            rewrite ^/{{ $node }}/resources(.*) /$1 break;
