@@ -149,5 +149,5 @@ let%test_unit "generic mul gadget" =
   assert (Bool.equal (test_generic_mul 0 0 0) true) ;
   assert (Bool.equal (test_generic_mul 1 2 2) true) ;
   (* Negatve tests *)
-  assert (Bool.equal (test_generic_add 1 0 1) false) ;
-  assert (Bool.equal (test_generic_add 2 4 7) false)
+  assert (Bool.equal (test_generic_mul 1 0 1) false) ;
+  assert (Bool.equal (test_generic_mul 2 4 7) false)
