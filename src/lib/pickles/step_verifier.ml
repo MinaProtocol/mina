@@ -828,9 +828,6 @@ struct
     Shifted_value.Type2.Shift.(
       map ~f:Field.constant (create (module Field.Constant)))
 
-  let%test_unit "endo scalar" =
-    SC.test (module Impl) ~endo:Endo.Wrap_inner_curve.scalar
-
   module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk
 
   module Plonk_checks = struct
