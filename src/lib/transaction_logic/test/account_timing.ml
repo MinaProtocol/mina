@@ -13,38 +13,6 @@ let init_min_bal a =
 let cliff_time a =
   Option.value ~default:Global_slot.zero @@ Account.cliff_time a
 
-let final_vesting_slot ~initial_minimum_balance ~cliff_time ~cliff_amount
-    ~vesting_period ~vesting_increment =
-  let open Unsigned in
-  let to_vest =
-    Balance.(initial_minimum_balance - cliff_amount)
-    |> Option.value_map ~default:UInt64.zero ~f:Balance.to_uint64
-  in
-  let incr = Amount.to_uint64 vesting_increment in
-  let periods =
-    let open UInt64 in
-    let open Infix in
-    (to_vest / incr) + if equal (rem to_vest incr) zero then zero else one
-  in
-  let open UInt32 in
-  let open Infix in
-  Global_slot.to_uint32 cliff_time
-  + (UInt64.to_uint32 periods * Global_slot.to_uint32 vesting_period)
-  |> Global_slot.of_uint32
-
-let timing_final_vesting_slot = function
-  | Account.Timing.Untimed ->
-      Global_slot.zero
-  | Timed
-      { initial_minimum_balance
-      ; cliff_time
-      ; cliff_amount
-      ; vesting_period
-      ; vesting_increment
-      } ->
-      final_vesting_slot ~initial_minimum_balance ~cliff_time ~cliff_amount
-        ~vesting_period ~vesting_increment
-
 (* These tests verify basic invariants of timed accounts' behaviour.
    This is done very simply by exercising the function which determines
    whether a transaction is valid. See the Account_timing modules in
@@ -120,7 +88,7 @@ let%test_module "Test account timing." =
         let%bind amount = Amount.(gen_incl zero available_amount) in
         let final_slot =
           Global_slot.(
-            sub (timing_final_vesting_slot account.timing) (of_int 1))
+            sub (Account.timing_final_vesting_slot account.timing) (of_int 1))
           |> Option.value ~default:Global_slot.zero
         in
         let%map slot = Global_slot.(gen_incl zero final_slot) in
@@ -136,7 +104,7 @@ let%test_module "Test account timing." =
         let%bind amount =
           Amount.(gen_incl zero (Balance.to_amount account.balance))
         in
-        let final_slot = timing_final_vesting_slot account.timing in
+        let final_slot = Account.timing_final_vesting_slot account.timing in
         let%map slot = Global_slot.(gen_incl final_slot max_value) in
         (account, amount, slot))
         ~f:(fun (account, txn_amount, txn_global_slot) ->
