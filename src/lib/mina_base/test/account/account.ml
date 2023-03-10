@@ -232,4 +232,27 @@ let%test_module "Test account's timing." =
               account.balance - to_amount minimum_balance
               |> Option.value ~default:zero)
             Account.(liquid_balance_at_slot account ~global_slot) )
+
+    let%test_unit "Minimum balance checked equal to unchecked." =
+      let global_slot_var gs = Global_slot.(Checked.constant @@ to_uint32 gs) in 
+      Quickcheck.test
+        (let open Quickcheck.Generator.Let_syntax in
+         let%bind timing = gen_timing in
+         let%map global_slot = Global_slot.gen in
+         (timing, global_slot))
+        ~f:(fun (timing, global_slot) ->
+          let min_balance = min_balance_at_slot timing ~global_slot in
+          let min_balance_checked =
+            Account.Checked.min_balance_at_slot
+              ~initial_minimum_balance:Balance.(var_of_t timing.initial_minimum_balance)
+              ~cliff_amount:Amount.(var_of_t timing.cliff_amount)
+              ~cliff_time:(global_slot_var timing.cliff_time)
+              ~vesting_increment:Amount.(var_of_t timing.vesting_increment)
+              ~vesting_period:(global_slot_var timing.vesting_period)
+              ~global_slot:(global_slot_var global_slot)
+            |> Snarky_backendless.(Checked_runner.Simple.map
+                                     ~f:(As_prover0.read Balance.typ))
+            |> Snark_params.Tick.run_and_check
+          in
+          [%test_eq: Balance.t Or_error.t] (Ok min_balance) min_balance_checked)
   end )
