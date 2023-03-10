@@ -31,6 +31,8 @@ module Step : sig
 
     module Constant = Backend.Tock.Field
 
+    val forbidden_shifted_values : (Impl.field * bool) list
+
     val typ_unchecked : (t, Constant.t) Typ.t
 
     val typ : (t, Constant.t, Internal_Basic.field) Snarky_backendless.Typ.t
@@ -139,6 +141,8 @@ module Wrap : sig
     type t = Field.t
 
     module Constant = Backend.Tick.Field
+
+    val forbidden_shifted_values : Impl.field list
 
     val typ_unchecked : (Impl.Field.t, Backend.Tick.Field.t) Impl.Typ.t
 
