@@ -762,8 +762,7 @@ let incremental_balance_between_slots ~start_slot ~end_slot ~cliff_time
     ~cliff_amount ~vesting_period ~vesting_increment ~initial_minimum_balance :
     Unsigned.UInt64.t =
   let open Unsigned in
-  if Global_slot.(end_slot <= start_slot) then
-    UInt64.zero
+  if Global_slot.(end_slot <= start_slot) then UInt64.zero
   else
     let min_balance_at_start_slot =
       min_balance_at_slot ~global_slot:start_slot ~cliff_time ~cliff_amount
@@ -854,14 +853,14 @@ let liquid_balance_at_slot ~global_slot (account : t) =
               ~vesting_period ~vesting_increment ~initial_minimum_balance ) )
       |> Option.value_exn
 
-let gen =
+let gen : t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind public_key = Public_key.Compressed.gen in
   let%bind token_id = Token_id.gen in
   let%map balance = Currency.Balance.gen in
   create (Account_id.create public_key token_id) balance
 
-let gen_with_constrained_balance ~low ~high =
+let gen_with_constrained_balance ~low ~high : t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind public_key = Public_key.Compressed.gen in
   let%bind token_id = Token_id.gen in
@@ -916,7 +915,7 @@ let gen_timing (account_balance : Balance.t) :
   ; vesting_increment
   }
 
-let gen_timed =
+let gen_timed : t Quickcheck.Generator.t =
   let open Quickcheck in
   let open Generator.Let_syntax in
   let%bind account =
