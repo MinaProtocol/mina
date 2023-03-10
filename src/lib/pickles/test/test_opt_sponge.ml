@@ -1,3 +1,6 @@
+module Wrap_main_inputs = Pickles__Wrap_main_inputs
+module Opt_sponge = Pickles__Opt_sponge
+
 module Test_make
     (Impl : Snarky_backendless.Snark_intf.Run)
     (P : Sponge.Intf.Permutation with type Field.t = Impl.Field.t) =

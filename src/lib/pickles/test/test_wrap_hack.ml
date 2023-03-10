@@ -1,5 +1,6 @@
 open Pickles_types
 open Backend
+module Wrap_main_inputs = Pickles__Wrap_main_inputs
 
 (* Check that the pre-absorbing technique works. I.e., that it's consistent with
    the actual definition of hash_messages_for_next_wrap_proof. *)
