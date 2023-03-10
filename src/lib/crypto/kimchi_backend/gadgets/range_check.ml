@@ -8,7 +8,7 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
  *)
 let range_check0 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    ?(is_64bit : bool = false) ?(is_compact : bool = false)
+    ~(label : string) ?(is_64bit : bool = false) ?(is_compact : bool = false)
     (v0 : Circuit.Field.t) =
   let open Circuit in
   (* Define a shorthand helper *)
@@ -36,10 +36,6 @@ let range_check0 (type f)
   let compact =
     if is_compact then Field.Constant.one else Field.Constant.zero
   in
-
-  (* Prepare debug label *)
-  let label = if is_64bit then "range_check64" else "range_check" in
-  let label = if is_compact then label ^ "_compact" else label in
 
   (* Create RangeCheck0 gate *)
   with_label label (fun () ->
@@ -71,7 +67,7 @@ let range_check0 (type f)
 (* Helper to create RangeCheck1 gate *)
 let range_check1 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    ?(is_compact : bool = false) (v0 : Circuit.Field.t) (v1 : Circuit.Field.t)
+    ~(label : string) (v0 : Circuit.Field.t) (v1 : Circuit.Field.t)
     (v2 : Circuit.Field.t) (v12 : Circuit.Field.t) =
   let open Circuit in
   (* Define shorthand helpers *)
@@ -108,11 +104,6 @@ let range_check1 (type f)
   let v2c17 = bits_le_to_field v2 4 6 in
   let v2c18 = bits_le_to_field v2 2 4 in
   let v2c19 = bits_le_to_field v2 0 2 in
-
-  (* Prepare debug label *)
-  let label =
-    if is_compact then "multi_range_check_compact" else "multi_range_check"
-  in
 
   (* Create RangeCheck0 gate *)
   with_label label (fun () ->
@@ -158,13 +149,17 @@ let range_check1 (type f)
 let range_check (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (v0 : Circuit.Field.t) =
-  range_check0 (module Circuit) ~is_64bit:false ~is_compact:false v0
+  range_check0
+    (module Circuit)
+    ~label:"range_check" ~is_64bit:false ~is_compact:false v0
 
 (* 64-bit range-check gadget - checks v0 \in [0, 2^64) *)
 let range_check64 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (v0 : Circuit.Field.t) =
-  range_check0 (module Circuit) ~is_64bit:true ~is_compact:false v0
+  range_check0
+    (module Circuit)
+    ~label:"range_check64" ~is_64bit:true ~is_compact:false v0
 
 (* 64-bit range-check gadget - checks v0 \in [0, 2^64) *)
 let multi_range_check (type f)
@@ -173,6 +168,11 @@ let multi_range_check (type f)
     (v1 : Circuit.Field.t) (* TODO: change params to v10, v2*)
     (v2 : Circuit.Field.t) =
   let open Circuit in
+  (* Prepare label *)
+  let label =
+    if is_compact then "multi_range_check_compact" else "multi_range_check"
+  in
+  (* Prepare range-check values *)
   let v0, v1, v2, v12 =
     if is_compact then
       let v01 =
@@ -188,9 +188,9 @@ let multi_range_check (type f)
       (v2, v0, v1, v01)
     else (v0, v1, v2, Field.zero)
   in
-  range_check0 (module Circuit) ~is_64bit:false ~is_compact:false v0 ;
-  range_check0 (module Circuit) ~is_64bit:false ~is_compact v1 ;
-  range_check1 (module Circuit) ~is_compact v0 v1 v2 v12
+  range_check0 (module Circuit) ~label ~is_64bit:false ~is_compact:false v0 ;
+  range_check0 (module Circuit) ~label ~is_64bit:false ~is_compact v1 ;
+  range_check1 (module Circuit) ~label v0 v1 v2 v12
 
 (*********)
 (* Tests *)
