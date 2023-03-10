@@ -2,7 +2,7 @@ open Core_kernel
 
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
-(* Example generic and gate gadget *)
+(* EXAMPLE generic addition gate gadget *)
 let add (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
@@ -32,7 +32,37 @@ let add (type f)
         } ;
       sum )
 
-let%test_unit "generic add gadget" =
+(* EXAMPLE generic multiplication gate gadget *)
+let mul (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
+    Circuit.Field.t =
+  let open Circuit in
+  (* Witness computation: prod = left_input + right_input *)
+  let prod =
+    exists Field.typ ~compute:(fun () ->
+        let left_input = As_prover.read Field.typ left_input in
+        let right_input = As_prover.read Field.typ right_input in
+        Field.Constant.mul left_input right_input )
+  in
+
+  (* Set up generic mul gate *)
+  with_label "generic_mul_gadget" (fun () ->
+      assert_
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (Basic
+                 { l = (Field.Constant.zero, left_input)
+                 ; r = (Field.Constant.zero, right_input)
+                 ; o = (Option.value_exn Field.(to_constant (negate one)), prod)
+                 ; m = Field.Constant.one
+                 ; c = Field.Constant.zero
+                 } )
+        } ;
+      prod )
+
+let%test_unit "generic gadgets" =
   (* Import the gadget test runner *)
   let open Kimchi_gadgets_test_runner in
   (* Initialize the SRS cache. *)
@@ -69,50 +99,6 @@ let%test_unit "generic add gadget" =
     with _ -> false
   in
 
-  (* Positive tests *)
-  assert (Bool.equal (test_generic_add 0 0 0) true) ;
-  assert (Bool.equal (test_generic_add 1 2 3) true) ;
-  (* Negatve tests *)
-  assert (Bool.equal (test_generic_add 1 0 0) false) ;
-  assert (Bool.equal (test_generic_add 2 4 7) false) ;
-  ()
-
-(* GENERIC MULTIPLICATION *)
-
-let mul (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
-    Circuit.Field.t =
-  (* Witness computation *)
-  let prod =
-    exists Field.typ ~compute:(fun () ->
-        let left_input = As_prover.read Field.typ left_input in
-        let right_input = As_prover.read Field.typ right_input in
-        Field.Constant.mul left_input right_input )
-  in
-
-  (* Set up generic gate *)
-  with_label "generic_mul" (fun () ->
-      assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (Basic
-                 { l = (Field.Constant.zero, left_input)
-                 ; r = (Field.Constant.zero, right_input)
-                 ; o = (negate Field.Constant.one, prod)
-                 ; m = Field.Constant.one
-                 ; c = Field.Constant.zero
-                 } )
-        } ;
-      prod )
-
-let%test_unit "generic mul gadget" =
-  (* Import the gadget test runner *)
-  let open Kimchi_gadgets_test_runner in
-  (* Initialize the SRS cache. *)
-  let () = Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] in
-
   (* Helper to test generic multimplication gate gadget
    *   Inputs operands and expected output: left_input * right_input = prod
    *   Returns true if constraints are satisfied, false otherwise.
@@ -138,15 +124,26 @@ let%test_unit "generic mul gadget" =
             let result = mul (module Runner.Impl) left_input right_input in
             Field.Assert.equal prod result ;
             (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
-            Boolean.Assert.is_true (Field.equal Field.zero Field.zero) )
+            Boolean.Assert.is_true (Field.equal prod prod) )
       in
       true
     with _ -> false
   in
 
+  (* TEST generic add gadget *)
+  (* Positive tests *)
+  assert (Bool.equal (test_generic_add 0 0 0) true) ;
+  assert (Bool.equal (test_generic_add 1 2 3) true) ;
+  (* Negatve tests *)
+  assert (Bool.equal (test_generic_add 1 0 0) false) ;
+  assert (Bool.equal (test_generic_add 2 4 7) false) ;
+
+  (* TEST generic mul gadget *)
   (* Positive tests *)
   assert (Bool.equal (test_generic_mul 0 0 0) true) ;
   assert (Bool.equal (test_generic_mul 1 2 2) true) ;
   (* Negatve tests *)
-  assert (Bool.equal (test_generic_add 1 0 1) false) ;
-  assert (Bool.equal (test_generic_add 2 4 7) false)
+  assert (Bool.equal (test_generic_mul 1 0 1) false) ;
+  assert (Bool.equal (test_generic_mul 2 4 7) false) ;
+
+  ()
