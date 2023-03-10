@@ -64,84 +64,82 @@ let xor64 (type f)
   let open Circuit in
   xor input1 input2 64
 
-  (* Recursively builds Xor *)
-  let rec xor_rec (type f)
-  (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-  ~input1 ~input2 ~output (length : int) =
+(* Recursively builds Xor *)
+let rec xor_rec (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    ~input1 ~input2 ~output (length : int) =
   let open Circuit in
-  
   (* If inputs are zero and length is zero, add the zero check *)
-  if length = 0 then
   assert (input1 = Field.zero) ;
   assert (input2 = Field.zero) ;
   assert (output = Field.zero) ;
-  with_label "zero_check" (fun () ->
-      assert_
-        { annotation = Some __LOC__
-        ; zero = Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-        (Basic
-           { l = (Field.one, Field.Constant.zero)
-           ; r = (Field.zero, Field.Constant.zero)
-           ; o = (Option.value_exn Field.zero, Field.Constant.zero)
-           ; m = Field.Constant.zero
-           ; c = Field.Constant.one
-           } )
-        };
-        Field.Constant.zero )
+  if length = 0 then
+    with_label "zero_check" (fun () ->
+        assert_
+          { annotation = Some __LOC__
+          ; basic =
+              Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+                (Basic
+                   { l = (Field.one, Field.Constant.zero)
+                   ; r = (Field.zero, Field.Constant.zero)
+                   ; o = (Option.value_exn Field.zero, Field.Constant.zero)
+                   ; m = Field.Constant.zero
+                   ; c = Field.Constant.one
+                   } )
+          } )
   else
-  (* Nibbles *)
-  let in1 = Common.field_bits_le_to_field (module Circuit) input1 0 length in
-  let in2 = Common.field_bits_le_to_field (module Circuit) input2 0 length in
-  let out = Common.field_bits_le_to_field (module Circuit) output 0 length in
-  let in1_0 = Common.field_bits_le_to_field (module Circuit) input1 0 4 in
-  let in1_1 = Common.field_bits_le_to_field (module Circuit) input1 4 8 in
-  let in1_2 = Common.field_bits_le_to_field (module Circuit) input1 8 12 in
-  let in1_3 = Common.field_bits_le_to_field (module Circuit) input1 12 16 in
-  let in2_0 = Common.field_bits_le_to_field (module Circuit) input2 0 4 in
-  let in2_1 = Common.field_bits_le_to_field (module Circuit) input2 4 8 in
-  let in2_2 = Common.field_bits_le_to_field (module Circuit) input2 8 12 in
-  let in2_3 = Common.field_bits_le_to_field (module Circuit) input2 12 16 in
-  let out_0 = Common.field_bits_le_to_field (module Circuit) output 0 4 in
-  let out_1 = Common.field_bits_le_to_field (module Circuit) output 4 8 in
-  let out_2 = Common.field_bits_le_to_field (module Circuit) output 8 12 in
-  let out_3 = Common.field_bits_le_to_field (module Circuit) output 12 16 in
-  
-  (* If length is more than 0, add the Xor gate *)
-  with_label "xor16_gate" (fun () -> 
-      (* Set up Xor gate *)
-      assert_
-        { annotation = Some __LOC__
-        ; xor =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (Xor
-                 { in1 
-                 ; in2 
-                 ; out 
-                 ; in1_0 
-                 ; in1_1
-                 ; in1_2 
-                 ; in1_3
-                 ; in2_0
-                 ; in2_1 
-                 ; in2_2
-                 ; in2_3 
-                 ; out_0 
-                 ; out_1 
-                 ; out_2 
-                 ; out_3 
-                 } )
-        }; out )
-        (* Remove least significant 4 nibbles *)
-        let next_in1 = List.drop input1 16 in 
-        let next_in2 = List.drop input2 16 in
-        let next_out = List.drop output 16 in
-        (* Next length is 4*4 less bits *)
-        let next_length = length - 16 in
-  
-      (* Recursively call xor on the next nibble *)
-      xor_rec (module Circuit) next_input1 next_input2 next_output next_length ;;
-  
+    (* Nibbles *)
+    let in1 = Common.field_bits_le_to_field (module Circuit) input1 0 length in
+    let in2 = Common.field_bits_le_to_field (module Circuit) input2 0 length in
+    let out = Common.field_bits_le_to_field (module Circuit) output 0 length in
+    let in1_0 = Common.field_bits_le_to_field (module Circuit) input1 0 4 in
+    let in1_1 = Common.field_bits_le_to_field (module Circuit) input1 4 8 in
+    let in1_2 = Common.field_bits_le_to_field (module Circuit) input1 8 12 in
+    let in1_3 = Common.field_bits_le_to_field (module Circuit) input1 12 16 in
+    let in2_0 = Common.field_bits_le_to_field (module Circuit) input2 0 4 in
+    let in2_1 = Common.field_bits_le_to_field (module Circuit) input2 4 8 in
+    let in2_2 = Common.field_bits_le_to_field (module Circuit) input2 8 12 in
+    let in2_3 = Common.field_bits_le_to_field (module Circuit) input2 12 16 in
+    let out_0 = Common.field_bits_le_to_field (module Circuit) output 0 4 in
+    let out_1 = Common.field_bits_le_to_field (module Circuit) output 4 8 in
+    let out_2 = Common.field_bits_le_to_field (module Circuit) output 8 12 in
+    let out_3 = Common.field_bits_le_to_field (module Circuit) output 12 16 in
 
+    (* If length is more than 0, add the Xor gate *)
+    with_label "xor16_gate" (fun () ->
+        (* Set up Xor gate *)
+        assert_
+          { annotation = Some __LOC__
+          ; xor =
+              Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+                (Xor
+                   { in1
+                   ; in2
+                   ; out
+                   ; in1_0
+                   ; in1_1
+                   ; in1_2
+                   ; in1_3
+                   ; in2_0
+                   ; in2_1
+                   ; in2_2
+                   ; in2_3
+                   ; out_0
+                   ; out_1
+                   ; out_2
+                   ; out_3
+                   } )
+          } ) ;
+
+    (* Remove least significant 4 nibbles *)
+    let next_in1 = List.drop input1 16 in
+    let next_in2 = List.drop input2 16 in
+    let next_out = List.drop output 16 in
+    (* Next length is 4*4 less bits *)
+    let next_length = length - 16 in
+
+    (* Recursively call xor on the next nibble *)
+    xor_rec (module Circuit) next_input1 next_input2 next_output next_length
 
 let%test_unit "xor gadget" =
   (* Import the gadget test runner *)
