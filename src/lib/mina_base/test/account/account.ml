@@ -36,4 +36,43 @@ let%test_module "Test account's timing." =
                 @@ Account.min_balance_at_slot ~global_slot ~cliff_time
                      ~cliff_amount ~vesting_period ~vesting_increment
                      ~initial_minimum_balance ) )
+
+     let%test_unit "Minimum balance never changes before the cliff time." =
+       Quickcheck.test
+         (let open Quickcheck.Generator.Let_syntax in
+          let%bind timing = Account.gen_timing Balance.max_int in
+          let max_global_slot =
+            Global_slot.(sub timing.cliff_time (of_int 1))
+            |> Option.value_exn
+          in
+          let%map global_slot = Global_slot.(gen_incl zero max_global_slot) in
+          (timing, global_slot))
+         ~f:(fun (timing, global_slot) ->
+           [%test_eq: Balance.t]
+             timing.initial_minimum_balance
+             (min_balance_at_slot timing ~global_slot))
+
+     let%test_unit "Cliff amount is immediately released at cliff_time." =
+       Quickcheck.test
+          (Account.gen_timing Balance.max_int) 
+          ~f:(fun timing ->
+            let min_balance =
+              Balance.(timing.initial_minimum_balance - timing.cliff_amount)
+              |> Option.value_exn
+            in
+           [%test_eq: Balance.t]
+             min_balance
+             (min_balance_at_slot timing ~global_slot:timing.cliff_time))
+
+     let%test_unit "Minimum balance never increases over time." =
+       Quickcheck.test
+         (let open Quickcheck.Generator.Let_syntax in
+          let%bind timing = Account.gen_timing Balance.max_int in
+          let%bind slot1 = Global_slot.gen in
+          let%map slot2 = Global_slot.(gen_incl slot1 max_value) in
+          (timing, slot1, slot2))
+         ~f:(fun (timing, slot1, slot2) ->
+           [%test_pred: Balance.t * Balance.t]
+             (Tuple.T2.uncurry Balance.(>=))
+             (min_balance_at_slot timing ~global_slot:slot1, min_balance_at_slot timing ~global_slot:slot2))
   end)
