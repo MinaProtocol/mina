@@ -15,13 +15,17 @@
   pickles
   pickles.composition_types
   pickles.backend
+  pickles.limb_vector
+  pickles.plonk_checks
   pickles_base
   pickles_types
   kimchi_backend
+  kimchi_backend.common
   kimchi_backend.pasta
   kimchi_backend.pasta.basic
   snarky.backendless
   sponge
+  tuple_lib
   )
  (action (run %{test}))) 
 
