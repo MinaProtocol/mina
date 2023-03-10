@@ -16,7 +16,10 @@
   mina_base
   mina_numbers
   mina_wire_types
-  ppx_version.runtime)
+  pickles
+  ppx_version.runtime
+  snark_params
+  snarky.backendless)
  (preprocessor_deps ../../../../config.mlh)
  (preprocess
   (pps
