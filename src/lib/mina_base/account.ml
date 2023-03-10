@@ -762,17 +762,20 @@ let incremental_balance_between_slots ~start_slot ~end_slot ~cliff_time
     ~cliff_amount ~vesting_period ~vesting_increment ~initial_minimum_balance :
     Unsigned.UInt64.t =
   let open Unsigned in
-  let min_balance_at_start_slot =
-    min_balance_at_slot ~global_slot:start_slot ~cliff_time ~cliff_amount
-      ~vesting_period ~vesting_increment ~initial_minimum_balance
-    |> Balance.to_amount |> Amount.to_uint64
-  in
-  let min_balance_at_end_slot =
-    min_balance_at_slot ~global_slot:end_slot ~cliff_time ~cliff_amount
-      ~vesting_period ~vesting_increment ~initial_minimum_balance
-    |> Balance.to_amount |> Amount.to_uint64
-  in
-  UInt64.Infix.(min_balance_at_start_slot - min_balance_at_end_slot)
+  if Global_slot.(end_slot <= start_slot) then
+    UInt64.zero
+  else
+    let min_balance_at_start_slot =
+      min_balance_at_slot ~global_slot:start_slot ~cliff_time ~cliff_amount
+        ~vesting_period ~vesting_increment ~initial_minimum_balance
+      |> Balance.to_amount |> Amount.to_uint64
+    in
+    let min_balance_at_end_slot =
+      min_balance_at_slot ~global_slot:end_slot ~cliff_time ~cliff_amount
+        ~vesting_period ~vesting_increment ~initial_minimum_balance
+      |> Balance.to_amount |> Amount.to_uint64
+    in
+    UInt64.Infix.(min_balance_at_start_slot - min_balance_at_end_slot)
 
 let has_locked_tokens ~global_slot (account : t) =
   match account.timing with
@@ -790,6 +793,38 @@ let has_locked_tokens ~global_slot (account : t) =
           ~vesting_period ~vesting_increment ~initial_minimum_balance
       in
       Balance.(curr_min_balance > zero)
+
+let final_vesting_slot ~initial_minimum_balance ~cliff_time ~cliff_amount
+    ~vesting_period ~vesting_increment =
+  let open Unsigned in
+  let to_vest =
+    Balance.(initial_minimum_balance - cliff_amount)
+    |> Option.value_map ~default:UInt64.zero ~f:Balance.to_uint64
+  in
+  let incr = Amount.to_uint64 vesting_increment in
+  let periods =
+    let open UInt64 in
+    let open Infix in
+    (to_vest / incr) + if equal (rem to_vest incr) zero then zero else one
+  in
+  let open UInt32 in
+  let open Infix in
+  Global_slot.to_uint32 cliff_time
+  + (UInt64.to_uint32 periods * Global_slot.to_uint32 vesting_period)
+  |> Global_slot.of_uint32
+
+let timing_final_vesting_slot = function
+  | Timing.Untimed ->
+      Global_slot.zero
+  | Timed
+      { initial_minimum_balance
+      ; cliff_time
+      ; cliff_amount
+      ; vesting_period
+      ; vesting_increment
+      } ->
+      final_vesting_slot ~initial_minimum_balance ~cliff_time ~cliff_amount
+        ~vesting_period ~vesting_increment
 
 let has_permission ~control ~to_ (account : t) =
   match to_ with
