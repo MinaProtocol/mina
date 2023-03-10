@@ -762,8 +762,7 @@ let incremental_balance_between_slots ~start_slot ~end_slot ~cliff_time
     ~cliff_amount ~vesting_period ~vesting_increment ~initial_minimum_balance :
     Unsigned.UInt64.t =
   let open Unsigned in
-  if Global_slot.(end_slot <= start_slot) then
-    UInt64.zero
+  if Global_slot.(end_slot <= start_slot) then UInt64.zero
   else
     let min_balance_at_start_slot =
       min_balance_at_slot ~global_slot:start_slot ~cliff_time ~cliff_amount
@@ -854,37 +853,32 @@ let liquid_balance_at_slot ~global_slot (account : t) =
               ~vesting_period ~vesting_increment ~initial_minimum_balance ) )
       |> Option.value_exn
 
-let gen =
+let gen : t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind public_key = Public_key.Compressed.gen in
   let%bind token_id = Token_id.gen in
   let%map balance = Currency.Balance.gen in
   create (Account_id.create public_key token_id) balance
 
-let gen_with_constrained_balance ~low ~high =
+let gen_with_constrained_balance ~low ~high : t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind public_key = Public_key.Compressed.gen in
   let%bind token_id = Token_id.gen in
   let%map balance = Currency.Balance.gen_incl low high in
   create (Account_id.create public_key token_id) balance
 
-let gen_timed =
-  let open Quickcheck.Let_syntax in
-  let open Currency in
+let gen_timing (account_balance : Balance.t) :
+    Timing.as_record Quickcheck.Generator.t =
   let open Unsigned in
-  let%bind public_key = Public_key.Compressed.gen in
-  let%bind token_id = Token_id.gen in
-  let account_id = Account_id.create public_key token_id in
-  let%bind initial_minimum_balance = Balance.(gen_incl one max_int) in
-  let%bind balance = Balance.(gen_incl initial_minimum_balance max_int) in
-  let%bind vesting_schedule_end = Global_slot.(gen_incl (of_int 1) max_value) in
-  let%bind cliff_time =
-    Global_slot.(gen_incl (of_int 1) vesting_schedule_end)
-  in
+  let open Quickcheck in
+  let open Generator.Let_syntax in
+  let%bind initial_minimum_balance = Balance.(gen_incl one account_balance) in
+  let%bind vesting_end = Global_slot.(gen_incl (of_int 1) max_value) in
+  let%bind cliff_time = Global_slot.(gen_incl (of_int 1) vesting_end) in
   let vesting_slots =
     let open Global_slot in
     let open UInt32.Infix in
-    to_uint32 vesting_schedule_end - to_uint32 cliff_time
+    to_uint32 vesting_end - to_uint32 cliff_time
   in
   (* vesting period must be at least one to avoid division by zero *)
   let%bind vesting_period = Int.gen_incl 1 1000 >>| Global_slot.of_int in
@@ -897,7 +891,7 @@ let gen_timed =
     Balance.(initial_minimum_balance - Amount.of_uint64 vesting_periods_count)
     |> Option.value_map ~f:Balance.to_amount ~default:Amount.zero
   in
-  let%bind cliff_amount =
+  let%map cliff_amount =
     if UInt32.(compare vesting_slots zero) > 0 then
       Amount.(gen_incl zero max_cliff_amt)
     else return @@ Balance.to_amount initial_minimum_balance
@@ -913,14 +907,22 @@ let gen_timed =
       UInt64.Infix.((to_vest / vesting_periods_count) + UInt64.one)
       |> Amount.of_uint64
   in
-  match
-    create_timed account_id balance ~initial_minimum_balance ~cliff_time
-      ~cliff_amount ~vesting_period ~vesting_increment
-  with
-  | Error e ->
-      failwith @@ Error.to_string_hum e
-  | Ok a ->
-      return a
+  { Timing.As_record.is_timed = true
+  ; initial_minimum_balance
+  ; cliff_time
+  ; cliff_amount
+  ; vesting_period
+  ; vesting_increment
+  }
+
+let gen_timed : t Quickcheck.Generator.t =
+  let open Quickcheck in
+  let open Generator.Let_syntax in
+  let%bind account =
+    gen_with_constrained_balance ~low:Balance.one ~high:Balance.max_int
+  in
+  let%map timing = gen_timing account.balance in
+  { account with timing = Timing.of_record timing }
 
 let deriver obj =
   let open Fields_derivers_zkapps in
