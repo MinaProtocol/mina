@@ -1,6 +1,7 @@
 (* Common gadget helpers *)
 
 open Core_kernel
+module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 
 (* field_bits_le_to_field - Create a field element from contiguous bits of another
  *
@@ -47,6 +48,30 @@ let field_from_base10 (type f)
     (base10 : string) =
   let open Circuit in
   exists Field.typ ~compute:(fun () -> Field.Constant.of_string base10)
+
+(* Convert field element to bigint *)
+let field_to_bignum_bigint (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (field_element : f) : Bignum_bigint.t =
+  (* Bigint doesn't have bigint operators defined for it, so we must use Bignum_bigint *)
+  Circuit.Bigint.(to_bignum_bigint (of_field field_element))
+
+(* Convert bigint to field element *)
+let bignum_bigint_to_field (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (bigint : Bignum_bigint.t) : f =
+  Circuit.Bigint.(to_field (of_bignum_bigint bigint))
+
+(* Foreign field element limb size: 2^88 *)
+let two_to_limb = Bignum_bigint.(pow (of_int 2) (of_int 88))
+
+(* Returns (quotient, remainder) such that numerator = quotient * denominator + remainder
+ * where quotient, remainder \in [0, denominator) *)
+let bignum_bigint_div_rem (numerator : Bignum_bigint.t)
+    (denominator : Bignum_bigint.t) : Bignum_bigint.t * Bignum_bigint.t =
+  let quotient = Bignum_bigint.(numerator / denominator) in
+  let remainder = Bignum_bigint.(numerator - (denominator * quotient)) in
+  (quotient, remainder)
 
 let%test_unit "helper field_bits_le_to_field" =
   Printf.printf "field_bits_le_to_field test\n" ;

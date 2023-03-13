@@ -161,36 +161,50 @@ let range_check64 (type f)
     (module Circuit)
     ~label:"range_check64" ~is_64bit:true ~is_compact:false v0
 
-(* 64-bit range-check gadget - checks v0 \in [0, 2^64) *)
+(* multi-range-check gadget - checks v0,v1,v2 \in [0, 2^88) *)
 let multi_range_check (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    ?(is_compact : bool = false) (v0 : Circuit.Field.t)
-    (v1 : Circuit.Field.t) (* TODO: change params to v10, v2*)
-    (v2 : Circuit.Field.t) =
+    (v0 : Circuit.Field.t) (v1 : Circuit.Field.t) (v2 : Circuit.Field.t) =
   let open Circuit in
-  (* Prepare label *)
-  let label =
-    if is_compact then "multi_range_check_compact" else "multi_range_check"
-  in
+  range_check0
+    (module Circuit)
+    ~label:"multi_range_check" ~is_64bit:false ~is_compact:false v0 ;
+  range_check0
+    (module Circuit)
+    ~label:"multi_range_check" ~is_64bit:false ~is_compact:false v1 ;
+  range_check1 (module Circuit) ~label:"multi_range_check" v0 v1 v2 Field.zero
+
+(* compact multi-range-check gadget - checks
+ *     - v0,v1,v2 \in [0, 2^88)
+ *     - v01 = v0 + 2^88 * v1
+ *)
+let compact_multi_range_check (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (v01 : Circuit.Field.t) (v2 : Circuit.Field.t) =
+  let open Circuit in
+  (* Set up helper *)
+  let bignum_bigint_to_field = Common.bignum_bigint_to_field (module Circuit) in
   (* Prepare range-check values *)
-  let v0, v1, v2, v12 =
-    if is_compact then
-      let v01 =
-        exists Field.typ ~compute:(fun () ->
-            let two_to_limb =
-              Field.Constant.of_string "309485009821345068724781056"
-            in
-            let v0 = As_prover.read Field.typ v0 in
-            let v1 = As_prover.read Field.typ v1 in
-            let v1_scaled = Field.Constant.mul v1 two_to_limb in
-            Field.Constant.add v0 v1_scaled )
-      in
-      (v2, v0, v1, v01)
-    else (v0, v1, v2, Field.zero)
+  let v1, v0 =
+    exists
+      Typ.(Field.typ * Field.typ)
+      ~compute:(fun () ->
+        (* Decompose v0 and v1 from v01 = 2^L * v1 + v0 *)
+        let v01 =
+          Common.field_to_bignum_bigint
+            (module Circuit)
+            (As_prover.read Field.typ v01)
+        in
+        let v1, v0 = Common.(bignum_bigint_div_rem v01 two_to_limb) in
+        (bignum_bigint_to_field v1, bignum_bigint_to_field v0) )
   in
-  range_check0 (module Circuit) ~label ~is_64bit:false ~is_compact:false v0 ;
-  range_check0 (module Circuit) ~label ~is_64bit:false ~is_compact v1 ;
-  range_check1 (module Circuit) ~label v0 v1 v2 v12
+  range_check0
+    (module Circuit)
+    ~label:"compact_multi_range_check" ~is_64bit:false ~is_compact:false v2 ;
+  range_check0
+    (module Circuit)
+    ~label:"compact_multi_range_check" ~is_64bit:false ~is_compact:true v0 ;
+  range_check1 (module Circuit) ~label:"compact_multi_range_check" v2 v0 v1 v01
 
 (*********)
 (* Tests *)
@@ -292,5 +306,157 @@ let%test_unit "range_check64 gadget" =
     Bool.equal
       (test_range_check64 "170141183460469231731687303715884105728")
       (* 2^127  *)
+      false ) ;
+  ()
+
+let%test_unit "multi_range_check gadget" =
+  Printf.printf "multi_range_check gadget test\n" ;
+  (* Import the gadget test runner *)
+  let open Kimchi_gadgets_test_runner in
+  (* Initialize the SRS cache. *)
+  let () =
+    try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+  in
+
+  (* Helper to test multi_range_check gadget *)
+  let test_multi_range_check v0 v1 v2 : bool =
+    try
+      let _proof_keypair, _proof =
+        Runner.generate_and_verify_proof (fun () ->
+            let open Runner.Impl in
+            let values =
+              exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
+                  [| Field.Constant.of_string v0
+                   ; Field.Constant.of_string v1
+                   ; Field.Constant.of_string v2
+                  |] )
+            in
+            multi_range_check
+              (module Runner.Impl)
+              values.(0) values.(1) values.(2) )
+      in
+      true
+    with exn ->
+      Format.eprintf "Error: %s@." (Exn.to_string exn) ;
+      Printexc.print_backtrace Stdlib.stdout ;
+      Stdlib.(flush stdout) ;
+      false
+  in
+
+  (* Positive tests *)
+  assert (
+    Bool.equal
+      (test_multi_range_check "0" "4294967" "309485009821345068724781055")
+      true ) ;
+  assert (
+    Bool.equal
+      (test_multi_range_check "267475740839011166017999907"
+         "120402749546803056196583080" "1159834292458813579124542" )
+      true ) ;
+  assert (
+    Bool.equal
+      (test_multi_range_check "309485009821345068724781055"
+         "309485009821345068724781055" "309485009821345068724781055" )
+      true ) ;
+  assert (Bool.equal (test_multi_range_check "0" "0" "0") true) ;
+  (* Negative tests *)
+  assert (
+    Bool.equal
+      (test_multi_range_check "0" "4294967" "309485009821345068724781056")
+      false ) ;
+  assert (
+    Bool.equal
+      (test_multi_range_check "0" "309485009821345068724781056"
+         "309485009821345068724781055" )
+      false ) ;
+  assert (
+    Bool.equal
+      (test_multi_range_check "309485009821345068724781056" "4294967"
+         "309485009821345068724781055" )
+      false ) ;
+  assert (
+    Bool.equal
+      (test_multi_range_check
+         "28948022309329048855892746252171976963317496166410141009864396001978282409984"
+         "0170141183460469231731687303715884105728"
+         "170141183460469231731687303715884105728" )
+      false ) ;
+  assert (
+    Bool.equal
+      (test_multi_range_check "0" "0"
+         "28948022309329048855892746252171976963317496166410141009864396001978282409984" )
+      false ) ;
+  assert (
+    Bool.equal
+      (test_multi_range_check "0170141183460469231731687303715884105728" "0"
+         "28948022309329048855892746252171976963317496166410141009864396001978282409984" )
+      false ) ;
+  ()
+
+let%test_unit "compact_multi_range_check gadget" =
+  Printf.printf "compact_multi_range_check gadget test\n" ;
+  (* Import the gadget test runner *)
+  let open Kimchi_gadgets_test_runner in
+  (* Initialize the SRS cache. *)
+  let () =
+    try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+  in
+
+  (* Helper to test compact_multi_range_check gadget *)
+  let test_compact_multi_range_check v01 v2 : bool =
+    try
+      let _proof_keypair, _proof =
+        Runner.generate_and_verify_proof (fun () ->
+            let open Runner.Impl in
+            let v01, v2 =
+              exists
+                Typ.(Field.typ * Field.typ)
+                ~compute:(fun () ->
+                  (Field.Constant.of_string v01, Field.Constant.of_string v2) )
+            in
+            compact_multi_range_check (module Runner.Impl) v01 v2 )
+      in
+      true
+    with exn ->
+      Format.eprintf "Error: %s@." (Exn.to_string exn) ;
+      Printexc.print_backtrace Stdlib.stdout ;
+      Stdlib.(flush stdout) ;
+      false
+  in
+
+  (* Positive tests *)
+  assert (Bool.equal (test_compact_multi_range_check "0" "0") true) ;
+  (* Negative tests *)
+  assert (
+    Bool.equal
+      (test_compact_multi_range_check
+         "28948022309329048855892746252171976963317496166410141009864396001978282409984"
+         "0" )
+      false ) ;
+  assert (
+    Bool.equal
+      (test_compact_multi_range_check
+         "95780971304118053647396689196894323976171195136475135" (* 2^176 - 1 *)
+         "309485009821345068724781055" )
+      (* 2^88 - 1 *)
+      true ) ;
+  assert (
+    Bool.equal
+      (test_compact_multi_range_check "0"
+         "28948022309329048855892746252171976963317496166410141009864396001978282409984" )
+      false ) ;
+  assert (
+    Bool.equal
+      (test_compact_multi_range_check
+         "95780971304118053647396689196894323976171195136475136" (* 2^176 *)
+         "309485009821345068724781055" )
+      (* 2^88 - 1 *)
+      false ) ;
+  assert (
+    Bool.equal
+      (test_compact_multi_range_check
+         "95780971304118053647396689196894323976171195136475135" (* 2^176 - 1 *)
+         "309485009821345068724781056" )
+      (* 2^88 *)
       false ) ;
   ()
