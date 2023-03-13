@@ -3,6 +3,7 @@ use std::rc::Rc;
 use kimchi::snarky::{
     checked_runner::Constraint,
     constraint_system::{BasicSnarkyConstraint, KimchiConstraint},
+    errors::SnarkyResult,
     prelude::*,
 };
 use mina_curves::pasta::{Fp, Fq, Pallas, Vesta};
@@ -49,29 +50,29 @@ impl_functions! {
         mut state: ocaml::Pointer<CamlFpState>,
         v1: CamlFpVar,
         v2: CamlFpVar,
-    ) {
+    ) -> SnarkyResult<()> {
         let state = &mut state.as_mut().0;
         let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::Square(v1.0, v2.0));
-        state.add_constraint(constraint, None);
+        state.add_constraint(constraint, None)
     }
 
     pub fn fp_state_add_equal_constraint(
         mut state: ocaml::Pointer<CamlFpState>,
         v1: CamlFpVar,
         v2: CamlFpVar,
-    ) {
+    ) -> SnarkyResult<()> {
         let state = &mut state.as_mut().0;
         let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::Equal(v1.0, v2.0));
-        state.add_constraint(constraint, None);
+        state.add_constraint(constraint, None)
     }
 
     pub fn fp_state_add_boolean_constraint(
         mut state: ocaml::Pointer<CamlFpState>,
         v1: CamlFpVar,
-    ) {
+    ) -> SnarkyResult<()> {
         let state = &mut state.as_mut().0;
         let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::Boolean(v1.0));
-        state.add_constraint(constraint, None);
+        state.add_constraint(constraint, None)
     }
 
     pub fn fp_state_add_r1cs_constraint(
@@ -79,10 +80,10 @@ impl_functions! {
         v1: CamlFpVar,
         v2: CamlFpVar,
         v3: CamlFpVar,
-    ) {
+    ) -> SnarkyResult<()> {
         let state = &mut state.as_mut().0;
         let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::R1CS(v1.0, v2.0, v3.0));
-        state.add_constraint(constraint, None);
+        state.add_constraint(constraint, None)
     }
 
     pub fn fp_state_add_kimchi_constraint(
@@ -150,9 +151,9 @@ impl_functions! {
         CamlFpVector(Rc::new(state.as_ref().get_private_inputs()))
     }
 
-    pub fn fp_state_seal(mut state: ocaml::Pointer<CamlFpState>, var: CamlFpVar) -> CamlFpVar {
-        let sealed_var = var.0.seal(&mut state.as_mut().0, "seal");
-        CamlFpVar(sealed_var)
+    pub fn fp_state_seal(mut state: ocaml::Pointer<CamlFpState>, var: CamlFpVar) -> SnarkyResult<CamlFpVar> {
+        let sealed_var = var.0.seal(&mut state.as_mut().0, "seal")?;
+        Ok(CamlFpVar(sealed_var))
     }
 }
 
@@ -178,29 +179,29 @@ impl_functions! {
         mut state: ocaml::Pointer<CamlFqState>,
         v1: CamlFqVar,
         v2: CamlFqVar,
-    ) {
+    )  -> SnarkyResult<()> {
         let state = &mut state.as_mut().0;
         let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::Square(v1.0, v2.0));
-        state.add_constraint(constraint, None);
+        state.add_constraint(constraint, None)
     }
 
     pub fn fq_state_add_equal_constraint(
         mut state: ocaml::Pointer<CamlFqState>,
         v1: CamlFqVar,
         v2: CamlFqVar,
-    ) {
+    ) -> SnarkyResult<()> {
         let state = &mut state.as_mut().0;
         let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::Equal(v1.0, v2.0));
-        state.add_constraint(constraint, None);
+        state.add_constraint(constraint, None)
     }
 
     pub fn fq_state_add_boolean_constraint(
         mut state: ocaml::Pointer<CamlFqState>,
         v1: CamlFqVar,
-    ) {
+    ) -> SnarkyResult<()>{
         let state = &mut state.as_mut().0;
         let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::Boolean(v1.0));
-        state.add_constraint(constraint, None);
+        state.add_constraint(constraint, None)
     }
 
     pub fn fq_state_add_r1cs_constraint(
@@ -208,10 +209,10 @@ impl_functions! {
         v1: CamlFqVar,
         v2: CamlFqVar,
         v3: CamlFqVar,
-    ) {
+    ) -> SnarkyResult<()> {
         let state = &mut state.as_mut().0;
         let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::R1CS(v1.0, v2.0, v3.0));
-        state.add_constraint(constraint, None);
+        state.add_constraint(constraint, None)
     }
 
     pub fn fq_state_add_kimchi_constraint(
@@ -274,8 +275,8 @@ impl_functions! {
         CamlFqVector(Rc::new(state.as_ref().get_private_inputs()))
     }
 
-    pub fn fq_state_seal(mut state: ocaml::Pointer<CamlFqState>, var: CamlFqVar) -> CamlFqVar {
-        let sealed_var = var.0.seal(&mut state.as_mut().0, "seal");
-        CamlFqVar(sealed_var)
+    pub fn fq_state_seal(mut state: ocaml::Pointer<CamlFqState>, var: CamlFqVar) -> SnarkyResult<CamlFqVar> {
+        let sealed_var = var.0.seal(&mut state.as_mut().0, "seal")?;
+        Ok(CamlFqVar(sealed_var))
     }
 }
