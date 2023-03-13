@@ -1063,9 +1063,11 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
         (*Last block; don't apply second pass. This is for snarked ledgers which are first pass ledgers*)
         apply_txns_first_pass txns_per_block.first_pass
           ~k:(fun first_pass_ledger_hash _partially_applied_txns ->
-            (*Apply second pass of previous tree's transactions, if any*)
-            apply_previous_incomplete_txns previous_incomplete ~k:(fun () ->
-                apply_txns (Unapplied []) [] ~first_pass_ledger_hash ) )
+            (*Skip previous_incomplete: If there are previous_incomplete txns
+              then there’d be at least two sets of txns_per_block and the
+              previous_incomplete txns will be applied when processing the first
+              set. The subsequent sets shouldn’t have any previous-incomplete.*)
+            apply_txns (Unapplied []) [] ~first_pass_ledger_hash )
     | txns_per_block :: ordered_txns' ->
         (*Apply first pass of a blocks transactions either new or continued from previous tree*)
         apply_txns_first_pass txns_per_block.first_pass
