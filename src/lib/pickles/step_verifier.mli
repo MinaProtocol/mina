@@ -184,3 +184,14 @@ val verify :
      , 'e )
      Import.Types.Step.Proof_state.Per_proof.In_circuit.t
   -> Step_main_inputs.Impl.Boolean.var
+
+module For_tests_only : sig
+  val side_loaded_domain :
+       log2_size:Step_main_inputs.Impl.Field.t
+    -> < generator : Step_main_inputs.Impl.Field.t
+       ; log2_size : Step_main_inputs.Impl.Field.t
+       ; shifts :
+           Step_main_inputs.Impl.Field.t Pickles_types.Plonk_types.Shifts.t
+       ; vanishing_polynomial :
+           Step_main_inputs.Impl.Field.t -> Step_main_inputs.Impl.Field.t >
+end
