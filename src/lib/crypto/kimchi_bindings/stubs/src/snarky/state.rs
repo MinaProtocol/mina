@@ -64,8 +64,6 @@ impl_functions! {
         }
     }
 
-    pub fn fp_state_get_variable_value(state: ocaml::Pointer<CamlFpState>, var: usize) -> CamlFp {
-        CamlFp(state.as_ref().read_var_idx(var))
     }
 
     pub fn fp_state_store_field_elt(
@@ -157,10 +155,6 @@ impl_functions! {
                 convert_constraint(constraint.as_ref());
             cs.add_constraint(constraint);
         }
-    }
-
-    pub fn fq_state_get_variable_value(state: ocaml::Pointer<CamlFqState>, var: usize) -> CamlFq {
-        CamlFq(state.as_ref().read_var_idx(var))
     }
 
     pub fn fq_state_store_field_elt(

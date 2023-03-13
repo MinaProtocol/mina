@@ -566,7 +566,6 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_func!(w, env, fp_state_make => "make");
             decl_func!(w, env, fp_state_add_legacy_constraint => "add_legacy_constraint");
             decl_func!(w, env, fp_state_add_kimchi_constraint => "add_kimchi_constraint");
-            decl_func!(w, env, fp_state_get_variable_value => "get_variable_value");
             decl_func!(w, env, fp_state_store_field_elt => "store_field_elt");
             decl_func!(w, env, fp_state_alloc_var => "alloc_var");
             decl_func!(w, env, fp_state_has_witness => "has_witness");
@@ -618,7 +617,6 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_func!(w, env, fq_state_make => "make");
             decl_func!(w, env, fq_state_add_legacy_constraint => "add_legacy_constraint");
             decl_func!(w, env, fq_state_add_kimchi_constraint => "add_kimchi_constraint");
-            decl_func!(w, env, fq_state_get_variable_value => "get_variable_value");
             decl_func!(w, env, fq_state_store_field_elt => "store_field_elt");
             decl_func!(w, env, fq_state_alloc_var => "alloc_var");
             decl_func!(w, env, fq_state_has_witness => "has_witness");
