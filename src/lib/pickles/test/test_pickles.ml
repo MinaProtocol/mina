@@ -126,17 +126,21 @@ module Test1 = struct
     module Proof = (val p)
 
     let example =
-      let res, (), b0 =
-        Common.time "b0" (fun () ->
-            Promise.block_on_async_exn (fun () -> step ()) )
-      in
-      assert (Field.Constant.(equal zero) res) ;
-      Or_error.ok_exn
-        (Promise.block_on_async_exn (fun () ->
-             Proof.verify_promise [ (res, b0) ] ) ) ;
-      (res, b0)
+      lazy
+        (let res, (), b0 =
+           Common.time "b0" (fun () ->
+               Promise.block_on_async_exn (fun () -> step ()) )
+         in
+         assert (Field.Constant.(equal zero) res) ;
+         Or_error.ok_exn
+           (Promise.block_on_async_exn (fun () ->
+                Proof.verify_promise [ (res, b0) ] ) ) ;
+         (res, b0) )
 
-    let example_input, example_proof = example
+    let () =
+      Tests.add_slow ~name:"no recursion return" ~f:(fun () ->
+          let _r, _b = Lazy.force example in
+          () )
   end
 
   module Simple_chain = struct
@@ -423,7 +427,8 @@ module Test1 = struct
             Promise.block_on_async_exn (fun () ->
                 step
                   ~handler:
-                    (handler true No_recursion_return.example
+                    (handler true
+                       (Lazy.force No_recursion_return.example)
                        (s_neg_one, b_neg_one) )
                   () ) )
       in
@@ -435,7 +440,10 @@ module Test1 = struct
         Common.time "tree b1" (fun () ->
             Promise.block_on_async_exn (fun () ->
                 step
-                  ~handler:(handler false No_recursion_return.example (s0, b0))
+                  ~handler:
+                    (handler false
+                       (Lazy.force No_recursion_return.example)
+                       (s0, b0) )
                   () ) )
       in
       assert (Field.Constant.(equal one) s1) ;
