@@ -562,18 +562,55 @@ struct
     match constr with
     | Basic { l; r; o; m; c } ->
         let open Snarky_bindings.Constraints in
-        let kimchi_input = Basic { l; r; o; m; c } in
+        let kimchi_input : (Field_var.t, Field.t) kimchi =
+          Basic { l; r; o; m; c }
+        in
         State.add_kimchi_constraint state kimchi_input
-    | Poseidon _ ->
-        failwith "finish implementing this"
-    | EC_add_complete _ ->
-        failwith "finish implementing this"
-    | EC_scale _ ->
-        failwith "finish implementing this"
-    | EC_endoscale _ ->
-        failwith "finish implementing this"
-    | EC_endoscalar _ ->
-        failwith "finish implementing this"
+    | Poseidon { state = poseidon_state } ->
+        let open Snarky_bindings.Constraints in
+        let kimchi_input : (Field_var.t, Field.t) kimchi =
+          Poseidon poseidon_state
+        in
+        State.add_kimchi_constraint state kimchi_input
+    | EC_add_complete { p1; p2; p3; inf; same_x; slope; inf_z; x21_inv } ->
+        let open Snarky_bindings.Constraints in
+        let kimchi_input : (Field_var.t, Field.t) kimchi =
+          EcAddComplete { p1; p2; p3; inf; same_x; slope; inf_z; x21_inv }
+        in
+        State.add_kimchi_constraint state kimchi_input
+    | EC_scale { state = state2 } ->
+        let open Snarky_bindings.Constraints in
+        let state2 =
+          Array.map
+            ~f:(fun { accs; bits; ss; base; n_prev; n_next } ->
+              Snarky_bindings.Constraints.Inputs.
+                { accs; bits; ss; base; n_prev; n_next } )
+            state2
+        in
+        let kimchi_input = EcScale state2 in
+        State.add_kimchi_constraint state kimchi_input
+    | EC_endoscale { state = state2; xs; ys; n_acc } ->
+        let open Snarky_bindings.Constraints in
+        let state2 =
+          Array.map
+            ~f:(fun { xt; yt; xp; yp; n_acc; xr; yr; s1; s3; b1; b2; b3; b4 } ->
+              Snarky_bindings.Constraints.Inputs.
+                { xt; yt; xp; yp; n_acc; xr; yr; s1; s3; b1; b2; b3; b4 } )
+            state2
+        in
+        let kimchi_input = EcEndoscale { state = state2; xs; ys; n_acc } in
+        State.add_kimchi_constraint state kimchi_input
+    | EC_endoscalar { state = state2 } ->
+        let open Snarky_bindings.Constraints in
+        let state2 =
+          Array.map
+            ~f:(fun { n0; n8; a0; b0; a8; b8; x0; x1; x2; x3; x4; x5; x6; x7 } ->
+              Snarky_bindings.Constraints.Inputs.
+                { n0; n8; a0; b0; a8; b8; x0; x1; x2; x3; x4; x5; x6; x7 } )
+            state2
+        in
+        let kimchi_input = EcEndoscalar state2 in
+        State.add_kimchi_constraint state kimchi_input
     | RangeCheck0 _ ->
         failwith "finish implementing this"
     | RangeCheck1 _ ->
@@ -587,8 +624,6 @@ struct
     | Rot64 _ ->
         failwith "finish implementing this"
     | Raw _ ->
-        failwith "finish implementing this"
-    | _ ->
         failwith "finish implementing this"
 
   let add_constraint :

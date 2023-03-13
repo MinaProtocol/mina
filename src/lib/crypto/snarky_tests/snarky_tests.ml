@@ -11,6 +11,25 @@ module Impl = Kimchi_backend.Impls.Step
 
 (* let () = Kimchi_bindings.RustHelpers.init_rust_panic_hook () *)
 
+(* TODO: delete the following (only used to test that things were working during snarky-rs integration) *)
+
+let () =
+  let main (x : Impl.Field.t) () =
+    let y = Impl.Field.one in
+    let res = Impl.Field.(x + y) in
+    let two = Impl.Field.of_int 2 in
+
+    Impl.Field.Assert.equal res two ;
+    Impl.Field.Assert.not_equal res Impl.Field.one ;
+    Impl.Field.Assert.non_zero res
+  in
+  let cs : Impl.Constraint_system.t =
+    Impl.constraint_system ~input_typ:Impl.Field.typ ~return_typ:Impl.Typ.unit
+      main
+  in
+  let serialized_json = Impl.Constraint_system.to_json cs in
+  Format.printf "%s\n" serialized_json
+
 (* helpers *)
 
 let compare_with obtained filepath =
