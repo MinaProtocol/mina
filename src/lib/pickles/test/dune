@@ -23,6 +23,9 @@
   kimchi_backend.common
   kimchi_backend.pasta
   kimchi_backend.pasta.basic
+  kimchi_bindings
+  kimchi_types
+  pasta_bindings
   snarky.backendless
   sponge
   tuple_lib

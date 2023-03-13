@@ -10,60 +10,60 @@
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_version
-   ppx_mina
-   ppx_jane
-   ppx_compare
-   ppx_deriving_yojson
-   h_list.ppx))
+    h_list.ppx
+    ppx_compare
+    ppx_deriving_yojson
+    ppx_jane
+    ppx_mina
+    ppx_version))
  (libraries
    ;; opam libraries
-   stdio
-   integers
-   result
-   base.caml
-   bignum.bigint
-   core_kernel
-   base64
-   digestif
-   ppx_inline_test.config
-   sexplib0
-   base
    async_kernel
+   base
+   base.caml
+   base64
+   bignum.bigint
    bin_prot.shape
+   core_kernel
+   digestif
+   integers
+   ppx_inline_test.config
+   result
+   sexplib0
+   stdio
    ;; local libraries
-   mina_wire_types
-   kimchi_bindings
-   kimchi_types
-   pasta_bindings
+   base58_check
+   bitstring_lib
+   codable
+   group_map
+   key_cache
+   kimchi_backend
+   kimchi_backend.common
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    kimchi_backend.pasta.constraint_system
-   bitstring_lib
-   snarky.intf
-   pickles.backend
-   pickles_types
-   snarky.backendless
-   snarky_group_map
-   sponge
-   pickles.pseudo
-   pickles.limb_vector
-   pickles_base
-   kimchi_backend
+   kimchi_bindings
+   kimchi_types
    mina_version
-   base58_check
-   codable
-   random_oracle_input
+   mina_wire_types
+   pasta_bindings
+   pickles.backend
    pickles.composition_types
-   pickles.plonk_checks
+   pickles.limb_vector
    pickles.one_hot_vector
-   snarky_log
-   group_map
-   snarky_curve
-   key_cache
-   snark_keys_header
-   tuple_lib
-   promise
-   kimchi_backend.common
+   pickles.plonk_checks
+   pickles.pseudo
+   pickles_base
+   pickles_types
    ppx_version.runtime
+   promise
+   random_oracle_input
+   snark_keys_header
+   snarky.backendless
+   snarky.intf
+   snarky_curve
+   snarky_group_map
+   snarky_log
+   sponge
+   tuple_lib
 ))

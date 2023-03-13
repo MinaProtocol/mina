@@ -201,3 +201,64 @@ module Type1 :
       Plonk_checks.Make
         (Pickles_types.Shifted_value.Type1)
         (Plonk_checks.Scalars.Tick)
+
+module For_tests_only : sig
+  type shifted_tick_field :=
+    Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+
+  type scalar_challenge_constant =
+    Import.Challenge.Constant.t Import.Scalar_challenge.t
+
+  type deferred_values_and_hints =
+    { x_hat_evals : Backend.Tick.Field.t * Backend.Tick.Field.t
+    ; sponge_digest_before_evaluations : Backend.Tick.Field.t
+    ; deferred_values :
+        ( ( Import.Challenge.Constant.t
+          , scalar_challenge_constant
+          , shifted_tick_field
+          , (shifted_tick_field, bool) Plonk_types.Opt.t
+          , ( scalar_challenge_constant
+              Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
+              .Lookup
+              .t
+            , bool )
+            Plonk_types.Opt.t
+          , bool )
+          Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
+        , scalar_challenge_constant
+        , shifted_tick_field
+        , scalar_challenge_constant Import.Bulletproof_challenge.t
+          Import.Types.Step_bp_vec.t
+        , Import.Branch_data.t )
+        Import.Types.Wrap.Proof_state.Deferred_values.t
+    }
+
+  val deferred_values :
+       sgs:
+         ( Kimchi_pasta_basic.Fq.Stable.Latest.t
+           * Kimchi_pasta_basic.Fq.Stable.Latest.t
+         , 'n )
+         Pickles_types__Vector.T.t
+    -> feature_flags:
+         Pickles_types__Plonk_types.Opt.Flag.t
+         Pickles_types__Plonk_types.Features.Stable.V1.t
+    -> actual_feature_flags:bool Pickles_types__Plonk_types.Features.Stable.V1.t
+    -> prev_challenges:
+         ( (Backend.Tick.Field.t, 'a) Pickles_types__Vector.T.t
+         , 'n )
+         Pickles_types__Vector.T.t
+    -> step_vk:
+         ( Pasta_bindings.Fp.t
+         , Kimchi_bindings.Protocol.SRS.Fp.t
+         , Pasta_bindings.Fq.t Kimchi_types.or_infinity Kimchi_types.poly_comm
+         )
+         Kimchi_types.VerifierIndex.verifier_index
+    -> public_input:Pasta_bindings.Fp.t list
+    -> proof:
+         ( Pasta_bindings.Fq.t * Pasta_bindings.Fq.t
+         , Pasta_bindings.Fp.t
+         , Pasta_bindings.Fp.t array )
+         Pickles_types.Plonk_types.Proof.Stable.V2.t
+    -> actual_proofs_verified:'n Pickles_types__Nat.t
+    -> deferred_values_and_hints
+end
