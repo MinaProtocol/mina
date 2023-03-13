@@ -64,6 +64,8 @@ impl_functions! {
         }
     }
 
+    pub fn fp_state_evaluate_var(state: ocaml::Pointer<CamlFpState>, var: CamlFpVar) -> CamlFp {
+        CamlFp(var.0.eval(&state.as_ref().0))
     }
 
     pub fn fp_state_store_field_elt(
@@ -155,6 +157,9 @@ impl_functions! {
                 convert_constraint(constraint.as_ref());
             cs.add_constraint(constraint);
         }
+    }
+    pub fn fq_state_evaluate_var(state: ocaml::Pointer<CamlFqState>, var: CamlFqVar) -> CamlFq {
+        CamlFq(var.0.eval(&state.as_ref().0))
     }
 
     pub fn fq_state_store_field_elt(

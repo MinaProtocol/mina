@@ -167,8 +167,8 @@ module Fp = struct
       t -> (Cvar.t, Pasta_bindings.Fp.t) Constraints.kimchi -> unit
       = "fp_state_add_kimchi_constraint"
 
-    external get_variable_value : t -> int -> Pasta_bindings.Fp.t
-      = "fp_state_get_variable_value"
+    external evaluate_var : t -> Cvar.t -> Pasta_bindings.Fp.t
+      = "fp_state_evaluate_var"
 
     external store_field_elt : t -> Pasta_bindings.Fp.t -> Cvar.t
       = "fp_state_store_field_elt"
@@ -272,8 +272,8 @@ module Fq = struct
       t -> (Cvar.t, Pasta_bindings.Fq.t) Constraints.kimchi -> unit
       = "fq_state_add_kimchi_constraint"
 
-    external get_variable_value : t -> int -> Pasta_bindings.Fq.t
-      = "fq_state_get_variable_value"
+    external evaluate_var : t -> Cvar.t -> Pasta_bindings.Fq.t
+      = "fq_state_evaluate_var"
 
     external store_field_elt : t -> Pasta_bindings.Fq.t -> Cvar.t
       = "fq_state_store_field_elt"
