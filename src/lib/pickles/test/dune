@@ -11,6 +11,7 @@
   core_kernel
   alcotest
   sexplib0
+  integers
   ; Mina libraries
   pickles
   pickles.composition_types
@@ -27,6 +28,8 @@
   kimchi_bindings
   kimchi_types
   pasta_bindings
+  promise
+  snark_keys_header
   snarky.backendless
   sponge
   tuple_lib
