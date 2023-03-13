@@ -525,17 +525,30 @@ module Plonk_constraint = struct
   include Snarky_backendless.Constraint.Add_kind (T)
 end
 
-module Make
-    (Field : T)
-    (Field_var : T) (State : sig
-      type t
+module Make (Field : sig
+  type t [@@deriving sexp]
 
-      val add_legacy_constraint :
-        t -> Field_var.t Snarky_bindings.Constraints.r1cs -> unit
+  val zero : t
 
-      val add_kimchi_constraint :
-        t -> (Field_var.t, Field.t) Snarky_bindings.Constraints.kimchi -> unit
-    end) =
+  val one : t
+
+  val equal : t -> t -> bool
+
+  val mul : t -> t -> t
+
+  val square : t -> t
+
+  val add : t -> t -> t
+end)
+(Field_var : T) (State : sig
+  type t
+
+  val add_legacy_constraint :
+    t -> Field_var.t Snarky_bindings.Constraints.r1cs -> unit
+
+  val add_kimchi_constraint :
+    t -> (Field_var.t, Field.t) Snarky_bindings.Constraints.kimchi -> unit
+end) =
 struct
   let add_kimchi_constraint _ =
     failwith "call Impl.add_kimchi_constraint with the right type"
@@ -557,6 +570,45 @@ struct
         failwith "call Impl.add_legacy_constraint with the right type"
     | Plonk_constraint.T kimchi_constraint ->
         add_kimchi_constraint kimchi_constraint
+    | _ ->
+        failwith "unrecognized constraint"
+
+  let eval_constraint
+      ({ basic; _ } :
+        ( Field_var.t
+        , Field.t )
+        Snarky_backendless.Constraint.basic_with_annotation ) get_value =
+    let open Plonk_constraint in
+    match basic with
+    | Snarky_backendless.Constraint.Boolean v ->
+        let x = get_value v in
+        Field.(equal x zero || equal x one)
+    | Snarky_backendless.Constraint.Equal (v1, v2) ->
+        Field.equal (get_value v1) (get_value v2)
+    | Snarky_backendless.Constraint.R1CS (v1, v2, v3) ->
+        Field.(equal (mul (get_value v1) (get_value v2)) (get_value v3))
+    | Snarky_backendless.Constraint.Square (a, c) ->
+        Field.equal (Field.square (get_value a)) (get_value c)
+    | Plonk_constraint.T (Basic { l = cl, vl; r = cr, vr; o = co, vo; m; c }) ->
+        let vl = get_value vl in
+        let vr = get_value vr in
+        let vo = get_value vo in
+        let open Field in
+        let res =
+          List.reduce_exn ~f:add
+            [ mul cl vl; mul cr vr; mul co vo; mul m (mul vl vr); c ]
+        in
+        if not (equal zero res) then (
+          eprintf
+            !"%{sexp:t} * %{sexp:t}\n\
+              + %{sexp:t} * %{sexp:t}\n\
+              + %{sexp:t} * %{sexp:t}\n\
+              + %{sexp:t} * %{sexp:t}\n\
+              + %{sexp:t}\n\
+              = %{sexp:t}%!"
+            cl vl cr vr co vo m (mul vl vr) c res ;
+          false )
+        else true
     | _ ->
         failwith "unrecognized constraint"
 end
