@@ -1,10 +1,8 @@
 use std::rc::Rc;
 
 use kimchi::snarky::{
-    constraint_system::{
-        caml::{convert_basic_constraint, convert_constraint},
-        BasicSnarkyConstraint, KimchiConstraint,
-    },
+    checked_runner::Constraint,
+    constraint_system::{BasicSnarkyConstraint, KimchiConstraint},
     prelude::*,
 };
 use mina_curves::pasta::{Fp, Fq, Pallas, Vesta};
@@ -12,6 +10,7 @@ use mina_curves::pasta::{Fp, Fq, Pallas, Vesta};
 use crate::{
     arkworks::{CamlFp, CamlFq},
     field_vector::{fp::CamlFpVector, fq::CamlFqVector},
+    snarky::conv::convert_constraint_fp,
 };
 
 use super::{CamlFpCS, CamlFpVar, CamlFqCS, CamlFqVar};
@@ -46,16 +45,44 @@ impl_functions! {
         format!("{state:#?}")
     }
 
-
-    pub fn fp_state_add_legacy_constraint(
+    pub fn fp_state_add_square_constraint(
         mut state: ocaml::Pointer<CamlFpState>,
-        constraint: ocaml::Pointer<BasicSnarkyConstraint<CamlFpVar>>,
+        v1: CamlFpVar,
+        v2: CamlFpVar,
     ) {
-        if let Some(cs) = &mut state.as_mut().0.system {
-            let constraint: BasicSnarkyConstraint<FieldVar<Fp>> =
-                convert_basic_constraint(constraint.as_ref());
-            cs.add_basic_snarky_constraint(constraint);
-        }
+        let state = &mut state.as_mut().0;
+        let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::Square(v1.0, v2.0));
+        state.add_constraint(constraint, None);
+    }
+
+    pub fn fp_state_add_equal_constraint(
+        mut state: ocaml::Pointer<CamlFpState>,
+        v1: CamlFpVar,
+        v2: CamlFpVar,
+    ) {
+        let state = &mut state.as_mut().0;
+        let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::Equal(v1.0, v2.0));
+        state.add_constraint(constraint, None);
+    }
+
+    pub fn fp_state_add_boolean_constraint(
+        mut state: ocaml::Pointer<CamlFpState>,
+        v1: CamlFpVar,
+    ) {
+        let state = &mut state.as_mut().0;
+        let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::Boolean(v1.0));
+        state.add_constraint(constraint, None);
+    }
+
+    pub fn fp_state_add_r1cs_constraint(
+        mut state: ocaml::Pointer<CamlFpState>,
+        v1: CamlFpVar,
+        v2: CamlFpVar,
+        v3: CamlFpVar,
+    ) {
+        let state = &mut state.as_mut().0;
+        let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::R1CS(v1.0, v2.0, v3.0));
+        state.add_constraint(constraint, None);
     }
 
     pub fn fp_state_add_kimchi_constraint(
@@ -64,7 +91,7 @@ impl_functions! {
     ) {
         if let Some(cs) = &mut state.as_mut().0.system {
             let constraint: KimchiConstraint<FieldVar<Fp>, Fp> =
-                convert_constraint(constraint.as_ref());
+                convert_constraint_fp(constraint.as_ref());
             cs.add_constraint(constraint);
         }
     }
@@ -147,27 +174,53 @@ impl_functions! {
         format!("{state:#?}")
     }
 
-    pub fn fq_state_add_legacy_constraint(
+    pub fn fq_state_add_square_constraint(
         mut state: ocaml::Pointer<CamlFqState>,
-        constraint: ocaml::Pointer<BasicSnarkyConstraint<CamlFqVar>>,
+        v1: CamlFqVar,
+        v2: CamlFqVar,
     ) {
-        if let Some(cs) = &mut state.as_mut().0.system {
-            let constraint: BasicSnarkyConstraint<FieldVar<Fq>> =
-                convert_basic_constraint(constraint.as_ref());
-            cs.add_basic_snarky_constraint(constraint);
-        }
+        let state = &mut state.as_mut().0;
+        let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::Square(v1.0, v2.0));
+        state.add_constraint(constraint, None);
+    }
+
+    pub fn fq_state_add_equal_constraint(
+        mut state: ocaml::Pointer<CamlFqState>,
+        v1: CamlFqVar,
+        v2: CamlFqVar,
+    ) {
+        let state = &mut state.as_mut().0;
+        let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::Equal(v1.0, v2.0));
+        state.add_constraint(constraint, None);
+    }
+
+    pub fn fq_state_add_boolean_constraint(
+        mut state: ocaml::Pointer<CamlFqState>,
+        v1: CamlFqVar,
+    ) {
+        let state = &mut state.as_mut().0;
+        let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::Boolean(v1.0));
+        state.add_constraint(constraint, None);
+    }
+
+    pub fn fq_state_add_r1cs_constraint(
+        mut state: ocaml::Pointer<CamlFqState>,
+        v1: CamlFqVar,
+        v2: CamlFqVar,
+        v3: CamlFqVar,
+    ) {
+        let state = &mut state.as_mut().0;
+        let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::R1CS(v1.0, v2.0, v3.0));
+        state.add_constraint(constraint, None);
     }
 
     pub fn fq_state_add_kimchi_constraint(
         mut state: ocaml::Pointer<CamlFqState>,
         constraint: ocaml::Pointer<KimchiConstraint<CamlFqVar, CamlFq>>,
     ) {
-        if let Some(cs) = &mut state.as_mut().0.system {
-            let constraint: KimchiConstraint<FieldVar<Fq>, Fq> =
-                convert_constraint(constraint.as_ref());
-            cs.add_constraint(constraint);
-        }
+        panic!("yolo");
     }
+
     pub fn fq_state_evaluate_var(state: ocaml::Pointer<CamlFqState>, var: CamlFqVar) -> CamlFq {
         CamlFq(var.0.eval(&state.as_ref().0))
     }

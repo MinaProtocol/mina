@@ -2,13 +2,7 @@
 (** The constraints exposed by Kimchi. *)
 
 module Constraints = struct
-  (** The legacy R1CS constraints. *)
-  type nonrec 'var r1cs =
-    | Boolean of 'var
-    | Equal of 'var * 'var
-    | Square of 'var * 'var
-    | R1CS of 'var * 'var * 'var
-        (** The inputs to the different custom gates. *)
+  (** The inputs to the different custom gates. *)
 
   module Inputs = struct
     type nonrec ('var, 'field) generic =
@@ -119,13 +113,6 @@ module Fp = struct
 
     external create : unit -> t = "fp_cs_create"
 
-    external add_legacy_constraint : t -> Cvar.t Constraints.r1cs -> unit
-      = "fp_cs_add_legacy_constraint"
-
-    external add_kimchi_constraint :
-      t -> (Cvar.t, Pasta_bindings.Fp.t) Constraints.kimchi -> unit
-      = "fp_cs_add_kimchi_constraint"
-
     external finalize : t -> unit = "fp_cs_finalize"
 
     external digest : t -> bytes = "fp_cs_digest"
@@ -162,8 +149,17 @@ module Fp = struct
 
     external debug : t -> string = "fp_state_debug"
 
-    external add_legacy_constraint : t -> Cvar.t Constraints.r1cs -> unit
-      = "fp_state_add_legacy_constraint"
+    external add_boolean_constraint : t -> Cvar.t -> unit
+      = "fp_state_add_boolean_constraint"
+
+    external add_square_constraint : t -> Cvar.t -> Cvar.t -> unit
+      = "fp_state_add_square_constraint"
+
+    external add_equal_constraint : t -> Cvar.t -> Cvar.t -> unit
+      = "fp_state_add_equal_constraint"
+
+    external add_r1cs_constraint : t -> Cvar.t -> Cvar.t -> Cvar.t -> unit
+      = "fp_state_add_r1cs_constraint"
 
     external add_kimchi_constraint :
       t -> (Cvar.t, Pasta_bindings.Fp.t) Constraints.kimchi -> unit
@@ -226,13 +222,6 @@ module Fq = struct
 
     external create : unit -> t = "fq_cs_create"
 
-    external add_legacy_constraint : t -> Cvar.t Constraints.r1cs -> unit
-      = "fq_cs_add_legacy_constraint"
-
-    external add_kimchi_constraint :
-      t -> (Cvar.t, Pasta_bindings.Fq.t) Constraints.kimchi -> unit
-      = "fq_cs_add_kimchi_constraint"
-
     external finalize : t -> unit = "fq_cs_finalize"
 
     external digest : t -> bytes = "fq_cs_digest"
@@ -269,8 +258,17 @@ module Fq = struct
 
     external debug : t -> string = "fq_state_debug"
 
-    external add_legacy_constraint : t -> Cvar.t Constraints.r1cs -> unit
-      = "fq_state_add_legacy_constraint"
+    external add_boolean_constraint : t -> Cvar.t -> unit
+      = "fq_state_add_boolean_constraint"
+
+    external add_square_constraint : t -> Cvar.t -> Cvar.t -> unit
+      = "fq_state_add_square_constraint"
+
+    external add_equal_constraint : t -> Cvar.t -> Cvar.t -> unit
+      = "fq_state_add_equal_constraint"
+
+    external add_r1cs_constraint : t -> Cvar.t -> Cvar.t -> Cvar.t -> unit
+      = "fq_state_add_r1cs_constraint"
 
     external add_kimchi_constraint :
       t -> (Cvar.t, Pasta_bindings.Fq.t) Constraints.kimchi -> unit

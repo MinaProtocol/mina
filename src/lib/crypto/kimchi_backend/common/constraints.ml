@@ -543,8 +543,14 @@ end)
 (Field_var : T) (State : sig
   type t
 
-  val add_legacy_constraint :
-    t -> Field_var.t Snarky_bindings.Constraints.r1cs -> unit
+  val add_boolean_constraint : t -> Field_var.t -> unit
+
+  val add_equal_constraint : t -> Field_var.t -> Field_var.t -> unit
+
+  val add_square_constraint : t -> Field_var.t -> Field_var.t -> unit
+
+  val add_r1cs_constraint :
+    t -> Field_var.t -> Field_var.t -> Field_var.t -> unit
 
   val add_kimchi_constraint :
     t -> (Field_var.t, Field.t) Snarky_bindings.Constraints.kimchi -> unit
@@ -593,17 +599,13 @@ struct
    fun ?label state constr ->
     match constr with
     | Snarky_backendless.Constraint.Square (v1, v2) ->
-        let legacy_input = Snarky_bindings.Constraints.Square (v1, v2) in
-        State.add_legacy_constraint state legacy_input
+        State.add_square_constraint state v1 v2
     | Snarky_backendless.Constraint.R1CS (v1, v2, v3) ->
-        let legacy_input = Snarky_bindings.Constraints.R1CS (v1, v2, v3) in
-        State.add_legacy_constraint state legacy_input
+        State.add_r1cs_constraint state v1 v2 v3
     | Snarky_backendless.Constraint.Boolean v ->
-        let legacy_input = Snarky_bindings.Constraints.Boolean v in
-        State.add_legacy_constraint state legacy_input
+        State.add_boolean_constraint state v
     | Snarky_backendless.Constraint.Equal (v1, v2) ->
-        let legacy_input = Snarky_bindings.Constraints.Equal (v1, v2) in
-        State.add_legacy_constraint state legacy_input
+        State.add_equal_constraint state v1 v2
     | Plonk_constraint.T kimchi_constraint ->
         add_kimchi_constraint state kimchi_constraint
     | _ ->

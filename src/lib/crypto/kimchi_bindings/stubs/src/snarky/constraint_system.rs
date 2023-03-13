@@ -1,23 +1,13 @@
 use kimchi::{
     circuits::gate::Circuit,
-    snarky::{
-        constants::Constants,
-        constraint_system::{
-            caml::{convert_basic_constraint, convert_constraint},
-            BasicSnarkyConstraint, KimchiConstraint, SnarkyConstraintSystem,
-        },
-        prelude::FieldVar,
-    },
+    snarky::{constants::Constants, constraint_system::SnarkyConstraintSystem},
 };
 use mina_curves::pasta::{Fp, Fq, Pallas, Vesta};
 
 use crate::{
-    arkworks::{CamlFp, CamlFq},
     field_vector::{fp::CamlFpVector, fq::CamlFqVector},
     gate_vector::{fp::CamlPastaFpPlonkGateVector, fq::CamlPastaFqPlonkGateVector},
 };
-
-use super::{CamlFpVar, CamlFqVar};
 
 //
 // Wrapper types
@@ -35,16 +25,6 @@ impl_functions! {
     pub fn fp_cs_create() -> CamlFpCS {
         let constants = Constants::new::<Vesta>();
         CamlFpCS(SnarkyConstraintSystem::create(constants))
-    }
-
-    pub fn fp_cs_add_legacy_constraint(mut cs: ocaml::Pointer<CamlFpCS>, constraint: ocaml::Pointer<BasicSnarkyConstraint<CamlFpVar>>) {
-        let constraint: BasicSnarkyConstraint<FieldVar<Fp>> = convert_basic_constraint(constraint.as_ref());
-        cs.as_mut().0.add_basic_snarky_constraint(constraint);
-    }
-
-    pub fn fp_cs_add_kimchi_constraint(mut cs: ocaml::Pointer<CamlFpCS>, constraint: ocaml::Pointer<KimchiConstraint<CamlFpVar, CamlFp>>) {
-        let constraint: KimchiConstraint<FieldVar<Fp>, Fp> = convert_constraint(constraint.as_ref());
-        cs.as_mut().0.add_constraint(constraint);
     }
 
     pub fn fp_cs_finalize(mut cs: ocaml::Pointer<CamlFpCS>) {
@@ -96,16 +76,6 @@ impl_functions! {
     pub fn fq_cs_create() -> CamlFqCS {
         let constants = Constants::new::<Pallas>();
         CamlFqCS(SnarkyConstraintSystem::create(constants))
-    }
-
-    pub fn fq_cs_add_legacy_constraint(mut cs: ocaml::Pointer<CamlFqCS>, constraint: ocaml::Pointer<BasicSnarkyConstraint<CamlFqVar>>) {
-        let constraint: BasicSnarkyConstraint<FieldVar<Fq>> = convert_basic_constraint(constraint.as_ref());
-        cs.as_mut().0.add_basic_snarky_constraint(constraint);
-    }
-
-    pub fn fq_cs_add_kimchi_constraint(mut cs: ocaml::Pointer<CamlFqCS>, constraint: ocaml::Pointer<KimchiConstraint<CamlFqVar, CamlFq>>) {
-        let constraint: KimchiConstraint<FieldVar<Fq>, Fq> = convert_constraint(constraint.as_ref());
-        cs.as_mut().0.add_constraint(constraint);
     }
 
     pub fn fq_cs_finalize(mut cs: ocaml::Pointer<CamlFqCS>) {
