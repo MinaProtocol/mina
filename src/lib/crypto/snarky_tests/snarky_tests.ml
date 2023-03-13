@@ -483,10 +483,10 @@ module Improper_calls = struct
     ()
 
   let use_for_constraint_generation circuit : unit =
-    let cs : Impl.R1CS_constraint_system.t =
+    let cs : Impl.Constraint_system.t =
       Impl.constraint_system ~input_typ ~return_typ circuit
     in
-    let _digest = Md5.to_hex (Impl.R1CS_constraint_system.digest cs) in
+    let _digest = Md5.to_hex (Impl.Constraint_system.digest cs) in
     ()
 
   module Tests = struct
