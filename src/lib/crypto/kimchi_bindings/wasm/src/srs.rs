@@ -166,11 +166,13 @@ macro_rules! impl_srs {
                 srs: &[<Wasm $field_name:camel Srs>],
                 chals: WasmFlatVector<$WasmF>,
             ) -> Result<$WasmPolyComm, JsValue> {
-                let chals: Vec<$F> = chals.into_iter().map(Into::into).collect();
-                let coeffs = b_poly_coefficients(&chals);
-                let p = DensePolynomial::<$F>::from_coefficients_vec(coeffs);
-
-                Ok(srs.commit_non_hiding(&p, None).into())
+                let result = crate::rayon::run_in_pool(|| {
+                    let chals: Vec<$F> = chals.into_iter().map(Into::into).collect();
+                    let coeffs = b_poly_coefficients(&chals);
+                    let p = DensePolynomial::<$F>::from_coefficients_vec(coeffs);
+                    srs.commit_non_hiding(&p, None)
+                });
+                Ok(result.into())
             }
 
             #[wasm_bindgen]
@@ -179,9 +181,11 @@ macro_rules! impl_srs {
                 comms: WasmVector<$WasmG>,
                 chals: WasmFlatVector<$WasmF>,
             ) -> bool {
-                let comms: Vec<_> = comms.into_iter().map(Into::into).collect();
-                let chals: Vec<_> = chals.into_iter().map(Into::into).collect();
-                crate::urs_utils::batch_dlog_accumulator_check(&srs, &comms, &chals)
+                crate::rayon::run_in_pool(|| {
+                    let comms: Vec<_> = comms.into_iter().map(Into::into).collect();
+                    let chals: Vec<_> = chals.into_iter().map(Into::into).collect();
+                    crate::urs_utils::batch_dlog_accumulator_check(&srs, &comms, &chals)
+                })
             }
 
             #[wasm_bindgen]

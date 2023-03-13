@@ -1,4 +1,5 @@
 use ark_poly::EvaluationDomain;
+use kimchi::circuits::lookup::index;
 
 use crate::gate_vector::fq::WasmGateVector;
 use crate::srs::fq::WasmFqSrs as WasmSrs;
@@ -34,53 +35,53 @@ pub fn caml_pasta_fq_plonk_index_create(
     srs: &WasmSrs,
 ) -> Result<WasmPastaFqPlonkIndex, JsValue> {
     console_error_panic_hook::set_once();
+    let index = crate::rayon::run_in_pool(|| {
+        // flatten the permutation information (because OCaml has a different way of keeping track of permutations)
+        let gates: Vec<_> = gates
+            .0
+            .iter()
+            .map(|gate| CircuitGate::<Fq> {
+                typ: gate.typ,
+                wires: gate.wires,
+                coeffs: gate.coeffs.clone(),
+            })
+            .collect();
 
-    // flatten the permutation information (because OCaml has a different way of keeping track of permutations)
-    let gates: Vec<_> = gates
-        .0
-        .iter()
-        .map(|gate| CircuitGate::<Fq> {
-            typ: gate.typ,
-            wires: gate.wires,
-            coeffs: gate.coeffs.clone(),
-        })
-        .collect();
+        /*
+        for (i, g) in gates.iter().enumerate() {
+            let x : Vec<_> = g.c.iter().map(|x| format!("{}", x)).collect();
+            let s = x.join(", ");
+            println!("c[{}][{:?}]: {}", i, g.typ, s);
+        } */
 
-    /*
-    for (i, g) in gates.iter().enumerate() {
-        let x : Vec<_> = g.c.iter().map(|x| format!("{}", x)).collect();
-        let s = x.join(", ");
-        println!("c[{}][{:?}]: {}", i, g.typ, s);
-    } */
+        // create constraint system
+        let cs = match ConstraintSystem::<Fq>::create(gates)
+            .public(public_ as usize)
+            .prev_challenges(prev_challenges as usize)
+            .build()
+        {
+            Err(_) => {
+                panic!("caml_pasta_fq_plonk_index_create: could not create constraint system",);
+            }
+            Ok(cs) => cs,
+        };
 
-    // create constraint system
-    let cs = match ConstraintSystem::<Fq>::create(gates)
-        .public(public_ as usize)
-        .prev_challenges(prev_challenges as usize)
-        .build()
-    {
-        Err(_) => {
-            return Err(JsValue::from_str(
-                "caml_pasta_fq_plonk_index_create: could not create constraint system",
-            ));
+        // endo
+        let (endo_q, _endo_r) = poly_commitment::srs::endos::<GAffineOther>();
+
+        // Unsafe if we are in a multi-core ocaml
+        {
+            let ptr: &mut poly_commitment::srs::SRS<GAffine> =
+                unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+            ptr.add_lagrange_basis(cs.domain.d1);
         }
-        Ok(cs) => cs,
-    };
 
-    // endo
-    let (endo_q, _endo_r) = poly_commitment::srs::endos::<GAffineOther>();
+        let mut index = ProverIndex::<GAffine>::create(cs, endo_q, srs.0.clone());
+        // Compute and cache the verifier index digest
+        index.compute_verifier_index_digest::<DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>>();
 
-    // Unsafe if we are in a multi-core ocaml
-    {
-        let ptr: &mut poly_commitment::srs::SRS<GAffine> =
-            unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-        ptr.add_lagrange_basis(cs.domain.d1);
-    }
-
-    let mut index = ProverIndex::<GAffine>::create(cs, endo_q, srs.0.clone());
-    // Compute and cache the verifier index digest
-    index.compute_verifier_index_digest::<DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>>();
-
+        index
+    });
     // create index
     Ok(WasmPastaFqPlonkIndex(Box::new(index)))
 }

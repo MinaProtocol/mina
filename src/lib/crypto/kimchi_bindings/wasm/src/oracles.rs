@@ -176,57 +176,61 @@ macro_rules! impl_oracles {
                 proof: $WasmProverProof, // the final proof (contains public elements at the beginning)
             ) -> Result<[<Wasm $field_name:camel Oracles>], JsValue> {
                 // conversions
+                let (oracles, p_eval, opening_prechallenges, digest) = crate::rayon::run_in_pool(|| {
 
-                let index: DlogVerifierIndex<$G> = index.into();
+                    let index: DlogVerifierIndex<$G> = index.into();
 
-                let lgr_comm: Vec<PolyComm<$G>> = lgr_comm
-                    .into_iter()
-                    .take(proof.public.len())
-                    .map(Into::into)
-                    .collect();
-                let lgr_comm_refs: Vec<_> = lgr_comm.iter().collect();
+                    let lgr_comm: Vec<PolyComm<$G>> = lgr_comm
+                        .into_iter()
+                        .take(proof.public.len())
+                        .map(Into::into)
+                        .collect();
+                    let lgr_comm_refs: Vec<_> = lgr_comm.iter().collect();
 
-                let p_comm = PolyComm::<$G>::multi_scalar_mul(
-                    &lgr_comm_refs,
-                    &proof
-                        .public
-                        .iter()
-                        .map(|a| a.clone().into())
-                        .map(|s: $F| -s)
-                        .collect::<Vec<_>>(),
-                );
-                let p_comm = {
-                    index
-                        .srs()
-                        .mask_custom(
-                            p_comm.clone(),
-                            &p_comm.map(|_| $F::one()),
-                        )
-                        .unwrap()
-                        .commitment
-                };
+                    let p_comm = PolyComm::<$G>::multi_scalar_mul(
+                        &lgr_comm_refs,
+                        &proof
+                            .public
+                            .iter()
+                            .map(|a| a.clone().into())
+                            .map(|s: $F| -s)
+                            .collect::<Vec<_>>(),
+                    );
+                    let p_comm = {
+                        index
+                            .srs()
+                            .mask_custom(
+                                p_comm.clone(),
+                                &p_comm.map(|_| $F::one()),
+                            )
+                            .unwrap()
+                            .commitment
+                    };
 
-                let (proof, public_input): (ProverProof<$G>, Vec<$F>) = proof.into();
+                    let (proof, public_input): (ProverProof<$G>, Vec<$F>) = proof.into();
 
-                let oracles_result =
-                    proof.oracles::<DefaultFqSponge<$curve_params, PlonkSpongeConstantsKimchi>, DefaultFrSponge<$F, PlonkSpongeConstantsKimchi>>(&index, &p_comm,&public_input).map_err(|e| JsValue::from_str(&format!("oracles_create: {}", e)))?;
+                    let oracles_result =
+                        proof.oracles::<DefaultFqSponge<$curve_params, PlonkSpongeConstantsKimchi>, DefaultFrSponge<$F, PlonkSpongeConstantsKimchi>>(&index, &p_comm,&public_input).unwrap();
 
-                let (mut sponge, combined_inner_product, p_eval, digest, oracles) = (
-                    oracles_result.fq_sponge,
-                    oracles_result.combined_inner_product,
-                    oracles_result.public_evals,
-                    oracles_result.digest,
-                    oracles_result.oracles,
-                );
+                    let (mut sponge, combined_inner_product, p_eval, digest, oracles) = (
+                        oracles_result.fq_sponge,
+                        oracles_result.combined_inner_product,
+                        oracles_result.public_evals,
+                        oracles_result.digest,
+                        oracles_result.oracles,
+                    );
 
-                sponge.absorb_fr(&[shift_scalar::<$G>(combined_inner_product)]);
+                    sponge.absorb_fr(&[shift_scalar::<$G>(combined_inner_product)]);
 
-                let opening_prechallenges = proof
-                    .proof
-                    .prechallenges(&mut sponge)
-                    .into_iter()
-                    .map(|x| x.0.into())
-                    .collect();
+                    let opening_prechallenges = proof
+                        .proof
+                        .prechallenges(&mut sponge)
+                        .into_iter()
+                        .map(|x| x.0.into())
+                        .collect();
+
+                    (oracles, p_eval, opening_prechallenges, digest)
+                });
 
                 Ok([<Wasm $field_name:camel Oracles>] {
                     o: oracles.into(),

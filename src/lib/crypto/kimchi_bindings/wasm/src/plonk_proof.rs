@@ -553,53 +553,58 @@ macro_rules! impl_proof {
                 prev_sgs: WasmVector<$WasmG>,
             ) -> WasmProverProof {
                 console_error_panic_hook::set_once();
-                {
-                    let ptr: &mut poly_commitment::srs::SRS<$G> =
-                        unsafe { &mut *(std::sync::Arc::as_ptr(&index.0.as_ref().srs) as *mut _) };
-                    ptr.add_lagrange_basis(index.0.as_ref().cs.domain.d1);
-                }
-                let prev: Vec<RecursionChallenge<$G>> = {
-                    if prev_challenges.is_empty() {
-                        Vec::new()
-                    } else {
-                        let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
-                        prev_sgs
-                            .into_iter()
-                            .map(Into::<$G>::into)
-                            .enumerate()
-                            .map(|(i, sg)| {
-                                let chals =
-                                    prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
-                                        .iter()
-                                        .map(|a| a.clone().into())
-                                        .collect();
-                                let comm = PolyComm::<$G> {
-                                    unshifted: vec![sg],
-                                    shifted: None,
-                                };
-                                RecursionChallenge { chals, comm }
-                            })
-                            .collect()
+                let (maybe_proof, public_input) = crate::rayon::run_in_pool(|| {
+                    {
+                        let ptr: &mut poly_commitment::srs::SRS<$G> =
+                            unsafe { &mut *(std::sync::Arc::as_ptr(&index.0.as_ref().srs) as *mut _) };
+                        ptr.add_lagrange_basis(index.0.as_ref().cs.domain.d1);
                     }
-                };
+                    let prev: Vec<RecursionChallenge<$G>> = {
+                        if prev_challenges.is_empty() {
+                            Vec::new()
+                        } else {
+                            let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
+                            prev_sgs
+                                .into_iter()
+                                .map(Into::<$G>::into)
+                                .enumerate()
+                                .map(|(i, sg)| {
+                                    let chals =
+                                        prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
+                                            .iter()
+                                            .map(|a| a.clone().into())
+                                            .collect();
+                                    let comm = PolyComm::<$G> {
+                                        unshifted: vec![sg],
+                                        shifted: None,
+                                    };
+                                    RecursionChallenge { chals, comm }
+                                })
+                                .collect()
+                        }
+                    };
 
-                let witness: [Vec<_>; COLUMNS] = witness.0
-                    .try_into()
-                    .expect("the witness should be a column of 15 vectors");
+                    let witness: [Vec<_>; COLUMNS] = witness.0
+                        .try_into()
+                        .expect("the witness should be a column of 15 vectors");
 
-                let index: &ProverIndex<$G> = &index.0.as_ref();
+                    let index: &ProverIndex<$G> = &index.0.as_ref();
 
-                let public_input = witness[0][0..index.cs.public].to_vec();
+                    let public_input = witness[0][0..index.cs.public].to_vec();
 
-                // Release the runtime lock so that other threads can run using it while we generate the proof.
-                let group_map = GroupMap::<_>::setup();
-                let maybe_proof = ProverProof::create_recursive::<
-                    DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
-                    DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
-                >(&group_map, witness, &[], index, prev, None);
+                    // Release the runtime lock so that other threads can run using it while we generate the proof.
+                    let group_map = GroupMap::<_>::setup();
+                    let maybe_proof = ProverProof::create_recursive::<
+                        DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
+                        DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
+                        >(&group_map, witness, &[], index, prev, None);
+                    (maybe_proof, public_input)
+                });
+
                 return match maybe_proof {
                     Ok(proof) => (proof, public_input).into(),
                     Err(err) => {
+                        // TODO give this a proper error
                         log(&err.to_string());
                         panic!("thrown an error")
                     }
@@ -645,20 +650,22 @@ macro_rules! impl_proof {
                 indexes: WasmVector<$WasmVerifierIndex>,
                 proofs: WasmVector<WasmProverProof>,
             ) -> bool {
-                let ts: Vec<_> = indexes
-                    .into_iter()
-                    .zip(proofs.into_iter())
-                    .map(|(index, proof)| (index.into(), proof.into()))
-                    .collect();
-                let ts: Vec<_> = ts.iter().map(|(verifier_index, (proof, public_input))| Context { verifier_index, proof, public_input}).collect();
-                let group_map = GroupMap::<_>::setup();
+                crate::rayon::run_in_pool(|| {
+                    let ts: Vec<_> = indexes
+                        .into_iter()
+                        .zip(proofs.into_iter())
+                        .map(|(index, proof)| (index.into(), proof.into()))
+                        .collect();
+                    let ts: Vec<_> = ts.iter().map(|(verifier_index, (proof, public_input))| Context { verifier_index, proof, public_input}).collect();
+                    let group_map = GroupMap::<_>::setup();
 
-                batch_verify::<
-                    $G,
-                    DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
-                    DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
-                >(&group_map, &ts)
-                .is_ok()
+                    batch_verify::<
+                        $G,
+                        DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
+                        DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
+                    >(&group_map, &ts)
+                    .is_ok()
+                })
             }
 
             #[wasm_bindgen]

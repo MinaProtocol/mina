@@ -879,9 +879,9 @@ dependencies = [
  "serde-wasm-bindgen",
  "serde_json",
  "serde_with 2.2.0",
+ "spmc",
  "sprs",
  "wasm-bindgen",
- "wasm-bindgen-rayon",
  "wasm-bindgen-test",
  "web-sys",
 ]
@@ -1419,17 +1419,6 @@ dependencies = [
  "syn",
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
-]
-
-[[package]]
-name = "wasm-bindgen-rayon"
-version = "1.0.3"
-source = "git+https://github.com/o1-labs/wasm-bindgen-rayon?rev=68303317c96549feae6b7dcc72d891afbfbda070#68303317c96549feae6b7dcc72d891afbfbda070"
-dependencies = [
- "js-sys",
- "rayon",
- "spmc",
- "wasm-bindgen",
 ]
 
 [[package]]

@@ -73,7 +73,7 @@ pub fn wait_until_non_zero(ptr: *const u32) -> u32 {
     unreachable!();
 }
 
-pub use wasm_bindgen_rayon::init_thread_pool;
+pub mod rayon;
 
 /// Arkworks types
 pub mod arkworks;
