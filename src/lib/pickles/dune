@@ -66,6 +66,7 @@
    promise
    kimchi_backend.common
    logger
+   internal_tracing.context_logger
    ppx_version.runtime
    error_json
 ))
