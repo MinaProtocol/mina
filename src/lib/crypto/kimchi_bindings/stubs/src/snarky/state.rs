@@ -41,6 +41,11 @@ impl_functions! {
         CamlFpState(state)
     }
 
+    pub fn fp_state_debug(state: ocaml::Pointer<CamlFpState>) -> String {
+        let state = &state.as_ref().0;
+        format!("{state:#?}")
+    }
+
 
     pub fn fp_state_add_legacy_constraint(
         mut state: ocaml::Pointer<CamlFpState>,
@@ -135,6 +140,11 @@ impl_functions! {
         let mut state = RunState::new::<Pallas>(num_inputs, public_output_size, system);
         state.eval_constraints = eval_constraints;
         CamlFqState(state)
+    }
+
+    pub fn fq_state_debug(state: ocaml::Pointer<CamlFqState>) -> String {
+        let state = &state.as_ref().0;
+        format!("{state:#?}")
     }
 
     pub fn fq_state_add_legacy_constraint(

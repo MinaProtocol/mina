@@ -160,6 +160,8 @@ module Fp = struct
 
     external make : int -> bool -> bool -> t = "fp_state_make"
 
+    external debug : t -> string = "fp_state_debug"
+
     external add_legacy_constraint : t -> Cvar.t Constraints.r1cs -> unit
       = "fp_state_add_legacy_constraint"
 
@@ -264,6 +266,8 @@ module Fq = struct
     type nonrec t
 
     external make : int -> bool -> bool -> t = "fq_state_make"
+
+    external debug : t -> string = "fq_state_debug"
 
     external add_legacy_constraint : t -> Cvar.t Constraints.r1cs -> unit
       = "fq_state_add_legacy_constraint"
