@@ -80,7 +80,6 @@ macro_rules! impl_cvar_methods {
             }
 
             pub fn [<$name:snake _var_to_constant>](var: $CamlFVar) -> Option<$CamlF> {
-                println!("var_to_constant: {:?}", var);
                 match &var.0 {
                     FieldVar::Constant(c) => Some($CamlF(*c)),
                     _ => None,
