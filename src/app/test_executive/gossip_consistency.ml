@@ -15,16 +15,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let block_producer_balance = "1000" (* 1_000_000_000_000 *)
-
   let config =
-    let n = 3 in
     let open Test_config in
     { default with
       requires_graphql = true
+    ; genesis_ledger =
+        [ { account_name = "node-a-key"; balance = "1000"; timing = Untimed }
+        ; { account_name = "node-b-key"; balance = "1000"; timing = Untimed }
+        ]
     ; block_producers =
-        List.init n ~f:(fun _ ->
-            { Wallet.balance = block_producer_balance; timing = Untimed } )
+        [ { node_name = "node-a"; account_name = "node-a-key" }
+        ; { node_name = "node-b"; account_name = "node-b-key" }
+        ]
     }
 
   let run network t =
@@ -33,13 +35,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info] "gossip_consistency test: starting..." ;
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize (Network.all_nodes network))
+        (Wait_condition.nodes_to_initialize
+           (Core.String.Map.data (Network.all_nodes network)) )
     in
     [%log info] "gossip_consistency test: done waiting for initializations" ;
-    let receiver_bp = Caml.List.nth (Network.block_producers network) 0 in
+    let receiver_bp =
+      Core.String.Map.find_exn (Network.block_producers network) "node-a"
+    in
     let%bind receiver_pub_key = pub_key_of_node receiver_bp in
     let sender_bp =
-      Core_kernel.List.nth_exn (Network.block_producers network) 1
+      Core.String.Map.find_exn (Network.block_producers network) "node-b"
     in
     let%bind sender_pub_key = pub_key_of_node sender_bp in
     let num_payments = 3 in
