@@ -200,7 +200,7 @@ val get_staged_ledger_async :
         -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
            Or_error.t )
   -> t
-  -> Ledger_hash.t Deferred.Or_error.t
+  -> [ `First_pass_ledger_hash of Ledger_hash.t ] Deferred.Or_error.t
 
 val free_space : t -> int
 
