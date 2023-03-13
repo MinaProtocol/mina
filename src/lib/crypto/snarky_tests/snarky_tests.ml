@@ -36,9 +36,12 @@ let compare_with obtained filepath =
   let filepath = "examples/" ^ filepath in
   let expected = In_channel.read_all filepath in
   if String.(trim obtained <> trim expected) then (
-    Format.printf "mismatch for %s detected\n" filepath ;
-    Format.printf "expected:\n%s\n\n" expected ;
-    Format.printf "obtained:\n%s\n" obtained ;
+    Format.printf "mismatch for %s detected\n\n" filepath ;
+    Format.printf
+      "if this is expected, update the serialization with the following \
+       command:\n\n" ;
+    (* Format.printf "expected:\n%s\n\n" expected ; *)
+    Format.printf "echo '%s' > %s\n\n" obtained filepath ;
     failwith "circuit compilation has changed" )
 
 let check_json ~input_typ ~return_typ ~circuit filename () =
@@ -345,11 +348,13 @@ module As_prover_circuits = struct
           in
           let l = List.range 0 vars in
           let total : Impl.field =
-            List.fold l ~init:Impl.Field.Constant.one ~f
+            List.fold l ~init:Impl.Field.Constant.zero ~f
           in
-          assert (not (Impl.Field.(Constant.compare total Constant.one) = 0)) ;
-          assert (not Impl.Field.Constant.(equal total one)) ;
-          () ) ;
+
+          (* manual sum is equal to circuit sum *)
+          let abc = Impl.As_prover.read_var abc in
+
+          assert (Impl.Field.(Constant.equal abc total)) ) ;
     Impl.Field.Assert.non_zero abc ;
 
     ()
