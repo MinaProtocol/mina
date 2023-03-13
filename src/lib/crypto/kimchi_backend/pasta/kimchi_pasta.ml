@@ -23,8 +23,6 @@ module Pallas_based_plonk = struct
       let of_index = of_index_unsafe
     end
 
-    let eval _ _ = failwith "TODO"
-
     let ( + ) = add
 
     let ( - ) = sub
@@ -71,8 +69,6 @@ module Vesta_based_plonk = struct
     module Unsafe = struct
       let of_index = of_index_unsafe
     end
-
-    let eval _ _ = failwith "TODO"
 
     let ( + ) = add
 
