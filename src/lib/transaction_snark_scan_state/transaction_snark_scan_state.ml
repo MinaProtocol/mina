@@ -895,7 +895,7 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
   let rec apply_txns_first_pass ?(acc = []) ~k txns =
     match txns with
     | [] ->
-        k (Ledger.merkle_root ledger) (List.rev acc)
+        k (`First_pass_ledger_hash (Ledger.merkle_root ledger)) (List.rev acc)
     | txn :: txns' ->
         let transaction, state_hash, block_global_slot =
           extract_txn_and_global_slot txn
@@ -1106,7 +1106,9 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
   in
   (*Assuming this function is called on snarked ledger and snarked ledger is the
     first pass ledger*)
-  let first_pass_ledger_hash = Ledger.merkle_root ledger in
+  let first_pass_ledger_hash =
+    `First_pass_ledger_hash (Ledger.merkle_root ledger)
+  in
   apply_txns previous_incomplete ordered_txns ~first_pass_ledger_hash
 
 let apply_ordered_txns_sync ?stop_at_first_pass ordered_txns ~ledger

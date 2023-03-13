@@ -367,7 +367,7 @@ module T = struct
       in
       partial_txn
     in
-    let%bind first_pass_ledger_target =
+    let%bind (`First_pass_ledger_hash first_pass_ledger_target) =
       Scan_state.get_staged_ledger_async
         ~async_batch_size:transaction_application_scheduler_batch_size
         ~ledger:snarked_ledger ~get_protocol_state:get_state ~apply_first_pass
