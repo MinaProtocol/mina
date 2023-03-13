@@ -14,7 +14,6 @@ module Impl = Kimchi_backend.Impls.Step
 (* helpers *)
 
 let compare_with obtained filepath =
-  let (_ : int) = Sys.command "tree" in
   let filepath = "examples/" ^ filepath in
   let expected = In_channel.read_all filepath in
   if String.(trim obtained <> trim expected) then (
@@ -184,10 +183,6 @@ module RangeCircuits = struct
       (* TODO: it'd be nicer to generate actual fields directly, since that domain is most likely smaller *)
       QCheck.(tup3 bool pos_int pos_int)
       (fun (should_succeed, a, b) -> range_circuit ~should_succeed a b)
-
-  let () =
-    let res = range_circuit ~should_succeed:true 0 1 in
-    assert res
 end
 
 module TernaryCircuit = struct
@@ -369,7 +364,7 @@ module As_prover_circuits = struct
     (* test that accessing non existent vars fails*)
     let generate_witness_fails () =
       Alcotest.(
-        check_raises "should fail accesing non existent var"
+        check_raises "should fail accessing non existent var"
           (Failure "vector_get") generate_witness_fails)
 
     (* test that as_prover doesn't affect constraints *)
