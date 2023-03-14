@@ -10,6 +10,9 @@ let bxor (type f)
     (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) (length : int) :
     Circuit.Field.t =
   let open Circuit in
+  (* Check that the length is permitted *)
+  assert (length < Field.size_in_bits) ;
+
   (* Convert to bits *)
   let input1_bits = Circuit.Field.unpack input1 in
   let input2_bits = Circuit.Field.unpack input2 in
@@ -19,8 +22,8 @@ let bxor (type f)
   assert (List.length input2_bits <= length) ;
 
   (* Pad with zeros in MSB until reaching same length *)
-  let input1_bits = pad_upto length Circuit.Boolean.false_ input1_bits in
-  let input2_bits = pad_upto length Circuit.Boolean.false_ input2_bits in
+  let input1_bits = Common.pad_upto length Circuit.Boolean.false_ input1_bits in
+  let input2_bits = Common.pad_upto length Circuit.Boolean.false_ input2_bits in
 
   (* Pad with more zeros until the length is a multiple of 16 *)
   let pad_length = length in
@@ -141,7 +144,7 @@ let%test_unit "xor gadget" =
   (* Initialize the SRS cache. *)
   let () = Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] in
 
-  (* Helper to test xor16 gadget
+  (* Helper to test Xor gadget
      *   Inputs operands and expected output: left_input xor right_input
      *   Returns true if constraints are satisfied, false otherwise.
   *)
@@ -150,7 +153,7 @@ let%test_unit "xor gadget" =
       let _proof_keypair, _proof =
         Runner.generate_and_verify_proof (fun () ->
             let open Runner.Impl in
-            (* Set up snarky variables for inputs and outputs *)
+            (* Set up snarky variables for inputs and output *)
             let left_input =
               exists Field.typ ~compute:(fun () ->
                   Field.Constant.of_int left_input )
