@@ -10,7 +10,7 @@ mina:
   image: gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet
   useCustomEntrypoint: false
   customEntrypoint: ""
-  privkeyPass: "naughty blue worm"
+  # privkeyPass: "naughty blue worm"
   seedPeers:
     - /dns4/seed-one.genesis-redux.o1test.net/tcp/10002/p2p/12D3KooWP7fTKbyiUcYJGajQDpCFo2rDexgTHFJTxCH8jvcL1eAH
     - /dns4/seed-two.genesis-redux.o1test.net/tcp/10002/p2p/12D3KooWL9ywbiXNfMBqnUKHSB1Q1BaHFNUzppu6JLMVn9TTPFSA
@@ -47,7 +47,11 @@ blockProducerConfigs:
   - name: "test-1"
     runWithUserAgent: false
     runWithBots: false
-    privateKeySecret: "yolo"
+    # privateKeySecret: "yolo"
+    keypairName: ""
+    # privateKey : ""
+    # publicKey : ""
+    privateKeyPW : ""
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
@@ -56,7 +60,11 @@ blockProducerConfigs:
   - name: "test-2"
     runWithUserAgent: true
     runWithBots: false
-    privateKeySecret: "yolo"
+    # privateKeySecret: "yolo"
+    keypairName: ""
+    # privateKey : ""
+    # publicKey : ""
+    privateKeyPW : ""
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
@@ -65,7 +73,11 @@ blockProducerConfigs:
   - name: "test-3"
     runWithUserAgent: false
     runWithBots: true
-    privateKeySecret: "yolo"
+    # privateKeySecret: "yolo"
+    keypairName: ""
+    # privateKey : ""
+    # publicKey : ""
+    privateKeyPW : ""
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
@@ -75,7 +87,11 @@ blockProducerConfigs:
   - name: "test-4"
     runWithUserAgent: true
     runWithBots: true
-    privateKeySecret: "yolo"
+    # privateKeySecret: "yolo"
+    keypairName: ""
+    # privateKey : ""
+    # publicKey : ""
+    privateKeyPW : ""
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
