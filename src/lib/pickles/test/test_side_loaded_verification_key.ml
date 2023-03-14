@@ -20,7 +20,8 @@ let test_input_size () =
        (Nat.to_int SLV_key.Width.Max.n)
        ~stop:`inclusive ~start:`inclusive )
     ~f:(fun n ->
-      [%test_eq: int]
+      Alcotest.(check int)
+        "input size"
         (input_size ~of_int:Fn.id ~add:( + ) ~mul:( * ) n)
         (let (T a) = Pickles_types.Nat.of_int n in
          let (T (Typ typ, _conv, _conv_inv)) =

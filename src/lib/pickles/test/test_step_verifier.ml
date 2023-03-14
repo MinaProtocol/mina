@@ -26,7 +26,11 @@ let test_side_loaded_domains () =
         Pickles__Step_verifier.For_tests_only.side_loaded_domain
           ~log2_size:(Field.of_int ds.h)
       in
-      [%test_eq: Field.Constant.t]
+      let pp ppf cst =
+        Format.pp_print_string ppf (Field.Constant.to_string cst)
+      in
+      (Alcotest.check (Alcotest.testable pp Field.Constant.equal))
+        "side loaded domains"
         (d_unchecked#vanishing_polynomial pt)
         (run (fun () ->
              (checked_domain ())#vanishing_polynomial (Field.constant pt) ) ) )
