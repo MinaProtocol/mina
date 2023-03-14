@@ -92,8 +92,8 @@ let%test_unit "and gadget" =
   (* Initialize the SRS cache. *)
   let () = Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] in
 
-  (* Helper to test xor16 gadget
-     *   Inputs operands and expected output: left_input xor right_input
+  (* Helper to test And gadget
+     *   Inputs operands and expected output: left_input and right_input = output
      *   Returns true if constraints are satisfied, false otherwise.
   *)
   let test_and left_input right_input output length =
@@ -113,7 +113,7 @@ let%test_unit "and gadget" =
             let output =
               exists Field.typ ~compute:(fun () -> Field.Constant.of_int output)
             in
-            (* Use the xor gate gadget *)
+            (* Use the and gate gadget *)
             let result =
               band (module Runner.Impl) left_input right_input length
             in
