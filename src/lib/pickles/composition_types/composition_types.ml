@@ -88,11 +88,7 @@ module Wrap = struct
 
           module Optional_column_scalars = struct
             type 'fp t =
-              { chacha0 : 'fp
-              ; chacha1 : 'fp
-              ; chacha2 : 'fp
-              ; chacha_final : 'fp
-              ; range_check0 : 'fp
+              { range_check0 : 'fp
               ; range_check1 : 'fp
               ; foreign_field_add : 'fp
               ; foreign_field_mul : 'fp
@@ -104,11 +100,7 @@ module Wrap = struct
             [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
             let map ~f
-                { chacha0
-                ; chacha1
-                ; chacha2
-                ; chacha_final
-                ; range_check0
+                { range_check0
                 ; range_check1
                 ; foreign_field_add
                 ; foreign_field_mul
@@ -117,11 +109,7 @@ module Wrap = struct
                 ; lookup_gate
                 ; runtime_tables
                 } =
-              { chacha0 = f chacha0
-              ; chacha1 = f chacha1
-              ; chacha2 = f chacha2
-              ; chacha_final = f chacha_final
-              ; range_check0 = f range_check0
+              { range_check0 = f range_check0
               ; range_check1 = f range_check1
               ; foreign_field_add = f foreign_field_add
               ; foreign_field_mul = f foreign_field_mul
@@ -132,11 +120,7 @@ module Wrap = struct
               }
 
             let map2 ~f t1 t2 =
-              { chacha0 = f t1.chacha0 t2.chacha0
-              ; chacha1 = f t1.chacha1 t2.chacha1
-              ; chacha2 = f t1.chacha2 t2.chacha2
-              ; chacha_final = f t1.chacha_final t2.chacha_final
-              ; range_check0 = f t1.range_check0 t2.range_check0
+              { range_check0 = f t1.range_check0 t2.range_check0
               ; range_check1 = f t1.range_check1 t2.range_check1
               ; foreign_field_add = f t1.foreign_field_add t2.foreign_field_add
               ; foreign_field_mul = f t1.foreign_field_mul t2.foreign_field_mul
@@ -147,11 +131,7 @@ module Wrap = struct
               }
 
             let to_list
-                { chacha0
-                ; chacha1
-                ; chacha2
-                ; chacha_final
-                ; range_check0
+                { range_check0
                 ; range_check1
                 ; foreign_field_add
                 ; foreign_field_mul
@@ -160,11 +140,7 @@ module Wrap = struct
                 ; lookup_gate
                 ; runtime_tables
                 } =
-              [ chacha0
-              ; chacha1
-              ; chacha2
-              ; chacha_final
-              ; range_check0
+              [ range_check0
               ; range_check1
               ; foreign_field_add
               ; foreign_field_mul
@@ -175,11 +151,7 @@ module Wrap = struct
               ]
 
             let to_data
-                { chacha0
-                ; chacha1
-                ; chacha2
-                ; chacha_final
-                ; range_check0
+                { range_check0
                 ; range_check1
                 ; foreign_field_add
                 ; foreign_field_mul
@@ -189,11 +161,7 @@ module Wrap = struct
                 ; runtime_tables
                 } =
               Hlist.HlistId.
-                [ chacha0
-                ; chacha1
-                ; chacha2
-                ; chacha_final
-                ; range_check0
+                [ range_check0
                 ; range_check1
                 ; foreign_field_add
                 ; foreign_field_mul
@@ -205,11 +173,7 @@ module Wrap = struct
 
             let of_data
                 Hlist.HlistId.
-                  [ chacha0
-                  ; chacha1
-                  ; chacha2
-                  ; chacha_final
-                  ; range_check0
+                  [ range_check0
                   ; range_check1
                   ; foreign_field_add
                   ; foreign_field_mul
@@ -218,11 +182,7 @@ module Wrap = struct
                   ; lookup_gate
                   ; runtime_tables
                   ] =
-              { chacha0
-              ; chacha1
-              ; chacha2
-              ; chacha_final
-              ; range_check0
+              { range_check0
               ; range_check1
               ; foreign_field_add
               ; foreign_field_mul
@@ -233,11 +193,7 @@ module Wrap = struct
               }
 
             let of_feature_flags (feature_flags : _ Plonk_types.Features.t) =
-              { chacha0 = feature_flags.chacha
-              ; chacha1 = feature_flags.chacha
-              ; chacha2 = feature_flags.chacha
-              ; chacha_final = feature_flags.chacha
-              ; range_check0 = feature_flags.range_check0
+              { range_check0 = feature_flags.range_check0
               ; range_check1 = feature_flags.range_check1
               ; foreign_field_add = feature_flags.foreign_field_add
               ; foreign_field_mul = feature_flags.foreign_field_mul
@@ -287,7 +243,7 @@ module Wrap = struct
                 | _ ->
                     opt_spec
               in
-              let [ f1; f2; f3; f4; f5; f6; f7; f8; f9; f10; f11; f12 ] =
+              let [ f1; f2; f3; f4; f5; f6; f7; f8 ] =
                 of_feature_flags feature_flags |> to_data
               in
               Spec.T.Struct
@@ -299,10 +255,6 @@ module Wrap = struct
                 ; opt_spec f6
                 ; opt_spec f7
                 ; opt_spec f8
-                ; opt_spec f9
-                ; opt_spec f10
-                ; opt_spec f11
-                ; opt_spec f12
                 ]
 
             let typ (type f fp)
@@ -314,11 +266,7 @@ module Wrap = struct
                 Plonk_types.Opt.typ Impl.Boolean.typ flag fp ~dummy:dummy_scalar
               in
               Snarky_backendless.Typ.of_hlistable
-                [ opt_typ feature_flags.chacha
-                ; opt_typ feature_flags.chacha
-                ; opt_typ feature_flags.chacha
-                ; opt_typ feature_flags.chacha
-                ; opt_typ feature_flags.range_check0
+                [ opt_typ feature_flags.range_check0
                 ; opt_typ feature_flags.range_check1
                 ; opt_typ feature_flags.foreign_field_add
                 ; opt_typ feature_flags.foreign_field_mul
@@ -950,7 +898,7 @@ module Wrap = struct
           representing it inside the circuit. *)
       let spec impl lookup feature_flags =
         let feature_flags_spec =
-          let [ f1; f2; f3; f4; f5; f6; f7; f8; f9 ] =
+          let [ f1; f2; f3; f4; f5; f6; f7; f8 ] =
             (* Ensure that layout is the same *)
             Plonk_types.Features.to_data feature_flags
           in
@@ -968,14 +916,13 @@ module Wrap = struct
           in
           Spec.T.Struct
             [ maybe_constant f1
-            ; maybe_constant f1
-            ; maybe_constant f1
-            ; maybe_constant f1
-            ; maybe_constant f1
-            ; maybe_constant f1
-            ; maybe_constant f1
-            ; maybe_constant f1
-            ; maybe_constant f1
+            ; maybe_constant f2
+            ; maybe_constant f3
+            ; maybe_constant f4
+            ; maybe_constant f5
+            ; maybe_constant f6
+            ; maybe_constant f7
+            ; maybe_constant f8
             ]
         in
         Spec.T.Struct
@@ -1319,6 +1266,34 @@ module Step = struct
         (** A layout of the raw data in this value, which is needed for
           representing it inside the circuit. *)
         let spec impl bp_log2 lookup feature_flags =
+          let feature_flags_spec =
+            let [ f1; f2; f3; f4; f5; f6; f7; f8 ] =
+              (* Ensure that layout is the same *)
+              Plonk_types.Features.to_data feature_flags
+            in
+            let constant x =
+              Spec.T.Constant (x, (fun x y -> assert (Bool.equal x y)), B Bool)
+            in
+            let maybe_constant flag =
+              match flag with
+              | Plonk_types.Opt.Flag.Yes ->
+                  constant true
+              | Plonk_types.Opt.Flag.No ->
+                  constant false
+              | Plonk_types.Opt.Flag.Maybe ->
+                  Spec.T.B Bool
+            in
+            Spec.T.Struct
+              [ maybe_constant f1
+              ; maybe_constant f2
+              ; maybe_constant f3
+              ; maybe_constant f4
+              ; maybe_constant f5
+              ; maybe_constant f6
+              ; maybe_constant f7
+              ; maybe_constant f8
+              ]
+          in
           Spec.T.Struct
             [ Vector (B Field, Nat.N9.n)
             ; Vector (B Digest, Nat.N1.n)
@@ -1326,17 +1301,7 @@ module Step = struct
             ; Vector (Scalar Challenge, Nat.N3.n)
             ; Vector (B Bulletproof_challenge, bp_log2)
             ; Vector (B Bool, Nat.N1.n)
-            ; Spec.T.Struct
-                [ B Bool
-                ; B Bool
-                ; B Bool
-                ; B Bool
-                ; B Bool
-                ; B Bool
-                ; B Bool
-                ; B Bool
-                ; B Bool
-                ]
+            ; feature_flags_spec
             ; Wrap.Lookup_parameters.opt_spec impl lookup
             ; Wrap.Proof_state.Deferred_values.Plonk.In_circuit
               .Optional_column_scalars

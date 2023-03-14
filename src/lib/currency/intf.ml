@@ -123,8 +123,7 @@ module type Signed_intf = sig
 
   val gen : t Quickcheck.Generator.t
 
-  val create :
-    magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) Signed_poly.t
+  val create : magnitude:magnitude -> sgn:Sgn.t -> t
 
   val sgn : t -> Sgn.t
 
@@ -418,6 +417,8 @@ module type Full = sig
 
       val to_fee : var -> Fee.var
 
+      val to_field : var -> Field.Var.t
+
       module Unsafe : sig
         val of_field : Field.Var.t -> t
       end
@@ -500,6 +501,8 @@ module type Full = sig
       val ( >= ) : var -> var -> Boolean.var Checked.t
 
       val if_ : Boolean.var -> then_:var -> else_:var -> var Checked.t
+
+      val to_field : var -> Field.Var.t
 
       module Unsafe : sig
         val of_field : Field.Var.t -> var

@@ -302,7 +302,7 @@ module Util = struct
          ~f:(fun _ -> Zkapp_basic.Set_or_keep.Keep) )
     |> Zkapp_state.V.of_list_exn
 
-  let sequence_state_of_list array_lst : Snark_params.Tick.Field.t array list =
+  let action_state_of_list array_lst : Snark_params.Tick.Field.t array list =
     List.map ~f:Events.of_string_array array_lst
 
   let auth_of_string s : Permissions.Auth_required.t =
@@ -532,12 +532,12 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
   in
   zkapp_command
 
-let update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-    ~sequence_state =
+let update_action_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+    ~action_state =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
-  let actions = Util.sequence_state_of_list sequence_state in
+  let actions = Util.action_state_of_list action_state in
   let spec =
     { Transaction_snark.For_tests.Update_states_spec.sender = (keypair, nonce)
     ; fee

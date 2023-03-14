@@ -1,4 +1,3 @@
-use commitment_dlog::commitment::{shift_scalar, PolyComm};
 use kimchi::circuits::scalars::RandomOracles;
 use kimchi::proof::ProverProof;
 use kimchi::verifier_index::VerifierIndex as DlogVerifierIndex;
@@ -9,6 +8,7 @@ use mina_poseidon::{
     FqSponge,
 };
 use paste::paste;
+use poly_commitment::commitment::{shift_scalar, PolyComm};
 use wasm_bindgen::prelude::*;
 // use wasm_bindgen::convert::{IntoWasmAbi, FromWasmAbi};
 use crate::wasm_vector::WasmVector;

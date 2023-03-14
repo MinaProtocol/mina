@@ -28,6 +28,7 @@
    precomputed_values
    coda_genesis_ledger
    mina_runtime_config
+   hex
    sgn
    mina_base.util
    kimchi_backend.pasta

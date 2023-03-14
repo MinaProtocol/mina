@@ -12,6 +12,8 @@ struct
     { Account_update.Update.dummy with
       token_symbol = Zkapp_basic.Set_or_keep.Set "Zoozoo"
     }
+
+  let is_non_zkapp_update = true
 end
 
 let%test_module "Update account token symbol" =

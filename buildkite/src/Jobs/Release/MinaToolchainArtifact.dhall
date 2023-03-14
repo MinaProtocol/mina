@@ -23,7 +23,9 @@ Pipeline.build
           S.strictlyStart (S.contains "dockerfiles/stages/2-"),
           S.strictlyStart (S.contains "dockerfiles/stages/3-"),
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaToolchainArtifact"),
-          S.strictly (S.contains "opam.export")
+          S.strictly (S.contains "opam.export"),
+          -- Rust version has changed
+          S.strictlyEnd (S.contains "rust-toolchain.toml")
         ],
         path = "Release",
         name = "MinaToolchainArtifact"
