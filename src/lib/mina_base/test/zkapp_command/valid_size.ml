@@ -18,17 +18,18 @@ let%test_module "valid_size" =
                 list)
       }
 
-    let zkapp_type_gen_fixed_length length =
+    let zkapp_type_gen_fixed_length =
+      let open Quickcheck.Let_syntax in
+      let%bind length = Int.gen_incl 1 1000 in
       let gen_call_forest =
         List.gen_with_length length
         @@ With_stack_hash.quickcheck_generator tree_gen
              Unit.quickcheck_generator
       in
-      let open Quickcheck.Let_syntax in
       let%bind fee_payer = Account_update.Fee_payer.gen in
       let%bind account_updates = gen_call_forest in
       let%map memo = Signed_command_memo.gen in
-      { T.Stable.V1.Wire.fee_payer; account_updates; memo }
+      ({ T.Stable.V1.Wire.fee_payer; account_updates; memo }, length)
 
     let genesis_constant_error limit events actions : Genesis_constants.t =
       { protocol =
@@ -48,39 +49,50 @@ let%test_module "valid_size" =
       ; max_action_elements = actions
       }
 
+    (* Note that in the following tests the generated zkapp_type will have an account_updates (i.e. a call_forest) that is a list of variable length (say Length), but each
+        element in that list will always have two events and two actions. This means that the number of total actions and total events for the zkapp_type
+       will be 2 * Length for each. Thus, in order to generate an error, we just need the genesis file to be defined such that max_event_elements < 2 * Length and similarly for  max_action_elements.*)
+
     (* zkapp transaction too expensive *)
     let%test_unit "valid_size_errors" =
-      Quickcheck.test ~trials:50 (zkapp_type_gen_fixed_length 100) ~f:(fun x ->
+      Quickcheck.test ~trials:50 zkapp_type_gen_fixed_length ~f:(fun (x, y) ->
           [%test_eq: unit Or_error.t]
             (Error (Error.of_string "zkapp transaction too expensive"))
-            ( valid_size ~genesis_constants:(genesis_constant_error 1. 200 200)
+            ( valid_size
+                ~genesis_constants:(genesis_constant_error 1. (2 * y) (2 * y))
             @@ of_wire x ) )
 
     (* too many event elements *)
     let%test_unit "valid_size_errors_events" =
-      Quickcheck.test ~trials:50 (zkapp_type_gen_fixed_length 100) ~f:(fun x ->
+      Quickcheck.test ~trials:50 zkapp_type_gen_fixed_length ~f:(fun (x, y) ->
           [%test_eq: unit Or_error.t]
             (Error
-               (Error.of_string
-                  "too many event elements (200, max allowed is 10)" ) )
-            ( valid_size ~genesis_constants:(genesis_constant_error 100. 10 200)
+               ( Error.of_string
+               @@ sprintf "too many event elements (%d, max allowed is %d)"
+                    (2 * y) y ) )
+            ( valid_size
+                ~genesis_constants:(genesis_constant_error 100000. y (2 * y))
             @@ of_wire x ) )
 
     (* too many action elements *)
     let%test_unit "valid_size_errors_actions" =
-      Quickcheck.test ~trials:50 (zkapp_type_gen_fixed_length 100) ~f:(fun x ->
+      Quickcheck.test ~trials:50 zkapp_type_gen_fixed_length ~f:(fun (x, y) ->
           [%test_eq: unit Or_error.t]
             (Error
-               (Error.of_string
-                  "too many sequence event elements (200, max allowed is 10)" )
-            )
-            ( valid_size ~genesis_constants:(genesis_constant_error 100. 200 10)
+               ( Error.of_string
+               @@ sprintf
+                    "too many sequence event elements (%d, max allowed is %d)"
+                    (2 * y) y ) )
+            ( valid_size
+                ~genesis_constants:(genesis_constant_error 100000. (2 * y) y)
             @@ of_wire x ) )
 
     (* returns OK *)
     let%test_unit "returns ok" =
-      Quickcheck.test ~trials:50 (zkapp_type_gen_fixed_length 100) ~f:(fun x ->
+      Quickcheck.test ~trials:50 zkapp_type_gen_fixed_length ~f:(fun (x, y) ->
           [%test_eq: unit Or_error.t] (Ok ())
-            ( valid_size ~genesis_constants:(genesis_constant_error 100. 200 200)
+            ( valid_size
+                ~genesis_constants:
+                  (genesis_constant_error 100000. (2 * y) (2 * y))
             @@ of_wire x ) )
   end )
