@@ -1609,13 +1609,12 @@ module Circuit = struct
       Js.wrap_callback (fun (f : (unit -> unit) Js.callback) : unit ->
           Impl.as_prover (fun () -> Js.Unsafe.fun_call f [||]) ) ;
     circuit##.generateKeypair :=
-      Js.wrap_meth_callback
-        (fun (this : _ Circuit_main.t) : keypair_class Js.t ->
-          generate_keypair this ) ;
+      Js.wrap_callback (fun (circuit : _ Circuit_main.t) : keypair_class Js.t ->
+          generate_keypair circuit ) ;
     circuit##.prove :=
-      Js.wrap_meth_callback
-        (fun (this : _ Circuit_main.t) w p (kp : keypair_class Js.t) ->
-          prove this w p kp##.value ) ;
+      Js.wrap_callback
+        (fun (circuit : _ Circuit_main.t) w p (kp : keypair_class Js.t) ->
+          prove circuit w p kp##.value ) ;
     (circuit##.verify :=
        fun (pub : Js.Unsafe.any Js.js_array Js.t)
            (vk : verification_key_class Js.t) (pi : proof_class Js.t) :
