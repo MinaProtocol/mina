@@ -2,6 +2,13 @@
 
 open Core_kernel
 
+(* pad_upto - Pad a list with a value until it reaches a given length *)
+let pad_upto ~length ~value list =
+  let len = List.length list in
+  assert (len <= length) ;
+  let padding = List.init (length - len) ~f:(fun _ -> value) in
+  list @ padding
+
 (* field_bits_le_to_field - Create a field element from contiguous bits of another
  *
  *   Inputs:
