@@ -616,17 +616,19 @@ macro_rules! impl_proof {
                 index: $WasmVerifierIndex,
                 proof: WasmProverProof,
             ) -> bool {
-                let group_map = <$G as CommitmentCurve>::Map::setup();
-                let verifier_index = &index.into();
-                let (proof, public_input) = &proof.into();
-                batch_verify::<
-                    $G,
-                    DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
-                    DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
-                >(
-                    &group_map,
-                    &[Context { verifier_index, proof, public_input }]
-                ).is_ok()
+                crate::rayon::run_in_pool(|| {
+                    let group_map = <$G as CommitmentCurve>::Map::setup();
+                    let verifier_index = &index.into();
+                    let (proof, public_input) = &proof.into();
+                    batch_verify::<
+                        $G,
+                        DefaultFqSponge<_, PlonkSpongeConstantsKimchi>,
+                        DefaultFrSponge<_, PlonkSpongeConstantsKimchi>,
+                    >(
+                        &group_map,
+                        &[Context { verifier_index, proof, public_input }]
+                    ).is_ok()
+                })
             }
 
             #[wasm_bindgen]
