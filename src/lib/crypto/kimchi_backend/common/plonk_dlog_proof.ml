@@ -98,7 +98,7 @@ module type Inputs_intf = sig
       -> Scalar_field.Vector.t
       -> Scalar_field.t array
       -> Curve.Affine.Backend.t array
-      -> t
+      -> t * Kimchi_types.prover_traces
 
     val create_async :
          Index.t
@@ -106,7 +106,7 @@ module type Inputs_intf = sig
       -> Scalar_field.Vector.t
       -> Scalar_field.t array
       -> Curve.Affine.Backend.t array
-      -> t Promise.t
+      -> (t * Kimchi_types.prover_traces) Promise.t
 
     val verify : Verifier_index.t -> t -> bool
 
@@ -372,8 +372,10 @@ module Make (Inputs : Inputs_intf) = struct
         ~f:(fun { Challenge_polynomial.commitment; _ } ->
           G.Affine.to_backend (Finite commitment) )
     in
-    let res = Backend.create pk primary auxiliary challenges commitments in
-    of_backend res
+    let proof, traces =
+      Backend.create pk primary auxiliary challenges commitments
+    in
+    (of_backend proof, traces)
 
   let create_async ?message pk ~primary ~auxiliary =
     let chal_polys =
@@ -389,10 +391,10 @@ module Make (Inputs : Inputs_intf) = struct
         ~f:(fun { Challenge_polynomial.commitment; _ } ->
           G.Affine.to_backend (Finite commitment) )
     in
-    let%map.Promise res =
+    let%map.Promise proof, traces =
       Backend.create_async pk primary auxiliary challenges commitments
     in
-    of_backend res
+    (of_backend proof, traces)
 
   let batch_verify' (conv : 'a -> Fq.t array)
       (ts : (Verifier_index.t * t * 'a * message option) list) =

@@ -61,7 +61,7 @@ pub use {
         wires::caml::CamlWire,
     },
     kimchi::proof::caml::{CamlLookupEvaluations, CamlProofEvaluations},
-    kimchi::prover::caml::{CamlLookupCommitments, CamlProverCommitments, CamlProverProof},
+    kimchi::prover::caml::{CamlLookupCommitments, CamlProverCommitments, CamlProverProof, CamlProverTraces},
     mina_poseidon::sponge::caml::CamlScalarChallenge,
     poly_commitment::commitment::caml::{CamlOpeningProof, CamlPolyComm},
 };
