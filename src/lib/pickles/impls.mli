@@ -3,7 +3,7 @@ open Pickles_types
 module Wrap_impl : module type of Kimchi_backend.Impls.Wrap
 
 module Step : sig
-  module Impl : module type of Snarky_backendless.Snark.Run.Make (Backend.Tick)
+  module Impl : module type of Kimchi_backend.Impls.Step
 
   include module type of Impl
 

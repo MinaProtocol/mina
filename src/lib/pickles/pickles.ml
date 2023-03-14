@@ -384,7 +384,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       (* Currently, a circuit must have at least 1 of every type of constraint. *)
       let dummy_constraints () =
-        Impl.(
+        Impls.Step.(
           let x =
             exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3)
           in
@@ -394,7 +394,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           ignore
             ( SC.to_field_checked'
-                (module Impl)
+                (module Impls.Step)
                 ~num_bits:16
                 (Kimchi_backend_common.Scalar_challenge.create x)
               : Field.t * Field.t * Field.t ) ;

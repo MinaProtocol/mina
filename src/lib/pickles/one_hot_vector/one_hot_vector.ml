@@ -10,7 +10,7 @@ end
 type ('field_var, 'n) t = ('field_var Snarky_backendless.Boolean.t, 'n) Vector.t
 
 module T (Impl : Snarky_backendless.Snark_intf.Run) = struct
-  type nonrec 'n t = (Impl.field, 'n) t
+  type nonrec 'n t = (Impl.field_var, 'n) t
 end
 
 module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
@@ -37,7 +37,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
                       Boolean.Assert.exactly_one (Vector.to_list x) ) ) )
         }
     in
-    Typ.transport typ
+    Impl.Typ.transport typ
       ~there:(fun i -> Vector.init n ~f:(( = ) i))
       ~back:(fun v ->
         let i, _ =

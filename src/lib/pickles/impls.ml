@@ -31,7 +31,7 @@ let forbidden_shifted_values ~modulus:r ~size_in_bits =
   |> List.dedup_and_sort ~compare:B.compare
 
 module Step = struct
-  module Impl = Snarky_backendless.Snark.Run.Make (Tick)
+  module Impl = Kimchi_backend.Impls.Step
   include Impl
   module Verification_key = Tick.Verification_key
   module Proving_key = Tick.Proving_key

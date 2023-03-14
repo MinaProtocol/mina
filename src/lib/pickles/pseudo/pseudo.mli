@@ -4,8 +4,6 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) : sig
   type ('a, 'n) t =
     'n One_hot_vector.T(Impl).t * ('a, 'n) Pickles_types.Vector.t
 
-  val seal : Impl.Field.t -> Impl.Field.t
-
   val mask :
        'n One_hot_vector.T(Impl).t
     -> (Impl.Field.t, 'n) Pickles_types.Vector.t

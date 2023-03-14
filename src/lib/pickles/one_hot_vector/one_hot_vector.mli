@@ -9,7 +9,7 @@ type ('field_var, 'n) t =
   ('field_var Snarky_backendless.Boolean.t, 'n) Vector.t
 
 module T (Impl : Snarky_backendless.Snark_intf.Run) : sig
-  type nonrec 'n t = (Impl.Boolean.var, 'n) t
+  type nonrec 'n t = (Impl.field_var, 'n) t
 end
 
 module Make (Impl : Snarky_backendless.Snark_intf.Run) : sig
