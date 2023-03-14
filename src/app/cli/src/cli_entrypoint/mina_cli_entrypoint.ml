@@ -94,6 +94,11 @@ let setup_daemon logger =
          likely get tracked in your history. Mainly to be used from the \
          daemon.json config file"
       (optional string)
+  and itn_keys =
+    flag "--itn-keys" ~aliases:[ "itn-keys" ] (optional string)
+      ~doc:
+        "PUBLICKEYS A comma-delimited list of public keys that are permitted \
+         to send signed requests to the incentivized testnet GraphQL server"
   and demo_mode =
     flag "--demo-mode" ~aliases:[ "demo-mode" ] no_arg
       ~doc:
@@ -1349,7 +1354,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
              ~f:ignore ) ;
         Mina_run.setup_local_server ?client_trustlist ~rest_server_port
           ~insecure_rest_server ~open_limited_graphql_port ?limited_graphql_port
-          ?itn_graphql_port mina ;
+          ?itn_graphql_port ?auth_keys:itn_keys mina ;
         let%bind () =
           Option.map metrics_server_port ~f:(fun port ->
               let forward_uri =

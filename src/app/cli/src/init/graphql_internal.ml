@@ -190,8 +190,11 @@ struct
             respond_string ~status:`OK ~body () )
 
   let make_callback :
-      (Cohttp.Request.t -> 'ctx) -> 'ctx Schema.schema -> 'conn callback =
-   fun make_context schema _conn (req : Cohttp.Request.t) body ->
+         ?auth_keys:Signature_lib.Public_key.t list
+      -> (Cohttp.Request.t -> 'ctx)
+      -> 'ctx Schema.schema
+      -> 'conn callback =
+   fun ?auth_keys make_context schema _conn (req : Cohttp.Request.t) body ->
     let req_path = Cohttp.Request.uri req |> Uri.path in
     let path_parts = Astring.String.cuts ~empty:false ~sep:"/" req_path in
     let headers = Cohttp.Request.headers req in
@@ -202,23 +205,63 @@ struct
       | Some s ->
           List.mem "text/html" (String.split_on_char ',' s)
     in
-    match (req.meth, path_parts, accept_html) with
-    | `GET, [ "graphql" ], true ->
-        static_file_response "index_extensions.html"
-    | `GET, [ "graphql" ], false ->
-        if
-          Cohttp.Header.get headers "Connection" = Some "Upgrade"
-          && Cohttp.Header.get headers "Upgrade" = Some "websocket"
-        then
-          let handle_conn =
-            Websocket_transport.handle (execute_query (make_context req) schema)
-          in
-          Io.return (Ws.upgrade_connection req handle_conn)
-        else execute_request schema (make_context req) req body
-    | `GET, [ "graphql"; path ], _ ->
-        static_file_response path
-    | `POST, [ "graphql" ], _ ->
-        execute_request schema (make_context req) req body
-    | _ ->
-        respond_string ~status:`Not_found ~body:"" ()
+    Io.( >>= ) (Body.to_string body) (fun body_str ->
+        let respond () =
+          match (req.meth, path_parts, accept_html) with
+          | `GET, [ "graphql" ], true ->
+              static_file_response "index_extensions.html"
+          | `GET, [ "graphql" ], false ->
+              if
+                Cohttp.Header.get headers "Connection" = Some "Upgrade"
+                && Cohttp.Header.get headers "Upgrade" = Some "websocket"
+              then
+                let handle_conn =
+                  Websocket_transport.handle
+                    (execute_query (make_context req) schema)
+                in
+                Io.return (Ws.upgrade_connection req handle_conn)
+              else execute_request schema (make_context req) req body
+          | `GET, [ "graphql"; path ], _ ->
+              static_file_response path
+          | `POST, [ "graphql" ], _ ->
+              execute_request schema (make_context req) req body
+          | _ ->
+              respond_string ~status:`Not_found ~body:"" ()
+        in
+        let unauthorized () =
+          respond_string ~status:`Unauthorized ~body:"" ()
+        in
+        (*        Format.eprintf "BODY: \"%s\"@." body_str; *)
+        let body_trimmed = String.trim body_str in
+        (*          Format.eprintf "BODY TRIMMED: \"%s\"@." body_trimmed; *)
+        let _json = Yojson.Safe.from_string body_trimmed in
+        (* auth_keys is Some if authentication is required
+           only caller is `create_graphql_server, which enforces that invariant
+        *)
+        match auth_keys with
+        | None ->
+            respond ()
+        | Some pks -> (
+            match Cohttp.Header.get headers "Authorization" with
+            | None ->
+                unauthorized ()
+            | Some auth -> (
+                (* format: `Itn signature` *)
+                match Core.String.split_on_chars auth ~on:[ ' ' ] with
+                | [ "Itn"; s ] -> (
+                    (* `Itn` is our own auth scheme *)
+                    match Mina_base.Signature.of_base58_check s with
+                    | Ok signature ->
+                        if
+                          Core.List.exists pks ~f:(fun pk ->
+                              String_sign.verify
+                                ~signature_kind:Mina_signature_kind.Testnet
+                                signature pk body_str )
+                        then respond ()
+                        else unauthorized ()
+                    | Error _ ->
+                        unauthorized () )
+                | _ ->
+                    (* invalid auth scheme *)
+                    unauthorized () ) ) )
 end

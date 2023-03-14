@@ -271,8 +271,8 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
 let setup_local_server ?(client_trustlist = []) ?rest_server_port
-    ?limited_graphql_port ?itn_graphql_port ?(open_limited_graphql_port = false)
-    ?(insecure_rest_server = false) mina =
+    ?limited_graphql_port ?itn_graphql_port ?auth_keys:_
+    ?(open_limited_graphql_port = false) ?(insecure_rest_server = false) mina =
   let client_trustlist =
     ref
       (Unix.Cidr.Set.of_list
@@ -501,9 +501,21 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           Deferred.unit )
     ]
   in
-  let create_graphql_server ~bind_to_address ~schema ~server_description port =
+  let create_graphql_server ?auth_keys ~bind_to_address ~schema
+      ~server_description ~require_auth port =
+    if require_auth && Option.is_none auth_keys then
+      failwith
+        "Could not create GraphQL server, authentication is required, but no \
+         authentication keys were provided" ;
+    let auth_keys =
+      Option.map auth_keys ~f:(fun s ->
+          let pk_strs = String.split_on_chars ~on:[ ',' ] s in
+          List.map pk_strs ~f:(fun pk_str ->
+              Signature_lib.Public_key.(
+                Compressed.(of_base58_check_exn pk_str |> decompress_exn)) ) )
+    in
     let graphql_callback =
-      Graphql_cohttp_async.make_callback (fun _req -> mina) schema
+      Graphql_cohttp_async.make_callback ?auth_keys (fun _req -> mina) schema
     in
     Cohttp_async.(
       Server.create_expert
@@ -559,7 +571,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               Tcp.Bind_to_address.(
                 if insecure_rest_server then All_addresses else Localhost)
             ~schema:Mina_graphql.schema ~server_description:"GraphQL server"
-            rest_server_port ) ) ;
+            ~require_auth:false rest_server_port ) ) ;
   (* Second graphql server with limited queries exposed *)
   Option.iter limited_graphql_port ~f:(fun rest_server_port ->
       O1trace.background_thread "serve_limited_graphql" (fun () ->
@@ -569,7 +581,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 if open_limited_graphql_port then All_addresses else Localhost)
             ~schema:Mina_graphql.schema_limited
             ~server_description:"GraphQL server with limited queries"
-            rest_server_port ) ) ;
+            ~require_auth:false rest_server_port ) ) ;
   (* Third graphql server with ITN-particular queries exposed *)
   Option.iter itn_graphql_port ~f:(fun rest_server_port ->
       O1trace.background_thread "serve_itn_graphql" (fun () ->
@@ -579,7 +591,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 if insecure_rest_server then All_addresses else Localhost)
             ~schema:Mina_graphql.schema_limited
             ~server_description:"GraphQL server for ITN queries"
-            rest_server_port ) ) ;
+            ~require_auth:true rest_server_port ) ) ;
   let where_to_listen =
     Tcp.Where_to_listen.bind_to All_addresses
       (On_port (Mina_lib.client_port mina))
