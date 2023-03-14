@@ -340,6 +340,7 @@ let create ~logger ~(network : Kubernetes_network.t) =
     in
     String.concat filters ~sep:"\n"
   in
+  [%log debug] "log_filter: %s" log_filter ;
   let%map subscription =
     Subscription.create_with_retry ~logger ~name:network.namespace
       ~filter:log_filter
