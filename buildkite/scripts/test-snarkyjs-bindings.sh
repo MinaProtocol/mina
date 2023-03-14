@@ -11,9 +11,6 @@ node --version
 echo "Build SnarkyJS..."
 make snarkyjs
 
-echo "Run SnarkyJS bindings unit tests..."
-node src/lib/snarky_js_bindings/tests/run-tests.mjs
-
 echo "Run SnarkyJS unit tests..."
 cd src/lib/snarky_js_bindings/snarkyjs
 npm run test:unit
