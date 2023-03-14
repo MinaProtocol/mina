@@ -10,6 +10,9 @@ let bxor (type f)
     (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) (length : int) :
     Circuit.Field.t =
   let open Circuit in
+  (* Check that the length is permitted *)
+  assert (length < Field.size_in_bits) ;
+
   (* Convert to bits *)
   let input1_bits = Circuit.Field.unpack input1 in
   let input2_bits = Circuit.Field.unpack input2 in
@@ -19,8 +22,8 @@ let bxor (type f)
   assert (List.length input2_bits <= length) ;
 
   (* Pad with zeros in MSB until reaching same length *)
-  let input1_bits = pad_upto length Circuit.Boolean.false_ input1_bits in
-  let input2_bits = pad_upto length Circuit.Boolean.false_ input2_bits in
+  let input1_bits = Common.pad_upto length Circuit.Boolean.false_ input1_bits in
+  let input2_bits = Common.pad_upto length Circuit.Boolean.false_ input2_bits in
 
   (* Pad with more zeros until the length is a multiple of 16 *)
   let pad_length = length in
