@@ -107,13 +107,14 @@ module One_hot = struct
     type 'field_var t = ('field_var, Pickles_types.Nat.N3.n) One_hot_vector.t
 
     let to_input (type f field_var)
-        (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-        (t : field_var t) =
+        (module Impl : Snarky_backendless.Snark_intf.Run
+          with type field = f
+           and type field_var = field_var ) (t : field_var t) =
       Random_oracle_input.Chunked.packeds
         (Array.map
            Pickles_types.(
              Vector.to_array (t :> (field_var boolean, Nat.N3.n) Vector.t))
-           ~f:(fun b -> ((b :> Impl.field_var), 1)) )
+           ~f:(fun b -> (Impl.Boolean.to_field_var b, 1)) )
   end
 
   let there : proofs_verified -> int = function N0 -> 0 | N1 -> 1 | N2 -> 2
@@ -145,9 +146,7 @@ module One_hot = struct
         with type field = f
          and type field_var = field_var
          and type run_state = state ) :
-      ( field_var Snarky_backendless.Boolean.t Checked.t
-      , proofs_verified )
-      Impl.Typ.t =
+      (field_var Checked.t, proofs_verified) Impl.Typ.t =
     let module M = One_hot_vector.Make (Impl) in
     let open Impl in
     Typ.transport (M.typ Pickles_types.Nat.N3.n) ~there ~back

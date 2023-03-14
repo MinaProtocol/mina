@@ -22,7 +22,12 @@ module One_hot : sig
   module Checked : sig
     type 'field_var t = ('field_var, Pickles_types.Nat.N3.n) One_hot_vector.t
 
-    val to_input : 'field_var t -> 'field_var Random_oracle_input.Chunked.t
+    val to_input :
+         (module Snarky_backendless.Snark_intf.Run
+            with type field = 'f
+             and type field_var = 'field_var )
+      -> 'field_var t
+      -> 'field_var Random_oracle_input.Chunked.t
   end
 
   val to_input : zero:'a -> one:'a -> t -> 'a Random_oracle_input.Chunked.t
@@ -58,7 +63,7 @@ module Prefix_mask : sig
           with type field = 'f
            and type field_var = 'field_var
            and type run_state = 'state )
-    -> ( 'field_var Snarky_backendless.Boolean.t Checked.t
+    -> ( 'field_var Checked.t
        , t
        , 'f
        , 'field_var

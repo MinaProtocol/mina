@@ -17,7 +17,7 @@ module Checked : sig
   open Snarky_backendless
 
   val wrap :
-       ('f, 'cvar) Snark.m
+       ('f, 'cvar, 'state) Snark.m
     -> potential_xs:('input -> 'cvar * 'cvar * 'cvar)
     -> y_squared:(x:'cvar -> 'cvar)
     -> ('input -> 'cvar * 'cvar) Core_kernel.Staged.t
