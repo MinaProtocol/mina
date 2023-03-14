@@ -59,5 +59,7 @@ sed -i 's/return \[0,Exn,t\]/return joo_global_object.Error(t.c)/' "$BINDINGS_PA
 # TODO: this doesn't cover all cases, maybe should rewrite to_exn instead
 sed -i 's/function raise(t){throw caml_call1(to_exn$0,t)}/function raise(t){throw Error(t?.[1]?.c ?? "Unknown error thrown by raise")}/' "$BINDINGS_PATH"/snarky_js_node.bc.cjs
 
+chmod 777 "$BINDINGS_PATH"/*
+node "$SNARKY_JS_PATH/src/build/fix-wasm-bindings-node.js" "$BINDINGS_PATH/plonk_wasm.cjs"
 
 npm run --prefix="$SNARKY_JS_PATH" dev

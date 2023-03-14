@@ -11,10 +11,8 @@ SNARKY_JS_PATH=src/lib/snarky_js_bindings/snarkyjs
 BINDINGS_PATH="$SNARKY_JS_PATH"/dist/node/_node_bindings/
 cp "$BINDINGS_PATH"/snarky_js_node.bc.cjs "$SNARKY_JS_PATH"/src/node_bindings/snarky_js_node.bc.cjs
 cp "$BINDINGS_PATH"/snarky_js_node.bc.map "$SNARKY_JS_PATH"/src/node_bindings/snarky_js_node.bc.map
+cp "$BINDINGS_PATH"/plonk_wasm* "$SNARKY_JS_PATH"/src/node_bindings/
 
-cp _build/default/src/lib/crypto/kimchi_bindings/js/node_js/plonk_wasm* "$SNARKY_JS_PATH"/src/node_bindings/
-mv -f "$SNARKY_JS_PATH"/src/node_bindings/plonk_wasm.js "$SNARKY_JS_PATH"/src/node_bindings/plonk_wasm.cjs
-sed -i 's/plonk_wasm.js/plonk_wasm.cjs/' "$SNARKY_JS_PATH"/src/node_bindings/snarky_js_node.bc.cjs
 
 npm run build --prefix="$SNARKY_JS_PATH"
 
