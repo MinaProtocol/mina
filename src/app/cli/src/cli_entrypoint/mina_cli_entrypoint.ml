@@ -963,24 +963,25 @@ let setup_daemon logger =
             | None ->
                 client_trustlist
           in
+          let get_monitor_infos monitor =
+            let rec get_monitors accum monitor =
+              match Async_kernel.Monitor.parent monitor with
+              | None ->
+                  List.rev accum
+              | Some parent ->
+                  get_monitors (parent :: accum) parent
+            in
+            let monitors = get_monitors [ monitor ] monitor in
+            List.map monitors ~f:(fun monitor ->
+                Async_kernel.Monitor.sexp_of_t monitor
+                |> Error_json.sexp_to_yojson )
+          in
           Stream.iter
             (Async_kernel.Async_kernel_scheduler.long_cycles_with_context
                ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest) )
             ~f:(fun (span, context) ->
               let secs = Time_ns.Span.to_sec span in
-              let rec get_monitors accum monitor =
-                match Async_kernel.Monitor.parent monitor with
-                | None ->
-                    List.rev accum
-                | Some parent ->
-                    get_monitors (parent :: accum) parent
-              in
-              let monitors = get_monitors [ context.monitor ] context.monitor in
-              let monitor_infos =
-                List.map monitors ~f:(fun monitor ->
-                    Async_kernel.Monitor.sexp_of_t monitor
-                    |> Error_json.sexp_to_yojson )
-              in
+              let monitor_infos = get_monitor_infos context.monitor in
               [%log debug]
                 ~metadata:
                   [ ("long_async_cycle", `Float secs)
@@ -993,9 +994,11 @@ let setup_daemon logger =
           Stream.iter Async_kernel.Async_kernel_scheduler.long_jobs_with_context
             ~f:(fun (context, span) ->
               let secs = Time_ns.Span.to_sec span in
+              let monitor_infos = get_monitor_infos context.monitor in
               [%log debug]
                 ~metadata:
                   [ ("long_async_job", `Float secs)
+                  ; ("monitors", `List monitor_infos)
                   ; ( "most_recent_2_backtrace"
                     , `String
                         (String.concat ~sep:"␤"
