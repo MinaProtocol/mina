@@ -132,7 +132,6 @@ installed: [
   "js_of_ocaml-toplevel.4.0.0"
   "jsonm.1.0.1"
   "jst-config.v0.14.1"
-  "jwto.0.4.0"
   "lambda-term.3.1.0"
   "lens.1.2.5"
   "lmdb.1.0"
