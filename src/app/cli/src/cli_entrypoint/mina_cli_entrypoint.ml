@@ -974,7 +974,7 @@ let setup_daemon logger =
             let monitors = get_monitors [ monitor ] monitor in
             List.map monitors ~f:(fun monitor ->
                 Async_kernel.Monitor.sexp_of_t monitor
-                |> Error_json.sexp_to_yojson )
+                |> Error_json.sexp_record_to_yojson )
           in
           Stream.iter
             (Async_kernel.Async_kernel_scheduler.long_cycles_with_context
