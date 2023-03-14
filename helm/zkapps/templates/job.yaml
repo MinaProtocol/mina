@@ -1,0 +1,44 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "mina-sample-zkapp.job-name" . }}
+spec:
+  parallelism: {{ $.Values.parallelism | default 1 }}
+  template:
+    metadata:
+      labels:
+        app:  {{ include "mina-sample-zkapp.job-name" . }}
+    spec:
+      runtimeClassName: kata-clh
+      initContainers:
+      - name: controller-is-ready
+        image: alpine:latest
+        args:
+        - sh
+        - -c
+        - for t in $(seq 15); do nc -vz {{ include "mina-sample-zkapp.service-name" . }} 80 && exit; sleep 1; done; exit 1
+      containers:
+      - name: send
+        image: {{ $.Values.jobImage.repository }}:{{ $.Values.jobImage.tag | default "latest" }}
+        imagePullPolicy: {{ $.Values.jobImage.pullPolicy }}
+        args:
+        - job
+        - --controller=http://{{ include "mina-sample-zkapp.service-name" . }}/
+        - --count={{ add (div (sub ($.Values.transactionCount | default 1) 1) ($.Values.parallelism | default 1)) 1 }}
+        resources:
+          requests:
+            {{ if $.Values.cpu }}
+            cpu: {{ $.Values.cpu }}
+            {{ end }}
+            {{ if $.Values.mem }}
+            memory: {{ $.Values.mem }}
+            {{ end }}
+          limits:
+            {{ if $.Values.cpu }}
+            cpu: {{ $.Values.cpu }}
+            {{ end }}
+            {{ if $.Values.mem }}
+            memory: {{ $.Values.mem }}
+            {{ end }}
+      restartPolicy: {{ $.Values.restartPolicy | default "OnFailure" }}
+  backoffLimit: {{ div ($.Values.parallelism | default 1) 3 }}

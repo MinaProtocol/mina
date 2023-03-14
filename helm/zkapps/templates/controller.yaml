@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mina-sample-zkapp.service-name" . }}
+  labels:
+    app: {{ include "mina-sample-zkapp.service-name" . }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "mina-sample-zkapp.service-name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "mina-sample-zkapp.service-name" . }}
+    spec:
+      containers:
+      - name: controller
+        image: {{ $.Values.controllerImage.repository }}:{{ $.Values.controllerImage.tag | default "latest" }}
+        imagePullPolicy: {{ $.Values.controllerImage.pullPolicy }}
+        args:
+        - --port=80
+        - /conf/config.json
+        ports:
+        - containerPort: 80
+          name: http
+        volumeMounts:
+        - name: conf
+          mountPath: /conf
+      volumes:
+      - name: conf
+        configMap:
+          name: {{ include "mina-sample-zkapp.service-name" . }}
+          items:
+          - key: config.json
+            path: config.json
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mina-sample-zkapp.service-name" . }}
+spec:
+  selector:
+    app: {{ include "mina-sample-zkapp.service-name" . }}
+  ports:
+  - protocol: TCP
+    name: http
+    port: 80
+    targetPort: http
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mina-sample-zkapp.service-name" . }}
+data:
+  config.json: |
+    {{ .Files.Get $.Values.config | nindent 6 }}
