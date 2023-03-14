@@ -1,0 +1,9 @@
+mina:
+  cpuRequest: 8
+  memRequest: "8.0Gi"
+
+healthcheck:
+  enabled: true
+  failureThreshold: 90
+  periodSeconds: 10
+  initialDelaySeconds: 60

@@ -1,0 +1,7 @@
+WORKDIR /root/
+USER 0
+RUN mv /home/opam/app/* /usr/local/bin/
+RUN cp -f /usr/local/bin/mina-dev /usr/local/bin/mina
+RUN mv /usr/local/bin/libp2p_helper /usr/local/bin/coda-libp2p_helper
+RUN mkdir -p /root/.mina-config
+COPY dockerfiles/scripts/healthcheck-utilities.sh /healthcheck/utilities.sh

@@ -24,6 +24,7 @@ spec:
         prometheus.io/port: {{ $.Values.mina.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
+      {{ include "sideCar.podAttrs" (dict "resources" $.Values.resources "bpfDebugger" $.Values.bpfDebugger) | nindent 6 }}
       initContainers:
       {{ if $config.libp2pSecret -}}
       - name: libp2p-perms
@@ -40,6 +41,13 @@ spec:
         env:
         - name: MINA_LIBP2P_PASS
           value: {{ $config.libp2pSecretPassword | quote }}
+        resources:
+          requests:
+            memory: {{ $.Values.mina.memRequest }}
+            cpu: {{ $.Values.mina.cpuRequest }}
+          limits:
+            memory: {{ $.Values.mina.memRequest }}
+            cpu: {{ $.Values.mina.cpuRequest }}
       {{- else -}}
       - name: libp2p-perms
         image: {{ $.Values.mina.image | quote }}
@@ -53,12 +61,25 @@ spec:
         env:
           - name: MINA_LIBP2P_PASS
             value: {{ $config.libp2pSecretPassword | quote }}
+        resources:
+          requests:
+            memory: {{ $.Values.mina.memRequest }}
+            cpu: {{ $.Values.mina.cpuRequest }}
+          limits:
+            memory: {{ $.Values.mina.memRequest }}
+            cpu: {{ $.Values.mina.cpuRequest }}
       {{- end }}
       containers:
+      {{ include "sideCar.resources.containerSpec" (dict "resources" $.Values.resources) | nindent 6 }}
+      {{ include "sideCar.bpfDebugger.containerSpec" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 6 }}
+      {{ include "sideCar.logs.containerSpec" (dict "logs" $.Values.logs "name" $config.name) | nindent 6 }}
+      {{ include "sideCar.internalTrace.containerSpec" (dict "internalTrace" $.Values.internalTrace "name" $config.name) | nindent 6 }}
       - name: mina
         resources:
-          limits:
           requests:
+            memory: {{ $.Values.mina.memRequest }}
+            cpu: {{ $.Values.mina.cpuRequest }}
+          limits:
             memory: {{ $.Values.mina.memRequest }}
             cpu: {{ $.Values.mina.cpuRequest }}
         image: {{ $.Values.mina.image }}
@@ -72,9 +93,15 @@ spec:
           "-config-directory", "/root/.mina-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
+          {{- if $.Values.internalTrace.enable}}
+          "-internal-tracing",
+          {{- end -}}
           {{- if $.Values.mina.exposeGraphql }}
           "-insecure-rest-server",
           {{- end -}}
+          {{- if $.Values.mina.usePodIp }}
+          "-external-ip", "$(DAEMON_POD_IP)",
+          {{- end }}
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-enable-peer-exchange", "true",
@@ -123,12 +150,23 @@ spec:
           value: {{ $.Values.testnetName }}
         - name: GCLOUD_BLOCK_UPLOAD_BUCKET
           value: "mina_network_block_data"
+        - name: DAEMON_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         - name: DAEMON_EXTERNAL_PORT
           value: {{ $.Values.mina.ports.p2p | quote }}
         # {{- if $config.libp2pSecret }}
         - name: MINA_LIBP2P_PASS
           value: {{ $config.libp2pSecretPassword | quote }}
         # {{- end }}
+        {{ if $.Values.mina.optimized }}
+        - name: MINA_SKIP_REDUNDANT_SNARK_VERIFICATIONS
+          value: "1"
+        - name: MINA_PARTIAL_STATEMENT_HASH
+          value: "1"
+        {{ end -}}
+        {{ include "sideCar.bpfDebugger.envVar" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 8 }}
         ports:
         - name: client-port
           protocol: TCP
@@ -142,7 +180,7 @@ spec:
         - name: external-port
           protocol: TCP
           containerPort: {{ $.Values.mina.ports.p2p }}
-          hostPort: {{ $.Values.mina.ports.p2p }}
+          #hostPort: {{ $.Values.mina.ports.p2p }}
 {{$data := dict "name" $config.name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.seed.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
@@ -159,6 +197,12 @@ spec:
         {{- end }}
         - name: config-dir
           mountPath: /root/.mina-config/
+        - name: scripts
+          mountPath: "/scripts"
+        {{- if $.Values.logs.enable }}
+        - name: {{ template "sideCar.logs.minaLogsVolumeName" }}
+          mountPath: "/root/.mina-config"
+        {{- end }}
       volumes:
       - name: config-dir
       {{- if $.Values.persist_working_dir }}
@@ -205,6 +249,15 @@ spec:
       {{- end }}
       - name: actual-libp2p
         emptyDir: {}
+      {{ include "sideCar.bpfDebugger.volume" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 6 }}
+      {{ include "sideCar.logs.minaLogsVolume" (dict "logs" $.Values.logs) | nindent 6 }}
+      - name: scripts
+        configMap:
+          defaultMode: 0755
+          name: scripts
+          items:
+          - key: "unset-k8s-env.sh"
+            path: "unset-k8s-env.sh"
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
 ---
 apiVersion: v1
@@ -245,6 +298,10 @@ spec:
     port: 80
     targetPort: {{ $.Values.mina.ports.graphql }}
 {{- end }}
+{{ include "sideCar.resources.service" (dict "name" $config.name "resources" $.Values.resources) }}
+{{ include "sideCar.bpfDebugger.service" (dict "name" $config.name "bpfDebugger" $.Values.bpfDebugger) }}
+{{ include "sideCar.logs.service" (dict "name" $config.name "logs" $.Values.logs) }}
+{{ include "sideCar.internalTrace.service" (dict "name" $config.name "internalTrace" $.Values.internalTrace) }}
 ---
 {{- if $.Values.persist_working_dir }}
 apiVersion: v1

@@ -1,0 +1,20 @@
+{{- if $.Values.mina.exposeGraphql }}
+{{ range until ($.Values.httpCoordinatedSnarkersConfig.count | int) }}
+{{ $name := printf "%s%03d" $.Values.httpCoordinatedSnarkersConfig.namePrefix (add . 1) }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-graphql
+spec:
+  type: ClusterIP
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ $name }}
+  ports:
+  - name: http-graphql
+    protocol: TCP
+    port: 80
+    targetPort: {{ $.Values.mina.ports.graphql }}
+{{- end }}
+{{- end }}

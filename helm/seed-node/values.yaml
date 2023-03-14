@@ -18,6 +18,7 @@ mina:
     metrics: "8081"
     p2p: "10001"
   exposeGraphql: false
+  usePodIp: false
   cpuRequest: 6
   memRequest: "12.0Gi"
 
@@ -51,3 +52,12 @@ storage:
   accessMode: "ReadWriteOnce"
   size: "4Gi"
   storageClass: "standard"
+
+resources:
+  enable: false
+
+bpfDebugger:
+  enable: false
+
+logs:
+  enable: false

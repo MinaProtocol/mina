@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    app: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+        component: frontend
+    spec:
+      containers:
+        - name: main
+          image: {{ .Values.frontend.image }}
+          command: ["sh", "-ce"]
+          args:
+            - |
+              ENV=$(echo $ENV) envsubst < /usr/share/nginx/html/assets/env.template.js > /usr/share/nginx/html/assets/env.js
+              exec nginx -c /nginx-conf/nginx.conf -g 'daemon off;'
+          env:
+            - name: ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: frontend-app-conf
+                  key: runtime-config
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          volumeMounts:
+            - name: nginx-conf
+              mountPath: /nginx-conf
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+      volumes:
+        - name: nginx-conf
+          configMap:
+            name: frontend-nginx-conf
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-nginx-conf
+data:
+  nginx.conf: |
+    {{ include "frontend-nginx-conf" (dict "namespace" $.Release.Namespace "nodes" $.Values.frontend.nodes "httpSnarkWorkCoordinator" $.Values.httpSnarkWorkCoordinator) | nindent 4 }}
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-app-conf
+data:
+  runtime-config: >-
+    {
+      "production": true,
+      "aggregator": "/aggregator",
+      "isVanilla": {{ $.Values.isVanilla | default "false" }},
+      "globalConfig": {
+        "features": {
+          "dashboard": ["nodes", "topology"],
+          "explorer": ["blocks", "transactions", "snark-pool", "scan-state", "snark-traces"],
+          "resources": ["system"],
+          "network": ["messages", "connections", "blocks", "blocks-ipc"],
+          "tracing": ["overview", "blocks"],
+          "benchmarks": ["wallets"],
+          "web-node": ["wallet", "peers", "logs", "state"],
+          "snark-worker": ["actions"]
+        }
+      },
+      "configs": [
+        {{ range $i, $node := $.Values.frontend.nodes  }}
+        {{ include "frontend-app-config-entry" (dict "name" $node.name "first" (eq $i 0) "debugger" "bpf-debugger" ) }}
+        {{ end }}
+      ]
+    }

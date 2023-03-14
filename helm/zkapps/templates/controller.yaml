@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "controller-name" . }}
+  labels:
+    app: {{ include "controller-name" . }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "controller-name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "controller-name" . }}
+    spec:
+      containers:
+      - name: controller
+        image: {{ $.Values.repository }}:{{ $.Values.tag | default "latest" }}
+        imagePullPolicy: {{ $.Values.pullPolicy }}
+        command:
+        - node
+        # - --inspect
+        - build/src/main.js
+        args:
+        - -v
+        - -v
+        - controller
+        - --port=80
+        - --accounts-file=/testnet/accounts.txt
+        - --nodes-file=/testnet/nodes.txt
+        - --config-file=/conf/config.json
+        ports:
+        - containerPort: 80
+          name: http
+        - containerPort: 9229
+          name: debug
+        volumeMounts:
+        - name: conf
+          mountPath: /conf
+        - name: testnet
+          mountPath: /testnet
+      volumes:
+      - name: conf
+        configMap:
+          name: config-{{ include "controller-name" . }}
+          items:
+          - key: config
+            path: config.json
+      - name: testnet
+        configMap:
+          name: testnet-{{ include "controller-name" . }}
+          items:
+          - key: accounts
+            path: accounts.txt
+          - key: nodes
+            path: nodes.txt
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "controller-name" . }}
+spec:
+  selector:
+    app: {{ include "controller-name" . }}
+  ports:
+  - protocol: TCP
+    name: http
+    port: 80
+    targetPort: http
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-{{ include "controller-name" . }}
+data:
+  config: |
+    {
+        "name": {{ $.Values.job | quote }},
+        "count": {{ $.Values.count }},
+        "workers": {{ $.Values.workers }}
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: testnet-{{ include "controller-name" . }}
+data:
+  accounts: |
+    {{- .Files.Get $.Values.accounts | nindent 6 }}
+  nodes: |
+    {{- .Files.Get $.Values.nodes | nindent 6 }}

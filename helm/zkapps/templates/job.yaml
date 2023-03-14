@@ -1,0 +1,53 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "job-name" . }}
+spec:
+  parallelism: {{ $.Values.workers | default 1 }}
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app:  {{ include "job-name" . }}
+    spec:
+      runtimeClassName: kata-clh
+      initContainers:
+      - name: controller-is-ready
+        image: alpine:latest
+        args:
+        - sh
+        - -c
+        - for t in $(seq 15); do nc -vz {{ include "controller-name" . }} 80 && exit; sleep 1; done; exit 1
+      containers:
+      - name: worker
+        image: {{ $.Values.repository }}:{{ $.Values.tag | default "latest" }}
+        imagePullPolicy: {{ $.Values.pullPolicy }}
+        args:
+        - -v
+        - -v
+        - job
+        - http://{{ include "controller-name" . }}/
+        resources:
+          requests:
+            {{ if $.Values.cpu }}
+            cpu: {{ $.Values.cpu }}
+            {{ end }}
+            {{ if $.Values.mem }}
+            memory: {{ $.Values.mem }}
+            {{ end }}
+          limits:
+            {{ if $.Values.cpu }}
+            cpu: {{ $.Values.cpu }}
+            {{ end }}
+            {{ if $.Values.mem }}
+            memory: {{ $.Values.mem }}
+            {{ end }}
+      restartPolicy: Never
+  backoffLimit: {{ $.Values.workers }}
+  podFailurePolicy:
+    rules:
+    - action: FailJob
+      onExitCodes:
+        containerName: worker
+        operator: In
+        values: [125]
