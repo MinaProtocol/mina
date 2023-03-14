@@ -4,14 +4,8 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 (* XOR *)
 
-let pad_upto ~length ~value list =
-  let len = List.length list in
-  assert (len <= length) ;
-  let padding = List.init (length - len) ~f:(fun _ -> value) in
-  list @ padding
-
-(* Xor of length bits *)
-let xor (type f)
+(* Boolean Xor of length bits *)
+let bxor (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) (length : int) :
     Circuit.Field.t =
@@ -51,21 +45,21 @@ let output_bits =
   output
 
 (* Xor of 16 bits *)
-let xor16
+let bxor16
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) : Circuit.Field.t =
   let open Circuit in
   xor input1 input2 16
 
 (* Xor of 64 bits *)
-let xor64 (type f)
+let bxor64 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) : Circuit.Field.t =
   let open Circuit in
   xor input1 input2 64
 
 (* Recursively builds Xor *)
-let rec xor_rec (type f)
+let rec bxor_rec (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     ~input1 ~input2 ~output (length : int) =
   let open Circuit in
@@ -80,9 +74,9 @@ let rec xor_rec (type f)
           ; basic =
               Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
                 (Basic
-                   { l = (Field.one, Field.Constant.zero)
-                   ; r = (Field.zero, Field.Constant.zero)
-                   ; o = (Option.value_exn Field.zero, Field.Constant.zero)
+                   { l = (Field.Constant.zero, Field.one)
+                   ; r = (Field.Constant.zero, Field.zero)
+                   ; o = (Option.value_exn Field.Constant.zero, Field.zero)
                    ; m = Field.Constant.zero
                    ; c = Field.Constant.one
                    } )
@@ -168,9 +162,9 @@ let%test_unit "xor gadget" =
             let output =
               exists Field.typ ~compute:(fun () -> Field.Constant.of_int output)
             in
-            (* Use the xor16 gate gadget *)
+            (* Use the xor gate gadget *)
             let result =
-              xor (module Runner.Impl) left_input right_input length
+              bxor (module Runner.Impl) left_input right_input length
             in
             Field.Assert.equal output result ;
             (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
