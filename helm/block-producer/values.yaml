@@ -20,6 +20,7 @@ mina:
     metrics: "10001"
     p2p: "10909"
   exposeGraphql: false
+  usePodIp: false
   cpuRequest: 6
   memRequest: "12.0Gi"
 
@@ -105,5 +106,14 @@ healthcheck:
   periodSeconds: 5
   initialDelaySeconds: 30
 
+resources:
+  enable: false
+
+bpfDebugger:
+  enable: false
+
 nodeSelector:
   preemptible: true
+
+logs:
+  enable: false
