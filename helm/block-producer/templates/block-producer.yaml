@@ -24,6 +24,7 @@ spec:
         prometheus.io/port: {{ $.Values.mina.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
+      {{ include "sideCar.podAttrs" (dict "resources" $.Values.resources "bpfDebugger" $.Values.bpfDebugger) | nindent 6 }}
       initContainers:
       - name: fix-perms
         image: busybox
@@ -91,6 +92,9 @@ spec:
             value: {{ $config.privateKeyPW | quote }}
       {{- end }}
       containers:
+      {{ include "sideCar.resources.containerSpec" (dict "resources" $.Values.resources) | nindent 6 }}
+      {{ include "sideCar.bpfDebugger.containerSpec" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 6 }}
+      {{ include "sideCar.logs.containerSpec" (dict "logs" $.Values.logs "name" $config.name) | nindent 6 }}
       {{ if $config.runWithUserAgent -}}
       - name: user-agent
         resources:
@@ -184,6 +188,8 @@ spec:
       - name: mina
         resources:
           limits:
+            memory: {{ $.Values.mina.memRequest }}
+            cpu: {{ $.Values.mina.cpuRequest }}
           requests:
             memory: {{ $.Values.mina.memRequest }}
             cpu: {{ $.Values.mina.cpuRequest }}
@@ -225,6 +231,9 @@ spec:
           {{- if $.Values.mina.exposeGraphql }}
           "-insecure-rest-server",
           {{- end -}}
+          {{- if $.Values.mina.usePodIp }}
+          "-external-ip", "$(DAEMON_POD_IP)",
+          {{- end }}
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-block-producer-key", "/root/wallet-keys/key",
@@ -248,6 +257,10 @@ spec:
           value: {{ $.Values.mina.ports.client | quote }}
         - name: DAEMON_METRICS_PORT
           value: {{ $.Values.mina.ports.metrics | quote }}
+        - name: DAEMON_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         - name: DAEMON_EXTERNAL_PORT
           value: {{ default $.Values.mina.ports.p2p $config.externalPort | quote }}
         - name: GCLOUD_KEYFILE
@@ -262,6 +275,17 @@ spec:
           value: {{ $config.privateKeyPW | quote }}
         - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
+        {{ if $.Values.mina.optimized }}
+        - name: MINA_SKIP_REDUNDANT_SNARK_VERIFICATIONS
+          value: "1"
+        - name: MINA_PARTIAL_STATEMENT_HASH
+          value: "1"
+        {{ end -}}
+        {{ if eq "prod1" $config.name -}}
+        - name: MINA_SKIP_SIGCHECK
+          value: "y"
+        {{- end }}
+        {{ include "sideCar.bpfDebugger.envVar" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 8 }}
         ports:
         - name: client-port
           protocol: TCP
@@ -275,9 +299,9 @@ spec:
         - name: external-port
           protocol: TCP
           containerPort: {{ default $.Values.mina.ports.p2p $config.externalPort }}
-          hostPort: {{ default $.Values.mina.ports.external $config.externalPort }}
+          #hostPort: {{ default $.Values.mina.ports.external $config.externalPort }}
 {{$data := dict "name" $config.name "healthcheck" $.Values.healthcheck }}
-{{- include "healthcheck.daemon.allChecks" $data | indent 8 }}
+{{- include "healthcheck.blockProducer.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
         volumeMounts:
         - name: wallet-keys
@@ -294,6 +318,8 @@ spec:
         - name: daemon-config
           mountPath: "/config/"
         {{- end }}
+        - name: scripts
+          mountPath: "/scripts"
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
       volumes:
       - name: private-keys
@@ -356,6 +382,14 @@ spec:
           - key: keyfile
             path: keyfile.json
       {{- end }}
+      {{ include "sideCar.bpfDebugger.volume" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 6 }}
+      - name: scripts
+        configMap:
+          defaultMode: 0755
+          name: scripts
+          items:
+          - key: "unset-k8s-env.sh"
+            path: "unset-k8s-env.sh"
 ---
 apiVersion: v1
 kind: Service
@@ -390,5 +424,8 @@ spec:
     port: 80
     targetPort: {{ $.Values.mina.ports.graphql }}
 {{- end }}
+{{ include "sideCar.resources.service" (dict "name" $config.name "resources" $.Values.resources) }}
+{{ include "sideCar.bpfDebugger.service" (dict "name" $config.name "bpfDebugger" $.Values.bpfDebugger) }}
+{{ include "sideCar.logs.service" (dict "name" $config.name "logs" $.Values.logs) }}
 ---
 {{ end }}
