@@ -1,0 +1,79 @@
+testnetName: testnet
+mina:
+  image: tizoc/mina-daemon:tracing-optional-optimizations-focal-berkeley-current-capture_proof_generation_inputs-1
+  snarkCoordinatorImage: binier/mina-snark-worker-rs:latest
+  privkeyPass:
+  exposeGraphql: true
+  usePodIp: true
+  seedPeers:
+    # see resources/seed1.peerid
+    - /dns4/seed1/tcp/10909/p2p/12D3KooWBT8pyJAfWJhdeGYAtKvcaUmm78ExyZ6uo6BEimYNVat1
+  # memRequest: 4Gi
+  # cpuRequest: 4
+  # optimized: false
+  useCustomEntrypoint: true
+  customEntrypoint: /scripts/unset-k8s-env.sh
+
+healthcheck:
+  enabled: false
+  failureThreshold: 60
+  periodSeconds: 10
+  initialDelaySeconds: 60
+
+plainNodesConfig:
+  # the number of plain nodes
+  count: 8
+  namePrefix: node
+
+snarkWorkersConfig:
+  # the number of snark workers
+  count: 64
+  namePrefix: snarker
+
+seedConfigs:
+  - name: seed1
+    # see resources/seed1
+    libp2pSecret: seed1-libp2p-secret
+
+blockProducerConfigs:
+  - name: prod01
+    # see resources/key-01
+    privateKeySecret: prod1-privkey-secret
+    isolated: false
+  - name: prod02
+    # see resources/key-01
+    privateKeySecret: prod1-privkey-secret
+    isolated: false
+  - name: prod03
+    # see resources/key-01
+    privateKeySecret: prod1-privkey-secret
+    isolated: false
+  - name: prod2
+    # see resources/key-02
+    privateKeySecret: prod2-privkey-secret
+    isolated: false
+  - name: prod3
+    # see resources/key-03
+    privateKeySecret: prod3-privkey-secret
+    isolated: false
+
+resources:
+  enable: true
+  image: adrnagy/mina-node-monitoring:17c9127
+  args: ["--executable-name=mina"]
+  cpu: "100m"
+  memory: "100Mi"
+
+bpfDebugger:
+  enable: true
+  image: openmina/mina-network-debugger:c0fd10e0
+  cpu: "2000m"
+  memory: "4Gi"
+  restartMina: true
+
+logs:
+  enable: true
+  image: openmina/mina-logs-service:b5d32468
+
+nodeSelector:
+  preemptible: false
