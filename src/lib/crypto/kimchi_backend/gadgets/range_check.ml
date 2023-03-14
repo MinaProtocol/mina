@@ -220,45 +220,37 @@ let%test_unit "range_check gadget" =
   in
 
   (* Helper to test range_check gadget *)
-  let test_range_check base10 : bool =
-    try
-      let _proof_keypair, _proof =
-        Runner.generate_and_verify_proof (fun () ->
-            let open Runner.Impl in
-            let value =
-              exists Field.typ ~compute:(fun () ->
-                  Field.Constant.of_string base10 )
-            in
-            range_check (module Runner.Impl) value ;
-            (* Padding *)
-            Boolean.Assert.is_true (Field.equal value value) )
-      in
-      true
-    with exn ->
-      Format.eprintf "Error: %s@." (Exn.to_string exn) ;
-      Printexc.print_backtrace Stdlib.stdout ;
-      Stdlib.(flush stdout) ;
-      false
+  let test_range_check base10 : unit =
+    let _, _ =
+      Runner.generate_and_verify_proof (fun () ->
+          let open Runner.Impl in
+          let value =
+            exists Field.typ ~compute:(fun () ->
+                Field.Constant.of_string base10 )
+          in
+          range_check (module Runner.Impl) value ;
+          (* Padding *)
+          Boolean.Assert.is_true (Field.equal value value) )
+    in
+    ()
   in
 
   (* Positive tests *)
-  assert (Bool.equal (test_range_check "0") true) ;
-  assert (Bool.equal (test_range_check "18446744073709551616") (* 2^64 *) true) ;
-  assert (
-    Bool.equal
-      (test_range_check "309485009821345068724781055")
-      (* 2^88 - 1 *)
-      true ) ;
+  test_range_check "0" ;
+  test_range_check "18446744073709551616" (* 2^64 *) ;
+  test_range_check "309485009821345068724781055" (* 2^88 - 1 *) ;
 
   (* Negative tests *)
   assert (
-    Bool.equal (test_range_check "309485009821345068724781056") (* 2^88 *) false ) ;
+    Result.is_error
+    @@ Or_error.try_with (fun () ->
+           test_range_check "309485009821345068724781056" (* 2^88 *) ) ) ;
   assert (
-    Bool.equal
-      (test_range_check
-         "28948022309329048855892746252171976963317496166410141009864396001978282409984" )
-      (* 2^254 *)
-      false ) ;
+    Result.is_error
+    @@ Or_error.try_with (fun () ->
+           test_range_check
+             "28948022309329048855892746252171976963317496166410141009864396001978282409984"
+           (* 2^254 *) ) ) ;
   ()
 
 let%test_unit "range_check64 gadget" =
