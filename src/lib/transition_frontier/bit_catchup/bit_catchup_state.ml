@@ -171,11 +171,12 @@ let rec remove_tree ?body_ref ~logger ~state state_hash =
       State_hash.Set.iter ~f children.processed ) ;
   List.iter ~f children'
 
-let prune_by_length ~logger ~state root_length =
+let prune_by_length ~logger ~state ~root_hash root_length =
   let old_hashes =
     Mina_numbers.Length.Map.to_sequence ~order:`Decreasing_key
       ~keys_less_or_equal_to:root_length state.transition_hashes_by_length
     |> Sequence.to_list |> List.concat_map ~f:snd
+    |> List.filter ~f:(Fn.compose not @@ State_hash.equal root_hash)
   in
   List.iter old_hashes ~f:(remove_tree ~logger ~state)
 
@@ -213,18 +214,6 @@ let create ~root ~logger ~is_in_frontier transition_states ~block_storage
       when (not (is_in_frontier state_hash))
            && Option.is_none
                 (Transition_states.find transition_states state_hash) ->
-        (* let hv =
-             let open Mina_block.Validation in
-             wrap_header (with_hash state_hash h)
-             |> skip_time_received_validation_header
-                  `This_block_was_not_received_via_gossip
-             |> skip_genesis_protocol_state_validation_header
-                  `This_header_was_loaded_from_persistence
-             |> skip_protocol_versions_validation_header
-                  `This_header_was_loaded_from_persistence
-             |> skip_delta_block_chain_validation_header
-                  `This_header_was_loaded_from_persistence
-           in *)
         for_catchup := with_hash state_hash h :: !for_catchup ;
         `Continue
     | Invalid { body_ref = None; blockchain_length; _ }
@@ -301,7 +290,9 @@ let create ~root ~logger ~is_in_frontier transition_states ~block_storage
     ; block_storage_actions
     }
   in
-  prune_by_length ~logger ~state (breadcrumb_length root) ;
+  prune_by_length ~logger ~state
+    ~root_hash:(Frontier_base.Breadcrumb.state_hash root)
+    (breadcrumb_length root) ;
   (state, !for_catchup)
 
 let apply_diffs ~logger ({ transition_states; _ } as state)
@@ -319,11 +310,16 @@ let apply_diffs ~logger ({ transition_states; _ } as state)
               (Transition_state.State_functions.name st)
               ~metadata:[ ("state_hash", State_hash.to_yojson state_hash) ] )
     | E (Root_transitioned { new_root; garbage = Full hs; _ }) ->
-        let root_length =
+        let root_validated =
           Frontier_base.Root_data.Limited.transition new_root
-          |> Mina_block.Validated.header |> Mina_block.Header.blockchain_length
         in
-        prune_by_length ~logger ~state root_length ;
+        let root_length =
+          Mina_block.Validated.header root_validated
+          |> Mina_block.Header.blockchain_length
+        in
+        prune_by_length ~logger ~state
+          ~root_hash:(Mina_block.Validated.state_hash root_validated)
+          root_length ;
         List.iter hs ~f:(fun node ->
             let transition = node.transition in
             let body_ref =
