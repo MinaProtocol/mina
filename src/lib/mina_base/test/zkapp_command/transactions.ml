@@ -6,14 +6,9 @@ open Snark_params.Tick
 
 let%test_module "valid_size" =
   ( module struct
-    let zkapp_type_gen =
-      let open Quickcheck.Let_syntax in
-      let%map wire = Zkapp_command.T.Stable.Latest.Wire.gen in
-      Zkapp_command.T.Stable.Latest.of_wire wire
-
     let tree_gen =
       let open Quickcheck.Let_syntax in
-      let%map account_gen = Account_update.gen in
+      let%map account_gen = Account_update.gen_with_events_and_actions in
       { Call_forest.Tree.account_update = account_gen
       ; account_update_digest = ()
       ; calls =
@@ -35,8 +30,7 @@ let%test_module "valid_size" =
       let%map memo = Signed_command_memo.gen in
       { T.Stable.V1.Wire.fee_payer; account_updates; memo }
 
-    (* zkapp transaction too expensive *)
-    let genesis_constant_error : Genesis_constants.t =
+    let genesis_constant_error limit events actions : Genesis_constants.t =
       { protocol =
           { k = 5
           ; slots_per_epoch = 5
@@ -49,23 +43,44 @@ let%test_module "valid_size" =
       ; zkapp_proof_update_cost = 1.
       ; zkapp_signed_single_update_cost = 1.
       ; zkapp_signed_pair_update_cost = 1.
-      ; zkapp_transaction_cost_limit = 1.
-      ; max_event_elements = 0
-      ; max_action_elements = 0
+      ; zkapp_transaction_cost_limit = limit
+      ; max_event_elements = events
+      ; max_action_elements = actions
       }
 
+    (* zkapp transaction too expensive *)
     let%test_unit "valid_size_errors" =
-      Quickcheck.test ~trials:50 zkapp_type_gen ~f:(fun x ->
+      Quickcheck.test ~trials:50 (zkapp_type_gen_fixed_length 100) ~f:(fun x ->
           [%test_eq: unit Or_error.t]
             (Error (Error.of_string "zkapp transaction too expensive"))
-            (valid_size ~genesis_constants:genesis_constant_error x) )
+            ( valid_size ~genesis_constants:(genesis_constant_error 1. 200 200)
+            @@ of_wire x ) )
 
     (* too many event elements *)
     let%test_unit "valid_size_errors_events" =
-      Quickcheck.test ~trials:50 (zkapp_type_gen_fixed_length 10) ~f:(fun x ->
+      Quickcheck.test ~trials:50 (zkapp_type_gen_fixed_length 100) ~f:(fun x ->
           [%test_eq: unit Or_error.t]
-            (Error (Error.of_string "zkapp transaction too expensive"))
-            (valid_size ~genesis_constants:genesis_constant_error @@ of_wire x) )
+            (Error
+               (Error.of_string
+                  "too many event elements (200, max allowed is 10)" ) )
+            ( valid_size ~genesis_constants:(genesis_constant_error 100. 10 200)
+            @@ of_wire x ) )
 
     (* too many action elements *)
+    let%test_unit "valid_size_errors_actions" =
+      Quickcheck.test ~trials:50 (zkapp_type_gen_fixed_length 100) ~f:(fun x ->
+          [%test_eq: unit Or_error.t]
+            (Error
+               (Error.of_string
+                  "too many sequence event elements (200, max allowed is 10)" )
+            )
+            ( valid_size ~genesis_constants:(genesis_constant_error 100. 200 10)
+            @@ of_wire x ) )
+
+    (* returns OK *)
+    let%test_unit "returns ok" =
+      Quickcheck.test ~trials:50 (zkapp_type_gen_fixed_length 100) ~f:(fun x ->
+          [%test_eq: unit Or_error.t] (Ok ())
+            ( valid_size ~genesis_constants:(genesis_constant_error 100. 200 200)
+            @@ of_wire x ) )
   end )
