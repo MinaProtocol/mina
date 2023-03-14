@@ -17,10 +17,13 @@ mina:
     metrics: "10001"
     p2p: "10909"
   exposeGraphql: false
+  usePodIp: false
   cpuRequest: 6
   memRequest: "12.0Gi"
 
-name: "plain-node-x"
+plainNodesConfig:
+  count: 0
+  namePrefix: node
 
 healthcheck:
   enabled: true
@@ -30,3 +33,12 @@ healthcheck:
 
 nodeSelector:
   preemptible: false
+
+resources:
+  enable: false
+
+bpfDebugger:
+  enable: false
+
+logs:
+  enable: false
