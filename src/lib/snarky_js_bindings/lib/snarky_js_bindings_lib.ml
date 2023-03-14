@@ -1624,11 +1624,6 @@ module Circuit = struct
     circuit##.assertEqual := assert_equal ;
     circuit##.equal := equal ;
     circuit##.toFields := Js.wrap_callback to_field_elts_magic ;
-    circuit##.inProver :=
-      Js.wrap_callback (fun () : bool Js.t -> Js.bool (Impl.in_prover ())) ;
-    circuit##.inCheckedComputation
-    := Js.wrap_callback (fun () : bool Js.t ->
-           Js.bool (Impl.in_checked_computation ()) ) ;
     Js.Unsafe.set circuit (Js.string "if") if_ ;
     Js.Unsafe.set circuit (Js.string "_constraintSystem") constraint_system ;
     Js.Unsafe.set circuit (Js.string "_witness")
