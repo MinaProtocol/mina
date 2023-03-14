@@ -1,9 +1,11 @@
+{{ range .Values.minaSnarkCoordinatorsConfig }}
+---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $.Values.coordinatorName }}
+  name: {{ .name }}
   labels:
-    app: {{ $.Values.coordinatorName }}
+    app: {{ .name }}
 spec:
   type: ClusterIP
   # We want all pods to have their addresses published for the sake of the
@@ -11,7 +13,7 @@ spec:
   # have to be able to talk to each other in order to become ready.
   publishNotReadyAddresses: true
   selector:
-    app: {{ $.Values.coordinatorName }}
+    app: {{ .name }}
   ports:
   - name: tcp-p2p
     port: {{ $.Values.mina.ports.p2p }}
@@ -24,12 +26,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $.Values.coordinatorName }}-graphql
+  name: {{ .name }}-graphql
 spec:
   type: ClusterIP
   publishNotReadyAddresses: true
   selector:
-    app: {{ $.Values.coordinatorName }}
+    app: {{ .name }}
   ports:
   - name: http-graphql
     protocol: TCP
@@ -37,3 +39,4 @@ spec:
     targetPort: {{ $.Values.mina.ports.graphql }}
 {{- end }}
 
+{{ end }}

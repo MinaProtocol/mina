@@ -1,0 +1,404 @@
+---
+kind: pipeline
+name: build-image-custom
+type: docker
+clone:
+  disable: true
+trigger:
+  event:
+  - custom
+
+environment:
+  OPENMINA_BRANCH: openmina-berkeley
+
+steps:
+
+- name: clone
+  image: alpine/git
+  commands:
+  - git clone $${MINA_REPO:-$${DRONE_REPO_LINK}} --depth 1 -b $${MINA_BRANCH:-$${DRONE_BRANCH}} .
+
+- name: prepare-dockerfiles
+  image: busybox
+  commands:
+  - wget https://github.com/openmina/mina/raw/$${OPENMINA_BRANCH}/dockerfiles/stages/99-openmina-tail -O dockerfiles/stages/99-openmina-tail
+  - sed -i -e "s/zlib1g-dev/zlib1g-dev jq/" dockerfiles/stages/1-build-deps
+  - for f in 1-build-deps 2-opam-deps 3-builder 99-openmina-tail; do cat dockerfiles/stages/$$f; done > ./dockerfiles/stages/merged
+  - echo "!dockerfiles/scripts/healthcheck-utilities.sh" >> .dockerignore
+
+- name: publish-image
+  image: plugins/docker
+  settings:
+    build_args:
+    - MINA_BRANCH=${MINA_BRANCH:-${DRONE_BRANCH}}
+    - MINA_REPO=${MINA_REPO:-${DRONE_REPO_LINK}}
+    dockerfile: ./dockerfiles/stages/merged
+    password:
+      from_secret: docker_hub_password
+    repo: openmina/mina
+    tags:
+    - ${MINA_BRANCH:-${DRONE_BRANCH}}-${DRONE_COMMIT_SHA:0:8}
+    - ${MINA_BRANCH:-${DRONE_BRANCH}}-latest
+    username:
+      from_secret: docker_hub_username
+    cache_from: ${CACHE_IMAGE:-}
+
+
+---
+kind: pipeline
+name: deploy-to-cluster-custom
+type: docker
+clone:
+  depth: 1
+trigger:
+  event:
+  - custom
+depends_on:
+- build-image-custom
+volumes:
+- name: step-cache
+  temp: {}
+
+
+environment:
+  # path to openmina tooling
+  OM: helm/openmina-config
+  # target height to wait for after deployment
+  TARGET_HEIGHT: 8
+  # resource to wait for status when deploying Mina seeds
+  SEEDS_WAIT_RESOURCE: deployment/seed1
+  # timeout to wait when deploying Mina seeds
+  SEEDS_WAIT_TIMEOUT: 10m
+  # resource to wait for status when deploying Mina nodes
+  NODES_WAIT_RESOURCE: deployment/node1
+  # timeout to wait when deploying Mina nodes
+  NODES_WAIT_TIMEOUT: 15m
+  # retries to check all nodes to be at the same level
+  HEIGHT_WAIT_RETRIES: 20
+  # period to wait before retrying
+  HEIGHT_WAIT_PERIOD: 15
+
+defs:
+- &log
+  image: alpine/k8s:1.26.1
+  detach: true
+  environment:
+    KUBECONFIG: kube-config
+  commands:
+  - while ! kubectl logs deployment/$${NAME} --container mina --follow; do echo "waiting for $${NAME} to start..."; sleep 10; done
+
+steps:
+
+- name: prepare-kubeconfig
+  image: alpine/k8s:1.26.1
+  environment:
+    DRONE_KUBECONFIG:
+      from_secret: k8s_config
+    KUBECONFIG: kube-config
+  commands:
+  - umask 0077
+  - echo "$DRONE_KUBECONFIG" > $${KUBECONFIG}
+  - kubectl config set-context --current --namespace $${NAMESPACE:-testnet-default}
+
+- name: deployment-info
+  image: alpine/k8s:1.26.1
+  environment:
+    KUBECONFIG: kube-config
+  commands:
+  - PORT="$$($${OM}/kube-utils.sh frontend-port $${NAMESPACE:-testnet-default})"
+  - 'echo "Frontend: http://1.k8.openmina.com:$PORT"'
+  - 'echo "Namespace: $${NAMESPACE:-testnet-default}"'
+
+- name: delete-old-testnet
+  image: alpine/k8s:1.26.1
+  environment:
+    KUBECONFIG: kube-config
+  commands:
+  - $${OM}/deploy.sh delete --all --force
+  - sleep 10
+  - |
+    PODS="$$($${OM}/kube-utils.sh mina-pods)"
+    if [ -n "$${PODS}" ]; then
+        echo "Workaround for pods left running, force-delete pods $$PODS"
+        kubectl delete --force pods $${PODS} || true
+    fi
+
+- name: prepare-deamon-json
+  image: alpine/k8s:1.26.1
+  commands:
+  - $${OM}/generate-conf-file.sh --slot-duration=$${SLOT_DURATION:-180} $${SLOTS_PER_EPOCH:+--slots-per-epoch=$${SLOTS_PER_EPOCH}} > $${OM}/resources/daemon.json
+
+- name: log-seed
+  <<: *log
+  environment:
+    NAME: seed1
+
+- name: deploy-seeds
+  image: alpine/k8s:1.26.1
+  environment:
+    KUBECONFIG: kube-config
+  commands:
+  - export MINA_IMAGE=openmina/mina:$${MINA_BRANCH:-$${DRONE_BRANCH}}-${DRONE_COMMIT_SHA:0:8}
+  - $${OM}/deploy.sh deploy --seeds --force $${SET_ARGS}
+
+- name: seeds-are-ready
+  image: alpine/k8s:1.26.1
+  environment:
+    KUBECONFIG: kube-config
+  commands:
+  - kubectl wait $${SEEDS_WAIT_RESOURCE} --for=condition=Available --timeout=$${SEEDS_WAIT_TIMEOUT}
+
+- name: log-node
+  <<: *log
+  environment:
+    NAME: node1
+
+- name: log-producer
+  <<: *log
+  environment:
+    NAME: node1
+
+- name: log-snarker
+  <<: *log
+  environment:
+    NAME: snarker001
+
+- name: deploy-nodes
+  image: alpine/k8s:1.26.1
+  environment:
+    KUBECONFIG: kube-config
+  commands:
+  - export MINA_IMAGE=openmina/mina:$${MINA_BRANCH:-$${DRONE_BRANCH}}-${DRONE_COMMIT_SHA:0:8}
+  - $${OM}/deploy.sh deploy --producers --snarkers --nodes --force $${SET_ARGS}
+
+- name: testnet-is-ready
+  image: alpine/k8s:1.26.1
+  environment:
+    KUBECONFIG: kube-config
+  commands:
+  - $${OM}/kube-utils.sh mina-testnet-available $${NODES_WAIT_TIMEOUT}
+  - $${OM}/kube-utils.sh mina-testnet-same-height $${HEIGHT_WAIT_RETRIES} $${HEIGHT_WAIT_PERIOD}
+
+---
+
+kind: pipeline
+name: split
+type: docker
+clone:
+  depth: 1
+depends_on: [ deploy-to-cluster-custom ]
+
+trigger:
+  event: [ custom ]
+
+steps:
+
+- name: split
+  image: openmina/mina-network-debugger:latest
+  environment:
+    URL: http://1.k8.openmina.com:31355
+  commands:
+  - sleep  10 && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 show-graph --expected-components 1
+  - sleep  10 && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 enable-firewall
+  - sleep  90 && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 show-graph --expected-components 2
+  - sleep $$(($${SPLIT_DURATION:-30} * 60)) && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 disable-firewall # wait 30 minutes before disable firewall
+  - sleep 120 && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 show-graph --expected-components 1
+
+---
+
+kind: pipeline
+name: graphql-timeout-test
+type: docker
+clone:
+  depth: 1
+trigger:
+  event:
+  - custom
+depends_on: [ deploy-to-cluster-custom ]
+
+defs:
+- &wrk
+  image: alpine/k8s:1.26.1
+  environment:
+    KUBECONFIG: kube-config
+    ENDPOINT_URL: http://localhost:3085/graphql
+  commands:
+  - sleep $${SLEEP_SECONDS}
+  - apk add --no-cache openssl
+  - export POD_NAME=$(kubectl get pods -o json | jq '.items[] | select(.metadata.name | startswith(env.POD_PREFIX)) | .metadata.name' | tr -d '"')
+  - echo $${POD_NAME}
+  - kubectl cp scripts/drone/install_wrk2_and_run_test.sh -c mina $${POD_NAME}:/tmp/install_wrk2_and_run_test.sh
+  - kubectl cp scripts/drone/version-post.lua -c mina $${POD_NAME}:/tmp/version-post.lua
+  - kubectl exec $${POD_NAME} -c mina -- /bin/bash -c /tmp/install_wrk2_and_run_test.sh
+  - kubectl cp -c mina $${POD_NAME}:/tmp/wrk_output.txt wrk_output.txt
+  - cat wrk_output.txt
+  - export TIMEOUTS=$(grep 'Socket errors' wrk_output.txt | cut -d ' ' -f 12)
+  - if [ "$${TIMEOUTS:-0}" -gt 0 ]; then echo "There were $${TIMEOUTS} timeouts during the test"; exit 1; else echo "No timeouts occurred during the test"; fi
+
+steps:
+- name: prepare-kubeconfig
+  image: alpine/k8s:1.26.1
+  environment:
+    DRONE_KUBECONFIG:
+      from_secret: k8s_config
+    KUBECONFIG: kube-config
+  commands:
+  - umask 0077
+  - echo "$DRONE_KUBECONFIG" > $${KUBECONFIG}
+  - kubectl config set-context --current --namespace $${NAMESPACE:-testnet-default}
+
+- name: run-test-in-snarker
+  <<: *wrk
+  environment:
+    POD_PREFIX: "snarker001"
+    SLEEP_SECONDS: 5
+
+- name: run-test-in-producer
+  <<: *wrk
+  environment:
+    POD_PREFIX: "prod01"
+    SLEEP_SECONDS: 10
+
+- name: run-test-in-seed
+  <<: *wrk
+  environment:
+    POD_PREFIX: "seed1"
+    SLEEP_SECONDS: 15
+
+- name: run-test-in-plain-node
+  <<: *wrk
+  environment:
+    POD_PREFIX: "node1"
+    SLEEP_SECONDS: 20
+
+- name: wait-for-all-tests
+  image: alpine/k8s:1.26.1
+  commands:
+    - exit 0
+  depends_on:
+    - run-test-in-snarker
+    - run-test-in-producer
+    - run-test-in-seed
+    - run-test-in-plain-node
+
+---
+
+kind: pipeline
+name: run-zkapps
+type: docker
+clone:
+  depth: 1
+depends_on: [ graphql-timeout-test ]
+
+trigger:
+  event: [ custom ]
+
+environment:
+  # path to openmina tooling
+  OM: helm/openmina-config
+  RELEASE_NAME: zkapps-drone-${DRONE_BUILD_NUMBER}
+  SUFFIX: ${DRONE_BUILD_NUMBER}
+
+steps:
+
+- name: configure
+  image: alpine/k8s:1.26.1
+  environment:
+    DRONE_KUBECONFIG:
+      from_secret: k8s_config
+    KUBECONFIG: kube-config
+  commands:
+  - umask 0077
+  - echo "$DRONE_KUBECONFIG" > "$KUBECONFIG"
+  - kubectl config set-context --current --namespace $${NAMESPACE:-testnet-default}
+
+
+- name: start
+  image: alpine/k8s:1.26.1
+  environment:
+    KUBECONFIG: kube-config
+  commands:
+  - helm install $${RELEASE_NAME} helm/zkapps --set=job=$${ZK_JOB:-sign-proof-x3} --set=count=$${COUNT:-512} $${WORKERS:+--set=workers=$${WORKERS}} --set=suffix=$${SUFFIX}
+
+- name: run
+  image: alpine/k8s:1.26.1
+  environment:
+    KUBECONFIG: kube-config
+  commands:
+  - |
+    for t in $(seq 10); do
+        kubectl logs jobs/zkapp-worker-$${SUFFIX} --container=worker --follow && exit
+        echo "Waiting for worker container..."
+        sleep 5
+    done
+    echo "Failed to wait for worker container"
+    exit
+
+- name: finish
+  image: alpine/k8s:1.26.1
+  environment:
+    KUBECONFIG: kube-config
+  commands:
+  - $${OM}/kube-utils.sh wait-for-job-status job/zkapp-worker-$${SUFFIX} 60m
+
+- name: clean-up
+  image: alpine/k8s:1.26.1
+  environment:
+    KUBECONFIG: kube-config
+  commands:
+  - helm delete $${RELEASE_NAME}
+  when:
+    status:
+    - success
+    # - failure
+
+
+---
+kind: pipeline
+name: finish
+type: docker
+clone:
+  depth: 1
+depends_on: [ run-zkapps ]
+trigger:
+  event: [ custom ]
+
+environment:
+  # path to openmina tooling
+  OM: helm/openmina-config
+  # global slot to wait force
+  MAX_HEIGHT: 30
+
+steps:
+- name: configure
+  image: alpine/k8s:1.26.1
+  environment:
+    DRONE_KUBECONFIG:
+      from_secret: k8s_config
+    KUBECONFIG: kube-config
+  commands:
+  - umask 0077
+  - echo "$DRONE_KUBECONFIG" > "$KUBECONFIG"
+  - kubectl config set-context --current --namespace $${NAMESPACE:-testnet-default}
+
+- name: wait-for-slot
+  image: alpine/k8s:1.26.1
+  environment:
+    KUBECONFIG: kube-config
+  commands:
+  - |
+    while true; do
+      HEIGHT=$$()
+      HEIGHT=$$($${OM}/kube-utils.sh mina-node-chain-height deployment/node1)
+      if [ -n "$HEIGHT" ] && [ "$HEIGHT" -ge "$MAX_HEIGHT" ]; then
+        echo "Reached height $MAX_HEIGHT"
+        exit
+      fi
+      echo "Height $HEIGHT is lower than $MAX_HEIGHT"
+      sleep 20
+    done
+
+- name: report-finish
+  image: busybox
+  commands:
+  - echo "Done"

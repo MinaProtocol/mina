@@ -1,0 +1,13 @@
+{
+  "genesis": {
+    "slots_per_epoch": 3000,
+    "genesis_state_timestamp": ""
+  },
+  "proof": {
+    "block_window_duration_ms": 60000
+  },
+  "ledger": {
+    "name": "testnet",
+    "accounts": {}
+  }
+}

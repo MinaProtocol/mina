@@ -1,18 +1,21 @@
+{{ range .Values.minaSnarkCoordinatorsConfig }}
+{{ $name := .workerName | default (printf "snark-worker-%s" .name) }}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ $.Values.workerName }}
+  name: {{ $name }}
   labels:
-    app: {{$.Values.workerName}}
+    app: {{ $name }}
 spec:
-  replicas: {{ $.Values.workerReplicas }}
+  replicas: {{ .workers | default 8 }}
   selector:
     matchLabels:
-      app: {{$.Values.workerName}}
+      app: {{ $name }}
   template:
     metadata:
       labels:
-        app: {{$.Values.workerName}}
+        app: {{ $name }}
         testnet: {{ $.Values.testnetName }}
         role: snark-worker
         version: {{ trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-" }}
@@ -24,24 +27,27 @@ spec:
       {{- if $.Values.priorityClass }}
       priorityClassName: {{ $.Values.priorityClass }}
       {{- end }}
+      {{ include "sideCar.podAttrs" (dict "resources" $.Values.resources "bpfDebugger" $.Values.bpfDebugger) | nindent 6 }}
       containers:
       - name: worker
         resources:
           limits:
-            memory: 16.0Gi
+            memory: {{$.Values.workerMemRequest}}
+            cpu: {{$.Values.workerCpuRequest}}
           requests:
             memory: {{$.Values.workerMemRequest}}
             cpu: {{$.Values.workerCpuRequest}}
         image: {{ $.Values.mina.image }}
-        {{ if $.Values.mina.useCustomEntrypoint -}}
-        command: [{{ $.Values.mina.customEntrypoint }}]
-        {{- end }}
+        # {{ if $.Values.mina.useCustomEntrypoint -}}
+        # command: [{{ $.Values.mina.customEntrypoint }}]
+        # {{- end }}
+        command: [ mina ]
         args: [
           "internal", 
           "snark-worker", 
           "-proof-level","full",
           "-shutdown-on-disconnect", "false", "-daemon-address",
-          "{{ $.Values.coordinatorHostName }}:{{ $.Values.coordinatorRpcPort }}"
+          "{{ .name }}:{{ $.Values.coordinatorRpcPort }}"
         ]
         env:
           - name: "RAYON_NUM_THREADS"

@@ -1,0 +1,10 @@
+[
+  "http://node1-graphql/graphql",
+  "http://node2-graphql/graphql",
+  "http://node3-graphql/graphql",
+  "http://node4-graphql/graphql",
+  "http://node5-graphql/graphql",
+  "http://node6-graphql/graphql",
+  "http://node7-graphql/graphql",
+  "http://node8-graphql/graphql"
+]

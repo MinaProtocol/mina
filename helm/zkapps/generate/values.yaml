@@ -1,0 +1,9 @@
+repository: openmina/mina-load-generator
+pullPolicy: Always
+# Overrides the image tag whose default is the chart appVersion.
+tag: ""
+
+jobKind: generate
+loadKind: sign-proof-x3
+cpu: 16
+mem: "8G"
