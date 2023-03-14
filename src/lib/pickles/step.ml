@@ -826,13 +826,15 @@ struct
                           ; public_inputs
                           } next_statement_hashed ->
                     [%log internal] "Backend_tick_proof_create_async" ;
-                    let%map.Promise proof =
+                    let%map.Promise proof, traces =
                       Backend.Tick.Proof.create_async ~primary:public_inputs
                         ~auxiliary:auxiliary_inputs
                         ~message:
                           (Lazy.force prev_challenge_polynomial_commitments)
                         pk
                     in
+                    [%log internal] "@metadata"
+                      ~metadata:[ ("traces", `String traces.inner) ] ;
                     [%log internal] "Backend_tick_proof_create_async_done" ;
                     (proof, next_statement_hashed) )
                   ~input_typ:Impls.Step.Typ.unit ~return_typ:input

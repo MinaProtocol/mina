@@ -36,8 +36,10 @@ groupmap = { path = "../../proof-systems/groupmap" }
 mina-curves = { path = "../../proof-systems/curves" }
 o1-utils = { path = "../../proof-systems/utils" }
 mina-poseidon = { path = "../../proof-systems/poseidon" }
-kimchi = { path = "../../proof-systems/kimchi", features = ["ocaml_types"] }
+kimchi = { path = "../../proof-systems/kimchi", features = ["ocaml_types", "internal_tracing"] }
 
 # ocaml-specific
 ocaml = { version = "0.22.2", features = ["no-caml-startup"] }
 ocaml-gen = "0.1.0"
+
+internal-tracing = { git = "https://github.com/openmina/internal-tracing-rs", rev = "32f700e200faa8cf528589e7ef6a8e61f3a8d15e" }

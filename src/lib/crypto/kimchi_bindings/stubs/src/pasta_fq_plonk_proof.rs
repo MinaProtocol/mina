@@ -8,6 +8,7 @@ use ark_ec::AffineCurve;
 use ark_ff::One;
 use array_init::array_init;
 use groupmap::GroupMap;
+use kimchi::prover::internal_traces;
 use kimchi::prover_index::ProverIndex;
 use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
 use kimchi::{
@@ -16,7 +17,7 @@ use kimchi::{
     },
     verifier::Context,
 };
-use kimchi::{prover::caml::CamlProverProof, verifier_index::VerifierIndex};
+use kimchi::{prover::caml::{CamlProverProof, CamlProverTraces}, verifier_index::VerifierIndex};
 use mina_curves::pasta::{Fp, Fq, Pallas, PallasParameters};
 use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
@@ -33,7 +34,9 @@ pub fn caml_pasta_fq_plonk_proof_create(
     witness: Vec<CamlFqVector>,
     prev_challenges: Vec<CamlFq>,
     prev_sgs: Vec<CamlGPallas>,
-) -> Result<CamlProverProof<CamlGPallas, CamlFq>, ocaml::Error> {
+) -> Result<(CamlProverProof<CamlGPallas, CamlFq>, CamlProverTraces), ocaml::Error> {
+    internal_traces::start_tracing();
+    internal_tracing::checkpoint!(internal_traces; pasta_fq_plonk_proof_create);
     {
         let ptr: &mut poly_commitment::srs::SRS<Pallas> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
@@ -83,7 +86,10 @@ pub fn caml_pasta_fq_plonk_proof_create(
             DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
         >(&group_map, witness, &[], index, prev, None)
         .map_err(|e| ocaml::Error::Error(e.into()))?;
-        Ok((proof, public_input).into())
+        Ok((
+            (proof, public_input).into(),
+            internal_traces::take_traces().into(),
+        ))
     })
 }
 

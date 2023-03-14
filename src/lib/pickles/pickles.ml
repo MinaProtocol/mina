@@ -1791,7 +1791,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       .prepare
                         next_statement.proof_state.messages_for_next_wrap_proof
                     in
-                    let%map.Promise next_proof =
+                    let%map.Promise next_proof, _ =
                       let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
                       Common.time "wrap proof" (fun () ->
                           Impls.Wrap.generate_witness_conv

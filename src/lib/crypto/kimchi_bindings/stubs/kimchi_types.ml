@@ -118,6 +118,8 @@ type nonrec ('caml_g, 'caml_f) prover_proof =
   ; prev_challenges : ('caml_g, 'caml_f) recursion_challenge array
   }
 
+type nonrec prover_traces = { inner : string } [@@boxed]
+
 type nonrec wire = { row : int; col : int }
 
 type nonrec gate_type =
