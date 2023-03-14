@@ -1,0 +1,3 @@
+testnetName: testnet
+frontend:
+  image: directcuteo/mina-frontend:scstate12
