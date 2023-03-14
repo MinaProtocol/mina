@@ -115,7 +115,7 @@ spec:
         - name: external-port
           protocol: TCP
           containerPort: {{ .Values.mina.ports.p2p }}
-          hostPort: {{ .Values.mina.ports.p2p }}
+          #hostPort: {{ .Values.mina.ports.p2p }}
 {{$name := include "archive-node.fullname" . }}
 {{$data := dict "name" $name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.daemon.allChecks" $data | indent 8 }}
