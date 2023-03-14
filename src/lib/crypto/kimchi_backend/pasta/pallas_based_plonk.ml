@@ -87,9 +87,8 @@ module Proof = Plonk_dlog_proof.Make (struct
       (* external values contains [1, primary..., auxiliary ] *)
       let external_values i =
         let open Field.Vector in
-        if i = 0 then Field.one
-        else if i - 1 < length primary then get primary (i - 1)
-        else get auxiliary (i - 1 - length primary)
+        if i < length primary then get primary i
+        else get auxiliary (i - length primary)
       in
 
       (* compute witness *)

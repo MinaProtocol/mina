@@ -18,20 +18,29 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
-    let open Test_config.Wallet in
     { default with
       requires_graphql = true
-    ; block_producers = [ { balance = "1000"; timing = Untimed } ]
+    ; genesis_ledger =
+        [ { account_name = "node-key"; balance = "1000"; timing = Untimed } ]
+    ; block_producers = [ { node_name = "node"; account_name = "node-key" } ]
     }
 
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_nodes = Network.all_nodes network in
-    let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
-    let[@warning "-8"] [ untimed_node_a ] = Network.block_producers network in
-    let[@warning "-8"] [ bp ] = Network.block_producer_keypairs network in
-    let bp_pk = bp.public_key |> Signature_lib.Public_key.compress in
+    let%bind () =
+      wait_for t
+        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
+    in
+    let node =
+      Core.String.Map.find_exn (Network.block_producers network) "node"
+    in
+    let bp_keypair =
+      (Core.String.Map.find_exn (Network.genesis_keypairs network) "node-key")
+        .keypair
+    in
+    let bp_pk = bp_keypair.public_key |> Signature_lib.Public_key.compress in
     let bp_pk_account_id = Account_id.create bp_pk Token_id.default in
     let bp_original_balance = Currency.Amount.of_mina_string_exn "1000" in
     let coinbase_reward = Currency.Amount.of_mina_string_exn "720" in
@@ -43,7 +52,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       "check that the account balances are what we expect after the block has \
        been produced"
       (let%bind { total_balance = bp_balance; _ } =
-         Network.Node.must_get_account_data ~logger untimed_node_a
+         Network.Node.must_get_account_data ~logger node
            ~account_id:bp_pk_account_id
        in
        (* TODO, the intg test framework is ignoring test_constants.coinbase_amount for whatever reason, so hardcoding this until that is fixed *)

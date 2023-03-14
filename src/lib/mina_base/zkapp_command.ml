@@ -890,6 +890,8 @@ include T
 
 [%%define_locally Stable.Latest.(of_wire, to_wire)]
 
+[%%define_locally Stable.Latest.Wire.(gen)]
+
 let of_simple (w : Simple.t) : t =
   { fee_payer = w.fee_payer
   ; memo = w.memo

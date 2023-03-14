@@ -16,9 +16,12 @@ let compare_with obtained filepath =
   let filepath = "examples/" ^ filepath in
   let expected = In_channel.read_all filepath in
   if String.(trim obtained <> trim expected) then (
-    Format.printf "mismatch for %s detected\n" filepath ;
-    Format.printf "expected:\n%s\n\n" expected ;
-    Format.printf "obtained:\n%s\n" obtained ;
+    Format.printf "mismatch for %s detected\n\n" filepath ;
+    Format.printf
+      "if this is expected, update the serialization with the following \
+       command:\n\n" ;
+    (* Format.printf "expected:\n%s\n\n" expected ; *)
+    Format.printf "echo '%s' > %s\n\n" obtained filepath ;
     failwith "circuit compilation has changed" )
 
 let check_json ~input_typ ~return_typ ~circuit filename () =
@@ -325,21 +328,30 @@ module As_prover_circuits = struct
   let main as_prover vars
       ((b1, b2, b3) : Impl.Field.t * Impl.Field.t * Impl.Field.t) () =
     let abc = Impl.Field.(b1 + b2 + b3) in
-    assert (get_id b1 = 1) ;
+
+    (* we encode the assumption that variables are indexed starting at zero
+       (which used not to be the case due to an extra R1CS row)
+    *)
+    assert (get_id b1 = 0) ;
+
+    (* if [as_prover] is set, we try to access all variables that have been created by index *)
     if as_prover then
       Impl.as_prover (fun _ ->
+          (* sum all variables *)
           let f acc e =
             let var = Snarky_backendless.Cvar.Unsafe.of_index e in
             let v = Impl.As_prover.read_var var in
             Impl.Field.Constant.(acc + v)
           in
-          let l = List.range 1 (vars + 1) in
+          let l = List.range 0 vars in
           let total : Impl.field =
-            List.fold l ~init:Impl.Field.Constant.one ~f
+            List.fold l ~init:Impl.Field.Constant.zero ~f
           in
-          assert (not (Impl.Field.(Constant.compare total Constant.one) = 0)) ;
-          assert (not Impl.Field.Constant.(equal total one)) ;
-          () ) ;
+
+          (* manual sum is equal to circuit sum *)
+          let abc = Impl.As_prover.read_var abc in
+
+          assert (Impl.Field.(Constant.equal abc total)) ) ;
     Impl.Field.Assert.non_zero abc ;
 
     ()
@@ -439,6 +451,154 @@ let outside_circuit_tests =
   ; ("out-of-circuit constraint (bad)", `Quick, out_of_circuit_impure_function)
   ]
 
+(****************************
+ * improper calls tests *
+ ****************************)
+module Improper_calls = struct
+  let input_typ = Impl.Typ.tuple2 Impl.Field.typ Impl.Field.typ
+
+  let return_typ = Impl.Typ.unit
+
+  let use_circuit_functions a b : unit =
+    let ab = Impl.Field.(a + b) in
+    Impl.Field.Assert.non_zero ab ;
+    ()
+
+  let use_prover_functions a b : unit =
+    let a = Impl.As_prover.read_var a in
+    let b = Impl.As_prover.read_var b in
+    let ab = Impl.Field.Constant.(a + b) in
+    assert (not (Impl.Field.Constant.(compare ab one) = 0)) ;
+    ()
+
+  let random_input = Impl.Field.Constant.(random (), random ())
+
+  let use_for_witness_generation circuit : unit =
+    let compiled = Impl.generate_witness ~input_typ ~return_typ circuit in
+    let input = random_input in
+    let _b = compiled input in
+    ()
+
+  let use_for_constraint_generation circuit : unit =
+    let cs : Impl.R1CS_constraint_system.t =
+      Impl.constraint_system ~input_typ ~return_typ circuit
+    in
+    let _digest = Md5.to_hex (Impl.R1CS_constraint_system.digest cs) in
+    ()
+
+  module Tests = struct
+    open Impl
+
+    let circuit_function_inside_circuit_inside_prover () =
+      let inner_circuit ((a, b) : Field.t * Field.t) () : unit =
+        use_circuit_functions a b ; ()
+      in
+      let circuit ((_a, _b) : Field.t * Field.t) () =
+        as_prover (fun _ ->
+            use_for_constraint_generation inner_circuit ;
+            () )
+      in
+      use_for_witness_generation circuit ;
+      ()
+
+    let circuit_functions_inside_prover () : unit =
+      let circuit ((a, b) : Field.t * Field.t) () =
+        as_prover (fun _ -> use_circuit_functions a b ; ()) ;
+        ()
+      in
+      use_for_witness_generation circuit ;
+      ()
+
+    let prover_functions_outside_prover_block () : unit =
+      let circuit ((a, b) : Field.t * Field.t) () =
+        use_prover_functions a b ; ()
+      in
+      use_for_constraint_generation circuit ;
+      ()
+
+    let prover_functions_outside_prover_block () : unit =
+      Alcotest.(
+        check_raises
+          "should fail to call prover functions outside as_prover block"
+          (Failure "Can't evaluate prover code outside an as_prover block")
+          prover_functions_outside_prover_block)
+
+    (* There could be cases like recursive proofs where a proof
+        is generated inside another and used by the outher circuit *)
+    let prover_function_inside_circuit_inside_circuit () : unit =
+      let inner_circuit ((a, b) : Field.t * Field.t) () : unit =
+        as_prover (fun _ -> use_prover_functions a b ; ()) ;
+        ()
+      in
+      let circuit ((a, b) : Field.t * Field.t) () =
+        let inner_value =
+          (* generate witness for inner circuit and return first public input *)
+          exists Field.typ ~compute:(fun _ ->
+              let compiled =
+                generate_witness ~input_typ ~return_typ inner_circuit
+              in
+              let input = random_input in
+              (* passes *)
+              assert (As_prover.in_prover_block ()) ;
+              let proof = compiled input in
+              let a =
+                Kimchi_bindings.FieldVectors.Fp.get proof.public_inputs 0
+              in
+              (* fails *)
+              assert (As_prover.in_prover_block ()) ;
+              (* and thus this also fails *)
+              let b = As_prover.read_var b in
+              let ab = Field.Constant.(mul a b) in
+              ab )
+        in
+        let c = Field.(inner_value + a) in
+        Field.Assert.non_zero c ; ()
+      in
+      use_for_witness_generation circuit ;
+      ()
+
+    let prover_function_in_prover_block_of_other_circuit () : unit =
+      let inner_circuit ((a, b) : Field.t * Field.t) () =
+        use_prover_functions a b ; ()
+      in
+      let circuit ((_a, _b) : Field.t * Field.t) () =
+        as_prover (fun _ ->
+            use_for_constraint_generation inner_circuit ;
+            () )
+      in
+      use_for_witness_generation circuit ;
+      ()
+
+    let prover_function_in_prover_block_of_other_circuit () : unit =
+      Alcotest.(
+        check_raises
+          "should fail to use prover functions outside prover block, even \
+           inside a block of another circuit  "
+          (Failure "Can't evaluate prover code outside an as_prover block")
+          prover_function_in_prover_block_of_other_circuit)
+  end
+
+  let tests =
+    [ ( "call circuit functions inside a prover block of another circuit"
+      , `Quick
+      , Tests.circuit_function_inside_circuit_inside_prover )
+    ; ( "call circuit functions inside an as_prover block"
+      , `Quick
+      , Tests.circuit_functions_inside_prover )
+    ; ( "calling prover functions outside of a as_prover block should fail"
+      , `Quick
+      , Tests.prover_functions_outside_prover_block )
+    ; ( "call prover functions inside a prover block inside another block of \
+         other circuit"
+      , `Quick
+      , Tests.prover_function_inside_circuit_inside_circuit )
+    ; ( "calling prover functions outside prover block but inside block of \
+         other circuit also fails "
+      , `Quick
+      , Tests.prover_function_in_prover_block_of_other_circuit )
+    ]
+end
+
 (* run tests *)
 
 let api_tests =
@@ -459,6 +619,7 @@ let () =
     ; ("circuit tests", circuit_tests)
     ; ("As_prover tests", As_prover_circuits.as_prover_tests)
     ; ("range checks", range_checks)
+    ; ("improper calls", Improper_calls.tests)
       (* We run the pure functions before and after other tests,
          because we've had bugs in the past where it would only work after the global state was initialized by an API function
          (like generate_witness, or constraint_system).
