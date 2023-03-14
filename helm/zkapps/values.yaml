@@ -1,0 +1,35 @@
+# Default values for mina-sample-zkapp.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+jobImage:
+  repository: akoptelov/mina-sample-zkapp
+  pullPolicy: Always
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "cb7448f1"
+
+controllerImage:
+  repository: akoptelov/mina-sample-zkapp-controller
+  pullPolicy: Always
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+transactionCount: 1024
+parallelism: 64
+config: controller-config.json
+cpu: 16
+mem: "8G"
+
+podAnnotations: {}
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
