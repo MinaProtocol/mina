@@ -546,16 +546,24 @@ module type S = sig
     -> ledger
     -> bool Or_error.t
 
-    module For_tests : sig
-      module Stack (Elt : sig type t end) : sig
-        type t = Elt.t list
-        val if_ : bool -> then_:'a -> else_:'a -> 'a
-        val empty : unit -> 'a list
-        val is_empty : 'a list -> bool
-        val pop_exn : t -> Elt.t * t
-        val pop : t -> (Elt.t * t) option
-        val push : Elt.t -> onto:Elt.t list -> t
-      end
+  module For_tests : sig
+    module Stack (Elt : sig
+      type t
+    end) : sig
+      type t = Elt.t list
+
+      val if_ : bool -> then_:'a -> else_:'a -> 'a
+
+      val empty : unit -> 'a list
+
+      val is_empty : 'a list -> bool
+
+      val pop_exn : t -> Elt.t * t
+
+      val pop : t -> (Elt.t * t) option
+
+      val push : Elt.t -> onto:Elt.t list -> t
+    end
 
     val validate_timing_with_min_balance :
          account:Account.t
@@ -2558,7 +2566,6 @@ module Make (L : Ledger_intf.S) :
     >>= Mina_stdlib.Result.List.map ~f:(apply_transaction_second_pass ledger)
 
   module For_tests = struct
-
     module Stack = Inputs.Stack
 
     let validate_timing_with_min_balance = validate_timing_with_min_balance
