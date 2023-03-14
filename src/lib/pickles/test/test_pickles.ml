@@ -731,8 +731,6 @@ module Domain_too_small = struct
         ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
         ~feature_flags:Plonk_types.Features.none ~typ:Field.typ
 
-    module SLV_key = Pickles__Side_loaded_verification_key
-
     let _tag, _, p, Provers.[ step ] =
       Common.time "compile" (fun () ->
           compile_promise () ~public_input:(Input Field.typ)
@@ -1356,23 +1354,23 @@ module Side_loaded_with_feature_flags = struct
              Proof.verify_promise [ (Field.Constant.one, b2) ] ) ) ;
       (Field.Constant.one, b2)
 
-    let _example3 =
-      let (), (), b3 =
-        Common.time "b3" (fun () ->
-            Promise.block_on_async_exn (fun () ->
-                step
-                  ~handler:
-                    (handler Fake_2_recursion.example_input
-                       (Side_loaded.Proof.of_proof
-                          Fake_2_recursion.example_proof )
-                       (Side_loaded.Verification_key.of_compiled
-                          Fake_2_recursion.tag ) )
-                  Field.Constant.one ) )
-      in
-      Or_error.ok_exn
-        (Promise.block_on_async_exn (fun () ->
-             Proof.verify_promise [ (Field.Constant.one, b3) ] ) ) ;
-      (Field.Constant.one, b3)
+    let () =
+      Tests.add_slow ~name:"foo" ~f:(fun () ->
+          let (), (), b3 =
+            Common.time "b3" (fun () ->
+                Promise.block_on_async_exn (fun () ->
+                    step
+                      ~handler:
+                        (handler Fake_2_recursion.example_input
+                           (Side_loaded.Proof.of_proof
+                              Fake_2_recursion.example_proof )
+                           (Side_loaded.Verification_key.of_compiled
+                              Fake_2_recursion.tag ) )
+                      Field.Constant.one ) )
+          in
+          Or_error.ok_exn
+            (Promise.block_on_async_exn (fun () ->
+                 Proof.verify_promise [ (Field.Constant.one, b3) ] ) ) )
   end
 end
 
