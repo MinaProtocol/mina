@@ -1337,20 +1337,21 @@ module Step : sig
         -> assert_16_bits:('field_var -> unit)
         -> zero:
              ( Limb_vector.Challenge.Constant.t
-             , 'a Limb_vector.Challenge.t
+             , 'field_var Limb_vector.Challenge.t
              , 'c Hlist0.Id.t
              , 'b Hlist0.Id.t )
              Zero_values.t
         -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
-        -> ( ( 'a Limb_vector.Challenge.t
-             , 'a Limb_vector.Challenge.t Scalar_challenge.t
+        -> ( ( 'field_var Limb_vector.Challenge.t
+             , 'field_var Limb_vector.Challenge.t Scalar_challenge.t
              , 'b
              , ('b, 'field_var Snarky_backendless__Snark_intf.Boolean0.t) Opt.t
-             , ( 'a Limb_vector.Challenge.t Scalar_challenge.t Hlist0.Id.t
+             , ( 'field_var Limb_vector.Challenge.t Scalar_challenge.t
+                 Hlist0.Id.t
                  Deferred_values.Plonk.In_circuit.Lookup.t
                , 'field_var Snarky_backendless__Snark_intf.Boolean0.t )
                Opt.t
-             , ( 'a Limb_vector.Challenge.t Scalar_challenge.t
+             , ( 'field_var Limb_vector.Challenge.t Scalar_challenge.t
                  Bulletproof_challenge.t
                , Backend.Tock.Rounds.n )
                Vector.t
@@ -1407,7 +1408,7 @@ module Step : sig
              and type field_var = 'field_var
              and type run_state = 'state )
       -> ( Limb_vector.Challenge.Constant.t
-         , 'f Limb_vector.Challenge.t
+         , 'field_var Limb_vector.Challenge.t
          , 'a Hlist0.Id.t
          , 'b Hlist0.Id.t )
          Zero_values.t
@@ -1421,17 +1422,17 @@ module Step : sig
            , 'state )
            Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
          snarky_typ
-      -> ( ( ( ( 'f Limb_vector.Challenge.t
-               , 'f Limb_vector.Challenge.t Scalar_challenge.t
+      -> ( ( ( ( 'field_var Limb_vector.Challenge.t
+               , 'field_var Limb_vector.Challenge.t Scalar_challenge.t
                , 'b
                , ( 'b
                  , 'field_var Snarky_backendless__Snark_intf.Boolean0.t )
                  Opt.t
-               , ( 'f Limb_vector.Challenge.t Scalar_challenge.t
+               , ( 'field_var Limb_vector.Challenge.t Scalar_challenge.t
                    Deferred_values.Plonk.In_circuit.Lookup.t
                  , 'field_var Snarky_backendless__Snark_intf.Boolean0.t )
                  Opt.t
-               , ( 'f Limb_vector.Challenge.t Scalar_challenge.t
+               , ( 'field_var Limb_vector.Challenge.t Scalar_challenge.t
                    Bulletproof_challenge.t
                  , Backend.Tock.Rounds.n )
                  Vector.t

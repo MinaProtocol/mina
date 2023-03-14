@@ -87,7 +87,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   module Checked = struct
     type ('f, 'field_var) t =
-      { proofs_verified_mask : 'f Proofs_verified.Prefix_mask.Checked.t
+      { proofs_verified_mask : 'field_var Proofs_verified.Prefix_mask.Checked.t
       ; domain_log2 : 'field_var
       }
     [@@deriving hlist]
@@ -125,7 +125,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       ((f, field_var) Checked.t, t) Impl.Typ.t =
     let open Impl in
     let proofs_verified_mask :
-        (f Proofs_verified.Prefix_mask.Checked.t, Proofs_verified.t) Typ.t =
+        ( field_var Proofs_verified.Prefix_mask.Checked.t
+        , Proofs_verified.t )
+        Typ.t =
       Proofs_verified.Prefix_mask.typ (module Impl)
     in
     let domain_log2 : (Field.t, Domain_log2.t) Typ.t =

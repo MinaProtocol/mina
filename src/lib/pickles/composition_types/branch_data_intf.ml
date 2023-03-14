@@ -26,7 +26,7 @@ module type S = sig
 
   module Checked : sig
     type ('f, 'field_var) t =
-      { proofs_verified_mask : 'f Proofs_verified.Prefix_mask.Checked.t
+      { proofs_verified_mask : 'field_var Proofs_verified.Prefix_mask.Checked.t
       ; domain_log2 : 'field_var
       }
 

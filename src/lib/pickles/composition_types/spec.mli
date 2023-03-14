@@ -102,10 +102,11 @@ val typ :
            Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; bulletproof_challenge2 :
-           'f Limb_vector.Challenge.t Kimchi_backend_common.Scalar_challenge.t
+           'field_var Limb_vector.Challenge.t
+           Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; challenge1 : Limb_vector.Challenge.Constant.t
-       ; challenge2 : 'f Limb_vector.Challenge.t
+       ; challenge2 : 'field_var Limb_vector.Challenge.t
        ; digest1 :
            ( Limb_vector.Constant.Hex64.t
            , Digest.Limbs.n )
@@ -174,10 +175,11 @@ val pack :
            Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; bulletproof_challenge2 :
-           'f Limb_vector.Challenge.t Kimchi_backend_common.Scalar_challenge.t
+           'field_var Limb_vector.Challenge.t
+           Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; challenge1 : Limb_vector.Challenge.Constant.t
-       ; challenge2 : 'f Limb_vector.Challenge.t
+       ; challenge2 : 'field_var Limb_vector.Challenge.t
        ; digest1 :
            ( Limb_vector.Constant.Hex64.t
            , Digest.Limbs.n )

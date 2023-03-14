@@ -7,7 +7,7 @@ module Spec = Spec
 module Opt = Plonk_types.Opt
 open Core_kernel
 
-type ('f, 'field_var) impl = ('f, 'field_var) Snarky_backendless.Snark0.m
+type ('f, 'field_var, 'state) impl = ('f, 'field_var, 'state) Snarky_backendless.Snark0.m
 
 let index_to_field_elements =
   Pickles_base.Side_loaded_verification_key.index_to_field_elements
