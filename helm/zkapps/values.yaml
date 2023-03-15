@@ -15,9 +15,9 @@ controllerImage:
   tag: ""
 
 # each job sends this many transactions
-count: 32
+count: 16
 # the number of parallel jobs
-parallelism: 32
+parallelism: 64
 config: controller-config.json
 cpu: 16
 mem: "8G"
