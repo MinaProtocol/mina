@@ -162,10 +162,10 @@ module Base
             don't_wait_for
               ( match%map Mina_net2.Validation_callback.await cb'' with
               | None ->
+                  let diff = Envelope.Incoming.data env' in
                   [%log error]
-                    "Validation timed out on transaction/snark pool diff"
-                    ~metadata:
-                      [ ("msg", Diff.to_yojson (Envelope.Incoming.data env')) ]
+                    "Validation timed out on transaction/snark pool $diff"
+                    ~metadata:[ ("diff", Diff.to_yojson diff) ]
               | Some _ ->
                   () )
         | _ ->
