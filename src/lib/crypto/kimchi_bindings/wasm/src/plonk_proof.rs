@@ -551,7 +551,7 @@ macro_rules! impl_proof {
                 witness: WasmVecVecF,
                 prev_challenges: WasmFlatVector<$WasmF>,
                 prev_sgs: WasmVector<$WasmG>,
-            ) -> WasmProverProof {
+            ) -> Result<WasmProverProof, JsValue> {
                 console_error_panic_hook::set_once();
                 let (maybe_proof, public_input) = crate::rayon::run_in_pool(|| {
                     {
@@ -602,12 +602,15 @@ macro_rules! impl_proof {
                 });
 
                 return match maybe_proof {
-                    Ok(proof) => (proof, public_input).into(),
+                    Ok(proof) => Ok((proof, public_input).into()),
                     Err(err) => {
-                        // TODO give this a proper error
-                        log(&err.to_string());
-                        panic!("thrown an error")
+                        panic!(err.to_string())
+                        // TODO: make an error here bubble up properly
+                        // right now the error gets swallowed by jsoo somewhere
+                        // the panic! hook is the best we can do because it logs the error + originating line number
+                        // Err(JsValue::from_str(&err.to_string()))
                     }
+
                 }
             }
 

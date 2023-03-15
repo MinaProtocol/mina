@@ -46,11 +46,6 @@ pub fn caml_pasta_fp_plonk_index_create(
             })
             .collect();
 
-        // console_log("Index.create Fp");
-        // for (i, g) in gates.iter().enumerate() {
-        //     console_log(&format_circuit_gate(i, g));
-        // }
-
         // create constraint system
         let cs = match ConstraintSystem::<Fp>::create(gates)
             .public(public_ as usize)
@@ -58,7 +53,7 @@ pub fn caml_pasta_fp_plonk_index_create(
             .build()
         {
             Err(_) => {
-                panic!("caml_pasta_fp_plonk_index_create: could not create constraint system");
+                return Err("caml_pasta_fp_plonk_index_create: could not create constraint system");
             }
             Ok(cs) => cs,
         };
@@ -76,12 +71,14 @@ pub fn caml_pasta_fp_plonk_index_create(
         let mut index = ProverIndex::<GAffine>::create(cs, endo_q, srs.0.clone());
         // Compute and cache the verifier index digest
         index.compute_verifier_index_digest::<DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>>();
-
-        index
+        Ok(index)
     });
 
     // create index
-    Ok(WasmPastaFpPlonkIndex(Box::new(index)))
+    match index {
+        Ok(index) => Ok(WasmPastaFpPlonkIndex(Box::new(index))),
+        Err(str) => Err(JsValue::from_str(str)),
+    }
 }
 
 #[wasm_bindgen]
