@@ -547,22 +547,29 @@ module type S = sig
     -> bool Or_error.t
 
   module For_tests : sig
-
-    module Ledger : 
-    sig
+    module Ledger : sig
       type t = ledger
+
       val if_ : bool -> then_:'a -> else_:'a -> 'a
+
       val empty : depth:int -> unit -> t
+
       type inclusion_proof = [ `Existing of location | `New ]
+
       val get_account :
         Account_update.t -> t -> Account.t * [> `Existing of location | `New ]
-      val set_account :
-        t -> Account.t * [< `Existing of location | `New ] -> t
+
+      val set_account : t -> Account.t * [< `Existing of location | `New ] -> t
+
       val check_inclusion : 'a -> 'b * 'c -> unit
+
       val check_account :
-        Account.key ->
-        Token_id.t -> Account.t * inclusion_proof -> [> `Is_new of bool ]
-    end    
+           Account.key
+        -> Token_id.t
+        -> Account.t * inclusion_proof
+        -> [> `Is_new of bool ]
+    end
+
     val validate_timing_with_min_balance :
          account:Account.t
       -> txn_amount:Amount.t
@@ -2564,7 +2571,6 @@ module Make (L : Ledger_intf.S) :
     >>= Mina_stdlib.Result.List.map ~f:(apply_transaction_second_pass ledger)
 
   module For_tests = struct
-
     module Ledger = Inputs.Ledger
 
     let validate_timing_with_min_balance = validate_timing_with_min_balance
