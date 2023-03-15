@@ -834,6 +834,8 @@ struct
 
       type _unused = unit constraint t = Diff_versioned.t
 
+      let label = label
+
       module Diff_error = struct
         type t = Diff_versioned.Diff_error.t =
           | Insufficient_replace_fee
