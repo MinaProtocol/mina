@@ -73,6 +73,9 @@ let bignum_bigint_div_rem (numerator : Bignum_bigint.t)
   let remainder = Bignum_bigint.(numerator - (denominator * quotient)) in
   (quotient, remainder)
 
+(* Negative test helper *)
+let is_error (func : unit -> _) = Result.is_error (Or_error.try_with func)
+
 let%test_unit "helper field_bits_le_to_field" =
   Printf.printf "field_bits_le_to_field test\n" ;
   (* Import the gadget test runner *)
@@ -163,14 +166,10 @@ let%test_unit "helper field_bits_le_to_field" =
           (from_base10 "1") ;
 
         (* Test invalid range is denied *)
-        assert (
-          Result.is_error
-          @@ Or_error.try_with (fun () -> bits_le_to_field field_element 2 2) ) ;
+        assert (is_error (fun () -> bits_le_to_field field_element 2 2)) ;
 
         (* Test invalid range is denied *)
-        assert (
-          Result.is_error
-          @@ Or_error.try_with (fun () -> bits_le_to_field field_element 2 1) ) ;
+        assert (is_error (fun () -> bits_le_to_field field_element 2 1)) ;
 
         (* Padding *)
         Boolean.Assert.is_true (Field.equal field_element field_element) )

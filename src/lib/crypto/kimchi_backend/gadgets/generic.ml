@@ -133,19 +133,15 @@ let%test_unit "generic gadgets" =
   test_generic_add 0 0 0 ;
   test_generic_add 1 2 3 ;
   (* Negatve tests *)
-  assert (
-    Result.is_error @@ Or_error.try_with (fun () -> test_generic_add 1 0 0) ) ;
-  assert (
-    Result.is_error @@ Or_error.try_with (fun () -> test_generic_add 2 4 7) ) ;
+  assert (Common.is_error (fun () -> test_generic_add 1 0 0)) ;
+  assert (Common.is_error (fun () -> test_generic_add 2 4 7)) ;
 
   (* TEST generic mul gadget *)
   (* Positive tests *)
   test_generic_mul 0 0 0 ;
   test_generic_mul 1 2 2 ;
   (* Negatve tests *)
-  assert (
-    Result.is_error @@ Or_error.try_with (fun () -> test_generic_mul 1 0 1) ) ;
-  assert (
-    Result.is_error @@ Or_error.try_with (fun () -> test_generic_mul 2 4 7) ) ;
+  assert (Common.is_error (fun () -> test_generic_mul 1 0 1)) ;
+  assert (Common.is_error (fun () -> test_generic_mul 2 4 7)) ;
 
   ()

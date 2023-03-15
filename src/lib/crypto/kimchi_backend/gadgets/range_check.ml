@@ -242,15 +242,13 @@ let%test_unit "range_check gadget" =
 
   (* Negative tests *)
   assert (
-    Result.is_error
-    @@ Or_error.try_with (fun () ->
-           test_range_check "309485009821345068724781056" (* 2^88 *) ) ) ;
+    Common.is_error (fun () ->
+        test_range_check "309485009821345068724781056" (* 2^88 *) ) ) ;
   assert (
-    Result.is_error
-    @@ Or_error.try_with (fun () ->
-           test_range_check
-             "28948022309329048855892746252171976963317496166410141009864396001978282409984"
-           (* 2^254 *) ) ) ;
+    Common.is_error (fun () ->
+        test_range_check
+          "28948022309329048855892746252171976963317496166410141009864396001978282409984"
+        (* 2^254 *) ) ) ;
   ()
 
 let%test_unit "range_check64 gadget" =
@@ -287,14 +285,12 @@ let%test_unit "range_check64 gadget" =
   (* 2^64 - 1 *)
   (* Negative tests *)
   assert (
-    Result.is_error
-    @@ Or_error.try_with (fun () ->
-           test_range_check64 "18446744073709551616" (* 2^64 *) ) ) ;
+    Common.is_error (fun () ->
+        test_range_check64 "18446744073709551616" (* 2^64 *) ) ) ;
   assert (
-    Result.is_error
-    @@ Or_error.try_with (fun () ->
-           test_range_check64 "170141183460469231731687303715884105728"
-           (* 2^127  *) ) ) ;
+    Common.is_error (fun () ->
+        test_range_check64 "170141183460469231731687303715884105728"
+        (* 2^127  *) ) ) ;
   ()
 
 let%test_unit "multi_range_check gadget" =
@@ -334,36 +330,30 @@ let%test_unit "multi_range_check gadget" =
   test_multi_range_check "0" "0" "0" ;
   (* Negative tests *)
   assert (
-    Result.is_error
-    @@ Or_error.try_with (fun () ->
-           test_multi_range_check "0" "4294967" "309485009821345068724781056" ) ) ;
+    Common.is_error (fun () ->
+        test_multi_range_check "0" "4294967" "309485009821345068724781056" ) ) ;
   assert (
-    Result.is_error
-    @@ Or_error.try_with (fun () ->
-           test_multi_range_check "0" "309485009821345068724781056"
-             "309485009821345068724781055" ) ) ;
+    Common.is_error (fun () ->
+        test_multi_range_check "0" "309485009821345068724781056"
+          "309485009821345068724781055" ) ) ;
   assert (
-    Result.is_error
-    @@ Or_error.try_with (fun () ->
-           test_multi_range_check "309485009821345068724781056" "4294967"
-             "309485009821345068724781055" ) ) ;
+    Common.is_error (fun () ->
+        test_multi_range_check "309485009821345068724781056" "4294967"
+          "309485009821345068724781055" ) ) ;
   assert (
-    Result.is_error
-    @@ Or_error.try_with (fun () ->
-           test_multi_range_check
-             "28948022309329048855892746252171976963317496166410141009864396001978282409984"
-             "0170141183460469231731687303715884105728"
-             "170141183460469231731687303715884105728" ) ) ;
+    Common.is_error (fun () ->
+        test_multi_range_check
+          "28948022309329048855892746252171976963317496166410141009864396001978282409984"
+          "0170141183460469231731687303715884105728"
+          "170141183460469231731687303715884105728" ) ) ;
   assert (
-    Result.is_error
-    @@ Or_error.try_with (fun () ->
-           test_multi_range_check "0" "0"
-             "28948022309329048855892746252171976963317496166410141009864396001978282409984" ) ) ;
+    Common.is_error (fun () ->
+        test_multi_range_check "0" "0"
+          "28948022309329048855892746252171976963317496166410141009864396001978282409984" ) ) ;
   assert (
-    Result.is_error
-    @@ Or_error.try_with (fun () ->
-           test_multi_range_check "0170141183460469231731687303715884105728" "0"
-             "28948022309329048855892746252171976963317496166410141009864396001978282409984" ) ) ;
+    Common.is_error (fun () ->
+        test_multi_range_check "0170141183460469231731687303715884105728" "0"
+          "28948022309329048855892746252171976963317496166410141009864396001978282409984" ) ) ;
   ()
 
 let%test_unit "compact_multi_range_check gadget" =
@@ -399,29 +389,23 @@ let%test_unit "compact_multi_range_check gadget" =
   (* 2^88 - 1 *) ;
   (* Negative tests *)
   assert (
-    Result.is_error
-    @@ Or_error.try_with (fun () ->
-           test_compact_multi_range_check
-             "28948022309329048855892746252171976963317496166410141009864396001978282409984"
-             "0" ) ) ;
+    Common.is_error (fun () ->
+        test_compact_multi_range_check
+          "28948022309329048855892746252171976963317496166410141009864396001978282409984"
+          "0" ) ) ;
   assert (
-    Result.is_error
-    @@ Or_error.try_with (fun () ->
-           test_compact_multi_range_check "0"
-             "28948022309329048855892746252171976963317496166410141009864396001978282409984" ) ) ;
+    Common.is_error (fun () ->
+        test_compact_multi_range_check "0"
+          "28948022309329048855892746252171976963317496166410141009864396001978282409984" ) ) ;
   assert (
-    Result.is_error
-    @@ Or_error.try_with (fun () ->
-           test_compact_multi_range_check
-             "95780971304118053647396689196894323976171195136475136" (* 2^176 *)
-             "309485009821345068724781055" )
-       (* 2^88 - 1 *) ) ;
+    Common.is_error (fun () ->
+        test_compact_multi_range_check
+          "95780971304118053647396689196894323976171195136475136" (* 2^176 *)
+          "309485009821345068724781055" ) (* 2^88 - 1 *) ) ;
   assert (
-    Result.is_error
-    @@ Or_error.try_with (fun () ->
-           test_compact_multi_range_check
-             "95780971304118053647396689196894323976171195136475135"
-             (* 2^176 - 1 *)
-             "309485009821345068724781056" )
-       (* 2^88 *) ) ;
+    Common.is_error (fun () ->
+        test_compact_multi_range_check
+          "95780971304118053647396689196894323976171195136475135"
+          (* 2^176 - 1 *)
+          "309485009821345068724781056" ) (* 2^88 *) ) ;
   ()
