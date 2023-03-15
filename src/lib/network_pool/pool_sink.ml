@@ -164,7 +164,8 @@ module Base
               | None ->
                   let diff = Envelope.Incoming.data env' in
                   [%log error]
-                    "Validation timed out on transaction/snark pool $diff"
+                    !"Validation timed out on %s $diff"
+                    Diff.label
                     ~metadata:[ ("diff", Diff.to_yojson diff) ]
               | Some _ ->
                   () )
