@@ -74,35 +74,29 @@ let%test_unit "generic gadgets" =
    *   Inputs operands and expected output: left_input + right_input = sum
    *   Returns true if constraints are satisfied, false otherwise.
    *)
-  let test_generic_add left_input right_input sum : bool =
-    try
-      let _proof_keypair, _proof =
-        Runner.generate_and_verify_proof (fun () ->
-            let open Runner.Impl in
-            (* Set up snarky variables for inputs and outputs *)
-            let left_input =
-              exists Field.typ ~compute:(fun () ->
-                  Field.Constant.of_int left_input )
-            in
-            let right_input =
-              exists Field.typ ~compute:(fun () ->
-                  Field.Constant.of_int right_input )
-            in
-            let sum =
-              exists Field.typ ~compute:(fun () -> Field.Constant.of_int sum)
-            in
-            (* Use the generic add gate gadget *)
-            let result = add (module Runner.Impl) left_input right_input in
-            Field.Assert.equal sum result ;
-            (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
-            Boolean.Assert.is_true (Field.equal sum sum) )
-      in
-      true
-    with exn ->
-      Format.eprintf "Error: %s@." (Exn.to_string exn) ;
-      Printexc.print_backtrace Stdlib.stdout ;
-      Stdlib.(flush stdout) ;
-      false
+  let test_generic_add left_input right_input sum : unit =
+    let _proof_keypair, _proof =
+      Runner.generate_and_verify_proof (fun () ->
+          let open Runner.Impl in
+          (* Set up snarky variables for inputs and outputs *)
+          let left_input =
+            exists Field.typ ~compute:(fun () ->
+                Field.Constant.of_int left_input )
+          in
+          let right_input =
+            exists Field.typ ~compute:(fun () ->
+                Field.Constant.of_int right_input )
+          in
+          let sum =
+            exists Field.typ ~compute:(fun () -> Field.Constant.of_int sum)
+          in
+          (* Use the generic add gate gadget *)
+          let result = add (module Runner.Impl) left_input right_input in
+          Field.Assert.equal sum result ;
+          (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
+          Boolean.Assert.is_true (Field.equal sum sum) )
+    in
+    ()
   in
 
   (* Helper to test generic multimplication gate gadget
@@ -110,46 +104,48 @@ let%test_unit "generic gadgets" =
    *   Returns true if constraints are satisfied, false otherwise.
    *)
   let test_generic_mul left_input right_input prod =
-    try
-      let _proof_keypair, _proof =
-        Runner.generate_and_verify_proof (fun () ->
-            let open Runner.Impl in
-            (* Set up snarky variables for inputs and outputs *)
-            let left_input =
-              exists Field.typ ~compute:(fun () ->
-                  Field.Constant.of_int left_input )
-            in
-            let right_input =
-              exists Field.typ ~compute:(fun () ->
-                  Field.Constant.of_int right_input )
-            in
-            let prod =
-              exists Field.typ ~compute:(fun () -> Field.Constant.of_int prod)
-            in
-            (* Use the generic mul gate gadget *)
-            let result = mul (module Runner.Impl) left_input right_input in
-            Field.Assert.equal prod result ;
-            (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
-            Boolean.Assert.is_true (Field.equal prod prod) )
-      in
-      true
-    with _ -> false
+    let _proof_keypair, _proof =
+      Runner.generate_and_verify_proof (fun () ->
+          let open Runner.Impl in
+          (* Set up snarky variables for inputs and outputs *)
+          let left_input =
+            exists Field.typ ~compute:(fun () ->
+                Field.Constant.of_int left_input )
+          in
+          let right_input =
+            exists Field.typ ~compute:(fun () ->
+                Field.Constant.of_int right_input )
+          in
+          let prod =
+            exists Field.typ ~compute:(fun () -> Field.Constant.of_int prod)
+          in
+          (* Use the generic mul gate gadget *)
+          let result = mul (module Runner.Impl) left_input right_input in
+          Field.Assert.equal prod result ;
+          (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
+          Boolean.Assert.is_true (Field.equal prod prod) )
+    in
+    ()
   in
 
   (* TEST generic add gadget *)
   (* Positive tests *)
-  assert (Bool.equal (test_generic_add 0 0 0) true) ;
-  assert (Bool.equal (test_generic_add 1 2 3) true) ;
+  test_generic_add 0 0 0 ;
+  test_generic_add 1 2 3 ;
   (* Negatve tests *)
-  assert (Bool.equal (test_generic_add 1 0 0) false) ;
-  assert (Bool.equal (test_generic_add 2 4 7) false) ;
+  assert (
+    Result.is_error @@ Or_error.try_with (fun () -> test_generic_add 1 0 0) ) ;
+  assert (
+    Result.is_error @@ Or_error.try_with (fun () -> test_generic_add 2 4 7) ) ;
 
   (* TEST generic mul gadget *)
   (* Positive tests *)
-  assert (Bool.equal (test_generic_mul 0 0 0) true) ;
-  assert (Bool.equal (test_generic_mul 1 2 2) true) ;
+  test_generic_mul 0 0 0 ;
+  test_generic_mul 1 2 2 ;
   (* Negatve tests *)
-  assert (Bool.equal (test_generic_mul 1 0 1) false) ;
-  assert (Bool.equal (test_generic_mul 2 4 7) false) ;
+  assert (
+    Result.is_error @@ Or_error.try_with (fun () -> test_generic_mul 1 0 1) ) ;
+  assert (
+    Result.is_error @@ Or_error.try_with (fun () -> test_generic_mul 2 4 7) ) ;
 
   ()

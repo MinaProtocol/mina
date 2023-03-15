@@ -220,45 +220,37 @@ let%test_unit "range_check gadget" =
   in
 
   (* Helper to test range_check gadget *)
-  let test_range_check base10 : bool =
-    try
-      let _proof_keypair, _proof =
-        Runner.generate_and_verify_proof (fun () ->
-            let open Runner.Impl in
-            let value =
-              exists Field.typ ~compute:(fun () ->
-                  Field.Constant.of_string base10 )
-            in
-            range_check (module Runner.Impl) value ;
-            (* Padding *)
-            Boolean.Assert.is_true (Field.equal value value) )
-      in
-      true
-    with exn ->
-      Format.eprintf "Error: %s@." (Exn.to_string exn) ;
-      Printexc.print_backtrace Stdlib.stdout ;
-      Stdlib.(flush stdout) ;
-      false
+  let test_range_check base10 : unit =
+    let _, _ =
+      Runner.generate_and_verify_proof (fun () ->
+          let open Runner.Impl in
+          let value =
+            exists Field.typ ~compute:(fun () ->
+                Field.Constant.of_string base10 )
+          in
+          range_check (module Runner.Impl) value ;
+          (* Padding *)
+          Boolean.Assert.is_true (Field.equal value value) )
+    in
+    ()
   in
 
   (* Positive tests *)
-  assert (Bool.equal (test_range_check "0") true) ;
-  assert (Bool.equal (test_range_check "18446744073709551616") (* 2^64 *) true) ;
-  assert (
-    Bool.equal
-      (test_range_check "309485009821345068724781055")
-      (* 2^88 - 1 *)
-      true ) ;
+  test_range_check "0" ;
+  test_range_check "18446744073709551616" (* 2^64 *) ;
+  test_range_check "309485009821345068724781055" (* 2^88 - 1 *) ;
 
   (* Negative tests *)
   assert (
-    Bool.equal (test_range_check "309485009821345068724781056") (* 2^88 *) false ) ;
+    Result.is_error
+    @@ Or_error.try_with (fun () ->
+           test_range_check "309485009821345068724781056" (* 2^88 *) ) ) ;
   assert (
-    Bool.equal
-      (test_range_check
-         "28948022309329048855892746252171976963317496166410141009864396001978282409984" )
-      (* 2^254 *)
-      false ) ;
+    Result.is_error
+    @@ Or_error.try_with (fun () ->
+           test_range_check
+             "28948022309329048855892746252171976963317496166410141009864396001978282409984"
+           (* 2^254 *) ) ) ;
   ()
 
 let%test_unit "range_check64 gadget" =
@@ -273,40 +265,36 @@ let%test_unit "range_check64 gadget" =
   (* Helper to test range_check64 gadget
    *   Input: value to be range checked in [0, 2^64)
    *)
-  let test_range_check64 base10 : bool =
-    try
-      let _proof_keypair, _proof =
-        Runner.generate_and_verify_proof (fun () ->
-            let open Runner.Impl in
-            let value =
-              exists Field.typ ~compute:(fun () ->
-                  Field.Constant.of_string base10 )
-            in
-            range_check64 (module Runner.Impl) value ;
-            (* Padding *)
-            Boolean.Assert.is_true (Field.equal value value) )
-      in
-      true
-    with exn ->
-      Format.eprintf "Error: %s@." (Exn.to_string exn) ;
-      Printexc.print_backtrace Stdlib.stdout ;
-      Stdlib.(flush stdout) ;
-      false
+  let test_range_check64 base10 : unit =
+    let _proof_keypair, _proof =
+      Runner.generate_and_verify_proof (fun () ->
+          let open Runner.Impl in
+          let value =
+            exists Field.typ ~compute:(fun () ->
+                Field.Constant.of_string base10 )
+          in
+          range_check64 (module Runner.Impl) value ;
+          (* Padding *)
+          Boolean.Assert.is_true (Field.equal value value) )
+    in
+    ()
   in
 
   (* Positive tests *)
-  assert (Bool.equal (test_range_check64 "0") true) ;
-  assert (Bool.equal (test_range_check64 "4294967") true) ;
-  assert (Bool.equal (test_range_check64 "18446744073709551615") true) ;
+  test_range_check64 "0" ;
+  test_range_check64 "4294967" ;
+  test_range_check64 "18446744073709551615" ;
   (* 2^64 - 1 *)
   (* Negative tests *)
-  assert (Bool.equal (test_range_check64 "18446744073709551616") false) ;
-  (* 2^64 *)
   assert (
-    Bool.equal
-      (test_range_check64 "170141183460469231731687303715884105728")
-      (* 2^127  *)
-      false ) ;
+    Result.is_error
+    @@ Or_error.try_with (fun () ->
+           test_range_check64 "18446744073709551616" (* 2^64 *) ) ) ;
+  assert (
+    Result.is_error
+    @@ Or_error.try_with (fun () ->
+           test_range_check64 "170141183460469231731687303715884105728"
+           (* 2^127  *) ) ) ;
   ()
 
 let%test_unit "multi_range_check gadget" =
@@ -319,78 +307,63 @@ let%test_unit "multi_range_check gadget" =
   in
 
   (* Helper to test multi_range_check gadget *)
-  let test_multi_range_check v0 v1 v2 : bool =
-    try
-      let _proof_keypair, _proof =
-        Runner.generate_and_verify_proof (fun () ->
-            let open Runner.Impl in
-            let values =
-              exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
-                  [| Field.Constant.of_string v0
-                   ; Field.Constant.of_string v1
-                   ; Field.Constant.of_string v2
-                  |] )
-            in
-            multi_range_check
-              (module Runner.Impl)
-              values.(0) values.(1) values.(2) )
-      in
-      true
-    with exn ->
-      Format.eprintf "Error: %s@." (Exn.to_string exn) ;
-      Printexc.print_backtrace Stdlib.stdout ;
-      Stdlib.(flush stdout) ;
-      false
+  let test_multi_range_check v0 v1 v2 : unit =
+    let _proof_keypair, _proof =
+      Runner.generate_and_verify_proof (fun () ->
+          let open Runner.Impl in
+          let values =
+            exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
+                [| Field.Constant.of_string v0
+                 ; Field.Constant.of_string v1
+                 ; Field.Constant.of_string v2
+                |] )
+          in
+          multi_range_check
+            (module Runner.Impl)
+            values.(0) values.(1) values.(2) )
+    in
+    ()
   in
 
   (* Positive tests *)
-  assert (
-    Bool.equal
-      (test_multi_range_check "0" "4294967" "309485009821345068724781055")
-      true ) ;
-  assert (
-    Bool.equal
-      (test_multi_range_check "267475740839011166017999907"
-         "120402749546803056196583080" "1159834292458813579124542" )
-      true ) ;
-  assert (
-    Bool.equal
-      (test_multi_range_check "309485009821345068724781055"
-         "309485009821345068724781055" "309485009821345068724781055" )
-      true ) ;
-  assert (Bool.equal (test_multi_range_check "0" "0" "0") true) ;
+  test_multi_range_check "0" "4294967" "309485009821345068724781055" ;
+  test_multi_range_check "267475740839011166017999907"
+    "120402749546803056196583080" "1159834292458813579124542" ;
+  test_multi_range_check "309485009821345068724781055"
+    "309485009821345068724781055" "309485009821345068724781055" ;
+  test_multi_range_check "0" "0" "0" ;
   (* Negative tests *)
   assert (
-    Bool.equal
-      (test_multi_range_check "0" "4294967" "309485009821345068724781056")
-      false ) ;
+    Result.is_error
+    @@ Or_error.try_with (fun () ->
+           test_multi_range_check "0" "4294967" "309485009821345068724781056" ) ) ;
   assert (
-    Bool.equal
-      (test_multi_range_check "0" "309485009821345068724781056"
-         "309485009821345068724781055" )
-      false ) ;
+    Result.is_error
+    @@ Or_error.try_with (fun () ->
+           test_multi_range_check "0" "309485009821345068724781056"
+             "309485009821345068724781055" ) ) ;
   assert (
-    Bool.equal
-      (test_multi_range_check "309485009821345068724781056" "4294967"
-         "309485009821345068724781055" )
-      false ) ;
+    Result.is_error
+    @@ Or_error.try_with (fun () ->
+           test_multi_range_check "309485009821345068724781056" "4294967"
+             "309485009821345068724781055" ) ) ;
   assert (
-    Bool.equal
-      (test_multi_range_check
-         "28948022309329048855892746252171976963317496166410141009864396001978282409984"
-         "0170141183460469231731687303715884105728"
-         "170141183460469231731687303715884105728" )
-      false ) ;
+    Result.is_error
+    @@ Or_error.try_with (fun () ->
+           test_multi_range_check
+             "28948022309329048855892746252171976963317496166410141009864396001978282409984"
+             "0170141183460469231731687303715884105728"
+             "170141183460469231731687303715884105728" ) ) ;
   assert (
-    Bool.equal
-      (test_multi_range_check "0" "0"
-         "28948022309329048855892746252171976963317496166410141009864396001978282409984" )
-      false ) ;
+    Result.is_error
+    @@ Or_error.try_with (fun () ->
+           test_multi_range_check "0" "0"
+             "28948022309329048855892746252171976963317496166410141009864396001978282409984" ) ) ;
   assert (
-    Bool.equal
-      (test_multi_range_check "0170141183460469231731687303715884105728" "0"
-         "28948022309329048855892746252171976963317496166410141009864396001978282409984" )
-      false ) ;
+    Result.is_error
+    @@ Or_error.try_with (fun () ->
+           test_multi_range_check "0170141183460469231731687303715884105728" "0"
+             "28948022309329048855892746252171976963317496166410141009864396001978282409984" ) ) ;
   ()
 
 let%test_unit "compact_multi_range_check gadget" =
@@ -403,60 +376,52 @@ let%test_unit "compact_multi_range_check gadget" =
   in
 
   (* Helper to test compact_multi_range_check gadget *)
-  let test_compact_multi_range_check v01 v2 : bool =
-    try
-      let _proof_keypair, _proof =
-        Runner.generate_and_verify_proof (fun () ->
-            let open Runner.Impl in
-            let v01, v2 =
-              exists
-                Typ.(Field.typ * Field.typ)
-                ~compute:(fun () ->
-                  (Field.Constant.of_string v01, Field.Constant.of_string v2) )
-            in
-            compact_multi_range_check (module Runner.Impl) v01 v2 )
-      in
-      true
-    with exn ->
-      Format.eprintf "Error: %s@." (Exn.to_string exn) ;
-      Printexc.print_backtrace Stdlib.stdout ;
-      Stdlib.(flush stdout) ;
-      false
+  let test_compact_multi_range_check v01 v2 : unit =
+    let _proof_keypair, _proof =
+      Runner.generate_and_verify_proof (fun () ->
+          let open Runner.Impl in
+          let v01, v2 =
+            exists
+              Typ.(Field.typ * Field.typ)
+              ~compute:(fun () ->
+                (Field.Constant.of_string v01, Field.Constant.of_string v2) )
+          in
+          compact_multi_range_check (module Runner.Impl) v01 v2 )
+    in
+    ()
   in
 
   (* Positive tests *)
-  assert (Bool.equal (test_compact_multi_range_check "0" "0") true) ;
+  test_compact_multi_range_check "0" "0" ;
+  test_compact_multi_range_check
+    "95780971304118053647396689196894323976171195136475135" (* 2^176 - 1 *)
+    "309485009821345068724781055"
+  (* 2^88 - 1 *) ;
   (* Negative tests *)
   assert (
-    Bool.equal
-      (test_compact_multi_range_check
-         "28948022309329048855892746252171976963317496166410141009864396001978282409984"
-         "0" )
-      false ) ;
+    Result.is_error
+    @@ Or_error.try_with (fun () ->
+           test_compact_multi_range_check
+             "28948022309329048855892746252171976963317496166410141009864396001978282409984"
+             "0" ) ) ;
   assert (
-    Bool.equal
-      (test_compact_multi_range_check
-         "95780971304118053647396689196894323976171195136475135" (* 2^176 - 1 *)
-         "309485009821345068724781055" )
-      (* 2^88 - 1 *)
-      true ) ;
+    Result.is_error
+    @@ Or_error.try_with (fun () ->
+           test_compact_multi_range_check "0"
+             "28948022309329048855892746252171976963317496166410141009864396001978282409984" ) ) ;
   assert (
-    Bool.equal
-      (test_compact_multi_range_check "0"
-         "28948022309329048855892746252171976963317496166410141009864396001978282409984" )
-      false ) ;
+    Result.is_error
+    @@ Or_error.try_with (fun () ->
+           test_compact_multi_range_check
+             "95780971304118053647396689196894323976171195136475136" (* 2^176 *)
+             "309485009821345068724781055" )
+       (* 2^88 - 1 *) ) ;
   assert (
-    Bool.equal
-      (test_compact_multi_range_check
-         "95780971304118053647396689196894323976171195136475136" (* 2^176 *)
-         "309485009821345068724781055" )
-      (* 2^88 - 1 *)
-      false ) ;
-  assert (
-    Bool.equal
-      (test_compact_multi_range_check
-         "95780971304118053647396689196894323976171195136475135" (* 2^176 - 1 *)
-         "309485009821345068724781056" )
-      (* 2^88 *)
-      false ) ;
+    Result.is_error
+    @@ Or_error.try_with (fun () ->
+           test_compact_multi_range_check
+             "95780971304118053647396689196894323976171195136475135"
+             (* 2^176 - 1 *)
+             "309485009821345068724781056" )
+       (* 2^88 *) ) ;
   ()

@@ -164,21 +164,13 @@ let%test_unit "helper field_bits_le_to_field" =
 
         (* Test invalid range is denied *)
         assert (
-          Bool.equal
-            ( try
-                let _x = bits_le_to_field field_element 2 2 in
-                true
-              with _ -> false )
-            false ) ;
+          Result.is_error
+          @@ Or_error.try_with (fun () -> bits_le_to_field field_element 2 2) ) ;
 
         (* Test invalid range is denied *)
         assert (
-          Bool.equal
-            ( try
-                let _x = bits_le_to_field field_element 2 1 in
-                true
-              with _ -> false )
-            false ) ;
+          Result.is_error
+          @@ Or_error.try_with (fun () -> bits_le_to_field field_element 2 1) ) ;
 
         (* Padding *)
         Boolean.Assert.is_true (Field.equal field_element field_element) )
