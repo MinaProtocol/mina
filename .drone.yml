@@ -41,7 +41,7 @@ steps:
     - ${MINA_BRANCH:-${DRONE_BRANCH}}-latest
     username:
       from_secret: docker_hub_username
-#    cache_from: openmina/mina:${MINA_BRANCH:-${DRONE_BRANCH}}-latest
+    cache_from: ${CACHE_IMAGE:-}
 
 
 ---
