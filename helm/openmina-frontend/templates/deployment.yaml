@@ -60,7 +60,7 @@ data:
     {
       "production": true,
       "aggregator": "/aggregator",
-      "isVanilla": true,
+      "isVanilla": {{ $.Values.isVanilla | default "false" }},
       "configs": [
         {{ range $i, $node := $.Values.frontend.nodes  }}
         {{ include "frontend-app-config-entry" (dict "name" $node "first" (eq $i 0) "debugger" "bpf-debugger" ) }}
