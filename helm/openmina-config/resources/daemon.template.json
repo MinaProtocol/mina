@@ -4,7 +4,7 @@
     "genesis_state_timestamp": "${TIMESTAMP}"
   },
   "proof": {
-    "block_window_duration_ms": 60000
+    "block_window_duration_ms": 120000
   },
   "ledger": {
     "name": "testnet",
