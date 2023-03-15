@@ -182,23 +182,19 @@ module Engine = struct
 
     val genesis_constants : t -> Genesis_constants.t
 
-    val seeds : t -> Node.t list
+    val seeds : t -> Node.t Core.String.Map.t
 
-    val all_non_seed_pods : t -> Node.t list
+    val all_non_seed_pods : t -> Node.t Core.String.Map.t
 
-    val block_producers : t -> Node.t list
+    val block_producers : t -> Node.t Core.String.Map.t
 
-    val snark_coordinators : t -> Node.t list
+    val snark_coordinators : t -> Node.t Core.String.Map.t
 
-    val archive_nodes : t -> Node.t list
+    val archive_nodes : t -> Node.t Core.String.Map.t
 
-    val all_nodes : t -> Node.t list
+    val all_nodes : t -> Node.t Core.String.Map.t
 
-    val all_keypairs : t -> Signature_lib.Keypair.t list
-
-    val block_producer_keypairs : t -> Signature_lib.Keypair.t list
-
-    val extra_genesis_keypairs : t -> Signature_lib.Keypair.t list
+    val genesis_keypairs : t -> Network_keypair.t Core.String.Map.t
 
     val initialize_infra : logger:Logger.t -> t -> unit Malleable_error.t
   end
@@ -354,47 +350,6 @@ module Dsl = struct
     val ledger_proofs_emitted_since_genesis : num_proofs:int -> t
   end
 
-  module type Util_intf = sig
-    module Engine : Engine.S
-
-    val pub_key_of_node :
-         Engine.Network.Node.t
-      -> Signature_lib.Public_key.Compressed.t Malleable_error.t
-
-    val check_common_prefixes :
-         tolerance:int
-      -> logger:Logger.t
-      -> string list list
-      -> ( unit Malleable_error.Result_accumulator.t
-         , Malleable_error.Hard_fail.t )
-         result
-         Async_kernel.Deferred.t
-
-    val fetch_connectivity_data :
-         logger:Logger.t
-      -> Engine.Network.Node.t list
-      -> ( (Engine.Network.Node.t * (string * string list)) list
-           Malleable_error.Result_accumulator.t
-         , Malleable_error.Hard_fail.t )
-         result
-         Deferred.t
-
-    val assert_peers_completely_connected :
-         (Engine.Network.Node.t * (string * string list)) list
-      -> ( unit Malleable_error.Result_accumulator.t
-         , Malleable_error.Hard_fail.t )
-         result
-         Deferred.t
-
-    val assert_peers_cant_be_partitioned :
-         max_disconnections:int
-      -> (Engine.Network.Node.t * (string * string list)) list
-      -> ( unit Malleable_error.Result_accumulator.t
-         , Malleable_error.Hard_fail.t )
-         result
-         Deferred.t
-  end
-
   module type S = sig
     module Engine : Engine.S
 
@@ -410,8 +365,6 @@ module Dsl = struct
         with module Engine := Engine
          and module Event_router := Event_router
          and module Network_state := Network_state
-
-    module Util : Util_intf with module Engine := Engine
 
     type t
 

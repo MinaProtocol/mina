@@ -152,7 +152,13 @@ module Subscription = struct
             gcloud_key_file_env
     in
     let create_topic name =
-      run_cmd_or_error "." prog [ "pubsub"; "topics"; "create"; name ]
+      run_cmd_or_error "." prog
+        [ "pubsub"
+        ; "topics"
+        ; "create"
+        ; name
+        ; "--message-retention-duration=3d"
+        ]
     in
     let create_subscription name topic =
       run_cmd_or_error "." prog
@@ -164,6 +170,7 @@ module Subscription = struct
         ; topic
         ; "--topic-project"
         ; project_id
+        ; "--expiration-period=3d"
         ]
     in
     let t = resource_names name in
@@ -258,7 +265,7 @@ let parse_event_from_log_entry ~logger ~network log_entry =
   let%bind pod_id =
     find string log_entry [ "resource"; "labels"; "pod_name" ]
   in
-  let%bind node =
+  let%bind _, node =
     Kubernetes_network.lookup_node_by_pod_id network pod_id
     |> Option.value_map ~f:Or_error.return
          ~default:

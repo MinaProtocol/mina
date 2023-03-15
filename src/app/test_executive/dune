@@ -8,10 +8,12 @@
    yojson
    core_kernel
    cmdliner
+   base.base_internalhash_types
    base.caml
    async_unix
    integers
    unsigned_extended
+   stdio
    ;; local libraries
    with_hash
    data_hash_lib
@@ -37,6 +39,8 @@
    pipe_lib
    user_command_input
    participating_state
+   graph_algorithms
+   visualization
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_jane ppx_deriving_yojson ppx_coda ppx_version)))

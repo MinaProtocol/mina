@@ -5,6 +5,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Engine
   open Dsl
 
+  open Test_common.Make (Inputs)
+
   (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
   type network = Network.t
 
@@ -14,14 +16,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
-    let open Test_config.Wallet in
     { default with
       requires_graphql = true
-    ; block_producers =
-        [ { balance = "1000"; timing = Untimed }
-        ; { balance = "1000"; timing = Untimed }
+    ; genesis_ledger =
+        [ { account_name = "node-a-key"; balance = "1000"; timing = Untimed }
+        ; { account_name = "node-b-key"; balance = "1000"; timing = Untimed }
         ]
-    ; num_snark_workers = 0
+    ; block_producers =
+        [ { node_name = "node-a"; account_name = "node-a-key" }
+        ; { node_name = "node-b"; account_name = "node-b-key" }
+        ]
     }
 
   let run network t =
@@ -30,17 +34,25 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (* fee for user commands *)
     let fee = Currency.Fee.of_int 10_000_000 in
     let all_nodes = Network.all_nodes network in
-    let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
-    let[@warning "-8"] [ node_a; node_b ] = Network.block_producers network in
+    let%bind () =
+      wait_for t
+        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
+    in
+    let node_a =
+      Core.String.Map.find_exn (Network.block_producers network) "node-a"
+    in
+    let node_b =
+      Core.String.Map.find_exn (Network.block_producers network) "node-b"
+    in
     let%bind () =
       section "delegate all mina currency from node_b to node_a"
         (let delegation_receiver = node_a in
          let%bind delegation_receiver_pub_key =
-           Util.pub_key_of_node delegation_receiver
+           pub_key_of_node delegation_receiver
          in
          let delegation_sender = node_b in
          let%bind delegation_sender_pub_key =
-           Util.pub_key_of_node delegation_sender
+           pub_key_of_node delegation_sender
          in
          let%bind { hash; _ } =
            Network.Node.must_send_delegation ~logger delegation_sender

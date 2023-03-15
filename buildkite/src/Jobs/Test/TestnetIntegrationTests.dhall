@@ -7,8 +7,8 @@ let TestExecutive = ../../Command/TestExecutive.dhall
 
 let dependsOn = [
     { name = "TestnetIntegrationTests", key = "build-test-executive" },
-    { name = "MinaArtifactBuster", key = "daemon-devnet-buster-docker-image" },
-    { name = "MinaArtifactBuster", key = "archive-buster-docker-image" }
+    { name = "MinaArtifactBullseye", key = "daemon-devnet-bullseye-docker-image" },
+    { name = "MinaArtifactBullseye", key = "archive-bullseye-docker-image" }
 ]
 
 in Pipeline.build Pipeline.Config::{
@@ -32,6 +32,7 @@ in Pipeline.build Pipeline.Config::{
     TestExecutive.execute "gossip-consis" dependsOn,
     TestExecutive.execute "opt-block-prod" dependsOn,
     TestExecutive.execute "medium-bootstrap" dependsOn,
+    TestExecutive.execute "snark" dependsOn,
     TestExecutive.execute "archive-node" dependsOn
 
   ]

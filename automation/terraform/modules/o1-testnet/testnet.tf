@@ -66,9 +66,10 @@ module "kubernetes_testnet" {
     {
       name                   = bp.name
       class                  = bp.class
-      id                     = bp.total_node_index
+      # id                     = bp.total_node_index
+      keypair_name     = "${bp.class}-${bp.unique_node_index}-key"
+      privkey_password = "naughty blue worm"
       external_port          = bp.port
-      private_key_secret     = "${bp.class}-${bp.unique_node_index}-key"
       libp2p_secret          = ""
       enable_gossip_flooding = false
       run_with_user_agent    = bp.class =="whale" ? false : ( var.nodes_with_user_agent == [] ? true : contains(var.nodes_with_user_agent, bp.name) )
@@ -81,15 +82,18 @@ module "kubernetes_testnet" {
     }
   ]
 
+  seed_external_port = 10001
+
   seed_configs = [
     for i in range(var.seed_count) : {
       name               = local.seed_static_peers[i].name
       class              = "seed"
-      id                 = i + 1
-      external_port      = local.seed_static_peers[i].port
+      # id                 = i + 1
+      # external_port      = local.seed_static_peers[i].port
+      libp2p_secret      = "seed-${i + 1}-key"
+      libp2p_secret_pw      = "naughty blue worm"
       external_ip        = google_compute_address.seed_static_ip[i].address
       # private_key_secret = "online-seeds-account-${i + 1}-key"
-      libp2p_secret      = "seed-${i + 1}-key"
       enableArchive      = length(local.archive_node_configs) > 0
       archiveAddress     = length(local.archive_node_configs) > 0 ? "${element(local.archive_node_configs, i)["name"]}:${element(local.archive_node_configs, i)["serverPort"]}" : ""
     }

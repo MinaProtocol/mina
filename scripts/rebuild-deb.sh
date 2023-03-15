@@ -23,7 +23,10 @@ cd "${SCRIPTPATH}/../_build"
 # Set dependencies based on debian release
 SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata"
 case "${MINA_DEB_CODENAME}" in
-  bullseye)
+  bookworm|jammy)
+    DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8"
+    ;;
+  bullseye|focal)
     DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8"
     ;;
   buster)
@@ -31,9 +34,6 @@ case "${MINA_DEB_CODENAME}" in
     ;;
   stretch|bionic)
     DAEMON_DEPS=", libffi6, libjemalloc1, libpq-dev, libprocps6"
-    ;;
-  focal)
-    DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8"
     ;;
   *)
     echo "Unknown Debian codename provided: ${MINA_DEB_CODENAME}"; exit 1
@@ -69,6 +69,7 @@ echo "Control File:"
 cat "${BUILDDIR}/DEBIAN/control"
 
 # Binaries
+rm -rf "${BUILDDIR}/usr/local/bin"
 mkdir -p "${BUILDDIR}/usr/local/bin"
 cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
 cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
@@ -84,6 +85,8 @@ fakeroot dpkg-deb --build "${BUILDDIR}" mina-generate-keypair_${MINA_DEB_VERSION
 ls -lh mina*.deb
 
 ##################################### END GENERATE KEYPAIR PACKAGE #######################################
+
+##################################### GENERATE MINA MAINNET PACKAGE #######################################
 
 ###### deb without the proving keys
 echo "------------------------------------------------------------"
@@ -126,7 +129,7 @@ chmod +w $p2p_path
 # Only for nix builds
 # patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
 chmod -w $p2p_path
-cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
+# cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
 cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/mina-create-genesis"
 
 mkdir -p "${BUILDDIR}/usr/lib/systemd/user"
@@ -169,6 +172,10 @@ find "${BUILDDIR}"
 echo "------------------------------------------------------------"
 fakeroot dpkg-deb --build "${BUILDDIR}" mina-mainnet_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
+
+##################################### END GENERATE MINA MAINNET PACKAGE #######################################
+
+##################################### GENERATE MINA DEVNET PACKAGE #######################################
 
 ###### deb with testnet signatures
 echo "------------------------------------------------------------"
@@ -218,6 +225,8 @@ find "${BUILDDIR}"
 echo "------------------------------------------------------------"
 fakeroot dpkg-deb --build "${BUILDDIR}" mina-devnet_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
+
+##################################### END GENERATE MINA DEVNET PACKAGE #######################################
 
 # TODO: Find a way to package keys properly without blocking/locking in CI
 # TODO: Keys should be their own package, which this 'non-noprovingkeys' deb depends on
