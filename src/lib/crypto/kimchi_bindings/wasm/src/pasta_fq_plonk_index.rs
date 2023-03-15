@@ -1,5 +1,4 @@
 use ark_poly::EvaluationDomain;
-use kimchi::circuits::lookup::index;
 
 use crate::gate_vector::fq::WasmGateVector;
 use crate::srs::fq::WasmFqSrs as WasmSrs;

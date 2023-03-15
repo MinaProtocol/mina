@@ -604,7 +604,7 @@ macro_rules! impl_proof {
                 return match maybe_proof {
                     Ok(proof) => Ok((proof, public_input).into()),
                     Err(err) => {
-                        panic!(err.to_string())
+                        panic!("{}", err.to_string())
                         // TODO: make an error here bubble up properly
                         // right now the error gets swallowed by jsoo somewhere
                         // the panic! hook is the best we can do because it logs the error + originating line number
