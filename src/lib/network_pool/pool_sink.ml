@@ -166,7 +166,8 @@ module Base
                     "Validation timed out on transaction/snark pool diff"
                     ~metadata:
                       [ ("msg", Diff.to_yojson (Envelope.Incoming.data env')) ]
-              )
+              | Some _ ->
+                  () )
         | _ ->
             () ) ;
         if Throttle.num_jobs_waiting_to_start throttle > max_waiting_jobs then
