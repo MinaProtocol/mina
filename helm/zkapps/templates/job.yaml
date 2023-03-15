@@ -9,6 +9,7 @@ spec:
       labels:
         app:  {{ include "mina-sample-zkapp.job-name" . }}
     spec:
+      ttlSecondsAfterFinished: 300
       runtimeClassName: kata-clh
       initContainers:
       - name: controller-is-ready
@@ -24,7 +25,7 @@ spec:
         args:
         - job
         - --controller=http://{{ include "mina-sample-zkapp.service-name" . }}/
-        - --count={{ add (div (sub ($.Values.transactionCount | default 1) 1) ($.Values.parallelism | default 1)) 1 }}
+        - --count={{ $.Values.count | default 1 }}
         resources:
           requests:
             {{ if $.Values.cpu }}
