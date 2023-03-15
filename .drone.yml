@@ -30,8 +30,8 @@ steps:
   image: plugins/docker
   settings:
     build_args:
-    - MINA_BRANCH: ${MINA_BRANCH:-${DRONE_BRANCH}}
-    - MINA_REPO: ${MINA_REPO:-${DRONE_REPO_LINK}}
+    - MINA_BRANCH=${MINA_BRANCH:-${DRONE_BRANCH}}
+    - MINA_REPO=${MINA_REPO:-${DRONE_REPO_LINK}}
     dockerfile: ./dockerfiles/stages/merged
     password:
       from_secret: docker_hub_password
