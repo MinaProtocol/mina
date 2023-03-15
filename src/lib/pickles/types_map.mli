@@ -1,7 +1,7 @@
 open Pickles_types
 
 type inner_curve_var =
-  Kimchi_backend.Impls.Step.field_var * Kimchi_backend.Impls.Step.field_var
+  Kimchi_backend.Snarky.Step.field_var * Kimchi_backend.Snarky.Step.field_var
 
 module Basic : sig
   type ('var, 'value, 'n1, 'n2) t =

@@ -5,7 +5,7 @@ open Core_kernel
 
 (* instantiate snarky for Vesta *)
 
-module Impl = Kimchi_backend.Impls.Step
+module Impl = Kimchi_backend.Snarky.Step
 
 (* to get better stack traces in Rust *)
 

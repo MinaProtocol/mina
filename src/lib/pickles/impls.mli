@@ -1,9 +1,9 @@
 open Pickles_types
 
-module Wrap_impl : module type of Kimchi_backend.Impls.Wrap
+module Wrap_impl : module type of Kimchi_backend.Snarky.Wrap
 
 module Step : sig
-  module Impl : module type of Kimchi_backend.Impls.Step
+  module Impl : module type of Kimchi_backend.Snarky.Step
 
   include module type of Impl
 
@@ -111,7 +111,7 @@ module Step : sig
 end
 
 module Wrap : sig
-  module Impl : module type of Kimchi_backend.Impls.Wrap
+  module Impl : module type of Kimchi_backend.Snarky.Wrap
 
   include module type of Impl
 
@@ -141,7 +141,7 @@ module Wrap : sig
 
     val typ :
       ( Impl.Field.t
-      , Kimchi_backend.Impls.Step.Field.Constant.t
+      , Kimchi_backend.Snarky.Step.Field.Constant.t
       , Impl.Field.Constant.t
       , Impl.field_var
       , Impl.run_state )

@@ -208,7 +208,7 @@ module Pasta : sig
 end
 
 (** Instantiations of Snarky with the pasta curves. *)
-module Impls : sig
+module Snarky : sig
   module Tick : sig
     include module type of Pasta.Vesta_based_plonk
 

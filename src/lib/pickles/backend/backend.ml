@@ -1,3 +1,2 @@
-module Tick = Kimchi_backend.Impls.Tick
-
-module Tock = Kimchi_backend.Impls.Tock
+module Tick = Kimchi_backend.Snarky.Tick
+module Tock = Kimchi_backend.Snarky.Tock

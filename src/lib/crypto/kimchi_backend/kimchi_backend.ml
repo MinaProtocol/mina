@@ -16,7 +16,7 @@ end
 
 (* TODO: there's actually a tests.ml file doing this, delete this *)
 
-module Impls = struct
+module Snarky = struct
   module Tick = struct
     include Pasta.Vesta_based_plonk
     module Inner_curve = Pasta.Pasta.Pallas
