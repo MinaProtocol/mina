@@ -246,6 +246,8 @@ steps:
 kind: pipeline
 name: finish
 type: docker
+clone:
+  depth: 1
 depends_on: [ run-zkapps ]
 trigger:
   event: [ custom ]
@@ -276,9 +278,10 @@ steps:
   - |
     while true; do
       SLOT=$$($${OM}/kube-utils.sh mina-graphql deployment/node1 'query { bestChain(maxLength: 1) { protocolState { consensusState { slotSinceGenesis } } } }' | jq -r '.data.bestChain[0].protocolState.consensusState.slotSinceGenesis')
-      if [ -n "$SLOT" ] && [ "$SLOT" -gt "$MAX_SLOT" ]; then
+      if [ -n "$SLOT" ] && [ "$SLOT" -ge "$MAX_SLOT" ]; then
         echo "Reached slot $MAX_SLOT"
         exit
+      fi
       sleep 20
     done
 
