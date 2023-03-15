@@ -1,12 +1,13 @@
+(** The modules here should only be use to instantiate Snarky, and not directly. *)
+
 module Basic = Kimchi_pasta_basic
 
 module Pallas_based_plonk = struct
+  let field_size = Pallas_based_plonk.field_size
+
   module Field = Pallas_based_plonk.Field
   module Curve = Pallas_based_plonk.Curve
   module Bigint = Pallas_based_plonk.Bigint
-
-  let field_size = Pallas_based_plonk.field_size
-
   module Verification_key = Pallas_based_plonk.Verification_key
   module Rounds_vector = Pallas_based_plonk.Rounds_vector
   module Rounds = Pallas_based_plonk.Rounds
@@ -48,12 +49,11 @@ module Pallas_based_plonk = struct
 end
 
 module Vesta_based_plonk = struct
+  let field_size = Vesta_based_plonk.field_size
+
   module Field = Vesta_based_plonk.Field
   module Curve = Vesta_based_plonk.Curve
   module Bigint = Vesta_based_plonk.Bigint
-
-  let field_size = Vesta_based_plonk.field_size
-
   module Verification_key = Vesta_based_plonk.Verification_key
   module Rounds_vector = Vesta_based_plonk.Rounds_vector
   module Rounds = Vesta_based_plonk.Rounds

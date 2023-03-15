@@ -147,83 +147,56 @@ module Kimchi_backend_common : sig
   module Scalar_challenge = Kimchi_backend_common.Scalar_challenge
 end
 
-module Field = Kimchi_backend_common.Field
-
 module Pasta : sig
   module Basic : sig
     module Bigint256 = Kimchi_pasta.Basic.Bigint256
     module Fp = Kimchi_pasta.Basic.Fp
   end
-
-  (* pickles required *)
-  module Pallas_based_plonk : sig
-    (* all pickles required *)
-    module Field = Kimchi_pasta.Pallas_based_plonk.Field
-    module Curve = Kimchi_pasta.Pallas_based_plonk.Curve
-    module Bigint = Kimchi_pasta.Pallas_based_plonk.Bigint
-
-    val field_size : Pasta_bindings.BigInt256.t
-
-    module Verification_key = Kimchi_pasta.Pallas_based_plonk.Verification_key
-    module Rounds_vector = Kimchi_pasta.Pallas_based_plonk.Rounds_vector
-    module Rounds = Kimchi_pasta.Pallas_based_plonk.Rounds
-    module Keypair = Kimchi_pasta.Pallas_based_plonk.Keypair
-    module Proof = Kimchi_pasta.Pallas_based_plonk.Proof
-    module Proving_key = Kimchi_pasta.Pallas_based_plonk.Proving_key
-    module Oracles = Kimchi_pasta.Pallas_based_plonk.Oracles
-    module Cvar = Kimchi_pasta.Pallas_based_plonk.Cvar
-    module Constraint_system = Kimchi_pasta.Pallas_based_plonk.Constraint_system
-    module Run_state = Kimchi_pasta.Pallas_based_plonk.Run_state
-  end
-
-  (* module Pasta = Kimchi_pasta.Pasta *)
-  module Pasta : sig
-    (* pickles required *)
-    module Vesta = Kimchi_pasta.Pasta.Vesta
-
-    (* pickles required *)
-    module Pallas = Kimchi_pasta.Pasta.Pallas
-  end
-
-  (* pickles required *)
-  module Vesta_based_plonk : sig
-    (* all pickles required *)
-    module Field = Kimchi_pasta.Vesta_based_plonk.Field
-    module Curve = Kimchi_pasta.Vesta_based_plonk.Curve
-    module Bigint = Kimchi_pasta.Vesta_based_plonk.Bigint
-
-    val field_size : Pasta_bindings.BigInt256.t
-
-    module Verification_key = Kimchi_pasta.Vesta_based_plonk.Verification_key
-    module Rounds_vector = Kimchi_pasta.Vesta_based_plonk.Rounds_vector
-    module Rounds = Kimchi_pasta.Vesta_based_plonk.Rounds
-    module Keypair = Kimchi_pasta.Vesta_based_plonk.Keypair
-    module Proof = Kimchi_pasta.Vesta_based_plonk.Proof
-    module Proving_key = Kimchi_pasta.Vesta_based_plonk.Proving_key
-    module Oracles = Kimchi_pasta.Vesta_based_plonk.Oracles
-    module Cvar = Kimchi_pasta.Vesta_based_plonk.Cvar
-    module Constraint_system = Kimchi_pasta.Vesta_based_plonk.Constraint_system
-    module Run_state = Kimchi_pasta.Vesta_based_plonk.Run_state
-  end
 end
+
+module Field = Kimchi_backend_common.Field
 
 (** Instantiations of Snarky with the pasta curves. *)
 module Snarky : sig
   module Tick : sig
-    include module type of Pasta.Vesta_based_plonk
+    val field_size : Pasta_bindings.BigInt256.t
 
-    module Inner_curve = Pasta.Pasta.Pallas
+    module Inner_curve = Kimchi_pasta.Pasta.Pallas
+    module Field = Kimchi_pasta_basic.Fp
+    module Curve = Kimchi_pasta_basic.Vesta
+    module Bigint = Kimchi_pasta.Vesta_based_plonk.Bigint
+    module Verification_key = Kimchi_pasta.Vesta_based_plonk.Verification_key
+    module Rounds_vector = Kimchi_pasta_basic.Rounds.Step_vector
+    module Rounds = Kimchi_pasta_basic.Rounds.Step
+    module Keypair = Kimchi_pasta.Vesta_based_plonk.Keypair
+    module Proof = Kimchi_pasta.Vesta_based_plonk.Proof
+    module Proving_key = Kimchi_pasta.Vesta_based_plonk.Proving_key
+    module Oracles = Kimchi_pasta.Vesta_based_plonk.Oracles
   end
 
   module Tock : sig
-    include module type of Pasta.Pallas_based_plonk
+    val field_size : Pasta_bindings.BigInt256.t
 
-    module Inner_curve = Pasta.Pasta.Vesta
+    module Inner_curve = Kimchi_pasta.Pasta.Vesta
+    module Field = Kimchi_pasta_basic.Fq
+    module Curve = Kimchi_pasta_basic.Pallas
+    module Bigint = Kimchi_pasta.Pallas_based_plonk.Bigint
+    module Verification_key = Kimchi_pasta.Pallas_based_plonk.Verification_key
+    module Rounds_vector = Kimchi_pasta_basic.Rounds.Wrap_vector
+    module Rounds = Kimchi_pasta_basic.Rounds.Wrap
+    module Keypair = Kimchi_pasta.Pallas_based_plonk.Keypair
+    module Proof = Kimchi_pasta.Pallas_based_plonk.Proof
+    module Proving_key = Kimchi_pasta.Pallas_based_plonk.Proving_key
+    module Oracles = Kimchi_pasta.Pallas_based_plonk.Oracles
   end
 
   (** Instantiation of Snarky on the Tick / Step / Vesta curve. *)
-  module Step : module type of Snarky_backendless.Snark.Run.Make (Tick)
+  module Step :
+      module type of
+        Snarky_backendless.Snark.Run.Make (Kimchi_pasta.Vesta_based_plonk)
 
   (** Instantiation of Snarky on the Tock / Wrap / Pallas curve. *)
-  module Wrap : module type of Snarky_backendless.Snark.Run.Make (Tock)
+  module Wrap :
+      module type of
+        Snarky_backendless.Snark.Run.Make (Kimchi_pasta.Pallas_based_plonk)
 end

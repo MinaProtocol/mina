@@ -12,10 +12,6 @@ module Pasta = struct
   module Vesta_based_plonk = Kimchi_pasta.Vesta_based_plonk
 end
 
-(* The following is mostly unused, but we do this to test that we can instantiate snarky with the backend here (instead of failing later) *)
-
-(* TODO: there's actually a tests.ml file doing this, delete this *)
-
 module Snarky = struct
   module Tick = struct
     include Pasta.Vesta_based_plonk
@@ -27,8 +23,12 @@ module Snarky = struct
     module Inner_curve = Pasta.Pasta.Vesta
   end
 
-  module Step_monad = Snarky_backendless.Snark.Make (Tick)
-  module Wrap_monad = Snarky_backendless.Snark.Make (Tock)
-  module Step = Snarky_backendless.Snark.Run.Make (Tick)
-  module Wrap = Snarky_backendless.Snark.Run.Make (Tock)
+  module Step_monad =
+    Snarky_backendless.Snark.Make (Kimchi_pasta.Vesta_based_plonk)
+  module Wrap_monad =
+    Snarky_backendless.Snark.Make (Kimchi_pasta.Pallas_based_plonk)
+  module Step =
+    Snarky_backendless.Snark.Run.Make (Kimchi_pasta.Vesta_based_plonk)
+  module Wrap =
+    Snarky_backendless.Snark.Run.Make (Kimchi_pasta.Pallas_based_plonk)
 end
