@@ -44,9 +44,12 @@ end
 
 module Make
     (Inputs : Intf.Wrap_main_inputs.S
-                with type Impl.field = Backend.Tock.Field.t
-                 and type Impl.Bigint.t = Backend.Tock.Bigint.t
-                 and type Inner_curve.Constant.Scalar.t = Backend.Tick.Field.t) =
+                with type Impl.field = Kimchi_backend.Snarky.Wrap.field
+                 and type Impl.field_var = Kimchi_backend.Snarky.Wrap.field_var
+                 and type Impl.run_state = Kimchi_backend.Snarky.Wrap.run_state
+                 and type Impl.Bigint.t = Kimchi_backend.Snarky.Wrap.Bigint.t
+                 and type Inner_curve.Constant.Scalar.t =
+                  Kimchi_backend.Snarky.Tick.Field.t) =
 struct
   open Inputs
   open Impl
@@ -201,7 +204,7 @@ struct
         keys
         ~f:(fun b key -> map key ~f:(fun g -> Double.map g ~f:(( * ) (b :> t))))
       |> Vector.reduce_exn ~f:(map2 ~f:(Double.map2 ~f:( + )))
-      |> map ~f:(fun g -> Double.map ~f:(Util.seal (module Impl)) g)
+      |> map ~f:(fun g -> Double.map ~f:Impl.seal g)
 
   (* TODO: Unify with the code in step_verifier *)
   let lagrange (type n)
@@ -287,7 +290,7 @@ struct
                          Field.((b :> t) * x, (b :> t) * y) ) )
               |> Vector.reduce_exn
                    ~f:(Double.map2 ~f:(Double.map2 ~f:Field.( + )))
-              |> Double.map ~f:(Double.map ~f:(Util.seal (module Impl))) )
+              |> Double.map ~f:(Double.map ~f:Impl.seal) )
 
   let h_precomp =
     Lazy.map ~f:Inner_curve.Scaling_precomputation.create Generators.h
@@ -552,19 +555,21 @@ struct
               Array.(to_list (mapi public_input ~f:(fun i t -> (i, t))))
               ~f:(fun (i, t) ->
                 match t with
-                | `Field (Constant c, _) ->
-                    First
-                      ( if Field.Constant.(equal zero) c then None
-                      else if Field.Constant.(equal one) c then
-                        Some (lagrange ~domain srs i)
-                      else
-                        Some
-                          (scaled_lagrange ~domain
-                             (Inner_curve.Constant.Scalar.project
-                                (Field.Constant.unpack c) )
-                             srs i ) )
-                | `Field x ->
-                    Second (i, x) )
+                | `Field ((c, _) as x) -> (
+                    match Field.to_constant c with
+                    | Some c ->
+                        First
+                          ( if Field.Constant.(equal zero) c then None
+                          else if Field.Constant.(equal one) c then
+                            Some (lagrange ~domain srs i)
+                          else
+                            Some
+                              (scaled_lagrange ~domain
+                                 (Inner_curve.Constant.Scalar.project
+                                    (Field.Constant.unpack c) )
+                                 srs i ) )
+                    | None ->
+                        Second (i, x) ) )
           in
           with_label __LOC__ (fun () ->
               let terms =
@@ -792,10 +797,9 @@ struct
 
   let map_plonk_to_field plonk =
     Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
-      ~f:(Util.seal (module Impl))
-      ~scalar:scalar_to_field plonk
+      ~f:Impl.seal ~scalar:scalar_to_field plonk
     |> Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_fields
-         ~f:(Shifted_value.Type2.map ~f:(Util.seal (module Impl)))
+         ~f:(Shifted_value.Type2.map ~f:Impl.seal)
 
   module Plonk_checks = struct
     include Plonk_checks

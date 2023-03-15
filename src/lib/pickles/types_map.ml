@@ -7,8 +7,7 @@ open Backend
    data.
 *)
 type inner_curve_var =
-  Tick.Field.t Snarky_backendless.Cvar.t
-  * Tick.Field.t Snarky_backendless.Cvar.t
+  Kimchi_backend.Snarky.Step.Field.t * Kimchi_backend.Snarky.Step.Field.t
 
 module Basic = struct
   type ('var, 'value, 'n1, 'n2) t =
@@ -140,7 +139,8 @@ module For_step = struct
     ; wrap_domain :
         [ `Known of Domain.t
         | `Side_loaded of
-          Impls.Step.field Pickles_base.Proofs_verified.One_hot.Checked.t ]
+          Impls.Step.field_var Pickles_base.Proofs_verified.One_hot.Checked.t
+        ]
     ; step_domains : [ `Known of (Domains.t, 'branches) Vector.t | `Side_loaded ]
     ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
     }

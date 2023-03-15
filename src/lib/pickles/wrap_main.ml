@@ -32,7 +32,7 @@ module Old_bulletproof_chals = struct
   type t =
     | T :
         'max_local_max_proofs_verified Nat.t
-        * ('field_var, 'max_local_max_proofs_verified) Challenges_vector.t
+        * 'max_local_max_proofs_verified Challenges_vector.t
         -> t
 end
 

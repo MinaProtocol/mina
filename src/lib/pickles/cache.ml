@@ -7,7 +7,7 @@ module Step = struct
         Type_equal.Id.Uid.t
         * Snark_keys_header.t
         * int
-        * Backend.Tick.Constraint_system.t
+        * Kimchi_backend.Snarky.Step.Constraint_system.t
 
       let to_string : t -> _ = function
         | _id, header, n, h ->
@@ -144,7 +144,7 @@ module Wrap = struct
       type t =
         Type_equal.Id.Uid.t
         * Snark_keys_header.t
-        * Backend.Tock.Constraint_system.t
+        * Kimchi_backend.Snarky.Wrap.Constraint_system.t
 
       let to_string : t -> _ = function
         | _id, header, h ->
@@ -251,7 +251,7 @@ module Wrap = struct
              let vk : Vk.t =
                { index = vk
                ; commitments =
-                   Kimchi_pasta.Pallas_based_plonk.Keypair.vk_commitments vk
+                   Kimchi_backend.Snarky.Tock.Keypair.vk_commitments vk
                ; data =
                    (let open Kimchi_bindings.Protocol.Index.Fq in
                    { constraints = domain_d1_size pk.index })

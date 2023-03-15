@@ -29,8 +29,7 @@ open Impl
 (* Debug helper to convert wrap circuit field element to a hex string *)
 let read_wrap_circuit_field_element_as_hex fe =
   let prover_fe = As_prover.read Field.typ fe in
-  Kimchi_backend.Pasta.Pallas_based_plonk.(
-    Bigint.to_hex (Field.to_bigint prover_fe))
+  Kimchi_backend.Snarky.Tock.(Bigint.to_hex (Field.to_bigint prover_fe))
 
 module Other_field = struct
   type t = Impls.Step.Field.Constant.t [@@deriving sexp]

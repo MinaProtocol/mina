@@ -163,7 +163,7 @@ module H1 = struct
 
     type field_var
 
-    type state
+    type run_state
   end)
   (F : T1)
   (Var : T1)
@@ -174,7 +174,7 @@ module H1 = struct
          , 'a Val.t
          , Impl.field
          , Impl.field_var
-         , Impl.state )
+         , Impl.run_state )
          Snarky_backendless.Typ.t
   end) =
   struct
@@ -185,7 +185,7 @@ module H1 = struct
            , xs T(Val).t
            , Impl.field
            , Impl.field_var
-           , Impl.state )
+           , Impl.run_state )
            Snarky_backendless.Typ.t =
       let transport, transport_var, tuple2, unit =
         Snarky_backendless.Typ.(transport, transport_var, tuple2, unit)
@@ -261,11 +261,11 @@ module H2 = struct
 
     type field_var
 
-    type state
+    type run_state
 
     module Typ : sig
       type ('var, 'value) t =
-        ('var, 'value, field, field_var, state) Snarky_backendless.Typ.t
+        ('var, 'value, field, field_var, run_state) Snarky_backendless.Typ.t
     end
   end) =
   struct
@@ -279,7 +279,7 @@ module H2 = struct
            , values H1.T(Id).t
            , Impl.field
            , Impl.field_var
-           , Impl.state )
+           , Impl.run_state )
            Snarky_backendless.Typ.t =
      fun ts ->
       match ts with
@@ -706,7 +706,7 @@ module H4 = struct
 
     type field_var
 
-    type state
+    type run_state
   end)
   (F : T4)
   (Var : T3)
@@ -717,7 +717,7 @@ module H4 = struct
          , ('value, 'n1, 'n2) Val.t
          , Impl.field
          , Impl.field_var
-         , Impl.state )
+         , Impl.run_state )
          Snarky_backendless.Typ.t
   end) =
   struct
@@ -731,7 +731,7 @@ module H4 = struct
            , (values, ns1, ns2) H3.T(Val).t
            , Impl.field
            , Impl.field_var
-           , Impl.state )
+           , Impl.run_state )
            Snarky_backendless.Typ.t =
      fun ts ->
       match ts with
@@ -858,7 +858,7 @@ module H6 = struct
 
     type field_var
 
-    type state
+    type run_state
   end)
   (F : T6)
   (Var : T4)
@@ -869,7 +869,7 @@ module H6 = struct
          , ('value, 'ret_value, 'n1, 'n2) Val.t
          , Impl.field
          , Impl.field_var
-         , Impl.state )
+         , Impl.run_state )
          Snarky_backendless.Typ.t
   end) =
   struct
@@ -883,7 +883,7 @@ module H6 = struct
            , (values, ret_values, ns1, ns2) H4.T(Val).t
            , Impl.field
            , Impl.field_var
-           , Impl.state )
+           , Impl.run_state )
            Snarky_backendless.Typ.t =
      fun ts ->
       match ts with

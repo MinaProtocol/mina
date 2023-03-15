@@ -227,7 +227,8 @@ module Tick = struct
 
   module Util = Snark_util.Make (Tick0)
 
-  let m : Run.field Snarky_backendless.Snark.m = (module Run)
+  let m : (Run.field, Run.field_var, Run.run_state) Snarky_backendless.Snark.m =
+    (module Run)
 
   let make_checked c = Run.make_checked c
 end

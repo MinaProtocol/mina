@@ -27,7 +27,7 @@ module type S = sig
   end
 
   module type Statement_var_intf =
-    Statement_intf with type field := Impls.Step.Field.t
+    Statement_intf with type field := Impls.Step.field_var
 
   module type Statement_value_intf =
     Statement_intf with type field := Impls.Step.field

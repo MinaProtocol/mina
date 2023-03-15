@@ -13,9 +13,13 @@ let lookup_verification_enabled = false
 
 module Make
     (Inputs : Intf.Step_main_inputs.S
-                with type Impl.field = Backend.Tick.Field.t
-                 and type Impl.Bigint.t = Backend.Tick.Bigint.t
-                 and type Inner_curve.Constant.Scalar.t = Backend.Tock.Field.t) =
+                with type Impl.field =
+                  Kimchi_backend.Snarky.Step.Field.Constant.t
+                 and type Impl.field_var = Kimchi_backend.Snarky.Step.Field.t
+                 and type Impl.run_state = Kimchi_backend.Snarky.Step.run_state
+                 and type Impl.Bigint.t = Kimchi_backend.Snarky.Step.Bigint.t
+                 and type Inner_curve.Constant.Scalar.t =
+                  Kimchi_backend.Snarky.Tock.Field.t) =
 struct
   open Inputs
   open Impl
@@ -416,7 +420,7 @@ struct
                     Field.((b :> t) * x, (b :> t) * y) ) )
             |> Vector.reduce_exn
                  ~f:(Vector.map2 ~f:(Double.map2 ~f:Field.( + )))
-            |> Vector.map ~f:(Double.map ~f:(Util.seal (module Impl)))
+            |> Vector.map ~f:(Double.map ~f:Impl.seal)
     in
     let lagrange i =
       select_curve_points ~points_for_domain:(fun d ->
@@ -443,7 +447,9 @@ struct
           (Array.to_list (Array.mapi ~f:(fun i t -> (i, t)) public_input))
           ~f:(fun (i, t) ->
             match t with
-            | `Field (Constant c) | `Packed_bits (Constant c, _) ->
+            | (`Field c | `Packed_bits (c, _))
+              when Option.is_some (Field.to_constant c) ->
+                let c = Option.value_exn (Field.to_constant c) in
                 First
                   ( if Field.Constant.(equal zero) c then None
                   else if Field.Constant.(equal one) c then Some (lagrange i)
@@ -850,7 +856,7 @@ struct
 
   let domain_for_compiled (type branches)
       (domains : (Domains.t, branches) Vector.t)
-      (branch_data : Impl.field Branch_data.Checked.t) :
+      (branch_data : (Impl.field, Impl.field_var) Branch_data.Checked.t) :
       Field.t Plonk_checks.plonk_domain =
     let (T unique_domains) =
       List.map (Vector.to_list domains) ~f:Domains.h
@@ -905,7 +911,7 @@ struct
         , _
         , _
         , _
-        , Field.Constant.t Branch_data.Checked.t
+        , (Field.Constant.t, Field.t) Branch_data.Checked.t
         , _ )
         Types.Wrap.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =

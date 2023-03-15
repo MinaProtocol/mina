@@ -12,7 +12,8 @@ val to_field_checked' :
      ?num_bits:int
   -> (module Snarky_backendless.Snark_intf.Run
         with type field = 'f
-         and type field_var = 'field_var )
+         and type field_var = 'field_var
+         and type run_state = 'state )
   -> 'field_var Import.Scalar_challenge.t
   -> 'field_var * 'field_var * 'field_var
 
@@ -20,7 +21,8 @@ val to_field_checked :
      ?num_bits:int
   -> (module Snarky_backendless.Snark_intf.Run
         with type field = 'f
-         and type field_var = 'field_var )
+         and type field_var = 'field_var
+         and type run_state = 'state )
   -> endo:'f
   -> 'field_var Import.Scalar_challenge.t
   -> 'field_var

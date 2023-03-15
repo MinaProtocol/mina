@@ -91,7 +91,8 @@ module For_step : sig
     ; wrap_domain :
         [ `Known of Import.Domain.t
         | `Side_loaded of
-          Impls.Step.field Pickles_base.Proofs_verified.One_hot.Checked.t ]
+          Impls.Step.field_var Pickles_base.Proofs_verified.One_hot.Checked.t
+        ]
     ; step_domains :
         [ `Known of (Import.Domains.t, 'branches) Pickles_types.Vector.t
         | `Side_loaded ]

@@ -126,7 +126,7 @@ val verify :
   -> sponge_after_index:Step_main_inputs.Sponge.t
   -> lookup_parameters:
        ( Limb_vector.Challenge.Constant.t
-       , Step_main_inputs.Impl.field Limb_vector.Challenge.t
+       , Step_main_inputs.Impl.field_var Limb_vector.Challenge.t
        , 'b Pickles_types.Hlist0.Id.t
        , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
          Pickles_types.Hlist0.Id.t )
@@ -137,19 +137,19 @@ val verify :
   -> wrap_domain:
        [ `Known of Import.Domain.t
        | `Side_loaded of
-         Step_main_inputs.Impl.field
+         Step_main_inputs.Impl.field_var
          Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t ]
   -> wrap_verification_key:
        Step_main_inputs.Inner_curve.t
        Pickles_types.Plonk_verification_key_evals.t
-  -> ( Step_main_inputs.Impl.field Limb_vector.Challenge.t
-     , Step_main_inputs.Impl.field Limb_vector.Challenge.t
+  -> ( Step_main_inputs.Impl.field_var Limb_vector.Challenge.t
+     , Step_main_inputs.Impl.field_var Limb_vector.Challenge.t
        Composition_types.Scalar_challenge.t
      , Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
      , ( Step_main_inputs.Impl.Field.t Pickles_types.Shifted_value.Type1.t
        , Step_main_inputs.Impl.Boolean.var )
        Pickles_types.Plonk_types.Opt.t
-     , ( Step_main_inputs.Impl.field Limb_vector.Challenge.t
+     , ( Step_main_inputs.Impl.field_var Limb_vector.Challenge.t
          Composition_types.Scalar_challenge.t
          Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
          .Lookup
@@ -161,7 +161,7 @@ val verify :
      , Step_main_inputs.Impl.field_var
      , Step_main_inputs.Impl.field_var
      , Step_main_inputs.Impl.field_var
-     , ( Step_main_inputs.Impl.field Limb_vector.Challenge.t
+     , ( Step_main_inputs.Impl.field_var Limb_vector.Challenge.t
          Kimchi_backend_common.Scalar_challenge.t
          Composition_types.Bulletproof_challenge.t
        , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )

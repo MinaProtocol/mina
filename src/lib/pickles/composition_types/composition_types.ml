@@ -7,7 +7,8 @@ module Spec = Spec
 module Opt = Plonk_types.Opt
 open Core_kernel
 
-type ('f, 'field_var, 'state) impl = ('f, 'field_var, 'state) Snarky_backendless.Snark0.m
+type ('f, 'field_var, 'state) impl =
+  ('f, 'field_var, 'state) Snarky_backendless.Snark0.m
 
 let index_to_field_elements =
   Pickles_base.Side_loaded_verification_key.index_to_field_elements
@@ -798,7 +799,8 @@ module Wrap = struct
     let opt_spec (type f field_var state)
         (module Impl : Snarky_backendless.Snark_intf.Run
           with type field = f
-           and type field_var = field_var and type run_state = state ) { zero = { value; var }; use } =
+           and type field_var = field_var
+           and type run_state = state ) { zero = { value; var }; use } =
       Spec.T.Opt
         { inner = Struct [ Scalar Challenge ]
         ; flag = use
@@ -1591,7 +1593,7 @@ module Wrap_bp_vec = Backend.Tock.Rounds_vector
 module Step_bp_vec = Backend.Tick.Rounds_vector
 
 module Challenges_vector = struct
-  type ('field_var, 'n) t = ('field_var Wrap_bp_vec.t, 'n) Vector.t
+  type 'n t = (Kimchi_backend.Snarky.Wrap.field_var Wrap_bp_vec.t, 'n) Vector.t
 
   module Constant = struct
     type 'n t = (Backend.Tock.Field.t Wrap_bp_vec.t, 'n) Vector.t

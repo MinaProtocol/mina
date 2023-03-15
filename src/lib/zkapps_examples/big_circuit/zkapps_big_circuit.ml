@@ -21,7 +21,7 @@ let () =
   let circuit _ _ = big_circuit expected_constraints in
   let cs = constraint_system ~input_typ ~return_typ circuit in
   let num_constraints =
-    Kimchi_backend.Pasta.Vesta_based_plonk.Constraint_system.num_constraints cs
+    Kimchi_backend.Snarky.Tick.Constraint_system.num_constraints cs
   in
   let _witness = generate_witness ~input_typ ~return_typ circuit () in
   if num_constraints < expected_constraints then (

@@ -205,7 +205,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
          , (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.vec
          , ( 'b
-           , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
+           , ( Kimchi_backend.Snarky.Tock.Proof.G.Affine.t
              , 'actual_proofs_verified )
              Pickles_types.Vector.t
            , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -239,7 +239,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            , Composition_types.Digest.Limbs.n )
            Pickles_types.Vector.vec
          , ( 'b
-           , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
+           , ( Kimchi_backend.Snarky.Tock.Proof.G.Affine.t
              , 'actual_proofs_verified )
              Pickles_types.Vector.t
            , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -323,58 +323,9 @@ struct
     (* TODO Think this is right.. *)
   end
 
-  let log_step main typ name index =
-    let module Constraints = Snarky_log.Constraints (Impls.Step.Internal_Basic) in
-    let log =
-      let weight =
-        let sys = Backend.Tick.Constraint_system.create () in
-        fun ({ annotation; basic } : Impls.Step.Constraint.t) ->
-          let prev =
-            Kimchi_pasta_constraint_system.Vesta_constraint_system.next_row sys
-          in
-          Backend.Tick.Constraint_system.add_constraint sys ?label:annotation
-            basic ;
-          let next =
-            Kimchi_pasta_constraint_system.Vesta_constraint_system.next_row sys
-          in
-          next - prev
-      in
-      Constraints.log ~weight (fun () -> Impls.Step.make_checked main)
-    in
-    if profile_constraints then
-      Snarky_log.to_file (sprintf "step-snark-%s-%d.json" name index) log
+  let log_step main typ name index = failwith "unimplemented"
 
-  let log_wrap main typ name id =
-    let module Constraints = Snarky_log.Constraints (Impls.Wrap.Internal_Basic) in
-    let log =
-      let sys = Backend.Tock.Constraint_system.create () in
-      let weight ({ annotation; basic } : Impls.Wrap.Constraint.t) =
-        let prev =
-          Kimchi_pasta_constraint_system.Pallas_constraint_system.next_row sys
-        in
-        Backend.Tock.Constraint_system.add_constraint sys ?label:annotation
-          basic ;
-        let next =
-          Kimchi_pasta_constraint_system.Pallas_constraint_system.next_row sys
-        in
-        next - prev
-      in
-      let log =
-        Constraints.log ~weight
-          Impls.Wrap.(
-            fun () ->
-              make_checked (fun () : unit ->
-                  let x = with_label __LOC__ (fun () -> exists typ) in
-                  main x () ))
-      in
-      log
-    in
-    if profile_constraints then
-      Snarky_log.to_file
-        (sprintf
-           !"wrap-%s-%{sexp:Type_equal.Id.Uid.t}.json"
-           name (Type_equal.Id.uid id) )
-        log
+  let log_wrap main typ name id = failwith "unimplemented"
 
   let compile :
       type var value prev_varss prev_valuess widthss heightss max_proofs_verified branches.

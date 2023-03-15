@@ -333,7 +333,7 @@ module H1 : sig
 
        type field_var
 
-       type state
+       type run_state
      end)
     (A : T1)
     (Var : T1)
@@ -345,7 +345,7 @@ module H1 : sig
             , 'a Val.t
             , Impl.field
             , Impl.field_var
-            , Impl.state )
+            , Impl.run_state )
             Snarky_backendless.Typ.t
      end)
     -> sig
@@ -355,7 +355,7 @@ module H1 : sig
          , 'xs T(Val).t
          , Impl.field
          , Impl.field_var
-         , Impl.state )
+         , Impl.run_state )
          Snarky_backendless.Typ.t
   end
 end
@@ -423,11 +423,11 @@ module H2 : sig
 
        type field_var
 
-       type state
+       type run_state
 
        module Typ : sig
          type ('var, 'value) t =
-           ('var, 'value, field, field_var, state) Snarky_backendless.Typ.t
+           ('var, 'value, field, field_var, run_state) Snarky_backendless.Typ.t
        end
      end)
     -> sig
@@ -437,7 +437,7 @@ module H2 : sig
          , 'values H1.T(Id).t
          , Impl.field
          , Impl.field_var
-         , Impl.state )
+         , Impl.run_state )
          Snarky_backendless.Typ.t
   end
 end
@@ -817,7 +817,7 @@ module H4 : sig
 
        type field_var
 
-       type state
+       type run_state
      end)
     (A : T4)
     (Var : T3)
@@ -829,7 +829,7 @@ module H4 : sig
             , ('value, 'n1, 'n2) Val.t
             , Impl.field
             , Impl.field_var
-            , Impl.state )
+            , Impl.run_state )
             Snarky_backendless.Typ.t
      end)
     -> sig
@@ -859,7 +859,7 @@ module H4 : sig
          , ('values, 'ns1, 'ns2) H3.T(Val).t
          , Impl.field
          , Impl.field_var
-         , Impl.state )
+         , Impl.run_state )
          Snarky_backendless.Typ.t
   end
 end
@@ -966,7 +966,7 @@ module H6 : sig
 
        type field_var
 
-       type state
+       type run_state
      end)
     (A : T6)
     (Var : T4)
@@ -978,7 +978,7 @@ module H6 : sig
             , ('value, 'ret_value, 'n1, 'n2) Val.t
             , Impl.field
             , Impl.field_var
-            , Impl.state )
+            , Impl.run_state )
             Snarky_backendless.Typ.t
      end)
     -> sig
@@ -1008,7 +1008,7 @@ module H6 : sig
          , ('values, 'ret_values, 'ns1, 'ns2) H4.T(Val).t
          , Impl.field
          , Impl.field_var
-         , Impl.state )
+         , Impl.run_state )
          Snarky_backendless.Typ.t
   end
 end

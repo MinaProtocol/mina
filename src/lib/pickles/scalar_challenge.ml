@@ -156,9 +156,11 @@ let to_field_constant (type f) ~endo
   done ;
   F.((!a * endo) + !b)
 
-let test (type f)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-    ~(endo : f) =
+let test (type f field_var state)
+    (module Impl : Snarky_backendless.Snark_intf.Run
+      with type field = f
+       and type field_var = field_var
+       and type run_state = state ) ~(endo : f) =
   let open Impl in
   let module T = Internal_Basic in
   let n = 128 in

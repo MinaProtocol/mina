@@ -59,7 +59,7 @@ val wrap :
              Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
            , (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.vec
            , ( 'b
-             , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.Stable.V1.t
+             , ( Kimchi_backend.Snarky.Tock.Proof.G.Affine.Stable.V1.t
                , 'actual_proofs_verified )
                Pickles_types.Vector.t
              , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -94,7 +94,7 @@ val wrap :
              , Composition_types.Digest.Limbs.n )
              Pickles_types.Vector.vec
            , ( 'b
-             , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.Stable.V1.t
+             , ( Kimchi_backend.Snarky.Tock.Proof.G.Affine.Stable.V1.t
                , 'actual_proofs_verified )
                Pickles_types.Vector.t
              , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -109,7 +109,7 @@ val wrap :
              Import.Types.Step_bp_vec.t
            , Import.Types.Branch_data.t )
            Import.Types.Wrap.Statement.In_circuit.t )
-  -> Kimchi_pasta.Pallas_based_plonk.Keypair.t
+  -> Kimchi_backend.Snarky.Tock.Keypair.t
   -> ( 'b
      , ( ( Impls.Wrap.Challenge.Constant.t
          , Impls.Wrap.Challenge.Constant.t Import.Types.Scalar_challenge.t

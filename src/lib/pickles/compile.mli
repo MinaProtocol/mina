@@ -23,7 +23,7 @@ module type Statement_intf = sig
 end
 
 module type Statement_var_intf =
-  Statement_intf with type field := Impls.Step.Field.t
+  Statement_intf with type field := Impls.Step.field_var
 
 module type Statement_value_intf =
   Statement_intf with type field := Impls.Step.field
@@ -212,7 +212,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
          , (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.vec
          , ( 'b
-           , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
+           , ( Kimchi_backend.Snarky.Tock.Proof.G.Affine.t
              , 'actual_proofs_verified )
              Pickles_types.Vector.t
            , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -246,7 +246,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            , Composition_types.Digest.Limbs.n )
            Pickles_types.Vector.vec
          , ( 'b
-           , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
+           , ( Kimchi_backend.Snarky.Tock.Proof.G.Affine.t
              , 'actual_proofs_verified )
              Pickles_types.Vector.t
            , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t

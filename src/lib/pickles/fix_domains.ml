@@ -7,9 +7,11 @@ let rough_domains : Domains.t =
   let d = Domain.Pow_2_roots_of_unity 20 in
   { h = d }
 
-let domains (type field)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
-    (Spec.ETyp.T (typ, conv, _conv_inv))
+let domains (type field field_var state)
+    (module Impl : Snarky_backendless.Snark_intf.Run
+      with type field = field
+       and type field_var = field_var
+       and type run_state = state ) (Spec.ETyp.T (typ, conv, _conv_inv))
     (Spec.ETyp.T (return_typ, _ret_conv, ret_conv_inv)) main =
   let main x () = ret_conv_inv (main (conv x)) in
 

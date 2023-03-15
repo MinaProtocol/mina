@@ -313,10 +313,8 @@ module type Statement = sig
   val to_field_elements : t -> field array
 end
 
-module type Statement_var = sig
-  type field_var
+module type Statement_var =
+  Statement with type field := Kimchi_backend.Snarky.Step.Field.t
 
-  include Statement with type field := field_var
-end
-
-module type Statement_value = Statement with type field := Backend.Tick.Field.t
+module type Statement_value =
+  Statement with type field := Kimchi_backend.Snarky.Step.Field.Constant.t

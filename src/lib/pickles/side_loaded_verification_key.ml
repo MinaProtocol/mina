@@ -330,10 +330,10 @@ module Checked = struct
 
   type t =
     { max_proofs_verified :
-        Impl.field Pickles_base.Proofs_verified.One_hot.Checked.t
+        Impl.field_var Pickles_base.Proofs_verified.One_hot.Checked.t
           (** The maximum of all of the [step_widths]. *)
     ; actual_wrap_domain_size :
-        Impl.field Pickles_base.Proofs_verified.One_hot.Checked.t
+        Impl.field_var Pickles_base.Proofs_verified.One_hot.Checked.t
           (** The actual domain size used by the wrap circuit. *)
     ; wrap_index : Inner_curve.t Plonk_verification_key_evals.t
           (** The plonk verification key for the 'wrapping' proof that this key
@@ -351,10 +351,12 @@ module Checked = struct
         _ Random_oracle_input.Chunked.t ->
       let max_proofs_verified =
         Pickles_base.Proofs_verified.One_hot.Checked.to_input
+          (module Impl)
           max_proofs_verified
       in
       let actual_wrap_domain_size =
         Pickles_base.Proofs_verified.One_hot.Checked.to_input
+          (module Impl)
           actual_wrap_domain_size
       in
       List.reduce_exn ~f:append

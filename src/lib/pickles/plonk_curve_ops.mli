@@ -1,7 +1,8 @@
 val add_fast :
      (module Snarky_backendless.Snark_intf.Run
         with type field = 'f
-         and type field_var = 'field_var )
+         and type field_var = 'field_var
+         and type run_state = 'state )
   -> ?check_finite:bool
   -> 'field_var * 'field_var
   -> 'field_var * 'field_var
@@ -13,8 +14,6 @@ module Make
   type var := Impl.field_var
 
   type pair := var Tuple_lib.Double.t
-
-  val seal : pair -> pair
 
   val add_fast : ?check_finite:bool -> var * var -> var * var -> var * var
 
