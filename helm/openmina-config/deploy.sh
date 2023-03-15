@@ -5,6 +5,7 @@ set -e
 . "$(dirname "$0")/common.sh"
 
 HELM_ARGS=""
+SET_ARGS=""
 
 if [ -z "$CHARTS" ]; then
     CHARTS="$(charts)"
@@ -14,7 +15,7 @@ BLOCK_PRODUCER_CHART="$CHARTS/block-producer"
 SNARK_WORKER_CHART="$CHARTS/snark-worker"
 PLAIN_NODE_CHART="$CHARTS/plain-node"
 
-TEMP=$(getopt -o 'hafspwdoP:n:li:' --long 'help,all,frontend,seeds,producers,snarkers,snark-workers,nodes,plain-nodes,optimized,port:,node-port:,namespace:,force,image:,mina-image:,dry-run' -n "$0" -- "$@")
+TEMP=$(getopt -o 'hafspwdoP:n:li:' --long 'help,all,frontend,seeds,producers,snarkers,snark-workers,nodes,plain-nodes,optimized,port:,node-port:,namespace:,force,image:,mina-image:,dry-run,set:' -n "$0" -- "$@")
 
 if [ $? -ne 0 ]; then
 	echo 'Terminating...' >&2
@@ -54,6 +55,7 @@ Options:
    -D, --delete     Deletes all node-related Helm releases
        --dry-run    Do not deploy, just print commands
        --force      Do not ask confirmations
+       --set        Set values to be passed to helm/kubectl
 EOF
 }
 
@@ -128,6 +130,11 @@ while true; do
             shift
             continue
         ;;
+        '--set')
+            SET_ARGS="$SET_ARGS --set=$2"
+            shift 2
+            continue
+        ;;
 		'--')
 			shift
 			break
@@ -195,9 +202,9 @@ operate() {
     case $OP in
         deploy)
             if [ -z "$DRY_RUN" ]; then
-               $HELM upgrade --install "$NAME" "$@"
+               $HELM upgrade --install "$NAME" $SET_ARGS "$@"
             else
-               echo $HELM upgrade --install "$NAME" "$@"
+               echo $HELM upgrade --install "$NAME" $SET_ARGS "$@"
             fi
         ;;
         lint)
