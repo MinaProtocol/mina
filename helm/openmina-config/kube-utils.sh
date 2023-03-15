@@ -39,7 +39,8 @@ mina_exec() {
 mina_graphql() {
     RESOURCE=$1
     shift
-    mina_exec "$RESOURCE" curl --silent --show-error --data "{\"query\": \"$*\"}" --header "Content-Type:application/json" http://localhost:3085/graphql
+    DATA="{\"query\": \"$*\"}"
+    mina_exec "$RESOURCE" curl --silent --show-error --data "$DATA" --header "Content-Type:application/json" http://localhost:3085/graphql
 }
 
 mina_blockchain_height() {
