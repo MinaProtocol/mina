@@ -239,3 +239,27 @@ let%test_module "Test transaction logic." =
                  Transaction_status.equal txn.command.status Applied ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
   end )
+
+(* This module tests Inputs.Ledger *)
+let%test_module "Test stack module" =
+  ( module struct
+    module Ledger = Transaction_logic.For_tests.Ledger
+
+    let%test_unit "Ensure get_account works on empty ledger." =
+      Quickcheck.test ~trials
+        (let open Quickcheck in
+        let open Generator.Let_syntax in
+        let%bind update = Account_update.gen in
+        let ledger = Ledger.empty ~depth:5 () in
+        let acct, loc = Ledger.get_account update ledger in
+        let new_acct =
+          Account.create (Account_update.account_id update) Balance.zero
+        in
+        return (acct, loc, new_acct))
+        ~f:(fun (acct, loc, new_acct) ->
+          match loc with
+          | `New ->
+              assert (Account.equal acct new_acct)
+          | `Existing _ ->
+              assert false )
+  end )
