@@ -16,7 +16,6 @@
             "resources",
             "logs"
           ],
-          "isVanilla": {{ .isVanilla | default "false" }},
           "name": "{{.name}}"
         }
 {{- end }}
