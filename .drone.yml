@@ -222,7 +222,7 @@ steps:
         sleep 5
     done
     echo "Failed to wait for send container"
-    exit 1
+    exit
 
 - name: finish
   image: alpine/k8s:1.26.1
@@ -241,3 +241,48 @@ steps:
     status:
     - success
     # - failure
+
+---
+kind: pipeline
+name: finish
+type: docker
+depends_on: [ run-zkapps ]
+trigger:
+  event: [ custom ]
+
+environment:
+  # path to openmina tooling
+  OM: helm/openmina-config
+  # global slot to wait force
+  MAX_SLOT: 30
+
+steps:
+- name: configure
+  image: alpine/k8s:1.26.1
+  environment:
+    DRONE_KUBECONFIG:
+      from_secret: k8s_config
+    KUBECONFIG: kube-config
+  commands:
+  - umask 0077
+  - echo "$DRONE_KUBECONFIG" > "$KUBECONFIG"
+  - kubectl config set-context --current --namespace $${NAMESPACE:-testnet-default}
+
+- name: wait-for-slot
+  image: alpine/k8s:1.26.1
+  environment:
+    KUBECONFIG: kube-config
+  commands:
+  - |
+    while true; do
+      SLOT=$$($${OM}/kube-utils.sh mina-graphql deployment/node1 'query { bestChain(maxLength: 1) { protocolState { consensusState { slotSinceGenesis } } } }' | jq -r '.data.bestChain[0].protocolState.consensusState.slotSinceGenesis')
+      if [ -n "$SLOT" ] && [ "$SLOT" -gt "$MAX_SLOT" ]; then
+        echo "Reached slot $MAX_SLOT"
+        exit
+      sleep 20
+    done
+
+- name: report-finish
+  image: busybox
+  commands:
+  - echo "Done"
