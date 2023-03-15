@@ -1,12 +1,13 @@
 open Core_kernel
-
-open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
+open Kimchi_backend_common.Constraints.Plonk_constraint
 
 (* EXAMPLE generic addition gate gadget *)
-let add (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
-    Circuit.Field.t =
+let add (type f field_var state)
+    (module Circuit : Snarky_backendless.Snark_intf.Run
+      with type field = f
+       and type field_var = field_var
+       and type run_state = state ) (left_input : Circuit.Field.t)
+    (right_input : Circuit.Field.t) : Circuit.Field.t =
   let open Circuit in
   (* Witness computation; sum = left_input + right_input *)
   let sum =
@@ -21,7 +22,7 @@ let add (type f)
       assert_
         { annotation = Some __LOC__
         ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+            T
               (Basic
                  { l = (Field.Constant.one, left_input)
                  ; r = (Field.Constant.one, right_input)
@@ -33,10 +34,12 @@ let add (type f)
       sum )
 
 (* EXAMPLE generic multiplication gate gadget *)
-let mul (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
-    Circuit.Field.t =
+let mul (type f field_var state)
+    (module Circuit : Snarky_backendless.Snark_intf.Run
+      with type field = f
+       and type field_var = field_var
+       and type run_state = state ) (left_input : Circuit.Field.t)
+    (right_input : Circuit.Field.t) : Circuit.Field.t =
   let open Circuit in
   (* Witness computation: prod = left_input + right_input *)
   let prod =
@@ -51,7 +54,7 @@ let mul (type f)
       assert_
         { annotation = Some __LOC__
         ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+            T
               (Basic
                  { l = (Field.Constant.zero, left_input)
                  ; r = (Field.Constant.zero, right_input)

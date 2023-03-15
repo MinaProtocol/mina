@@ -1,6 +1,6 @@
 (* Step circuit Impl *)
-module Tick = Kimchi_backend.Pasta.Vesta_based_plonk
-module Impl = Snarky_backendless.Snark.Run.Make (Tick)
+module Tick = Kimchi_backend.Snarky.Tick
+module Impl = Kimchi_backend.Snarky.Step
 
 let generate_and_verify_proof circuit =
   (* Generate constraint system for the circuit *)
