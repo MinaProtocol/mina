@@ -83,6 +83,7 @@ let%test_module "Access permission tests" =
             ; account = Accept
             ; valid_while = Ignore
             }
+        ; may_use_token = No
         ; use_full_commitment = true
         ; authorization_kind = Signature
         }

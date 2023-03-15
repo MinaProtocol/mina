@@ -19,13 +19,13 @@ resource "kubernetes_ingress" "testnet_graphql_ingress" {
 
   spec {
     rule {
-      host = "${local.graphql_ingress_dns}"
+      host = local.graphql_ingress_dns
       http {
         dynamic "path" {
           for_each = concat(
             [local.seed_config.name],
             [for config in var.block_producer_configs : config.name],
-            var.snark_worker_replicas > 0 ? [local.snark_coordinator_name] : []
+            var.snark_coordinator_config != null ? [var.snark_coordinator_config.name] : []
           )
 
           content {
