@@ -288,8 +288,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let%test_unit "typ is identity" =
         let s = "this is a string" in
         let memo = create_by_digesting_string_exn s in
-        let read_constant = function
-          | Snarky_backendless.Cvar.Constant x ->
+        let read_constant x =
+          match Tick.Field.Var.to_constant x with
+          | Some x ->
               x
           | _ ->
               assert false
@@ -298,8 +299,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let memo_var =
           memo |> typ.value_to_fields
           |> (fun (arr, aux) ->
-               ( Array.map arr ~f:(fun x -> Snarky_backendless.Cvar.Constant x)
-               , aux ) )
+               (Array.map arr ~f:(fun x -> Tick.Field.Var.constant x), aux) )
           |> typ.var_of_fields
         in
         let memo_read =

@@ -17,7 +17,8 @@ type 'field_var t = { value : 'field_var; precision : int }
 
 let precision t = t.precision
 
-let to_bignum (type f field_var) ~m:((module M) as m : (f, field_var) m) t =
+let to_bignum (type f field_var state)
+    ~m:((module M) as m : (f, field_var, state) m) t =
   let open M in
   let d = t.precision in
   fun () ->
@@ -29,14 +30,14 @@ let to_bignum (type f field_var) ~m:((module M) as m : (f, field_var) m) t =
     ---- * ---- = ---------
     2^px   2^py   2^(px+py)
 *)
-let mul (type f field_var) ~m:((module I) : (f, field_var) m) x y =
+let mul (type f field_var state) ~m:((module I) : (f, field_var, state) m) x y =
   let open I in
   let new_precision = x.precision + y.precision in
   assert (new_precision < Field.Constant.size_in_bits) ;
   { value = Field.(x.value * y.value); precision = new_precision }
 
-let constant (type f field_var) ~m:((module M) as m : (f, field_var) m) ~value
-    ~precision =
+let constant (type f field_var state)
+    ~m:((module M) as m : (f, field_var, state) m) ~value ~precision =
   assert (B.(value < one lsl precision)) ;
   let open M in
   { value = Field.constant (bigint_to_field ~m value); precision }
@@ -64,8 +65,8 @@ let pow2 add ~one k =
     ---- + ---- = ---------------
     2^px   2^py        2^py
 *)
-let add_signed (type f field_var) ~m:((module M) : (f, field_var) m) t1 (sgn, t2)
-    =
+let add_signed (type f field_var state)
+    ~m:((module M) : (f, field_var, state) m) t1 (sgn, t2) =
   let open M in
   let precision = max t1.precision t2.precision in
   assert (precision < Field.Constant.size_in_bits) ;
@@ -81,7 +82,8 @@ let add ~m x y = add_signed ~m x (`Pos, y)
 
 let sub ~m x y = add_signed ~m x (`Neg, y)
 
-let le (type f field_var) ~m:((module M) : (f, field_var) m) t1 t2 =
+let le (type f field_var state) ~m:((module M) : (f, field_var, state) m) t1 t2
+    =
   let open M in
   let precision = max t1.precision t2.precision in
   assert (precision < Field.Constant.size_in_bits) ;
@@ -121,7 +123,7 @@ let of_quotient ~m ~precision ~top ~bottom ~top_is_less_than_bottom:() =
   let q, _r = Integer.(div_mod ~m (shift_left ~m top precision) bottom) in
   { value = Integer.to_field q; precision }
 
-let of_bits (type f field_var) ~m:((module M) : (f, field_var) m) bits
-    ~precision =
+let of_bits (type f field_var state) ~m:((module M) : (f, field_var, state) m)
+    bits ~precision =
   assert (List.length bits <= precision) ;
   { value = M.Field.pack bits; precision }

@@ -94,8 +94,8 @@ struct
 
   let gte x y =
     let open Pickles.Impls.Step in
-    let xy = Pickles.Util.seal m Field.(x - y) in
-    let yx = Pickles.Util.seal m (Field.negate xy) in
+    let xy = Pickles.Impls.Step.seal Field.(x - y) in
+    let yx = Pickles.Impls.Step.seal (Field.negate xy) in
     let x_gte_y = range_check_flag xy in
     let y_gte_x = range_check_flag yx in
     Boolean.Assert.any [ x_gte_y; y_gte_x ] ;
@@ -136,8 +136,6 @@ struct
   let succ (t : var) =
     Checked.return (Field.Var.add t (Field.Var.constant Field.one))
 
-  let seal x = make_checked (fun () -> Pickles.Util.seal m x)
-
   let add (x : var) (y : var) =
     let%bind res = seal (Field.Var.add x y) in
     let%map () = range_check res in
@@ -150,8 +148,8 @@ struct
 
   let subtract_unpacking_or_zero x y =
     let open Pickles.Impls.Step in
-    let res = Pickles.Util.seal m Field.(x - y) in
-    let neg_res = Pickles.Util.seal m (Field.negate res) in
+    let res = seal Field.(x - y) in
+    let neg_res = seal (Field.negate res) in
     let x_gte_y = range_check_flag res in
     let y_gte_x = range_check_flag neg_res in
     Boolean.Assert.any [ x_gte_y; y_gte_x ] ;
