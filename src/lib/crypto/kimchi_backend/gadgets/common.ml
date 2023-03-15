@@ -7,7 +7,7 @@ module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
  *
  *   Inputs:
  *     field_element: source field element
- *     start:         zero-indexed starting bit offset (or -1 to denote the last bit)
+ *     start:         zero-indexed starting bit offset
  *     stop:          zero-indexed stopping bit index (or -1 to denote the last bit)
  *
  *   Output:
