@@ -6,7 +6,7 @@ jobImage:
   repository: akoptelov/mina-sample-zkapp
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "1a7091a6"
+  tag: "c26e6e7a"
 
 controllerImage:
   repository: akoptelov/mina-sample-zkapp-controller
