@@ -6,7 +6,7 @@ jobImage:
   repository: akoptelov/mina-sample-zkapp
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "cb7448f1"
+  tag: "427cc866"
 
 controllerImage:
   repository: akoptelov/mina-sample-zkapp-controller
@@ -14,7 +14,9 @@ controllerImage:
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
 
-transactionCount: 1024
+# each job sends this many transactions
+count: 16
+# the number of parallel jobs
 parallelism: 64
 config: controller-config.json
 cpu: 16
