@@ -256,7 +256,7 @@ environment:
   # path to openmina tooling
   OM: helm/openmina-config
   # global slot to wait force
-  MAX_SLOT: 30
+  MAX_HEIGHT: 30
 
 steps:
 - name: configure
@@ -277,11 +277,13 @@ steps:
   commands:
   - |
     while true; do
-      SLOT=$$($${OM}/kube-utils.sh mina-graphql deployment/node1 'query { bestChain(maxLength: 1) { protocolState { consensusState { slotSinceGenesis } } } }' | jq -r '.data.bestChain[0].protocolState.consensusState.slotSinceGenesis')
-      if [ -n "$SLOT" ] && [ "$SLOT" -ge "$MAX_SLOT" ]; then
-        echo "Reached slot $MAX_SLOT"
+      HEIGHT=$$()
+      HEIGHT=$$($${OM}/kube-utils.sh mina-node-chain-height deployment/node1)
+      if [ -n "$HEIGHT" ] && [ "$HEIGHT" -ge "$MAX_HEIGHT" ]; then
+        echo "Reached height $MAX_HEIGHT"
         exit
       fi
+      echo "Height $HEIGHT is lower than $MAX_HEIGHT"
       sleep 20
     done
 
