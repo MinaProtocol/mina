@@ -130,6 +130,14 @@ CREATE TABLE epoch_data
 , UNIQUE (seed, ledger_hash_id, total_currency, start_checkpoint, lock_checkpoint, epoch_length)
 );
 
+CREATE TABLE protocol_versions
+( id               serial PRIMARY KEY
+, major            int    NOT NULL
+, minor            int    NOT NULL
+, patch            int    NOT NULL
+, UNIQUE (major,minor,patch)
+);
+
 CREATE TYPE chain_status_type AS ENUM ('canonical', 'orphaned', 'pending');
 
 CREATE TABLE blocks
@@ -148,6 +156,7 @@ CREATE TABLE blocks
 , height                       bigint NOT NULL
 , global_slot_since_hard_fork  bigint NOT NULL
 , global_slot_since_genesis    bigint NOT NULL
+, protocol_version_id          int    NOT NULL        REFERENCES protocol_version(id)
 , timestamp                    text   NOT NULL
 , chain_status                 chain_status_type NOT NULL
 );

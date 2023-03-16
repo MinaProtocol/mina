@@ -35,6 +35,7 @@
    mina_transaction
    mina_transaction_logic
    mina_block
+   protocol_version
    consensus
    interruptible
    o1trace
