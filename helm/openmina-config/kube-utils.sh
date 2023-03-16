@@ -27,7 +27,7 @@ wait_for_job_status() {
     kubectl wait --for=jsonpath='{.status.conditions[*].status}'=True "$RESOURCE" --timeout="$TIMEOUT"
     MSG=$(kubectl get "$RESOURCE" -o jsonpath='{.status.conditions[?(@.status=="True")].message}')
     TYPE=$(kubectl get "$RESOURCE" -o jsonpath='{.status.conditions[?(@.status=="True")].type}')
-    if [ "${TYPE}" != "Complete" ]; then echo "Error running job: ${MSG}"; fi
+    if [ "${TYPE}" != "Complete" ]; then echo "Error running job: ${MSG}"; exit 1; fi
 }
 
 mina_exec() {
