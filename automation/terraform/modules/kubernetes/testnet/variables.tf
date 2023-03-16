@@ -246,6 +246,7 @@ variable "snark_coordinators" {
       snark_worker_fee      = number
       snark_worker_public_key = string
       snark_coordinators_host_port = number
+      persist_working_dir = bool
     }))
   default = []
 }
@@ -371,7 +372,7 @@ variable "zkapps_dashboard_key" {
 }
 
 
-variable "persist_working_dir" {
+variable "enable_working_dir_persitence" {
   type    = bool
   default = false
 }

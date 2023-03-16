@@ -154,7 +154,7 @@ spec:
         - name: daemon-config
           mountPath: "/root/config/"
         {{- end }}
-        {{- if $.Values.persist_working_dir }}
+        {{- if .Values.persist_working_dir }}
         - name: working-dir
           mountPath: /root
         {{ end }}
@@ -180,3 +180,8 @@ spec:
       {{- end }}
       - name: actual-libp2p
         emptyDir: {}
+      {{- if .Values.persist_working_dir }}
+      - name: working-dir
+        persistentVolumeClaim:
+          claimName: pvc-{{ template "archive-node.fullname" . }}
+      {{- end }}

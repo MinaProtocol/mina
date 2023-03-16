@@ -16,7 +16,7 @@ resource "kubernetes_namespace" "testnet_namespace" {
 }
 
 resource "kubernetes_persistent_volume_claim" "block-producers-pvc" {
-  count = var.persist_working_dir ? length(local.block_producer_vars.blockProducerConfigs) : 0
+  count = var.enable_working_dir_persitence ? length(local.block_producer_vars.blockProducerConfigs) : 0
   metadata {
     name = format("pvc-%s", local.block_producer_vars.blockProducerConfigs[count.index].name)
     namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
@@ -34,7 +34,7 @@ resource "kubernetes_persistent_volume_claim" "block-producers-pvc" {
 }
 
 resource "kubernetes_persistent_volume_claim" "seed-pvc" {
-  count = var.persist_working_dir ? length(local.seed_vars.seedConfigs) : 0
+  count = var.enable_working_dir_persitence ? length(local.seed_vars.seedConfigs) : 0
  
   metadata {
     name = format("pvc-%s",local.seed_vars.seedConfigs[count.index].name)
@@ -53,7 +53,7 @@ resource "kubernetes_persistent_volume_claim" "seed-pvc" {
 }
 
 resource "kubernetes_persistent_volume_claim" "snark-cordinator-pvc" {
-  count = var.persist_working_dir ? length(local.snark_vars) : 0
+  count = var.enable_working_dir_persitence ? length(local.snark_vars) : 0
  
   metadata {
     name = format("pvc-%s",local.snark_vars[count.index].coordinatorName)
@@ -72,7 +72,7 @@ resource "kubernetes_persistent_volume_claim" "snark-cordinator-pvc" {
 }
 
 resource "kubernetes_persistent_volume_claim" "snark-worker-pvc" {
-  count = var.persist_working_dir ? length(local.snark_vars) : 0
+  count = var.enable_working_dir_persitence ? length(local.snark_vars) : 0
  
   metadata {
     name = format("cov-%s",local.snark_vars[count.index].workerName)
@@ -91,7 +91,7 @@ resource "kubernetes_persistent_volume_claim" "snark-worker-pvc" {
 }
 
 resource "kubernetes_persistent_volume_claim" "archive-pvc" {
-  count = var.persist_working_dir ? length(local.archive_vars) : 0
+  count = var.enable_working_dir_persitence ? length(local.archive_vars) : 0
  
   metadata {
     name = format("cov-%s",local.archive_vars[count.index].archive.name)
