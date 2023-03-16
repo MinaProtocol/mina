@@ -48,6 +48,13 @@ spec:
           mountPath: /wallet-keys
         securityContext:
           runAsUser: 0
+        resources:
+          limits:
+            memory: 0.1G
+            cpu: 100m
+          requests:
+            memory: 0.1G
+            cpu: 100m
       - name: install-key
         image: {{ $.Values.mina.image | quote }}
         command:
@@ -62,6 +69,13 @@ spec:
         env:
           - name: MINA_PRIVKEY_PASS
             value: {{ $config.privateKeyPW | quote }}
+        resources:
+          limits:
+            memory: {{ $.Values.mina.memRequest }}
+            cpu: {{ $.Values.mina.cpuRequest }}
+          requests:
+            memory: {{ $.Values.mina.memRequest }}
+            cpu: {{ $.Values.mina.cpuRequest }}
       {{ if $config.libp2pSecret -}}
       - name: libp2p-perms
         image: {{ $.Values.mina.image | quote }}
@@ -90,6 +104,13 @@ spec:
         env:
           - name: MINA_LIBP2P_PASS
             value: {{ $config.privateKeyPW | quote }}
+        resources:
+          limits:
+            memory: {{ $.Values.mina.memRequest }}
+            cpu: {{ $.Values.mina.cpuRequest }}
+          requests:
+            memory: {{ $.Values.mina.memRequest }}
+            cpu: {{ $.Values.mina.cpuRequest }}
       {{- end }}
       containers:
       {{ include "sideCar.resources.containerSpec" (dict "resources" $.Values.resources) | nindent 6 }}
