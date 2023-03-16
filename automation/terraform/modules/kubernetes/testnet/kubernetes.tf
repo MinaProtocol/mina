@@ -89,3 +89,22 @@ resource "kubernetes_persistent_volume_claim" "snark-worker-pvc" {
     }
   }
 }
+
+resource "kubernetes_persistent_volume_claim" "archive-pvc" {
+  count = var.persist_working_dir ? length(local.archive_vars) : 0
+ 
+  metadata {
+    name = format("cov-%s",local.archive_vars[count.index].archive.name)
+    namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
+  }
+ 
+  spec {
+    access_modes = ["ReadWriteOnce"]
+    storage_class_name = "standard"
+    resources {
+      requests = {
+        storage = "1Gi"
+      }
+    }
+  }
+}
