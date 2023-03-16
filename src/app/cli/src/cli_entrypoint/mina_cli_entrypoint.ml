@@ -987,7 +987,7 @@ let setup_daemon logger =
             let monitors = get_monitors [ monitor ] monitor in
             List.map monitors ~f:(fun monitor ->
                 Async_kernel.Monitor.sexp_of_t monitor
-                |> Error_json.sexp_record_to_yojson )
+                |> Error_json.sexp_to_yojson )
           in
           Stream.iter
             (Async_kernel.Async_kernel_scheduler.long_cycles_with_context
@@ -995,12 +995,12 @@ let setup_daemon logger =
             ~f:(fun (span, context) ->
               let secs = Time_ns.Span.to_sec span in
               let monitor_infos = get_monitor_infos context.monitor in
-              [%log debug]
+              [%log info]
                 ~metadata:
                   [ ("long_async_cycle", `Float secs)
                   ; ("monitors", `List monitor_infos)
                   ]
-                "Long async cycle, $long_async_cycle seconds" ;
+                "Long async cycle, $long_async_cycle seconds, $monitors" ;
               Mina_metrics.(
                 Runtime.Long_async_histogram.observe Runtime.long_async_cycle
                   secs) ) ;
