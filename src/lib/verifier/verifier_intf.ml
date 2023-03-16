@@ -47,6 +47,8 @@ module Base = struct
 
     val get_blockchain_verification_key :
       t -> Pickles.Verification_key.t Or_error.t Deferred.t
+
+    val toggle_internal_tracing : t -> bool -> unit Or_error.t Deferred.t
   end
 end
 
