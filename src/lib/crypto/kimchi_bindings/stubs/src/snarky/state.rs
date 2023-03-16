@@ -11,7 +11,7 @@ use mina_curves::pasta::{Fp, Fq, Pallas, Vesta};
 use crate::{
     arkworks::{CamlFp, CamlFq},
     field_vector::{fp::CamlFpVector, fq::CamlFqVector},
-    snarky::conv::convert_constraint_fp,
+    snarky::conv,
 };
 
 use super::{CamlFpCS, CamlFpVar, CamlFqCS, CamlFqVar};
@@ -88,13 +88,12 @@ impl_functions! {
 
     pub fn fp_state_add_kimchi_constraint(
         mut state: ocaml::Pointer<CamlFpState>,
-        constraint: ocaml::Pointer<KimchiConstraint<CamlFpVar, CamlFp>>,
-    ) {
-        if let Some(cs) = &mut state.as_mut().0.system {
-            let constraint: KimchiConstraint<FieldVar<Fp>, Fp> =
-                convert_constraint_fp(constraint.as_ref());
-            cs.add_constraint(constraint);
-        }
+        constraint: KimchiConstraint<CamlFpVar, CamlFp>,
+    ) -> SnarkyResult<()> {
+        let constraint: KimchiConstraint<FieldVar<Fp>, Fp> =
+        conv::fp::convert_constraint(&constraint);
+        let state = &mut state.as_mut().0;
+        state.add_constraint(Constraint::KimchiConstraint(constraint), None)
     }
 
     pub fn fp_state_evaluate_var(state: ocaml::Pointer<CamlFpState>, var: CamlFpVar) -> CamlFp {
@@ -215,13 +214,16 @@ impl_functions! {
         state.add_constraint(constraint, None)
     }
 
+
     pub fn fq_state_add_kimchi_constraint(
         mut state: ocaml::Pointer<CamlFqState>,
-        constraint: ocaml::Pointer<KimchiConstraint<CamlFqVar, CamlFq>>,
-    ) {
-        panic!("yolo");
+        constraint: KimchiConstraint<CamlFqVar, CamlFq>,
+    ) -> SnarkyResult<()> {
+        let constraint: KimchiConstraint<FieldVar<Fq>, Fq> =
+        conv::fq::convert_constraint(&constraint);
+        let state = &mut state.as_mut().0;
+        state.add_constraint(Constraint::KimchiConstraint(constraint), None)
     }
-
     pub fn fq_state_evaluate_var(state: ocaml::Pointer<CamlFqState>, var: CamlFqVar) -> CamlFq {
         CamlFq(var.0.eval(&state.as_ref().0))
     }
