@@ -10,12 +10,12 @@ let rec sexp_to_yojson (sexp : Sexp.t) : Yojson.Safe.t =
 let sexp_record_to_yojson (sexp : Sexp.t) : Yojson.Safe.t =
   let fail () =
     failwith
-      "sexp_record_to_yojson called on an s-expression with a non-record \
-       structure"
+      (Printf.sprintf
+         "sexp_record_to_yojson called on an s-expression with a non-record \
+          structure %s"
+         (Sexp.to_string_hum sexp) )
   in
   match sexp with
-  | Atom _ ->
-      fail ()
   | List fields ->
       `Assoc
         (List.map fields ~f:(function
@@ -23,6 +23,8 @@ let sexp_record_to_yojson (sexp : Sexp.t) : Yojson.Safe.t =
               (label, sexp_to_yojson value)
           | _ ->
               fail () ) )
+  | _ ->
+      fail ()
 
 let rec sexp_of_yojson (json : Yojson.Safe.t) : (Sexp.t, string) Result.t =
   match json with
