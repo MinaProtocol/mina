@@ -986,8 +986,11 @@ let setup_daemon logger =
             in
             let monitors = get_monitors [ monitor ] monitor in
             List.map monitors ~f:(fun monitor ->
-                Async_kernel.Monitor.sexp_of_t monitor
-                |> Error_json.sexp_record_to_yojson )
+                match Async_kernel.Monitor.sexp_of_t monitor with
+                | Sexp.List sexps ->
+                    `List (List.map ~f:Error_json.sexp_record_to_yojson sexps)
+                | Sexp.Atom _ ->
+                    failwith "Expeted a sexp list" )
           in
           Stream.iter
             (Async_kernel.Async_kernel_scheduler.long_cycles_with_context
