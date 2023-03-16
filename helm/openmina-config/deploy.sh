@@ -146,14 +146,15 @@ while true; do
     esac
 done
 
-if [ $# != 1 ]; then
+if [ $# -lt 1 ]; then
     usage
     exit 1
 fi
 
 case $1 in
-    'deploy'|'delete'|'lint')
+    'deploy'|'delete'|'lint'|'template')
         OP="$1"
+        shift
     ;;
     *)
         echo "Unknown command $1"
@@ -164,7 +165,7 @@ esac
 KUBECTL_NAMESPACE=$(kubectl config view --minify --output 'jsonpath={..namespace}')
 if [ -z "$NAMESPACE" ]; then
     echo "Using current namespace ${KUBECTL_NAMESPACE:-default}"
-    if [ -z "$LINT" ] && [ -z "$DRY_RUN" ] && [ -z "$FORCE" ]; then
+    if [ "$OP" != "lint" ] && [ -z "$DRY_RUN" ] && [ -z "$FORCE" ]; then
         echo "You are using current namespace ${KUBECTL_NAMESPACE:-default}. Continue? [y/N]"
         read -r CONFIRM
         if ! [ "$CONFIRM" = y ] && ! [ "$CONFIRM" = Y ]; then
@@ -202,13 +203,16 @@ operate() {
     case $OP in
         deploy)
             if [ -z "$DRY_RUN" ]; then
-               $HELM upgrade --install "$NAME" $SET_ARGS "$@"
+               $HELM upgrade --install "$NAME" "$@"
             else
-               echo $HELM upgrade --install "$NAME" $SET_ARGS "$@"
+               echo $HELM upgrade --install "$NAME" "$@"
             fi
         ;;
         lint)
             $HELM lint "$@"
+        ;;
+        template)
+            $HELM template "$NAME" "$@"
         ;;
         delete)
             if [ -z "$DRY_RUN" ]; then
@@ -226,19 +230,19 @@ operate() {
 
 
 if [ -n "$SEEDS" ]; then
-    operate seeds $SEED_NODE_CHART $HELM_ARGS --values="$(values seed)"
+    operate seeds $SEED_NODE_CHART $HELM_ARGS --values="$(values seed)" "$@"
 fi
 
 if [ -n "$PRODUCERS" ]; then
-    operate producers $BLOCK_PRODUCER_CHART $HELM_ARGS --values="$(values producer)"
+    operate producers $BLOCK_PRODUCER_CHART $HELM_ARGS --values="$(values producer)" "$@"
 fi
 
 if [ -n "$SNARK_WORKERS" ]; then
-    operate snark-workers $SNARK_WORKER_CHART $HELM_ARGS  --values="$(values snark-worker)" --set-file=publicKey="$(resource key-99.pub)"
+    operate snark-workers $SNARK_WORKER_CHART $HELM_ARGS  --values="$(values snark-worker)" --set-file=publicKey="$(resource key-99.pub)" "$@"
 fi
 
 if [ -n "$NODES" ]; then
-    operate nodes $PLAIN_NODE_CHART $HELM_ARGS --values="$(values node)"
+    operate nodes $PLAIN_NODE_CHART $HELM_ARGS --values="$(values node)" "$@"
 fi
 
 if [ -n "$FRONTEND" ]; then
