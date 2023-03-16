@@ -85,7 +85,6 @@ let%test_module "valid_size" =
                 ~genesis_constants:(genesis_constant_error 100000. (2 * y) y)
             @@ of_wire x ) )
 
-    (* returns OK *)
     let%test_unit "returns ok" =
       Quickcheck.test ~trials:50 zkapp_type_gen ~f:(fun (x, y) ->
           [%test_eq: unit Or_error.t] (Ok ())
