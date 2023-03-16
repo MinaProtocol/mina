@@ -231,6 +231,13 @@ Side-Car - LogService: container
   volumeMounts:
   - mountPath: /mina-logs
     name: {{ template "sideCar.logs.minaLogsVolumeName" }}
+  resources:
+    requests:
+      memory: {{ .logs.memory | default "0.1G" }}
+      cpu: {{ .logs.cpu | default "0.1" }}
+    limits:
+      memory: {{ .logs.memory | default "0.1G" }}
+      cpu: {{ .logs.cpu | default "0.1" }}
 {{- end }}
 {{- end }}
 
