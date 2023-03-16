@@ -49,12 +49,12 @@ let%test_module "valid_size" =
       ; max_action_elements = actions
       }
 
-    (* Note that in the following tests the generated zkapp_type will have an account_updates (i.e. a call_forest) that is a list of variable length (say Length), but each
-       element in that list will always have two events and two actions. This means that the number of total actions and total events for the zkapp_type
-       will be 2 * Length for each. Thus, in order to generate an error, we just need the genesis file to be defined such that max_event_elements < 2 * Length and similarly for max_action_elements.*)
+    (* Note that in the following tests the generated zkapp_type will have an account_updates (i.e. a call_forest)
+       that is a list of variable length (say Length), but each element in that list will always have two events and two actions.
+       This means that the number of total actions and total events for the zkapp_type will be 2 * Length for each.
+       Thus, in order to generate an error, we just need the genesis file to be defined such that max_event_elements < 2 * Length and similarly for max_action_elements.*)
 
-    (* zkapp transaction too expensive *)
-    let%test_unit "valid_size_errors" =
+    let%test_unit "valid_size_errors_expensive" =
       Quickcheck.test ~trials:50 zkapp_type_gen ~f:(fun (x, y) ->
           [%test_eq: unit Or_error.t]
             (Error (Error.of_string "zkapp transaction too expensive"))
@@ -62,7 +62,6 @@ let%test_module "valid_size" =
                 ~genesis_constants:(genesis_constant_error 1. (2 * y) (2 * y))
             @@ of_wire x ) )
 
-    (* too many event elements *)
     let%test_unit "valid_size_errors_events" =
       Quickcheck.test ~trials:50 zkapp_type_gen ~f:(fun (x, y) ->
           [%test_eq: unit Or_error.t]
@@ -74,7 +73,6 @@ let%test_module "valid_size" =
                 ~genesis_constants:(genesis_constant_error 100000. y (2 * y))
             @@ of_wire x ) )
 
-    (* too many action elements *)
     let%test_unit "valid_size_errors_actions" =
       Quickcheck.test ~trials:50 zkapp_type_gen ~f:(fun (x, y) ->
           [%test_eq: unit Or_error.t]
