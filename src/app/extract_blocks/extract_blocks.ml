@@ -92,6 +92,13 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   in
   let timestamp = Block_time.of_string_exn block.timestamp in
   let chain_status = Chain_status.of_string block.chain_status in
+  let%bind protocol_version =
+    let%map { major; minor; patch } =
+      query_db ~f:(fun db ->
+          Processor.Protocol_versions.load db block.protocol_version_id )
+    in
+    Protocol_version.create_exn ~major ~minor ~patch
+  in
   (* commands, accounts_accessed, accounts_created, tokens_used to be filled in later *)
   return
     { Extensional.Block.state_hash
@@ -111,6 +118,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     ; user_cmds = []
     ; internal_cmds = []
     ; zkapp_cmds = []
+    ; protocol_version
     ; chain_status
     ; accounts_accessed = []
     ; accounts_created = []
