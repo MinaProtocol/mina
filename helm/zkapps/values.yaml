@@ -2,20 +2,14 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-jobImage:
-  repository: akoptelov/mina-sample-zkapp
-  pullPolicy: Always
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: "c26e6e7a"
+jobRepository: akoptelov/mina-sample-zkapp
+controllerRepository: akoptelov/mina-sample-zkapp-controller
+pullPolicy: Always
+# Overrides the image tag whose default is the chart appVersion.
+tag: ""
 
-controllerImage:
-  repository: akoptelov/mina-sample-zkapp-controller
-  pullPolicy: Always
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
-
-# each job sends this many transactions
-count: 20
+# total count of transactions
+count: 1024
 # the number of parallel jobs
 parallelism: 48
 config: controller-config.json
