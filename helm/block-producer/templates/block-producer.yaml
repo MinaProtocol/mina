@@ -300,9 +300,11 @@ spec:
         {{- end }}
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
       volumes:
+      {{- if $.Values.persist_working_dir }}
       - name: working-dir
         persistentVolumeClaim:
           claimName: pvc-{{ $config.name }}
+      {{- end }}
       - name: private-keys
         secret:
           secretName: {{ $config.keypairName }}

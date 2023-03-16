@@ -121,7 +121,7 @@ locals {
         archiveAddress       = config.archiveAddress
       }
     ]
-    persist_working_dir = var.persist_working_dir
+    persist_working_dir = var.enable_working_dir_persitence
   }
 
   archive_vars = [for item in var.archive_configs : {
@@ -163,7 +163,7 @@ locals {
         }
       }
     }
-    persist_working_dir = var.persist_working_dir
+    persist_working_dir = var.enable_working_dir_persitence
   }]
 
   snark_vars = [
@@ -186,7 +186,7 @@ locals {
 
       workerCpuRequest    = var.worker_cpu_request
       workerMemRequest    = var.worker_mem_request
-      persist_working_dir = var.persist_working_dir
+      persist_working_dir = var.enable_working_dir_persitence
     }
   ]
 
@@ -196,6 +196,7 @@ locals {
       mina        = local.daemon
       healthcheck = local.healthcheck_vars
       name = node.name
+      persist_working_dir = var.enable_working_dir_persitence
     }
   ]
 

@@ -19,6 +19,8 @@ let cluster_region = "us-west1"
 
 let cluster_zone = "us-west1a"
 
+let enable_working_dir_persitence = true;
+
 module Network_config = struct
   module Cli_inputs = Cli_inputs
 
@@ -39,6 +41,7 @@ module Network_config = struct
     ; cluster_region : string
     ; aws_route53_zone_id : string
     ; testnet_name : string
+    ; enable_working_dir_persitence: bool
     ; deploy_graphql_ingress : bool
     ; mina_image : string
     ; mina_agent_image : string
@@ -340,6 +343,7 @@ module Network_config = struct
         ; mina_image = images.mina
         ; mina_agent_image = images.user_agent
         ; mina_bots_image = images.bots
+        ; enable_working_dir_persitence
         ; mina_points_image = images.points
         ; mina_archive_image = images.archive_node
         ; runtime_config = Runtime_config.to_yojson runtime_config
