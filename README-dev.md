@@ -38,13 +38,29 @@ Refer to [/dev](/dev).
 
 ### Developer Setup (MacOS)
 
-- Invoke `make macos-setup`
+1. Make sure you're on the latest verion of MacOS
+2. Make sure xcode is installed: `xcode-select --install`
+3. Invoke `make macos-setup`
   - You will be prompted to add a number of `export`s in your shell config file. Do so.
+  - Make sure to `source` your shell config file OR just create a new terminal
   - If this is your first time using OCaml, be sure to run `eval $(opam config env)`
-- Install [rustup](https://rustup.rs/).
-- Invoke `make build`
-- Jump to [customizing your editor for autocomplete](#customizing-your-dev-environment-for-autocompletemerlin)
-- Note: If you are seeing conf-openssl install errors, try running `export PKG_CONFIG_PATH=$(brew --prefix openssl@1.1)/lib/pkgconfig` and try `opam switch import opam.export` again.
+4. Install [rustup](https://rustup.rs/)
+5. Create your switch with deps `opam switch import --switch mina opam.export`
+  - If prompted, then run `opam user-setup install` to enable opam-user-setup support for Merlin
+6. Pin dependencies that should override opam versions: `scripts/pin-external-packages.sh`
+7. Install correct version of golang:
+   - `goenv init`
+   - Update your shell env script with
+     ```text
+     eval "$(goenv init -)"
+     export PATH="/Users/$USER/.goenv/shims:$PATH"
+     ```
+   - `goenv install 1.18.10`
+   - `goenv global 1.18.10`
+8. Note: If you are seeing conf-openssl install errors, try running `export PKG_CONFIG_PATH=$(brew --prefix openssl@1.1)/lib/pkgconfig` and try `opam switch import opam.export` again.
+9. Invoke `make build`
+10. Install language server protocol `opam install ocaml-lsp-server` for better IDE support
+11. Set up your IDE (see [customizing your editor for autocomplete](#customizing-your-dev-environment-for-autocompletemerlin))
 
 ### Developer Setup (Linux)
 
@@ -85,10 +101,7 @@ let g:syntastic_ocaml_checkers=['merlin']
 - Now `/usr/bin/opam install merlin ocp-indent core async ppx_jane ppx_deriving` (everything we depend on, that you want autocompletes for) for doc reasons
 - Make sure you have `au FileType ocaml set omnifunc=merlin#Complete` in your vimrc
 - Install an auto-completer (such as YouCompleteMe) and a syntastic (such syntastic or ALE)
-- If you use vscode, you might like this extension
-
-  - [OCaml and Reason IDE](https://marketplace.visualstudio.com/items?itemName=freebroccolo.reasonml)
-  - [OCaml Platform](https://marketplace.visualstudio.com/items?itemName=ocamllabs.ocaml-platform)
+- If you use VSCode, then use [OCaml Platform](https://marketplace.visualstudio.com/items?itemName=ocamllabs.ocaml-platform)
 
 - If you use emacs, besides the `opam` packages mentioned above, also install `tuareg`, and add the following to your .emacs file:
 
