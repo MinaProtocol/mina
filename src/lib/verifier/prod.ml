@@ -33,6 +33,8 @@ module Worker_state = struct
       (Transaction_snark.t * Sok_message.t) list -> unit Or_error.t Deferred.t
 
     val get_blockchain_verification_key : unit -> Pickles.Verification_key.t
+
+    val toggle_internal_tracing : bool -> unit
   end
 
   (* bin_io required by rpc_parallel *)
@@ -148,6 +150,11 @@ module Worker_state = struct
 
              let get_blockchain_verification_key () =
                Lazy.force B.Proof.verification_key
+
+             let toggle_internal_tracing enabled =
+               don't_wait_for
+               @@ Internal_tracing.toggle ~logger
+                    (if enabled then `Enabled else `Disabled)
            end in
           (module M : S) )
     | Check | None ->
@@ -195,6 +202,8 @@ module Worker_state = struct
                  Lazy.force B.Proof.verification_key )
 
              let get_blockchain_verification_key () = Lazy.force vk
+
+             let toggle_internal_tracing _ = ()
            end : S )
 
   let get = Fn.id
@@ -222,6 +231,7 @@ module Worker = struct
           F.t
       ; get_blockchain_verification_key :
           ('w, unit, Pickles.Verification_key.t) F.t
+      ; toggle_internal_tracing : ('w, bool, unit) F.t
       }
 
     module Worker_state = Worker_state
@@ -256,6 +266,11 @@ module Worker = struct
       let get_blockchain_verification_key (w : Worker_state.t) () =
         let (module M) = Worker_state.get w in
         Deferred.return (M.get_blockchain_verification_key ())
+
+      let toggle_internal_tracing (w : Worker_state.t) enabled =
+        let (module M) = Worker_state.get w in
+        M.toggle_internal_tracing enabled ;
+        Deferred.unit
 
       let functions =
         let f (i, o, f) =
@@ -297,6 +312,11 @@ module Worker = struct
               ( [%bin_type_class: unit]
               , [%bin_type_class: Pickles.Verification_key.Stable.Latest.t]
               , get_blockchain_verification_key )
+        ; toggle_internal_tracing =
+            f
+              ( [%bin_type_class: bool]
+              , [%bin_type_class: unit]
+              , toggle_internal_tracing )
         }
 
       let init_worker_state
@@ -326,7 +346,8 @@ module Worker = struct
                      ~log_filename
                      ~max_size:(1024 * 1024 * 10)
                      ~num_rotate:50 ) ) ) ;
-        if enable_internal_tracing then Internal_tracing.toggle ~logger `Enabled ;
+        if enable_internal_tracing then
+          don't_wait_for @@ Internal_tracing.toggle ~logger `Enabled ;
         [%log info] "Verifier started" ;
         Worker_state.create
           { conf_dir
@@ -635,3 +656,10 @@ let get_blockchain_verification_key { worker; logger } =
           Worker.Connection.run connection
             ~f:Worker.functions.get_blockchain_verification_key ~arg:()
           |> Deferred.Or_error.map ~f:(fun x -> `Continue x) ) )
+
+let toggle_internal_tracing { worker; logger } enabled =
+  with_retry ~logger (fun () ->
+      let%bind { connection; _ } = Ivar.read !worker in
+      Worker.Connection.run connection
+        ~f:Worker.functions.toggle_internal_tracing ~arg:enabled
+      |> Deferred.Or_error.map ~f:(fun x -> `Continue x) )
