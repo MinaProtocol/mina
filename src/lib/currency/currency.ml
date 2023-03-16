@@ -237,7 +237,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%bind actual = image_from_bits_unsafe t in
       with_label "range_check" (fun () -> Field.Checked.Assert.equal actual t)
 
-    let seal x = make_checked (fun () -> Tick.seal x)
+    let seal = Tick.seal
 
     let modulus_as_field =
       lazy (Fn.apply_n_times ~n:length_in_bits Field.(mul (of_int 2)) Field.one)
@@ -980,8 +980,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Basic
             with type t := Stable.Latest.t
              and type var =
-              Pickles.Impls.Step.Impl.Internal_Basic.field
-              Snarky_backendless.Cvar.t
+              Pickles.Impls.Step.Impl.Internal_Basic.field_var
 
         [%%else]
 
