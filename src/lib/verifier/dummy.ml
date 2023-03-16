@@ -89,3 +89,5 @@ let get_blockchain_verification_key { proof_level; constraint_constants } =
         let proof_level = proof_level
       end) in
       Deferred.return @@ Lazy.force B.Proof.verification_key )
+
+let toggle_internal_tracing _ _ = Deferred.Or_error.ok_unit

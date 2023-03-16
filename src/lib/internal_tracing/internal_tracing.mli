@@ -90,12 +90,30 @@
 (** [is_enabled ()] returns [true] if internal tracing is enabled, and [false] otherwise. *)
 val is_enabled : unit -> bool
 
+(** [register_toggle_callback callback] will register [callback] to be called whenever
+    internal tracing is toggled.
+
+    This is useful to syncronize internal tracing done by subprocesses like the verifier
+    and prover.
+
+    [callback] will be called with [true] if internal tracing must be enabled, and with
+    [false] if it must be disabled. It must return a [Deferred.t] that will be resolved
+    once the call completes. *)
+val register_toggle_callback : (bool -> unit Async_kernel.Deferred.t) -> unit
+
 (** [toggle `Enabled] will enable tracing.
     [toggle `Disabled] will disable tracing.
 
     If [force] is [false] (the default), and if tracing is already active,
-    then trying to enable tracing is a noop. *)
-val toggle : logger:Logger.t -> ?force:bool -> [ `Enabled | `Disabled ] -> unit
+    then trying to enable tracing is a noop.
+
+    The returned promise will be resolved when all the calls to the registered toggle
+    callbacks have been resolved. *)
+val toggle :
+     logger:Logger.t
+  -> ?force:bool
+  -> [ `Enabled | `Disabled ]
+  -> unit Async_kernel.Deferred.t
 
 (** [with_state_hash state_hash f] runs [f] in a context in which checkpoints
     and metadata will be associated to a block with state hash equal to [state_hash].
