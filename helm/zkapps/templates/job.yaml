@@ -20,12 +20,11 @@ spec:
         - for t in $(seq 15); do nc -vz {{ include "mina-sample-zkapp.service-name" . }} 80 && exit; sleep 1; done; exit 1
       containers:
       - name: send
-        image: {{ $.Values.jobImage.repository }}:{{ $.Values.jobImage.tag | default "latest" }}
-        imagePullPolicy: {{ $.Values.jobImage.pullPolicy }}
+        image: {{ $.Values.jobRepository }}:{{ $.Values.tag | default "latest" }}
+        imagePullPolicy: {{ $.Values.pullPolicy }}
         args:
         - job
         - --controller=http://{{ include "mina-sample-zkapp.service-name" . }}/
-        - --count={{ $.Values.count | default 1 }}
         resources:
           requests:
             {{ if $.Values.cpu }}
