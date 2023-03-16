@@ -1,2 +1,2 @@
 frontend:
-  image: directcuteo/mina-frontend:fixScanState
+  image: directcuteo/mina-frontend:explorerZkApps
