@@ -13,25 +13,31 @@ let bxor (type f)
   (* Check that the length is permitted *)
   assert (length < Field.size_in_bits) ;
 
-  (* Convert to bits *)
-  let input1_bits = Circuit.Field.unpack input1 in
-  let input2_bits = Circuit.Field.unpack input2 in
+  exists Field.typ ~compute:(fun () -> 
+    
+    (* Convert to bits *)
+    let input1_bits =
+      Circuit.Field.unpack (As_prover.read Field.typ input1)
+    in
+    let input2_bits =
+      Circuit.Field.unpack (As_prover.read Field.typ input2)
+    in
 
   (* Check real lengths are at most the desired length *)
   assert (List.length input1_bits <= length) ;
   assert (List.length input2_bits <= length) ;
 
   (* Pad with zeros in MSB until reaching same length *)
-  let input1_bits = Common.pad_upto length Circuit.Boolean.false_ input1_bits in
-  let input2_bits = Common.pad_upto length Circuit.Boolean.false_ input2_bits in
+  let input1_bits = Common.pad_upto ~length ~value:Circuit.Boolean.false_ input1_bits in
+  let input2_bits = Common.pad_upto ~length ~value:Circuit.Boolean.false_ input2_bits in
 
   (* Pad with more zeros until the length is a multiple of 16 *)
   let pad_length = length in
   while pad_length mod 16 != 0 do
     input1_bits <- input1_bits :: Circuit.Boolean.false_ ;
     input2_bits <- input2_bits :: Circuit.Boolean.false_ ;
-    pad_length <- pad_length + 1
-  done
+    pad_length <- pad_length + 1 ;
+  done;
 
 (* Xor list of bits to obtain output *)
 let output_bits =
@@ -40,12 +46,12 @@ let output_bits =
   (* Recursively build Xor gadget *)
   xor_rec input1_bits input2_bits output_bits pad_length ;
 
+  
   (* Convert back to field *)
-  let output =
-    exists Field.typ ~compute:(fun () -> Field.Constant.project output_bits)
-  in
-
-  output
+  Field.Constant.project output_bits
+  
+  )
+  
 
 (* Xor of 16 bits *)
 let bxor16
