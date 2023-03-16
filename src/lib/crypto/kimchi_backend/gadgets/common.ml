@@ -62,9 +62,6 @@ let bignum_bigint_to_field (type f)
     (bigint : Bignum_bigint.t) : f =
   Circuit.Bigint.(to_field (of_bignum_bigint bigint))
 
-(* Foreign field element limb size: 2^88 *)
-let two_to_limb = Bignum_bigint.(pow (of_int 2) (of_int 88))
-
 (* Returns (quotient, remainder) such that numerator = quotient * denominator + remainder
  * where quotient, remainder \in [0, denominator) *)
 let bignum_bigint_div_rem (numerator : Bignum_bigint.t)
@@ -72,6 +69,10 @@ let bignum_bigint_div_rem (numerator : Bignum_bigint.t)
   let quotient = Bignum_bigint.(numerator / denominator) in
   let remainder = Bignum_bigint.(numerator - (denominator * quotient)) in
   (quotient, remainder)
+
+(* Length of bigint in bits *)
+let bignum_bigint_bit_length (bigint : Bignum_bigint.t) : int =
+  Z.log2up (Bignum_bigint.to_zarith_bigint bigint)
 
 (* Negative test helper *)
 let is_error (func : unit -> _) = Result.is_error (Or_error.try_with func)
