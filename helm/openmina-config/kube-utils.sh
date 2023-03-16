@@ -47,6 +47,11 @@ mina_blockchain_height() {
     mina_graphql "$1" 'query { daemonStatus { highestBlockLengthReceived } }' | jq '.data.daemonStatus.highestBlockLengthReceived'
 }
 
+mina_node_chain_height() {
+    mina_graphql "$1" 'query MyQuery {version bestChain(maxLength: 1) {protocolState {consensusState {blockHeight}}}}' | \
+        jq -r '.data.bestChain[0].protocolState.consensusState.blockHeight'
+}
+
 mina_testnet_available() {
     TIMEOUT=$1
     for NAME in $(mina_deployments); do
@@ -113,6 +118,11 @@ case "$CMD" in
                             mina_testnet_available "$@" ;;
     "mina-testnet-same-height")
                             mina_testnet_same_height "$@" ;;
+    "mina-node-max-height") mina_blockchain_height "$@" ;;
+    "mina-node-chain-height")
+                            mina_node_chain_height "$@" ;;
+    "mina-node-global-slot")
+                            mina_node_global_slot "$@" ;;
     *)
         echo "No such command $CMD"
         usage
