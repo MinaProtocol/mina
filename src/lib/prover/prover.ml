@@ -52,6 +52,8 @@ module Worker_state = struct
       -> Blockchain.t Async.Deferred.Or_error.t
 
     val verify : Protocol_state.Value.t -> Proof.t -> unit Or_error.t Deferred.t
+
+    val toggle_internal_tracing : bool -> unit
   end
 
   (* bin_io required by rpc_parallel *)
@@ -144,6 +146,11 @@ module Worker_state = struct
                  let%map result = B.Proof.verify [ (state, proof) ] in
                  [%log internal] "Prover_verify_done" ;
                  result
+
+               let toggle_internal_tracing enabled =
+                 don't_wait_for
+                 @@ Internal_tracing.toggle ~logger
+                      (if enabled then `Enabled else `Disabled)
              end : S )
          | Check ->
              ( module struct
@@ -178,6 +185,8 @@ module Worker_state = struct
                  Async.Deferred.return res
 
                let verify _state _proof = Deferred.return (Ok ())
+
+               let toggle_internal_tracing _ = ()
              end : S )
          | None ->
              ( module struct
@@ -192,6 +201,8 @@ module Worker_state = struct
                          ~state:next_state )
 
                let verify _ _ = Deferred.return (Ok ())
+
+               let toggle_internal_tracing _ = ()
              end : S )
        in
        Memory_stats.log_memory_stats logger ~process:"prover" ;
@@ -237,6 +248,12 @@ module Functions = struct
         W.verify
           (Blockchain_snark.Blockchain.state chain)
           (Blockchain_snark.Blockchain.proof chain) )
+
+  let toggle_internal_tracing =
+    create bin_bool bin_unit (fun w enabled ->
+        let (module M) = Worker_state.get w in
+        M.toggle_internal_tracing enabled ;
+        Deferred.unit )
 end
 
 module Worker = struct
@@ -248,6 +265,7 @@ module Worker = struct
       ; extend_blockchain :
           ('w, Extend_blockchain_input.t, Blockchain.t Or_error.t) F.t
       ; verify_blockchain : ('w, Blockchain.t, unit Or_error.t) F.t
+      ; toggle_internal_tracing : ('w, bool, unit) F.t
       }
 
     module Worker_state = Worker_state
@@ -274,6 +292,7 @@ module Worker = struct
         { initialized = f initialized
         ; extend_blockchain = f extend_blockchain
         ; verify_blockchain = f verify_blockchain
+        ; toggle_internal_tracing = f toggle_internal_tracing
         }
 
       let init_worker_state
@@ -299,7 +318,8 @@ module Worker = struct
                 (Internal_tracing.For_logger.json_lines_rotate_transport
                    ~directory:(conf_dir ^ "/internal-tracing")
                    ~log_filename () ) ) ;
-        if enable_internal_tracing then Internal_tracing.toggle ~logger `Enabled ;
+        if enable_internal_tracing then
+          don't_wait_for @@ Internal_tracing.toggle ~logger `Enabled ;
         [%log info] "Prover started" ;
         Worker_state.create
           { conf_dir
@@ -508,3 +528,7 @@ let create_genesis_block t (genesis_inputs : Genesis_proof.Inputs.t) =
     Gauge.set Cryptography.blockchain_proving_time_ms
       (Core.Time.Span.to_ms @@ Core.Time.diff (Core.Time.now ()) start_time)) ;
   chain
+
+let toggle_internal_tracing { connection; _ } enabled =
+  Worker.Connection.run connection ~f:Worker.functions.toggle_internal_tracing
+    ~arg:enabled

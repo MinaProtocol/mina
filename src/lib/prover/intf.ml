@@ -49,4 +49,6 @@ module type S = sig
 
   val create_genesis_block :
     t -> Genesis_proof.Inputs.t -> Blockchain.t Deferred.Or_error.t
+
+  val toggle_internal_tracing : t -> bool -> unit Deferred.Or_error.t
 end

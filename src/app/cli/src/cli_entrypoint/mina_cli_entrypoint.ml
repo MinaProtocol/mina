@@ -1136,8 +1136,11 @@ let setup_daemon logger =
               ~default:Cli_lib.Default.stop_time stop_time
           in
           if enable_tracing then Mina_tracing.start conf_dir |> don't_wait_for ;
-          if enable_internal_tracing then
-            Internal_tracing.toggle ~logger `Enabled ;
+          let%bind () =
+            if enable_internal_tracing then
+              Internal_tracing.toggle ~logger `Enabled
+            else Deferred.unit
+          in
           let seed_peer_list_url =
             Option.value_map seed_peer_list_url ~f:Option.some
               ~default:

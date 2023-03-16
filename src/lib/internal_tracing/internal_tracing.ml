@@ -21,6 +21,8 @@ let enabled = ref false
 
 let is_enabled () = !enabled
 
+let toggle_callbacks = ref []
+
 let disable_tracing ~logger () =
   [%log internal] "@internal_tracing_disabled" ;
   enabled := false
@@ -36,11 +38,24 @@ let enable_tracing ~logger () =
       ; ("branch", `String Mina_version.branch)
       ]
 
+let register_toggle_callback (f : bool -> unit Async_kernel.Deferred.t) =
+  toggle_callbacks := !toggle_callbacks @ [ f ]
+
+let call_toggle_callbacks enable =
+  Async_kernel.Deferred.List.iter
+    ~f:(fun cb -> cb enable)
+    ~how:`Parallel !toggle_callbacks
+
 let toggle ~logger ?(force = false) = function
   | `Enabled ->
-      if force || not (is_enabled ()) then enable_tracing ~logger ()
+      if force || not (is_enabled ()) then (
+        enable_tracing ~logger () ; call_toggle_callbacks true )
+      else Async_kernel.Deferred.unit
   | `Disabled ->
-      disable_tracing ~logger ()
+      if force || is_enabled () then (
+        disable_tracing ~logger () ;
+        call_toggle_callbacks false )
+      else Async_kernel.Deferred.unit
 
 let current_block_id_key =
   Univ_map.Key.create ~name:"current_block_id" Block_id.sexp_of_t

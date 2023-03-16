@@ -1438,6 +1438,22 @@ let create ?wallets (config : Config.t) =
                       ~pids:config.pids ~conf_dir:(Some config.conf_dir) () ) )
             >>| Result.ok_exn
           in
+          (* This setup is required for the dynamic enabling/disabling of internal
+             tracing to also work with the verifier and prover sub-processes. *)
+          Internal_tracing.register_toggle_callback (fun enabled ->
+              let%map result =
+                Verifier.toggle_internal_tracing verifier enabled
+              in
+              Or_error.iter_error result ~f:(fun error ->
+                  [%log' warn config.logger]
+                    "Failed to toggle verifier internal tracing: $error"
+                    ~metadata:[ ("error", `String (Error.to_string_hum error)) ] ) ) ;
+          Internal_tracing.register_toggle_callback (fun enabled ->
+              let%map result = Prover.toggle_internal_tracing prover enabled in
+              Or_error.iter_error result ~f:(fun error ->
+                  [%log' warn config.logger]
+                    "Failed to toggle prover internal tracing: $error"
+                    ~metadata:[ ("error", `String (Error.to_string_hum error)) ] ) ) ;
           let%bind vrf_evaluator =
             Monitor.try_with ~here:[%here]
               ~rest:
