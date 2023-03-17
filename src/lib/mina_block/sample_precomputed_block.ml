@@ -292,6 +292,7 @@ let sample_block_sexp =
  (delta_transition_chain_proof
   (6015213778799164743705381332887935226819166012453542567863482729120123228169
    ()))
+ (protocol_version ((major 1) (minor 0) (patch 0)))
  (accounts_accessed
   ((2
     ((public_key B62qpkCEM5N5ddVsYNbFtwWV4bsT9AwuUJXoehFhHUbYYvZ6j3fXt93)
@@ -904,6 +905,7 @@ let sample_block_json =
       "jwApG9UCFomnbgkG3Bn8NYisGGLdnwHBqKka9bGCuc1BFPvN4jK",
       []
     ],
+    "protocol_version": { "major": 1, "minor": 0, "patch": 0 },
     "accounts_accessed": [
       [
         2,
