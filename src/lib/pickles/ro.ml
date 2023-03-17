@@ -4,7 +4,7 @@ open Pickles_types
 open Import
 
 let bits_random_oracle =
-  let h = Digestif.blake2s in
+  let h = Digestif.blake2s 32 in
   fun ~length s ->
     Digestif.digest_string h s |> Digestif.to_raw_string h |> String.to_list
     |> List.concat_map ~f:(fun c ->
