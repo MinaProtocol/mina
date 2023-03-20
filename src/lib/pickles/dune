@@ -65,6 +65,7 @@
    tuple_lib
    promise
    kimchi_backend.common
+   logger
    ppx_version.runtime
    error_json
 ))

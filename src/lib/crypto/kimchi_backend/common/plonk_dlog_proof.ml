@@ -396,14 +396,22 @@ module Make (Inputs : Inputs_intf) = struct
 
   let batch_verify' (conv : 'a -> Fq.t array)
       (ts : (Verifier_index.t * t * 'a * message option) list) =
+    let logger = Internal_tracing_context_logger.get () in
+    [%log internal] "Batch_verify_backend_convert_inputs" ;
     let vks_and_v =
       Array.of_list_map ts ~f:(fun (vk, t, xs, m) ->
           let p = to_backend' (Option.value ~default:[] m) (conv xs) t in
           (vk, p) )
     in
-    Backend.batch_verify
-      (Array.map ~f:fst vks_and_v)
-      (Array.map ~f:snd vks_and_v)
+    [%log internal] "Batch_verify_backend_convert_inputs_done" ;
+    [%log internal] "Batch_verify_backend" ;
+    let%map.Promise result =
+      Backend.batch_verify
+        (Array.map ~f:fst vks_and_v)
+        (Array.map ~f:snd vks_and_v)
+    in
+    [%log internal] "Batch_verify_backend_done" ;
+    result
 
   let batch_verify = batch_verify' (fun xs -> List.to_array xs)
 

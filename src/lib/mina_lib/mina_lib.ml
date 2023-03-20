@@ -1429,10 +1429,12 @@ let create ?wallets (config : Config.t) =
               (fun () ->
                 O1trace.thread "manage_verifier_subprocess" (fun () ->
                     Verifier.create ~logger:config.logger
+                      ~enable_internal_tracing:(Internal_tracing.is_enabled ())
+                      ~internal_trace_filename:"verifier-internal-trace.jsonl"
                       ~proof_level:config.precomputed_values.proof_level
                       ~constraint_constants:
                         config.precomputed_values.constraint_constants
-                      ~pids:config.pids ~conf_dir:(Some config.conf_dir) ) )
+                      ~pids:config.pids ~conf_dir:(Some config.conf_dir) () ) )
             >>| Result.ok_exn
           in
           let%bind vrf_evaluator =
