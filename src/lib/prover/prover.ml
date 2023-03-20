@@ -133,7 +133,11 @@ module Worker_state = struct
                        "Prover threw an error while extending block: $error" ) ;
                  res
 
-               let verify state proof = B.Proof.verify [ (state, proof) ]
+               let verify state proof =
+                 [%log internal] "Prover_verify" ;
+                 let%map result = B.Proof.verify [ (state, proof) ] in
+                 [%log internal] "Prover_verify_done" ;
+                 result
              end : S )
          | Check ->
              ( module struct
