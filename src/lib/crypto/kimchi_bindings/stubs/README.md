@@ -6,37 +6,53 @@ These bindings are written in Rust with the help of two libraries:
 * [OCaml-rs](https://github.com/zshipko/ocaml-rs) to facilitate exporting a Rust library to a static library that can be used from within OCaml. Insead of exporting code directly to a C interface, it makes use of the OCaml runtime directly and can also store values and custom types on the OCaml heap.
 * [ocaml-gen](https://github.com/o1-labs/proof-systems) to generate the necessary OCaml code. This library is used in [`src/main.rs`](./src/main.rs).
 
-The bindings are generated automatically via the [`dune`](./dune) file's rule and 'promoted' to this directory.
-If you want to generate the OCaml binding manually, you can run the following command:
+The bindings are generated automatically via the [`dune`](./dune) file's rule and [promoted](https://dune.readthedocs.io/en/stable/dune-files.html#promote) to this directory.
+
+If you want to generate the OCaml binding manually, you can run the command dune's running yourself (which will print them in the terminal):
 
 ```shell
 $ cargo run
 ```
 
-If you follow the command with up to 3 `output_file` arguments it will write the result to the corresponding `output_file`s:
-
-```shell
-$ cargo run ./kimchi_types.ml ./pasta_bindings.ml ./kimchi_bindings.ml ./snarky_bindings.ml
-```
-
 ## Some OCaml-rs guidelines
+
+### Exposing types
 
 There are two ways of dealing with types:
 
 1. let OCaml handle your types: use the `ocaml::ToValue` and `ocaml::FromValue` traits to let OCaml convert your types into OCaml types.
-2. Make it opaque to OCaml: use [custom types](https://ocaml.org/manual/intfc.html#s:c-custom) to store opaque blocks within the OCaml heap. There's the [`ocaml::custom!`](https://docs.rs/ocaml/0.22.0/ocaml/macro.custom.html) macro to help you with that.
+2. Make your types opaque to OCaml: use [custom types](https://ocaml.org/manual/intfc.html#s:c-custom) to store opaque blocks within the OCaml heap. There's the [`ocaml::custom!`](https://docs.rs/ocaml/0.22.0/ocaml/macro.custom.html) macro to help you with that.
 
-Simply put, use custom types unless you need to be able to access a certain type in OCaml. If you need to expose the internal of a struct/enum, use ocaml-gen to generate the matching struct/enum in OCaml. Exposing the internals of a struct/enum requires generating the matching struct/enum in OCaml (using ocaml-gen). If you don't need all of the fields, consider implementing and exposing getters on a custom type instead.
+A good rule of thum: always use custom types unless you need to be able to access the fields of your type in OCaml. 
+If you don't need access to all of the fields, consider implementing and exposing getters on a custom type instead of exposing your whole type.
 
-Note that because of Rust's [*orphan rule*](https://github.com/Ixrec/rust-orphan-rules), you can't implement the `ToValue` and `FromValue` traits on foreign types. This means that you'll have to use the second option anytime you're dealing with foreign types, by wrapping them into a local type and using `custom!`. 
+There's one more extra consideration: opaque types store values on the Rust heap.
+This won't let the OCaml garbage collector efficiently manage the space they take.
+Storing values on the OCaml heap is often a good idea when performance issues are detected. 
+That is, unless the values are long-lived (like an SRS or a prover index) or would be very inefficient on the OCaml heap (like a `Vec<_>` where we need to use `emplace_back`).
 
-We also prefer to store values passed to OCaml on the OCaml heap wherever possible. That is, unless they are long-lived (think SRS, prover index) or would be very inefficient on the OCaml heap (think Vec<_> where we need to use emplace_back).
+### How to think about custom types
+
+Whenever you expose a custom type to the OCaml side, the OCaml side won't be able to create itself.
+For this reason, a custom type is always associated to some other Rust functions that can create the type (and use it).
+
+When creating a custom type, the value will be stored in the Rust heap, but a pointer of it will be stored in the OCaml heap (typical for OCaml).
+
+The Rust value is copied or cloned only if the Rust functions exposed take a value as argument. If they take a reference, or the pointer direct (`ocaml::Pointer<T>`) then they can mutate the value in place.
+
+For this reason, it can be useful to think of custom types as being passed as Rust-like mutable references everywhere, as the OCaml side has no way to know if the Rust side will mutate them or not.
+
+It is only by looking at the implementations of the Rust functions exposed to the OCaml side that you can know in which case the Rust value will be mutated.
+
+### Edge case: foreign types
+
+Because of Rust's [*orphan rule*](https://github.com/Ixrec/rust-orphan-rules), you can't implement the `ToValue` and `FromValue` traits on foreign types. This means that you'll have to use the second option anytime you're dealing with foreign types, by wrapping them into a local type and using `custom!`.  (This is what we do with the arkworks types, for example)
 
 ### The ToValue and FromValue traits
 
-In both methods, the [traits ToValue and FromValue](https://github.com/zshipko/ocaml-rs/blob/f300f2f382a694a6cc51dc14a9b3f849191580f0/src/value.rs#L55:L73) are used:
+Ocaml-rs exposes two traits to communicate to and from Ocaml: [ToValue and FromValue](https://github.com/zshipko/ocaml-rs/blob/f300f2f382a694a6cc51dc14a9b3f849191580f0/src/value.rs#L55:L73).
 
-```rust=
+```rust
 pub unsafe trait IntoValue {
     fn into_value(self, rt: &Runtime) -> Value;
 }
@@ -45,11 +61,21 @@ pub unsafe trait FromValue<'a> {
 }
 ```
 
-these traits are implemented for all primitive Rust types ([here](https://github.com/zshipko/ocaml-rs/blob/f300f2f382a694a6cc51dc14a9b3f849191580f0/src/conv.rs)), and can be derived automatically via [derive macros](https://docs.rs/ocaml/0.22.0/ocaml/#derives). Don't forget that you can use [cargo expand](https://github.com/dtolnay/cargo-expand) to expand macros, which is really useful to understand what the ocaml-rs macros are doing.
+These traits are implemented for all primitive Rust types ([here](https://github.com/zshipko/ocaml-rs/blob/f300f2f382a694a6cc51dc14a9b3f849191580f0/src/conv.rs)), and can be derived automatically via [derive macros](https://docs.rs/ocaml/0.22.0/ocaml/#derives). (Very much like serde.)
+
+### Debugging
+
+Don't forget that you can use [cargo expand](https://github.com/dtolnay/cargo-expand) to expand macros, which is really useful to understand what the ocaml-rs macros are doing.
 
 ```
 $ cargo expand -- some_filename_without_rs > expanded.rs
 ```
+
+In general, you will want to return a `Result<Value, ocaml::Error>` from your functions, and use the `?` operator to propagate errors.
+
+Note that returning a `Result` will not return a `result` type in OCaml, but instead raise an exception.
+Still, you will get better error messages on the OCaml side than if you were to use `unwrap` everywhere (I'm actually not sure why).
+If this doesn't seem like a good-enough reason to return `Result` in your exposed functions already, note that the next version of OCaml-rs will make it possible to return `result` types in OCaml.
 
 ### Custom types
 
@@ -59,7 +85,7 @@ Values of custom types are opaque to OCaml. They are used to store the data of s
 
 Here is how custom types are transformed into OCaml values:
 
-```rust=
+```rust
 unsafe impl<T: 'static + Custom> IntoValue for T {
     fn into_value(self, rt: &Runtime) -> Value {
         let val: crate::Pointer<T> = Pointer::alloc_custom(self);
@@ -70,7 +96,7 @@ unsafe impl<T: 'static + Custom> IntoValue for T {
 
 which eventually is a call to `caml_alloc_custom`:
 
-```rust=
+```rust
 /// Allocate custom value
 pub unsafe fn alloc_custom<T: crate::Custom>() -> Value {
     let size = core::mem::size_of::<T>();
@@ -85,7 +111,7 @@ pub unsafe fn alloc_custom<T: crate::Custom>() -> Value {
 
 and the data of your type (probably a pointer to some Rust memory) is copied into the OCaml's heap ([source](https://github.com/zshipko/ocaml-rs/blob/f300f2f382a694a6cc51dc14a9b3f849191580f0/src/types.rs#L80)):
 
-```rust=
+```rust
 pub fn set(&mut self, x: T) {
     unsafe {
         core::ptr::write_unaligned(self.as_mut_ptr(), x);
@@ -95,8 +121,10 @@ pub fn set(&mut self, x: T) {
 
 ### A note on generic custom types
 
-Note that the generated bindings do not allow you to differentiate the same custom type used in different context. 
-If you want to differentiate custom types, differentiate the Rust types first. 
+Note that the generated bindings do not allow you to differentiate the same custom type used in different context.
+
+If you want to differentiate custom types, differentiate the Rust types first.
+
 For example, if you have a generic custom type that must be converted to different OCaml types depending on the concrete parameter used, you will have to instead create non-generic custom types
 
 ### Helper macros
