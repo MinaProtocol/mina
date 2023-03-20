@@ -239,7 +239,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
       ; set_permissions = Either
       ; set_verification_key = Either
       ; set_zkapp_uri = Either
-      ; edit_sequence_state = Either
+      ; edit_action_state = Either
       ; set_token_symbol = Either
       ; increment_nonce = Either
       ; set_voting_for = Either
