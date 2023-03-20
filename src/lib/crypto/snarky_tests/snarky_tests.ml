@@ -57,10 +57,7 @@ let check_json ~input_typ ~return_typ ~circuit filename () =
 let expected = "5357346d161dcccaa547c7999b8148db"
 
 module MonadicAPI = struct
-  module Impl = Snarky_backendless.Snark.Make (struct
-    include Kimchi_backend.Pasta.Vesta_based_plonk
-    module Inner_curve = Kimchi_backend.Pasta.Pasta.Pallas
-  end)
+  module Impl = Kimchi_backend.Snarky.Step_monad
 
   let main ((b1, b2) : Impl.Boolean.var * Impl.Boolean.var) =
     let open Impl in
