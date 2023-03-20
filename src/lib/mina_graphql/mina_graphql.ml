@@ -4055,7 +4055,7 @@ module Mutations = struct
   module Itn = struct
     (* ITN-specific mutations *)
 
-    let handle_tbl : unit Async_kernel.Ivar.t Uuid.Table.t =
+    let scheduler_tbl : unit Async_kernel.Ivar.t Uuid.Table.t =
       Uuid.Table.create ()
 
     let schedule_payments =
@@ -4122,8 +4122,7 @@ module Mutations = struct
                           |> Array.to_list
                         in
                         Error
-                          (sprintf
-                             "Could not get ledger nonces for accounts: %s"
+                          (sprintf "Could not get nonces for accounts: %s"
                              ( List.map pks ~f:(fun pk ->
                                    Signature_lib.Public_key.Compressed.to_yojson
                                      pk
@@ -4148,8 +4147,30 @@ module Mutations = struct
                         in
                         let tm_start = Time.now () in
                         let tm_end = Time.add tm_start duration_span in
+                        let uuid = Uuid.create () in
+                        let ivar = Ivar.create () in
+                        ( match
+                            Uuid.Table.add scheduler_tbl ~key:uuid ~data:ivar
+                          with
+                        | `Ok ->
+                            ()
+                        | `Duplicate ->
+                            failwith
+                              "Unexpected duplicate scheduled payments handle"
+                        ) ;
                         let rec go ndx =
-                          if Time.( >= ) (Time.now ()) tm_end then Deferred.unit
+                          if Time.( >= ) (Time.now ()) tm_end then (
+                            [%log info]
+                              "Scheduled payments with handle %s has expired"
+                              (Uuid.to_string uuid) ;
+                            Uuid.Table.remove scheduler_tbl uuid ;
+                            Deferred.unit )
+                          else if Ivar.is_full ivar then (
+                            [%log info]
+                              "Terminating scheduled payments with handle %s"
+                              (Uuid.to_string uuid) ;
+                            Uuid.Table.remove scheduler_tbl uuid ;
+                            Deferred.unit )
                           else
                             let sender = senders.(ndx) in
                             let source_pk_uncompressed =
@@ -4187,6 +4208,25 @@ module Mutations = struct
                             let signature =
                               Ok (Signed_command.sign_payload sender payload)
                             in
+                            [%log info]
+                              "Payment scheduler with handle %s is sending a \
+                               payment from sender %s"
+                              (Uuid.to_string uuid)
+                              ( Signature_lib.Public_key.Compressed.to_yojson
+                                  source_pk
+                              |> Yojson.Safe.to_string )
+                              ~metadata:
+                                [ ( "receiver"
+                                  , Signature_lib.Public_key.Compressed
+                                    .to_yojson receiver_pk )
+                                ; ("nonce", Account.Nonce.to_yojson nonce)
+                                ; ("fee", Currency.Fee.to_yojson fee)
+                                ; ( "amount"
+                                  , Currency.Amount.to_yojson
+                                      payment_details.amount )
+                                ; ("memo", `String payment_details.memo)
+                                ] ;
+
                             let%bind () =
                               let fee = Currency.Fee.to_uint64 fee in
                               let memo = Some payment_details.memo in
@@ -4207,11 +4247,39 @@ module Mutations = struct
                             go ((ndx + 1) mod num_senders)
                         in
                         don't_wait_for @@ go 0 ;
-                        Ok "foo" ) )
+                        Ok (Uuid.to_string uuid) ) )
           | Error err ->
-              Error (sprintf "Invalid input: %s" err) )
+              Error (sprintf "Invalid input to payment scheduler: %s" err) )
 
-    let mutations = []
+    let stop_payments =
+      io_field "stopPayments"
+        ~args:
+          Arg.
+            [ arg "input" ~doc:"Payment scheduler handle" ~typ:(non_null string)
+            ]
+        ~typ:(non_null string)
+        ~resolve:(fun { ctx = mina; _ } () input ->
+          let logger = Mina_lib.top_level_logger mina in
+          try
+            let uuid = Uuid.of_string input in
+            match Uuid.Table.find scheduler_tbl uuid with
+            | None ->
+                return
+                @@ Error
+                     (sprintf "Could not find scheduled payments with handle %s"
+                        input )
+            | Some ivar ->
+                [%log info] "Stopping scheduled payments with handle %s" input ;
+                Ivar.fill_if_empty ivar () ;
+                return
+                @@ Ok
+                     (sprintf "Stopped scheduled payments with handle %s" input)
+          with _ ->
+            return
+            @@ Error (sprintf "Not a valid scheduled payments handle: %s" input)
+          )
+
+    let mutations = [ schedule_payments; stop_payments ]
   end
 end
 
