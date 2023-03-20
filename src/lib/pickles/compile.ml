@@ -1136,7 +1136,7 @@ let wrap_main_dummy_override _ _ _ _ _ _ _ =
     (* Pad the circuit so that its domain size matches the one
        that would have been used by the true wrap_main.
     *)
-    for i = 0 to 64000 do
+    for _ = 0 to 64000 do
       assert_r1cs x y z
     done
   in
