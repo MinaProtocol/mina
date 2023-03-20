@@ -38,6 +38,8 @@ module Worker_state = struct
   (* bin_io required by rpc_parallel *)
   type init_arg =
     { conf_dir : string option
+    ; enable_internal_tracing : bool
+    ; internal_trace_filename : string option
     ; logger : Logger.Stable.Latest.t
     ; proof_level : Genesis_constants.Proof_level.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
@@ -107,7 +109,23 @@ module Worker_state = struct
                  | `Mismatched_authorization_kind keys ->
                      `Mismatched_authorization_kind keys )
 
+             let verify_commands cs =
+               Internal_tracing_context_logger.with_logger (Some logger)
+               @@ fun () ->
+               [%log internal] "Verifier_verify_commands" ;
+               let%map result = verify_commands cs in
+               [%log internal] "Verifier_verify_commands_done" ;
+               result
+
              let verify_blockchain_snarks = B.Proof.verify
+
+             let verify_blockchain_snarks bs =
+               Internal_tracing_context_logger.with_logger (Some logger)
+               @@ fun () ->
+               [%log internal] "Verifier_verify_blockchain_snarks" ;
+               let%map result = verify_blockchain_snarks bs in
+               [%log internal] "Verifier_verify_blockchain_snarks_done" ;
+               result
 
              let verify_transaction_snarks ts =
                match Or_error.try_with (fun () -> T.verify ts) with
@@ -119,6 +137,14 @@ module Worker_state = struct
                      "Verifier threw an exception while verifying transaction \
                       snark" ;
                    failwith "Verifier crashed"
+
+             let verify_transaction_snarks ts =
+               Internal_tracing_context_logger.with_logger (Some logger)
+               @@ fun () ->
+               [%log internal] "Verifier_verify_transaction_snarks" ;
+               let%map result = verify_transaction_snarks ts in
+               [%log internal] "Verifier_verify_transaction_snarks_done" ;
+               result
 
              let get_blockchain_verification_key () =
                Lazy.force B.Proof.verification_key
@@ -274,8 +300,15 @@ module Worker = struct
         }
 
       let init_worker_state
-          Worker_state.{ conf_dir; logger; proof_level; constraint_constants } =
-        ( if Option.is_some conf_dir then
+          Worker_state.
+            { conf_dir
+            ; enable_internal_tracing
+            ; internal_trace_filename
+            ; logger
+            ; proof_level
+            ; constraint_constants
+            } =
+        if Option.is_some conf_dir then (
           let max_size = 256 * 1024 * 512 in
           let num_rotate = 1 in
           Logger.Consumer_registry.register ~id:"default"
@@ -283,10 +316,26 @@ module Worker = struct
             ~transport:
               (Logger_file_system.dumb_logrotate
                  ~directory:(Option.value_exn conf_dir)
-                 ~log_filename:"mina-verifier.log" ~max_size ~num_rotate ) ) ;
+                 ~log_filename:"mina-verifier.log" ~max_size ~num_rotate ) ;
+          Option.iter internal_trace_filename ~f:(fun log_filename ->
+              Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
+                ~processor:Internal_tracing.For_logger.processor
+                ~transport:
+                  (Logger_file_system.dumb_logrotate
+                     ~directory:(Option.value_exn conf_dir ^ "/internal-tracing")
+                     ~log_filename
+                     ~max_size:(1024 * 1024 * 10)
+                     ~num_rotate:50 ) ) ) ;
+        if enable_internal_tracing then Internal_tracing.toggle ~logger `Enabled ;
         [%log info] "Verifier started" ;
         Worker_state.create
-          { conf_dir; logger; proof_level; constraint_constants }
+          { conf_dir
+          ; enable_internal_tracing
+          ; internal_trace_filename
+          ; logger
+          ; proof_level
+          ; constraint_constants
+          }
 
       let init_connection_state ~connection:_ ~worker_state:_ () = Deferred.unit
     end
@@ -304,8 +353,8 @@ type worker =
 type t = { worker : worker Ivar.t ref; logger : Logger.Stable.Latest.t }
 
 (* TODO: investigate why conf_dir wasn't being used *)
-let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
-    t Deferred.t =
+let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
+    ~proof_level ~constraint_constants ~pids ~conf_dir () : t Deferred.t =
   let on_failure err =
     [%log error] "Verifier process failed with error $err"
       ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
@@ -337,7 +386,13 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
           Worker.spawn_in_foreground_exn
             ~connection_timeout:(Time.Span.of_min 1.) ~on_failure
             ~shutdown_on:Connection_closed ~connection_state_init_arg:()
-            { conf_dir; logger; proof_level; constraint_constants } )
+            { conf_dir
+            ; enable_internal_tracing
+            ; internal_trace_filename
+            ; logger
+            ; proof_level
+            ; constraint_constants
+            } )
       |> Deferred.Result.map_error ~f:Error.of_exn
     in
     Child_processes.Termination.wait_for_process_log_errors ~logger process
@@ -563,6 +618,15 @@ let verify_commands { worker; logger } ts =
           Worker.Connection.run connection ~f:Worker.functions.verify_commands
             ~arg:ts
           |> Deferred.Or_error.map ~f:(fun x -> `Continue x) ) )
+
+let verify_commands t ts =
+  let logger = t.logger in
+  let count = List.length ts in
+  let open Deferred.Let_syntax in
+  [%log internal] "Verify_commands" ~metadata:[ ("count", `Int count) ] ;
+  let%map result = verify_commands t ts in
+  [%log internal] "Verify_commands_done" ;
+  result
 
 let get_blockchain_verification_key { worker; logger } =
   O1trace.thread "dispatch_blockchain_verification_key" (fun () ->
