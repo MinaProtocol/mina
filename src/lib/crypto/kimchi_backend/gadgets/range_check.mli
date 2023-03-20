@@ -1,9 +1,3 @@
-(* range-check gadget - checks v0 \in [0, 2^88) *)
-val range_check :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> 'f Snarky_backendless.Cvar.t
-  -> unit
-
 (* 64-bit range-check gadget - checks v0 \in [0, 2^64) *)
 val range_check64 :
      (module Snarky_backendless.Snark_intf.Run with type field = 'f)
