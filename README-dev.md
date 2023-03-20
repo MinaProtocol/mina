@@ -46,6 +46,19 @@ Refer to [/dev](/dev).
   - If this is your first time using OCaml, be sure to run `eval $(opam config env)`
 4. Install [rustup](https://rustup.rs/)
 5. Create your switch with deps `opam switch import --switch mina opam.export`
+  - M1-related issues (because Homebrew does not link include files automatically):
+    - If you find an error failing to find `gmp.h`, update your `~/.zshrc` or `~/.bashrc` with:
+     ```export CFLAGS="-I/opt/homebrew/Cellar/gmp/6.2.1_1/include/"
+     ```
+     or run in the shell the command `env CFLAGS="/opt/homebrew/Cellar/gmp/6.2.1_1/include/" opam install conf-gmp.2`
+    - If you find an error failing to find `lmdb.h`, update your `~/.zshrc` or `~/.bashrc` with:
+    ```
+    export CPATH="$HOMEBREW_PREFIX/include:$CPATH"
+    export LIBRARY_PATH="$HOMEBREW_PREFIX/lib:$LIBRARY_PATH"
+    export PATH="$(brew --prefix lmdb)/bin:$PATH"
+    export PKG_CONFIG_PATH=$(brew --prefix lmdb)/lib/pkgconfig:$PKG_CONFIG_PATH
+    ```
+  - Note: If you are seeing conf-openssl install errors, try running `export PKG_CONFIG_PATH=$(brew --prefix openssl@1.1)/lib/pkgconfig` and try `opam switch import opam.export` again.
   - If prompted, then run `opam user-setup install` to enable opam-user-setup support for Merlin
 6. Pin dependencies that should override opam versions: `scripts/pin-external-packages.sh`
 7. Install correct version of golang:
@@ -57,10 +70,11 @@ Refer to [/dev](/dev).
      ```
    - `goenv install 1.18.10`
    - `goenv global 1.18.10`
-8. Note: If you are seeing conf-openssl install errors, try running `export PKG_CONFIG_PATH=$(brew --prefix openssl@1.1)/lib/pkgconfig` and try `opam switch import opam.export` again.
-9. Invoke `make build`
-10. Install language server protocol `opam install ocaml-lsp-server` for better IDE support
-11. Set up your IDE (see [customizing your editor for autocomplete](#customizing-your-dev-environment-for-autocompletemerlin))
+   - If in the next step you find the message `compile: version "go1.18.10" does not match go tool version "go1.20.2"`, run `brew remove go`
+8. Invoke `make build`
+  - If you get errors about `libp2p` and `capnp` try with `brew install capnp`
+9. Install language server protocol `opam install ocaml-lsp-server` for better IDE support
+10. Set up your IDE (see [customizing your editor for autocomplete](#customizing-your-dev-environment-for-autocompletemerlin))
 
 ### Developer Setup (Linux)
 
