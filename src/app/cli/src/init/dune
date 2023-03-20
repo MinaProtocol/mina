@@ -32,6 +32,7 @@
    graphql-cohttp
    cohttp-async
    graphql-async
+   mirage-crypto-ec
    ;;local libraries
    snark_profiler_lib
    archive_lib
@@ -60,6 +61,7 @@
    node_status
    o1trace_webkit_event
    generated_graphql_queries
+   itn_crypto
    mina_transaction
    mina_generators
    mina_user_error
@@ -112,6 +114,8 @@
    pickles
    pickles.backend
    snark_params
+   mina_signature_kind
+   string_sign
    zkapp_command_builder
  )
  (instrumentation (backend bisect_ppx))

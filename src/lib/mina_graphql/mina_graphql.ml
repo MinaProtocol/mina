@@ -4817,6 +4817,18 @@ module Queries = struct
     ; thread_graph
     ; blockchain_verification_key
     ]
+
+  module Itn = struct
+    (* incentivized testnet-specific queries *)
+
+    let auth =
+      field "auth" ~typ:bool
+        ~args:Arg.[]
+        ~doc:"Returns true if query is authorized"
+        ~resolve:(fun _ _ -> Some true)
+
+    let queries = [ auth ]
+  end
 end
 
 let schema =
@@ -4825,8 +4837,12 @@ let schema =
       ~subscriptions:Subscriptions.commands)
 
 let schema_limited =
-  (*including version because that's the default query*)
+  (* including version because that's the default query *)
   Graphql_async.Schema.(
     schema
       [ Queries.daemon_status; Queries.block; Queries.version ]
       ~mutations:[] ~subscriptions:[])
+
+let schema_itn : Mina_lib.t Schema.schema =
+  Graphql_async.Schema.(
+    schema Queries.Itn.queries ~mutations:[] ~subscriptions:[])
