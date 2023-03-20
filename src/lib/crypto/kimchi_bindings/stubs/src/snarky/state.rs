@@ -130,6 +130,10 @@ impl_functions! {
         state.as_ref().eval_constraints
     }
 
+    pub fn fp_state_set_eval_constraints(mut state: ocaml::Pointer<CamlFpState>, b: bool) {
+        state.as_mut().0.eval_constraints = b;
+    }
+
     pub fn fp_state_next_auxiliary(state: ocaml::Pointer<CamlFpState>) -> usize {
         state.as_ref().next_var
     }
@@ -265,6 +269,10 @@ impl_functions! {
 
     pub fn fq_state_eval_constraints(state: ocaml::Pointer<CamlFqState>) -> bool {
         state.as_ref().eval_constraints
+    }
+
+    pub fn fq_state_set_eval_constraints(mut state: ocaml::Pointer<CamlFqState>, b: bool) {
+        state.as_mut().0.eval_constraints = b;
     }
 
     pub fn fq_state_next_auxiliary(state: ocaml::Pointer<CamlFqState>) -> usize {

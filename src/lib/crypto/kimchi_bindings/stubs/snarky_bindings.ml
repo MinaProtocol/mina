@@ -181,6 +181,9 @@ module Fp = struct
 
     external eval_constraints : t -> bool = "fp_state_eval_constraints"
 
+    external set_eval_constraints : t -> bool -> unit
+      = "fp_state_set_eval_constraints"
+
     external next_auxiliary : t -> int = "fp_state_next_auxiliary"
 
     external system : t -> Constraint_system.t option = "fp_state_system"
@@ -289,6 +292,9 @@ module Fq = struct
     external set_as_prover : t -> bool -> unit = "fq_state_set_as_prover"
 
     external eval_constraints : t -> bool = "fq_state_eval_constraints"
+
+    external set_eval_constraints : t -> bool -> unit
+      = "fq_state_set_eval_constraints"
 
     external next_auxiliary : t -> int = "fq_state_next_auxiliary"
 

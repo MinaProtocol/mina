@@ -1,13 +1,11 @@
+use kimchi::circuits::{
+    expr::FeatureFlag,
+    lookup::lookups::{LookupFeatures, LookupPattern, LookupPatterns},
+};
 use kimchi::proof::{caml::CamlRecursionChallenge, PointEvaluations};
 use kimchi::snarky::constraint_system::{
     BasicInput, EcAddCompleteInput, EcEndoscaleInput, EndoscaleRound, EndoscaleScalarRound,
     KimchiConstraint, PoseidonInput, ScaleRound,
-};
-use kimchi::{
-    circuits::{
-        expr::FeatureFlag,
-        lookup::lookups::{LookupFeatures, LookupPattern, LookupPatterns},
-    },
 };
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
 use std::fs::File;
@@ -571,6 +569,7 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_func!(w, env, fp_state_as_prover => "as_prover");
             decl_func!(w, env, fp_state_set_as_prover => "set_as_prover");
             decl_func!(w, env, fp_state_eval_constraints => "eval_constraints");
+            decl_func!(w, env, fp_state_set_eval_constraints => "set_eval_constraints");
             decl_func!(w, env, fp_state_next_auxiliary => "next_auxiliary");
             decl_func!(w, env, fp_state_system => "system");
             decl_func!(w, env, fp_state_finalize => "finalize");
@@ -625,6 +624,7 @@ fn generate_snarky_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_func!(w, env, fq_state_as_prover => "as_prover");
             decl_func!(w, env, fq_state_set_as_prover => "set_as_prover");
             decl_func!(w, env, fq_state_eval_constraints => "eval_constraints");
+            decl_func!(w, env, fq_state_set_eval_constraints => "set_eval_constraints");
             decl_func!(w, env, fq_state_next_auxiliary => "next_auxiliary");
             decl_func!(w, env, fq_state_system => "system");
             decl_func!(w, env, fq_state_finalize => "finalize");
