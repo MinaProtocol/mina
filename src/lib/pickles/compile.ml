@@ -537,7 +537,7 @@ struct
                 let res = b.main ~step_domains () in
                 Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
               in
-              let () = if true then log_step main typ name b.index in
+              let () = if false then log_step main typ name b.index in
               let open Impls.Step in
               (* HACK: TODO docs *)
               if return_early_digest_exception then
@@ -625,7 +625,7 @@ struct
       let open Impls.Wrap in
       let (T (typ, conv, _conv_inv)) = input () in
       let main x () : unit = wrap_main (conv x) in
-      let () = if true then log_wrap main typ name self.id in
+      let () = if false then log_wrap main typ name self.id in
       let self_id = Type_equal.Id.uid self.id in
       let disk_key_prover =
         lazy
