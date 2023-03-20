@@ -360,14 +360,7 @@ struct
         [ 0; 1 ; 2 ]
     in *)
     let lagrange_commitment (d : Domains.t) (i : int) : Inner_curve.Constant.t =
-      let d = Int.pow 2 (Domain.log2_size d.h) in
-      match
-        (Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment srs d i).unshifted
-      with
-      | [| Finite g |] ->
-          Inner_curve.Constant.of_affine g
-      | _ ->
-          assert false
+      lagrange_commitment ~domain:d.h srs i
     in
     let select_curve_points (type k)
         ~(points_for_domain : Domains.t -> (Inner_curve.Constant.t, k) Vector.t)
