@@ -983,11 +983,25 @@ module Account_precondition = struct
         | Full of Zkapp_precondition.Account.Stable.V2.t
         | Nonce of Account.Nonce.Stable.V1.t
         | Accept
-      [@@deriving sexp, equal, yojson, hash, compare]
+      [@@deriving sexp, yojson, hash, compare]
 
       let to_latest = Fn.id
+
+      let to_full = function
+        | Full s ->
+            s
+        | Nonce n ->
+            { Zkapp_precondition.Account.accept with
+              nonce = Check { lower = n; upper = n }
+            }
+        | Accept ->
+            Zkapp_precondition.Account.accept
+
+      let equal p q = Zkapp_precondition.Account.equal (to_full p) (to_full q)
     end
   end]
+
+  [%%define_locally Stable.Latest.(to_full, equal)]
 
   let gen : t Quickcheck.Generator.t =
     Quickcheck.Generator.variant3 Zkapp_precondition.Account.gen
@@ -999,16 +1013,6 @@ module Account_precondition = struct
              Nonce x
          | `C () ->
              Accept )
-
-  let to_full = function
-    | Full s ->
-        s
-    | Nonce n ->
-        { Zkapp_precondition.Account.accept with
-          nonce = Check { lower = n; upper = n }
-        }
-    | Accept ->
-        Zkapp_precondition.Account.accept
 
   let of_full (p : Zkapp_precondition.Account.t) =
     let module A = Zkapp_precondition.Account in
@@ -1048,11 +1052,31 @@ module Account_precondition = struct
     [%test_eq: t] account_precondition
       (account_precondition |> Fd.to_json full |> Fd.of_json full)
 
+  let%test "json roundtrip Full with ignore" =
+    let account_precondition = Full Zkapp_precondition.Account.accept in
+    let module Fd = Fields_derivers_zkapps.Derivers in
+    let full = deriver (Fd.o ()) in
+    equal account_precondition
+      (account_precondition |> Fd.to_json full |> Fd.of_json full)
+
   let%test_unit "json roundtrip nonce" =
     let account_precondition : t = Nonce (Account_nonce.of_int 928472) in
     let module Fd = Fields_derivers_zkapps.Derivers in
     let full = deriver (Fd.o ()) in
     [%test_eq: t] account_precondition
+      (account_precondition |> Fd.to_json full |> Fd.of_json full)
+
+  let%test "json roundtrip Full with nonce" =
+    let n = Account_nonce.of_int 4321 in
+    let account_precondition : t =
+      Full
+        { Zkapp_precondition.Account.accept with
+          nonce = Check { lower = n; upper = n }
+        }
+    in
+    let module Fd = Fields_derivers_zkapps.Derivers in
+    let full = deriver (Fd.o ()) in
+    equal account_precondition
       (account_precondition |> Fd.to_json full |> Fd.of_json full)
 
   let%test_unit "json roundtrip full" =
@@ -1080,7 +1104,7 @@ module Account_precondition = struct
           nonce: {lower: "34928", upper: "34928"},
           receiptChainHash: null, delegate: null,
           state: [null,null,null,null,null,null,null,null],
-          sequenceState: null, provedState: null, isNew: null
+          actionState: null, provedState: null, isNew: null
         }|json}
       |> Yojson.Safe.from_string |> Yojson.Safe.to_string )
 
