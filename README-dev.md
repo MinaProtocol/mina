@@ -134,6 +134,17 @@ let g:syntastic_ocaml_checkers=['merlin']
 Emacs has a built-in autocomplete, via `M-x completion-at-point`, or simply `M-tab`. There are other
 Emacs autocompletion packages; see [Emacs from scratch](https://github.com/ocaml/merlin/wiki/emacs-from-scratch).
 
+- If you use VSCode:
+  - Make sure to be in the right switch (mina)
+  - Install OCaml Platform extension
+  - You might get a prompt to install `ocaml-lsp-server` as well in the Sandbox
+  - You might get a prompt to install `ocamlformat-rpc` as well in the Sandbox
+  - Type "shell command: install code command in PATH"
+  - Close all windows and instances of VSCode
+  - From terminal, in your mina directory, run `code .`
+  - Run `dune build` in the terminal inside VSCode
+  - Now Merlin should work inside VSCode.
+
 ## Running a node
 
 The source code for the Mina node is located in src/app/cli/. Once it is compiled, it can be run like this:
