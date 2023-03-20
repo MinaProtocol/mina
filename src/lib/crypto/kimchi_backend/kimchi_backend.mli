@@ -199,4 +199,14 @@ module Snarky : sig
   module Wrap :
       module type of
         Snarky_backendless.Snark.Run.Make (Kimchi_pasta.Pallas_based_plonk)
+
+  (** Monadic Instantiation of Snarky on the Tick / Step / Vesta curve. *)
+  module Step_monad :
+      module type of
+        Snarky_backendless.Snark.Make (Kimchi_pasta.Vesta_based_plonk)
+
+  (** Monadic Instantiation of Snarky on the Tock / Wrap / Pallas curve. *)
+  module Wrap_monad :
+      module type of
+        Snarky_backendless.Snark.Make (Kimchi_pasta.Pallas_based_plonk)
 end
