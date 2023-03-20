@@ -222,6 +222,12 @@ module PublicOutput = struct
 
   let main (x : Impl.Boolean.var) () : Impl.Boolean.var =
     Impl.Boolean.(x && Impl.Boolean.true_)
+
+  let check_pub_witness () =
+    let input_ = true in
+    let inputs = Impl.generate_witness ~input_typ ~return_typ main input_ in
+    let output_val = Impl.Field.Constant.Vector.get inputs.public_inputs 1 in
+    assert (Impl.Field.Constant.(equal output_val one))
 end
 
 module InvalidWitness = struct
@@ -272,6 +278,7 @@ let circuit_tests =
     , check_json ~input_typ:PublicOutput.input_typ
         ~return_typ:PublicOutput.return_typ ~circuit:PublicOutput.main
         "output.json" )
+  ; ("updated public output in witness", `Quick, PublicOutput.check_pub_witness)
   ; ( "circuit with range check (less than equal)"
     , `Quick
     , check_json ~input_typ:RangeCircuits.input_typ
