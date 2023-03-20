@@ -70,10 +70,6 @@ let bignum_bigint_div_rem (numerator : Bignum_bigint.t)
   let remainder = Bignum_bigint.(numerator - (denominator * quotient)) in
   (quotient, remainder)
 
-(* Length of bigint in bits *)
-let bignum_bigint_bit_length (bigint : Bignum_bigint.t) : int =
-  Z.log2up (Bignum_bigint.to_zarith_bigint bigint)
-
 (* Negative test helper *)
 let is_error (func : unit -> _) = Result.is_error (Or_error.try_with func)
 
