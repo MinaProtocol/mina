@@ -63,7 +63,7 @@ pub unsafe trait FromValue<'a> {
 
 These traits are implemented for all primitive Rust types ([here](https://github.com/zshipko/ocaml-rs/blob/f300f2f382a694a6cc51dc14a9b3f849191580f0/src/conv.rs)), and can be derived automatically via [derive macros](https://docs.rs/ocaml/0.22.0/ocaml/#derives). (Very much like serde.)
 
-### Debugging
+### Understanding the macros
 
 Don't forget that you can use [cargo expand](https://github.com/dtolnay/cargo-expand) to expand macros, which is really useful to understand what the ocaml-rs macros are doing.
 
@@ -141,3 +141,17 @@ For example, if you have a generic custom type that must be converted to differe
 * The priority is to keep small, potentially short-lived data on the heap so we don't fragment the rust heap and so that it gets free'd appropriately quickly.
 * Since OCaml does not have fixed-sized arrays, we usually convert any arrays (`[T; N]`) into tuples (`(T, T, T, ...)`)
 * Do not use `unwrap()` and other functions that can panic in the stubs. Instead return a `Result<_, ocaml::Error>` with a string literal (e.g. `Err(ocaml::Error::Message("my error"))`). This will get you much better errors on the OCaml side. If you want to add dynamic information you'll have to print it on the Rust side before returning the error (I haven't found a better way, `ocaml::Error` seems to only expect string literals).
+
+### Debugging
+
+It is sometimes hard to get good errors.
+One thing you can do is use better stack traces from Rust by initializing panic hooks before the error:
+
+```ocaml
+let () = Kimchi_bindings.RustHelpers.init_rust_panic_hook ()
+```
+
+This sometimes work, and sometimes doesn't.
+
+Another thing you can do is just build the (test) binary and then debug it with gdb/lldb. 
+Simply running it, and displaying the backtrace (`bt`) often shows enough to unstuck you.
