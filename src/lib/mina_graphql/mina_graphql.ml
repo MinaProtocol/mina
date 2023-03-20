@@ -4068,123 +4068,148 @@ module Mutations = struct
         ~typ:(non_null string)
         ~resolve:(fun { ctx = mina; _ } () input ->
           return
-            ( match input with
-            | Ok payment_details ->
-                let max_memo_len = Signed_command_memo.max_input_length in
-                if List.is_empty payment_details.senders then
-                  Error "Empty list of senders"
-                else if String.length payment_details.memo > max_memo_len then
-                  Error
-                    (sprintf "Memo too long, limited to %d characters"
-                       max_memo_len )
-                else if
-                  Currency.Fee.( < ) payment_details.fee_max
-                    payment_details.fee_min
-                then Error "Maximum fee less than mininum fee"
-                else
-                  let logger = Mina_lib.top_level_logger mina in
-                  let senders = payment_details.senders |> Array.of_list in
-                  let num_senders = Array.length senders in
-                  let fee =
-                    Quickcheck.random_value
-                    @@ Currency.Fee.gen_incl payment_details.fee_min
-                         payment_details.fee_max
-                  in
-                  let memo =
-                    Signed_command_memo.create_from_string_exn
-                      payment_details.memo
-                  in
-                  let wait_span =
-                    1. /. payment_details.transactions_per_second
-                    |> Time.Span.of_sec
-                  in
-                  let duration_span =
-                    Time.Span.of_min
-                      (Float.of_int payment_details.duration_in_minutes)
-                  in
-                  let tm_start = Time.now () in
-                  let tm_end = Time.add tm_start duration_span in
-                  let rec go ndx =
-                    if Time.( >= ) (Time.now ()) tm_end then Deferred.unit
-                    else
-                      let sender = senders.(ndx) in
-                      let source_pk_uncompressed =
-                        Signature_lib.Public_key.of_private_key_exn sender
-                      in
-                      let source_pk =
-                        Signature_lib.Public_key.compress source_pk_uncompressed
-                      in
-                      let sender_kp : Signature_lib.Keypair.t =
-                        { private_key = sender
-                        ; public_key = source_pk_uncompressed
-                        }
-                      in
-                      let receiver_pk = payment_details.receiver in
-                      let body =
-                        Signed_command_payload.Body.Payment
-                          { source_pk
-                          ; receiver_pk
-                          ; amount = payment_details.amount
-                          }
-                      in
-                      let valid_until = None in
-                      (* lookup sender's account to get current nonce *)
-                      let current_nonce_opt =
-                        let open Option.Let_syntax in
-                        let%bind ledger, _tip =
-                          get_ledger_and_breadcrumb mina
-                        in
-                        let acct_id =
-                          Account_id.create source_pk Token_id.default
-                        in
-                        let%bind loc =
-                          Ledger.location_of_account ledger acct_id
-                        in
-                        let%map { nonce; _ } = Ledger.get ledger loc in
-                        nonce
-                      in
-                      match current_nonce_opt with
-                      | None ->
-                          [%log error]
-                            "No user account at best tip for sender, \
-                             terminating scheduled payments"
-                            ~metadata:
-                              [ ( "sender"
-                                , Public_key.Compressed.to_yojson source_pk )
-                              ] ;
-                          (* TODO: remove handle from table *)
-                          Deferred.unit
-                      | Some current_nonce ->
-                          let nonce = Account.Nonce.succ current_nonce in
-                          let payload =
-                            Signed_command_payload.create
-                              ~fee_payer_pk:source_pk ~fee ~memo ~body
-                              ~valid_until ~nonce
+          @@
+          match input with
+          | Ok payment_details -> (
+              let max_memo_len = Signed_command_memo.max_input_length in
+              if List.is_empty payment_details.senders then
+                Error "Empty list of senders"
+              else if String.length payment_details.memo > max_memo_len then
+                Error
+                  (sprintf "Memo too long, limited to %d characters"
+                     max_memo_len )
+              else if
+                Currency.Fee.( < ) payment_details.fee_max
+                  payment_details.fee_min
+              then Error "Maximum fee less than mininum fee"
+              else
+                let logger = Mina_lib.top_level_logger mina in
+                let senders = payment_details.senders |> Array.of_list in
+                let num_senders = Array.length senders in
+                let sources =
+                  Array.map senders ~f:(fun sender ->
+                      Signature_lib.Public_key.of_private_key_exn sender
+                      |> Signature_lib.Public_key.compress )
+                in
+                match get_ledger_and_breadcrumb mina with
+                | None ->
+                    Error "Could not get best tip ledger"
+                | Some (ledger, _tip) -> (
+                    let nonce_opts =
+                      Array.map sources ~f:(fun source ->
+                          let acct_id =
+                            Account_id.create source Token_id.default
                           in
-                          let signature =
-                            Ok (Signed_command.sign_payload sender payload)
-                          in
-                          let%bind () =
-                            let fee = Currency.Fee.to_uint64 fee in
-                            let memo = Some payment_details.memo in
-                            match%bind
-                              send_signed_user_command ~mina
-                                ~nonce_opt:(Some nonce) ~signer:source_pk ~memo
-                                ~fee ~fee_payer_pk:source_pk ~valid_until ~body
-                                ~signature
-                            with
-                            | Ok _cmd_with_status ->
-                                Deferred.unit
-                            | Error _ ->
-                                Deferred.unit
-                          in
-                          let%bind () = Async_unix.after wait_span in
-                          go ((ndx + 1) mod num_senders)
-                  in
-                  don't_wait_for @@ go 0 ;
-                  Ok "foo"
-            | Error err ->
-                Error (sprintf "Invalid input: %s" err) ) )
+                          match Ledger.location_of_account ledger acct_id with
+                          | None ->
+                              (source, None)
+                          | Some loc -> (
+                              match Ledger.get ledger loc with
+                              | None ->
+                                  (source, None)
+                              | Some { nonce; _ } ->
+                                  (source, Some nonce) ) )
+                    in
+                    match
+                      Array.partition_tf nonce_opts
+                        ~f:(fun (_source, nonce_opt) ->
+                          Option.is_some nonce_opt )
+                    with
+                    | _with_nonces, no_nonces when Array.length no_nonces > 0 ->
+                        let pks =
+                          Array.map no_nonces ~f:(fun (source, _nonce_opt) ->
+                              source )
+                          |> Array.to_list
+                        in
+                        Error
+                          (sprintf
+                             "Could not get ledger nonces for accounts: %s"
+                             ( List.map pks ~f:(fun pk ->
+                                   Signature_lib.Public_key.Compressed.to_yojson
+                                     pk
+                                   |> Yojson.Safe.to_string )
+                             |> String.concat ~sep:"," ) )
+                    | _ ->
+                        let nonces =
+                          Array.map nonce_opts ~f:(fun (_source, nonce_opt) ->
+                              Option.value_exn nonce_opt )
+                        in
+                        let memo =
+                          Signed_command_memo.create_from_string_exn
+                            payment_details.memo
+                        in
+                        let wait_span =
+                          1. /. payment_details.transactions_per_second
+                          |> Time.Span.of_sec
+                        in
+                        let duration_span =
+                          Time.Span.of_min
+                            (Float.of_int payment_details.duration_in_minutes)
+                        in
+                        let tm_start = Time.now () in
+                        let tm_end = Time.add tm_start duration_span in
+                        let rec go ndx =
+                          if Time.( >= ) (Time.now ()) tm_end then Deferred.unit
+                          else
+                            let sender = senders.(ndx) in
+                            let source_pk_uncompressed =
+                              Signature_lib.Public_key.of_private_key_exn sender
+                            in
+                            let source_pk =
+                              Signature_lib.Public_key.compress
+                                source_pk_uncompressed
+                            in
+                            let sender_kp : Signature_lib.Keypair.t =
+                              { private_key = sender
+                              ; public_key = source_pk_uncompressed
+                              }
+                            in
+                            let receiver_pk = payment_details.receiver in
+                            let fee =
+                              Quickcheck.random_value ~seed:`Nondeterministic
+                              @@ Currency.Fee.gen_incl payment_details.fee_min
+                                   payment_details.fee_max
+                            in
+                            let body =
+                              Signed_command_payload.Body.Payment
+                                { source_pk
+                                ; receiver_pk
+                                ; amount = payment_details.amount
+                                }
+                            in
+                            let valid_until = None in
+                            let nonce = nonces.(ndx) in
+                            let payload =
+                              Signed_command_payload.create ~fee
+                                ~fee_payer_pk:source_pk ~nonce ~valid_until
+                                ~memo ~body
+                            in
+                            let signature =
+                              Ok (Signed_command.sign_payload sender payload)
+                            in
+                            let%bind () =
+                              let fee = Currency.Fee.to_uint64 fee in
+                              let memo = Some payment_details.memo in
+                              match%bind
+                                send_signed_user_command ~mina
+                                  ~nonce_opt:(Some nonce) ~signer:source_pk
+                                  ~memo ~fee ~fee_payer_pk:source_pk
+                                  ~valid_until ~body ~signature
+                              with
+                              | Ok _cmd_with_status ->
+                                  Deferred.unit
+                              | Error _ ->
+                                  Deferred.unit
+                            in
+                            (* next nonce for this sender *)
+                            nonces.(ndx) <- Account.Nonce.succ nonce ;
+                            let%bind () = Async_unix.after wait_span in
+                            go ((ndx + 1) mod num_senders)
+                        in
+                        don't_wait_for @@ go 0 ;
+                        Ok "foo" ) )
+          | Error err ->
+              Error (sprintf "Invalid input: %s" err) )
 
     let mutations = []
   end

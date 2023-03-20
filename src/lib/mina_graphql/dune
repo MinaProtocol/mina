@@ -29,6 +29,7 @@
    kimchi_backend.pasta.basic
    mina_base.util
    mina_ledger
+   merkle_address
    pickles
    pickles_unix
    mina_incremental
