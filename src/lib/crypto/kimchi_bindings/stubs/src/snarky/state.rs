@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use ark_ff::Zero;
 use kimchi::snarky::{
     checked_runner::Constraint,
     constraint_system::{BasicSnarkyConstraint, KimchiConstraint},
@@ -143,7 +144,16 @@ impl_functions! {
 
 
     pub fn fp_state_set_public_inputs(mut state : ocaml::Pointer<CamlFpState>, inputs : CamlFpVector) -> SnarkyResult<()> {
-        state.as_mut().0.generate_witness_init(inputs.0.to_vec())
+        // The OCaml side currently does not use  snarky-rs to handle public outputs.
+        // Instead, it does that outside.
+        // The argument `inputs` does not contain the public outputs,
+        // but `num_public_inputs` is the size including the public output.
+        // Hence the padding.
+        let mut inputs = inputs.0.to_vec();
+        let state = &mut state.as_mut().0;
+        let padding = state.num_public_inputs - inputs.len();
+        inputs.extend(std::iter::repeat(Fp::zero()).take(padding));
+        state.generate_witness_init(inputs)
     }
 
     pub fn fp_state_get_private_inputs(state : ocaml::Pointer<CamlFpState>) -> CamlFpVector {
@@ -270,7 +280,16 @@ impl_functions! {
     }
 
     pub fn fq_state_set_public_inputs(mut state : ocaml::Pointer<CamlFqState>, inputs : CamlFqVector) -> SnarkyResult<()> {
-        state.as_mut().0.generate_witness_init(inputs.0.to_vec())
+        // The OCaml side currently does not use  snarky-rs to handle public outputs.
+        // Instead, it does that outside.
+        // The argument `inputs` does not contain the public outputs,
+        // but `num_public_inputs` is the size including the public output.
+        // Hence the padding.
+        let mut inputs = inputs.0.to_vec();
+        let state = &mut state.as_mut().0;
+        let padding = state.num_public_inputs - inputs.len();
+        inputs.extend(std::iter::repeat(Fq::zero()).take(padding));
+        state.generate_witness_init(inputs)
     }
 
     pub fn fq_state_get_private_inputs(state : ocaml::Pointer<CamlFqState>) -> CamlFqVector {
