@@ -1,6 +1,6 @@
 (* open Core_kernel *)
 
-(* open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint *)
+open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
@@ -10,6 +10,10 @@ let limb_bits = 88
 
 (* Foreign field element limb size 2^L where L=88 *)
 let two_to_limb = Bignum_bigint.(pow (of_int 2) (of_int limb_bits))
+
+let two_to_limb_field (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f) =
+  Common.bignum_bigint_to_field (module Circuit) two_to_limb
 
 (* 2^2L *)
 let two_to_2limb = Bignum_bigint.(pow (of_int 2) (of_int Int.(mul 2 limb_bits)))
@@ -41,6 +45,36 @@ type 'field limbs =
   | Standard of 'field standard_limbs
   | Extended of 'field extended_limbs
 
+(* Convert Bignum_bigint.t to Bignum_bigint standard_limbs *)
+let bignum_bigint_to_standard_limbs (bigint : Bignum_bigint.t) :
+    Bignum_bigint.t standard_limbs =
+  let l12, l0 = Common.bignum_bigint_div_rem bigint two_to_limb in
+  let l2, l1 = Common.bignum_bigint_div_rem l12 two_to_limb in
+  (l0, l1, l2)
+
+(* Convert Bignum_bigint.t to field standard_limbs *)
+let bignum_bigint_to_field_standard_limbs (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (bigint : Bignum_bigint.t) : f standard_limbs =
+  let l0, l1, l2 = bignum_bigint_to_standard_limbs bigint in
+  ( Common.bignum_bigint_to_field (module Circuit) l0
+  , Common.bignum_bigint_to_field (module Circuit) l1
+  , Common.bignum_bigint_to_field (module Circuit) l2 )
+
+(* Convert Bignum_bigint.t to Bignum_bigint compact_limbs *)
+let bignum_bigint_to_compact_limbs (bigint : Bignum_bigint.t) :
+    Bignum_bigint.t compact_limbs =
+  let l2, l01 = Common.bignum_bigint_div_rem bigint two_to_2limb in
+  (l01, l2)
+
+(* Convert Bignum_bigint.t to field compact_limbs *)
+let bignum_bigint_to_field_compact_limbs (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (bigint : Bignum_bigint.t) : f compact_limbs =
+  let l01, l2 = bignum_bigint_to_compact_limbs bigint in
+  ( Common.bignum_bigint_to_field (module Circuit) l01
+  , Common.bignum_bigint_to_field (module Circuit) l2 )
+
 (* Foreign field element base type - not used directly *)
 module type Foreign_field_element_base = sig
   type 'field t
@@ -61,14 +95,14 @@ module type Foreign_field_element_base = sig
     'field.
     (module Snark_intf.Run with type field = 'field) -> 'field t -> 'field limbs
 
-  (* Convert foreign field element into bignum_bigint limbs *)
+  (* Convert foreign field element into Bignum_bigint.t limbs *)
   val to_bignum_bigint_limbs :
     'field.
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> Bignum_bigint.t limbs
 
-  (* Convert foreign field element into a bignum_bigint *)
+  (* Convert foreign field element into a Bignum_bigint.t *)
   val to_bignum_bigint :
     'field.
        (module Snark_intf.Run with type field = 'field)
@@ -135,8 +169,8 @@ let to_extended x =
 
 (* Foreign field element type (standard limbs) *)
 module Foreign_field_element : sig
-  include Foreign_field_element_base
   (* Specialization of base type to standard_limbs *)
+  include Foreign_field_element_base
 
   (* Create foreign field element from standard_limbs *)
   val of_limbs : 'field Cvar.t standard_limbs -> 'field t
@@ -194,27 +228,382 @@ end = struct
     Bignum_bigint.(l0 + (two_to_limb * l1) + (two_to_2limb * l2))
 end
 
+(* Compute non-zero intermediate products
+ *
+ * For more details see the "Intermediate products" Section of
+ * the [Foreign Field Multiplication RFC](../rfcs/foreign_field_mul.md) *)
+let compute_intermediate_products (type f)
+    (module Circuit : Snark_intf.Run with type field = f)
+    (left_input : f Foreign_field_element.t)
+    (right_input : f Foreign_field_element.t) (quotient : f standard_limbs)
+    (neg_foreign_field_modulus : f standard_limbs) : f * f * f =
+  let open Circuit in
+  let left_input0, left_input1, left_input2 =
+    Foreign_field_element.to_field_limbs (module Circuit) left_input
+  in
+  let right_input0, right_input1, right_input2 =
+    Foreign_field_element.to_field_limbs (module Circuit) right_input
+  in
+  let quotient0, quotient1, quotient2 = quotient in
+  let ( neg_foreign_field_modulus0
+      , neg_foreign_field_modulus1
+      , neg_foreign_field_modulus2 ) =
+    neg_foreign_field_modulus
+  in
+  ( (* p0 = a0 * b0 + q0 + f'0 *)
+    Field.Constant.(
+      (left_input0 * right_input0) + (quotient0 * neg_foreign_field_modulus0))
+  , (* p1 = a0 * b1 + a1 * b0 + q0 * f'1 + q1 * f'0 *)
+    Field.Constant.(
+      (left_input0 * right_input1)
+      + (left_input1 * right_input0)
+      + (quotient0 * neg_foreign_field_modulus1)
+      + (quotient1 * neg_foreign_field_modulus0))
+  , (* p2 = a0 * b2 + a2 * b0 + a1 * b1 - q0 * f'2 + q2 * f'0 + q1 * f'1 *)
+    Field.Constant.(
+      (left_input0 * right_input2)
+      + (left_input2 * right_input0)
+      + (left_input1 * right_input1)
+      + (quotient0 * neg_foreign_field_modulus2)
+      + (quotient2 * neg_foreign_field_modulus0)
+      + (quotient1 * neg_foreign_field_modulus1)) )
+
+(* Compute intermediate sums
+ *   For more details see the "Optimizations" Section of
+ *   the [Foreign Field Multiplication RFC](../rfcs/foreign_field_mul.md) *)
+let compute_intermediate_sums (type f)
+    (module Circuit : Snark_intf.Run with type field = f)
+    (quotient : f standard_limbs) (neg_foreign_field_modulus : f standard_limbs)
+    : f * f =
+  let open Circuit in
+  let quotient0, quotient1, quotient2 = quotient in
+  let ( neg_foreign_field_modulus0
+      , neg_foreign_field_modulus1
+      , neg_foreign_field_modulus2 ) =
+    neg_foreign_field_modulus
+  in
+  (* let q01 = q0 + 2^L * q1 *)
+  let quotient01 =
+    Field.Constant.(
+      quotient0 + (two_to_limb_field (module Circuit) * quotient1))
+  in
+
+  (* f'01 = f'0 + 2^L * f'1 *)
+  let neg_foreign_field_modulus01 =
+    Field.Constant.(
+      neg_foreign_field_modulus0
+      + (two_to_limb_field (module Circuit) * neg_foreign_field_modulus1))
+  in
+  ( (* q'01 = q01 + f'01 *)
+    Field.Constant.(quotient01 + neg_foreign_field_modulus01)
+  , (* q'2 = q2 + f'2 *)
+    Field.Constant.(quotient2 + neg_foreign_field_modulus2) )
+
+(* Compute witness variables related for foreign field multplication *)
+let compute_witness_variables (type f)
+    (module Circuit : Snark_intf.Run with type field = f)
+    (products : Bignum_bigint.t standard_limbs)
+    (remainder : Bignum_bigint.t standard_limbs) : f * f * f * f * f * f =
+  let open Circuit in
+  let products0, products1, products2 = products in
+  let remainder0, remainder1, remainder2 = remainder in
+
+  (* C1-C2: Compute components of product1 *)
+  let product1_hi, product1_lo =
+    Common.bignum_bigint_div_rem products1 two_to_limb
+  in
+  let product1_hi_1, product1_hi_0 =
+    Common.bignum_bigint_div_rem product1_hi two_to_limb
+  in
+
+  (* C3-C5: Compute v0 = the top 2 bits of (p0 + 2^L * p10 - r0 - 2^L * r1) / 2^2L
+   *   N.b. To avoid an underflow error, the equation must sum the intermediate
+   *        product terms before subtracting limbs of the remainder. *)
+  let carry0 =
+    Bignum_bigint.(
+      ( products0
+      + (two_to_limb * product1_lo)
+      - remainder0 - (two_to_limb * remainder1) )
+      / two_to_2limb)
+  in
+
+  (* C6-C7: Compute v1 = the top L + 3 bits (p2 + p11 + v0 - r2) / 2^L
+   *   N.b. Same as above, to avoid an underflow error, the equation must
+   *        sum the intermediate product terms before subtracting the remainder. *)
+  let carry1 =
+    Bignum_bigint.(
+      (products2 + product1_hi + carry0 - remainder2) / two_to_limb)
+  in
+  (* Compute v10 and v11 *)
+  let carry1_hi, carry1_lo = Common.bignum_bigint_div_rem carry1 two_to_limb in
+
+  ( Common.bignum_bigint_to_field (module Circuit) product1_lo
+  , Common.bignum_bigint_to_field (module Circuit) product1_hi_0
+  , Common.bignum_bigint_to_field (module Circuit) product1_hi_1
+  , Common.bignum_bigint_to_field (module Circuit) carry0
+  , Common.bignum_bigint_to_field (module Circuit) carry1_lo
+  , Common.bignum_bigint_to_field (module Circuit) carry1_hi )
+
+(* Perform integer bound addition computation x' = x + f' *)
+let compute_bound (x : Bignum_bigint.t)
+    (neg_foreign_field_modulus : Bignum_bigint.t) : Bignum_bigint.t =
+  let x_bound = Bignum_bigint.(x + neg_foreign_field_modulus) in
+  assert (Bignum_bigint.(x_bound < binary_modulus)) ;
+  x_bound
+
+(* Compute bound witness carry bit *)
+let compute_bound_witness_carry (type f)
+    (module Circuit : Snark_intf.Run with type field = f)
+    (sums : Bignum_bigint.t compact_limbs)
+    (bound : Bignum_bigint.t compact_limbs) : f =
+  let sums01, _sums2 = sums in
+  let bound01, _bound2 = bound in
+
+  (* C9: witness data is created by externally by called and multi-range-check gate *)
+
+  (* C10-C11: Compute q'_carry01 = (s01 - q'01)/2^2L *)
+  let quotient_bound_carry, _ =
+    Common.bignum_bigint_div_rem Bignum_bigint.(sums01 - bound01) two_to_2limb
+  in
+  Common.bignum_bigint_to_field (module Circuit) quotient_bound_carry
+
 let foreign_field_mul (type f)
     (module Circuit : Snark_intf.Run with type field = f)
     (left_input : f Foreign_field_element.t)
-    (_right_input : f Foreign_field_element.t)
-    (_foreign_modulus : f Foreign_field_element.t) =
+    (right_input : f Foreign_field_element.t)
+    (foreign_field_modulus : f Foreign_field_element.t) =
   let open Circuit in
-  let _left_input0, _left_input1, _left_input2 =
-    Foreign_field_element.to_limbs left_input
-  in
-  let _unused =
-    exists Field.typ ~compute:(fun () ->
-        let _left_input0, _left_input1, _left_input2 =
+  (* Compute witness values *)
+  let [| left_input0
+       ; left_input1
+       ; left_input2
+       ; right_input0
+       ; right_input1
+       ; right_input2
+       ; carry1_lo
+       ; carry1_hi
+       ; product1_hi_1
+       ; carry0
+       ; quotient0
+       ; quotient1
+       ; quotient2
+       ; quotient_bound_carry
+       ; remainder0
+       ; remainder1
+       ; remainder2
+       ; quotient_bound01
+       ; quotient_bound2
+       ; remainder_bound0
+       ; remainder_bound1
+       ; remainder_bound2
+       ; product1_lo
+       ; product1_hi_0
+       ; foreign_field_modulus0
+       ; foreign_field_modulus1
+       ; foreign_field_modulus2
+       ; neg_foreign_field_modulus0
+       ; neg_foreign_field_modulus1
+       ; neg_foreign_field_modulus2
+      |] =
+    exists (Typ.array ~length:30 Field.typ) ~compute:(fun () ->
+        (* Compute quotient remainder and negative foreign field modulus *)
+        let quotient, remainder, neg_foreign_field_modulus =
+          (* Bignum_bigint computations *)
+          let left_input =
+            Foreign_field_element.to_bignum_bigint (module Circuit) left_input
+          in
+          let right_input =
+            Foreign_field_element.to_bignum_bigint (module Circuit) right_input
+          in
+          let foreign_field_modulus =
+            Foreign_field_element.to_bignum_bigint
+              (module Circuit)
+              foreign_field_modulus
+          in
+          (* Compute quotient and remainder using foreign field modulus *)
+          let quotient, remainder =
+            Common.bignum_bigint_div_rem
+              Bignum_bigint.(left_input * right_input)
+              foreign_field_modulus
+          in
+
+          (* Compute negated foreign field modulus f' = 2^t - f public parameter *)
+          let neg_foreign_field_modulus =
+            Bignum_bigint.(binary_modulus - foreign_field_modulus)
+          in
+          (quotient, remainder, neg_foreign_field_modulus)
+        in
+
+        (* Compute the intermediate products *)
+        let products =
+          let quotient =
+            bignum_bigint_to_field_standard_limbs (module Circuit) quotient
+          in
+          let neg_foreign_field_modulus =
+            bignum_bigint_to_field_standard_limbs
+              (module Circuit)
+              neg_foreign_field_modulus
+          in
+          let product0, product1, product2 =
+            compute_intermediate_products
+              (module Circuit)
+              left_input right_input quotient neg_foreign_field_modulus
+          in
+
+          ( Common.field_to_bignum_bigint (module Circuit) product0
+          , Common.field_to_bignum_bigint (module Circuit) product1
+          , Common.field_to_bignum_bigint (module Circuit) product2 )
+        in
+
+        (* Compute the intermediate sums *)
+        let sums =
+          let quotient =
+            bignum_bigint_to_field_standard_limbs (module Circuit) quotient
+          in
+          let neg_foreign_field_modulus =
+            bignum_bigint_to_field_standard_limbs
+              (module Circuit)
+              neg_foreign_field_modulus
+          in
+          let sum01, sum2 =
+            compute_intermediate_sums
+              (module Circuit)
+              quotient neg_foreign_field_modulus
+          in
+          ( Common.field_to_bignum_bigint (module Circuit) sum01
+          , Common.field_to_bignum_bigint (module Circuit) sum2 )
+        in
+
+        (* Compute witness variables *)
+        let ( product1_lo
+            , product1_hi_0
+            , product1_hi_1
+            , carry0
+            , carry1_lo
+            , carry1_hi ) =
+          compute_witness_variables
+            (module Circuit)
+            products
+            (bignum_bigint_to_standard_limbs remainder)
+        in
+
+        (* Compute bounds for multi-range-checks on quotient and remainder *)
+        let quotient_bound = compute_bound quotient neg_foreign_field_modulus in
+        let remainder_bound =
+          compute_bound remainder neg_foreign_field_modulus
+        in
+
+        (* Compute quotient bound addition witness variables *)
+        let quotient_bound_carry =
+          compute_bound_witness_carry
+            (module Circuit)
+            sums
+            (bignum_bigint_to_compact_limbs quotient_bound)
+        in
+
+        (* Compute the rest of the witness data *)
+        let left_input0, left_input1, left_input2 =
           Foreign_field_element.to_field_limbs (module Circuit) left_input
         in
-        let _bi =
-          Foreign_field_element.to_bignum_bigint (module Circuit) left_input
+        let right_input0, right_input1, right_input2 =
+          Foreign_field_element.to_field_limbs (module Circuit) right_input
         in
-        let _limbs =
-          Foreign_field_element.map left_input (fun x ->
-              As_prover.read Field.typ x )
+        let quotient0, quotient1, quotient2 =
+          bignum_bigint_to_field_standard_limbs (module Circuit) quotient
         in
-        Field.Constant.zero )
+        let remainder0, remainder1, remainder2 =
+          bignum_bigint_to_field_standard_limbs (module Circuit) remainder
+        in
+        let quotient_bound01, quotient_bound2 =
+          bignum_bigint_to_field_compact_limbs (module Circuit) quotient_bound
+        in
+        let remainder_bound0, remainder_bound1, remainder_bound2 =
+          bignum_bigint_to_field_standard_limbs (module Circuit) remainder_bound
+        in
+
+        (* Compute gate coefficients *)
+        let ( foreign_field_modulus0
+            , foreign_field_modulus1
+            , foreign_field_modulus2 ) =
+          Foreign_field_element.to_field_limbs
+            (module Circuit)
+            foreign_field_modulus
+        in
+        let ( neg_foreign_field_modulus0
+            , neg_foreign_field_modulus1
+            , neg_foreign_field_modulus2 ) =
+          bignum_bigint_to_field_standard_limbs
+            (module Circuit)
+            neg_foreign_field_modulus
+        in
+
+        [| left_input0
+         ; left_input1
+         ; left_input2
+         ; right_input0
+         ; right_input1
+         ; right_input2
+         ; carry1_lo
+         ; carry1_hi
+         ; product1_hi_1
+         ; carry0
+         ; quotient0
+         ; quotient1
+         ; quotient2
+         ; quotient_bound_carry
+         ; remainder0
+         ; remainder1
+         ; remainder2
+         ; quotient_bound01
+         ; quotient_bound2
+         ; remainder_bound0
+         ; remainder_bound1
+         ; remainder_bound2
+         ; product1_lo
+         ; product1_hi_0
+         ; foreign_field_modulus0
+         ; foreign_field_modulus1
+         ; foreign_field_modulus2
+         ; neg_foreign_field_modulus0
+         ; neg_foreign_field_modulus1
+         ; neg_foreign_field_modulus2
+        |] )
   in
+
+  (* Create ForeignFieldMul gate *)
+  with_label "foreign_field_mul" (fun () ->
+      assert_
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (ForeignFieldMul
+                 { (* Current row *) left_input0
+                 ; left_input1
+                 ; left_input2
+                 ; right_input0
+                 ; right_input1
+                 ; right_input2
+                 ; carry1_lo
+                 ; carry1_hi
+                 ; carry0
+                 ; quotient0
+                 ; quotient1
+                 ; quotient2
+                 ; quotient_bound_carry
+                 ; product1_hi_1
+                 ; (* Next row *) remainder0
+                 ; remainder1
+                 ; remainder2
+                 ; quotient_bound01
+                 ; quotient_bound2
+                 ; product1_lo
+                 ; product1_hi_0
+                 ; (* Coefficients *) foreign_field_modulus0
+                 ; foreign_field_modulus1
+                 ; foreign_field_modulus2
+                 ; neg_foreign_field_modulus0
+                 ; neg_foreign_field_modulus1
+                 ; neg_foreign_field_modulus2
+                 } )
+        } ) ;
   ()
