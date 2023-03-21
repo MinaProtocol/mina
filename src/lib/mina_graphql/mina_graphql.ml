@@ -4224,7 +4224,15 @@ module Mutations = struct
                             with
                             | Ok _cmd_with_status ->
                                 Deferred.unit
-                            | Error _ ->
+                            | Error err ->
+                                [%log error]
+                                  "Payment scheduler with handle %s got error \
+                                   when sending payment from sender %s"
+                                  (Uuid.to_string uuid)
+                                  ( Signature_lib.Public_key.Compressed.to_yojson
+                                      source_pk
+                                  |> Yojson.Safe.to_string )
+                                  ~metadata:[ ("error", `String err) ] ;
                                 Deferred.unit
                           in
                           (* next nonce for this sender *)
