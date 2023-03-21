@@ -3082,7 +3082,7 @@ module Types = struct
       =
     let open Consensus_vrf.Layout.Evaluation in
     let vrf_scalar = Graphql_lib.Scalars.VrfScalar.typ () in
-    Schema.obj "VrfEvaluation"
+    obj "VrfEvaluation"
       ~doc:"A witness to a vrf evaluation, which may be externally verified"
       ~fields:(fun _ ->
         [ field "message" ~typ:(non_null vrf_message)
