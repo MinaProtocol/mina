@@ -32,7 +32,7 @@ pub fn caml_pasta_fq_plonk_index_create(
     public_: i32,
     prev_challenges: i32,
     srs: &WasmSrs,
-) -> Result<WasmPastaFqPlonkIndex, JsValue> {
+) -> Result<WasmPastaFqPlonkIndex, JsError> {
     console_error_panic_hook::set_once();
     let index = crate::rayon::run_in_pool(|| {
         // flatten the permutation information (because OCaml has a different way of keeping track of permutations)
@@ -78,7 +78,7 @@ pub fn caml_pasta_fq_plonk_index_create(
     // create index
     match index {
         Ok(index) => Ok(WasmPastaFqPlonkIndex(Box::new(index))),
-        Err(str) => Err(JsValue::from_str(str)),
+        Err(str) => Err(JsError::new(str)),
     }
 }
 
