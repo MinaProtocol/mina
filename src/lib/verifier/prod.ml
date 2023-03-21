@@ -112,7 +112,9 @@ module Worker_state = struct
                      `Mismatched_authorization_kind keys )
 
              let verify_commands cs =
-               Internal_tracing_context_logger.with_logger (Some logger)
+               Internal_tracing.Context_logger.with_logger (Some logger)
+               @@ fun () ->
+               Internal_tracing.Context_call.with_call_id
                @@ fun () ->
                [%log internal] "Verifier_verify_commands" ;
                let%map result = verify_commands cs in
@@ -122,7 +124,9 @@ module Worker_state = struct
              let verify_blockchain_snarks = B.Proof.verify
 
              let verify_blockchain_snarks bs =
-               Internal_tracing_context_logger.with_logger (Some logger)
+               Internal_tracing.Context_logger.with_logger (Some logger)
+               @@ fun () ->
+               Internal_tracing.Context_call.with_call_id
                @@ fun () ->
                [%log internal] "Verifier_verify_blockchain_snarks" ;
                let%map result = verify_blockchain_snarks bs in
@@ -141,7 +145,9 @@ module Worker_state = struct
                    failwith "Verifier crashed"
 
              let verify_transaction_snarks ts =
-               Internal_tracing_context_logger.with_logger (Some logger)
+               Internal_tracing.Context_logger.with_logger (Some logger)
+               @@ fun () ->
+               Internal_tracing.Context_call.with_call_id
                @@ fun () ->
                [%log internal] "Verifier_verify_transaction_snarks" ;
                let%map result = verify_transaction_snarks ts in
