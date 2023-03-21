@@ -49,52 +49,62 @@ impl_functions! {
 
     pub fn fp_state_add_square_constraint(
         mut state: ocaml::Pointer<CamlFpState>,
+        label: Option<String>,
         v1: CamlFpVar,
         v2: CamlFpVar,
     ) -> SnarkyResult<()> {
         let state = &mut state.as_mut().0;
         let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::Square(v1.0, v2.0));
-        state.add_constraint(constraint, None, &loc!())
+        let label = label.map(Into::into);
+        state.add_constraint(constraint, label, "")
     }
 
     pub fn fp_state_add_equal_constraint(
         mut state: ocaml::Pointer<CamlFpState>,
+        label: Option<String>,
         v1: CamlFpVar,
         v2: CamlFpVar,
     ) -> SnarkyResult<()> {
         let state = &mut state.as_mut().0;
         let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::Equal(v1.0, v2.0));
-        state.add_constraint(constraint, None, &loc!())
+        let label = label.map(Into::into);
+        state.add_constraint(constraint, label, "")
     }
 
     pub fn fp_state_add_boolean_constraint(
         mut state: ocaml::Pointer<CamlFpState>,
+        label: Option<String>,
         v1: CamlFpVar,
     ) -> SnarkyResult<()> {
         let state = &mut state.as_mut().0;
         let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::Boolean(v1.0));
-        state.add_constraint(constraint, None, &loc!())
+        let label = label.map(Into::into);
+        state.add_constraint(constraint, label, "")
     }
 
     pub fn fp_state_add_r1cs_constraint(
         mut state: ocaml::Pointer<CamlFpState>,
+        label: Option<String>,
         v1: CamlFpVar,
         v2: CamlFpVar,
         v3: CamlFpVar,
     ) -> SnarkyResult<()> {
         let state = &mut state.as_mut().0;
         let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::R1CS(v1.0, v2.0, v3.0));
-        state.add_constraint(constraint, None, &loc!())
+        let label = label.map(Into::into);
+        state.add_constraint(constraint, label, "")
     }
 
     pub fn fp_state_add_kimchi_constraint(
         mut state: ocaml::Pointer<CamlFpState>,
+        label: Option<String>,
         constraint: KimchiConstraint<CamlFpVar, CamlFp>,
     ) -> SnarkyResult<()> {
         let constraint: KimchiConstraint<FieldVar<Fp>, Fp> =
         conv::fp::convert_constraint(&constraint);
         let state = &mut state.as_mut().0;
-        state.add_constraint(Constraint::KimchiConstraint(constraint), None, &loc!())
+        let label = label.map(Into::into);
+        state.add_constraint(Constraint::KimchiConstraint(constraint), label, "")
     }
 
     pub fn fp_state_evaluate_var(state: ocaml::Pointer<CamlFpState>, var: CamlFpVar) -> CamlFp {
@@ -190,53 +200,63 @@ impl_functions! {
 
     pub fn fq_state_add_square_constraint(
         mut state: ocaml::Pointer<CamlFqState>,
+        label: Option<String>,
         v1: CamlFqVar,
         v2: CamlFqVar,
     )  -> SnarkyResult<()> {
         let state = &mut state.as_mut().0;
         let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::Square(v1.0, v2.0));
-        state.add_constraint(constraint, None, &loc!())
+        let label = label.map(Into::into);
+        state.add_constraint(constraint, label, "")
     }
 
     pub fn fq_state_add_equal_constraint(
         mut state: ocaml::Pointer<CamlFqState>,
+        label: Option<String>,
         v1: CamlFqVar,
         v2: CamlFqVar,
     ) -> SnarkyResult<()> {
         let state = &mut state.as_mut().0;
         let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::Equal(v1.0, v2.0));
-        state.add_constraint(constraint, None, &loc!())
+        let label = label.map(Into::into);
+        state.add_constraint(constraint, label, "")
     }
 
     pub fn fq_state_add_boolean_constraint(
         mut state: ocaml::Pointer<CamlFqState>,
+        label: Option<String>,
         v1: CamlFqVar,
     ) -> SnarkyResult<()>{
         let state = &mut state.as_mut().0;
         let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::Boolean(v1.0));
-        state.add_constraint(constraint, None, &loc!())
+        let label = label.map(Into::into);
+        state.add_constraint(constraint, label, "")
     }
 
     pub fn fq_state_add_r1cs_constraint(
         mut state: ocaml::Pointer<CamlFqState>,
+        label: Option<String>,
         v1: CamlFqVar,
         v2: CamlFqVar,
         v3: CamlFqVar,
     ) -> SnarkyResult<()> {
         let state = &mut state.as_mut().0;
         let constraint = Constraint::BasicSnarkyConstraint(BasicSnarkyConstraint::R1CS(v1.0, v2.0, v3.0));
-        state.add_constraint(constraint, None, &loc!())
+        let label = label.map(Into::into);
+        state.add_constraint(constraint, label, "")
     }
 
 
     pub fn fq_state_add_kimchi_constraint(
         mut state: ocaml::Pointer<CamlFqState>,
+        label: Option<String>,
         constraint: KimchiConstraint<CamlFqVar, CamlFq>,
     ) -> SnarkyResult<()> {
         let constraint: KimchiConstraint<FieldVar<Fq>, Fq> =
         conv::fq::convert_constraint(&constraint);
         let state = &mut state.as_mut().0;
-        state.add_constraint(Constraint::KimchiConstraint(constraint), None, &loc!())
+        let label = label.map(Into::into);
+        state.add_constraint(Constraint::KimchiConstraint(constraint), label, "")
     }
     pub fn fq_state_evaluate_var(state: ocaml::Pointer<CamlFqState>, var: CamlFqVar) -> CamlFq {
         CamlFq(var.0.eval(&state.as_ref().0))

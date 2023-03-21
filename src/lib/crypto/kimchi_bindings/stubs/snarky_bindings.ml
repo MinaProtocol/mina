@@ -149,21 +149,26 @@ module Fp = struct
 
     external debug : t -> string = "fp_state_debug"
 
-    external add_boolean_constraint : t -> Cvar.t -> unit
+    external add_boolean_constraint : t -> string option -> Cvar.t -> unit
       = "fp_state_add_boolean_constraint"
 
-    external add_square_constraint : t -> Cvar.t -> Cvar.t -> unit
+    external add_square_constraint :
+      t -> string option -> Cvar.t -> Cvar.t -> unit
       = "fp_state_add_square_constraint"
 
-    external add_equal_constraint : t -> Cvar.t -> Cvar.t -> unit
+    external add_equal_constraint :
+      t -> string option -> Cvar.t -> Cvar.t -> unit
       = "fp_state_add_equal_constraint"
 
-    external add_r1cs_constraint : t -> Cvar.t -> Cvar.t -> Cvar.t -> unit
+    external add_r1cs_constraint :
+      t -> string option -> Cvar.t -> Cvar.t -> Cvar.t -> unit
       = "fp_state_add_r1cs_constraint"
 
     external add_kimchi_constraint :
-      t -> (Cvar.t, Pasta_bindings.Fp.t) Constraints.kimchi -> unit
-      = "fp_state_add_kimchi_constraint"
+         t
+      -> string option
+      -> (Cvar.t, Pasta_bindings.Fp.t) Constraints.kimchi
+      -> unit = "fp_state_add_kimchi_constraint"
 
     external evaluate_var : t -> Cvar.t -> Pasta_bindings.Fp.t
       = "fp_state_evaluate_var"
@@ -261,21 +266,26 @@ module Fq = struct
 
     external debug : t -> string = "fq_state_debug"
 
-    external add_boolean_constraint : t -> Cvar.t -> unit
+    external add_boolean_constraint : t -> string option -> Cvar.t -> unit
       = "fq_state_add_boolean_constraint"
 
-    external add_square_constraint : t -> Cvar.t -> Cvar.t -> unit
+    external add_square_constraint :
+      t -> string option -> Cvar.t -> Cvar.t -> unit
       = "fq_state_add_square_constraint"
 
-    external add_equal_constraint : t -> Cvar.t -> Cvar.t -> unit
+    external add_equal_constraint :
+      t -> string option -> Cvar.t -> Cvar.t -> unit
       = "fq_state_add_equal_constraint"
 
-    external add_r1cs_constraint : t -> Cvar.t -> Cvar.t -> Cvar.t -> unit
+    external add_r1cs_constraint :
+      t -> string option -> Cvar.t -> Cvar.t -> Cvar.t -> unit
       = "fq_state_add_r1cs_constraint"
 
     external add_kimchi_constraint :
-      t -> (Cvar.t, Pasta_bindings.Fq.t) Constraints.kimchi -> unit
-      = "fq_state_add_kimchi_constraint"
+         t
+      -> string option
+      -> (Cvar.t, Pasta_bindings.Fq.t) Constraints.kimchi
+      -> unit = "fq_state_add_kimchi_constraint"
 
     external evaluate_var : t -> Cvar.t -> Pasta_bindings.Fq.t
       = "fq_state_evaluate_var"

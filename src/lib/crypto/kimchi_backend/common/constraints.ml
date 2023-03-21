@@ -543,20 +543,25 @@ end)
 (Field_var : T) (State : sig
   type t
 
-  val add_boolean_constraint : t -> Field_var.t -> unit
+  val add_boolean_constraint : t -> string option -> Field_var.t -> unit
 
-  val add_equal_constraint : t -> Field_var.t -> Field_var.t -> unit
+  val add_equal_constraint :
+    t -> string option -> Field_var.t -> Field_var.t -> unit
 
-  val add_square_constraint : t -> Field_var.t -> Field_var.t -> unit
+  val add_square_constraint :
+    t -> string option -> Field_var.t -> Field_var.t -> unit
 
   val add_r1cs_constraint :
-    t -> Field_var.t -> Field_var.t -> Field_var.t -> unit
+    t -> string option -> Field_var.t -> Field_var.t -> Field_var.t -> unit
 
   val add_kimchi_constraint :
-    t -> (Field_var.t, Field.t) Snarky_bindings.Constraints.kimchi -> unit
+       t
+    -> string option
+    -> (Field_var.t, Field.t) Snarky_bindings.Constraints.kimchi
+    -> unit
 end) =
 struct
-  let add_kimchi_constraint state
+  let add_kimchi_constraint state ?label
       (constr : (Field_var.t, Field.t) Plonk_constraint.t) =
     let open Plonk_constraint in
     match constr with
@@ -565,19 +570,19 @@ struct
         let kimchi_input : (Field_var.t, Field.t) kimchi =
           Basic { l; r; o; m; c }
         in
-        State.add_kimchi_constraint state kimchi_input
+        State.add_kimchi_constraint state label kimchi_input
     | Poseidon { state = poseidon_state } ->
         let open Snarky_bindings.Constraints in
         let kimchi_input : (Field_var.t, Field.t) kimchi =
           Poseidon poseidon_state
         in
-        State.add_kimchi_constraint state kimchi_input
+        State.add_kimchi_constraint state label kimchi_input
     | EC_add_complete { p1; p2; p3; inf; same_x; slope; inf_z; x21_inv } ->
         let open Snarky_bindings.Constraints in
         let kimchi_input : (Field_var.t, Field.t) kimchi =
           EcAddComplete { p1; p2; p3; inf; same_x; slope; inf_z; x21_inv }
         in
-        State.add_kimchi_constraint state kimchi_input
+        State.add_kimchi_constraint state label kimchi_input
     | EC_scale { state = state2 } ->
         let open Snarky_bindings.Constraints in
         let state2 =
@@ -588,7 +593,7 @@ struct
             state2
         in
         let kimchi_input = EcScale state2 in
-        State.add_kimchi_constraint state kimchi_input
+        State.add_kimchi_constraint state label kimchi_input
     | EC_endoscale { state = state2; xs; ys; n_acc } ->
         let open Snarky_bindings.Constraints in
         let state2 =
@@ -599,7 +604,7 @@ struct
             state2
         in
         let kimchi_input = EcEndoscale { state = state2; xs; ys; n_acc } in
-        State.add_kimchi_constraint state kimchi_input
+        State.add_kimchi_constraint state label kimchi_input
     | EC_endoscalar { state = state2 } ->
         let open Snarky_bindings.Constraints in
         let state2 =
@@ -610,7 +615,7 @@ struct
             state2
         in
         let kimchi_input = EcEndoscalar state2 in
-        State.add_kimchi_constraint state kimchi_input
+        State.add_kimchi_constraint state label kimchi_input
     | RangeCheck0 _ ->
         failwith "finish implementing this"
     | RangeCheck1 _ ->
@@ -634,15 +639,15 @@ struct
    fun ?label state constr ->
     match constr with
     | Snarky_backendless.Constraint.Square (v1, v2) ->
-        State.add_square_constraint state v1 v2
+        State.add_square_constraint state label v1 v2
     | Snarky_backendless.Constraint.R1CS (v1, v2, v3) ->
-        State.add_r1cs_constraint state v1 v2 v3
+        State.add_r1cs_constraint state label v1 v2 v3
     | Snarky_backendless.Constraint.Boolean v ->
-        State.add_boolean_constraint state v
+        State.add_boolean_constraint state label v
     | Snarky_backendless.Constraint.Equal (v1, v2) ->
-        State.add_equal_constraint state v1 v2
+        State.add_equal_constraint state label v1 v2
     | Plonk_constraint.T kimchi_constraint ->
-        add_kimchi_constraint state kimchi_constraint
+        add_kimchi_constraint state ?label kimchi_constraint
     | _ ->
         failwith "unrecognized constraint"
 end
