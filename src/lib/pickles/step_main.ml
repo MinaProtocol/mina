@@ -228,12 +228,12 @@ let step_main :
           []
       | ( _d :: ds
         , n1 :: ns1
-        , n2 :: ns2
+        , _n2 :: ns2
         , S ld
         , S ln1
         , S ln2
         , feature_flags :: feature_flagss ) ->
-          let t = Per_proof_witness.typ Typ.unit n1 n2 ~feature_flags in
+          let t = Per_proof_witness.typ Typ.unit n1 ~feature_flags in
           t :: join ds ns1 ns2 ld ln1 ln2 feature_flagss
       | [], _, _, _, _, _, _ ->
           .
