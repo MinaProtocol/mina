@@ -54,7 +54,7 @@ let check_json ~input_typ ~return_typ ~circuit filename () =
 (* monadic API tests *)
 
 (** Both the monadic and imperative API will produce the same circuit hash. *)
-let expected = "5357346d161dcccaa547c7999b8148db"
+let expected = "ec45af854f3d3e14367bb8394c2ed0d7"
 
 module MonadicAPI = struct
   module Impl = Kimchi_backend.Snarky.Step_monad
