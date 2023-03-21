@@ -145,14 +145,6 @@ let range_check1 (type f)
                  } )
         } )
 
-(* range-check gadget - checks v0 \in [0, 2^88) *)
-let range_check (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (v0 : Circuit.Field.t) =
-  range_check0
-    (module Circuit)
-    ~label:"range_check" ~is_64bit:false ~is_compact:false v0
-
 (* 64-bit range-check gadget - checks v0 \in [0, 2^64) *)
 let range_check64 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -212,49 +204,7 @@ let compact_multi_range_check (type f)
 (* Tests *)
 (*********)
 
-let%test_unit "range_check gadget" =
-  Printf.printf "range_check gadget test\n" ;
-  (* Import the gadget test runner *)
-  let open Kimchi_gadgets_test_runner in
-  (* Initialize the SRS cache. *)
-  let () =
-    try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
-  in
-
-  (* Helper to test range_check gadget *)
-  let test_range_check base10 : unit =
-    let _, _ =
-      Runner.generate_and_verify_proof (fun () ->
-          let open Runner.Impl in
-          let value =
-            exists Field.typ ~compute:(fun () ->
-                Field.Constant.of_string base10 )
-          in
-          range_check (module Runner.Impl) value ;
-          (* Padding *)
-          Boolean.Assert.is_true (Field.equal value value) )
-    in
-    ()
-  in
-
-  (* Positive tests *)
-  test_range_check "0" ;
-  test_range_check "18446744073709551616" (* 2^64 *) ;
-  test_range_check "309485009821345068724781055" (* 2^88 - 1 *) ;
-
-  (* Negative tests *)
-  assert (
-    Common.is_error (fun () ->
-        test_range_check "309485009821345068724781056" (* 2^88 *) ) ) ;
-  assert (
-    Common.is_error (fun () ->
-        test_range_check
-          "28948022309329048855892746252171976963317496166410141009864396001978282409984"
-        (* 2^254 *) ) ) ;
-  ()
-
 let%test_unit "range_check64 gadget" =
-  Printf.printf "range_check64 gadget test\n" ;
   (* Import the gadget test runner *)
   let open Kimchi_gadgets_test_runner in
   (* Initialize the SRS cache. *)
@@ -296,7 +246,6 @@ let%test_unit "range_check64 gadget" =
   ()
 
 let%test_unit "multi_range_check gadget" =
-  Printf.printf "multi_range_check gadget test\n" ;
   (* Import the gadget test runner *)
   let open Kimchi_gadgets_test_runner in
   (* Initialize the SRS cache. *)
@@ -359,7 +308,6 @@ let%test_unit "multi_range_check gadget" =
   ()
 
 let%test_unit "compact_multi_range_check gadget" =
-  Printf.printf "compact_multi_range_check gadget test\n" ;
   (* Import the gadget test runner *)
   let open Kimchi_gadgets_test_runner in
   (* Initialize the SRS cache. *)

@@ -74,7 +74,6 @@ let bignum_bigint_div_rem (numerator : Bignum_bigint.t)
 let is_error (func : unit -> _) = Result.is_error (Or_error.try_with func)
 
 let%test_unit "helper field_bits_le_to_field" =
-  Printf.printf "field_bits_le_to_field test\n" ;
   (* Import the gadget test runner *)
   let open Kimchi_gadgets_test_runner in
   (* Initialize the SRS cache. *)

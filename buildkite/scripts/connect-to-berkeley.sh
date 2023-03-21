@@ -3,7 +3,7 @@
 set -eo pipefail
 
 case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
-  rampup|berkeley|release/2.0.0)
+  rampup|berkeley|release/2.0.0|develop)
   ;;
   *)
     echo "Not pulling against rampup, not running the connect test"
@@ -30,9 +30,17 @@ apt-get install --allow-downgrades -y "mina-${TESTNET_NAME}=${MINA_DEB_VERSION}"
 # Remove lockfile if present
 rm ~/.mina-config/.mina-lock ||:
 
+mkdir -p /root/libp2p-keys/
+# Pre-generated random password for this quick test
+export MINA_LIBP2P_PASS=eithohShieshichoh8uaJ5iefo1reiRudaekohG7AeCeib4XuneDet2uGhu7lahf
+mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key
+# Set permissions on the keypair so the daemon doesn't complain
+chmod -R 0700 /root/libp2p-keys/
+
 # Restart in the background
 mina daemon \
   --peer-list-url "https://storage.googleapis.com/seed-lists/${TESTNET_NAME}_seeds.txt" \
+  --libp2p-keypair "/root/libp2p-keys/key" \
 & # -background
 
 # Attempt to connect to the GraphQL client every 10s for up to 4 minutes
@@ -55,7 +63,7 @@ sleep 2m
 mina client status
 if [ $(mina advanced get-peers | wc -l) -gt 0 ]; then
     echo "Found some peers"
-el0se
+else
     echo "No peers found"
     exit 1
 fi
