@@ -107,13 +107,15 @@ module Worker_state = struct
                    (next_state : Protocol_state.Value.t)
                    (block : Snark_transition.value) (t : Ledger_proof.t option)
                    state_for_handler pending_coinbase =
+                 Internal_tracing.Context_call.with_call_id
+                 @@ fun () ->
                  [%log internal] "Prover_extend_blockchain" ;
                  let%map.Async.Deferred res =
                    Deferred.Or_error.try_with ~here:[%here] (fun () ->
                        let txn_snark_statement, txn_snark_proof =
                          ledger_proof_opt next_state t
                        in
-                       Internal_tracing_context_logger.with_logger (Some logger)
+                       Internal_tracing.Context_logger.with_logger (Some logger)
                        @@ fun () ->
                        let%map.Async.Deferred (), (), proof =
                          B.step
@@ -142,6 +144,8 @@ module Worker_state = struct
                  res
 
                let verify state proof =
+                 Internal_tracing.Context_call.with_call_id
+                 @@ fun () ->
                  [%log internal] "Prover_verify" ;
                  let%map result = B.Proof.verify [ (state, proof) ] in
                  [%log internal] "Prover_verify_done" ;

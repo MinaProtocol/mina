@@ -32,7 +32,6 @@
    mina_base
    logger
    internal_tracing
-   internal_tracing.context_logger
    genesis_constants
    ledger_proof
    consensus

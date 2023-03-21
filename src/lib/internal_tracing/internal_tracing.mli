@@ -57,6 +57,8 @@
 
      - ["@current_block"]: used to notify of a execution context change that
        brings a different block into context.
+     - ["@current_call_id"]: used to notify of a execution context change that
+       brings a different concurrent verifier or prover call into context.
      - ["@internal_tracing_enabled"]: issued whenever internal tracing is enabled.
      - ["@internal_tracing_disabled"]: issued whenever internal tracing is disabled.
      - ["@mina_node_metadata"]: associates global metadata about the current node
@@ -145,4 +147,12 @@ module For_logger : sig
 
   (** Processor for the "internal" log level used to record checkpoints *)
   val processor : Logger.Processor.t
+end
+
+module Context_logger : sig
+  include module type of Internal_tracing_context_logger
+end
+
+module Context_call : sig
+  include module type of Internal_tracing_context_call
 end
