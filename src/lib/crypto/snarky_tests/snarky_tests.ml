@@ -216,18 +216,62 @@ module TernaryCircuit = struct
 end
 
 module PublicOutput = struct
-  let input_typ = Impl.Boolean.typ
+  let input_typ = Impl.Typ.tuple2 Impl.Field.typ Impl.Field.typ
 
-  let return_typ = Impl.Boolean.typ
+  let return_typ = Impl.Typ.tuple2 Impl.Field.typ Impl.Field.typ
 
-  let main (x : Impl.Boolean.var) () : Impl.Boolean.var =
-    Impl.Boolean.(x && Impl.Boolean.true_)
+  let main (x : Impl.Field.t * Impl.Field.t) () : Impl.Field.t * Impl.Field.t =
+    let res = Impl.Field.(fst x + snd x) in
+    let two = Impl.Field.constant (Impl.Field.Constant.of_int 2) in
+    let computed =
+      Impl.exists Impl.Field.typ ~compute:(fun () -> Impl.Field.Constant.one)
+    in
+    let res2 = Impl.Field.(computed + two) in
+
+    (* (in1 + in2, 3) *)
+    (res, res2)
 
   let check_pub_witness () =
-    let input_ = true in
+    (* compile *)
+    let cs = Impl.constraint_system ~input_typ ~return_typ main in
+
+    (* execute *)
+    let one = Impl.Field.Constant.one in
+    let input_ = (one, one) in
     let inputs = Impl.generate_witness ~input_typ ~return_typ main input_ in
-    let output_val = Impl.Field.Constant.Vector.get inputs.public_inputs 1 in
-    assert (Impl.Field.Constant.(equal output_val one))
+
+    (* sanity check on public input *)
+    let in1 = Impl.Field.Constant.Vector.get inputs.public_inputs 0 in
+    let in2 = Impl.Field.Constant.Vector.get inputs.public_inputs 1 in
+    let out1 = Impl.Field.Constant.Vector.get inputs.public_inputs 2 in
+    let out2 = Impl.Field.Constant.Vector.get inputs.public_inputs 3 in
+    let two = Impl.Field.Constant.of_int 2 in
+    let three = Impl.Field.Constant.of_int 3 in
+    assert (Impl.Field.Constant.(equal in1 one)) ;
+    assert (Impl.Field.Constant.(equal in2 one)) ;
+    assert (Impl.Field.Constant.(equal out1 two)) ;
+    assert (Impl.Field.Constant.(equal out2 three)) ;
+    assert (Impl.Field.Constant.Vector.length inputs.public_inputs = 4) ;
+
+    (* sanity check on private input *)
+
+    (* compute witness via CS directly (we should avoid doing that IMO) *)
+    let witness =
+      Snarky_bindings.Fp.Constraint_system.compute_witness cs
+        inputs.public_inputs inputs.auxiliary_inputs
+    in
+
+    (* sanity check on witness *)
+    let w0 = Impl.Field.Constant.Vector.get witness.(0) 0 in
+    let w1 = Impl.Field.Constant.Vector.get witness.(0) 1 in
+    let w2 = Impl.Field.Constant.Vector.get witness.(0) 2 in
+    let w3 = Impl.Field.Constant.Vector.get witness.(0) 3 in
+    assert (Impl.Field.Constant.(equal w0 one)) ;
+    assert (Impl.Field.Constant.(equal w1 one)) ;
+    assert (Impl.Field.Constant.(equal w2 two)) ;
+    assert (Impl.Field.Constant.(equal w3 three)) ;
+
+    ()
 end
 
 module InvalidWitness = struct
