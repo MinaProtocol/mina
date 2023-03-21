@@ -71,7 +71,7 @@ libp2p_helper:
 
 genesis_ledger: ocaml_checks
 	$(info Building runtime_genesis_ledger)
-	((ulimit -s 65532 || true) || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir $(GENESIS_DIR)
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir $(GENESIS_DIR)
 	$(info Genesis ledger and genesis proof generated)
 
 # checks that every OCaml packages in the project build without issues
@@ -80,32 +80,32 @@ check: ocaml_checks libp2p_helper
 
 build: ocaml_checks reformat-diff libp2p_helper
 	$(info Starting Build)
-	((ulimit -s 65532 || true) || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe --profile=$(DUNE_PROFILE)
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 build_all_sigs: ocaml_checks reformat-diff libp2p_helper
 	$(info Starting Build)
-	((ulimit -s 65532 || true) || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe src/app/cli/src/mina_testnet_signatures.exe src/app/cli/src/mina_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe src/app/cli/src/mina_testnet_signatures.exe src/app/cli/src/mina_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 build_archive: ocaml_checks reformat-diff
 	$(info Starting Build)
-	((ulimit -s 65532 || true) || true) && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe --profile=$(DUNE_PROFILE)
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 build_archive_all_sigs: ocaml_checks reformat-diff
 	$(info Starting Build)
-	((ulimit -s 65532 || true) || true) && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/archive/archive_testnet_signatures.exe src/app/archive/archive_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/archive/archive_testnet_signatures.exe src/app/archive/archive_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 build_rosetta: ocaml_checks
 	$(info Starting Build)
-	((ulimit -s 65532 || true) || true) && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/rosetta/rosetta.exe src/app/rosetta/ocaml-signer/signer.exe --profile=$(DUNE_PROFILE)
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/rosetta/rosetta.exe src/app/rosetta/ocaml-signer/signer.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 build_rosetta_all_sigs: ocaml_checks
 	$(info Starting Build)
-	((ulimit -s 65532 || true) || true) && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/archive/archive_testnet_signatures.exe src/app/archive/archive_mainnet_signatures.exe src/app/rosetta/rosetta.exe src/app/rosetta/rosetta_testnet_signatures.exe src/app/rosetta/rosetta_mainnet_signatures.exe src/app/rosetta/ocaml-signer/signer.exe src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe src/app/rosetta/ocaml-signer/signer_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/archive/archive_testnet_signatures.exe src/app/archive/archive_mainnet_signatures.exe src/app/rosetta/rosetta.exe src/app/rosetta/rosetta_testnet_signatures.exe src/app/rosetta/rosetta_mainnet_signatures.exe src/app/rosetta/ocaml-signer/signer.exe src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe src/app/rosetta/ocaml-signer/signer_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 build_intgtest: ocaml_checks
@@ -115,7 +115,7 @@ build_intgtest: ocaml_checks
 
 client_sdk: ocaml_checks
 	$(info Starting Build)
-	((ulimit -s 65532 || true) || true) && (ulimit -n 10240 || true) && dune build src/app/client_sdk/client_sdk.bc.js
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/client_sdk/client_sdk.bc.js
 	$(info Build complete)
 
 client_sdk_test_sigs: ocaml_checks

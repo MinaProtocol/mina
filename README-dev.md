@@ -63,14 +63,14 @@ Refer to [/dev](/dev).
 6. Pin dependencies that should override opam versions: `scripts/pin-external-packages.sh`
 7. Install correct version of golang:
    - `goenv init`
-   - Update your shell env script with
+   - To make sure the right `goenv` is used, update your shell env script with
      ```text
      eval "$(goenv init -)"
      export PATH="/Users/$USER/.goenv/shims:$PATH"
      ```
    - `goenv install 1.18.10`
    - `goenv global 1.18.10`
-   - If in the next step you find the message `compile: version "go1.18.10" does not match go tool version "go1.20.2"`, run `brew remove go`
+   - Check that the `go version` returns the right version or else you will see the mesage `compile: version "go1.18.10" does not match go tool version "go1.20.2"`. If so, run `brew remove go` or get the matching version.
 8. Invoke `make build`
   - If you get errors about `libp2p` and `capnp` try with `brew install capnp`
 9. Install language server protocol `opam install ocaml-lsp-server` for better IDE support
