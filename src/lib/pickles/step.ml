@@ -1,5 +1,4 @@
 module SC = Scalar_challenge
-module Proof = Proof
 open Pickles_types
 open Poly_types
 open Hlist
