@@ -7,7 +7,7 @@ mina:
   usePodIp: true
   seedPeers:
     # see resources/seed1.peerid
-    - /dns4/seed1/tcp/10909/p2p/12D3KooWBT8pyJAfWJhdeGYAtKvcaUmm78ExyZ6uo6BEimYNVat1
+    - /dns4/seed1/tcp/10001/p2p/12D3KooWBT8pyJAfWJhdeGYAtKvcaUmm78ExyZ6uo6BEimYNVat1
   # memRequest: 4Gi
   # cpuRequest: 4
   # optimized: false
@@ -38,23 +38,23 @@ seedConfigs:
 blockProducerConfigs:
   - name: prod01
     # see resources/key-01
-    privateKeySecret: prod1-privkey-secret
+    keypairName: prod1-privkey-secret
     isolated: false
   - name: prod02
     # see resources/key-01
-    privateKeySecret: prod1-privkey-secret
+    keypairName: prod1-privkey-secret
     isolated: false
   - name: prod03
     # see resources/key-01
-    privateKeySecret: prod1-privkey-secret
+    keypairName: prod1-privkey-secret
     isolated: false
   - name: prod2
     # see resources/key-02
-    privateKeySecret: prod2-privkey-secret
+    keypairName: prod2-privkey-secret
     isolated: false
   - name: prod3
     # see resources/key-03
-    privateKeySecret: prod3-privkey-secret
+    keypairName: prod3-privkey-secret
     isolated: false
 
 resources:
