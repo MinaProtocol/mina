@@ -44,7 +44,7 @@ let%test_module "Roundtrip tests" =
   ( module struct
     include Make (Test_schema)
 
-    let%test_module "PublicKey" =
+    let%test_module "PrivateKey" =
       (module Make_test (PrivateKey) (Signature_lib.Private_key))
 
     let%test_module "PublicKey" =
