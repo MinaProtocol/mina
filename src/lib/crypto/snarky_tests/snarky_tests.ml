@@ -231,7 +231,7 @@ module PublicOutput = struct
     (* (in1 + in2, 3) *)
     (res, res2)
 
-  let check_pub_witness () =
+  let check_pub_witness_prove_verify () =
     (* compile *)
     let cs = Impl.constraint_system ~input_typ ~return_typ main in
 
@@ -253,8 +253,6 @@ module PublicOutput = struct
     assert (Impl.Field.Constant.(equal out2 three)) ;
     assert (Impl.Field.Constant.Vector.length inputs.public_inputs = 4) ;
 
-    (* sanity check on private input *)
-
     (* compute witness via CS directly (we should avoid doing that IMO) *)
     let witness =
       Snarky_bindings.Fp.Constraint_system.compute_witness cs
@@ -271,7 +269,24 @@ module PublicOutput = struct
     assert (Impl.Field.Constant.(equal w2 two)) ;
     assert (Impl.Field.Constant.(equal w3 three)) ;
 
-    ()
+    (* Initialize the SRS cache. *)
+    let () = Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] in
+
+    (* compile to indexes *)
+    let kp = Kimchi_backend.Snarky.Tick.Keypair.create cs ~prev_challenges:0 in
+    let vk = Kimchi_backend.Snarky.Tick.Keypair.vk kp in
+
+    (* create a proof *)
+    let proof =
+      Kimchi_backend.Snarky.Tick.Proof.create kp ~primary:inputs.public_inputs
+        ~auxiliary:inputs.auxiliary_inputs
+    in
+
+    (* verify it *)
+    let res =
+      Kimchi_backend.Snarky.Tick.Proof.verify proof vk inputs.public_inputs
+    in
+    assert res
 end
 
 module InvalidWitness = struct
@@ -322,7 +337,9 @@ let circuit_tests =
     , check_json ~input_typ:PublicOutput.input_typ
         ~return_typ:PublicOutput.return_typ ~circuit:PublicOutput.main
         "output.json" )
-  ; ("updated public output in witness", `Quick, PublicOutput.check_pub_witness)
+  ; ( "public output in witness + prove & verify"
+    , `Quick
+    , PublicOutput.check_pub_witness_prove_verify )
   ; ( "circuit with range check (less than equal)"
     , `Quick
     , check_json ~input_typ:RangeCircuits.input_typ
