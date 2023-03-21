@@ -826,8 +826,10 @@ end = struct
               ps ) ) ;
     let res = Relative_position.Table.create () in
     Hashtbl.iter equivalence_classes ~f:(fun ps ->
-        let rotate_left = function [] -> [] | x :: xs -> xs @ [ x ] in
+        (* sort to get a canonical deterministic order *)
         let ps = Hash_set.to_list ps in
+        let ps = List.sort ~compare:Relative_position.compare ps in
+        let rotate_left = function [] -> [] | x :: xs -> xs @ [ x ] in
         List.iter2_exn ps (rotate_left ps) ~f:(fun input output ->
             Hashtbl.add_exn res ~key:input ~data:output ) ) ;
     res
