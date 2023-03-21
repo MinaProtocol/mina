@@ -175,6 +175,8 @@ module Types = struct
   include struct
     open Graphql_lib.Scalars
 
+    let private_key : (Mina_lib.t, PrivateKey.t option) typ = PrivateKey.typ ()
+
     let public_key = PublicKey.typ ()
 
     let uint32 = UInt32.typ ()
@@ -2981,6 +2983,60 @@ module Types = struct
                      from a trusted peer"
               ]
     end
+
+    module Itn = struct
+      module PaymentDetails = struct
+        type input =
+          { senders : Signature_lib.Private_key.t list
+          ; receiver : Signature_lib.Public_key.Compressed.t
+          ; amount : Currency.Amount.t
+          ; fee_min : Currency.Fee.t
+          ; fee_max : Currency.Fee.t
+          ; memo : string
+          ; transactions_per_second : float
+          ; duration_in_minutes : int
+          }
+
+        let arg_typ =
+          obj "PaymentsDetails"
+            ~doc:"Keys and other information for scheduling payments"
+            ~coerce:(fun senders receiver amount fee_min fee_max memo
+                         transactions_per_second duration_in_minutes ->
+              Result.return
+                { senders
+                ; receiver
+                ; amount
+                ; fee_min
+                ; fee_max
+                ; memo
+                ; transactions_per_second
+                ; duration_in_minutes
+                } )
+            ~split:(fun f (t : input) ->
+              f t.senders t.receiver t.amount t.fee_min t.fee_max t.memo
+                t.transactions_per_second t.duration_in_minutes )
+            ~fields:
+              Arg.
+                [ arg "senders"
+                    ~typ:(non_null (list (non_null PrivateKey.arg_typ)))
+                    ~doc:"Private keys of accounts to send from"
+                ; arg "receiver"
+                    ~typ:(non_null PublicKey.arg_typ)
+                    ~doc:"Public key of receiver of payments"
+                ; arg "amount"
+                    ~typ:(non_null CurrencyAmount.arg_typ)
+                    ~doc:"Amount for payments"
+                ; arg "feeMin" ~typ:(non_null Fee.arg_typ) ~doc:"Minimum fee"
+                ; arg "feeMax" ~typ:(non_null Fee.arg_typ) ~doc:"Minimum fee"
+                ; arg "memo" ~doc:"Memo, up to 32 characters"
+                    ~typ:(non_null string)
+                ; arg "transactionsPerSecond" ~doc:"Frequency of transactions"
+                    ~typ:(non_null float)
+                ; arg "durationInMinutes" ~doc:"Length of scheduler run"
+                    ~typ:(non_null int)
+                ]
+      end
+    end
   end
 
   let vrf_message : ('context, Consensus_vrf.Layout.Message.t option) typ =
@@ -3026,7 +3082,7 @@ module Types = struct
       =
     let open Consensus_vrf.Layout.Evaluation in
     let vrf_scalar = Graphql_lib.Scalars.VrfScalar.typ () in
-    obj "VrfEvaluation"
+    Schema.obj "VrfEvaluation"
       ~doc:"A witness to a vrf evaluation, which may be externally verified"
       ~fields:(fun _ ->
         [ field "message" ~typ:(non_null vrf_message)
@@ -3994,6 +4050,235 @@ module Mutations = struct
     ; archive_extensional_block
     ; send_rosetta_transaction
     ]
+
+  module Itn = struct
+    (* ITN-specific mutations *)
+
+    let scheduler_tbl : unit Async_kernel.Ivar.t Uuid.Table.t =
+      Uuid.Table.create ()
+
+    let schedule_payments =
+      io_field "schedulePayments"
+        ~args:
+          Arg.
+            [ arg "input" ~doc:"Payments details"
+                ~typ:(non_null Types.Input.Itn.PaymentDetails.arg_typ)
+            ]
+        ~typ:(non_null string)
+        ~resolve:(fun { ctx = mina; _ } () input ->
+          return
+          @@
+          match input with
+          | Ok payment_details -> (
+              let max_memo_len = Signed_command_memo.max_input_length in
+              if List.is_empty payment_details.senders then
+                Error "Empty list of senders"
+              else if String.length payment_details.memo > max_memo_len then
+                Error
+                  (sprintf "Memo too long, limited to %d characters"
+                     max_memo_len )
+              else if
+                Currency.Fee.( < ) payment_details.fee_max
+                  payment_details.fee_min
+              then Error "Maximum fee less than mininum fee"
+              else
+                let logger = Mina_lib.top_level_logger mina in
+                let senders = payment_details.senders |> Array.of_list in
+                let num_senders = Array.length senders in
+                let sources =
+                  Array.map senders ~f:(fun sender ->
+                      Signature_lib.Public_key.of_private_key_exn sender
+                      |> Signature_lib.Public_key.compress )
+                in
+                match get_ledger_and_breadcrumb mina with
+                | None ->
+                    Error "Could not get best tip ledger"
+                | Some (ledger, _tip) -> (
+                    let nonce_opts =
+                      Array.map sources ~f:(fun source ->
+                          let acct_id =
+                            Account_id.create source Token_id.default
+                          in
+                          match Ledger.location_of_account ledger acct_id with
+                          | None ->
+                              (source, None)
+                          | Some loc -> (
+                              match Ledger.get ledger loc with
+                              | None ->
+                                  (source, None)
+                              | Some { nonce; _ } ->
+                                  (source, Some nonce) ) )
+                    in
+                    match
+                      Array.partition_tf nonce_opts
+                        ~f:(fun (_source, nonce_opt) ->
+                          Option.is_some nonce_opt )
+                    with
+                    | _with_nonces, no_nonces when Array.length no_nonces > 0 ->
+                        let pks =
+                          Array.map no_nonces ~f:(fun (source, _nonce_opt) ->
+                              source )
+                          |> Array.to_list
+                        in
+                        Error
+                          (sprintf "Could not get nonces for accounts: %s"
+                             ( List.map pks ~f:(fun pk ->
+                                   Signature_lib.Public_key.Compressed.to_yojson
+                                     pk
+                                   |> Yojson.Safe.to_string )
+                             |> String.concat ~sep:"," ) )
+                    | _ ->
+                        let nonces =
+                          Array.map nonce_opts ~f:(fun (_source, nonce_opt) ->
+                              Option.value_exn nonce_opt )
+                        in
+                        let memo =
+                          Signed_command_memo.create_from_string_exn
+                            payment_details.memo
+                        in
+                        let wait_span =
+                          1. /. payment_details.transactions_per_second
+                          |> Time.Span.of_sec
+                        in
+                        let duration_span =
+                          Time.Span.of_min
+                            (Float.of_int payment_details.duration_in_minutes)
+                        in
+                        let tm_start = Time.now () in
+                        let tm_end = Time.add tm_start duration_span in
+                        let uuid = Uuid.create_random Random.State.default in
+                        let ivar = Ivar.create () in
+                        ( match
+                            Uuid.Table.add scheduler_tbl ~key:uuid ~data:ivar
+                          with
+                        | `Ok ->
+                            ()
+                        | `Duplicate ->
+                            failwith
+                              "Unexpected duplicate scheduled payments handle"
+                        ) ;
+                        let rec go ndx =
+                          if Time.( >= ) (Time.now ()) tm_end then (
+                            [%log info]
+                              "Scheduled payments with handle %s has expired"
+                              (Uuid.to_string uuid) ;
+                            Uuid.Table.remove scheduler_tbl uuid ;
+                            Deferred.unit )
+                          else if Ivar.is_full ivar then (
+                            [%log info]
+                              "Stopping scheduled payments with handle %s"
+                              (Uuid.to_string uuid) ;
+                            Uuid.Table.remove scheduler_tbl uuid ;
+                            Deferred.unit )
+                          else
+                            let sender = senders.(ndx) in
+                            let source_pk_uncompressed =
+                              Signature_lib.Public_key.of_private_key_exn sender
+                            in
+                            let source_pk =
+                              Signature_lib.Public_key.compress
+                                source_pk_uncompressed
+                            in
+                            let receiver_pk = payment_details.receiver in
+                            let fee =
+                              Quickcheck.random_value ~seed:`Nondeterministic
+                              @@ Currency.Fee.gen_incl payment_details.fee_min
+                                   payment_details.fee_max
+                            in
+                            let body =
+                              Signed_command_payload.Body.Payment
+                                { source_pk
+                                ; receiver_pk
+                                ; amount = payment_details.amount
+                                }
+                            in
+                            let valid_until = None in
+                            let nonce = nonces.(ndx) in
+                            let payload =
+                              Signed_command_payload.create ~fee
+                                ~fee_payer_pk:source_pk ~nonce ~valid_until
+                                ~memo ~body
+                            in
+                            let signature =
+                              Ok (Signed_command.sign_payload sender payload)
+                            in
+                            [%log info]
+                              "Payment scheduler with handle %s is sending a \
+                               payment from sender %s"
+                              (Uuid.to_string uuid)
+                              ( Signature_lib.Public_key.Compressed.to_yojson
+                                  source_pk
+                              |> Yojson.Safe.to_string )
+                              ~metadata:
+                                [ ( "receiver"
+                                  , Signature_lib.Public_key.Compressed
+                                    .to_yojson receiver_pk )
+                                ; ("nonce", Account.Nonce.to_yojson nonce)
+                                ; ("fee", Currency.Fee.to_yojson fee)
+                                ; ( "amount"
+                                  , Currency.Amount.to_yojson
+                                      payment_details.amount )
+                                ; ("memo", `String payment_details.memo)
+                                ] ;
+
+                            let%bind () =
+                              let fee = Currency.Fee.to_uint64 fee in
+                              let memo = Some payment_details.memo in
+                              match%bind
+                                send_signed_user_command ~mina
+                                  ~nonce_opt:(Some nonce) ~signer:source_pk
+                                  ~memo ~fee ~fee_payer_pk:source_pk
+                                  ~valid_until ~body ~signature
+                              with
+                              | Ok _cmd_with_status ->
+                                  Deferred.unit
+                              | Error _ ->
+                                  Deferred.unit
+                            in
+                            (* next nonce for this sender *)
+                            nonces.(ndx) <- Account.Nonce.succ nonce ;
+                            let%bind () = Async_unix.after wait_span in
+                            go ((ndx + 1) mod num_senders)
+                        in
+                        don't_wait_for @@ go 0 ;
+                        Ok (Uuid.to_string uuid) ) )
+          | Error err ->
+              Error (sprintf "Invalid input to payment scheduler: %s" err) )
+
+    let stop_payments =
+      io_field "stopPayments"
+        ~args:
+          Arg.
+            [ arg "handle" ~doc:"Payment scheduler handle"
+                ~typ:(non_null string)
+            ]
+        ~typ:(non_null string)
+        ~resolve:(fun { ctx = mina; _ } () handle ->
+          let logger = Mina_lib.top_level_logger mina in
+          try
+            let uuid = Uuid.of_string handle in
+            match Uuid.Table.find scheduler_tbl uuid with
+            | None ->
+                return
+                @@ Error
+                     (sprintf "Could not find scheduled payments with handle %s"
+                        handle )
+            | Some ivar ->
+                [%log info]
+                  "Requesting stop of scheduled payments with handle %s" handle ;
+                Ivar.fill_if_empty ivar () ;
+                return
+                @@ Ok
+                     (sprintf
+                        "Requesting stop of scheduled payments with handle %s"
+                        handle )
+          with _ ->
+            return
+            @@ Error
+                 (sprintf "Not a valid scheduled payments handle: %s" handle) )
+
+    let commands = [ schedule_payments; stop_payments ]
+  end
 end
 
 module Queries = struct
@@ -4827,7 +5112,7 @@ module Queries = struct
         ~doc:"Returns true if query is authorized"
         ~resolve:(fun _ _ -> Some true)
 
-    let queries = [ auth ]
+    let commands = [ auth ]
   end
 end
 
@@ -4845,4 +5130,5 @@ let schema_limited =
 
 let schema_itn : Mina_lib.t Schema.schema =
   Graphql_async.Schema.(
-    schema Queries.Itn.queries ~mutations:[] ~subscriptions:[])
+    schema Queries.Itn.commands ~mutations:Mutations.Itn.commands
+      ~subscriptions:[])
