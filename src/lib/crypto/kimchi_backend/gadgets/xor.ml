@@ -32,7 +32,7 @@ let rec bxor_rec (type f)
                    ; c = Field.Constant.one
                    } )
           } ) )
-  else begin
+  else
     (* Nibbles *)
     let in1 = input1 in
     let in2 = input2 in
@@ -107,30 +107,16 @@ let rec bxor_rec (type f)
           } ) ;
 
     (* Remove least significant 4 nibbles *)
-    let next_in1 = List.drop input1 4 * len_xor in
-    let next_in2 = List.drop input2 4 * len_xor in
-    let next_out = List.drop output 4 * len_xor in
+    let next_in1 = List.drop input1_bits 4 * len_xor in
+    let next_in2 = List.drop input2_bits 4 * len_xor in
+    let next_out = List.drop output_bits 4 * len_xor in
     (* Next length is 4*4 less bits *)
     let next_length = length - (4 * len_xor) in
 
     (* Recursively call xor on the next nibble *)
-    bxor_rec
-      next_input1 next_input2 next_output next_length len_xor;
-    end
+    bxor_rec next_in1 next_in2 next_out next_length len_xor
 
-(* Xor of 16 bits *)
-let bxor16 (type f)
-(module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-(input1 : Circuit.Field.t) (input2 : Circuit.Field.t) : Circuit.Field.t =
-let open Circuit in
-bxor input1 input2 16 4
 
-(* Xor of 64 bits *)
-let bxor64 (type f)
-(module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-(input1 : Circuit.Field.t) (input2 : Circuit.Field.t) : Circuit.Field.t =
-let open Circuit in
-bxor input1 input2 64 4
 
 (* Boolean Xor of length bits *)
 let bxor (type f)
@@ -183,6 +169,21 @@ exists Field.typ
   bxor_rec input1_bits input2_bits output_bits pad_length len_xor;
 (* Convert back to field *)
 Field.Constant.project output_bits ) in
+
+
+(* Xor of 16 bits *)
+let bxor16 (type f)
+(module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+(input1 : Circuit.Field.t) (input2 : Circuit.Field.t) : Circuit.Field.t =
+let open Circuit in
+bxor input1 input2 16 4
+
+(* Xor of 64 bits *)
+let bxor64 (type f)
+(module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+(input1 : Circuit.Field.t) (input2 : Circuit.Field.t) : Circuit.Field.t =
+let open Circuit in
+bxor input1 input2 64 4
 
 
 let%test_unit "xor gadget" =
