@@ -39,7 +39,6 @@
    with_hash
    snarky.backendless
    internal_tracing
-   internal_tracing.context_logger
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_custom_printf ppx_version ppx_compare ppx_hash ppx_mina ppx_version ppx_here ppx_bin_prot ppx_let
