@@ -492,11 +492,44 @@ let tuple24_of_array array =
   | _ ->
       assert false
 
+(* Structure for tracking external checks that must be made
+ * (using other gadgets) in order to acheive soundess for a
+ * given multiplication *)
+module External_checks = struct
+  module Cvar = Snarky_backendless.Cvar
+
+  type 'field t =
+    { mutable multi_ranges : 'field Cvar.t standard_limbs list
+    ; mutable compact_multi_ranges : 'field Cvar.t compact_limbs list
+    ; mutable bounds : 'field Cvar.t standard_limbs list
+    }
+
+  let create (type field)
+      (module Circuit : Snark_intf.Run with type field = field) : field t =
+    { multi_ranges = []; compact_multi_ranges = []; bounds = [] }
+
+  (* Track a multi-range-check *)
+  let add_multi_range_check (external_checks : 'field t)
+      (x : 'field Cvar.t standard_limbs) =
+    external_checks.multi_ranges <- external_checks.multi_ranges @ [ x ]
+
+  (* Track a compact-multi-range-check *)
+  let add_compact_multi_range_check (external_checks : 'field t)
+      (x : 'field Cvar.t compact_limbs) =
+    external_checks.compact_multi_ranges <-
+      external_checks.compact_multi_ranges @ [ x ]
+
+  (* Track a bound check *)
+  let add_bound_check (external_checks : 'field t)
+      (x : 'field Cvar.t standard_limbs) =
+    external_checks.bounds <- external_checks.bounds @ [ x ]
+end
+
 let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     (left_input : f Foreign_field_element.t)
     (right_input : f Foreign_field_element.t)
-    (foreign_field_modulus : f standard_limbs) : f Foreign_field_element.t =
-  (* * (f External_checks.t) *)
+    (foreign_field_modulus : f standard_limbs) :
+    f Foreign_field_element.t * f External_checks.t =
   let open Circuit in
   (* Compute gate coefficients
    *   This happen when circuit is created / not part of witness (e.g. exists, As_prover code)
@@ -543,9 +576,9 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
       , remainder2
       , quotient_bound01
       , quotient_bound2
-      , _remainder_bound0
-      , _remainder_bound1
-      , _remainder_bound2
+      , remainder_bound0
+      , remainder_bound1
+      , remainder_bound2
       , product1_lo
       , product1_hi_0 ) =
     exists (Typ.array ~length:24 Field.typ) ~compute:(fun () ->
@@ -687,7 +720,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     |> tuple24_of_array
   in
 
-  (* TODO: Witness hist module
+  (* TODO: Witness hlist module
 
      [@@deriving hlist]
      Circuit.Typ.of_hlistable
@@ -698,11 +731,24 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
        type 'a t = 'a array (* make it abstract *)
 
        let typ ty = Typ.array ~length:27 Field.typ
-     end *)
+     end
+  *)
 
-  (* TODO: external checks module *)
+  (* TODO: refactor Foreign_field_element so that Circuit is built in
+     (e.g. using module template function / functor *)
 
-  (* TODO: refactor Circuit into module template function / functor *)
+  (* TODO: Make module for standard_limbs and compact_limbs *)
+
+  (* Prepare external checks *)
+  let external_checks = External_checks.create (module Circuit) in
+  External_checks.add_multi_range_check external_checks
+    (carry1_lo, product1_lo, product1_hi_0) ;
+  External_checks.add_compact_multi_range_check external_checks
+    (quotient_bound01, quotient_bound2) ;
+  External_checks.add_multi_range_check external_checks
+    (remainder_bound0, remainder_bound1, remainder_bound2) ;
+  External_checks.add_bound_check external_checks
+    (remainder0, remainder1, remainder2) ;
 
   (* Create ForeignFieldMul gate *)
   with_label "foreign_field_mul" (fun () ->
@@ -740,7 +786,8 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
                  ; neg_foreign_field_modulus2
                  } )
         } ) ;
-  Foreign_field_element.of_limbs (remainder0, remainder1, remainder2)
+  ( Foreign_field_element.of_limbs (remainder0, remainder1, remainder2)
+  , external_checks )
 
 (*********)
 (* Tests *)
@@ -783,7 +830,7 @@ let%test_unit "foreign_field_mul gadget" =
             Foreign_field_element.of_string (module Runner.Impl) expected
           in
           (* Create the gadget *)
-          let product =
+          let product, _external_checks =
             mul
               (module Runner.Impl)
               left_input right_input foreign_field_modulus
