@@ -1069,7 +1069,7 @@ let max_account_updates = 2
 
 let max_token_updates = 2
 
-let gen_zkapp_command_from ?global_slot ?failure
+let gen_zkapp_command_from ?global_slot ?(limited = false) ?failure
     ?(max_account_updates = max_account_updates)
     ?(max_token_updates = max_token_updates)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
@@ -1095,12 +1095,14 @@ let gen_zkapp_command_from ?global_slot ?failure
       let acct_id = Account.identifier acct in
       let pk = Account_id.public_key acct_id in
       (*Initialize account states*)
-      Account_id.Table.update account_state_tbl acct_id ~f:(function
-        | None ->
-            if Account_id.equal acct_id fee_payer_acct_id then (acct, `Fee_payer)
-            else (acct, `Ordinary_participant)
-        | Some a ->
-            a ) ;
+      if not limited then
+        Account_id.Table.update account_state_tbl acct_id ~f:(function
+          | None ->
+              if Account_id.equal acct_id fee_payer_acct_id then
+                (acct, `Fee_payer)
+              else (acct, `Ordinary_participant)
+          | Some a ->
+              a ) ;
       if Option.is_none (Signature_lib.Public_key.Compressed.Map.find keymap pk)
       then
         failwithf

@@ -21,7 +21,9 @@
    sexplib0
    ppx_deriving_yojson.runtime
    graphql_parser
+   splittable_random
    ;; local libraries
+   mina_generators
    mina_wire_types
    network_pool
    cli_lib
