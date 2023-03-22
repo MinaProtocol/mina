@@ -1,7 +1,8 @@
 {{- define "frontend-app-config-entry" -}}
         {{ if not .first }}, {{ end }}
         {
-          "backend": "/{{ .name }}",
+          "graphql": "/{{ .name }}",
+          "tracing-graphql": "/{{ .name }}/internal-trace",
           {{ if .debugger }}
           "debugger": "/{{ .name }}/{{ .debugger }}",
           {{ end }}
