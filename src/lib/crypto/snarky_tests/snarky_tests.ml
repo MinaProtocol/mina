@@ -16,9 +16,12 @@ let compare_with obtained filepath =
   let filepath = "examples/" ^ filepath in
   let expected = In_channel.read_all filepath in
   if String.(trim obtained <> trim expected) then (
-    Format.printf "mismatch for %s detected\n" filepath ;
-    Format.printf "expected:\n%s\n\n" expected ;
-    Format.printf "obtained:\n%s\n" obtained ;
+    Format.printf "mismatch for %s detected\n\n" filepath ;
+    Format.printf
+      "if this is expected, update the serialization with the following \
+       command:\n\n" ;
+    (* Format.printf "expected:\n%s\n\n" expected ; *)
+    Format.printf "echo '%s' > %s\n\n" obtained filepath ;
     failwith "circuit compilation has changed" )
 
 let check_json ~input_typ ~return_typ ~circuit filename () =
@@ -325,21 +328,30 @@ module As_prover_circuits = struct
   let main as_prover vars
       ((b1, b2, b3) : Impl.Field.t * Impl.Field.t * Impl.Field.t) () =
     let abc = Impl.Field.(b1 + b2 + b3) in
-    assert (get_id b1 = 1) ;
+
+    (* we encode the assumption that variables are indexed starting at zero
+       (which used not to be the case due to an extra R1CS row)
+    *)
+    assert (get_id b1 = 0) ;
+
+    (* if [as_prover] is set, we try to access all variables that have been created by index *)
     if as_prover then
       Impl.as_prover (fun _ ->
+          (* sum all variables *)
           let f acc e =
             let var = Snarky_backendless.Cvar.Unsafe.of_index e in
             let v = Impl.As_prover.read_var var in
             Impl.Field.Constant.(acc + v)
           in
-          let l = List.range 1 (vars + 1) in
+          let l = List.range 0 vars in
           let total : Impl.field =
-            List.fold l ~init:Impl.Field.Constant.one ~f
+            List.fold l ~init:Impl.Field.Constant.zero ~f
           in
-          assert (not (Impl.Field.(Constant.compare total Constant.one) = 0)) ;
-          assert (not Impl.Field.Constant.(equal total one)) ;
-          () ) ;
+
+          (* manual sum is equal to circuit sum *)
+          let abc = Impl.As_prover.read_var abc in
+
+          assert (Impl.Field.(Constant.equal abc total)) ) ;
     Impl.Field.Assert.non_zero abc ;
 
     ()
