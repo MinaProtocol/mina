@@ -3027,7 +3027,7 @@ module Types = struct
                     ~typ:(non_null CurrencyAmount.arg_typ)
                     ~doc:"Amount for payments"
                 ; arg "feeMin" ~typ:(non_null Fee.arg_typ) ~doc:"Minimum fee"
-                ; arg "feeMax" ~typ:(non_null Fee.arg_typ) ~doc:"Minimum fee"
+                ; arg "feeMax" ~typ:(non_null Fee.arg_typ) ~doc:"Maximum fee"
                 ; arg "memo" ~doc:"Memo, up to 32 characters"
                     ~typ:(non_null string)
                 ; arg "transactionsPerSecond" ~doc:"Frequency of transactions"
@@ -4115,15 +4115,14 @@ module Mutations = struct
                     if not @@ Array.is_empty missing_nonces then
                       let missing_nonce_pks =
                         Array.to_list missing_nonces
-                        |> List.map ~f:(fun (source, _nonce_opt) -> source)
+                        |> List.map ~f:(fun (source, _nonce_opt) ->
+                               Signature_lib.Public_key.Compressed.to_yojson
+                                 source
+                               |> Yojson.Safe.to_string )
                       in
                       Error
                         (sprintf "Could not get nonces for accounts: %s"
-                           ( List.map missing_nonce_pks ~f:(fun pk ->
-                                 Signature_lib.Public_key.Compressed.to_yojson
-                                   pk
-                                 |> Yojson.Safe.to_string )
-                           |> String.concat ~sep:"," ) )
+                           (String.concat ~sep:"," missing_nonce_pks) )
                     else
                       let nonces =
                         Array.map nonce_opts ~f:(fun (_source, nonce_opt) ->
