@@ -438,7 +438,7 @@ let compute_bound_witness_carry (type f)
   in
   Common.bignum_bigint_to_field (module Circuit) quotient_bound_carry
 
-let array24_to_tuple24 array =
+let tuple24_of_array array =
   match array with
   | [| a1
      ; a2
@@ -684,7 +684,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
          ; product1_lo
          ; product1_hi_0
         |] )
-    |> array24_to_tuple24
+    |> tuple24_of_array
   in
 
   (* TODO: Witness hist module
