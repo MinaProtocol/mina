@@ -11,26 +11,28 @@ let range_check0 (type f)
     ~(label : string) ?(is_64bit : bool = false) ?(is_compact : bool = false)
     (v0 : Circuit.Field.t) =
   let open Circuit in
-  (* Define a shorthand helper *)
-  let bits_le_to_field = Common.field_bits_le_to_field (module Circuit) in
+  (* Define shorthand helper *)
+  let of_bits =
+    Common.as_prover_cvar_field_bits_le_to_cvar_field (module Circuit)
+  in
 
   (* Create sublimbs
    *   Note: when v0p0 and v0p1 are zero snary will automatically supply the copy constraints
    *)
-  let v0p0 = if is_64bit then Field.zero else bits_le_to_field v0 76 88 in
-  let v0p1 = if is_64bit then Field.zero else bits_le_to_field v0 64 76 in
-  let v0p2 = bits_le_to_field v0 52 64 in
-  let v0p3 = bits_le_to_field v0 40 52 in
-  let v0p4 = bits_le_to_field v0 28 40 in
-  let v0p5 = bits_le_to_field v0 16 28 in
-  let v0c0 = bits_le_to_field v0 14 16 in
-  let v0c1 = bits_le_to_field v0 12 14 in
-  let v0c2 = bits_le_to_field v0 10 12 in
-  let v0c3 = bits_le_to_field v0 8 10 in
-  let v0c4 = bits_le_to_field v0 6 8 in
-  let v0c5 = bits_le_to_field v0 4 6 in
-  let v0c6 = bits_le_to_field v0 2 4 in
-  let v0c7 = bits_le_to_field v0 0 2 in
+  let v0p0 = if is_64bit then Field.zero else of_bits v0 76 88 in
+  let v0p1 = if is_64bit then Field.zero else of_bits v0 64 76 in
+  let v0p2 = of_bits v0 52 64 in
+  let v0p3 = of_bits v0 40 52 in
+  let v0p4 = of_bits v0 28 40 in
+  let v0p5 = of_bits v0 16 28 in
+  let v0c0 = of_bits v0 14 16 in
+  let v0c1 = of_bits v0 12 14 in
+  let v0c2 = of_bits v0 10 12 in
+  let v0c3 = of_bits v0 8 10 in
+  let v0c4 = of_bits v0 6 8 in
+  let v0c5 = of_bits v0 4 6 in
+  let v0c6 = of_bits v0 2 4 in
+  let v0c7 = of_bits v0 0 2 in
 
   (* Set up compact mode coefficient *)
   let compact =
@@ -70,40 +72,42 @@ let range_check1 (type f)
     ~(label : string) (v0 : Circuit.Field.t) (v1 : Circuit.Field.t)
     (v2 : Circuit.Field.t) (v12 : Circuit.Field.t) =
   let open Circuit in
-  (* Define shorthand helpers *)
-  let bits_le_to_field = Common.field_bits_le_to_field (module Circuit) in
+  (* Define shorthand helper *)
+  let of_bits =
+    Common.as_prover_cvar_field_bits_le_to_cvar_field (module Circuit)
+  in
 
   (* Create sublimbs - current row *)
-  let v2c0 = bits_le_to_field v2 86 88 in
-  let v2p0 = bits_le_to_field v2 74 86 in
-  let v2p1 = bits_le_to_field v2 62 74 in
-  let v2p2 = bits_le_to_field v2 50 62 in
-  let v2p3 = bits_le_to_field v2 38 50 in
-  let v2c1 = bits_le_to_field v2 36 38 in
-  let v2c2 = bits_le_to_field v2 34 36 in
-  let v2c3 = bits_le_to_field v2 32 34 in
-  let v2c4 = bits_le_to_field v2 30 32 in
-  let v2c5 = bits_le_to_field v2 28 30 in
-  let v2c6 = bits_le_to_field v2 26 28 in
-  let v2c7 = bits_le_to_field v2 24 26 in
-  let v2c8 = bits_le_to_field v2 22 24 in
+  let v2c0 = of_bits v2 86 88 in
+  let v2p0 = of_bits v2 74 86 in
+  let v2p1 = of_bits v2 62 74 in
+  let v2p2 = of_bits v2 50 62 in
+  let v2p3 = of_bits v2 38 50 in
+  let v2c1 = of_bits v2 36 38 in
+  let v2c2 = of_bits v2 34 36 in
+  let v2c3 = of_bits v2 32 34 in
+  let v2c4 = of_bits v2 30 32 in
+  let v2c5 = of_bits v2 28 30 in
+  let v2c6 = of_bits v2 26 28 in
+  let v2c7 = of_bits v2 24 26 in
+  let v2c8 = of_bits v2 22 24 in
 
   (* Create sublimbs - next row *)
-  let v2c9 = bits_le_to_field v2 20 22 in
-  let v2c10 = bits_le_to_field v2 18 20 in
-  let v2c11 = bits_le_to_field v2 16 18 in
-  let v0p0 = bits_le_to_field v0 76 88 in
-  let v0p1 = bits_le_to_field v0 64 76 in
-  let v1p0 = bits_le_to_field v1 76 88 in
-  let v1p1 = bits_le_to_field v1 64 76 in
-  let v2c12 = bits_le_to_field v2 14 16 in
-  let v2c13 = bits_le_to_field v2 12 14 in
-  let v2c14 = bits_le_to_field v2 10 12 in
-  let v2c15 = bits_le_to_field v2 8 10 in
-  let v2c16 = bits_le_to_field v2 6 8 in
-  let v2c17 = bits_le_to_field v2 4 6 in
-  let v2c18 = bits_le_to_field v2 2 4 in
-  let v2c19 = bits_le_to_field v2 0 2 in
+  let v2c9 = of_bits v2 20 22 in
+  let v2c10 = of_bits v2 18 20 in
+  let v2c11 = of_bits v2 16 18 in
+  let v0p0 = of_bits v0 76 88 in
+  let v0p1 = of_bits v0 64 76 in
+  let v1p0 = of_bits v1 76 88 in
+  let v1p1 = of_bits v1 64 76 in
+  let v2c12 = of_bits v2 14 16 in
+  let v2c13 = of_bits v2 12 14 in
+  let v2c14 = of_bits v2 10 12 in
+  let v2c15 = of_bits v2 8 10 in
+  let v2c16 = of_bits v2 6 8 in
+  let v2c17 = of_bits v2 4 6 in
+  let v2c18 = of_bits v2 2 4 in
+  let v2c19 = of_bits v2 0 2 in
 
   (* Create RangeCheck0 gate *)
   with_label label (fun () ->
