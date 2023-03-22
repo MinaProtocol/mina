@@ -77,7 +77,7 @@ logs:
 
 internalTrace:
   enable: true
-  image: openmina/mina-internal-trace-consumer:28c40bd
+  image: openmina/mina-internal-trace-consumer:d34fba9
 
 nodeSelector:
   preemptible: false
