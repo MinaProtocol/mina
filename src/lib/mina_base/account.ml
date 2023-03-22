@@ -538,9 +538,9 @@ module Checked = struct
               (Global_slot.Checked.sub_or_zero global_slot cliff_time)
           in
           let cliff_decrement = cliff_amount in
-          let min_balance_less_cliff_decrement, _ =
+          let min_balance_less_cliff_decrement =
             Tick.Run.run_checked
-              (Balance.Checked.sub_amount_flagged initial_minimum_balance
+              (Balance.Checked.sub_amount_or_zero initial_minimum_balance
                  cliff_decrement )
           in
           let num_periods, _ =
@@ -554,8 +554,9 @@ module Checked = struct
           in
           let min_balance_less_cliff_and_vesting_decrements =
             Tick.Run.run_checked
-              (Balance.Checked.sub_or_zero min_balance_less_cliff_decrement
-                 (Balance.Checked.Unsafe.of_field vesting_decrement) )
+              (Balance.Checked.sub_amount_or_zero
+                 min_balance_less_cliff_decrement
+                 Amount.(Checked.Unsafe.of_field vesting_decrement) )
           in
           min_balance_less_cliff_and_vesting_decrements )
     in
