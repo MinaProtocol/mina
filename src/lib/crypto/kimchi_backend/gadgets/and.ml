@@ -7,78 +7,97 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 (* Boolean And of length bits *)
 let band (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) (length : int) :
-    Circuit.Field.t =
+    (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) (length : int)
+    (len_xor : int) : Circuit.Field.t =
   let open Circuit in
-  (* Recursively build And gadget with leading Xors and a final Generic gate *)
-  let xored = Xor.xor input1 input2 length in
+  let output_and =
+    exists Field.typ ~compute:(fun () ->
+        (* Recursively build And gadget with leading Xors and a final Generic gate *)
+        let xor_output = Xor.bxor input1 input2 length len_xor in
 
-  (* Convert to bits *)
-  let input1_bits = Circuit.Field.unpack input1 in
-  let input2_bits = Circuit.Field.unpack input2 in
+        (* Read inputs *)
+        let input1_field = As_prover.read Field.typ input1 in
+        let input2_field = As_prover.read Field.typ input2 in
 
-  (* Check real lengths are at most the desired length *)
-  assert (List.length input1_bits <= length) ;
-  assert (List.length input2_bits <= length) ;
+        (* Convert inputs field elements to list of bits *)
+        let input1_bits = Field.Constant.unpack @@ input1_field in
+        let input2_bits = Field.Constant.unpack @@ input2_field in
 
-  (* Pad with zeros in MSB until reaching same length *)
-  let input1_bits = Common.pad_upto length Circuit.Boolean.false_ input1_bits in
-  let input2_bits = Common.pad_upto length Circuit.Boolean.false_ input2_bits in
+        (* Check real lengths are at most the desired length *)
+        assert (List.length input1_bits <= length) ;
+        assert (List.length input2_bits <= length) ;
 
-  (* Pad with more zeros until the length is a multiple of 16 *)
-  let pad_length = length in
-  while pad_length mod 16 != 0 do
-    input1_bits <- input1_bits :: Circuit.Boolean.false_ ;
-    input2_bits <- input2_bits :: Circuit.Boolean.false_ ;
-    pad_length <- pad_length + 1
-  done
+        (* Pad with zeros in MSB until reaching same length *)
+        let input1_bits = Common.pad_upto ~length ~value:false input1_bits in
+        let input2_bits = Common.pad_upto ~length ~value:false input2_bits in
 
-(* AND list of bits to obtain output *)
-let output_bits =
-  List.map2_exn input1_bits input2_bits ~f:(fun b1 b2 -> b1 land b2) ;
+        (* Pad with more zeros until the length is a multiple of 4*n for n-bit length lookup table *)
+        let pad_length =
+          if length mod 4 * len_xor <> 0 then
+            length + ((4 * len_xor) - (length mod 4 * len_xor))
+          else length
+        in
+        let input1_bits =
+          Common.pad_upto ~length:pad_length ~value:false input1_bits
+        in
+        let input2_bits =
+          Common.pad_upto ~length:pad_length ~value:false input2_bits
+        in
 
-  (* Convert back to field a AND b *)
-  let output =
-    exists Field.typ ~compute:(fun () -> Field.Constant.project output_bits)
+        (* AND list of bits to obtain output *)
+        let and_bits =
+          List.map2_exn input1_bits input2_bits ~f:(fun b1 b2 -> b1 && b2)
+        in
+
+        (* Convert back to field a AND b *)
+        let and_output =
+          exists Field.typ ~compute:(fun () -> Field.Constant.project and_bits)
+        in
+
+        (* Compute sum of a + b *)
+        let sum = Field.add input1 input2 in
+
+        with_label "sum_of_inputs" (fun () ->
+            assert_
+              { annotation = Some __LOC__
+              ; basic =
+                  Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
+                  .T
+                    (Basic
+                       { l = (Field.Constant.one, input1)
+                       ; r = (Field.Constant.one, input2)
+                       ; o =
+                           ( Option.value_exn Field.(to_constant (negate one))
+                           , sum )
+                       ; m = Field.Constant.zero
+                       ; c = Field.Constant.zero
+                       } )
+              } ) ;
+
+        (* Compute AND as 2 * and = sum - xor *)
+        let two = Field.Constant.of_int 2 in
+        with_label "and_equation" (fun () ->
+            assert_
+              { annotation = Some __LOC__
+              ; basic =
+                  Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
+                  .T
+                    (Basic
+                       { l = (Field.Constant.one, sum)
+                       ; r =
+                           ( Field.Constant.(to_constant (negate one))
+                           , xor_output )
+                       ; o =
+                           ( Option.value_exn Field.(to_constant (negate two))
+                           , Field.and_output )
+                       ; m = Field.Constant.zero
+                       ; c = Field.Constant.zero
+                       } )
+              } ) ;
+        and_output )
   in
-
-  (* Compute sum of a + b *)
-  let sum = Field.add input1 input2 in
-
-  with_label "sum_of_inputs" (fun () ->
-      assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (Basic
-                 { l = (Field.Constant.one, input1)
-                 ; r = (Field.Constant.one, input2)
-                 ; o = (Option.value_exn Field.(to_constant (negate one)), sum)
-                 ; m = Field.Constant.zero
-                 ; c = Field.Constant.zero
-                 } )
-        } ) ;
-
-  (* Compute AND as 2 * and = sum - xor *)
-  let two = Field.Constant.of_int 2 in
-  with_label "and_equation" (fun () ->
-      assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (Basic
-                 { l = (Field.Constant.one, sum)
-                 ; r = (Field.Constant.(to_constant (negate one)), xored)
-                 ; o =
-                     ( Option.value_exn Field.(to_constant (negate two))
-                     , Field.output )
-                 ; m = Field.Constant.zero
-                 ; c = Field.Constant.zero
-                 } )
-        } ) ;
-
-  output
-
+  output_and ()
+(*
 (* And of 64 bits *)
 let band64 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -151,3 +170,4 @@ let%test_unit "and gadget" =
   (* Negatve tests *)
   assert (Bool.equal (test_and 1 1 0 1) false) ;
   ()
+*)
