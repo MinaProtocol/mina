@@ -7,11 +7,11 @@ module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
  *     1. Functions prefixed with "as_prover_" only happen during proving
  *        and not while creating the constraint system
  *          * These functions are called twice (once during creation of
- *            constraint system and once during proving).  Whatever resides
- *            within the exists (in the function definitions) is not executed
- *            during circuit creation, though there could be some code outside
- *            the exists (such as error checking code) that is run during
- *            circuit creation.
+ *            constraint system and once during proving).  Inside the definition
+ *            of these functions, whatever resides within the exists is not executed
+ *            during constraint system creation, though there could be some
+ *            code outside the exists (such as error checking code) that is
+ *            run during the creation of the constraint system.
  *     2. Functions suffixed with "_as_prover" can only be called outside
  *        the circuit.  Specifically, this means within an exists, within
 *         an as_prover or in an "as_prover_" prefixed function)
