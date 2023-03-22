@@ -169,6 +169,23 @@ let get_ledger_and_breadcrumb mina =
            |> Staged_ledger.ledger
          , tip ) )
 
+module Itn = struct
+  (* differs on each daemon run *)
+  let uuid = Uuid.create_random Random.State.default
+
+  (* maps Ed25519 public keys (in base64) to sequence numbers *)
+  let request_tbl : int String.Table.t = String.Table.create () 
+
+  let get_pubkey_sequence_no pubkey =
+    let b64 = Itn_crypto.pubkey_to_base64 pubkey in
+    String.Table.find_or_add request_tbl ~default:(fun () -> 0) b64
+
+  let incr_pubkey_sequence_no pubkey =
+    let b64 = Itn_crypto.pubkey_to_base64 pubkey in
+    String.Table.incr request_tbl b64
+    
+end
+
 module Types = struct
   open Schema
 
@@ -2985,8 +3002,42 @@ module Types = struct
     end
 
     module Itn = struct
+      module Sequencing = struct
+        type t =
+          { auth_uuid : Uuid.t
+          ; sequence_no : int
+          }
+
+        let arg_typ =
+          obj "Sequencing"
+            ~doc:"ITN GraphQL sequencing"
+            ~coerce:(fun auth_uuid sequence_no ->
+                match 
+                  Uuid.of_string auth_uuid
+                with exception exn ->
+                  Error (Error.createf "Invalid Uuid: %s" (Exn.to_string exn))
+                | auth_uuid ->
+                Result.return
+                { auth_uuid
+                ; sequence_no
+                })
+            ~split:(fun f (t : t) ->
+                let auth_uuid = Uuid.to_string t.auth_uuid in
+                f auth_uuid t.sequence_no)
+            ~fields:
+              Arg.
+                [ arg "authUuid"
+                    ~typ:(non_null string)
+                    ~doc:"Uuid of GraphQL server from auth query"
+                ; arg "sequenceNo" ~doc:"Current sequence number for public key"
+                    ~typ:(non_null int)
+                ]
+      end
+
+
+
       module PaymentDetails = struct
-        type input =
+        type t =
           { senders : Signature_lib.Private_key.t list
           ; receiver : Signature_lib.Public_key.Compressed.t
           ; amount : Currency.Amount.t
@@ -3012,7 +3063,7 @@ module Types = struct
                 ; transactions_per_second
                 ; duration_in_minutes
                 } )
-            ~split:(fun f (t : input) ->
+            ~split:(fun f (t : t) ->
               f t.senders t.receiver t.amount t.fee_min t.fee_max t.memo
                 t.transactions_per_second t.duration_in_minutes )
             ~fields:
@@ -4061,16 +4112,21 @@ module Mutations = struct
       io_field "schedulePayments"
         ~args:
           Arg.
-            [ arg "input" ~doc:"Payments details"
+            [ arg "paymentDetails" ~doc:"Payments details"
                 ~typ:(non_null Types.Input.Itn.PaymentDetails.arg_typ)
+            ; arg "sequencing" ~doc:"Pubkey sequence"
+                ~typ:(non_null Types.Input.Itn.Sequencing.arg_typ)
             ]
         ~typ:(non_null string)
-        ~resolve:(fun { ctx = mina; _ } () input ->
-          return
+        ~resolve:(fun { ctx = mina; x } () payment_details sequencing ->
+            x.variables
+
+
+            return
           @@
-          match input with
+          match payment_details with
           | Error err ->
-              Error (sprintf "Invalid input to payment scheduler: %s" err)
+              Error (sprintf "Invalid payment_details to payment scheduler: %s" err)
           | Ok payment_details ->
               let max_memo_len = Signed_command_memo.max_input_length in
               if List.is_empty payment_details.senders then
@@ -5107,10 +5163,10 @@ module Queries = struct
     (* incentivized testnet-specific queries *)
 
     let auth =
-      field "auth" ~typ:bool
+      field "auth" ~typ:string
         ~args:Arg.[]
-        ~doc:"Returns true if query is authorized"
-        ~resolve:(fun _ _ -> Some true)
+        ~doc:"Returns Uuid of ITN GraphQL server, if query is authorized"
+        ~resolve:(fun _ _ -> Some (Uuid.to_string Itn.uuid))
 
     let commands = [ auth ]
   end

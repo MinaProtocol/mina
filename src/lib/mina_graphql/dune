@@ -27,6 +27,7 @@
    cli_lib
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
+   itn_crypto
    mina_base.util
    mina_ledger
    pickles
