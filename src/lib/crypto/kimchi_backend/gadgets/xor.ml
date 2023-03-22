@@ -131,11 +131,11 @@ let rec bxor_rec (type f)
     let next_in1 = List.drop input1_bits (4 * len_xor) in
     let next_in2 = List.drop input2_bits (4 * len_xor) in
     let next_out = List.drop output_bits (4 * len_xor) in
-    (* Next length is 4*4 less bits *)
+    (* Next length is 4*n less bits *)
     let next_length = length - (4 * len_xor) in
 
     (* Recursively call xor on the next nibble *)
-    bxor_rec (Circuit) next_in1 next_in2 next_out next_length len_xor ;
+    bxor_rec (module Circuit) next_in1 next_in2 next_out next_length len_xor ;
     ()
 
 (* Boolean Xor of length bits *)
