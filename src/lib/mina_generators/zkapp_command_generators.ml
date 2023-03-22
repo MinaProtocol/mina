@@ -21,7 +21,8 @@ type role =
   [ `Fee_payer | `New_account | `Ordinary_participant | `New_token_account ]
 
 let gen_account_precondition_from_account ?failure
-    ?(is_nonce_precondition = false) ~first_use_of_account account =
+    ?(ignore_sequence_events_precond = false) ?(is_nonce_precondition = false)
+    ~first_use_of_account account =
   let open Quickcheck.Let_syntax in
   let { Account.Poly.balance; nonce; delegate; receipt_chain_hash; zkapp; _ } =
     account
@@ -111,12 +112,16 @@ let gen_account_precondition_from_account ?failure
                   Quickcheck.random_value (Or_ignore.gen (return field)) )
             in
             let%bind sequence_state =
-              (* choose a value from account sequence state *)
-              let fields =
-                Pickles_types.Vector.Vector_5.to_list sequence_state
-              in
-              let%bind ndx = Int.gen_uniform_incl 0 (List.length fields - 1) in
-              return (Or_ignore.Check (List.nth_exn fields ndx))
+              if ignore_sequence_events_precond then return Or_ignore.Ignore
+              else
+                (* choose a value from account sequence state *)
+                let fields =
+                  Pickles_types.Vector.Vector_5.to_list sequence_state
+                in
+                let%bind ndx =
+                  Int.gen_uniform_incl 0 (List.length fields - 1)
+                in
+                return (Or_ignore.Check (List.nth_exn fields ndx))
             in
             let proved_state = Or_ignore.Check proved_state in
             let is_new =
@@ -234,13 +239,14 @@ let gen_account_precondition_from_account ?failure
     | _ ->
         return (Account_update.Account_precondition.Nonce nonce)
 
-let gen_fee (account : Account.t) =
+let gen_fee ~num_updates (account : Account.t) =
   let balance = account.balance in
-  let lo_fee = Mina_compile_config.minimum_user_command_fee in
-  let hi_fee =
+  let lo_fee =
     Option.value_exn
-      Currency.Fee.(scale Mina_compile_config.minimum_user_command_fee 2)
+      Currency.Fee.(
+        scale Mina_compile_config.minimum_user_command_fee (num_updates * 2))
   in
+  let hi_fee = Option.value_exn Currency.Fee.(scale lo_fee 2) in
   assert (
     Currency.(
       Fee.(hi_fee <= (Balance.to_amount balance |> Currency.Amount.to_fee))) ) ;
@@ -975,7 +981,7 @@ let gen_account_update_from ?global_slot ?(update = None) ?failure
     ?(new_account = false) ?(zkapp_account = false) ?account_id ?token_id
     ?may_use_token ?permissions_auth ?required_balance_change ~zkapp_account_ids
     ~authorization ~account_ids_seen ~available_public_keys ~account_state_tbl
-    ?protocol_state_view ?vk () =
+    ?protocol_state_view ?vk ~ignore_sequence_events_precond () =
   let open Quickcheck.Let_syntax in
   let increment_nonce =
     (* permissions_auth is used to generate updated permissions consistent with a contemplated authorization;
@@ -1002,7 +1008,8 @@ let gen_account_update_from ?global_slot ?(update = None) ?failure
         (gen_balance_change ?permissions_auth ~new_account ?failure)
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
       ~f_account_precondition:(fun ~first_use_of_account acct ->
-        gen_account_precondition_from_account ~first_use_of_account acct )
+        gen_account_precondition_from_account ~ignore_sequence_events_precond
+          ~first_use_of_account acct )
       ~f_account_update_account_precondition:Fn.id
       ~gen_use_full_commitment:(fun ~account_precondition ->
         gen_use_full_commitment ~increment_nonce ~account_precondition
@@ -1018,8 +1025,8 @@ let gen_account_update_from ?global_slot ?(update = None) ?failure
 
 (* takes an account id, if we want to sign this data *)
 let gen_account_update_body_fee_payer ?global_slot ?failure ?permissions_auth
-    ~account_id ?vk ?protocol_state_view ~account_state_tbl () :
-    Account_update.Body.Fee_payer.t Quickcheck.Generator.t =
+    ~account_id ?vk ?protocol_state_view ~account_state_tbl ~num_account_updates
+    () : Account_update.Body.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let account_precondition_gen (account : Account.t) =
     Quickcheck.Generator.return account.nonce
@@ -1027,7 +1034,8 @@ let gen_account_update_body_fee_payer ?global_slot ?failure ?permissions_auth
   let%map body_components =
     gen_account_update_body_components ?global_slot ?failure ?permissions_auth
       ~account_id ~account_state_tbl ?vk ~zkapp_account_ids:[]
-      ~is_fee_payer:true ~increment_nonce:((), true) ~gen_balance_change:gen_fee
+      ~is_fee_payer:true ~increment_nonce:((), true)
+      ~gen_balance_change:(gen_fee ~num_updates:num_account_updates)
       ~f_balance_change:fee_to_amt
       ~f_token_id:(fun token_id ->
         (* make sure the fee payer's token id is the default,
@@ -1044,12 +1052,13 @@ let gen_account_update_body_fee_payer ?global_slot ?failure ?permissions_auth
   Account_update_body_components.to_fee_payer body_components
 
 let gen_fee_payer ?global_slot ?failure ?permissions_auth ~account_id
-    ?protocol_state_view ?vk ~account_state_tbl () :
+    ?protocol_state_view ?vk ~account_state_tbl ~num_account_updates () :
     Account_update.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%map body =
     gen_account_update_body_fee_payer ?global_slot ?failure ?permissions_auth
-      ~account_id ?vk ?protocol_state_view ~account_state_tbl ()
+      ~account_id ?vk ?protocol_state_view ~account_state_tbl
+      ~num_account_updates ()
   in
   (* real signature to be added when this data inserted into a Zkapp_command.t *)
   let authorization = Signature.dummy in
@@ -1069,7 +1078,9 @@ let max_account_updates = 2
 
 let max_token_updates = 2
 
-let gen_zkapp_command_from ?global_slot ?failure
+let gen_zkapp_command_from ?global_slot
+    ?(ignore_sequence_events_precond = false) ?(no_token_accounts = false)
+    ?(limited = false) ?(generate_new_accounts = true) ?failure
     ?(max_account_updates = max_account_updates)
     ?(max_token_updates = max_token_updates)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
@@ -1093,14 +1104,17 @@ let gen_zkapp_command_from ?global_slot ?failure
   (* make sure all ledger keys are in the keymap *)
   List.iter ledger_accounts ~f:(fun acct ->
       let acct_id = Account.identifier acct in
-      let pk = Account_id.public_key acct_id in
       (*Initialize account states*)
-      Account_id.Table.update account_state_tbl acct_id ~f:(function
-        | None ->
-            if Account_id.equal acct_id fee_payer_acct_id then (acct, `Fee_payer)
-            else (acct, `Ordinary_participant)
-        | Some a ->
-            a ) ;
+      if not limited then
+        Account_id.Table.update account_state_tbl acct_id ~f:(function
+          | None ->
+              if Account_id.equal acct_id fee_payer_acct_id then
+                (acct, `Fee_payer)
+              else (acct, `Ordinary_participant)
+          | Some a ->
+              a ) ) ;
+  List.iter (Account_id.Table.keys account_state_tbl) ~f:(fun id ->
+      let pk = Account_id.public_key id in
       if Option.is_none (Signature_lib.Public_key.Compressed.Map.find keymap pk)
       then
         failwithf
@@ -1136,9 +1150,11 @@ let gen_zkapp_command_from ?global_slot ?failure
      a account_update with a given account id has not been encountered before
   *)
   let account_ids_seen = Account_id.Hash_set.create () in
+  let%bind num_zkapp_command = Int.gen_uniform_incl 1 max_account_updates in
   let%bind fee_payer =
     gen_fee_payer ?global_slot ?failure ~permissions_auth:Control.Tag.Signature
-      ~account_id:fee_payer_acct_id ?vk ~account_state_tbl ()
+      ~account_id:fee_payer_acct_id ?vk ~account_state_tbl
+      ~num_account_updates:num_zkapp_command ()
   in
   let zkapp_account_ids =
     Account_id.Table.filteri account_state_tbl ~f:(fun ~key:_ ~data:(a, role) ->
@@ -1266,7 +1282,8 @@ let gen_zkapp_command_from ?global_slot ?failure
           gen_account_update_from ?global_slot ~zkapp_account_ids
             ~account_ids_seen ~update ?failure ~authorization ~new_account
             ~permissions_auth ~zkapp_account ~available_public_keys
-            ~account_state_tbl ?protocol_state_view ?vk ()
+            ~may_use_token:No ~account_state_tbl ?protocol_state_view ?vk
+            ~ignore_sequence_events_precond ()
         in
         let%bind account_update =
           (* authorization according to chosen permissions auth *)
@@ -1340,7 +1357,8 @@ let gen_zkapp_command_from ?global_slot ?failure
           gen_account_update_from ?global_slot ~update ?failure
             ~zkapp_account_ids ~account_ids_seen ~account_id ~authorization
             ~permissions_auth ~zkapp_account ~available_public_keys
-            ~account_state_tbl ?protocol_state_view ?vk ()
+            ~may_use_token:No ~account_state_tbl ?protocol_state_view ?vk
+            ~ignore_sequence_events_precond ()
         in
         (* this list will be reversed, so `account_update0` will execute before `account_update` *)
         go
@@ -1350,8 +1368,10 @@ let gen_zkapp_command_from ?global_slot ?failure
     go [] num_zkapp_command
   in
   (* at least 1 account_update *)
-  let%bind num_zkapp_command = Int.gen_uniform_incl 1 max_account_updates in
-  let%bind num_new_accounts = Int.gen_uniform_incl 0 num_zkapp_command in
+  let%bind num_new_accounts =
+    if generate_new_accounts then Int.gen_uniform_incl 0 num_zkapp_command
+    else return 0
+  in
   let num_old_zkapp_command = num_zkapp_command - num_new_accounts in
   let%bind old_zkapp_command =
     gen_zkapp_command_with_dynamic_balance ~new_account:false
@@ -1396,8 +1416,9 @@ let gen_zkapp_command_from ?global_slot ?failure
     gen_account_update_from ?global_slot ?failure
       ~permissions_auth:Control.Tag.Signature ~zkapp_account_ids
       ~account_ids_seen ~authorization ~new_account:false ~available_public_keys
-      ~account_state_tbl ~required_balance_change:balance_change
-      ?protocol_state_view ?vk ()
+      ~may_use_token:No ~account_state_tbl
+      ~required_balance_change:balance_change ?protocol_state_view ?vk
+      ~ignore_sequence_events_precond ()
   in
   let gen_zkapp_command_with_token_accounts ~num_zkapp_command =
     let authorization = Control.Signature Signature.dummy in
@@ -1417,7 +1438,8 @@ let gen_zkapp_command_from ?global_slot ?failure
           gen_account_update_from ?global_slot ~zkapp_account_ids
             ~account_ids_seen ~authorization ~permissions_auth
             ~available_public_keys ~may_use_token:No ~account_state_tbl
-            ~required_balance_change ?protocol_state_view ?vk ()
+            ~required_balance_change ?protocol_state_view ?vk
+            ~ignore_sequence_events_precond ()
         in
         let token_id =
           Account_id.derive_token_id
@@ -1429,14 +1451,15 @@ let gen_zkapp_command_from ?global_slot ?failure
             ~account_ids_seen ~new_account:true ~token_id
             ~may_use_token:Parents_own_token ~authorization ~permissions_auth
             ~available_public_keys ~account_state_tbl ?protocol_state_view ?vk
-            ()
+            ~ignore_sequence_events_precond ()
         in
         gen_tree (mk_node parent [ mk_node child [] ] :: acc) (n - 1)
     in
     gen_tree [] num_zkapp_command
   in
   let%bind num_new_token_zkapp_command =
-    Int.gen_uniform_incl 0 max_token_updates
+    if no_token_accounts then return 0
+    else Int.gen_uniform_incl 0 max_token_updates
   in
   let%bind new_token_zkapp_command =
     gen_zkapp_command_with_token_accounts
@@ -1556,3 +1579,71 @@ let gen_list_of_zkapp_command_from ?global_slot ?failure ?max_account_updates
     else return (List.rev acc)
   in
   go length []
+
+let%test_module _ =
+  ( module struct
+    module U = Transaction_snark_tests.Util
+    open Signature_lib
+
+    let `VK vk, `Prover _ = Lazy.force U.trivial_zkapp
+
+    let mk_ledger ~num_of_unused_keys () =
+      let keys = List.init 5 ~f:(fun _ -> Keypair.create ()) in
+      let zkapp_keys = List.init 5 ~f:(fun _ -> Keypair.create ()) in
+      let unused_keys =
+        List.init num_of_unused_keys ~f:(fun _ -> Keypair.create ())
+      in
+      let account_ids =
+        List.map keys ~f:(fun key ->
+            Account_id.create
+              (Signature_lib.Public_key.compress key.public_key)
+              Token_id.default )
+      in
+      let zkapp_account_ids =
+        List.map zkapp_keys ~f:(fun key ->
+            Account_id.create
+              (Signature_lib.Public_key.compress key.public_key)
+              Token_id.default )
+      in
+      let balance = Currency.Balance.of_mina_int_exn 1_000_000 in
+      let accounts =
+        List.map account_ids ~f:(fun id -> Account.create id balance)
+      in
+      let zkapp_accounts =
+        List.map zkapp_account_ids ~f:(fun id ->
+            let account = Account.create id balance in
+            let verification_key = Some vk in
+            let zkapp = Some { Zkapp_account.default with verification_key } in
+            { account with zkapp } )
+      in
+      let ledger = Mina_ledger.Ledger.create ~depth:10 () in
+      List.iter2_exn (account_ids @ zkapp_account_ids)
+        (accounts @ zkapp_accounts) ~f:(fun id account ->
+          Mina_ledger.Ledger.get_or_create_account ledger id account
+          |> Or_error.ok_exn
+          |> fun _ -> () ) ;
+      let keymap =
+        List.map
+          (keys @ zkapp_keys @ unused_keys)
+          ~f:(fun { public_key; private_key } ->
+            (Public_key.compress public_key, private_key) )
+        |> Public_key.Compressed.Map.of_alist_exn
+      in
+      (ledger, List.hd_exn keys, keymap)
+
+    let%test_unit "generate 100 zkapps with only 3 unused keys" =
+      let ledger, fee_payer_keypair, keymap =
+        mk_ledger ~num_of_unused_keys:3 ()
+      in
+      let _ =
+        Quickcheck.Generator.(
+          generate
+            (list_with_length 100
+               (gen_zkapp_command_from ~fee_payer_keypair ~keymap
+                  ~account_state_tbl:(Account_id.Table.create ())
+                  ~generate_new_accounts:false ~ledger () ) )
+            ~size:100
+            ~random:(Splittable_random.State.create Random.State.default))
+      in
+      ()
+  end )
