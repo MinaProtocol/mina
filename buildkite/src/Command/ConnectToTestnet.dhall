@@ -1,5 +1,5 @@
 let Prelude = ../External/Prelude.dhall
-let B = ../../External/Buildkite.dhall
+let B = ../External/Buildkite.dhall
 
 let Command = ./Base.dhall
 let Docker = ./Docker/Type.dhall
