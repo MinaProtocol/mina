@@ -477,6 +477,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let all bs = Tick.(Run.run_checked (Boolean.all bs))
 
     let ( || ) b1 b2 = Tick.(Run.run_checked Boolean.(b1 || b2))
+      [@@coverage off]
 
     let equal t t' = Tick.Run.run_checked (Frozen_ledger_hash.equal_var t t')
 
