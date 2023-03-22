@@ -157,6 +157,7 @@ CREATE TABLE blocks
 , global_slot_since_hard_fork  bigint NOT NULL
 , global_slot_since_genesis    bigint NOT NULL
 , protocol_version_id          int    NOT NULL        REFERENCES protocol_versions(id)
+, proposed_protocol_version_id int                    REFERENCES protocol_versions(id)
 , timestamp                    text   NOT NULL
 , chain_status                 chain_status_type NOT NULL
 );

@@ -124,6 +124,7 @@ module Block = struct
         ; internal_cmds : Internal_command.Stable.V1.t list
         ; zkapp_cmds : Zkapp_command.Stable.V1.t list
         ; protocol_version : Protocol_version.Stable.V1.t
+        ; proposed_protocol_version : Protocol_version.Stable.V1.t option
         ; chain_status : Chain_status.Stable.V1.t
         ; accounts_accessed : (int * Account.Stable.V2.t) list
         ; accounts_created :

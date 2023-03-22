@@ -293,6 +293,7 @@ let sample_block_sexp =
   (6015213778799164743705381332887935226819166012453542567863482729120123228169
    ()))
  (protocol_version ((major 1) (minor 0) (patch 0)))
+ (proposed_protocol_version ())
  (accounts_accessed
   ((2
     ((public_key B62qpkCEM5N5ddVsYNbFtwWV4bsT9AwuUJXoehFhHUbYYvZ6j3fXt93)

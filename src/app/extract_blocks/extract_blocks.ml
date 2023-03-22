@@ -99,6 +99,14 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     in
     Protocol_version.create_exn ~major ~minor ~patch
   in
+  let%bind proposed_protocol_version =
+    Option.value_map block.proposed_protocol_version_id ~default:(return None)
+      ~f:(fun id ->
+        let%map { major; minor; patch } =
+          query_db ~f:(fun db -> Processor.Protocol_versions.load db id)
+        in
+        Some (Protocol_version.create_exn ~major ~minor ~patch) )
+  in
   (* commands, accounts_accessed, accounts_created, tokens_used to be filled in later *)
   return
     { Extensional.Block.state_hash
@@ -118,6 +126,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     ; user_cmds = []
     ; internal_cmds = []
     ; zkapp_cmds = []
+    ; proposed_protocol_version
     ; protocol_version
     ; chain_status
     ; accounts_accessed = []

@@ -26,6 +26,7 @@ module Stable : sig
       ; delta_transition_chain_proof :
           Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
       ; protocol_version : Protocol_version.Stable.V1.t
+      ; proposed_protocol_version : Protocol_version.Stable.V1.t option
       ; accounts_accessed : (int * Account.Stable.V2.t) list
       ; accounts_created :
           (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
@@ -43,6 +44,7 @@ type t = Stable.Latest.t =
   ; delta_transition_chain_proof :
       Frozen_ledger_hash.t * Frozen_ledger_hash.t list
   ; protocol_version : Protocol_version.t
+  ; proposed_protocol_version : Protocol_version.t option
   ; accounts_accessed : (int * Account.t) list
   ; accounts_created : (Account_id.t * Currency.Fee.t) list
   ; tokens_used : (Token_id.t * Account_id.t option) list
