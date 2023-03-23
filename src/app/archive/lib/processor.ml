@@ -4016,7 +4016,7 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
   let reader, writer =
-    Strict_pipe.create ~name:"archive_migrated_to_berkeley" Synchronous
+    Strict_pipe.create ~name:"archive" Synchronous
   in
   let precomputed_block_reader, precomputed_block_writer =
     Strict_pipe.create ~name:"precomputed_archive_block" Synchronous
