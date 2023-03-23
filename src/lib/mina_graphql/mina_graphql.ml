@@ -4517,6 +4517,8 @@ module Mutations = struct
                 | None ->
                     Error "Could not get best tip ledger"
                 | Some (ledger, _best_tip) ->
+                    [%log info] "Starting zkApp scheduler with handle %s"
+                      (Uuid.to_string uuid) ;
                     let { Precomputed_values.constraint_constants; _ } =
                       (Mina_lib.config mina).precomputed_values
                     in
@@ -4573,9 +4575,6 @@ module Mutations = struct
                           | None ->
                               Deferred.unit
                           | Some (ledger, _) ->
-                              [%log info]
-                                "Starting zkApp scheduler with handle %s"
-                                (Uuid.to_string uuid) ;
                               let zkapp_command =
                                 Quickcheck.Generator.generate
                                   (Mina_generators.Zkapp_command_generators
