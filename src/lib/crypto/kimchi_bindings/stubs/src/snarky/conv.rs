@@ -12,7 +12,7 @@ use kimchi::{
     FieldVar,
 };
 
-macro_rules! impl_custom_clone {
+macro_rules! impl_conv_functions {
     ($CamlVar: ty, $CamlF: ty, $F: ty) => {
         pub fn convert_constraint(
             constraint: &KimchiConstraint<$CamlVar, $CamlF>,
@@ -198,7 +198,7 @@ pub mod fp {
     use crate::snarky::CamlFpVar;
     use mina_curves::pasta::Fp;
 
-    impl_custom_clone!(CamlFpVar, CamlFp, Fp);
+    impl_conv_functions!(CamlFpVar, CamlFp, Fp);
 }
 pub mod fq {
     use super::*;
@@ -207,5 +207,5 @@ pub mod fq {
     use crate::snarky::CamlFqVar;
     use mina_curves::pasta::Fq;
 
-    impl_custom_clone!(CamlFqVar, CamlFq, Fq);
+    impl_conv_functions!(CamlFqVar, CamlFq, Fq);
 }
