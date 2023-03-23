@@ -2,6 +2,8 @@ open Core_kernel
 
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
+module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
+
 (* XOR *)
 
 (* Boolean Xor of length bits *)
@@ -38,79 +40,10 @@ let bxor (type f)
             } ) )
     else
       (* Nibbles *)
-      let in1 = Field.constant input1 in
-      let in2 = Field.constant input2 in
-      let out = Field.constant output in
-      let in1_0 =
-        Common.field_bits_le_to_field (module Circuit) in1 0 len_xor
-      in
-      let in1_1 =
-        Common.field_bits_le_to_field
-          (module Circuit)
-          in1 len_xor
-          Int.(2 * len_xor)
-      in
-      let in1_2 =
-        Common.field_bits_le_to_field
-          (module Circuit)
-          in1
-          Int.(2 * len_xor)
-          Int.(3 * len_xor)
-      in
-      let in1_3 =
-        Common.field_bits_le_to_field
-          (module Circuit)
-          in1
-          Int.(3 * len_xor)
-          Int.(4 * len_xor)
-      in
-      let in2_0 =
-        Common.field_bits_le_to_field (module Circuit) in2 0 len_xor
-      in
-      let in2_1 =
-        Common.field_bits_le_to_field
-          (module Circuit)
-          in2 len_xor
-          Int.(2 * len_xor)
-      in
-      let in2_2 =
-        Common.field_bits_le_to_field
-          (module Circuit)
-          in2
-          Int.(2 * len_xor)
-          Int.(3 * len_xor)
-      in
-      let in2_3 =
-        Common.field_bits_le_to_field
-          (module Circuit)
-          in2
-          Int.(3 * len_xor)
-          Int.(4 * len_xor)
-      in
-      let out_0 =
-        Common.field_bits_le_to_field (module Circuit) out 0 len_xor
-      in
-      let out_1 =
-        Common.field_bits_le_to_field
-          (module Circuit)
-          out len_xor
-          Int.(2 * len_xor)
-      in
-      let out_2 =
-        Common.field_bits_le_to_field
-          (module Circuit)
-          out
-          Int.(2 * len_xor)
-          Int.(3 * len_xor)
-      in
-      let out_3 =
-        Common.field_bits_le_to_field
-          (module Circuit)
-          out
-          Int.(3 * len_xor)
-          Int.(4 * len_xor)
-      in
-
+      let first = len_xor in
+      let second = first + len_xor in
+      let third = second + len_xor in
+      let fourth = third + len_xor in
       (* If length is more than 0, add the Xor gate *)
       with_label "xor_gate" (fun () ->
           (* Set up Xor gate *)
@@ -119,30 +52,90 @@ let bxor (type f)
             ; basic =
                 Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
                   (Xor
-                     { in1
-                     ; in2
-                     ; out
-                     ; in1_0
-                     ; in1_1
-                     ; in1_2
-                     ; in1_3
-                     ; in2_0
-                     ; in2_1
-                     ; in2_2
-                     ; in2_3
-                     ; out_0
-                     ; out_1
-                     ; out_2
-                     ; out_3
+                     { in1 = Field.constant input1
+                     ; in2 = Field.constant input2
+                     ; out = Field.constant output
+                     ; in1_0 =
+                         Common.field_to_cvar_field
+                           (module Circuit)
+                           (Common.field_bits_le_to_field
+                              (module Circuit)
+                              input1 0 first )
+                     ; in1_1 =
+                         Common.field_to_cvar_field
+                           (module Circuit)
+                           (Common.field_bits_le_to_field
+                              (module Circuit)
+                              input1 first second )
+                     ; in1_2 =
+                         Common.field_to_cvar_field
+                           (module Circuit)
+                           (Common.field_bits_le_to_field
+                              (module Circuit)
+                              input1 second third )
+                     ; in1_3 =
+                         Common.field_to_cvar_field
+                           (module Circuit)
+                           (Common.field_bits_le_to_field
+                              (module Circuit)
+                              input1 third fourth )
+                     ; in2_0 =
+                         Common.field_to_cvar_field
+                           (module Circuit)
+                           (Common.field_bits_le_to_field
+                              (module Circuit)
+                              input2 0 first )
+                     ; in2_1 =
+                         Common.field_to_cvar_field
+                           (module Circuit)
+                           (Common.field_bits_le_to_field
+                              (module Circuit)
+                              input2 first second )
+                     ; in2_2 =
+                         Common.field_to_cvar_field
+                           (module Circuit)
+                           (Common.field_bits_le_to_field
+                              (module Circuit)
+                              input2 second third )
+                     ; in2_3 =
+                         Common.field_to_cvar_field
+                           (module Circuit)
+                           (Common.field_bits_le_to_field
+                              (module Circuit)
+                              input2 third fourth )
+                     ; out_0 =
+                         Common.field_to_cvar_field
+                           (module Circuit)
+                           (Common.field_bits_le_to_field
+                              (module Circuit)
+                              output 0 first )
+                     ; out_1 =
+                         Common.field_to_cvar_field
+                           (module Circuit)
+                           (Common.field_bits_le_to_field
+                              (module Circuit)
+                              output first second )
+                     ; out_2 =
+                         Common.field_to_cvar_field
+                           (module Circuit)
+                           (Common.field_bits_le_to_field
+                              (module Circuit)
+                              output second third )
+                     ; out_3 =
+                         Common.field_to_cvar_field
+                           (module Circuit)
+                           (Common.field_bits_le_to_field
+                              (module Circuit)
+                              output third fourth )
                      } )
             } ) ;
 
       (* Remove least significant 4 nibbles *)
-      let next_in1 = List.drop input1_bits (4 * len_xor) in
-      let next_in2 = List.drop input2_bits (4 * len_xor) in
-      let next_out = List.drop output_bits (4 * len_xor) in
+      let next_in1 = List.drop input1_bits fourth in
+      let next_in2 = List.drop input2_bits fourth in
+      let next_out = List.drop output_bits fourth in
       (* Next length is 4*n less bits *)
-      let next_length = length - (4 * len_xor) in
+      let next_length = length - fourth in
 
       (* Recursively call xor on the next nibble *)
       bxor_rec next_in1 next_in2 next_out next_length len_xor ;
@@ -150,8 +143,45 @@ let bxor (type f)
   in
 
   let open Circuit in
-  (* Check that the length is permitted *)
-  assert (length < Field.size_in_bits) ;
+  let open Common in
+  (* Check that the length fits in the field *)
+  assert (length <= Field.size_in_bits) ;
+
+  (* Sanity checks about lengths of inputs using bignum *)
+  as_prover (fun () ->
+      (* Convert to field type *)
+      let input1_field =
+        Common.cvar_field_to_field_as_prover (module Circuit) input1
+      in
+      let input2_field =
+        Common.cvar_field_to_field_as_prover (module Circuit) input2
+      in
+
+      (* Transform to big integer *)
+      let input1_big =
+        Common.field_to_bignum_bigint (module Circuit) input1_field
+      in
+      let input2_big =
+        Common.field_to_bignum_bigint (module Circuit) input2_field
+      in
+
+      (* Check real lengths are at most the desired length *)
+      let two_big = Bignum_bigint.of_int 2 in
+      let length_big = Bignum_bigint.of_int length in
+
+      (* Checks inputs are smaller than 2^length *)
+      assert (Bignum_bigint.(input1_big < pow two_big length_big)) ;
+      assert (Bignum_bigint.(input2_big < pow two_big length_big)) ;
+
+      (* Checks inputs fit in field *)
+      assert (Bignum_bigint.(input1_big < Field.size)) ;
+      assert (Bignum_bigint.(input2_big < Field.size)) ;
+      () ) ;
+
+  (* print the list of bits *)
+  let _print_bits bits =
+    List.iter bits ~f:(fun b -> print_string (if b then "1" else "0"))
+  in
 
   let output_xor =
     exists Field.typ ~compute:(fun () ->
@@ -160,12 +190,12 @@ let bxor (type f)
         let input2_field = As_prover.read Field.typ input2 in
 
         (* Convert inputs field elements to list of bits *)
-        let input1_bits = Field.Constant.unpack @@ input1_field in
-        let input2_bits = Field.Constant.unpack @@ input2_field in
-
-        (* Check real lengths are at most the desired length *)
-        assert (List.length input1_bits <= length) ;
-        assert (List.length input2_bits <= length) ;
+        let input1_bits =
+          field_to_bits_le_as_prover (module Circuit) input1_field
+        in
+        let input2_bits =
+          field_to_bits_le_as_prover (module Circuit) input2_field
+        in
 
         (* Pad with zeros in MSB until reaching same length *)
         let input1_bits = Common.pad_upto ~length ~value:false input1_bits in
@@ -173,8 +203,8 @@ let bxor (type f)
 
         (* Pad with more zeros until the length is a multiple of 4*n for n-bit length lookup table *)
         let pad_length =
-          if length mod 4 * len_xor <> 0 then
-            length + ((4 * len_xor) - (length mod 4 * len_xor))
+          if length mod (4 * len_xor) <> 0 then
+            length + (4 * len_xor) - (length mod (4 * len_xor))
           else length
         in
         let input1_bits =
@@ -189,12 +219,13 @@ let bxor (type f)
           List.map2_exn input1_bits input2_bits ~f:(fun b1 b2 ->
               Bool.(not (equal b1 b2)) )
         in
-
         (* Recursively build Xor gadget *)
         bxor_rec input1_bits input2_bits output_bits pad_length len_xor ;
+
         (* Convert back to field *)
         Field.Constant.project output_bits )
   in
+
   output_xor
 
 (* Xor of 16 bits *)
@@ -216,55 +247,52 @@ let%test_unit "xor gadget" =
   let () =
     try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
   in
+
   (* Helper to test Xor gadget
      *   Inputs operands and expected output: left_input xor right_input
      *   Returns true if constraints are satisfied, false otherwise.
   *)
-  let test_xor left_input right_input output_xor length =
-    try
-      let _proof_keypair, _proof =
-        Runner.generate_and_verify_proof (fun () ->
-            let open Runner.Impl in
-            (* Set up snarky variables for inputs and output *)
-            let left_input =
-              exists Field.typ ~compute:(fun () ->
-                  Field.Constant.of_string left_input )
-            in
-            let right_input =
-              exists Field.typ ~compute:(fun () ->
-                  Field.Constant.of_string right_input )
-            in
-            let output_xor =
-              exists Field.typ ~compute:(fun () ->
-                  Field.Constant.of_string output_xor )
-            in
-            (* Use the xor gate gadget *)
-            let result =
-              bxor (module Runner.Impl) left_input right_input length 4
-            in
-            Field.Assert.equal output_xor result ;
-            (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
-            Boolean.Assert.is_true (Field.equal result result) )
-      in
-      true
-    with _ -> false
+  let test_xor left_input right_input output_xor length : unit =
+    let _proof_keypair, _proof =
+      Runner.generate_and_verify_proof (fun () ->
+          let open Runner.Impl in
+          (* Set up snarky variables for inputs and output *)
+          let left_input =
+            exists Field.typ ~compute:(fun () ->
+                Field.Constant.of_string left_input )
+          in
+          let right_input =
+            exists Field.typ ~compute:(fun () ->
+                Field.Constant.of_string right_input )
+          in
+          let output_xor =
+            exists Field.typ ~compute:(fun () ->
+                Field.Constant.of_string output_xor )
+          in
+          (* Use the xor gate gadget *)
+          let result =
+            bxor (module Runner.Impl) left_input right_input length 4
+          in
+          Field.Assert.equal output_xor result ;
+          (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
+          Boolean.Assert.is_true (Field.equal result result) )
+    in
+    ()
   in
 
   (* Positive tests *)
-  assert (Bool.equal (test_xor "0" "0" "0" 16) true) ;
-  assert (Bool.equal (test_xor "0" "0" "1" 8) true) ;
-  assert (Bool.equal (test_xor "0" "0" "0" 1) true) ;
-  assert (Bool.equal (test_xor "0" "0" "0" 4) true) ;
-  assert (Bool.equal (test_xor "43210" "56789" "29983" 16) true) ;
-  assert (Bool.equal (test_xor "767430" "974317" "354347" 20) true) ;
+  test_xor "1" "0" "1" 16 ;
+  test_xor "0" "0" "0" 8 ;
+  test_xor "0" "0" "0" 1 ;
+  test_xor "0" "0" "0" 4 ;
+  test_xor "43210" "56789" "29983" 16 ;
+  test_xor "767430" "974317" "354347" 20 ;
   (* 0x5A5A5A5A5A5A5A5A xor 0xA5A5A5A5A5A5A5A5 = 0xFFFFFFFFFFFFFFFF*)
-  assert (
-    Bool.equal
-      (test_xor "6510615555426900570" "18446744073709551615" "72057594037927935"
-         64 )
-      true ) ;
+  test_xor "6510615555426900570" "11936128518282651045" "18446744073709551615"
+    64 ;
   (* Negatve tests *)
-  assert (Bool.equal (test_xor "1" "0" "0" 1) false) ;
-  assert (Bool.equal (test_xor "1111" "2222" "0" 16) false) ;
+  assert (Common.is_error (fun () -> test_xor "1" "0" "0" 1)) ;
+  assert (Common.is_error (fun () -> test_xor "1111" "2222" "0" 16)) ;
+  assert (Common.is_error (fun () -> test_xor "0" "0" "0" 256)) ;
 
   ()

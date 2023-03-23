@@ -10,6 +10,31 @@ let pad_upto ~length ~value list =
   let padding = List.init (length - len) ~f:(fun _ -> value) in
   list @ padding
 
+(* Length of bigint in bits *)
+let bignum_bigint_bit_length (bigint : Bignum_bigint.t) : int =
+  Z.log2up (Bignum_bigint.to_zarith_bigint bigint)
+
+(* Removes leading zero bits of a list of booleans (at least needs length 1) *)
+let rec rm_zero_bits (bitstring : bool list) : bool list =
+  match bitstring with
+  | [] ->
+      [ false ]
+  | false :: x ->
+      rm_zero_bits x
+  | _ ->
+      bitstring
+
+let field_to_bits_le_as_prover (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (field_element : f) : bool list =
+  let open Circuit in
+  (* Returns the bitstring of Field.size_in_bits elements *)
+  let bits = Field.Constant.unpack @@ field_element in
+  (* Reverse the bitstring *)
+  let bits = List.rev bits in
+  let bits = rm_zero_bits bits in
+  List.rev bits
+
 (* Conventions used in this interface
  *     1. Functions prefixed with "as_prover_" only happen during proving
  *        and not while creating the constraint system
