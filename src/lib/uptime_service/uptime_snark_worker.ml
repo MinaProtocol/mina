@@ -17,7 +17,7 @@ module Worker_state = struct
 
   type t = (module S)
 
-  let create ~logger:_ : t Deferred.t =
+  let create () : t Deferred.t =
     Deferred.return
       (let module M = struct
          let perform_single (message, single_spec) =
@@ -80,7 +80,7 @@ module Worker = struct
 
       let init_worker_state logger =
         [%log info] "Uptime SNARK worker started" ;
-        Worker_state.create ~logger
+        Worker_state.create ()
 
       let init_connection_state ~connection:_ ~worker_state:_ () = Deferred.unit
     end
