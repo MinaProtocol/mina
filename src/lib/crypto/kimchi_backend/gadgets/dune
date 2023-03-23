@@ -9,6 +9,7 @@
   bignum.bigint
   core_kernel
   ppx_inline_test.config
+  zarith
   ;; local libraries
   kimchi_backend.common
   kimchi_backend.pasta
