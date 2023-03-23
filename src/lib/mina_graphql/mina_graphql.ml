@@ -4290,17 +4290,12 @@ module Mutations = struct
         Token_id.default
 
     let account_of_kp (kp : Signature_lib.Keypair.t) ledger =
-      let id =
-        Account_id.create
-          (Signature_lib.Public_key.compress kp.public_key)
-          Token_id.default
-      in
-      account_of_id id ledger
+      account_of_id (id_of_kp kp) ledger
 
     let deploy_zkapps ~mina ~ledger
         ~(fee_payer_keypair : Signature_lib.Keypair.t)
         ~(account_creator_keypair : Signature_lib.Keypair.t)
-        ~constraint_constants keypairs =
+        ~constraint_constants ~logger keypairs =
       let fee_payer_account = account_of_kp fee_payer_keypair ledger in
       let account_creator = account_of_kp account_creator_keypair ledger in
       let fee_payer_nonce = ref fee_payer_account.nonce in
@@ -4323,12 +4318,19 @@ module Mutations = struct
           let zkapp_command =
             Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec
           in
-          match%map send_zkapp_command mina zkapp_command with
-          | Ok _ ->
-              fee_payer_nonce := Account.Nonce.succ !fee_payer_nonce ;
-              account_creator_nonce := Account.Nonce.succ !account_creator_nonce
-          | Error _ ->
-              () )
+          let rec go () =
+            match%bind send_zkapp_command mina zkapp_command with
+            | Ok _ ->
+                fee_payer_nonce := Account.Nonce.succ !fee_payer_nonce ;
+                account_creator_nonce :=
+                  Account.Nonce.succ !account_creator_nonce ;
+                Deferred.unit
+            | Error _ ->
+                [%log info]
+                  "Failed to setup one of the zkApp accounts, try again" ;
+                go ()
+          in
+          go () )
 
     let is_zkapp_deployed kp ledger =
       match
@@ -4364,12 +4366,15 @@ module Mutations = struct
           (Uuid.to_string uuid) ;
         Uuid.Table.remove scheduler_tbl uuid ;
         return None )
-      else if all_zkapps_deployed ~mina keypairs then return (Some ledger)
+      else if all_zkapps_deployed ~mina keypairs then (
+        [%log info] "All zkApp accounts are deployed" ;
+        return (Some ledger) )
       else
         let%bind () =
-          if not deployed then
+          if not deployed then (
+            [%log info] "Start deploying zkApp accounts" ;
             deploy_zkapps ~mina ~ledger ~fee_payer_keypair
-              ~account_creator_keypair ~constraint_constants keypairs
+              ~account_creator_keypair ~constraint_constants ~logger keypairs )
           else return ()
         in
         let%bind () =
@@ -4434,6 +4439,10 @@ module Mutations = struct
                       List.init zkapp_command_details.num_of_new_accounts
                         ~f:(fun _ -> Signature_lib.Keypair.create ())
                     in
+                    let unused_keypairs =
+                      List.init zkapp_command_details.num_of_new_accounts
+                        ~f:(fun _ -> Signature_lib.Keypair.create ())
+                    in
                     let account_creator_keypair =
                       Signature_lib.Keypair.of_private_key_exn
                         zkapp_command_details.account_creator
@@ -4452,7 +4461,9 @@ module Mutations = struct
                     let fee_payer_arrays = Array.of_list fee_payer_keypairs in
                     let fee_payer_keypair = fee_payer_keypairs |> List.hd_exn in
                     let keymap =
-                      List.map (zkapp_account_keypairs @ fee_payer_keypairs)
+                      List.map
+                        ( zkapp_account_keypairs @ fee_payer_keypairs
+                        @ unused_keypairs )
                         ~f:(fun { public_key; private_key } ->
                           (Public_key.compress public_key, private_key) )
                       |> Public_key.Compressed.Map.of_alist_exn
