@@ -18,7 +18,6 @@ module Worker_state = struct
   type t = (module S)
 
   let create ~logger : t Deferred.t =
-    Memory_stats.log_memory_stats logger ~process:"uptime service SNARK worker" ;
     Deferred.return
       (let module M = struct
          let perform_single (message, single_spec) =
