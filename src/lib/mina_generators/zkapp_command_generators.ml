@@ -1102,7 +1102,9 @@ let gen_zkapp_command_from ?global_slot ?(limited = false) ?failure
                 (acct, `Fee_payer)
               else (acct, `Ordinary_participant)
           | Some a ->
-              a ) ;
+              a ) ) ;
+  List.iter (Account_id.Table.keys account_state_tbl) ~f:(fun id ->
+      let pk = Account_id.public_key id in
       if Option.is_none (Signature_lib.Public_key.Compressed.Map.find keymap pk)
       then
         failwithf
