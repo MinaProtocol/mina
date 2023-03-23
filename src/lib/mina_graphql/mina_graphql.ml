@@ -3131,13 +3131,13 @@ module Types = struct
                 t.transactions_per_second t.duration_in_minutes )
             ~fields:
               Arg.
-                [ arg "account_creators"
+                [ arg "accountCreator"
                     ~typ:(non_null PrivateKey.arg_typ)
                     ~doc:"Private key of the account creator"
-                ; arg "fee_payers"
+                ; arg "feePayers"
                     ~typ:(non_null (list (non_null PrivateKey.arg_typ)))
                     ~doc:"Private keys of fee payers"
-                ; arg "num_of_accounts_to_create" ~typ:(non_null int)
+                ; arg "numAccountsToCreate" ~typ:(non_null int)
                     ~doc:"Number of zkapp accounts that we created for the test"
                 ; arg "transactionsPerSecond" ~typ:(non_null float)
                     ~doc:"Frequency of transactions"
@@ -4459,12 +4459,12 @@ module Mutations = struct
         ~constraint_constants ~logger ~uuid ~stop_signal ~stop_time
         (keypairs : Signature_lib.Keypair.t list) =
       if Time.( >= ) (Time.now ()) stop_time then (
-        [%log info] "Scheduled zkapp commands with handle %s has expired"
+        [%log info] "Scheduled zkApp commands with handle %s has expired"
           (Uuid.to_string uuid) ;
         Uuid.Table.remove scheduler_tbl uuid ;
         return None )
       else if Ivar.is_full stop_signal then (
-        [%log info] "Stopping scheduled zkapp commands with handle %s"
+        [%log info] "Stopping scheduled zkApp commands with handle %s"
           (Uuid.to_string uuid) ;
         Uuid.Table.remove scheduler_tbl uuid ;
         return None )
@@ -4516,7 +4516,7 @@ module Mutations = struct
                     ()
                 | `Duplicate ->
                     failwith
-                      "Unexpected duplicate scheduled zkapp commands handle" ) ;
+                      "Unexpected duplicate scheduled zkApp commands handle" ) ;
                 let wait_span =
                   1. /. zkapp_command_details.transactions_per_second
                   |> Time.Span.of_sec
@@ -4564,13 +4564,13 @@ module Mutations = struct
                     let rec go account_state_tbl ndx tm_next =
                       if Time.( >= ) (Time.now ()) tm_end then (
                         [%log info]
-                          "Scheduled zkapp commands with handle %s has expired"
+                          "Scheduled zkApp commands with handle %s has expired"
                           (Uuid.to_string uuid) ;
                         Uuid.Table.remove scheduler_tbl uuid ;
                         Deferred.unit )
                       else if Ivar.is_full ivar then (
                         [%log info]
-                          "Stopping scheduled zkapp commands with handle %s"
+                          "Stopping scheduled zkApp commands with handle %s"
                           (Uuid.to_string uuid) ;
                         Uuid.Table.remove scheduler_tbl uuid ;
                         Deferred.unit )
@@ -4626,11 +4626,11 @@ module Mutations = struct
 
                     Ok (Uuid.to_string uuid) ) )
 
-    let stop_payments =
-      io_field "stopPayments"
+    let stop_scheduled_transactions =
+      io_field "stopScheduledTransactions"
         ~args:
           Arg.
-            [ arg "handle" ~doc:"Payment scheduler handle"
+            [ arg "handle" ~doc:"Transaction scheduler handle"
                 ~typ:(non_null string)
             ]
         ~typ:(non_null string)
@@ -4645,25 +4645,30 @@ module Mutations = struct
                   return
                   @@ Error
                        (sprintf
-                          "Could not find scheduled payments with handle %s"
+                          "Could not find scheduled transactions with handle %s"
                           handle )
               | Some ivar ->
                   [%log info]
-                    "Requesting stop of scheduled payments with handle %s"
+                    "Requesting stop of scheduled transactions with handle %s"
                     handle ;
                   Ivar.fill_if_empty ivar () ;
                   return
                   @@ Ok
                        (sprintf
-                          "Requesting stop of scheduled payments with handle %s"
+                          "Requesting stop of scheduled transactions with \
+                           handle %s"
                           handle )
             with _ ->
               return
               @@ Error
-                   (sprintf "Not a valid scheduled payments handle: %s" handle)
-          )
+                   (sprintf "Not a valid scheduled transactions handle: %s"
+                      handle ) )
 
-    let commands = [ schedule_payments; stop_payments ]
+    let commands =
+      [ schedule_payments
+      ; schedule_zkapp_commands
+      ; stop_scheduled_transactions
+      ]
   end
 end
 
