@@ -4378,6 +4378,8 @@ module Mutations = struct
                           let next_tm_next = Time.add tm_next wait_span in
                           go ((ndx + 1) mod num_senders) next_tm_next
                       in
+                      [%log info] "Starting payment scheduler with handle %s"
+                        (Uuid.to_string uuid) ;
                       let tm_next = Time.add tm_start wait_span in
                       don't_wait_for @@ go 0 tm_next ;
                       Ok (Uuid.to_string uuid) ) )
@@ -4588,6 +4590,9 @@ module Mutations = struct
                           | None ->
                               Deferred.unit
                           | Some (ledger, _) ->
+                              [%log info]
+                                "Starting zkApp scheduler with handle %s"
+                                (Uuid.to_string uuid) ;
                               let zkapp_command =
                                 Quickcheck.Generator.generate
                                   (Mina_generators.Zkapp_command_generators
