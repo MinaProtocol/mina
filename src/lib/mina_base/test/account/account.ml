@@ -96,7 +96,7 @@ let%test_module "Test account's timing." =
             (min_balance_at_slot timing_rec ~global_slot:vesting_final_slot) ;
           let one_slot_prior =
             Global_slot.(sub vesting_final_slot (of_int 1))
-            |> Option.value ~default:Global_slot.zero
+            |> Option.value_exn
           in
           [%test_pred: Balance.t]
             Balance.(( < ) zero)
@@ -176,7 +176,7 @@ let%test_module "Test account's timing." =
           [%test_eq: Balance.t] Balance.zero
             (incr_bal_between timing ~start_slot ~end_slot) )
 
-    let%test_unit "Incremental balance during vesting is a multiply of \
+    let%test_unit "Incremental balance during vesting is a multiple of \
                    vesting_increment." =
       Quickcheck.test
         (let open Quickcheck in
