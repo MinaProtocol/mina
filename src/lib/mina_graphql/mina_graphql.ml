@@ -4447,13 +4447,9 @@ module Mutations = struct
       | _ ->
           false
 
-    let all_zkapps_deployed ~mina (keypairs : Signature_lib.Keypair.t list) =
-      match get_ledger_and_breadcrumb mina with
-      | Some (ledger, _best_tip_breadcrumb) ->
-          List.map keypairs ~f:(fun kp -> is_zkapp_deployed kp ledger)
-          |> List.for_all ~f:Fn.id
-      | None ->
-          false
+    let all_zkapps_deployed ~ledger (keypairs : Signature_lib.Keypair.t list) =
+      List.map keypairs ~f:(fun kp -> is_zkapp_deployed kp ledger)
+      |> List.for_all ~f:Fn.id
 
     let rec wait_until_zkapps_deployed ?(deployed = false) ~mina ~ledger
         ~(fee_payer_keypair : Signature_lib.Keypair.t)
@@ -4470,7 +4466,7 @@ module Mutations = struct
           (Uuid.to_string uuid) ;
         Uuid.Table.remove scheduler_tbl uuid ;
         return None )
-      else if all_zkapps_deployed ~mina keypairs then (
+      else if all_zkapps_deployed ~ledger keypairs then (
         [%log info] "All zkApp accounts are deployed" ;
         return (Some ledger) )
       else
