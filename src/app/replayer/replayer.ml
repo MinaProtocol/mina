@@ -1131,6 +1131,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                   , `String (Int64.to_string last_global_slot_since_genesis) )
                 ; ("block_id", `Int last_block_id)
                 ] ;
+            check_ledger_hash_at_slot () ;
             Deferred.unit )
           else
             let%bind () = run_transactions () in
