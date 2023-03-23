@@ -247,6 +247,9 @@ module Plonk_constraint = struct
           ; right_input_hi : 'v
           ; field_overflow : 'v
           ; carry : 'v
+          ; (* Coefficients *) foreign_field_modulus0 : 'f
+          ; foreign_field_modulus1 : 'f
+          ; foreign_field_modulus2 : 'f
           }
       | ForeignFieldMul of
           { (* Current row *)
@@ -271,6 +274,12 @@ module Plonk_constraint = struct
           ; quotient_bound2 : 'v
           ; product1_lo : 'v
           ; product1_hi_0 : 'v
+          ; (* Coefficients *) foreign_field_modulus0 : 'f
+          ; foreign_field_modulus1 : 'f
+          ; foreign_field_modulus2 : 'f
+          ; neg_foreign_field_modulus0 : 'f
+          ; neg_foreign_field_modulus1 : 'f
+          ; neg_foreign_field_modulus2 : 'f
           }
       | Rot64 of
           { (* Current row *)
@@ -486,6 +495,9 @@ module Plonk_constraint = struct
           ; right_input_hi
           ; field_overflow
           ; carry
+          ; (* Coefficients *) foreign_field_modulus0
+          ; foreign_field_modulus1
+          ; foreign_field_modulus2
           } ->
           ForeignFieldAdd
             { left_input_lo = f left_input_lo
@@ -496,6 +508,9 @@ module Plonk_constraint = struct
             ; right_input_hi = f right_input_hi
             ; field_overflow = f field_overflow
             ; carry = f carry
+            ; (* Coefficients *) foreign_field_modulus0
+            ; foreign_field_modulus1
+            ; foreign_field_modulus2
             }
       | ForeignFieldMul
           { (* Current row *) left_input0
@@ -519,6 +534,12 @@ module Plonk_constraint = struct
           ; quotient_bound2
           ; product1_lo
           ; product1_hi_0
+          ; (* Coefficients *) foreign_field_modulus0
+          ; foreign_field_modulus1
+          ; foreign_field_modulus2
+          ; neg_foreign_field_modulus0
+          ; neg_foreign_field_modulus1
+          ; neg_foreign_field_modulus2
           } ->
           ForeignFieldMul
             { (* Current row *) left_input0 = f left_input0
@@ -542,6 +563,12 @@ module Plonk_constraint = struct
             ; quotient_bound2 = f quotient_bound2
             ; product1_lo = f product1_lo
             ; product1_hi_0 = f product1_hi_0
+            ; (* Coefficients *) foreign_field_modulus0
+            ; foreign_field_modulus1
+            ; foreign_field_modulus2
+            ; neg_foreign_field_modulus0
+            ; neg_foreign_field_modulus1
+            ; neg_foreign_field_modulus2
             }
       | Rot64
           { (* Current row *) word
@@ -1856,6 +1883,9 @@ end = struct
           ; right_input_hi
           ; field_overflow
           ; carry
+          ; (* Coefficients *) foreign_field_modulus0
+          ; foreign_field_modulus1
+          ; foreign_field_modulus2
           } ) ->
         (*
         //! | Gate   | `ForeignFieldAdd`        | Circuit/gadget responsibility  |
@@ -1896,7 +1926,11 @@ end = struct
            ; None
           |]
         in
-        add_row sys vars ForeignFieldAdd [||]
+        add_row sys vars ForeignFieldAdd
+          [| foreign_field_modulus0
+           ; foreign_field_modulus1
+           ; foreign_field_modulus2
+          |]
     | Plonk_constraint.T
         (ForeignFieldMul
           { (* Current row *) left_input0
@@ -1920,6 +1954,12 @@ end = struct
           ; quotient_bound2
           ; product1_lo
           ; product1_hi_0
+          ; (* Coefficients *) foreign_field_modulus0
+          ; foreign_field_modulus1
+          ; foreign_field_modulus2
+          ; neg_foreign_field_modulus0
+          ; neg_foreign_field_modulus1
+          ; neg_foreign_field_modulus2
           } ) ->
         (*
         //! | Gate   | `ForeignFieldMul`            | `Zero`                    |
@@ -1978,7 +2018,14 @@ end = struct
            ; None
           |]
         in
-        add_row sys vars_curr ForeignFieldMul [||] ;
+        add_row sys vars_curr ForeignFieldMul
+          [| foreign_field_modulus0
+           ; foreign_field_modulus1
+           ; foreign_field_modulus2
+           ; neg_foreign_field_modulus0
+           ; neg_foreign_field_modulus1
+           ; neg_foreign_field_modulus2
+          |] ;
         add_row sys vars_next Zero [||]
     | Plonk_constraint.T
         (Rot64
