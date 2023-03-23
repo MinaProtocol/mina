@@ -1610,6 +1610,20 @@ module Circuit = struct
             try Impl.run_and_check (fun () -> f) with exn -> raise_exn exn
           in
           Or_error.ok_exn result ) ;
+
+    circuit##.runUnchecked :=
+      Js.wrap_callback (fun (f : unit -> 'a) ->
+          let result =
+            try
+              Impl.run_and_check (fun () ->
+                  Impl.set_eval_constraints false ;
+                  f () ;
+                  Impl.set_eval_constraints true ;
+                  fun () -> () )
+            with exn -> raise_exn exn
+          in
+          Or_error.ok_exn result ) ;
+
     circuit##.asProver :=
       Js.wrap_callback (fun (f : (unit -> unit) Js.callback) : unit ->
           Impl.as_prover (fun () -> Js.Unsafe.fun_call f [||]) ) ;
