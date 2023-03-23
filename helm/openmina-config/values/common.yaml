@@ -1,6 +1,6 @@
 testnetName: testnet
 mina:
-  image: tizoc/mina-daemon:5462a59380
+  image: tizoc/mina-daemon:openmina-rampup-436023ba41
   snarkCoordinatorImage: binier/mina-snark-worker-rs:latest
   privkeyPass:
   exposeGraphql: true
