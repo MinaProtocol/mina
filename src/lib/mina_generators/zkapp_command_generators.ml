@@ -1091,7 +1091,6 @@ let gen_zkapp_command_from ?global_slot ?(limited = false) ?failure
   (* make sure all ledger keys are in the keymap *)
   List.iter ledger_accounts ~f:(fun acct ->
       let acct_id = Account.identifier acct in
-      let pk = Account_id.public_key acct_id in
       (*Initialize account states*)
       if not limited then
         Account_id.Table.update account_state_tbl acct_id ~f:(function
