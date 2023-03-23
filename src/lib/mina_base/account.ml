@@ -801,17 +801,18 @@ let final_vesting_slot ~initial_minimum_balance ~cliff_time ~cliff_amount
     Balance.(initial_minimum_balance - cliff_amount)
     |> Option.value_map ~default:UInt64.zero ~f:Balance.to_uint64
   in
-  let incr = Amount.to_uint64 vesting_increment in
+  let vest_incr = Amount.to_uint64 vesting_increment in
   let periods =
     let open UInt64 in
     let open Infix in
-    (to_vest / incr) + if equal (rem to_vest incr) zero then zero else one
+    (to_vest / vest_incr)
+    + if equal (rem to_vest vest_incr) zero then zero else one
   in
   let open UInt32 in
   let open Infix in
-  Global_slot.to_uint32 cliff_time
-  + (UInt64.to_uint32 periods * Global_slot.to_uint32 vesting_period)
-  |> Global_slot.of_uint32
+  Global_slot.of_uint32
+  @@ Global_slot.to_uint32 cliff_time
+     + (UInt64.to_uint32 periods * Global_slot.to_uint32 vesting_period)
 
 let timing_final_vesting_slot = function
   | Timing.Untimed ->
