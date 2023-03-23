@@ -998,7 +998,7 @@ let setup_daemon logger =
             ~f:(fun (context, span) ->
               let secs = Time_ns.Span.to_sec span in
               let monitor_infos = get_monitor_infos context.monitor in
-              [%log debug]
+              [%log error]
                 ~metadata:
                   [ ("long_async_job", `Float secs)
                   ; ("monitors", `List monitor_infos)
