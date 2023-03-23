@@ -4499,6 +4499,11 @@ module Mutations = struct
                                     (Splittable_random.State.create
                                        Random.State.default )
                               in
+                              [%log info] "Send out zkApp $command"
+                                ~metadata:
+                                  [ ( "command"
+                                    , Zkapp_command.to_yojson zkapp_command )
+                                  ] ;
                               send_zkapp_command mina zkapp_command
                               |> Deferred.map ~f:(fun _ -> ())
                         in
