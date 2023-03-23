@@ -22,12 +22,12 @@ healthcheck:
 
 plainNodesConfig:
   # the number of plain nodes
-  count: 8
+  count: 0
   namePrefix: node
 
 snarkWorkersConfig:
   # the number of snark workers
-  count: 64
+  count: 8
   namePrefix: snarker
 
 seedConfigs:
@@ -36,15 +36,19 @@ seedConfigs:
     libp2pSecret: seed1-libp2p-secret
 
 blockProducerConfigs:
-  - name: prod01
-    # see resources/key-01
-    keypairName: prod1-privkey-secret
-    isolated: false
-  - name: prod02
-    # see resources/key-01
-    keypairName: prod1-privkey-secret
-    isolated: false
-  - name: prod03
+  # - name: prod01
+  #   # see resources/key-01
+  #   keypairName: prod1-privkey-secret
+  #   isolated: false
+  # - name: prod02
+  #   # see resources/key-01
+  #   keypairName: prod1-privkey-secret
+  #   isolated: false
+  # - name: prod03
+  #   # see resources/key-01
+  #   keypairName: prod1-privkey-secret
+  #   isolated: false
+  - name: prod1
     # see resources/key-01
     keypairName: prod1-privkey-secret
     isolated: false
