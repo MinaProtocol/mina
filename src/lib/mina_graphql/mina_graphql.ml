@@ -4403,6 +4403,11 @@ module Mutations = struct
                 fee_payer_nonce := Account.Nonce.succ !fee_payer_nonce ;
                 account_creator_nonce :=
                   Account.Nonce.succ !account_creator_nonce ;
+                [%log info]
+                  "Successfully send out zkApp $command that creates a zkApp \
+                   account"
+                  ~metadata:
+                    [ ("command", Zkapp_command.to_yojson zkapp_command) ] ;
                 Deferred.unit
             | Error _ ->
                 [%log info]
@@ -4462,6 +4467,9 @@ module Mutations = struct
           |> Option.value_map ~default:ledger ~f:(fun (new_ledger, _) ->
                  new_ledger )
         in
+        [%log info]
+          "The accounts were not in the best tip $ledger, try again"
+          ~metadata:[("ledger", `List (List.map (Ledger.to_list ledger) ~f:Account.to_yojson))] ;
         wait_until_zkapps_deployed ~deployed:true ~mina ~ledger
           ~fee_payer_keypair ~account_creator_keypair ~constraint_constants
           ~logger ~uuid ~stop_signal ~stop_time keypairs
