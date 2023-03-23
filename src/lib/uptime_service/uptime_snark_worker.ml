@@ -17,7 +17,7 @@ module Worker_state = struct
 
   type t = (module S)
 
-  let create ~logger : t Deferred.t =
+  let create ~logger:_ : t Deferred.t =
     Deferred.return
       (let module M = struct
          let perform_single (message, single_spec) =
