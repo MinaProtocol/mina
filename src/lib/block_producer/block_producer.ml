@@ -377,6 +377,8 @@ module Precomputed = struct
     ; staged_ledger_diff : Staged_ledger_diff.t
     ; delta_transition_chain_proof :
         Frozen_ledger_hash.t * Frozen_ledger_hash.t list
+    ; protocol_version : Protocol_version.t
+    ; proposed_protocol_version : Protocol_version.t option
     ; accounts_accessed : (int * Account.t) list
     ; accounts_created : (Account_id.t * Currency.Fee.t) list
     ; tokens_used : (Token_id.t * Account_id.t option) list
@@ -1228,6 +1230,8 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
       ; protocol_state_proof
       ; staged_ledger_diff
       ; delta_transition_chain_proof = delta_block_chain_proof
+      ; protocol_version = _
+      ; proposed_protocol_version = _
       ; accounts_accessed = _
       ; accounts_created = _
       ; tokens_used = _
