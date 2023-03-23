@@ -119,7 +119,7 @@ let setup_and_submit_user_commands t user_command_list =
       [ ("mina_command", `String "scheduling a batch of user transactions") ] ;
   Mina_lib.add_transactions t user_command_list
 
-let setup_and_submit_snapp_command t (zkapp_command : Zkapp_command.t) =
+let setup_and_submit_zkapp_command t (zkapp_command : Zkapp_command.t) =
   let open Participating_state.Let_syntax in
   (* hack to get types to work out *)
   let%map () = return () in
