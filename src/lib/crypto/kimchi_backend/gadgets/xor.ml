@@ -30,7 +30,8 @@ let bxor (type f)
             ; basic =
                 Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
                   (Basic
-                     { l = (Field.Constant.zero, Field.one)
+                     { force = Field.Constant.one
+                     ; l = (Field.Constant.zero, Field.one)
                      ; r = (Field.Constant.zero, Field.zero)
                      ; o =
                          (Option.value_exn Field.(to_constant zero), Field.zero)
@@ -283,6 +284,39 @@ let%test_unit "xor gadget" =
     ()
   in
 
+  let test_2xor left1 right1 output1 left2 right2 output2 length : unit =
+    let _proof_keypair, _proof =
+      Runner.generate_and_verify_proof (fun () ->
+          let open Runner.Impl in
+          (* Set up snarky variables for inputs and output *)
+          let left1 =
+            Common.as_prover_cvar_field_of_base10 (module Runner.Impl) left1
+          in
+          let right1 =
+            Common.as_prover_cvar_field_of_base10 (module Runner.Impl) right1
+          in
+          let output1 =
+            Common.as_prover_cvar_field_of_base10 (module Runner.Impl) output1
+          in
+          let left2 =
+            Common.as_prover_cvar_field_of_base10 (module Runner.Impl) left2
+          in
+          let right2 =
+            Common.as_prover_cvar_field_of_base10 (module Runner.Impl) right2
+          in
+          let output2 =
+            Common.as_prover_cvar_field_of_base10 (module Runner.Impl) output2
+          in
+          (* Use the xor gate gadget *)
+          let result1 = bxor (module Runner.Impl) left1 right1 length 4 in
+          let result2 = bxor (module Runner.Impl) left2 right2 length 4 in
+          Field.Assert.equal output1 result1 ;
+          Field.Assert.equal output2 result2 ;
+          Boolean.Assert.is_true (Field.equal result1 result1) )
+    in
+    ()
+  in
+
   (* Positive tests *)
   test_xor "1" "0" "1" 16 ;
   test_xor "0" "0" "0" 8 ;
@@ -293,6 +327,7 @@ let%test_unit "xor gadget" =
   (* 0x5A5A5A5A5A5A5A5A xor 0xA5A5A5A5A5A5A5A5 = 0xFFFFFFFFFFFFFFFF*)
   test_xor "6510615555426900570" "11936128518282651045" "18446744073709551615"
     64 ;
+  test_2xor "43210" "56789" "29983" "767430" "974317" "354347" 20 ;
   (* Negatve tests *)
   assert (Common.is_error (fun () -> test_xor "1" "0" "0" 1)) ;
   assert (Common.is_error (fun () -> test_xor "1111" "2222" "0" 16)) ;

@@ -779,7 +779,8 @@ struct
                   ; basic =
                       T
                         (Basic
-                           { l = (one, y)
+                           { force = zero
+                           ; l = (one, y)
                            ; r = (one, pt_n_acc)
                            ; o = (negate one, acc')
                            ; m = zero
