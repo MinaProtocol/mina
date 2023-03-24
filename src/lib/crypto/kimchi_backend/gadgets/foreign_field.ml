@@ -24,6 +24,18 @@ let two_to_3limb = Bignum_bigint.(pow (of_int 2) (of_int Int.(mul 3 limb_bits)))
 (* Binary modulus *)
 let binary_modulus = two_to_3limb
 
+(* Maximum foreign field modulus m = sqrt(2^t * n), see RFC for more details *)
+let max_foreign_field_modulus (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f) :
+    Bignum_bigint.t =
+  (* m = sqrt(2^t * n) *)
+  let product =
+    (* We need Zarith for sqrt *)
+    Bignum_bigint.to_zarith_bigint
+    @@ Bignum_bigint.(binary_modulus * Circuit.Field.size)
+  in
+  Bignum_bigint.of_zarith_bigint @@ Z.sqrt product
+
 (* Foreign field modulus is abstract on two parameters
  *   - Field type
  *   - Limbs structure
@@ -531,6 +543,16 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     (foreign_field_modulus : f standard_limbs) :
     f Foreign_field_element.t * f External_checks.t =
   let open Circuit in
+  (* Check foreign field modulus < max allowed *)
+  (let foreign_field_modulus =
+     field_standard_limbs_to_bignum_bigint
+       (module Circuit)
+       foreign_field_modulus
+   in
+   assert (
+     Bignum_bigint.(
+       foreign_field_modulus < max_foreign_field_modulus (module Circuit)) ) ) ;
+
   (* Compute gate coefficients
    *   This happen when circuit is created / not part of witness (e.g. exists, As_prover code)
    *)
@@ -596,6 +618,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
               (module Circuit)
               foreign_field_modulus
           in
+
           (* Compute quotient and remainder using foreign field modulus *)
           let quotient, remainder =
             Common.bignum_bigint_div_rem

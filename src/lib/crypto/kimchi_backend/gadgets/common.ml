@@ -120,26 +120,24 @@ let bignum_bigint_div_rem (numerator : Bignum_bigint.t)
   (quotient, remainder)
 
 (* Bignum_bigint to hex *)
-let bignum_bigint_to_hex
-    (bignum : Bignum_bigint.t) : string =
+let bignum_bigint_to_hex (bignum : Bignum_bigint.t) : string =
   Z.format "%x" @@ Bignum_bigint.to_zarith_bigint bignum
 
 (* Bignum_bigint.t of hex *)
-let bignum_bigint_of_hex
-    (hex : string) : Bignum_bigint.t =
-    Bignum_bigint.of_zarith_bigint @@ Z.of_string_base 16 hex
+let bignum_bigint_of_hex (hex : string) : Bignum_bigint.t =
+  Bignum_bigint.of_zarith_bigint @@ Z.of_string_base 16 hex
 
 (* Field to hex *)
 let field_to_hex (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (field_element : f) : string =
-    bignum_bigint_to_hex @@ field_to_bignum_bigint (module Circuit) field_element
+  bignum_bigint_to_hex @@ field_to_bignum_bigint (module Circuit) field_element
 
 (* Field of hex *)
 let field_of_hex (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (hex : string) : f =
-    bignum_bigint_to_field (module Circuit) @@ bignum_bigint_of_hex hex
+  bignum_bigint_to_field (module Circuit) @@ bignum_bigint_of_hex hex
 
 (* Negative test helper *)
 let is_error (func : unit -> _) = Result.is_error (Or_error.try_with func)
