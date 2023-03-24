@@ -4573,7 +4573,6 @@ module Mutations = struct
                         Deferred.unit )
                       else
                         let fee_payer = fee_payer_arrays.(ndx) in
-                        let next_tm_next = Time.add tm_next wait_span in
                         let%bind () =
                           match get_ledger_and_breadcrumb mina with
                           | None ->
@@ -4584,7 +4583,7 @@ module Mutations = struct
                                   [ ( "time"
                                     , `String
                                         (Time.to_string_fix_proto `Local
-                                           next_tm_next ) )
+                                           tm_next ) )
                                   ] ;
                               Deferred.unit
                           | Some (ledger, _) ->
@@ -4608,6 +4607,7 @@ module Mutations = struct
                               |> Deferred.map ~f:(fun _ -> ())
                         in
                         let%bind () = Async_unix.at tm_next in
+                        let next_tm_next = Time.add tm_next wait_span in                        
                         go account_state_tbl
                           ((ndx + 1) mod num_fee_payers)
                           next_tm_next
