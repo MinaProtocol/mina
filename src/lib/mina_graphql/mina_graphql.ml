@@ -4409,9 +4409,12 @@ module Mutations = struct
                   ~metadata:
                     [ ("command", Zkapp_command.to_yojson zkapp_command) ] ;
                 Deferred.unit
-            | Error _ ->
-                [%log info]
-                  "Failed to setup one of the zkApp accounts, try again" ;
+            | Error err ->
+                [%log info] "Failed to setup a zkApp account, try again"
+                  ~metadata:
+                    [ ("zkapp_command", Zkapp_command.to_yojson zkapp_command)
+                    ; ("error", `String err)
+                    ] ;
                 go ()
           in
           go () )
