@@ -1069,7 +1069,8 @@ let max_account_updates = 2
 
 let max_token_updates = 2
 
-let gen_zkapp_command_from ?global_slot ?(limited = false) ?failure
+let gen_zkapp_command_from ?global_slot ?(limited = false)
+    ?(generate_new_accounts = true) ?failure
     ?(max_account_updates = max_account_updates)
     ?(max_token_updates = max_token_updates)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
@@ -1354,7 +1355,10 @@ let gen_zkapp_command_from ?global_slot ?(limited = false) ?failure
   in
   (* at least 1 account_update *)
   let%bind num_zkapp_command = Int.gen_uniform_incl 1 max_account_updates in
-  let%bind num_new_accounts = Int.gen_uniform_incl 0 num_zkapp_command in
+  let%bind num_new_accounts =
+    if generate_new_accounts then Int.gen_uniform_incl 0 num_zkapp_command
+    else return 0
+  in
   let num_old_zkapp_command = num_zkapp_command - num_new_accounts in
   let%bind old_zkapp_command =
     gen_zkapp_command_with_dynamic_balance ~new_account:false
