@@ -4557,8 +4557,8 @@ module Mutations = struct
                         ~f:(fun _ -> Signature_lib.Keypair.create ())
                     in
                     let unused_keypairs =
-                      List.init zkapp_command_details.num_of_new_accounts
-                        ~f:(fun _ -> Signature_lib.Keypair.create ())
+                      List.init 200 ~f:(fun _ ->
+                          Signature_lib.Keypair.create () )
                     in
                     let account_creator_keypair =
                       Signature_lib.Keypair.of_private_key_exn
@@ -4609,8 +4609,8 @@ module Mutations = struct
                                 ~metadata:
                                   [ ( "time"
                                     , `String
-                                        (Time.to_string_fix_proto `Local
-                                           tm_next ) )
+                                        (Time.to_string_fix_proto `Local tm_next)
+                                    )
                                   ] ;
                               Deferred.unit
                           | Some (ledger, _) ->
@@ -4634,7 +4634,7 @@ module Mutations = struct
                               |> Deferred.map ~f:(fun _ -> ())
                         in
                         let%bind () = Async_unix.at tm_next in
-                        let next_tm_next = Time.add tm_next wait_span in                        
+                        let next_tm_next = Time.add tm_next wait_span in
                         go account_state_tbl
                           ((ndx + 1) mod num_fee_payers)
                           next_tm_next
