@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: itn-uptime-backend-service
+spec:
+  type: ClusterIP
+  selector:
+    app: itn-uptime-backend
+  ports:
+  - name: itn-uptime-backend-entrypoint
+    port: 8080
+    targetPort: "http"

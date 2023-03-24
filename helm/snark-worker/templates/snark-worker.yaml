@@ -26,6 +26,20 @@ spec:
     spec:
       {{ include "sideCar.podAttrs" (dict "resources" $.Values.resources "bpfDebugger" $.Values.bpfDebugger) | nindent 6 }}
       initContainers:
+      {{ if $.Values.itn.enable }}
+      - name: fix-uptime-key-perms
+        image: busybox
+        command:
+        - sh
+        - -c
+        - /bin/cp /umptime-keys/key /root/uptime-keys/key && /bin/chmod 0700 /root/uptime-keys/
+        volumeMounts:
+        - name: uptime-keys
+          mountPath: /umptime-keys/
+          readOnly: true
+        - name: actual-uptime-keys
+          mountPath: /root/uptime-keys/
+      {{- end }}
       - name: libp2p-perms
         image: {{ $.Values.mina.image | quote }}
         command:
@@ -78,6 +92,12 @@ spec:
           {{- end -}}
           {{- if $.Values.mina.usePodIp }}
           "-external-ip", "$(DAEMON_POD_IP)",
+          {{- end }}
+          {{- if $.Values.itn.enable }}
+          "-itn-keys", {{ $.Values.itn.keys }},
+          "-itn-graphql-port", "$(MINA_ITN_GRAPHQL_PORT)",
+          "-uptime-submitter-key", "/root/uptime-keys/key",
+          "-uptime-url", "http://itn-uptime-backend-service:8080/v1/submit",
           {{- end }}
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
@@ -137,6 +157,10 @@ spec:
         {{ include "sideCar.bpfDebugger.envVar" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 8 }}
         - name: MINA_SNARK_COORDINATOR_URL
           value: http://snarker-http-coordinator
+        - name: MINA_ITN_GRAPHQL_PORT
+          value: {{ $.Values.itn.itnGraphqlPort | quote }}
+        - name: UPTIME_PRIVKEY_PASS
+          value:
         ports:
         - name: client-port
           protocol: TCP
@@ -167,6 +191,10 @@ spec:
         - name: {{ template "sideCar.logs.minaLogsVolumeName" }}
           mountPath: "/root/.mina-config"
         {{- end }}
+        {{- if $.Values.itn.enable }}
+        - name: actual-uptime-keys
+          mountPath: /root/uptime-keys/
+        {{- end }}
       volumes:
       {{- if $.Values.mina.runtimeConfig }}
       - name: daemon-config
@@ -184,6 +212,19 @@ spec:
           items:
           - key: "unset-k8s-env.sh"
             path: "unset-k8s-env.sh"
+      {{- if $.Values.itn.enable }}
+      - name: uptime-keys
+        secret:
+          secretName: {{ $name }}-uptime-privkey-secret
+          defaultMode: 256
+          items:
+          - key: key
+            path: key
+          - key: pub
+            path: key.pub
+      - name: actual-uptime-keys
+        emptyDir: {}
+      {{- end}}
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
 
 ---

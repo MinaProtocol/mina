@@ -83,5 +83,10 @@ internalTrace:
   enable: true
   image: openmina/mina-internal-trace-consumer:cb7456e
 
+itn:
+  enable: true
+  keys: "gSsHGULVizunF+UC6z2p9/rJwLSwb4Y/wHYreSHUY+I="
+  itnGraphqlPort: 9000
+
 nodeSelector:
   preemptible: false
