@@ -894,7 +894,7 @@ let gen_timing (account_balance : Balance.t) :
     |> Option.value_map ~f:Balance.to_amount ~default:Amount.zero
   in
   let%map cliff_amount =
-    if UInt32.(compare vesting_slots zero) > 0 then
+    if UInt64.(compare vesting_periods_count zero) > 0 then
       Amount.(gen_incl zero max_cliff_amt)
     else return @@ Balance.to_amount initial_minimum_balance
   in
