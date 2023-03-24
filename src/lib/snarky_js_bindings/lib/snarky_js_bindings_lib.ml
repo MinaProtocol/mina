@@ -1603,6 +1603,26 @@ module Circuit = struct
 
   let circuit = Js.Unsafe.eval_string {js|(function() { return this })|js}
 
+  let run_circuit ~eval_constraints ~with_witness (f : unit -> 'a) =
+    let open Impl.Low_level in
+    let num_inputs = 0 in
+    let input = field_vec () in
+    let next_auxiliary = ref 1 in
+    let aux = field_vec () in
+    let system = Backend.R1CS_constraint_system.create () in
+    let state' =
+      make_state ~num_inputs ~input ~next_auxiliary ~aux ~system
+        ~eval_constraints ~with_witness ()
+    in
+    set_state state' ;
+    try
+      let result = mark_active f in
+      set_state { !state with is_running = false } ;
+      result
+    with exn ->
+      set_state { !state with is_running = false } ;
+      raise_exn exn
+
   let () =
     circuit##.runAndCheck :=
       Js.wrap_callback (fun (f : unit -> 'a) ->
@@ -1612,17 +1632,7 @@ module Circuit = struct
           Or_error.ok_exn result ) ;
 
     circuit##.runUnchecked :=
-      Js.wrap_callback (fun (f : unit -> 'a) ->
-          let result =
-            try
-              Impl.run_and_check (fun () ->
-                  Impl.set_eval_constraints false ;
-                  f () ;
-                  Impl.set_eval_constraints true ;
-                  fun () -> () )
-            with exn -> raise_exn exn
-          in
-          Or_error.ok_exn result ) ;
+      Js.wrap_callback (run_circuit ~eval_constraints:false ~with_witness:true) ;
 
     circuit##.asProver :=
       Js.wrap_callback (fun (f : (unit -> unit) Js.callback) : unit ->
