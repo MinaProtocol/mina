@@ -4496,9 +4496,19 @@ module Mutations = struct
                         Deferred.unit )
                       else
                         let fee_payer = fee_payer_arrays.(ndx) in
+                        let next_tm_next = Time.add tm_next wait_span in
                         let%bind () =
                           match get_ledger_and_breadcrumb mina with
                           | None ->
+                              [%log info]
+                                "Failed to fetch the best tip ledger, skip \
+                                 this round, we will try again at $time"
+                                ~metadata:
+                                  [ ( "time"
+                                    , `String
+                                        (Time.to_string_fix_proto `Local
+                                           next_tm_next ) )
+                                  ] ;
                               Deferred.unit
                           | Some (ledger, _) ->
                               let zkapp_command =
@@ -4521,7 +4531,6 @@ module Mutations = struct
                               |> Deferred.map ~f:(fun _ -> ())
                         in
                         let%bind () = Async_unix.at tm_next in
-                        let next_tm_next = Time.add tm_next wait_span in
                         go account_state_tbl
                           ((ndx + 1) mod num_fee_payers)
                           next_tm_next
@@ -4546,7 +4555,7 @@ module Mutations = struct
                                 @ get_account zkapp_account_ids
                                     `Ordinary_participant )
                             in
-                            let tm_next = Time.add tm_start wait_span in
+                            let tm_next = Time.add (Time.now ()) wait_span in
                             don't_wait_for @@ go account_state_tbl 0 tm_next ) ;
 
                     Ok (Uuid.to_string uuid) ) )
