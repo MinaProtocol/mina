@@ -258,7 +258,9 @@ struct
                   *)
                   match Cohttp.Header.get headers "Authorization" with
                   | None ->
-                      unauthorized ()
+                      (* TEMP!!! *)
+                      respond ()
+                      (* unauthorized () *)
                   | Some auth -> (
                       let open Core in
                       match String.split_on_chars auth ~on:[ ' ' ] with

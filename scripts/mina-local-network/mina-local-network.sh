@@ -143,12 +143,16 @@ exec-daemon() {
   DAEMON_METRICS_PORT=$((${BASE_PORT} + 3))
   LIBP2P_METRICS_PORT=$((${BASE_PORT} + 4))
 
+  ITN_PORT=$((${BASE_PORT} + 5))
+
   exec ${MINA_EXE} daemon \
     -client-port ${CLIENT_PORT} \
     -rest-port ${REST_PORT} \
     -insecure-rest-server \
     -external-port ${EXTERNAL_PORT} \
     -metrics-port ${DAEMON_METRICS_PORT} \
+    -itn-graphql-port ${ITN_PORT} \
+    -itn-keys "a0iZ/mQjCp/KK8xHH3sCFa8lkSs8LuvWR/3apOGszBg=" \
     -libp2p-metrics-port ${LIBP2P_METRICS_PORT} \
     -config-file ${CONFIG} \
     -log-json \
@@ -573,11 +577,13 @@ printf "\n"
 # ================================================
 # Start sending transactions and zkApp transactions
 
-if [ ${VALUE_TRANSFERS} ] || [ ${ZKAPP_TRANSACTIONS} ]; then
+echo "Skipping payments, etc."
+
+if false; then
   FEE_PAYER_KEY_FILE=${LEDGER_FOLDER}/offline_whale_keys/offline_whale_account_0
   SENDER_KEY_FILE=${LEDGER_FOLDER}/offline_whale_keys/offline_whale_account_1
   ZKAPP_ACCOUNT_KEY_FILE=${LEDGER_FOLDER}/zkapp_keys/zkapp_account
-  ZKAPP_ACCOUNT_PUB_KEY=$(cat ${LEDGER_FOLDER}/zkapp_keys/zkapp_account.pub)
+  ZKAPP_ACCOUNT_PUB_KEY="" # $(cat ${LEDGER_FOLDER}/zkapp_keys/zkapp_account.pub)
 
   KEY_FILE=${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0
   PUB_KEY=$(cat ${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0.pub)
@@ -606,7 +612,7 @@ if [ ${VALUE_TRANSFERS} ] || [ ${ZKAPP_TRANSACTIONS} ]; then
   echo "Starting to send value transfer transactions/zkApp transactions every: ${TRANSACTION_FREQUENCY} seconds"
   printf "\n"
 
-  if ${ZKAPP_TRANSACTIONS}; then
+  if false; then
     echo "Set up zkapp account"
     printf "\n"
 
@@ -614,19 +620,20 @@ if [ ${VALUE_TRANSFERS} ] || [ ${ZKAPP_TRANSACTIONS} ]; then
     python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
   fi
 
-  if ${VALUE_TRANSFER}; then
+  if false; then
     ${MINA_EXE} account import -rest-server ${REST_SERVER} -privkey-path ${KEY_FILE}
     ${MINA_EXE} account unlock -rest-server ${REST_SERVER} -public-key ${PUB_KEY}
 
     sleep ${TRANSACTION_FREQUENCY}
-    ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -nonce 0 -receiver ${PUB_KEY} -sender ${PUB_KEY}
+    # ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -nonce 0 -receiver ${PUB_KEY} -sender ${PUB_KEY}
   fi
 
   fee_payer_nonce=1
   sender_nonce=1
   state=0
 
-  while true; do
+  echo "Skipping payments"
+  while false; do
     sleep ${TRANSACTION_FREQUENCY}
 
     if ${VALUE_TRANSFER}; then
