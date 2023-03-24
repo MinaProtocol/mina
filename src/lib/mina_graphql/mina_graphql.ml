@@ -3109,7 +3109,8 @@ module Types = struct
         type input =
           { account_creator : Signature_lib.Private_key.t
           ; fee_payers : Signature_lib.Private_key.t list
-          ; num_of_new_accounts : int
+          ; num_of_zkapp_accounts : int
+          ; generating_new_accounts : int
           ; transactions_per_second : float
           ; duration_in_minutes : int
           }
@@ -3117,18 +3118,21 @@ module Types = struct
         let arg_typ =
           obj "ZkappCommandsDetails"
             ~doc:"Keys and other information for scheduling zkapp commands"
-            ~coerce:(fun account_creator fee_payers num_of_new_accounts
-                         transactions_per_second duration_in_minutes ->
+            ~coerce:(fun account_creator fee_payers num_of_zkapp_accounts
+                         generating_new_accounts transactions_per_second
+                         duration_in_minutes ->
               Result.return
                 { account_creator
                 ; fee_payers
-                ; num_of_new_accounts
+                ; num_of_zkapp_accounts
+                ; generating_new_accounts
                 ; transactions_per_second
                 ; duration_in_minutes
                 } )
             ~split:(fun f (t : input) ->
-              f t.account_creator t.fee_payers t.num_of_new_accounts
-                t.transactions_per_second t.duration_in_minutes )
+              f t.account_creator t.fee_payers t.num_of_zkapp_accounts
+                t.generating_new_accounts t.transactions_per_second
+                t.duration_in_minutes )
             ~fields:
               Arg.
                 [ arg "accountCreator"
@@ -3137,8 +3141,12 @@ module Types = struct
                 ; arg "feePayers"
                     ~typ:(non_null (list (non_null PrivateKey.arg_typ)))
                     ~doc:"Private keys of fee payers"
-                ; arg "numAccountsToCreate" ~typ:(non_null int)
+                ; arg "numZkappAccountsToCreate" ~typ:(non_null int)
                     ~doc:"Number of zkapp accounts that we created for the test"
+                ; arg "numNewAccountsToGenerate" ~typ:(non_null int)
+                    ~doc:
+                      "Number of zkapp accounts that the scheduler generates \
+                       during the test"
                 ; arg "transactionsPerSecond" ~typ:(non_null float)
                     ~doc:"Frequency of transactions"
                 ; arg "durationInMinutes" ~doc:"Length of scheduler run"
@@ -4385,7 +4393,7 @@ module Mutations = struct
                 (account_creator_keypair, !account_creator_nonce)
             ; fee = Currency.Fee.of_mina_string_exn "1.0"
             ; fee_payer = Some (fee_payer_keypair, !fee_payer_nonce)
-            ; amount = Currency.Amount.of_mina_string_exn "2000.0"
+            ; amount = Currency.Amount.of_mina_string_exn "20000.0"
             ; zkapp_account_keypairs = [ kp ]
             ; memo = Signed_command_memo.empty
             ; new_zkapp_account = true
@@ -4526,12 +4534,12 @@ module Mutations = struct
                       (Mina_lib.config mina).precomputed_values
                     in
                     let zkapp_account_keypairs =
-                      List.init zkapp_command_details.num_of_new_accounts
+                      List.init zkapp_command_details.num_of_zkapp_accounts
                         ~f:(fun _ -> Signature_lib.Keypair.create ())
                     in
                     let unused_keypairs =
-                      List.init 1000 ~f:(fun _ ->
-                          Signature_lib.Keypair.create () )
+                      List.init zkapp_command_details.generating_new_accounts
+                        ~f:(fun _ -> Signature_lib.Keypair.create ())
                     in
                     let account_creator_keypair =
                       Signature_lib.Keypair.of_private_key_exn
@@ -4587,12 +4595,26 @@ module Mutations = struct
                                   ] ;
                               Deferred.unit
                           | Some (ledger, _) ->
+                              let number_of_accounts_generated =
+                                Account_id.Table.data account_state_tbl
+                                |> List.filter ~f:(function
+                                     | _, `New_account ->
+                                         true
+                                     | _ ->
+                                         false )
+                                |> List.length
+                              in
+                              let generate_new_accounts =
+                                number_of_accounts_generated
+                                < zkapp_command_details.generating_new_accounts
+                              in
                               let zkapp_command =
                                 Quickcheck.Generator.generate
                                   (Mina_generators.Zkapp_command_generators
                                    .gen_zkapp_command_from ~limited:true
                                      ~fee_payer_keypair:fee_payer ~keymap
-                                     ~account_state_tbl ~ledger () )
+                                     ~account_state_tbl ~generate_new_accounts
+                                     ~ledger () )
                                   ~size:1
                                   ~random:
                                     (Splittable_random.State.create
