@@ -4530,7 +4530,7 @@ module Mutations = struct
                         ~f:(fun _ -> Signature_lib.Keypair.create ())
                     in
                     let unused_keypairs =
-                      List.init 200 ~f:(fun _ ->
+                      List.init 1000 ~f:(fun _ ->
                           Signature_lib.Keypair.create () )
                     in
                     let account_creator_keypair =
