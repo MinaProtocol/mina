@@ -108,6 +108,14 @@ module type Inputs_intf = sig
       -> Curve.Affine.Backend.t array
       -> t Promise.t
 
+    val create_and_verify_async :
+         Index.t
+      -> Scalar_field.Vector.t
+      -> Scalar_field.Vector.t
+      -> Scalar_field.t array
+      -> Curve.Affine.Backend.t array
+      -> t Promise.t
+
     val verify : Verifier_index.t -> t -> bool
 
     val batch_verify : Verifier_index.t array -> t array -> bool Promise.t
@@ -391,6 +399,26 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let%map.Promise res =
       Backend.create_async pk primary auxiliary challenges commitments
+    in
+    of_backend res
+
+  let create_and_verify_async ?message pk ~primary ~auxiliary =
+    let chal_polys =
+      match (message : message option) with Some s -> s | None -> []
+    in
+    let challenges =
+      List.map chal_polys ~f:(fun { Challenge_polynomial.challenges; _ } ->
+          challenges )
+      |> Array.concat
+    in
+    let commitments =
+      Array.of_list_map chal_polys
+        ~f:(fun { Challenge_polynomial.commitment; _ } ->
+          G.Affine.to_backend (Finite commitment) )
+    in
+    let%map.Promise res =
+      Backend.create_and_verify_async pk primary auxiliary challenges
+        commitments
     in
     of_backend res
 
