@@ -557,11 +557,13 @@ let to_one_or_two ({ fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } : t)
 
 [%%ifdef consensus_mechanism]
 
+let gen_single ?(token_id = Token_id.gen) ?(excess = Fee.Signed.gen) () :
+    (Token_id.t * Fee.Signed.t) Quickcheck.Generator.t =
+  Quickcheck.Generator.tuple2 token_id excess
+
 let gen : t Quickcheck.Generator.t =
   let open Quickcheck.Generator.Let_syntax in
-  let%map excesses =
-    One_or_two.gen (Quickcheck.Generator.tuple2 Token_id.gen Fee.Signed.gen)
-  in
+  let%map excesses = One_or_two.gen @@ gen_single () in
   match of_one_or_two excesses with
   | Ok ret ->
       ret
