@@ -25,13 +25,20 @@ let combine_checked_unchecked_consistent () =
 
 let combine_succeed_with_0_middle () =
   Quickcheck.test
-    Quickcheck.Generator.(
-      filter (tuple3 gen Token_id.gen Fee.Signed.gen)
-        ~f:(fun (fe1, tid, _excess) ->
-          (* The tokens before and after should be distinct.
-             Especially in this scenario, we may get an overflow error
-             otherwise. *)
-          not (Token_id.equal fe1.fee_token_l tid) ))
+    (let open Quickcheck in
+    let open Generator.Let_syntax in
+    let%bind fe = gen in
+    (* The tokens before and after should be distinct.
+       Especially in this scenario, we may get an overflow error
+       otherwise. *)
+    let%map tid, excess =
+      gen_single
+        ~token_id:
+          (Generator.filter Token_id.gen
+             ~f:(Fn.compose not (Token_id.equal fe.fee_token_l)) )
+        ()
+    in
+    (fe, tid, excess))
     ~f:(fun (fe1, tid, excess) ->
       let fe2 =
         if Fee.Signed.(equal zero) fe1.fee_excess_r then of_single (tid, excess)
