@@ -1610,6 +1610,7 @@ module Circuit = struct
     let next_auxiliary = ref 1 in
     let aux = field_vec () in
     let system = Backend.R1CS_constraint_system.create () in
+    let old_state = !state in
     let state' =
       make_state ~num_inputs ~input ~next_auxiliary ~aux ~system
         ~eval_constraints ~with_witness ()
@@ -1617,15 +1618,13 @@ module Circuit = struct
     set_state state' ;
     try
       let result = mark_active f in
-      set_state { !state with is_running = false } ;
-      result
-    with exn ->
-      set_state { !state with is_running = false } ;
-      raise_exn exn
+      set_state old_state ; result
+    with exn -> set_state old_state ; raise_exn exn
 
   let () =
     circuit##.runAndCheck :=
       Js.wrap_callback (fun (f : unit -> 'a) ->
+          (* TODO: this is using `run_and_check` wrong. Instead, it should use `run_circuit` and wrap on the JS side to read return values *)
           let result =
             try Impl.run_and_check (fun () -> f) with exn -> raise_exn exn
           in
