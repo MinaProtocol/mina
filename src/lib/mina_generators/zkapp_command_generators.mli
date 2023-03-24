@@ -46,6 +46,7 @@ val gen_protocol_state_precondition :
 val gen_zkapp_command_from :
      ?global_slot:Mina_numbers.Global_slot.t
   -> ?limited:bool
+  -> ?generate_new_accounts:bool
   -> ?failure:failure
   -> ?max_account_updates:int
   -> ?max_token_updates:int
