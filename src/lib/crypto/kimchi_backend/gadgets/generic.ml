@@ -23,7 +23,8 @@ let add (type f)
         ; basic =
             Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
               (Basic
-                 { l = (Field.Constant.one, left_input)
+                 { force = Field.Constant.zero 
+                 ; l = (Field.Constant.one, left_input)
                  ; r = (Field.Constant.one, right_input)
                  ; o = (Option.value_exn Field.(to_constant (negate one)), sum)
                  ; m = Field.Constant.zero
@@ -53,7 +54,8 @@ let mul (type f)
         ; basic =
             Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
               (Basic
-                 { l = (Field.Constant.zero, left_input)
+                 { force = Field.Constant.zero
+                 ; l = (Field.Constant.zero, left_input)
                  ; r = (Field.Constant.zero, right_input)
                  ; o = (Option.value_exn Field.(to_constant (negate one)), prod)
                  ; m = Field.Constant.one
