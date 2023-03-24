@@ -13,36 +13,20 @@ let band (type f)
   let output_and =
     exists Field.typ ~compute:(fun () ->
         (* Recursively build And gadget with leading Xors and a final Generic gate *)
-        let xor_output = Xor.bxor input1 input2 length len_xor in
+        (* It will also check the right lengths of the inputs, no need to do it again *)
+        let xor_output = Common.bxor input1 input2 length len_xor in
 
         (* Read inputs *)
-        let input1_field = As_prover.read Field.typ input1 in
-        let input2_field = As_prover.read Field.typ input2 in
+        let input1_field =
+          Common.cvar_field_to_field_as_prover (module Circuit) input1
+        in
+        let input2_field =
+          Common.cvar_field_to_field_as_prover (module Circuit) input2
+        in
 
-        (* Convert inputs field elements to list of bits *)
+        (* Convert inputs field elements to list of bits of length the field size *)
         let input1_bits = Field.Constant.unpack @@ input1_field in
         let input2_bits = Field.Constant.unpack @@ input2_field in
-
-        (* Check real lengths are at most the desired length *)
-        assert (List.length input1_bits <= length) ;
-        assert (List.length input2_bits <= length) ;
-
-        (* Pad with zeros in MSB until reaching same length *)
-        let input1_bits = Common.pad_upto ~length ~value:false input1_bits in
-        let input2_bits = Common.pad_upto ~length ~value:false input2_bits in
-
-        (* Pad with more zeros until the length is a multiple of 4*n for n-bit length lookup table *)
-        let pad_length =
-          if length mod 4 * len_xor <> 0 then
-            length + ((4 * len_xor) - (length mod 4 * len_xor))
-          else length
-        in
-        let input1_bits =
-          Common.pad_upto ~length:pad_length ~value:false input1_bits
-        in
-        let input2_bits =
-          Common.pad_upto ~length:pad_length ~value:false input2_bits
-        in
 
         (* AND list of bits to obtain output *)
         let and_bits =
@@ -50,9 +34,7 @@ let band (type f)
         in
 
         (* Convert back to field a AND b *)
-        let and_output =
-          exists Field.typ ~compute:(fun () -> Field.Constant.project and_bits)
-        in
+        let and_output = Field.Constant.project and_bits in
 
         (* Compute sum of a + b *)
         let sum = Field.add input1 input2 in
@@ -84,9 +66,7 @@ let band (type f)
                   .T
                     (Basic
                        { l = (Field.Constant.one, sum)
-                       ; r =
-                           ( Field.Constant.(to_constant (negate one))
-                           , xor_output )
+                       ; r = (Field.(to_constant (negate one)), xor_output)
                        ; o =
                            ( Option.value_exn Field.(to_constant (negate two))
                            , Field.and_output )
@@ -97,7 +77,7 @@ let band (type f)
         and_output )
   in
   output_and ()
-(*
+    (*
 (* And of 64 bits *)
 let band64 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -170,4 +150,5 @@ let%test_unit "and gadget" =
   (* Negatve tests *)
   assert (Bool.equal (test_and 1 1 0 1) false) ;
   ()
-*)
+     *)
+    ()
