@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: itn-uptime-backend
+  labels:
+    app: itn-uptime-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: itn-uptime-backend
+  template:
+    metadata:
+      labels:
+        app: itn-uptime-backend
+        component: itn-uptime-backend
+    spec:
+      containers:
+        - name: main
+          image: gcr.io/o1labs-192920/delegation-backend:1.2.0-itn
+          env:
+            - name: NETWORK
+              value: ITN
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /credentials/creds
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          volumeMounts:
+            - name: credentials
+              mountPath: /credentials/
+      volumes:
+        - name: credentials
+          secret:
+            secretName: google-application-credentials
+            defaultMode: 256
+            items:
+            - key: creds
+              path: creds

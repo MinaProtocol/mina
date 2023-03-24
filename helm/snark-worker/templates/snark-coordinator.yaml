@@ -19,6 +19,20 @@ spec:
         syncStatus: INIT
     spec:
       initContainers:
+      {{ if $.Values.itn.enable }}
+      - name: fix-uptime-key-perms
+        image: busybox
+        command:
+        - sh
+        - -c
+        - /bin/cp /umptime-keys/key /root/uptime-keys/key && /bin/chmod 0700 /root/uptime-keys/
+        volumeMounts:
+        - name: uptime-keys
+          mountPath: /umptime-keys/
+          readOnly: true
+        - name: actual-uptime-keys
+          mountPath: /root/uptime-keys/
+      {{- end }}
       - name: libp2p-perms
         image: {{ $.Values.mina.image | quote }}
         command:
@@ -60,6 +74,12 @@ spec:
           "-work-selection", "$(WORK_SELECTION)",
           "-enable-peer-exchange", "true",
           "-libp2p-keypair", "/root/libp2p-keys/key",
+          {{- if $.Values.itn.enable }}
+          "-itn-keys", {{ $.Values.itn.keys }},
+          "-itn-graphql-port", "$(MINA_ITN_GRAPHQL_PORT)",
+          "-uptime-submitter-key", "/root/uptime-keys/key",
+          "-uptime-url", "http://itn-uptime-backend-service:8080/v1/submit",
+          {{- end }}
           {{- if $.Values.internalTrace.enable}}
           "-internal-tracing",
           {{- end -}}
@@ -104,6 +124,10 @@ spec:
           value: {{$.Values.workSelectionAlgorithm | quote }}
         - name: MINA_LIBP2P_PASS
           value: {{ $.Values.mina.privkeyPass | quote }}
+        - name: MINA_ITN_GRAPHQL_PORT
+          value: {{ $.Values.itn.itnGraphqlPort | quote }}
+        - name: UPTIME_PRIVKEY_PASS
+          value:
         ports:
         - name: client-port
           protocol: TCP 
@@ -131,6 +155,10 @@ spec:
           mountPath: /root/libp2p-keys
         - name: scripts
           mountPath: "/scripts"
+        {{- if $.Values.itn.enable }}
+        - name: actual-uptime-keys
+          mountPath: /root/uptime-keys/
+        {{- end }}
       volumes:
       {{- if $.Values.mina.runtimeConfig }}
       - name: daemon-config
@@ -148,6 +176,19 @@ spec:
           items:
           - key: "unset-k8s-env.sh"
             path: "unset-k8s-env.sh"
+      {{- if $.Values.itn.enable }}
+      - name: uptime-keys
+        secret:
+          secretName: {{ $.Values.coordinatorName }}-uptime-privkey-secret
+          defaultMode: 256
+          items:
+          - key: key
+            path: key
+          - key: pub
+            path: key.pub
+      - name: actual-uptime-keys
+        emptyDir: {}
+      {{- end}}
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
 ---
 {{ include "sideCar.resources.service" (dict "name" $name "resources" $.Values.resources) }}

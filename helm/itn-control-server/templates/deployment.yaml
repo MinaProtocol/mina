@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: itn-control-server
+  labels:
+    app: itn-control-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: itn-control-server
+  template:
+    metadata:
+      labels:
+        app: itn-control-server
+        component: itn-control-server
+    spec:
+      containers:
+        - name: main
+          image: adrnagy/control-server:latest
+          ports:
+            - name: ssh
+              containerPort: 22
+              protocol: TCP
