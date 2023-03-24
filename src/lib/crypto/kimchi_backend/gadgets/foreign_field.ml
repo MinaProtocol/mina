@@ -24,15 +24,20 @@ let two_to_3limb = Bignum_bigint.(pow (of_int 2) (of_int Int.(mul 3 limb_bits)))
 (* Binary modulus *)
 let binary_modulus = two_to_3limb
 
-(* Maximum foreign field modulus m = sqrt(2^t * n), see RFC for more details *)
+(* Maximum foreign field modulus m = sqrt(2^t * n), see RFC for more details
+ *   For simplicity and efficiency we use the approximation m = floor(sqrt(2^t * n))
+ *     * Distinct from this approximation is the maximum prime foreign field modulus
+ *       for both Pallas and Vesta given our CRT scheme:
+ *       926336713898529563388567880069503262826888842373627227613104999999999999999607 *)
 let max_foreign_field_modulus (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f) :
     Bignum_bigint.t =
-  (* m = sqrt(2^t * n) *)
+  (* m = floor(sqrt(2^t * n)) *)
   let product =
     (* We need Zarith for sqrt *)
     Bignum_bigint.to_zarith_bigint
     @@ Bignum_bigint.(binary_modulus * Circuit.Field.size)
+    (* Zarith.sqrt truncates (rounds down to int) ~ floor *)
   in
   Bignum_bigint.of_zarith_bigint @@ Z.sqrt product
 
