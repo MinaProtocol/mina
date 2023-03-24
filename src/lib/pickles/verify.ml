@@ -1,11 +1,8 @@
 module SC = Scalar_challenge
-open Core_kernel
-open Async_kernel
 open Pickles_types
 open Common
 open Import
 open Backend
-open Tuple_lib
 
 module Instance = struct
   type t =
@@ -23,12 +20,9 @@ module Plonk_checks = struct
   include Plonk_checks
   module Type1 =
     Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Tick)
-  module Type2 =
-    Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Tock)
 end
 
 let verify_heterogenous (ts : Instance.t list) =
-  let module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk in
   let module Tick_field = Backend.Tick.Field in
   let tick_field : _ Plonk_checks.field = (module Tick_field) in
   let check, result =
@@ -45,7 +39,7 @@ let verify_heterogenous (ts : Instance.t list) =
     in
     ((fun (lab, b) -> if not b then r := lab :: !r), result)
   in
-  let in_circuit_plonks, computed_bp_chals =
+  let in_circuit_plonks, _computed_bp_chals =
     List.map ts
       ~f:(fun
            (T
@@ -59,6 +53,7 @@ let verify_heterogenous (ts : Instance.t list) =
                       ; prev_x_hat = (x_hat1, _) as prev_x_hat
                    *)
                  ; prev_evals = evals
+                 ; proof = _
                  } ) )
          ->
         Timer.start __LOC__ ;
@@ -161,8 +156,6 @@ let verify_heterogenous (ts : Instance.t list) =
           let p =
             let module Field = struct
               include Tick.Field
-
-              type nonrec bool = bool
             end in
             Plonk_checks.Type1.derive_plonk
               (module Field)
@@ -176,7 +169,7 @@ let verify_heterogenous (ts : Instance.t list) =
           ; gamma = plonk0.gamma
           ; lookup =
               Option.map (Plonk_types.Opt.to_option_unsafe p.lookup)
-                ~f:(fun l ->
+                ~f:(fun _l ->
                   { Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
                     .Lookup
                     .joint_combiner = Option.value_exn plonk0.joint_combiner
@@ -367,8 +360,7 @@ let verify_heterogenous (ts : Instance.t list) =
   Common.time "dlog_check" (fun () -> check (lazy "dlog_check", dlog_check)) ;
   result ()
 
-let verify (type a return_typ n)
-    (max_proofs_verified : (module Nat.Intf with type n = n))
+let verify (type a n) (max_proofs_verified : (module Nat.Intf with type n = n))
     (a_value : (module Intf.Statement_value with type t = a))
     (key : Verification_key.t) (ts : (a * (n, n) Proof.t) list) =
   verify_heterogenous
