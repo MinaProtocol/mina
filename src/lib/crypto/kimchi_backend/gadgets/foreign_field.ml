@@ -548,6 +548,8 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     (foreign_field_modulus : f standard_limbs) :
     f Foreign_field_element.t * f External_checks.t =
   let open Circuit in
+  Printf.printf "native mod = %s\n"
+  @@ Common.bignum_bigint_to_hex Circuit.Field.size ;
   (* Check foreign field modulus < max allowed *)
   (let foreign_field_modulus =
      field_standard_limbs_to_bignum_bigint
@@ -836,26 +838,30 @@ let%test_unit "foreign_field_mul gadget" =
    *     - foreign_field_modulus
    *     - expected product
    *)
-  let test_mul (left_input : string) (right_input : string)
-      (foreign_field_modulus : string) (expected : string) : unit =
+  let test_mul (left_input : Bignum_bigint.t) (right_input : Bignum_bigint.t)
+      (foreign_field_modulus : Bignum_bigint.t) : unit =
     Printf.printf "test_mul\n" ;
     let _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
           let open Runner.Impl in
           (* Prepare test inputs *)
+          let expected =
+            Bignum_bigint.(left_input * right_input % foreign_field_modulus)
+          in
           let foreign_field_modulus =
-            string_to_field_standard_limbs
+            bignum_bigint_to_field_standard_limbs
               (module Runner.Impl)
               foreign_field_modulus
           in
           let left_input =
-            Foreign_field_element.of_string (module Runner.Impl) left_input
+            Foreign_field_element.of_bignum_bigint
+              (module Runner.Impl)
+              left_input
           in
           let right_input =
-            Foreign_field_element.of_string (module Runner.Impl) right_input
-          in
-          let result =
-            Foreign_field_element.of_string (module Runner.Impl) expected
+            Foreign_field_element.of_bignum_bigint
+              (module Runner.Impl)
+              right_input
           in
           (* Create the gadget *)
           let product, _external_checks =
@@ -866,32 +872,107 @@ let%test_unit "foreign_field_mul gadget" =
           (* Check product matches expected result *)
           as_prover (fun () ->
               let expected =
-                Foreign_field_element.to_field_limbs (module Runner.Impl) result
+                bignum_bigint_to_field_standard_limbs
+                  (module Runner.Impl)
+                  expected
               in
               let product =
                 Foreign_field_element.to_field_limbs
                   (module Runner.Impl)
                   product
               in
-              assert (expected = product) ) ;
+              assert (product = expected) ) ;
           () )
     in
     ()
   in
 
-  (* Positive tests *)
+  (* Test constants *)
   let secp256k1_modulus =
-    "115792089237316195423570985008687907853269984665640564039457584007908834671663"
+    Common.bignum_bigint_of_hex
+      "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
   in
-  let secp256k1_max =
-    "115792089237316195423570985008687907853269984665640564039457584007908834671662"
+  let secp256k1_max = Bignum_bigint.(secp256k1_modulus - Bignum_bigint.one) in
+  let secp256k1_sqrt = Common.bignum_biguint_sqrt secp256k1_max in
+  let pallas_modulus =
+    Common.bignum_bigint_of_hex
+      "40000000000000000000000000000000224698fc094cf91b992d30ed00000001"
   in
-  (* 0 * 0 == 0 *)
-  test_mul "0" "0" secp256k1_modulus "0" ;
-  (* max * 1 == max *)
-  test_mul secp256k1_max "1" secp256k1_modulus secp256k1_max ;
-  (* Negative tests *)
-  (* 0 * 0 == 1 *)
-  assert (Common.is_error (fun () -> test_mul "0" "0" secp256k1_modulus "1")) ;
+  let pallas_max = Bignum_bigint.(pallas_modulus - Bignum_bigint.one) in
+  let pallas_sqrt = Common.bignum_biguint_sqrt pallas_max in
+  let vesta_modulus =
+    Common.bignum_bigint_of_hex
+      "40000000000000000000000000000000224698fc0994a8dd8c46eb2100000001"
+  in
 
+  (* Positive tests *)
+  (* zero_mul: 0 * 0 *)
+  test_mul Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus ;
+  (* one_mul: max * 1 *)
+  test_mul secp256k1_max Bignum_bigint.one secp256k1_modulus ;
+  (* max_native_square: pallas_sqrt * pallas_sqrt *)
+  test_mul pallas_sqrt pallas_sqrt secp256k1_modulus ;
+  (* max_foreign_square: secp256k1_sqrt * secp256k1_sqrt *)
+  test_mul secp256k1_sqrt secp256k1_sqrt secp256k1_modulus ;
+  (* max_native_multiplicands: pallas_max * pallas_max *)
+  test_mul pallas_max pallas_max secp256k1_modulus ;
+  (* max_foreign_multiplicands: secp256k1_max * secp256k1_max *)
+  test_mul secp256k1_max secp256k1_max secp256k1_modulus ;
+  (* nonzero carry0 bits *)
+  test_mul
+    (Common.bignum_bigint_of_hex
+       "fbbbd91e03b48cebbac38855289060f8b29fa6ad3cffffffffffffffffffffff" )
+    (Common.bignum_bigint_of_hex
+       "d551c3d990f42b6d780275d9ca7e30e72941aa29dcffffffffffffffffffffff" )
+    secp256k1_modulus ;
+  (* test nonzero carry10 *)
+  test_mul
+    (Common.bignum_bigint_of_hex
+       "4000000000000000000000000000000000000000000000000000000000000000" )
+    (Common.bignum_bigint_of_hex
+       "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0" )
+    Bignum_bigint.(pow (of_int 2) (of_int 259)) ;
+  (* test nonzero carry1_hi *)
+  test_mul
+    (Common.bignum_bigint_of_hex
+       "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" )
+    (Common.bignum_bigint_of_hex
+       "8000000000000000000000000000000000000000000000000000000000000000d0" )
+    Bignum_bigint.(pow (of_int 2) (of_int 259) - one) ;
+  (* test nonzero_second_bit_carry1_hi *)
+  test_mul
+    (Common.bignum_bigint_of_hex
+       "ffffffffffffffffffffffffffffffffffffffffffffffff8a9dec7cfd1acdeb" )
+    (Common.bignum_bigint_of_hex
+       "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e" )
+    secp256k1_modulus ;
+  (* test random_multiplicands_carry1_lo *)
+  test_mul
+    (Common.bignum_bigint_of_hex
+       "ffd913aa9e17a63c7a0ff2354218037aafcd6ecaa67f56af1de882594a434dd3" )
+    (Common.bignum_bigint_of_hex
+       "7d313d6b42719a39acea5f51de9d50cd6a4ec7147c003557e114289e9d57dffc" )
+    secp256k1_modulus ;
+  (* test random_multiplicands_valid *)
+  test_mul
+    (Common.bignum_bigint_of_hex
+       "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
+    (Common.bignum_bigint_of_hex
+       "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
+    secp256k1_modulus ;
+  (* test smaller foreign field modulus *)
+  test_mul
+    (Common.bignum_bigint_of_hex
+       "5945fa400436f458cb9e994dcd315ded43e9b60eb68e2ae7b5cf1d07b48ca1c" )
+    (Common.bignum_bigint_of_hex
+       "747109f882b8e26947dfcd887273c0b0720618cb7f6d407c9ba74dbe0eda22f" )
+    (Common.bignum_bigint_of_hex
+       "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" ) ;
+  (* vesta non-native on pallas native modulus *)
+  test_mul
+    (Common.bignum_bigint_of_hex
+       "69cc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15" )
+    (Common.bignum_bigint_of_hex
+       "1fffe27b14baa740db0c8bb6656de61d2871a64093908af6181f46351a1c1909" )
+    vesta_modulus ;
   ()

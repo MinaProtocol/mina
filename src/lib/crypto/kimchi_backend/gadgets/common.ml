@@ -127,6 +127,10 @@ let bignum_bigint_to_hex (bignum : Bignum_bigint.t) : string =
 let bignum_bigint_of_hex (hex : string) : Bignum_bigint.t =
   Bignum_bigint.of_zarith_bigint @@ Z.of_string_base 16 hex
 
+(* Compute square root of Bignum_bigint value x *)
+let bignum_biguint_sqrt (x : Bignum_bigint.t) : Bignum_bigint.t =
+  Bignum_bigint.of_zarith_bigint @@ Z.sqrt @@ Bignum_bigint.to_zarith_bigint x
+
 (* Field to hex *)
 let field_to_hex (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
