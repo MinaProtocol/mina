@@ -548,8 +548,6 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     (foreign_field_modulus : f standard_limbs) :
     f Foreign_field_element.t * f External_checks.t =
   let open Circuit in
-  Printf.printf "native mod = %s\n"
-  @@ Common.bignum_bigint_to_hex Circuit.Field.size ;
   (* Check foreign field modulus < max allowed *)
   (let foreign_field_modulus =
      field_standard_limbs_to_bignum_bigint
@@ -840,7 +838,6 @@ let%test_unit "foreign_field_mul gadget" =
    *)
   let test_mul (left_input : Bignum_bigint.t) (right_input : Bignum_bigint.t)
       (foreign_field_modulus : Bignum_bigint.t) : unit =
-    Printf.printf "test_mul\n" ;
     let _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
           let open Runner.Impl in
