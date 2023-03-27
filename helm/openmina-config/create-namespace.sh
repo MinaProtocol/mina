@@ -39,6 +39,7 @@ KUBECTL="kubectl --namespace=$NAMESPACE"
 $KUBECTL create configmap scripts --from-file=scripts
 "$(dirname "$0")/create-secrets.sh" --namespace="$NAMESPACE" \
   seed1-libp2p-secret="$(resource seed1)" \
+  seed2-libp2p-secret="$(resource seed2)" \
   prod1-privkey-secret="$(resource key-01)" \
   prod2-privkey-secret="$(resource key-02)" \
   prod3-privkey-secret="$(resource key-03)"
