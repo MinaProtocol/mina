@@ -185,3 +185,18 @@ spec:
         persistentVolumeClaim:
           claimName: pvc-{{ template "archive-node.fullname" . }}
       {{- end }}
+---
+{{- if $.Values.persist_working_dir }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-{{ template "archive-node.fullname" . }}
+spec:
+  accessModes:
+      - {{ $.Values.storage.accessMode | quote }}
+  resources:
+    requests:
+      storage: {{ $.Values.storage.size | quote }}
+  storageClassName: "{{ $.Values.storage.storageClass }}"
+---
+{{ end }}
