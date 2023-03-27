@@ -25,17 +25,20 @@ let bxor (type f)
     let output_cvar = Common.field_to_cvar_field (module Circuit) output in
     (* If inputs are zero and length is zero, add the zero check *)
     if length = 0 then (
-      Field.Assert.equal Field.zero input1_cvar;
-    Field.Assert.equal Field.zero input2_cvar;
-    Field.Assert.equal Field.zero output_cvar;
+      Field.Assert.equal Field.zero input1_cvar ;
+      Field.Assert.equal Field.zero input2_cvar ;
+      Field.Assert.equal Field.zero output_cvar ;
       with_label "zero_check" (fun () ->
           assert_
             { annotation = Some __LOC__
             ; basic =
                 Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-                  (Raw { kind = Zero; values = [|input1_cvar; input2_cvar; output_cvar|]; coeffs = [||] })
-                  }
-                 ) )
+                  (Raw
+                     { kind = Zero
+                     ; values = [| input1_cvar; input2_cvar; output_cvar |]
+                     ; coeffs = [||]
+                     } )
+            } ) )
     else
       (* Nibbles *)
       let first = len_xor in
