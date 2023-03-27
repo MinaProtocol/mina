@@ -128,10 +128,6 @@ module type Foreign_field_element_base = sig
     -> Bignum_bigint.t
     -> 'field t
 
-  (* Create foreign field element from string *)
-  val of_string :
-    (module Snark_intf.Run with type field = 'field) -> string -> 'field t
-
   (* Convert foreign field element into Cvar limbs *)
   val to_limbs : 'field t -> 'field Cvar.t limbs
 
@@ -163,10 +159,6 @@ module Foreign_field_element_base = struct
   let of_limbs x = x
 
   let of_bignum_bigint (type field)
-      (module Circuit : Snark_intf.Run with type field = field) _x : field t =
-    failwith "not implemented"
-
-  let of_string (type field)
       (module Circuit : Snark_intf.Run with type field = field) _x : field t =
     failwith "not implemented"
 
@@ -232,9 +224,6 @@ module Foreign_field_element : sig
   (* Create foreign field element from Bignum_bigint.t *)
   (* of_bignum_bigint included from Foreign_field_element_base *)
 
-  (* Create foreign field element from string *)
-  (* of_string included from Foreign_field_element_base *)
-
   (* Convert a foreign field element into tuple of 3 field standard_limbs *)
   val to_limbs : 'field t -> 'field Cvar.t standard_limbs
 
@@ -277,10 +266,6 @@ end = struct
       Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l2
     in
     of_limbs (l0, l1, l2)
-
-  let of_string (type field)
-      (module Circuit : Snark_intf.Run with type field = field) x : field t =
-    of_bignum_bigint (module Circuit) @@ Bignum_bigint.of_string x
 
   let to_limbs x = Foreign_field_element_base.to_limbs x
 
