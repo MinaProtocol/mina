@@ -1,5 +1,5 @@
 {{ range until ($.Values.snarkWorkersConfig.count | int) }}
-{{ $name := printf "%s%d" $.Values.snarkWorkersConfig.namePrefix (add . 1) }}
+{{ $name := printf "%s%03d" $.Values.snarkWorkersConfig.namePrefix (add . 1) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
