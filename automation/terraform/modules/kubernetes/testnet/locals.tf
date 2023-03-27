@@ -39,6 +39,8 @@ locals {
       uploadBlocksToGCloud = var.upload_blocks_to_gcloud
       exposeGraphql        = var.expose_graphql
     }
+    
+    persist_working_dir = var.enable_working_dir_persitence
 
     seedConfigs = [
       for index, config in var.seed_configs : {
