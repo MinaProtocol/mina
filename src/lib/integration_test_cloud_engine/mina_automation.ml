@@ -19,7 +19,7 @@ let cluster_region = "us-west1"
 
 let cluster_zone = "us-west1a"
 
-let enable_working_dir_persitence = true;
+let enable_working_dir_persitence = true
 
 module Network_config = struct
   module Cli_inputs = Cli_inputs
@@ -41,7 +41,7 @@ module Network_config = struct
     ; cluster_region : string
     ; aws_route53_zone_id : string
     ; testnet_name : string
-    ; enable_working_dir_persitence: bool
+    ; enable_working_dir_persitence : bool
     ; deploy_graphql_ingress : bool
     ; mina_image : string
     ; mina_agent_image : string
