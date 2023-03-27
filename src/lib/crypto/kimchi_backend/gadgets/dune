@@ -5,8 +5,6 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane))
  (libraries
-  ;; external libraries
-  zarith
   ;; opam libraries
   bignum.bigint
   core_kernel
