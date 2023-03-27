@@ -37,49 +37,47 @@ events {
 }
 
 http {
-    resolver coredns.kube-system.svc.cluster.local;
+    resolver {{ .resolver | default "coredns.kube-system.svc.cluster.local" }};
     server {
-	    listen 80;
-
+        listen 80;
         location / {
            root /usr/share/nginx/html;
            try_files $uri $uri/ /index.html;
            index index.html index.htm;
            error_page 404 /usr/share/nginx/html/index.html;
         }
-        {{ $namespace := .namespace }}
         location /snarker-http-coordinator {
-           set $upstream snarker-http-coordinator.{{ $namespace }}.svc.cluster.local;
+           set $upstream snarker-http-coordinator;
            rewrite ^/snarker-http-coordinator($|/.*) $1 break;
            proxy_pass http://$upstream;
         }
         {{ range $node := .nodes }}
-        location /{{ $node }}/graphql {
-           set $upstream {{ $node }}-graphql.{{ $namespace }}.svc.cluster.local;
+        location /{{ $node.name }}/graphql {
+           set $upstream {{ $node.name }}-graphql.{{ $node.namespace }}.svc.cluster.local;
            proxy_pass http://$upstream/graphql;
         }
-        location /{{ $node }}/internal-trace/graphql {
-           set $upstream {{ $node }}-internal-trace-graphql.{{ $namespace }}.svc.cluster.local;
+        location /{{ $node.name }}/internal-trace/graphql {
+           set $upstream {{ $node.name }}-internal-trace-graphql.{{ $node.namespace }}.svc.cluster.local;
            proxy_pass http://$upstream/graphql;
         }
-        location /{{ $node }}/resources {
-           set $upstream {{ $node }}-resources.{{ $namespace }}.svc.cluster.local;
-           rewrite ^/{{ $node }}/resources(.*) /$1 break;
+        location /{{ $node.name }}/resources {
+           set $upstream {{ $node.name }}-resources.{{ $node.namespace }}.svc.cluster.local;
+           rewrite ^/{{ $node.name }}/resources(.*) /$1 break;
            proxy_pass http://$upstream/resources;
         }
-        location /{{ $node }}/bpf-debugger {
-           set $upstream {{ $node }}-bpf-debugger.{{ $namespace }}.svc.cluster.local;
-           rewrite ^/{{ $node }}/bpf-debugger/(.*) /$1 break;
+        location /{{ $node.name }}/bpf-debugger {
+           set $upstream {{ $node.name }}-bpf-debugger.{{ $node.namespace }}.svc.cluster.local;
+           rewrite ^/{{ $node.name }}/bpf-debugger/(.*) /$1 break;
            proxy_pass http://$upstream;
         }
-        location /{{ $node }}/ptrace-debugger {
-           set $upstream {{ $node }}-ptrace-debugger.{{ $namespace }}.svc.cluster.local;
+        location /{{ $node.name }}/ptrace-debugger {
+           set $upstream {{ $node.name }}-ptrace-debugger.{{ $node.namespace }}.svc.cluster.local;
            proxy_pass http://$upstream;
         }
-        location /{{ $node }}/logs {
+        location /{{ $node.name }}/logs {
            rewrite_log on;
-           set $upstream {{ $node }}-logs.{{ $namespace }}.svc.cluster.local;
-           rewrite ^/{{ $node }}/logs/(.*) /$1 break;
+           set $upstream {{ $node.name }}-logs.{{ $node.namespace }}.svc.cluster.local;
+           rewrite ^/{{ $node.name }}/logs/(.*) /$1 break;
            proxy_pass http://$upstream;
         }
         {{ end }}
