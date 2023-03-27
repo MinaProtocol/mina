@@ -16,7 +16,7 @@ spec:
       labels:
         app: {{ $name }}
         testnet: {{ $.Values.testnetName }}
-        role: seed
+        role: plain-node
         class: "plain-node"
         version: {{ trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-" }}
         syncStatus: INIT
@@ -174,7 +174,7 @@ spec:
       {{- if $.Values.mina.runtimeConfig }}
       - name: daemon-config
         configMap:
-          name: seed-daemon-config
+          name: plain-node-daemon-config
       {{- end }}
       {{- if $.Values.mina.uploadBlocksToGCloud }}
       - name: gcloud-keyfile
