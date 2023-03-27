@@ -124,14 +124,12 @@ module type Foreign_field_element_base = sig
 
   (* Create foreign field element from Bignum_bigint.t *)
   val of_bignum_bigint :
-    'field.
        (module Snark_intf.Run with type field = 'field)
     -> Bignum_bigint.t
     -> 'field t
 
   (* Create foreign field element from string *)
   val of_string :
-    'field.
     (module Snark_intf.Run with type field = 'field) -> string -> 'field t
 
   (* Convert foreign field element into Cvar limbs *)
@@ -142,19 +140,16 @@ module type Foreign_field_element_base = sig
 
   (* Convert foreign field element into field limbs *)
   val to_field_limbs :
-    'field.
     (module Snark_intf.Run with type field = 'field) -> 'field t -> 'field limbs
 
   (* Convert foreign field element into Bignum_bigint.t limbs *)
   val to_bignum_bigint_limbs :
-    'field.
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> Bignum_bigint.t limbs
 
   (* Convert foreign field element into a Bignum_bigint.t *)
   val to_bignum_bigint :
-    'field.
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> Bignum_bigint.t
@@ -248,14 +243,12 @@ module Foreign_field_element : sig
 
   (* Convert foreign field element into field standard_limbs *)
   val to_field_limbs :
-    'field.
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> 'field standard_limbs
 
   (* Convert foreign field element into bignum_bigint standard_limbs *)
   val to_bignum_bigint_limbs :
-    'field.
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> Bignum_bigint.t standard_limbs
