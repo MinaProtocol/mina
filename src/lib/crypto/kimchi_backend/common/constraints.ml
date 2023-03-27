@@ -638,6 +638,7 @@ struct
       -> unit =
    fun ?label state constr ->
     match constr with
+    (* TODO: the R1CS stuff should be gadgets, not here *)
     | Snarky_backendless.Constraint.Square (v1, v2) ->
         State.add_square_constraint state label v1 v2
     | Snarky_backendless.Constraint.R1CS (v1, v2, v3) ->
