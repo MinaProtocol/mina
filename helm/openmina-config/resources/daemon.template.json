@@ -1,10 +1,10 @@
 {
   "genesis": {
-    "slots_per_epoch": 3000,
+    "slots_per_epoch": ${SLOTS_PER_EPOCH},
     "genesis_state_timestamp": "${TIMESTAMP}"
   },
   "proof": {
-    "block_window_duration_ms": 120000
+    "block_window_duration_ms": ${BLOCK_DURATION_MS}
   },
   "ledger": {
     "name": "testnet",
