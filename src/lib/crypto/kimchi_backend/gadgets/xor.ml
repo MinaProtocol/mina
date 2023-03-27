@@ -15,30 +15,27 @@ let bxor (type f)
   let rec bxor_rec (input1_bits : bool list) (input2_bits : bool list)
       (output_bits : bool list) (length : int) (len_xor : int) =
     let open Circuit in
-    (* Transform to field elements *)
+    (* Transform to field *)
     let input1 = Field.Constant.project input1_bits in
     let input2 = Field.Constant.project input2_bits in
     let output = Field.Constant.project output_bits in
+    (* Convert to cvar *)
+    let input1_cvar = Common.field_to_cvar_field (module Circuit) input1 in
+    let input2_cvar = Common.field_to_cvar_field (module Circuit) input2 in
+    let output_cvar = Common.field_to_cvar_field (module Circuit) output in
     (* If inputs are zero and length is zero, add the zero check *)
     if length = 0 then (
-      assert (Field.Constant.(equal input1 zero)) ;
-      assert (Field.Constant.(equal input2 zero)) ;
-      assert (Field.Constant.(equal output zero)) ;
+      Field.Assert.equal Field.zero input1_cvar;
+    Field.Assert.equal Field.zero input2_cvar;
+    Field.Assert.equal Field.zero output_cvar;
       with_label "zero_check" (fun () ->
           assert_
             { annotation = Some __LOC__
             ; basic =
                 Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-                  (Basic
-                     { force = Field.Constant.one
-                     ; l = (Field.Constant.zero, Field.one)
-                     ; r = (Field.Constant.zero, Field.zero)
-                     ; o =
-                         (Option.value_exn Field.(to_constant zero), Field.zero)
-                     ; m = Field.Constant.zero
-                     ; c = Field.Constant.one
-                     } )
-            } ) )
+                  (Raw { kind = Zero; values = [|input1_cvar; input2_cvar; output_cvar|]; coeffs = [||] })
+                  }
+                 ) )
     else
       (* Nibbles *)
       let first = len_xor in

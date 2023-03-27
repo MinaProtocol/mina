@@ -151,8 +151,7 @@ module Plonk_constraint = struct
   (** A PLONK constraint (or gate) can be [Basic], [Poseidon], [EC_add_complete], [EC_scale], [EC_endoscale], [EC_endoscalar], [RangeCheck0], [RangeCheck1], [Xor] *)
   module T = struct
     type ('v, 'f) t =
-      | Basic of
-          { force : 'f; l : 'f * 'v; r : 'f * 'v; o : 'f * 'v; m : 'f; c : 'f }
+      | Basic of { l : 'f * 'v; r : 'f * 'v; o : 'f * 'v; m : 'f; c : 'f }
           (** the Poseidon state is an array of states (and states are arrays of size 3). *)
       | Poseidon of { state : 'v array array }
       | EC_add_complete of
@@ -322,9 +321,9 @@ module Plonk_constraint = struct
     let map (type a b f) (t : (a, f) t) ~(f : a -> b) =
       let fp (x, y) = (f x, f y) in
       match t with
-      | Basic { force; l; r; o; m; c } ->
+      | Basic { l; r; o; m; c } ->
           let p (x, y) = (x, f y) in
-          Basic { force; l = p l; r = p r; o = p o; m; c }
+          Basic { l = p l; r = p r; o = p o; m; c }
       | Poseidon { state } ->
           Poseidon { state = Array.map ~f:(fun x -> Array.map ~f x) state }
       | EC_add_complete { p1; p2; p3; inf; same_x; slope; inf_z; x21_inv } ->
@@ -645,7 +644,7 @@ module Plonk_constraint = struct
         (eval_one : v -> f) (t : (v, f) t) =
       match t with
       (* cl * vl + cr * vr + co * vo + m * vl*vr + c = 0 *)
-      | Basic { force = b; l = cl, vl; r = cr, vr; o = co, vo; m; c } ->
+      | Basic { l = cl, vl; r = cr, vr; o = co, vo; m; c } ->
           let vl = eval_one vl in
           let vr = eval_one vr in
           let vo = eval_one vo in
@@ -1146,20 +1145,18 @@ end = struct
 
   (** Adds a generic constraint to the constraint system.
       As there are two generic gates per row, we queue
-      every other generic gate, unless force is set to true.
+      every other generic gate.
       *)
-  let add_generic_constraint ?(force = false) ?l ?r ?o coeffs sys : unit =
-    if force then add_row sys [| l; r; o |] Generic coeffs
-    else
-      match sys.pending_generic_gate with
-      (* if the queue of generic gate is empty, queue this *)
-      | None ->
-          sys.pending_generic_gate <- Some (l, r, o, coeffs)
-      (* otherwise empty the queue and create the row  *)
-      | Some (l2, r2, o2, coeffs2) ->
-          let coeffs = Array.append coeffs coeffs2 in
-          add_row sys [| l; r; o; l2; r2; o2 |] Generic coeffs ;
-          sys.pending_generic_gate <- None
+  let add_generic_constraint ?l ?r ?o coeffs sys : unit =
+    match sys.pending_generic_gate with
+    (* if the queue of generic gate is empty, queue this *)
+    | None ->
+        sys.pending_generic_gate <- Some (l, r, o, coeffs)
+    (* otherwise empty the queue and create the row  *)
+    | Some (l2, r2, o2, coeffs2) ->
+        let coeffs = Array.append coeffs coeffs2 in
+        add_row sys [| l; r; o; l2; r2; o2 |] Generic coeffs ;
+        sys.pending_generic_gate <- None
 
   (** Converts a number of scaled additions \sum s_i * x_i
       to as many constraints as needed,
@@ -1397,7 +1394,7 @@ end = struct
                 Hashtbl.set sys.cached_constants ~key:ratio ~data:x2 )
         | `Constant, `Constant ->
             assert (Fp.(equal s1 s2)) )
-    | Plonk_constraint.T (Basic { force; l; r; o; m; c }) ->
+    | Plonk_constraint.T (Basic { l; r; o; m; c }) ->
         (* 0
            = l.s * l.x
            + r.s * r.x
@@ -1454,10 +1451,7 @@ end = struct
               (* TODO: Figure this out later. *)
               failwith "Must use non-constant cvar in plonk constraints"
         in
-        (* create a flag that is false if `force` is zero, true otherwise *)
-        let force = not Fp.(equal force Fp.zero) in
-        add_generic_constraint ?force:(Some force) ?l:(var l) ?r:(var r)
-          ?o:(var o)
+        add_generic_constraint ?l:(var l) ?r:(var r) ?o:(var o)
           [| coeff l; coeff r; coeff o; m; !c |]
           sys
     (* | w0 | w1 | w2 | w3 | w4 | w5
