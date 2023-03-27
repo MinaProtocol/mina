@@ -6,7 +6,7 @@ spec:
   {{ if .Values.frontend.nodePort }}
   type: NodePort
   {{ else }}
-  type: ClusterIp
+  type: ClusterIP
   {{ end }}
   selector:
     app: frontend
