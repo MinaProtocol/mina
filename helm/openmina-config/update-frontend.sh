@@ -120,13 +120,9 @@ EOF
 }
 
 generate_values() {
-    VALUES=$(get_values_file "$IMAGE" "$NODE_PORT" $PODS)
-    if ! [ -f "$VALUES" ]; then
-        echo "Generating new $VALUES" >&2
-        gen_values_yaml "$IMAGE" "$NODE_PORT" > "$VALUES"
-    else
-        echo "Using existing $VALUES" >&2
-    fi
+    VALUES=$(mktemp --suffix=.yaml)
+    echo "Generating new $VALUES" >&2
+    gen_values_yaml "$IMAGE" "$NODE_PORT" > "$VALUES"
     echo "$VALUES"
 }
 
