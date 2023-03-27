@@ -519,18 +519,18 @@ module External_checks = struct
   (* Track a multi-range-check *)
   let add_multi_range_check (external_checks : 'field t)
       (x : 'field Cvar.t standard_limbs) =
-    external_checks.multi_ranges <- external_checks.multi_ranges @ [ x ]
+    external_checks.multi_ranges <- x :: external_checks.multi_ranges
 
   (* Track a compact-multi-range-check *)
   let add_compact_multi_range_check (external_checks : 'field t)
       (x : 'field Cvar.t compact_limbs) =
     external_checks.compact_multi_ranges <-
-      external_checks.compact_multi_ranges @ [ x ]
+      x :: external_checks.compact_multi_ranges
 
   (* Track a bound check *)
   let add_bound_check (external_checks : 'field t)
       (x : 'field Cvar.t standard_limbs) =
-    external_checks.bounds <- external_checks.bounds @ [ x ]
+    external_checks.bounds <- x :: external_checks.bounds
 end
 
 let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
@@ -920,6 +920,7 @@ let%test_unit "foreign_field_mul gadget" =
               assert (product = expected) ) ;
 
           (* TODO: 2) Add result bound addition gate *)
+          assert (1 == List.length external_checks.bounds) ;
 
           (* 3) Add multi-range-check left input *)
           let left_input0, left_input1, left_input2 =
@@ -947,6 +948,7 @@ let%test_unit "foreign_field_mul gadget" =
               let v0, v1, v2 = multi_range in
               Range_check.multi_range_check (module Runner.Impl) v0 v1 v2 ;
               () ) ;
+          assert (2 == List.length external_checks.multi_ranges) ;
 
           (* 7) Add gates for external compact-multi-range-checks
            *   In this case:
@@ -957,6 +959,7 @@ let%test_unit "foreign_field_mul gadget" =
               let v01, v2 = compact_multi_range in
               Range_check.compact_multi_range_check (module Runner.Impl) v01 v2 ;
               () ) ;
+          assert (1 == List.length external_checks.compact_multi_ranges) ;
 
           () )
     in
