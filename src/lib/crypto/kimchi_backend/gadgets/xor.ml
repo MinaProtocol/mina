@@ -30,8 +30,7 @@ let bxor (type f)
             ; basic =
                 Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
                   (Basic
-                     { force = Field.Constant.one
-                     ; l = (Field.Constant.zero, Field.one)
+                     { l = (Field.Constant.zero, Field.one)
                      ; r = (Field.Constant.zero, Field.zero)
                      ; o =
                          (Option.value_exn Field.(to_constant zero), Field.zero)
