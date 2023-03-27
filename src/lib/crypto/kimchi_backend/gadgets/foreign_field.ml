@@ -739,25 +739,6 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     |> tuple24_of_array
   in
 
-  (* TODO: Witness hlist module
-
-     [@@deriving hlist]
-     Circuit.Typ.of_hlistable
-     module Witness_vars: sig
-       type 'a t
-       val convert : 'a t -> 'a ....
-     end = struct
-       type 'a t = 'a array (* make it abstract *)
-
-       let typ ty = Typ.array ~length:27 Field.typ
-     end
-  *)
-
-  (* TODO: refactor Foreign_field_element so that Circuit is built in
-     (e.g. using module template function / functor *)
-
-  (* TODO: Make module for standard_limbs and compact_limbs *)
-
   (* Prepare external checks *)
   let external_checks = External_checks.create (module Circuit) in
   External_checks.add_multi_range_check external_checks
