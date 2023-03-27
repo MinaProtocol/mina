@@ -151,6 +151,8 @@ installed: [
   "mew_vi.0.5.0"
   "minicli.5.0.2"
   "mirage-crypto-ec.0.11.0"
+  "mirage-crypto.0.11.0"
+  "mirage-crypto-rng.0.11.0"
   "mirage-crypto-rng-async.0.11.0"
   "mmap.1.1.0"
   "num.1.1"
