@@ -3,6 +3,27 @@
 open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 
+(* pad_upto - Pad a list with a value until it reaches a given length *)
+let pad_upto ~length ~value list =
+  let len = List.length list in
+  assert (len <= length) ;
+  let padding = List.init (length - len) ~f:(fun _ -> value) in
+  list @ padding
+
+(* Length of bigint in bits *)
+let bignum_bigint_bit_length (bigint : Bignum_bigint.t) : int =
+  Z.log2up (Bignum_bigint.to_zarith_bigint bigint)
+
+(* Removes leading zero bits of a list of booleans (at least needs length 1) *)
+let rec rm_zero_bits (bitstring : bool list) : bool list =
+  match bitstring with
+  | [] ->
+      [ false ]
+  | false :: x ->
+      rm_zero_bits x
+  | _ ->
+      bitstring
+
 (* Conventions used in this interface
  *     1. Functions prefixed with "as_prover_" only happen during proving
  *        and not during circuit creation
