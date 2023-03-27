@@ -2046,7 +2046,7 @@ end = struct
            ; Some (reduce_to_v bound_crumb7)
           |]
         in
-        add_row sys vars_curr Rot64 [| two_to_rot |] 
+        add_row sys vars_curr Rot64 [| two_to_rot |]
     | Plonk_constraint.T (Raw { kind; values; coeffs }) ->
         let values =
           Array.init 15 ~f:(fun i ->
