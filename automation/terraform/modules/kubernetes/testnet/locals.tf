@@ -39,7 +39,7 @@ locals {
       uploadBlocksToGCloud = var.upload_blocks_to_gcloud
       exposeGraphql        = var.expose_graphql
     }
-    
+
     seedConfigs = [
       for index, config in var.seed_configs : {
         name             = config.name
