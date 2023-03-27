@@ -1602,24 +1602,6 @@ module Circuit = struct
     new%js proof_constr p
 
   let circuit = Js.Unsafe.eval_string {js|(function() { return this })|js}
-  (*
-     let run_circuit ~eval_constraints ~with_witness (f : unit -> 'a) =
-       let open Impl.Low_level in
-       let num_inputs = 0 in
-       let input = field_vec () in
-       let next_auxiliary = ref 1 in
-       let aux = field_vec () in
-       let system = Backend.R1CS_constraint_system.create () in
-       let old_state = !state in
-       let state' =
-         make_state ~num_inputs ~input ~next_auxiliary ~aux ~system
-           ~eval_constraints ~with_witness ()
-       in
-       set_state state' ;
-       try
-         let result = mark_active f in
-         set_state old_state ; result
-       with exn -> set_state old_state ; raise_exn exn *)
 
   let () =
     circuit##.runAndCheck :=
