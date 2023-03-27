@@ -48,7 +48,7 @@ metadata:
   name: frontend-nginx-conf
 data:
   nginx.conf: |
-    {{ include "frontend-nginx-conf" (dict "nodes" $.Values.frontend.nodes "namespace" $.Release.Namespace) | nindent 4 }}
+    {{ include "frontend-nginx-conf" (dict "nodes" $.Values.frontend.nodes "resolver" $.Values.frontend.resolver) | nindent 4 }}
 
 ---
 apiVersion: v1
@@ -63,7 +63,7 @@ data:
       "isVanilla": {{ $.Values.isVanilla | default "false" }},
       "configs": [
         {{ range $i, $node := $.Values.frontend.nodes  }}
-        {{ include "frontend-app-config-entry" (dict "name" $node "first" (eq $i 0) "debugger" "bpf-debugger" ) }}
+        {{ include "frontend-app-config-entry" (dict "name" $node.name "first" (eq $i 0) "debugger" "bpf-debugger" ) }}
         {{ end }}
       ]
     }
