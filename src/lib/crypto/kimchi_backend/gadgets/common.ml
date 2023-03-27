@@ -37,16 +37,21 @@ let field_to_bits_le_as_prover (type f)
 
 (* Conventions used in this interface
  *     1. Functions prefixed with "as_prover_" only happen during proving
- *        and not while creating the constraint system
+ *        and not during circuit creation
  *          * These functions are called twice (once during creation of
- *            constraint system and once during proving).  Inside the definition
+ *            the circuit and once during proving).  Inside the definition
  *            of these functions, whatever resides within the exists is not executed
- *            during constraint system creation, though there could be some
+ *            during circuit creation, though there could be some
  *            code outside the exists (such as error checking code) that is
- *            run during the creation of the constraint system.
+ *            run during the creation of the circuit.
+ *          * The value returned by exists depends on what mode it is called in
+ *              * In circuit generation mode it allocates a cvar without any backing memory
+ *              * In proof generation mode it allocates a cvar with backing memory to store
+ *                the values associated with the cvar.  The prover can then access these
+ *                with As_prover.read.
  *     2. Functions suffixed with "_as_prover" can only be called outside
  *        the circuit.  Specifically, this means within an exists, within
-*         an as_prover or in an "as_prover_" prefixed function)
+ *        an as_prover or in an "as_prover_" prefixed function)
  *)
 
 (* Convert cvar field element (i.e. Field.t) to field *)
@@ -149,6 +154,26 @@ let bignum_bigint_div_rem (numerator : Bignum_bigint.t)
   let remainder = Bignum_bigint.(numerator - (denominator * quotient)) in
   (quotient, remainder)
 
+(* Bignum_bigint to hex *)
+let bignum_bigint_to_hex (bignum : Bignum_bigint.t) : string =
+  Z.format "%x" @@ Bignum_bigint.to_zarith_bigint bignum
+
+(* Bignum_bigint.t of hex *)
+let bignum_bigint_of_hex (hex : string) : Bignum_bigint.t =
+  Bignum_bigint.of_zarith_bigint @@ Z.of_string_base 16 hex
+
+(* Field to hex *)
+let field_to_hex (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (field_element : f) : string =
+  bignum_bigint_to_hex @@ field_to_bignum_bigint (module Circuit) field_element
+
+(* Field of hex *)
+let field_of_hex (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (hex : string) : f =
+  bignum_bigint_to_field (module Circuit) @@ bignum_bigint_of_hex hex
+
 (* Negative test helper *)
 let is_error (func : unit -> _) = Result.is_error (Or_error.try_with func)
 
@@ -163,17 +188,16 @@ let%test_unit "helper field_bits_le_to_field" =
   let _proof_keypair, _proof =
     Runner.generate_and_verify_proof (fun () ->
         let open Runner.Impl in
-        (* Test value *)
-        let field_element =
-          exists Field.typ ~compute:(fun () ->
-              Field.Constant.of_string
-                "25138500177533925254565157548260087092526215225485178888176592492127995051965" )
-        in
-
         let of_bits =
           as_prover_cvar_field_bits_le_to_cvar_field (module Runner.Impl)
         in
         let of_base10 = as_prover_cvar_field_of_base10 (module Runner.Impl) in
+
+        (* Test value *)
+        let field_element =
+          of_base10
+            "25138500177533925254565157548260087092526215225485178888176592492127995051965"
+        in
 
         (* Test extracting all bits as field element *)
         Field.Assert.equal (of_bits field_element 0 (-1)) field_element ;
