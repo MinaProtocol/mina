@@ -36,7 +36,7 @@ let rec rm_zero_bits (bitstring : bool list) : bool list =
  *          * The value returned by exists depends on what mode it is called in
  *              * In circuit generation mode it allocates a cvar without any backing memory
  *              * In proof generation mode it allocates a cvar with backing memory to store
- *                the values associated with the cvar.  The prover can then access these
+ *                the values associated with the cvar. The prover can then access these
  *                with As_prover.read.
  *     2. Functions suffixed with "_as_prover" can only be called outside
  *        the circuit.  Specifically, this means within an exists, within
