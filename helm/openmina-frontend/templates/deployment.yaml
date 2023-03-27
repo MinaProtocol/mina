@@ -48,7 +48,7 @@ metadata:
   name: frontend-nginx-conf
 data:
   nginx.conf: |
-    {{ include "frontend-nginx-conf" (dict "nodes" $.Values.frontend.nodes "resolver" $.Values.frontend.resolver) | nindent 4 }}
+    {{ include "frontend-nginx-conf" (dict "namespace" $.Release.Namespace "nodes" $.Values.frontend.nodes "resolver" $.Values.frontend.resolver) | nindent 4 }}
 
 ---
 apiVersion: v1
