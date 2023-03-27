@@ -191,7 +191,7 @@ let compact_multi_range_check (type f)
             (module Circuit)
             (As_prover.read Field.typ v01)
         in
-        let v1, v0 = Common.(bignum_bigint_div_rem v01 Common.two_to_limb) in
+        let v1, v0 = Common.(bignum_bigint_div_rem v01 two_to_limb) in
         (bignum_bigint_to_field v1, bignum_bigint_to_field v0) )
   in
   range_check0
