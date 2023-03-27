@@ -14,6 +14,14 @@ resource() {
     echo "$(resources)/$1"
 }
 
+values_dir() {
+    echo "$(root)/${VALUES_DIR:-values}"
+}
+
 values() {
-    echo "$(root)/values/$1.yaml"
+    echo "$(values_dir)/$1.yaml"
+}
+
+kubectl_ns() {
+    kubectl config view --minify --output 'jsonpath={..namespace}'
 }

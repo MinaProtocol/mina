@@ -15,7 +15,7 @@ BLOCK_PRODUCER_CHART="$CHARTS/block-producer"
 SNARK_WORKER_CHART="$CHARTS/snark-worker"
 PLAIN_NODE_CHART="$CHARTS/plain-node"
 
-TEMP=$(getopt -o 'hafspwdoP:n:li:' --long 'help,all,frontend,seeds,producers,snarkers,snark-workers,nodes,plain-nodes,optimized,port:,node-port:,namespace:,force,image:,mina-image:,dry-run,set:' -n "$0" -- "$@")
+TEMP=$(getopt -o 'hafspwdoP:n:li:S:' --long 'help,all,frontend,seeds,producers,snarkers,snark-workers,nodes,plain-nodes,optimized,port:,node-port:,namespace:,force,image:,mina-image:,dry-run,values-dir:,suffix:' -n "$0" -- "$@")
 
 if [ $? -ne 0 ]; then
 	echo 'Terminating...' >&2
@@ -30,10 +30,10 @@ usage() {
 Deploys/updates Openmina testnet.
 
 Usage:
-$0 deploy [OPTIONS]
-$0 delete [OPTIONS]
-$0 lint [OPTIONS]
-$0 dry-run [OPTIONS]
+$0 deploy [OPTIONS] [ -- [HELM-OPTIONS ...] ]
+$0 delete [OPTIONS] [ -- [HELM-OPTIONS ...] ]
+$0 lint [OPTIONS] [ -- [HELM-OPTIONS ...] ]
+$0 dry-run [OPTIONS] [ -- [HELM-OPTIONS ...] ]
 
 Options:
    -h, --help       Display this message
@@ -45,17 +45,20 @@ Options:
    -a, --all        Install all nodes and the frontend
    -s, --seeds      Install seed nodes
    -p, --producers  Install block producing nodes
-   -w, --snark-workers
+   -w, --snark-workers, --snarkers
                     Install snark workers (and HTTP coordinator)
-   -d, --nodes      Install plain nodes
-   -f, --front-end  Install frontend
+   -d, --plain-nodes, --nodes
+                    Install plain nodes
+   -f, --frontend   Install frontend
    -P, --node-port=PORT
                     Use PORT as a node port to access the deployed frontend
                     (if omitted, taken from the namespace annotations)
-   -D, --delete     Deletes all node-related Helm releases
+       --values-dir <DIR>
+                    Use YAML files located in DIR instead of $(values_dir)
+   -S, --suffix <SUFFIX>
+                    Append SUFFIX to the Helm release names (to allow several releases in one namespace)
        --dry-run    Do not deploy, just print commands
        --force      Do not ask confirmations
-       --set        Set values to be passed to helm/kubectl
 EOF
 }
 
@@ -130,8 +133,13 @@ while true; do
             shift
             continue
         ;;
-        '--set')
-            SET_ARGS="$SET_ARGS --set=$2"
+        '--values-dir')
+            VALUES_DIR=$2
+            shift 2
+            continue
+        ;;
+        '--suffix')
+            SUFFIX=$2
             shift 2
             continue
         ;;
@@ -162,7 +170,7 @@ case $1 in
     ;;
 esac
 
-KUBECTL_NAMESPACE=$(kubectl config view --minify --output 'jsonpath={..namespace}')
+KUBECTL_NAMESPACE=$(kubectl_ns)
 if [ -z "$NAMESPACE" ]; then
     echo "Using current namespace ${KUBECTL_NAMESPACE:-default}"
     if [ "$OP" != "lint" ] && [ -z "$DRY_RUN" ] && [ -z "$FORCE" ]; then
@@ -198,7 +206,7 @@ HELM_ARGS="--values=$(values common) \
            $HELM_ARGS"
 
 operate() {
-    NAME=$1
+    NAME="$1${SUFFIX:-}"
     shift
     case $OP in
         deploy)
