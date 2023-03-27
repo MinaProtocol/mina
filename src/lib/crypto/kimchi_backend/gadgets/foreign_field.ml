@@ -1,5 +1,3 @@
-(* open Core_kernel *)
-
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
