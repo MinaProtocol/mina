@@ -1,2 +1,3 @@
 frontend:
   image: directcuteo/mina-frontend:ae3c693
+  resolver: 169.254.25.10

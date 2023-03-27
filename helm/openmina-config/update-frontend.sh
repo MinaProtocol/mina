@@ -19,6 +19,8 @@ Options:
    -h, --help       Display this message
    -n, --namespace=NAMESPACE
                     Use namespace NAMESPACE
+   -o, --other-namespace=NAMESPACE
+                    Add nodes from namespace NAMESPACE too. Use multiple times to add nodes from other namespaces.
    -p, --node-port=PORT
                     Use PORT as a node port to access the deployed frontend
    -i, --image=IMAGE
@@ -26,7 +28,7 @@ Options:
 EOF
 }
 
-TEMP=$(getopt -o 'hn:i:p:' --long 'help,namespace:,image:,port:,node-port:' -n "$0" -- "$@")
+TEMP=$(getopt -o 'hn:o:i:p:' --long 'help,namespace:,other-namespaces:,image:,port:,node-port:' -n "$0" -- "$@")
 
 if [ $? -ne 0 ]; then
 	echo 'Terminating...' >&2
@@ -36,6 +38,7 @@ fi
 eval set -- "$TEMP"
 unset TEMP
 
+OTHER_NAMESPACES=""
 
 while true; do
     case "$1" in
@@ -45,6 +48,11 @@ while true; do
         ;;
         '-n'|'--namespace')
             NAMESPACE=$2
+            shift 2
+            continue
+        ;;
+        '-o'|'--other-namespace')
+            OTHER_NAMESPACES="$OTHER_NAMESPACES $2"
             shift 2
             continue
         ;;
@@ -69,6 +77,9 @@ while true; do
     esac
 done
 
+if [ -z $NAMESPACE ]; then
+    NAMESPACE=$(kubectl_ns)
+fi
 if [ -z "$NAMESPACE" ]; then
     echo "'--namespace' is missing"
     exit 1
@@ -83,7 +94,7 @@ get_values_file() {
 }
 
 get_mina_deployments() {
-    $KUBECTL get deployments -o json | \
+    kubectl --namespace=$1 get deployments -o json | \
         jq -r '.items[] | select( .spec.template.spec.containers | any( .name == "mina") ) | .metadata.name'
 }
 
@@ -97,19 +108,22 @@ frontend:
   nodePort: $NODE_PORT
   nodes:
 EOF
-    for NAME in "$@"; do
-        cat <<EOF
-  - $NAME
+    for NS in "$NAMESPACE" $OTHER_NAMESPACES; do
+        PODS=$(get_mina_deployments $NS)
+        for NAME in $PODS; do
+            cat <<EOF
+  - name: $NAME
+    namespace: $NS
 EOF
+        done
     done
 }
 
 generate_values() {
-    PODS=$(get_mina_deployments)
     VALUES=$(get_values_file "$IMAGE" "$NODE_PORT" $PODS)
     if ! [ -f "$VALUES" ]; then
         echo "Generating new $VALUES" >&2
-        gen_values_yaml "$IMAGE" "$NODE_PORT" $PODS > "$VALUES"
+        gen_values_yaml "$IMAGE" "$NODE_PORT" > "$VALUES"
     else
         echo "Using existing $VALUES" >&2
     fi
