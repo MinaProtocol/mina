@@ -15,15 +15,15 @@ locals {
   seed_external_port = 10001
 
   seed_config = {
-    name               = "seed",
-    class              = "seed",
-    libp2p_secret      = "seed-discovery-keys",
-    libp2p_secret_pw   = "naughty blue worm"
-    external_ip        = null,
+    name                 = "seed",
+    class                = "seed",
+    libp2p_secret        = "seed-discovery-keys",
+    libp2p_secret_pw     = "naughty blue worm"
+    external_ip          = null,
     # private_key_secret = null,
-    enableArchive      = false,
-    archiveAddress     = null
-    persist_working_dir= var.enable_working_dir_persitence
+    enableArchive        = false,
+    archiveAddress       = null
+    persist_working_dir  = var.enable_working_dir_persitence
   }
   
 
@@ -47,7 +47,7 @@ locals {
     persistenceStorageClass = "ssd-delete"
     persistenceAccessModes  = ["ReadWriteOnce"]
     spotAllowed             = "true"
-    persist_working_dir= var.enable_working_dir_persitence
+    persist_working_dir     = var.enable_working_dir_persitence
   }
 
   archive_node_configs = var.archive_configs != null ? [for item in var.archive_configs : merge(local.default_archive_node, item)] : [
