@@ -59,5 +59,8 @@ end]
 let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
 
 let deriver obj =
-  Fields_derivers_zkapps.iso_string obj ~name:"StateHash" ~js_type:Field
-    ~to_string:to_base58_check ~of_string:of_base58_check_exn
+  Fields_derivers_zkapps.(
+    iso_string ~name:"StateHash" ~js_type:Field ~to_string:to_base58_check
+      ~of_string:of_base58_check_exn
+    |> needs_custom_js ~name:"StateHash" ~js_type:field)
+    obj

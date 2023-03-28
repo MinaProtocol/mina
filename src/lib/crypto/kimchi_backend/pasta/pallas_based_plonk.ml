@@ -87,9 +87,8 @@ module Proof = Plonk_dlog_proof.Make (struct
       (* external values contains [1, primary..., auxiliary ] *)
       let external_values i =
         let open Field.Vector in
-        if i = 0 then Field.one
-        else if i - 1 < length primary then get primary (i - 1)
-        else get auxiliary (i - 1 - length primary)
+        if i < length primary then get primary i
+        else get auxiliary (i - length primary)
       in
 
       (* compute witness *)
@@ -114,6 +113,11 @@ module Proof = Plonk_dlog_proof.Make (struct
         ~f:(fun pk auxiliary_input prev_challenges prev_sgs ->
           Promise.run_in_thread (fun () ->
               create pk auxiliary_input prev_challenges prev_sgs ) )
+
+    let create_and_verify_async (pk : Keypair.t) primary auxiliary prev_chals
+        prev_comms =
+      failwith "not implemented"
+    (* TODO: Remove this function when vesta_based_plonk.create_and_verify_async is removed *)
 
     let create (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
       create_aux pk primary auxiliary prev_chals prev_comms ~f:create

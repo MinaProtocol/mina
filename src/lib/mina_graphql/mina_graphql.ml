@@ -1120,11 +1120,11 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ permission ->
                 permission.Permissions.Poly.set_zkapp_uri )
-          ; field "editSequenceState" ~typ:(non_null auth_required)
-              ~doc:"Authorization required to edit the sequence state"
+          ; field "editActionState" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to edit the action state"
               ~args:Arg.[]
               ~resolve:(fun _ permission ->
-                permission.Permissions.Poly.edit_sequence_state )
+                permission.Permissions.Poly.edit_action_state )
           ; field "setTokenSymbol" ~typ:(non_null auth_required)
               ~doc:"Authorization required to set the token symbol"
               ~args:Arg.[]
@@ -1420,18 +1420,17 @@ module Types = struct
                  ~resolve:(fun _ { account; _ } ->
                    Option.value_map account.Account.Poly.zkapp ~default:None
                      ~f:(fun zkapp_account -> zkapp_account.verification_key) )
-             ; field "sequenceEvents"
-                 ~doc:"Sequence events associated with this account"
+             ; field "actionState"
+                 ~doc:"Action state associated with this account"
                  ~typ:
                    (list
                       ( non_null
-                      @@ Snark_params_unix.Graphql_scalars.SequenceEvent.typ ()
-                      ) )
+                      @@ Snark_params_unix.Graphql_scalars.Action.typ () ) )
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    Option.map account.Account.Poly.zkapp
                      ~f:(fun zkapp_account ->
-                       Pickles_types.Vector.to_list zkapp_account.sequence_state )
+                       Pickles_types.Vector.to_list zkapp_account.action_state )
                    )
              ; field "leafHash"
                  ~doc:
@@ -1692,7 +1691,15 @@ module Types = struct
             | Applied | Enqueued ->
                 None
             | Included_but_failed failures ->
-                List.concat failures |> List.hd )
+                let rec first_failure = function
+                  | (failure :: _) :: _ ->
+                      Some failure
+                  | [] :: others ->
+                      first_failure others
+                  | [] ->
+                      None
+                in
+                first_failure failures )
       ]
 
     let payment =
