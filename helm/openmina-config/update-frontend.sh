@@ -17,7 +17,7 @@ Usage: $0 --namespace=NAMESPACE
 
 Options:
    -h, --help       Display this message
-   -n, --namespace=NAMESPACE
+   -n, --namespace=<NAMESPACE>
                     Use namespace NAMESPACE
    -o, --other-namespace=NAMESPACE
                     Add nodes from namespace NAMESPACE too. Use multiple times to add nodes from other namespaces.
@@ -28,7 +28,7 @@ Options:
 EOF
 }
 
-TEMP=$(getopt -o 'hn:o:i:p:' --long 'help,namespace:,other-namespaces:,image:,port:,node-port:' -n "$0" -- "$@")
+TEMP=$(getopt -o 'hn:o:i:p:' --long 'help,namespace:,other-namespace:,image:,port:,node-port:' -n "$0" -- "$@")
 
 if [ $? -ne 0 ]; then
 	echo 'Terminating...' >&2
