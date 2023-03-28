@@ -43,3 +43,6 @@ make test_executive_deb
 
 echo "--- Upload debs to amazon s3 repo"
 make publish_debs
+
+echo "--- Git diff after build is complete:"
+git diff --exit-code
