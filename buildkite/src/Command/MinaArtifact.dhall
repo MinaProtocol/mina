@@ -111,7 +111,5 @@ in
 {
   bullseye  = pipeline DebianVersions.DebVersion.Bullseye
   , buster  = pipeline DebianVersions.DebVersion.Buster
-  , stretch = pipeline DebianVersions.DebVersion.Stretch
   , focal   = pipeline DebianVersions.DebVersion.Focal
-  , bionic  = pipeline DebianVersions.DebVersion.Bionic
 }
