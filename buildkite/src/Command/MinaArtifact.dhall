@@ -100,7 +100,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
           step_key="test-executive-${DebianVersions.lowerName debVersion}-docker-image"
         }
         in
-        if debVersion == Bullseye then DockerImage.generateStep testExecutiveSpec
+        if debVersion == Bullseye then DockerImage.generateStep testExecutiveSpec else None
 
       ]
     }
