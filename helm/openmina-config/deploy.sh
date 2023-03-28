@@ -160,7 +160,7 @@ if [ $# -lt 1 ]; then
 fi
 
 case $1 in
-    'deploy'|'delete'|'lint'|'template')
+    'deploy'|'install'|'delete'|'lint'|'template')
         OP="$1"
         shift
     ;;
@@ -210,11 +210,18 @@ operate() {
     NAME="$1${SUFFIX:-}"
     shift
     case $OP in
-        deploy)
+        deploy|upgrade)
             if [ -z "$DRY_RUN" ]; then
                $HELM upgrade --install "$NAME" "$@"
             else
                echo $HELM upgrade --install "$NAME" "$@"
+            fi
+        ;;
+        install)
+            if [ -z "$DRY_RUN" ]; then
+               $HELM install "$NAME" "$@"
+            else
+               echo $HELM install "$NAME" "$@"
             fi
         ;;
         lint)
@@ -225,9 +232,9 @@ operate() {
         ;;
         delete)
             if [ -z "$DRY_RUN" ]; then
-                $HELM delete "$NAME" --wait --timeout=1m || true
+                $HELM delete "$NAME" "--namespace=$NAMESPACE" --wait --timeout=1m || true
             else
-                echo $HELM delete "$NAME"
+                echo $HELM delete "--namespace=$NAMESPACE" "$NAME"
             fi
         ;;
         *)
