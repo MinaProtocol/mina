@@ -60,6 +60,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
         DockerImage.generateStep daemonBerkeleySpec,
 
         -- test_executive image
+        if debVersion == Bullseye then
         let testExecutiveSpec = DockerImage.ReleaseSpec::{
           deps=DebianVersions.dependsOn debVersion,
           service="mina-test-executive",
@@ -68,6 +69,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
         }
         in
         DockerImage.generateStep testExecutiveSpec,
+        else
 
         -- archive image
         let archiveSpec = DockerImage.ReleaseSpec::{
