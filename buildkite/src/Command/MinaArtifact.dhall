@@ -34,7 +34,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
               "AWS_SECRET_ACCESS_KEY",
               "MINA_BRANCH=$BUILDKITE_BRANCH",
               "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
-              "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}",
+              "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}"
             ] "./buildkite/scripts/build-artifact.sh",
             label = "Build Mina for ${DebianVersions.capitalName debVersion}",
             key = "build-deb-pkg",
