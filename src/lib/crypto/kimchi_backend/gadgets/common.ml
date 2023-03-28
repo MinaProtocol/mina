@@ -22,6 +22,12 @@ module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
  *        an as_prover or in an "as_prover_" prefixed function)
  *)
 
+(* Foreign field element limb size *)
+let limb_bits = 88
+
+(* Foreign field element limb size 2^L where L=88 *)
+let two_to_limb = Bignum_bigint.(pow (of_int 2) (of_int limb_bits))
+
 (* Convert cvar field element (i.e. Field.t) to field *)
 let cvar_field_to_field_as_prover (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -111,9 +117,6 @@ let bignum_bigint_to_field (type f)
     (bigint : Bignum_bigint.t) : f =
   Circuit.Bigint.(to_field (of_bignum_bigint bigint))
 
-(* Foreign field element limb size: 2^88 *)
-let two_to_limb = Bignum_bigint.(pow (of_int 2) (of_int 88))
-
 (* Returns (quotient, remainder) such that numerator = quotient * denominator + remainder
  * where quotient, remainder \in [0, denominator) *)
 let bignum_bigint_div_rem (numerator : Bignum_bigint.t)
@@ -129,6 +132,10 @@ let bignum_bigint_to_hex (bignum : Bignum_bigint.t) : string =
 (* Bignum_bigint.t of hex *)
 let bignum_bigint_of_hex (hex : string) : Bignum_bigint.t =
   Bignum_bigint.of_zarith_bigint @@ Z.of_string_base 16 hex
+
+(* Compute square root of Bignum_bigint value x *)
+let bignum_biguint_sqrt (x : Bignum_bigint.t) : Bignum_bigint.t =
+  Bignum_bigint.of_zarith_bigint @@ Z.sqrt @@ Bignum_bigint.to_zarith_bigint x
 
 (* Field to hex *)
 let field_to_hex (type f)
