@@ -198,8 +198,9 @@ if [ "$NAMESPACE" = testnet ] && [ -z "$DRY_RUN" ]; then
     fi
 fi
 
-HELM="helm --namespace=$NAMESPACE"
-HELM_ARGS="--values=$(values common) \
+HELM="helm"
+HELM_ARGS="--namespace=$NAMESPACE \
+           --values=$(values common) \
            --set=frontend.nodePort=$NODE_PORT \
            --set-file=mina.runtimeConfig=$(resource daemon.json) \
            ${MINA_IMAGE:+--set=mina.image=${MINA_IMAGE}} \
