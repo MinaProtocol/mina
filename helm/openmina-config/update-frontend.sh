@@ -120,7 +120,7 @@ EOF
 }
 
 generate_values() {
-    VALUES=$(mktemp --suffix=.yaml)
+    VALUES="$(mktemp -d)/values.yaml"
     echo "Generating new $VALUES" >&2
     gen_values_yaml "$IMAGE" "$NODE_PORT" > "$VALUES"
     echo "$VALUES"
