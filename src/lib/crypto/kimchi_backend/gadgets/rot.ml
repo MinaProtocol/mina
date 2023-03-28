@@ -52,7 +52,9 @@ let rotate (type f)
         let rotated_big = Bignum_bigint.(shifted_big + excess_big) in
 
         (* Compute bound that is the right input of FFAdd equation *)
-        let bound_big = Bignum_bigint.(excess_big + big_2_pow_64 - big_2_pow_rot) in
+        let bound_big =
+          Bignum_bigint.(excess_big + big_2_pow_64 - big_2_pow_rot)
+        in
 
         (* Convert back to field *)
         let shifted =
@@ -151,10 +153,10 @@ let%test_unit "rot gadget" =
   test_rot "1" 1 Left "2" ;
   test_rot "1" 63 Left "9223372036854775808" ;
   test_rot "256" 4 Right "16" ;
-  test_rot "1234567890" 32 Right "5302428712241725440";
+  test_rot "1234567890" 32 Right "5302428712241725440" ;
   (* 0x5A5A5A5A5A5A5A5A is 0xA5A5A5A5A5A5A5A5 both when rotate 4 bits Left or Right*)
   test_rot "6510615555426900570" 4 Left "11936128518282651045" ;
-  test_rot "6510615555426900570" 4 Right "11936128518282651045"; 
+  test_rot "6510615555426900570" 4 Right "11936128518282651045" ;
 
   (* Negatve tests *)
   assert (Common.is_error (fun () -> test_rot "0" 1 Left "1")) ;
