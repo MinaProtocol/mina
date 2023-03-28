@@ -5,3 +5,7 @@ Current changes
 
 * #9530: Remove verifier process automatic restart, which was
   intended to work around memory leaks, now fixed (Paul Steckler)
+
+### Test Changes
+
+* Force mina-pr-gating job to run so it shows up in lists
