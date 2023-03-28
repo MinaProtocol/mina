@@ -8,12 +8,10 @@ let two_to_limb_field (type f)
   Common.(bignum_bigint_to_field (module Circuit) two_to_limb)
 
 (* 2^2L *)
-let two_to_2limb =
-  Bignum_bigint.(pow (of_int 2) (of_int Int.(mul 2 Common.limb_bits)))
+let two_to_2limb = Bignum_bigint.(pow Common.two_to_limb (of_int 2))
 
 (* 2^3L *)
-let two_to_3limb =
-  Bignum_bigint.(pow (of_int 2) (of_int Int.(mul 3 Common.limb_bits)))
+let two_to_3limb = Bignum_bigint.(pow Common.two_to_limb (of_int 3))
 
 (* Binary modulus *)
 let binary_modulus = two_to_3limb
@@ -106,13 +104,6 @@ let field_standard_limbs_to_bignum_bigint (type f)
   in
   Bignum_bigint.(l0 + (Common.two_to_limb * l1) + (two_to_2limb * l2))
 
-(* Convert string standard_limbs to field standard_limbs *)
-let string_to_field_standard_limbs (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (value : string) : f standard_limbs =
-  let bigint = Bignum_bigint.of_string value in
-  bignum_bigint_to_field_standard_limbs (module Circuit) bigint
-
 (* Foreign field element base type - not used directly *)
 module type Foreign_field_element_base = sig
   type 'field t
@@ -121,12 +112,6 @@ module type Foreign_field_element_base = sig
 
   (* Create foreign field element from Cvar limbs *)
   val of_limbs : 'field Cvar.t limbs -> 'field t
-
-  (* Create foreign field element from Bignum_bigint.t *)
-  val of_bignum_bigint :
-       (module Snark_intf.Run with type field = 'field)
-    -> Bignum_bigint.t
-    -> 'field t
 
   (* Convert foreign field element into Cvar limbs *)
   val to_limbs : 'field t -> 'field Cvar.t limbs
@@ -156,12 +141,6 @@ module Foreign_field_element_base = struct
 
   type 'field t = 'field Cvar.t limbs
 
-  let of_limbs x = x
-
-  let of_bignum_bigint (type field)
-      (module Circuit : Snark_intf.Run with type field = field) _x : field t =
-    failwith "not implemented"
-
   let to_limbs x = x
 
   let map x func =
@@ -176,7 +155,7 @@ module Foreign_field_element_base = struct
   let to_field_limbs (type field)
       (module Circuit : Snark_intf.Run with type field = field) x =
     let open Circuit in
-    map x (fun cvar -> As_prover.read Field.typ cvar)
+    map x (As_prover.read Field.typ)
 
   let to_bignum_bigint_limbs (type field)
       (module Circuit : Snark_intf.Run with type field = field) x =
@@ -222,7 +201,10 @@ module Foreign_field_element : sig
   val of_limbs : 'field Cvar.t standard_limbs -> 'field t
 
   (* Create foreign field element from Bignum_bigint.t *)
-  (* of_bignum_bigint included from Foreign_field_element_base *)
+  val of_bignum_bigint :
+       (module Snark_intf.Run with type field = 'field)
+    -> Bignum_bigint.t
+    -> 'field t
 
   (* Convert a foreign field element into tuple of 3 field standard_limbs *)
   val to_limbs : 'field t -> 'field Cvar.t standard_limbs
@@ -286,8 +268,7 @@ end = struct
 
   let to_bignum_bigint (type field)
       (module Circuit : Snark_intf.Run with type field = field) (x : field t) =
-    let l0, l1, l2 = to_bignum_bigint_limbs (module Circuit) x in
-    Bignum_bigint.(l0 + (Common.two_to_limb * l1) + (two_to_2limb * l2))
+    Foreign_field_element_base.to_bignum_bigint (module Circuit) (Standard x)
 end
 
 (* Compute non-zero intermediate products
@@ -535,7 +516,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
        foreign_field_modulus < max_foreign_field_modulus (module Circuit)) ) ) ;
 
   (* Compute gate coefficients
-   *   This happen when circuit is created / not part of witness (e.g. exists, As_prover code)
+   *   This happens when circuit is created / not part of witness (e.g. exists, As_prover code)
    *)
   let foreign_field_modulus0, foreign_field_modulus1, foreign_field_modulus2 =
     foreign_field_modulus
