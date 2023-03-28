@@ -59,16 +59,6 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         DockerImage.generateStep daemonBerkeleySpec,
 
-        -- test_executive image
-        let testExecutiveSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion,
-          service="mina-test-executive",
-          deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="test-executive-${DebianVersions.lowerName debVersion}-docker-image"
-        }
-        in
-        if debVersion == Bullseye then DockerImage.generateStep testExecutiveSpec,
-
         -- archive image
         let archiveSpec = DockerImage.ReleaseSpec::{
           deps=DebianVersions.dependsOn debVersion,
@@ -100,7 +90,17 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
         in
 
-        DockerImage.generateStep zkappTestTxnSpec
+        DockerImage.generateStep zkappTestTxnSpec,
+
+        -- test_executive image
+        let testExecutiveSpec = DockerImage.ReleaseSpec::{
+          deps=DebianVersions.dependsOn debVersion,
+          service="mina-test-executive",
+          deb_codename="${DebianVersions.lowerName debVersion}",
+          step_key="test-executive-${DebianVersions.lowerName debVersion}-docker-image"
+        }
+        in
+        if debVersion == Bullseye then DockerImage.generateStep testExecutiveSpec
 
       ]
     }
