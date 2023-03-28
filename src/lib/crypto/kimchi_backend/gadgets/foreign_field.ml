@@ -45,6 +45,8 @@ let max_foreign_field_modulus (type f)
  *     - Normal mode   : 3 limbs of L-bits each
  *)
 
+type 'a circuit_variable = 'a Snarky_backendless.Cvar.t
+
 type 'field compact_limbs = 'field * 'field
 
 type 'field standard_limbs = 'field * 'field * 'field
@@ -117,10 +119,10 @@ let string_to_field_standard_limbs (type f)
 module type Foreign_field_element_base = sig
   type 'field t
 
-  module Cvar = Snarky_backendless.Cvar
+  type 'a lbs
 
   (* Create foreign field element from Cvar limbs *)
-  val of_limbs : 'field Cvar.t limbs -> 'field t
+  val of_limbs : 'field circuit_variable lbs -> 'field t
 
   (* Create foreign field element from Bignum_bigint.t *)
   val of_bignum_bigint :
@@ -129,20 +131,20 @@ module type Foreign_field_element_base = sig
     -> 'field t
 
   (* Convert foreign field element into Cvar limbs *)
-  val to_limbs : 'field t -> 'field Cvar.t limbs
+  val to_limbs : 'field t -> 'field circuit_variable lbs
 
   (* Map foreign field element's Cvar limbs into some other limbs with the mapping function func *)
-  val map : 'field t -> ('field Cvar.t -> 'g) -> 'g limbs
+  val map : 'field t -> ('field circuit_variable -> 'g) -> 'g lbs
 
   (* Convert foreign field element into field limbs *)
   val to_field_limbs :
-    (module Snark_intf.Run with type field = 'field) -> 'field t -> 'field limbs
+    (module Snark_intf.Run with type field = 'field) -> 'field t -> 'field lbs
 
   (* Convert foreign field element into Bignum_bigint.t limbs *)
   val to_bignum_bigint_limbs :
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
-    -> Bignum_bigint.t limbs
+    -> Bignum_bigint.t lbs
 
   (* Convert foreign field element into a Bignum_bigint.t *)
   val to_bignum_bigint :
@@ -154,7 +156,7 @@ end
 module Foreign_field_element_base = struct
   module Cvar = Snarky_backendless.Cvar
 
-  type 'field t = 'field Cvar.t limbs
+  type 'field t = 'field circuit_variable limbs
 
   let of_limbs x = x
 
@@ -176,7 +178,7 @@ module Foreign_field_element_base = struct
   let to_field_limbs (type field)
       (module Circuit : Snark_intf.Run with type field = field) x =
     let open Circuit in
-    map x (fun cvar -> As_prover.read Field.typ cvar)
+    map x (As_prover.read Field.typ)
 
   let to_bignum_bigint_limbs (type field)
       (module Circuit : Snark_intf.Run with type field = field) x =
@@ -216,38 +218,11 @@ let to_extended x =
 (* Foreign field element type (standard limbs) *)
 module Foreign_field_element : sig
   (* Specialization of base type to standard_limbs *)
-  include Foreign_field_element_base
-
-  (* Create foreign field element from standard_limbs *)
-  val of_limbs : 'field Cvar.t standard_limbs -> 'field t
-
-  (* Create foreign field element from Bignum_bigint.t *)
-  (* of_bignum_bigint included from Foreign_field_element_base *)
-
-  (* Convert a foreign field element into tuple of 3 field standard_limbs *)
-  val to_limbs : 'field t -> 'field Cvar.t standard_limbs
-
-  (* Map foreign field element's Cvar limbs into some other standard_limbs with the mapping function func *)
-  val map : 'field t -> ('field Cvar.t -> 'g) -> 'g standard_limbs
-
-  (* Convert foreign field element into field standard_limbs *)
-  val to_field_limbs :
-       (module Snark_intf.Run with type field = 'field)
-    -> 'field t
-    -> 'field standard_limbs
-
-  (* Convert foreign field element into bignum_bigint standard_limbs *)
-  val to_bignum_bigint_limbs :
-       (module Snark_intf.Run with type field = 'field)
-    -> 'field t
-    -> Bignum_bigint.t standard_limbs
-
-  (* Convert foreign field element into a bignum_bigint *)
-  (* to_bignum_bigint included from Foreign_field_element_base *)
+  include Foreign_field_element_base with type 'a lbs := 'a standard_limbs
 end = struct
   module Cvar = Snarky_backendless.Cvar
 
-  type 'field t = 'field Cvar.t standard_limbs
+  type 'field t = 'field circuit_variable standard_limbs
 
   let of_limbs x = x
 
@@ -492,9 +467,9 @@ module External_checks = struct
   module Cvar = Snarky_backendless.Cvar
 
   type 'field t =
-    { mutable multi_ranges : 'field Cvar.t standard_limbs list
-    ; mutable compact_multi_ranges : 'field Cvar.t compact_limbs list
-    ; mutable bounds : 'field Cvar.t standard_limbs list
+    { mutable multi_ranges : 'field circuit_variable standard_limbs list
+    ; mutable compact_multi_ranges : 'field circuit_variable compact_limbs list
+    ; mutable bounds : 'field circuit_variable standard_limbs list
     }
 
   let create (type field)
@@ -503,18 +478,18 @@ module External_checks = struct
 
   (* Track a multi-range-check *)
   let add_multi_range_check (external_checks : 'field t)
-      (x : 'field Cvar.t standard_limbs) =
+      (x : 'field circuit_variable standard_limbs) =
     external_checks.multi_ranges <- x :: external_checks.multi_ranges
 
   (* Track a compact-multi-range-check *)
   let add_compact_multi_range_check (external_checks : 'field t)
-      (x : 'field Cvar.t compact_limbs) =
+      (x : 'field circuit_variable compact_limbs) =
     external_checks.compact_multi_ranges <-
       x :: external_checks.compact_multi_ranges
 
   (* Track a bound check *)
   let add_bound_check (external_checks : 'field t)
-      (x : 'field Cvar.t standard_limbs) =
+      (x : 'field circuit_variable standard_limbs) =
     external_checks.bounds <- x :: external_checks.bounds
 end
 
