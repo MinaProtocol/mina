@@ -1,0 +1,76 @@
+package itn_json_types
+
+import (
+	"errors"
+	"strconv"
+)
+
+func UnmarshalUint64(data []byte, v *uint64) error {
+	if data[0] == '"' && data[len(data)-1] == '"' {
+		res, err := strconv.ParseUint(string(data[1:len(data)-1]), 10, 64)
+		if err != nil {
+			return err
+		}
+		*v = res
+		return nil
+	}
+	return errors.New("not a string token")
+}
+
+func encloseInQuotes(s string) []byte {
+	return append(append([]byte{'"'}, s...), byte('"'))
+}
+
+func MarshalUint64(v *uint64) ([]byte, error) {
+	return encloseInQuotes(strconv.FormatUint(*v, 10)), nil
+}
+
+// func UnmarshalBase64(data []byte, v *[]byte) error {
+// 	if data[0] == '"' && data[len(data)-1] == '"' {
+// 		res, err := base64.StdEncoding.DecodeString(string(data[1 : len(data)-1]))
+// 		if err != nil {
+// 			return err
+// 		}
+// 		*v = res
+// 		return nil
+// 	}
+// 	return errors.New("not a string token")
+// }
+
+// func MarshalBase64(v *[]byte) ([]byte, error) {
+// 	return encloseInQuotes(base64.StdEncoding.EncodeToString(*v)), nil
+// }
+
+// func UnmarshalPrivateKey(data []byte, v *ed25519.PrivateKey) error {
+// 	var b []byte
+// 	if err := UnmarshalBase64(data, &b); err != nil {
+// 		return err
+// 	}
+// 	if len(b) != ed25519.SeedSize {
+// 		return errors.New("wrong size of Private key")
+// 	}
+// 	*v = ed25519.NewKeyFromSeed(b)
+// 	return nil
+// }
+
+// func MarshalPrivateKey(v *ed25519.PrivateKey) ([]byte, error) {
+// 	seed := v.Seed()
+// 	return MarshalBase64(&seed)
+// }
+
+// func UnmarshalPublicKey(data []byte, v *ed25519.PublicKey) error {
+// 	var b []byte
+// 	if err := UnmarshalBase64(data, &b); err != nil {
+// 		return err
+// 	}
+// 	if len(b) != ed25519.PublicKeySize {
+// 		return errors.New("wrong size of Public key")
+// 	}
+// 	*v = ed25519.PublicKey(b)
+// 	return nil
+// }
+
+// func MarshalPublicKey(v *ed25519.PublicKey) ([]byte, error) {
+// 	a := []byte(*v)
+// 	return MarshalBase64(&a)
+// }
