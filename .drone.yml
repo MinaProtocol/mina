@@ -120,6 +120,9 @@ steps:
   image: busybox
   commands:
   - sed -e "s/\$${TIMESTAMP}/$(date -u -Iseconds | sed -e 's/:..+/:00+/')/" $${OM}/resources/daemon.template.json > $${OM}/resources/daemon.json
+  # Temporary solution, use config-file-subst.sh instead
+  - sed -i "s/\$${BLOCK_DURATION_MS}/60000/" $${OM}/resources/daemon.json
+  - sed -i "s/\$${SLOTS_PER_EPOCH}/3000/" $${OM}/resources/daemon.json
 
 - name: log-seed
   <<: *log
