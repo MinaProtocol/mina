@@ -31,6 +31,13 @@ First, we need to clean up the old nodes
 ./deploy.sh delete --all --force
 ```
 
+Then, we need to change the `genesis_state_timestamp` in the [daemon.json](/helm/openmina-config/resources/daemon.json) to mitigate the empty epoch error in the block producers. A safe bet is to change it to the current day.
+
+Ex.: (current date is 29th March 2023)
+```
+"2023-03-23T00:00:00+00:00" -> "2023-03-29T00:00:00+00:00"
+```
+
 Then we can redeploy the nodes using
 ```bash
 ./deploy.sh deploy --all --node-port=31400
