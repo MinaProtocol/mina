@@ -145,7 +145,12 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
 
     // circuit
     let mut gates = vec![];
-    for row in 0..num_gates {
+    gates.push(CircuitGate {
+        typ: GateType::Generic,
+        wires: Wire::for_row(0),
+        coeffs: vec![Fp::one()],
+    });
+    for row in 1..num_gates {
         gates.push(CircuitGate {
             typ: GateType::Lookup,
             wires: Wire::for_row(row),
