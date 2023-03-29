@@ -227,6 +227,20 @@ build_deb mina-zkapp-test-transaction
 
 ##################################### END SNAPP TEST TXN PACKAGE #######################################
 
+##################################### BATCH ZKAPP TEST TXNS #######################################
+
+echo "------------------------------------------------------------"
+echo "--- Building Mina Berkeley batch test zkApp transactions :"
+
+create_control_file mina-batch-zkapp-test-txns "${SHARED_DEPS}${DAEMON_DEPS}" 'Utility to generate random zkApp transactions'
+
+# Binaries
+cp ./default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe "${BUILDDIR}/usr/local/bin/mina-batch-zkapp-test-txns"
+
+build_deb mina-batch-zkapp-test-txns
+
+##################################### END BATCH ZKAPP TEST TXNS PACKAGE #######################################
+
 ##################################### BERKELEY PACKAGE #######################################
 echo "------------------------------------------------------------"
 echo "--- Building Mina Berkeley testnet signatures deb without keys:"

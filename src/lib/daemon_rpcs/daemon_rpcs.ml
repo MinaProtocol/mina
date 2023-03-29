@@ -31,6 +31,17 @@ module Send_user_commands = struct
       ~bin_response
 end
 
+module Send_zkapp_command = struct
+  type query = Zkapp_command.Stable.Latest.t [@@deriving bin_io_unversioned]
+
+  type response = Zkapp_command.Stable.Latest.t Or_error.t
+  [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Send_zkapp_command" ~version:0 ~bin_query
+      ~bin_response
+end
+
 module Get_ledger = struct
   type query = State_hash.Stable.Latest.t option [@@deriving bin_io_unversioned]
 

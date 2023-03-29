@@ -1,0 +1,45 @@
+(executable
+ (name batch_zkapp_txn_tool)
+ (libraries
+   ;; opam libraries
+   async.async_command
+   integers
+   base
+   uri
+   core_kernel
+   core
+   async
+   async_kernel
+   yojson
+   async_unix
+   splittable_random
+   sexplib0
+   ;; local libraries
+   currency
+   cli_lib
+   daemon_rpcs
+   mina_base.import
+   graphql_lib
+   genesis_constants
+   pickles
+   signature_lib
+   mina_base
+   mina_ledger
+   secrets
+   mina_numbers
+   mina_generators
+   snark_params
+   unsigned_extended
+   mina_wire_types
+   transaction_snark
+   with_hash
+   zkapp_command_builder
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocessor_deps ../../../graphql_schema.json)
+ (preprocess (pps 
+              ppx_version 
+              ppx_let
+              ppx_custom_printf
+              graphql_ppx -- %{read-lines:../../graphql-ppx-config.inc}
+)))
