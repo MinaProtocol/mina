@@ -17,15 +17,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
-    let open Test_config.Wallet in
     { default with
       requires_graphql = true
-    ; block_producers =
-        [ { balance = "1000"; timing = Untimed }
-        ; { balance = "1000"; timing = Untimed }
-        ; { balance = "0"; timing = Untimed }
+    ; genesis_ledger =
+        [ { account_name = "node-a-key"; balance = "1000"; timing = Untimed }
+        ; { account_name = "node-b-key"; balance = "1000"; timing = Untimed }
+        ; { account_name = "node-c-key"; balance = "0"; timing = Untimed }
         ]
-    ; num_snark_workers = 0
+    ; block_producers =
+        [ { node_name = "node-a"; account_name = "node-a-key" }
+        ; { node_name = "node-b"; account_name = "node-b-key" }
+        ; { node_name = "node-c"; account_name = "node-c-key" }
+        ]
     }
 
   let run network t =
@@ -33,9 +36,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_nodes = Network.all_nodes network in
-    let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
-    let[@warning "-8"] [ node_a; node_b; node_c ] =
-      Network.block_producers network
+    let%bind () =
+      wait_for t
+        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
+    in
+    let node_a =
+      Core.String.Map.find_exn (Network.block_producers network) "node-a"
+    in
+    let node_b =
+      Core.String.Map.find_exn (Network.block_producers network) "node-b"
+    in
+    let node_c =
+      Core.String.Map.find_exn (Network.block_producers network) "node-c"
     in
     let%bind _ =
       section "blocks are produced"
@@ -92,7 +104,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section "common prefix of all nodes is no farther back than 1 block"
       (* the common prefix test relies on at least 4 blocks having been produced.  previous sections altogether have already produced 4, so no further block production is needed.  if previous sections change, then this may need to be re-adjusted*)
       (let%bind (labeled_chains : (string * string list) list) =
-         Malleable_error.List.map all_nodes ~f:(fun node ->
+         Malleable_error.List.map (Core.String.Map.data all_nodes)
+           ~f:(fun node ->
              let%map chain = Network.Node.must_get_best_chain ~logger node in
              (Node.id node, List.map ~f:(fun b -> b.state_hash) chain) )
        in

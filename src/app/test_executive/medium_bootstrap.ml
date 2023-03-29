@@ -18,16 +18,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
-    let open Test_config.Wallet in
     { default with
       k = 2
     ; requires_graphql = true
-    ; block_producers =
-        [ { balance = "1000"; timing = Untimed }
-        ; { balance = "1000"; timing = Untimed }
-        ; { balance = "0"; timing = Untimed }
+    ; genesis_ledger =
+        [ { account_name = "node-a-key"; balance = "1000"; timing = Untimed }
+        ; { account_name = "node-b-key"; balance = "1000"; timing = Untimed }
+        ; { account_name = "node-c-key"; balance = "0"; timing = Untimed }
         ]
-    ; num_snark_workers = 0
+    ; block_producers =
+        [ { node_name = "node-a"; account_name = "node-a-key" }
+        ; { node_name = "node-b"; account_name = "node-b-key" }
+        ; { node_name = "node-c"; account_name = "node-c-key" }
+        ]
     }
 
   (*
@@ -45,9 +48,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_nodes = Network.all_nodes network in
-    let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
-    let[@warning "-8"] [ node_a; node_b; node_c ] =
-      Network.block_producers network
+    let%bind () =
+      wait_for t
+        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
+    in
+    let node_a =
+      Core.String.Map.find_exn (Network.block_producers network) "node-a"
+    in
+    let node_b =
+      Core.String.Map.find_exn (Network.block_producers network) "node-b"
+    in
+    let node_c =
+      Core.String.Map.find_exn (Network.block_producers network) "node-c"
     in
     let%bind () =
       section "blocks are produced"
@@ -70,7 +82,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section "network is fully connected after one node was restarted"
       (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
        let%bind final_connectivity_data =
-         fetch_connectivity_data ~logger all_nodes
+         fetch_connectivity_data ~logger (Core.String.Map.data all_nodes)
        in
        assert_peers_completely_connected final_connectivity_data )
 end
