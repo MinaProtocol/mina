@@ -1350,17 +1350,15 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
     incomplete_txns_from_recent_proof_tree t
   in
   let%bind work_list = fill_in_transaction_snark_work t.scan_state work in
-  let added_works = List.length work in
-  let merge_jobs_created = List.length work_list in
   let%bind proof_opt, updated_scan_state =
     Parallel_scan.update t.scan_state ~completed_jobs:work_list
       ~data:transactions
   in
   [%log internal] "@metadata"
     ~metadata:
-      [ ("scan_state_added_works", `Int added_works)
+      [ ("scan_state_added_works", `Int (List.length work))
       ; ("total_proofs", `Int (total_proofs work))
-      ; ("merge_jobs_created", `Int merge_jobs_created)
+      ; ("merge_jobs_created", `Int (List.length work_list))
       ; ("emitted_proof", `Bool (Option.is_some proof_opt))
       ] ;
   let%map result_opt, scan_state' =

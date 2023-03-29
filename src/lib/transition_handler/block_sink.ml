@@ -61,13 +61,13 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
           state |> header |> Header.protocol_state |> Protocol_state.hashes)
           .state_hash
       in
-      let blockchain_length = Mina_block.blockchain_length state in
       Internal_tracing.with_state_hash state_hash
       @@ fun () ->
       [%log internal] "@block_metadata"
         ~metadata:
           [ ( "blockchain_length"
-            , Mina_numbers.Length.to_yojson blockchain_length )
+            , Mina_numbers.Length.to_yojson (Mina_block.blockchain_length state)
+            )
           ] ;
       [%log internal] "External_block_received" ;
       let processing_start_time =
