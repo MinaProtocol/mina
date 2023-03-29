@@ -50,17 +50,9 @@ RUN apt-get update --yes \
     rubygems \
     wget \
     zlib1g-dev \
-  && rm -rf /var/lib/apt/lists/*
-
-# -- Debian Bullseye python dependencies (largely installed above from apt)
-# Ocaml lints tool `scripts/require-ppxs.py` requires python3 sexpdata
-# but debian stretch does not have this package, so only install in bullseye
-RUN test "$deb_codename" = "bullseye" \
-      && apt-get update --yes \
-      && apt-get install --yes --no-install-recommends \
-          python3-sexpdata \
-      && pip install readchar \
-      || exit 0
+    python3-sexpdata \
+  && rm -rf /var/lib/apt/lists/* \
+  && pip install readchar
 
 # --- deb-s3 tool
 # Custom version, with lock only on manifest upload
