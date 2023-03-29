@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use ark_ff::Zero;
 use kimchi::snarky::{
-    checked_runner::Constraint,
+    runner::Constraint,
     constraint_system::{BasicSnarkyConstraint, KimchiConstraint},
     errors::SnarkyResult,
     prelude::*,
@@ -30,7 +30,6 @@ impl_custom!(CamlFqState, RunState<Fq>);
 
 // Fp
 impl_functions! {
-
     pub fn fp_state_make(
         num_inputs: usize,
         eval_constraints: bool,
