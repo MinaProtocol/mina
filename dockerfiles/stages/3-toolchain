@@ -47,12 +47,11 @@ RUN apt-get update --yes \
     postgresql-contrib \
     perl \
     pkg-config \
+    python3-sexpdata \
     rubygems \
     wget \
     zlib1g-dev \
-    python3-sexpdata \
-  && rm -rf /var/lib/apt/lists/* \
-  && pip install readchar
+  && rm -rf /var/lib/apt/lists/*
 
 # --- deb-s3 tool
 # Custom version, with lock only on manifest upload
