@@ -60,8 +60,9 @@ locals {
 
   seed_static_peers = [
     for index, name in keys(data.local_file.libp2p_seed_peers) : {
-      full_peer = "/dns4/${name}.${var.testnet_name}.o1test.net/tcp/${var.seed_starting_host_port + index}/p2p/${trimspace(data.local_file.libp2p_seed_peers[name].content)}",
-      port      = var.seed_starting_host_port + index
+      # i don't think the seeds need to have different ports
+      full_peer = "/dns4/${name}.${var.testnet_name}.o1test.net/tcp/${var.seed_external_port}/p2p/${trimspace(data.local_file.libp2p_seed_peers[name].content)}",
+      # port      = var.seed_starting_host_port + index
       name      = local.seed_names[index]
       unique_node_index= -1
       total_node_index= -1

@@ -279,19 +279,6 @@ module Wrap : sig
         }
       [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
-      type ( 'plonk
-           , 'scalar_challenge
-           , 'fp
-           , 'bulletproof_challenges
-           , 'branch_data )
-           w :=
-        ( 'plonk
-        , 'scalar_challenge
-        , 'fp
-        , 'bulletproof_challenges
-        , 'branch_data )
-        t
-
       val map_challenges :
            ('a, 'b, 'fp, 'c, 'd) t
         -> f:'e
@@ -896,10 +883,11 @@ module Wrap : sig
       type 'a vec8 :=
         ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
         Hlist.HlistId.t
+      [@@warning "-34"]
 
       type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'fp_opt, 'bool) flat_repr :=
         ( ('a, Nat.N9.n) Vector.t
-        * ( ('b, Nat.N2.n) Vector.t
+        * ( 'b Vector.Vector_2.t
           * ( ('c, Nat.N3.n) Vector.t
             * ( ('d, Nat.N3.n) Vector.t
               * ( 'e
@@ -1356,10 +1344,6 @@ module Step : sig
          , ('b * ('e * unit)) Hlist.HlistId.t
          , 'c )
          Spec.T.t
-
-    type 'a vec8 :=
-      ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit)))))))))
-      Hlist.HlistId.t
 
     val typ :
          'f Spec.impl

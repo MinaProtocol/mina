@@ -693,8 +693,8 @@ CREATE TABLE public.zkapp_accounts (
     app_state_id integer NOT NULL,
     verification_key_id integer NOT NULL,
     zkapp_version bigint NOT NULL,
-    sequence_state_id integer NOT NULL,
-    last_sequence_slot bigint NOT NULL,
+    action_state_id integer NOT NULL,
+    last_action_slot bigint NOT NULL,
     proved_state boolean NOT NULL,
     zkapp_uri_id integer NOT NULL
 );
@@ -1250,7 +1250,7 @@ CREATE TABLE public.zkapp_permissions (
     set_permissions public.zkapp_auth_required_type NOT NULL,
     set_verification_key public.zkapp_auth_required_type NOT NULL,
     set_zkapp_uri public.zkapp_auth_required_type NOT NULL,
-    edit_sequence_state public.zkapp_auth_required_type NOT NULL,
+    edit_action_state public.zkapp_auth_required_type NOT NULL,
     set_token_symbol public.zkapp_auth_required_type NOT NULL,
     increment_nonce public.zkapp_auth_required_type NOT NULL,
     set_voting_for public.zkapp_auth_required_type NOT NULL
@@ -1293,7 +1293,7 @@ CREATE TABLE public.zkapp_account_precondition_values (
     receipt_chain_hash text,
     delegate_id integer,
     state_id integer NOT NULL,
-    sequence_state_id integer,
+    action_state_id integer,
     proved_state boolean,
     is_new boolean
 );
@@ -1324,10 +1324,10 @@ ALTER SEQUENCE public.zkapp_account_precondition_values_id_seq OWNED BY public.z
 
 
 --
--- Name: zkapp_sequence_states; Type: TABLE; Schema: public;
+-- Name: zkapp_action_states; Type: TABLE; Schema: public;
 --
 
-CREATE TABLE public.zkapp_sequence_states (
+CREATE TABLE public.zkapp_action_states (
     id integer NOT NULL,
     element0 integer NOT NULL,
     element1 integer NOT NULL,
@@ -1340,10 +1340,10 @@ CREATE TABLE public.zkapp_sequence_states (
 
 
 --
--- Name: zkapp_sequence_states_id_seq; Type: SEQUENCE; Schema: public;
+-- Name: zkapp_action_states_id_seq; Type: SEQUENCE; Schema: public;
 --
 
-CREATE SEQUENCE public.zkapp_sequence_states_id_seq
+CREATE SEQUENCE public.zkapp_action_states_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -1355,10 +1355,10 @@ CREATE SEQUENCE public.zkapp_sequence_states_id_seq
 
 
 --
--- Name: zkapp_sequence_states_id_seq; Type: SEQUENCE OWNED BY; Schema: public;
+-- Name: zkapp_action_states_id_seq; Type: SEQUENCE OWNED BY; Schema: public;
 --
 
-ALTER SEQUENCE public.zkapp_sequence_states_id_seq OWNED BY public.zkapp_sequence_states.id;
+ALTER SEQUENCE public.zkapp_action_states_id_seq OWNED BY public.zkapp_action_states.id;
 
 
 --
@@ -1896,10 +1896,10 @@ ALTER TABLE ONLY public.zkapp_account_precondition_values ALTER COLUMN id SET DE
 
 
 --
--- Name: zkapp_sequence_states id; Type: DEFAULT; Schema: public;
+-- Name: zkapp_action_states id; Type: DEFAULT; Schema: public;
 --
 
-ALTER TABLE ONLY public.zkapp_sequence_states ALTER COLUMN id SET DEFAULT nextval('public.zkapp_sequence_states_id_seq'::regclass);
+ALTER TABLE ONLY public.zkapp_action_states ALTER COLUMN id SET DEFAULT nextval('public.zkapp_action_states_id_seq'::regclass);
 
 
 --
@@ -2430,7 +2430,7 @@ COPY public.zkapp_account_precondition (id, kind, account_precondition_values_id
 -- Data for Name: zkapp_accounts; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.zkapp_accounts (id, app_state_id, verification_key_id, zkapp_version, sequence_state_id, last_sequence_slot, proved_state, zkapp_uri_id) FROM stdin;
+COPY public.zkapp_accounts (id, app_state_id, verification_key_id, zkapp_version, action_state_id, last_action_slot, proved_state, zkapp_uri_id) FROM stdin;
 1	2	1	0	1	0	f	1
 2	3	1	0	1	0	t	1
 \.
@@ -2566,7 +2566,7 @@ COPY public.zkapp_account_update_failures (id, index, failures) FROM stdin;
 -- Data for Name: zkapp_permissions; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.zkapp_permissions (id, edit_state, send, receive, set_delegate, set_permissions, set_verification_key, set_zkapp_uri, edit_sequence_state, set_token_symbol, increment_nonce, set_voting_for, set_timing) FROM stdin;
+COPY public.zkapp_permissions (id, edit_state, send, receive, set_delegate, set_permissions, set_verification_key, set_zkapp_uri, edit_action_state, set_token_symbol, increment_nonce, set_voting_for, set_timing) FROM stdin;
 1	signature	signature	none	signature	proof	signature	none	signature	signature	none	none    none
 2	signature	signature	signature	signature	signature	signature	none	none	none	none	none    none
 3	signature	signature	none	signature	signature	signature	none	none	none	none	none    none
@@ -2579,15 +2579,15 @@ COPY public.zkapp_permissions (id, edit_state, send, receive, set_delegate, set_
 -- Data for Name: zkapp_account_precondition_values; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.zkapp_account_precondition_values (id, balance_id, nonce_id, receipt_chain_hash, delegate_id, state_id, sequence_state_id, proved_state, is_new) FROM stdin;
+COPY public.zkapp_account_precondition_values (id, balance_id, nonce_id, receipt_chain_hash, delegate_id, state_id, action_state_id, proved_state, is_new) FROM stdin;
 \.
 
 
 --
--- Data for Name: zkapp_sequence_states; Type: TABLE DATA; Schema: public;
+-- Data for Name: zkapp_action_states; Type: TABLE DATA; Schema: public;
 --
 
-COPY public.zkapp_sequence_states (id, element0, element1, element2, element3, element4) FROM stdin;
+COPY public.zkapp_action_states (id, element0, element1, element2, element3, element4) FROM stdin;
 1	2	2	2	2	2
 \.
 
@@ -2896,10 +2896,10 @@ SELECT pg_catalog.setval('public.zkapp_account_precondition_values_id_seq', 1, f
 
 
 --
--- Name: zkapp_sequence_states_id_seq; Type: SEQUENCE SET; Schema: public;
+-- Name: zkapp_action_states_id_seq; Type: SEQUENCE SET; Schema: public;
 --
 
-SELECT pg_catalog.setval('public.zkapp_sequence_states_id_seq', 1, true);
+SELECT pg_catalog.setval('public.zkapp_action_states_id_seq', 1, true);
 
 
 --
@@ -3317,11 +3317,11 @@ ALTER TABLE ONLY public.zkapp_account_precondition_values
 
 
 --
--- Name: zkapp_sequence_states zkapp_sequence_states_pkey; Type: CONSTRAINT; Schema: public;
+-- Name: zkapp_action_states zkapp_action_states_pkey; Type: CONSTRAINT; Schema: public;
 --
 
-ALTER TABLE ONLY public.zkapp_sequence_states
-    ADD CONSTRAINT zkapp_sequence_states_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.zkapp_action_states
+    ADD CONSTRAINT zkapp_action_states_pkey PRIMARY KEY (id);
 
 
 --
@@ -3849,11 +3849,11 @@ ALTER TABLE ONLY public.zkapp_accounts
 
 
 --
--- Name: zkapp_accounts zkapp_accounts_sequence_state_id_fkey; Type: FK CONSTRAINT; Schema: public;
+-- Name: zkapp_accounts zkapp_accounts_action_state_id_fkey; Type: FK CONSTRAINT; Schema: public;
 --
 
 ALTER TABLE ONLY public.zkapp_accounts
-    ADD CONSTRAINT zkapp_accounts_sequence_state_id_fkey FOREIGN KEY (sequence_state_id) REFERENCES public.zkapp_sequence_states(id);
+    ADD CONSTRAINT zkapp_accounts_action_state_id_fkey FOREIGN KEY (action_state_id) REFERENCES public.zkapp_action_states(id);
 
 
 --
@@ -4071,11 +4071,11 @@ ALTER TABLE ONLY public.zkapp_account_precondition_values
 
 
 --
--- Name: zkapp_account_precondition_values zkapp_account_precondition_values_sequence_state_id_fkey; Type: FK CONSTRAINT; Schema: public;
+-- Name: zkapp_account_precondition_values zkapp_account_precondition_values_action_state_id_fkey; Type: FK CONSTRAINT; Schema: public;
 --
 
 ALTER TABLE ONLY public.zkapp_account_precondition_values
-    ADD CONSTRAINT zkapp_account_precondition_values_sequence_state_id_fkey FOREIGN KEY (sequence_state_id) REFERENCES public.zkapp_state_data(id);
+    ADD CONSTRAINT zkapp_account_precondition_values_action_state_id_fkey FOREIGN KEY (action_state_id) REFERENCES public.zkapp_state_data(id);
 
 
 --

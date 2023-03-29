@@ -154,11 +154,11 @@ end
 
 module Actions = struct
   include Make_events (struct
-    let salt_phrase = "MinaZkappSequenceEmpty"
+    let salt_phrase = "MinaZkappActionsEmpty"
 
     let hash_prefix = Hash_prefix_states.zkapp_actions
 
-    let deriver_name = "SequenceEvents"
+    let deriver_name = "Actions"
   end)
 
   let is_empty_var (e : var) =
@@ -166,7 +166,7 @@ module Actions = struct
       Checked.equal (Data_as_hash.hash e) (Var.constant empty_hash))
 
   let empty_state_element =
-    let salt_phrase = "MinaZkappSequenceStateEmptyElt" in
+    let salt_phrase = "MinaZkappActionStateEmptyElt" in
     Random_oracle.(salt salt_phrase |> digest)
 
   let push_events (acc : Field.t) (events : t) : Field.t =
@@ -235,8 +235,8 @@ module Poly = struct
         { app_state : 'app_state
         ; verification_key : 'vk
         ; zkapp_version : 'zkapp_version
-        ; sequence_state : 'field Pickles_types.Vector.Vector_5.Stable.V1.t
-        ; last_sequence_slot : 'slot
+        ; action_state : 'field Pickles_types.Vector.Vector_5.Stable.V1.t
+        ; last_action_slot : 'slot
         ; proved_state : 'bool
         ; zkapp_uri : 'zkapp_uri
         }
@@ -250,8 +250,8 @@ type ('app_state, 'vk, 'zkapp_version, 'field, 'slot, 'bool, 'zkapp_uri) t_ =
   { app_state : 'app_state
   ; verification_key : 'vk
   ; zkapp_version : 'zkapp_version
-  ; sequence_state : 'field Pickles_types.Vector.Vector_5.t
-  ; last_sequence_slot : 'slot
+  ; action_state : 'field Pickles_types.Vector.Vector_5.t
+  ; last_action_slot : 'slot
   ; proved_state : 'bool
   ; zkapp_uri : 'zkapp_uri
   }
@@ -317,8 +317,8 @@ module Checked = struct
     Poly.Fields.fold ~init:[] ~app_state:(f app_state)
       ~verification_key:(f field)
       ~zkapp_version:(f Mina_numbers.Zkapp_version.Checked.to_input)
-      ~sequence_state:(f app_state)
-      ~last_sequence_slot:(f Mina_numbers.Global_slot.Checked.to_input)
+      ~action_state:(f app_state)
+      ~last_action_slot:(f Mina_numbers.Global_slot.Checked.to_input)
       ~proved_state:
         (f (fun (b : Boolean.var) ->
              Random_oracle.Input.Chunked.packed ((b :> Field.Var.t), 1) ) )
@@ -417,8 +417,8 @@ let to_input (t : t) : _ Random_oracle.Input.Chunked.t =
          (Fn.compose field
             (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash) ) )
     ~zkapp_version:(f Mina_numbers.Zkapp_version.to_input)
-    ~sequence_state:(f app_state)
-    ~last_sequence_slot:(f Mina_numbers.Global_slot.to_input)
+    ~action_state:(f app_state)
+    ~last_action_slot:(f Mina_numbers.Global_slot.to_input)
     ~proved_state:
       (f (fun b -> Random_oracle.Input.Chunked.packed (field_of_bool b, 1)))
     ~zkapp_uri:(f zkapp_uri_to_input)
@@ -431,10 +431,10 @@ let default : _ Poly.t =
           F.zero )
   ; verification_key = None
   ; zkapp_version = Mina_numbers.Zkapp_version.zero
-  ; sequence_state =
+  ; action_state =
       (let empty = Actions.empty_state_element in
        [ empty; empty; empty; empty; empty ] )
-  ; last_sequence_slot = Mina_numbers.Global_slot.zero
+  ; last_action_slot = Mina_numbers.Global_slot.zero
   ; proved_state = false
   ; zkapp_uri = ""
   }
@@ -451,7 +451,7 @@ let hash_zkapp_account_opt' = function
   | Some (a : t) ->
       digest a
 
-let sequence_state_deriver obj =
+let action_state_deriver obj =
   let open Fields_derivers_zkapps.Derivers in
   let list_5 = list ~static_length:5 (field @@ o ()) in
   let open Pickles_types.Vector.Vector_5 in
@@ -465,6 +465,6 @@ let deriver obj =
        ~app_state:!.(Zkapp_state.deriver field)
        ~verification_key:
          !.(option ~js_type:Or_undefined (verification_key_with_hash @@ o ()))
-       ~zkapp_version:!.uint32 ~sequence_state:!.sequence_state_deriver
-       ~last_sequence_slot:!.global_slot ~proved_state:!.bool
-       ~zkapp_uri:!.string obj
+       ~zkapp_version:!.uint32 ~action_state:!.action_state_deriver
+       ~last_action_slot:!.global_slot ~proved_state:!.bool ~zkapp_uri:!.string
+       obj
