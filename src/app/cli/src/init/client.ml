@@ -1063,7 +1063,7 @@ let start_tracing =
            Daemon_rpcs.Client.dispatch Daemon_rpcs.Start_tracing.rpc () port
          with
          | Ok () ->
-             printf "Daemon started tracing!"
+             print_endline "Daemon started tracing!"
          | Error e ->
              Daemon_rpcs.Client.print_rpc_error e ) )
 
@@ -1076,7 +1076,7 @@ let stop_tracing =
            Daemon_rpcs.Client.dispatch Daemon_rpcs.Stop_tracing.rpc () port
          with
          | Ok () ->
-             printf "Daemon stopped printing!"
+             print_endline "Daemon stopped printing!"
          | Error e ->
              Daemon_rpcs.Client.print_rpc_error e ) )
 
@@ -1093,7 +1093,7 @@ let start_internal_tracing =
              port
          with
          | Ok () ->
-             printf "Daemon internal started tracing!"
+             print_endline "Daemon internal started tracing!"
          | Error e ->
              Daemon_rpcs.Client.print_rpc_error e ) )
 
@@ -1107,7 +1107,7 @@ let stop_internal_tracing =
              port
          with
          | Ok () ->
-             printf "Daemon internal tracing stopped!"
+             print_endline "Daemon internal tracing stopped!"
          | Error e ->
              Daemon_rpcs.Client.print_rpc_error e ) )
 

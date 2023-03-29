@@ -126,12 +126,14 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
   in
   let metadata = [ ("state_hash", State_hash.to_yojson transition_hash) ] in
   let state_hash = transition_hash in
-  let blockchain_length = Mina_block.blockchain_length transition in
   Internal_tracing.with_state_hash state_hash
   @@ fun () ->
   [%log internal] "@block_metadata"
     ~metadata:
-      [ ("blockchain_length", Mina_numbers.Length.to_yojson blockchain_length) ] ;
+      [ ( "blockchain_length"
+        , Mina_numbers.Length.to_yojson
+            (Mina_block.blockchain_length transition) )
+      ] ;
   [%log internal] "Begin_external_block_processing" ;
   Deferred.map ~f:(Fn.const ())
     (let open Deferred.Result.Let_syntax in
