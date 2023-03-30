@@ -1441,7 +1441,8 @@ let gen_zkapp_command_from ?global_slot ?(limited = false)
     gen_tree [] num_zkapp_command
   in
   let%bind num_new_token_zkapp_command =
-    Int.gen_uniform_incl 0 max_token_updates
+    if generate_new_accounts then Int.gen_uniform_incl 0 max_token_updates
+    else return 0
   in
   let%bind new_token_zkapp_command =
     gen_zkapp_command_with_token_accounts

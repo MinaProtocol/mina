@@ -4538,7 +4538,8 @@ module Mutations = struct
                         ~f:(fun _ -> Signature_lib.Keypair.create ())
                     in
                     let unused_keypairs =
-                      List.init (20 + zkapp_command_details.generating_new_accounts)
+                      List.init
+                        (20 + zkapp_command_details.generating_new_accounts)
                         ~f:(fun _ -> Signature_lib.Keypair.create ())
                     in
                     let account_creator_keypair =
