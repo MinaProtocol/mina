@@ -1,3 +1,5 @@
+open Core_kernel
+
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
@@ -816,7 +818,7 @@ let%test_unit "foreign_field_mul gadget" =
                   (module Runner.Impl)
                   product
               in
-              assert (product = expected) ) ;
+              assert (Stdlib.(product = expected)) ) ;
           () )
     in
     ()
@@ -883,10 +885,10 @@ let%test_unit "foreign_field_mul gadget" =
                   (module Runner.Impl)
                   product
               in
-              assert (product = expected) ) ;
+              assert Stdlib.(product = expected) ) ;
 
           (* TODO: 2) Add result bound addition gate *)
-          assert (1 == List.length external_checks.bounds) ;
+          assert (1 = List.length external_checks.bounds) ;
 
           (* 3) Add multi-range-check left input *)
           let left_input0, left_input1, left_input2 =
@@ -914,7 +916,7 @@ let%test_unit "foreign_field_mul gadget" =
               let v0, v1, v2 = multi_range in
               Range_check.multi_range_check (module Runner.Impl) v0 v1 v2 ;
               () ) ;
-          assert (2 == List.length external_checks.multi_ranges) ;
+          assert (2 = List.length external_checks.multi_ranges) ;
 
           (* 7) Add gates for external compact-multi-range-checks
            *   In this case:
@@ -925,7 +927,7 @@ let%test_unit "foreign_field_mul gadget" =
               let v01, v2 = compact_multi_range in
               Range_check.compact_multi_range_check (module Runner.Impl) v01 v2 ;
               () ) ;
-          assert (1 == List.length external_checks.compact_multi_ranges) ;
+          assert (1 = List.length external_checks.compact_multi_ranges) ;
 
           () )
     in
