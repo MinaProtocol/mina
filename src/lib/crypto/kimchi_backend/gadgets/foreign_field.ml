@@ -769,6 +769,14 @@ let%test_unit "foreign_field_mul gadget" =
     try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
   in
 
+  let assert_eq ((a, b, c) : 'field standard_limbs)
+      ((x, y, z) : 'field standard_limbs) =
+    let open Runner.Impl.Field in
+    Assert.equal (constant a) (constant x) ;
+    Assert.equal (constant b) (constant y) ;
+    Assert.equal (constant c) (constant z)
+  in
+
   (* Helper to test foreign_field_mul gadget
    *   Inputs:
    *     - left_input
@@ -818,14 +826,7 @@ let%test_unit "foreign_field_mul gadget" =
                   (module Runner.Impl)
                   product
               in
-               let assert_eq ((a, b, c) : field standard_limbs)
-                  ((x, y, z) : field standard_limbs) =
-                let open Runner.Impl.Field in
-                Assert.equal (constant a) (constant x) ;
-                Assert.equal (constant b) (constant y) ;
-                Assert.equal (constant c) (constant z)
-              in
-              assert_eq product expected  );
+              assert_eq product expected ) ;
           () )
     in
     ()
@@ -892,10 +893,10 @@ let%test_unit "foreign_field_mul gadget" =
                   (module Runner.Impl)
                   product
               in
-              assert Stdlib.(product = expected) ) ;
+              assert_eq product expected ) ;
 
           (* TODO: 2) Add result bound addition gate *)
-          assert (1 = List.length external_checks.bounds) ;
+          assert (Mina_stdlib.List.Length.equal external_checks.bounds 1) ;
 
           (* 3) Add multi-range-check left input *)
           let left_input0, left_input1, left_input2 =
@@ -923,7 +924,7 @@ let%test_unit "foreign_field_mul gadget" =
               let v0, v1, v2 = multi_range in
               Range_check.multi_range_check (module Runner.Impl) v0 v1 v2 ;
               () ) ;
-          assert (2 = List.length external_checks.multi_ranges) ;
+          assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 2) ;
 
           (* 7) Add gates for external compact-multi-range-checks
            *   In this case:
@@ -934,7 +935,8 @@ let%test_unit "foreign_field_mul gadget" =
               let v01, v2 = compact_multi_range in
               Range_check.compact_multi_range_check (module Runner.Impl) v01 v2 ;
               () ) ;
-          assert (1 = List.length external_checks.compact_multi_ranges) ;
+          assert (
+            Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges 1 ) ;
 
           () )
     in
