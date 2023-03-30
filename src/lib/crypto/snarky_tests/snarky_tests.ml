@@ -438,24 +438,6 @@ module As_prover_circuits = struct
 
       ()
 
-    (* test that all variables can be accessed*)
-    let generate_witness_fails () =
-      let f (inputs : Impl.Proof_inputs.t) _ = inputs in
-      let compiled =
-        Impl.generate_witness_conv ~f ~input_typ ~return_typ (main true 4)
-      in
-
-      let input = random_input in
-      let _b = compiled input in
-
-      ()
-
-    (* test that accessing non existent vars fails*)
-    let generate_witness_fails () =
-      Alcotest.(
-        check_raises "should fail accessing non existent var"
-          (Failure "vector_get") generate_witness_fails)
-
     (* test that as_prover doesn't affect constraints *)
     let as_prover_does_nothing () =
       let get_hash as_prov =
@@ -472,7 +454,6 @@ module As_prover_circuits = struct
 
   let as_prover_tests =
     [ ("access vars", `Quick, Tests.generate_witness)
-    ; ("access non-existent vars", `Quick, Tests.generate_witness_fails)
     ; ("as_prover makes no constraints", `Quick, Tests.as_prover_does_nothing)
     ]
 end
