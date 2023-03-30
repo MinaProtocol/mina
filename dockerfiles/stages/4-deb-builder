@@ -23,9 +23,6 @@ ENV MINA_COMMIT_SHA1=${MINA_COMMIT}
 
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
-# HACK: build without special cpu features to allow more people to run mina
-RUN ./scripts/zexe-standardize.sh
-
 # --- Build all major tagets required for packaging
 RUN echo "--- Build all major tagets required for packaging" \
    && echo "Building from Commit SHA: ${MINA_COMMIT_SHA1}" \
