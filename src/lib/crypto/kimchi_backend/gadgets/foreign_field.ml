@@ -818,7 +818,14 @@ let%test_unit "foreign_field_mul gadget" =
                   (module Runner.Impl)
                   product
               in
-              assert (Stdlib.(product = expected)) ) ;
+               let assert_eq ((a, b, c) : field standard_limbs)
+                  ((x, y, z) : field standard_limbs) =
+                let open Runner.Impl.Field in
+                Assert.equal (constant a) (constant x) ;
+                Assert.equal (constant b) (constant y) ;
+                Assert.equal (constant c) (constant z)
+              in
+              assert_eq product expected  );
           () )
     in
     ()
