@@ -95,7 +95,7 @@ val is_enabled : unit -> bool
 (** [register_toggle_callback callback] will register [callback] to be called whenever
     internal tracing is toggled.
 
-    This is useful to syncronize internal tracing done by subprocesses like the verifier
+    This is useful to synchronize internal tracing done by subprocesses like the verifier
     and prover.
 
     [callback] will be called with [true] if internal tracing must be enabled, and with
@@ -121,7 +121,7 @@ val toggle :
     and metadata will be associated to a block with state hash equal to [state_hash].
 
     Any context in which checkpoints or metadata are recorded must be wrapped
-    in either [with_state_hash] or [with_slot] for the checkpoints to be
+    in either {!val:with_state_hash} or {!val:with_slot} for the checkpoints to be
     properly associated to the block being processed/produced. *)
 val with_state_hash : Mina_base.State_hash.t -> (unit -> 'a) -> 'a
 
@@ -130,7 +130,7 @@ val with_state_hash : Mina_base.State_hash.t -> (unit -> 'a) -> 'a
     equal to [global_slot].
 
     Any context in which checkpoints or metadata are recorded must be wrapped
-    in either [with_state_hash] or [with_slot] for the checkpoints to be
+    in either {!val:with_state_hash} or {!val:with_slot} for the checkpoints to be
     properly associated to the block being processed/produced. *)
 val with_slot : Mina_numbers.Global_slot.t -> (unit -> 'a) -> 'a
 
@@ -149,10 +149,6 @@ module For_logger : sig
   val processor : Logger.Processor.t
 end
 
-module Context_logger : sig
-  include module type of Internal_tracing_context_logger
-end
+module Context_logger : module type of Internal_tracing_context_logger
 
-module Context_call : sig
-  include module type of Internal_tracing_context_call
-end
+module Context_call : module type of Internal_tracing_context_call
