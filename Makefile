@@ -140,8 +140,8 @@ mina_signer: ocaml_checks
 
 snarkyjs: ocaml_checks
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) \
-	&& bash ./scripts/build-snarkyjs-node.sh
+	(ulimit -s 65532) && (ulimit -n 10240 || true) \
+	&& bash ./src/lib/snarky_js_bindings/snarkyjs/src/snarkyjs-bindings/scripts/build-snarkyjs-node.sh
 	$(info Build complete)
 
 rosetta_lib_encodings: ocaml_checks
