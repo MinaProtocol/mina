@@ -16,7 +16,7 @@ let two_to_3limb = Bignum_bigint.(pow Common.two_to_limb (of_int 3))
 (* Binary modulus *)
 let binary_modulus = two_to_3limb
 
-(* Maximum foreign field modulus m = sqrt(2^t * n), see RFC for more details
+(* Maximum foreign field modulus for multiplication m = sqrt(2^t * n), see RFC for more details
  *   For simplicity and efficiency we use the approximation m = floor(sqrt(2^t * n))
  *     * Distinct from this approximation is the maximum prime foreign field modulus
  *       for both Pallas and Vesta given our CRT scheme:
@@ -499,6 +499,7 @@ module External_checks = struct
     external_checks.bounds <- x :: external_checks.bounds
 end
 
+(* Foreign field multiplication gadget definition *)
 let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     (left_input : f Foreign_field_element.t)
     (right_input : f Foreign_field_element.t)
@@ -753,6 +754,68 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
                  } )
         } ) ;
   ( Foreign_field_element.of_limbs (remainder0, remainder1, remainder2)
+  , external_checks )
+
+(* Foreign field addition gadget definition *)
+let _add (type f) (module Circuit : Snark_intf.Run with type field = f)
+    (_left_input : f Foreign_field_element.t)
+    (_right_input : f Foreign_field_element.t) (_is_subtraction : bool)
+    (foreign_field_modulus : f standard_limbs) :
+    f Foreign_field_element.t * f External_checks.t =
+  let open Circuit in
+  (* Check foreign field modulus < max allowed *)
+  (let foreign_field_modulus =
+     field_standard_limbs_to_bignum_bigint
+       (module Circuit)
+       foreign_field_modulus
+   in
+   (* Note that the maximum foreign field modulus possible for addition is much
+    * larger than that supported by multiplication.
+    *
+    * Specifically, since the 88-bit limbs are embedded in a native field element
+    * of ~2^255 bits and foreign field addition increases the number of bits
+    * logarithmically, for addition we can actually support a maximum field modulus
+    * of 2^264 - 1 (i.e. binary_modulus - 1) for circuits up to length ~ 2^79 - 1,
+    * which is far larger than the maximum circuit size supported by Kimchi.
+    *
+    * However, for compatibility with multiplication operations, we must use the
+    * same maximum as foreign field multiplication.
+    *)
+   assert (
+     Bignum_bigint.(
+       foreign_field_modulus < max_foreign_field_modulus (module Circuit)) ) ) ;
+
+  (* Compute gate coefficients
+   *   This happens when circuit is created / not part of witness (e.g. exists, As_prover code)
+   *)
+  let _foreign_field_modulus0, _foreign_field_modulus1, _foreign_field_modulus2
+      =
+    foreign_field_modulus
+  in
+  let ( _neg_foreign_field_modulus
+      , ( _neg_foreign_field_modulus0
+        , _neg_foreign_field_modulus1
+        , _neg_foreign_field_modulus2 ) ) =
+    let foreign_field_modulus =
+      field_standard_limbs_to_bignum_bigint
+        (module Circuit)
+        foreign_field_modulus
+    in
+    (* Compute negated foreign field modulus f' = 2^t - f public parameter *)
+    let neg_foreign_field_modulus =
+      Bignum_bigint.(binary_modulus - foreign_field_modulus)
+    in
+    ( neg_foreign_field_modulus
+    , bignum_bigint_to_field_standard_limbs
+        (module Circuit)
+        neg_foreign_field_modulus )
+  in
+
+  (* Track external checks*)
+  let external_checks = External_checks.create (module Circuit) in
+
+  (* Return result *)
+  ( Foreign_field_element.of_limbs (Field.zero, Field.zero, Field.zero)
   , external_checks )
 
 (*********)
