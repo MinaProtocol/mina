@@ -1564,3 +1564,71 @@ let gen_list_of_zkapp_command_from ?global_slot ?failure ?max_account_updates
     else return (List.rev acc)
   in
   go length []
+
+let%test_module _ =
+  ( module struct
+    module U = Transaction_snark_tests.Util
+    open Signature_lib
+
+    let `VK vk, `Prover _ = Lazy.force U.trivial_zkapp
+
+    let mk_ledger ~num_of_unused_keys () =
+      let keys = List.init 5 ~f:(fun _ -> Keypair.create ()) in
+      let zkapp_keys = List.init 5 ~f:(fun _ -> Keypair.create ()) in
+      let unused_keys =
+        List.init num_of_unused_keys ~f:(fun _ -> Keypair.create ())
+      in
+      let account_ids =
+        List.map keys ~f:(fun key ->
+            Account_id.create
+              (Signature_lib.Public_key.compress key.public_key)
+              Token_id.default )
+      in
+      let zkapp_account_ids =
+        List.map zkapp_keys ~f:(fun key ->
+            Account_id.create
+              (Signature_lib.Public_key.compress key.public_key)
+              Token_id.default )
+      in
+      let balance = Currency.Balance.of_mina_int_exn 1_000_000 in
+      let accounts =
+        List.map account_ids ~f:(fun id -> Account.create id balance)
+      in
+      let zkapp_accounts =
+        List.map zkapp_account_ids ~f:(fun id ->
+            let account = Account.create id balance in
+            let verification_key = Some vk in
+            let zkapp = Some { Zkapp_account.default with verification_key } in
+            { account with zkapp } )
+      in
+      let ledger = Mina_ledger.Ledger.create ~depth:10 () in
+      List.iter2_exn (account_ids @ zkapp_account_ids)
+        (accounts @ zkapp_accounts) ~f:(fun id account ->
+          Mina_ledger.Ledger.get_or_create_account ledger id account
+          |> Or_error.ok_exn
+          |> fun _ -> () ) ;
+      let keymap =
+        List.map
+          (keys @ zkapp_keys @ unused_keys)
+          ~f:(fun { public_key; private_key } ->
+            (Public_key.compress public_key, private_key) )
+        |> Public_key.Compressed.Map.of_alist_exn
+      in
+      (ledger, List.hd_exn keys, keymap)
+
+    let%test_unit "generate 100 zkapps with only 3 unused keys" =
+      let ledger, fee_payer_keypair, keymap =
+        mk_ledger ~num_of_unused_keys:3 ()
+      in
+      let _ =
+        Quickcheck.Generator.(
+          generate
+            (list_with_length 100
+               (gen_zkapp_command_from ~fee_payer_keypair ~keymap
+                  ~account_state_tbl:(Account_id.Table.create ())
+                  ~generate_new_accounts:false ~ledger () ) )
+            ~size:100
+            ~random:(Splittable_random.State.create Random.State.default))
+      in
+      ()
+  end )
