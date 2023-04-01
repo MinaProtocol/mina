@@ -3,15 +3,19 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
-let two_to_limb_field (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f) =
-  Common.(bignum_bigint_to_field (module Circuit) two_to_limb)
-
 (* 2^2L *)
 let two_to_2limb = Bignum_bigint.(pow Common.two_to_limb (of_int 2))
 
 (* 2^3L *)
 let two_to_3limb = Bignum_bigint.(pow Common.two_to_limb (of_int 3))
+
+let two_to_limb_field (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f) =
+  Common.(bignum_bigint_to_field (module Circuit) two_to_limb)
+
+let two_to_2limb_field (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f) =
+  Common.(bignum_bigint_to_field (module Circuit) two_to_2limb)
 
 (* Binary modulus *)
 let binary_modulus = two_to_3limb
@@ -755,6 +759,114 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
         } ) ;
   ( Foreign_field_element.of_limbs (remainder0, remainder1, remainder2)
   , external_checks )
+
+let compact_limb (type f) (module Circuit : Snark_intf.Run with type field = f)
+    (lo : f) (hi : f) : f =
+  Circuit.Field.Constant.(lo + (hi * two_to_limb_field (module Circuit)))
+
+(* Given a left and right inputs to an addition or subtraction, and a modulus, it computes
+ * all necessary values needed for the witness layout. Meaning, it returns an [FFAddValues] instance
+ * - the result of the addition/subtraction as a ForeignElement
+ * - the sign of the operation
+ * - the overflow flag
+ * - the carry value *)
+let compute_ffadd_values (type f)
+    (module Circuit : Snark_intf.Run with type field = f)
+    (left_input : f Foreign_field_element.t)
+    (right_input : f Foreign_field_element.t) (is_subtraction : bool)
+    (foreign_field_modulus : f Foreign_field_element.t) :
+    f Foreign_field_element.t * f * f * f =
+  let open Circuit in
+  (* Compute bigint version of the inputs *)
+  let left =
+    Foreign_field_element.to_bignum_bigint (module Circuit) left_input
+  in
+  let right =
+    Foreign_field_element.to_bignum_bigint (module Circuit) right_input
+  in
+
+  (* Clarification *)
+  (* TODO:  switch right input to Foreign_field_element_extended.t once it's implemented *)
+  (* let right_hi = right_input[3] * F::two_to_limb() + right_input[HI]; (* This allows to store 2^88 in the high limb *) *)
+  let modulus =
+    Foreign_field_element.to_bignum_bigint
+      (module Circuit)
+      foreign_field_modulus
+  in
+
+  (* Addition or subtraction *)
+  let sign = Field.Constant.(if is_subtraction then negate one else one) in
+
+  (* Overflow if addition and greater than modulus or
+     c* underflow if subtraction and less than zero *)
+  let has_overflow =
+    Bignum_bigint.(
+      if is_subtraction then left < right else left + right >= modulus)
+  in
+
+  (* 0 for no overflow
+   * -1 for underflow
+   * +1 for overflow *)
+  let field_overflow = if has_overflow then sign else Field.Constant.zero in
+
+  (* Compute the result
+   * result = left + sign * right - field_overflow * modulus
+   * TODO: unluckily, we cannot do it in one line if we keep these types, because one
+   *       cannot combine field elements and biguints in the same operation automatically *)
+  let result =
+    Foreign_field_element.of_bignum_bigint (module Circuit)
+    @@ Bignum_bigint.(
+         if is_subtraction then
+           if not has_overflow then (* normal subtraction *)
+             left - right
+           else (* underflow *)
+             modulus + left - right
+         else if not has_overflow then (* normal addition *)
+           left + right
+         else (* overflow *)
+           left + right - modulus)
+  in
+
+  (* c = [ (a1 * 2^88 + a0) + s * (b1 * 2^88 + b0) - q * (f1 * 2^88 + f0) - (r1 * 2^88 + r0) ] / 2^176
+   *  <=>
+   * c = r2 - a2 - s*b2 + q*f2 *)
+  let left_input0, left_input1, left_input2 =
+    Foreign_field_element.to_field_limbs (module Circuit) left_input
+  in
+  let right_input0, right_input1, right_input2 =
+    Foreign_field_element.to_field_limbs (module Circuit) right_input
+  in
+  let foreign_field_modulus0, foreign_field_modulus1, foreign_field_modulus2 =
+    Foreign_field_element.to_field_limbs (module Circuit) foreign_field_modulus
+  in
+  let result0, result1, result2 =
+    Foreign_field_element.to_field_limbs (module Circuit) result
+  in
+  (* TODO remove once Foreign_field_element_extended is implemented *)
+  let right_hi = right_input2 in
+
+  let carry_bot =
+    Field.Constant.(
+      ( compact_limb (module Circuit) left_input0 left_input1
+      + (compact_limb (module Circuit) right_input0 right_input1 * sign)
+      - compact_limb
+          (module Circuit)
+          foreign_field_modulus0 foreign_field_modulus1
+        * field_overflow
+      - compact_limb (module Circuit) result0 result1 )
+      / two_to_2limb_field (module Circuit))
+  in
+
+  let carry_top =
+    Field.Constant.(
+      result2 - left_input2 - (sign * right_hi)
+      + (field_overflow * foreign_field_modulus2))
+  in
+
+  (* Check that both ways of computing the carry value are equal *)
+  assert (Field.Constant.(carry_top = carry_bot)) ;
+
+  (result, sign, field_overflow, carry_bot)
 
 (* Foreign field addition gadget definition *)
 let _add (type f) (module Circuit : Snark_intf.Run with type field = f)
