@@ -1282,7 +1282,7 @@ let gen_zkapp_command_from ?global_slot
           gen_account_update_from ?global_slot ~zkapp_account_ids
             ~account_ids_seen ~update ?failure ~authorization ~new_account
             ~permissions_auth ~zkapp_account ~available_public_keys
-            ~account_state_tbl ?protocol_state_view ?vk
+            ~may_use_token:No ~account_state_tbl ?protocol_state_view ?vk
             ~ignore_sequence_events_precond ()
         in
         let%bind account_update =
@@ -1357,7 +1357,7 @@ let gen_zkapp_command_from ?global_slot
           gen_account_update_from ?global_slot ~update ?failure
             ~zkapp_account_ids ~account_ids_seen ~account_id ~authorization
             ~permissions_auth ~zkapp_account ~available_public_keys
-            ~account_state_tbl ?protocol_state_view ?vk
+            ~may_use_token:No ~account_state_tbl ?protocol_state_view ?vk
             ~ignore_sequence_events_precond ()
         in
         (* this list will be reversed, so `account_update0` will execute before `account_update` *)
@@ -1416,8 +1416,9 @@ let gen_zkapp_command_from ?global_slot
     gen_account_update_from ?global_slot ?failure
       ~permissions_auth:Control.Tag.Signature ~zkapp_account_ids
       ~account_ids_seen ~authorization ~new_account:false ~available_public_keys
-      ~account_state_tbl ~required_balance_change:balance_change
-      ?protocol_state_view ?vk ~ignore_sequence_events_precond ()
+      ~may_use_token:No ~account_state_tbl
+      ~required_balance_change:balance_change ?protocol_state_view ?vk
+      ~ignore_sequence_events_precond ()
   in
   let gen_zkapp_command_with_token_accounts ~num_zkapp_command =
     let authorization = Control.Signature Signature.dummy in
