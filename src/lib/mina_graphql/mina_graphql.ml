@@ -4687,7 +4687,7 @@ module Mutations = struct
                                               [ ( "command"
                                                 , Zkapp_command.to_yojson
                                                     zkapp_command )
-                                              ; ("error", Error.to_string_hum e)
+                                              ; ("error", `String e)
                                               ] )
                                 in
                                 let%bind () = Async_unix.at tm_next in
