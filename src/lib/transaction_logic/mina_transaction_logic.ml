@@ -552,17 +552,17 @@ module type S = sig
     end) : sig
       type t = Elt.t list
 
-      val if_ : bool -> then_:'a -> else_:'a -> 'a
+      val if_ : bool -> then_:t -> else_:t -> t
 
-      val empty : unit -> 'a list
+      val empty : unit -> t
 
-      val is_empty : 'a list -> bool
+      val is_empty : t -> bool
 
       val pop_exn : t -> Elt.t * t
 
       val pop : t -> (Elt.t * t) option
 
-      val push : Elt.t -> onto:Elt.t list -> t
+      val push : Elt.t -> onto:t -> t
     end
 
     val validate_timing_with_min_balance :
