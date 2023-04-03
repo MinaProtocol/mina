@@ -102,6 +102,7 @@
    kimchi_backend
    sgn_type
    mina_transaction_logic
+   zkapp_command_builder
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../config.mlh)

@@ -4609,7 +4609,7 @@ module Mutations = struct
                                   )
                               |> Public_key.Compressed.Map.of_alist_exn
                             in
-                            let rec go account_state_tbl ndx tm_next =
+                            let rec go ~prover account_state_tbl ndx tm_next =
                               if Time.( >= ) (Time.now ()) tm_end then (
                                 [%log info]
                                   "Scheduled zkApp commands with handle %s has \
@@ -4655,7 +4655,7 @@ module Mutations = struct
                                         < zkapp_command_details
                                             .generating_new_accounts
                                       in
-                                      let zkapp_command =
+                                      let zkapp_command_with_dummy_auth =
                                         Quickcheck.Generator.generate
                                           (Mina_generators
                                            .Zkapp_command_generators
@@ -4668,7 +4668,11 @@ module Mutations = struct
                                             (Splittable_random.State.create
                                                Random.State.default )
                                       in
-
+                                      let%bind zkapp_command =
+                                        Zkapp_command_builder
+                                        .replace_authorizations ~prover ~keymap
+                                          zkapp_command_with_dummy_auth
+                                      in
                                       match%map
                                         send_zkapp_command mina zkapp_command
                                       with
@@ -4692,7 +4696,7 @@ module Mutations = struct
                                 in
                                 let%bind () = Async_unix.at tm_next in
                                 let next_tm_next = Time.add tm_next wait_span in
-                                go account_state_tbl
+                                go ~prover account_state_tbl
                                   ((ndx + 1) mod num_fee_payers)
                                   next_tm_next
                             in
@@ -4716,11 +4720,16 @@ module Mutations = struct
                                         @ get_account zkapp_account_ids
                                             `Ordinary_participant )
                                     in
+                                    let `VK _, `Prover prover =
+                                      Transaction_snark.For_tests
+                                      .create_trivial_snapp
+                                        ~constraint_constants ()
+                                    in
                                     let tm_next =
                                       Time.add (Time.now ()) wait_span
                                     in
                                     don't_wait_for
-                                    @@ go account_state_tbl 0 tm_next ) ;
+                                    @@ go account_state_tbl ~prover 0 tm_next ) ;
 
                             Ok (Uuid.to_string uuid) ) ) ) )
 
