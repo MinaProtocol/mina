@@ -177,53 +177,24 @@ then
   cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
   cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
 
-<<<<<<< HEAD
   build_deb mina-generate-keypair
-=======
-##################################### GENERATE KEYPAIR PACKAGE #######################################
+
+##################################### GENERATE LOGPROC PACKAGE #######################################
+
+echo "------------------------------------------------------------"
+echo "--- Building logproc deb:"
 
 mkdir -p "${BUILDDIR}/DEBIAN"
-cat << EOF > "${BUILDDIR}/DEBIAN/control"
-
-Package: mina-logproc
-Version: ${MINA_DEB_VERSION}
-License: Apache-2.0
-Vendor: none
-Architecture: amd64
-Maintainer: o(1)Labs <build@o1labs.org>
-Installed-Size:
-Depends: ${SHARED_DEPS}
-Section: base
-Priority: optional
-Homepage: https://minaprotocol.com/
-Description: Utility for processing mina-daemon log output
- Utility for processing mina-daemon log output
- Built from ${GITHASH} by ${BUILD_URL}
-EOF
-
-echo "------------------------------------------------------------"
-echo "Control File:"
-cat "${BUILDDIR}/DEBIAN/control"
+create_control_file mina-logproc "${SHARED_DEPS}" 'Utility for processing mina-daemon log output'
 
 # Binaries
-rm -rf "${BUILDDIR}/usr/local/bin"
-mkdir -p "${BUILDDIR}/usr/local/bin"
 cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
 
-# echo contents of deb
-echo "------------------------------------------------------------"
-echo "Deb Contents:"
-find "${BUILDDIR}"
-
-# Build the package
-echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" mina-logproc_${MINA_DEB_VERSION}.deb
-ls -lh mina*.deb
+build_deb mina-logproc
 
 ##################################### END LOGPROC PACKAGE #######################################
 
 ##################################### GENERATE MINA MAINNET PACKAGE #######################################
->>>>>>> origin/compatible
 
 fi # only builds on mainnet-like branches
 ##################################### END GENERATE KEYPAIR PACKAGE #######################################
