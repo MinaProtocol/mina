@@ -89,9 +89,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Deferred.both
           (let%bind.Deferred process =
              Async_unix.Process.create_exn
-               ~prog:"./src/lib/snarky_js_bindings/test_module/node"
+               ~prog:"./src/lib/snarkyjs/tests/integration/node"
                ~args:
-                 [ "src/lib/snarky_js_bindings/test_module/simple-zkapp.js"
+                 [ "src/lib/snarkyjs/tests/integration/simple-zkapp.js"
                  ; which_str
                  ; Signature_lib.Private_key.to_base58_check zkapp_sk
                  ; Signature_lib.Private_key.to_base58_check my_sk
