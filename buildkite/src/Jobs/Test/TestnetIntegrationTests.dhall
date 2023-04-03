@@ -39,9 +39,15 @@ in Pipeline.build Pipeline.Config::{
     TestExecutive.execute "gossip-consis" dependsOn,
     TestExecutive.execute "opt-block-prod" dependsOn,
     TestExecutive.execute "medium-bootstrap" dependsOn,
+<<<<<<< HEAD
     TestExecutive.execute "zkapps" dependsOn,
     TestExecutive.execute "zkapps-timing" dependsOn,
     TestExecutive.execute "zkapps-nonce" dependsOn,
     TestExecutive.executeWithJs "snarkyjs" dependsOnJs
+=======
+    TestExecutive.execute "snark" dependsOn,
+    TestExecutive.execute "archive-node" dependsOn
+
+>>>>>>> origin/compatible
   ]
 }

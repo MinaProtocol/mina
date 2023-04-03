@@ -15,25 +15,26 @@ mina:
   ports:
     client: "8301"
     graphql: "3085"
-    metrics: "10001"
-    p2p: "10909"
+    metrics: "8081"
+    p2p: "10001"
   exposeGraphql: false
   cpuRequest: 6
   memRequest: "12.0Gi"
 
-seed:
-  active: true
-  fullname: "seed-node"
-  hostPort: 10001
-  rpcPort: 8301
-  discoveryKeypair: "CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
+# seed:
+#   active: true
+#   fullname: "seed-node"
+#   hostPort: 10001
+#   rpcPort: 8301
+#   discoveryKeypair: "CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
 
 seedConfigs:
 - name: test-1
   class: "seed"
-  external_port: 1111
-  external_ip: 1.1.1.1
-  node_port: 1111
+  libp2pSecret: "seed-discovery-keys"
+  libp2pSecretPassword: "naughty blue worm"
+  # externalPort: 10001
+  externalIp: 1.1.1.1
   enableArchive: false
   archiveAddress: archive-1:3086
 

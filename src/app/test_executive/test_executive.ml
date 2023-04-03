@@ -63,7 +63,11 @@ let tests : test list =
   ; ("zkapps-nonce", (module Zkapps_nonce_test.Make : Intf.Test.Functor_intf))
   ; ( "opt-block-prod"
     , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
+<<<<<<< HEAD
   ; ("snarkyjs", (module Snarkyjs.Make : Intf.Test.Functor_intf))
+=======
+  ; ("snark", (module Snark_test.Make : Intf.Test.Functor_intf))
+>>>>>>> origin/compatible
   ]
 
 let report_test_errors ~log_error_set ~internal_error_set =
@@ -366,8 +370,12 @@ let main inputs =
           [%log info] "%s started" (Engine.Network.Node.id node) ;
           Malleable_error.return res
         in
-        let seed_nodes = network |> Engine.Network.seeds in
-        let non_seed_pods = network |> Engine.Network.all_non_seed_pods in
+        let seed_nodes =
+          network |> Engine.Network.seeds |> Core.String.Map.data
+        in
+        let non_seed_pods =
+          network |> Engine.Network.all_non_seed_pods |> Core.String.Map.data
+        in
         (* TODO: parallelize (requires accumlative hard errors) *)
         let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
         let%bind () =
