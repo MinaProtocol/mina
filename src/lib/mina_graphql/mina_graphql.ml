@@ -4536,7 +4536,7 @@ module Mutations = struct
                                                    tm_next ) )
                                           ] ;
                                       Deferred.unit
-                                  | Some (ledger, _) ->
+                                  | Some (ledger, _) -> (
                                       let number_of_accounts_generated =
                                         Account_id.Table.data account_state_tbl
                                         |> List.filter ~f:(function
@@ -4564,14 +4564,27 @@ module Mutations = struct
                                             (Splittable_random.State.create
                                                Random.State.default )
                                       in
-                                      [%log info] "Send out zkApp $command"
-                                        ~metadata:
-                                          [ ( "command"
-                                            , Zkapp_command.to_yojson
-                                                zkapp_command )
-                                          ] ;
-                                      send_zkapp_command mina zkapp_command
-                                      |> Deferred.map ~f:(fun _ -> ())
+
+                                      match%map
+                                        send_zkapp_command mina zkapp_command
+                                      with
+                                      | Ok _ ->
+                                          [%log info] "Send out zkApp $command"
+                                            ~metadata:
+                                              [ ( "command"
+                                                , Zkapp_command.to_yojson
+                                                    zkapp_command )
+                                              ]
+                                      | Error e ->
+                                          [%log info]
+                                            "Failed to send out zkApp \
+                                             $command, see $error"
+                                            ~metadata:
+                                              [ ( "command"
+                                                , Zkapp_command.to_yojson
+                                                    zkapp_command )
+                                              ; ("error", Error.to_string_hum e)
+                                              ] )
                                 in
                                 let%bind () = Async_unix.at tm_next in
                                 let next_tm_next = Time.add tm_next wait_span in
