@@ -63,7 +63,8 @@ module Inputs = struct
     list
   [@@deriving sexp, to_yojson]
 
-  let perform_single ({ m; cache; proof_level } : Worker_state.t) ~message =
+  let perform_single ?log ({ m; cache; proof_level } : Worker_state.t) ~message
+      =
     let open Deferred.Or_error.Let_syntax in
     let open Snark_work_lib in
     let sok_digest = Mina_base.Sok_message.digest message in
@@ -136,10 +137,12 @@ module Inputs = struct
                                      (Error.to_string_hum e) )
                             |> Deferred.return
                           in
-                          let log_base_snark f ~statement ~spec ~all_inputs =
+                          let log_base_snark ~witness ~statement ~spec
+                              ~all_inputs =
                             match%map.Deferred
-                              Deferred.Or_error.try_with (fun () ->
-                                  f ~statement ~spec )
+                              Deferred.Or_error.try_with
+                                (M.of_zkapp_command_segment_exn ?log ~witness
+                                   ~statement ~spec )
                             with
                             | Ok p ->
                                 Ok p
@@ -194,12 +197,10 @@ module Inputs = struct
                                 "no witnesses generated"
                           | (witness, spec, stmt) :: rest as inputs ->
                               let%bind (p1 : Ledger_proof.t) =
-                                log_base_snark
+                                log_base_snark ~witness
                                   ~statement:{ stmt with sok_digest } ~spec
                                   ~all_inputs:inputs
-                                  (M.of_zkapp_command_segment_exn ~witness)
                               in
-
                               let%bind (p : Ledger_proof.t) =
                                 Deferred.List.fold ~init:(Ok p1) rest
                                   ~f:(fun acc (witness, spec, stmt) ->
@@ -207,10 +208,9 @@ module Inputs = struct
                                       Deferred.return acc
                                     in
                                     let%bind (curr : Ledger_proof.t) =
-                                      log_base_snark
+                                      log_base_snark ~witness
                                         ~statement:{ stmt with sok_digest }
                                         ~spec ~all_inputs:inputs
-                                        (M.of_zkapp_command_segment_exn ~witness)
                                     in
                                     log_merge_snark ~sok_digest prev curr
                                       ~all_inputs:inputs )

@@ -355,14 +355,14 @@ module T = struct
       ~expected_merkle_root ~get_state f =
     let open Deferred.Or_error.Let_syntax in
     let apply_first_pass =
-      Ledger.apply_transaction_first_pass ~constraint_constants
+      Ledger.apply_transaction_first_pass ?log:None ~constraint_constants
     in
     let apply_second_pass = Ledger.apply_transaction_second_pass in
     let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
         sparse_ledger txn =
       let open Or_error.Let_syntax in
       let%map _ledger, partial_txn =
-        Mina_ledger.Sparse_ledger.apply_transaction_first_pass
+        Mina_ledger.Sparse_ledger.apply_transaction_first_pass ?log:None
           ~constraint_constants ~global_slot ~txn_state_view sparse_ledger txn
       in
       partial_txn
@@ -2528,9 +2528,12 @@ let%test_module "staged ledger tests" =
                            |> Yojson.Safe.to_string ) ) ) ;
             let do_snarked_ledger_transition proof_opt =
               let apply_first_pass =
-                Ledger.apply_transaction_first_pass ~constraint_constants
+                Ledger.apply_transaction_first_pass ?log:None
+                  ~constraint_constants
               in
-              let apply_second_pass = Ledger.apply_transaction_second_pass in
+              let apply_second_pass =
+                Ledger.apply_transaction_second_pass ?log:None
+              in
               let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
                   sparse_ledger txn =
                 let open Or_error.Let_syntax in

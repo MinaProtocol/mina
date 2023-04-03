@@ -16,6 +16,7 @@
    base.base_internalhash_types
    integers
    base_quickcheck
+   stdio
    ;; local libraries
    mina_stdlib
    mina_wire_types
@@ -47,7 +48,8 @@
    snark_params
    unsigned_extended
    ppx_version.runtime
-   with_hash)
+   with_hash
+   logger)
  (instrumentation (backend bisect_ppx))
  (preprocess
   (pps
@@ -60,4 +62,5 @@
    ppx_let
    ppx_hash
    ppx_sexp_conv
-   ppx_version)))
+   ppx_version
+   ppx_mina)))

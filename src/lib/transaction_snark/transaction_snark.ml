@@ -680,8 +680,24 @@ module Make_str (A : Wire_types.Concrete) = struct
         module V = Prover_value
         open Impl
 
+        let pp_as_prover ~typ ~pp fmt t =
+          as_prover (fun () -> pp fmt (As_prover.read typ t))
+
+        let pp_as_prover' ~typ ~to_string =
+          pp_as_prover ~typ ~pp:(fun fmt t ->
+              Format.pp_print_string fmt (to_string t) )
+
+        module Field = struct
+          include Impl.Field
+
+          let pp =
+            pp_as_prover' ~typ ~to_string:Snark_params.Tick.Field.to_string
+        end
+
         module Transaction_commitment = struct
           type t = Field.t
+
+          let pp = Field.pp
 
           let if_ = Field.if_
 
@@ -721,6 +737,9 @@ module Make_str (A : Wire_types.Concrete) = struct
               with Failure msg -> raise_failure ~pos msg
           end
 
+          let pp = pp_as_prover' ~typ:Boolean.typ ~to_string:Bool.to_string
+
+          (* TODO: rm me in favor of `pp` *)
           let display _b ~label:_ = ""
 
           type failure_status = unit
@@ -736,6 +755,10 @@ module Make_str (A : Wire_types.Concrete) = struct
 
           type t = var
 
+          let pp =
+            pp_as_prover' ~typ:Mina_numbers.Index.typ
+              ~to_string:Mina_numbers.Index.to_string
+
           let zero = zero
 
           let succ t = succ t |> run_checked
@@ -745,6 +768,17 @@ module Make_str (A : Wire_types.Concrete) = struct
 
         module Account_id = struct
           type t = Account_id.var
+
+          let pp =
+            (* TODO: share code *)
+            let to_string t =
+              String.concat ~sep:":"
+                [ Public_key.Compressed.to_string (Account_id.public_key t)
+                ; Token_id.to_string (Account_id.token_id t)
+                ]
+            in
+
+            pp_as_prover' ~typ:Account_id.typ ~to_string
 
           let if_ b ~then_ ~else_ =
             run_checked (Account_id.Checked.if_ b ~then_ ~else_)
@@ -772,10 +806,17 @@ module Make_str (A : Wire_types.Concrete) = struct
           let if_ b ~then_ ~else_ = run_checked (if_ b ~then_ ~else_)
 
           let equal x y = run_checked (equal x y)
+
+          let pp =
+            pp_as_prover' ~typ:Global_slot.typ ~to_string:Global_slot.to_string
         end
 
         module Nonce = struct
           type t = Account.Nonce.Checked.t
+
+          let pp =
+            pp_as_prover' ~typ:Account.Nonce.typ
+              ~to_string:Account.Nonce.to_string
 
           let if_ b ~then_ ~else_ =
             run_checked (Account.Nonce.Checked.if_ b ~then_ ~else_)
@@ -786,11 +827,20 @@ module Make_str (A : Wire_types.Concrete) = struct
         module State_hash = struct
           type t = State_hash.var
 
+          let pp =
+            pp_as_prover' ~typ:State_hash.typ
+              ~to_string:State_hash.to_base58_check
+
           let if_ b ~then_ ~else_ = run_checked (State_hash.if_ b ~then_ ~else_)
         end
 
         module Timing = struct
           type t = Account_timing.var
+
+          let pp =
+            pp_as_prover' ~typ:Account_timing.typ
+              ~to_string:
+                (Fn.compose Yojson.Safe.to_string Account_timing.to_yojson)
 
           let if_ b ~then_ ~else_ =
             run_checked (Account_timing.if_ b ~then_ ~else_)
@@ -800,6 +850,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
         module Balance = struct
           include Balance.Checked
+
+          let pp = pp_as_prover' ~typ:Balance.typ ~to_string:Balance.to_string
 
           let if_ b ~then_ ~else_ = run_checked (if_ b ~then_ ~else_)
 
@@ -821,6 +873,10 @@ module Make_str (A : Wire_types.Concrete) = struct
               Zkapp_command_elt.Zkapp_command_commitment tc
           end
 
+          let pp =
+            pp_as_prover' ~typ:Receipt.Chain_hash.typ
+              ~to_string:Receipt.Chain_hash.to_base58_check
+
           let cons_zkapp_command_commitment index elt t =
             run_checked (cons_zkapp_command_commitment index elt t)
 
@@ -836,12 +892,37 @@ module Make_str (A : Wire_types.Concrete) = struct
               Data_as_hash.t )
             Zkapp_basic.Flagged_option.t
 
+          let pp fmt ({ is_some; data } : t) =
+            as_prover (fun () ->
+                let is_some = As_prover.read Boolean.typ is_some in
+                let opt = if is_some then Some data else None in
+                opt
+                |> Option.map ~f:Data_as_hash.hash
+                |> Format.pp_print_option Field.pp fmt )
+
+          (*
+            pp_as_prover
+              ~typ:(
+                Zkapp_basic.Flagged_option.typ
+                  (Data_as_hash.typ ~hash:Verification_key_wire.digest_vk))
+              ~pp:(fun fmt t ->
+                Zkapp_basic.Flagged_option.to_option t
+                |> Format.pp_print_option pp_hash fmt)
+            *)
+
           let if_ b ~(then_ : t) ~(else_ : t) : t =
             Zkapp_basic.Flagged_option.if_ ~if_:Data_as_hash.if_ b ~then_ ~else_
         end
 
         module Verification_key_hash = struct
           type t = Field.t
+
+          (*
+      let pp =
+        (* TODO: boxing *)
+        Format.pp_print_option (fun fmt t ->
+          Field.pp fmt (With_hash.hash t))
+          *)
 
           let equal = Field.equal
         end
@@ -857,11 +938,20 @@ module Make_str (A : Wire_types.Concrete) = struct
         module Zkapp_uri = struct
           type t = string Data_as_hash.t
 
+          let pp fmt t =
+            as_prover (fun () ->
+                let data = As_prover.Ref.get (Data_as_hash.ref t) in
+                Format.pp_print_char fmt '"' ;
+                Format.pp_print_string fmt data ;
+                Format.pp_print_char fmt '"' )
+
           let if_ = Data_as_hash.if_
         end
 
         module Token_symbol = struct
           type t = Account.Token_symbol.var
+
+          let pp = pp_as_prover' ~typ:Account.Token_symbol.typ ~to_string:Fn.id
 
           let if_ = Account.Token_symbol.if_
         end
@@ -869,8 +959,21 @@ module Make_str (A : Wire_types.Concrete) = struct
         module Account = struct
           type t = (Account.Checked.Unhashed.t, Field.t Lazy.t) With_hash.t
 
+          let pp fmt t =
+            as_prover (fun () ->
+                With_hash.data t
+                |> As_prover.read Account.Checked.Unhashed.typ
+                |> Account.to_yojson |> Yojson.Safe.to_string
+                |> Format.pp_print_string fmt )
+
           module Permissions = struct
             type controller = Permissions.Auth_required.Checked.t
+
+            let pp fmt t =
+              as_prover (fun () ->
+                  As_prover.read Permissions.typ t
+                  |> Permissions.to_yojson |> Yojson.Safe.to_string
+                  |> Format.pp_print_string fmt )
 
             let edit_state : t -> controller =
              fun a -> a.data.permissions.edit_state
@@ -1289,8 +1392,17 @@ module Make_str (A : Wire_types.Concrete) = struct
 
           type unsigned = t
 
+          let pp = pp_as_prover' ~typ:Amount.typ ~to_string:Amount.to_string
+
           module Signed = struct
             type t = Amount.Signed.Checked.t
+
+            let pp =
+              let to_string (t : Amount.Signed.t) =
+                let prefix = match t.sgn with Pos -> "" | Neg -> "-" in
+                prefix ^ Amount.to_string t.magnitude
+              in
+              pp_as_prover' ~typ:Amount.Signed.typ ~to_string
 
             let equal t t' = run_checked (Amount.Signed.Checked.equal t t')
 
@@ -1331,6 +1443,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         module Token_id = struct
           type t = Token_id.Checked.t
 
+          let pp = pp_as_prover' ~typ:Token_id.typ ~to_string:Token_id.to_string
+
           let if_ = Token_id.Checked.if_
 
           let equal x y = Token_id.Checked.equal x y
@@ -1343,6 +1457,10 @@ module Make_str (A : Wire_types.Concrete) = struct
 
           let if_ b ~then_ ~else_ =
             run_checked (Public_key.Compressed.Checked.if_ b ~then_ ~else_)
+
+          let pp =
+            pp_as_prover' ~typ:Public_key.Compressed.typ
+              ~to_string:Public_key.Compressed.to_base58_check
         end
 
         module Protocol_state_precondition = struct
@@ -1352,8 +1470,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         module Valid_while_precondition = struct
           type t = Zkapp_precondition.Valid_while.Checked.t
         end
-
-        module Field = Impl.Field
 
         module Local_state = struct
           type t =
@@ -1440,6 +1556,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                   fun ~proof_verifies:_ ~signature_verifies perm ->
                     Permissions.Auth_required.Checked.eval_no_proof
                       ~signature_verifies perm
+
+            let pp =
+              pp_as_prover' ~typ:Permissions.Auth_required.typ
+                ~to_string:Permissions.Auth_required.to_string
           end
 
           module Ledger = struct
@@ -1450,6 +1570,10 @@ module Make_str (A : Wire_types.Concrete) = struct
             let if_ b ~then_:((xt, rt) : t) ~else_:((xe, re) : t) =
               ( run_checked (Ledger_hash.if_ b ~then_:xt ~else_:xe)
               , V.if_ b ~then_:rt ~else_:re )
+
+            let pp fmt (root, _) =
+              pp_as_prover' ~typ:Ledger_hash.typ
+                ~to_string:Ledger_hash.to_base58_check fmt root
 
             let empty ~depth () : t =
               let t = Sparse_ledger.empty ~depth () in
@@ -1665,9 +1789,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             end
           end
 
-          module Set_or_keep = struct
-            include Zkapp_basic.Set_or_keep.Checked
-          end
+          module Set_or_keep = Zkapp_basic.Set_or_keep.Checked
 
           module Global_state = struct
             include Global_state
@@ -1817,8 +1939,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                 Boolean.Assert.all
                   [ correct_coinbase_target_stack; valid_init_state ] ) )
 
-      let main ?(witness : Witness.t option) (spec : Spec.t)
-          ~constraint_constants (statement : Statement.With_sok.Checked.t) =
+      let main ?(log = Mina_transaction_logic.Log.Disabled)
+          ?(witness : Witness.t option) (spec : Spec.t) ~constraint_constants
+          (statement : Statement.With_sok.Checked.t) =
         let open Impl in
         run_checked (dummy_constraints ()) ;
         let ( ! ) x = Option.value_exn x in
@@ -1948,6 +2071,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                               `Yes start_data
                           | `Compute_in_circuit ->
                               `Compute start_data )
+                        log
                         S.{ perform }
                         acc )
                 in
@@ -1957,7 +2081,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 match account_update_spec.is_start with
                 | `No ->
                     let global_state, local_state =
-                      S.apply ~constraint_constants ~is_start:`No
+                      S.apply ~constraint_constants ~is_start:`No log
                         S.{ perform }
                         acc
                     in
@@ -2046,6 +2170,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       (* Horrible hack :( *)
       let witness : Witness.t option ref = ref None
 
+      (* Another horrible hack :'( *)
+      let log : Mina_transaction_logic.Log.t option ref = ref None
+
       let rule (type a b c d) ~constraint_constants ~proof_level
           (t : (a, b, c, d) Basic.t_typed) :
           ( a
@@ -2078,7 +2205,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; main =
                 (fun { public_input = stmt } ->
                   let zkapp_input, `Must_verify must_verify =
-                    main ?witness:!witness s ~constraint_constants stmt
+                    main ?log:!log ?witness:!witness s ~constraint_constants
+                      stmt
                   in
                   let proof =
                     Run.exists (Typ.Internal.ref ()) ~request:(fun () ->
@@ -2101,7 +2229,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; main =
                 (fun { public_input = stmt } ->
                   let zkapp_input_opt, _ =
-                    main ?witness:!witness s ~constraint_constants stmt
+                    main ?log:!log ?witness:!witness s ~constraint_constants
+                      stmt
                   in
                   assert (Option.is_none zkapp_input_opt) ;
                   { previous_proof_statements = []
@@ -2116,7 +2245,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; main =
                 (fun { public_input = stmt } ->
                   let zkapp_input_opt, _ =
-                    main ?witness:!witness s ~constraint_constants stmt
+                    main ?log:!log ?witness:!witness s ~constraint_constants
+                      stmt
                   in
                   assert (Option.is_none zkapp_input_opt) ;
                   { previous_proof_statements = []
@@ -3329,9 +3459,11 @@ module Make_str (A : Wire_types.Concrete) = struct
       -> t Async.Deferred.t
 
     val of_zkapp_command_segment_exn :
-         statement:Statement.With_sok.t
+         ?log:Mina_transaction_logic.Log.t
+      -> statement:Statement.With_sok.t
       -> witness:Zkapp_command_segment.Witness.t
       -> spec:Zkapp_command_segment.Basic.t
+      -> unit
       -> t Async.Deferred.t
 
     val merge :
@@ -3977,9 +4109,11 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       (pi, vk)
 
-    let of_zkapp_command_segment_exn ~(statement : Proof.statement) ~witness
-        ~(spec : Zkapp_command_segment.Basic.t) : t Async.Deferred.t =
+    let of_zkapp_command_segment_exn ?log ~(statement : Proof.statement)
+        ~witness ~(spec : Zkapp_command_segment.Basic.t) () : t Async.Deferred.t
+        =
       Base.Zkapp_command_snark.witness := Some witness ;
+      Base.Zkapp_command_snark.log := log ;
       let res =
         match spec with
         | Opt_signed ->
@@ -3999,6 +4133,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let open Async in
       let%map (), (), proof = res in
       Base.Zkapp_command_snark.witness := None ;
+      Base.Zkapp_command_snark.log := None ;
       { proof; statement }
 
     let of_transaction_union ~statement ~init_stack transaction state_body

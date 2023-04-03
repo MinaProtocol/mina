@@ -21,7 +21,8 @@ module type Inputs_intf = sig
   end
 
   val perform_single :
-       Worker_state.t
+       ?log:Mina_transaction_logic.Log.t
+    -> Worker_state.t
     -> message:Mina_base.Sok_message.t
     -> (Transaction_witness.t, Ledger_proof.t) Work.Single.Spec.t
     -> (Ledger_proof.t * Time.Span.t) Deferred.Or_error.t

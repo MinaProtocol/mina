@@ -153,9 +153,11 @@ module type Full = sig
       -> t Async.Deferred.t
 
     val of_zkapp_command_segment_exn :
-         statement:Statement.With_sok.t
+         ?log:Mina_transaction_logic.Log.t
+      -> statement:Statement.With_sok.t
       -> witness:Zkapp_command_segment.Witness.t
       -> spec:Zkapp_command_segment.Basic.t
+      -> unit
       -> t Async.Deferred.t
 
     val merge :
@@ -251,7 +253,8 @@ module type Full = sig
 
     module Zkapp_command_snark : sig
       val main :
-           ?witness:Zkapp_command_segment.Witness.t
+           ?log:Mina_transaction_logic.Log.t
+        -> ?witness:Zkapp_command_segment.Witness.t
         -> Zkapp_command_segment.Spec.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> Statement.With_sok.var

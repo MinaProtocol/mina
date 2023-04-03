@@ -91,23 +91,24 @@ let apply_user_command ~constraint_constants ~txn_global_slot =
   apply_transaction_logic
     (T.apply_user_command ~constraint_constants ~txn_global_slot)
 
-let apply_transaction_first_pass ~constraint_constants ~global_slot
+let apply_transaction_first_pass ?log ~constraint_constants ~global_slot
     ~txn_state_view =
   apply_transaction_logic
-    (T.apply_transaction_first_pass ~constraint_constants ~global_slot
+    (T.apply_transaction_first_pass ?log ~constraint_constants ~global_slot
        ~txn_state_view )
 
-let apply_transaction_second_pass =
-  apply_transaction_logic T.apply_transaction_second_pass
+let apply_transaction_second_pass ?log =
+  apply_transaction_logic (T.apply_transaction_second_pass ?log)
 
-let apply_transactions ~constraint_constants ~global_slot ~txn_state_view =
+let apply_transactions ?log ~constraint_constants ~global_slot ~txn_state_view =
   apply_transaction_logic
-    (T.apply_transactions ~constraint_constants ~global_slot ~txn_state_view)
+    (T.apply_transactions ?log ~constraint_constants ~global_slot
+       ~txn_state_view )
 
-let apply_zkapp_first_pass_unchecked_with_states ~constraint_constants
+let apply_zkapp_first_pass_unchecked_with_states ?log ~constraint_constants
     ~global_slot ~state_view ~fee_excess ~supply_increase ~first_pass_ledger
     ~second_pass_ledger c =
-  T.apply_zkapp_command_first_pass_aux ~constraint_constants ~global_slot
+  T.apply_zkapp_command_first_pass_aux ?log ~constraint_constants ~global_slot
     ~state_view ~fee_excess ~supply_increase (ref first_pass_ledger) c ~init:[]
     ~f:(fun
          acc
@@ -130,8 +131,8 @@ let apply_zkapp_first_pass_unchecked_with_states ~constraint_constants
       , { local_state with ledger = !(local_state.ledger) } )
       :: acc )
 
-let apply_zkapp_second_pass_unchecked_with_states ~init ledger c =
-  T.apply_zkapp_command_second_pass_aux (ref ledger) c ~init
+let apply_zkapp_second_pass_unchecked_with_states ?log ~init ledger c =
+  T.apply_zkapp_command_second_pass_aux ?log (ref ledger) c ~init
     ~f:(fun
          acc
          ( { first_pass_ledger

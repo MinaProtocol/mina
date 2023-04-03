@@ -45,6 +45,7 @@
    mina_state
    transaction_protocol_state
    ppx_version_runtime
+   mina_transaction_logic
  )
  (preprocess
   (pps

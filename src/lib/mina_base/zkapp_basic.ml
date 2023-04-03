@@ -104,6 +104,15 @@ module Set_or_keep = struct
     end
   end]
 
+  let pp f fmt t =
+    match t with
+    | Set x ->
+        Format.pp_print_string fmt "Set" ;
+        Format.pp_print_space fmt () ;
+        f fmt x
+    | Keep ->
+        Format.pp_print_string fmt "Keep"
+
   let map t ~f = match t with Keep -> Keep | Set x -> Set (f x)
 
   let to_option = function Set x -> Some x | Keep -> None
@@ -135,6 +144,9 @@ module Set_or_keep = struct
 
   module Checked : sig
     type 'a t
+
+    val pp :
+      (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
 
     val is_keep : _ t -> Boolean.var
 
@@ -168,6 +180,13 @@ module Set_or_keep = struct
     val make_unsafe : Boolean.var -> 'a -> 'a t
   end = struct
     type 'a t = (Boolean.var, 'a) Flagged_option.t
+
+    let pp f fmt ({ is_some; data } : _ t) =
+      let open Pickles.Impls.Step in
+      as_prover (fun () ->
+          let is_some = As_prover.read Boolean.typ is_some in
+          let value = if is_some then Set data else Keep in
+          pp f fmt value )
 
     let set_or_keep ~if_ ({ is_some; data } : _ t) x =
       if_ is_some ~then_:data ~else_:x
