@@ -4555,7 +4555,10 @@ module Mutations = struct
                                         Quickcheck.Generator.generate
                                           (Mina_generators
                                            .Zkapp_command_generators
-                                           .gen_zkapp_command_from ~limited:true
+                                           .gen_zkapp_command_from
+                                             ~ignore_sequence_events_precond:
+                                               true ~no_token_accounts:true
+                                             ~limited:true
                                              ~fee_payer_keypair:fee_payer
                                              ~keymap ~account_state_tbl
                                              ~generate_new_accounts ~ledger () )
