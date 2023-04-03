@@ -49,6 +49,8 @@ end
 module type Resource_pool_diff_intf = sig
   type pool
 
+  val label : string
+
   type t [@@deriving sexp, to_yojson]
 
   type verified [@@deriving sexp, to_yojson]

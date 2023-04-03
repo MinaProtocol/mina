@@ -181,33 +181,42 @@ let handle_incoming_message t msg ~handle_push_message =
   in
   match msg with
   | RpcResponse rpc_response ->
-      O1trace.sync_thread "handle_libp2p_ipc_rpc_response" (fun () ->
-          let rpc_header =
-            Libp2pHelperInterface.RpcResponse.header_get rpc_response
-          in
-          let sequence_number =
-            RpcMessageHeader.sequence_number_get rpc_header
-          in
-          record_message_delay (RpcMessageHeader.time_sent_get rpc_header) ;
-          match Hashtbl.find t.outstanding_requests sequence_number with
-          | Some ivar ->
-              if Ivar.is_full ivar then
-                [%log' error t.logger]
-                  "Attempted fill outstanding libp2p_helper RPC request more \
-                   than once"
-              else
-                Ivar.fill ivar
-                  (Libp2p_ipc.rpc_response_to_or_error rpc_response)
-          | None ->
-              [%log' error t.logger]
-                "Attempted to fill outstanding libp2p_helper RPC request, but \
-                 not outstanding request was found" ) ;
-      Deferred.unit
+      Monitor.protect ~here:[%here]
+        ~finally:(fun () -> Deferred.unit)
+        (fun () ->
+          O1trace.sync_thread "handle_libp2p_ipc_rpc_response" (fun () ->
+              let rpc_header =
+                Libp2pHelperInterface.RpcResponse.header_get rpc_response
+              in
+              let sequence_number =
+                RpcMessageHeader.sequence_number_get rpc_header
+              in
+              record_message_delay (RpcMessageHeader.time_sent_get rpc_header) ;
+              match Hashtbl.find t.outstanding_requests sequence_number with
+              | Some ivar ->
+                  if Ivar.is_full ivar then
+                    [%log' error t.logger]
+                      "Attempted fill outstanding libp2p_helper RPC request \
+                       more than once"
+                  else
+                    Ivar.fill ivar
+                      (Libp2p_ipc.rpc_response_to_or_error rpc_response)
+              | None ->
+                  [%log' error t.logger]
+                    "Attempted to fill outstanding libp2p_helper RPC request, \
+                     but not outstanding request was found" ) ;
+          Deferred.unit )
   | PushMessage push_msg ->
-      O1trace.thread "handle_libp2p_ipc_push" (fun () ->
-          let push_header = DaemonInterface.PushMessage.header_get push_msg in
-          record_message_delay (PushMessageHeader.time_sent_get push_header) ;
-          handle_push_message t (DaemonInterface.PushMessage.get push_msg) )
+      Monitor.protect ~here:[%here]
+        ~finally:(fun () -> Deferred.unit)
+        (fun () ->
+          O1trace.thread "handle_libp2p_ipc_push" (fun () ->
+              let push_header =
+                DaemonInterface.PushMessage.header_get push_msg
+              in
+              record_message_delay (PushMessageHeader.time_sent_get push_header) ;
+              handle_push_message t (DaemonInterface.PushMessage.get push_msg) )
+          )
   | Undefined n ->
       Libp2p_ipc.undefined_union ~context:"DaemonInterface.Message" n ;
       Deferred.unit
