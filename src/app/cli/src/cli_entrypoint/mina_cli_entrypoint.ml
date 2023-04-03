@@ -1581,43 +1581,86 @@ let internal_commands logger =
   ; ( "run-snark-worker-single"
     , Command.async
         ~summary:"Run snark-worker on a sexp provided on a single line of stdin"
-        (Command.Param.return (fun () ->
-             let logger = Logger.create () in
-             Parallel.init_master () ;
-             match%bind
-               Reader.with_file "./failure.sexp" ~f:(fun reader ->
-                   [%log info] "Created reader for failure.sexp" ;
-                   Reader.read_sexp reader )
-             with
-             | `Ok sexp -> (
-                 let%bind worker_state =
-                   Snark_worker.Prod.Inputs.Worker_state.create
-                     ~proof_level:Genesis_constants.Proof_level.compiled
-                     ~constraint_constants:
-                       Genesis_constants.Constraint_constants.compiled ()
-                 in
-                 let sok_message =
-                   { Mina_base.Sok_message.fee = Currency.Fee.of_int 0
-                   ; prover = Quickcheck.random_value Public_key.Compressed.gen
-                   }
-                 in
-                 let spec =
-                   [%of_sexp:
-                     ( Transaction_witness.t
-                     , Ledger_proof.t )
-                     Snark_work_lib.Work.Single.Spec.t] sexp
-                 in
-                 match%map
-                   Snark_worker.Prod.Inputs.perform_single worker_state
-                     ~message:sok_message spec
-                 with
-                 | Ok _ ->
-                     [%log info] "Successfully worked"
-                 | Error err ->
-                     [%log error] "Work didn't work: $err"
-                       ~metadata:[ ("err", Error_json.error_to_yojson err) ] )
-             | `Eof ->
-                 failwith "early EOF while reading sexp" ) ) )
+        ( let open Command.Let_syntax in
+          let%map_open conf_dir = Cli_lib.Flag.conf_dir
+          and config_file =
+            flag "--config-file" ~aliases:[ "config-file" ]
+              ~doc:
+                "PATH path to a configuration file (overrides MINA_CONFIG_FILE, \
+                 default: <config_dir>/daemon.json). Pass multiple times to override \
+                 fields from earlier config files"
+              (required string)
+          and genesis_dir =
+            flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
+              ~doc:
+                "DIR Directory that contains the genesis ledger and the genesis \
+                 blockchain proof (default: <config-dir>)"
+              (optional string)
+          in
+          fun () ->
+            let open Deferred.Let_syntax in
+            let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
+            let genesis_dir =
+              Option.value ~default:(conf_dir ^/ "genesis") genesis_dir
+            in
+              let%bind config =
+                match%bind Genesis_ledger_helper.load_config_json config_file with
+                | Ok config_json ->
+                     let%map config_json =
+                       Genesis_ledger_helper.upgrade_old_config ~logger
+                         config_file config_json
+                     in
+                     Runtime_config.combine
+                       Runtime_config.default
+                       (Result.ok_or_failwith @@ Runtime_config.of_yojson config_json)
+                | Error err ->
+                    Error.raise err
+              in
+              let%bind precomputed_values =
+                match%map
+                  Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger ~proof_level:(Some Genesis_constants.Proof_level.compiled) config
+                with
+                | Ok (precomputed_values, _) ->
+                    precomputed_values
+                | Error err ->
+                    Error.raise err
+              in
+              let logger = Logger.create () in
+              Parallel.init_master () ;
+              match%bind
+                Reader.with_file "./failure.sexp" ~f:(fun reader ->
+                    [%log info] "Created reader for failure.sexp" ;
+                    Reader.read_sexp reader )
+              with
+              | `Ok sexp -> (
+                  let%bind worker_state =
+                    Snark_worker.Prod.Inputs.Worker_state.create
+                      ~proof_level:Genesis_constants.Proof_level.compiled
+                      ~constraint_constants:precomputed_values.constraint_constants
+                      ()
+                  in
+                  let sok_message =
+                    { Mina_base.Sok_message.fee = Currency.Fee.zero
+                    ; prover = Quickcheck.random_value Public_key.Compressed.gen
+                    }
+                  in
+                  let spec =
+                    [%of_sexp:
+                      ( Transaction_witness.t
+                      , Ledger_proof.t )
+                      Snark_work_lib.Work.Single.Spec.t] sexp
+                  in
+                  match%map
+                    Snark_worker.Prod.Inputs.perform_single worker_state
+                      ~message:sok_message spec
+                  with
+                  | Ok _ ->
+                      [%log info] "Successfully worked"
+                  | Error err ->
+                      [%log error] "Work didn't work: $err"
+                        ~metadata:[ ("err", Error_json.error_to_yojson err) ] )
+              | `Eof ->
+                  failwith "early EOF while reading sexp" ) )
   ; ( "run-verifier"
     , Command.async
         ~summary:"Run verifier on a proof provided on a single line of stdin"
