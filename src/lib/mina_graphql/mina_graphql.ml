@@ -4582,7 +4582,8 @@ module Mutations = struct
                                   )
                               |> Public_key.Compressed.Map.of_alist_exn
                             in
-                            let rec go ~prover account_state_tbl ndx tm_next =
+                            let rec go ~vk ~prover account_state_tbl ndx tm_next
+                                =
                               if Time.( >= ) (Time.now ()) tm_end then (
                                 [%log info]
                                   "Scheduled zkApp commands with handle %s has \
@@ -4638,7 +4639,8 @@ module Mutations = struct
                                              ~limited:true
                                              ~fee_payer_keypair:fee_payer
                                              ~keymap ~account_state_tbl
-                                             ~generate_new_accounts ~ledger () )
+                                             ~generate_new_accounts ~ledger ~vk
+                                             () )
                                           ~size:1
                                           ~random:
                                             (Splittable_random.State.create
@@ -4672,7 +4674,7 @@ module Mutations = struct
                                 in
                                 let%bind () = Async_unix.at tm_next in
                                 let next_tm_next = Time.add tm_next wait_span in
-                                go ~prover account_state_tbl
+                                go ~vk ~prover account_state_tbl
                                   ((ndx + 1) mod num_fee_payers)
                                   next_tm_next
                             in
@@ -4696,7 +4698,7 @@ module Mutations = struct
                                         @ get_account zkapp_account_ids
                                             `Ordinary_participant )
                                     in
-                                    let `VK _, `Prover prover =
+                                    let `VK vk, `Prover prover =
                                       Transaction_snark.For_tests
                                       .create_trivial_snapp
                                         ~constraint_constants ()
@@ -4705,7 +4707,8 @@ module Mutations = struct
                                       Time.add (Time.now ()) wait_span
                                     in
                                     don't_wait_for
-                                    @@ go account_state_tbl ~prover 0 tm_next ) ;
+                                    @@ go account_state_tbl ~vk ~prover 0
+                                         tm_next ) ;
 
                             Ok (Uuid.to_string uuid) ) ) ) )
 
