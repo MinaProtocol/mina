@@ -228,7 +228,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                           let%bind p1 =
                             Async.Deferred.Or_error.try_with (fun () ->
                                 T.of_zkapp_command_segment_exn ~statement:stmt
-                                  ~witness ~spec )
+                                  ~witness ~spec () )
                           in
                           Async.Deferred.List.fold ~init:(Ok p1) rest
                             ~f:(fun acc (witness, spec, stmt) ->
@@ -236,7 +236,7 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                               let%bind curr =
                                 Async.Deferred.Or_error.try_with (fun () ->
                                     T.of_zkapp_command_segment_exn
-                                      ~statement:stmt ~witness ~spec )
+                                      ~statement:stmt ~witness ~spec () )
                               in
                               let sok_digest =
                                 Sok_message.create ~fee:Fee.zero

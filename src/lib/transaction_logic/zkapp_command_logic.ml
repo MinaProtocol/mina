@@ -1,7 +1,11 @@
 (* zkapp_command_logic.ml *)
+(* TODO: review side effects *)
 
 open Core_kernel
 open Mina_base
+open Log
+
+let pp_as_list ~to_list f fmt x = Format.pp_print_list f fmt (to_list x)
 
 module type Iffable = sig
   type bool
@@ -11,10 +15,23 @@ module type Iffable = sig
   val if_ : bool -> then_:t -> else_:t -> t
 end
 
+module type Formattable = sig
+  type t
+
+  val pp : Format.formatter -> t -> unit
+end
+
+(* TODO: better name for this *)
+module type Programmable = sig
+  include Iffable
+
+  include Formattable with type t := t
+end
+
 module type Bool_intf = sig
   type t
 
-  include Iffable with type t := t and type bool := t
+  include Programmable with type t := t and type bool := t
 
   val true_ : t
 
@@ -50,7 +67,7 @@ module type Bool_intf = sig
 end
 
 module type Balance_intf = sig
-  include Iffable
+  include Programmable
 
   type amount
 
@@ -62,7 +79,7 @@ module type Balance_intf = sig
 end
 
 module type Receipt_chain_hash_intf = sig
-  include Iffable
+  include Programmable
 
   type transaction_commitment
 
@@ -78,12 +95,12 @@ module type Receipt_chain_hash_intf = sig
 end
 
 module type Amount_intf = sig
-  include Iffable
+  include Programmable
 
   type unsigned = t
 
   module Signed : sig
-    include Iffable with type bool := bool
+    include Programmable with type bool := bool
 
     val equal : t -> t -> bool
 
@@ -110,7 +127,7 @@ module type Amount_intf = sig
 end
 
 module type Account_id_intf = sig
-  include Iffable
+  include Programmable
 
   type public_key
 
@@ -126,7 +143,7 @@ module type Account_id_intf = sig
 end
 
 module type Global_slot_intf = sig
-  include Iffable
+  include Programmable
 
   val zero : t
 
@@ -144,7 +161,7 @@ module type Verification_key_hash_intf = sig
 end
 
 module type Timing_intf = sig
-  include Iffable
+  include Programmable
 
   type global_slot
 
@@ -152,7 +169,7 @@ module type Timing_intf = sig
 end
 
 module type Token_id_intf = sig
-  include Iffable
+  include Programmable
 
   val equal : t -> t -> bool
 
@@ -295,6 +312,8 @@ module type Set_or_keep_intf = sig
   val is_keep : _ t -> bool
 
   val set_or_keep : if_:(bool -> then_:'a -> else_:'a -> 'a) -> 'a t -> 'a -> 'a
+
+  val pp : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
 end
 
 module type Account_update_intf = sig
@@ -474,7 +493,7 @@ module type Call_stack_intf = sig
 end
 
 module type Ledger_intf = sig
-  include Iffable
+  include Programmable
 
   type public_key
 
@@ -499,13 +518,13 @@ module type Ledger_intf = sig
 end
 
 module type Controller_intf = sig
-  include Iffable
+  include Programmable
 
   val check : proof_verifies:bool -> signature_verifies:bool -> t -> bool
 end
 
 module type Account_intf = sig
-  type t
+  include Formattable
 
   type bool
 
@@ -542,7 +561,7 @@ module type Account_intf = sig
 
     val set_timing : t -> controller
 
-    include Iffable with type bool := bool
+    include Programmable with type bool := bool
   end
 
   type timing
@@ -696,7 +715,7 @@ module type Inputs_intf = sig
 
   module Bool : Bool_intf
 
-  module Field : Iffable with type bool := Bool.t
+  module Field : Programmable with type bool := Bool.t
 
   module Amount : Amount_intf with type bool := Bool.t
 
@@ -706,7 +725,7 @@ module type Inputs_intf = sig
        and type amount := Amount.t
        and type signed_amount := Amount.Signed.t
 
-  module Public_key : Iffable with type bool := Bool.t
+  module Public_key : Programmable with type bool := Bool.t
 
   module Token_id : Token_id_intf with type bool := Bool.t
 
@@ -727,19 +746,19 @@ module type Inputs_intf = sig
   module Global_slot : Global_slot_intf with type bool := Bool.t
 
   module Nonce : sig
-    include Iffable with type bool := Bool.t
+    include Programmable with type bool := Bool.t
 
     val succ : t -> t
   end
 
-  module State_hash : Iffable with type bool := Bool.t
+  module State_hash : Programmable with type bool := Bool.t
 
   module Timing :
     Timing_intf with type bool := Bool.t and type global_slot := Global_slot.t
 
-  module Zkapp_uri : Iffable with type bool := Bool.t
+  module Zkapp_uri : Programmable with type bool := Bool.t
 
-  module Token_symbol : Iffable with type bool := Bool.t
+  module Token_symbol : Programmable with type bool := Bool.t
 
   module Opt : Opt_intf with type bool := Bool.t
 
@@ -749,7 +768,7 @@ module type Inputs_intf = sig
        and type transaction_commitment := Transaction_commitment.t
        and type index := Index.t)
 
-  and Verification_key : (Iffable with type bool := Bool.t)
+  and Verification_key : (Programmable with type bool := Bool.t)
   and Verification_key_hash :
     (Verification_key_hash_intf with type bool := Bool.t)
 
@@ -832,7 +851,7 @@ module type Inputs_intf = sig
 
   and Transaction_commitment : sig
     include
-      Iffable
+      Programmable
         with type bool := Bool.t
          and type t = Account_update.transaction_commitment
 
@@ -845,7 +864,7 @@ module type Inputs_intf = sig
   end
 
   and Index : sig
-    include Iffable with type bool := Bool.t
+    include Programmable with type bool := Bool.t
 
     val zero : t
 
@@ -921,6 +940,12 @@ module Make (Inputs : Inputs_intf) = struct
       ~calls:(Call_forest.empty ())
 
   let assert_ ~pos b = Bool.Assert.is_true ~pos b
+
+  let add_check l local_state failure success =
+    log l
+      !"Checking for failure %{Transaction_status.Failure}: %a"
+      failure Bool.pp success ;
+    Local_state.add_check local_state failure success
 
   (* Pop from the call stack, returning dummy values if the stack is empty. *)
   let pop_call_stack (s : Call_stack.t) : Stack_frame.t * Call_stack.t =
@@ -1059,6 +1084,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let apply ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(is_start : [ `Yes of _ Start_data.t | `No | `Compute of _ Start_data.t ])
+      (l : Log.t)
       (h :
         (< global_state : Global_state.t
          ; transaction_commitment : Transaction_commitment.t
@@ -1110,6 +1136,10 @@ module Make (Inputs : Inputs_intf) = struct
       ; will_succeed
       }
     in
+    log l
+      "Preparing to apply an account update: is_start=%a, will_succeed=%a, \
+       ledger=%a"
+      Bool.pp is_start' Bool.pp will_succeed Ledger.pp local_state.ledger ;
     let ( (account_update, remaining, call_stack)
         , account_update_forest
         , local_state
@@ -1141,6 +1171,8 @@ module Make (Inputs : Inputs_intf) = struct
             (* TODO: Make the stack frame hashed inside of the local state *)
             get_next_account_update to_pop call_stack )
       in
+      log l "Account update to apply: public_key=%a" Public_key.pp
+        (Account_update.public_key account_update) ;
       let local_state =
         with_label ~label:"token owner not caller" (fun () ->
             let default_token_or_token_owner_was_caller =
@@ -1153,7 +1185,7 @@ module Make (Inputs : Inputs_intf) = struct
                 (Token_id.equal account_update_token_id Token_id.default)
                 (Token_id.equal account_update_token_id caller_id)
             in
-            Local_state.add_check local_state Token_owner_not_caller
+            add_check l local_state Token_owner_not_caller
               default_token_or_token_owner_was_caller )
       in
       let ((a, inclusion_proof) as acct) =
@@ -1161,6 +1193,7 @@ module Make (Inputs : Inputs_intf) = struct
             Inputs.Ledger.get_account account_update local_state.ledger )
       in
       Inputs.Ledger.check_inclusion local_state.ledger (a, inclusion_proof) ;
+      log l "Account state to apply update to: %a" Account.pp a ;
       let transaction_commitment, full_transaction_commitment =
         match is_start with
         | `No ->
@@ -1217,21 +1250,30 @@ module Make (Inputs : Inputs_intf) = struct
         (a, inclusion_proof)
     in
     let matching_verification_key_hashes =
-      Inputs.Bool.(
-        (not (Account_update.is_proved account_update))
-        ||| Verification_key_hash.equal
-              (Account.verification_key_hash a)
-              (Account_update.verification_key_hash account_update))
+      let account_is_proved = Account_update.is_proved account_update in
+      let verification_key_matches =
+        Verification_key_hash.equal
+          (Account.verification_key_hash a)
+          (Account_update.verification_key_hash account_update)
+      in
+      log l
+        "Determining verification key validity: account_is_proved=%a, \
+         verification_key_matches=%a"
+        Bool.pp account_is_proved Bool.pp verification_key_matches ;
+      Inputs.Bool.((not account_is_proved) ||| verification_key_matches)
     in
     let local_state =
-      Local_state.add_check local_state Unexpected_verification_key_hash
+      add_check l local_state Unexpected_verification_key_hash
         matching_verification_key_hashes
     in
+    (* TODO: instrument precondition checks *)
+    log l "Checking account preconditions" ;
     let local_state =
       h.perform
         (Check_account_precondition
            (account_update, a, account_is_new, local_state) )
     in
+    log l "Checking protocol state preconditions" ;
     let protocol_state_predicate_satisfied =
       h.perform
         (Check_protocol_state_precondition
@@ -1239,17 +1281,18 @@ module Make (Inputs : Inputs_intf) = struct
            , global_state ) )
     in
     let local_state =
-      Local_state.add_check local_state Protocol_state_precondition_unsatisfied
+      add_check l local_state Protocol_state_precondition_unsatisfied
         protocol_state_predicate_satisfied
     in
     let local_state =
+      log l "Checking valid while precondition" ;
       let valid_while_satisfied =
         h.perform
           (Check_valid_while_precondition
              ( Account_update.valid_while_precondition account_update
              , global_state ) )
       in
-      Local_state.add_check local_state Valid_while_precondition_unsatisfied
+      add_check l local_state Valid_while_precondition_unsatisfied
         valid_while_satisfied
     in
     let `Proof_verifies proof_verifies, `Signature_verifies signature_verifies =
@@ -1263,18 +1306,22 @@ module Make (Inputs : Inputs_intf) = struct
         ~will_succeed:local_state.will_succeed ~commitment
         ~calls:account_update_forest account_update
     in
+    log l
+      "Evaluating account authorization: proof_verifies=%a, \
+       signature_verifies=%a"
+      Bool.pp proof_verifies Bool.pp signature_verifies ;
     assert_ ~pos:__POS__
       (Bool.equal proof_verifies (Account_update.is_proved account_update)) ;
     assert_ ~pos:__POS__
       (Bool.equal signature_verifies (Account_update.is_signed account_update)) ;
     (* The fee-payer must increment their nonce. *)
     let local_state =
-      Local_state.add_check local_state Fee_payer_nonce_must_increase
+      add_check l local_state Fee_payer_nonce_must_increase
         Inputs.Bool.(
           Inputs.Account_update.increment_nonce account_update ||| not is_start')
     in
     let local_state =
-      Local_state.add_check local_state Fee_payer_must_be_signed
+      add_check l local_state Fee_payer_must_be_signed
         Inputs.Bool.(signature_verifies ||| not is_start')
     in
     let local_state =
@@ -1293,12 +1340,21 @@ module Make (Inputs : Inputs_intf) = struct
           &&& not is_start')
       in
       let does_not_use_a_signature = Inputs.Bool.not signature_verifies in
-      Local_state.add_check local_state Zkapp_command_replay_check_failed
+      log l
+        "Determining zkapp command replayability: \
+         increments_nonce_and_constrains_its_old_value=%a, \
+         depends_on_the_fee_payers_nonce_and_isnt_the_fee_payer=%a, \
+         does_not_use_a_signature=%a"
+        Bool.pp increments_nonce_and_constrains_its_old_value Bool.pp
+        depends_on_the_fee_payers_nonce_and_isnt_the_fee_payer Bool.pp
+        does_not_use_a_signature ;
+      add_check l local_state Zkapp_command_replay_check_failed
         Inputs.Bool.(
           increments_nonce_and_constrains_its_old_value
           ||| depends_on_the_fee_payers_nonce_and_isnt_the_fee_payer
           ||| does_not_use_a_signature)
     in
+    (* set the account token id to the update token id (noop except in the case of new accounts) *)
     let a = Account.set_token_id a (Account_update.token_id account_update) in
     let account_update_token = Account_update.token_id account_update in
     let account_update_token_is_default =
@@ -1312,8 +1368,12 @@ module Make (Inputs : Inputs_intf) = struct
         Controller.check ~proof_verifies ~signature_verifies
           (Account.Permissions.set_timing a)
       in
+      log l
+        "Determining timing update permissions: account_is_untimed=%a, \
+         has_permissions=%a"
+        Bool.pp account_is_untimed Bool.pp has_permission ;
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_timing
+        add_check l local_state Update_not_permitted_timing
           Bool.(
             Set_or_keep.is_keep timing
             ||| (account_is_untimed &&& has_permission))
@@ -1334,8 +1394,13 @@ module Make (Inputs : Inputs_intf) = struct
       Account_update.implicit_account_creation_fee account_update
     in
     (* Check the token for implicit account creation fee payment. *)
+    log l
+      "Determining account creation fee payment: \
+       implicit_account_creation_fee=%a, account_update_token_is_default=%a"
+      Bool.pp implicit_account_creation_fee Bool.pp
+      account_update_token_is_default ;
     let local_state =
-      Local_state.add_check local_state Cannot_pay_creation_fee_in_token
+      add_check l local_state Cannot_pay_creation_fee_in_token
         Bool.(
           (not implicit_account_creation_fee)
           ||| account_update_token_is_default)
@@ -1359,8 +1424,13 @@ module Make (Inputs : Inputs_intf) = struct
         Amount.Signed.if_ pay_creation_fee ~then_:balance_change_for_creation
           ~else_:balance_change
       in
+      log l
+        "Determining account creation fee sufficiency: pay_creation_fee=%a, \
+         creation_overflow=%a, balance_change=%a"
+        Bool.pp pay_creation_fee Bool.pp creation_overflow Amount.Signed.pp
+        balance_change ;
       let local_state =
-        Local_state.add_check local_state Amount_insufficient_to_create_account
+        add_check l local_state Amount_insufficient_to_create_account
           Bool.(
             not
               ( pay_creation_fee
@@ -1377,10 +1447,11 @@ module Make (Inputs : Inputs_intf) = struct
         Balance.add_signed_amount_flagged (Account.balance a)
           actual_balance_change
       in
+      log l "Applying balance change: %a + %a = %a (overflow=%a)" Balance.pp
+        (Account.balance a) Amount.Signed.pp actual_balance_change Balance.pp
+        balance Bool.pp failed1 ;
       (* TODO: Should this report 'insufficient balance'? *)
-      let local_state =
-        Local_state.add_check local_state Overflow (Bool.not failed1)
-      in
+      let local_state = add_check l local_state Overflow (Bool.not failed1) in
       let account_creation_fee =
         Amount.of_constant_fee constraint_constants.account_creation_fee
       in
@@ -1390,8 +1461,14 @@ module Make (Inputs : Inputs_intf) = struct
           Amount.Signed.add_flagged local_state.excess
             Amount.Signed.(negate (of_unsigned account_creation_fee))
         in
+        log l
+          "Updating local state excess based on account creation fee: if %a \
+           then %a -> %a (overflow=%a)"
+          Bool.pp pay_creation_fee_from_excess Amount.Signed.pp
+          local_state.excess Amount.Signed.pp excess_minus_creation_fee Bool.pp
+          excess_update_failed ;
         let local_state =
-          Local_state.add_check local_state Local_excess_overflow
+          add_check l local_state Local_excess_overflow
             Bool.(not (pay_creation_fee_from_excess &&& excess_update_failed))
         in
         { local_state with
@@ -1407,8 +1484,14 @@ module Make (Inputs : Inputs_intf) = struct
           Amount.Signed.add_flagged local_state.supply_increase
             Amount.Signed.(negate (of_unsigned account_creation_fee))
         in
+        log l
+          "Updating local state supply increase based on account creation fee: \
+           if %a then %a -> %a (overflow=%a)"
+          Bool.pp account_is_new Amount.Signed.pp local_state.supply_increase
+          Amount.Signed.pp supply_increase_minus_creation_fee Bool.pp
+          supply_increase_update_failed ;
         let local_state =
-          Local_state.add_check local_state Local_supply_increase_overflow
+          add_check l local_state Local_supply_increase_overflow
             Bool.(not (account_is_new &&& supply_increase_update_failed))
         in
         { local_state with
@@ -1428,7 +1511,12 @@ module Make (Inputs : Inputs_intf) = struct
         let has_permission =
           Controller.check ~proof_verifies ~signature_verifies controller
         in
-        Local_state.add_check local_state Update_not_permitted_balance
+        log l
+          "Determining balance change permissions: is_receiver=%a, \
+           controller=%a, has_permission=%a, actual_balance_change=%a"
+          Bool.pp is_receiver Controller.pp controller Bool.pp has_permission
+          Amount.Signed.pp actual_balance_change ;
+        add_check l local_state Update_not_permitted_balance
           Bool.(
             has_permission
             ||| Amount.Signed.(
@@ -1450,8 +1538,12 @@ module Make (Inputs : Inputs_intf) = struct
             *)
             (`Invalid_timing invalid_timing, timing)
       in
+      log l
+        "Determining account timing: global_slot=%a, invalid_timing=%a, \
+         new_timing=%a"
+        Global_slot.pp txn_global_slot Bool.pp invalid_timing Timing.pp timing ;
       let local_state =
-        Local_state.add_check local_state Source_minimum_balance_violation
+        add_check l local_state Source_minimum_balance_violation
           (Bool.not invalid_timing)
       in
       let a = Account.set_timing a timing in
@@ -1467,8 +1559,7 @@ module Make (Inputs : Inputs_intf) = struct
         Controller.check ~proof_verifies ~signature_verifies
           (Account.Permissions.access a)
       in
-      Local_state.add_check local_state Update_not_permitted_access
-        has_permission
+      add_check l local_state Update_not_permitted_access has_permission
     in
     (* Update app state. *)
     let a, local_state =
@@ -1508,19 +1599,34 @@ module Make (Inputs : Inputs_intf) = struct
                     ~else_:(Account.proved_state a) )
                ~else_:Bool.false_ )
       in
+      log l
+        "Updating account proved state: %a -> %a (keeping_app_state=%a, \
+         proof_verifies=%a, changing_entire_app_state=%a)"
+        Bool.pp (Account.proved_state a) Bool.pp proved_state Bool.pp
+        keeping_app_state Bool.pp proof_verifies Bool.pp
+        changing_entire_app_state ;
       let a = Account.set_proved_state proved_state a in
       let has_permission =
         Controller.check ~proof_verifies ~signature_verifies
           (Account.Permissions.edit_state a)
       in
+      log l
+        "Determining account state update permissions: keeping_app_state=%a, \
+         has_permission=%a"
+        Bool.pp keeping_app_state Bool.pp has_permission ;
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_app_state
+        add_check l local_state Update_not_permitted_app_state
           Bool.(keeping_app_state ||| has_permission)
       in
       let app_state =
         Pickles_types.Vector.map2 app_state (Account.app_state a)
           ~f:(Set_or_keep.set_or_keep ~if_:Field.if_)
       in
+      log l "Updating account state: %a -> %a"
+        (pp_as_list ~to_list:Pickles_types.Vector.to_list Field.pp)
+        (Account.app_state a)
+        (pp_as_list ~to_list:Pickles_types.Vector.to_list Field.pp)
+        app_state ;
       let a = Account.set_app_state app_state a in
       (a, local_state)
     in
@@ -1533,10 +1639,20 @@ module Make (Inputs : Inputs_intf) = struct
         Controller.check ~proof_verifies ~signature_verifies
           (Account.Permissions.set_verification_key a)
       in
+      log l
+        "Determining verification key update permissions: \
+         keep_verification_key=%a, has_permission=%a"
+        Bool.pp
+        (Set_or_keep.is_keep verification_key)
+        Bool.pp has_permission ;
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_verification_key
+        add_check l local_state Update_not_permitted_verification_key
           Bool.(Set_or_keep.is_keep verification_key ||| has_permission)
       in
+      log l "Updating account verification key: %a -> %a" Verification_key.pp
+        (Account.verification_key a)
+        (Set_or_keep.pp Verification_key.pp)
+        verification_key ;
       let verification_key =
         Set_or_keep.set_or_keep ~if_:Verification_key.if_ verification_key
           (Account.verification_key a)
@@ -1560,10 +1676,23 @@ module Make (Inputs : Inputs_intf) = struct
         Controller.check ~proof_verifies ~signature_verifies
           (Account.Permissions.edit_action_state a)
       in
+      log l
+        "Determining account actions update permissions: is_empty=%a, \
+         has_permission=%a"
+        Bool.pp is_empty Bool.pp has_permission ;
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_action_state
+        add_check l local_state Update_not_permitted_action_state
           Bool.(is_empty ||| has_permission)
       in
+      log l
+        "Updating account actions: (sequence_state: %a -> %a), \
+         (last_sequence_slot: %a -> %a)"
+        (pp_as_list ~to_list:Pickles_types.Vector.Vector_5.to_list Field.pp)
+        (Account.action_state a)
+        (pp_as_list ~to_list:Pickles_types.Vector.Vector_5.to_list Field.pp)
+        action_state Global_slot.pp
+        (Account.last_action_slot a)
+        Global_slot.pp last_action_slot ;
       let a =
         a
         |> Account.set_action_state action_state
@@ -1578,10 +1707,20 @@ module Make (Inputs : Inputs_intf) = struct
         Controller.check ~proof_verifies ~signature_verifies
           (Account.Permissions.set_zkapp_uri a)
       in
+      log l
+        "Determining zkapp uri update permissions: keeping_zkapp_uri=%a, \
+         has_permission=%a"
+        Bool.pp
+        (Set_or_keep.is_keep zkapp_uri)
+        Bool.pp has_permission ;
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_zkapp_uri
+        add_check l local_state Update_not_permitted_zkapp_uri
           Bool.(Set_or_keep.is_keep zkapp_uri ||| has_permission)
       in
+      log l "Updating account zkapp uri: %a -> %a" Zkapp_uri.pp
+        (Account.zkapp_uri a)
+        (Set_or_keep.pp Zkapp_uri.pp)
+        zkapp_uri ;
       let zkapp_uri =
         Set_or_keep.set_or_keep ~if_:Zkapp_uri.if_ zkapp_uri
           (Account.zkapp_uri a)
@@ -1594,6 +1733,13 @@ module Make (Inputs : Inputs_intf) = struct
        is unmodified.
     *)
     let a = Account.unmake_zkapp a in
+    (* TODO: find a way to enable this log
+       log l
+         "Resetting zkapp account state if no changes made: \
+          account_has_zkapp_state=%a"
+         Bool.pp
+         (Account.is_zkapp_account a) ;
+    *)
     (* Update token symbol. *)
     let a, local_state =
       let token_symbol = Account_update.Update.token_symbol account_update in
@@ -1601,10 +1747,20 @@ module Make (Inputs : Inputs_intf) = struct
         Controller.check ~proof_verifies ~signature_verifies
           (Account.Permissions.set_token_symbol a)
       in
+      log l
+        "Determining token symbol update permissions: keeping_token_symbol=%a, \
+         has_permission=%a"
+        Bool.pp
+        (Set_or_keep.is_keep token_symbol)
+        Bool.pp has_permission ;
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_token_symbol
+        add_check l local_state Update_not_permitted_token_symbol
           Bool.(Set_or_keep.is_keep token_symbol ||| has_permission)
       in
+      log l "Updating account token symbol: %a -> %a" Token_symbol.pp
+        (Account.token_symbol a)
+        (Set_or_keep.pp Token_symbol.pp)
+        token_symbol ;
       let token_symbol =
         Set_or_keep.set_or_keep ~if_:Token_symbol.if_ token_symbol
           (Account.token_symbol a)
@@ -1627,17 +1783,31 @@ module Make (Inputs : Inputs_intf) = struct
           ~then_:(Account_update.public_key account_update)
           ~else_:(Account.delegate a)
       in
+      log l
+        "Determining base delegate: account_is_new=%a, \
+         account_update_token_is_default=%a, base_delegate=%a"
+        Bool.pp account_is_new Bool.pp account_update_token_is_default
+        Public_key.pp base_delegate ;
       let has_permission =
         Controller.check ~proof_verifies ~signature_verifies
           (Account.Permissions.set_delegate a)
       in
+      log l
+        "Determining delegate update permissions: keeping_delegate=%a, \
+         has_permission=%a, account_update_token_is_default=%a"
+        Bool.pp
+        (Set_or_keep.is_keep delegate)
+        Bool.pp has_permission Bool.pp account_update_token_is_default ;
       let local_state =
         (* Note: only accounts for the default token can delegate. *)
-        Local_state.add_check local_state Update_not_permitted_delegate
+        add_check l local_state Update_not_permitted_delegate
           Bool.(
             Set_or_keep.is_keep delegate
             ||| (has_permission &&& account_update_token_is_default))
       in
+      log l "Updating account delegate: %a -> %a" Public_key.pp base_delegate
+        (Set_or_keep.pp Public_key.pp)
+        delegate ;
       let delegate =
         Set_or_keep.set_or_keep ~if_:Public_key.if_ delegate base_delegate
       in
@@ -1655,10 +1825,16 @@ module Make (Inputs : Inputs_intf) = struct
         Controller.check ~proof_verifies ~signature_verifies
           (Account.Permissions.increment_nonce a)
       in
+      log l
+        "Determining nonce update permissions: increment_nonce=%a, \
+         has_permission=%a"
+        Bool.pp increment_nonce Bool.pp has_permission ;
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_nonce
+        add_check l local_state Update_not_permitted_nonce
           Bool.((not increment_nonce) ||| has_permission)
       in
+      log l "Updating account nonce: %a -> %a" Nonce.pp (Account.nonce a)
+        Nonce.pp nonce ;
       let a = Account.set_nonce nonce a in
       (a, local_state)
     in
@@ -1669,10 +1845,20 @@ module Make (Inputs : Inputs_intf) = struct
         Controller.check ~proof_verifies ~signature_verifies
           (Account.Permissions.set_voting_for a)
       in
+      log l
+        "Determining voting for update permissions: keeping_voting_for=%a, \
+         has_permission=%a"
+        Bool.pp
+        (Set_or_keep.is_keep voting_for)
+        Bool.pp has_permission ;
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_voting_for
+        add_check l local_state Update_not_permitted_voting_for
           Bool.(Set_or_keep.is_keep voting_for ||| has_permission)
       in
+      log l "Updating account voting for: %a -> %a" State_hash.pp
+        (Account.voting_for a)
+        (Set_or_keep.pp State_hash.pp)
+        voting_for ;
       let voting_for =
         Set_or_keep.set_or_keep ~if_:State_hash.if_ voting_for
           (Account.voting_for a)
@@ -1696,6 +1882,13 @@ module Make (Inputs : Inputs_intf) = struct
                local_state.account_update_index elt old_hash )
           ~else_:old_hash
       in
+      log l
+        "Updating account receipt chain hash: %a -> %a (signature_verifies=%a, \
+         proof_verifies=%a)"
+        Receipt_chain_hash.pp
+        (Account.receipt_chain_hash a)
+        Receipt_chain_hash.pp new_hash Bool.pp signature_verifies Bool.pp
+        proof_verifies ;
       Account.set_receipt_chain_hash a new_hash
     in
     (* Finally, update permissions.
@@ -1709,10 +1902,20 @@ module Make (Inputs : Inputs_intf) = struct
         Controller.check ~proof_verifies ~signature_verifies
           (Account.Permissions.set_permissions a)
       in
+      log l
+        "Determining permissions update permissions: keeping_permissions=%a, \
+         has_permission=%a"
+        Bool.pp
+        (Set_or_keep.is_keep permissions)
+        Bool.pp has_permission ;
       let local_state =
-        Local_state.add_check local_state Update_not_permitted_permissions
+        add_check l local_state Update_not_permitted_permissions
           Bool.(Set_or_keep.is_keep permissions ||| has_permission)
       in
+      log l "Updating account permissions: %a -> %a" Account.Permissions.pp
+        (Account.permissions a)
+        (Set_or_keep.pp Account.Permissions.pp)
+        permissions ;
       let permissions =
         Set_or_keep.set_or_keep ~if_:Account.Permissions.if_ permissions
           (Account.permissions a)
@@ -1721,6 +1924,7 @@ module Make (Inputs : Inputs_intf) = struct
       (a, local_state)
     in
     (* Initialize account's pk, in case it is new. *)
+    log l "Initializing account (if new)" ;
     let a = h.perform (Init_account { account_update; account = a }) in
     (* DO NOT ADD ANY UPDATES HERE. They must be earlier in the code.
        See comment above.
@@ -1740,6 +1944,12 @@ module Make (Inputs : Inputs_intf) = struct
       let curr_token : Token_id.t = local_state.token_id in
       let curr_is_default = Token_id.(equal default) curr_token in
       (* We only allow the default token for fees. *)
+      log l
+        "Determining if fee payment: curr_is_default=%a, is_start'=%a, \
+         account_update_token_is_default=%a, local_delta_is_positive=%a"
+        Bool.pp curr_is_default Bool.pp is_start' Bool.pp
+        account_update_token_is_default Bool.pp
+        (Amount.Signed.is_non_neg local_delta) ;
       assert_ ~pos:__POS__ curr_is_default ;
       Bool.(
         assert_ ~pos:__POS__
@@ -1749,6 +1959,10 @@ module Make (Inputs : Inputs_intf) = struct
       let new_local_fee_excess, `Overflow overflow =
         Amount.Signed.add_flagged local_state.excess local_delta
       in
+      log l "Updating local state fee excess: if %a then %a -> %a (overflow=%a)"
+        Bool.pp account_update_token_is_default Amount.Signed.pp
+        local_state.excess Amount.Signed.pp new_local_fee_excess Bool.pp
+        overflow ;
       ( Amount.Signed.if_ account_update_token_is_default
           ~then_:new_local_fee_excess ~else_:local_state.excess
       , (* No overflow if we aren't using the result of the addition (which we don't in the case that account_update token is not default). *)
@@ -1756,8 +1970,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let local_state = { local_state with excess = new_local_fee_excess } in
     let local_state =
-      Local_state.add_check local_state Local_excess_overflow
-        (Bool.not overflowed)
+      add_check l local_state Local_excess_overflow (Bool.not overflowed)
     in
     (* If a's token ID differs from that in the local state, then
        the local state excess gets moved into the execution state's fee excess.
@@ -1774,6 +1987,15 @@ module Make (Inputs : Inputs_intf) = struct
     let is_last_account_update =
       Call_forest.is_empty (Stack_frame.calls remaining)
     in
+    log l "Updating local state transaction commitment: if %a then %a -> %a"
+      Bool.pp is_last_account_update Transaction_commitment.pp
+      local_state.transaction_commitment Transaction_commitment.pp
+      Transaction_commitment.empty ;
+    log l
+      "Updating local state full transaction commitment: if %a then %a -> %a"
+      Bool.pp is_last_account_update Transaction_commitment.pp
+      local_state.full_transaction_commitment Transaction_commitment.pp
+      Transaction_commitment.empty ;
     let local_state =
       { local_state with
         ledger = new_ledger
@@ -1791,6 +2013,10 @@ module Make (Inputs : Inputs_intf) = struct
       let delta_settled =
         Amount.Signed.equal local_state.excess Amount.(Signed.of_unsigned zero)
       in
+      log l
+        "Determining if fee excess is valid: is_start'=%a, \
+         is_last_account_update=%a, delta_settled=%a"
+        Bool.pp is_start' Bool.pp is_last_account_update Bool.pp delta_settled ;
       (* 1) ignore local excess if it is_start because it will be promoted to global
              excess and then set to zero later in the code
          2) ignore everything but last account update since the excess wouldn't have
@@ -1800,7 +2026,7 @@ module Make (Inputs : Inputs_intf) = struct
       Bool.(is_start' ||| not is_last_account_update ||| delta_settled)
     in
     let local_state =
-      Local_state.add_check local_state Invalid_fee_excess valid_fee_excess
+      add_check l local_state Invalid_fee_excess valid_fee_excess
     in
     let is_start_or_last = Bool.(is_start' ||| is_last_account_update) in
     let update_global_state_fee_excess =
@@ -1814,12 +2040,21 @@ module Make (Inputs : Inputs_intf) = struct
       let global_excess_update_failed =
         Bool.(update_global_state_fee_excess &&& overflow)
       in
+      log l
+        "Updating global state fee excess: if %a then %a -> %a (is_start'=%a, \
+         is_last_account_update=%a, local_state.success=%a, overflow=%a)"
+        Bool.pp update_global_state_fee_excess Amount.Signed.pp amt
+        Amount.Signed.pp res Bool.pp is_start' Bool.pp is_last_account_update
+        Bool.pp local_state.success Bool.pp overflow ;
       let new_amt =
         Amount.Signed.if_ update_global_state_fee_excess ~then_:res ~else_:amt
       in
       ( Global_state.set_fee_excess global_state new_amt
       , global_excess_update_failed )
     in
+    log l "Updating local state fee excess: if %a then %a -> %a" Bool.pp
+      is_start_or_last Amount.Signed.pp local_state.excess Amount.Signed.pp
+      Amount.(Signed.of_unsigned zero) ;
     let local_state =
       { local_state with
         excess =
@@ -1829,20 +2064,34 @@ module Make (Inputs : Inputs_intf) = struct
       }
     in
     let local_state =
-      Local_state.add_check local_state Global_excess_overflow
+      add_check l local_state Global_excess_overflow
         Bool.(not global_excess_update_failed)
     in
     (* add local supply increase in global state *)
-    let new_global_supply_increase, global_supply_increase_update_failed =
-      let res, `Overflow overflow =
+    let is_successful_last_party =
+      Bool.(is_last_account_update &&& local_state.success)
+    in
+    let global_state, global_supply_increase_update_failed =
+      let new_global_supply_increase, `Overflow overflow =
         Amount.Signed.add_flagged
           (Global_state.supply_increase global_state)
           local_state.supply_increase
       in
-      (res, overflow)
+      log l "Updating global state supply increase: %a + %a = %a (overflow=%a)"
+        Amount.Signed.pp
+        (Global_state.supply_increase global_state)
+        Amount.Signed.pp local_state.supply_increase Amount.Signed.pp
+        new_global_supply_increase Bool.pp overflow ;
+      let global_state =
+        Global_state.set_supply_increase global_state
+          (Amount.Signed.if_ is_successful_last_party
+             ~then_:new_global_supply_increase
+             ~else_:(Global_state.supply_increase global_state) )
+      in
+      (global_state, overflow)
     in
     let local_state =
-      Local_state.add_check local_state Global_supply_increase_overflow
+      add_check l local_state Global_supply_increase_overflow
         Bool.(not global_supply_increase_update_failed)
     in
     (* The first account_update must succeed. *)
@@ -1851,15 +2100,25 @@ module Make (Inputs : Inputs_intf) = struct
         ((not is_start') ||| local_state.success)
         local_state.failure_status_tbl) ;
     (* If we are the fee payer (is_start' = true), push the first pass ledger
-       and set the local ledger to be the second pass ledger in preparation for
-       the children.
+        and set the local ledger to be the second pass ledger in preparation for
+        the children.
+       If this is the last party and there were no failures, update the second
+        pass ledger and the supply increase.
     *)
     let local_state, global_state =
       let is_fee_payer = is_start' in
+      log l "Updating global state first pass ledger: if %a then %a -> %a"
+        Bool.pp is_fee_payer Ledger.pp
+        (Global_state.first_pass_ledger global_state)
+        Ledger.pp local_state.ledger ;
       let global_state =
         Global_state.set_first_pass_ledger ~should_update:is_fee_payer
           global_state local_state.ledger
       in
+      log l "Updating local state ledger: if %a then %a -> %a" Bool.pp
+        is_fee_payer Ledger.pp
+        (Global_state.second_pass_ledger global_state)
+        Ledger.pp local_state.ledger ;
       let local_state =
         { local_state with
           ledger =
@@ -1868,33 +2127,31 @@ module Make (Inputs : Inputs_intf) = struct
               ~else_:local_state.ledger
         }
       in
+      log l "Updating global state second pass ledger: if %a then %a -> %a"
+        Bool.pp is_successful_last_party Ledger.pp
+        (Global_state.second_pass_ledger global_state)
+        Ledger.pp local_state.ledger ;
+      let global_state =
+        Global_state.set_second_pass_ledger
+          ~should_update:is_successful_last_party global_state
+          local_state.ledger
+      in
       (local_state, global_state)
     in
     (* If this is the last account update, and [will_succeed] is false, then
        [success] must also be false.
     *)
+    log l
+      "Asserting command application status: is_last_account_update=%a, \
+       local_state.will_succeed=%a, local_state.success=%a"
+      Bool.pp is_last_account_update Bool.pp local_state.will_succeed Bool.pp
+      local_state.success ;
     Bool.(
       Assert.any ~pos:__POS__
         [ not is_last_account_update
         ; local_state.will_succeed
         ; not local_state.success
         ]) ;
-    (* If this is the last party and there were no failures, update the second
-       pass ledger and the supply increase.
-    *)
-    let global_state =
-      let is_successful_last_party =
-        Bool.(is_last_account_update &&& local_state.success)
-      in
-      let global_state =
-        Global_state.set_supply_increase global_state
-          (Amount.Signed.if_ is_successful_last_party
-             ~then_:new_global_supply_increase
-             ~else_:(Global_state.supply_increase global_state) )
-      in
-      Global_state.set_second_pass_ledger
-        ~should_update:is_successful_last_party global_state local_state.ledger
-    in
     let local_state =
       (* Make sure to reset the local_state at the end of a transaction.
          The following fields are already reset
@@ -1909,27 +2166,57 @@ module Make (Inputs : Inputs_intf) = struct
          - account_update_index = Index.zero
          - supply_increase = Amount.Signed.zero
       *)
+      let token_id =
+        log l "Updating local state token id: if %a then %a -> %a" Bool.pp
+          is_last_account_update Token_id.pp Token_id.default Token_id.pp
+          local_state.token_id ;
+        Token_id.if_ is_last_account_update ~then_:Token_id.default
+          ~else_:local_state.token_id
+      in
+      let ledger =
+        let empty_ledger = Ledger.empty ~depth:0 () in
+        log l "Updating local state ledger: if %a then %a -> %a" Bool.pp
+          is_last_account_update Ledger.pp empty_ledger Ledger.pp
+          local_state.ledger ;
+        Ledger.if_ is_last_account_update ~then_:empty_ledger
+          ~else_:local_state.ledger
+      in
+      let success =
+        log l "Updating local state success: if %a then %a -> %a" Bool.pp
+          is_last_account_update Bool.pp Bool.true_ Bool.pp local_state.success ;
+        Bool.if_ is_last_account_update ~then_:Bool.true_
+          ~else_:local_state.success
+      in
+      let account_update_index =
+        let next_index = Index.succ local_state.account_update_index in
+        log l "Updating local state account update index: if %a then %a -> %a"
+          Bool.pp is_last_account_update Index.pp Index.zero Index.pp next_index ;
+        Inputs.Index.if_ is_last_account_update ~then_:Inputs.Index.zero
+          ~else_:(Inputs.Index.succ local_state.account_update_index)
+      in
+      let supply_increase =
+        log l "Updating local state supply increase: if %a then %a -> %a"
+          Bool.pp is_last_account_update Amount.Signed.pp
+          Amount.(Signed.of_unsigned zero)
+          Amount.Signed.pp local_state.supply_increase ;
+        Amount.Signed.if_ is_last_account_update
+          ~then_:Amount.(Signed.of_unsigned zero)
+          ~else_:local_state.supply_increase
+      in
+      let will_succeed =
+        log l "Updating local state will succeed: if %a then %a -> %a" Bool.pp
+          is_last_account_update Bool.pp Bool.true_ Bool.pp
+          local_state.will_succeed ;
+        Bool.if_ is_last_account_update ~then_:Bool.true_
+          ~else_:local_state.will_succeed
+      in
       { local_state with
-        token_id =
-          Token_id.if_ is_last_account_update ~then_:Token_id.default
-            ~else_:local_state.token_id
-      ; ledger =
-          Inputs.Ledger.if_ is_last_account_update
-            ~then_:(Inputs.Ledger.empty ~depth:0 ())
-            ~else_:local_state.ledger
-      ; success =
-          Bool.if_ is_last_account_update ~then_:Bool.true_
-            ~else_:local_state.success
-      ; account_update_index =
-          Inputs.Index.if_ is_last_account_update ~then_:Inputs.Index.zero
-            ~else_:(Inputs.Index.succ local_state.account_update_index)
-      ; supply_increase =
-          Amount.Signed.if_ is_last_account_update
-            ~then_:Amount.(Signed.of_unsigned zero)
-            ~else_:local_state.supply_increase
-      ; will_succeed =
-          Bool.if_ is_last_account_update ~then_:Bool.true_
-            ~else_:local_state.will_succeed
+        token_id
+      ; ledger
+      ; success
+      ; account_update_index
+      ; supply_increase
+      ; will_succeed
       }
     in
     (global_state, local_state)

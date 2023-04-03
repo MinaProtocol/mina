@@ -476,10 +476,10 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
       (* STEP 5 *)
       (*Validate transactions against the protocol state associated with the transaction*)
       let apply_first_pass =
-        Ledger.apply_transaction_first_pass
+        Ledger.apply_transaction_first_pass ?log:None
           ~constraint_constants:Context.constraint_constants
       in
-      let apply_second_pass = Ledger.apply_transaction_second_pass in
+      let apply_second_pass = Ledger.apply_transaction_second_pass ?log:None in
       let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
           sparse_ledger txn =
         let open Or_error.Let_syntax in

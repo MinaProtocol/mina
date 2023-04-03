@@ -1617,43 +1617,141 @@ let internal_commands logger =
   ; ( "run-snark-worker-single"
     , Command.async
         ~summary:"Run snark-worker on a sexp provided on a single line of stdin"
-        (Command.Param.return (fun () ->
-             let logger = Logger.create () in
-             Parallel.init_master () ;
-             match%bind
-               Reader.with_file "./failure.sexp" ~f:(fun reader ->
-                   [%log info] "Created reader for failure.sexp" ;
-                   Reader.read_sexp reader )
-             with
-             | `Ok sexp -> (
-                 let%bind worker_state =
-                   Snark_worker.Prod.Inputs.Worker_state.create
-                     ~proof_level:Genesis_constants.Proof_level.compiled
-                     ~constraint_constants:
-                       Genesis_constants.Constraint_constants.compiled ()
-                 in
-                 let sok_message =
-                   { Mina_base.Sok_message.fee = Currency.Fee.of_int 0
-                   ; prover = Quickcheck.random_value Public_key.Compressed.gen
-                   }
-                 in
-                 let spec =
-                   [%of_sexp:
-                     ( Transaction_witness.t
-                     , Ledger_proof.t )
-                     Snark_work_lib.Work.Single.Spec.t] sexp
-                 in
-                 match%map
-                   Snark_worker.Prod.Inputs.perform_single worker_state
-                     ~message:sok_message spec
-                 with
-                 | Ok _ ->
-                     [%log info] "Successfully worked"
-                 | Error err ->
-                     [%log error] "Work didn't work: $err"
-                       ~metadata:[ ("err", Error_json.error_to_yojson err) ] )
-             | `Eof ->
-                 failwith "early EOF while reading sexp" ) ) )
+        (let open Command.Let_syntax in
+        let%map_open conf_dir = Cli_lib.Flag.conf_dir
+        and config_file =
+          flag "--config-file" ~aliases:[ "config-file" ]
+            ~doc:
+              "PATH path to a configuration file (overrides MINA_CONFIG_FILE, \
+               default: <config_dir>/daemon.json). Pass multiple times to \
+               override fields from earlier config files"
+            (required string)
+        and genesis_dir =
+          flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
+            ~doc:
+              "DIR Directory that contains the genesis ledger and the genesis \
+               blockchain proof (default: <config-dir>)"
+            (optional string)
+        in
+        fun () ->
+          let open Deferred.Let_syntax in
+          let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
+          let genesis_dir =
+            Option.value ~default:(conf_dir ^/ "genesis") genesis_dir
+          in
+          let%bind config =
+            match%bind Genesis_ledger_helper.load_config_json config_file with
+            | Ok config_json ->
+                let%map config_json =
+                  Genesis_ledger_helper.upgrade_old_config ~logger config_file
+                    config_json
+                in
+                Runtime_config.combine Runtime_config.default
+                  (Result.ok_or_failwith @@ Runtime_config.of_yojson config_json)
+            | Error err ->
+                Error.raise err
+          in
+          let%bind precomputed_values =
+            match%map
+              Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
+                ~proof_level:(Some Genesis_constants.Proof_level.compiled)
+                config
+            with
+            | Ok (precomputed_values, _) ->
+                precomputed_values
+            | Error err ->
+                Error.raise err
+          in
+          let logger = Logger.create () in
+          Parallel.init_master () ;
+          match%bind
+            Reader.with_file "./failure.sexp" ~f:(fun reader ->
+                [%log info] "Created reader for failure.sexp" ;
+                Reader.read_sexp reader )
+          with
+          | `Ok sexp -> (
+              let%bind worker_state =
+                Snark_worker.Prod.Inputs.Worker_state.create
+                  ~proof_level:Genesis_constants.Proof_level.compiled
+                  ~constraint_constants:precomputed_values.constraint_constants
+                  ()
+              in
+              let sok_message =
+                { Mina_base.Sok_message.fee = Currency.Fee.zero
+                ; prover = Quickcheck.random_value Public_key.Compressed.gen
+                }
+              in
+              (* TODO: move *)
+              let apply_log = "transaction_apply.log" in
+              let snark_log = "transaction_snark.log" in
+              let debug_apply (stmt : Mina_state.Snarked_ledger_state.t)
+                  (witness : Transaction_witness.t) =
+                let open Mina_ledger in
+                let open Or_error.Let_syntax in
+                [%log info] "Applying transaction out-of-snark" ;
+                let txn_state_view =
+                  Mina_state.Protocol_state.Body.view
+                    witness.protocol_state_body
+                in
+                let res =
+                  Out_channel.with_file apply_log ~f:(fun channel ->
+                      let log = Mina_transaction_logic.Log.Channel channel in
+                      let%bind first_pass_output_ledger, partially_applied =
+                        Sparse_ledger.apply_transaction_first_pass ~log
+                          ~constraint_constants:
+                            precomputed_values.constraint_constants
+                          ~global_slot:witness.block_global_slot ~txn_state_view
+                          witness.first_pass_ledger witness.transaction
+                      in
+                      let%map second_pass_output_ledger, fully_applied =
+                        Sparse_ledger.apply_transaction_second_pass ~log
+                          witness.second_pass_ledger partially_applied
+                      in
+                      (* TODO: test outputs against the snark statement *)
+                      let _ =
+                        ( stmt
+                        , first_pass_output_ledger
+                        , second_pass_output_ledger
+                        , fully_applied )
+                      in
+                      () )
+                in
+                match res with
+                | Ok _ ->
+                    [%log info] "Successfully applied transaction out-of-snark"
+                | Error err ->
+                    [%log error] "Failed to apply transaction out-of-snark"
+                      ~metadata:[ ("err", Error_json.error_to_yojson err) ]
+              in
+              let debug_snark spec =
+                [%log info] "Applying transaction in-snark" ;
+                let channel = Out_channel.create snark_log in
+                let%map res =
+                  Snark_worker.Prod.Inputs.perform_single worker_state
+                    ~log:(Mina_transaction_logic.Log.Channel channel)
+                    ~message:sok_message spec
+                in
+                Out_channel.close channel ;
+                match res with
+                | Ok _ ->
+                    [%log info] "Successfully applied transaction in-snark"
+                | Error err ->
+                    [%log error] "Failed to apply transaction in-snark: $err"
+                      ~metadata:[ ("err", Error_json.error_to_yojson err) ]
+              in
+              let spec =
+                [%of_sexp:
+                  ( Transaction_witness.t
+                  , Ledger_proof.t )
+                  Snark_work_lib.Work.Single.Spec.t] sexp
+              in
+              match spec with
+              | Transition (stmt, witness) ->
+                  debug_apply stmt witness ; debug_snark spec
+              | Merge _ ->
+                  debug_snark spec )
+          | `Eof ->
+              failwith "early EOF while reading sexp") )
   ; ( "run-verifier"
     , Command.async
         ~summary:"Run verifier on a proof provided on a single line of stdin"

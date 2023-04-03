@@ -99,7 +99,7 @@ module Make (Inputs : Intf.Inputs_intf) :
         let%map proof, time =
           perform_single s
             ~message:(Mina_base.Sok_message.create ~fee ~prover:public_key)
-            w
+            ~log:Mina_transaction_logic.Log.Disabled w
         in
         ( proof
         , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge)
