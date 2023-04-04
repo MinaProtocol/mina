@@ -3,20 +3,7 @@
         {
           "graphql": "/{{ .name }}",
           "tracing-graphql": "/{{ .name }}/internal-trace",
-          {{ if .debugger }}
           "debugger": "/{{ .name }}/{{ .debugger }}",
-          {{ end }}
-          "features": [
-            "dashboard",
-            {{ if .debugger }}
-            "network",
-            {{ end }}
-            "benchmarks",
-            "explorer",
-            "tracing",
-            "resources",
-            "logs"
-          ],
           "name": "{{.name}}"
         }
 {{- end }}
@@ -37,7 +24,6 @@ events {
 }
 
 http {
-    resolver {{ .resolver | default "coredns.kube-system.svc.cluster.local" }};
     server {
         listen 80;
         location / {
