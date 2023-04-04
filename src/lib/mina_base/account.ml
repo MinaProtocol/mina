@@ -943,9 +943,9 @@ let gen_timing (account_balance : Balance.t) =
   gen_vesting_details ~vesting_period ~cliff_time ~vesting_end
     initial_minimum_balance
 
-let gen_timing_at_least_one_vesting_period (account_balabnce : Balance.t) =
+let gen_timing_at_least_one_vesting_period (account_balance : Balance.t) =
   let open Quickcheck.Generator.Let_syntax in
-  let%bind initial_minimum_balance = Balance.(gen_incl one account_balabnce)
+  let%bind initial_minimum_balance = Balance.(gen_incl one account_balance)
   and cliff_time, vesting_end, vesting_period =
     gen_at_least_one_vesting_period
   in
