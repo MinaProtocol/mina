@@ -4326,7 +4326,8 @@ module Mutations = struct
             }
           in
           let zkapp_command =
-            Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec
+            Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+              ~default_permissions:true spec
           in
           let rec go () =
             match%bind send_zkapp_command mina zkapp_command with
