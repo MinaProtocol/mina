@@ -26,7 +26,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; timing = Untimed
           }
         ; { account_name = "node-b-key"
-          ; balance = "1000000000"
+          ; balance = "1000000"
           ; timing = Untimed
           }
         ; { account_name = "fish1"; balance = "3000"; timing = Untimed }
