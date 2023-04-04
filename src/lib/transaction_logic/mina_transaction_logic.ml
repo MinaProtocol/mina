@@ -625,7 +625,7 @@ let validate_timing_with_min_balance' ~account ~txn_amount ~txn_global_slot =
                 ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
                 ~initial_minimum_balance
             in
-            if Balance.(proposed_new_balance < curr_min_balance) then
+            if Balance.(proposed_new_balance <= curr_min_balance) then
               (false, true, curr_min_balance)
             else (false, false, curr_min_balance)
       in
