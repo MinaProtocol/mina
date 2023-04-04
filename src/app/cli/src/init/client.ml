@@ -2169,6 +2169,216 @@ let thread_graph =
                   (humanize_graphql_error ~graphql_endpoint e) ) ;
              exit 1 ) )
 
+[@@@warning "-26-27"]
+
+let itn_create_accounts =
+  Command.async ~summary:"Fund new accounts for incentivized testnet"
+    (let open Command.Param in
+    let privkey_path = Cli_lib.Flag.privkey_read_path in
+    let key_prefix =
+      flag "--key-prefix" ~doc:"STRING prefix of keyfiles" (required string)
+    in
+    let num_accounts =
+      flag "--num-accounts" ~doc:"NN Number of new accounts" (required int)
+    in
+    let fee =
+      flag "--fee"
+        ~doc:
+          (sprintf "NN Fee in nanomina paid to create an account (minimum: %s)"
+             Mina_compile_config.minimum_user_command_fee_string )
+        (required int)
+    in
+    let amount =
+      flag "--amount"
+        ~doc:"NN Amount in nanomina to be divided among new accounts"
+        (required int)
+    in
+    let args = Args.zip5 privkey_path key_prefix num_accounts fee amount in
+    Cli_lib.Background_daemon.rpc_init args
+      ~f:(fun port (privkey_path, key_prefix, num_accounts, fee, amount) ->
+        let min_fee =
+          Currency.Fee.to_nanomina_int
+            Mina_compile_config.minimum_user_command_fee
+        in
+        if fee < min_fee then (
+          Format.eprintf "Minimum fee is %d@." min_fee ;
+          Core.exit 1 ) ;
+        let%bind fee_payer_keypair =
+          Secrets.Keypair.Terminal_stdin.read_exn
+            ~which:"Mina fee payer keypair" privkey_path
+        in
+        let fee_payer_account_id =
+          let pk =
+            fee_payer_keypair.public_key |> Signature_lib.Public_key.compress
+          in
+          Account_id.create pk Token_id.default
+        in
+        let%bind fee_payer_balance =
+          match%bind
+            Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_balance.rpc
+              fee_payer_account_id port
+          with
+          | Ok (Ok (Some balance)) ->
+              Deferred.return balance
+          | Ok (Ok None) ->
+              Format.eprintf "Could not get fee payer balance" ;
+              exit 1
+          | Ok (Error err) ->
+              Format.eprintf "Error getting fee payer balance: %s@."
+                (Error.to_string_hum err) ;
+              exit 1
+          | Error err ->
+              Format.eprintf "Failed to get fee payer balance, error: %s@."
+                (Error.to_string_hum err) ;
+              exit 1
+        in
+        let fee_payer_balance_as_amount =
+          Currency.Balance.to_amount fee_payer_balance
+        in
+        let%bind fee_payer_initial_nonce =
+          (* inferred nonce considers txns in pool, in addition to ledger *)
+          match%bind
+            get_nonce ~rpc:Daemon_rpcs.Get_inferred_nonce.rpc
+              fee_payer_account_id port
+          with
+          | Ok nonce ->
+              Deferred.return @@ Account.Nonce.of_uint32 nonce
+          | Error err ->
+              Format.eprintf "Failed to get fee payer nonce: %s@." err ;
+              exit 1
+        in
+        Format.printf "Fee payer public key: %s, initial nonce = %d@."
+          ( Account_id.public_key fee_payer_account_id
+          |> Public_key.Compressed.to_base58_check )
+          (Account.Nonce.to_int fee_payer_initial_nonce) ;
+        let fee_payer_current_nonce = ref fee_payer_initial_nonce in
+        let keys_per_zkapp = 8 in
+        let keypairs =
+          List.init num_accounts ~f:(fun _n -> Signature_lib.Keypair.create ())
+        in
+        let keypair_chunks = List.chunks_of keypairs ~length:keys_per_zkapp in
+        let num_chunks = List.length keypair_chunks in
+        (* amount + fees must not be more than fee payer balance *)
+        let amount_and_fees =
+          let total_fees = num_chunks * fee in
+          Currency.Amount.of_nanomina_int_exn (amount + total_fees)
+        in
+        if Currency.Amount.( > ) amount_and_fees fee_payer_balance_as_amount
+        then (
+          Format.eprintf
+            !"Amount plus fees (%{sexp: Currency.Amount.t}) is greater than \
+              fee payer balance (%{sexp: Currency.Amount.t})@."
+            amount_and_fees fee_payer_balance_as_amount ;
+          Core.exit 1 ) ;
+        let amount_per_chunk = amount / num_chunks in
+        let amount_rem = amount mod num_chunks in
+        (* add 1 to enough per-chunk amounts so total over all chunks is amount *)
+        let chunk_amounts =
+          Array.init num_chunks ~f:(fun i ->
+              if i < amount_rem then amount_per_chunk + 1 else amount_per_chunk )
+        in
+        assert (Array.fold chunk_amounts ~init:0 ~f:( + ) = amount) ;
+        Deferred.List.iteri keypair_chunks ~f:(fun i kps ->
+            let chunk_amount = chunk_amounts.(i) in
+            let num_updates = List.length kps in
+            let amount_per_update = chunk_amount / num_updates in
+            let update_rem = chunk_amount mod num_updates in
+            let update_amounts =
+              Array.init num_updates ~f:(fun i ->
+                  if i = 0 then
+                    if 0 < amount_rem then amount_per_update + 1 - fee
+                    else amount_per_update - fee
+                  else if i < amount_rem then amount_per_update + 1
+                  else amount_per_update )
+            in
+            assert (
+              Array.fold update_amounts ~init:0 ~f:( + ) = chunk_amount - fee ) ;
+            if Int.is_negative update_amounts.(0) then (
+              Format.eprintf
+                "Calculated negative amount for account update; increase \
+                 amount or lower fee@." ;
+              Core.exit 1 ) ;
+            let memo_str = sprintf "ITN account funder, chunk %d" i in
+            let memo = Signed_command_memo.create_from_string_exn memo_str in
+            let multispec :
+                Transaction_snark.For_tests.Multiple_transfers_spec.t =
+              let fee = Currency.Fee.of_nanomina_int_exn fee in
+              let sender = (fee_payer_keypair, !fee_payer_current_nonce) in
+              let fee_payer = None in
+              let receivers =
+                List.mapi kps ~f:(fun j kp ->
+                    let pk =
+                      kp.public_key |> Signature_lib.Public_key.compress
+                    in
+                    let amount =
+                      update_amounts.(j) |> Currency.Amount.of_nanomina_int_exn
+                    in
+                    (pk, amount) )
+              in
+              let amount =
+                chunk_amount |> Currency.Amount.of_nanomina_int_exn
+              in
+              let zkapp_account_keypairs = [] in
+              let new_zkapp_account = false in
+              let snapp_update = Account_update.Update.dummy in
+              let actions = [] in
+              let events = [] in
+              let call_data = Snark_params.Tick.Field.zero in
+              let preconditions = None in
+              { fee
+              ; sender
+              ; fee_payer
+              ; receivers
+              ; amount
+              ; zkapp_account_keypairs
+              ; memo
+              ; new_zkapp_account
+              ; snapp_update
+              ; actions
+              ; events
+              ; call_data
+              ; preconditions
+              }
+            in
+            fee_payer_current_nonce :=
+              Account.Nonce.succ !fee_payer_current_nonce ;
+            let zkapp_command =
+              Transaction_snark.For_tests.multiple_transfers multispec
+            in
+            let%bind res =
+              Daemon_rpcs.Client.dispatch Daemon_rpcs.Send_zkapp_commands.rpc
+                [ zkapp_command ] port
+            in
+            let txn_hash =
+              Transaction_hash.hash_command (Zkapp_command zkapp_command)
+              |> Transaction_hash.to_base58_check
+            in
+            ( match res with
+            | Ok res_inner -> (
+                match res_inner with
+                | Ok [ _ ] ->
+                    Format.printf "Sent zkApp [%s], transaction hash: %s@."
+                      memo_str txn_hash ;
+                    Format.printf
+                      "The zkApp will create accounts with these public keys \
+                       and balances:@." ;
+                    List.iter multispec.receivers ~f:(fun (pk, amt) ->
+                        Format.printf "  %s : %d@."
+                          (Public_key.Compressed.to_base58_check pk)
+                          (Currency.Amount.to_nanomina_int amt) )
+                | Ok _ ->
+                    failwith "Got unexpected number of zkApps sent"
+                | Error err ->
+                    Format.eprintf
+                      "When sending zkApp [%s], transaction hash: %s, got \
+                       error: %s@."
+                      memo_str txn_hash (Error.to_string_hum err) )
+            | Error err ->
+                Format.printf
+                  "Failed to send zkApp [%s], transaction hash: %s@." memo_str
+                  txn_hash ) ;
+            Deferred.unit ) ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -2289,6 +2499,7 @@ let advanced =
     ; ("runtime-config", runtime_config)
     ; ("vrf", Cli_lib.Commands.Vrf.command_group)
     ; ("thread-graph", thread_graph)
+    ; ("itn-create-accounts", itn_create_accounts)
     ]
 
 let ledger =
