@@ -219,6 +219,9 @@ let%test_module "Zkapp payments tests" =
                   let zkapp_command =
                     Transaction_snark.For_tests.multiple_transfers test_spec
                   in
+                  Format.eprintf "ZKAPP: %s@."
+                    ( Zkapp_command.to_yojson zkapp_command
+                    |> Yojson.Safe.pretty_to_string ) ;
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
