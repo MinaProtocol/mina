@@ -2270,13 +2270,19 @@ let itn_create_accounts =
               fee payer balance (%{sexp: Currency.Amount.t})@."
             amount_and_fees fee_payer_balance_as_amount ;
           Core.exit 1 ) ;
-        let amount_per_chunk = amount / num_chunks in
-        let amount_rem = amount mod num_chunks in
-        (* add 1 to enough per-chunk amounts so total over all chunks is amount *)
+        let amount_per_key = amount / num_accounts in
         let chunk_amounts =
           Array.init num_chunks ~f:(fun i ->
-              if i < amount_rem then amount_per_chunk + 1 else amount_per_chunk )
+              let chunk_len = List.length (List.nth_exn keypair_chunks i) in
+              chunk_len * amount_per_key )
         in
+        let rec top_off_chunks i total =
+          if total < amount then (
+            chunk_amounts.(i) <- chunk_amounts.(i) + 1 ;
+            top_off_chunks ((i + 1) mod num_chunks) (total + 1) )
+        in
+        let chunk_total = Array.fold chunk_amounts ~init:0 ~f:( + ) in
+        top_off_chunks 0 chunk_total ;
         assert (Array.fold chunk_amounts ~init:0 ~f:( + ) = amount) ;
         Deferred.List.iteri keypair_chunks ~f:(fun i kps ->
             let chunk_amount = chunk_amounts.(i) - fee in
