@@ -371,38 +371,42 @@ let prove_from_input_sexp { connection; logger; _ } sexp =
 
 let extend_blockchain { connection; logger; _ } chain next_state block
     ledger_proof prover_state pending_coinbase =
-  let input =
-    { Extend_blockchain_input.chain
-    ; next_state
-    ; block
-    ; ledger_proof
-    ; prover_state
-    ; pending_coinbase
-    }
-  in
-  match%map
-    Worker.Connection.run connection ~f:Worker.functions.extend_blockchain
-      ~arg:input
-    >>| Or_error.join
-  with
-  | Ok x ->
-      Ok x
-  | Error e ->
-      [%log error]
-        ~metadata:
-          [ ( "input-sexp"
-            , `String (Sexp.to_string (Extend_blockchain_input.sexp_of_t input))
-            )
-          ; ( "input-bin-io"
-            , `String
-                (Base64.encode_exn
-                   (Binable.to_string
-                      (module Extend_blockchain_input.Stable.Latest)
-                      input ) ) )
-          ; ("error", Error_json.error_to_yojson e)
-          ]
-        "Prover failed: $error" ;
-      Error e
+  Scheduler.within'
+    ~monitor:(Monitor.create ~here:[%here] ())
+    (fun () ->
+      let input =
+        { Extend_blockchain_input.chain
+        ; next_state
+        ; block
+        ; ledger_proof
+        ; prover_state
+        ; pending_coinbase
+        }
+      in
+      match%map
+        Worker.Connection.run connection ~f:Worker.functions.extend_blockchain
+          ~arg:input
+        >>| Or_error.join
+      with
+      | Ok x ->
+          Ok x
+      | Error e ->
+          [%log error]
+            ~metadata:
+              [ ( "input-sexp"
+                , `String
+                    (Sexp.to_string (Extend_blockchain_input.sexp_of_t input))
+                )
+              ; ( "input-bin-io"
+                , `String
+                    (Base64.encode_exn
+                       (Binable.to_string
+                          (module Extend_blockchain_input.Stable.Latest)
+                          input ) ) )
+              ; ("error", Error_json.error_to_yojson e)
+              ]
+            "Prover failed: $error" ;
+          Error e )
 
 let prove t ~prev_state ~prev_state_proof ~next_state
     (transition : Internal_transition.t) pending_coinbase =
@@ -423,50 +427,55 @@ let prove t ~prev_state ~prev_state_proof ~next_state
   Blockchain_snark.Blockchain.proof chain
 
 let create_genesis_block t (genesis_inputs : Genesis_proof.Inputs.t) =
-  let start_time = Core.Time.now () in
-  let genesis_ledger = Genesis_ledger.Packed.t genesis_inputs.genesis_ledger in
-  let constraint_constants = genesis_inputs.constraint_constants in
-  let consensus_constants = genesis_inputs.consensus_constants in
-  let prev_state =
-    let open Staged_ledger_diff in
-    Protocol_state.negative_one ~genesis_ledger
-      ~genesis_epoch_data:genesis_inputs.genesis_epoch_data
-      ~constraint_constants ~consensus_constants ~genesis_body_reference
-  in
-  let genesis_epoch_ledger =
-    match genesis_inputs.genesis_epoch_data with
-    | None ->
-        genesis_ledger
-    | Some data ->
-        data.staking.ledger
-  in
-  let open Pickles_types in
-  let blockchain_dummy =
-    Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:16
-  in
-  let snark_transition =
-    let open Staged_ledger_diff in
-    Snark_transition.genesis ~constraint_constants ~consensus_constants
-      ~genesis_ledger ~genesis_body_reference
-  in
-  let pending_coinbase =
-    { Mina_base.Pending_coinbase_witness.pending_coinbases =
-        Mina_base.Pending_coinbase.create
-          ~depth:constraint_constants.pending_coinbase_depth ()
-        |> Or_error.ok_exn
-    ; is_new_stack = true
-    }
-  in
-  let prover_state : Consensus_mechanism.Data.Prover_state.t =
-    Consensus.Data.Prover_state.genesis_data ~genesis_epoch_ledger
-  in
-  let%map chain =
-    extend_blockchain t
-      (Blockchain.create ~proof:blockchain_dummy ~state:prev_state)
-      genesis_inputs.protocol_state_with_hashes.data snark_transition None
-      prover_state pending_coinbase
-  in
-  Mina_metrics.(
-    Gauge.set Cryptography.blockchain_proving_time_ms
-      (Core.Time.Span.to_ms @@ Core.Time.diff (Core.Time.now ()) start_time)) ;
-  chain
+  Scheduler.within'
+    ~monitor:(Monitor.create ~here:[%here] ())
+    (fun () ->
+      let start_time = Core.Time.now () in
+      let genesis_ledger =
+        Genesis_ledger.Packed.t genesis_inputs.genesis_ledger
+      in
+      let constraint_constants = genesis_inputs.constraint_constants in
+      let consensus_constants = genesis_inputs.consensus_constants in
+      let prev_state =
+        let open Staged_ledger_diff in
+        Protocol_state.negative_one ~genesis_ledger
+          ~genesis_epoch_data:genesis_inputs.genesis_epoch_data
+          ~constraint_constants ~consensus_constants ~genesis_body_reference
+      in
+      let genesis_epoch_ledger =
+        match genesis_inputs.genesis_epoch_data with
+        | None ->
+            genesis_ledger
+        | Some data ->
+            data.staking.ledger
+      in
+      let open Pickles_types in
+      let blockchain_dummy =
+        Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:16
+      in
+      let snark_transition =
+        let open Staged_ledger_diff in
+        Snark_transition.genesis ~constraint_constants ~consensus_constants
+          ~genesis_ledger ~genesis_body_reference
+      in
+      let pending_coinbase =
+        { Mina_base.Pending_coinbase_witness.pending_coinbases =
+            Mina_base.Pending_coinbase.create
+              ~depth:constraint_constants.pending_coinbase_depth ()
+            |> Or_error.ok_exn
+        ; is_new_stack = true
+        }
+      in
+      let prover_state : Consensus_mechanism.Data.Prover_state.t =
+        Consensus.Data.Prover_state.genesis_data ~genesis_epoch_ledger
+      in
+      let%map chain =
+        extend_blockchain t
+          (Blockchain.create ~proof:blockchain_dummy ~state:prev_state)
+          genesis_inputs.protocol_state_with_hashes.data snark_transition None
+          prover_state pending_coinbase
+      in
+      Mina_metrics.(
+        Gauge.set Cryptography.blockchain_proving_time_ms
+          (Core.Time.Span.to_ms @@ Core.Time.diff (Core.Time.now ()) start_time)) ;
+      chain )

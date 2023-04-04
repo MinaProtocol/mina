@@ -119,36 +119,42 @@ module Make (Inputs : Intf.Inputs_intf) :
              } )
 
   let dispatch rpc shutdown_on_disconnect query address =
-    let%map res =
-      Rpc.Connection.with_client
-        ~handshake_timeout:
-          (Time.Span.of_sec Mina_compile_config.rpc_handshake_timeout_sec)
-        ~heartbeat_config:
-          (Rpc.Connection.Heartbeat_config.create
-             ~timeout:
-               (Time_ns.Span.of_sec
-                  Mina_compile_config.rpc_heartbeat_timeout_sec )
-             ~send_every:
-               (Time_ns.Span.of_sec
-                  Mina_compile_config.rpc_heartbeat_send_every_sec )
-             () )
-        (Tcp.Where_to_connect.of_host_and_port address)
-        (fun conn -> Rpc.Rpc.dispatch rpc conn query)
-    in
-    match res with
-    | Error exn ->
-        if shutdown_on_disconnect then
-          failwithf
-            !"Shutting down. Error using the RPC call, %s,: %s"
-            (Rpc.Rpc.name rpc) (Exn.to_string_mach exn) ()
-        else
-          Error
-            ( Error.createf
-                !"Error using the RPC call, %s: %s"
-                (Rpc.Rpc.name rpc)
-            @@ Exn.to_string_mach exn )
-    | Ok res ->
-        res
+    Scheduler.within'
+      ~monitor:(Monitor.create ~here:[%here] ())
+      (fun () ->
+        let%map res =
+          Rpc.Connection.with_client
+            ~handshake_timeout:
+              (Time.Span.of_sec Mina_compile_config.rpc_handshake_timeout_sec)
+            ~heartbeat_config:
+              (Rpc.Connection.Heartbeat_config.create
+                 ~timeout:
+                   (Time_ns.Span.of_sec
+                      Mina_compile_config.rpc_heartbeat_timeout_sec )
+                 ~send_every:
+                   (Time_ns.Span.of_sec
+                      Mina_compile_config.rpc_heartbeat_send_every_sec )
+                 () )
+            (Tcp.Where_to_connect.of_host_and_port address)
+            (fun conn ->
+              Scheduler.within'
+                ~monitor:(Monitor.create ~here:[%here] ())
+                (fun () -> Rpc.Rpc.dispatch rpc conn query) )
+        in
+        match res with
+        | Error exn ->
+            if shutdown_on_disconnect then
+              failwithf
+                !"Shutting down. Error using the RPC call, %s,: %s"
+                (Rpc.Rpc.name rpc) (Exn.to_string_mach exn) ()
+            else
+              Error
+                ( Error.createf
+                    !"Error using the RPC call, %s: %s"
+                    (Rpc.Rpc.name rpc)
+                @@ Exn.to_string_mach exn )
+        | Ok res ->
+            res )
 
   let emit_proof_metrics metrics instances logger =
     One_or_two.iter (One_or_two.zip_exn metrics instances)

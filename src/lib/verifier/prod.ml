@@ -482,66 +482,80 @@ let with_retry ~logger f =
   go 4
 
 let verify_blockchain_snarks { worker; logger } chains =
-  O1trace.thread "dispatch_blockchain_snark_verification" (fun () ->
-      with_retry ~logger (fun () ->
-          let%bind { connection; _ } =
-            let ivar = !worker in
-            match Ivar.peek ivar with
-            | Some worker ->
-                Deferred.return worker
-            | None ->
-                [%log debug] "Waiting for the verifier process to restart" ;
-                let%map worker = Ivar.read ivar in
-                [%log debug] "Verifier process has restarted; finished waiting" ;
-                worker
-          in
-          Deferred.any
-            [ ( after (Time.Span.of_min 3.)
-              >>| fun _ ->
-              Or_error.return
-              @@ `Stop (Error.of_string "verify_blockchain_snarks timeout") )
-            ; Worker.Connection.run connection
-                ~f:Worker.functions.verify_blockchains ~arg:chains
-              |> Deferred.Or_error.map ~f:(fun x -> `Continue x)
-            ] ) )
+  Scheduler.within'
+    ~monitor:(Monitor.create ~here:[%here] ())
+    (fun () ->
+      O1trace.thread "dispatch_blockchain_snark_verification" (fun () ->
+          with_retry ~logger (fun () ->
+              let%bind { connection; _ } =
+                let ivar = !worker in
+                match Ivar.peek ivar with
+                | Some worker ->
+                    Deferred.return worker
+                | None ->
+                    [%log debug] "Waiting for the verifier process to restart" ;
+                    let%map worker = Ivar.read ivar in
+                    [%log debug]
+                      "Verifier process has restarted; finished waiting" ;
+                    worker
+              in
+              Deferred.any
+                [ ( after (Time.Span.of_min 3.)
+                  >>| fun _ ->
+                  Or_error.return
+                  @@ `Stop (Error.of_string "verify_blockchain_snarks timeout")
+                  )
+                ; Worker.Connection.run connection
+                    ~f:Worker.functions.verify_blockchains ~arg:chains
+                  |> Deferred.Or_error.map ~f:(fun x -> `Continue x)
+                ] ) ) )
 
 let verify_transaction_snarks { worker; logger } ts =
-  O1trace.thread "dispatch_transaction_snark_verification" (fun () ->
-      let n = List.length ts in
-      let metadata = [ ("n", `Int n) ] in
-      [%log trace] "verify $n transaction_snarks (before)" ~metadata ;
-      let%map res =
-        with_retry ~logger (fun () ->
-            let%bind { connection; _ } = Ivar.read !worker in
-            Worker.Connection.run connection
-              ~f:Worker.functions.verify_transaction_snarks ~arg:ts
-            |> Deferred.Or_error.map ~f:(fun x -> `Continue x) )
-      in
-      let res_json =
-        match res with
-        | Ok (Ok ()) ->
-            `String "ok"
-        | Error err ->
-            Error_json.error_to_yojson (Error.tag ~tag:"Verifier issue" err)
-        | Ok (Error err) ->
-            Error_json.error_to_yojson err
-      in
-      [%log trace] "verify $n transaction_snarks (after)!"
-        ~metadata:(("result", res_json) :: metadata) ;
-      res )
+  Scheduler.within'
+    ~monitor:(Monitor.create ~here:[%here] ())
+    (fun () ->
+      O1trace.thread "dispatch_transaction_snark_verification" (fun () ->
+          let n = List.length ts in
+          let metadata = [ ("n", `Int n) ] in
+          [%log trace] "verify $n transaction_snarks (before)" ~metadata ;
+          let%map res =
+            with_retry ~logger (fun () ->
+                let%bind { connection; _ } = Ivar.read !worker in
+                Worker.Connection.run connection
+                  ~f:Worker.functions.verify_transaction_snarks ~arg:ts
+                |> Deferred.Or_error.map ~f:(fun x -> `Continue x) )
+          in
+          let res_json =
+            match res with
+            | Ok (Ok ()) ->
+                `String "ok"
+            | Error err ->
+                Error_json.error_to_yojson (Error.tag ~tag:"Verifier issue" err)
+            | Ok (Error err) ->
+                Error_json.error_to_yojson err
+          in
+          [%log trace] "verify $n transaction_snarks (after)!"
+            ~metadata:(("result", res_json) :: metadata) ;
+          res ) )
 
 let verify_commands { worker; logger } ts =
-  O1trace.thread "dispatch_user_command_verification" (fun () ->
-      with_retry ~logger (fun () ->
-          let%bind { connection; _ } = Ivar.read !worker in
-          Worker.Connection.run connection ~f:Worker.functions.verify_commands
-            ~arg:ts
-          |> Deferred.Or_error.map ~f:(fun x -> `Continue x) ) )
+  Scheduler.within'
+    ~monitor:(Monitor.create ~here:[%here] ())
+    (fun () ->
+      O1trace.thread "dispatch_user_command_verification" (fun () ->
+          with_retry ~logger (fun () ->
+              let%bind { connection; _ } = Ivar.read !worker in
+              Worker.Connection.run connection
+                ~f:Worker.functions.verify_commands ~arg:ts
+              |> Deferred.Or_error.map ~f:(fun x -> `Continue x) ) ) )
 
 let get_blockchain_verification_key { worker; logger } =
-  O1trace.thread "dispatch_blockchain_verification_key" (fun () ->
-      with_retry ~logger (fun () ->
-          let%bind { connection; _ } = Ivar.read !worker in
-          Worker.Connection.run connection
-            ~f:Worker.functions.get_blockchain_verification_key ~arg:()
-          |> Deferred.Or_error.map ~f:(fun x -> `Continue x) ) )
+  Scheduler.within'
+    ~monitor:(Monitor.create ~here:[%here] ())
+    (fun () ->
+      O1trace.thread "dispatch_blockchain_verification_key" (fun () ->
+          with_retry ~logger (fun () ->
+              let%bind { connection; _ } = Ivar.read !worker in
+              Worker.Connection.run connection
+                ~f:Worker.functions.get_blockchain_verification_key ~arg:()
+              |> Deferred.Or_error.map ~f:(fun x -> `Continue x) ) ) )
