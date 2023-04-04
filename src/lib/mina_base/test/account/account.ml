@@ -6,7 +6,6 @@ open Unsigned
 
 let gen_timing = Account.gen_timing Balance.max_int
 
-
 let%test_module "Test account's timing." =
   ( module struct
     open Account.Timing.As_record
@@ -29,26 +28,26 @@ let%test_module "Test account's timing." =
     let%test_unit "Test fine-tuning of the account generation." =
       Quickcheck.test Account.gen_timed ~f:(fun account ->
           try
-          [%test_eq: Balance.t option] (Some Balance.zero)
-            ( match account.timing with
-            | Untimed ->
-                None
-            | Timed
-                { initial_minimum_balance
-                ; cliff_time
-                ; cliff_amount
-                ; vesting_period
-                ; vesting_increment
-                } ->
-                let global_slot = Global_slot.max_value in
-                Option.some
-                @@ Account.min_balance_at_slot ~global_slot ~cliff_time
-                     ~cliff_amount ~vesting_period ~vesting_increment
-                     ~initial_minimum_balance )
-          with
-          | e ->
-             Printf.printf "%s" (Sexp.to_string @@ Account.Timing.sexp_of_t account.timing);
-             raise e)
+            [%test_eq: Balance.t option] (Some Balance.zero)
+              ( match account.timing with
+              | Untimed ->
+                  None
+              | Timed
+                  { initial_minimum_balance
+                  ; cliff_time
+                  ; cliff_amount
+                  ; vesting_period
+                  ; vesting_increment
+                  } ->
+                  let global_slot = Global_slot.max_value in
+                  Option.some
+                  @@ Account.min_balance_at_slot ~global_slot ~cliff_time
+                       ~cliff_amount ~vesting_period ~vesting_increment
+                       ~initial_minimum_balance )
+          with e ->
+            Printf.printf "%s"
+              (Sexp.to_string @@ Account.Timing.sexp_of_t account.timing) ;
+            raise e )
 
     let%test_unit "Minimum balance never changes before the cliff time." =
       Quickcheck.test
@@ -105,7 +104,9 @@ let%test_module "Test account's timing." =
         let open Generator.Let_syntax in
         (* The amount to be vested after the cliff time must be greater than zero
            or else there is no vesting at all. *)
-        let%bind timing_rec = Account.gen_timing_at_least_one_vesting_period Balance.max_int in
+        let%bind timing_rec =
+          Account.gen_timing_at_least_one_vesting_period Balance.max_int
+        in
         let timing = Account.Timing.of_record timing_rec in
         let vesting_end = Account.timing_final_vesting_slot timing in
         (* Global_slot addition may overflow, so we need to make sure it won't happen. *)
@@ -178,9 +179,7 @@ let%test_module "Test account's timing." =
         (let open Quickcheck in
         let open Generator.Let_syntax in
         let%bind timing =
-          Generator.filter
-            (Account.gen_timing_at_least_one_vesting_period Balance.max_int)
-            ~f:(fun t -> Global_slot.(t.vesting_period > of_int 1) )
+          Account.gen_timing_at_least_one_vesting_period Balance.max_int
         in
         let min_slot = Global_slot.(add timing.cliff_time (of_int 1)) in
         let max_slot =
