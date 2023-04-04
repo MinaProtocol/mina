@@ -2277,25 +2277,21 @@ let itn_create_accounts =
         in
         assert (Array.fold chunk_amounts ~init:0 ~f:( + ) = amount) ;
         Deferred.List.iteri keypair_chunks ~f:(fun i kps ->
-            let chunk_amount = chunk_amounts.(i) in
+            let chunk_amount = chunk_amounts.(i) - fee in
+            if Int.is_negative chunk_amount then (
+              Format.eprintf
+                "Calculated negative amount for chunk of account updates; \
+                 increase amount or lower fee@." ;
+              Core.exit 1 ) ;
             let num_updates = List.length kps in
             let amount_per_update = chunk_amount / num_updates in
             let update_rem = chunk_amount mod num_updates in
             let update_amounts =
               Array.init num_updates ~f:(fun i ->
-                  if i = 0 then
-                    if 0 < amount_rem then amount_per_update + 1 - fee
-                    else amount_per_update - fee
-                  else if i < amount_rem then amount_per_update + 1
+                  if i < update_rem then amount_per_update + 1
                   else amount_per_update )
             in
-            assert (
-              Array.fold update_amounts ~init:0 ~f:( + ) = chunk_amount - fee ) ;
-            if Int.is_negative update_amounts.(0) then (
-              Format.eprintf
-                "Calculated negative amount for account update; increase \
-                 amount or lower fee@." ;
-              Core.exit 1 ) ;
+            assert (Array.fold update_amounts ~init:0 ~f:( + ) = chunk_amount) ;
             let memo_str = sprintf "ITN account funder, chunk %d" i in
             let memo = Signed_command_memo.create_from_string_exn memo_str in
             let multispec :
