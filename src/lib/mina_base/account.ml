@@ -878,7 +878,7 @@ let gen_any_vesting_range =
   let%map cliff_time = gen_incl (of_int 1) vesting_end in
   (cliff_time, vesting_end, vesting_period)
 
-let gen_at_laest_one_vesting_period =
+let gen_at_least_one_vesting_period =
   let open Quickcheck.Generator.Let_syntax in
   let open Global_slot in
   (* vesting period must be at least oe to avoid division by zero *)
@@ -889,11 +889,9 @@ let gen_at_laest_one_vesting_period =
   let%map cliff_time = gen_incl (of_int 1) max_cliff_time in
   (cliff_time, vesting_end, vesting_period)
 
-let gen_vesting_details
-      ~(cliff_time : Global_slot.t)
-      ~(vesting_end : Global_slot.t)
-      ~(vesting_period : Global_slot.t)
-      (initial_minimum_balance : Balance.t) :
+let gen_vesting_details ~(cliff_time : Global_slot.t)
+    ~(vesting_end : Global_slot.t) ~(vesting_period : Global_slot.t)
+    (initial_minimum_balance : Balance.t) :
     Timing.as_record Quickcheck.Generator.t =
   let open Unsigned in
   let open Quickcheck in
@@ -938,17 +936,21 @@ let gen_vesting_details
   ; vesting_increment
   }
 
-let gen_timing (account_balabnce : Balance.t) =
+let gen_timing (account_balance : Balance.t) =
   let open Quickcheck.Generator.Let_syntax in
-  let%bind initial_minimum_balance = Balance.(gen_incl one account_balabnce)
+  let%bind initial_minimum_balance = Balance.(gen_incl one account_balance)
   and cliff_time, vesting_end, vesting_period = gen_any_vesting_range in
-  gen_vesting_details ~vesting_period ~cliff_time ~vesting_end initial_minimum_balance
+  gen_vesting_details ~vesting_period ~cliff_time ~vesting_end
+    initial_minimum_balance
 
 let gen_timing_at_least_one_vesting_period (account_balabnce : Balance.t) =
   let open Quickcheck.Generator.Let_syntax in
   let%bind initial_minimum_balance = Balance.(gen_incl one account_balabnce)
-  and cliff_time, vesting_end, vesting_period = gen_at_laest_one_vesting_period in
-  gen_vesting_details ~vesting_period ~cliff_time ~vesting_end initial_minimum_balance
+  and cliff_time, vesting_end, vesting_period =
+    gen_at_least_one_vesting_period
+  in
+  gen_vesting_details ~vesting_period ~cliff_time ~vesting_end
+    initial_minimum_balance
 
 let gen_timed : t Quickcheck.Generator.t =
   let open Quickcheck in
