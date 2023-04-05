@@ -104,14 +104,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let fish1_account_id =
       Mina_base.Account_id.create fish1_pk Mina_base.Token_id.default
     in
-    let with_timeout ?(soft_slots = 3) () =
+    let with_timeout ~soft_slots =
       let soft_timeout = Network_time_span.Slots soft_slots in
       let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
       Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
     in
     let wait_for_zkapp ~has_failures zkapp_command =
       let%map () =
-        wait_for t @@ with_timeout ()
+        wait_for t @@ with_timeout ~soft_slots:4
         @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures
              ~zkapp_command
       in
@@ -252,8 +252,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section_hard "wait for 1 block to be produced"
-        ( wait_for t
-        @@ with_timeout ~soft_slots:5 ()
+        ( wait_for t @@ with_timeout ~soft_slots:6
         @@ Wait_condition.blocks_to_be_produced 1 )
     in
     let%bind () =
@@ -303,7 +302,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section_hard "wait for 1 block to be produced"
-        (wait_for t (Wait_condition.blocks_to_be_produced 1))
+        ( wait_for t
+        @@ with_timeout ~soft_slots:4 (Wait_condition.blocks_to_be_produced 1)
+        )
     in
     let%bind () =
       section
