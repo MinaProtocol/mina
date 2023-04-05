@@ -12,6 +12,7 @@ type t = Stable.V1.t
 
 module Level : sig
   type t =
+    | Internal
     | Spam
     | Trace
     | Debug
@@ -20,7 +21,6 @@ module Level : sig
     | Error
     | Faulty_peer
     | Fatal
-    | Internal
   [@@deriving
     sexp, equal, compare, yojson, show { with_path = false }, enumerate]
 
