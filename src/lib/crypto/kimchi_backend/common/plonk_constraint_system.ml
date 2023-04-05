@@ -250,6 +250,7 @@ module Plonk_constraint = struct
           ; (* Coefficients *) foreign_field_modulus0 : 'f
           ; foreign_field_modulus1 : 'f
           ; foreign_field_modulus2 : 'f
+          ; sign: 'f
           }
       | ForeignFieldMul of
           { (* Current row *)
@@ -498,6 +499,7 @@ module Plonk_constraint = struct
           ; (* Coefficients *) foreign_field_modulus0
           ; foreign_field_modulus1
           ; foreign_field_modulus2
+          ; sign
           } ->
           ForeignFieldAdd
             { left_input_lo = f left_input_lo
@@ -511,6 +513,7 @@ module Plonk_constraint = struct
             ; (* Coefficients *) foreign_field_modulus0
             ; foreign_field_modulus1
             ; foreign_field_modulus2
+            ; sign
             }
       | ForeignFieldMul
           { (* Current row *) left_input0
@@ -1886,6 +1889,7 @@ end = struct
           ; (* Coefficients *) foreign_field_modulus0
           ; foreign_field_modulus1
           ; foreign_field_modulus2
+          ; sign
           } ) ->
         (*
         //! | Gate   | `ForeignFieldAdd`        | Circuit/gadget responsibility  |
@@ -1930,6 +1934,7 @@ end = struct
           [| foreign_field_modulus0
            ; foreign_field_modulus1
            ; foreign_field_modulus2
+           ; sign
           |]
     | Plonk_constraint.T
         (ForeignFieldMul
