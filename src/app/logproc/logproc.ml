@@ -291,6 +291,6 @@ let () =
           , {|logproc -f '.message match /broadcast/ && .metadata.peer.host == "182.9.63.3" || .metadata.peer.discover_port == 8302|}
           ) ]
     in
-    Term.info ~version:"0.1" ~doc ~exits:Term.default_exits ~man "logproc"
+    Cmd.info ~version:"0.1" ~doc ~man "logproc"
   in
-  Term.(exit @@ eval (main_term, main_info))
+  Stdlib.exit @@ Cmd.eval @@ Cmd.v main_info main_term

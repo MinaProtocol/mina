@@ -81,7 +81,7 @@ module TextFormat_0_0_4 = struct
       | None ->
           (label_names, label_values)
       | Some (label_name, label_value) ->
-          let label_value_str = Fmt.strf "%a" output_value label_value in
+          let label_value_str = Fmt.str "%a" output_value label_value in
           (label_name :: label_names, label_value_str :: label_values)
     in
     Fmt.pf f "%a%s%a %a@." MetricName.pp base ext
