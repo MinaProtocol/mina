@@ -2212,7 +2212,7 @@ let itn_create_accounts =
           Format.eprintf "Minimum fee is %d@." min_fee ;
           Core.exit 1 ) ;
         if not @@ Option.is_some @@ Sys.getenv Secrets.Keypair.env then (
-          Format.eprintf "Please set environment variable %s"
+          Format.eprintf "Please set environment variable %s@."
             Secrets.Keypair.env ;
           Core.exit 1 ) ;
         let%bind fee_payer_keypair =
@@ -2354,7 +2354,7 @@ let itn_create_accounts =
                 let actions = [] in
                 let events = [] in
                 let call_data = Snark_params.Tick.Field.zero in
-                let preconditions = None in
+                let preconditions = Some Account_update.Preconditions.accept in
                 { fee
                 ; sender
                 ; fee_payer
@@ -2444,6 +2444,8 @@ let itn_create_accounts =
               |> List.dedup_and_sort
                    ~compare:Signature_lib.Public_key.Compressed.compare
             in
+            let num_batch_pks = List.length batch_pks in
+            Format.eprintf "Number of batch keys: %d@." num_batch_pks ;
             (* check ledger at intervals for presence of all pks *)
             let rec check_for_pks () =
               let%bind res =
@@ -2456,9 +2458,11 @@ let itn_create_accounts =
                     Signature_lib.Public_key.Compressed.Hash_set.of_list
                       (List.map accounts ~f:(fun acct -> acct.public_key))
                   in
-                  Deferred.return
-                  @@ List.for_all batch_pks ~f:(fun pk ->
-                         Hash_set.mem key_set pk )
+                  let pk_count =
+                    List.count batch_pks ~f:(fun pk -> Hash_set.mem key_set pk)
+                  in
+                  Format.eprintf "Number of batch keys in ledger: %d@." pk_count ;
+                  Deferred.return (pk_count = num_batch_pks)
               | Ok (Error err) ->
                   Format.eprintf "Error in getting daemon ledger: %s@."
                     (Error.to_string_hum err) ;
