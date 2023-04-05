@@ -8,19 +8,29 @@ open Zkapp_command
 open Zkapp_command.Verifiable
 
 let check_verifiable_property () =
-  let find_vk _ _ =
-    Ok
-      { With_hash.data = Side_loaded_verification_key.dummy
-      ; hash =
-          Verification_key_wire.digest_vk Side_loaded_verification_key.dummy
-      }
+  let processed_account_ids = ref Account_id.Map.empty in
+  let find_vk_create vk_hash account_id =
+    let () =
+      processed_account_ids :=
+        Account_id.Map.set !processed_account_ids ~key:account_id ~data:vk_hash
+    in
+    Ok { With_hash.data = Side_loaded_verification_key.dummy; hash = vk_hash }
   in
-  (* TODO: *)
+  let find_vk_check vk_hash account_id =
+    match Account_id.Map.find !processed_account_ids account_id with
+    | Some vk_hash' ->
+        if Zkapp_basic.F.equal vk_hash' vk_hash then
+          Ok
+            { With_hash.data = Side_loaded_verification_key.dummy
+            ; hash = vk_hash
+            }
+        else Error (Error.of_string "Verification key hash mismatch")
+    | None ->
+        Error (Error.of_string "Verification key not found")
+  in
   let gen_authorization_kind account_id authorization =
     let open Quickcheck.Generator.Let_syntax in
-    let vk_hash =
-      Verification_key_wire.digest_vk Side_loaded_verification_key.dummy
-    in
+    let vk_hash = Zkapp_basic.F.random () in
     match authorization with
     | Control.None_given ->
         Quickcheck.Generator.return Account_update.Authorization_kind.None_given
@@ -68,7 +78,7 @@ let check_verifiable_property () =
   Quickcheck.test ~trials:100 gen_cmd ~f:(fun cmd ->
       let status = Transaction_status.Applied in
       let cmd = T.Stable.V1.of_wire cmd in
-      match create cmd ~status ~find_vk with
+      match create cmd ~status ~find_vk:find_vk_create with
       | Ok verifiable_cmd ->
           let (_ : Verification_key_wire.t option Account_id.Map.t) =
             Call_forest.fold verifiable_cmd.account_updates
@@ -102,7 +112,7 @@ let check_verifiable_property () =
                       | Some None ->
                           Alcotest.failf "Verification key update failed\n"
                       | None -> (
-                          match find_vk vk_hash account_id with
+                          match find_vk_check vk_hash account_id with
                           | Ok ledger_vk ->
                               if
                                 Zkapp_basic.F.equal (With_hash.hash vk') vk_hash
