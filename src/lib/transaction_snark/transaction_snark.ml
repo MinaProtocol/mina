@@ -4854,7 +4854,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; update = Account_update.Update.noop
             ; token_id = Token_id.default
             ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
-            ; increment_nonce = true
+            ; increment_nonce = false
             ; events = []
             ; actions = []
             ; call_data = Field.zero
@@ -4864,7 +4864,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; account = Nonce (Account.Nonce.succ sender_nonce)
                 ; valid_while = Ignore
                 }
-            ; use_full_commitment = false
+            ; use_full_commitment = true
             ; implicit_account_creation_fee = false
             ; may_use_token = No
             ; authorization_kind = Signature
