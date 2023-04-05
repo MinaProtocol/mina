@@ -415,7 +415,7 @@ let test_arg =
 
 let mina_image_arg =
   let doc = "Identifier of the Mina docker image to test." in
-  let env = Arg.env_var "MINA_IMAGE" ~doc in
+  let env = Cmd.Env.info "MINA_IMAGE" ~doc in
   Arg.(
     required
     & opt (some string) None
@@ -423,7 +423,7 @@ let mina_image_arg =
 
 let archive_image_arg =
   let doc = "Identifier of the archive node docker image to test." in
-  let env = Arg.env_var "ARCHIVE_IMAGE" ~doc in
+  let env = Cmd.Env.info "ARCHIVE_IMAGE" ~doc in
   Arg.(
     value
       ( opt (some string) None
@@ -441,7 +441,7 @@ let help_term = Term.(ret @@ const (`Help (`Plain, None)))
 let engine_cmd ((engine_name, (module Engine)) : engine) =
   let info =
     let doc = "Run mina integration test(s) on remote cloud provider." in
-    Term.info engine_name ~doc ~exits:Term.default_exits
+    Cmd.info engine_name ~doc
   in
   let test_inputs_with_cli_inputs_arg =
     let wrap_cli_inputs cli_inputs =
@@ -459,19 +459,20 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
       $ mina_image_arg $ archive_image_arg $ debug_arg)
   in
   let term = Term.(const start $ inputs_term) in
-  (term, info)
+  Cmd.v info term
 
 let help_cmd =
   let doc = "Print out test executive documentation." in
-  let info = Term.info "help" ~doc ~exits:Term.default_exits in
-  (help_term, info)
+  let info = Cmd.info "help" ~doc in
+  Cmd.v info help_term
 
-let default_cmd =
+let default_info =
   let doc = "Run mina integration test(s)." in
-  let info = Term.info "test_executive" ~doc ~exits:Term.default_error_exits in
-  (help_term, info)
+  let info = Cmd.info "test_executive" ~doc in
+  info
 
 (* TODO: move required args to positions instead of flags, or provide reasonable defaults to make them optional *)
 let () =
   let engine_cmds = List.map engines ~f:engine_cmd in
-  Term.(exit @@ eval_choice default_cmd (engine_cmds @ [ help_cmd ]))
+  Stdlib.exit @@ Cmd.eval
+  @@ Cmd.group default_info ~default:help_term (engine_cmds @ [ help_cmd ])
