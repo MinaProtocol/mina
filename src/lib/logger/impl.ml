@@ -4,6 +4,7 @@ let max_log_line_length = 1 lsl 20
 
 module Level = struct
   type t =
+    | Internal
     | Spam
     | Trace
     | Debug
@@ -12,7 +13,6 @@ module Level = struct
     | Error
     | Faulty_peer
     | Fatal
-    | Internal
   [@@deriving sexp, equal, compare, show { with_path = false }, enumerate]
 
   let of_string str =
