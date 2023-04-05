@@ -94,36 +94,68 @@ module Token = struct
   let find_opt (module Conn : CONNECTION) =
     make_finder Conn.find_opt Caqti_request.find_opt
 
+  let find_no_owner_opt (module Conn : CONNECTION) token_id =
+    let value = Token_id.to_string token_id in
+    Conn.find_opt
+      (Caqti_request.find_opt Caqti_type.string Caqti_type.int
+         {sql| SELECT id
+               FROM tokens
+               WHERE value = $1
+               AND owner_public_key_id IS NULL
+               AND owner_token_id IS NULL
+         |sql} )
+      value
+
+  let set_owner (module Conn : CONNECTION) ~id ~owner_public_key_id
+      ~owner_token_id =
+    Conn.find
+      (Caqti_request.find
+         Caqti_type.(tup3 int int int)
+         Caqti_type.int
+         {sql| UPDATE tokens
+               SET owner_public_key_id = $2, owner_token_id = $3
+               WHERE id = $1
+               RETURNING id
+         |sql} )
+      (id, owner_public_key_id, owner_token_id)
+
   let add_if_doesn't_exist (module Conn : CONNECTION) token_id =
     let open Deferred.Result.Let_syntax in
-    let value = Token_id.(to_string token_id) in
+    let value = Token_id.to_string token_id in
     match Token_owners.find_owner token_id with
     | None ->
-        assert (Token_id.(equal default) token_id) ;
+        (* not necessarily the default token *)
         Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
           ~table_name ~cols:(Fields.names, typ)
           (module Conn)
           { value; owner_public_key_id = None; owner_token_id = None }
-    | Some acct_id ->
+    | Some acct_id -> (
         assert (not @@ Token_id.(equal default) token_id) ;
+        assert (
+          Token_id.equal (Account_id.derive_token_id ~owner:acct_id) token_id ) ;
         (* we can only add this token if its owner exists
            that means if we add several tokens in a block,
            we must add them in topologically sorted order
         *)
         let%bind owner_public_key_id =
           let owner_pk = Account_id.public_key acct_id in
-          let%map id = Public_key.add_if_doesn't_exist (module Conn) owner_pk in
-          Some id
+          Public_key.add_if_doesn't_exist (module Conn) owner_pk
         in
         let%bind owner_token_id =
           let owner_tid = Account_id.token_id acct_id in
-          let%map id = find (module Conn) owner_tid in
-          Some id
+          find (module Conn) owner_tid
         in
-        Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-          ~table_name ~cols:(Fields.names, typ)
-          (module Conn)
-          { value; owner_public_key_id; owner_token_id }
+        match%bind find_no_owner_opt (module Conn) token_id with
+        | Some id ->
+            (* existing entry, no owner *)
+            set_owner (module Conn) ~id ~owner_public_key_id ~owner_token_id
+        | None ->
+            let owner_public_key_id = Some owner_public_key_id in
+            let owner_token_id = Some owner_token_id in
+            Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+              ~table_name ~cols:(Fields.names, typ)
+              (module Conn)
+              { value; owner_public_key_id; owner_token_id } )
 end
 
 module Voting_for = struct
