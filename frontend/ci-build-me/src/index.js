@@ -112,7 +112,11 @@ const handler = async (event, req) => {
       const orgData = await getRequest(req.body.sender.organizations_url);
       // and the comment author is part of the core team
       if (
-          orgData.data.filter((org) => org.login == "MinaProtocol").length > 0 ||
+        orgData.data.filter((org) =>
+          org.login == "MinaProtocol" ||
+          org.login == "o1-labs" ||
+          org.login == "openmina"
+        ).length > 0 ||
           req.body.sender.login == "ylecornec" ||
           req.body.sender.login == "balsoft" ||
           req.body.sender.login == "bryanhonof"
