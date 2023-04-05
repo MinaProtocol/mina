@@ -168,6 +168,41 @@ let get_ledger_and_breadcrumb mina =
            |> Staged_ledger.ledger
          , tip ) )
 
+module Itn_sequencing = struct
+  (* we don't have compare, etc. for pubkey type to use Core_kernel.Hashtbl *)
+  module Hashtbl = Stdlib.Hashtbl
+
+  let uuid = Uuid.create_random Random.State.default
+
+  let sequence_tbl : (Itn_crypto.pubkey, int) Hashtbl.t =
+    Hashtbl.create ~random:true 1023
+
+  let get_sequence_number pubkey =
+    let key = pubkey in
+    match Hashtbl.find_opt sequence_tbl key with
+    | None ->
+        let data = 0 in
+        Hashtbl.add sequence_tbl key data ;
+        data
+    | Some n ->
+        n
+
+  let valid_sequence_number query_uuid pubkey n =
+    Uuid.equal query_uuid uuid && get_sequence_number pubkey = n
+
+  let incr_sequence_number pubkey =
+    let key = pubkey in
+    match Hashtbl.find_opt sequence_tbl key with
+    | None ->
+        failwithf
+          "Expected to find sequence number for UUID %s and public key %s"
+          (Uuid.to_string uuid)
+          (Itn_crypto.pubkey_to_base64 pubkey)
+          ()
+    | Some n ->
+        Hashtbl.replace sequence_tbl key (n + 1)
+end
+
 module Types = struct
   open Schema
 
@@ -5104,10 +5139,10 @@ module Queries = struct
     (* incentivized testnet-specific queries *)
 
     let auth =
-      field "auth" ~typ:bool
+      field "auth"
         ~args:Arg.[]
-        ~doc:"Returns true if query is authorized"
-        ~resolve:(fun _ () -> Some true)
+        ~typ:(non_null string) ~doc:"Uuid for this GraphQL server"
+        ~resolve:(fun _ () -> Uuid.to_string Itn_sequencing.uuid)
 
     let slots_won =
       io_field "slotsWon"

@@ -235,51 +235,88 @@ struct
         let unauthorized () =
           respond_string ~status:`Unauthorized ~body:"Unauthorized" ()
         in
-        if String.length body_str = 0 then
-          (* the browser interface generates empty strings periodically *)
-          respond ()
-        else
-          match Yojson.Safe.from_string body_str with
-          | `Assoc [ ("query", `String s) ]
-            when Core.String.is_prefix (Core.String.lstrip s)
-                   ~prefix:"query IntrospectionQuery" ->
-              (* the browser interface generates an introspection query on startup *)
-              respond ()
-          | _ -> (
-              (* neither empty string nor introspection query, enforce authorization
-                 if we have keys
-              *)
-              match auth_keys with
-              | None ->
-                  respond ()
-              | Some pks -> (
-                  (* auth_keys is Some iff authentication is required
-                     only caller is `create_graphql_server`, which enforces that invariant
+        let invalid_uuid () =
+          respond_string ~status:`Precondition_failed
+            ~body:"Invalid server Uuid" ()
+        in
+        let invalid_sequence_no () =
+          respond_string ~status:`Precondition_failed
+            ~body:"Invalid sequence number" ()
+        in
+        let missing_sequence_info () =
+          respond_string ~status:`Precondition_failed
+            ~body:"Missing sequence information" ()
+        in
+        match auth_keys with
+        | None ->
+            respond ()
+        | Some pks -> (
+            (* auth_keys is Some iff authentication is required
+               only caller is `create_graphql_server`, which enforces that invariant
+            *)
+            match Cohttp.Header.get headers "Authorization" with
+            | None ->
+                unauthorized ()
+            | Some auth -> (
+                let open Core in
+                let verify_signature_and_respond pk signature =
+                  (* we need to know not only that the pk verifies the
+                     signature, but also that this pk is allowed to verify
+                     the signature; otherwise, the client could sign a
+                     request using an arbitrary pk
                   *)
-                  match Cohttp.Header.get headers "Authorization" with
-                  | None ->
-                      unauthorized ()
-                  | Some auth -> (
-                      let open Core in
-                      match String.split_on_chars auth ~on:[ ' ' ] with
-                      | [ "Signature"; pk_str; signature ] -> (
-                          match Itn_crypto.pubkey_of_base64 pk_str with
-                          | Ok pk ->
-                              (* we need to know not only that the pk verifies the
-                                 signature, but also that this pk is allowed to verify
-                                 the signature; otherwise, the client could sign a
-                                 request using an arbitrary pk
-                              *)
-                              if
-                                List.mem pks pk ~equal:Itn_crypto.equal_pubkeys
-                                && Itn_crypto.verify ~key:pk ~msg:body_str
-                                     signature
-                              then respond ()
-                              else unauthorized ()
-                          | Error _err ->
-                              (* not a base64-encoded key *)
-                              unauthorized () )
-                      | _ ->
-                          (* invalid auth scheme *)
-                          unauthorized () ) ) ) )
+                  if
+                    List.mem pks pk ~equal:Itn_crypto.equal_pubkeys
+                    && Itn_crypto.verify ~key:pk ~msg:body_str signature
+                  then respond ()
+                  else unauthorized ()
+                in
+                match String.split_on_chars auth ~on:[ ' ' ] with
+                | [ "Signature"
+                  ; pk_str
+                  ; signature
+                  ; ";"
+                  ; "Sequencing"
+                  ; uuid_str
+                  ; seq_no_str
+                  ] -> (
+                    let pk_or_error = Itn_crypto.pubkey_of_base64 pk_str in
+                    let uuid_or_error =
+                      try Ok (Uuid.of_string uuid_str)
+                      with Failure err -> Error (Error.of_string err)
+                    in
+                    match (pk_or_error, uuid_or_error) with
+                    | Error _, _ ->
+                        (* not a base64-encoded key *)
+                        unauthorized ()
+                    | _, Error _ ->
+                        (* not a valid Uuid *)
+                        invalid_uuid ()
+                    | Ok pk, Ok uuid ->
+                        let seq_no = Int.of_string seq_no_str in
+                        if
+                          not
+                          @@ Mina_graphql.Itn_sequencing.valid_sequence_number
+                               uuid pk seq_no
+                        then
+                          (* don't increment sequence no *)
+                          invalid_sequence_no ()
+                        else (
+                          (* increment sequence no, even if request is unauthorized *)
+                          Mina_graphql.Itn_sequencing.incr_sequence_number pk ;
+                          verify_signature_and_respond pk signature ) )
+                | [ "Signature"; pk_str; signature ] -> (
+                    if not @@ String.equal body_str "auth" then
+                      missing_sequence_info ()
+                    else
+                      (* can omit sequence information for `auth` query *)
+                      match Itn_crypto.pubkey_of_base64 pk_str with
+                      | Ok pk ->
+                          verify_signature_and_respond pk signature
+                      | Error _ ->
+                          (* not a base64-encoded key *)
+                          unauthorized () )
+                | _ ->
+                    (* invalid auth scheme *)
+                    unauthorized () ) ) )
 end
