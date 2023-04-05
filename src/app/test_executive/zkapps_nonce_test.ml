@@ -25,10 +25,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; balance = "8000000000"
           ; timing = Untimed
           }
-        ; { account_name = "node-b-key"
-          ; balance = "1000000"
-          ; timing = Untimed
-          }
+        ; { account_name = "node-b-key"; balance = "1000000"; timing = Untimed }
         ; { account_name = "fish1"; balance = "3000"; timing = Untimed }
         ; { account_name = "fish2"; balance = "3000"; timing = Untimed }
         ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
@@ -49,7 +46,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { proof_config_default with
           work_delay = Some 1
         ; transaction_capacity =
-            Some Runtime_config.Proof_keys.Transaction_capacity.small
+            Some Runtime_config.Proof_keys.Transaction_capacity.medium
         }
     }
 
@@ -173,7 +170,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
-    let%bind.Deferred set_precondition_zkapp_cmd_from_fish1 =
+    let%bind.Deferred set_permission_zkapp_cmd_from_fish1 =
       let open Zkapp_command_builder in
       let with_dummy_signatures =
         let account_updates =
@@ -195,7 +192,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
-    let%bind.Deferred valid_precondition_zkapp_cmd_from_fish1 =
+    let%bind.Deferred valid_permission_zkapp_cmd_from_fish1 =
       let open Zkapp_command_builder in
       let with_dummy_signatures =
         let account_updates =
@@ -251,50 +248,28 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~n:(padding_payments ())
     in
     let%bind () =
-      section_hard "wait for 1 block to be produced"
-        ( wait_for t
-        @@ with_timeout ~soft_slots:5 ()
-        @@ Wait_condition.blocks_to_be_produced 1 )
-    in
-    let%bind () =
-      section "Verify invalid zkapp commands are removed from transaction pool"
-        (let%bind pooled_zkapp_commands =
-           Network.Node.get_pooled_zkapp_commands ~logger node ~pk:fish1_pk
-           |> Deferred.bind ~f:Malleable_error.or_hard_error
-         in
-         if List.is_empty pooled_zkapp_commands then (
-           [%log info] "Transaction pool is empty" ;
-           return () )
-         else
-           Malleable_error.hard_error
-             (Error.of_string
-                "Transaction pool contains invalid zkapp commands after a \
-                 block was produced" ) )
+      section
+        "Send a zkapp command account update for fish1 that sets send \
+         permission to Proof"
+        (send_zkapp ~logger node set_permission_zkapp_cmd_from_fish1)
     in
     let%bind () =
       section
-        "Send a zkapp command account update that sets send precondition using \
-         fish1"
-        (send_zkapp ~logger node set_precondition_zkapp_cmd_from_fish1)
-    in
-    let%bind () =
-      section
-        "Send a zkapp command that should be valid after precondition from the \
+        "Send a zkapp command that should be valid after permission from the \
          fish1 transaction"
-        (send_zkapp ~logger node valid_precondition_zkapp_cmd_from_fish1)
+        (send_zkapp ~logger node valid_permission_zkapp_cmd_from_fish1)
     in
     let%bind () =
       section
         "Wait for fish1 zkapp command with set precondition to be accepted by \
          transition frontier"
-        (wait_for_zkapp ~has_failures:false
-           set_precondition_zkapp_cmd_from_fish1 )
+        (wait_for_zkapp ~has_failures:false set_permission_zkapp_cmd_from_fish1)
     in
     let%bind () =
       section
         "Wait for fish1 zkapp command to be accepted by transition frontier"
         (wait_for_zkapp ~has_failures:false
-           valid_precondition_zkapp_cmd_from_fish1 )
+           valid_permission_zkapp_cmd_from_fish1 )
     in
     let%bind () =
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
@@ -323,6 +298,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            [%log info] "Invalid zkapp command was correctly ignored" ;
            return () ) )
     in
+    (*TODO: Add invalid commands*)
     let%bind () =
       section "Verify invalid zkapp commands are removed from transaction pool"
         (let%bind pooled_zkapp_commands =
