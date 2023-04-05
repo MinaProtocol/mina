@@ -134,13 +134,12 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
             emul_comm: evals.emul_comm.into(),
             endomul_scalar_comm: evals.endomul_scalar_comm.into(),
 
-            xor_comm: None,
-
-            range_check0_comm: None,
-            range_check1_comm: None,
-            foreign_field_add_comm: None,
-            foreign_field_mul_comm: None,
-            rot_comm: None,
+            xor_comm: evals.xor_comm.map(Into::into),
+            range_check0_comm: evals.range_check0_comm.map(Into::into),
+            range_check1_comm: evals.range_check1_comm.map(Into::into),
+            foreign_field_add_comm: evals.foreign_field_add_comm.map(Into::into),
+            foreign_field_mul_comm: evals.foreign_field_mul_comm.map(Into::into),
+            rot_comm: evals.rot_comm.map(Into::into),
 
             shift,
             zkpm: {
