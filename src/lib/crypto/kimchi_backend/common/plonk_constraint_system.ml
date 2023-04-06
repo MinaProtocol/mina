@@ -250,7 +250,7 @@ module Plonk_constraint = struct
           ; (* Coefficients *) foreign_field_modulus0 : 'f
           ; foreign_field_modulus1 : 'f
           ; foreign_field_modulus2 : 'f
-          ; sign: 'f
+          ; sign : 'f
           }
       | ForeignFieldMul of
           { (* Current row *)
