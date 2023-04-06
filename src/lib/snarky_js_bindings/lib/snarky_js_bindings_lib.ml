@@ -14,15 +14,18 @@ let console_log_string s = Js_of_ocaml.Firebug.console##log (Js.string s)
 let console_log s = Js_of_ocaml.Firebug.console##log s
 
 let raise_error s =
-  Js_of_ocaml.Js_error.(
-    raise_ @@ of_error (new%js Js.error_constr (Js.string s)))
+  Js.Js_error.(raise_ @@ of_error (new%js Js.error_constr (Js.string s)))
 
 let raise_errorf fmt = Core_kernel.ksprintf raise_error fmt
+
+external raise_exn_js : exn -> Js.js_string Js.t -> 'a = "custom_reraise_exn"
+
+let raise_exn exn = raise_exn_js exn (Js.string (Core_kernel.Exn.to_string exn))
 
 let log_and_raise_error_with_message ~exn ~msg =
   match Js.Optdef.to_option msg with
   | None ->
-      raise_error (Core_kernel.Exn.to_string exn)
+      raise_exn exn
   | Some msg ->
       let stack = Printexc.get_backtrace () in
       let msg =
@@ -1603,8 +1606,10 @@ module Circuit = struct
   let () =
     circuit##.runAndCheck :=
       Js.wrap_callback (fun (f : unit -> 'a) ->
-          Impl.run_and_check (fun () -> f) |> Or_error.ok_exn ) ;
-
+          let result =
+            try Impl.run_and_check (fun () -> f) with exn -> raise_exn exn
+          in
+          Or_error.ok_exn result ) ;
     circuit##.asProver :=
       Js.wrap_callback (fun (f : (unit -> unit) Js.callback) : unit ->
           Impl.as_prover (fun () -> Js.Unsafe.fun_call f [||]) ) ;
