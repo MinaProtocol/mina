@@ -15,6 +15,6 @@ bindings:
     marshaler: itn_json_types.MarshalUint64
     unmarshaler: itn_json_types.UnmarshalUint64
   PublicKey:
-    type: string
+    type: itn_json_types.MinaPublicKey
   PrivateKey:
-    type: string
+    type: itn_json_types.MinaPrivateKey
