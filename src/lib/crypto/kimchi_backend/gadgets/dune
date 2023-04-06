@@ -14,5 +14,6 @@
   kimchi_backend.common
   kimchi_backend.pasta
   kimchi_gadgets_test_runner
+  mina_stdlib
   snarky.backendless
 ))
