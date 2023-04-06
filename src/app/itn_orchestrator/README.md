@@ -53,11 +53,11 @@ Example of `test.script` is below:
 
 This script performs the following steps:
 
-    1. Loads 6 keys from `./keys` directory (in Mina keyfile format with empty passwords)
-    2. Finds 2 nodes that are online and authorize the connection from Orchestrator
-    3. Schedules payments through discovered nodes and loaded secret keys (each node is provided 3 secret keys and sends 3 transactions per minute for 10 minites)
-    4. Waits for 3 minutes
-    5. Stops payments sent on step 3
+  1. Loads 6 keys from `./keys` directory (in Mina keyfile format with empty passwords)
+  2. Finds 2 nodes that are online and authorize the connection from Orchestrator
+  3. Schedules payments through discovered nodes and loaded secret keys (each node is provided 3 secret keys and sends 3 transactions per minute for 10 minites)
+  4. Waits for 3 minutes
+  5. Stops payments sent on step 3
 
 Parameter of a step is defined either as a JSON value or a reference to an output of previous step, like:
 
