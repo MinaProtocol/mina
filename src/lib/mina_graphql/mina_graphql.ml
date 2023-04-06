@@ -542,7 +542,7 @@ module Types = struct
   module Itn = struct
     let auth =
       obj "ItnAuth" ~fields:(fun _ ->
-          [ field "uuid"
+          [ field "serverUuid"
               ~args:Arg.[]
               ~doc:"Uuid of the ITN GraphQL server" ~typ:(non_null string)
               ~resolve:(fun _ (uuid, _) -> uuid)
