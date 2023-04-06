@@ -97,15 +97,11 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
             , `List (List.map ~f:User_command.to_yojson valid_commands) )
           ; ( "invalid_commands"
             , `List
-                (List.map
-                   ~f:
-                     (Fn.compose
-                        Network_pool.Transaction_pool.Resource_pool.Diff
-                        .Diff_error
-                        .to_yojson snd )
-                   invalid_commands ) )
+                (List.map invalid_commands ~f:(fun (_cmd, diff_err) ->
+                     Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+                     .to_yojson diff_err ) ) )
           ]
-        "Invalid result from scheduling a user command" ;
+        "Invalid result when scheduling a user command" ;
       Error (Error.of_string "Internal error while scheduling a user command")
   | Error e ->
       Error e
@@ -148,16 +144,19 @@ let setup_and_submit_zkapp_commands t (zkapp_commands : Zkapp_command.t list) =
             , `List (List.map ~f:User_command.to_yojson valid_commands) )
           ; ( "invalid_zkapp_commands"
             , `List
-                (List.map
-                   ~f:
-                     (Fn.compose
-                        Network_pool.Transaction_pool.Resource_pool.Diff
-                        .Diff_error
-                        .to_yojson snd )
-                   invalid_commands ) )
+                (List.map invalid_commands ~f:(fun (_cmd, diff_err) ->
+                     Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+                     .to_yojson diff_err ) ) )
           ]
-        "Invalid result from scheduling zkApp commands" ;
-      Error (Error.of_string "Internal error while scheduling zkApp commands")
+        "Invalid results when scheduling zkApp commands" ;
+      let err_str =
+        List.map invalid_commands ~f:(fun (_cmd, diff_error) ->
+            Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+            .to_yojson diff_error
+            |> Yojson.Safe.to_string )
+        |> String.concat ~sep:"; "
+      in
+      Error (Error.of_string err_str)
   | Error e ->
       Error e
 
