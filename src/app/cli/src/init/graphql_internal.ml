@@ -306,8 +306,20 @@ struct
                           Mina_graphql.Itn_sequencing.incr_sequence_number pk ;
                           verify_signature_and_respond pk signature ) )
                 | [ "Signature"; pk_str; signature ] -> (
-                    if not @@ String.equal body_str "auth" then
-                      missing_sequence_info ()
+                    let is_auth =
+                      try
+                        match Yojson.Safe.from_string body_str with
+                        | `Assoc [ ("query", `String s) ]
+                          when String.equal
+                                 (String.substr_replace_all s ~pattern:" "
+                                    ~with_:"" )
+                                 "{auth}" ->
+                            true
+                        | _ ->
+                            false
+                      with _ -> false
+                    in
+                    if not is_auth then missing_sequence_info ()
                     else
                       (* can omit sequence information for `auth` query *)
                       match Itn_crypto.pubkey_of_base64 pk_str with
