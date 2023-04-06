@@ -39,7 +39,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Some
           { node_name = "snark-node"
           ; account_name = "snark-node-key"
-          ; worker_nodes = 2
+          ; worker_nodes = 4
           }
     ; snark_worker_fee = "0.0001"
     ; proof_config =
@@ -229,7 +229,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
         in
         account_updates
-        |> mk_zkapp_command ~memo:"valid zkapp from fish1" ~fee:100_000
+        |> mk_zkapp_command ~memo:"valid zkapp from fish1" ~fee:2_000_000
              ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 4)
       in
       replace_authorizations ~keymap with_dummy_signatures
@@ -246,65 +246,65 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Deferred.return `Continue )
     in
     let%bind () =
-      section
+      section_hard
         "Send a zkapp command with an invalid account update nonce using fish1"
         (send_zkapp ~logger node invalid_nonce_zkapp_cmd_from_fish1)
     in
     let%bind () =
-      section
+      section_hard
         "Send a zkapp command that has its nonce properly incremented after \
          the fish1 transaction"
         (send_zkapp ~logger node valid_zkapp_cmd_from_fish1)
     in
     let%bind () =
-      section
+      section_hard
         "Wait for fish1 zkapp command with invalid nonce to appear in \
          transition frontier with failed status"
         (wait_for_zkapp ~has_failures:true invalid_nonce_zkapp_cmd_from_fish1)
     in
     let%bind () =
-      section
+      section_hard
         "Wait for fish1 zkapp command with valid nonce to be accepted into \
          transition frontier"
         (wait_for_zkapp ~has_failures:false valid_zkapp_cmd_from_fish1)
     in
     let%bind () =
-      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      let fee = Currency.Fee.of_nanomina_int_exn 3_000_000 in
       send_padding_transactions block_producer_nodes ~fee ~logger
         ~n:(padding_payments ())
     in
     let%bind () =
-      section
+      section_hard
         "Send a zkapp command account update for fish1 that sets send \
          permission to Proof"
         (send_zkapp ~logger node set_permission_zkapp_cmd_from_fish1)
     in
     let%bind () =
-      section
+      section_hard
         "Send a zkapp command that should be valid after permission from the \
          fish1 transaction"
         (send_zkapp ~logger node valid_permission_zkapp_cmd_from_fish1)
     in
     (*low fee transaction to prevent from getting into a block*)
     let%bind () =
-      section
+      section_hard
         "Send a zkapp command that should be invalid after permission from the \
          fish1 transaction is set to Proof"
         (send_zkapp ~logger node invalid_permission_zkapp_cmd_from_fish1)
     in
     let%bind () =
-      section
+      section_hard
         "Wait for fish1 zkapp command with set permission to be accepted by \
          transition frontier"
         (wait_for_zkapp ~has_failures:false set_permission_zkapp_cmd_from_fish1)
     in
     let%bind () =
-      section
+      section_hard
         "Wait for fish1 zkapp command to be accepted by transition frontier"
         (wait_for_zkapp ~has_failures:true valid_permission_zkapp_cmd_from_fish1)
     in
     let%bind () =
-      section
+      section_hard
         "Verify account update after the updated permission failed by checking \
          account nonce"
         (let%bind { nonce = fish1_nonce; _ } =
@@ -322,7 +322,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            return () ) )
     in
     let%bind () =
-      section "Verify invalid zkapp commands are removed from transaction pool"
+      section_hard
+        "Verify invalid zkapp commands are removed from transaction pool"
         (let%bind pooled_zkapp_commands =
            Network.Node.get_pooled_zkapp_commands ~logger node ~pk:fish1_pk
            |> Deferred.bind ~f:Malleable_error.or_hard_error
