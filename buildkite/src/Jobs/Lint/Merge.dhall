@@ -27,6 +27,7 @@ Pipeline.build
         Command.Config::{
           commands = [ Cmd.run "buildkite/scripts/merges-cleanly.sh compatible"]
           , label = "Check merges cleanly into compatible"
+          , soft_fail = Some (B/SoftFail.Boolean True)
           , key = "clean-merge-compatible"
           , soft_fail = Some (B/SoftFail.Boolean True)
           , target = Size.Small
