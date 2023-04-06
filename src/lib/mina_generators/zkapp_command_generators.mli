@@ -48,6 +48,8 @@ val gen_protocol_state_precondition :
 val gen_zkapp_command_from :
      ?global_slot:Mina_numbers.Global_slot.t
   -> ?memo:string
+  -> ?max_size:bool
+  -> ?genesis_constants:Genesis_constants.t
   -> ?no_account_precondition:bool
   -> ?ignore_sequence_events_precond:bool
   -> ?no_token_accounts:bool
