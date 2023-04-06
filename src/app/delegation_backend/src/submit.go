@@ -10,7 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"cloud.google.com/go/storage"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/btcsuite/btcutil/base58"
 	logging "github.com/ipfs/go-log/v2"
 	"golang.org/x/crypto/blake2b"
@@ -33,12 +34,22 @@ func writeErrorResponse(app *App, w *http.ResponseWriter, msg string) {
 	}
 }
 
-func (ctx *GoogleContext) GoogleStorageSave(objs ObjectsToSave) {
+func (ctx *AwsContext) S3Save(objs ObjectsToSave) {
 	for path, bs := range objs {
-		obj := ctx.Bucket.Object(path).If(storage.Conditions{DoesNotExist: true})
-		writer := obj.NewWriter(ctx.Context)
-		defer writer.Close()
-		_, err := io.Copy(writer, bytes.NewReader(bs))
+		_, err := ctx.Client.HeadObject(ctx.Context, &s3.HeadObjectInput{
+			Bucket: ctx.BucketName,
+			Key:    aws.String(path),
+		})
+		if err == nil {
+			ctx.Log.Warnf("object already exists: %s", path)
+		}
+
+		_, err = ctx.Client.PutObject(ctx.Context, &s3.PutObjectInput{
+			Bucket:     ctx.BucketName,
+			Key:        aws.String(path),
+			Body:       bytes.NewReader(bs),
+			ContentMD5: nil,
+		})
 		if err != nil {
 			ctx.Log.Warnf("Error while saving metadata: %v", err)
 		}
@@ -47,10 +58,11 @@ func (ctx *GoogleContext) GoogleStorageSave(objs ObjectsToSave) {
 
 type ObjectsToSave map[string][]byte
 
-type GoogleContext struct {
-	Bucket  *storage.BucketHandle
-	Context context.Context
-	Log     *logging.ZapEventLogger
+type AwsContext struct {
+	Client     *s3.Client
+	BucketName *string
+	Context    context.Context
+	Log        *logging.ZapEventLogger
 }
 
 type App struct {
