@@ -112,26 +112,36 @@ let field_standard_limbs_to_bignum_bigint (type f)
 module type Foreign_field_element_base = sig
   type 'field t
 
+  type 'a limbs_type
+
   module Cvar = Snarky_backendless.Cvar
 
+  (* Create foreign field element from Bignum_bigint.t *)
+  val of_bignum_bigint :
+       (module Snark_intf.Run with type field = 'field)
+    -> Bignum_bigint.t
+    -> 'field t
+
   (* Create foreign field element from Cvar limbs *)
-  val of_limbs : 'field Cvar.t limbs -> 'field t
+  val of_limbs : 'field Cvar.t limbs_type -> 'field t
 
   (* Convert foreign field element into Cvar limbs *)
-  val to_limbs : 'field t -> 'field Cvar.t limbs
+  val to_limbs : 'field t -> 'field Cvar.t limbs_type
 
   (* Map foreign field element's Cvar limbs into some other limbs with the mapping function func *)
-  val map : 'field t -> ('field Cvar.t -> 'g) -> 'g limbs
+  val map : 'field t -> ('field Cvar.t -> 'g) -> 'g limbs_type
 
   (* Convert foreign field element into field limbs *)
   val to_field_limbs :
-    (module Snark_intf.Run with type field = 'field) -> 'field t -> 'field limbs
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> 'field limbs_type
 
   (* Convert foreign field element into Bignum_bigint.t limbs *)
   val to_bignum_bigint_limbs :
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
-    -> Bignum_bigint.t limbs
+    -> Bignum_bigint.t limbs_type
 
   (* Convert foreign field element into a Bignum_bigint.t *)
   val to_bignum_bigint :
@@ -144,6 +154,8 @@ module Foreign_field_element_base = struct
   module Cvar = Snarky_backendless.Cvar
 
   type 'field t = 'field Cvar.t limbs
+
+  let of_limbs x = x
 
   let to_limbs x = x
 
@@ -199,37 +211,8 @@ let to_extended x =
 (* Foreign field element type (standard limbs) *)
 module Foreign_field_element : sig
   (* Specialization of base type to standard_limbs *)
-  include Foreign_field_element_base
-
-  (* Create foreign field element from standard_limbs *)
-  val of_limbs : 'field Cvar.t standard_limbs -> 'field t
-
-  (* Create foreign field element from Bignum_bigint.t *)
-  val of_bignum_bigint :
-       (module Snark_intf.Run with type field = 'field)
-    -> Bignum_bigint.t
-    -> 'field t
-
-  (* Convert a foreign field element into tuple of 3 field standard_limbs *)
-  val to_limbs : 'field t -> 'field Cvar.t standard_limbs
-
-  (* Map foreign field element's Cvar limbs into some other standard_limbs with the mapping function func *)
-  val map : 'field t -> ('field Cvar.t -> 'g) -> 'g standard_limbs
-
-  (* Convert foreign field element into field standard_limbs *)
-  val to_field_limbs :
-       (module Snark_intf.Run with type field = 'field)
-    -> 'field t
-    -> 'field standard_limbs
-
-  (* Convert foreign field element into bignum_bigint standard_limbs *)
-  val to_bignum_bigint_limbs :
-       (module Snark_intf.Run with type field = 'field)
-    -> 'field t
-    -> Bignum_bigint.t standard_limbs
-
-  (* Convert foreign field element into a bignum_bigint *)
-  (* to_bignum_bigint included from Foreign_field_element_base *)
+  include
+    Foreign_field_element_base with type 'a limbs_type := 'a standard_limbs
 end = struct
   module Cvar = Snarky_backendless.Cvar
 
@@ -273,6 +256,105 @@ end = struct
   let to_bignum_bigint (type field)
       (module Circuit : Snark_intf.Run with type field = field) (x : field t) =
     Foreign_field_element_base.to_bignum_bigint (module Circuit) (Standard x)
+end
+
+(* Foreign field element type (extended limbs) *)
+module Foreign_field_element_extended : sig
+  (* Specialization of base type to extended_limbs *)
+  include
+    Foreign_field_element_base with type 'a limbs_type := 'a extended_limbs
+end = struct
+  module Cvar = Snarky_backendless.Cvar
+
+  type 'field t = 'field Cvar.t extended_limbs
+
+  let of_limbs x = x
+
+  let of_bignum_bigint (type field)
+      (module Circuit : Snark_intf.Run with type field = field) x : field t =
+    let open Circuit in
+    let l123, l0 = Common.(bignum_bigint_div_rem x two_to_limb) in
+    let l23, l1 = Common.(bignum_bigint_div_rem l123 two_to_limb) in
+    let l3, l2 = Common.(bignum_bigint_div_rem l23 two_to_limb) in
+    let l0 =
+      Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l0
+    in
+    let l1 =
+      Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l1
+    in
+    let l2 =
+      Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l2
+    in
+    let l3 =
+      Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l3
+    in
+    of_limbs (l0, l1, l2, l3)
+
+  let to_limbs x = Foreign_field_element_base.to_limbs x
+
+  let map x func =
+    to_extended @@ Foreign_field_element_base.map (Extended x) func
+
+  let to_field_limbs (type field)
+      (module Circuit : Snark_intf.Run with type field = field) x =
+    to_extended
+    @@ Foreign_field_element_base.to_field_limbs (module Circuit) (Extended x)
+
+  let to_bignum_bigint_limbs (type field)
+      (module Circuit : Snark_intf.Run with type field = field) x =
+    to_extended
+    @@ Foreign_field_element_base.to_bignum_bigint_limbs
+         (module Circuit)
+         (Extended x)
+
+  let to_bignum_bigint (type field)
+      (module Circuit : Snark_intf.Run with type field = field) (x : field t) =
+    Foreign_field_element_base.to_bignum_bigint (module Circuit) (Extended x)
+end
+
+(* Foreign field element type (compact limbs) *)
+module Foreign_field_element_compact : sig
+  (* Specialization of base type to compact_limbs *)
+  include Foreign_field_element_base with type 'a limbs_type := 'a compact_limbs
+end = struct
+  module Cvar = Snarky_backendless.Cvar
+
+  type 'field t = 'field Cvar.t compact_limbs
+
+  let of_limbs x = x
+
+  let of_bignum_bigint (type field)
+      (module Circuit : Snark_intf.Run with type field = field) x : field t =
+    let open Circuit in
+    let l2, l01 = Common.(bignum_bigint_div_rem x two_to_2limb) in
+
+    let l01 =
+      Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l01
+    in
+    let l2 =
+      Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l2
+    in
+    of_limbs (l01, l2)
+
+  let to_limbs x = Foreign_field_element_base.to_limbs x
+
+  let map x func = to_compact @@ Foreign_field_element_base.map (Compact x) func
+
+  let to_field_limbs (type field)
+      (module Circuit : Snark_intf.Run with type field = field) x =
+    to_compact
+    @@ Foreign_field_element_base.to_field_limbs (module Circuit) (Compact x)
+
+  let to_bignum_bigint_limbs (type field)
+      (module Circuit : Snark_intf.Run with type field = field) x =
+    to_compact
+    @@ Foreign_field_element_base.to_bignum_bigint_limbs
+         (module Circuit)
+         (Compact x)
+
+  let to_bignum_bigint (type field)
+      (module Circuit : Snark_intf.Run with type field = field) (x : field t) =
+    Foreign_field_element_base.to_bignum_bigint (module Circuit) (Compact x)
 end
 
 (* Compute non-zero intermediate products
