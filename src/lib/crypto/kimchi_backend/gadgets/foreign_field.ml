@@ -946,7 +946,7 @@ let _compute_ffadd_values (type f)
   in
 
   (* Check that both ways of computing the carry value are equal *)
-  assert (carry_top = carry_bot) ;
+  assert (Field.Constant.equal carry_top carry_bot) ;
 
   (result, sign, field_overflow, carry_bot)
 
