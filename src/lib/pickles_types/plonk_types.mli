@@ -1,4 +1,4 @@
-(* Module and type signatures helpful for Plonk *)
+(** Module and type signatures helpful for Plonk **)
 
 val hash_fold_array : 'a Sigs.hashable -> 'a array Sigs.hashable
 
@@ -28,19 +28,32 @@ module Features : sig
   (** [flags] are out-of-circuit feature flags *)
   type flags = bool t
 
+  (** [none] sets all in-circuit feature flags to {!val:Opt.Flag.No} *)
   val none : options
 
+  (** [none_bool] sets all out-of-circuit feature flags to [false] *)
   val none_bool : flags
+
+  (** {2 Iterators} *)
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
 
   val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t
 
+  (** {2 Converters} *)
+
+  (** [to_data features] transforms the fields into a list representation such
+      with fields ordered as follows [[ range_check0 ; range_check1 ;
+      foreign_field_add ; foreign_field_mul ; xor ; rot ; lookup ;
+      runtime_tables ]] *)
   val to_data :
        'a t
     -> ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
        Hlist.HlistId.t
 
+  (** [of_data hlist] is the inverse of {!val:to_data}. Fields of hlist are
+      ordered as follows [[ range_check0 ; range_check1 ; foreign_field_add ;
+      foreign_field_mul ; xor ; rot ; lookup ; runtime_tables ]] *)
   val of_data :
        ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
        Hlist.HlistId.t
