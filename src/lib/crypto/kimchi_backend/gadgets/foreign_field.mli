@@ -6,24 +6,21 @@ module Snark_intf = Snarky_backendless.Snark_intf
  *   - Limbs structure
  *
  *   There are 3 specific limb structures required
- *     - Compact mode  : 2 limbs where the lowest is 2L bits and the highest is L bits
+ *     - Standard mode : 3 limbs of L-bits each
  *     - Extended mode : 4 limbs of L-bits each, used by bound addition (i.e. Matthew's trick)
- *     - Normal mode   : 3 limbs of L-bits each
+ *     - Compact mode  : 2 limbs where the lowest is 2L bits and the highest is L bits
  *)
-
-type 'field compact_limbs = 'field * 'field
 
 type 'field standard_limbs = 'field * 'field * 'field
 
 type 'field extended_limbs = 'field * 'field * 'field * 'field
 
+type 'field compact_limbs = 'field * 'field
+
 type 'field limbs =
-  | Compact of 'field compact_limbs
   | Standard of 'field standard_limbs
   | Extended of 'field extended_limbs
-
-(** Convert generic limbs into compact limbs *)
-val to_compact : 'f limbs -> 'f compact_limbs
+  | Compact of 'field compact_limbs
 
 (** Convert generic limbs into standard limbs *)
 val to_standard : 'f limbs -> 'f standard_limbs
@@ -31,30 +28,43 @@ val to_standard : 'f limbs -> 'f standard_limbs
 (** Convert generic limbs into extended limbs *)
 val to_extended : 'f limbs -> 'f extended_limbs
 
+(** Convert generic limbs into compact limbs *)
+val to_compact : 'f limbs -> 'f compact_limbs
+
 (** Foreign field element base type - not used directly *)
 module type Foreign_field_element_base = sig
   type 'field t
 
+  type 'a limbs_type
+
   module Cvar = Snarky_backendless.Cvar
 
+  (** Create foreign field element from Bignum_bigint.t *)
+  val of_bignum_bigint :
+       (module Snark_intf.Run with type field = 'field)
+    -> Bignum_bigint.t
+    -> 'field t
+
   (** Create foreign field element from Cvar limbs *)
-  val of_limbs : 'field Cvar.t limbs -> 'field t
+  val of_limbs : 'field Cvar.t limbs_type -> 'field t
 
   (** Convert foreign field element into Cvar limbs *)
-  val to_limbs : 'field t -> 'field Cvar.t limbs
+  val to_limbs : 'field t -> 'field Cvar.t limbs_type
 
   (** Map foreign field element's Cvar limbs into some other limbs with the mapping function func *)
-  val map : 'field t -> ('field Cvar.t -> 'g) -> 'g limbs
+  val map : 'field t -> ('field Cvar.t -> 'g) -> 'g limbs_type
 
   (** Convert foreign field element into field limbs *)
   val to_field_limbs :
-    (module Snark_intf.Run with type field = 'field) -> 'field t -> 'field limbs
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> 'field limbs_type
 
   (** Convert foreign field element into Bignum_bigint.t limbs *)
   val to_bignum_bigint_limbs :
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
-    -> Bignum_bigint.t limbs
+    -> Bignum_bigint.t limbs_type
 
   (** Convert foreign field element into a Bignum_bigint.t *)
   val to_bignum_bigint :
@@ -65,39 +75,19 @@ end
 
 (** Foreign field element type (standard limbs) *)
 module Foreign_field_element : sig
-  (** Specialization of base type to standard_limbs *)
-  include Foreign_field_element_base
+  include
+    Foreign_field_element_base with type 'a limbs_type := 'a standard_limbs
+end
 
-  (** Create foreign field element from standard_limbs *)
-  val of_limbs : 'field Snarky_backendless.Cvar.t standard_limbs -> 'field t
+(** Foreign field element type (extended limbs) *)
+module Foreign_field_element_extended : sig
+  include
+    Foreign_field_element_base with type 'a limbs_type := 'a extended_limbs
+end
 
-  (** Create foreign field element from Bignum_bigint.t *)
-  val of_bignum_bigint :
-       (module Snark_intf.Run with type field = 'field)
-    -> Bignum_bigint.t
-    -> 'field t
-
-  (** Convert a foreign field element into tuple of 3 field standard_limbs *)
-  val to_limbs : 'field t -> 'field Snarky_backendless.Cvar.t standard_limbs
-
-  (** Map foreign field element's Cvar limbs into some other standard_limbs with the mapping function func *)
-  val map :
-    'field t -> ('field Snarky_backendless.Cvar.t -> 'g) -> 'g standard_limbs
-
-  (** Convert foreign field element into field standard_limbs *)
-  val to_field_limbs :
-       (module Snark_intf.Run with type field = 'field)
-    -> 'field t
-    -> 'field standard_limbs
-
-  (** Convert foreign field element into bignum_bigint standard_limbs *)
-  val to_bignum_bigint_limbs :
-       (module Snark_intf.Run with type field = 'field)
-    -> 'field t
-    -> Bignum_bigint.t standard_limbs
-
-  (* Convert foreign field element into a bignum_bigint *)
-  (* to_bignum_bigint included from Foreign_field_element_base *)
+(** Foreign field element type (compact limbs) *)
+module Foreign_field_element_compact : sig
+  include Foreign_field_element_base with type 'a limbs_type := 'a compact_limbs
 end
 
 (** Structure for tracking external checks that must be made

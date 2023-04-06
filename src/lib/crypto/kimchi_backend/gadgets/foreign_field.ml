@@ -42,21 +42,21 @@ let max_foreign_field_modulus (type f)
  *   - Limbs structure
  *
  *   There are 3 specific limb structures required
- *     - Compact mode  : 2 limbs where the lowest is 2L bits and the highest is L bits
+ *     - Standard mode : 3 limbs of L-bits each
  *     - Extended mode : 4 limbs of L-bits each, used by bound addition (i.e. Matthew's trick)
- *     - Normal mode   : 3 limbs of L-bits each
+ *     - Compact mode  : 2 limbs where the lowest is 2L bits and the highest is L bits
  *)
-
-type 'field compact_limbs = 'field * 'field
 
 type 'field standard_limbs = 'field * 'field * 'field
 
 type 'field extended_limbs = 'field * 'field * 'field * 'field
 
+type 'field compact_limbs = 'field * 'field
+
 type 'field limbs =
-  | Compact of 'field compact_limbs
   | Standard of 'field standard_limbs
   | Extended of 'field extended_limbs
+  | Compact of 'field compact_limbs
 
 (* Convert Bignum_bigint.t to Bignum_bigint standard_limbs *)
 let bignum_bigint_to_standard_limbs (bigint : Bignum_bigint.t) :
@@ -155,8 +155,6 @@ module Foreign_field_element_base = struct
 
   type 'field t = 'field Cvar.t limbs
 
-  let of_limbs x = x
-
   let to_limbs x = x
 
   let map x func =
@@ -195,9 +193,6 @@ module Foreign_field_element_base = struct
 end
 
 (* Limbs structure helpers *)
-let to_compact x =
-  match x with Compact (l0, l1) -> (l0, l1) | _ -> assert false
-
 let to_standard x =
   match x with Standard (l0, l1, l2) -> (l0, l1, l2) | _ -> assert false
 
@@ -207,6 +202,9 @@ let to_extended x =
       (l0, l1, l2, l3)
   | _ ->
       assert false
+
+let to_compact x =
+  match x with Compact (l0, l1) -> (l0, l1) | _ -> assert false
 
 (* Foreign field element type (standard limbs) *)
 module Foreign_field_element : sig
@@ -852,7 +850,7 @@ let compact_limb (type f) (module Circuit : Snark_intf.Run with type field = f)
  * - the sign of the operation
  * - the overflow flag
  * - the carry value *)
-let compute_ffadd_values (type f)
+let _compute_ffadd_values (type f)
     (module Circuit : Snark_intf.Run with type field = f)
     (left_input : f Foreign_field_element.t)
     (right_input : f Foreign_field_element.t) (is_subtraction : bool)
@@ -946,7 +944,7 @@ let compute_ffadd_values (type f)
   in
 
   (* Check that both ways of computing the carry value are equal *)
-  assert (Field.Constant.(carry_top = carry_bot)) ;
+  assert (carry_top = carry_bot) ;
 
   (result, sign, field_overflow, carry_bot)
 
