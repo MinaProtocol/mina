@@ -106,7 +106,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let open Mina_base in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.of_mina_int_exn 10 in
-      let nonce = Account.Nonce.of_int 2 in
+      let nonce = Account.Nonce.of_int 1 in
       let memo =
         Signed_command_memo.create_from_string_exn
           "zkApp, 2nd account with timing"
@@ -152,7 +152,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let open Mina_base in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.of_mina_int_exn 100 in
-      let nonce = Account.Nonce.of_int 4 in
+      let nonce = Account.Nonce.of_int 2 in
       let memo =
         Signed_command_memo.create_from_string_exn
           "zkApp, 3rd account with timing"
@@ -229,7 +229,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let open Mina_base in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.of_mina_int_exn 7 in
-      let nonce = Account.Nonce.of_int 2 in
+      let nonce = Account.Nonce.of_int 1 in
       let memo =
         Signed_command_memo.create_from_string_exn
           "Invalid transfer, timed account"
@@ -260,7 +260,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let open Mina_base in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.zero in
-      let nonce = Account.Nonce.of_int 6 in
+      let nonce = Account.Nonce.of_int 3 in
       let memo =
         Signed_command_memo.create_from_string_exn
           "zkApp, invalid update timing"
