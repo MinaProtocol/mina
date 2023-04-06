@@ -27,9 +27,13 @@ impl From<VerifierIndex<Pallas>> for CamlPastaFqPlonkVerifierIndex {
         let runtime_tables_comm = vi.lookup_index.as_ref().map_or(None, |v| {
             v.runtime_tables_selector.as_ref().map(|v| v.into())
         });
-        let lookup_gate_comm = vi.lookup_index.as_ref().map_or(None, |v| {
-            v.lookup_selectors.lookup.as_ref().map(|v| v.into())
-        });
+
+        let lookup_gate_comm = vi
+            .lookup_index
+            .as_ref()
+            .map(|v| v.lookup_selectors.as_ref().map(Into::into))
+            .map_or(None, |v| v.lookup);
+
         Self {
             domain: CamlPlonkDomain {
                 log_size_of_group: vi.domain.log_size_of_group as isize,
