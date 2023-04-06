@@ -324,6 +324,12 @@ struct
                       (* can omit sequence information for `auth` query *)
                       match Itn_crypto.pubkey_of_base64 pk_str with
                       | Ok pk ->
+                          (* setting state in Mina_graphql is safe, as long as this GraphQL callback
+                             can't be preempted by another call to it
+                          *)
+                          Mina_graphql.Itn_sequencing
+                          .set_sequence_number_for_auth pk ;
+                          (* don't increment sequence no for an auth query *)
                           verify_signature_and_respond pk signature
                       | Error _ ->
                           (* not a base64-encoded key *)

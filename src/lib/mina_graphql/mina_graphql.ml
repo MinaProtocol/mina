@@ -187,6 +187,21 @@ module Itn_sequencing = struct
     | Some n ->
         n
 
+  (* used for `auth` queries, so we can return
+     the sequence number for the pubkey that signed
+     the query
+
+     this is stateful, but appears to be safe
+  *)
+  let set_sequence_number_for_auth, get_sequence_no_for_auth =
+    let pubkey_sequence_no = ref 0 in
+    let setter pubkey =
+      let seq_no = get_sequence_number pubkey in
+      pubkey_sequence_no := seq_no
+    in
+    let getter () = !pubkey_sequence_no in
+    (setter, getter)
+
   let valid_sequence_number query_uuid pubkey n =
     Uuid.equal query_uuid uuid && get_sequence_number pubkey = n
 
@@ -522,6 +537,21 @@ module Types = struct
                ~highest_block_length_received:nn_int
                ~highest_unvalidated_block_length_received:nn_int
                ~metrics:(id ~typ:(non_null metrics)) )
+  end
+
+  module Itn = struct
+    let auth =
+      obj "ItnAuth" ~fields:(fun _ ->
+          [ field "uuid"
+              ~args:Arg.[]
+              ~doc:"Uuid of the ITN GraphQL server" ~typ:(non_null string)
+              ~resolve:(fun _ (uuid, _) -> uuid)
+          ; field "signerSequenceNumber"
+              ~args:Arg.[]
+              ~doc:"Sequence number for the signer of the auth query"
+              ~typ:(non_null int)
+              ~resolve:(fun _ (_, n) -> n)
+          ] )
   end
 
   let fee_transfer =
@@ -5141,8 +5171,11 @@ module Queries = struct
     let auth =
       field "auth"
         ~args:Arg.[]
-        ~typ:(non_null string) ~doc:"Uuid for this GraphQL server"
-        ~resolve:(fun _ () -> Uuid.to_string Itn_sequencing.uuid)
+        ~typ:(non_null Types.Itn.auth)
+        ~doc:"Uuid for GraphQL server, sequence number for signing public key"
+        ~resolve:(fun _ () ->
+          ( Uuid.to_string Itn_sequencing.uuid
+          , Itn_sequencing.get_sequence_no_for_auth () ) )
 
     let slots_won =
       io_field "slotsWon"
