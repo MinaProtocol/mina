@@ -6,17 +6,26 @@ module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 
 (* NOT *)
 
-(* Boolean Not of length bits for checked length (uses Xor gadgets inside) *)
+(* Boolean Not of length bits for checked length (uses Xor gadgets inside) 
+    *   input of word to negate
+    *   length of word to negate
+    *   len_xor is the length of the Xor lookup table to use beneath (default 4) 
+*)
 let bnot_checked (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (input : Circuit.Field.t) (length : int) (len_xor : int) : Circuit.Field.t =
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f) ?(len_xor = 4)
+    (input : Circuit.Field.t) (length : int) : Circuit.Field.t =
   let open Circuit in
   let all_ones = Bignum_bigint.(pow (of_int 2) (of_int length) - one) in
   let all_ones = Common.bignum_bigint_to_field (module Circuit) all_ones in
   let all_ones = Field.constant all_ones in
+  let all_ones_var =
+    exists Field.typ ~compute:(fun () ->
+        Common.cvar_field_to_field_as_prover (module Circuit) all_ones )
+  in
+  Field.Assert.equal all_ones all_ones_var ;
 
   (* Negating is equivalent to XORing with all one word *)
-  Xor.bxor (module Circuit) input all_ones length len_xor
+  Xor.bxor (module Circuit) input all_ones length ~len_xor
 
 (* Boolean Not of length bits for unchecked length (uses Generic subtractions inside) *)
 let bnot_unchecked (type f)
@@ -54,7 +63,7 @@ let bnot_unchecked (type f)
 let bnot64_checked (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (input : Circuit.Field.t) : Circuit.Field.t =
-  bnot_checked (module Circuit) input 64 4
+  bnot_checked (module Circuit) input 64
 
 (* Not of 64 bits unchecked *)
 let bnot64_unchecked (type f)
@@ -86,7 +95,7 @@ let%test_unit "not gadget" =
           in
           (* Use the not gate gadget *)
           let result_checked =
-            bnot_checked (module Runner.Impl) input length 4
+            bnot_checked (module Runner.Impl) input length
           in
           let result_unchecked =
             bnot_unchecked (module Runner.Impl) input length
