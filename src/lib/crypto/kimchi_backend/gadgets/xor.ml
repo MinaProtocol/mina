@@ -6,12 +6,21 @@ module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 
 (* XOR *)
 
-(* Boolean Xor of length bits *)
+(* Boolean Xor of length bits 
+ * input1 and input2 are the inputs to the Xor gate
+  * length is the number of bits to Xor
+  * len_xor is the number of bits of the lookup table (default is 4)
+ *)
 let bxor (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) (length : int)
-    (len_xor : int) : Circuit.Field.t =
-  (* Recursively builds Xor *)
+    ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
+    (length : int) : Circuit.Field.t =
+  (* Recursively builds Xor
+     * input1_bits and input2_bits are the inputs to the Xor gate as bits
+     * output_bits is the output of the Xor gate as bits
+     * length is the number of remaining bits to Xor
+     * len_xor is the number of bits of the lookup table (default is 4)
+  *)
   let rec bxor_rec (input1_bits : bool list) (input2_bits : bool list)
       (output_bits : bool list) (length : int) (len_xor : int) =
     let open Circuit in
@@ -28,7 +37,7 @@ let bxor (type f)
       Field.Assert.equal Field.zero input1_cvar ;
       Field.Assert.equal Field.zero input2_cvar ;
       Field.Assert.equal Field.zero output_cvar ;
-      with_label "zero_check" (fun () ->
+      with_label "xor_zero_check" (fun () ->
           assert_
             { annotation = Some __LOC__
             ; basic =
@@ -40,7 +49,17 @@ let bxor (type f)
                      } )
             } ) )
     else
-      (* Nibbles *)
+      (* Define shorthand helper *)
+      let of_bits (type f)
+          (module Circuit : Snarky_backendless.Snark_intf.Run
+            with type field = f ) (field_element : f) (start : int) (stop : int)
+          : Circuit.Field.t =
+        Common.field_bits_le_to_cvar_field
+          (module Circuit)
+          field_element start stop
+      in
+
+      (* Nibble offsets *)
       let first = len_xor in
       let second = first + len_xor in
       let third = second + len_xor in
@@ -56,78 +75,18 @@ let bxor (type f)
                      { in1 = Field.constant input1
                      ; in2 = Field.constant input2
                      ; out = Field.constant output
-                     ; in1_0 =
-                         Common.field_to_cvar_field
-                           (module Circuit)
-                           (Common.field_bits_le_to_field
-                              (module Circuit)
-                              input1 0 first )
-                     ; in1_1 =
-                         Common.field_to_cvar_field
-                           (module Circuit)
-                           (Common.field_bits_le_to_field
-                              (module Circuit)
-                              input1 first second )
-                     ; in1_2 =
-                         Common.field_to_cvar_field
-                           (module Circuit)
-                           (Common.field_bits_le_to_field
-                              (module Circuit)
-                              input1 second third )
-                     ; in1_3 =
-                         Common.field_to_cvar_field
-                           (module Circuit)
-                           (Common.field_bits_le_to_field
-                              (module Circuit)
-                              input1 third fourth )
-                     ; in2_0 =
-                         Common.field_to_cvar_field
-                           (module Circuit)
-                           (Common.field_bits_le_to_field
-                              (module Circuit)
-                              input2 0 first )
-                     ; in2_1 =
-                         Common.field_to_cvar_field
-                           (module Circuit)
-                           (Common.field_bits_le_to_field
-                              (module Circuit)
-                              input2 first second )
-                     ; in2_2 =
-                         Common.field_to_cvar_field
-                           (module Circuit)
-                           (Common.field_bits_le_to_field
-                              (module Circuit)
-                              input2 second third )
-                     ; in2_3 =
-                         Common.field_to_cvar_field
-                           (module Circuit)
-                           (Common.field_bits_le_to_field
-                              (module Circuit)
-                              input2 third fourth )
-                     ; out_0 =
-                         Common.field_to_cvar_field
-                           (module Circuit)
-                           (Common.field_bits_le_to_field
-                              (module Circuit)
-                              output 0 first )
-                     ; out_1 =
-                         Common.field_to_cvar_field
-                           (module Circuit)
-                           (Common.field_bits_le_to_field
-                              (module Circuit)
-                              output first second )
-                     ; out_2 =
-                         Common.field_to_cvar_field
-                           (module Circuit)
-                           (Common.field_bits_le_to_field
-                              (module Circuit)
-                              output second third )
-                     ; out_3 =
-                         Common.field_to_cvar_field
-                           (module Circuit)
-                           (Common.field_bits_le_to_field
-                              (module Circuit)
-                              output third fourth )
+                     ; in1_0 = of_bits (module Circuit) input1 0 first
+                     ; in1_1 = of_bits (module Circuit) input1 first second
+                     ; in1_2 = of_bits (module Circuit) input1 second third
+                     ; in1_3 = of_bits (module Circuit) input1 third fourth
+                     ; in2_0 = of_bits (module Circuit) input2 0 first
+                     ; in2_1 = of_bits (module Circuit) input2 first second
+                     ; in2_2 = of_bits (module Circuit) input2 second third
+                     ; in2_3 = of_bits (module Circuit) input2 third fourth
+                     ; out_0 = of_bits (module Circuit) output 0 first
+                     ; out_1 = of_bits (module Circuit) output first second
+                     ; out_2 = of_bits (module Circuit) output second third
+                     ; out_3 = of_bits (module Circuit) output third fourth
                      } )
             } ) ;
 
@@ -145,12 +104,18 @@ let bxor (type f)
 
   let open Circuit in
   let open Common in
+  (* Check that the length is positive *)
+  assert (length > 0 && len_xor > 0) ;
   (* Check that the length fits in the field *)
   assert (length <= Field.size_in_bits) ;
 
+  (* Initialize array of 255 bools *)
+  let input1_array = Array.create ~len:Field.size_in_bits false in
+  let input2_array = Array.create ~len:Field.size_in_bits false in
+
   (* Sanity checks about lengths of inputs using bignum *)
   as_prover (fun () ->
-      (* Convert to field type *)
+      (* Read inputs, Convert to field type *)
       let input1_field =
         Common.cvar_field_to_field_as_prover (module Circuit) input1
       in
@@ -177,69 +142,72 @@ let bxor (type f)
       (* Checks inputs fit in field *)
       assert (Bignum_bigint.(input1_big < Field.size)) ;
       assert (Bignum_bigint.(input2_big < Field.size)) ;
+
+      (* Convert inputs field elements to list of bits of length 255 *)
+      let input1_bits = Field.Constant.unpack @@ input1_field in
+      let input2_bits = Field.Constant.unpack @@ input2_field in
+
+      (* Convert list of bits to arrays *)
+      let input1_bits_array = List.to_array @@ input1_bits in
+      let input2_bits_array = List.to_array @@ input2_bits in
+
+      (* Iterate over 255 positions to update value of arrays *)
+      for i = 0 to Field.size_in_bits - 1 do
+        input1_array.(i) <- input1_bits_array.(i) ;
+        input2_array.(i) <- input2_bits_array.(i)
+      done ;
+
       () ) ;
 
-  (* print the list of bits *)
-  let _print_bits bits =
-    List.iter bits ~f:(fun b -> print_string (if b then "1" else "0"))
+  (* Convert array of bits to list of booleans without leading zeros *)
+  let input1_bits =
+    Common.bool_list_wo_zero_bits @@ Array.to_list input1_array
+  in
+  let input2_bits =
+    Common.bool_list_wo_zero_bits @@ Array.to_list input2_array
   in
 
-  let output_xor =
-    exists Field.typ ~compute:(fun () ->
-        (* Read inputs *)
-        let input1_field = As_prover.read Field.typ input1 in
-        let input2_field = As_prover.read Field.typ input2 in
+  (* Pad with zeros in MSB until reaching same length *)
+  let input1_bits = Common.pad_upto ~length ~value:false input1_bits in
+  let input2_bits = Common.pad_upto ~length ~value:false input2_bits in
 
-        (* Convert inputs field elements to list of bits *)
-        let input1_bits =
-          field_to_bits_le_as_prover (module Circuit) input1_field
-        in
-        let input2_bits =
-          field_to_bits_le_as_prover (module Circuit) input2_field
-        in
-
-        (* Pad with zeros in MSB until reaching same length *)
-        let input1_bits = Common.pad_upto ~length ~value:false input1_bits in
-        let input2_bits = Common.pad_upto ~length ~value:false input2_bits in
-
-        (* Pad with more zeros until the length is a multiple of 4*n for n-bit length lookup table *)
-        let pad_length =
-          if length mod (4 * len_xor) <> 0 then
-            length + (4 * len_xor) - (length mod (4 * len_xor))
-          else length
-        in
-        let input1_bits =
-          Common.pad_upto ~length:pad_length ~value:false input1_bits
-        in
-        let input2_bits =
-          Common.pad_upto ~length:pad_length ~value:false input2_bits
-        in
-
-        (* Xor list of bits to obtain output of the xor *)
-        let output_bits =
-          List.map2_exn input1_bits input2_bits ~f:(fun b1 b2 ->
-              Bool.(not (equal b1 b2)) )
-        in
-        (* Recursively build Xor gadget *)
-        bxor_rec input1_bits input2_bits output_bits pad_length len_xor ;
-
-        (* Convert back to field *)
-        Field.Constant.project output_bits )
+  (* Pad with more zeros until the length is a multiple of 4*n for n-bit length lookup table *)
+  let pad_length =
+    if length mod (4 * len_xor) <> 0 then
+      length + (4 * len_xor) - (length mod (4 * len_xor))
+    else length
+  in
+  let input1_bits =
+    Common.pad_upto ~length:pad_length ~value:false input1_bits
+  in
+  let input2_bits =
+    Common.pad_upto ~length:pad_length ~value:false input2_bits
   in
 
-  output_xor
+  (* Xor list of bits to obtain output of the xor *)
+  let output_bits =
+    List.map2_exn input1_bits input2_bits ~f:(fun b1 b2 ->
+        Bool.(not (equal b1 b2)) )
+  in
+
+  (* Recursively build Xor gadget *)
+  bxor_rec input1_bits input2_bits output_bits pad_length len_xor ;
+
+  (* Convert back to field *)
+  Common.field_to_cvar_field (module Circuit)
+  @@ Field.Constant.project output_bits
 
 (* Xor of 16 bits *)
 let bxor16 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) : Circuit.Field.t =
-  bxor (module Circuit) input1 input2 16 4
+  bxor (module Circuit) input1 input2 16 ~len_xor:4
 
 (* Xor of 64 bits *)
 let bxor64 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) : Circuit.Field.t =
-  bxor (module Circuit) input1 input2 64 4
+  bxor (module Circuit) input1 input2 64 ~len_xor:4
 
 let%test_unit "xor gadget" =
   (* Import the gadget test runner *)
@@ -272,11 +240,9 @@ let%test_unit "xor gadget" =
           in
           (* Use the xor gate gadget *)
           let result =
-            bxor (module Runner.Impl) left_input right_input length 4
+            bxor (module Runner.Impl) left_input right_input length
           in
-          Field.Assert.equal output_xor result ;
-          (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
-          Boolean.Assert.is_true (Field.equal result result) )
+          Field.Assert.equal output_xor result )
     in
     ()
   in
@@ -305,8 +271,8 @@ let%test_unit "xor gadget" =
             Common.as_prover_cvar_field_of_base10 (module Runner.Impl) output2
           in
           (* Use the xor gate gadget *)
-          let result1 = bxor (module Runner.Impl) left1 right1 length 4 in
-          let result2 = bxor (module Runner.Impl) left2 right2 length 4 in
+          let result1 = bxor (module Runner.Impl) left1 right1 length in
+          let result2 = bxor (module Runner.Impl) left2 right2 length in
           Field.Assert.equal output1 result1 ;
           Field.Assert.equal output2 result2 ;
           Boolean.Assert.is_true (Field.equal result1 result1) )
