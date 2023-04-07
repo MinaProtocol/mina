@@ -106,7 +106,6 @@ let field_bits_le_to_cvar_field (type f)
     (field_element : f) (start : int) (stop : int) : Circuit.Field.t =
   field_to_cvar_field (module Circuit) (field_bits_le_to_field (module Circuit) field_element start stop)
 
-
 (* Create cvar field element from contiguous bits of another
      See field_bits_le_to_field for more information *)
 let as_prover_cvar_field_bits_le_to_cvar_field (type f)

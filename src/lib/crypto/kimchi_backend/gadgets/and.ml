@@ -4,20 +4,18 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 (* AND *)
 
-(* Boolean And of length bits *)
+(* Boolean And of length bits
+   *  input1 and input2 are the two inputs to AND
+   *  length is the number of bits to AND
+   *  len_xor is the number of bits of the inputs of the Xor lookup table (default is 4)
+*)
 let band (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) (length : int)
-    (len_xor : int) : Circuit.Field.t =
+    ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
+    (length : int) : Circuit.Field.t =
   let open Circuit in
-  let output_and =
+  let and_output =
     exists Field.typ ~compute:(fun () ->
-        (* Recursively build And gadget with leading Xors and a final Generic gate *)
-        (* It will also check the right lengths of the inputs, no need to do it again *)
-        let xor_output =
-          Xor.bxor (module Circuit) input1 input2 length len_xor
-        in
-
         (* Read inputs *)
         let input1_field =
           Common.cvar_field_to_field_as_prover (module Circuit) input1
@@ -36,59 +34,56 @@ let band (type f)
         in
 
         (* Convert back to field a AND b *)
-        let and_output = Field.Constant.project and_bits in
-
-        (* Compute sum of a + b *)
-        let sum = Field.add input1 input2 in
-
-        with_label "sum_of_inputs" (fun () ->
-            assert_
-              { annotation = Some __LOC__
-              ; basic =
-                  Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
-                  .T
-                    (Basic
-                       { l = (Field.Constant.one, input1)
-                       ; r = (Field.Constant.one, input2)
-                       ; o =
-                           ( Option.value_exn Field.(to_constant (negate one))
-                           , sum )
-                       ; m = Field.Constant.zero
-                       ; c = Field.Constant.zero
-                       } )
-              } ) ;
-
-        (* Compute AND as 2 * and = sum - xor *)
-        with_label "and_equation" (fun () ->
-            assert_
-              { annotation = Some __LOC__
-              ; basic =
-                  Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
-                  .T
-                    (Basic
-                       { l = (Field.Constant.one, sum)
-                       ; r =
-                           ( Option.value_exn Field.(to_constant (negate one))
-                           , xor_output )
-                       ; o =
-                           ( Option.value_exn
-                               Field.(to_constant (negate @@ of_int 2))
-                           , Common.field_to_cvar_field
-                               (module Circuit)
-                               and_output )
-                       ; m = Field.Constant.zero
-                       ; c = Field.Constant.zero
-                       } )
-              } ) ;
-        and_output )
+        Field.Constant.project and_bits )
   in
-  output_and
 
-(* And of 64 bits *)
+  (* Recursively build And gadget with leading Xors and a final Generic gate *)
+  (* It will also check the right lengths of the inputs, no need to do it again *)
+  let xor_output = Xor.bxor (module Circuit) input1 input2 length ~len_xor in
+  (* Transform to non constant cvar *)
+  let xor_output_var =
+    exists Field.typ ~compute:(fun () ->
+        Common.cvar_field_to_field_as_prover (module Circuit) xor_output )
+  in
+
+  (* Compute sum of a + b and constrain in the circuit *)
+  let sum = Generic.add (module Circuit) input1 input2 in
+  (* Transform to non constant cvar *)
+  let sum_var =
+    exists Field.typ ~compute:(fun () ->
+        Common.cvar_field_to_field_as_prover (module Circuit) sum )
+  in
+
+  let two = Field.of_int 2 in
+
+  (* Constrain AND as 2 * and = sum - xor *)
+  with_label "and_equation" (fun () ->
+      assert_
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (Basic
+                 { l = (Field.Constant.one, sum_var)
+                 ; r =
+                     ( Option.value_exn Field.(to_constant (negate one))
+                     , xor_output_var )
+                 ; o =
+                     ( Option.value_exn Field.(to_constant (negate two))
+                     , and_output )
+                 ; m = Field.Constant.zero
+                 ; c = Field.Constant.zero
+                 } )
+        } ) ;
+
+  and_output
+
+(* And of 64 bits
+   * input1 and input2 are the two inputs to AND
+*)
 let band64 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) : Circuit.Field.t =
-  band (module Circuit) input1 input2 64 4
+  band (module Circuit) input1 input2 64
 
 let%test_unit "and gadget" =
   (* Import the gadget test runner *)
@@ -123,11 +118,9 @@ let%test_unit "and gadget" =
           in
           (* Use the and gate gadget *)
           let result =
-            band (module Runner.Impl) left_input right_input length 4
+            band (module Runner.Impl) left_input right_input length
           in
-          Field.Assert.equal output_and result ;
-          (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
-          Boolean.Assert.is_true (Field.equal result result) )
+          Field.Assert.equal output_and result )
     in
     ()
   in
