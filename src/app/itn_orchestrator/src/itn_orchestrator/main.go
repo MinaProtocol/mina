@@ -24,9 +24,10 @@ func init() {
 	actions = map[string]lib.Action{
 		"discovery": lib.DiscoverParticipantsAction{},
 		"payments":  lib.PaymentsAction{},
-		"keyloader": lib.KeyloaderAction{},
+		"load-keys": lib.KeyloaderAction{},
 		"stop":      lib.StopAction{},
 		"wait":      lib.WaitAction{},
+		"fund-keys": lib.FundAction{},
 	}
 }
 
@@ -35,6 +36,8 @@ type AppConfig struct {
 	LogFile      string        `json:",omitempty"`
 	Key          itn_json_types.Ed25519Privkey
 	UptimeBucket string
+	Daemon       string `json:",omitempty"`
+	MinaExec     string `json:",omitempty"`
 }
 
 func loadAppConfig() (res AppConfig) {
@@ -85,6 +88,11 @@ func main() {
 		UptimeBucket: client.Bucket(appConfig.UptimeBucket),
 		GetGqlClient: lib.GetGqlClient(authClient, clientCache),
 		Log:          log,
+		Daemon:       appConfig.Daemon,
+		MinaExec:     appConfig.MinaExec,
+	}
+	if config.MinaExec == "" {
+		config.MinaExec = "mina"
 	}
 	outCache := map[string]map[int]map[string]lib.OutputCacheEntry{
 		"": {},
@@ -108,7 +116,7 @@ func main() {
 			os.Exit(6)
 			return
 		}
-		log.Infof("Performing step %d", step)
+		log.Infof("Performing step %s (%d)", cmd.Action, step)
 		err = actions[cmd.Action].Run(config, params, func(name string, value_ any, multiple bool, sensitive bool) {
 			value, err := json.Marshal(value_)
 			if err != nil {
