@@ -12,7 +12,7 @@ fi
 
 ./test_executive.exe cloud "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \
-  --archive-image "$ARCHIVE_IMAGE" \
+  -d --archive-image "$ARCHIVE_IMAGE" \
   --mina-automation-location ./automation \
   | tee "$TEST_NAME.test.log" \
-  | ./logproc.exe -i inline -f '!(.level in ["Debug", "Spam"])'
+  | ./logproc.exe -i inline -f '!(.level in ["Spam"])'

@@ -223,22 +223,28 @@ struct
             cmd_with_status.With_status.data |> User_command.forget_check
             |> command_matches_zkapp_command )
       in
-      [%log' spam (Logger.create ())]
+      [%log' info (Logger.create ())]
+        "Looking for a zkApp transaction match in block with state_hash \
+         $state_hash"
+        ~metadata:
+          [ ("state_hash", State_hash.to_yojson breadcrumb_added.state_hash) ] ;
+      [%log' debug (Logger.create ())]
         "wait_condition check, zkapp_to_be_included_in_frontier, \
          zkapp_command: $zkapp_command "
         ~metadata:[ ("zkapp_command", Zkapp_command.to_yojson zkapp_command) ] ;
-      [%log' spam (Logger.create ())]
+      [%log' debug (Logger.create ())]
         "wait_condition check, zkapp_to_be_included_in_frontier, user_commands \
-         from breadcrumb: $user_commands"
+         from breadcrumb: $user_commands state_hash: $state_hash"
         ~metadata:
           [ ( "user_commands"
             , `List
                 (List.map breadcrumb_added.user_commands
                    ~f:(With_status.to_yojson User_command.Valid.to_yojson) ) )
+          ; ("state_hash", State_hash.to_yojson breadcrumb_added.state_hash)
           ] ;
       match zkapp_opt with
       | Some cmd_with_status ->
-          [%log' spam (Logger.create ())]
+          [%log' debug (Logger.create ())]
             "wait_condition check, zkapp_to_be_included_in_frontier, \
              cmd_with_status: $cmd_with_status "
             ~metadata:

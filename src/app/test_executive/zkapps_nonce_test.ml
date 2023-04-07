@@ -197,7 +197,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
-    let%bind.Deferred valid_permission_zkapp_cmd_from_fish1 =
+    let%bind.Deferred valid_fee_invalid_permission_zkapp_cmd_from_fish1 =
       let open Zkapp_command_builder in
       let with_dummy_signatures =
         let account_updates =
@@ -218,7 +218,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
-    let%bind.Deferred invalid_permission_zkapp_cmd_from_fish1 =
+    let%bind.Deferred invalid_fee_invalid_permission_zkapp_cmd_from_fish1 =
       let open Zkapp_command_builder in
       let with_dummy_signatures =
         let account_updates =
@@ -283,14 +283,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard
         "Send a zkapp command that should be valid after permission from the \
          fish1 transaction"
-        (send_zkapp ~logger node valid_permission_zkapp_cmd_from_fish1)
+        (send_zkapp ~logger node
+           valid_fee_invalid_permission_zkapp_cmd_from_fish1 )
     in
     (*low fee transaction to prevent from getting into a block*)
     let%bind () =
       section_hard
         "Send a zkapp command that should be invalid after permission from the \
          fish1 transaction is set to Proof"
-        (send_zkapp ~logger node invalid_permission_zkapp_cmd_from_fish1)
+        (send_zkapp ~logger node
+           invalid_fee_invalid_permission_zkapp_cmd_from_fish1 )
     in
     let%bind () =
       section_hard
@@ -301,7 +303,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard
         "Wait for fish1 zkapp command to be accepted by transition frontier"
-        (wait_for_zkapp ~has_failures:true valid_permission_zkapp_cmd_from_fish1)
+        (wait_for_zkapp ~has_failures:true
+           valid_fee_invalid_permission_zkapp_cmd_from_fish1 )
     in
     let%bind () =
       section_hard
@@ -328,6 +331,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Network.Node.get_pooled_zkapp_commands ~logger node ~pk:fish1_pk
            |> Deferred.bind ~f:Malleable_error.or_hard_error
          in
+         [%log debug] "Pooled zkapp_commands $commands"
+           ~metadata:
+             [ ( "commands"
+               , `List (List.map ~f:(fun s -> `String s) pooled_zkapp_commands)
+               )
+             ] ;
          if List.is_empty pooled_zkapp_commands then (
            [%log info] "Transaction pool is empty" ;
            return () )
