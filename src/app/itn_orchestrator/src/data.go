@@ -32,6 +32,8 @@ type Config struct {
 	UptimeBucket *storage.BucketHandle
 	GetGqlClient GetGqlClientF
 	Log          logging.StandardLogger
+	Daemon       string
+	MinaExec     string
 }
 
 type OutputF = func(name string, value any, multiple bool, sensitive bool)

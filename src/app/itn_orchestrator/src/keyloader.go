@@ -7,6 +7,7 @@ import (
 	"io"
 	"itn_json_types"
 	"os"
+	"strings"
 
 	"github.com/btcsuite/btcutil/base58"
 	logging "github.com/ipfs/go-log/v2"
@@ -62,7 +63,7 @@ type secretBox struct {
 type KeyloaderParams struct {
 	Dir         string
 	Limit       int
-	PasswordEnv string `json:",omitempty"`
+	PasswordEnv string `json:"password-env,omitempty"`
 }
 
 func LoadPrivateKeyFiles(log logging.StandardLogger, params KeyloaderParams, output func(itn_json_types.MinaPrivateKey)) error {
@@ -79,26 +80,27 @@ func LoadPrivateKeyFiles(log logging.StandardLogger, params KeyloaderParams, out
 	}
 	i := 0
 	for _, e := range entries {
-		if params.Limit > 0 && i >= params.Limit {
-			break
+		fname := e.Name()
+		if strings.HasSuffix(fname, ".pub") {
+			continue
 		}
-		jsonFile, err := os.Open(params.Dir + string(os.PathSeparator) + e.Name())
+		jsonFile, err := os.Open(params.Dir + string(os.PathSeparator) + fname)
 		if err != nil {
-			return fmt.Errorf("failed to open keyfile %s: %v", e.Name(), err)
+			return fmt.Errorf("failed to open keyfile %s: %v", fname, err)
 		}
 		defer jsonFile.Close()
 		bs, err := io.ReadAll(jsonFile)
 		if err != nil {
-			return fmt.Errorf("failed to read keyfile %s: %v", e.Name(), err)
+			return fmt.Errorf("failed to read keyfile %s: %v", fname, err)
 		}
 		var box secretBox
 		json.Unmarshal(bs, &box)
 		if box.Box_primitive != "xsalsa20poly1305" || box.Pw_primitive != "argon2i" {
-			return fmt.Errorf("unknown primitive type in %s", e.Name())
+			return fmt.Errorf("unknown primitive type in %s", fname)
 		}
 		k := argon2.Key(password, box.Pwsalt, box.Pwdiff.Ops, box.Pwdiff.Mem/1024, 1, 32)
 		if err != nil {
-			return fmt.Errorf("failed to parse key %s: %v", e.Name(), err)
+			return fmt.Errorf("failed to parse key %s: %v", fname, err)
 		}
 		var key [32]byte
 		copy(key[:], k)
@@ -106,11 +108,14 @@ func LoadPrivateKeyFiles(log logging.StandardLogger, params KeyloaderParams, out
 		copy(nonce[:], box.Nonce)
 		sk, opened := secretbox.Open(nil, box.Ciphertext, &nonce, &key)
 		if !opened {
-			return fmt.Errorf("failed to unseal key %s", e.Name())
+			return fmt.Errorf("failed to unseal key %s", fname)
 		}
 		sender := base58.CheckEncode(sk, '\x5A')
 		output(itn_json_types.MinaPrivateKey(sender))
 		i++
+		if params.Limit > 0 && i >= params.Limit {
+			break
+		}
 	}
 	return nil
 }
