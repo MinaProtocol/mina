@@ -60,6 +60,8 @@ module Port : sig
     val rest_server : int Types.with_name_and_displayed_default Command.Param.t
 
     val limited_graphql_server : int option Types.with_name Command.Param.t
+
+    val itn_graphql_server : int option Types.with_name Command.Param.t
   end
 
   module Archive : sig

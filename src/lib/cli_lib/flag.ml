@@ -168,6 +168,10 @@ module Port = struct
       create_optional ~name:"--limited-graphql-port"
         ~aliases:[ "limited-graphql-port" ]
         "GraphQL-server for limited daemon interaction"
+
+    let itn_graphql_server =
+      create_optional ~name:"--itn-graphql-port" ~aliases:[ "itn-graphql-port" ]
+        "GraphQL-server for incentivized testnet interaction"
   end
 
   module Archive = struct
