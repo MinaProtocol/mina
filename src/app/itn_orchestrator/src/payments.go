@@ -17,12 +17,11 @@ type PaymentParams struct {
 }
 
 type ScheduledPaymentsReceipt struct {
-	Address NodeAddress
-	Handle  string
+	Address NodeAddress `json:"address"`
+	Handle  string      `json:"handle"`
 }
 
 func SendPayments(config Config, params PaymentParams, output func(ScheduledPaymentsReceipt)) error {
-	config.Log.Infof("SendPayments: %v", params)
 	sendersPerNode := len(params.Senders) / len(params.Nodes)
 	for nodeIx, nodeAddress := range params.Nodes {
 		paymentInput := PaymentsDetails{
