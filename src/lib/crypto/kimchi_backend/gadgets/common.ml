@@ -15,25 +15,18 @@ let bignum_bigint_bit_length (bigint : Bignum_bigint.t) : int =
   Z.log2up (Bignum_bigint.to_zarith_bigint bigint)
 
 (* Removes leading zero bits of a list of booleans (at least needs length 1) *)
-let rec rm_zero_bits (bitstring : bool list) : bool list =
+let rec rm_lead_zero_bits (bitstring : bool list) : bool list =
   match bitstring with
   | [] ->
       [ false ]
   | false :: x ->
-      rm_zero_bits x
+      rm_lead_zero_bits x
   | _ ->
       bitstring
 
-let field_to_bits_le_as_prover (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (field_element : f) : bool list =
-  let open Circuit in
-  (* Returns the bitstring of Field.size_in_bits elements *)
-  let bits = Field.Constant.unpack @@ field_element in
-  (* Reverse the bitstring *)
-  let bits = List.rev bits in
-  let bits = rm_zero_bits bits in
-  List.rev bits
+(* Removes leading zero bits of a list of booleans (least significant bit first) *)
+let bool_list_wo_zero_bits (bitstring : bool list) : bool list =
+  List.rev @@ rm_lead_zero_bits @@ List.rev @@ bitstring
 
 (* Conventions used in this interface
  *     1. Functions prefixed with "as_prover_" only happen during proving
@@ -50,7 +43,7 @@ let field_to_bits_le_as_prover (type f)
  *                the values associated with the cvar.  The prover can then access these
  *                with As_prover.read.
  *     2. Functions suffixed with "_as_prover" can only be called outside
- *        the circuit.  Specifically, this means within an exists, within
+ *        the circuit. Specifically, this means within an exists, within
  *        an as_prover or in an "as_prover_" prefixed function)
  *)
 
@@ -71,6 +64,8 @@ let field_to_cvar_field (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (field_element : f) : Circuit.Field.t =
   Circuit.Field.constant field_element
+
+(* Convert field element to a cvar field element *)
 
 (* field_bits_le_to_field - Create a field element from contiguous bits of another
  *
@@ -104,6 +99,13 @@ let field_bits_le_to_field (type f)
   let stop = if stop = -1 then List.length bits else stop in
   (* Convert bits range (boolean list) to field element *)
   Field.Constant.project @@ List.slice bits start stop
+
+(* Convert an interval of bits of a field element into a cvar *)
+let field_bits_le_to_cvar_field (type f) 
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (field_element : f) (start : int) (stop : int) : Circuit.Field.t =
+  field_to_cvar_field (module Circuit) (field_bits_le_to_field (module Circuit) field_element start stop)
+
 
 (* Create cvar field element from contiguous bits of another
      See field_bits_le_to_field for more information *)
