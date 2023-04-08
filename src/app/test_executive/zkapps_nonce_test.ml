@@ -124,6 +124,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (Wait_condition.nodes_to_initialize
            (Core.String.Map.data (Network.all_nodes network)) )
     in
+    (*Start sending padding transactions to get snarked ledger sooner*)
+    let%bind () =
+      let fee = Currency.Fee.of_nanomina_int_exn 3_000_000 in
+      send_padding_transactions block_producer_nodes ~fee ~logger
+        ~n:(padding_payments ())
+    in
     let keymap =
       List.fold [ fish1_kp ] ~init:Signature_lib.Public_key.Compressed.Map.empty
         ~f:(fun map { private_key; public_key } ->
@@ -267,11 +273,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "Wait for fish1 zkapp command with valid nonce to be accepted into \
          transition frontier"
         (wait_for_zkapp ~has_failures:false valid_zkapp_cmd_from_fish1)
-    in
-    let%bind () =
-      let fee = Currency.Fee.of_nanomina_int_exn 3_000_000 in
-      send_padding_transactions block_producer_nodes ~fee ~logger
-        ~n:(padding_payments ())
     in
     let%bind () =
       section_hard
