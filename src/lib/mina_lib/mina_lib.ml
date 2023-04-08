@@ -2165,4 +2165,6 @@ let runtime_config { config = { precomputed_values; _ }; _ } =
 
 let verifier { processes = { verifier; _ }; _ } = verifier
 
+let vrf_evaluator { processes = { vrf_evaluator; _ }; _ } = vrf_evaluator
+
 let genesis_ledger t = Genesis_proof.genesis_ledger t.config.precomputed_values
