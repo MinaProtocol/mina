@@ -5131,6 +5131,7 @@ module Queries = struct
                 let slots_since_hard_fork =
                   List.map vrf_result.slots_won ~f:(fun { global_slot; _ } ->
                       Unsigned.UInt32.to_int global_slot )
+                  |> List.sort ~compare:Int.compare
                 in
                 Ok (Some slots_since_hard_fork)
             | _ ->
