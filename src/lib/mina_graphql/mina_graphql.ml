@@ -5112,7 +5112,7 @@ module Queries = struct
 
     let slots_won =
       io_field "slotsWon"
-        ~typ:(list (non_null int))
+        ~typ:(non_null (list (non_null int)))
         ~args:Arg.[]
         ~doc:"Slots won by a block producer for current epoch"
         ~resolve:(fun { ctx = mina; _ } () ->
@@ -5133,7 +5133,7 @@ module Queries = struct
                       Unsigned.UInt32.to_int global_slot )
                   |> List.sort ~compare:Int.compare
                 in
-                Ok (Some slots_since_hard_fork)
+                Ok slots_since_hard_fork
             | _ ->
                 Error "Vrf evaluation not completed for current epoch" )
 
