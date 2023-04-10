@@ -39,14 +39,14 @@ module type Element_intf = sig
 
   module Cvar = Snarky_backendless.Cvar
 
+  (** Create foreign field element from Cvar limbs *)
+  val of_limbs : 'field Cvar.t limbs_type -> 'field t
+
   (** Create foreign field element from Bignum_bigint.t *)
   val of_bignum_bigint :
        (module Snark_intf.Run with type field = 'field)
     -> Bignum_bigint.t
     -> 'field t
-
-  (** Create foreign field element from Cvar limbs *)
-  val of_limbs : 'field Cvar.t limbs_type -> 'field t
 
   (** Convert foreign field element into Cvar limbs *)
   val to_limbs : 'field t -> 'field Cvar.t limbs_type
