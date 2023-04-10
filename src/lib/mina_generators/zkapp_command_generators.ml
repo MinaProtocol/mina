@@ -92,7 +92,7 @@ let gen_account_precondition_from_account ?failure
         | Some pk ->
             Or_ignore.gen (return pk)
       in
-      let%bind state, sequence_state, proved_state, is_new =
+      let%bind state, action_state, proved_state, is_new =
         match zkapp with
         | None ->
             let len = Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n in
@@ -101,20 +101,18 @@ let gen_account_precondition_from_account ?failure
               Zkapp_state.V.of_list_exn
                 (List.init len ~f:(fun _ -> Or_ignore.Ignore))
             in
-            let sequence_state = Or_ignore.Ignore in
+            let action_state = Or_ignore.Ignore in
             let proved_state = Or_ignore.Ignore in
             let is_new = Or_ignore.Ignore in
-            return (state, sequence_state, proved_state, is_new)
-        | Some { Zkapp_account.app_state; sequence_state; proved_state; _ } ->
+            return (state, action_state, proved_state, is_new)
+        | Some { Zkapp_account.app_state; action_state; proved_state; _ } ->
             let state =
               Zkapp_state.V.map app_state ~f:(fun field ->
                   Quickcheck.random_value (Or_ignore.gen (return field)) )
             in
-            let%bind sequence_state =
-              (* choose a value from account sequence state *)
-              let fields =
-                Pickles_types.Vector.Vector_5.to_list sequence_state
-              in
+            let%bind action_state =
+              (* choose a value from account action state *)
+              let fields = Pickles_types.Vector.Vector_5.to_list action_state in
               let%bind ndx = Int.gen_uniform_incl 0 (List.length fields - 1) in
               return (Or_ignore.Check (List.nth_exn fields ndx))
             in
@@ -124,7 +122,7 @@ let gen_account_precondition_from_account ?failure
               *)
               Or_ignore.Check false
             in
-            return (state, sequence_state, proved_state, is_new)
+            return (state, action_state, proved_state, is_new)
       in
       return
         { Zkapp_precondition.Account.balance
@@ -132,7 +130,7 @@ let gen_account_precondition_from_account ?failure
         ; receipt_chain_hash
         ; delegate
         ; state
-        ; sequence_state
+        ; action_state
         ; proved_state
         ; is_new
         }
@@ -208,8 +206,8 @@ let gen_account_precondition_from_account ?failure
               return { predicate_account with state }
           | Sequence_state ->
               let%bind field = Snark_params.Tick.Field.gen in
-              let sequence_state = Or_ignore.Check field in
-              return { predicate_account with sequence_state }
+              let action_state = Or_ignore.Check field in
+              return { predicate_account with action_state }
           | Proved_state ->
               let%bind proved_state =
                 match predicate_account.proved_state with
@@ -892,20 +890,20 @@ let gen_account_update_body_components (type a b c d) ?global_slot
                     value_to_be_updated to_be_updated ~default:current )
              |> Zkapp_state.V.of_list_exn
            in
-           let sequence_state =
-             let last_sequence_slot = zk.last_sequence_slot in
+           let action_state =
+             let last_action_slot = zk.last_action_slot in
              let txn_global_slot =
-               Option.value_map protocol_state_view ~default:last_sequence_slot
+               Option.value_map protocol_state_view ~default:last_action_slot
                  ~f:(fun ps ->
                    ps
                      .Zkapp_precondition.Protocol_state.Poly
                       .global_slot_since_genesis )
              in
-             let sequence_state, _last_sequence_slot =
-               Mina_ledger.Ledger.update_sequence_state zk.sequence_state
-                 actions ~txn_global_slot ~last_sequence_slot
+             let action_state, _last_action_slot =
+               Mina_ledger.Ledger.update_action_state zk.action_state actions
+                 ~txn_global_slot ~last_action_slot
              in
-             sequence_state
+             action_state
            in
            let proved_state =
              let keeping_app_state =
@@ -924,7 +922,7 @@ let gen_account_update_body_components (type a b c d) ?global_slot
                if changing_entire_app_state then true else zk.proved_state
              else false
            in
-           Some { zk with app_state; sequence_state; proved_state }
+           Some { zk with app_state; action_state; proved_state }
    in
    Account_id.Table.update account_state_tbl (Account.identifier account)
      ~f:(function
