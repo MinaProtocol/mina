@@ -203,14 +203,15 @@ steps:
   - echo "$DRONE_KUBECONFIG" > "$KUBECONFIG"
   - kubectl config set-context --current --namespace $${NAMESPACE:-testnet-default}
 
-- name: start
+
+- name: start-simple4
   image: alpine/k8s:1.26.1
   environment:
     KUBECONFIG: kube-config
   commands:
   - helm install $${RELEASE_NAME} helm/zkapps --set=job=$${ZK_JOB:-simple4} $${COUNT:+--set=count=$${COUNT}} $${WORKERS:+--set=workers=$${WORKERS}} --set=suffix=$${SUFFIX}
 
-- name: run
+- name: run-simple4
   image: alpine/k8s:1.26.1
   environment:
     KUBECONFIG: kube-config
@@ -224,14 +225,54 @@ steps:
     echo "Failed to wait for worker container"
     exit
 
-- name: finish
+- name: finish-simple4
   image: alpine/k8s:1.26.1
   environment:
     KUBECONFIG: kube-config
   commands:
   - $${OM}/kube-utils.sh wait-for-job-status job/zkapp-worker-$${SUFFIX} 60m
 
-- name: clean-up
+- name: clean-up-simple4
+  image: alpine/k8s:1.26.1
+  environment:
+    KUBECONFIG: kube-config
+  commands:
+  - helm delete $${RELEASE_NAME}
+  when:
+    status:
+    - success
+    # - failure
+
+
+- name: start-zkapp3
+  image: alpine/k8s:1.26.1
+  environment:
+    KUBECONFIG: kube-config
+  commands:
+  - helm install $${RELEASE_NAME} helm/zkapps --set=job=$${ZK_JOB:-zkapp3} $${COUNT:+--set=count=$${COUNT}} $${WORKERS:+--set=workers=$${WORKERS}} --set=suffix=$${SUFFIX}
+
+- name: run-zkapp3
+  image: alpine/k8s:1.26.1
+  environment:
+    KUBECONFIG: kube-config
+  commands:
+  - |
+    for t in $(seq 10); do
+        kubectl logs jobs/zkapp-worker-$${SUFFIX} --container=worker --follow && exit
+        echo "Waiting for worker container..."
+        sleep 5
+    done
+    echo "Failed to wait for worker container"
+    exit
+
+- name: finish-zkapp3
+  image: alpine/k8s:1.26.1
+  environment:
+    KUBECONFIG: kube-config
+  commands:
+  - $${OM}/kube-utils.sh wait-for-job-status job/zkapp-worker-$${SUFFIX} 60m
+
+- name: clean-up-zkapp3
   image: alpine/k8s:1.26.1
   environment:
     KUBECONFIG: kube-config
