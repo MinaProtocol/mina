@@ -77,7 +77,7 @@ func ResolveParam(config ResolutionConfig, step int, raw json.RawMessage) (json.
 	if _, has := config.OutputCache[val.File]; !has {
 		fileEntry, err := loadOutputFile(val.File)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read output file %s needed for step %d", val.File, step)
+			return nil, fmt.Errorf("failed to read output file %s needed for step %d: %v", val.File, step, err)
 		}
 		config.OutputCache[val.File] = fileEntry
 	}
