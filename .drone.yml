@@ -211,7 +211,7 @@ steps:
   environment:
     KUBECONFIG: kube-config
   commands:
-  - helm install $${RELEASE_NAME} helm/zkapps $${COUNT:+--set=transactionCount=$${COUNT}} $${PARALLELISM:+--set=parallelism=$${PARALLELISM}} --set=suffix=$${SUFFIX}
+  - helm install $${RELEASE_NAME} helm/zkapps --set=job=$${JOB:-simple4} $${COUNT:+--set=count=$${COUNT}} $${WORKERS:+--set=workers=$${WORKERS}} --set=suffix=$${SUFFIX}
 
 - name: run
   image: alpine/k8s:1.26.1
@@ -220,7 +220,7 @@ steps:
   commands:
   - |
     for t in $(seq 10); do
-        kubectl logs jobs/send-zkapps-$${SUFFIX} --container=send --follow && exit
+        kubectl logs jobs/zkapp-worker-$${SUFFIX} --container=worker --follow && exit
         echo "Waiting for send container..."
         sleep 5
     done
