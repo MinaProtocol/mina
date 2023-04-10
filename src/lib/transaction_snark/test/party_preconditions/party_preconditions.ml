@@ -439,7 +439,7 @@ let%test_module "Account precondition tests" =
           | Some pk ->
               Or_ignore.Check pk
         in
-        let state, sequence_state, proved_state, is_new =
+        let state, action_state, proved_state, is_new =
           match zkapp with
           | None ->
               let len = Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n in
@@ -448,33 +448,33 @@ let%test_module "Account precondition tests" =
                 Zkapp_state.V.of_list_exn
                   (List.init len ~f:(fun _ -> Or_ignore.Ignore))
               in
-              let sequence_state = Or_ignore.Ignore in
+              let action_state = Or_ignore.Ignore in
               let proved_state = Or_ignore.Ignore in
               let is_new = Or_ignore.Ignore in
-              (state, sequence_state, proved_state, is_new)
-          | Some { app_state; sequence_state; proved_state; _ } ->
+              (state, action_state, proved_state, is_new)
+          | Some { app_state; action_state; proved_state; _ } ->
               let state =
                 Zkapp_state.V.map app_state ~f:(fun field ->
                     Or_ignore.Check field )
               in
-              let sequence_state =
-                (* choose a value from account sequence state *)
+              let action_state =
+                (* choose a value from account action state *)
                 let fields =
-                  Pickles_types.Vector.Vector_5.to_list sequence_state
+                  Pickles_types.Vector.Vector_5.to_list action_state
                 in
                 Or_ignore.Check (List.hd_exn fields)
               in
               let proved_state = Or_ignore.Check proved_state in
               (* the account is in the ledger *)
               let is_new = Or_ignore.Check false in
-              (state, sequence_state, proved_state, is_new)
+              (state, action_state, proved_state, is_new)
         in
         { Zkapp_precondition.Account.balance
         ; nonce
         ; receipt_chain_hash
         ; delegate
         ; state
-        ; sequence_state
+        ; action_state
         ; proved_state
         ; is_new
         }
