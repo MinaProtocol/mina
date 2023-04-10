@@ -60,20 +60,6 @@ type 'field limbs =
   | Extended of 'field extended_limbs
   | Compact of 'field compact_limbs
 
-(* Limbs structure helpers *)
-let to_standard x =
-  match x with Standard (l0, l1, l2) -> (l0, l1, l2) | _ -> assert false
-
-let to_extended x =
-  match x with
-  | Extended (l0, l1, l2, l3) ->
-      (l0, l1, l2, l3)
-  | _ ->
-      assert false
-
-let to_compact x =
-  match x with Compact (l0, l1) -> (l0, l1) | _ -> assert false
-
 (* Convert Bignum_bigint.t to Bignum_bigint standard_limbs *)
 let bignum_bigint_to_standard_limbs (bigint : Bignum_bigint.t) :
     Bignum_bigint.t standard_limbs =

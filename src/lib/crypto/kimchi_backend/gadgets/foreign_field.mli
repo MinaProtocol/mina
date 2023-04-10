@@ -22,15 +22,6 @@ type 'field limbs =
   | Extended of 'field extended_limbs
   | Compact of 'field compact_limbs
 
-(** Convert generic limbs into standard limbs *)
-val to_standard : 'f limbs -> 'f standard_limbs
-
-(** Convert generic limbs into extended limbs *)
-val to_extended : 'f limbs -> 'f extended_limbs
-
-(** Convert generic limbs into compact limbs *)
-val to_compact : 'f limbs -> 'f compact_limbs
-
 (** Foreign field element base type - not used directly *)
 module type Element_intf = sig
   type 'field t
