@@ -119,10 +119,7 @@ steps:
 - name: prepare-deamon-json
   image: alpine/k8s:1.26.1
   commands:
-  - $${OM}/generate-conf-file.sh \
-      --slot-duration=$${SLOT_DURATION:-180} \
-      $${SLOTS_PER_EPOCH:+--slots-per-epoch=$${SLOTS_PER_EPOCH}} \
-      > $${OM}/resources/daemon.json
+  - $${OM}/generate-conf-file.sh --slot-duration=$${SLOT_DURATION:-180} $${SLOTS_PER_EPOCH:+--slots-per-epoch=$${SLOTS_PER_EPOCH}} > $${OM}/resources/daemon.json
 
 - name: log-seed
   <<: *log
@@ -211,7 +208,7 @@ steps:
   environment:
     KUBECONFIG: kube-config
   commands:
-  - helm install $${RELEASE_NAME} helm/zkapps --set=job=$${JOB:-simple4} $${COUNT:+--set=count=$${COUNT}} $${WORKERS:+--set=workers=$${WORKERS}} --set=suffix=$${SUFFIX}
+  - helm install $${RELEASE_NAME} helm/zkapps --set=job=$${ZK_JOB:-simple4} $${COUNT:+--set=count=$${COUNT}} $${WORKERS:+--set=workers=$${WORKERS}} --set=suffix=$${SUFFIX}
 
 - name: run
   image: alpine/k8s:1.26.1
