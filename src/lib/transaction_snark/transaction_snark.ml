@@ -4218,13 +4218,13 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; update = Account_update.Update.noop
           ; token_id = Token_id.default
           ; balance_change
-          ; increment_nonce = true
+          ; increment_nonce = false
           ; events = []
           ; actions = []
           ; call_data = Field.zero
           ; call_depth = 0
           ; preconditions = preconditions'
-          ; use_full_commitment = false
+          ; use_full_commitment = true
           ; implicit_account_creation_fee = false
           ; may_use_token = No
           ; authorization_kind = Signature
