@@ -3277,9 +3277,11 @@ module Block = struct
                       snarked_ledger_hash_id, staking_epoch_data_id,
                       next_epoch_data_id,
                       min_window_density, sub_window_densities, total_currency,
-                      ledger_hash, height, global_slot_since_hard_fork,
-                      global_slot_since_genesis, protocol_version, timestamp, chain_status)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
+                      ledger_hash, height,
+                      global_slot_since_hard_fork, global_slot_since_genesis,
+                      protocol_version, proposed_protocol_version,
+                      timestamp, chain_status)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::bigint[], ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
                      RETURNING id
                |sql} )
             { state_hash = block.state_hash |> State_hash.to_base58_check
@@ -3443,19 +3445,23 @@ module Block = struct
          Caqti_type.(tup2 int int)
          typ
          {sql| WITH RECURSIVE chain AS (
-              SELECT id,state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,
+              SELECT id,state_hash,parent_id,parent_hash,creator_id,block_winner_id,
+                     last_vrf_output,snarked_ledger_hash_id,
                      staking_epoch_data_id,next_epoch_data_id,
-                     min_window_density,total_currency,
+                     min_window_density,sub_window_densities,total_currency,
                      ledger_hash,height,global_slot_since_hard_fork,global_slot_since_genesis,
+                     protocol_version_id, proposed_protocol_version_id,
                      timestamp,chain_status
               FROM blocks b WHERE b.id = $1
 
               UNION ALL
 
-              SELECT b.id,b.state_hash,b.parent_id,b.parent_hash,b.creator_id,b.block_winner_id,b.snarked_ledger_hash_id,
+              SELECT b.id,b.state_hash,b.parent_id,b.parent_hash,b.creator_id,b.block_winner_id,
+                     b.last_vrf_output,b.snarked_ledger_hash_id,
                      b.staking_epoch_data_id,b.next_epoch_data_id,
-                     b.min_window_density,b.total_currency,
+                     b.min_window_density,b.sub_window_densities,b.total_currency,
                      b.ledger_hash,b.height,b.global_slot_since_hard_fork,b.global_slot_since_genesis,
+                     b.protocol_version_id, b.proposed_protocol_version_id,
                      b.timestamp,b.chain_status
               FROM blocks b
 
@@ -3465,11 +3471,13 @@ module Block = struct
 
            )
 
-           SELECT state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,
+           SELECT state_hash,parent_id,parent_hash,creator_id,block_winner_id,
+                  last_vrf_output,snarked_ledger_hash_id,
                   staking_epoch_data_id, next_epoch_data_id,
-                  min_window_density, total_currency,
+                  min_window_density,sub_window_densities,total_currency,
                   ledger_hash,height,
                   global_slot_since_hard_fork,global_slot_since_genesis,
+                  protocol_version_id, proposed_protocol_version_id,
                   timestamp,chain_status
            FROM chain ORDER BY height ASC
       |sql} )
