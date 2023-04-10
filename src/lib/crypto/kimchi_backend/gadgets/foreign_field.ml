@@ -786,7 +786,7 @@ let%test_unit "foreign_field_mul gadget" =
    *)
   let test_mul (left_input : Bignum_bigint.t) (right_input : Bignum_bigint.t)
       (foreign_field_modulus : Bignum_bigint.t) : unit =
-    let _proof_keypair, _proof =
+    let _cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
           let open Runner.Impl in
           (* Prepare test inputs *)
@@ -842,7 +842,7 @@ let%test_unit "foreign_field_mul gadget" =
   let test_mul_full (left_input : Bignum_bigint.t)
       (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
       : unit =
-    let _proof_keypair, _proof =
+    let _cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
           let open Runner.Impl in
           (* Prepare test inputs *)

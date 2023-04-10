@@ -75,7 +75,7 @@ let%test_unit "generic gadgets" =
    *   Returns true if constraints are satisfied, false otherwise.
    *)
   let test_generic_add left_input right_input sum : unit =
-    let _proof_keypair, _proof =
+    let _cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
           let open Runner.Impl in
           (* Set up snarky variables for inputs and outputs *)
@@ -104,7 +104,7 @@ let%test_unit "generic gadgets" =
    *   Returns true if constraints are satisfied, false otherwise.
    *)
   let test_generic_mul left_input right_input prod =
-    let _proof_keypair, _proof =
+    let _cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
           let open Runner.Impl in
           (* Set up snarky variables for inputs and outputs *)

@@ -218,7 +218,7 @@ let%test_unit "range_check64 gadget" =
    *   Input: value to be range checked in [0, 2^64)
    *)
   let test_range_check64 base10 : unit =
-    let _proof_keypair, _proof =
+    let _cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
           let open Runner.Impl in
           let value =
@@ -257,7 +257,7 @@ let%test_unit "multi_range_check gadget" =
 
   (* Helper to test multi_range_check gadget *)
   let test_multi_range_check v0 v1 v2 : unit =
-    let _proof_keypair, _proof =
+    let _cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
           let open Runner.Impl in
           let values =
@@ -319,7 +319,7 @@ let%test_unit "compact_multi_range_check gadget" =
 
   (* Helper to test compact_multi_range_check gadget *)
   let test_compact_multi_range_check v01 v2 : unit =
-    let _proof_keypair, _proof =
+    let _cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
           let open Runner.Impl in
           let v01, v2 =
