@@ -15,7 +15,6 @@ let bignum_bigint_bit_length (bigint : Bignum_bigint.t) : int =
   Z.log2up (Bignum_bigint.to_zarith_bigint bigint)
 
 (* Removes leading zero bits of a list of booleans (at least needs length 1) *)
-
 let rec rm_lead_zero_bits (bitstring : bool list) : bool list =
   match bitstring with
   | [] ->
@@ -66,6 +65,27 @@ let field_to_cvar_field (type f)
     (field_element : f) : Circuit.Field.t =
   Circuit.Field.constant field_element
 
+(* Combines bits of two cvars with a given boolean function and returns the resulting field element *)
+let field_bits_combine_as_prover (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
+    (bfun : bool -> bool -> bool) : f =
+  let open Circuit in
+  let list1 =
+    Field.Constant.unpack
+    @@ cvar_field_to_field_as_prover (module Circuit)
+    @@ input1
+  in
+  let list2 =
+    Field.Constant.unpack
+    @@ cvar_field_to_field_as_prover (module Circuit)
+    @@ input2
+  in
+
+  let combined = List.map2_exn list1 list2 ~f:bfun in
+
+  Field.Constant.project combined
+
 (* Convert field element to a cvar field element *)
 
 (* field_bits_le_to_field - Create a field element from contiguous bits of another
@@ -102,11 +122,12 @@ let field_bits_le_to_field (type f)
   Field.Constant.project @@ List.slice bits start stop
 
 (* Convert an interval of bits of a field element into a cvar *)
-let field_bits_le_to_cvar_field (type f) 
+let field_bits_le_to_cvar_field (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (field_element : f) (start : int) (stop : int) : Circuit.Field.t =
-  field_to_cvar_field (module Circuit) (field_bits_le_to_field (module Circuit) field_element start stop)
-
+  field_to_cvar_field
+    (module Circuit)
+    (field_bits_le_to_field (module Circuit) field_element start stop)
 
 (* Create cvar field element from contiguous bits of another
      See field_bits_le_to_field for more information *)
