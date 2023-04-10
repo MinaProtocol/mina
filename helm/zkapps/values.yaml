@@ -2,17 +2,16 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-jobRepository: akoptelov/mina-sample-zkapp
-controllerRepository: akoptelov/mina-sample-zkapp-controller
+repository: akoptelov/mina-load-generator
 pullPolicy: Always
 # Overrides the image tag whose default is the chart appVersion.
 tag: ""
 
-# total count of transactions
-count: 2048
 # the number of parallel jobs
-parallelism: 48
-config: controller-config.json
+workers: 16
+count: 256
+accounts: accounts.txt
+nodes: nodes.txt
 cpu: 16
 mem: "8G"
 

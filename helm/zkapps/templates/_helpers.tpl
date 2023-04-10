@@ -64,21 +64,21 @@ Create the name of the service account to use
 {{/*
 Job name
 */}}
-{{- define "mina-sample-zkapp.job-name" -}}
+{{- define "job-name" -}}
 {{- if .Values.suffix -}}
-send-zkapps-{{ .Values.suffix }}
+zkapp-worker-{{ .Values.suffix }}
 {{- else -}}
-send-zkapps
+zkapp-worker
 {{- end -}}
 {{- end -}}
 
 {{/*
 Service name
 */}}
-{{- define "mina-sample-zkapp.service-name" -}}
+{{- define "controller-name" -}}
 {{- if .Values.suffix -}}
-send-zkapps-controller-{{ .Values.suffix }}
+zkapp-ctrl-{{ .Values.suffix }}
 {{- else -}}
-send-zkapps-controller
+zkapp-ctrl
 {{- end -}}
 {{- end -}}
