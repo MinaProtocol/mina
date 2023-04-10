@@ -61,13 +61,13 @@ type secretBox struct {
 }
 
 type KeyloaderParams struct {
-	Prefix      string
+	Dir         string
 	Limit       int
 	PasswordEnv string `json:"password-env,omitempty"`
 }
 
 func LoadPrivateKeyFiles(log logging.StandardLogger, params KeyloaderParams, output func(itn_json_types.MinaPrivateKey)) error {
-	entries, err := os.ReadDir(params.Prefix)
+	entries, err := os.ReadDir(params.Dir)
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func LoadPrivateKeyFiles(log logging.StandardLogger, params KeyloaderParams, out
 		if strings.HasSuffix(fname, ".pub") {
 			continue
 		}
-		jsonFile, err := os.Open(params.Prefix + string(os.PathSeparator) + fname)
+		jsonFile, err := os.Open(params.Dir + string(os.PathSeparator) + fname)
 		if err != nil {
 			return fmt.Errorf("failed to open keyfile %s: %v", fname, err)
 		}
