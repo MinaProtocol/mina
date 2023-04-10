@@ -60,6 +60,20 @@ type 'field limbs =
   | Extended of 'field extended_limbs
   | Compact of 'field compact_limbs
 
+(* Limbs structure helpers *)
+let to_standard x =
+  match x with Standard (l0, l1, l2) -> (l0, l1, l2) | _ -> assert false
+
+let to_extended x =
+  match x with
+  | Extended (l0, l1, l2, l3) ->
+      (l0, l1, l2, l3)
+  | _ ->
+      assert false
+
+let to_compact x =
+  match x with Compact (l0, l1) -> (l0, l1) | _ -> assert false
+
 (* Convert Bignum_bigint.t to Bignum_bigint standard_limbs *)
 let bignum_bigint_to_standard_limbs (bigint : Bignum_bigint.t) :
     Bignum_bigint.t standard_limbs =
@@ -110,8 +124,8 @@ let field_standard_limbs_to_bignum_bigint (type f)
   in
   Bignum_bigint.(l0 + (Common.two_to_limb * l1) + (two_to_2limb * l2))
 
-(* Foreign field element base type - not used directly *)
-module type Foreign_field_element_base = sig
+(* Foreign field element interface *)
+module type Element_intf = sig
   type 'field t
 
   type 'a limbs_type
@@ -152,209 +166,192 @@ module type Foreign_field_element_base = sig
     -> Bignum_bigint.t
 end
 
-module Foreign_field_element_base = struct
-  module Cvar = Snarky_backendless.Cvar
+(* Foreign field element structures *)
+module Element : sig
+  (* Foreign field element (standard limbs) *)
+  module Standard : Element_intf with type 'a limbs_type = 'a standard_limbs
 
-  type 'field t = 'field Cvar.t limbs
+  (* Foreign field element (extended limbs) *)
+  module Extended : Element_intf with type 'a limbs_type = 'a extended_limbs
 
-  let to_limbs x = x
-
-  let map x func =
-    match to_limbs x with
-    | Compact (l0, l1) ->
-        Compact (func l0, func l1)
-    | Standard (l0, l1, l2) ->
-        Standard (func l0, func l1, func l2)
-    | Extended (l0, l1, l2, l3) ->
-        Extended (func l0, func l1, func l2, func l3)
-
-  let to_field_limbs (type field)
-      (module Circuit : Snark_intf.Run with type field = field) x =
-    let open Circuit in
-    map x (As_prover.read Field.typ)
-
-  let to_bignum_bigint_limbs (type field)
-      (module Circuit : Snark_intf.Run with type field = field) x =
-    let open Circuit in
-    map x (fun cvar ->
-        Common.field_to_bignum_bigint (module Circuit)
-        @@ As_prover.read Field.typ cvar )
-
-  let to_bignum_bigint (type field)
-      (module Circuit : Snark_intf.Run with type field = field) (x : field t) =
-    let limbs = to_bignum_bigint_limbs (module Circuit) x in
-    match limbs with
-    | Compact (l01, l2) ->
-        Bignum_bigint.(l01 + (two_to_2limb * l2))
-    | Standard (l0, l1, l2) ->
-        Bignum_bigint.(l0 + (Common.two_to_limb * l1) + (two_to_2limb * l2))
-    | Extended (l0, l1, l2, l3) ->
-        Bignum_bigint.(
-          l0 + (Common.two_to_limb * l1) + (two_to_2limb * l2)
-          + (two_to_3limb * l3))
-end
-
-(* Limbs structure helpers *)
-let to_standard x =
-  match x with Standard (l0, l1, l2) -> (l0, l1, l2) | _ -> assert false
-
-let to_extended x =
-  match x with
-  | Extended (l0, l1, l2, l3) ->
-      (l0, l1, l2, l3)
-  | _ ->
-      assert false
-
-let to_compact x =
-  match x with Compact (l0, l1) -> (l0, l1) | _ -> assert false
-
-(* Foreign field element type (standard limbs) *)
-module Foreign_field_element : sig
-  (* Specialization of base type to standard_limbs *)
-  include
-    Foreign_field_element_base with type 'a limbs_type := 'a standard_limbs
+  (* Foreign field element (compact limbs) *)
+  module Compact : Element_intf with type 'a limbs_type = 'a compact_limbs
 end = struct
-  module Cvar = Snarky_backendless.Cvar
+  module Base = struct
+    module Cvar = Snarky_backendless.Cvar
 
-  type 'field t = 'field Cvar.t standard_limbs
+    type 'field t = 'field Cvar.t limbs
 
-  let of_limbs x = x
+    let to_limbs x = x
 
-  let of_bignum_bigint (type field)
-      (module Circuit : Snark_intf.Run with type field = field) x : field t =
-    let open Circuit in
-    let l12, l0 = Common.(bignum_bigint_div_rem x two_to_limb) in
-    let l2, l1 = Common.(bignum_bigint_div_rem l12 two_to_limb) in
-    let l0 =
-      Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l0
-    in
-    let l1 =
-      Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l1
-    in
-    let l2 =
-      Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l2
-    in
-    of_limbs (l0, l1, l2)
+    let map x func =
+      match to_limbs x with
+      | Compact (l0, l1) ->
+          Compact (func l0, func l1)
+      | Standard (l0, l1, l2) ->
+          Standard (func l0, func l1, func l2)
+      | Extended (l0, l1, l2, l3) ->
+          Extended (func l0, func l1, func l2, func l3)
 
-  let to_limbs x = Foreign_field_element_base.to_limbs x
+    let to_field_limbs (type field)
+        (module Circuit : Snark_intf.Run with type field = field) x =
+      let open Circuit in
+      map x (As_prover.read Field.typ)
 
-  let map x func =
-    to_standard @@ Foreign_field_element_base.map (Standard x) func
+    let to_bignum_bigint_limbs (type field)
+        (module Circuit : Snark_intf.Run with type field = field) x =
+      let open Circuit in
+      map x (fun cvar ->
+          Common.field_to_bignum_bigint (module Circuit)
+          @@ As_prover.read Field.typ cvar )
 
-  let to_field_limbs (type field)
-      (module Circuit : Snark_intf.Run with type field = field) x =
-    to_standard
-    @@ Foreign_field_element_base.to_field_limbs (module Circuit) (Standard x)
+    let to_bignum_bigint (type field)
+        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
+        =
+      let limbs = to_bignum_bigint_limbs (module Circuit) x in
+      match limbs with
+      | Compact (l01, l2) ->
+          Bignum_bigint.(l01 + (two_to_2limb * l2))
+      | Standard (l0, l1, l2) ->
+          Bignum_bigint.(l0 + (Common.two_to_limb * l1) + (two_to_2limb * l2))
+      | Extended (l0, l1, l2, l3) ->
+          Bignum_bigint.(
+            l0 + (Common.two_to_limb * l1) + (two_to_2limb * l2)
+            + (two_to_3limb * l3))
+  end
 
-  let to_bignum_bigint_limbs (type field)
-      (module Circuit : Snark_intf.Run with type field = field) x =
-    to_standard
-    @@ Foreign_field_element_base.to_bignum_bigint_limbs
-         (module Circuit)
-         (Standard x)
+  (* Standard limbs foreign field element *)
+  module Standard = struct
+    module Cvar = Snarky_backendless.Cvar
 
-  let to_bignum_bigint (type field)
-      (module Circuit : Snark_intf.Run with type field = field) (x : field t) =
-    Foreign_field_element_base.to_bignum_bigint (module Circuit) (Standard x)
-end
+    type 'field limbs_type = 'field standard_limbs
 
-(* Foreign field element type (extended limbs) *)
-module Foreign_field_element_extended : sig
-  (* Specialization of base type to extended_limbs *)
-  include
-    Foreign_field_element_base with type 'a limbs_type := 'a extended_limbs
-end = struct
-  module Cvar = Snarky_backendless.Cvar
+    type 'field t = 'field Cvar.t standard_limbs
 
-  type 'field t = 'field Cvar.t extended_limbs
+    let of_limbs x = x
 
-  let of_limbs x = x
+    let of_bignum_bigint (type field)
+        (module Circuit : Snark_intf.Run with type field = field) x : field t =
+      let open Circuit in
+      let l12, l0 = Common.(bignum_bigint_div_rem x two_to_limb) in
+      let l2, l1 = Common.(bignum_bigint_div_rem l12 two_to_limb) in
+      let l0 =
+        Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l0
+      in
+      let l1 =
+        Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l1
+      in
+      let l2 =
+        Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l2
+      in
+      of_limbs (l0, l1, l2)
 
-  let of_bignum_bigint (type field)
-      (module Circuit : Snark_intf.Run with type field = field) x : field t =
-    let open Circuit in
-    let l123, l0 = Common.(bignum_bigint_div_rem x two_to_limb) in
-    let l23, l1 = Common.(bignum_bigint_div_rem l123 two_to_limb) in
-    let l3, l2 = Common.(bignum_bigint_div_rem l23 two_to_limb) in
-    let l0 =
-      Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l0
-    in
-    let l1 =
-      Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l1
-    in
-    let l2 =
-      Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l2
-    in
-    let l3 =
-      Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l3
-    in
-    of_limbs (l0, l1, l2, l3)
+    let to_limbs x = Base.to_limbs x
 
-  let to_limbs x = Foreign_field_element_base.to_limbs x
+    let map x func = to_standard @@ Base.map (Standard x) func
 
-  let map x func =
-    to_extended @@ Foreign_field_element_base.map (Extended x) func
+    let to_field_limbs (type field)
+        (module Circuit : Snark_intf.Run with type field = field) x =
+      to_standard @@ Base.to_field_limbs (module Circuit) (Standard x)
 
-  let to_field_limbs (type field)
-      (module Circuit : Snark_intf.Run with type field = field) x =
-    to_extended
-    @@ Foreign_field_element_base.to_field_limbs (module Circuit) (Extended x)
+    let to_bignum_bigint_limbs (type field)
+        (module Circuit : Snark_intf.Run with type field = field) x =
+      to_standard @@ Base.to_bignum_bigint_limbs (module Circuit) (Standard x)
 
-  let to_bignum_bigint_limbs (type field)
-      (module Circuit : Snark_intf.Run with type field = field) x =
-    to_extended
-    @@ Foreign_field_element_base.to_bignum_bigint_limbs
-         (module Circuit)
-         (Extended x)
+    let to_bignum_bigint (type field)
+        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
+        =
+      Base.to_bignum_bigint (module Circuit) (Standard x)
+  end
 
-  let to_bignum_bigint (type field)
-      (module Circuit : Snark_intf.Run with type field = field) (x : field t) =
-    Foreign_field_element_base.to_bignum_bigint (module Circuit) (Extended x)
-end
+  (* Extended limbs foreign field element *)
+  module Extended = struct
+    module Cvar = Snarky_backendless.Cvar
 
-(* Foreign field element type (compact limbs) *)
-module Foreign_field_element_compact : sig
-  (* Specialization of base type to compact_limbs *)
-  include Foreign_field_element_base with type 'a limbs_type := 'a compact_limbs
-end = struct
-  module Cvar = Snarky_backendless.Cvar
+    type 'field limbs_type = 'field extended_limbs
 
-  type 'field t = 'field Cvar.t compact_limbs
+    type 'field t = 'field Cvar.t extended_limbs
 
-  let of_limbs x = x
+    let of_limbs x = x
 
-  let of_bignum_bigint (type field)
-      (module Circuit : Snark_intf.Run with type field = field) x : field t =
-    let open Circuit in
-    let l2, l01 = Common.(bignum_bigint_div_rem x two_to_2limb) in
+    let of_bignum_bigint (type field)
+        (module Circuit : Snark_intf.Run with type field = field) x : field t =
+      let open Circuit in
+      let l123, l0 = Common.(bignum_bigint_div_rem x two_to_limb) in
+      let l23, l1 = Common.(bignum_bigint_div_rem l123 two_to_limb) in
+      let l3, l2 = Common.(bignum_bigint_div_rem l23 two_to_limb) in
+      let l0 =
+        Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l0
+      in
+      let l1 =
+        Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l1
+      in
+      let l2 =
+        Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l2
+      in
+      let l3 =
+        Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l3
+      in
+      of_limbs (l0, l1, l2, l3)
 
-    let l01 =
-      Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l01
-    in
-    let l2 =
-      Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l2
-    in
-    of_limbs (l01, l2)
+    let to_limbs x = Base.to_limbs x
 
-  let to_limbs x = Foreign_field_element_base.to_limbs x
+    let map x func = to_extended @@ Base.map (Extended x) func
 
-  let map x func = to_compact @@ Foreign_field_element_base.map (Compact x) func
+    let to_field_limbs (type field)
+        (module Circuit : Snark_intf.Run with type field = field) x =
+      to_extended @@ Base.to_field_limbs (module Circuit) (Extended x)
 
-  let to_field_limbs (type field)
-      (module Circuit : Snark_intf.Run with type field = field) x =
-    to_compact
-    @@ Foreign_field_element_base.to_field_limbs (module Circuit) (Compact x)
+    let to_bignum_bigint_limbs (type field)
+        (module Circuit : Snark_intf.Run with type field = field) x =
+      to_extended @@ Base.to_bignum_bigint_limbs (module Circuit) (Extended x)
 
-  let to_bignum_bigint_limbs (type field)
-      (module Circuit : Snark_intf.Run with type field = field) x =
-    to_compact
-    @@ Foreign_field_element_base.to_bignum_bigint_limbs
-         (module Circuit)
-         (Compact x)
+    let to_bignum_bigint (type field)
+        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
+        =
+      Base.to_bignum_bigint (module Circuit) (Extended x)
+  end
 
-  let to_bignum_bigint (type field)
-      (module Circuit : Snark_intf.Run with type field = field) (x : field t) =
-    Foreign_field_element_base.to_bignum_bigint (module Circuit) (Compact x)
+  (* Compact limbs foreign field element *)
+  module Compact = struct
+    module Cvar = Snarky_backendless.Cvar
+
+    type 'field limbs_type = 'field compact_limbs
+
+    type 'field t = 'field Cvar.t compact_limbs
+
+    let of_limbs x = x
+
+    let of_bignum_bigint (type field)
+        (module Circuit : Snark_intf.Run with type field = field) x : field t =
+      let open Circuit in
+      let l2, l01 = Common.(bignum_bigint_div_rem x two_to_2limb) in
+
+      let l01 =
+        Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l01
+      in
+      let l2 =
+        Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l2
+      in
+      of_limbs (l01, l2)
+
+    let to_limbs x = Base.to_limbs x
+
+    let map x func = to_compact @@ Base.map (Compact x) func
+
+    let to_field_limbs (type field)
+        (module Circuit : Snark_intf.Run with type field = field) x =
+      to_compact @@ Base.to_field_limbs (module Circuit) (Compact x)
+
+    let to_bignum_bigint_limbs (type field)
+        (module Circuit : Snark_intf.Run with type field = field) x =
+      to_compact @@ Base.to_bignum_bigint_limbs (module Circuit) (Compact x)
+
+    let to_bignum_bigint (type field)
+        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
+        =
+      Base.to_bignum_bigint (module Circuit) (Compact x)
+  end
 end
 
 (* Compute non-zero intermediate products
@@ -363,15 +360,15 @@ end
  * the [Foreign Field Multiplication RFC](../rfcs/foreign_field_mul.md) *)
 let compute_intermediate_products (type f)
     (module Circuit : Snark_intf.Run with type field = f)
-    (left_input : f Foreign_field_element.t)
-    (right_input : f Foreign_field_element.t) (quotient : f standard_limbs)
-    (neg_foreign_field_modulus : f standard_limbs) : f * f * f =
+    (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
+    (quotient : f standard_limbs) (neg_foreign_field_modulus : f standard_limbs)
+    : f * f * f =
   let open Circuit in
   let left_input0, left_input1, left_input2 =
-    Foreign_field_element.to_field_limbs (module Circuit) left_input
+    Element.Standard.to_field_limbs (module Circuit) left_input
   in
   let right_input0, right_input1, right_input2 =
-    Foreign_field_element.to_field_limbs (module Circuit) right_input
+    Element.Standard.to_field_limbs (module Circuit) right_input
   in
   let quotient0, quotient1, quotient2 = quotient in
   let ( neg_foreign_field_modulus0
@@ -587,10 +584,9 @@ end
 
 (* Foreign field multiplication gadget definition *)
 let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (left_input : f Foreign_field_element.t)
-    (right_input : f Foreign_field_element.t)
+    (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
     (foreign_field_modulus : f standard_limbs) :
-    f Foreign_field_element.t * f External_checks.t =
+    f Element.Standard.t * f External_checks.t =
   let open Circuit in
   (* Check foreign field modulus < max allowed *)
   (let foreign_field_modulus =
@@ -657,10 +653,10 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
         let quotient, remainder =
           (* Bignum_bigint computations *)
           let left_input =
-            Foreign_field_element.to_bignum_bigint (module Circuit) left_input
+            Element.Standard.to_bignum_bigint (module Circuit) left_input
           in
           let right_input =
-            Foreign_field_element.to_bignum_bigint (module Circuit) right_input
+            Element.Standard.to_bignum_bigint (module Circuit) right_input
           in
           let foreign_field_modulus =
             field_standard_limbs_to_bignum_bigint
@@ -746,10 +742,10 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
 
         (* Compute the rest of the witness data *)
         let left_input0, left_input1, left_input2 =
-          Foreign_field_element.to_field_limbs (module Circuit) left_input
+          Element.Standard.to_field_limbs (module Circuit) left_input
         in
         let right_input0, right_input1, right_input2 =
-          Foreign_field_element.to_field_limbs (module Circuit) right_input
+          Element.Standard.to_field_limbs (module Circuit) right_input
         in
         let quotient0, quotient1, quotient2 =
           bignum_bigint_to_field_standard_limbs (module Circuit) quotient
@@ -839,7 +835,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
                  ; neg_foreign_field_modulus2
                  } )
         } ) ;
-  ( Foreign_field_element.of_limbs (remainder0, remainder1, remainder2)
+  ( Element.Standard.of_limbs (remainder0, remainder1, remainder2)
   , external_checks )
 
 let compact_limb (type f) (module Circuit : Snark_intf.Run with type field = f)
@@ -854,26 +850,19 @@ let compact_limb (type f) (module Circuit : Snark_intf.Run with type field = f)
  * - the carry value *)
 let _compute_ffadd_values (type f)
     (module Circuit : Snark_intf.Run with type field = f)
-    (left_input : f Foreign_field_element.t)
-    (right_input : f Foreign_field_element.t) (is_subtraction : bool)
-    (foreign_field_modulus : f Foreign_field_element.t) :
-    f Foreign_field_element.t * f * f * f =
+    (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
+    (is_subtraction : bool) (foreign_field_modulus : f Element.Standard.t) :
+    f Element.Standard.t * f * f * f =
   let open Circuit in
   (* Compute bigint version of the inputs *)
-  let left =
-    Foreign_field_element.to_bignum_bigint (module Circuit) left_input
-  in
-  let right =
-    Foreign_field_element.to_bignum_bigint (module Circuit) right_input
-  in
+  let left = Element.Standard.to_bignum_bigint (module Circuit) left_input in
+  let right = Element.Standard.to_bignum_bigint (module Circuit) right_input in
 
   (* Clarification *)
   (* TODO:  switch right input to Foreign_field_element_extended.t once it's implemented *)
   (* let right_hi = right_input[3] * F::two_to_limb() + right_input[HI]; (* This allows to store 2^88 in the high limb *) *)
   let modulus =
-    Foreign_field_element.to_bignum_bigint
-      (module Circuit)
-      foreign_field_modulus
+    Element.Standard.to_bignum_bigint (module Circuit) foreign_field_modulus
   in
 
   (* Addition or subtraction *)
@@ -896,7 +885,7 @@ let _compute_ffadd_values (type f)
    * TODO: unluckily, we cannot do it in one line if we keep these types, because one
    *       cannot combine field elements and biguints in the same operation automatically *)
   let result =
-    Foreign_field_element.of_bignum_bigint (module Circuit)
+    Element.Standard.of_bignum_bigint (module Circuit)
     @@ Bignum_bigint.(
          if is_subtraction then
            if not has_overflow then (* normal subtraction *)
@@ -913,16 +902,16 @@ let _compute_ffadd_values (type f)
    *  <=>
    * c = r2 - a2 - s*b2 + q*f2 *)
   let left_input0, left_input1, left_input2 =
-    Foreign_field_element.to_field_limbs (module Circuit) left_input
+    Element.Standard.to_field_limbs (module Circuit) left_input
   in
   let right_input0, right_input1, right_input2 =
-    Foreign_field_element.to_field_limbs (module Circuit) right_input
+    Element.Standard.to_field_limbs (module Circuit) right_input
   in
   let foreign_field_modulus0, foreign_field_modulus1, foreign_field_modulus2 =
-    Foreign_field_element.to_field_limbs (module Circuit) foreign_field_modulus
+    Element.Standard.to_field_limbs (module Circuit) foreign_field_modulus
   in
   let result0, result1, result2 =
-    Foreign_field_element.to_field_limbs (module Circuit) result
+    Element.Standard.to_field_limbs (module Circuit) result
   in
   (* TODO remove once Foreign_field_element_extended is implemented *)
   let right_hi = right_input2 in
@@ -952,10 +941,9 @@ let _compute_ffadd_values (type f)
 
 (* Foreign field addition gadget definition *)
 let _add (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (_left_input : f Foreign_field_element.t)
-    (_right_input : f Foreign_field_element.t) (_is_subtraction : bool)
-    (foreign_field_modulus : f standard_limbs) :
-    f Foreign_field_element.t * f External_checks.t =
+    (_left_input : f Element.Standard.t) (_right_input : f Element.Standard.t)
+    (_is_subtraction : bool) (foreign_field_modulus : f standard_limbs) :
+    f Element.Standard.t * f External_checks.t =
   let open Circuit in
   (* Check foreign field modulus < max allowed *)
   (let foreign_field_modulus =
@@ -1009,7 +997,7 @@ let _add (type f) (module Circuit : Snark_intf.Run with type field = f)
   let external_checks = External_checks.create (module Circuit) in
 
   (* Return result *)
-  ( Foreign_field_element.of_limbs (Field.zero, Field.zero, Field.zero)
+  ( Element.Standard.of_limbs (Field.zero, Field.zero, Field.zero)
   , external_checks )
 
 (*********)
@@ -1054,14 +1042,10 @@ let%test_unit "foreign_field_mul gadget" =
               foreign_field_modulus
           in
           let left_input =
-            Foreign_field_element.of_bignum_bigint
-              (module Runner.Impl)
-              left_input
+            Element.Standard.of_bignum_bigint (module Runner.Impl) left_input
           in
           let right_input =
-            Foreign_field_element.of_bignum_bigint
-              (module Runner.Impl)
-              right_input
+            Element.Standard.of_bignum_bigint (module Runner.Impl) right_input
           in
           (* Create the gadget *)
           let product, _external_checks =
@@ -1077,9 +1061,7 @@ let%test_unit "foreign_field_mul gadget" =
                   expected
               in
               let product =
-                Foreign_field_element.to_field_limbs
-                  (module Runner.Impl)
-                  product
+                Element.Standard.to_field_limbs (module Runner.Impl) product
               in
               assert_eq product expected ) ;
           () )
@@ -1110,14 +1092,10 @@ let%test_unit "foreign_field_mul gadget" =
               foreign_field_modulus
           in
           let left_input =
-            Foreign_field_element.of_bignum_bigint
-              (module Runner.Impl)
-              left_input
+            Element.Standard.of_bignum_bigint (module Runner.Impl) left_input
           in
           let right_input =
-            Foreign_field_element.of_bignum_bigint
-              (module Runner.Impl)
-              right_input
+            Element.Standard.of_bignum_bigint (module Runner.Impl) right_input
           in
 
           (* External checks for this test (example, circuit designer has complete flexibility about organization)
@@ -1144,9 +1122,7 @@ let%test_unit "foreign_field_mul gadget" =
                   expected
               in
               let product =
-                Foreign_field_element.to_field_limbs
-                  (module Runner.Impl)
-                  product
+                Element.Standard.to_field_limbs (module Runner.Impl) product
               in
               assert_eq product expected ) ;
 
@@ -1155,7 +1131,7 @@ let%test_unit "foreign_field_mul gadget" =
 
           (* 3) Add multi-range-check left input *)
           let left_input0, left_input1, left_input2 =
-            Foreign_field_element.to_limbs left_input
+            Element.Standard.to_limbs left_input
           in
           Range_check.multi_range_check
             (module Runner.Impl)
@@ -1163,7 +1139,7 @@ let%test_unit "foreign_field_mul gadget" =
 
           (* 4) Add multi-range-check right input *)
           let right_input0, right_input1, right_input2 =
-            Foreign_field_element.to_limbs right_input
+            Element.Standard.to_limbs right_input
           in
           Range_check.multi_range_check
             (module Runner.Impl)

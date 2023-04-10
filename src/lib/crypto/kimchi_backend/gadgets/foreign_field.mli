@@ -32,7 +32,7 @@ val to_extended : 'f limbs -> 'f extended_limbs
 val to_compact : 'f limbs -> 'f compact_limbs
 
 (** Foreign field element base type - not used directly *)
-module type Foreign_field_element_base = sig
+module type Element_intf = sig
   type 'field t
 
   type 'a limbs_type
@@ -73,21 +73,15 @@ module type Foreign_field_element_base = sig
     -> Bignum_bigint.t
 end
 
-(** Foreign field element type (standard limbs) *)
-module Foreign_field_element : sig
-  include
-    Foreign_field_element_base with type 'a limbs_type := 'a standard_limbs
-end
+module Element : sig
+  (* Foreign field element type (standard limbs) *)
+  module Standard : Element_intf with type 'a limbs_type = 'a standard_limbs
 
-(** Foreign field element type (extended limbs) *)
-module Foreign_field_element_extended : sig
-  include
-    Foreign_field_element_base with type 'a limbs_type := 'a extended_limbs
-end
+  (* Foreign field element type (extended limbs) *)
+  module Extended : Element_intf with type 'a limbs_type = 'a extended_limbs
 
-(** Foreign field element type (compact limbs) *)
-module Foreign_field_element_compact : sig
-  include Foreign_field_element_base with type 'a limbs_type := 'a compact_limbs
+  (* Foreign field element type (compact limbs) *)
+  module Compact : Element_intf with type 'a limbs_type = 'a compact_limbs
 end
 
 (** Structure for tracking external checks that must be made
@@ -113,8 +107,8 @@ end
  *)
 val mul :
      (module Snark_intf.Run with type field = 'f)
-  -> 'f Foreign_field_element.t (* left_input *)
-  -> 'f Foreign_field_element.t (* right_input *)
+  -> 'f Element.Standard.t (* left_input *)
+  -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
-  -> 'f Foreign_field_element.t * 'f External_checks.t
+  -> 'f Element.Standard.t * 'f External_checks.t
 (* remainder, external_checks *)
