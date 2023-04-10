@@ -14,36 +14,21 @@ let band (type f)
     ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
     (length : int) : Circuit.Field.t =
   let open Circuit in
-  let and_output =
-    exists Field.typ ~compute:(fun () ->
-        (* Read inputs *)
-        let input1_field =
-          Common.cvar_field_to_field_as_prover (module Circuit) input1
-        in
-        let input2_field =
-          Common.cvar_field_to_field_as_prover (module Circuit) input2
-        in
-
-        (* Convert inputs field elements to list of bits of length the field size *)
-        let input1_bits = Field.Constant.unpack @@ input1_field in
-        let input2_bits = Field.Constant.unpack @@ input2_field in
-
-        (* AND list of bits to obtain output *)
-        let and_bits =
-          List.map2_exn input1_bits input2_bits ~f:(fun b1 b2 -> b1 && b2)
-        in
-
-        (* Convert back to field a AND b *)
-        Field.Constant.project and_bits )
-  in
-
   (* Recursively build And gadget with leading Xors and a final Generic gate *)
-  (* It will also check the right lengths of the inputs, no need to do it again *)
+  (* It will also check the correct lengths of the inputs, no need to do it again *)
   let xor_output = Xor.bxor (module Circuit) input1 input2 length ~len_xor in
   (* Transform to non constant cvar *)
   let xor_output_var =
     exists Field.typ ~compute:(fun () ->
         Common.cvar_field_to_field_as_prover (module Circuit) xor_output )
+  in
+
+  let and_output =
+    exists Field.typ ~compute:(fun () ->
+        Common.field_bits_combine_as_prover
+          (module Circuit)
+          input1 input2
+          (fun b1 b2 -> b1 && b2) )
   in
 
   (* Compute sum of a + b and constrain in the circuit *)
@@ -102,19 +87,16 @@ let%test_unit "and gadget" =
           let open Runner.Impl in
           (* Set up snarky variables for inputs and outputs *)
           let left_input =
-            Common.as_prover_cvar_field_of_base10
-              (module Runner.Impl)
-              left_input
+            exists Field.typ ~compute:(fun () ->
+                Field.Constant.of_string left_input )
           in
           let right_input =
-            Common.as_prover_cvar_field_of_base10
-              (module Runner.Impl)
-              right_input
+            exists Field.typ ~compute:(fun () ->
+                Field.Constant.of_string right_input )
           in
           let output_and =
-            Common.as_prover_cvar_field_of_base10
-              (module Runner.Impl)
-              output_and
+            exists Field.typ ~compute:(fun () ->
+                Field.Constant.of_string output_and )
           in
           (* Use the and gate gadget *)
           let result =
@@ -138,4 +120,5 @@ let%test_unit "and gadget" =
   (* Negatve tests *)
   assert (Common.is_error (fun () -> test_and "1" "1" "0" 1)) ;
   assert (Common.is_error (fun () -> test_and "255" "255" "255" 7)) ;
+  assert (Common.is_error (fun () -> test_and "1" "1" "1" (-1))) ;
   ()
