@@ -6,6 +6,10 @@ mutation schedulePayments($input: PaymentsDetails!) {
     schedulePayments(input: $input) 
 }
 
-mutation stopPayments($handle: String!) {
-    stopPayments(handle: $handle) 
+mutation stopScheduledTransactions($handle: String!) {
+    stopScheduledTransactions(handle: $handle) 
+}
+
+mutation scheduleZkappCommands($input: ZkappCommandsDetails!) {
+    scheduleZkappCommands(input: $input) 
 }

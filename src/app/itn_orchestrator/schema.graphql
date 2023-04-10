@@ -14,8 +14,12 @@ type mutation {
     """Payments details"""
     input: PaymentsDetails!
   ): String!
-  stopPayments(
-    """Payment scheduler handle"""
+  scheduleZkappCommands(
+    """Zkapp commands details"""
+    input: ZkappCommandsDetails!
+  ): String!
+  stopScheduledTransactions(
+    """Transaction scheduler handle"""
     handle: String!
   ): String!
 }
@@ -56,4 +60,25 @@ scalar PublicKey
 type query {
   """Returns true if query is authorized"""
   auth: Boolean
+}
+
+"""Keys and other information for scheduling zkapp commands"""
+input ZkappCommandsDetails {
+  """Length of scheduler run"""
+  durationInMinutes: Int!
+
+  """Frequency of transactions"""
+  transactionsPerSecond: Float!
+
+  """Number of zkapp accounts that the scheduler generates during the test"""
+  numNewAccountsToGenerate: Int!
+
+  """Number of zkapp accounts that we created for the test"""
+  numZkappAccountsToCreate: Int!
+
+  """Private keys of fee payers"""
+  feePayers: [PrivateKey!]!
+
+  """Private key of the account creator"""
+  accountCreator: PrivateKey!
 }

@@ -61,10 +61,18 @@ func SchedulePayments(ctx context.Context, client graphql.Client, input Payments
 	return resp.SchedulePayments, nil
 }
 
-func StopPayments(ctx context.Context, client graphql.Client, handle string) (string, error) {
-	resp, err := stopPayments(ctx, client, handle)
+func StopTransactions(ctx context.Context, client graphql.Client, handle string) (string, error) {
+	resp, err := stopScheduledTransactions(ctx, client, handle)
 	if err != nil {
 		return "", err
 	}
-	return resp.StopPayments, nil
+	return resp.StopScheduledTransactions, nil
+}
+
+func ScheduleZkappCommands(ctx context.Context, client graphql.Client, input ZkappCommandsDetails) (string, error) {
+	resp, err := scheduleZkappCommands(ctx, client, input)
+	if err != nil {
+		return "", err
+	}
+	return resp.ScheduleZkappCommands, nil
 }
