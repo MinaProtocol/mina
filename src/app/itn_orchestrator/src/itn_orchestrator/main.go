@@ -27,6 +27,7 @@ func init() {
 		"stop":      lib.StopAction{},
 		"wait":      lib.WaitAction{},
 		"fund-keys": lib.FundAction{},
+		"zkapp-txs": lib.ZkappCommandsAction{},
 	}
 }
 
