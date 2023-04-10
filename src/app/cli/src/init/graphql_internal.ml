@@ -259,7 +259,8 @@ struct
                 unauthorized ()
             | Some auth -> (
                 let open Core in
-                let verify_signature_and_respond pk signature =
+                let verify_signature_and_respond ~increment_seq_no ~pk ~msg
+                    ~signature =
                   (* we need to know not only that the pk verifies the
                      signature, but also that this pk is allowed to verify
                      the signature; otherwise, the client could sign a
@@ -267,8 +268,11 @@ struct
                   *)
                   if
                     List.mem pks pk ~equal:Itn_crypto.equal_pubkeys
-                    && Itn_crypto.verify ~key:pk ~msg:body_str signature
-                  then respond ()
+                    && Itn_crypto.verify ~key:pk ~msg signature
+                  then (
+                    if increment_seq_no then
+                      Mina_graphql.Itn_sequencing.incr_sequence_number pk ;
+                    respond () )
                   else unauthorized ()
                 in
                 match String.split_on_chars auth ~on:[ ' ' ] with
@@ -298,13 +302,14 @@ struct
                           not
                           @@ Mina_graphql.Itn_sequencing.valid_sequence_number
                                uuid pk seq_no
-                        then
-                          (* don't increment sequence no *)
-                          invalid_sequence_no ()
-                        else (
-                          (* increment sequence no, even if request is unauthorized *)
-                          Mina_graphql.Itn_sequencing.incr_sequence_number pk ;
-                          verify_signature_and_respond pk signature ) )
+                        then invalid_sequence_no ()
+                        else
+                          let msg =
+                            sprintf "%s%04d%s" uuid_str (seq_no mod 10_000)
+                              body_str
+                          in
+                          verify_signature_and_respond ~increment_seq_no:true
+                            ~msg ~pk ~signature )
                 | [ "Signature"; pk_str; signature ] -> (
                     let is_auth =
                       try
@@ -330,7 +335,9 @@ struct
                           Mina_graphql.Itn_sequencing
                           .set_sequence_number_for_auth pk ;
                           (* don't increment sequence no for an auth query *)
-                          verify_signature_and_respond pk signature
+                          let msg = body_str in
+                          verify_signature_and_respond ~increment_seq_no:false
+                            ~msg ~pk ~signature
                       | Error _ ->
                           (* not a base64-encoded key *)
                           unauthorized () )
