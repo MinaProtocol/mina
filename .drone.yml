@@ -218,10 +218,10 @@ steps:
   - |
     for t in $(seq 10); do
         kubectl logs jobs/zkapp-worker-$${SUFFIX} --container=worker --follow && exit
-        echo "Waiting for send container..."
+        echo "Waiting for worker container..."
         sleep 5
     done
-    echo "Failed to wait for send container"
+    echo "Failed to wait for worker container"
     exit
 
 - name: finish
@@ -229,7 +229,7 @@ steps:
   environment:
     KUBECONFIG: kube-config
   commands:
-  - $${OM}/kube-utils.sh wait-for-job-status job/send-zkapps-$${SUFFIX} 60m
+  - $${OM}/kube-utils.sh wait-for-job-status job/zkapp-worker-$${SUFFIX} 60m
 
 - name: clean-up
   image: alpine/k8s:1.26.1
