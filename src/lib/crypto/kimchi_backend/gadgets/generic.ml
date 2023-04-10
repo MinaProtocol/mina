@@ -94,15 +94,18 @@ let%test_unit "generic gadgets" =
       Boolean.Assert.is_true (Field.equal sum sum)
     in
 
+    (* Generate and verify first proof *)
     let cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
           circuit left_input right_input sum )
     in
 
-    (* Reuse CS with another witness *)
+    (* Set up another witness *)
     let left_input = left_input * 13 in
     let right_input = right_input * 21 in
     let sum = left_input + right_input in
+
+    (* Generate and verify second proof, reusing constraint system *)
     let _cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof ~cs (fun () ->
           circuit left_input right_input sum )
@@ -110,7 +113,7 @@ let%test_unit "generic gadgets" =
     ()
   in
 
-  (* Helper to test generic multimplication gate gadget
+  (* Helper to test generic multiplication gate gadget
    *   Inputs operands and expected output: left_input * right_input = prod
    *   Returns true if constraints are satisfied, false otherwise.
    *)
@@ -134,15 +137,18 @@ let%test_unit "generic gadgets" =
       Boolean.Assert.is_true (Field.equal prod prod)
     in
 
+    (* Generate and verify first proof *)
     let cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
           circuit left_input right_input prod )
     in
 
-    (* Reuse CS with another witness *)
+    (* Set up another witness *)
     let left_input = left_input * 5 in
     let right_input = right_input * 7 in
     let prod = left_input * right_input in
+
+    (* Generate and verify second proof, reusing constraint system *)
     let _cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof ~cs (fun () ->
           circuit left_input right_input prod )
