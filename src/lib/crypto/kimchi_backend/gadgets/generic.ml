@@ -102,10 +102,10 @@ let%test_unit "generic gadgets" =
     (* Run CS with another witness *)
     let left_input = left_input * 13 in
     let right_input = right_input * 21 in
-    let prod = left_input * right_input in
+    let sum = left_input + right_input in
     let _cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof ~cs (fun () ->
-          circuit left_input right_input prod )
+          circuit left_input right_input sum )
     in
     ()
   in
@@ -142,7 +142,7 @@ let%test_unit "generic gadgets" =
     (* Run CS with another witness *)
     let left_input = left_input * 5 in
     let right_input = right_input * 7 in
-    let prod = left_input + right_input in
+    let prod = left_input * right_input in
     let _cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof ~cs (fun () ->
           circuit left_input right_input prod )
