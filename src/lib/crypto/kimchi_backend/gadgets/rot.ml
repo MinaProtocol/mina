@@ -127,7 +127,7 @@ let%test_unit "rot gadget" =
      *   Returns unit if constraints are satisfied, error otherwise.
   *)
   let test_rot word length mode result : unit =
-    let _proof_keypair, _proof =
+    let _cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
           let open Runner.Impl in
           (* Set up snarky variables for inputs and output *)
