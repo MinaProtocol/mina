@@ -227,16 +227,19 @@ let%test_unit "xor gadget" =
           let open Runner.Impl in
           (* Set up snarky variables for inputs and output *)
           let left_input =
-            exists Field.typ ~compute:(fun () ->
-                Field.Constant.of_string left_input )
+            Common.as_prover_cvar_field_of_base10
+              (module Runner.Impl)
+              left_input
           in
           let right_input =
-            exists Field.typ ~compute:(fun () ->
-                Field.Constant.of_string right_input )
+            Common.as_prover_cvar_field_of_base10
+              (module Runner.Impl)
+              right_input
           in
           let output_xor =
-            exists Field.typ ~compute:(fun () ->
-                Field.Constant.of_string output_xor )
+            Common.as_prover_cvar_field_of_base10
+              (module Runner.Impl)
+              output_xor
           in
           (* Use the xor gate gadget *)
           let result =
