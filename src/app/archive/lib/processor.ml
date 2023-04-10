@@ -3440,29 +3440,25 @@ module Block = struct
       (parent_id, State_hash.to_base58_check parent_hash)
 
   let get_subchain (module Conn : CONNECTION) ~start_block_id ~end_block_id =
+    (* derive query from type `t` *)
+    let concat = String.concat ~sep:"," in
+    let columns_with_id = concat ("id" :: Fields.names) in
+    let b_columns_with_id =
+      concat (List.map ("id" :: Fields.names) ~f:(fun s -> "b." ^ s))
+    in
+    let columns = concat Fields.names in
     Conn.collect_list
       (Caqti_request.collect
          Caqti_type.(tup2 int int)
          typ
-         {sql| WITH RECURSIVE chain AS (
-              SELECT id,state_hash,parent_id,parent_hash,creator_id,block_winner_id,
-                     last_vrf_output,snarked_ledger_hash_id,
-                     staking_epoch_data_id,next_epoch_data_id,
-                     min_window_density,sub_window_densities,total_currency,
-                     ledger_hash,height,global_slot_since_hard_fork,global_slot_since_genesis,
-                     protocol_version_id, proposed_protocol_version_id,
-                     timestamp,chain_status
+         (sprintf
+            {sql| WITH RECURSIVE chain AS (
+              SELECT %s
               FROM blocks b WHERE b.id = $1
 
               UNION ALL
 
-              SELECT b.id,b.state_hash,b.parent_id,b.parent_hash,b.creator_id,b.block_winner_id,
-                     b.last_vrf_output,b.snarked_ledger_hash_id,
-                     b.staking_epoch_data_id,b.next_epoch_data_id,
-                     b.min_window_density,b.sub_window_densities,b.total_currency,
-                     b.ledger_hash,b.height,b.global_slot_since_hard_fork,b.global_slot_since_genesis,
-                     b.protocol_version_id, b.proposed_protocol_version_id,
-                     b.timestamp,b.chain_status
+              SELECT %s
               FROM blocks b
 
               INNER JOIN chain
@@ -3471,16 +3467,10 @@ module Block = struct
 
            )
 
-           SELECT state_hash,parent_id,parent_hash,creator_id,block_winner_id,
-                  last_vrf_output,snarked_ledger_hash_id,
-                  staking_epoch_data_id, next_epoch_data_id,
-                  min_window_density,sub_window_densities,total_currency,
-                  ledger_hash,height,
-                  global_slot_since_hard_fork,global_slot_since_genesis,
-                  protocol_version_id, proposed_protocol_version_id,
-                  timestamp,chain_status
+           SELECT %s
            FROM chain ORDER BY height ASC
-      |sql} )
+         |sql}
+            columns_with_id b_columns_with_id columns ) )
       (end_block_id, start_block_id)
 
   let get_highest_canonical_block_opt (module Conn : CONNECTION) =
