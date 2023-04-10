@@ -117,12 +117,12 @@ steps:
   - $${OM}/deploy.sh delete --all --force
 
 - name: prepare-deamon-json
-  image: busybox
+  image: alpine/k8s:1.26.1
   commands:
-  - sed -e "s/\$${TIMESTAMP}/$(date -u -Iseconds | sed -e 's/:..+/:00+/')/" $${OM}/resources/daemon.template.json > $${OM}/resources/daemon.json
-  # Temporary solution, use config-file-subst.sh instead
-  - sed -i "s/\$${BLOCK_DURATION_MS}/60000/" $${OM}/resources/daemon.json
-  - sed -i "s/\$${SLOTS_PER_EPOCH}/3000/" $${OM}/resources/daemon.json
+  - $${OM}/generate-conf-file.sh \
+      --slot-duration=$${SLOT_DURATION:-180} \
+      $${SLOTS_PER_EPOCH:+--slots-per-epoch=$${SLOTS_PER_EPOCH}} \
+      > $${OM}/resources/daemon.json
 
 - name: log-seed
   <<: *log
