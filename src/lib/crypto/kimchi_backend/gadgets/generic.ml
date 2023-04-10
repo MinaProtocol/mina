@@ -99,7 +99,7 @@ let%test_unit "generic gadgets" =
           circuit left_input right_input sum )
     in
 
-    (* Run CS with another witness *)
+    (* Reuse CS with another witness *)
     let left_input = left_input * 13 in
     let right_input = right_input * 21 in
     let sum = left_input + right_input in
@@ -139,7 +139,7 @@ let%test_unit "generic gadgets" =
           circuit left_input right_input prod )
     in
 
-    (* Run CS with another witness *)
+    (* Reuse CS with another witness *)
     let left_input = left_input * 5 in
     let right_input = right_input * 7 in
     let prod = left_input * right_input in
