@@ -1,15 +1,15 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "mina-sample-zkapp.job-name" . }}
+  name: {{ include "job-name" . }}
 spec:
-  parallelism: {{ $.Values.parallelism | default 1 }}
+  parallelism: {{ $.Values.workers | default 1 }}
+  ttlSecondsAfterFinished: 300
   template:
     metadata:
       labels:
-        app:  {{ include "mina-sample-zkapp.job-name" . }}
+        app:  {{ include "job-name" . }}
     spec:
-      ttlSecondsAfterFinished: 300
       runtimeClassName: kata-clh
       initContainers:
       - name: controller-is-ready
@@ -17,14 +17,16 @@ spec:
         args:
         - sh
         - -c
-        - for t in $(seq 15); do nc -vz {{ include "mina-sample-zkapp.service-name" . }} 80 && exit; sleep 1; done; exit 1
+        - for t in $(seq 15); do nc -vz {{ include "controller-name" . }} 80 && exit; sleep 1; done; exit 1
       containers:
-      - name: send
-        image: {{ $.Values.jobRepository }}:{{ $.Values.tag | default "latest" }}
+      - name: worker
+        image: {{ $.Values.repository }}:{{ $.Values.tag | default "latest" }}
         imagePullPolicy: {{ $.Values.pullPolicy }}
         args:
+        - -v
+        - -v
         - job
-        - --controller=http://{{ include "mina-sample-zkapp.service-name" . }}/
+        - http://{{ include "controller-name" . }}/
         resources:
           requests:
             {{ if $.Values.cpu }}
@@ -41,4 +43,4 @@ spec:
             memory: {{ $.Values.mem }}
             {{ end }}
       restartPolicy: {{ $.Values.restartPolicy | default "OnFailure" }}
-  backoffLimit: {{ div ($.Values.parallelism | default 1) 3 }}
+#  backoffLimit: {{ div ($.Values.parallelism | default 1) 3 }}
