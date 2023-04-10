@@ -15,6 +15,7 @@ let bignum_bigint_bit_length (bigint : Bignum_bigint.t) : int =
   Z.log2up (Bignum_bigint.to_zarith_bigint bigint)
 
 (* Removes leading zero bits of a list of booleans (at least needs length 1) *)
+
 let rec rm_lead_zero_bits (bitstring : bool list) : bool list =
   match bitstring with
   | [] ->
@@ -40,7 +41,7 @@ let bool_list_wo_zero_bits (bitstring : bool list) : bool list =
  *          * The value returned by exists depends on what mode it is called in
  *              * In circuit generation mode it allocates a cvar without any backing memory
  *              * In proof generation mode it allocates a cvar with backing memory to store
- *                the values associated with the cvar.  The prover can then access these
+ *                the values associated with the cvar. The prover can then access these
  *                with As_prover.read.
  *     2. Functions suffixed with "_as_prover" can only be called outside
  *        the circuit. Specifically, this means within an exists, within
