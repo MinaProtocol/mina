@@ -15,8 +15,8 @@ func StopScheduledTransactions(config Config, params StopParams) error {
 		if err != nil {
 			return fmt.Errorf("failed to created client for %s: %v", receipt.Address, err)
 		}
-		resp, err := StopPayments(config.Ctx, client, receipt.Handle)
-		config.Log.Infof("stopPayments on %s: %s (%v)", receipt.Address, resp, err)
+		resp, err := StopTransactions(config.Ctx, client, receipt.Handle)
+		config.Log.Infof("stop scheduled transactions on %s: %s (%v)", receipt.Address, resp, err)
 	}
 	return nil
 }
