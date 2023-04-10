@@ -298,19 +298,6 @@ module Plonk_constraint = struct
           ; bound_crumb5 : 'v
           ; bound_crumb6 : 'v
           ; bound_crumb7 : 'v
-          ; (* Next row *) shifted : 'v
-          ; shifted_limb0 : 'v
-          ; shifted_limb1 : 'v
-          ; shifted_limb2 : 'v
-          ; shifted_limb3 : 'v
-          ; shifted_crumb0 : 'v
-          ; shifted_crumb1 : 'v
-          ; shifted_crumb2 : 'v
-          ; shifted_crumb3 : 'v
-          ; shifted_crumb4 : 'v
-          ; shifted_crumb5 : 'v
-          ; shifted_crumb6 : 'v
-          ; shifted_crumb7 : 'v
           ; (* Coefficients *) two_to_rot : 'f (* Rotation scalar 2^rot *)
           }
       | Raw of
@@ -586,19 +573,6 @@ module Plonk_constraint = struct
           ; bound_crumb5
           ; bound_crumb6
           ; bound_crumb7
-          ; (* Next row *) shifted
-          ; shifted_limb0
-          ; shifted_limb1
-          ; shifted_limb2
-          ; shifted_limb3
-          ; shifted_crumb0
-          ; shifted_crumb1
-          ; shifted_crumb2
-          ; shifted_crumb3
-          ; shifted_crumb4
-          ; shifted_crumb5
-          ; shifted_crumb6
-          ; shifted_crumb7
           ; (* Coefficients *) two_to_rot
           } ->
           Rot64
@@ -617,19 +591,6 @@ module Plonk_constraint = struct
             ; bound_crumb5 = f bound_crumb5
             ; bound_crumb6 = f bound_crumb6
             ; bound_crumb7 = f bound_crumb7
-            ; (* Next row *) shifted = f shifted
-            ; shifted_limb0 = f shifted_limb0
-            ; shifted_limb1 = f shifted_limb1
-            ; shifted_limb2 = f shifted_limb2
-            ; shifted_limb3 = f shifted_limb3
-            ; shifted_crumb0 = f shifted_crumb0
-            ; shifted_crumb1 = f shifted_crumb1
-            ; shifted_crumb2 = f shifted_crumb2
-            ; shifted_crumb3 = f shifted_crumb3
-            ; shifted_crumb4 = f shifted_crumb4
-            ; shifted_crumb5 = f shifted_crumb5
-            ; shifted_crumb6 = f shifted_crumb6
-            ; shifted_crumb7 = f shifted_crumb7
             ; (* Coefficients *) two_to_rot
             }
       | Raw { kind; values; coeffs } ->
@@ -2044,24 +2005,11 @@ end = struct
           ; bound_crumb5
           ; bound_crumb6
           ; bound_crumb7
-          ; (* Next row *) shifted
-          ; shifted_limb0
-          ; shifted_limb1
-          ; shifted_limb2
-          ; shifted_limb3
-          ; shifted_crumb0
-          ; shifted_crumb1
-          ; shifted_crumb2
-          ; shifted_crumb3
-          ; shifted_crumb4
-          ; shifted_crumb5
-          ; shifted_crumb6
-          ; shifted_crumb7
           ; (* Coefficients *) two_to_rot
           } ) ->
         (*
-        //! | Gate   | `Rot64`             | `RangeCheck0`    |
-        //! | ------ | ------------------- | ---------------- |
+        //! | Gate   | `Rot64`             | `RangeCheck0` gadget designer's duty |
+        //! | ------ | ------------------- | ------------------------------------ |
         //! | Column | `Curr`              | `Next`           |
         //! | ------ | ------------------- | ---------------- |
         //! |      0 | copy `word`         |`shifted`         |
@@ -2098,28 +2046,7 @@ end = struct
            ; Some (reduce_to_v bound_crumb7)
           |]
         in
-        let vars_next =
-          [| (* Next row *) Some (reduce_to_v shifted)
-           ; None
-           ; None
-           ; Some (reduce_to_v shifted_limb0)
-           ; Some (reduce_to_v shifted_limb1)
-           ; Some (reduce_to_v shifted_limb2)
-           ; Some (reduce_to_v shifted_limb3)
-           ; Some (reduce_to_v shifted_crumb0)
-           ; Some (reduce_to_v shifted_crumb1)
-           ; Some (reduce_to_v shifted_crumb2)
-           ; Some (reduce_to_v shifted_crumb3)
-           ; Some (reduce_to_v shifted_crumb4)
-           ; Some (reduce_to_v shifted_crumb5)
-           ; Some (reduce_to_v shifted_crumb6)
-           ; Some (reduce_to_v shifted_crumb7)
-          |]
-        in
-        let compact = Fp.zero in
-        add_row sys vars_curr Rot64 [| two_to_rot |] ;
-        add_row sys vars_next RangeCheck0
-          [| compact (* Standard 3-limb mode *) |]
+        add_row sys vars_curr Rot64 [| two_to_rot |]
     | Plonk_constraint.T (Raw { kind; values; coeffs }) ->
         let values =
           Array.init 15 ~f:(fun i ->
