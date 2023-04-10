@@ -4,16 +4,18 @@
 
 repository: akoptelov/mina-load-generator
 pullPolicy: Always
+# restartPolicy: Never
 # Overrides the image tag whose default is the chart appVersion.
 tag: ""
 
 # the number of parallel jobs
-workers: 16
-count: 256
+workers: 64
+count: 1024
 accounts: accounts.txt
 nodes: nodes.txt
 cpu: 16
 mem: "8G"
+
 
 podAnnotations: {}
 
