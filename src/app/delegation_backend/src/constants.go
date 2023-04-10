@@ -18,7 +18,7 @@ const PROD_WHITELIST_SPREADSHEET_ID = "1xiKppb0BFUo8IKM2itIx2EWIQbBzUlFxgtZlKdnr
 const PROD_CLOUD_BUCKET_NAME = "foundation-delegation-uptime"
 
 const TEST_WHITELIST_SPREADSHEET_ID = "1NODwwcVxLNnCI4XnIrGdGBSjointN4MZ8QZ7wqgtSTQ"
-const TEST_CLOUD_BUCKET_NAME = "georgeee-delegation-test-1"
+const TEST_CLOUD_BUCKET_NAME = "georgeee-uptime-itn-test-1"
 
 func CloudBucketName() string {
 	if os.Getenv("TEST") == "" {
