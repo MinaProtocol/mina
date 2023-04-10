@@ -2,7 +2,7 @@
 
 . $(dirname $0)/common.sh
 
-TEMP=$(getopt -o 'ht:e:m:s:b:B:A:' --long 'help,timestamp:,slots-per-epoch:,slot-duration-ms:,slot-duration:,high-balance:,balance:,high-balance-accounts:' -n "$0" -- "$@")
+TEMP=$(getopt -o 'ht:e:m:s:b:B:A:v:' --long 'help,timestamp:,slots-per-epoch:,slot-duration-ms:,slot-duration:,high-balance:,balance:,high-balance-accounts:,value:' -n "$0" -- "$@")
 
 if [ $? -ne 0 ]; then
     echo 'Terminating...' >&2
@@ -13,15 +13,12 @@ eval set -- "$TEMP"
 unset TEMP
 
 TIMESTAMP=$(date -u -Isecond | sed -e 's/:..+/:00+/')
-SLOTS_PER_EPOCH=3000
-BLOCK_DURATION_MS=60000
-NAME=testnet
 HIGH_BALANCE=1000000000
 LOW_BALANCE=100000
 HIGH_BALANCE_ACCOUNTS=3
 OUTPUT=${OUTPUT:-$(resources)/daemon.json}
 DEFAULT_ACCOUNTS=$(resource test-accounts.json)
-
+TEMPLATE=$(resource daemon.template.json)
 
 usage() {
     cat <<EOF
@@ -49,8 +46,13 @@ usage() {
                     Balance for other accounts
     -A, --high-balance-accounts <N>
                     Number of pumped-up accounts
+    -v, --value <VALUE-SPEC>
+                    Value for arbitrary parameter
+                    VALUE-SPEC should be a string in a form of '.obj1.obj2.obj3=JSON-VALUE'
 EOF
 }
+
+FILTER='.'
 
 while true; do
     case $1 in
@@ -66,15 +68,20 @@ while true; do
             shift 2
         ;;
         '-e'|'--slots-per-epoch')
-            export SLOTS_PER_EPOCH=$2
+            if [ $(($2 % 3)) -ne 0 ]; then
+                echo "Epoch lenght $2 cannot be divided by 3"
+                exit 1
+            fi
+            FILTER="$FILTER | .genesis.slots_per_epoch = $2"
             shift 2
         ;;
         '-m'|'--slot-duration-ms')
+            FILTER="$FILTER | .proof.block_window_duration_ms = $2"
             BLOCK_DURATION_MS=$2
             shift 2
         ;;
         '-s'|'--slot-duration')
-            BLOCK_DURATION_MS=$(($2 * 1000))
+            FILTER="$FILTER | .proof.block_window_duration_ms = $(($2 * 1000))"
             shift 2
         ;;
         '-B'|'--high-balance')
@@ -87,6 +94,10 @@ while true; do
         ;;
         '-A'|'--high-balance-accounts')
             HIGH_BALANCE_ACCOUNTS=$2
+            shift 2
+        ;;
+        '-v'|'--value')
+            FILTER="$FILTER | $2"
             shift 2
         ;;
         '--')
@@ -102,15 +113,8 @@ done
 
 ACCOUNTS=${1:-$DEFAULT_ACCOUNTS}
 
-if [ $((SLOTS_PER_EPOCH % 3)) -ne 0 ]; then
-    echo "Epoch lenght $SLOTS_PER_EPOCH cannot be divided by 3"
-    exit 1
-fi
-
-GENESIS="{slots_per_epoch: ${SLOTS_PER_EPOCH}, genesis_state_timestamp: \"${TIMESTAMP}\"}"
-PROOF="{block_window_duration_ms: $BLOCK_DURATION_MS}"
 ACCS1=".[:$HIGH_BALANCE_ACCOUNTS] | map( . + { balance: \"$HIGH_BALANCE\" })"
 ACCS2=".[$HIGH_BALANCE_ACCOUNTS:] | map( . + { balance: \"$LOW_BALANCE\" })"
-LEDGER="{name: \"$NAME\", accounts: (($ACCS1) + ($ACCS2))}"
+FILTER="$FILTER | .genesis.genesis_state_timestamp = \"$TIMESTAMP\" | .ledger.accounts = (\$accounts[0] | (($ACCS1) + ($ACCS2)))"
 
-jq "{genesis: $GENESIS, proof: $PROOF, ledger: $LEDGER}" $ACCOUNTS
+jq --slurpfile accounts "$ACCOUNTS" "$FILTER" "$TEMPLATE"
