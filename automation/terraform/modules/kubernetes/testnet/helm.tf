@@ -132,3 +132,28 @@ resource "helm_release" "watchdog" {
   depends_on = [helm_release.seeds]
 }
 
+# zkApps Dashboard
+
+resource "helm_release" "zkapps-dashboard" {
+  provider   = helm.testnet_deploy
+
+  name       = "zkapps-dashboard"
+  repository = var.use_local_charts ? "" : local.mina_helm_repo
+  chart      = var.use_local_charts ? "../../../../helm/zkapps-dashboard" : "zkapps-dashboard"
+  version    = "0.1.2"
+  namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
+
+  set {
+    name  = "postgresql.primary.initdb.password"
+    value = var.zkapps_dashboard_key
+  }
+
+  set {
+    name  = "postgresql.auth.password"
+    value = var.zkapps_dashboard_key
+  }
+
+  wait       = false
+  timeout    = 600
+  depends_on = [helm_release.archive_node]
+}

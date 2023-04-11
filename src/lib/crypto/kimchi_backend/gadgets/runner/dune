@@ -1,5 +1,6 @@
 (library
  (name kimchi_gadgets_test_runner)
+ (public_name kimchi_backend.gadgets_test_runner)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson))
  (libraries

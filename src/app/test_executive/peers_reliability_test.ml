@@ -18,13 +18,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
-    let open Test_config.Wallet in
     { default with
       requires_graphql = true
+    ; genesis_ledger =
+        [ { account_name = "node-a-key"; balance = "700000"; timing = Untimed }
+        ; { account_name = "node-b-key"; balance = "700000"; timing = Untimed }
+        ; { account_name = "node-c-key"; balance = "800000"; timing = Untimed }
+        ]
     ; block_producers =
-        [ { balance = "700000"; timing = Untimed }
-        ; { balance = "700000"; timing = Untimed }
-        ; { balance = "800000"; timing = Untimed }
+        [ { node_name = "node-a"; account_name = "node-a-key" }
+        ; { node_name = "node-b"; account_name = "node-b-key" }
+        ; { node_name = "node-c"; account_name = "node-c-key" }
         ]
     }
 
@@ -35,18 +39,39 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let all_nodes = Network.all_nodes network in
     [%log info] "peers_list"
       ~metadata:
-        [ ("peers", `List (List.map all_nodes ~f:(fun n -> `String (Node.id n))))
+        [ ( "peers"
+          , `List
+              (List.map (Core.String.Map.data all_nodes) ~f:(fun n ->
+                   `String (Node.id n) ) ) )
         ] ;
-    let[@warning "-8"] [ node_a; node_b; node_c ] =
-      Network.block_producers network
+    let node_a =
+      Core.String.Map.find_exn (Network.block_producers network) "node-a"
+    in
+    let node_b =
+      Core.String.Map.find_exn (Network.block_producers network) "node-b"
+    in
+    let node_c =
+      Core.String.Map.find_exn (Network.block_producers network) "node-c"
     in
     (* witness the node_c frontier load on initialization *)
     let%bind () =
-      wait_for t @@ Wait_condition.persisted_frontier_loaded node_c
+      wait_for t
+      @@ ( Wait_condition.persisted_frontier_loaded node_c
+         |> Wait_condition.with_timeouts
+              ~soft_timeout:
+                (Network_time_span.Literal
+                   (Time.Span.of_ms (20. *. 60. *. 1000.)) )
+              ~hard_timeout:
+                (Network_time_span.Literal
+                   (Time.Span.of_ms (20. *. 60. *. 1000.)) ) )
     in
-    let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
+    (* let%bind () = wait_for t (Wait_condition.nodes_to_initialize [ node_c ]) in *)
+    let%bind () =
+      wait_for t
+        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
+    in
     let%bind initial_connectivity_data =
-      fetch_connectivity_data ~logger all_nodes
+      fetch_connectivity_data ~logger (Core.String.Map.data all_nodes)
     in
     let%bind () =
       section "network is fully connected upon initialization"
@@ -170,7 +195,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section "network is fully connected after one node was restarted"
       (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
        let%bind final_connectivity_data =
-         fetch_connectivity_data ~logger all_nodes
+         fetch_connectivity_data ~logger (Core.String.Map.data all_nodes)
        in
        assert_peers_completely_connected final_connectivity_data )
 end
