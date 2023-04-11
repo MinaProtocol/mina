@@ -22,10 +22,15 @@ mina_deployments() {
 }
 
 mina_pods_ns() {
-    for NS in $*; do
-        kubectl --namespace=$NS get pods -o json | \
-            jq -r '.items[] | select( .spec.containers | any( .name == "mina") ) | @text "\(.metadata.namespace) \(.metadata.name)"'
-    done
+    if [ $# -eq 0 ]; then
+        kubectl get pods -o json | \
+            jq -r '.items[] | select( .spec.containers | any( .name == "mina") ) | @text "\(.metadata.name)"'
+    else
+        for NS in $*; do
+            kubectl --namespace=$NS get pods -o json | \
+                jq -r '.items[] | select( .spec.containers | any( .name == "mina") ) | @text "\(.metadata.namespace) \(.metadata.name)"'
+        done
+    fi
 }
 
 wait_for_job_status() {
@@ -288,6 +293,7 @@ fi
 case "$CMD" in
     "frontend-port")        frontend_port "$@" ;;
     "mina-deployments")     mina_deployments ;;
+    "mina-pods-ns")         mina_pods_ns $* ;;
     "mina-pods")            mina_pods_ns $* ;;
     "wait-for-job-status")  wait_for_job_status "$@" ;;
     "mina-exec")            mina_exec "$@" ;;
