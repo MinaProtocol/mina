@@ -43,4 +43,4 @@ spec:
             memory: {{ $.Values.mem }}
             {{ end }}
       restartPolicy: {{ $.Values.restartPolicy | default "OnFailure" }}
-#  backoffLimit: {{ div ($.Values.parallelism | default 1) 3 }}
+  backoffLimit: {{ $.Values.count }}

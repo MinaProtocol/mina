@@ -9,7 +9,7 @@ pullPolicy: Always
 tag: ""
 
 # the number of parallel jobs
-workers: 64
+workers: 32
 count: 1024
 accounts: accounts.txt
 nodes: nodes.txt
