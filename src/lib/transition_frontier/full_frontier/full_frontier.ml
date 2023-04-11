@@ -631,8 +631,10 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       let new_root_protocol_states =
         Root_data.Limited.protocol_states new_root
       in
+      [%log' internal t.logger] "Move_frontier_root" ;
       move_root t ~new_root_hash ~new_root_protocol_states ~garbage
         ~enable_epoch_ledger_sync ;
+      [%log' internal t.logger] "Move_frontier_root_done" ;
       (old_root_hash, Some new_root_hash)
 
 module Metrics = struct

@@ -28,6 +28,7 @@ val close : t -> unit
 
 val notify :
      t
+  -> logger:Logger.t
   -> frontier:Full_frontier.t
   -> diffs_with_mutants:Diff.Full.With_mutant.t list
   -> unit Deferred.t

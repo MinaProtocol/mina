@@ -1063,7 +1063,7 @@ let start_tracing =
            Daemon_rpcs.Client.dispatch Daemon_rpcs.Start_tracing.rpc () port
          with
          | Ok () ->
-             printf "Daemon started tracing!"
+             print_endline "Daemon started tracing!"
          | Error e ->
              Daemon_rpcs.Client.print_rpc_error e ) )
 
@@ -1076,7 +1076,38 @@ let stop_tracing =
            Daemon_rpcs.Client.dispatch Daemon_rpcs.Stop_tracing.rpc () port
          with
          | Ok () ->
-             printf "Daemon stopped printing!"
+             print_endline "Daemon stopped printing!"
+         | Error e ->
+             Daemon_rpcs.Client.print_rpc_error e ) )
+
+let start_internal_tracing =
+  let open Deferred.Let_syntax in
+  let open Command.Param in
+  Command.async
+    ~summary:
+      "Start internal tracing to \
+       $config-directory/internal-tracing/internal-trace.jsonl"
+    (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
+         match%map
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Start_internal_tracing.rpc ()
+             port
+         with
+         | Ok () ->
+             print_endline "Daemon internal started tracing!"
+         | Error e ->
+             Daemon_rpcs.Client.print_rpc_error e ) )
+
+let stop_internal_tracing =
+  let open Deferred.Let_syntax in
+  let open Command.Param in
+  Command.async ~summary:"Stop internal tracing"
+    (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
+         match%map
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Stop_internal_tracing.rpc ()
+             port
+         with
+         | Ok () ->
+             print_endline "Daemon internal tracing stopped!"
          | Error e ->
              Daemon_rpcs.Client.print_rpc_error e ) )
 
@@ -2289,6 +2320,8 @@ let advanced =
     ; ("constraint-system-digests", constraint_system_digests)
     ; ("start-tracing", start_tracing)
     ; ("stop-tracing", stop_tracing)
+    ; ("start-internal-tracing", start_internal_tracing)
+    ; ("stop-internal-tracing", stop_internal_tracing)
     ; ("snark-job-list", snark_job_list)
     ; ("pooled-user-commands", pooled_user_commands)
     ; ("pooled-zkapp-commands", pooled_zkapp_commands)
