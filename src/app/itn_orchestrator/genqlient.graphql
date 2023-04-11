@@ -1,5 +1,8 @@
 query auth() {
-    auth
+    auth {
+        serverUuid
+        signerSequenceNumber
+    }
 }
 
 mutation schedulePayments($input: PaymentsDetails!) {
