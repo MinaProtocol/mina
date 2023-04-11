@@ -136,7 +136,7 @@ let%test_unit "generic gadgets" =
    *   Inputs operands and expected output: left_input - right_input = difference
    *   Returns true if constraints are satisfied, false otherwise.
    *)
-   let test_generic_sub left_input right_input difference : unit =
+  let test_generic_sub left_input right_input difference : unit =
     let _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
           let open Runner.Impl in
@@ -150,7 +150,8 @@ let%test_unit "generic gadgets" =
                 Field.Constant.of_int right_input )
           in
           let difference =
-            exists Field.typ ~compute:(fun () -> Field.Constant.of_int difference)
+            exists Field.typ ~compute:(fun () ->
+                Field.Constant.of_int difference )
           in
           (* Use the generic sub gate gadget *)
           let result = sub (module Runner.Impl) left_input right_input in
