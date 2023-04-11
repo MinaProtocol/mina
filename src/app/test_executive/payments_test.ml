@@ -77,9 +77,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
     }
 
-  let blocks_for_first_proof_exn =
-    Test_config.blocks_for_first_ledger_proof_exn config
-
   let run network t =
     let open Network in
     let open Malleable_error.Let_syntax in

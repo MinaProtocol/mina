@@ -84,9 +84,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let payment_receiver =
     Signature_lib.(Public_key.compress (Keypair.create ()).public_key)
 
-  let blocks_for_first_proof_exn =
-    Test_config.blocks_for_first_ledger_proof_exn config
-
   let send_payment_from_zkapp_account ?expected_failure
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~logger
       ~node (sender : Signature_lib.Keypair.t) nonce =
