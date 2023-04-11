@@ -66,4 +66,5 @@
    promise
    kimchi_backend.common
    ppx_version.runtime
+   error_json
 ))

@@ -6,6 +6,7 @@ module type Statement_var_intf = Intf.Statement_var
 
 module type Statement_value_intf = Intf.Statement_value
 
+module SC = Scalar_challenge
 open Tuple_lib
 open Core_kernel
 open Async_kernel
@@ -1133,3 +1134,288 @@ let compile_with_wrap_main_override_promise :
     let statement (T p : t) = p.statement.messages_for_next_step_proof.app_state
   end in
   (self, cache_handle, (module P), provers)
+
+let wrap_main_dummy_override _ _ _ _ _ _ _ =
+  let requests =
+    (* The requests that the logic in [Wrap.wrap] use to pass
+       values into and out of the wrap proof circuit.
+       Since these are unnecessary for the dummy circuit below, we
+       generate them without using them.
+    *)
+    Requests.Wrap.create ()
+  in
+  (* A replacement for the 'wrap' circuit, which makes no
+     assertions about the statement that it receives as its first
+     argument.
+  *)
+  let wrap_main _ =
+    let module SC' = SC in
+    let open Impls.Wrap in
+    let open Wrap_main_inputs in
+    let open Wrap_main in
+    (* Create some variables to be used in constraints below. *)
+    let x = exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3) in
+    let y = exists Field.typ ~compute:(fun () -> Field.Constant.of_int 0) in
+    let z = exists Field.typ ~compute:(fun () -> Field.Constant.of_int 0) in
+    (* Every circuit must use at least 1 of each constraint; we
+       use them here.
+    *)
+    let () =
+      let g = Inner_curve.one in
+      let sponge = Sponge.create sponge_params in
+      Sponge.absorb sponge x ;
+      ignore (Sponge.squeeze_field sponge : Field.t) ;
+      ignore
+        ( SC'.to_field_checked'
+            (module Impl)
+            ~num_bits:16
+            (Kimchi_backend_common.Scalar_challenge.create x)
+          : Field.t * Field.t * Field.t ) ;
+      ignore (Ops.scale_fast g ~num_bits:5 (Shifted_value x) : Inner_curve.t) ;
+      ignore
+        ( Wrap_verifier.Scalar_challenge.endo g ~num_bits:4
+            (Kimchi_backend_common.Scalar_challenge.create x)
+          : Field.t * Field.t )
+    in
+    (* Pad the circuit so that its domain size matches the one
+       that would have been used by the true wrap_main.
+    *)
+    for i = 0 to 64000 do
+      assert_r1cs x y z
+    done
+  in
+  (requests, wrap_main)
+
+module Make_adversarial_test (M : sig
+  val tweak_statement :
+       ( Import.Challenge.Constant.t
+       , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
+       , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+       , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+         , bool )
+         Import.Types.Opt.t
+       , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
+           Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
+           .Lookup
+           .t
+         , bool )
+         Import.Types.Opt.t
+       , bool
+       , 'max_proofs_verified
+         Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
+       , (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.vec
+       , ( 'b
+         , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
+           , 'actual_proofs_verified )
+           Pickles_types.Vector.t
+         , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
+               Import.Bulletproof_challenge.t
+             , 'e )
+             Pickles_types.Vector.t
+           , 'actual_proofs_verified )
+           Pickles_types.Vector.t )
+         Proof.Base.Messages_for_next_proof_over_same_field.Step.t
+       , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
+         Import.Types.Bulletproof_challenge.t
+         Import.Types.Step_bp_vec.t
+       , Import.Types.Branch_data.t )
+       Import.Types.Wrap.Statement.In_circuit.t
+    -> ( Import.Challenge.Constant.t
+       , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
+       , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+       , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+         , bool )
+         Import.Types.Opt.t
+       , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
+           Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
+           .Lookup
+           .t
+         , bool )
+         Import.Types.Opt.t
+       , bool
+       , 'max_proofs_verified
+         Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
+       , ( Limb_vector.Constant.Hex64.t
+         , Composition_types.Digest.Limbs.n )
+         Pickles_types.Vector.vec
+       , ( 'b
+         , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
+           , 'actual_proofs_verified )
+           Pickles_types.Vector.t
+         , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
+               Import.Bulletproof_challenge.t
+             , 'e )
+             Pickles_types.Vector.t
+           , 'actual_proofs_verified )
+           Pickles_types.Vector.t )
+         Proof.Base.Messages_for_next_proof_over_same_field.Step.t
+       , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
+         Import.Types.Bulletproof_challenge.t
+         Import.Types.Step_bp_vec.t
+       , Import.Types.Branch_data.t )
+       Import.Types.Wrap.Statement.In_circuit.t
+
+  val check_verifier_error : Error.t -> unit
+end) =
+struct
+  open Impls.Step
+
+  module Statement = struct
+    type t = unit
+
+    let to_field_elements () = [||]
+  end
+
+  module A = Statement
+  module A_value = Statement
+
+  let typ = Typ.unit
+
+  module Branches = Nat.N1
+  module Max_proofs_verified = Nat.N2
+
+  let constraint_constants : Snark_keys_header.Constraint_constants.t =
+    { sub_windows_per_window = 0
+    ; ledger_depth = 0
+    ; work_delay = 0
+    ; block_window_duration_ms = 0
+    ; transaction_capacity = Log_2 0
+    ; pending_coinbase_depth = 0
+    ; coinbase_amount = Unsigned.UInt64.of_int 0
+    ; supercharged_coinbase_factor = 0
+    ; account_creation_fee = Unsigned.UInt64.of_int 0
+    ; fork = None
+    }
+
+  let rule self : _ Inductive_rule.t =
+    { identifier = "main"
+    ; prevs = [ self; self ]
+    ; main =
+        (fun { public_input = () } ->
+          let dummy_proof =
+            As_prover.Ref.create (fun () ->
+                Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15 )
+          in
+          { previous_proof_statements =
+              [ { public_input = ()
+                ; proof = dummy_proof
+                ; proof_must_verify = Boolean.false_
+                }
+              ; { public_input = ()
+                ; proof = dummy_proof
+                ; proof_must_verify = Boolean.false_
+                }
+              ]
+          ; public_output = ()
+          ; auxiliary_output = ()
+          } )
+    ; feature_flags = Plonk_types.Features.none_bool
+    }
+
+  let override_wrap_main =
+    { wrap_main = wrap_main_dummy_override
+    ; tweak_statement = M.tweak_statement
+    }
+
+  let tag, _, p, ([ step ] : _ H3_2.T(Prover).t) =
+    compile_with_wrap_main_override_promise () ~override_wrap_main
+      ~public_input:(Input Typ.unit) ~auxiliary_typ:Typ.unit
+      ~branches:(module Nat.N1)
+      ~max_proofs_verified:(module Nat.N2)
+      ~name:"blockchain-snark"
+      ~constraint_constants:
+        (* Dummy values *)
+        { sub_windows_per_window = 0
+        ; ledger_depth = 0
+        ; work_delay = 0
+        ; block_window_duration_ms = 0
+        ; transaction_capacity = Log_2 0
+        ; pending_coinbase_depth = 0
+        ; coinbase_amount = Unsigned.UInt64.of_int 0
+        ; supercharged_coinbase_factor = 0
+        ; account_creation_fee = Unsigned.UInt64.of_int 0
+        ; fork = None
+        }
+      ~choices:(fun ~self -> [ rule self ])
+
+  module Proof = (val p)
+
+  let proof_with_stmt =
+    let (), (), p = Promise.block_on_async_exn (fun () -> step ()) in
+    ((), p)
+
+  let%test "should not be able to verify invalid proof" =
+    match
+      Promise.block_on_async_exn (fun () ->
+          Proof.verify_promise [ proof_with_stmt ] )
+    with
+    | Ok () ->
+        false
+    | Error err ->
+        M.check_verifier_error err ; true
+
+  module Recurse_on_bad_proof = struct
+    open Impls.Step
+
+    let dummy_proof = P.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15
+
+    type _ Snarky_backendless.Request.t +=
+      | Proof : Proof.t Snarky_backendless.Request.t
+
+    let handler (proof : Proof.t)
+        (Snarky_backendless.Request.With { request; respond }) =
+      match request with
+      | Proof ->
+          respond (Provide proof)
+      | _ ->
+          respond Unhandled
+
+    let tag, _, p, ([ step ] : _ H3_2.T(Prover).t) =
+      Common.time "compile" (fun () ->
+          compile_with_wrap_main_override_promise ()
+            ~public_input:(Input Typ.unit) ~auxiliary_typ:Typ.unit
+            ~branches:(module Nat.N1)
+            ~max_proofs_verified:(module Nat.N2)
+            ~name:"recurse-on-bad" ~constraint_constants
+            ~choices:(fun ~self ->
+              [ { identifier = "main"
+                ; feature_flags = Plonk_types.Features.none_bool
+                ; prevs = [ tag; tag ]
+                ; main =
+                    (fun { public_input = () } ->
+                      let proof =
+                        exists (Typ.Internal.ref ()) ~request:(fun () -> Proof)
+                      in
+                      { previous_proof_statements =
+                          [ { public_input = ()
+                            ; proof
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ; { public_input = ()
+                            ; proof
+                            ; proof_must_verify = Boolean.true_
+                            }
+                          ]
+                      ; public_output = ()
+                      ; auxiliary_output = ()
+                      } )
+                }
+              ] ) )
+
+    module Proof = (val p)
+  end
+
+  let%test "should not be able to create a recursive proof from an invalid \
+            proof" =
+    try
+      let (), (), proof =
+        Promise.block_on_async_exn (fun () ->
+            Recurse_on_bad_proof.step
+              ~handler:(Recurse_on_bad_proof.handler (snd proof_with_stmt))
+              () )
+      in
+      Or_error.is_error
+      @@ Promise.block_on_async_exn (fun () ->
+             Recurse_on_bad_proof.Proof.verify_promise [ ((), proof) ] )
+    with _ -> true
+end

@@ -35,6 +35,7 @@
    block_time
    mina_numbers
    mina_transaction
+   protocol_version
    snark_params
    currency
    unsigned_extended
