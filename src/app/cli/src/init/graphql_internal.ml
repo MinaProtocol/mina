@@ -297,15 +297,17 @@ struct
                         (* not a valid Uuid *)
                         invalid_uuid ()
                     | Ok pk, Ok uuid ->
-                        let seq_no = Int.of_string seq_no_str in
+                        let seq_no = Unsigned.UInt32.of_string seq_no_str in
+                        let seq_no_check = Unsigned.UInt32.to_string seq_no in
                         if
-                          not
-                          @@ Mina_graphql.Itn_sequencing.valid_sequence_number
+                          (not @@ String.equal seq_no_check seq_no_str)
+                          && Mina_graphql.Itn_sequencing.valid_sequence_number
                                uuid pk seq_no
                         then invalid_sequence_no ()
                         else
                           let msg =
-                            sprintf "%s%04d%s" uuid_str (seq_no mod 10_000)
+                            sprintf "%s%08x%s" uuid_str
+                              (Unsigned.UInt32.to_int seq_no)
                               body_str
                           in
                           verify_signature_and_respond ~increment_seq_no:true
