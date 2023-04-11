@@ -161,7 +161,7 @@ steps:
 - name: log-snarker
   <<: *log
   environment:
-    NAME: snarker1
+    NAME: snarker001
 
 - name: deploy-nodes
   image: alpine/k8s:1.26.1
