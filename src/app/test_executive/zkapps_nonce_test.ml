@@ -39,7 +39,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Some
           { node_name = "snark-node"
           ; account_name = "snark-node-key"
-          ; worker_nodes = 4
+          ; worker_nodes = 8
           }
     ; snark_worker_fee = "0.0001"
     ; proof_config =
@@ -54,12 +54,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let num_proofs = 2
 
+  let blocks_for_first_proof_exn =
+    Test_config.blocks_for_first_ledger_proof_exn config
+
   let padding_payments () =
     let needed_for_padding =
-      72 + (8 * (num_proofs - 1))
-      (*for first proof: ((work_delay+1)*(txn_capacity_log_2+1)+1) * transactions_per_block *)
+      Test_config.transactions_needed_for_ledger_proofs config ~num_proofs
     in
-    (* for work_delay=1 and transaction_capacity=8 per block*)
     if !transactions_sent >= needed_for_padding then 0
     else needed_for_padding - !transactions_sent
 
@@ -119,16 +120,25 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       [%log info] "zkApp transaction included in transition frontier"
     in
+    (*Wait for first BP to start sending payments and avoid partially filling blocks*)
+    let first_bp = List.hd_exn block_producer_nodes in
     let%bind () =
-      wait_for t
-        (Wait_condition.nodes_to_initialize
-           (Core.String.Map.data (Network.all_nodes network)) )
+      wait_for t (Wait_condition.nodes_to_initialize [ first_bp ])
     in
     (*Start sending padding transactions to get snarked ledger sooner*)
     let%bind () =
       let fee = Currency.Fee.of_nanomina_int_exn 3_000_000 in
       send_padding_transactions block_producer_nodes ~fee ~logger
         ~n:(padding_payments ())
+    in
+    (*wait for the rest*)
+    let%bind () =
+      wait_for t
+        (Wait_condition.nodes_to_initialize
+           (List.filter
+              ~f:(fun n ->
+                String.(Network.Node.id n <> Network.Node.id first_bp) )
+              (Core.String.Map.data (Network.all_nodes network)) ) )
     in
     let keymap =
       List.fold [ fish1_kp ] ~init:Signature_lib.Public_key.Compressed.Map.empty
@@ -349,9 +359,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    block was produced" ) )
       in *)
     let%bind () =
+      (*wait for blocks required to produce 2 proofs given 0.75 slot fill rate*)
+      let soft_timeout =
+        Network_time_span.Slots
+          (Test_config.slots_of_blocks (blocks_for_first_proof_exn + 1))
+      in
+      let hard_timeout =
+        Network_time_span.Slots
+          (Test_config.slots_of_blocks (blocks_for_first_proof_exn + 4))
+      in
       section_hard "Wait for proof to be emitted"
         ( wait_for t
-        @@ Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs )
+        @@ Wait_condition.ledger_proofs_emitted_since_genesis ~soft_timeout
+             ~hard_timeout ~num_proofs )
     in
     Event_router.cancel (event_router t) snark_work_event_subscription () ;
     Event_router.cancel (event_router t) snark_work_failure_subscription () ;

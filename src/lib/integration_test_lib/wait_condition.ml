@@ -192,7 +192,8 @@ struct
     ; hard_timeout = Slots (soft_timeout_in_slots * 2)
     }
 
-  let ledger_proofs_emitted_since_genesis ~num_proofs =
+  let ledger_proofs_emitted_since_genesis ~soft_timeout ~hard_timeout
+      ~num_proofs =
     let open Network_state in
     let check () (state : Network_state.t) =
       if state.snarked_ledgers_generated >= num_proofs then Predicate_passed
@@ -204,8 +205,8 @@ struct
     { id = Ledger_proofs_emitted_since_genesis
     ; description
     ; predicate = Network_state_predicate (check (), check)
-    ; soft_timeout = Slots 15
-    ; hard_timeout = Slots 20
+    ; soft_timeout
+    ; hard_timeout
     }
 
   let zkapp_to_be_included_in_frontier ~has_failures ~zkapp_command =

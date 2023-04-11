@@ -53,6 +53,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
     }
 
+  let blocks_for_first_proof_exn =
+    Test_config.blocks_for_first_ledger_proof_exn config
+
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
@@ -194,6 +197,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          send_payments ~logger ~sender_pub_key ~receiver_pub_key
            ~amount:Currency.Amount.one ~fee ~node:sender 12
        in
+       (*wait for blocks required to produce 1 proof given 0.75 slot fill rate*)
+       let soft_timeout =
+         Network_time_span.Slots
+           (Test_config.slots_of_blocks blocks_for_first_proof_exn)
+       in
+       let hard_timeout =
+         Network_time_span.Slots
+           (Test_config.slots_of_blocks (blocks_for_first_proof_exn + 3))
+       in
        wait_for t
-         (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
+         (Wait_condition.ledger_proofs_emitted_since_genesis ~soft_timeout
+            ~hard_timeout ~num_proofs:1 ) )
 end
