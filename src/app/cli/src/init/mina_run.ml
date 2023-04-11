@@ -597,16 +597,17 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             ~schema:Mina_graphql.schema_limited
             ~server_description:"GraphQL server with limited queries"
             ~require_auth:false rest_server_port ) ) ;
-  (* Third graphql server with ITN-particular queries exposed *)
-  Option.iter itn_graphql_port ~f:(fun rest_server_port ->
-      O1trace.background_thread "serve_itn_graphql" (fun () ->
-          create_graphql_server ?auth_keys
-            ~bind_to_address:
-              Tcp.Bind_to_address.(
-                if insecure_rest_server then All_addresses else Localhost)
-            ~schema:Mina_graphql.schema_itn
-            ~server_description:"GraphQL server for ITN queries"
-            ~require_auth:true rest_server_port ) ) ;
+  if Mina_compile_config.itn_features_enabled then
+    (* Third graphql server with ITN-particular queries exposed *)
+    Option.iter itn_graphql_port ~f:(fun rest_server_port ->
+        O1trace.background_thread "serve_itn_graphql" (fun () ->
+            create_graphql_server ?auth_keys
+              ~bind_to_address:
+                Tcp.Bind_to_address.(
+                  if insecure_rest_server then All_addresses else Localhost)
+              ~schema:Mina_graphql.schema_itn
+              ~server_description:"GraphQL server for ITN queries"
+              ~require_auth:true rest_server_port ) ) ;
   let where_to_listen =
     Tcp.Where_to_listen.bind_to All_addresses
       (On_port (Mina_lib.client_port mina))

@@ -95,11 +95,15 @@ let setup_daemon logger =
          daemon.json config file"
       (optional string)
   and itn_keys =
-    flag "--itn-keys" ~aliases:[ "itn-keys" ] (optional string)
-      ~doc:
-        "PUBLICKEYS A comma-delimited list of Ed25519 public keys that are \
-         permitted to send signed requests to the incentivized testnet GraphQL \
-         server"
+    if Mina_compile_config.itn_features_enabled then
+      flag "--itn-keys" ~aliases:[ "itn-keys" ] (optional string)
+        ~doc:
+          "PUBLICKEYS A comma-delimited list of Ed25519 public keys that are \
+           permitted to send signed requests to the incentivized testnet \
+           GraphQL server"
+    else
+      flag "--itn-keys" (optional string)
+        ~doc:"PUBLICKEYS (Unused in this daemon)"
   and demo_mode =
     flag "--demo-mode" ~aliases:[ "demo-mode" ] no_arg
       ~doc:
@@ -800,10 +804,12 @@ let setup_daemon logger =
             maybe_from_config YJ.Util.to_int_option name value
           in
           let itn_graphql_port =
-            let ({ value; name } : int option Flag.Types.with_name) =
-              itn_graphql_port
-            in
-            maybe_from_config YJ.Util.to_int_option name value
+            if Mina_compile_config.itn_features_enabled then
+              let ({ value; name } : int option Flag.Types.with_name) =
+                itn_graphql_port
+              in
+              maybe_from_config YJ.Util.to_int_option name value
+            else None
           in
           let client_port = get_port client_port in
           let snark_work_fee_flag =

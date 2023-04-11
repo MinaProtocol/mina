@@ -28,6 +28,16 @@ let compaction_interval_ms = Some compaction_interval
 
 [%%endif]
 
+[%%ifndef itn_features_enabled]
+
+let itn_features_enabled = false
+
+[%%else]
+
+[%%inject "itn_features_enabled", itn_features_enabled]
+
+[%%endif]
+
 let minimum_user_command_fee =
   Currency.Fee.of_mina_string_exn minimum_user_command_fee_string
 
