@@ -4133,13 +4133,15 @@ module Mutations = struct
                 ~typ:(non_null Types.Input.Itn.PaymentDetails.arg_typ)
             ]
         ~typ:(non_null string)
-        ~resolve:(fun { ctx = mina; _ } () input ->
+        ~resolve:(fun { ctx = with_seq_no, mina; _ } () input ->
           return
           @@
-          match input with
-          | Error err ->
+          match (with_seq_no, input) with
+          | false, _ ->
+              Error "Missing sequence information"
+          | true, Error err ->
               Error (sprintf "Invalid input to payment scheduler: %s" err)
-          | Ok payment_details ->
+          | true, Ok payment_details ->
               let max_memo_len = Signed_command_memo.max_input_length in
               if List.is_empty payment_details.senders then
                 Error "Empty list of senders"
@@ -4320,29 +4322,34 @@ module Mutations = struct
                 ~typ:(non_null string)
             ]
         ~typ:(non_null string)
-        ~resolve:(fun { ctx = mina; _ } () handle ->
+        ~resolve:(fun { ctx = with_seq_no, mina; _ } () handle ->
           let logger = Mina_lib.top_level_logger mina in
-          try
-            let uuid = Uuid.of_string handle in
-            match Uuid.Table.find scheduler_tbl uuid with
-            | None ->
-                return
-                @@ Error
-                     (sprintf "Could not find scheduled payments with handle %s"
-                        handle )
-            | Some ivar ->
-                [%log info]
-                  "Requesting stop of scheduled payments with handle %s" handle ;
-                Ivar.fill_if_empty ivar () ;
-                return
-                @@ Ok
-                     (sprintf
-                        "Requesting stop of scheduled payments with handle %s"
-                        handle )
-          with _ ->
-            return
-            @@ Error
-                 (sprintf "Not a valid scheduled payments handle: %s" handle) )
+          if not with_seq_no then return @@ Error "Missing sequence information"
+          else
+            try
+              let uuid = Uuid.of_string handle in
+              match Uuid.Table.find scheduler_tbl uuid with
+              | None ->
+                  return
+                  @@ Error
+                       (sprintf
+                          "Could not find scheduled payments with handle %s"
+                          handle )
+              | Some ivar ->
+                  [%log info]
+                    "Requesting stop of scheduled payments with handle %s"
+                    handle ;
+                  Ivar.fill_if_empty ivar () ;
+                  return
+                  @@ Ok
+                       (sprintf
+                          "Requesting stop of scheduled payments with handle %s"
+                          handle )
+            with _ ->
+              return
+              @@ Error
+                   (sprintf "Not a valid scheduled payments handle: %s" handle)
+          )
 
     let commands = [ schedule_payments; stop_payments ]
   end
@@ -5187,27 +5194,29 @@ module Queries = struct
         ~typ:(non_null (list (non_null int)))
         ~args:Arg.[]
         ~doc:"Slots won by a block producer for current epoch"
-        ~resolve:(fun { ctx = mina; _ } () ->
-          let bp_keys = Mina_lib.block_production_pubkeys mina in
-          if Public_key.Compressed.Set.is_empty bp_keys then
-            return @@ Error "Not a block producing node"
+        ~resolve:(fun { ctx = with_seq_no, mina; _ } () ->
+          if not with_seq_no then return @@ Error "Missing sequence information"
           else
-            let vrf_evaluator = Mina_lib.vrf_evaluator mina in
-            let logger = Mina_lib.top_level_logger mina in
-            let%map vrf_result =
-              Block_producer.Vrf_evaluation_state.poll_vrf_evaluator ~logger
-                vrf_evaluator
-            in
-            match vrf_result.evaluator_status with
-            | Completed ->
-                let slots_since_hard_fork =
-                  List.map vrf_result.slots_won ~f:(fun { global_slot; _ } ->
-                      Unsigned.UInt32.to_int global_slot )
-                  |> List.sort ~compare:Int.compare
-                in
-                Ok slots_since_hard_fork
-            | _ ->
-                Error "Vrf evaluation not completed for current epoch" )
+            let bp_keys = Mina_lib.block_production_pubkeys mina in
+            if Public_key.Compressed.Set.is_empty bp_keys then
+              return @@ Error "Not a block producing node"
+            else
+              let vrf_evaluator = Mina_lib.vrf_evaluator mina in
+              let logger = Mina_lib.top_level_logger mina in
+              let%map vrf_result =
+                Block_producer.Vrf_evaluation_state.poll_vrf_evaluator ~logger
+                  vrf_evaluator
+              in
+              match vrf_result.evaluator_status with
+              | Completed ->
+                  let slots_since_hard_fork =
+                    List.map vrf_result.slots_won ~f:(fun { global_slot; _ } ->
+                        Unsigned.UInt32.to_int global_slot )
+                    |> List.sort ~compare:Int.compare
+                  in
+                  Ok slots_since_hard_fork
+              | _ ->
+                  Error "Vrf evaluation not completed for current epoch" )
 
     let commands = [ auth; slots_won ]
   end
@@ -5225,7 +5234,7 @@ let schema_limited =
       [ Queries.daemon_status; Queries.block; Queries.version ]
       ~mutations:[] ~subscriptions:[])
 
-let schema_itn : Mina_lib.t Schema.schema =
+let schema_itn : (bool * Mina_lib.t) Schema.schema =
   if Mina_compile_config.itn_features then
     Graphql_async.Schema.(
       schema Queries.Itn.commands ~mutations:Mutations.Itn.commands
