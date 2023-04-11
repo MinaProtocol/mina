@@ -22,6 +22,8 @@ spec:
         - --inspect
         - build/src/main.js
         args:
+        - -v
+        - -v
         - controller
         - --port=80
         - --accounts-file=/testnet/accounts.txt
@@ -74,11 +76,11 @@ metadata:
   name: config-{{ include "controller-name" . }}
 data:
   config: |
-    [{
+    {
         "name": {{ $.Values.job | quote }},
         "count": {{ $.Values.count }},
         "workers": {{ $.Values.workers }}
-    }]
+    }
 ---
 apiVersion: v1
 kind: ConfigMap
