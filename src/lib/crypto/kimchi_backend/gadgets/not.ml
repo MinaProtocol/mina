@@ -4,6 +4,21 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 
+(* returns a field containing the all one word of length bits *)
+let all_ones_check (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (length : int) : Circuit.Field.t =
+  let open Circuit in
+  let all_ones = Field.constant
+  @@ Common.bignum_bigint_to_field (module Circuit)
+  @@ Bignum_bigint.(pow (of_int 2) (of_int length) - one) in
+  let all_ones_var =
+    exists Field.typ ~compute:(fun () ->
+        Common.cvar_field_to_field_as_prover (module Circuit) all_ones )
+  in
+  Field.Assert.equal all_ones all_ones_var ;
+  all_ones_var
+
 (* NOT *)
 
 (* Boolean Not of length bits for checked length (uses Xor gadgets inside to constrain the length)
@@ -15,17 +30,10 @@ let bnot_checked (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     ?(len_xor = 4) (input : Circuit.Field.t) (length : int) : Circuit.Field.t =
   let open Circuit in
-  let all_ones = Bignum_bigint.(pow (of_int 2) (of_int length) - one) in
-  let all_ones = Common.bignum_bigint_to_field (module Circuit) all_ones in
-  let all_ones = Field.constant all_ones in
-  let all_ones_var =
-    exists Field.typ ~compute:(fun () ->
-        Common.cvar_field_to_field_as_prover (module Circuit) all_ones )
-  in
-  Field.Assert.equal all_ones all_ones_var ;
+  let all_ones_var = all_ones_check (module Circuit) length in
 
   (* Negating is equivalent to XORing with all one word *)
-  Xor.bxor (module Circuit) input all_ones length ~len_xor
+  Xor.bxor (module Circuit) input all_ones_var length ~len_xor
 
 (* Boolean Not of length bits for unchecked length (uses Generic subtractions inside) 
  *  - input of word to negate
@@ -37,14 +45,8 @@ let bnot_unchecked (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (input : Circuit.Field.t) (length : int) : Circuit.Field.t =
   let open Circuit in
-  let all_ones = Bignum_bigint.(pow (of_int 2) (of_int length) - one) in
-  let all_ones = Common.bignum_bigint_to_field (module Circuit) all_ones in
-  let all_ones = Field.constant all_ones in
-  let all_ones_var =
-    exists Field.typ ~compute:(fun () ->
-        Common.cvar_field_to_field_as_prover (module Circuit) all_ones )
-  in
-  Field.Assert.equal all_ones all_ones_var ;
+  let all_ones_var = all_ones_check (module Circuit) length in
+  let not_output = Field.(all_ones_var - input) in
   (* Negating is equivalent to subtracting with all one word *)
   (* [2^len - 1] - input = not (input) *)
   with_label "not_subtraction" (fun () ->
@@ -57,12 +59,12 @@ let bnot_unchecked (type f)
                  ; r = (Option.value_exn Field.(to_constant (negate one)), input)
                  ; o =
                      ( Option.value_exn Field.(to_constant (negate one))
-                     , Field.(all_ones_var - input) )
+                     , not_output )
                  ; m = Field.Constant.zero
                  ; c = Field.Constant.zero
                  } )
         } ) ;
-  Field.(all_ones_var - input)
+  not_output
 
 (* Negates a word of 64 bits with checked length of 64 bits *)
 let bnot64_checked (type f)
