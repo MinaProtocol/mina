@@ -6,14 +6,14 @@ module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 
 (* NOT *)
 
-(* Boolean Not of length bits for checked length (uses Xor gadgets inside) 
-    *   input of word to negate
-    *   length of word to negate
-    *   len_xor is the length of the Xor lookup table to use beneath (default 4) 
+(* Boolean Not of length bits for checked length (uses Xor gadgets inside to constrain the length)
+    *   - input of word to negate
+    *   - length of word to negate
+    *   - len_xor is the length of the Xor lookup table to use beneath (default 4)
 *)
 let bnot_checked (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f) ?(len_xor = 4)
-    (input : Circuit.Field.t) (length : int) : Circuit.Field.t =
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    ?(len_xor = 4) (input : Circuit.Field.t) (length : int) : Circuit.Field.t =
   let open Circuit in
   let all_ones = Bignum_bigint.(pow (of_int 2) (of_int length) - one) in
   let all_ones = Common.bignum_bigint_to_field (module Circuit) all_ones in
@@ -27,7 +27,12 @@ let bnot_checked (type f)
   (* Negating is equivalent to XORing with all one word *)
   Xor.bxor (module Circuit) input all_ones length ~len_xor
 
-(* Boolean Not of length bits for unchecked length (uses Generic subtractions inside) *)
+(* Boolean Not of length bits for unchecked length (uses Generic subtractions inside) 
+ *  - input of word to negate
+ *  - length of word to negate
+ * (Note that this can negate two words per row, but it inputs need to be a copy of another
+ variable with a correct length in order to make sure that the length is correct )   
+ *)
 let bnot_unchecked (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (input : Circuit.Field.t) (length : int) : Circuit.Field.t =
@@ -59,13 +64,13 @@ let bnot_unchecked (type f)
         } ) ;
   Field.(all_ones_var - input)
 
-(* Not of 64 bits checked *)
+(* Negates a word of 64 bits with checked length of 64 bits *)
 let bnot64_checked (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (input : Circuit.Field.t) : Circuit.Field.t =
   bnot_checked (module Circuit) input 64
 
-(* Not of 64 bits unchecked *)
+(* Negates a word of 64 bits, but its length goes unconstrained *)
 let bnot64_unchecked (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (input : Circuit.Field.t) : Circuit.Field.t =
@@ -88,25 +93,34 @@ let%test_unit "not gadget" =
           let open Runner.Impl in
           (* Set up snarky variables for input and output *)
           let input =
-            Common.as_prover_cvar_field_of_base10 (module Runner.Impl) input
+            exists Field.typ ~compute:(fun () ->
+                Field.Constant.of_string input )
           in
+          (* TODO: fix this misbehaviour in permutation code:
+           * Intentionally duplicating this variable twice because 
+           * otherwise it causes a final permutation error when
+           * reusing the same output to compare the three values:
+           *   - result_checked
+           *   - result_unchecked
+          *   - output
+           *)
           let output =
-            Common.as_prover_cvar_field_of_base10 (module Runner.Impl) output
+            exists (Typ.array ~length:2 Field.typ) ~compute:(fun () ->
+                let cvar = Field.Constant.of_string output in
+                [| cvar; cvar |] )
           in
+
           (* Use the not gate gadget *)
-          let result_checked =
-            bnot_checked (module Runner.Impl) input length
-          in
+          let result_checked = bnot_checked (module Runner.Impl) input length in
           let result_unchecked =
             bnot_unchecked (module Runner.Impl) input length
           in
-          (* Check that the result is correct *)
-          Field.Assert.equal output result_checked ;
-          Field.Assert.equal output result_unchecked )
+          Field.Assert.equal output.(0) result_checked ;
+          Field.Assert.equal output.(1) result_unchecked )
     in
     ()
   in
-
+  
   (* Positive tests *)
   test_not "0" "1" 1 ;
   test_not "0" "15" 4 ;
