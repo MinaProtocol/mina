@@ -174,14 +174,14 @@ module Itn_sequencing = struct
 
   let uuid = Uuid.create_random Random.State.default
 
-  let sequence_tbl : (Itn_crypto.pubkey, Unsigned.UInt32.t) Hashtbl.t =
+  let sequence_tbl : (Itn_crypto.pubkey, Unsigned.uint16) Hashtbl.t =
     Hashtbl.create ~random:true 1023
 
   let get_sequence_number pubkey =
     let key = pubkey in
     match Hashtbl.find_opt sequence_tbl key with
     | None ->
-        let data = Unsigned.UInt32.zero in
+        let data = Unsigned.UInt16.zero in
         Hashtbl.add sequence_tbl key data ;
         data
     | Some n ->
@@ -194,7 +194,7 @@ module Itn_sequencing = struct
      this is stateful, but appears to be safe
   *)
   let set_sequence_number_for_auth, get_sequence_no_for_auth =
-    let pubkey_sequence_no = ref Unsigned.UInt32.zero in
+    let pubkey_sequence_no = ref Unsigned.UInt16.zero in
     let setter pubkey =
       let seq_no = get_sequence_number pubkey in
       pubkey_sequence_no := seq_no
@@ -202,9 +202,11 @@ module Itn_sequencing = struct
     let getter () = !pubkey_sequence_no in
     (setter, getter)
 
-  let valid_sequence_number query_uuid pubkey n =
-    Uuid.equal query_uuid uuid
-    && Unsigned.UInt32.equal (get_sequence_number pubkey) n
+  let valid_sequence_number query_uuid pubkey seqno_str =
+    let%bind.Option () = Option.some_if (Uuid.equal query_uuid uuid) () in
+    let seqno = get_sequence_number pubkey in
+    if String.equal (Unsigned.UInt16.to_string seqno) seqno_str then Some seqno
+    else None
 
   let incr_sequence_number pubkey =
     let key = pubkey in
@@ -216,7 +218,7 @@ module Itn_sequencing = struct
           (Itn_crypto.pubkey_to_base64 pubkey)
           ()
     | Some n ->
-        Hashtbl.replace sequence_tbl key (Unsigned.UInt32.succ n)
+        Hashtbl.replace sequence_tbl key (Unsigned.UInt16.succ n)
 end
 
 module Types = struct
@@ -228,6 +230,8 @@ module Types = struct
     let private_key : (Mina_lib.t, PrivateKey.t option) typ = PrivateKey.typ ()
 
     let public_key = PublicKey.typ ()
+
+    let uint16 = UInt16.typ ()
 
     let uint32 = UInt32.typ ()
 
@@ -550,7 +554,7 @@ module Types = struct
           ; field "signerSequenceNumber"
               ~args:Arg.[]
               ~doc:"Sequence number for the signer of the auth query"
-              ~typ:(non_null uint32)
+              ~typ:(non_null uint16)
               ~resolve:(fun _ (_, n) -> n)
           ] )
   end
