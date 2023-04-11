@@ -43,12 +43,6 @@ let rec rm_zero_bits (bitstring : bool list) : bool list =
  *        an as_prover or in an "as_prover_" prefixed function)
  *)
 
-(* Foreign field element limb size *)
-let limb_bits = 88
-
-(* Foreign field element limb size 2^L where L=88 *)
-let two_to_limb = Bignum_bigint.(pow (of_int 2) (of_int limb_bits))
-
 (* Convert cvar field element (i.e. Field.t) to field *)
 let cvar_field_to_field_as_prover (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
