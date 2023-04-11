@@ -1,6 +1,6 @@
 mina:
   cpuRequest: 4
-  memRequest: "12.0Gi"
+  memRequest: "8.0Gi"
 
 healthcheck:
   enabled: true
