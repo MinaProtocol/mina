@@ -29,7 +29,7 @@ plainNodesConfig:
 
 snarkWorkersConfig:
   # the number of snark workers
-  count: 96
+  count: 160
   namePrefix: snarker
 
 seedConfigs:
