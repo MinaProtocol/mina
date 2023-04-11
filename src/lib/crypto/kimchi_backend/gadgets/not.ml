@@ -102,7 +102,7 @@ let%test_unit "not gadget" =
            * reusing the same output to compare the three values:
            *   - result_checked
            *   - result_unchecked
-          *   - output
+           *   - output
            *)
           let output =
             exists (Typ.array ~length:2 Field.typ) ~compute:(fun () ->
@@ -120,7 +120,7 @@ let%test_unit "not gadget" =
     in
     ()
   in
-  
+
   (* Positive tests *)
   test_not "0" "1" 1 ;
   test_not "0" "15" 4 ;
