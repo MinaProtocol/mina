@@ -1787,25 +1787,6 @@ let mina_commands logger =
 
 [%%endif]
 
-let print_version_help coda_exe version =
-  (* mimic Jane Street command help *)
-  let lines =
-    [ "print version information"
-    ; ""
-    ; sprintf "  %s %s" (Filename.basename coda_exe) version
-    ; ""
-    ; "=== flags ==="
-    ; ""
-    ; "  [-help]  print this help text and exit"
-    ; "           (alias: -?)"
-    ]
-  in
-  List.iter lines ~f:(Core.printf "%s\n%!")
-
-let print_version_info () =
-  Core.printf "Commit %s on branch %s\n" Mina_version.commit_id
-    Mina_version.branch
-
 let () =
   Random.self_init () ;
   let logger = Logger.create () in
@@ -1815,15 +1796,12 @@ let () =
   (* intercept command-line processing for "version", because we don't
      use the Jane Street scripts that generate their version information
   *)
-  (let make_list_mem ss s = List.mem ss s ~equal:String.equal in
-   let is_version_cmd = make_list_mem [ "version"; "-version"; "--version" ] in
-   let is_help_flag = make_list_mem [ "-help"; "-?" ] in
+  (let is_version_cmd s =
+     List.mem [ "version"; "-version"; "--version" ] s ~equal:String.equal
+   in
    match Sys.get_argv () with
-   | [| _coda_exe; version |] when is_version_cmd version ->
+   | [| _mina_exe; version |] when is_version_cmd version ->
        Mina_version.print_version ()
-   | [| coda_exe; version; help |]
-     when is_version_cmd version && is_help_flag help ->
-       print_version_help coda_exe version
    | _ ->
        Command.run
          (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
