@@ -29,7 +29,6 @@ let all_ones_check (type f)
 let bnot_checked (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     ?(len_xor = 4) (input : Circuit.Field.t) (length : int) : Circuit.Field.t =
-  let open Circuit in
   let all_ones_var = all_ones_check (module Circuit) length in
 
   (* Negating is equivalent to XORing with all one word *)
