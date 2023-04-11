@@ -117,12 +117,13 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> signed_command_result Malleable_error.t
 
-      (** returned string is the transaction id *)
-      val send_zkapp :
+      (** Send a batch of zkApp transactions.
+          Returned is a list of transaction id *)
+      val send_zkapp_batch :
            logger:Logger.t
         -> t
-        -> zkapp_command:Mina_base.Zkapp_command.t
-        -> string Deferred.Or_error.t
+        -> zkapp_commands:Mina_base.Zkapp_command.t list
+        -> string list Deferred.Or_error.t
 
       val must_send_test_payments :
            repeat_count:Unsigned.UInt32.t

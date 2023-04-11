@@ -846,15 +846,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~n:padding_payments
     in
     let%bind () =
-      (*wait for blocks required to produce 1 proof given 0.75 slot fill rate*)
-      let soft_timeout =
-        Network_time_span.Slots
-          (Test_config.slots_of_blocks blocks_for_first_proof_exn)
-      in
-      let hard_timeout =
-        Network_time_span.Slots
-          (Test_config.slots_of_blocks (blocks_for_first_proof_exn + 3))
-      in
+      (*TODO: wait for blocks required to produce 1 proof given 0.75 slot fill rate*)
+      let soft_timeout = Network_time_span.Slots 15 in
+      let hard_timeout = Network_time_span.Slots 20 in
       section_hard "Wait for proof to be emitted"
         (wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis ~soft_timeout

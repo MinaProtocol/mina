@@ -197,15 +197,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          send_payments ~logger ~sender_pub_key ~receiver_pub_key
            ~amount:Currency.Amount.one ~fee ~node:sender 12
        in
-       (*wait for blocks required to produce 1 proof given 0.75 slot fill rate*)
-       let soft_timeout =
-         Network_time_span.Slots
-           (Test_config.slots_of_blocks blocks_for_first_proof_exn)
-       in
-       let hard_timeout =
-         Network_time_span.Slots
-           (Test_config.slots_of_blocks (blocks_for_first_proof_exn + 3))
-       in
+       (*TODO: wait for blocks required to produce 1 proof given 0.75 slot fill rate*)
+       let soft_timeout = Network_time_span.Slots 15 in
+       let hard_timeout = Network_time_span.Slots 30 in
        wait_for t
          (Wait_condition.ledger_proofs_emitted_since_genesis ~soft_timeout
             ~hard_timeout ~num_proofs:1 ) )

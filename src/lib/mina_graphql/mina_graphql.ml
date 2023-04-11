@@ -3431,6 +3431,31 @@ module Mutations = struct
     | `Bootstrapping ->
         return (Error "Daemon is bootstrapping")
 
+  let internal_send_zkapp_commands mina zkapp_commands =
+    match Mina_commands.setup_and_submit_zkapp_commands mina zkapp_commands with
+    | `Active f -> (
+        match%map f with
+        | Ok zkapp_commands ->
+            let cmds_with_hash =
+              List.map zkapp_commands ~f:(fun zkapp_command ->
+                  let cmd =
+                    { Types.Zkapp_command.With_status.data = zkapp_command
+                    ; status = Enqueued
+                    }
+                  in
+                  Types.Zkapp_command.With_status.map cmd ~f:(fun cmd ->
+                      { With_hash.data = cmd
+                      ; hash = Transaction_hash.hash_command (Zkapp_command cmd)
+                      } ) )
+            in
+            Ok cmds_with_hash
+        | Error e ->
+            Error
+              (sprintf "Couldn't send zkApp commands: %s"
+                 (Error.to_string_hum e) ) )
+    | `Bootstrapping ->
+        return (Error "Daemon is bootstrapping")
+
   let send_zkapp_command mina zkapp_command =
     match Mina_commands.setup_and_submit_zkapp_command mina zkapp_command with
     | `Active f -> (
@@ -3725,12 +3750,14 @@ module Mutations = struct
       ~doc:"Send a zkApp (for internal testing purposes)"
       ~args:
         Arg.
-          [ arg "zkappCommand"
-              ~typ:(non_null Types.Input.SendTestZkappInput.arg_typ)
+          [ arg "zkappCommands"
+              ~typ:
+                ( non_null @@ list
+                @@ non_null Types.Input.SendTestZkappInput.arg_typ )
           ]
-      ~typ:(non_null Types.Payload.send_zkapp)
-      ~resolve:(fun { ctx = mina; _ } () zkapp_command ->
-        send_zkapp_command mina zkapp_command )
+      ~typ:(non_null @@ list @@ non_null Types.Payload.send_zkapp)
+      ~resolve:(fun { ctx = mina; _ } () zkapp_commands ->
+        internal_send_zkapp_commands mina zkapp_commands )
 
   let send_test_payments =
     io_field "sendTestPayments" ~doc:"Send a series of test payments"

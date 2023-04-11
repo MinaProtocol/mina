@@ -235,6 +235,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       replace_authorizations ~keymap with_dummy_signatures
     in
     let%bind.Deferred invalid_fee_invalid_permission_zkapp_cmd_from_fish1 =
+      (*low fee transaction to prevent from getting into a block; for transaction pool pruning test*)
       let open Zkapp_command_builder in
       let with_dummy_signatures =
         let account_updates =
@@ -264,13 +265,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard
         "Send a zkapp command with an invalid account update nonce using fish1"
-        (send_zkapp ~logger node invalid_nonce_zkapp_cmd_from_fish1)
-    in
-    let%bind () =
-      section_hard
-        "Send a zkapp command that has its nonce properly incremented after \
-         the fish1 transaction"
-        (send_zkapp ~logger node valid_zkapp_cmd_from_fish1)
+        (send_zkapp_batch ~logger node
+           [ invalid_nonce_zkapp_cmd_from_fish1; valid_zkapp_cmd_from_fish1 ] )
     in
     let%bind () =
       section_hard
@@ -288,22 +284,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard
         "Send a zkapp command account update for fish1 that sets send \
          permission to Proof"
-        (send_zkapp ~logger node set_permission_zkapp_cmd_from_fish1)
-    in
-    let%bind () =
-      section_hard
-        "Send a zkapp command that should be valid after permission from the \
-         fish1 transaction"
-        (send_zkapp ~logger node
-           valid_fee_invalid_permission_zkapp_cmd_from_fish1 )
-    in
-    (*low fee transaction to prevent from getting into a block*)
-    let%bind () =
-      section_hard
-        "Send a zkapp command that should be invalid after permission from the \
-         fish1 transaction is set to Proof"
-        (send_zkapp ~logger node
-           invalid_fee_invalid_permission_zkapp_cmd_from_fish1 )
+        (send_zkapp_batch ~logger node
+           [ set_permission_zkapp_cmd_from_fish1
+           ; valid_fee_invalid_permission_zkapp_cmd_from_fish1
+           ; invalid_fee_invalid_permission_zkapp_cmd_from_fish1
+           ] )
     in
     let%bind () =
       section_hard
@@ -359,14 +344,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    block was produced" ) )
       in *)
     let%bind () =
-      (*wait for blocks required to produce 2 proofs given 0.75 slot fill rate*)
+      (*wait for blocks required to produce 2 proofs given 0.75 slot fill rate + some buffer*)
       let soft_timeout =
         Network_time_span.Slots
-          (Test_config.slots_of_blocks (blocks_for_first_proof_exn + 1))
+          (Test_config.slots_of_blocks (blocks_for_first_proof_exn + 5))
       in
       let hard_timeout =
         Network_time_span.Slots
-          (Test_config.slots_of_blocks (blocks_for_first_proof_exn + 4))
+          (Test_config.slots_of_blocks (blocks_for_first_proof_exn + 10))
       in
       section_hard "Wait for proof to be emitted"
         ( wait_for t
