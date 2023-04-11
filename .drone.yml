@@ -115,6 +115,13 @@ steps:
     KUBECONFIG: kube-config
   commands:
   - $${OM}/deploy.sh delete --all --force
+  - sleep 10
+  - |
+    PODS="$$($${OM}/kube-utils.sh mina-pods)"
+    if [ -n "$${PODS}" ]; then
+        echo "Workaround for pods left running, force-delete pods $$PODS"
+        kubectl delete --force pods $${PODS} || true
+    fi
 
 - name: prepare-deamon-json
   image: alpine/k8s:1.26.1
