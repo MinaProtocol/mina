@@ -288,12 +288,17 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
   let logger =
     Logger.extend
       (Mina_lib.top_level_logger mina)
-      [ ("coda_run", `String "Setting up server logs") ]
+      [ ("mina_run", `String "Setting up server logs") ]
   in
   let client_impls =
     [ implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
           Deferred.map
             ( Mina_commands.setup_and_submit_user_commands mina ts
+            |> Participating_state.to_deferred_or_error )
+            ~f:Or_error.join )
+    ; implement Daemon_rpcs.Send_zkapp_commands.rpc (fun () zkapps ->
+          Deferred.map
+            ( Mina_commands.setup_and_submit_zkapp_commands mina zkapps
             |> Participating_state.to_deferred_or_error )
             ~f:Or_error.join )
     ; implement Daemon_rpcs.Get_balance.rpc (fun () aid ->

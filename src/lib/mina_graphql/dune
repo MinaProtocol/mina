@@ -29,6 +29,7 @@
    kimchi_backend.pasta.basic
    mina_base.util
    mina_ledger
+   block_producer
    pickles
    pickles_unix
    mina_incremental
@@ -37,6 +38,7 @@
    error_json
    mina_networking
    consensus.vrf
+   vrf_evaluator
    trust_system
    with_hash
    data_hash_lib
