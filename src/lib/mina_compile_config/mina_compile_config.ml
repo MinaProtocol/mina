@@ -16,6 +16,8 @@
 
 [%%inject "minimum_user_command_fee_string", minimum_user_command_fee]
 
+[%%inject "itn_features", itn_features]
+
 [%%ifndef compaction_interval]
 
 let compaction_interval_ms = None
@@ -25,16 +27,6 @@ let compaction_interval_ms = None
 [%%inject "compaction_interval", compaction_interval]
 
 let compaction_interval_ms = Some compaction_interval
-
-[%%endif]
-
-[%%ifndef itn_features]
-
-let itn_features = false
-
-[%%else]
-
-[%%inject "itn_features", itn_features]
 
 [%%endif]
 
