@@ -4,6 +4,37 @@ open Mina_base
 open Snark_params.Tick
 open Fee_excess
 
+let sole_non_zero_excess_is_on_the_left fe =
+  let open Fee.Signed in
+  equal zero fe.fee_excess_r || not (equal zero fe.fee_excess_l)
+
+let zero_fee_excess_has_the_default_token fe =
+  ( (not Fee.Signed.(equal zero fe.fee_excess_l))
+  || Token_id.(equal default fe.fee_token_l) )
+  && ( (not Fee.Signed.(equal zero fe.fee_excess_r))
+     || Token_id.(equal default fe.fee_token_r) )
+
+let fee_tokens_are_different fe =
+  (* Right token can actually by the default even if the left one is. *)
+  let open Token_id in
+  (not (equal fe.fee_token_l fe.fee_token_r)) || equal default fe.fee_token_r
+
+let rebalancing_properties_hold () =
+  (* Properties that must hold in any rebalanced fee excess are:
+     - if there is only 1 nonzero excess, it is to the left
+     - any zero fee excess has the default token
+     - if the fee tokens are the same, the excesses are combined *)
+  Quickcheck.test gen ~f:(fun fee_excess ->
+      [%test_pred: t Or_error.t]
+        (function
+          | Ok rebalanced ->
+              sole_non_zero_excess_is_on_the_left rebalanced
+              && zero_fee_excess_has_the_default_token rebalanced
+              && fee_tokens_are_different rebalanced
+          | Error _ ->
+              false )
+        (rebalance fee_excess) )
+
 let combine_checked_unchecked_consistent () =
   Quickcheck.test (Quickcheck.Generator.tuple2 gen gen) ~f:(fun (fe1, fe2) ->
       let fe = combine fe1 fe2 in
@@ -65,5 +96,7 @@ let () =
             combine_checked_unchecked_consistent
         ; test_case "Combine succeeds when the middle excess is zero." `Quick
             combine_succeed_with_0_middle
+        ; test_case "Rebalanced fee excess is really rebalanced." `Quick
+            rebalancing_properties_hold
         ] )
     ]
