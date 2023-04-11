@@ -30,6 +30,22 @@ func MarshalUint64(v *uint64) ([]byte, error) {
 	return encloseInQuotes(strconv.FormatUint(*v, 10)), nil
 }
 
+func UnmarshalUint16(data []byte, v *uint16) error {
+	if data[0] == '"' && data[len(data)-1] == '"' {
+		res, err := strconv.ParseUint(string(data[1:len(data)-1]), 10, 16)
+		if err != nil {
+			return err
+		}
+		*v = uint16(res)
+		return nil
+	}
+	return errors.New("not a string token")
+}
+
+func MarshalUint16(v *uint16) ([]byte, error) {
+	return encloseInQuotes(strconv.FormatUint(uint64(*v), 10)), nil
+}
+
 func UnmarshalBase64(data []byte, v *[]byte) error {
 	if data[0] == '"' && data[len(data)-1] == '"' {
 		res, err := base64.StdEncoding.DecodeString(string(data[1 : len(data)-1]))

@@ -8,6 +8,17 @@ scalar CurrencyAmount
 
 """uint64 encoded as a json string representing a fee"""
 scalar Fee
+ 
+"""String representing a uint16 number in base 10"""
+scalar UInt16
+
+type ItnAuth {
+  """Uuid of the ITN GraphQL server"""
+  serverUuid: String!
+
+  """Sequence number for the signer of the auth query"""
+  signerSequenceNumber: UInt16!
+}
 
 type mutation {
   schedulePayments(
@@ -54,6 +65,6 @@ scalar PrivateKey
 scalar PublicKey
 
 type query {
-  """Returns true if query is authorized"""
-  auth: Boolean
+  """Uuid for GraphQL server, sequence number for signing public key"""
+  auth: ItnAuth!
 }

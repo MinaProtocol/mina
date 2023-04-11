@@ -2,8 +2,10 @@ package itn_orchestrator
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -33,20 +35,20 @@ type DiscoveryParams struct {
 
 type GetGqlClientF = func(context.Context, NodeAddress) (graphql.Client, error)
 
-func GetGqlClient(authClient *AuthenticatedClient, cache map[NodeAddress]graphql.Client) GetGqlClientF {
+func GetGqlClient(sk ed25519.PrivateKey, cache map[NodeAddress]graphql.Client) GetGqlClientF {
+	authenticator := NewAuthenticator(sk, http.DefaultClient)
 	return func(ctx context.Context, addr NodeAddress) (graphql.Client, error) {
 		if client, has := cache[addr]; has {
 			return client, nil
 		}
-		client := graphql.NewClient("http://"+string(addr)+"/graphql", authClient)
-		authRes, err := Auth(ctx, client)
+		url := "http://" + string(addr) + "/graphql"
+		authClient := graphql.NewClient(url, authenticator)
+		uuid, seqno, err := Auth(ctx, authClient)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to authorize client %s: %v", addr, err)
 		}
-		if !authRes {
-			return nil, fmt.Errorf("failed to authorize client %s", addr)
-		}
-		return client, nil
+		seqAuthenticator := NewSequentialAuthenticator(uuid, seqno, authenticator)
+		return graphql.NewClient(url, seqAuthenticator), nil
 	}
 }
 
