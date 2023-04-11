@@ -95,7 +95,7 @@ let setup_daemon logger =
          daemon.json config file"
       (optional string)
   and itn_keys =
-    if Mina_compile_config.itn_features_enabled then
+    if Mina_compile_config.itn_features then
       flag "--itn-keys" ~aliases:[ "itn-keys" ] (optional string)
         ~doc:
           "PUBLICKEYS A comma-delimited list of Ed25519 public keys that are \
@@ -804,7 +804,7 @@ let setup_daemon logger =
             maybe_from_config YJ.Util.to_int_option name value
           in
           let itn_graphql_port =
-            if Mina_compile_config.itn_features_enabled then
+            if Mina_compile_config.itn_features then
               let ({ value; name } : int option Flag.Types.with_name) =
                 itn_graphql_port
               in

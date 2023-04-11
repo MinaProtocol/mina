@@ -170,7 +170,7 @@ module Port = struct
         "GraphQL-server for limited daemon interaction"
 
     let itn_graphql_server =
-      if Mina_compile_config.itn_features_enabled then
+      if Mina_compile_config.itn_features then
         create_optional ~name:"--itn-graphql-port"
           ~aliases:[ "itn-graphql-port" ]
           "GraphQL-server for incentivized testnet interaction"

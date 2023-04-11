@@ -25,7 +25,7 @@
 [%%define download_snark_keys false]
 [%%define generate_genesis_proof false]
 
-[%%define itn_features_enabled true]
+[%%define itn_features true]
 
 [%%define print_versioned_types false]
 

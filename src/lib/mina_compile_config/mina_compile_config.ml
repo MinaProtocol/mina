@@ -28,13 +28,13 @@ let compaction_interval_ms = Some compaction_interval
 
 [%%endif]
 
-[%%ifndef itn_features_enabled]
+[%%ifndef itn_features]
 
-let itn_features_enabled = false
+let itn_features = false
 
 [%%else]
 
-[%%inject "itn_features_enabled", itn_features_enabled]
+[%%inject "itn_features", itn_features]
 
 [%%endif]
 
