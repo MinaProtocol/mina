@@ -12,7 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"cloud.google.com/go/storage"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/btcsuite/btcutil/base58"
 	logging "github.com/ipfs/go-log/v2"
 	"google.golang.org/api/iterator"
@@ -44,14 +46,21 @@ type oldMeta struct {
 	RemoteAddr  string     `json:"remote_addr"`
 }
 
-func process(srcGctx, dstGctx dg.GoogleContext, log logging.StandardLogger, ctx context.Context, fullName string, pk dg.Pk, blockHashStr, createdAtStr string) {
+func process(srcActx, dstActx dg.AwsContext, log logging.StandardLogger, ctx context.Context, fullName string, pk dg.Pk, blockHashStr, createdAtStr string) {
 	var oldMeta oldMeta
 	{
-		reader, err := srcGctx.Bucket.Object(fullName).NewReader(ctx)
-		if err == nil {
-			decoder := json.NewDecoder(reader)
-			err = decoder.Decode(&oldMeta)
+		output, err := srcActx.Client.GetObject(srcActx.Context, &s3.GetObjectInput{
+			Bucket: srcActx.BucketName,
+			Key:    aws.String(fullName),
+		})
+		if err != nil {
+			log.Warnf("Error while reading submission file %s: %v", fullName, err)
+			return
 		}
+
+		decoder := json.NewDecoder(output.Body)
+		err = decoder.Decode(&oldMeta)
+		output.Body.Close()
 		if err != nil {
 			log.Warnf("Malformed submission file %s: %v", fullName, err)
 			return
@@ -73,7 +82,7 @@ func process(srcGctx, dstGctx dg.GoogleContext, log logging.StandardLogger, ctx 
 		log.Errorf("Error while marshaling JSON for %s: %v", fullName, err)
 		return
 	}
-	dstGctx.GoogleStorageSave(dg.ObjectsToSave{newMetaPath: newMetaBytes})
+	dstActx.S3Save(dg.ObjectsToSave{newMetaPath: newMetaBytes})
 }
 
 func main() {
@@ -108,21 +117,29 @@ func main() {
 	}
 	ctx := context.Background()
 
-	client, err1 := storage.NewClient(ctx)
-	if err1 != nil {
-		log.Fatalf("Error creating Cloud client: %v", err1)
+	// TODO: get AWS S3 credentials
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		log.Fatalf("Error creating AWS client: %v", err)
 		return
 	}
-	srcGctx := dg.GoogleContext{Bucket: client.Bucket(srcBucketName), Context: ctx, Log: log}
-	dstGctx := dg.GoogleContext{Bucket: client.Bucket(dstBucketName), Context: ctx, Log: log}
+	client := s3.NewFromConfig(cfg)
+	srcActx := dg.AwsContext{Client: client, BucketName: aws.String(srcBucketName), Context: ctx, Log: log}
+	dstActx := dg.AwsContext{Client: client, BucketName: aws.String(dstBucketName), Context: ctx, Log: log}
 	prefix := "submissions/"
 	suffix := ".json"
-	q := storage.Query{Prefix: prefix}
-	lst := srcGctx.Bucket.Objects(ctx, &q)
-	objAttrs, err := lst.Next()
+	q := &s3.ListObjectsV2Input{
+		Bucket: srcActx.BucketName,
+		Prefix: aws.String(prefix),
+	}
+	lst, err := srcActx.Client.ListObjectsV2(srcActx.Context, q)
+	if err != nil {
+		log.Fatalf("Error while listing submissions: %v", err)
+		return
+	}
 	sem := make(chan interface{}, 100)
-	for ; err == nil; objAttrs, err = lst.Next() {
-		fullName := objAttrs.Name
+	for _, objAttrs := range lst.Contents {
+		fullName := aws.ToString(objAttrs.Key)
 		if visited[fullName] {
 			continue
 		}
@@ -147,11 +164,11 @@ func main() {
 		select {
 		case sem <- nil:
 			go func() {
-				process(srcGctx, dstGctx, log, ctx, fullName, pk, blockHashStr, createdAtStr)
+				process(srcActx, dstActx, log, ctx, fullName, pk, blockHashStr, createdAtStr)
 				<-sem
 			}()
 		default:
-			process(srcGctx, dstGctx, log, ctx, fullName, pk, blockHashStr, createdAtStr)
+			process(srcActx, dstActx, log, ctx, fullName, pk, blockHashStr, createdAtStr)
 		}
 	}
 	if err != iterator.Done {
