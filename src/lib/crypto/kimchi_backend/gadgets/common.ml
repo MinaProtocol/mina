@@ -154,6 +154,14 @@ let bignum_bigint_to_hex (bignum : Bignum_bigint.t) : string =
 let bignum_bigint_of_hex (hex : string) : Bignum_bigint.t =
   Bignum_bigint.of_zarith_bigint @@ Z.of_string_base 16 hex
 
+(* Convert cvar field element (i.e. Field.t) to Bignum_bigint.t *)
+let cvar_field_to_bignum_bigint_as_prover (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (field_element : Circuit.Field.t) : Bignum_bigint.t =
+  let open Circuit in
+  field_to_bignum_bigint (module Circuit)
+  @@ As_prover.read Field.typ field_element
+
 (* Compute square root of Bignum_bigint value x *)
 let bignum_biguint_sqrt (x : Bignum_bigint.t) : Bignum_bigint.t =
   Bignum_bigint.of_zarith_bigint @@ Z.sqrt @@ Bignum_bigint.to_zarith_bigint x
