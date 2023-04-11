@@ -190,8 +190,11 @@ struct
             respond_string ~status:`OK ~body () )
 
   let make_callback :
-      (Cohttp.Request.t -> 'ctx) -> 'ctx Schema.schema -> 'conn callback =
-   fun make_context schema _conn (req : Cohttp.Request.t) body ->
+         ?auth_keys:Itn_crypto.pubkey list
+      -> (Cohttp.Request.t -> 'ctx)
+      -> 'ctx Schema.schema
+      -> 'conn callback =
+   fun ?auth_keys make_context schema _conn (req : Cohttp.Request.t) body ->
     let req_path = Cohttp.Request.uri req |> Uri.path in
     let path_parts = Astring.String.cuts ~empty:false ~sep:"/" req_path in
     let headers = Cohttp.Request.headers req in
@@ -202,23 +205,81 @@ struct
       | Some s ->
           List.mem "text/html" (String.split_on_char ',' s)
     in
-    match (req.meth, path_parts, accept_html) with
-    | `GET, [ "graphql" ], true ->
-        static_file_response "index_extensions.html"
-    | `GET, [ "graphql" ], false ->
-        if
-          Cohttp.Header.get headers "Connection" = Some "Upgrade"
-          && Cohttp.Header.get headers "Upgrade" = Some "websocket"
-        then
-          let handle_conn =
-            Websocket_transport.handle (execute_query (make_context req) schema)
-          in
-          Io.return (Ws.upgrade_connection req handle_conn)
-        else execute_request schema (make_context req) req body
-    | `GET, [ "graphql"; path ], _ ->
-        static_file_response path
-    | `POST, [ "graphql" ], _ ->
-        execute_request schema (make_context req) req body
-    | _ ->
-        respond_string ~status:`Not_found ~body:"" ()
+    Io.( >>= ) (Body.to_string body) (fun body_str ->
+        let respond () =
+          (* the Io `bind` above appears to consume the body
+             we reconstruct it the body from the extracted string
+          *)
+          let body = Body.of_string body_str in
+          match (req.meth, path_parts, accept_html) with
+          | `GET, [ "graphql" ], true ->
+              static_file_response "index_extensions.html"
+          | `GET, [ "graphql" ], false ->
+              if
+                Cohttp.Header.get headers "Connection" = Some "Upgrade"
+                && Cohttp.Header.get headers "Upgrade" = Some "websocket"
+              then
+                let handle_conn =
+                  Websocket_transport.handle
+                    (execute_query (make_context req) schema)
+                in
+                Io.return (Ws.upgrade_connection req handle_conn)
+              else execute_request schema (make_context req) req body
+          | `GET, [ "graphql"; path ], _ ->
+              static_file_response path
+          | `POST, [ "graphql" ], _ ->
+              execute_request schema (make_context req) req body
+          | _ ->
+              respond_string ~status:`Not_found ~body:"" ()
+        in
+        let unauthorized () =
+          respond_string ~status:`Unauthorized ~body:"Unauthorized" ()
+        in
+        if String.length body_str = 0 then
+          (* the browser interface generates empty strings periodically *)
+          respond ()
+        else
+          match Yojson.Safe.from_string body_str with
+          | `Assoc [ ("query", `String s) ]
+            when Core.String.is_prefix (Core.String.lstrip s)
+                   ~prefix:"query IntrospectionQuery" ->
+              (* the browser interface generates an introspection query on startup *)
+              respond ()
+          | _ -> (
+              (* neither empty string nor introspection query, enforce authorization
+                 if we have keys
+              *)
+              match auth_keys with
+              | None ->
+                  respond ()
+              | Some pks -> (
+                  (* auth_keys is Some iff authentication is required
+                     only caller is `create_graphql_server`, which enforces that invariant
+                  *)
+                  match Cohttp.Header.get headers "Authorization" with
+                  | None ->
+                      unauthorized ()
+                  | Some auth -> (
+                      let open Core in
+                      match String.split_on_chars auth ~on:[ ' ' ] with
+                      | [ "Signature"; pk_str; signature ] -> (
+                          match Itn_crypto.pubkey_of_base64 pk_str with
+                          | Ok pk ->
+                              (* we need to know not only that the pk verifies the
+                                 signature, but also that this pk is allowed to verify
+                                 the signature; otherwise, the client could sign a
+                                 request using an arbitrary pk
+                              *)
+                              if
+                                List.mem pks pk ~equal:Itn_crypto.equal_pubkeys
+                                && Itn_crypto.verify ~key:pk ~msg:body_str
+                                     signature
+                              then respond ()
+                              else unauthorized ()
+                          | Error _err ->
+                              (* not a base64-encoded key *)
+                              unauthorized () )
+                      | _ ->
+                          (* invalid auth scheme *)
+                          unauthorized () ) ) ) )
 end

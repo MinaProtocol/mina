@@ -2169,6 +2169,31 @@ let thread_graph =
                   (humanize_graphql_error ~graphql_endpoint e) ) ;
              exit 1 ) )
 
+let itn_create_accounts =
+  Command.async ~summary:"Fund new accounts for incentivized testnet"
+    (let open Command.Param in
+    let privkey_path = Cli_lib.Flag.privkey_read_path in
+    let key_prefix =
+      flag "--key-prefix" ~doc:"STRING prefix of keyfiles" (required string)
+    in
+    let num_accounts =
+      flag "--num-accounts" ~doc:"NN Number of new accounts" (required int)
+    in
+    let fee =
+      flag "--fee"
+        ~doc:
+          (sprintf "NN Fee in nanomina paid to create an account (minimum: %s)"
+             Mina_compile_config.minimum_user_command_fee_string )
+        (required int)
+    in
+    let amount =
+      flag "--amount"
+        ~doc:"NN Amount in nanomina to be divided among new accounts"
+        (required int)
+    in
+    let args = Args.zip5 privkey_path key_prefix num_accounts fee amount in
+    Cli_lib.Background_daemon.rpc_init args ~f:Itn.create_accounts)
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -2289,6 +2314,7 @@ let advanced =
     ; ("runtime-config", runtime_config)
     ; ("vrf", Cli_lib.Commands.Vrf.command_group)
     ; ("thread-graph", thread_graph)
+    ; ("itn-create-accounts", itn_create_accounts)
     ]
 
 let ledger =

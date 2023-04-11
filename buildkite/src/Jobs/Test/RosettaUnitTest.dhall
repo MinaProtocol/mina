@@ -15,7 +15,7 @@ let Size = ../../Command/Size.dhall
 let buildTestCmd : Text -> Text -> Size -> Command.Type = \(profile : Text) -> \(path : Text) -> \(cmd_target : Size) ->
   Command.build
     Command.Config::{
-      commands = RunInToolchain.runInToolchainStretch ([] : List Text) "buildkite/scripts/unit-test.sh ${profile} ${path}",
+      commands = RunInToolchain.runInToolchain ([] : List Text) "buildkite/scripts/unit-test.sh ${profile} ${path}",
       label = "Rosetta unit tests",
       key = "rosetta-unit-test-${profile}",
       target = cmd_target,
