@@ -147,6 +147,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ~key:(Signature_lib.Public_key.compress public_key)
             ~data:private_key )
     in
+    (*Transaction that updates fee payer account in account_updates.
+      The account update should fail due to failing nonce condition if the next transaction with the same fee payer is added to the same block
+    *)
     let%bind.Deferred invalid_nonce_zkapp_cmd_from_fish1 =
       let open Zkapp_command_builder in
       let with_dummy_signatures =
@@ -169,6 +172,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
+    (*Transaction that updates fee payer account in account_updates but passes
+       because the nonce precondition is true. There should be no other fee
+       payer updates in the same block*)
     let%bind.Deferred valid_zkapp_cmd_from_fish1 =
       let open Zkapp_command_builder in
       let with_dummy_signatures =
@@ -191,6 +197,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
+    (*Set fee payer send permission to Proof. New transactions with the same
+      fee payer are accepted into the pool.
+      Only the ones that make it to the same block are applied.
+      The remaining ones in the pool should be evicted because the fee payer will
+      no longer have the permission to send with Signature authorization*)
     let%bind.Deferred set_permission_zkapp_cmd_from_fish1 =
       let open Zkapp_command_builder in
       let with_dummy_signatures =
@@ -213,6 +224,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
+    (*Transaction with fee payer update in account_updates. The account update
+      should fail if the send permission is changed to Proof*)
     let%bind.Deferred valid_fee_invalid_permission_zkapp_cmd_from_fish1 =
       let open Zkapp_command_builder in
       let with_dummy_signatures =
@@ -234,8 +247,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
+    (*Transaction that doesn't make it into a block and should be evicted from
+      the pool after fee payer's send permission is changed
+      Making it a low fee transaction to prevent from getting into a block, to
+      test transaction pruning*)
     let%bind.Deferred invalid_fee_invalid_permission_zkapp_cmd_from_fish1 =
-      (*low fee transaction to prevent from getting into a block; for transaction pool pruning test*)
       let open Zkapp_command_builder in
       let with_dummy_signatures =
         let account_updates =
@@ -264,26 +280,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section_hard
-        "Send a zkapp command with an invalid account update nonce using fish1"
+        "Send a zkapp commands with fee payer nonce increments and nonce \
+         preconditions"
         (send_zkapp_batch ~logger node
            [ invalid_nonce_zkapp_cmd_from_fish1; valid_zkapp_cmd_from_fish1 ] )
     in
     let%bind () =
       section_hard
-        "Wait for fish1 zkapp command with invalid nonce to appear in \
+        "Wait for fish1 zkapp command with failing nonce check to appear in \
          transition frontier with failed status"
         (wait_for_zkapp ~has_failures:true invalid_nonce_zkapp_cmd_from_fish1)
     in
     let%bind () =
       section_hard
-        "Wait for fish1 zkapp command with valid nonce to be accepted into \
-         transition frontier"
+        "Wait for fish1 zkapp command with passing nonce check to be accepted \
+         into transition frontier"
         (wait_for_zkapp ~has_failures:false valid_zkapp_cmd_from_fish1)
     in
     let%bind () =
       section_hard
-        "Send a zkapp command account update for fish1 that sets send \
-         permission to Proof"
+        "Send zkapp commands with account updates for fish1 that sets send \
+         permission to Proof and then tries to send funds "
         (send_zkapp_batch ~logger node
            [ set_permission_zkapp_cmd_from_fish1
            ; valid_fee_invalid_permission_zkapp_cmd_from_fish1
@@ -298,7 +315,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section_hard
-        "Wait for fish1 zkapp command to be accepted by transition frontier"
+        "Wait for fish1 zkapp command that tries to send funds with Signature"
         (wait_for_zkapp ~has_failures:true
            valid_fee_invalid_permission_zkapp_cmd_from_fish1 )
     in
@@ -317,7 +334,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Error.of_string
                 "Nonce value of fish1 does not match expected nonce" )
          else (
-           [%log info] "Invalid zkapp command was correctly ignored" ;
+           [%log info]
+             "Invalid zkapp command was ignored as expected due to low fee" ;
            return () ) )
     in
     (*TODO: enable later

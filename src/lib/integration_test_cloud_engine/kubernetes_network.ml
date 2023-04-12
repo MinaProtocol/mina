@@ -803,35 +803,6 @@ module Node = struct
         ~query_name:"get_pooled_zkapp_commands" get_pooled_zkapp_commands
     in
     let%bind zkapp_pool_obj = get_pooled_zkapp_commands_graphql () in
-    (*Why do we need this check?
-      let%bind () =
-        match zkapp_pool_obj.pooledZkappCommands with
-        | [||] ->
-            return ()
-        | zkapp_commands ->
-            Deferred.Or_error.errorf "Zkapp failed, reasons: %s"
-              ( Array.fold ~init:[] zkapp_commands
-                  ~f:(fun failures zkapp_command ->
-                    match zkapp_command.failureReason with
-                    | None ->
-                        failures
-                    | Some f ->
-                        let inner_failures =
-                          Array.fold ~init:[] f ~f:(fun failures failure ->
-                              match failure with
-                              | None ->
-                                  failures
-                              | Some f ->
-                                  ( Option.value_exn f.index
-                                  , f.failures |> Array.to_list |> List.rev )
-                                  :: failures )
-                        in
-                        List.map inner_failures ~f:(fun f -> f :: failures)
-                        |> List.concat )
-              |> Mina_base.Transaction_status.Failure.Collection.Display.to_yojson
-              |> Yojson.Safe.to_string )
-      in
-    *)
     let transaction_ids =
       Array.map zkapp_pool_obj.pooledZkappCommands ~f:(fun zkapp_command ->
           zkapp_command.id |> Transaction_id.to_base64 )
