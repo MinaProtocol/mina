@@ -1078,7 +1078,7 @@ let max_account_updates = 2
 
 let max_token_updates = 2
 
-let gen_zkapp_command_from ?global_slot
+let gen_zkapp_command_from ?global_slot ?memo
     ?(ignore_sequence_events_precond = false) ?(no_token_accounts = false)
     ?(limited = false) ?(generate_new_accounts = true) ?failure
     ?(max_account_updates = max_account_updates)
@@ -1471,7 +1471,13 @@ let gen_zkapp_command_from ?global_slot
     @ new_token_zkapp_command
     |> mk_forest
   in
-  let%map memo = Signed_command_memo.gen in
+  let%map memo =
+    match memo with
+    | Some memo ->
+        return @@ Signed_command_memo.create_from_string_exn memo
+    | None ->
+        Signed_command_memo.gen
+  in
   let zkapp_command_dummy_authorizations : Zkapp_command.t =
     { fee_payer
     ; account_updates =
