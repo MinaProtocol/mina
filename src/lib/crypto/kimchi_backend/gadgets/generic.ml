@@ -108,7 +108,7 @@ let%test_unit "generic gadgets" =
    *   Returns true if constraints are satisfied, false otherwise.
    *)
   let test_generic_add left_input right_input sum : unit =
-    let circuit left_input right_input sum =
+    let make_circuit left_input right_input sum =
       let open Runner.Impl in
       (* Set up snarky variables for inputs and outputs *)
       let left_input =
@@ -130,7 +130,7 @@ let%test_unit "generic gadgets" =
     (* Generate and verify first proof *)
     let cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
-          circuit left_input right_input sum )
+          make_circuit left_input right_input sum )
     in
 
     (* Set up another witness *)
@@ -141,7 +141,7 @@ let%test_unit "generic gadgets" =
     (* Generate and verify second proof, reusing constraint system *)
     let _cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof ~cs (fun () ->
-          circuit left_input right_input sum )
+          make_circuit left_input right_input sum )
     in
     ()
   in
@@ -151,27 +151,40 @@ let%test_unit "generic gadgets" =
    *   Returns true if constraints are satisfied, false otherwise.
    *)
   let test_generic_sub left_input right_input difference : unit =
-    let _cs, _proof_keypair, _proof =
+    let make_circuit left_input right_input difference =
+      let open Runner.Impl in
+      (* Set up snarky variables for inputs and outputs *)
+      let left_input =
+        exists Field.typ ~compute:(fun () -> Field.Constant.of_int left_input)
+      in
+      let right_input =
+        exists Field.typ ~compute:(fun () -> Field.Constant.of_int right_input)
+      in
+      let difference =
+        exists Field.typ ~compute:(fun () -> Field.Constant.of_int difference)
+      in
+      (* Use the generic sub gate gadget *)
+      let result = sub (module Runner.Impl) left_input right_input in
+      Field.Assert.equal difference result ;
+      (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
+      Boolean.Assert.is_true (Field.equal difference difference)
+    in
+
+    (* Generate and verify first proof *)
+    let cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
-          let open Runner.Impl in
-          (* Set up snarky variables for inputs and outputs *)
-          let left_input =
-            exists Field.typ ~compute:(fun () ->
-                Field.Constant.of_int left_input )
-          in
-          let right_input =
-            exists Field.typ ~compute:(fun () ->
-                Field.Constant.of_int right_input )
-          in
-          let difference =
-            exists Field.typ ~compute:(fun () ->
-                Field.Constant.of_int difference )
-          in
-          (* Use the generic sub gate gadget *)
-          let result = sub (module Runner.Impl) left_input right_input in
-          Field.Assert.equal difference result ;
-          (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
-          Boolean.Assert.is_true (Field.equal difference difference) )
+          make_circuit left_input right_input difference )
+    in
+
+    (* Set up another witness *)
+    let left_input = left_input * 17 in
+    let right_input = right_input * 9 in
+    let difference = left_input - right_input in
+
+    (* Generate and verify second proof, reusing constraint system *)
+    let _cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof ~cs (fun () ->
+          make_circuit left_input right_input difference )
     in
     ()
   in
@@ -181,7 +194,7 @@ let%test_unit "generic gadgets" =
    *   Returns true if constraints are satisfied, false otherwise.
    *)
   let test_generic_mul left_input right_input prod =
-    let circuit left_input right_input prod =
+    let make_circuit left_input right_input prod =
       let open Runner.Impl in
       (* Set up snarky variables for inputs and outputs *)
       let left_input =
@@ -203,7 +216,7 @@ let%test_unit "generic gadgets" =
     (* Generate and verify first proof *)
     let cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
-          circuit left_input right_input prod )
+          make_circuit left_input right_input prod )
     in
 
     (* Set up another witness *)
@@ -214,7 +227,7 @@ let%test_unit "generic gadgets" =
     (* Generate and verify second proof, reusing constraint system *)
     let _cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof ~cs (fun () ->
-          circuit left_input right_input prod )
+          make_circuit left_input right_input prod )
     in
     ()
   in
