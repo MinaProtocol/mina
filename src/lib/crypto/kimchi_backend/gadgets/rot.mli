@@ -1,7 +1,7 @@
-(* Side of rotation *)
+(** Side of rotation *)
 type direction = Left | Right
 
-(* 64bit rotation gadget
+(** 64bit rotation gadget
  *   Inputs:
  *     word      := Word to rotation (as CVar field element)
  *     rot_bits  := How many bit positions to rotate by 0 to 64

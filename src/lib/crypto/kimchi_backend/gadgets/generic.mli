@@ -1,4 +1,4 @@
-(* Generic addition gate gadget
+(** Generic addition gate gadget
  *   Constrains left_input + right_input = sum
  *   Returns sum
  *)
@@ -9,7 +9,7 @@ val add :
   -> 'f Snarky_backendless.Cvar.t
 (* sum *)
 
-(* Generic subtraction gate gadget
+(** Generic subtraction gate gadget
  *   Constrains left_input - right_input = difference
  *   Returns difference
  *)
@@ -20,7 +20,7 @@ val sub :
   -> 'f Snarky_backendless.Cvar.t
 (* difference *)
 
-(* Generic multiplication gate gadget
+(** Generic multiplication gate gadget
  *   Constrains left_input * right_input = product
  *   Returns product
  *)

@@ -2,13 +2,13 @@ module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
 (** Foreign field modulus is abstract on two parameters
- *   - Field type
- *   - Limbs structure
+ *    Field type
+ *    Limbs structure
  *
  *   There are 3 specific limb structures required
- *     - Standard mode : 3 limbs of L-bits each
- *     - Extended mode : 4 limbs of L-bits each, used by bound addition (i.e. Matthew's trick)
- *     - Compact mode  : 2 limbs where the lowest is 2L bits and the highest is L bits
+ *     Standard mode := 3 limbs of L-bits each
+ *     Extended mode := 4 limbs of L-bits each, used by bound addition (i.e. Matthew's trick)
+ *     Compact mode  := 2 limbs where the lowest is 2L bits and the highest is L bits
  *)
 
 type 'field standard_limbs = 'field * 'field * 'field
@@ -93,8 +93,10 @@ end
  *   where remainder is the product.
  *
  *   Inputs:
- *     - left_input and right_input must be in [0, foreign_field_modulus)
- *     - foreign_field_modulus must be less than than max foreign field modulus
+ *     left_input            := multiplicand in [0, foreign_field_modulus)
+ *     right_input           := multiplicand in [0, foreign_field_modulus)
+ *     foreign_field_modulus := must be less than than max foreign field modulus
+ *   Outputs: tuple of product and required external checks
  *)
 val mul :
      (module Snark_intf.Run with type field = 'f)
