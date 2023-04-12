@@ -9,9 +9,11 @@ let all_ones_check (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (length : int) : Circuit.Field.t =
   let open Circuit in
-  let all_ones = Field.constant
-  @@ Common.bignum_bigint_to_field (module Circuit)
-  @@ Bignum_bigint.(pow (of_int 2) (of_int length) - one) in
+  let all_ones =
+    Field.constant
+    @@ Common.bignum_bigint_to_field (module Circuit)
+    @@ Bignum_bigint.(pow (of_int 2) (of_int length) - one)
+  in
   let all_ones_var =
     exists Field.typ ~compute:(fun () ->
         Common.cvar_field_to_field_as_prover (module Circuit) all_ones )
