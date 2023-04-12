@@ -4413,11 +4413,10 @@ module Mutations = struct
       let fee_payer_account = account_of_kp fee_payer_keypair ledger in
       let account_creator = account_of_kp account_creator_keypair ledger in
       let fee_payer_nonce = ref fee_payer_account.nonce in
-      let account_creator_nonce = ref account_creator.nonce in
       Deferred.List.iter keypairs ~f:(fun kp ->
           let spec =
             { Transaction_snark.For_tests.Deploy_snapp_spec.sender =
-                (account_creator_keypair, !account_creator_nonce)
+                (account_creator_keypair, account_creator.nonce)
             ; fee = Currency.Fee.of_mina_string_exn "1.0"
             ; fee_payer = Some (fee_payer_keypair, !fee_payer_nonce)
             ; amount = Currency.Amount.of_mina_string_exn "20000.0"
@@ -4437,8 +4436,6 @@ module Mutations = struct
             match%bind send_zkapp_command mina zkapp_command with
             | Ok _ ->
                 fee_payer_nonce := Account.Nonce.succ !fee_payer_nonce ;
-                account_creator_nonce :=
-                  Account.Nonce.succ !account_creator_nonce ;
                 [%log info]
                   "Successfully submitted zkApp command that creates a zkApp \
                    account"
