@@ -3,6 +3,12 @@
 open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 
+(* Foreign field element limb size *)
+let limb_bits = 88
+
+(* Foreign field element limb size 2^L where L=88 *)
+let two_to_limb = Bignum_bigint.(pow (of_int 2) (of_int limb_bits))
+
 (* pad_upto - Pad a list with a value until it reaches a given length *)
 let pad_upto ~length ~value list =
   let len = List.length list in
