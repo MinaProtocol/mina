@@ -1122,11 +1122,11 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ permission ->
                 permission.Permissions.Poly.set_zkapp_uri )
-          ; field "editSequenceState" ~typ:(non_null auth_required)
-              ~doc:"Authorization required to edit the sequence state"
+          ; field "editActionState" ~typ:(non_null auth_required)
+              ~doc:"Authorization required to edit the action state"
               ~args:Arg.[]
               ~resolve:(fun _ permission ->
-                permission.Permissions.Poly.edit_sequence_state )
+                permission.Permissions.Poly.edit_action_state )
           ; field "setTokenSymbol" ~typ:(non_null auth_required)
               ~doc:"Authorization required to set the token symbol"
               ~args:Arg.[]
@@ -1422,18 +1422,17 @@ module Types = struct
                  ~resolve:(fun _ { account; _ } ->
                    Option.value_map account.Account.Poly.zkapp ~default:None
                      ~f:(fun zkapp_account -> zkapp_account.verification_key) )
-             ; field "sequenceEvents"
-                 ~doc:"Sequence events associated with this account"
+             ; field "actionState"
+                 ~doc:"Action state associated with this account"
                  ~typ:
                    (list
                       ( non_null
-                      @@ Snark_params_unix.Graphql_scalars.SequenceEvent.typ ()
-                      ) )
+                      @@ Snark_params_unix.Graphql_scalars.Action.typ () ) )
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    Option.map account.Account.Poly.zkapp
                      ~f:(fun zkapp_account ->
-                       Pickles_types.Vector.to_list zkapp_account.sequence_state )
+                       Pickles_types.Vector.to_list zkapp_account.action_state )
                    )
              ; field "leafHash"
                  ~doc:
@@ -3027,7 +3026,7 @@ module Types = struct
                     ~typ:(non_null CurrencyAmount.arg_typ)
                     ~doc:"Amount for payments"
                 ; arg "feeMin" ~typ:(non_null Fee.arg_typ) ~doc:"Minimum fee"
-                ; arg "feeMax" ~typ:(non_null Fee.arg_typ) ~doc:"Minimum fee"
+                ; arg "feeMax" ~typ:(non_null Fee.arg_typ) ~doc:"Maximum fee"
                 ; arg "memo" ~doc:"Memo, up to 32 characters"
                     ~typ:(non_null string)
                 ; arg "transactionsPerSecond" ~doc:"Frequency of transactions"
@@ -4164,15 +4163,14 @@ module Mutations = struct
                     if not @@ Array.is_empty missing_nonces then
                       let missing_nonce_pks =
                         Array.to_list missing_nonces
-                        |> List.map ~f:(fun (source, _nonce_opt) -> source)
+                        |> List.map ~f:(fun (source, _nonce_opt) ->
+                               Signature_lib.Public_key.Compressed.to_yojson
+                                 source
+                               |> Yojson.Safe.to_string )
                       in
                       Error
                         (sprintf "Could not get nonces for accounts: %s"
-                           ( List.map missing_nonce_pks ~f:(fun pk ->
-                                 Signature_lib.Public_key.Compressed.to_yojson
-                                   pk
-                                 |> Yojson.Safe.to_string )
-                           |> String.concat ~sep:"," ) )
+                           (String.concat ~sep:"," missing_nonce_pks) )
                     else
                       let nonces =
                         Array.map nonce_opts ~f:(fun (_source, nonce_opt) ->
@@ -4273,7 +4271,15 @@ module Mutations = struct
                             with
                             | Ok _cmd_with_status ->
                                 Deferred.unit
-                            | Error _ ->
+                            | Error err ->
+                                [%log error]
+                                  "Payment scheduler with handle %s got error \
+                                   when sending payment from sender %s"
+                                  (Uuid.to_string uuid)
+                                  ( Signature_lib.Public_key.Compressed.to_yojson
+                                      source_pk
+                                  |> Yojson.Safe.to_string )
+                                  ~metadata:[ ("error", `String err) ] ;
                                 Deferred.unit
                           in
                           (* next nonce for this sender *)
@@ -4555,8 +4561,8 @@ module Mutations = struct
                                           (Mina_generators
                                            .Zkapp_command_generators
                                            .gen_zkapp_command_from
-                                             ~ignore_sequence_events_precond:
-                                               true ~no_token_accounts:true
+                                             ~ignore_action_state_precond:true
+                                             ~no_token_accounts:true
                                              ~limited:true
                                              ~fee_payer_keypair:fee_payer
                                              ~keymap ~account_state_tbl

@@ -1036,7 +1036,9 @@ let pending_snark_work =
                           { Cli_lib.Graphql_types.Pending_snark_work.Work
                             .work_id = w.work_id
                           ; fee_excess =
-                              to_signed_fee_exn f.sign f.fee_magnitude
+                              Currency.Amount.Signed.of_fee
+                                (to_signed_fee_exn f.sign
+                                   (Currency.Amount.to_fee f.fee_magnitude) )
                           ; supply_increase = w.supply_increase
                           ; source_first_pass_ledger_hash =
                               w.source_first_pass_ledger_hash

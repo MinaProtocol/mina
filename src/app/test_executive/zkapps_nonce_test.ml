@@ -20,16 +20,30 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Test_config in
     { default with
       requires_graphql = true
-    ; block_producers =
-        [ { balance = "8000000000"; timing = Untimed }
-        ; { balance = "1000000000"; timing = Untimed }
+    ; genesis_ledger =
+        [ { account_name = "node-a-key"
+          ; balance = "8000000000"
+          ; timing = Untimed
+          }
+        ; { account_name = "node-b-key"
+          ; balance = "1000000000"
+          ; timing = Untimed
+          }
+        ; { account_name = "fish1"; balance = "3000"; timing = Untimed }
+        ; { account_name = "fish2"; balance = "3000"; timing = Untimed }
+        ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
         ]
-    ; extra_genesis_accounts =
-        [ { balance = "3000"; timing = Untimed }
-        ; { balance = "3000"; timing = Untimed }
+    ; block_producers =
+        [ { node_name = "node-a"; account_name = "node-a-key" }
+        ; { node_name = "node-b"; account_name = "node-b-key" }
         ]
     ; num_archive_nodes = 1
-    ; num_snark_workers = 2
+    ; snark_coordinator =
+        Some
+          { node_name = "snark-node"
+          ; account_name = "snark-node-key"
+          ; worker_nodes = 2
+          }
     ; snark_worker_fee = "0.0001"
     ; proof_config =
         { proof_config_default with
@@ -76,32 +90,37 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let block_producer_nodes = Network.block_producers network in
-    let node = List.hd_exn block_producer_nodes in
-    let[@warning "-8"] [ fish1_kp; _fish2_kp ] =
-      Network.extra_genesis_keypairs network
+    let block_producer_nodes =
+      Network.block_producers network |> Core.String.Map.data
+    in
+    let node =
+      Core.String.Map.find_exn (Network.block_producers network) "node-a"
+    in
+    let fish1_kp =
+      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1")
+        .keypair
     in
     let fish1_pk = Signature_lib.Public_key.compress fish1_kp.public_key in
     let fish1_account_id =
       Mina_base.Account_id.create fish1_pk Mina_base.Token_id.default
     in
-    let with_timeout ?(soft_slots = 3) () =
+    let with_timeout ~soft_slots =
       let soft_timeout = Network_time_span.Slots soft_slots in
       let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
       Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
     in
     let wait_for_zkapp ~has_failures zkapp_command =
       let%map () =
-        wait_for t @@ with_timeout ()
+        wait_for t @@ with_timeout ~soft_slots:4
         @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures
              ~zkapp_command
       in
       [%log info] "zkApp transaction included in transition frontier"
     in
     let%bind () =
-      section_hard "Wait for nodes to initialize"
-        (wait_for t
-           (Wait_condition.nodes_to_initialize @@ Network.all_nodes network) )
+      wait_for t
+        (Wait_condition.nodes_to_initialize
+           (Core.String.Map.data (Network.all_nodes network)) )
     in
     let keymap =
       List.fold [ fish1_kp ] ~init:Signature_lib.Public_key.Compressed.Map.empty
@@ -233,8 +252,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section_hard "wait for 1 block to be produced"
-        ( wait_for t
-        @@ with_timeout ~soft_slots:5 ()
+        ( wait_for t @@ with_timeout ~soft_slots:6
         @@ Wait_condition.blocks_to_be_produced 1 )
     in
     let%bind () =
@@ -284,7 +302,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section_hard "wait for 1 block to be produced"
-        (wait_for t (Wait_condition.blocks_to_be_produced 1))
+        ( wait_for t
+        @@ with_timeout ~soft_slots:4 (Wait_condition.blocks_to_be_produced 1)
+        )
     in
     let%bind () =
       section
@@ -329,7 +349,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
-           (List.hd_exn @@ Network.archive_nodes network)
+           ( List.hd_exn
+           @@ (Network.archive_nodes network |> Core.String.Map.data) )
        in
        check_replayer_logs ~logger logs )
 end

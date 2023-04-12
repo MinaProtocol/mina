@@ -103,3 +103,7 @@ release
 # pipenv
 Pipfile
 Pipfile.lock
+
+# coverage report files
+*.coverage
+_coverage/

@@ -18,6 +18,8 @@ DROP TABLE accounts_created;
 
 DROP TABLE blocks;
 
+DROP TABLE protocol_versions;
+
 DROP TYPE chain_status_type;
 
 DROP TABLE epoch_data;
@@ -94,7 +96,7 @@ DROP TABLE timing_info;
 
 DROP TABLE account_identifiers;
 
-DROP TABLE zkapp_sequence_states;
+DROP TABLE zkapp_action_states;
 
 DROP TABLE zkapp_uris;
 

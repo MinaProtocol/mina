@@ -21,7 +21,7 @@ type role =
   [ `Fee_payer | `New_account | `Ordinary_participant | `New_token_account ]
 
 let gen_account_precondition_from_account ?failure
-    ?(ignore_sequence_events_precond = false) ?(is_nonce_precondition = false)
+    ?(ignore_action_state_precond = false) ?(is_nonce_precondition = false)
     ~first_use_of_account account =
   let open Quickcheck.Let_syntax in
   let { Account.Poly.balance; nonce; delegate; receipt_chain_hash; zkapp; _ } =
@@ -93,7 +93,7 @@ let gen_account_precondition_from_account ?failure
         | Some pk ->
             Or_ignore.gen (return pk)
       in
-      let%bind state, sequence_state, proved_state, is_new =
+      let%bind state, action_state, proved_state, is_new =
         match zkapp with
         | None ->
             let len = Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n in
@@ -102,21 +102,21 @@ let gen_account_precondition_from_account ?failure
               Zkapp_state.V.of_list_exn
                 (List.init len ~f:(fun _ -> Or_ignore.Ignore))
             in
-            let sequence_state = Or_ignore.Ignore in
+            let action_state = Or_ignore.Ignore in
             let proved_state = Or_ignore.Ignore in
             let is_new = Or_ignore.Ignore in
-            return (state, sequence_state, proved_state, is_new)
-        | Some { Zkapp_account.app_state; sequence_state; proved_state; _ } ->
+            return (state, action_state, proved_state, is_new)
+        | Some { Zkapp_account.app_state; action_state; proved_state; _ } ->
             let state =
               Zkapp_state.V.map app_state ~f:(fun field ->
                   Quickcheck.random_value (Or_ignore.gen (return field)) )
             in
-            let%bind sequence_state =
-              if ignore_sequence_events_precond then return Or_ignore.Ignore
+            let%bind action_state =
+              if ignore_action_state_precond then return Or_ignore.Ignore
               else
                 (* choose a value from account sequence state *)
                 let fields =
-                  Pickles_types.Vector.Vector_5.to_list sequence_state
+                  Pickles_types.Vector.Vector_5.to_list action_state
                 in
                 let%bind ndx =
                   Int.gen_uniform_incl 0 (List.length fields - 1)
@@ -129,7 +129,7 @@ let gen_account_precondition_from_account ?failure
               *)
               Or_ignore.Check false
             in
-            return (state, sequence_state, proved_state, is_new)
+            return (state, action_state, proved_state, is_new)
       in
       return
         { Zkapp_precondition.Account.balance
@@ -137,7 +137,7 @@ let gen_account_precondition_from_account ?failure
         ; receipt_chain_hash
         ; delegate
         ; state
-        ; sequence_state
+        ; action_state
         ; proved_state
         ; is_new
         }
@@ -213,8 +213,8 @@ let gen_account_precondition_from_account ?failure
               return { predicate_account with state }
           | Sequence_state ->
               let%bind field = Snark_params.Tick.Field.gen in
-              let sequence_state = Or_ignore.Check field in
-              return { predicate_account with sequence_state }
+              let action_state = Or_ignore.Check field in
+              return { predicate_account with action_state }
           | Proved_state ->
               let%bind proved_state =
                 match predicate_account.proved_state with
@@ -898,20 +898,20 @@ let gen_account_update_body_components (type a b c d) ?global_slot
                     value_to_be_updated to_be_updated ~default:current )
              |> Zkapp_state.V.of_list_exn
            in
-           let sequence_state =
-             let last_sequence_slot = zk.last_sequence_slot in
+           let action_state =
+             let last_action_slot = zk.last_action_slot in
              let txn_global_slot =
-               Option.value_map protocol_state_view ~default:last_sequence_slot
+               Option.value_map protocol_state_view ~default:last_action_slot
                  ~f:(fun ps ->
                    ps
                      .Zkapp_precondition.Protocol_state.Poly
                       .global_slot_since_genesis )
              in
-             let sequence_state, _last_sequence_slot =
-               Mina_ledger.Ledger.update_sequence_state zk.sequence_state
-                 actions ~txn_global_slot ~last_sequence_slot
+             let action_state, _last_action_slot =
+               Mina_ledger.Ledger.update_action_state zk.action_state actions
+                 ~txn_global_slot ~last_action_slot
              in
-             sequence_state
+             action_state
            in
            let proved_state =
              let keeping_app_state =
@@ -930,7 +930,7 @@ let gen_account_update_body_components (type a b c d) ?global_slot
                if changing_entire_app_state then true else zk.proved_state
              else false
            in
-           Some { zk with app_state; sequence_state; proved_state }
+           Some { zk with app_state; action_state; proved_state }
    in
    Account_id.Table.update account_state_tbl (Account.identifier account)
      ~f:(function
@@ -981,7 +981,7 @@ let gen_account_update_from ?global_slot ?(update = None) ?failure
     ?(new_account = false) ?(zkapp_account = false) ?account_id ?token_id
     ?may_use_token ?permissions_auth ?required_balance_change ~zkapp_account_ids
     ~authorization ~account_ids_seen ~available_public_keys ~account_state_tbl
-    ?protocol_state_view ?vk ~ignore_sequence_events_precond () =
+    ?protocol_state_view ?vk ~ignore_action_state_precond () =
   let open Quickcheck.Let_syntax in
   let increment_nonce =
     (* permissions_auth is used to generate updated permissions consistent with a contemplated authorization;
@@ -1008,7 +1008,7 @@ let gen_account_update_from ?global_slot ?(update = None) ?failure
         (gen_balance_change ?permissions_auth ~new_account ?failure)
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
       ~f_account_precondition:(fun ~first_use_of_account acct ->
-        gen_account_precondition_from_account ~ignore_sequence_events_precond
+        gen_account_precondition_from_account ~ignore_action_state_precond
           ~first_use_of_account acct )
       ~f_account_update_account_precondition:Fn.id
       ~gen_use_full_commitment:(fun ~account_precondition ->
@@ -1078,9 +1078,9 @@ let max_account_updates = 2
 
 let max_token_updates = 2
 
-let gen_zkapp_command_from ?global_slot
-    ?(ignore_sequence_events_precond = false) ?(no_token_accounts = false)
-    ?(limited = false) ?(generate_new_accounts = true) ?failure
+let gen_zkapp_command_from ?global_slot ?(ignore_action_state_precond = false)
+    ?(no_token_accounts = false) ?(limited = false)
+    ?(generate_new_accounts = true) ?failure
     ?(max_account_updates = max_account_updates)
     ?(max_token_updates = max_token_updates)
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
@@ -1283,7 +1283,7 @@ let gen_zkapp_command_from ?global_slot
             ~account_ids_seen ~update ?failure ~authorization ~new_account
             ~permissions_auth ~zkapp_account ~available_public_keys
             ~may_use_token:No ~account_state_tbl ?protocol_state_view ?vk
-            ~ignore_sequence_events_precond ()
+            ~ignore_action_state_precond ()
         in
         let%bind account_update =
           (* authorization according to chosen permissions auth *)
@@ -1358,7 +1358,7 @@ let gen_zkapp_command_from ?global_slot
             ~zkapp_account_ids ~account_ids_seen ~account_id ~authorization
             ~permissions_auth ~zkapp_account ~available_public_keys
             ~may_use_token:No ~account_state_tbl ?protocol_state_view ?vk
-            ~ignore_sequence_events_precond ()
+            ~ignore_action_state_precond ()
         in
         (* this list will be reversed, so `account_update0` will execute before `account_update` *)
         go
@@ -1418,7 +1418,7 @@ let gen_zkapp_command_from ?global_slot
       ~account_ids_seen ~authorization ~new_account:false ~available_public_keys
       ~may_use_token:No ~account_state_tbl
       ~required_balance_change:balance_change ?protocol_state_view ?vk
-      ~ignore_sequence_events_precond ()
+      ~ignore_action_state_precond ()
   in
   let gen_zkapp_command_with_token_accounts ~num_zkapp_command =
     let authorization = Control.Signature Signature.dummy in
@@ -1439,7 +1439,7 @@ let gen_zkapp_command_from ?global_slot
             ~account_ids_seen ~authorization ~permissions_auth
             ~available_public_keys ~may_use_token:No ~account_state_tbl
             ~required_balance_change ?protocol_state_view ?vk
-            ~ignore_sequence_events_precond ()
+            ~ignore_action_state_precond ()
         in
         let token_id =
           Account_id.derive_token_id
@@ -1451,7 +1451,7 @@ let gen_zkapp_command_from ?global_slot
             ~account_ids_seen ~new_account:true ~token_id
             ~may_use_token:Parents_own_token ~authorization ~permissions_auth
             ~available_public_keys ~account_state_tbl ?protocol_state_view ?vk
-            ~ignore_sequence_events_precond ()
+            ~ignore_action_state_precond ()
         in
         gen_tree (mk_node parent [ mk_node child [] ] :: acc) (n - 1)
     in

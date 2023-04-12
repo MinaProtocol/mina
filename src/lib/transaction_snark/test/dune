@@ -50,6 +50,7 @@
    staged_ledger_diff
    mina_wire_types
    block_time
+   zkapps_examples
    )
   (library_flags -linkall)
   (inline_tests)
