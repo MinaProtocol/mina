@@ -4218,7 +4218,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; update = Account_update.Update.noop
           ; token_id = Token_id.default
           ; balance_change
-          ; increment_nonce = true
+          ; increment_nonce = false
           ; events = []
           ; actions = []
           ; call_data = Field.zero
