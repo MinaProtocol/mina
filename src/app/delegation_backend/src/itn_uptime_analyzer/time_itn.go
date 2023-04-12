@@ -9,10 +9,10 @@ func GetCurrentTime() time.Time {
 	return currentTime
 }
 
-func GetLastExecutionTime(currentTime time.Time) string {
+func GetLastExecutionTime(currentTime time.Time) time.Time {
 	// Get last execution of application
 
 	pastTime := currentTime.Add(-12 * time.Hour)
 
-	return pastTime.Format(time.RFC3339)
+	return pastTime
 }
