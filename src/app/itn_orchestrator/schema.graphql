@@ -1,0 +1,59 @@
+schema {
+  query: query
+  mutation: mutation
+}
+
+"""uint64 encoded as a json string representing an ammount of currency"""
+scalar CurrencyAmount
+
+"""uint64 encoded as a json string representing a fee"""
+scalar Fee
+
+type mutation {
+  schedulePayments(
+    """Payments details"""
+    input: PaymentsDetails!
+  ): String!
+  stopPayments(
+    """Payment scheduler handle"""
+    handle: String!
+  ): String!
+}
+
+"""Keys and other information for scheduling payments"""
+input PaymentsDetails {
+  """Length of scheduler run"""
+  durationInMinutes: Int!
+
+  """Frequency of transactions"""
+  transactionsPerSecond: Float!
+
+  """Memo, up to 32 characters"""
+  memo: String!
+
+  """Maximum fee"""
+  feeMax: Fee!
+
+  """Minimum fee"""
+  feeMin: Fee!
+
+  """Amount for payments"""
+  amount: CurrencyAmount!
+
+  """Public key of receiver of payments"""
+  receiver: PublicKey!
+
+  """Private keys of accounts to send from"""
+  senders: [PrivateKey!]!
+}
+
+"""Base58Check-encoded private key"""
+scalar PrivateKey
+
+"""Public key in Base58Check format"""
+scalar PublicKey
+
+type query {
+  """Returns true if query is authorized"""
+  auth: Boolean
+}
