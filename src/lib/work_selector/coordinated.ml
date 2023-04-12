@@ -59,9 +59,9 @@ struct
 
   let rec find_matching_job ~logger wanted_identifier identifiers jobs =
     match (identifiers, jobs) with
-    | identifier :: _, job :: _ when String.equal identifier wanted_identifier
-      ->
-        Some job
+    | identifier :: remaining_identifiers, job :: remaining_jobs
+      when String.equal identifier wanted_identifier ->
+        Some (job, remaining_identifiers, remaining_jobs)
     | _ :: identifiers, _ :: jobs ->
         find_matching_job ~logger wanted_identifier identifiers jobs
     | _, _ ->
@@ -69,18 +69,46 @@ struct
           ~metadata:[ ("identifier", `String wanted_identifier) ] ;
         None
 
-  let work ~snark_pool ~fee ~logger (state : Lib.State.t) =
+  let get_work_from_coordinator ~logger identifiers expensive_work
+      (state : Lib.State.t) =
+    query_coordinator identifiers
+    |> Option.bind ~f:(fun identifier ->
+           find_matching_job ~logger identifier identifiers expensive_work )
+    |> Option.map ~f:(fun (x, remaining_identifiers, remaining_jobs) ->
+           Lib.State.set state x ;
+           (Some x, remaining_jobs, remaining_identifiers) )
+    |> Option.value ~default:(None, [], [])
+
+  let work_uncached ~snark_pool ~fee ~logger (state : Lib.State.t) =
     Lib.State.remove_old_assignments state ~logger ;
     let unseen_jobs = Lib.State.all_unseen_works state in
     match Lib.get_expensive_work ~snark_pool ~fee unseen_jobs with
     | [] ->
-        None
+        (None, [], [])
     | expensive_work ->
         let identifiers = List.map ~f:work_identifier expensive_work in
-        query_coordinator identifiers
-        |> Option.bind ~f:(fun identifier ->
-               find_matching_job ~logger identifier identifiers expensive_work )
-        |> Option.map ~f:(fun x -> Lib.State.set state x ; x)
+        get_work_from_coordinator ~logger identifiers expensive_work state
+
+  let work =
+    let result_cache = ref ([], []) in
+    let cached_at = ref 0.0 in
+    fun ~snark_pool ~fee ~logger (state : Lib.State.t) ->
+      let now = Core.Unix.gettimeofday () in
+      (* only recompute list every few seconds to avoid stalling the scheduler *)
+      if Float.(now - !cached_at > 6.0) then (
+        cached_at := now ;
+        let work_opt, expensive_work, identifiers =
+          work_uncached ~snark_pool ~fee ~logger state
+        in
+        result_cache := (expensive_work, identifiers) ;
+        work_opt )
+      else
+        let expensive_work, identifiers = !result_cache in
+        let work_opt, expensive_work, identifiers =
+          get_work_from_coordinator ~logger identifiers expensive_work state
+        in
+        result_cache := (expensive_work, identifiers) ;
+        work_opt
 
   let remove = Lib.State.remove
 
