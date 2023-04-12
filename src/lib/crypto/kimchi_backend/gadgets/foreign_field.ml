@@ -987,62 +987,49 @@ let%test_unit "foreign_field_mul gadget" =
    *     - foreign_field_modulus
    *     - expected product
    *)
-  let test_mul (left_input : Bignum_bigint.t) (right_input : Bignum_bigint.t)
-      (foreign_field_modulus : Bignum_bigint.t) : unit =
-    (* Circuit definition function *)
-    let make_circuit left_input right_input foreign_field_modulus =
-      let open Runner.Impl in
-      (* Prepare test inputs *)
-      let expected =
-        Bignum_bigint.(left_input * right_input % foreign_field_modulus)
-      in
-      let foreign_field_modulus =
-        bignum_bigint_to_field_standard_limbs
-          (module Runner.Impl)
-          foreign_field_modulus
-      in
-      let left_input =
-        Element.Standard.of_bignum_bigint (module Runner.Impl) left_input
-      in
-      let right_input =
-        Element.Standard.of_bignum_bigint (module Runner.Impl) right_input
-      in
-      (* Create the gadget *)
-      let product, _external_checks =
-        mul (module Runner.Impl) left_input right_input foreign_field_modulus
-      in
-      (* Check product matches expected result *)
-      as_prover (fun () ->
-          let expected =
-            bignum_bigint_to_field_standard_limbs (module Runner.Impl) expected
-          in
-          let product =
-            Element.Standard.to_field_limbs (module Runner.Impl) product
-          in
-          assert_eq product expected ) ;
-      ()
-    in
-
-    (* Generate and verify first proof *)
+  let test_mul ?cs (left_input : Bignum_bigint.t)
+      (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
+      =
+    (* Generate and verify proof *)
     let cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof (fun () ->
-          make_circuit left_input right_input foreign_field_modulus )
+      Runner.generate_and_verify_proof ?cs (fun () ->
+          let open Runner.Impl in
+          (* Prepare test inputs *)
+          let expected =
+            Bignum_bigint.(left_input * right_input % foreign_field_modulus)
+          in
+          let foreign_field_modulus =
+            bignum_bigint_to_field_standard_limbs
+              (module Runner.Impl)
+              foreign_field_modulus
+          in
+          let left_input =
+            Element.Standard.of_bignum_bigint (module Runner.Impl) left_input
+          in
+          let right_input =
+            Element.Standard.of_bignum_bigint (module Runner.Impl) right_input
+          in
+          (* Create the gadget *)
+          let product, _external_checks =
+            mul
+              (module Runner.Impl)
+              left_input right_input foreign_field_modulus
+          in
+          (* Check product matches expected result *)
+          as_prover (fun () ->
+              let expected =
+                bignum_bigint_to_field_standard_limbs
+                  (module Runner.Impl)
+                  expected
+              in
+              let product =
+                Element.Standard.to_field_limbs (module Runner.Impl) product
+              in
+              assert_eq product expected ) ;
+          () )
     in
 
-    (* Set up another witness *)
-    let mutate_witness value =
-      Bignum_bigint.(if equal zero value then value + one else value - one)
-    in
-
-    let left_input = mutate_witness left_input in
-    let right_input = mutate_witness right_input in
-
-    (* Generate and verify second proof, reusing constraint system *)
-    let _cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof ~cs (fun () ->
-          make_circuit left_input right_input foreign_field_modulus )
-    in
-    ()
+    cs
   in
 
   (* Helper to test foreign_field_mul gadget with external checks
@@ -1185,74 +1172,90 @@ let%test_unit "foreign_field_mul gadget" =
 
   (* Positive tests *)
   (* zero_mul: 0 * 0 *)
-  test_mul Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus ;
+  let cs = test_mul Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus in
   (* one_mul: max * 1 *)
-  test_mul secp256k1_max Bignum_bigint.one secp256k1_modulus ;
+  let _cs = test_mul ~cs secp256k1_max Bignum_bigint.one secp256k1_modulus in
   (* max_native_square: pallas_sqrt * pallas_sqrt *)
-  test_mul pallas_sqrt pallas_sqrt secp256k1_modulus ;
+  let _cs = test_mul ~cs pallas_sqrt pallas_sqrt secp256k1_modulus in
   (* max_foreign_square: secp256k1_sqrt * secp256k1_sqrt *)
-  test_mul secp256k1_sqrt secp256k1_sqrt secp256k1_modulus ;
+  let _cs = test_mul ~cs secp256k1_sqrt secp256k1_sqrt secp256k1_modulus in
   (* max_native_multiplicands: pallas_max * pallas_max *)
-  test_mul pallas_max pallas_max secp256k1_modulus ;
+  let _cs = test_mul ~cs pallas_max pallas_max secp256k1_modulus in
   (* max_foreign_multiplicands: secp256k1_max * secp256k1_max *)
-  test_mul secp256k1_max secp256k1_max secp256k1_modulus ;
+  let _cs = test_mul ~cs secp256k1_max secp256k1_max secp256k1_modulus in
   (* nonzero carry0 bits *)
-  test_mul
-    (Common.bignum_bigint_of_hex
-       "fbbbd91e03b48cebbac38855289060f8b29fa6ad3cffffffffffffffffffffff" )
-    (Common.bignum_bigint_of_hex
-       "d551c3d990f42b6d780275d9ca7e30e72941aa29dcffffffffffffffffffffff" )
-    secp256k1_modulus ;
+  let _cs =
+    test_mul ~cs
+      (Common.bignum_bigint_of_hex
+         "fbbbd91e03b48cebbac38855289060f8b29fa6ad3cffffffffffffffffffffff" )
+      (Common.bignum_bigint_of_hex
+         "d551c3d990f42b6d780275d9ca7e30e72941aa29dcffffffffffffffffffffff" )
+      secp256k1_modulus
+  in
   (* test nonzero carry10 *)
-  test_mul
-    (Common.bignum_bigint_of_hex
-       "4000000000000000000000000000000000000000000000000000000000000000" )
-    (Common.bignum_bigint_of_hex
-       "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0" )
-    Bignum_bigint.(pow (of_int 2) (of_int 259)) ;
+  let _cs =
+    test_mul
+      (Common.bignum_bigint_of_hex
+         "4000000000000000000000000000000000000000000000000000000000000000" )
+      (Common.bignum_bigint_of_hex
+         "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0" )
+      Bignum_bigint.(pow (of_int 2) (of_int 259))
+  in
   (* test nonzero carry1_hi *)
-  test_mul
-    (Common.bignum_bigint_of_hex
-       "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" )
-    (Common.bignum_bigint_of_hex
-       "8000000000000000000000000000000000000000000000000000000000000000d0" )
-    Bignum_bigint.(pow (of_int 2) (of_int 259) - one) ;
+  let _cs =
+    test_mul
+      (Common.bignum_bigint_of_hex
+         "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" )
+      (Common.bignum_bigint_of_hex
+         "8000000000000000000000000000000000000000000000000000000000000000d0" )
+      Bignum_bigint.(pow (of_int 2) (of_int 259) - one)
+  in
   (* test nonzero_second_bit_carry1_hi *)
-  test_mul
-    (Common.bignum_bigint_of_hex
-       "ffffffffffffffffffffffffffffffffffffffffffffffff8a9dec7cfd1acdeb" )
-    (Common.bignum_bigint_of_hex
-       "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e" )
-    secp256k1_modulus ;
+  let _cs =
+    test_mul ~cs
+      (Common.bignum_bigint_of_hex
+         "ffffffffffffffffffffffffffffffffffffffffffffffff8a9dec7cfd1acdeb" )
+      (Common.bignum_bigint_of_hex
+         "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e" )
+      secp256k1_modulus
+  in
   (* test random_multiplicands_carry1_lo *)
-  test_mul
-    (Common.bignum_bigint_of_hex
-       "ffd913aa9e17a63c7a0ff2354218037aafcd6ecaa67f56af1de882594a434dd3" )
-    (Common.bignum_bigint_of_hex
-       "7d313d6b42719a39acea5f51de9d50cd6a4ec7147c003557e114289e9d57dffc" )
-    secp256k1_modulus ;
+  let _cs =
+    test_mul ~cs
+      (Common.bignum_bigint_of_hex
+         "ffd913aa9e17a63c7a0ff2354218037aafcd6ecaa67f56af1de882594a434dd3" )
+      (Common.bignum_bigint_of_hex
+         "7d313d6b42719a39acea5f51de9d50cd6a4ec7147c003557e114289e9d57dffc" )
+      secp256k1_modulus
+  in
   (* test random_multiplicands_valid *)
-  test_mul
-    (Common.bignum_bigint_of_hex
-       "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
-    (Common.bignum_bigint_of_hex
-       "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
-    secp256k1_modulus ;
+  let _cs =
+    test_mul ~cs
+      (Common.bignum_bigint_of_hex
+         "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
+      (Common.bignum_bigint_of_hex
+         "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
+      secp256k1_modulus
+  in
   (* test smaller foreign field modulus *)
-  test_mul
-    (Common.bignum_bigint_of_hex
-       "5945fa400436f458cb9e994dcd315ded43e9b60eb68e2ae7b5cf1d07b48ca1c" )
-    (Common.bignum_bigint_of_hex
-       "747109f882b8e26947dfcd887273c0b0720618cb7f6d407c9ba74dbe0eda22f" )
-    (Common.bignum_bigint_of_hex
-       "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" ) ;
+  let _cs =
+    test_mul
+      (Common.bignum_bigint_of_hex
+         "5945fa400436f458cb9e994dcd315ded43e9b60eb68e2ae7b5cf1d07b48ca1c" )
+      (Common.bignum_bigint_of_hex
+         "747109f882b8e26947dfcd887273c0b0720618cb7f6d407c9ba74dbe0eda22f" )
+      (Common.bignum_bigint_of_hex
+         "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" )
+  in
   (* vesta non-native on pallas native modulus *)
-  test_mul
-    (Common.bignum_bigint_of_hex
-       "69cc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15" )
-    (Common.bignum_bigint_of_hex
-       "1fffe27b14baa740db0c8bb6656de61d2871a64093908af6181f46351a1c1909" )
-    vesta_modulus ;
+  let _cs =
+    test_mul
+      (Common.bignum_bigint_of_hex
+         "69cc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15" )
+      (Common.bignum_bigint_of_hex
+         "1fffe27b14baa740db0c8bb6656de61d2871a64093908af6181f46351a1c1909" )
+      vesta_modulus
+  in
 
   (* Full test including all external checks *)
   test_mul_full

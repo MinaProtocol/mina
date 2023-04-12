@@ -217,7 +217,7 @@ let%test_unit "range_check64 gadget" =
   (* Helper to test range_check64 gadget
    *   Input: value to be range checked in [0, 2^64)
    *)
-  let test_range_check64 base10 : unit =
+  let test_range_check64 ?cs base10 =
     let open Runner.Impl in
     let value = Common.field_of_base10 (module Runner.Impl) base10 in
 
@@ -229,35 +229,25 @@ let%test_unit "range_check64 gadget" =
       Boolean.Assert.is_true (Field.equal value value)
     in
 
-    (* Generate and verify first proof *)
+    (* Generate and verify proof *)
     let cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof (fun () -> make_circuit value)
+      Runner.generate_and_verify_proof ?cs (fun () -> make_circuit value)
     in
-
-    (* Set up another witness *)
-    let value =
-      Field.Constant.(if equal zero value then value + one else value - one)
-    in
-
-    (* Generate and verify second proof, reusing constraint system *)
-    let _cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof ~cs (fun () -> make_circuit value)
-    in
-    ()
+    cs
   in
 
   (* Positive tests *)
-  test_range_check64 "0" ;
-  test_range_check64 "4294967" ;
-  test_range_check64 "18446744073709551615" ;
+  let cs = test_range_check64 "0" in
+  let _cs = test_range_check64 ~cs "4294967" in
+  let _cs = test_range_check64 ~cs "18446744073709551615" in
   (* 2^64 - 1 *)
   (* Negative tests *)
   assert (
     Common.is_error (fun () ->
-        test_range_check64 "18446744073709551616" (* 2^64 *) ) ) ;
+        test_range_check64 ~cs "18446744073709551616" (* 2^64 *) ) ) ;
   assert (
     Common.is_error (fun () ->
-        test_range_check64 "170141183460469231731687303715884105728"
+        test_range_check64 ~cs "170141183460469231731687303715884105728"
         (* 2^127  *) ) ) ;
   ()
 
@@ -270,7 +260,7 @@ let%test_unit "multi_range_check gadget" =
   in
 
   (* Helper to test multi_range_check gadget *)
-  let test_multi_range_check v0 v1 v2 : unit =
+  let test_multi_range_check ?cs v0 v1 v2 =
     let open Runner.Impl in
     let v0 = Common.field_of_base10 (module Runner.Impl) v0 in
     let v1 = Common.field_of_base10 (module Runner.Impl) v1 in
@@ -285,58 +275,51 @@ let%test_unit "multi_range_check gadget" =
       multi (module Runner.Impl) values.(0) values.(1) values.(2)
     in
 
-    (* Generate and verify first proof *)
+    (* Generate and verify proof *)
     let cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof (fun () -> make_circuit v0 v1 v2)
+      Runner.generate_and_verify_proof ?cs (fun () -> make_circuit v0 v1 v2)
     in
 
-    (* Set up another witness *)
-    let mutate_witness value =
-      Field.Constant.(if equal zero value then value + one else value - one)
-    in
-    let v0 = mutate_witness v0 in
-    let v1 = mutate_witness v1 in
-    let v2 = mutate_witness v2 in
-
-    (* Generate and verify second proof, reusing constraint system *)
-    let _cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof ~cs (fun () -> make_circuit v0 v1 v2)
-    in
-    ()
+    cs
   in
 
   (* Positive tests *)
-  test_multi_range_check "0" "4294967" "309485009821345068724781055" ;
-  test_multi_range_check "267475740839011166017999907"
-    "120402749546803056196583080" "1159834292458813579124542" ;
-  test_multi_range_check "309485009821345068724781055"
-    "309485009821345068724781055" "309485009821345068724781055" ;
-  test_multi_range_check "0" "0" "0" ;
+  let cs = test_multi_range_check "0" "4294967" "309485009821345068724781055" in
+  let _cs =
+    test_multi_range_check ~cs "267475740839011166017999907"
+      "120402749546803056196583080" "1159834292458813579124542"
+  in
+  let _cs =
+    test_multi_range_check ~cs "309485009821345068724781055"
+      "309485009821345068724781055" "309485009821345068724781055"
+  in
+  let _cs = test_multi_range_check ~cs "0" "0" "0" in
   (* Negative tests *)
   assert (
     Common.is_error (fun () ->
-        test_multi_range_check "0" "4294967" "309485009821345068724781056" ) ) ;
+        test_multi_range_check ~cs "0" "4294967" "309485009821345068724781056" ) ) ;
   assert (
     Common.is_error (fun () ->
-        test_multi_range_check "0" "309485009821345068724781056"
+        test_multi_range_check ~cs "0" "309485009821345068724781056"
           "309485009821345068724781055" ) ) ;
   assert (
     Common.is_error (fun () ->
-        test_multi_range_check "309485009821345068724781056" "4294967"
+        test_multi_range_check ~cs "309485009821345068724781056" "4294967"
           "309485009821345068724781055" ) ) ;
   assert (
     Common.is_error (fun () ->
-        test_multi_range_check
+        test_multi_range_check ~cs
           "28948022309329048855892746252171976963317496166410141009864396001978282409984"
           "0170141183460469231731687303715884105728"
           "170141183460469231731687303715884105728" ) ) ;
   assert (
     Common.is_error (fun () ->
-        test_multi_range_check "0" "0"
+        test_multi_range_check ~cs "0" "0"
           "28948022309329048855892746252171976963317496166410141009864396001978282409984" ) ) ;
   assert (
     Common.is_error (fun () ->
-        test_multi_range_check "0170141183460469231731687303715884105728" "0"
+        test_multi_range_check ~cs "0170141183460469231731687303715884105728"
+          "0"
           "28948022309329048855892746252171976963317496166410141009864396001978282409984" ) ) ;
   ()
 
