@@ -347,7 +347,8 @@ module Dsl = struct
       -> node_included_in:[ `Any_node | `Node of Engine.Network.Node.t ]
       -> t
 
-    val ledger_proofs_emitted_since_genesis : num_proofs:int -> t
+    val ledger_proofs_emitted_since_genesis :
+      test_config:Test_config.t -> num_proofs:int -> t
   end
 
   module type S = sig
