@@ -71,133 +71,6 @@ let tests : test list =
   ; ("block-reward", (module Block_reward_test.Make : Intf.Test.Functor_intf))
   ]
 
-let report_test_errors ~log_error_set ~internal_error_set =
-  (* TODO: we should be able to show which sections passed as well *)
-  let open Test_error in
-  let open Test_error.Set in
-  let color_eprintf color =
-    Printf.ksprintf (fun s -> Print.eprintf "%s%s%s" color s Bash_colors.none)
-  in
-  let color_of_severity = function
-    | `None ->
-        Bash_colors.green
-    | `Soft ->
-        Bash_colors.yellow
-    | `Hard ->
-        Bash_colors.red
-  in
-  let category_prefix_of_severity = function
-    | `None ->
-        "✓"
-    | `Soft ->
-        "-"
-    | `Hard ->
-        "×"
-  in
-  let print_category_header severity =
-    Printf.ksprintf
-      (color_eprintf
-         (color_of_severity severity)
-         "%s %s\n"
-         (category_prefix_of_severity severity) )
-  in
-  let max_sev a b =
-    match (a, b) with
-    | `Hard, _ | _, `Hard ->
-        `Hard
-    | `Soft, _ | _, `Soft ->
-        `Soft
-    | _ ->
-        `None
-  in
-  let max_severity_of_list severities =
-    List.fold severities ~init:`None ~f:max_sev
-  in
-  let combine_errors error_set =
-    Error_accumulator.combine
-      [ Error_accumulator.map error_set.soft_errors ~f:(fun err -> (`Soft, err))
-      ; Error_accumulator.map error_set.hard_errors ~f:(fun err -> (`Hard, err))
-      ]
-  in
-  let internal_errors = combine_errors internal_error_set in
-  let internal_errors_severity = max_severity internal_error_set in
-  let log_errors = combine_errors log_error_set in
-  let log_errors_severity = max_severity log_error_set in
-  let report_log_errors log_type =
-    color_eprintf
-      (color_of_severity log_errors_severity)
-      "=== Log %ss ===\n" log_type ;
-    Error_accumulator.iter_contexts log_errors ~f:(fun node_id log_errors ->
-        color_eprintf Bash_colors.light_magenta "    %s:\n" node_id ;
-        List.iter log_errors ~f:(fun (severity, { error_message; _ }) ->
-            color_eprintf
-              (color_of_severity severity)
-              "        [%s] %s\n"
-              (Time.to_string error_message.timestamp)
-              (Yojson.Safe.to_string (Logger.Message.to_yojson error_message)) ) ;
-        Print.eprintf "\n" )
-  in
-  (* check invariants *)
-  match log_errors.from_current_context with
-  | _ :: _ ->
-      failwith "all error logs should be contextualized by node id"
-  | [] ->
-      (* report log errors *)
-      Print.eprintf "\n" ;
-      ( match log_errors_severity with
-      | `None ->
-          ()
-      | `Soft ->
-          report_log_errors "Warning"
-      | `Hard ->
-          report_log_errors "Error" ) ;
-      (* report contextualized internal errors *)
-      color_eprintf Bash_colors.magenta "=== Test Results ===\n" ;
-      Error_accumulator.iter_contexts internal_errors ~f:(fun context errors ->
-          print_category_header
-            (max_severity_of_list (List.map errors ~f:fst))
-            "%s" context ;
-          List.iter errors ~f:(fun (severity, { occurrence_time; error }) ->
-              color_eprintf
-                (color_of_severity severity)
-                "    [%s] %s\n"
-                (Time.to_string occurrence_time)
-                (Error.to_string_hum error) ) ) ;
-      (* report non-contextualized internal errors *)
-      List.iter internal_errors.from_current_context
-        ~f:(fun (severity, { occurrence_time; error }) ->
-          color_eprintf
-            (color_of_severity severity)
-            "[%s] %s\n"
-            (Time.to_string occurrence_time)
-            (Error.to_string_hum error) ) ;
-      (* determine if test is passed/failed and exit accordingly *)
-      let test_failed =
-        match (log_errors_severity, internal_errors_severity) with
-        | _, `Hard | _, `Soft ->
-            true
-        (* TODO: re-enable log error checks after libp2p logs are cleaned up *)
-        | `Hard, _ | `Soft, _ | `None, `None ->
-            false
-      in
-      Print.eprintf "\n" ;
-      let exit_code =
-        if test_failed then (
-          color_eprintf Bash_colors.red
-            "The test has failed. See the above errors for details.\n\n" ;
-          match (internal_error_set.exit_code, log_error_set.exit_code) with
-          | None, None ->
-              Some 1
-          | Some exit_code, _ | None, Some exit_code ->
-              Some exit_code )
-        else (
-          color_eprintf Bash_colors.green
-            "The test has completed successfully.\n\n" ;
-          None )
-      in
-      let%bind () = Writer.(flushed (Lazy.force stderr)) in
-      return exit_code
-
 (* TODO: refactor cleanup system (smells like a monad for composing linear resources would help a lot) *)
 
 let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
@@ -219,7 +92,8 @@ let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
       combine [ test_error_set; of_hard_or_error log_engine_cleanup_result ]
     in
     let%bind exit_code =
-      report_test_errors ~log_error_set ~internal_error_set
+      Test_result.calculate_test_result ~log_error_set ~internal_error_set
+        ~logger
     in
     let%bind () = pause_cleanup_func () in
     let%bind () =
