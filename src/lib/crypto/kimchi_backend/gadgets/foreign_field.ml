@@ -1103,7 +1103,7 @@ let%test_unit "foreign_field_mul gadget" =
 
       (* 3) Add multi-range-check left input *)
       let left_input0, left_input1, left_input2 =
-      Element.Standard.to_limbs left_input
+        Element.Standard.to_limbs left_input
       in
       Range_check.multi_range_check
         (module Runner.Impl)
@@ -1111,7 +1111,7 @@ let%test_unit "foreign_field_mul gadget" =
 
       (* 4) Add multi-range-check right input *)
       let right_input0, right_input1, right_input2 =
-      Element.Standard.to_limbs right_input
+        Element.Standard.to_limbs right_input
       in
       Range_check.multi_range_check
         (module Runner.Impl)
