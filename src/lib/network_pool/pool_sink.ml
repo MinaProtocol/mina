@@ -158,7 +158,17 @@ module Base
         ( match cb' with
         | BC.External cb'' ->
             Diff.update_metrics env' cb''
-              (Option.some_if log_gossip_heard logger)
+              (Option.some_if log_gossip_heard logger) ;
+            don't_wait_for
+              ( match%map Mina_net2.Validation_callback.await cb'' with
+              | None ->
+                  let diff = Envelope.Incoming.data env' in
+                  [%log error]
+                    !"Validation timed out on %s $diff"
+                    Diff.label
+                    ~metadata:[ ("diff", Diff.to_yojson diff) ]
+              | Some _ ->
+                  () )
         | _ ->
             () ) ;
         if Throttle.num_jobs_waiting_to_start throttle > max_waiting_jobs then
