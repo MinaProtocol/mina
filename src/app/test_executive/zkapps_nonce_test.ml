@@ -39,7 +39,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Some
           { node_name = "snark-node"
           ; account_name = "snark-node-key"
-          ; worker_nodes = 8
+          ; worker_nodes = 5
           }
     ; snark_worker_fee = "0.0001"
     ; proof_config =
@@ -365,11 +365,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       (*wait for blocks required to produce 2 proofs given 0.75 slot fill rate + some buffer*)
       let soft_timeout =
         Network_time_span.Slots
-          (Test_config.slots_of_blocks (blocks_for_first_proof_exn + 5))
+          (Test_config.slots_of_blocks (blocks_for_first_proof_exn + 6))
       in
       let hard_timeout =
         Network_time_span.Slots
-          (Test_config.slots_of_blocks (blocks_for_first_proof_exn + 10))
+          (Test_config.slots_of_blocks (blocks_for_first_proof_exn + 12))
       in
       section_hard "Wait for proof to be emitted"
         ( wait_for t
