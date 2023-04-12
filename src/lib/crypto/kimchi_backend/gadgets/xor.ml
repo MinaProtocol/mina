@@ -117,18 +117,18 @@ let bxor (type f)
   as_prover (fun () ->
       (* Read inputs, Convert to field type *)
       let input1_field =
-        Common.cvar_field_to_field_as_prover (module Circuit) input1
+        cvar_field_to_field_as_prover (module Circuit) input1
       in
       let input2_field =
-        Common.cvar_field_to_field_as_prover (module Circuit) input2
+        cvar_field_to_field_as_prover (module Circuit) input2
       in
 
       (* Transform to big integer *)
       let input1_big =
-        Common.field_to_bignum_bigint (module Circuit) input1_field
+        field_to_bignum_bigint (module Circuit) input1_field
       in
       let input2_big =
-        Common.field_to_bignum_bigint (module Circuit) input2_field
+        field_to_bignum_bigint (module Circuit) input2_field
       in
 
       (* Check real lengths are at most the desired length *)
@@ -168,8 +168,8 @@ let bxor (type f)
   in
 
   (* Pad with zeros in MSB until reaching same length *)
-  let input1_bits = Common.pad_upto ~length ~value:false input1_bits in
-  let input2_bits = Common.pad_upto ~length ~value:false input2_bits in
+  let input1_bits = pad_upto ~length ~value:false input1_bits in
+  let input2_bits = pad_upto ~length ~value:false input2_bits in
 
   (* Pad with more zeros until the length is a multiple of 4*n for n-bit length lookup table *)
   let pad_length =
@@ -178,10 +178,10 @@ let bxor (type f)
     else length
   in
   let input1_bits =
-    Common.pad_upto ~length:pad_length ~value:false input1_bits
+    pad_upto ~length:pad_length ~value:false input1_bits
   in
   let input2_bits =
-    Common.pad_upto ~length:pad_length ~value:false input2_bits
+    pad_upto ~length:pad_length ~value:false input2_bits
   in
 
   (* Xor list of bits to obtain output of the xor *)
@@ -194,7 +194,7 @@ let bxor (type f)
   bxor_rec input1_bits input2_bits output_bits pad_length len_xor ;
 
   (* Convert back to field *)
-  Common.field_to_cvar_field (module Circuit)
+  field_to_cvar_field (module Circuit)
   @@ Field.Constant.project output_bits
 
 (* Xor of 16 bits *)
