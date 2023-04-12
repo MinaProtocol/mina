@@ -14,12 +14,12 @@ postgresql:
       storageClass: ssd-delete
     initdb:
       user: "minadash"
-      password: "zo3moong7moog4Iep7eNgo3iecaesahH"
+      password: null
       scripts:
         zkapp-table.sql : CREATE TABLE zkapps (time timestamp, unique_zkapps INT, total_zkapps INT, successful_txns INT, failed_txns INT, total_txns INT, successful_payments INT, failed_payments INT, total_payments INT, total_acct_updates INT);
   auth:
     username: "minadash"
-    password: "zo3moong7moog4Iep7eNgo3iecaesahH"
+    password: null
     database: "dashboard-db"
     enablePostgresUser: false
 
