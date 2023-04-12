@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 	"context"
+	"io/ioutil"
+	"encoding/json"
 	itn "block_producers_uptime/itn_uptime_analyzer"
 	dg "block_producers_uptime/delegation_backend"
 	"google.golang.org/api/iterator"
@@ -28,6 +30,16 @@ func main (){
 	log := logging.Logger("itn availability script")
 	log.Infof("itn availability script has the following logging subsystems active: %v", logging.GetSubsystems())
 
+	// Create identity struct TODO move this to itn_uptime_analyzer package
+
+	// type NodeIdentity struct {
+	// 	PubKey string
+	// 	IP string
+	// 	// GraphQLPort int
+	// }
+
+	var identities map[string]interface{}
+
 	// Empty context object and initializing memory for application
 
 	ctx := context.Background()
@@ -36,15 +48,18 @@ func main (){
 
 	// Get current time and date
 
-	currentTime := itn.GetCurrentTime()
+	// currentTime := itn.GetCurrentTime()
+	currentTime := time.Date(2023, time.April, 3, 23, 59, 0, 0, time.UTC)
 	currentDateString := currentTime.Format(time.RFC3339)[:10]
-	fmt.Println(currentTime)
+	fmt.Println(currentTime.Format(time.RFC3339))
 	fmt.Println(currentDateString)
 
 	// Get last execution of application
 
-	lastExecutionTimeString := itn.GetLastExecutionTime(currentTime)
-	lastExecutionDateString := lastExecutionTimeString[:10]
+	lastExecutionTime := itn.GetLastExecutionTime(currentTime)
+	lastExecutionDateString := lastExecutionTime.Format(time.RFC3339)[:10]
+	fmt.Println(lastExecutionDateString)
+	fmt.Println(lastExecutionTime.Format(time.RFC3339))
 	// Create Google Cloud client
 
 	client, err1 := storage.NewClient(ctx)
@@ -55,9 +70,8 @@ func main (){
 
 	// Create prefix for filtering the entries from the last 12 hours
 
-	// prefix := strings.Join([]string{"submissions", currentDateString}, "/")
-	prefixCurrent := strings.Join([]string{"submissions", "2023-04-04"}, "/")
-	prefixPast := strings.Join([]string{"submissions", lastExecutionDateString}, "/")
+	prefixCurrent := strings.Join([]string{"submissions", currentDateString}, "/")
+	// prefixPast := strings.Join([]string{"submissions", lastExecutionDateString}, "/")
 
 	submissions := client.Bucket(dg.CloudBucketName()).Objects(ctx, &storage.Query{Prefix: prefixCurrent})
 	
@@ -69,7 +83,29 @@ func main (){
 		if err != nil {
 			log.Fatalf("Failed to iterate over objects: %v", err)
 		}
-		fmt.Println(obj.Name)
+		submissionTimeString := obj.Name[23:43]
+		submissionTime, err := time.Parse(time.RFC3339, submissionTimeString)
+		if err != nil {
+			fmt.Println("Error parsing time:", err)
+			return
+		}
+		if (submissionTime.After(lastExecutionTime)) && (submissionTime.Before(currentTime)) {
+			reader, err := client.Bucket(dg.CloudBucketName()).Object(obj.Name).NewReader(ctx)
+			if err != nil {
+				fmt.Printf("Error getting creating reader for json: %v\n", err)
+			}
+			contentJSON, err := ioutil.ReadAll(reader)
+			if err != nil {
+				fmt.Printf("Error reading json: %v\n", err)
+			}
+			// fmt.Println("Type is %T", contentJSON)
+			// fmt.Println(contentJSON)
+			err1 = json.Unmarshal(contentJSON, &identities)
+			if err1 != nil {
+				fmt.Printf("Error converting json to string: %v\n", err1)
+			}
+			fmt.Println(identities)
+		}
 	}
 
 	// blocks := client.Bucket(dg.CloudBucketName()).Object("blocks")
