@@ -827,13 +827,12 @@ let%test_unit "foreign_field_mul gadget" =
     in
 
     (* Set up another witness *)
-    let _mutate_witness value =
+    let mutate_witness value =
       Bignum_bigint.(if equal zero value then value + one else value - one)
     in
 
-    (* let left_input = mutate_witness left_input in
-       let right_input = mutate_witness right_input in
-       let foreign_field_modulus = mutate_witness foreign_field_modulus in *)
+    let left_input = mutate_witness left_input in
+    let right_input = mutate_witness right_input in
 
     (* Generate and verify second proof, reusing constraint system *)
     let _cs, _proof_keypair, _proof =
@@ -952,9 +951,10 @@ let%test_unit "foreign_field_mul gadget" =
       Bignum_bigint.(if equal zero value then value + one else value - one)
     in
 
-    (* let left_input = mutate_witness left_input in
-       let right_input = mutate_witness right_input in *)
-    (* let _foreign_field_modulus = mutate_witness foreign_field_modulus in *)
+    (* TODO: fix this case
+       let left_input = mutate_witness left_input in
+       let right_input = mutate_witness right_input in
+    *)
 
     (* Generate and verify second proof, reusing constraint system *)
     let _cs, _proof_keypair, _proof =
