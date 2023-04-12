@@ -3038,43 +3038,47 @@ module Types = struct
 
       module ZkappCommandsDetails = struct
         type input =
-          { account_creator : Signature_lib.Private_key.t
+          { account_creators : Signature_lib.Private_key.t list
           ; fee_payers : Signature_lib.Private_key.t list
-          ; num_of_zkapp_accounts : int
-          ; generating_new_accounts : int
+          ; num_zkapps_to_deploy : int
+          ; num_new_accounts : int
           ; transactions_per_second : float
           ; duration_in_minutes : int
+          ; memo_prefix : string
           }
 
         let arg_typ =
           obj "ZkappCommandsDetails"
             ~doc:"Keys and other information for scheduling zkapp commands"
-            ~coerce:(fun account_creator fee_payers num_of_zkapp_accounts
-                         generating_new_accounts transactions_per_second
-                         duration_in_minutes ->
+            ~coerce:(fun account_creators fee_payers num_zkapps_to_deploy
+                         num_new_accounts transactions_per_second
+                         duration_in_minutes memo_prefix ->
               Result.return
-                { account_creator
+                { account_creators
                 ; fee_payers
-                ; num_of_zkapp_accounts
-                ; generating_new_accounts
+                ; num_zkapps_to_deploy
+                ; num_new_accounts
                 ; transactions_per_second
                 ; duration_in_minutes
+                ; memo_prefix
                 } )
             ~split:(fun f (t : input) ->
-              f t.account_creator t.fee_payers t.num_of_zkapp_accounts
-                t.generating_new_accounts t.transactions_per_second
-                t.duration_in_minutes )
+              f t.account_creators t.fee_payers t.num_zkapps_to_deploy
+                t.num_new_accounts t.transactions_per_second
+                t.duration_in_minutes t.memo_prefix )
             ~fields:
               Arg.
-                [ arg "accountCreator"
-                    ~typ:(non_null PrivateKey.arg_typ)
-                    ~doc:"Private key of the account creator"
+                [ arg "accountCreators"
+                    ~typ:(non_null (list (non_null PrivateKey.arg_typ)))
+                    ~doc:"Private keys of the account creator"
                 ; arg "feePayers"
                     ~typ:(non_null (list (non_null PrivateKey.arg_typ)))
                     ~doc:"Private keys of fee payers"
-                ; arg "numZkappAccountsToCreate" ~typ:(non_null int)
-                    ~doc:"Number of zkapp accounts that we created for the test"
-                ; arg "numNewAccountsToGenerate" ~typ:(non_null int)
+                ; arg "numZkappsToDeploy" ~typ:(non_null int)
+                    ~doc:
+                      "Number of zkapp accounts that we deploy for the purpose \
+                       of test"
+                ; arg "numNewAccounts" ~typ:(non_null int)
                     ~doc:
                       "Number of zkapp accounts that the scheduler generates \
                        during the test"
@@ -3082,6 +3086,7 @@ module Types = struct
                     ~doc:"Frequency of transactions"
                 ; arg "durationInMinutes" ~doc:"Length of scheduler run"
                     ~typ:(non_null int)
+                ; arg "memoPrefix" ~doc:"Prefix of memo" ~typ:(non_null string)
                 ]
       end
     end
@@ -4310,12 +4315,20 @@ module Mutations = struct
 
     let deploy_zkapps ~mina ~ledger
         ~(fee_payer_keypair : Signature_lib.Keypair.t)
-        ~(account_creator_keypair : Signature_lib.Keypair.t)
-        ~constraint_constants ~logger keypairs =
+        ~(account_creator_array : Signature_lib.Keypair.t Array.t)
+        ~constraint_constants ~logger ~memo_prefix keypairs =
       let fee_payer_account = account_of_kp fee_payer_keypair ledger in
-      let account_creator = account_of_kp account_creator_keypair ledger in
       let fee_payer_nonce = ref fee_payer_account.nonce in
+      let account_creator_ndx = ref 0 in
+      let num_account_creators = Array.length account_creator_array in
       Deferred.List.iter keypairs ~f:(fun kp ->
+          let account_creator_keypair =
+            account_creator_array.(!account_creator_ndx)
+          in
+          let account_creator = account_of_kp account_creator_keypair ledger in
+          let memo =
+            sprintf "%s-%s" memo_prefix (Int.to_string !account_creator_ndx)
+          in
           let spec =
             { Transaction_snark.For_tests.Deploy_snapp_spec.sender =
                 (account_creator_keypair, account_creator.nonce)
@@ -4323,7 +4336,7 @@ module Mutations = struct
             ; fee_payer = Some (fee_payer_keypair, !fee_payer_nonce)
             ; amount = Currency.Amount.of_mina_string_exn "20000.0"
             ; zkapp_account_keypairs = [ kp ]
-            ; memo = Signed_command_memo.empty
+            ; memo = Signed_command_memo.create_from_string_exn memo
             ; new_zkapp_account = true
             ; snapp_update = Account_update.Update.dummy
             ; preconditions = None
@@ -4338,6 +4351,8 @@ module Mutations = struct
             match%bind send_zkapp_command mina zkapp_command with
             | Ok _ ->
                 fee_payer_nonce := Account.Nonce.succ !fee_payer_nonce ;
+                account_creator_ndx :=
+                  (!account_creator_ndx + 1) mod num_account_creators ;
                 [%log info]
                   "Successfully submitted zkApp command that creates a zkApp \
                    account"
@@ -4371,8 +4386,8 @@ module Mutations = struct
 
     let rec wait_until_zkapps_deployed ?(deployed = false) ~mina ~ledger
         ~(fee_payer_keypair : Signature_lib.Keypair.t)
-        ~(account_creator_keypair : Signature_lib.Keypair.t)
-        ~constraint_constants ~logger ~uuid ~stop_signal ~stop_time
+        ~(account_creator_array : Signature_lib.Keypair.t Array.t)
+        ~constraint_constants ~logger ~uuid ~stop_signal ~stop_time ~memo_prefix
         (keypairs : Signature_lib.Keypair.t list) =
       if Time.( >= ) (Time.now ()) stop_time then (
         [%log info] "Scheduled zkApp commands with handle %s has expired"
@@ -4392,7 +4407,8 @@ module Mutations = struct
           if not deployed then (
             [%log info] "Start deploying zkApp accounts" ;
             deploy_zkapps ~mina ~ledger ~fee_payer_keypair
-              ~account_creator_keypair ~constraint_constants ~logger keypairs )
+              ~account_creator_array ~constraint_constants ~logger ~memo_prefix
+              keypairs )
           else return ()
         in
         [%log debug] "The accounts were not in the best tip $ledger, try again"
@@ -4411,8 +4427,8 @@ module Mutations = struct
                  new_ledger )
         in
         wait_until_zkapps_deployed ~deployed:true ~mina ~ledger
-          ~fee_payer_keypair ~account_creator_keypair ~constraint_constants
-          ~logger ~uuid ~stop_signal ~stop_time keypairs
+          ~fee_payer_keypair ~account_creator_array ~constraint_constants
+          ~logger ~uuid ~stop_signal ~stop_time ~memo_prefix keypairs
 
     let schedule_zkapp_commands =
       io_field "scheduleZkappCommands"
@@ -4461,17 +4477,16 @@ module Mutations = struct
                       (Mina_lib.config mina).precomputed_values
                     in
                     let zkapp_account_keypairs =
-                      List.init zkapp_command_details.num_of_zkapp_accounts
+                      List.init zkapp_command_details.num_zkapps_to_deploy
                         ~f:(fun _ -> Signature_lib.Keypair.create ())
                     in
                     let unused_keypairs =
-                      List.init
-                        (20 + zkapp_command_details.generating_new_accounts)
+                      List.init (20 + zkapp_command_details.num_new_accounts)
                         ~f:(fun _ -> Signature_lib.Keypair.create ())
                     in
-                    let account_creator_keypair =
-                      Signature_lib.Keypair.of_private_key_exn
-                        zkapp_command_details.account_creator
+                    let account_creator_keypairs =
+                      List.map zkapp_command_details.account_creators
+                        ~f:Signature_lib.Keypair.of_private_key_exn
                     in
                     let fee_payer_keypairs =
                       List.map zkapp_command_details.fee_payers
@@ -4484,18 +4499,24 @@ module Mutations = struct
                       List.map zkapp_account_keypairs ~f:id_of_kp
                     in
                     let num_fee_payers = List.length fee_payer_keypairs in
-                    let fee_payer_arrays = Array.of_list fee_payer_keypairs in
-                    let fee_payer_keypair = fee_payer_keypairs |> List.hd_exn in
+                    let fee_payer_array = Array.of_list fee_payer_keypairs in
+                    let account_creator_array =
+                      Array.of_list account_creator_keypairs
+                    in
+                    let fee_payer_keypair = fee_payer_array.(0) in
                     match
                       Option.try_with (fun () ->
-                          account_of_kp fee_payer_keypair ledger )
+                          Array.map fee_payer_array ~f:(fun fee_payer_keypair ->
+                              account_of_kp fee_payer_keypair ledger ) )
                     with
                     | None ->
                         Error "fee payer not in the ledger"
                     | Some _ -> (
                         match
                           Option.try_with (fun () ->
-                              account_of_kp account_creator_keypair ledger )
+                              Array.map account_creator_array
+                                ~f:(fun account_creator_keypair ->
+                                  account_of_kp account_creator_keypair ledger ) )
                         with
                         | None ->
                             Error "account creator not in the ledger"
@@ -4510,7 +4531,7 @@ module Mutations = struct
                               |> Public_key.Compressed.Map.of_alist_exn
                             in
                             let rec go ~vk ~prover account_state_tbl ndx tm_next
-                                =
+                                counter =
                               if Time.( >= ) (Time.now ()) tm_end then (
                                 [%log info]
                                   "Scheduled zkApp commands with handle %s has \
@@ -4526,7 +4547,7 @@ module Mutations = struct
                                 Uuid.Table.remove scheduler_tbl uuid ;
                                 Deferred.unit )
                               else
-                                let fee_payer = fee_payer_arrays.(ndx) in
+                                let fee_payer = fee_payer_array.(ndx) in
                                 let%bind () =
                                   match get_ledger_and_breadcrumb mina with
                                   | None ->
@@ -4553,14 +4574,25 @@ module Mutations = struct
                                       in
                                       let generate_new_accounts =
                                         number_of_accounts_generated
-                                        < zkapp_command_details
-                                            .generating_new_accounts
+                                        < zkapp_command_details.num_new_accounts
+                                      in
+                                      let (fee_payer_account : Account.t), _ =
+                                        Account_id.Table.find_exn
+                                          account_state_tbl (id_of_kp fee_payer)
+                                      in
+                                      let memo =
+                                        Printf.sprintf "%s-%s-%s-%s"
+                                          zkapp_command_details.memo_prefix
+                                          (Int.to_string_hum ndx)
+                                          (Mina_numbers.Account_nonce.to_string
+                                             fee_payer_account.nonce )
+                                          (Int.to_string_hum counter)
                                       in
                                       let zkapp_command_with_dummy_auth =
                                         Quickcheck.Generator.generate
                                           (Mina_generators
                                            .Zkapp_command_generators
-                                           .gen_zkapp_command_from
+                                           .gen_zkapp_command_from ~memo
                                              ~ignore_action_state_precond:true
                                              ~no_token_accounts:true
                                              ~limited:true
@@ -4603,14 +4635,16 @@ module Mutations = struct
                                 let next_tm_next = Time.add tm_next wait_span in
                                 go ~vk ~prover account_state_tbl
                                   ((ndx + 1) mod num_fee_payers)
-                                  next_tm_next
+                                  next_tm_next (counter + 1)
                             in
                             upon
                               (wait_until_zkapps_deployed ~mina ~ledger
-                                 ~fee_payer_keypair ~account_creator_keypair
+                                 ~fee_payer_keypair ~account_creator_array
                                  ~constraint_constants zkapp_account_keypairs
                                  ~logger ~uuid ~stop_signal:ivar
-                                 ~stop_time:tm_end ) (fun result ->
+                                 ~stop_time:tm_end
+                                 ~memo_prefix:zkapp_command_details.memo_prefix )
+                              (fun result ->
                                 match result with
                                 | None ->
                                     ()
@@ -4635,7 +4669,7 @@ module Mutations = struct
                                     in
                                     don't_wait_for
                                     @@ go account_state_tbl ~vk ~prover 0
-                                         tm_next ) ;
+                                         tm_next 0 ) ;
 
                             Ok (Uuid.to_string uuid) ) ) ) )
 

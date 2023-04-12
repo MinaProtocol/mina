@@ -46,6 +46,7 @@ val gen_protocol_state_precondition :
   *)
 val gen_zkapp_command_from :
      ?global_slot:Mina_numbers.Global_slot.t
+  -> ?memo:string
   -> ?ignore_action_state_precond:bool
   -> ?no_token_accounts:bool
   -> ?limited:bool
