@@ -108,26 +108,40 @@ let%test_unit "generic gadgets" =
    *   Returns true if constraints are satisfied, false otherwise.
    *)
   let test_generic_add left_input right_input sum : unit =
-    let _proof_keypair, _proof =
+    let circuit left_input right_input sum =
+      let open Runner.Impl in
+      (* Set up snarky variables for inputs and outputs *)
+      let left_input =
+        exists Field.typ ~compute:(fun () -> Field.Constant.of_int left_input)
+      in
+      let right_input =
+        exists Field.typ ~compute:(fun () -> Field.Constant.of_int right_input)
+      in
+      let sum =
+        exists Field.typ ~compute:(fun () -> Field.Constant.of_int sum)
+      in
+      (* Use the generic add gate gadget *)
+      let result = add (module Runner.Impl) left_input right_input in
+      Field.Assert.equal sum result ;
+      (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
+      Boolean.Assert.is_true (Field.equal sum sum)
+    in
+
+    (* Generate and verify first proof *)
+    let cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
-          let open Runner.Impl in
-          (* Set up snarky variables for inputs and outputs *)
-          let left_input =
-            exists Field.typ ~compute:(fun () ->
-                Field.Constant.of_int left_input )
-          in
-          let right_input =
-            exists Field.typ ~compute:(fun () ->
-                Field.Constant.of_int right_input )
-          in
-          let sum =
-            exists Field.typ ~compute:(fun () -> Field.Constant.of_int sum)
-          in
-          (* Use the generic add gate gadget *)
-          let result = add (module Runner.Impl) left_input right_input in
-          Field.Assert.equal sum result ;
-          (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
-          Boolean.Assert.is_true (Field.equal sum sum) )
+          circuit left_input right_input sum )
+    in
+
+    (* Set up another witness *)
+    let left_input = left_input * 13 in
+    let right_input = right_input * 21 in
+    let sum = left_input + right_input in
+
+    (* Generate and verify second proof, reusing constraint system *)
+    let _cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof ~cs (fun () ->
+          circuit left_input right_input sum )
     in
     ()
   in
@@ -137,7 +151,7 @@ let%test_unit "generic gadgets" =
    *   Returns true if constraints are satisfied, false otherwise.
    *)
   let test_generic_sub left_input right_input difference : unit =
-    let _proof_keypair, _proof =
+    let _cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
           let open Runner.Impl in
           (* Set up snarky variables for inputs and outputs *)
@@ -167,26 +181,40 @@ let%test_unit "generic gadgets" =
    *   Returns true if constraints are satisfied, false otherwise.
    *)
   let test_generic_mul left_input right_input prod =
-    let _proof_keypair, _proof =
+    let circuit left_input right_input prod =
+      let open Runner.Impl in
+      (* Set up snarky variables for inputs and outputs *)
+      let left_input =
+        exists Field.typ ~compute:(fun () -> Field.Constant.of_int left_input)
+      in
+      let right_input =
+        exists Field.typ ~compute:(fun () -> Field.Constant.of_int right_input)
+      in
+      let prod =
+        exists Field.typ ~compute:(fun () -> Field.Constant.of_int prod)
+      in
+      (* Use the generic mul gate gadget *)
+      let result = mul (module Runner.Impl) left_input right_input in
+      Field.Assert.equal prod result ;
+      (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
+      Boolean.Assert.is_true (Field.equal prod prod)
+    in
+
+    (* Generate and verify first proof *)
+    let cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
-          let open Runner.Impl in
-          (* Set up snarky variables for inputs and outputs *)
-          let left_input =
-            exists Field.typ ~compute:(fun () ->
-                Field.Constant.of_int left_input )
-          in
-          let right_input =
-            exists Field.typ ~compute:(fun () ->
-                Field.Constant.of_int right_input )
-          in
-          let prod =
-            exists Field.typ ~compute:(fun () -> Field.Constant.of_int prod)
-          in
-          (* Use the generic mul gate gadget *)
-          let result = mul (module Runner.Impl) left_input right_input in
-          Field.Assert.equal prod result ;
-          (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
-          Boolean.Assert.is_true (Field.equal prod prod) )
+          circuit left_input right_input prod )
+    in
+
+    (* Set up another witness *)
+    let left_input = left_input * 5 in
+    let right_input = right_input * 7 in
+    let prod = left_input * right_input in
+
+    (* Generate and verify second proof, reusing constraint system *)
+    let _cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof ~cs (fun () ->
+          circuit left_input right_input prod )
     in
     ()
   in

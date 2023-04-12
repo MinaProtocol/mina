@@ -218,16 +218,30 @@ let%test_unit "range_check64 gadget" =
    *   Input: value to be range checked in [0, 2^64)
    *)
   let test_range_check64 base10 : unit =
-    let _proof_keypair, _proof =
-      Runner.generate_and_verify_proof (fun () ->
-          let open Runner.Impl in
-          let value =
-            exists Field.typ ~compute:(fun () ->
-                Field.Constant.of_string base10 )
-          in
-          range_check64 (module Runner.Impl) value ;
-          (* Padding *)
-          Boolean.Assert.is_true (Field.equal value value) )
+    let open Runner.Impl in
+    let value = Common.field_of_base10 (module Runner.Impl) base10 in
+
+    let make_circuit value =
+      (* Circuit definition *)
+      let value = exists Field.typ ~compute:(fun () -> value) in
+      range_check64 (module Runner.Impl) value ;
+      (* Padding *)
+      Boolean.Assert.is_true (Field.equal value value)
+    in
+
+    (* Generate and verify first proof *)
+    let cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof (fun () -> make_circuit value)
+    in
+
+    (* Set up another witness *)
+    let value =
+      Field.Constant.(if equal zero value then value + one else value - one)
+    in
+
+    (* Generate and verify second proof, reusing constraint system *)
+    let _cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof ~cs (fun () -> make_circuit value)
     in
     ()
   in
@@ -257,19 +271,36 @@ let%test_unit "multi_range_check gadget" =
 
   (* Helper to test multi_range_check gadget *)
   let test_multi_range_check v0 v1 v2 : unit =
-    let _proof_keypair, _proof =
-      Runner.generate_and_verify_proof (fun () ->
-          let open Runner.Impl in
-          let values =
-            exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
-                [| Field.Constant.of_string v0
-                 ; Field.Constant.of_string v1
-                 ; Field.Constant.of_string v2
-                |] )
-          in
-          multi_range_check
-            (module Runner.Impl)
-            values.(0) values.(1) values.(2) )
+    let open Runner.Impl in
+    let v0 = Common.field_of_base10 (module Runner.Impl) v0 in
+    let v1 = Common.field_of_base10 (module Runner.Impl) v1 in
+    let v2 = Common.field_of_base10 (module Runner.Impl) v2 in
+
+    let make_circuit v0 v1 v2 =
+      (* Circuit definition *)
+      let values =
+        exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
+            [| v0; v1; v2 |] )
+      in
+      multi_range_check (module Runner.Impl) values.(0) values.(1) values.(2)
+    in
+
+    (* Generate and verify first proof *)
+    let cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof (fun () -> make_circuit v0 v1 v2)
+    in
+
+    (* Set up another witness *)
+    let mutate_witness value =
+      Field.Constant.(if equal zero value then value + one else value - one)
+    in
+    let v0 = mutate_witness v0 in
+    let v1 = mutate_witness v1 in
+    let v2 = mutate_witness v2 in
+
+    (* Generate and verify second proof, reusing constraint system *)
+    let _cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof ~cs (fun () -> make_circuit v0 v1 v2)
     in
     ()
   in
@@ -319,17 +350,35 @@ let%test_unit "compact_multi_range_check gadget" =
 
   (* Helper to test compact_multi_range_check gadget *)
   let test_compact_multi_range_check v01 v2 : unit =
-    let _proof_keypair, _proof =
-      Runner.generate_and_verify_proof (fun () ->
-          let open Runner.Impl in
-          let v01, v2 =
-            exists
-              Typ.(Field.typ * Field.typ)
-              ~compute:(fun () ->
-                (Field.Constant.of_string v01, Field.Constant.of_string v2) )
-          in
-          compact_multi_range_check (module Runner.Impl) v01 v2 )
+    let open Runner.Impl in
+    let v01 = Common.field_of_base10 (module Runner.Impl) v01 in
+    let v2 = Common.field_of_base10 (module Runner.Impl) v2 in
+
+    let make_circuit v01 v2 =
+      (* Circuit definition *)
+      let v01, v2 =
+        exists Typ.(Field.typ * Field.typ) ~compute:(fun () -> (v01, v2))
+      in
+      compact_multi_range_check (module Runner.Impl) v01 v2
     in
+
+    (* Generate and verify first proof *)
+    let cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof (fun () -> make_circuit v01 v2)
+    in
+
+    (* Set up another witness *)
+    let mutate_witness value =
+      Field.Constant.(if equal zero value then value + one else value - one)
+    in
+    let v01 = mutate_witness v01 in
+    let v2 = mutate_witness v2 in
+
+    (* Generate and verify second proof, reusing constraint system *)
+    let _cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof ~cs (fun () -> make_circuit v01 v2)
+    in
+
     ()
   in
 

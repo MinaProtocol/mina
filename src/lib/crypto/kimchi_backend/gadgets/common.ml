@@ -189,7 +189,7 @@ let%test_unit "helper field_bits_le_to_field" =
     try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
   in
 
-  let _proof_keypair, _proof =
+  let _cs, _proof_keypair, _proof =
     Runner.generate_and_verify_proof (fun () ->
         let open Runner.Impl in
         let of_bits =
