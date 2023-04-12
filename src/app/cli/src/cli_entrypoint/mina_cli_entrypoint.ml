@@ -101,9 +101,7 @@ let setup_daemon logger =
           "PUBLICKEYS A comma-delimited list of Ed25519 public keys that are \
            permitted to send signed requests to the incentivized testnet \
            GraphQL server"
-    else
-      flag "--itn-keys" (optional string)
-        ~doc:"PUBLICKEYS (Unused in this daemon)"
+    else Command.Param.return None
   and demo_mode =
     flag "--demo-mode" ~aliases:[ "demo-mode" ] no_arg
       ~doc:
@@ -156,7 +154,12 @@ let setup_daemon logger =
   and client_port = Flag.Port.Daemon.client
   and rest_server_port = Flag.Port.Daemon.rest_server
   and limited_graphql_port = Flag.Port.Daemon.limited_graphql_server
-  and itn_graphql_port = Flag.Port.Daemon.itn_graphql_server
+  and itn_graphql_port =
+    if Mina_compile_config.itn_features then
+      flag "--itn-graphql-port" ~aliases:[ "itn-graphql-port" ]
+        ~doc:"PORT GraphQL-server for incentivized testnet interaction"
+        (optional int)
+    else Command.Param.return None
   and open_limited_graphql_port =
     flag "--open-limited-graphql-port"
       ~aliases:[ "open-limited-graphql-port" ]
@@ -802,14 +805,6 @@ let setup_daemon logger =
               limited_graphql_port
             in
             maybe_from_config YJ.Util.to_int_option name value
-          in
-          let itn_graphql_port =
-            if Mina_compile_config.itn_features then
-              let ({ value; name } : int option Flag.Types.with_name) =
-                itn_graphql_port
-              in
-              maybe_from_config YJ.Util.to_int_option name value
-            else None
           in
           let client_port = get_port client_port in
           let snark_work_fee_flag =
