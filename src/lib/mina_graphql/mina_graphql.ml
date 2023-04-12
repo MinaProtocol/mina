@@ -5135,9 +5135,36 @@ module Queries = struct
       field "auth" ~typ:bool
         ~args:Arg.[]
         ~doc:"Returns true if query is authorized"
-        ~resolve:(fun _ _ -> Some true)
+        ~resolve:(fun _ () -> Some true)
 
-    let commands = [ auth ]
+    let slots_won =
+      io_field "slotsWon"
+        ~typ:(non_null (list (non_null int)))
+        ~args:Arg.[]
+        ~doc:"Slots won by a block producer for current epoch"
+        ~resolve:(fun { ctx = mina; _ } () ->
+          let bp_keys = Mina_lib.block_production_pubkeys mina in
+          if Public_key.Compressed.Set.is_empty bp_keys then
+            return @@ Error "Not a block producing node"
+          else
+            let vrf_evaluator = Mina_lib.vrf_evaluator mina in
+            let logger = Mina_lib.top_level_logger mina in
+            let%map vrf_result =
+              Block_producer.Vrf_evaluation_state.poll_vrf_evaluator ~logger
+                vrf_evaluator
+            in
+            match vrf_result.evaluator_status with
+            | Completed ->
+                let slots_since_hard_fork =
+                  List.map vrf_result.slots_won ~f:(fun { global_slot; _ } ->
+                      Unsigned.UInt32.to_int global_slot )
+                  |> List.sort ~compare:Int.compare
+                in
+                Ok slots_since_hard_fork
+            | _ ->
+                Error "Vrf evaluation not completed for current epoch" )
+
+    let commands = [ auth; slots_won ]
   end
 end
 
