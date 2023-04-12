@@ -96,7 +96,7 @@ end
  *     - left_input and right_input must be in [0, foreign_field_modulus)
  *     - foreign_field_modulus must be less than than max foreign field modulus
  *)
-val mul :
+val ffmul :
      (module Snark_intf.Run with type field = 'f)
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)

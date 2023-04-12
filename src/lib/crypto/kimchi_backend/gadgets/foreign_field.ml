@@ -156,6 +156,19 @@ module type Element_intf = sig
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> Bignum_bigint.t
+
+  (* Check that the foreign element is smaller than a given field modulus *)
+  val fits :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> 'field t
+    -> bool
+
+  (* Creates an extended element *)
+  val extend: 
+        (module Snark_intf.Run with type field = 'field)
+      -> 'field t
+      -> 'field Cvar.t extended_limbs
 end
 
 (* Foreign field element structures *)
@@ -216,6 +229,20 @@ end = struct
         : Bignum_bigint.t =
       let l0, l1, l2 = to_bignum_bigint_limbs (module Circuit) x in
       Bignum_bigint.(l0 + (two_to_limb * l1) + (two_to_2limb * l2))
+
+    let fits (type field)
+        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
+        (modulus : field t) : bool =
+      Bignum_bigint.(
+        to_bignum_bigint (module Circuit) x
+        < to_bignum_bigint (module Circuit) modulus)
+
+    let extend (type field)
+        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
+        : field Cvar.t extended_limbs =
+      let open Circuit in
+      let l0, l1, l2 = to_limbs x in
+      of_limbs (l0, l1, l2, Field.zero)
   end
 
   (* Extended limbs foreign field element *)
@@ -270,6 +297,18 @@ end = struct
       let l0, l1, l2, l3 = to_bignum_bigint_limbs (module Circuit) x in
       Bignum_bigint.(
         l0 + (two_to_limb * l1) + (two_to_2limb * l2) + (two_to_3limb * l3))
+
+    let fits (type field)
+        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
+        (modulus : field t) : bool =
+      Bignum_bigint.(
+        to_bignum_bigint (module Circuit) x
+        < to_bignum_bigint (module Circuit) modulus)
+
+    let extend (type field)
+        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
+        : field Cvar.t extended_limbs =
+      x
   end
 
   (* Compact limbs foreign field element *)
@@ -316,7 +355,22 @@ end = struct
         =
       let l01, l2 = to_bignum_bigint_limbs (module Circuit) x in
       Bignum_bigint.(l01 + (two_to_2limb * l2))
-  end
+
+    let fits (type field)
+        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
+        (modulus : field t) : bool =
+      Bignum_bigint.(
+        to_bignum_bigint (module Circuit) x
+        < to_bignum_bigint (module Circuit) modulus)
+  
+      let extend (type field)
+        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
+        : field Cvar.t extended_limbs =
+        let open Circuit in
+      let l01, l2 = to_limbs x in
+      of_limbs (l01, l2, Field.zero, Field.zero)
+
+      end
 end
 
 (* Structure for tracking external checks that must be made
@@ -482,12 +536,50 @@ let compute_ffadd_values (type f)
 
   (result, sign, field_overflow, carry_bot)
 
-(* Foreign field addition gadget definition *)
-let ffadd (type f) (module Circuit : Snark_intf.Run with type field = f)
+let ffadd_single (type f) (module Circuit : Snark_intf.Run with type field = f)
     (left_input : f Element.Standard.t) (right_input : f Element.Extended.t)
     (is_sub : bool) (foreign_field_modulus : f standard_limbs) :
+    f Element.Standard.t * f * f * f =
+  let open Circuit in
+  let result, sign, field_overflow, carry =
+    compute_ffadd_values (module Circuit) left_input right_input is_sub
+      foreign_field_modulus
+  in
+
+  (* Check that the result is in the correct range *)
+  let is_in_range =
+    let modulus =
+      field_standard_limbs_to_bignum_bigint (module Circuit) foreign_field_modulus
+    in
+    let result = Element.Standard.to_bignum_bigint (module Circuit) result in
+    Bignum_bigint.(result < modulus)
+  in
+  assert is_in_range ;
+
+  (result, sign, field_overflow, carry)
+
+(* FOREIGN FIELD ADDITION GADGET *)
+
+(* Definition of a gadget for a chain of foreign field additions
+   * - inputs: all the inputs to the chain of additions
+   * - is_sub: a list of booleans indicating whether the corresponding addition is a subtraction
+   * - foreign_field_modulus: the modulus of the foreign field (all the same)
+   * - with_range_check: whether to perform a range check on the result at the end of the chain or not (default is true)
+   * - Returns the final result of the chain of additions
+   *
+   * For n+1 inputs, the gadget creates n foreign field addition gates, followed by a final
+   * foreign field addition gate for the bound check. An additional multi range check must be performed.
+   * By default, the range check takes place right after the final Raw row.
+*)
+let ffadd_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
+    ?(with_range_check = true) (inputs : f Element.Standard.t list)
+    (is_sub : bool list) (foreign_field_modulus : f standard_limbs) :
     f Element.Standard.t * f External_checks.t =
   let open Circuit in
+  (* Check that the number of inputs is correct *)
+  let n = List.length is_sub in
+  assert (List.length inputs = n + 1) ;
+
   (* Check foreign field modulus < max allowed *)
   check_modulus (module Circuit) foreign_field_modulus ;
 
@@ -498,11 +590,76 @@ let ffadd (type f) (module Circuit : Snark_intf.Run with type field = f)
     foreign_field_modulus
   in
 
-  let ffadd_values =
+  (* Make sure that all inputs are smaller than the foreign modulus *)
+  (let modulus =
+     Element.Standard.of_bignum_bigint (module Circuit)
+     @@ field_standard_limbs_to_bignum_bigint
+          (module Circuit)
+          ( foreign_field_modulus0
+          , foreign_field_modulus1
+          , foreign_field_modulus2 )
+   in
+   List.iter inputs ~f:(fun input ->
+       assert (Element.Standard.fits (module Circuit) input modulus) ) ) ;
+
+  (* Initialize first left input *)
+  let left = List.hd_exn inputs in
+
+  (* For all n additions, compute its values and create gates *)
+  for i = 0 to n do
+    let right = List.nth_exn inputs (i + 1) in
+    let right = Element.Standard.extend (module Circuit) right in
+    let right0, right1, right2, right3 =
+      right in
+
+    let sub = List.nth_exn is_sub i in
+    let result, sign, field_overflow, carry =
+    compute_ffadd_values
+      (module Circuit)
+      left right sub foreign_field_modulus
+  in
+    ()
+  done ;
+
+  (* If range check is required, add the final gate *)
+
+  (* Initialize first right input *)
+  
+  (* Obtain the values for FFAdd *)
+  let result, sign, field_overflow, carry =
     compute_ffadd_values
       (module Circuit)
       left_input right_input is_sub foreign_field_modulus
   in
+  (* Parse the result as limbs *)
+  let result0, result1, result2 =
+    Element.Standard.to_field_limbs (module Circuit) result
+  in
+
+  with_label "ffadd_gate" (fun () ->
+      (* Set up FFAdd gate *)
+      assert_
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (ForeignFieldAdd
+                 { left_input_lo = Field.constant input1
+                 ; left_input_mi = Field.constant input2
+                 ; left_input_hi = Field.constant output
+                 ; right_input_lo = of_bits (module Circuit) input1 0 first
+                 ; in1_1 = of_bits (module Circuit) input1 first second
+                 ; in1_2 = of_bits (module Circuit) input1 second third
+                 ; in1_3 = of_bits (module Circuit) input1 third fourth
+                 ; in2_0 = of_bits (module Circuit) input2 0 first
+                 ; in2_1 = of_bits (module Circuit) input2 first second
+                 ; in2_2 = of_bits (module Circuit) input2 second third
+                 ; in2_3 = of_bits (module Circuit) input2 third fourth
+                 ; out_0 = of_bits (module Circuit) output 0 first
+                 ; out_1 = of_bits (module Circuit) output first second
+                 ; out_2 = of_bits (module Circuit) output second third
+                 ; out_3 = of_bits (module Circuit) output third fourth
+                 } )
+        } ) ;
 
   (* Track external checks*)
   let external_checks = External_checks.create (module Circuit) in
