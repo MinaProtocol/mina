@@ -306,10 +306,9 @@ module Transaction_pool = struct
   let create verifier : t =
     let logger = Logger.create () in
     create ~compare_init:compare_envelope ~logger (fun (ds : input list) ->
-<<<<<<< HEAD
         O1trace.thread "dispatching_transaction_pool_batcher_verification"
           (fun () ->
-            [%log info]
+            [%log debug]
               "Dispatching $num_proofs transaction pool proofs to verifier"
               ~metadata:[ ("num_proofs", `Int (List.length ds)) ] ;
             let open Deferred.Or_error.Let_syntax in
@@ -414,75 +413,6 @@ module Transaction_pool = struct
                             | `Valid_assuming (v, xs) ->
                                 `Valid_assuming (v, xs) )
                         , Error.of_string "In progress" ) ) ) ) )
-=======
-        [%log debug]
-          "Dispatching $num_proofs transaction pool proofs to verifier"
-          ~metadata:[ ("num_proofs", `Int (List.length ds)) ] ;
-        let open Deferred.Or_error.Let_syntax in
-        let result = init_result ds in
-        (* Extract all the transactions that have not yet been fully validated and hold on to their
-           position (diff index, position in diff). *)
-        let unknowns =
-          List.concat_mapi ds ~f:(fun i x ->
-              match x with
-              | `Init diff ->
-                  List.mapi diff.data ~f:(fun j c -> ((i, j), c))
-              | `Partially_validated partial ->
-                  List.filter_mapi partial ~f:(fun j c ->
-                      match c with
-                      | `Valid _ ->
-                          None
-                      | `Valid_assuming (v, _) ->
-                          (* TODO: This rechecks the signatures on snapp transactions... oh well for now *)
-                          Some ((i, j), v) ) )
-        in
-        let%map res =
-          (* Verify the unknowns *)
-          Verifier.verify_commands verifier (List.map unknowns ~f:snd)
-        in
-        (* We now iterate over the results of the unknown transactions and appropriately modify
-           the verification result of the diff that it belongs to. *)
-        List.iter2_exn unknowns res ~f:(fun ((i, j), v) r ->
-            match r with
-            | `Invalid ->
-                (* A diff is invalid is any of the transactions it contains are invalid.
-                   Invalidate the whole diff that this transaction comes from. *)
-                result.(i) <- `Invalid
-            | `Valid_assuming xs -> (
-                match result.(i) with
-                | `Invalid ->
-                    (* If this diff has already been declared invalid, knowing that one of its
-                       transactions is partially valid is not useful. *)
-                    ()
-                | `In_progress a ->
-                    (* The diff may still be valid. *)
-                    a.(j) <- `Valid_assuming (v, xs) )
-            | `Valid c -> (
-                (* Similar to the above. *)
-                match result.(i) with
-                | `Invalid ->
-                    ()
-                | `In_progress a ->
-                    a.(j) <- `Valid c ) ) ;
-        list_of_array_map result ~f:(function
-          | `Invalid ->
-              `Invalid
-          | `In_progress a -> (
-              (* If the diff is all valid, we're done. If not, we return a partial
-                   result. *)
-              match all_valid a with
-              | Some res ->
-                  `Valid res
-              | None ->
-                  `Potentially_invalid
-                    (list_of_array_map a ~f:(function
-                      | `Unknown ->
-                          assert false
-                      | `Valid c ->
-                          `Valid c
-                      | `Valid_assuming (v, xs) ->
-                          `Valid_assuming (v, xs) ) ) ) ) )
->>>>>>> origin/compatible
 
   let verify (t : t) = verify t
 end
