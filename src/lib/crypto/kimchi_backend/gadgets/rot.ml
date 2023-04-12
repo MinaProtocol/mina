@@ -7,12 +7,12 @@ module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 (* ROT *)
 
 (* Side of rotation *)
-type rot_mode = Left | Right
+type direction = Left | Right
 
-(* 64-bit rotation of rot_bits to the `mode` side *)
-let rotate (type f)
+(* 64-bit rotation of rot_bits to the `direction` side *)
+let bits64 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (word : Circuit.Field.t) (rot_bits : int) (mode : rot_mode) :
+    (word : Circuit.Field.t) (rot_bits : int) (direction : direction) :
     Circuit.Field.t =
   let open Circuit in
   (* Check that the rotation bits is smaller than 64 *)
@@ -20,8 +20,10 @@ let rotate (type f)
   (* Check that the rotation bits is non-negative *)
   assert (rot_bits >= 0) ;
 
-  (* Compute actual length depending on whether the rotation mode is Left or Right *)
-  let rot_bits = match mode with Left -> rot_bits | Right -> 64 - rot_bits in
+  (* Compute actual length depending on whether the rotation direction is Left or Right *)
+  let rot_bits =
+    match direction with Left -> rot_bits | Right -> 64 - rot_bits
+  in
 
   (* Auxiliary Bignum_bigint values *)
   let big_2_pow_64 = Bignum_bigint.(pow (of_int 2) (of_int 64)) in
@@ -111,7 +113,7 @@ let rotate (type f)
         } ) ;
 
   (* Next row *)
-  Range_check.range_check64 (module Circuit) shifted ;
+  Range_check.bits64 (module Circuit) shifted ;
   rotated
 
 let%test_unit "rot gadget" =
@@ -123,10 +125,10 @@ let%test_unit "rot gadget" =
   in
 
   (* Helper to test Rot gadget
-     *   Input operands and expected output: word len mode rotated
+     *   Input operands and expected output: word len direction rotated
      *   Returns unit if constraints are satisfied, error otherwise.
   *)
-  let test_rot word length mode result : unit =
+  let test_rot word length direction result : unit =
     let _cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
           let open Runner.Impl in
@@ -139,7 +141,7 @@ let%test_unit "rot gadget" =
                 Field.Constant.of_string result )
           in
           (* Use the xor gate gadget *)
-          let output_rot = rotate (module Runner.Impl) word length mode in
+          let output_rot = bits64 (module Runner.Impl) word length direction in
           Field.Assert.equal output_rot result ;
           (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
           Boolean.Assert.is_true (Field.equal output_rot output_rot) )

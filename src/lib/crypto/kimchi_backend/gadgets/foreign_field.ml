@@ -1105,15 +1105,13 @@ let%test_unit "foreign_field_mul gadget" =
       let left_input0, left_input1, left_input2 =
         Element.Standard.to_limbs left_input
       in
-      Range_check.multi_range_check
-        (module Runner.Impl)
-        left_input0 left_input1 left_input2 ;
+      Range_check.multi (module Runner.Impl) left_input0 left_input1 left_input2 ;
 
       (* 4) Add multi-range-check right input *)
       let right_input0, right_input1, right_input2 =
         Element.Standard.to_limbs right_input
       in
-      Range_check.multi_range_check
+      Range_check.multi
         (module Runner.Impl)
         right_input0 right_input1 right_input2 ;
 
@@ -1124,7 +1122,7 @@ let%test_unit "foreign_field_mul gadget" =
        *)
       Core_kernel.List.iter external_checks.multi_ranges ~f:(fun multi_range ->
           let v0, v1, v2 = multi_range in
-          Range_check.multi_range_check (module Runner.Impl) v0 v1 v2 ;
+          Range_check.multi (module Runner.Impl) v0 v1 v2 ;
           () ) ;
       assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 2) ;
 
@@ -1135,7 +1133,7 @@ let%test_unit "foreign_field_mul gadget" =
       Core_kernel.List.iter external_checks.compact_multi_ranges
         ~f:(fun compact_multi_range ->
           let v01, v2 = compact_multi_range in
-          Range_check.compact_multi_range_check (module Runner.Impl) v01 v2 ;
+          Range_check.compact_multi (module Runner.Impl) v01 v2 ;
           () ) ;
       assert (
         Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges 1 ) ;

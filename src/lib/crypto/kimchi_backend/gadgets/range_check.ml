@@ -150,7 +150,7 @@ let range_check1 (type f)
         } )
 
 (* 64-bit range-check gadget - checks v0 \in [0, 2^64) *)
-let range_check64 (type f)
+let bits64 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (v0 : Circuit.Field.t) =
   range_check0
@@ -158,7 +158,7 @@ let range_check64 (type f)
     ~label:"range_check64" ~is_64bit:true ~is_compact:false v0
 
 (* multi-range-check gadget - checks v0,v1,v2 \in [0, 2^88) *)
-let multi_range_check (type f)
+let multi (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (v0 : Circuit.Field.t) (v1 : Circuit.Field.t) (v2 : Circuit.Field.t) =
   let open Circuit in
@@ -174,7 +174,7 @@ let multi_range_check (type f)
  *     - v0,v1,v2 \in [0, 2^88)
  *     - v01 = v0 + 2^88 * v1
  *)
-let compact_multi_range_check (type f)
+let compact_multi (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (v01 : Circuit.Field.t) (v2 : Circuit.Field.t) =
   let open Circuit in
@@ -224,7 +224,7 @@ let%test_unit "range_check64 gadget" =
     let make_circuit value =
       (* Circuit definition *)
       let value = exists Field.typ ~compute:(fun () -> value) in
-      range_check64 (module Runner.Impl) value ;
+      bits64 (module Runner.Impl) value ;
       (* Padding *)
       Boolean.Assert.is_true (Field.equal value value)
     in
@@ -282,7 +282,7 @@ let%test_unit "multi_range_check gadget" =
         exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
             [| v0; v1; v2 |] )
       in
-      multi_range_check (module Runner.Impl) values.(0) values.(1) values.(2)
+      multi (module Runner.Impl) values.(0) values.(1) values.(2)
     in
 
     (* Generate and verify first proof *)
@@ -359,7 +359,7 @@ let%test_unit "compact_multi_range_check gadget" =
       let v01, v2 =
         exists Typ.(Field.typ * Field.typ) ~compute:(fun () -> (v01, v2))
       in
-      compact_multi_range_check (module Runner.Impl) v01 v2
+      compact_multi (module Runner.Impl) v01 v2
     in
 
     (* Generate and verify first proof *)
