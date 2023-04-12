@@ -124,12 +124,8 @@ let bxor (type f)
       in
 
       (* Transform to big integer *)
-      let input1_big =
-        field_to_bignum_bigint (module Circuit) input1_field
-      in
-      let input2_big =
-        field_to_bignum_bigint (module Circuit) input2_field
-      in
+      let input1_big = field_to_bignum_bigint (module Circuit) input1_field in
+      let input2_big = field_to_bignum_bigint (module Circuit) input2_field in
 
       (* Check real lengths are at most the desired length *)
       let two_big = Bignum_bigint.of_int 2 in
@@ -177,12 +173,8 @@ let bxor (type f)
       length + (4 * len_xor) - (length mod (4 * len_xor))
     else length
   in
-  let input1_bits =
-    pad_upto ~length:pad_length ~value:false input1_bits
-  in
-  let input2_bits =
-    pad_upto ~length:pad_length ~value:false input2_bits
-  in
+  let input1_bits = pad_upto ~length:pad_length ~value:false input1_bits in
+  let input2_bits = pad_upto ~length:pad_length ~value:false input2_bits in
 
   (* Xor list of bits to obtain output of the xor *)
   let output_bits =
@@ -194,8 +186,7 @@ let bxor (type f)
   bxor_rec input1_bits input2_bits output_bits pad_length len_xor ;
 
   (* Convert back to field *)
-  field_to_cvar_field (module Circuit)
-  @@ Field.Constant.project output_bits
+  field_to_cvar_field (module Circuit) @@ Field.Constant.project output_bits
 
 (* Xor of 16 bits *)
 let bxor16 (type f)
