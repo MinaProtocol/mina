@@ -2,7 +2,7 @@ open Core_kernel
 
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
-(* EXAMPLE generic addition gate gadget *)
+(* Generic addition gate gadget *)
 let add (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
@@ -32,7 +32,40 @@ let add (type f)
         } ;
       sum )
 
-(* EXAMPLE generic multiplication gate gadget *)
+(* Generic subtraction gate gadget *)
+let sub (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
+    Circuit.Field.t =
+  let open Circuit in
+  (* Witness computation; difference = left_input - right_input *)
+  let difference =
+    exists Field.typ ~compute:(fun () ->
+        let left_input = As_prover.read Field.typ left_input in
+        let right_input = As_prover.read Field.typ right_input in
+        Field.Constant.sub left_input right_input )
+  in
+
+  (* Negative one gate coefficient *)
+  let neg_one = Option.value_exn Field.(to_constant (negate one)) in
+
+  (* Set up generic sub gate *)
+  with_label "generic_sub_gadget" (fun () ->
+      assert_
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (Basic
+                 { l = (Field.Constant.one, left_input)
+                 ; r = (neg_one, right_input)
+                 ; o = (neg_one, difference)
+                 ; m = Field.Constant.zero
+                 ; c = Field.Constant.zero
+                 } )
+        } ;
+      difference )
+
+(* Generic multiplication gate gadget *)
 let mul (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (left_input : Circuit.Field.t) (right_input : Circuit.Field.t) :
@@ -99,6 +132,36 @@ let%test_unit "generic gadgets" =
     ()
   in
 
+  (* Helper to test generic sub gate gadget
+   *   Inputs operands and expected output: left_input - right_input = difference
+   *   Returns true if constraints are satisfied, false otherwise.
+   *)
+  let test_generic_sub left_input right_input difference : unit =
+    let _proof_keypair, _proof =
+      Runner.generate_and_verify_proof (fun () ->
+          let open Runner.Impl in
+          (* Set up snarky variables for inputs and outputs *)
+          let left_input =
+            exists Field.typ ~compute:(fun () ->
+                Field.Constant.of_int left_input )
+          in
+          let right_input =
+            exists Field.typ ~compute:(fun () ->
+                Field.Constant.of_int right_input )
+          in
+          let difference =
+            exists Field.typ ~compute:(fun () ->
+                Field.Constant.of_int difference )
+          in
+          (* Use the generic sub gate gadget *)
+          let result = sub (module Runner.Impl) left_input right_input in
+          Field.Assert.equal difference result ;
+          (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
+          Boolean.Assert.is_true (Field.equal difference difference) )
+    in
+    ()
+  in
+
   (* Helper to test generic multimplication gate gadget
    *   Inputs operands and expected output: left_input * right_input = prod
    *   Returns true if constraints are satisfied, false otherwise.
@@ -135,6 +198,14 @@ let%test_unit "generic gadgets" =
   (* Negatve tests *)
   assert (Common.is_error (fun () -> test_generic_add 1 0 0)) ;
   assert (Common.is_error (fun () -> test_generic_add 2 4 7)) ;
+
+  (* TEST generic sub gadget *)
+  (* Positive tests *)
+  test_generic_sub 0 0 0 ;
+  test_generic_sub 2 1 1 ;
+  (* Negatve tests *)
+  assert (Common.is_error (fun () -> test_generic_sub 4 2 1)) ;
+  assert (Common.is_error (fun () -> test_generic_sub 13 4 10)) ;
 
   (* TEST generic mul gadget *)
   (* Positive tests *)
