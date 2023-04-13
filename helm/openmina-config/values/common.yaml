@@ -71,10 +71,11 @@ resources:
 
 bpfDebugger:
   enable: true
-  image: openmina/mina-network-debugger:bda44531
+  image: openmina/mina-network-debugger:121edfce
   cpu: "1500m"
   memory: "4Gi"
   restartMina: true
+  runtime: kata-qemu
 
 logs:
   enable: true

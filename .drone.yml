@@ -182,6 +182,31 @@ steps:
 ---
 
 kind: pipeline
+name: split
+type: docker
+clone:
+  depth: 1
+depends_on: [ deploy-to-cluster-custom ]
+
+trigger:
+  event: [ custom ]
+
+steps:
+
+- name: split
+  image: openmina/mina-network-debugger:latest
+  environment:
+    URL: http://1.k8.openmina.com:31355
+  commands:
+  - sleep  10 && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 show-graph --expected-components 1
+  - sleep  10 && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 enable-firewall
+  - sleep  90 && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 show-graph --expected-components 2
+  - sleep  10 && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 disable-firewall
+  - sleep 120 && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 show-graph --expected-components 1
+
+---
+
+kind: pipeline
 name: run-zkapps
 type: docker
 clone:
