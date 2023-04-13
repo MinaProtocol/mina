@@ -55,8 +55,6 @@ type 'field extended_limbs = 'field * 'field * 'field * 'field
 
 type 'field compact_limbs = 'field * 'field
 
-type 'field single_limb = 'field
-
 type 'field limbs =
   | Standard of 'field standard_limbs
   | Extended of 'field extended_limbs
@@ -159,22 +157,20 @@ module type Element_intf = sig
     -> 'field t
     -> 'field t
     -> bool
-
-  (* Convert a foreign element into an extended version *)
-  val extend :
-       (module Snark_intf.Run with type field = 'field)
-    -> 'field t
-    -> 'field Cvar.t single_limb
-       * 'field Cvar.t single_limb
-       * 'field Cvar.t single_limb
-       * 'field Cvar.t single_limb
 end
 
 (* Foreign field element structures *)
-(* Foreign field element structures *)
 module Element : sig
   (* Foreign field element (standard limbs) *)
-  module Standard : Element_intf with type 'a limbs_type = 'a standard_limbs
+  module Standard : sig
+    include Element_intf with type 'a limbs_type = 'a standard_limbs
+
+    (* Convert a standard foreign element into extended limbs *)
+    val extend :
+         (module Snark_intf.Run with type field = 'field)
+      -> 'field t
+      -> 'field Cvar.t extended_limbs
+  end
 
   (* Foreign field element (extended limbs) *)
   module Extended : Element_intf with type 'a limbs_type = 'a extended_limbs
@@ -240,9 +236,8 @@ end = struct
     let extend (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         =
-      let open Circuit in
       let l0, l1, l2 = to_limbs x in
-      (l0, l1, l2, Field.zero)
+      (l0, l1, l2, Circuit.Field.zero)
   end
 
   (* Extended limbs foreign field element *)
@@ -305,11 +300,6 @@ end = struct
       Bignum_bigint.(
         to_bignum_bigint (module Circuit) x
         < to_bignum_bigint (module Circuit) modulus)
-
-    let extend (type field)
-        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
-        =
-      to_limbs x
   end
 
   (* Compact limbs foreign field element *)
@@ -363,13 +353,6 @@ end = struct
       Bignum_bigint.(
         to_bignum_bigint (module Circuit) x
         < to_bignum_bigint (module Circuit) modulus)
-
-    let extend (type field)
-        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
-        =
-      Extended.to_limbs
-      @@ Extended.of_bignum_bigint (module Circuit)
-      @@ to_bignum_bigint (module Circuit) x
   end
 end
 
@@ -585,10 +568,11 @@ let add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* For all n additions, compute its values and create gates *)
   for i = 0 to n do
-    let right0, right1, right2, right3 =
-      Element.Standard.extend (module Circuit) @@ List.nth_exn inputs (i + 1)
+    let right =
+      Element.Extended.of_limbs
+      @@ Element.Standard.extend (module Circuit)
+      @@ List.nth_exn inputs (i + 1)
     in
-    let right = Element.Extended.of_limbs (right0, right1, right2, right3) in
     let sub = List.nth_exn is_sub i in
     let result, sign, field_overflow, carry =
       compute_ffadd_values
@@ -903,10 +887,6 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
   let open Circuit in
   (* Check foreign field modulus < max allowed *)
   check_modulus (module Circuit) foreign_field_modulus ;
-
-  (* Compute gate coefficients
-   *   This happens when circuit is created / not part of witness (e.g. exists, As_prover code)
-   *)
 
   (* Compute gate coefficients
    *   This happens when circuit is created / not part of witness (e.g. exists, As_prover code)
