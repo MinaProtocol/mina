@@ -4188,6 +4188,13 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; authorization = Signature.dummy
         }
       in
+      let sender_is_the_same_as_fee_payer =
+        match fee_payer_opt with
+        | Some (fee_payer, _) ->
+            Signature_lib.Keypair.equal fee_payer sender
+        | None ->
+            false
+      in
       let preconditions' =
         Option.value preconditions
           ~default:
@@ -4196,9 +4203,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ~f:(fun { network; _ } -> network)
                   ~default:Zkapp_precondition.Protocol_state.accept
             ; account =
-                ( if Option.is_none fee_payer_opt then
-                  Nonce (Account.Nonce.succ sender_nonce)
-                else Nonce sender_nonce )
+                ( if sender_is_the_same_as_fee_payer then
+                  Account_update.Account_precondition.Accept
+                else Nonce (Account.Nonce.succ sender_nonce) )
             ; valid_while =
                 Option.value_map preconditions
                   ~f:(fun { valid_while; _ } -> valid_while)
@@ -4219,18 +4226,14 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; token_id = Token_id.default
           ; balance_change
           ; increment_nonce =
-              ( match fee_payer_opt with
-              | Some (fee_payer, _) ->
-                  if Signature_lib.Keypair.equal fee_payer sender then false
-                  else true
-              | None ->
-                  false )
+              (if sender_is_the_same_as_fee_payer then false else true)
           ; events = []
           ; actions = []
           ; call_data = Field.zero
           ; call_depth = 0
           ; preconditions = preconditions'
-          ; use_full_commitment = true
+          ; use_full_commitment =
+              (if sender_is_the_same_as_fee_payer then true else false)
           ; implicit_account_creation_fee = false
           ; may_use_token = No
           ; authorization_kind = Signature
