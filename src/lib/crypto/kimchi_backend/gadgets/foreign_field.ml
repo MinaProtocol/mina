@@ -532,7 +532,7 @@ let compute_ffadd_values (type f)
    * foreign field addition gate for the bound check. An additional multi range check must be performed.
    * By default, the range check takes place right after the final Raw row.
 *)
-let add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
+let _add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
     ?(_with_range_check = true) (inputs : f Element.Standard.t list)
     (is_sub : bool list) (foreign_field_modulus : f standard_limbs) :
     f Element.Standard.t =
