@@ -5,17 +5,11 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
-(* Foreign field element limb size *)
-let limb_bits = 88
-
-(* Foreign field element limb size 2^L where L=88 *)
-let two_to_limb = Bignum_bigint.(pow (of_int 2) (of_int limb_bits))
-
 (* 2^2L *)
-let two_to_2limb = Bignum_bigint.(pow two_to_limb (of_int 2))
+let two_to_2limb = Bignum_bigint.(pow Common.two_to_limb (of_int 2))
 
 (* 2^3L *)
-let two_to_3limb = Bignum_bigint.(pow two_to_limb (of_int 3))
+let two_to_3limb = Bignum_bigint.(pow Common.two_to_limb (of_int 3))
 
 let two_to_limb_field (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f) =
@@ -55,15 +49,15 @@ let max_foreign_field_modulus (type f)
  *     - Compact mode  : 2 limbs where the lowest is 2L bits and the highest is L bits
  *)
 
-type 'field standard_limbs = 'field * 'field * 'field
-
 type 'field extended_limbs = 'field * 'field * 'field * 'field
+
+type 'field standard_limbs = 'field * 'field * 'field
 
 type 'field compact_limbs = 'field * 'field
 
 type 'field limbs =
-  | Standard of 'field standard_limbs
   | Extended of 'field extended_limbs
+  | Standard of 'field standard_limbs
   | Compact of 'field compact_limbs
 
 (* Convert Bignum_bigint.t to Bignum_bigint standard_limbs *)
@@ -114,7 +108,7 @@ let field_standard_limbs_to_bignum_bigint (type f)
       (module Circuit)
       field_limbs
   in
-  Bignum_bigint.(l0 + (two_to_limb * l1) + (two_to_2limb * l2))
+  Bignum_bigint.(l0 + (Common.two_to_limb * l1) + (two_to_2limb * l2))
 
 (* Foreign field element interface *)
 module type Element_intf = sig
@@ -163,8 +157,15 @@ module type Element_intf = sig
     -> 'field t
     -> 'field t
     -> bool
+
+  (* Convert a foreign element into an extended version *)
+  val extend :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> 'field extended_limbs
 end
 
+(* Foreign field element structures *)
 (* Foreign field element structures *)
 module Element : sig
   (* Foreign field element (standard limbs) *)
@@ -222,7 +223,7 @@ end = struct
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         : Bignum_bigint.t =
       let l0, l1, l2 = to_bignum_bigint_limbs (module Circuit) x in
-      Bignum_bigint.(l0 + (two_to_limb * l1) + (two_to_2limb * l2))
+      Bignum_bigint.(l0 + (Common.two_to_limb * l1) + (two_to_2limb * l2))
 
     let fits (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
@@ -230,6 +231,13 @@ end = struct
       Bignum_bigint.(
         to_bignum_bigint (module Circuit) x
         < to_bignum_bigint (module Circuit) modulus)
+
+    let extend (type field)
+        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
+        : field extended_limbs =
+      let open Circuit in
+      let l0, l1, l2 = to_field_limbs (module Circuit) x in
+      of_limbs (l0, l1, l2, Field.Constant.zero)
   end
 
   (* Extended limbs foreign field element *)
@@ -283,7 +291,8 @@ end = struct
         : Bignum_bigint.t =
       let l0, l1, l2, l3 = to_bignum_bigint_limbs (module Circuit) x in
       Bignum_bigint.(
-        l0 + (two_to_limb * l1) + (two_to_2limb * l2) + (two_to_3limb * l3))
+        l0 + (Common.two_to_limb * l1) + (two_to_2limb * l2)
+        + (two_to_3limb * l3))
 
     let fits (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
@@ -291,6 +300,11 @@ end = struct
       Bignum_bigint.(
         to_bignum_bigint (module Circuit) x
         < to_bignum_bigint (module Circuit) modulus)
+
+    let extend (type field)
+        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
+        : field extended_limbs =
+      x
   end
 
   (* Compact limbs foreign field element *)
@@ -344,6 +358,13 @@ end = struct
       Bignum_bigint.(
         to_bignum_bigint (module Circuit) x
         < to_bignum_bigint (module Circuit) modulus)
+
+    let extend (type field)
+        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
+        : field extended_limbs =
+      let open Circuit in
+      let l01, l2 = to_limbs x in
+      of_limbs (l01, l2, Field.zero, Field.zero)
   end
 end
 
@@ -380,6 +401,8 @@ module External_checks = struct
     external_checks.bounds <- x :: external_checks.bounds
 end
 
+(* Common auxiliary functions for foreign field gadgets *)
+
 (* Check that the foreign modulus is less than the maximum allowed *)
 let check_modulus (type f) (module Circuit : Snark_intf.Run with type field = f)
     (foreign_field_modulus : f standard_limbs) =
@@ -402,8 +425,6 @@ let check_modulus (type f) (module Circuit : Snark_intf.Run with type field = f)
   assert (
     Bignum_bigint.(
       foreign_field_modulus < max_foreign_field_modulus (module Circuit)) )
-
-(* Common auxiliary functions for foreign field gadgets *)
 
 (* Represents two limbs as one single field element with twice as many bits *)
 let compact_limb (type f) (module Circuit : Snark_intf.Run with type field = f)
@@ -484,7 +505,7 @@ let compute_ffadd_values (type f)
     Element.Standard.to_field_limbs (module Circuit) result
   in
   (* This allows to store 2^88 in the high limb*)
-  let offset = Common.bignum_bigint_to_field (module Circuit) two_to_limb in
+  let offset = Common.(bignum_bigint_to_field (module Circuit) two_to_limb) in
   let right_input2 = Field.Constant.((right_input3 * offset) + right_input2) in
 
   let carry_bot =
@@ -551,7 +572,7 @@ let ffadd_single (type f) (module Circuit : Snark_intf.Run with type field = f)
 let ffadd_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
     ?(with_range_check = true) (inputs : f Element.Standard.t list)
     (is_sub : bool list) (foreign_field_modulus : f standard_limbs) :
-    f Element.Standard.t * f External_checks.t =
+    f Element.Standard.t =
   let open Circuit in
   (* Check that the number of inputs is correct *)
   let n = List.length is_sub in
@@ -580,20 +601,16 @@ let ffadd_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
        assert (Element.Standard.fits (module Circuit) input modulus) ) ) ;
 
   (* Initialize first left input *)
-  let left = [|List.hd_exn inputs|] in
-
-  (* Creates an extended element from a standard element *)
-  let extend (std : f Element.Standard.t) : f Element.Extended.t =
-    let std0, std1, std2 = Element.Standard.to_limbs std in
-    Element.Extended.of_limbs (std0, std1, std2, Field.zero)
-  in
+  let left = [| List.hd_exn inputs |] in
 
   (* For all n additions, compute its values and create gates *)
   for i = 0 to n do
-    let right = extend @@ List.nth_exn inputs (i + 1) in
+    let right = Element.Standard.extend @@ List.nth_exn inputs (i + 1) in
     let sub = List.nth_exn is_sub i in
     let result, sign, field_overflow, carry =
-      compute_ffadd_values (module Circuit) left.(0) right sub foreign_field_modulus
+      compute_ffadd_values
+        (module Circuit)
+        left.(0) right sub foreign_field_modulus
     in
 
     let left0, left1, left2 = Element.Standard.to_limbs left.(0) in
@@ -607,12 +624,12 @@ let ffadd_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
           ; basic =
               Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
                 (ForeignFieldAdd
-                   { left_input_lo = Field.constant left0
-                   ; left_input_mi = Field.constant left1
-                   ; left_input_hi = Field.constant left2
-                   ; right_input_lo = Field.constant right0
-                   ; right_input_mi = Field.constant right1
-                   ; right_input_hi = Field.constant right2
+                   { left_input_lo = left0
+                   ; left_input_mi = left1
+                   ; left_input_hi = left2
+                   ; right_input_lo = right0
+                   ; right_input_mi = right1
+                   ; right_input_hi = right2
                    ; field_overflow = Field.constant field_overflow
                    ; carry = Field.constant carry
                    ; foreign_field_modulus0
@@ -620,74 +637,83 @@ let ffadd_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
                    ; foreign_field_modulus2
                    ; sign
                    } )
-          } );
-          left.(0) <- result ;
-          ()
-  done;
+          } ) ;
+    left.(0) <- result ;
+    ()
+  done ;
 
   (* Add the final gate for the bound *)
   (* result + (2^264 - f) = bound *)
   let result0, result1, result2 = Element.Standard.to_limbs left.(0) in
-  let final_right = Element.Extended.of_bignum_bigint (module Circuit) two_to_3limb in
-  let final_bound, final_sign, final_ovf, final_carry = compute_ffadd_values (module Circuit) left.(0) final_right false foreign_field_modulus in
-  let bound0, bound1, bound2 = final_bound in
+  let final_right =
+    Element.Extended.of_bignum_bigint (module Circuit) two_to_3limb
+  in
+  let final_bound, final_sign, final_ovf, final_carry =
+    compute_ffadd_values
+      (module Circuit)
+      left.(0) final_right false foreign_field_modulus
+  in
+  let bound0, bound1, bound2 =
+    Element.Standard.to_field_limbs (module Circuit) final_bound
+  in
 
   (* Check that the correct expected values were obtained *)
   assert (Field.Constant.(equal final_sign one)) ;
   assert (Field.Constant.(equal final_ovf one)) ;
 
   with_label "final_ffadd_gate" (fun () ->
-    (* Set up FFAdd gate *)
-    assert_
-      { annotation = Some __LOC__
-      ; basic =
-          Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-            (ForeignFieldAdd
-               { left_input_lo = Field.constant result0
-               ; left_input_mi = Field.constant result1
-               ; left_input_hi = Field.constant result2
-               ; right_input_lo = Field.zero
-               ; right_input_mi = Field.zero
-               ; right_input_hi = Field.constant two_to_limb_field
-               ; field_overflow = Field.constant final_ovf
-               ; carry = Field.constant final_carry
-               ; foreign_field_modulus0
-               ; foreign_field_modulus1
-               ; foreign_field_modulus2
-               ; sign = final_sign
-               } )
-      } );
+      (* Set up FFAdd gate *)
+      assert_
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (ForeignFieldAdd
+                 { left_input_lo = result0
+                 ; left_input_mi = result1
+                 ; left_input_hi = result2
+                 ; right_input_lo = Field.zero
+                 ; right_input_mi = Field.zero
+                 ; right_input_hi =
+                     Field.constant @@ two_to_limb_field (module Circuit)
+                 ; field_overflow = Field.constant final_ovf
+                 ; carry = Field.constant final_carry
+                 ; foreign_field_modulus0
+                 ; foreign_field_modulus1
+                 ; foreign_field_modulus2
+                 ; sign = final_sign
+                 } )
+        } ) ;
 
-(* Set up copy constraints with sign and overflow *)
+  (* Set up copy constraints with sign and overflow *)
+  Field.Assert.equal (Field.constant final_sign) Field.one ;
+  Field.Assert.equal (Field.constant final_ovf) Field.one ;
 
-    Field.Assert.equal (Field.constant final_sign) Field.one ;
-    Field.Assert.equal (Field.constant final_ovf) Field.one ;
-
-    (* Final Zero gate*)
-
-      with_label "final_ffadd_zero_gate" (fun () ->
-        (* Set up FFAdd gate *)
-        assert_
-          { annotation = Some __LOC__
-          ; basic =
-              Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-                (Raw
-                   { kind = Zero
-                   ; values = [|bound0; bound1; bound2|]
-                   ; coeffs = [||]
-                   } )
-          } );
-
+  (* Final Zero gate*)
+  with_label "final_ffadd_zero_gate" (fun () ->
+      (* Set up FFAdd gate *)
+      assert_
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (Raw
+                 { kind = Zero
+                 ; values =
+                     [| Field.constant bound0
+                      ; Field.constant bound1
+                      ; Field.constant bound2
+                     |]
+                 ; coeffs = [||]
+                 } )
+        } ) ;
 
   (* If range check is required, add the final gate *)
 
-
   (* Track external checks*)
+  (*
   let external_checks = External_checks.create (module Circuit) in
-
+*)
   (* Return result *)
-  ( Element.Standard.of_limbs (result0, result1, result2)
-  , external_checks )
+  Element.Standard.of_limbs (result0, result1, result2)
 
 (* FOREIGN FIELD MULTIPLICATION *)
 
@@ -784,8 +810,8 @@ let compute_witness_variables (type f)
   let carry0 =
     Bignum_bigint.(
       ( products0
-      + (two_to_limb * product1_lo)
-      - remainder0 - (two_to_limb * remainder1) )
+      + (Common.two_to_limb * product1_lo)
+      - remainder0 - (Common.two_to_limb * remainder1) )
       / two_to_2limb)
   in
 
@@ -794,7 +820,7 @@ let compute_witness_variables (type f)
    *        sum the intermediate product terms before subtracting the remainder. *)
   let carry1 =
     Bignum_bigint.(
-      (products2 + product1_hi + carry0 - remainder2) / two_to_limb)
+      (products2 + product1_hi + carry0 - remainder2) / Common.two_to_limb)
   in
   (* Compute v10 and v11 *)
   let carry1_hi, carry1_lo =
