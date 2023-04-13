@@ -27,10 +27,10 @@ func processRows(rows [][](interface{})) Whitelist {
 // Retrieve data from delegation program spreadsheet
 // and extract public keys out of the column containing
 // public keys of program participants.
-func RetrieveWhitelist(service *sheets.Service, log *logging.ZapEventLogger) Whitelist {
+func RetrieveWhitelist(service *sheets.Service, log *logging.ZapEventLogger, appCfg AppConfig) Whitelist {
 	col := DELEGATION_WHITELIST_COLUMN
 	readRange := DELEGATION_WHITELIST_LIST + "!" + col + ":" + col
-	spId := WhitelistSpreadsheetId()
+	spId := appCfg.GsheetId
 	resp, err := service.Spreadsheets.Values.Get(spId, readRange).Do()
 	if err != nil {
 		log.Fatalf("Unable to retrieve data from sheet: %v", err)
