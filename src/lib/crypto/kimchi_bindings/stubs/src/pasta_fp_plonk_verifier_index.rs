@@ -12,7 +12,10 @@ use kimchi::circuits::lookup::lookups::{LookupFeatures, LookupPatterns};
 use kimchi::circuits::polynomials::permutation::Shifts;
 use kimchi::circuits::polynomials::permutation::{zk_polynomial, zk_w3};
 use kimchi::circuits::wires::{COLUMNS, PERMUTS};
-use kimchi::{linearization::expr_linearization, verifier_index::VerifierIndex};
+use kimchi::{
+    linearization::expr_linearization,
+    verifier_index::{LookupVerifierIndex, VerifierIndex},
+};
 use mina_curves::pasta::{Fp, Pallas, Vesta};
 use poly_commitment::commitment::caml::CamlPolyComm;
 use poly_commitment::{commitment::PolyComm, srs::SRS};
@@ -84,7 +87,6 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
         let coefficients_comm: Vec<PolyComm<Vesta>> =
             evals.coefficients_comm.iter().map(Into::into).collect();
         let coefficients_comm: [_; COLUMNS] = coefficients_comm.try_into().expect("wrong size");
-
         let sigma_comm: Vec<PolyComm<Vesta>> = evals.sigma_comm.iter().map(Into::into).collect();
         let sigma_comm: [_; PERMUTS] = sigma_comm
             .try_into()
@@ -93,6 +95,11 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
         let shifts: Vec<Fp> = shifts.iter().map(Into::into).collect();
         let shift: [Fp; PERMUTS] = shifts.try_into().expect("wrong size");
 
+        let lookup_index: std::option::Option<LookupVerifierIndex<Vesta>> =
+            index.lookup_index.map(Into::into);
+
+        // FIXME: Is the flag computation correct ?
+        // Should both xor fields be synced ?
         let feature_flags = FeatureFlags {
             range_check0: false,
             range_check1: false,
@@ -100,20 +107,56 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
             foreign_field_mul: false,
             rot: false,
             xor: false,
-            lookup_features: LookupFeatures {
-                patterns: LookupPatterns {
-                    xor: false,
-                    lookup: false,
-                    range_check: false,
-                    foreign_field_mul: false,
+            lookup_features: match &lookup_index {
+                None => LookupFeatures {
+                    patterns: LookupPatterns {
+                        xor: false,
+                        lookup: false,
+                        range_check: false,
+                        foreign_field_mul: false,
+                    },
+                    joint_lookup_used: false,
+                    uses_runtime_tables: false,
                 },
-                joint_lookup_used: false,
-                uses_runtime_tables: false,
+                Some(idx) => idx.lookup_info.features,
             },
         };
 
         // TODO dummy_lookup_value ?
         let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true);
+
+        let srs = {
+            let res = once_cell::sync::OnceCell::new();
+            res.set(index.srs.0).unwrap();
+            res
+        };
+
+        let psm_comm = evals.psm_comm.into();
+        let complete_add_comm = evals.complete_add_comm.into();
+        let mul_comm = evals.mul_comm.into();
+        let emul_comm = evals.emul_comm.into();
+        let endomul_scalar_comm = evals.endomul_scalar_comm.into();
+        let generic_comm = evals.generic_comm.into();
+
+        let xor_comm = evals.xor_comm.map(Into::into);
+        let range_check0_comm = evals.range_check0_comm.map(Into::into);
+        let range_check1_comm = evals.range_check1_comm.map(Into::into);
+        let foreign_field_add_comm = evals.foreign_field_add_comm.map(Into::into);
+        let foreign_field_mul_comm = evals.foreign_field_mul_comm.map(Into::into);
+        let rot_comm = evals.rot_comm.map(Into::into);
+
+        let w = {
+            let res = once_cell::sync::OnceCell::new();
+            let zkw3 = zk_w3(domain);
+            res.set(zkw3).unwrap();
+            res
+        };
+
+        let zkpm = {
+            let res = once_cell::sync::OnceCell::new();
+            res.set(zk_polynomial(domain)).unwrap();
+            res
+        };
 
         VerifierIndex::<Vesta> {
             domain,
@@ -121,44 +164,31 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
             public: index.public as usize,
             prev_challenges: index.prev_challenges as usize,
             powers_of_alpha,
-            srs: {
-                let res = once_cell::sync::OnceCell::new();
-                res.set(index.srs.0).unwrap();
-                res
-            },
+            srs,
 
             sigma_comm,
             coefficients_comm,
-            generic_comm: evals.generic_comm.into(),
+            generic_comm,
+            psm_comm,
 
-            psm_comm: evals.psm_comm.into(),
+            complete_add_comm,
+            mul_comm,
+            emul_comm,
+            endomul_scalar_comm,
 
-            complete_add_comm: evals.complete_add_comm.into(),
-            mul_comm: evals.mul_comm.into(),
-            emul_comm: evals.emul_comm.into(),
-            endomul_scalar_comm: evals.endomul_scalar_comm.into(),
-
-            xor_comm: evals.xor_comm.map(Into::into),
-            range_check0_comm: evals.range_check0_comm.map(Into::into),
-            range_check1_comm: evals.range_check1_comm.map(Into::into),
-            foreign_field_add_comm: evals.foreign_field_add_comm.map(Into::into),
-            foreign_field_mul_comm: evals.foreign_field_mul_comm.map(Into::into),
-            rot_comm: evals.rot_comm.map(Into::into),
+            xor_comm,
+            range_check0_comm,
+            range_check1_comm,
+            foreign_field_add_comm,
+            foreign_field_mul_comm,
+            rot_comm,
 
             shift,
-            zkpm: {
-                let res = once_cell::sync::OnceCell::new();
-                res.set(zk_polynomial(domain)).unwrap();
-                res
-            },
-            w: {
-                let res = once_cell::sync::OnceCell::new();
-                res.set(zk_w3(domain)).unwrap();
-                res
-            },
+            zkpm,
+            w,
             endo: endo_q,
 
-            lookup_index: index.lookup_index.map(Into::into),
+            lookup_index,
             linearization,
         }
     }
@@ -273,7 +303,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_dummy() -> CamlPastaFpPlonkVerifierInd
             lookup_gate_comm: None,
             runtime_tables_comm: None,
         },
-        shifts: (0..PERMUTS - 1).map(|_| Fp::one().into()).collect(),
+        shifts: (0..PERMUTS).map(|_| Fp::one().into()).collect(),
         lookup_index: None,
     }
 }
@@ -284,4 +314,132 @@ pub fn caml_pasta_fp_plonk_verifier_index_deep_copy(
     x: CamlPastaFpPlonkVerifierIndex,
 ) -> CamlPastaFpPlonkVerifierIndex {
     x
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::plonk_verifier_index::{
+        CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex,
+    };
+    use crate::srs::fp::CamlFpSrs;
+
+    fn comm() -> CamlPolyComm<CamlGVesta> {
+        let g: CamlGVesta = Vesta::prime_subgroup_generator().into();
+        CamlPolyComm {
+            shifted: Some(g),
+            unshifted: vec![g, g, g],
+        }
+    }
+
+    fn vec_comm(num: usize) -> Vec<CamlPolyComm<CamlGVesta>> {
+        (0..num).map(|_| comm()).collect()
+    }
+
+    // Helper function to generate a string representation of a value that
+    // derives the Debug trait.  This can be used to get a poor man's
+    // PartialEq/Eq-like trait for assertions when nothing else can be done
+    fn debug_string<G: std::fmt::Debug>(vi: G) -> String {
+        use std::fmt::Write;
+        let mut buf = String::new();
+        buf.write_fmt(format_args!("{:?}", vi))
+            .expect("a Debug implementation returned an error unexpectedly");
+        buf.shrink_to_fit();
+        buf
+    }
+
+    // Generate a verifier index value.
+    fn gen_caml_verifier_index() -> CamlPastaFpPlonkVerifierIndex {
+        CamlPlonkVerifierIndex {
+            domain: CamlPlonkDomain {
+                log_size_of_group: 2,
+                group_gen: Fp::one().into(),
+            },
+            max_poly_size: 0,
+            public: 0,
+            prev_challenges: 0,
+            srs: CamlFpSrs::new(SRS::create(0)),
+            evals: CamlPlonkVerificationEvals {
+                sigma_comm: vec_comm(PERMUTS),
+                coefficients_comm: vec_comm(COLUMNS),
+                generic_comm: comm(),
+                psm_comm: comm(),
+                complete_add_comm: comm(),
+                mul_comm: comm(),
+                emul_comm: comm(),
+                endomul_scalar_comm: comm(),
+                xor_comm: Some(comm()),
+                range_check0_comm: Some(comm()),
+                range_check1_comm: Some(comm()),
+                foreign_field_add_comm: Some(comm()),
+                foreign_field_mul_comm: Some(comm()),
+                rot_comm: Some(comm()),
+                lookup_gate_comm: Some(comm()),
+                runtime_tables_comm: Some(comm()),
+            },
+            shifts: (0..PERMUTS).map(|_| Fp::one().into()).collect(),
+            lookup_index: None,
+        }
+    }
+
+    #[test]
+    fn back_and_forth() -> () {
+        let dummy: CamlPastaFpPlonkVerifierIndex = gen_caml_verifier_index();
+
+        let vi = VerifierIndex::<Vesta>::from(dummy);
+        let caml_vi = CamlPastaFpPlonkVerifierIndex::from(vi.clone());
+        let vi2 = VerifierIndex::<Vesta>::from(caml_vi);
+
+        //////////////////////////////////////////////////////////////////////////////
+        // The full equality assertion is divided up into assertions on fields.     //
+        // This helps in localizing errors when they fail.                          //
+        // The main issue is that one could easily forget a record field.           //
+        // Pay attention to that here.                                              //
+        //                                                                          //
+        // Would be great to add a assert_eq!(vi, vi2) in the end to catch this but //
+        // this might fail due to ordering issue in serialized vectors. See the     //
+        // last equality assertion below                                            //
+        //////////////////////////////////////////////////////////////////////////////
+
+        assert_eq!(vi.domain, vi2.domain);
+        assert_eq!(vi.max_poly_size, vi2.max_poly_size);
+        assert_eq!(debug_string(vi.srs), debug_string(vi2.srs));
+        assert_eq!(vi.public, vi2.public);
+        assert_eq!(vi.prev_challenges, vi.prev_challenges);
+
+        assert_eq!(vi.xor_comm, vi2.xor_comm);
+        assert_eq!(vi.sigma_comm, vi2.sigma_comm);
+        assert_eq!(vi.coefficients_comm, vi2.coefficients_comm);
+        assert_eq!(vi.generic_comm, vi2.generic_comm);
+        assert_eq!(vi.psm_comm, vi2.psm_comm);
+        assert_eq!(vi.complete_add_comm, vi2.complete_add_comm);
+        assert_eq!(vi.mul_comm, vi2.mul_comm);
+        assert_eq!(vi.emul_comm, vi2.emul_comm);
+        assert_eq!(vi.endomul_scalar_comm, vi2.endomul_scalar_comm);
+        assert_eq!(vi.range_check0_comm, vi2.range_check0_comm);
+        assert_eq!(vi.range_check1_comm, vi2.range_check1_comm);
+        assert_eq!(vi.foreign_field_mul_comm, vi2.foreign_field_mul_comm);
+        assert_eq!(vi.foreign_field_add_comm, vi2.foreign_field_add_comm);
+        assert_eq!(vi.rot_comm, vi2.rot_comm);
+        assert_eq!(vi.shift, vi2.shift);
+        assert_eq!(vi.zkpm, vi2.zkpm);
+        assert_eq!(vi.w, vi2.w);
+        assert_eq!(vi.endo, vi2.endo);
+        assert_eq!(vi.powers_of_alpha, vi2.powers_of_alpha);
+        assert_eq!(
+            debug_string(vi.lookup_index),
+            debug_string(vi2.lookup_index)
+        );
+
+        assert_eq!(
+            vi.linearization.constant_term,
+            vi2.linearization.constant_term
+        );
+
+        // Serialization back and forth seems to change the order in
+        // vector. Sort it before applying equality comparison.
+        let mut it1 = vi.linearization.index_terms.to_vec();
+        let mut it2 = vi2.linearization.index_terms.to_vec();
+        assert_eq!(it1.sort(), it2.sort());
+    }
 }
