@@ -16,12 +16,30 @@ import (
 	sheets "google.golang.org/api/sheets/v4"
 )
 
-func loadAwsConfig(filename string, log logging.EventLogger) {
-	// TODO: load AWS credentials from JSON file
+func loadAwsCredentials(filename string, log logging.EventLogger) {
+	configFile := os.Getenv(filename)
+	if configFile == "" {
+		log.Fatal("Error loading credentials file: %s", filename)
+	} else {
+		file, err := os.Open(configFile)
+		if err != nil {
+			log.Errorf("Error loading credentials file: %s", err)
+			os.Exit(1)
+		}
+		defer file.Close()
+		decoder := json.NewDecoder(file)
+		var credentials AwsCredentials
+		err = decoder.Decode(&credentials)
+		if err != nil {
+			log.Errorf("Error loading credentials file: %s", err)
+			os.Exit(1)
+		}
+		os.Setenv("AWS_ACCESS_KEY_ID", credentials.AccessKeyId)
+		os.Setenv("AWS_SECRET_ACCESS_KEY", credentials.SecretAccessKey)
+	}
 }
 
 func loadEnv(log logging.EventLogger) AppConfig {
-
 	var config AppConfig
 
 	configFile := os.Getenv("CONFIG_FILE")
@@ -57,7 +75,14 @@ func loadEnv(log logging.EventLogger) AppConfig {
 
 	awsCredentialsFile := os.Getenv("AWS_CREDENTIALS_FILE")
 	if awsCredentialsFile != "" {
-		loadAwsConfig(awsCredentialsFile, log)
+		loadAwsCredentials(awsCredentialsFile, log)
+	} else {
+		if os.Getenv("AWS_ACCESS_KEY_ID") == "" {
+			log.Fatal("missing AWS_ACCESS_KEY_ID environment variable")
+		}
+		if os.Getenv("AWS_SECRET_ACCESS_KEY") == "" {
+			log.Fatal("missing AWS_SECRET_ACCESS_KEY environment variable")
+		}
 	}
 
 	return config
