@@ -549,7 +549,7 @@ let compute_ffadd_values (type f)
    * foreign field addition gate for the bound check. An additional multi range check must be performed.
    * By default, the range check takes place right after the final Raw row.
 *)
-let _ffadd_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
+let add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
     ?(_with_range_check = true) (inputs : f Element.Standard.t list)
     (is_sub : bool list) (foreign_field_modulus : f standard_limbs) :
     f Element.Standard.t =
@@ -600,7 +600,7 @@ let _ffadd_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
     let right0, right1, right2, _right3 = Element.Extended.to_limbs right in
 
     (* Create the gate *)
-    with_label "ffadd_gate" (fun () ->
+    with_label "add_gate" (fun () ->
         (* Set up FFAdd gate *)
         assert_
           { annotation = Some __LOC__
@@ -644,7 +644,7 @@ let _ffadd_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
   assert (Field.Constant.(equal final_sign one)) ;
   assert (Field.Constant.(equal final_ovf one)) ;
 
-  with_label "final_ffadd_gate" (fun () ->
+  with_label "final_add_gate" (fun () ->
       (* Set up FFAdd gate *)
       assert_
         { annotation = Some __LOC__
@@ -672,7 +672,7 @@ let _ffadd_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
   Field.Assert.equal (Field.constant final_ovf) Field.one ;
 
   (* Final Zero gate*)
-  with_label "final_ffadd_zero_gate" (fun () ->
+  with_label "final_add_zero_gate" (fun () ->
       (* Set up FFAdd gate *)
       assert_
         { annotation = Some __LOC__
@@ -896,7 +896,7 @@ let tuple24_of_array array =
       assert false
 
 (* Foreign field multiplication gadget definition *)
-let ffmul (type f) (module Circuit : Snark_intf.Run with type field = f)
+let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
     (foreign_field_modulus : f standard_limbs) :
     f Element.Standard.t * f External_checks.t =
@@ -1175,7 +1175,7 @@ let%test_unit "foreign_field_mul gadget" =
    *     - foreign_field_modulus
    *     - expected product
    *)
-  let test_ffmul ?cs (left_input : Bignum_bigint.t)
+  let test_mul ?cs (left_input : Bignum_bigint.t)
       (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
       =
     (* Generate and verify proof *)
@@ -1199,7 +1199,7 @@ let%test_unit "foreign_field_mul gadget" =
           in
           (* Create the gadget *)
           let product, _external_checks =
-            ffmul
+            mul
               (module Runner.Impl)
               left_input right_input foreign_field_modulus
           in
@@ -1227,7 +1227,7 @@ let%test_unit "foreign_field_mul gadget" =
    *     - foreign_field_modulus
    *     - expected product
    *)
-  let test_ffmul_full (left_input : Bignum_bigint.t)
+  let test_mul_full (left_input : Bignum_bigint.t)
       (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
       : unit =
     (* Circuit definition function *)
@@ -1260,7 +1260,7 @@ let%test_unit "foreign_field_mul gadget" =
 
       (* 1) Create the foreign field mul gadget *)
       let product, external_checks =
-        ffmul (module Runner.Impl) left_input right_input foreign_field_modulus
+        mul (module Runner.Impl) left_input right_input foreign_field_modulus
       in
 
       (* Sanity check product matches expected result *)
@@ -1360,20 +1360,20 @@ let%test_unit "foreign_field_mul gadget" =
 
   (* Positive tests *)
   (* zero_mul: 0 * 0 *)
-  let cs = test_ffmul Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus in
+  let cs = test_mul Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus in
   (* one_mul: max * 1 *)
-  let _cs = test_ffmul ~cs secp256k1_max Bignum_bigint.one secp256k1_modulus in
+  let _cs = test_mul ~cs secp256k1_max Bignum_bigint.one secp256k1_modulus in
   (* max_native_square: pallas_sqrt * pallas_sqrt *)
-  let _cs = test_ffmul ~cs pallas_sqrt pallas_sqrt secp256k1_modulus in
+  let _cs = test_mul ~cs pallas_sqrt pallas_sqrt secp256k1_modulus in
   (* max_foreign_square: secp256k1_sqrt * secp256k1_sqrt *)
-  let _cs = test_ffmul ~cs secp256k1_sqrt secp256k1_sqrt secp256k1_modulus in
+  let _cs = test_mul ~cs secp256k1_sqrt secp256k1_sqrt secp256k1_modulus in
   (* max_native_multiplicands: pallas_max * pallas_max *)
-  let _cs = test_ffmul ~cs pallas_max pallas_max secp256k1_modulus in
+  let _cs = test_mul ~cs pallas_max pallas_max secp256k1_modulus in
   (* max_foreign_multiplicands: secp256k1_max * secp256k1_max *)
-  let _cs = test_ffmul ~cs secp256k1_max secp256k1_max secp256k1_modulus in
+  let _cs = test_mul ~cs secp256k1_max secp256k1_max secp256k1_modulus in
   (* nonzero carry0 bits *)
   let _cs =
-    test_ffmul ~cs
+    test_mul ~cs
       (Common.bignum_bigint_of_hex
          "fbbbd91e03b48cebbac38855289060f8b29fa6ad3cffffffffffffffffffffff" )
       (Common.bignum_bigint_of_hex
@@ -1382,7 +1382,7 @@ let%test_unit "foreign_field_mul gadget" =
   in
   (* test nonzero carry10 *)
   let _cs =
-    test_ffmul
+    test_mul
       (Common.bignum_bigint_of_hex
          "4000000000000000000000000000000000000000000000000000000000000000" )
       (Common.bignum_bigint_of_hex
@@ -1391,7 +1391,7 @@ let%test_unit "foreign_field_mul gadget" =
   in
   (* test nonzero carry1_hi *)
   let _cs =
-    test_ffmul
+    test_mul
       (Common.bignum_bigint_of_hex
          "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" )
       (Common.bignum_bigint_of_hex
@@ -1400,7 +1400,7 @@ let%test_unit "foreign_field_mul gadget" =
   in
   (* test nonzero_second_bit_carry1_hi *)
   let _cs =
-    test_ffmul ~cs
+    test_mul ~cs
       (Common.bignum_bigint_of_hex
          "ffffffffffffffffffffffffffffffffffffffffffffffff8a9dec7cfd1acdeb" )
       (Common.bignum_bigint_of_hex
@@ -1409,7 +1409,7 @@ let%test_unit "foreign_field_mul gadget" =
   in
   (* test random_multiplicands_carry1_lo *)
   let _cs =
-    test_ffmul ~cs
+    test_mul ~cs
       (Common.bignum_bigint_of_hex
          "ffd913aa9e17a63c7a0ff2354218037aafcd6ecaa67f56af1de882594a434dd3" )
       (Common.bignum_bigint_of_hex
@@ -1418,7 +1418,7 @@ let%test_unit "foreign_field_mul gadget" =
   in
   (* test random_multiplicands_valid *)
   let _cs =
-    test_ffmul ~cs
+    test_mul ~cs
       (Common.bignum_bigint_of_hex
          "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
       (Common.bignum_bigint_of_hex
@@ -1427,7 +1427,7 @@ let%test_unit "foreign_field_mul gadget" =
   in
   (* test smaller foreign field modulus *)
   let _cs =
-    test_ffmul
+    test_mul
       (Common.bignum_bigint_of_hex
          "5945fa400436f458cb9e994dcd315ded43e9b60eb68e2ae7b5cf1d07b48ca1c" )
       (Common.bignum_bigint_of_hex
@@ -1437,7 +1437,7 @@ let%test_unit "foreign_field_mul gadget" =
   in
   (* vesta non-native on pallas native modulus *)
   let _cs =
-    test_ffmul
+    test_mul
       (Common.bignum_bigint_of_hex
          "69cc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15" )
       (Common.bignum_bigint_of_hex
@@ -1446,7 +1446,7 @@ let%test_unit "foreign_field_mul gadget" =
   in
 
   (* Full test including all external checks *)
-  test_ffmul_full
+  test_mul_full
     (Common.bignum_bigint_of_hex
        "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
     (Common.bignum_bigint_of_hex
