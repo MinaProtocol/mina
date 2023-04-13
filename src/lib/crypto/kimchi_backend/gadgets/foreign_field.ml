@@ -55,6 +55,8 @@ type 'field standard_limbs = 'field * 'field * 'field
 
 type 'field compact_limbs = 'field * 'field
 
+type 'field single_limb = 'field
+
 type 'field limbs =
   | Extended of 'field extended_limbs
   | Standard of 'field standard_limbs
@@ -162,7 +164,10 @@ module type Element_intf = sig
   val extend :
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
-    -> 'field extended_limbs
+    -> 'field Cvar.t single_limb
+       * 'field Cvar.t single_limb
+       * 'field Cvar.t single_limb
+       * 'field Cvar.t single_limb
 end
 
 (* Foreign field element structures *)
@@ -234,10 +239,10 @@ end = struct
 
     let extend (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
-        : field extended_limbs =
+        =
       let open Circuit in
-      let l0, l1, l2 = to_field_limbs (module Circuit) x in
-      of_limbs (l0, l1, l2, Field.Constant.zero)
+      let l0, l1, l2 = to_limbs x in
+      (l0, l1, l2, Field.zero)
   end
 
   (* Extended limbs foreign field element *)
@@ -303,8 +308,8 @@ end = struct
 
     let extend (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
-        : field extended_limbs =
-      x
+        =
+      to_limbs x
   end
 
   (* Compact limbs foreign field element *)
@@ -314,6 +319,8 @@ end = struct
     type 'field limbs_type = 'field compact_limbs
 
     type 'field t = 'field Cvar.t compact_limbs
+
+    type 'field cvar = 'field Cvar.t
 
     let of_limbs x = x
 
@@ -361,13 +368,15 @@ end = struct
 
     let extend (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
-        : field extended_limbs =
+        =
       let open Circuit in
-      let l01, l2 = to_limbs x in
-      of_limbs (l01, l2, Field.zero, Field.zero)
+      Extended.to_limbs
+      @@ Extended.of_bignum_bigint (module Circuit)
+      @@ to_bignum_bigint (module Circuit) x
   end
 end
 
+(*
 (* Structure for tracking external checks that must be made
  * (using other gadgets) in order to acheive soundess for a
  * given multiplication *)
@@ -400,6 +409,7 @@ module External_checks = struct
       (x : 'field Cvar.t standard_limbs) =
     external_checks.bounds <- x :: external_checks.bounds
 end
+*)
 
 (* Common auxiliary functions for foreign field gadgets *)
 
@@ -605,7 +615,8 @@ let ffadd_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* For all n additions, compute its values and create gates *)
   for i = 0 to n do
-    let right = Element.Standard.extend @@ List.nth_exn inputs (i + 1) in
+    let right0, right1, right2, right3 = Element.Standard.extend (module Circuit) @@ List.nth_exn inputs (i + 1)  in
+    let right = Element.Extended.of_limbs (right0, right1, right2, right3) in
     let sub = List.nth_exn is_sub i in
     let result, sign, field_overflow, carry =
       compute_ffadd_values
@@ -811,7 +822,8 @@ let compute_witness_variables (type f)
     Bignum_bigint.(
       ( products0
       + (Common.two_to_limb * product1_lo)
-      - remainder0 - (Common.two_to_limb * remainder1) )
+      - remainder0
+      - (Common.two_to_limb * remainder1) )
       / two_to_2limb)
   in
 
