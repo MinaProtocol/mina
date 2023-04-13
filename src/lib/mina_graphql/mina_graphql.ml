@@ -3159,6 +3159,55 @@ module Types = struct
                 ; arg "memoPrefix" ~doc:"Prefix of memo" ~typ:(non_null string)
                 ]
       end
+
+      module GatingUpdate = struct
+        type input =
+          { trusted_peers : Network_peer.Peer.t list
+          ; banned_peers : Network_peer.Peer.t list
+          ; isolate : bool
+          ; clean_added_peers : bool
+          ; added_peers : Network_peer.Peer.t list
+          }
+
+        let arg_typ =
+          obj "GatingUpdate" ~doc:"Update to gating config and added peers"
+            ~coerce:(fun trusted_peers banned_peers isolate clean_added_peers
+                         added_peers ->
+              let%bind.Result trusted_peers = Result.all trusted_peers in
+              let%bind.Result banned_peers = Result.all banned_peers in
+              let%map.Result added_peers = Result.all added_peers in
+              { trusted_peers
+              ; banned_peers
+              ; isolate
+              ; clean_added_peers
+              ; added_peers
+              } )
+            ~split:(fun f (t : input) ->
+              f t.trusted_peers t.banned_peers t.isolate t.clean_added_peers
+                t.added_peers )
+            ~fields:
+              Arg.
+                [ arg "trustedPeers"
+                    ~typ:(non_null (list (non_null NetworkPeer.arg_typ)))
+                    ~doc:"Peers we will always allow connections from"
+                ; arg "bannedPeers"
+                    ~typ:(non_null (list (non_null NetworkPeer.arg_typ)))
+                    ~doc:
+                      "Peers we will never allow connections from (unless they \
+                       are also trusted!)"
+                ; arg "isolate" ~typ:(non_null bool)
+                    ~doc:
+                      "If true, no connections will be allowed unless they are \
+                       from a trusted peer"
+                ; arg "cleanAddedPeers" ~typ:(non_null bool)
+                    ~doc:
+                      "If true, resets added peers to an empty list (including \
+                       seeds)"
+                ; arg "addedPeers"
+                    ~typ:(non_null (list (non_null NetworkPeer.arg_typ)))
+                    ~doc:"Peers to connect to"
+                ]
+      end
     end
   end
 
@@ -4766,10 +4815,50 @@ module Mutations = struct
                    (sprintf "Not a valid scheduled transactions handle: %s"
                       handle ) )
 
+    let update_gating =
+      io_field "updateGating"
+        ~args:
+          Arg.
+            [ arg "input" ~doc:"Gating update"
+                ~typ:(non_null Types.Input.Itn.GatingUpdate.arg_typ)
+            ]
+        ~typ:(non_null string)
+        ~resolve:(fun { ctx = mina; _ } () input ->
+          let%bind.Deferred.Result { trusted_peers
+                                   ; banned_peers
+                                   ; isolate
+                                   ; clean_added_peers
+                                   ; added_peers
+                                   } =
+            Deferred.return input
+          in
+          let config = Mina_net2.{ trusted_peers; banned_peers; isolate } in
+          let net = Mina_lib.net mina in
+          let%bind _new_gating_config =
+            Mina_networking.set_connection_gating_config ~clean_added_peers net
+              config
+          in
+          let%bind failures =
+            (* Add all peers *)
+            Deferred.List.filter_map added_peers ~f:(fun peer ->
+                match%map.Deferred
+                  Mina_networking.add_peer net peer ~is_seed:false
+                with
+                | Ok () ->
+                    None
+                | Error err ->
+                    Some (Error.to_string_hum err) )
+          in
+          if List.is_empty failures then Deferred.Result.return "success"
+          else
+            Deferred.Result.failf "failed to add peers: %s"
+              (String.concat ~sep:", " failures) )
+
     let commands =
       [ schedule_payments
       ; schedule_zkapp_commands
       ; stop_scheduled_transactions
+      ; update_gating
       ]
   end
 end
