@@ -463,7 +463,7 @@ let compute_ffadd_values (type f)
   let sign = Field.Constant.(if is_sub then negate one else one) in
 
   (* Overflow if addition and greater than modulus or
-   * underflow if subtraction and less than zero 
+   * underflow if subtraction and less than zero
    *)
   let has_overflow =
     Bignum_bigint.(if is_sub then left < right else left + right >= modulus)
@@ -471,14 +471,14 @@ let compute_ffadd_values (type f)
 
   (* 0 for no overflow
    * -1 for underflow
-   * +1 for overflow 
+   * +1 for overflow
    *)
   let field_overflow = if has_overflow then sign else Field.Constant.zero in
 
   (* Compute the result
    * result = left + sign * right - field_overflow * modulus
    * TODO: unluckily, we cannot do it in one line if we keep these types, because one
-   *       cannot combine field elements and biguints in the same operation automatically 
+   *       cannot combine field elements and biguints in the same operation automatically
    *)
   let result =
     Element.Standard.of_bignum_bigint (module Circuit)
@@ -549,7 +549,7 @@ let compute_ffadd_values (type f)
    * foreign field addition gate for the bound check. An additional multi range check must be performed.
    * By default, the range check takes place right after the final Raw row.
 *)
-let ffadd_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
+let _ffadd_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
     ?(_with_range_check = true) (inputs : f Element.Standard.t list)
     (is_sub : bool list) (foreign_field_modulus : f standard_limbs) :
     f Element.Standard.t =
