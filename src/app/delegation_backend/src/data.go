@@ -156,6 +156,6 @@ type AppConfig struct {
 }
 
 type AwsCredentials struct {
-	AccessKey       string `json:"access_key"`
+	AccessKeyId     string `json:"access_key_id"`
 	SecretAccessKey string `json:"secret_access_key"`
 }
