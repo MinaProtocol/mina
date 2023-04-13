@@ -4218,7 +4218,13 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; update = Account_update.Update.noop
           ; token_id = Token_id.default
           ; balance_change
-          ; increment_nonce = false
+          ; increment_nonce =
+              ( match fee_payer_opt with
+              | Some (fee_payer, _) ->
+                  if Signature_lib.Keypair.equal fee_payer sender then false
+                  else true
+              | None ->
+                  false )
           ; events = []
           ; actions = []
           ; call_data = Field.zero
