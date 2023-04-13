@@ -320,8 +320,6 @@ end = struct
 
     type 'field t = 'field Cvar.t compact_limbs
 
-    type 'field cvar = 'field Cvar.t
-
     let of_limbs x = x
 
     let of_bignum_bigint (type field)
@@ -369,7 +367,6 @@ end = struct
     let extend (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         =
-      let open Circuit in
       Extended.to_limbs
       @@ Extended.of_bignum_bigint (module Circuit)
       @@ to_bignum_bigint (module Circuit) x
@@ -539,31 +536,6 @@ let compute_ffadd_values (type f)
 
   (result, sign, field_overflow, carry_bot)
 
-let ffadd_single (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (left_input : f Element.Standard.t) (right_input : f Element.Extended.t)
-    (is_sub : bool) (foreign_field_modulus : f standard_limbs) :
-    f Element.Standard.t * f * f * f =
-  let open Circuit in
-  let result, sign, field_overflow, carry =
-    compute_ffadd_values
-      (module Circuit)
-      left_input right_input is_sub foreign_field_modulus
-  in
-
-  (* Check that the result is in the correct range *)
-  let is_in_range =
-    let modulus =
-      field_standard_limbs_to_bignum_bigint
-        (module Circuit)
-        foreign_field_modulus
-    in
-    let result = Element.Standard.to_bignum_bigint (module Circuit) result in
-    Bignum_bigint.(result < modulus)
-  in
-  assert is_in_range ;
-
-  (result, sign, field_overflow, carry)
-
 (* FOREIGN FIELD ADDITION GADGET *)
 
 (* Definition of a gadget for a chain of foreign field additions
@@ -578,7 +550,7 @@ let ffadd_single (type f) (module Circuit : Snark_intf.Run with type field = f)
    * By default, the range check takes place right after the final Raw row.
 *)
 let ffadd_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
-    ?(with_range_check = true) (inputs : f Element.Standard.t list)
+    ?(_with_range_check = true) (inputs : f Element.Standard.t list)
     (is_sub : bool list) (foreign_field_modulus : f standard_limbs) :
     f Element.Standard.t =
   let open Circuit in
