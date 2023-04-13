@@ -30,6 +30,7 @@ type inputs =
   ; mina_image : string
   ; archive_image : string option
   ; debug : bool
+  ; generate_code_coverage : bool
   }
 
 let validate_inputs ~logger inputs (test_config : Test_config.t) :
@@ -279,6 +280,7 @@ let main inputs =
   let network_config =
     Engine.Network_config.expand ~logger ~test_name ~cli_inputs
       ~debug:inputs.debug ~test_config:T.config ~images
+      ~generate_code_coverage:inputs.generate_code_coverage
   in
   (* resources which require additional cleanup at end of test *)
   let net_manager_ref : Engine.Network_manager.t option ref = ref None in
@@ -326,7 +328,7 @@ let main inputs =
     in
     Monitor.try_with ~here:[%here] ~extract_exn:false (fun () ->
         let open Malleable_error.Let_syntax in
-        let%bind network, dsl =
+        let%bind network, net_manager, dsl =
           let lift ?exit_code =
             Deferred.bind ~f:(Malleable_error.or_hard_error ?exit_code)
           in
@@ -357,7 +359,7 @@ let main inputs =
           let (`Don't_call_in_tests dsl) =
             Dsl.create ~logger ~network ~event_router ~network_state_reader
           in
-          (network, dsl)
+          (network, net_manager, dsl)
         in
         [%log trace] "initializing network abstraction" ;
         let%bind () = Engine.Network.initialize_infra ~logger network in
@@ -384,7 +386,12 @@ let main inputs =
         let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
         [%log info] "Daemons started" ;
         [%log trace] "executing test" ;
-        T.run network dsl )
+        let%bind result = T.run network dsl in
+        let open Malleable_error.Let_syntax in
+        let%bind () =
+          Engine.Network_manager.generate_code_coverage net_manager network
+        in
+        Malleable_error.return result )
   in
   let exit_reason, test_result =
     match monitor_test_result with
@@ -436,6 +443,21 @@ let debug_arg =
   in
   Arg.(value & flag & info [ "debug"; "d" ] ~doc)
 
+let generate_code_coverage_arg =
+  let doc =
+    "Dump coverage data of each mina process to specified bucket. Requires \
+     special version of mina package (built with --instrument-with flag) and \
+     env variable 'BISECT_SIGTERM=yes' in mina container. WARNING: this is \
+     destructive operation as coverage data is generated on sig term signal. \
+     Process iterates of every applicable pod (which have mina process) and \
+     kills it. After that downloads coverage data and upload to gcloud bucket"
+  in
+  let env = Arg.env_var "GENERATE_COVERAGE" ~doc in
+  Arg.(
+    value
+      ( opt bool false
+      & info [ "generate-coverage" ] ~env ~docv:"GENERATE_COVERAGE" ~doc ))
+
 let help_term = Term.(ret @@ const (`Help (`Plain, None)))
 
 let engine_cmd ((engine_name, (module Engine)) : engine) =
@@ -451,12 +473,20 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
     Term.(const wrap_cli_inputs $ Engine.Network_config.Cli_inputs.term)
   in
   let inputs_term =
-    let cons_inputs test_inputs test mina_image archive_image debug =
-      { test_inputs; test; mina_image; archive_image; debug }
+    let cons_inputs test_inputs test mina_image archive_image debug
+        generate_code_coverage =
+      { test_inputs
+      ; test
+      ; mina_image
+      ; archive_image
+      ; debug
+      ; generate_code_coverage
+      }
     in
     Term.(
       const cons_inputs $ test_inputs_with_cli_inputs_arg $ test_arg
-      $ mina_image_arg $ archive_image_arg $ debug_arg)
+      $ mina_image_arg $ archive_image_arg $ debug_arg
+      $ generate_code_coverage_arg)
   in
   let term = Term.(const start $ inputs_term) in
   (term, info)

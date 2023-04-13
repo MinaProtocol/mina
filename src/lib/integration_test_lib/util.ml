@@ -90,3 +90,8 @@ let rec prompt_continue prompt_string =
   print_newline () ;
   if Char.equal c 'y' || Char.equal c 'Y' then Deferred.unit
   else prompt_continue prompt_string
+
+let write_to_file file_name content =
+  let file = Out_channel.create file_name in
+  Out_channel.output_string file content ;
+  Malleable_error.ok_unit

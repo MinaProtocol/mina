@@ -32,6 +32,7 @@ module Engine = struct
       -> test_name:string
       -> cli_inputs:Cli_inputs.t
       -> debug:bool
+      -> generate_code_coverage:bool
       -> test_config:Test_config.t
       -> images:Test_config.Container_images.t
       -> t
@@ -245,6 +246,8 @@ module Engine = struct
     val deploy : t -> Network.t Malleable_error.t
 
     val destroy : t -> unit Malleable_error.t
+
+    val generate_code_coverage : t -> Network.t -> unit Malleable_error.t
 
     val cleanup : t -> unit Deferred.t
   end

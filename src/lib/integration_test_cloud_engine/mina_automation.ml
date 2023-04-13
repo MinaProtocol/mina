@@ -68,6 +68,7 @@ module Network_config = struct
   type t =
     { mina_automation_location : string
     ; debug_arg : bool
+    ; generate_code_coverage : bool
     ; check_capacity : bool
     ; check_capacity_delay : int
     ; check_capacity_retries : int
@@ -92,8 +93,8 @@ module Network_config = struct
     assoc
 
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
-      ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
-      =
+      ~(generate_code_coverage : bool) ~(test_config : Test_config.t)
+      ~(images : Test_config.Container_images.t) =
     let { requires_graphql
         ; genesis_ledger
         ; block_producers
@@ -329,6 +330,7 @@ module Network_config = struct
     (* NETWORK CONFIG *)
     { mina_automation_location = cli_inputs.mina_automation_location
     ; debug_arg = debug
+    ; generate_code_coverage
     ; check_capacity = cli_inputs.check_capacity
     ; check_capacity_delay = cli_inputs.check_capacity_delay
     ; check_capacity_retries = cli_inputs.check_capacity_retries
@@ -400,6 +402,47 @@ module Network_config = struct
       network_config.terraform.testnet_name
 end
 
+(* Responsible for code coverage raw files generatation from pods.
+   Requires tailored mina images with instrumentation and BISECT_SIGTEM env variable set.
+   Function traverse all applicable pods (those which has mina process) and kills them.
+   This operation dumps raw bissect files (.coverage) and downloads it to gcloud bucket.
+   WARNING: operations of test coverage retrieval is destructive (as it kills mina processes).
+*)
+let download_raw_coverage_data pods ~logger =
+  let open Kubernetes_network in
+  let open Malleable_error.Let_syntax in
+  [%log' info logger] "Generating test coverage data..." ;
+  let coverage_files =
+    pods |> Map.to_alist
+    |> Malleable_error.List.fold ~init:[] ~f:(fun acc (_id, pod) ->
+           let pod_id = Node.id pod in
+           let%bind (_ : string) =
+             Node.run_in_container pod ~cmd:[ "pkill"; "mina" ]
+           in
+           [%log' debug logger] "Mina process in '$pod' killed."
+             ~metadata:[ ("pod", `String pod_id) ] ;
+           let%bind files_in_root = Node.list_files pod "." in
+           let%bind coverage_files =
+             files_in_root
+             |> List.filter ~f:(String.is_substring ~substring:".coverage")
+             |> Malleable_error.List.map ~f:(fun coverage_file ->
+                    [%log' debug logger]
+                      "Downloading coverage file to ($file) from $pod'."
+                      ~metadata:
+                        [ ("file", `String coverage_file)
+                        ; ("pod", `String pod_id)
+                        ] ;
+                    let%bind () =
+                      Node.download_file_safe pod ~source_file:coverage_file
+                        ~target_file:coverage_file
+                    in
+                    Malleable_error.return coverage_file )
+           in
+           Malleable_error.return (acc @ coverage_files) )
+  in
+  [%log' info logger] "Test coverage data generated" ;
+  coverage_files
+
 module Network_manager = struct
   type t =
     { logger : Logger.t
@@ -421,6 +464,7 @@ module Network_manager = struct
         Kubernetes_network.Workload_to_deploy.t Core.String.Map.t
     ; workloads_by_id :
         Kubernetes_network.Workload_to_deploy.t Core.String.Map.t
+    ; generate_code_coverage : bool
     ; mutable deployed : bool
     ; genesis_keypairs : Network_keypair.t Core.String.Map.t
     }
@@ -672,6 +716,7 @@ module Network_manager = struct
       ; testnet_dir
       ; testnet_log_filter
       ; constants = network_config.constants
+      ; generate_code_coverage = network_config.generate_code_coverage
       ; seed_workloads
       ; block_producer_workloads
       ; snark_coordinator_workloads
@@ -802,6 +847,16 @@ module Network_manager = struct
     [%log' info t.logger] "Cleaning up network configuration" ;
     let%bind () = File_system.remove_dir t.testnet_dir in
     Deferred.unit
+
+  let generate_code_coverage t network =
+    if t.generate_code_coverage then
+      let open Malleable_error.Let_syntax in
+      let%bind _ =
+        download_raw_coverage_data ~logger:t.logger
+          (Kubernetes_network.all_nodes network)
+      in
+      Malleable_error.ok_unit
+    else Malleable_error.ok_unit
 
   let destroy t =
     Deferred.Or_error.try_with (fun () -> destroy t)

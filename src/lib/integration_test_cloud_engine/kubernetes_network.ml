@@ -78,6 +78,19 @@ module Node = struct
       @ [ "exec"; "-c"; container_id; "-i"; pod_id; "--" ]
       @ cmd )
 
+  let run_in_pod ?(exit_code = 10) ?override_with_pod_id ~cmd t =
+    let { config; _ } = t in
+    let pod_id =
+      match override_with_pod_id with
+      | Some pid ->
+          pid
+      | None ->
+          List.hd_exn t.pod_ids
+    in
+    let%bind cwd = Unix.getcwd () in
+    Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code cwd "kubectl"
+      (base_kube_args config @ [ "exec"; "-i"; pod_id; "--" ] @ cmd)
+
   let cp_string_to_container_file ?container_id ~str ~dest t =
     let { pod_ids; config; pod_info; _ } = t in
     let container_id =
@@ -95,6 +108,17 @@ module Node = struct
     in
     Integration_test_lib.Util.run_cmd_or_error cwd "kubectl"
       (base_kube_args config @ [ "cp"; "-c"; container_id; tmp_file; dest_file ])
+
+  (* Downloads file using cat. Method useful in case when pod does not have tar installed thus cp command is not supported *)
+  let download_file_safe node ~source_file ~target_file =
+    let open Malleable_error.Let_syntax in
+    let%bind content = run_in_pod node ~cmd:[ "cat"; source_file ] in
+    Util.write_to_file target_file content
+
+  let list_files node folder =
+    let open Malleable_error.Let_syntax in
+    let%bind folder_content = run_in_pod node ~cmd:[ "ls"; folder ] in
+    Malleable_error.return (String.split folder_content ~on:'\n')
 
   let start ~fresh_state node : unit Malleable_error.t =
     let open Malleable_error.Let_syntax in
