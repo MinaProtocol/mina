@@ -15,6 +15,9 @@ require (
 
 require (
 	cloud.google.com/go v0.84.0 // indirect
+	github.com/agnivade/levenshtein v1.1.1 // indirect
+	github.com/alexflint/go-arg v1.4.2 // indirect
+	github.com/alexflint/go-scalar v1.0.0 // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.0.5 // indirect
@@ -35,6 +38,7 @@ require (
 	google.golang.org/genproto v0.0.0-20210624174822-c5cf32407d0a // indirect
 	google.golang.org/grpc v1.38.0 // indirect
 	google.golang.org/protobuf v1.26.0 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
 replace itn_json_types => ../json_types
