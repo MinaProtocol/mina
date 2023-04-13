@@ -55,8 +55,6 @@ type 'field extended_limbs = 'field * 'field * 'field * 'field
 
 type 'field compact_limbs = 'field * 'field
 
-type 'field single_limb = 'field
-
 type 'field limbs =
   | Standard of 'field standard_limbs
   | Extended of 'field extended_limbs
@@ -159,22 +157,20 @@ module type Element_intf = sig
     -> 'field t
     -> 'field standard_limbs
     -> bool
-
-  (* Convert a foreign element into an extended version *)
-  val extend :
-       (module Snark_intf.Run with type field = 'field)
-    -> 'field t
-    -> 'field Cvar.t single_limb
-       * 'field Cvar.t single_limb
-       * 'field Cvar.t single_limb
-       * 'field Cvar.t single_limb
 end
 
 (* Foreign field element structures *)
-(* Foreign field element structures *)
 module Element : sig
   (* Foreign field element (standard limbs) *)
-  module Standard : Element_intf with type 'a limbs_type = 'a standard_limbs
+  module Standard : sig
+    include Element_intf with type 'a limbs_type = 'a standard_limbs
+
+    (* Convert a standard foreign element into extended limbs *)
+    val extend :
+         (module Snark_intf.Run with type field = 'field)
+      -> 'field t
+      -> 'field Cvar.t extended_limbs
+  end
 
   (* Foreign field element (extended limbs) *)
   module Extended : Element_intf with type 'a limbs_type = 'a extended_limbs
@@ -241,9 +237,8 @@ end = struct
     let extend (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         =
-      let open Circuit in
       let l0, l1, l2 = to_limbs x in
-      (l0, l1, l2, Field.zero)
+      (l0, l1, l2, Circuit.Field.zero)
   end
 
   (* Extended limbs foreign field element *)
@@ -554,10 +549,9 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
     (is_sub : bool) (foreign_field_modulus : f standard_limbs) :
     f Element.Standard.t * f * f =
   let open Circuit in
-
-    (* Check foreign field modulus < max allowed *)
-    check_modulus (module Circuit) foreign_field_modulus ;
-    let foreign_field_modulus0, foreign_field_modulus1, foreign_field_modulus2 =
+  (* Check foreign field modulus < max allowed *)
+  check_modulus (module Circuit) foreign_field_modulus ;
+  let foreign_field_modulus0, foreign_field_modulus1, foreign_field_modulus2 =
     foreign_field_modulus
   in
   (* Make sure that inputs are smaller than the foreign modulus *)
@@ -606,16 +600,20 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (result, sign, field_overflow)
 
-  (* This function adds a FFAdd gate to check that a given value is smaller than the modulus *)
-let add_bound_check (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (value : f Element.Standard.t) (foreign_field_modulus : f standard_limbs)  =
+(* This function adds a FFAdd gate to check that a given value is smaller than the modulus *)
+let add_bound_check (type f)
+    (module Circuit : Snark_intf.Run with type field = f)
+    (value : f Element.Standard.t) (foreign_field_modulus : f standard_limbs) =
   let open Circuit in
-
   (* Compute the value for the right input of the addition as 2^264 *)
-  let offset = Element.Extended.of_bignum_bigint (module Circuit) two_to_3limb in
+  let offset =
+    Element.Extended.of_bignum_bigint (module Circuit) two_to_3limb
+  in
 
   (* Create the foreign field addition gate *)
-  let (bound, sign, ovf) = add (module Circuit) value offset false foreign_field_modulus in
+  let bound, sign, ovf =
+    add (module Circuit) value offset false foreign_field_modulus
+  in
   (* Parse the bound outcome *)
   let bound0, bound1, bound2 =
     Element.Standard.to_field_limbs (module Circuit) bound
@@ -648,7 +646,6 @@ let add_bound_check (type f) (module Circuit : Snark_intf.Run with type field = 
         } ) ;
   ()
 
-
 (* FOREIGN FIELD ADDITION CHAIN GADGET *)
 
 (* Definition of a gadget for a chain of foreign field additions
@@ -662,7 +659,7 @@ let add_bound_check (type f) (module Circuit : Snark_intf.Run with type field = 
    * foreign field addition gate for the bound check. An additional multi range check must be performed.
    * By default, the range check takes place right after the final Raw row.
 *)
-let add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
+let _add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
     ?(_with_range_check = true) (inputs : f Element.Standard.t list)
     (is_sub : bool list) (foreign_field_modulus : f standard_limbs) :
     f Element.Standard.t =
@@ -676,24 +673,26 @@ let add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* For all n additions, compute its values and create gates *)
   for i = 0 to n do
-    let right0, right1, right2, right3 =
-      Element.Standard.extend (module Circuit) @@ List.nth_exn inputs (i + 1)
+    let right =
+      Element.Extended.of_limbs
+      @@ Element.Standard.extend (module Circuit)
+      @@ List.nth_exn inputs (i + 1)
     in
-    let right = Element.Extended.of_limbs (right0, right1, right2, right3) in
     let sub = List.nth_exn is_sub i in
 
     (* Create the foreign field addition row *)
-    let result, _sign, _ovf = add (module Circuit) left.(0) right sub foreign_field_modulus in
+    let result, _sign, _ovf =
+      add (module Circuit) left.(0) right sub foreign_field_modulus
+    in
 
     (* Update left input for next iteration *)
-    left.(0) <- result ;
-    ()
+    left.(0) <- result ; ()
   done ;
 
   (* Add the final gate for the bound *)
   (* result + (2^264 - f) = bound *)
   let result = left.(0) in
-  add_bound_check (module Circuit) result foreign_field_modulus;
+  add_bound_check (module Circuit) result foreign_field_modulus ;
 
   (* If range check is required, add the final gate *)
 
@@ -909,10 +908,6 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
   let open Circuit in
   (* Check foreign field modulus < max allowed *)
   check_modulus (module Circuit) foreign_field_modulus ;
-
-  (* Compute gate coefficients
-   *   This happens when circuit is created / not part of witness (e.g. exists, As_prover code)
-   *)
 
   (* Compute gate coefficients
    *   This happens when circuit is created / not part of witness (e.g. exists, As_prover code)

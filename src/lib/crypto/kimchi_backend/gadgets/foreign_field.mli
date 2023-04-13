@@ -16,8 +16,6 @@ type 'field extended_limbs = 'field * 'field * 'field * 'field
 
 type 'field compact_limbs = 'field * 'field
 
-type 'field single_limb = 'field
-
 type 'field limbs =
   | Standard of 'field standard_limbs
   | Extended of 'field extended_limbs
@@ -70,25 +68,24 @@ module type Element_intf = sig
     -> 'field t
     -> 'field t
     -> bool
-
-  (* Convert a foreign element into an extended version *)
-  val extend :
-       (module Snark_intf.Run with type field = 'field)
-    -> 'field t
-    -> 'field Cvar.t single_limb
-       * 'field Cvar.t single_limb
-       * 'field Cvar.t single_limb
-       * 'field Cvar.t single_limb
 end
 
 module Element : sig
-  (* Foreign field element type (standard limbs) *)
-  module Standard : Element_intf with type 'a limbs_type = 'a standard_limbs
+  (** Foreign field element type (standard limbs) *)
+  module Standard : sig
+    include Element_intf with type 'a limbs_type = 'a standard_limbs
 
-  (* Foreign field element type (extended limbs) *)
+    (** Convert a standard foreign element into extended limbs *)
+    val extend :
+         (module Snark_intf.Run with type field = 'field)
+      -> 'field t
+      -> 'field Cvar.t extended_limbs
+  end
+
+  (** Foreign field element type (extended limbs) *)
   module Extended : Element_intf with type 'a limbs_type = 'a extended_limbs
 
-  (* Foreign field element type (compact limbs) *)
+  (** Foreign field element type (compact limbs) *)
   module Compact : Element_intf with type 'a limbs_type = 'a compact_limbs
 end
 
