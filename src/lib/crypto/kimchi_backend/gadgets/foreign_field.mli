@@ -10,17 +10,17 @@ module Snark_intf = Snarky_backendless.Snark_intf
  *     Extended mode := 4 limbs of L-bits each, used by bound addition (i.e. Matthew's trick)
  *     Compact mode  := 2 limbs where the lowest is 2L bits and the highest is L bits
  *)
-type 'field extended_limbs = 'field * 'field * 'field * 'field
-
 type 'field standard_limbs = 'field * 'field * 'field
+
+type 'field extended_limbs = 'field * 'field * 'field * 'field
 
 type 'field compact_limbs = 'field * 'field
 
 type 'field single_limb = 'field
 
 type 'field limbs =
-  | Extended of 'field extended_limbs
   | Standard of 'field standard_limbs
+  | Extended of 'field extended_limbs
   | Compact of 'field compact_limbs
 
 (** Foreign field element base type - not used directly *)
@@ -115,7 +115,7 @@ end
  *     foreign_field_modulus := must be less than than max foreign field modulus
  *   Outputs: tuple of product and required external checks
  *)
-val ffmul :
+val mul :
      (module Snark_intf.Run with type field = 'f)
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
