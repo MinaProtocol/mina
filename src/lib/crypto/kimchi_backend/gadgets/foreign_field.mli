@@ -10,16 +10,17 @@ module Snark_intf = Snarky_backendless.Snark_intf
  *     Extended mode := 4 limbs of L-bits each, used by bound addition (i.e. Matthew's trick)
  *     Compact mode  := 2 limbs where the lowest is 2L bits and the highest is L bits
  *)
+type 'field extended_limbs = 'field * 'field * 'field * 'field
 
 type 'field standard_limbs = 'field * 'field * 'field
 
-type 'field extended_limbs = 'field * 'field * 'field * 'field
-
 type 'field compact_limbs = 'field * 'field
 
+type 'field single_limb = 'field
+
 type 'field limbs =
-  | Standard of 'field standard_limbs
   | Extended of 'field extended_limbs
+  | Standard of 'field standard_limbs
   | Compact of 'field compact_limbs
 
 (** Foreign field element base type - not used directly *)
@@ -62,6 +63,22 @@ module type Element_intf = sig
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> Bignum_bigint.t
+
+  (* Check that the foreign element is smaller than a given field modulus *)
+  val fits :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> 'field t
+    -> bool
+
+  (* Convert a foreign element into an extended version *)
+  val extend :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> 'field Cvar.t single_limb
+       * 'field Cvar.t single_limb
+       * 'field Cvar.t single_limb
+       * 'field Cvar.t single_limb
 end
 
 module Element : sig
