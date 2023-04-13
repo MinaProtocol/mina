@@ -4193,7 +4193,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         | Some (fee_payer, _) ->
             Signature_lib.Keypair.equal fee_payer sender
         | None ->
-            false
+            true
       in
       let preconditions' =
         Option.value preconditions
