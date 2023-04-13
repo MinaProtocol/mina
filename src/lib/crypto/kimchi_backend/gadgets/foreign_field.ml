@@ -157,7 +157,7 @@ module type Element_intf = sig
   val fits :
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
-    -> 'field t
+    -> 'field standard_limbs
     -> bool
 
   (* Convert a foreign element into an extended version *)
@@ -232,10 +232,11 @@ end = struct
 
     let fits (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
-        (modulus : field t) : bool =
-      Bignum_bigint.(
-        to_bignum_bigint (module Circuit) x
-        < to_bignum_bigint (module Circuit) modulus)
+        (modulus : field standard_limbs) : bool =
+      let modulus =
+        field_standard_limbs_to_bignum_bigint (module Circuit) modulus
+      in
+      Bignum_bigint.(to_bignum_bigint (module Circuit) x < modulus)
 
     let extend (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
@@ -301,10 +302,11 @@ end = struct
 
     let fits (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
-        (modulus : field t) : bool =
-      Bignum_bigint.(
-        to_bignum_bigint (module Circuit) x
-        < to_bignum_bigint (module Circuit) modulus)
+        (modulus : field standard_limbs) : bool =
+      let modulus =
+        field_standard_limbs_to_bignum_bigint (module Circuit) modulus
+      in
+      Bignum_bigint.(to_bignum_bigint (module Circuit) x < modulus)
 
     let extend (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
@@ -359,10 +361,11 @@ end = struct
 
     let fits (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
-        (modulus : field t) : bool =
-      Bignum_bigint.(
-        to_bignum_bigint (module Circuit) x
-        < to_bignum_bigint (module Circuit) modulus)
+        (modulus : field standard_limbs) : bool =
+      let modulus =
+        field_standard_limbs_to_bignum_bigint (module Circuit) modulus
+      in
+      Bignum_bigint.(to_bignum_bigint (module Circuit) x < modulus)
 
     let extend (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
@@ -538,6 +541,116 @@ let compute_ffadd_values (type f)
 
 (* FOREIGN FIELD ADDITION GADGET *)
 
+(* Definition of a gadget for a single foreign field addition
+   * - left_input of the addition as 3 limbs element
+   * - right_input of the addition as 4 limbs element
+   * - is_sub: a flag indicating whether the corresponding gate is addition or a subtraction
+   * - foreign_field_modulus: the modulus of the foreign field
+   * - Returns the result of the addition/subtraction as a 3 limbs element
+   *
+*)
+let add (type f) (module Circuit : Snark_intf.Run with type field = f)
+    (left_input : f Element.Standard.t) (right_input : f Element.Extended.t)
+    (is_sub : bool) (foreign_field_modulus : f standard_limbs) :
+    f Element.Standard.t * f * f =
+  let open Circuit in
+
+    (* Check foreign field modulus < max allowed *)
+    check_modulus (module Circuit) foreign_field_modulus ;
+    let foreign_field_modulus0, foreign_field_modulus1, foreign_field_modulus2 =
+    foreign_field_modulus
+  in
+  (* Make sure that inputs are smaller than the foreign modulus *)
+  assert (
+    Element.Standard.fits (module Circuit) left_input foreign_field_modulus ) ;
+  assert (
+    Element.Extended.fits (module Circuit) right_input foreign_field_modulus ) ;
+
+  (* Compute values for the ffadd *)
+  let result, sign, field_overflow, carry =
+    compute_ffadd_values
+      (module Circuit)
+      left_input right_input is_sub foreign_field_modulus
+  in
+
+  (* Parse inputs *)
+  let right_input0, right_input1, right_input2, _right_input3 =
+    Element.Extended.to_limbs right_input
+  in
+  let left_input0, left_input1, left_input2 =
+    Element.Standard.to_limbs left_input
+  in
+
+  (* Create the gate *)
+  with_label "ffadd_gate" (fun () ->
+      (* Set up FFAdd gate *)
+      assert_
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (ForeignFieldAdd
+                 { left_input_lo = left_input0
+                 ; left_input_mi = left_input1
+                 ; left_input_hi = left_input2
+                 ; right_input_lo = right_input0
+                 ; right_input_mi = right_input1
+                 ; right_input_hi = right_input2
+                 ; field_overflow = Field.constant field_overflow
+                 ; carry = Field.constant carry
+                 ; foreign_field_modulus0
+                 ; foreign_field_modulus1
+                 ; foreign_field_modulus2
+                 ; sign
+                 } )
+        } ) ;
+
+  (result, sign, field_overflow)
+
+  (* This function adds a FFAdd gate to check that a given value is smaller than the modulus *)
+let add_bound_check (type f) (module Circuit : Snark_intf.Run with type field = f)
+    (value : f Element.Standard.t) (foreign_field_modulus : f standard_limbs)  =
+  let open Circuit in
+
+  (* Compute the value for the right input of the addition as 2^264 *)
+  let offset = Element.Extended.of_bignum_bigint (module Circuit) two_to_3limb in
+
+  (* Create the foreign field addition gate *)
+  let (bound, sign, ovf) = add (module Circuit) value offset false foreign_field_modulus in
+  (* Parse the bound outcome *)
+  let bound0, bound1, bound2 =
+    Element.Standard.to_field_limbs (module Circuit) bound
+  in
+
+  (* Check that the correct expected values were obtained *)
+  assert (Field.Constant.(equal sign one)) ;
+  assert (Field.Constant.(equal ovf one)) ;
+
+  (* Set up copy constraints with sign and overflow with those checks*)
+  Field.Assert.equal (Field.constant sign) Field.one ;
+  Field.Assert.equal (Field.constant ovf) Field.one ;
+
+  (* Final Zero gate*)
+  with_label "final_add_zero_gate" (fun () ->
+      (* Set up FFAdd gate *)
+      assert_
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (Raw
+                 { kind = Zero
+                 ; values =
+                     [| Field.constant bound0
+                      ; Field.constant bound1
+                      ; Field.constant bound2
+                     |]
+                 ; coeffs = [||]
+                 } )
+        } ) ;
+  ()
+
+
+(* FOREIGN FIELD ADDITION CHAIN GADGET *)
+
 (* Definition of a gadget for a chain of foreign field additions
    * - inputs: all the inputs to the chain of additions
    * - is_sub: a list of booleans indicating whether the corresponding addition is a subtraction
@@ -558,28 +671,6 @@ let add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
   let n = List.length is_sub in
   assert (List.length inputs = n + 1) ;
 
-  (* Check foreign field modulus < max allowed *)
-  check_modulus (module Circuit) foreign_field_modulus ;
-
-  (* Compute gate coefficients
-     *   This happens when circuit is created / not part of witness (e.g. exists, As_prover code)
-  *)
-  let foreign_field_modulus0, foreign_field_modulus1, foreign_field_modulus2 =
-    foreign_field_modulus
-  in
-
-  (* Make sure that all inputs are smaller than the foreign modulus *)
-  (let modulus =
-     Element.Standard.of_bignum_bigint (module Circuit)
-     @@ field_standard_limbs_to_bignum_bigint
-          (module Circuit)
-          ( foreign_field_modulus0
-          , foreign_field_modulus1
-          , foreign_field_modulus2 )
-   in
-   List.iter inputs ~f:(fun input ->
-       assert (Element.Standard.fits (module Circuit) input modulus) ) ) ;
-
   (* Initialize first left input *)
   let left = [| List.hd_exn inputs |] in
 
@@ -590,104 +681,19 @@ let add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
     in
     let right = Element.Extended.of_limbs (right0, right1, right2, right3) in
     let sub = List.nth_exn is_sub i in
-    let result, sign, field_overflow, carry =
-      compute_ffadd_values
-        (module Circuit)
-        left.(0) right sub foreign_field_modulus
-    in
 
-    let left0, left1, left2 = Element.Standard.to_limbs left.(0) in
-    let right0, right1, right2, _right3 = Element.Extended.to_limbs right in
+    (* Create the foreign field addition row *)
+    let result, _sign, _ovf = add (module Circuit) left.(0) right sub foreign_field_modulus in
 
-    (* Create the gate *)
-    with_label "add_gate" (fun () ->
-        (* Set up FFAdd gate *)
-        assert_
-          { annotation = Some __LOC__
-          ; basic =
-              Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-                (ForeignFieldAdd
-                   { left_input_lo = left0
-                   ; left_input_mi = left1
-                   ; left_input_hi = left2
-                   ; right_input_lo = right0
-                   ; right_input_mi = right1
-                   ; right_input_hi = right2
-                   ; field_overflow = Field.constant field_overflow
-                   ; carry = Field.constant carry
-                   ; foreign_field_modulus0
-                   ; foreign_field_modulus1
-                   ; foreign_field_modulus2
-                   ; sign
-                   } )
-          } ) ;
+    (* Update left input for next iteration *)
     left.(0) <- result ;
     ()
   done ;
 
   (* Add the final gate for the bound *)
   (* result + (2^264 - f) = bound *)
-  let result0, result1, result2 = Element.Standard.to_limbs left.(0) in
-  let final_right =
-    Element.Extended.of_bignum_bigint (module Circuit) two_to_3limb
-  in
-  let final_bound, final_sign, final_ovf, final_carry =
-    compute_ffadd_values
-      (module Circuit)
-      left.(0) final_right false foreign_field_modulus
-  in
-  let bound0, bound1, bound2 =
-    Element.Standard.to_field_limbs (module Circuit) final_bound
-  in
-
-  (* Check that the correct expected values were obtained *)
-  assert (Field.Constant.(equal final_sign one)) ;
-  assert (Field.Constant.(equal final_ovf one)) ;
-
-  with_label "final_add_gate" (fun () ->
-      (* Set up FFAdd gate *)
-      assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (ForeignFieldAdd
-                 { left_input_lo = result0
-                 ; left_input_mi = result1
-                 ; left_input_hi = result2
-                 ; right_input_lo = Field.zero
-                 ; right_input_mi = Field.zero
-                 ; right_input_hi =
-                     Field.constant @@ two_to_limb_field (module Circuit)
-                 ; field_overflow = Field.constant final_ovf
-                 ; carry = Field.constant final_carry
-                 ; foreign_field_modulus0
-                 ; foreign_field_modulus1
-                 ; foreign_field_modulus2
-                 ; sign = final_sign
-                 } )
-        } ) ;
-
-  (* Set up copy constraints with sign and overflow *)
-  Field.Assert.equal (Field.constant final_sign) Field.one ;
-  Field.Assert.equal (Field.constant final_ovf) Field.one ;
-
-  (* Final Zero gate*)
-  with_label "final_add_zero_gate" (fun () ->
-      (* Set up FFAdd gate *)
-      assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (Raw
-                 { kind = Zero
-                 ; values =
-                     [| Field.constant bound0
-                      ; Field.constant bound1
-                      ; Field.constant bound2
-                     |]
-                 ; coeffs = [||]
-                 } )
-        } ) ;
+  let result = left.(0) in
+  add_bound_check (module Circuit) result foreign_field_modulus;
 
   (* If range check is required, add the final gate *)
 
@@ -696,7 +702,7 @@ let add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
   let external_checks = External_checks.create (module Circuit) in
 *)
   (* Return result *)
-  Element.Standard.of_limbs (result0, result1, result2)
+  result
 
 (* FOREIGN FIELD MULTIPLICATION *)
 
@@ -1147,10 +1153,192 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
         } ) ;
   ( Element.Standard.of_limbs (remainder0, remainder1, remainder2)
   , external_checks )
+    (*********)
+    (* Tests *)
+    (*********)
+
+    (* Create ForeignFieldMul gate *)
+    with_label "foreign_field_mul" (fun () ->
+      assert_
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (ForeignFieldMul
+                 { (* Current row *) left_input0
+                 ; left_input1
+                 ; left_input2
+                 ; right_input0
+                 ; right_input1
+                 ; right_input2
+                 ; carry1_lo
+                 ; carry1_hi
+                 ; carry0
+                 ; quotient0
+                 ; quotient1
+                 ; quotient2
+                 ; quotient_bound_carry
+                 ; product1_hi_1
+                 ; (* Next row *) remainder0
+                 ; remainder1
+                 ; remainder2
+                 ; quotient_bound01
+                 ; quotient_bound2
+                 ; product1_lo
+                 ; product1_hi_0
+                 ; (* Coefficients *) foreign_field_modulus0
+                 ; foreign_field_modulus1
+                 ; foreign_field_modulus2
+                 ; neg_foreign_field_modulus0
+                 ; neg_foreign_field_modulus1
+                 ; neg_foreign_field_modulus2
+                 } )
+        } ) ;
+  ( Element.Standard.of_limbs (remainder0, remainder1, remainder2)
+  , external_checks )
 
 (*********)
 (* Tests *)
 (*********)
+
+let%test_unit "foreign_field_add gadget" =
+  (* Import the gadget test runner *)
+  let open Kimchi_gadgets_test_runner in
+  (* Initialize the SRS cache. *)
+  let () =
+    try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+  in
+
+  let assert_eq ((a, b, c) : 'field standard_limbs)
+      ((x, y, z) : 'field standard_limbs) =
+    let open Runner.Impl.Field in
+    Assert.equal (constant a) (constant x) ;
+    Assert.equal (constant b) (constant y) ;
+    Assert.equal (constant c) (constant z)
+  in
+
+  (* Helper to test foreign_field_add gadget
+     *   Inputs:
+     *     - left_input
+     *     - right_input
+     *     - foreign_field_modulus
+     *     - expected product
+  *)
+  let _test_aadd ?cs (left_input : Bignum_bigint.t)
+      (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
+      =
+    (* Generate and verify proof *)
+    let cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof ?cs (fun () ->
+          let open Runner.Impl in
+          (* Prepare test inputs *)
+          let expected =
+            Bignum_bigint.(left_input * right_input % foreign_field_modulus)
+          in
+          let foreign_field_modulus =
+            bignum_bigint_to_field_standard_limbs
+              (module Runner.Impl)
+              foreign_field_modulus
+          in
+          let left_input =
+            Element.Standard.of_bignum_bigint (module Runner.Impl) left_input
+          in
+          let right_input =
+            Element.Standard.of_bignum_bigint (module Runner.Impl) right_input
+          in
+          (* Create the gadget *)
+          let product, _external_checks =
+            add_chain
+              (module Runner.Impl)
+              left_input right_input foreign_field_modulus
+          in
+          (* Check product matches expected result *)
+          as_prover (fun () ->
+              let expected =
+                bignum_bigint_to_field_standard_limbs
+                  (module Runner.Impl)
+                  expected
+              in
+              let product =
+                Element.Standard.to_field_limbs (module Runner.Impl) product
+              in
+              assert_eq product expected ) ;
+          () )
+    in
+
+    cs
+  in
+
+  (* Helper to test foreign_field_mul gadget with external checks
+     *   Inputs:
+     *     - left_input
+     *     - right_input
+     *     - foreign_field_modulus
+     *     - expected product
+  *)
+  let _test_add_full (left_input : Bignum_bigint.t)
+      (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
+      : unit =
+    (* Circuit definition function *)
+    let make_circuit left_input right_input foreign_field_modulus =
+      let open Runner.Impl in
+      (* Prepare test inputs *)
+      let expected =
+        Bignum_bigint.(left_input + (right_input % foreign_field_modulus))
+      in
+      let foreign_field_modulus =
+        bignum_bigint_to_field_standard_limbs
+          (module Runner.Impl)
+          foreign_field_modulus
+      in
+      let left_input =
+        Element.Standard.of_bignum_bigint (module Runner.Impl) left_input
+      in
+      let right_input =
+        Element.Standard.of_bignum_bigint (module Runner.Impl) right_input
+      in
+
+      (* External checks for this test (example, circuit designer has complete flexibility about organization)
+       *   1) ForeignFieldAdd
+       *   2) Zero (result bound addition)
+       *   3) multi-range-check (result)
+       *)
+
+      (* 1) Create the foreign field mul gadget *)
+      let product, external_checks =
+        mul (module Runner.Impl) left_input right_input foreign_field_modulus
+      in
+
+      (* Sanity check product matches expected result *)
+      as_prover (fun () ->
+          let expected =
+            bignum_bigint_to_field_standard_limbs (module Runner.Impl) expected
+          in
+          let product =
+            Element.Standard.to_field_limbs (module Runner.Impl) product
+          in
+          assert_eq product expected ) ;
+
+      (* TODO: 2) Add result bound addition gate *)
+      assert (Mina_stdlib.List.Length.equal external_checks.bounds 1) ;
+
+      ()
+    in
+
+    (* Generate and verify first proof *)
+    let cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof (fun () ->
+          make_circuit left_input right_input foreign_field_modulus )
+    in
+
+    (* Generate and verify second proof, reusing constraint system *)
+    let _cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof ~cs (fun () ->
+          make_circuit left_input right_input foreign_field_modulus )
+    in
+    ()
+  in
+
+  ()
 
 let%test_unit "foreign_field_mul gadget" =
   (* Import the gadget test runner *)
