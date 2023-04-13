@@ -15,6 +15,7 @@
    async
    base.base_internalhash_types
    ;;local libraries
+   unsigned_extended
    staged_ledger_diff
    block_time
    one_or_two
@@ -58,6 +59,7 @@
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    mina_wire_types
- )
+   internal_tracing
+   )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_mina ppx_version ppx_deriving.std ppx_deriving_yojson)))

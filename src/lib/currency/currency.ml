@@ -1179,6 +1179,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let sub_amount = sub
 
+      let sub_amount_or_zero = sub_or_zero
+
       let add_amount_flagged = add_flagged
 
       let add_signed_amount_flagged = add_signed_flagged
