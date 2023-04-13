@@ -73,12 +73,11 @@ let result_field2 ~resolve =
 module Doc = struct
   let date ?(extra = "") s =
     sprintf
-      !"%s (stringified Unix time - number of milliseconds since January 1, \
-        1970)%s"
+      "%s (stringified Unix time - number of milliseconds since January 1, \
+       1970)%s"
       s extra
 
-  let bin_prot =
-    sprintf !"%s (base58-encoded janestreet/bin_prot serialization)"
+  let bin_prot = sprintf "%s (base58-encoded janestreet/bin_prot serialization)"
 end
 
 module Reflection = struct
@@ -5154,6 +5153,8 @@ let schema_limited =
       ~mutations:[] ~subscriptions:[])
 
 let schema_itn : Mina_lib.t Schema.schema =
-  Graphql_async.Schema.(
-    schema Queries.Itn.commands ~mutations:Mutations.Itn.commands
-      ~subscriptions:[])
+  if Mina_compile_config.itn_features then
+    Graphql_async.Schema.(
+      schema Queries.Itn.commands ~mutations:Mutations.Itn.commands
+        ~subscriptions:[])
+  else Graphql_async.Schema.(schema [] ~mutations:[] ~subscriptions:[])
