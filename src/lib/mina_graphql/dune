@@ -100,6 +100,7 @@
    kimchi_backend
    sgn_type
    mina_transaction_logic
+   gossip_net
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../config.mlh)
