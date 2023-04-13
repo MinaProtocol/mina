@@ -603,7 +603,8 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
 (* This function adds a FFAdd gate to check that a given value is smaller than the modulus *)
 let add_bound_check (type f)
     (module Circuit : Snark_intf.Run with type field = f)
-    (value : f Element.Standard.t) (foreign_field_modulus : f standard_limbs) =
+    (value : f Element.Standard.t) (foreign_field_modulus : f standard_limbs) :
+    f Element.Standard.t =
   let open Circuit in
   (* Compute the value for the right input of the addition as 2^264 *)
   let offset =
@@ -623,10 +624,6 @@ let add_bound_check (type f)
   assert (Field.Constant.(equal sign one)) ;
   assert (Field.Constant.(equal ovf one)) ;
 
-  (* Set up copy constraints with sign and overflow with those checks*)
-  Field.Assert.equal (Field.constant sign) Field.one ;
-  Field.Assert.equal (Field.constant ovf) Field.one ;
-
   (* Final Zero gate*)
   with_label "final_add_zero_gate" (fun () ->
       (* Set up FFAdd gate *)
@@ -644,7 +641,11 @@ let add_bound_check (type f)
                  ; coeffs = [||]
                  } )
         } ) ;
-  ()
+
+  (* Set up copy constraints with overflow with the overflow check*)
+  Field.Assert.equal (Field.constant ovf) Field.one ;
+
+  bound
 
 (* FOREIGN FIELD ADDITION CHAIN GADGET *)
 
@@ -652,17 +653,15 @@ let add_bound_check (type f)
    * - inputs: all the inputs to the chain of additions
    * - is_sub: a list of booleans indicating whether the corresponding addition is a subtraction
    * - foreign_field_modulus: the modulus of the foreign field (all the same)
-   * - with_range_check: whether to perform a range check on the result at the end of the chain or not (default is true)
    * - Returns the final result of the chain of additions
    *
    * For n+1 inputs, the gadget creates n foreign field addition gates, followed by a final
    * foreign field addition gate for the bound check. An additional multi range check must be performed.
    * By default, the range check takes place right after the final Raw row.
 *)
-let _add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
-    ?(_with_range_check = true) (inputs : f Element.Standard.t list)
-    (is_sub : bool list) (foreign_field_modulus : f standard_limbs) :
-    f Element.Standard.t =
+let add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
+    (inputs : f Element.Standard.t list) (is_sub : bool list)
+    (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
   let open Circuit in
   (* Check that the number of inputs is correct *)
   let n = List.length is_sub in
@@ -672,7 +671,7 @@ let _add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
   let left = [| List.hd_exn inputs |] in
 
   (* For all n additions, compute its values and create gates *)
-  for i = 0 to n do
+  for i = 0 to n - 1 do
     let right =
       Element.Extended.of_limbs
       @@ Element.Standard.extend (module Circuit)
@@ -692,14 +691,12 @@ let _add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
   (* Add the final gate for the bound *)
   (* result + (2^264 - f) = bound *)
   let result = left.(0) in
-  add_bound_check (module Circuit) result foreign_field_modulus ;
+  let bound = add_bound_check (module Circuit) result foreign_field_modulus in
+  let bound0, bound1, bound2 = Element.Standard.to_limbs bound in
 
-  (* If range check is required, add the final gate *)
+  (* Range check bound *)
+  Range_check.multi (module Circuit) bound0 bound1 bound2 ;
 
-  (* Track external checks*)
-  (*
-  let external_checks = External_checks.create (module Circuit) in
-*)
   (* Return result *)
   result
 
@@ -1215,10 +1212,10 @@ let%test_unit "foreign_field_add gadget" =
      *   Inputs:
      *     - left_input
      *     - right_input
+     *     - is_sub: default is false
      *     - foreign_field_modulus
-     *     - expected product
   *)
-  let _test_aadd ?cs (left_input : Bignum_bigint.t)
+  let test_add ?cs ?(is_sub = false) (left_input : Bignum_bigint.t)
       (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
       =
     (* Generate and verify proof *)
@@ -1226,8 +1223,12 @@ let%test_unit "foreign_field_add gadget" =
       Runner.generate_and_verify_proof ?cs (fun () ->
           let open Runner.Impl in
           (* Prepare test inputs *)
+          let op_sign =
+            if is_sub then Bignum_bigint.of_int (-1) else Bignum_bigint.one
+          in
           let expected =
-            Bignum_bigint.(left_input * right_input % foreign_field_modulus)
+            Bignum_bigint.(
+              left_input + (op_sign * right_input % foreign_field_modulus))
           in
           let foreign_field_modulus =
             bignum_bigint_to_field_standard_limbs
@@ -1238,13 +1239,13 @@ let%test_unit "foreign_field_add gadget" =
             Element.Standard.of_bignum_bigint (module Runner.Impl) left_input
           in
           let right_input =
-            Element.Standard.of_bignum_bigint (module Runner.Impl) right_input
+            Element.Extended.of_bignum_bigint (module Runner.Impl) right_input
           in
           (* Create the gadget *)
-          let product, _external_checks =
-            add_chain
+          let sum, _sign, _ovf =
+            add
               (module Runner.Impl)
-              left_input right_input foreign_field_modulus
+              left_input right_input is_sub foreign_field_modulus
           in
           (* Check product matches expected result *)
           as_prover (fun () ->
@@ -1253,84 +1254,92 @@ let%test_unit "foreign_field_add gadget" =
                   (module Runner.Impl)
                   expected
               in
-              let product =
-                Element.Standard.to_field_limbs (module Runner.Impl) product
+              let sum =
+                Element.Standard.to_field_limbs (module Runner.Impl) sum
               in
-              assert_eq product expected ) ;
+              assert_eq sum expected ) ;
           () )
     in
-
     cs
   in
 
   (* Helper to test foreign_field_mul gadget with external checks
      *   Inputs:
-     *     - left_input
-     *     - right_input
+     *     - inputs
      *     - foreign_field_modulus
-     *     - expected product
+     *     - is_sub: list of operations to perform
   *)
-  let _test_add_full (left_input : Bignum_bigint.t)
-      (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
-      : unit =
-    (* Circuit definition function *)
-    let make_circuit left_input right_input foreign_field_modulus =
-      let open Runner.Impl in
-      (* Prepare test inputs *)
-      let expected =
-        Bignum_bigint.(left_input + (right_input % foreign_field_modulus))
-      in
-      let foreign_field_modulus =
-        bignum_bigint_to_field_standard_limbs
-          (module Runner.Impl)
-          foreign_field_modulus
-      in
-      let left_input =
-        Element.Standard.of_bignum_bigint (module Runner.Impl) left_input
-      in
-      let right_input =
-        Element.Standard.of_bignum_bigint (module Runner.Impl) right_input
-      in
-
-      (* External checks for this test (example, circuit designer has complete flexibility about organization)
-       *   1) ForeignFieldAdd
-       *   2) Zero (result bound addition)
-       *   3) multi-range-check (result)
-       *)
-
-      (* 1) Create the foreign field mul gadget *)
-      let product, external_checks =
-        mul (module Runner.Impl) left_input right_input foreign_field_modulus
-      in
-
-      (* Sanity check product matches expected result *)
-      as_prover (fun () ->
-          let expected =
-            bignum_bigint_to_field_standard_limbs (module Runner.Impl) expected
-          in
-          let product =
-            Element.Standard.to_field_limbs (module Runner.Impl) product
-          in
-          assert_eq product expected ) ;
-
-      (* TODO: 2) Add result bound addition gate *)
-      assert (Mina_stdlib.List.Length.equal external_checks.bounds 1) ;
-
-      ()
-    in
-
-    (* Generate and verify first proof *)
+  let test_add_chain ?cs (inputs : Bignum_bigint.t list) (is_sub : bool list)
+      (foreign_field_modulus : Bignum_bigint.t) =
+    (* Generate and verify proof *)
     let cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof (fun () ->
-          make_circuit left_input right_input foreign_field_modulus )
-    in
+      Runner.generate_and_verify_proof ?cs (fun () ->
+          let open Runner.Impl in
+          (* compute result of the chain *)
+          let n = List.length is_sub in
+          let chain_result = [| List.nth_exn inputs 0 |] in
+          for i = 0 to n - 1 do
+            let op_sign =
+              if List.nth_exn is_sub i then Bignum_bigint.of_int (-1)
+              else Bignum_bigint.one
+            in
+            let inp = List.nth_exn inputs (i + 1) in
+            let sum =
+              Bignum_bigint.(
+                chain_result.(i) + (op_sign * inp % foreign_field_modulus))
+            in
+            chain_result.(0) <- sum ; ()
+          done ;
 
-    (* Generate and verify second proof, reusing constraint system *)
-    let _cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof ~cs (fun () ->
-          make_circuit left_input right_input foreign_field_modulus )
+          let inputs =
+            List.map
+              ~f:(fun x ->
+                Element.Standard.of_bignum_bigint (module Runner.Impl) x )
+              inputs
+          in
+          let foreign_field_modulus =
+            bignum_bigint_to_field_standard_limbs
+              (module Runner.Impl)
+              foreign_field_modulus
+          in
+
+          (* Create the gadget *)
+          let sum =
+            add_chain (module Runner.Impl) inputs is_sub foreign_field_modulus
+          in
+          (* Check product matches expected result *)
+          as_prover (fun () ->
+              let expected =
+                bignum_bigint_to_field_standard_limbs
+                  (module Runner.Impl)
+                  chain_result.(0)
+              in
+              let sum =
+                Element.Standard.to_field_limbs (module Runner.Impl) sum
+              in
+              assert_eq sum expected ) ;
+          () )
     in
-    ()
+    cs
+  in
+
+  (* Test foreign_field_add gadget *)
+
+  let secp256k1_modulus =
+    Common.bignum_bigint_of_hex
+      "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
+  in
+
+  let cs = test_add Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus in
+  let _cs = test_add ~is_sub: false Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus in
+
+  let _cs =
+    test_add ~cs
+      (Common.bignum_bigint_of_hex
+         "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
+      (Common.bignum_bigint_of_hex
+         "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
+      secp256k1_modulus
   in
 
   ()
