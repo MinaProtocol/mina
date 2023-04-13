@@ -1,6 +1,7 @@
 schema {
   query: query
   mutation: mutation
+  subscription: subscription
 }
 
 """uint64 encoded as a json string representing an ammount of currency"""
@@ -8,17 +9,6 @@ scalar CurrencyAmount
 
 """uint64 encoded as a json string representing a fee"""
 scalar Fee
- 
-"""String representing a uint16 number in base 10"""
-scalar UInt16
-
-type ItnAuth {
-  """Uuid of the ITN GraphQL server"""
-  serverUuid: String!
-
-  """Sequence number for the signer of the auth query"""
-  signerSequenceNumber: UInt16!
-}
 
 """Update to gating config and added peers"""
 input GatingUpdate {
@@ -40,6 +30,20 @@ input GatingUpdate {
 
   """Peers we will always allow connections from"""
   trustedPeers: [NetworkPeer!]!
+}
+
+type ItnAuth {
+  """Uuid of the ITN GraphQL server"""
+  serverUuid: String!
+
+  """Sequence number for the signer of the auth query"""
+  signerSequenceNumber: UInt16!
+
+  """Libp2p port"""
+  libp2pPort: UInt16!
+
+  """Peer id"""
+  peerId: String!
 }
 
 type mutation {
@@ -135,3 +139,6 @@ input ZkappCommandsDetails {
   """
   feePayers: [PrivateKey!]!
 }
+
+"""String representing a uint16 number in base 10"""
+scalar UInt16

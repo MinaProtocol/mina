@@ -556,6 +556,21 @@ module Types = struct
               ~doc:"Sequence number for the signer of the auth query"
               ~typ:(non_null uint16)
               ~resolve:(fun _ (_, n) -> n)
+          ; field "libp2pPort"
+              ~args:Arg.[]
+              ~doc:"Libp2p port" ~typ:(non_null uint16)
+              ~resolve:(fun { ctx = _, mina; _ } _ ->
+                Mina_lib.config mina
+                |> fun Mina_lib.Config.{ gossip_net_params; _ } ->
+                gossip_net_params.addrs_and_ports.libp2p_port
+                |> Unsigned.UInt16.of_int )
+          ; field "peerId"
+              ~args:Arg.[]
+              ~doc:"Peer id" ~typ:(non_null string)
+              ~resolve:(fun { ctx = _, mina; _ } _ ->
+                Mina_lib.config mina
+                |> fun Mina_lib.Config.{ gossip_net_params; _ } ->
+                Mina_net2.Keypair.to_peer_id gossip_net_params.keypair )
           ] )
   end
 
@@ -4823,7 +4838,7 @@ module Mutations = struct
                 ~typ:(non_null Types.Input.Itn.GatingUpdate.arg_typ)
             ]
         ~typ:(non_null string)
-        ~resolve:(fun { ctx = mina; _ } () input ->
+        ~resolve:(fun { ctx = _, mina; _ } () input ->
           let%bind.Deferred.Result { trusted_peers
                                    ; banned_peers
                                    ; isolate
