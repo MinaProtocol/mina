@@ -280,6 +280,15 @@
           "description": null,
           "fields": [
             {
+              "name": "cleanAddedPeers",
+              "description":
+                "If true, resets added peers to an empty list (including seeds)",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "isolate",
               "description":
                 "If true, no connections will be allowed unless they are from a trusted peer",
@@ -347,6 +356,13 @@
             }
           ],
           "inputFields": [
+            {
+              "name": "cleanAddedPeers",
+              "description":
+                "If true, resets added peers to an empty list (including seeds)",
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
+              "defaultValue": null
+            },
             {
               "name": "isolate",
               "description":

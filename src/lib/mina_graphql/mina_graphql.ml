@@ -3024,17 +3024,19 @@ module Types = struct
     end
 
     module SetConnectionGatingConfigInput = struct
-      type input = Mina_net2.connection_gating
+      type input =
+        Mina_net2.connection_gating * [ `Clean_added_peers of bool option ]
 
       let arg_typ =
         obj "SetConnectionGatingConfigInput"
-          ~coerce:(fun trusted_peers banned_peers isolate ->
+          ~coerce:(fun trusted_peers banned_peers isolate clean_added_peers ->
             let open Result.Let_syntax in
             let%bind trusted_peers = Result.all trusted_peers in
             let%map banned_peers = Result.all banned_peers in
-            Mina_net2.{ isolate; trusted_peers; banned_peers } )
-          ~split:(fun f (t : input) ->
-            f t.trusted_peers t.banned_peers t.isolate )
+            ( Mina_net2.{ isolate; trusted_peers; banned_peers }
+            , `Clean_added_peers clean_added_peers ) )
+          ~split:(fun f ((t, `Clean_added_peers clean_added_peers) : input) ->
+            f t.trusted_peers t.banned_peers t.isolate clean_added_peers )
           ~fields:
             Arg.
               [ arg "trustedPeers"
@@ -3049,6 +3051,10 @@ module Types = struct
                   ~doc:
                     "If true, no connections will be allowed unless they are \
                      from a trusted peer"
+              ; arg "cleanAddedPeers" ~typ:bool
+                  ~doc:
+                    "If true, resets added peers to an empty list (including \
+                     seeds)"
               ]
     end
 
@@ -4030,9 +4036,12 @@ module Mutations = struct
       ~typ:(non_null Types.Payload.set_connection_gating_config)
       ~resolve:(fun { ctx = mina; _ } () config ->
         let open Deferred.Result.Let_syntax in
-        let%bind config = Deferred.return config in
+        let%bind config, `Clean_added_peers clean_added_peers =
+          Deferred.return config
+        in
         let open Deferred.Let_syntax in
-        Mina_networking.set_connection_gating_config (Mina_lib.net mina) config
+        Mina_networking.set_connection_gating_config ?clean_added_peers
+          (Mina_lib.net mina) config
         >>| Result.return )
 
   let add_peer =
