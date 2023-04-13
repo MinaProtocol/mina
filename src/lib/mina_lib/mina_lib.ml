@@ -1336,6 +1336,7 @@ let start t =
     ~time_controller:t.config.time_controller
     ~block_produced_bvar:t.components.block_produced_bvar
     ~uptime_submitter_keypair:t.config.uptime_submitter_keypair
+    ~graphql_control_port:t.config.graphql_control_port
     ~get_next_producer_timing:(fun () -> t.next_producer_timing)
     ~get_snark_work_fee:(fun () -> snark_work_fee t)
     ~get_peer:(fun () -> t.config.gossip_net_params.addrs_and_ports.peer) ;
@@ -2163,5 +2164,7 @@ let runtime_config { config = { precomputed_values; _ }; _ } =
   Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values
 
 let verifier { processes = { verifier; _ }; _ } = verifier
+
+let vrf_evaluator { processes = { vrf_evaluator; _ }; _ } = vrf_evaluator
 
 let genesis_ledger t = Genesis_proof.genesis_ledger t.config.precomputed_values

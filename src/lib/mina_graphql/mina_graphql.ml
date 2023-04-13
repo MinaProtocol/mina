@@ -73,12 +73,11 @@ let result_field2 ~resolve =
 module Doc = struct
   let date ?(extra = "") s =
     sprintf
-      !"%s (stringified Unix time - number of milliseconds since January 1, \
-        1970)%s"
+      "%s (stringified Unix time - number of milliseconds since January 1, \
+       1970)%s"
       s extra
 
-  let bin_prot =
-    sprintf !"%s (base58-encoded janestreet/bin_prot serialization)"
+  let bin_prot = sprintf "%s (base58-encoded janestreet/bin_prot serialization)"
 end
 
 module Reflection = struct
@@ -169,13 +168,70 @@ let get_ledger_and_breadcrumb mina =
            |> Staged_ledger.ledger
          , tip ) )
 
+module Itn_sequencing = struct
+  (* we don't have compare, etc. for pubkey type to use Core_kernel.Hashtbl *)
+  module Hashtbl = Stdlib.Hashtbl
+
+  let uuid = Uuid.create_random Random.State.default
+
+  let sequence_tbl : (Itn_crypto.pubkey, Unsigned.uint16) Hashtbl.t =
+    Hashtbl.create ~random:true 1023
+
+  let get_sequence_number pubkey =
+    let key = pubkey in
+    match Hashtbl.find_opt sequence_tbl key with
+    | None ->
+        let data = Unsigned.UInt16.zero in
+        Hashtbl.add sequence_tbl key data ;
+        data
+    | Some n ->
+        n
+
+  (* used for `auth` queries, so we can return
+     the sequence number for the pubkey that signed
+     the query
+
+     this is stateful, but appears to be safe
+  *)
+  let set_sequence_number_for_auth, get_sequence_no_for_auth =
+    let pubkey_sequence_no = ref Unsigned.UInt16.zero in
+    let setter pubkey =
+      let seq_no = get_sequence_number pubkey in
+      pubkey_sequence_no := seq_no
+    in
+    let getter () = !pubkey_sequence_no in
+    (setter, getter)
+
+  let valid_sequence_number query_uuid pubkey seqno_str =
+    let%bind.Option () = Option.some_if (Uuid.equal query_uuid uuid) () in
+    let seqno = get_sequence_number pubkey in
+    if String.equal (Unsigned.UInt16.to_string seqno) seqno_str then Some seqno
+    else None
+
+  let incr_sequence_number pubkey =
+    let key = pubkey in
+    match Hashtbl.find_opt sequence_tbl key with
+    | None ->
+        failwithf
+          "Expected to find sequence number for UUID %s and public key %s"
+          (Uuid.to_string uuid)
+          (Itn_crypto.pubkey_to_base64 pubkey)
+          ()
+    | Some n ->
+        Hashtbl.replace sequence_tbl key (Unsigned.UInt16.succ n)
+end
+
 module Types = struct
   open Schema
 
   include struct
     open Graphql_lib.Scalars
 
+    let private_key : (Mina_lib.t, PrivateKey.t option) typ = PrivateKey.typ ()
+
     let public_key = PublicKey.typ ()
+
+    let uint16 = UInt16.typ ()
 
     let uint32 = UInt32.typ ()
 
@@ -486,6 +542,21 @@ module Types = struct
                ~highest_block_length_received:nn_int
                ~highest_unvalidated_block_length_received:nn_int
                ~metrics:(id ~typ:(non_null metrics)) )
+  end
+
+  module Itn = struct
+    let auth =
+      obj "ItnAuth" ~fields:(fun _ ->
+          [ field "serverUuid"
+              ~args:Arg.[]
+              ~doc:"Uuid of the ITN GraphQL server" ~typ:(non_null string)
+              ~resolve:(fun _ (uuid, _) -> uuid)
+          ; field "signerSequenceNumber"
+              ~args:Arg.[]
+              ~doc:"Sequence number for the signer of the auth query"
+              ~typ:(non_null uint16)
+              ~resolve:(fun _ (_, n) -> n)
+          ] )
   end
 
   let fee_transfer =
@@ -2980,6 +3051,60 @@ module Types = struct
                      from a trusted peer"
               ]
     end
+
+    module Itn = struct
+      module PaymentDetails = struct
+        type input =
+          { senders : Signature_lib.Private_key.t list
+          ; receiver : Signature_lib.Public_key.Compressed.t
+          ; amount : Currency.Amount.t
+          ; fee_min : Currency.Fee.t
+          ; fee_max : Currency.Fee.t
+          ; memo : string
+          ; transactions_per_second : float
+          ; duration_in_minutes : int
+          }
+
+        let arg_typ =
+          obj "PaymentsDetails"
+            ~doc:"Keys and other information for scheduling payments"
+            ~coerce:(fun senders receiver amount fee_min fee_max memo
+                         transactions_per_second duration_in_minutes ->
+              Result.return
+                { senders
+                ; receiver
+                ; amount
+                ; fee_min
+                ; fee_max
+                ; memo
+                ; transactions_per_second
+                ; duration_in_minutes
+                } )
+            ~split:(fun f (t : input) ->
+              f t.senders t.receiver t.amount t.fee_min t.fee_max t.memo
+                t.transactions_per_second t.duration_in_minutes )
+            ~fields:
+              Arg.
+                [ arg "senders"
+                    ~typ:(non_null (list (non_null PrivateKey.arg_typ)))
+                    ~doc:"Private keys of accounts to send from"
+                ; arg "receiver"
+                    ~typ:(non_null PublicKey.arg_typ)
+                    ~doc:"Public key of receiver of payments"
+                ; arg "amount"
+                    ~typ:(non_null CurrencyAmount.arg_typ)
+                    ~doc:"Amount for payments"
+                ; arg "feeMin" ~typ:(non_null Fee.arg_typ) ~doc:"Minimum fee"
+                ; arg "feeMax" ~typ:(non_null Fee.arg_typ) ~doc:"Maximum fee"
+                ; arg "memo" ~doc:"Memo, up to 32 characters"
+                    ~typ:(non_null string)
+                ; arg "transactionsPerSecond" ~doc:"Frequency of transactions"
+                    ~typ:(non_null float)
+                ; arg "durationInMinutes" ~doc:"Length of scheduler run"
+                    ~typ:(non_null int)
+                ]
+      end
+    end
   end
 
   let vrf_message : ('context, Consensus_vrf.Layout.Message.t option) typ =
@@ -3376,7 +3501,7 @@ module Mutations = struct
         return (Error "Daemon is bootstrapping")
 
   let send_zkapp_command mina zkapp_command =
-    match Mina_commands.setup_and_submit_snapp_command mina zkapp_command with
+    match Mina_commands.setup_and_submit_zkapp_command mina zkapp_command with
     | `Active f -> (
         match%map f with
         | Ok zkapp_command ->
@@ -3993,6 +4118,241 @@ module Mutations = struct
     ; archive_extensional_block
     ; send_rosetta_transaction
     ]
+
+  module Itn = struct
+    (* ITN-specific mutations *)
+
+    let scheduler_tbl : unit Async_kernel.Ivar.t Uuid.Table.t =
+      Uuid.Table.create ()
+
+    let schedule_payments =
+      io_field "schedulePayments"
+        ~args:
+          Arg.
+            [ arg "input" ~doc:"Payments details"
+                ~typ:(non_null Types.Input.Itn.PaymentDetails.arg_typ)
+            ]
+        ~typ:(non_null string)
+        ~resolve:(fun { ctx = with_seq_no, mina; _ } () input ->
+          return
+          @@
+          match (with_seq_no, input) with
+          | false, _ ->
+              Error "Missing sequence information"
+          | true, Error err ->
+              Error (sprintf "Invalid input to payment scheduler: %s" err)
+          | true, Ok payment_details ->
+              let max_memo_len = Signed_command_memo.max_input_length in
+              if List.is_empty payment_details.senders then
+                Error "Empty list of senders"
+              else if String.length payment_details.memo > max_memo_len then
+                Error
+                  (sprintf "Memo too long, limited to %d characters"
+                     max_memo_len )
+              else if
+                Currency.Fee.( < ) payment_details.fee_max
+                  payment_details.fee_min
+              then Error "Maximum fee less than mininum fee"
+              else
+                let logger = Mina_lib.top_level_logger mina in
+                let senders = payment_details.senders |> Array.of_list in
+                let num_senders = Array.length senders in
+                let sources =
+                  Array.map senders ~f:(fun sender ->
+                      Signature_lib.Public_key.of_private_key_exn sender
+                      |> Signature_lib.Public_key.compress )
+                in
+                Option.value_map (get_ledger_and_breadcrumb mina)
+                  ~default:(Error "Could not get best tip ledger")
+                  ~f:(fun (ledger, _tip) ->
+                    let nonce_opts =
+                      Array.map sources ~f:(fun source ->
+                          let open Option.Let_syntax in
+                          let acct_id =
+                            Account_id.create source Token_id.default
+                          in
+                          let%bind loc =
+                            Ledger.location_of_account ledger acct_id
+                          in
+                          let%map { nonce; _ } = Ledger.get ledger loc in
+                          nonce )
+                      |> Array.zip_exn sources
+                    in
+                    let missing_nonces =
+                      Array.filter nonce_opts ~f:(fun (_source, nonce_opt) ->
+                          Option.is_none nonce_opt )
+                    in
+                    if not @@ Array.is_empty missing_nonces then
+                      let missing_nonce_pks =
+                        Array.to_list missing_nonces
+                        |> List.map ~f:(fun (source, _nonce_opt) ->
+                               Signature_lib.Public_key.Compressed.to_yojson
+                                 source
+                               |> Yojson.Safe.to_string )
+                      in
+                      Error
+                        (sprintf "Could not get nonces for accounts: %s"
+                           (String.concat ~sep:"," missing_nonce_pks) )
+                    else
+                      let nonces =
+                        Array.map nonce_opts ~f:(fun (_source, nonce_opt) ->
+                            Option.value_exn nonce_opt )
+                      in
+                      let memo =
+                        Signed_command_memo.create_from_string_exn
+                          payment_details.memo
+                      in
+                      let uuid = Uuid.create_random Random.State.default in
+                      let ivar = Ivar.create () in
+                      ( match
+                          Uuid.Table.add scheduler_tbl ~key:uuid ~data:ivar
+                        with
+                      | `Ok ->
+                          ()
+                      | `Duplicate ->
+                          failwith
+                            "Unexpected duplicate scheduled payments handle" ) ;
+                      let wait_span =
+                        1. /. payment_details.transactions_per_second
+                        |> Time.Span.of_sec
+                      in
+                      let duration_span =
+                        Time.Span.of_min
+                          (Float.of_int payment_details.duration_in_minutes)
+                      in
+                      let tm_start = Time.now () in
+                      let tm_end = Time.add tm_start duration_span in
+                      let rec go ndx tm_next =
+                        if Time.( >= ) (Time.now ()) tm_end then (
+                          [%log info]
+                            "Scheduled payments with handle %s has expired"
+                            (Uuid.to_string uuid) ;
+                          Uuid.Table.remove scheduler_tbl uuid ;
+                          Deferred.unit )
+                        else if Ivar.is_full ivar then (
+                          [%log info]
+                            "Stopping scheduled payments with handle %s"
+                            (Uuid.to_string uuid) ;
+                          Uuid.Table.remove scheduler_tbl uuid ;
+                          Deferred.unit )
+                        else
+                          let sender = senders.(ndx) in
+                          let source_pk =
+                            Signature_lib.Public_key.of_private_key_exn sender
+                            |> Signature_lib.Public_key.compress
+                          in
+                          let receiver_pk = payment_details.receiver in
+                          let fee =
+                            Quickcheck.random_value ~seed:`Nondeterministic
+                            @@ Currency.Fee.gen_incl payment_details.fee_min
+                                 payment_details.fee_max
+                          in
+                          let body =
+                            Signed_command_payload.Body.Payment
+                              { source_pk
+                              ; receiver_pk
+                              ; amount = payment_details.amount
+                              }
+                          in
+                          let valid_until = None in
+                          let nonce = nonces.(ndx) in
+                          let payload =
+                            Signed_command_payload.create ~fee
+                              ~fee_payer_pk:source_pk ~nonce ~valid_until ~memo
+                              ~body
+                          in
+                          let signature =
+                            Ok (Signed_command.sign_payload sender payload)
+                          in
+                          [%log info]
+                            "Payment scheduler with handle %s is sending a \
+                             payment from sender %s"
+                            (Uuid.to_string uuid)
+                            ( Signature_lib.Public_key.Compressed.to_yojson
+                                source_pk
+                            |> Yojson.Safe.to_string )
+                            ~metadata:
+                              [ ( "receiver"
+                                , Signature_lib.Public_key.Compressed.to_yojson
+                                    receiver_pk )
+                              ; ("nonce", Account.Nonce.to_yojson nonce)
+                              ; ("fee", Currency.Fee.to_yojson fee)
+                              ; ( "amount"
+                                , Currency.Amount.to_yojson
+                                    payment_details.amount )
+                              ; ("memo", `String payment_details.memo)
+                              ] ;
+                          let%bind () =
+                            let fee = Currency.Fee.to_uint64 fee in
+                            let memo = Some payment_details.memo in
+                            match%bind
+                              send_signed_user_command ~mina
+                                ~nonce_opt:(Some nonce) ~signer:source_pk ~memo
+                                ~fee ~fee_payer_pk:source_pk ~valid_until ~body
+                                ~signature
+                            with
+                            | Ok _cmd_with_status ->
+                                Deferred.unit
+                            | Error err ->
+                                [%log error]
+                                  "Payment scheduler with handle %s got error \
+                                   when sending payment from sender %s"
+                                  (Uuid.to_string uuid)
+                                  ( Signature_lib.Public_key.Compressed.to_yojson
+                                      source_pk
+                                  |> Yojson.Safe.to_string )
+                                  ~metadata:[ ("error", `String err) ] ;
+                                Deferred.unit
+                          in
+                          (* next nonce for this sender *)
+                          nonces.(ndx) <- Account.Nonce.succ nonce ;
+                          let%bind () = Async_unix.at tm_next in
+                          let next_tm_next = Time.add tm_next wait_span in
+                          go ((ndx + 1) mod num_senders) next_tm_next
+                      in
+                      let tm_next = Time.add tm_start wait_span in
+                      don't_wait_for @@ go 0 tm_next ;
+                      Ok (Uuid.to_string uuid) ) )
+
+    let stop_payments =
+      io_field "stopPayments"
+        ~args:
+          Arg.
+            [ arg "handle" ~doc:"Payment scheduler handle"
+                ~typ:(non_null string)
+            ]
+        ~typ:(non_null string)
+        ~resolve:(fun { ctx = with_seq_no, mina; _ } () handle ->
+          let logger = Mina_lib.top_level_logger mina in
+          if not with_seq_no then return @@ Error "Missing sequence information"
+          else
+            try
+              let uuid = Uuid.of_string handle in
+              match Uuid.Table.find scheduler_tbl uuid with
+              | None ->
+                  return
+                  @@ Error
+                       (sprintf
+                          "Could not find scheduled payments with handle %s"
+                          handle )
+              | Some ivar ->
+                  [%log info]
+                    "Requesting stop of scheduled payments with handle %s"
+                    handle ;
+                  Ivar.fill_if_empty ivar () ;
+                  return
+                  @@ Ok
+                       (sprintf
+                          "Requesting stop of scheduled payments with handle %s"
+                          handle )
+            with _ ->
+              return
+              @@ Error
+                   (sprintf "Not a valid scheduled payments handle: %s" handle)
+          )
+
+    let commands = [ schedule_payments; stop_payments ]
+  end
 end
 
 module Queries = struct
@@ -4816,6 +5176,50 @@ module Queries = struct
     ; thread_graph
     ; blockchain_verification_key
     ]
+
+  module Itn = struct
+    (* incentivized testnet-specific queries *)
+
+    let auth =
+      field "auth"
+        ~args:Arg.[]
+        ~typ:(non_null Types.Itn.auth)
+        ~doc:"Uuid for GraphQL server, sequence number for signing public key"
+        ~resolve:(fun _ () ->
+          ( Uuid.to_string Itn_sequencing.uuid
+          , Itn_sequencing.get_sequence_no_for_auth () ) )
+
+    let slots_won =
+      io_field "slotsWon"
+        ~typ:(non_null (list (non_null int)))
+        ~args:Arg.[]
+        ~doc:"Slots won by a block producer for current epoch"
+        ~resolve:(fun { ctx = with_seq_no, mina; _ } () ->
+          if not with_seq_no then return @@ Error "Missing sequence information"
+          else
+            let bp_keys = Mina_lib.block_production_pubkeys mina in
+            if Public_key.Compressed.Set.is_empty bp_keys then
+              return @@ Error "Not a block producing node"
+            else
+              let vrf_evaluator = Mina_lib.vrf_evaluator mina in
+              let logger = Mina_lib.top_level_logger mina in
+              let%map vrf_result =
+                Block_producer.Vrf_evaluation_state.poll_vrf_evaluator ~logger
+                  vrf_evaluator
+              in
+              match vrf_result.evaluator_status with
+              | Completed ->
+                  let slots_since_hard_fork =
+                    List.map vrf_result.slots_won ~f:(fun { global_slot; _ } ->
+                        Unsigned.UInt32.to_int global_slot )
+                    |> List.sort ~compare:Int.compare
+                  in
+                  Ok slots_since_hard_fork
+              | _ ->
+                  Error "Vrf evaluation not completed for current epoch" )
+
+    let commands = [ auth; slots_won ]
+  end
 end
 
 let schema =
@@ -4824,8 +5228,15 @@ let schema =
       ~subscriptions:Subscriptions.commands)
 
 let schema_limited =
-  (*including version because that's the default query*)
+  (* including version because that's the default query *)
   Graphql_async.Schema.(
     schema
       [ Queries.daemon_status; Queries.block; Queries.version ]
       ~mutations:[] ~subscriptions:[])
+
+let schema_itn : (bool * Mina_lib.t) Schema.schema =
+  if Mina_compile_config.itn_features then
+    Graphql_async.Schema.(
+      schema Queries.Itn.commands ~mutations:Mutations.Itn.commands
+        ~subscriptions:[])
+  else Graphql_async.Schema.(schema [] ~mutations:[] ~subscriptions:[])
