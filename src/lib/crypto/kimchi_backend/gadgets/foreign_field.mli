@@ -98,7 +98,7 @@ end
  *     foreign_field_modulus := must be less than than max foreign field modulus
  *   Outputs: tuple of product and required external checks
  *)
-val mul :
+val ffmul :
      (module Snark_intf.Run with type field = 'f)
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
