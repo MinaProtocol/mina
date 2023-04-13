@@ -4,30 +4,47 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/base64"
+	"encoding/binary"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/Khan/genqlient/graphql"
 )
 
-func Auth(ctx context.Context, client graphql.Client) (bool, error) {
+func Auth(ctx context.Context, client graphql.Client) (string, uint16, error) {
 	resp, err := auth(ctx, client)
 	if err != nil {
-		return false, err
+		return "", 0, err
 	}
-	return resp.Auth, nil
+	return resp.Auth.ServerUuid, resp.Auth.SignerSequenceNumber, nil
 }
 
-type AuthenticatedClient struct {
+type Authenticator struct {
 	sk    ed25519.PrivateKey
 	pkStr string
 	doer  graphql.Doer
 }
 
-func NewAuthenticatedClient(sk ed25519.PrivateKey, doer graphql.Doer) *AuthenticatedClient {
+type SequentialAuthenticator struct {
+	Authenticator
+	uuid  string
+	seqno uint16
+}
+
+func NewAuthenticator(sk ed25519.PrivateKey, doer graphql.Doer) *Authenticator {
 	pk := sk.Public().(ed25519.PublicKey)
-	return &AuthenticatedClient{
+	return &Authenticator{
 		sk: sk, doer: doer, pkStr: base64.StdEncoding.EncodeToString(pk),
+	}
+}
+
+func NewSequentialAuthenticator(uuid string, seqno uint16, authenticator *Authenticator) *SequentialAuthenticator {
+	return &SequentialAuthenticator{
+		Authenticator: *authenticator,
+		uuid:          uuid,
+		seqno:         seqno,
 	}
 }
 
@@ -40,7 +57,7 @@ func readBody(req *http.Request) ([]byte, error) {
 	return io.ReadAll(readCloser)
 }
 
-func (client *AuthenticatedClient) Do(req *http.Request) (*http.Response, error) {
+func (client *Authenticator) Do(req *http.Request) (*http.Response, error) {
 	body, err := readBody(req)
 	if err != nil {
 		return nil, err
@@ -51,7 +68,34 @@ func (client *AuthenticatedClient) Do(req *http.Request) (*http.Response, error)
 	return client.doer.Do(req)
 }
 
-var _ graphql.Doer = (*AuthenticatedClient)(nil)
+var _ graphql.Doer = (*Authenticator)(nil)
+
+func (client *SequentialAuthenticator) Do(req *http.Request) (*http.Response, error) {
+	body, err := readBody(req)
+	if err != nil {
+		return nil, err
+	}
+	uuid := []byte(client.uuid)
+	msg := make([]byte, len(body)+len(client.uuid)+2)
+	binary.BigEndian.PutUint16(msg, client.seqno)
+	copy(msg[2:], uuid)
+	copy(msg[2+len(uuid):], body)
+	sig := ed25519.Sign(client.sk, msg)
+	sigStr := base64.StdEncoding.EncodeToString(sig)
+	header := strings.Join([]string{
+		"Signature",
+		client.pkStr,
+		sigStr,
+		"; Sequencing",
+		client.uuid,
+		strconv.Itoa(int(client.seqno)),
+	}, " ")
+	req.Header.Set("Authorization", header)
+	client.seqno++
+	return client.doer.Do(req)
+}
+
+var _ graphql.Doer = (*SequentialAuthenticator)(nil)
 
 func SchedulePayments(ctx context.Context, client graphql.Client, input PaymentsDetails) (string, error) {
 	resp, err := schedulePayments(ctx, client, input)

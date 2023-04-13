@@ -25,6 +25,7 @@
    mina_wire_types
    network_pool
    cli_lib
+   itn_crypto
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    mina_base.util

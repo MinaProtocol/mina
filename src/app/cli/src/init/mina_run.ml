@@ -512,8 +512,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           Deferred.unit )
     ]
   in
-  let create_graphql_server ?auth_keys ~bind_to_address ~schema
-      ~server_description ~require_auth port =
+  let create_graphql_server_with_auth ~mk_context ?auth_keys ~bind_to_address
+      ~schema ~server_description ~require_auth port =
     if require_auth && Option.is_none auth_keys then
       failwith
         "Could not create GraphQL server, authentication is required, but no \
@@ -530,7 +530,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                     pk_str () ) )
     in
     let graphql_callback =
-      Graphql_cohttp_async.make_callback ?auth_keys (fun _req -> mina) schema
+      Graphql_cohttp_async.make_callback ?auth_keys mk_context schema
     in
     Cohttp_async.(
       Server.create_expert
@@ -579,6 +579,11 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
              !"Created %s at: http://localhost:%i/graphql"
              server_description port )
   in
+  let create_graphql_server =
+    create_graphql_server_with_auth
+      ~mk_context:(fun ~with_seq_no:_ _req -> mina)
+      ?auth_keys:None
+  in
   Option.iter rest_server_port ~f:(fun rest_server_port ->
       O1trace.background_thread "serve_graphql" (fun () ->
           create_graphql_server
@@ -601,7 +606,9 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     (* Third graphql server with ITN-particular queries exposed *)
     Option.iter itn_graphql_port ~f:(fun rest_server_port ->
         O1trace.background_thread "serve_itn_graphql" (fun () ->
-            create_graphql_server ?auth_keys
+            create_graphql_server_with_auth
+              ~mk_context:(fun ~with_seq_no _req -> (with_seq_no, mina))
+              ?auth_keys
               ~bind_to_address:
                 Tcp.Bind_to_address.(
                   if insecure_rest_server then All_addresses else Localhost)

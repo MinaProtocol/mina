@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"itn_json_types"
-	"net/http"
 	"os"
 
 	"cloud.google.com/go/storage"
@@ -81,12 +80,11 @@ func main() {
 		os.Exit(4)
 		return
 	}
-	authClient := lib.NewAuthenticatedClient(ed25519.PrivateKey(appConfig.Key), http.DefaultClient)
 	clientCache := make(map[lib.NodeAddress]graphql.Client)
 	config := lib.Config{
 		Ctx:          ctx,
 		UptimeBucket: client.Bucket(appConfig.UptimeBucket),
-		GetGqlClient: lib.GetGqlClient(authClient, clientCache),
+		GetGqlClient: lib.GetGqlClient(ed25519.PrivateKey(appConfig.Key), clientCache),
 		Log:          log,
 		Daemon:       appConfig.Daemon,
 		MinaExec:     appConfig.MinaExec,
