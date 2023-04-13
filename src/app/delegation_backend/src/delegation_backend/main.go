@@ -16,14 +16,13 @@ import (
 	sheets "google.golang.org/api/sheets/v4"
 )
 
-func loadAwsConfig(filename string, log logging.EventLogger) AwsConfig {
-	// TODO: load config from file
-	return AwsConfig{}
+func loadAwsConfig(filename string, log logging.EventLogger) {
+	// TODO: load AWS credentials from JSON file
 }
 
-func loadEnv(log logging.EventLogger) Config {
+func loadEnv(log logging.EventLogger) AppConfig {
 
-	var config Config
+	var config AppConfig
 
 	configFile := os.Getenv("CONFIG_FILE")
 	if configFile != "" {
@@ -34,7 +33,6 @@ func loadEnv(log logging.EventLogger) Config {
 		}
 		defer file.Close()
 		decoder := json.NewDecoder(file)
-		var config Config
 		err = decoder.Decode(&config)
 		if err != nil {
 			log.Errorf("Error loading config file: %s", err)
@@ -55,21 +53,14 @@ func loadEnv(log logging.EventLogger) Config {
 		if gsheetId == "" {
 			log.Fatal("missing GSHEET_ID environment variable")
 		}
-
-		awsCredentialsFile := os.Getenv("AWS_CREDENTIALS_FILE")
-		if awsCredentialsFile == "" {
-			log.Fatal("missing AWS_CREDENTIALS_FILE environment variable")
-		}
 	}
 
-	awsConfig := loadAwsConfig(awsCredentialsFile, log)
-
-	return Config{
-		BucketName:  bucketName,
-		NetworkName: networkName,
-		GsheetId:    gsheetId,
-		AwsConfig:   awsConfig,
+	awsCredentialsFile := os.Getenv("AWS_CREDENTIALS_FILE")
+	if awsCredentialsFile != "" {
+		loadAwsConfig(awsCredentialsFile, log)
 	}
+
+	return config
 }
 
 func main() {
@@ -85,7 +76,8 @@ func main() {
 
 	ctx := context.Background()
 
-	// TODO: get AWS S3 credentials
+	appCfg := loadEnv(log)
+
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		log.Fatalf("Error creating AWS client: %v", err)
@@ -99,7 +91,7 @@ func main() {
 	})
 	http.Handle("/v1/submit", app.NewSubmitH())
 	client := s3.NewFromConfig(cfg)
-	awsctx := AwsContext{Client: client, BucketName: aws.String(CloudBucketName()), Context: ctx, Log: log}
+	awsctx := AwsContext{Client: client, BucketName: aws.String(appCfg.BucketName), Context: ctx, Log: log}
 	app.Save = func(objs ObjectsToSave) {
 		awsctx.S3Save(objs)
 	}
@@ -110,30 +102,16 @@ func main() {
 		log.Fatalf("Error creating Sheets service: %v", err2)
 		return
 	}
-	initWl := RetrieveWhitelist(sheetsService, log)
+	initWl := RetrieveWhitelist(sheetsService, log, appCfg)
 	wlMvar := new(WhitelistMVar)
 	wlMvar.Replace(&initWl)
 	app.Whitelist = wlMvar
 	go func() {
 		for {
-			wl := RetrieveWhitelist(sheetsService, log)
+			wl := RetrieveWhitelist(sheetsService, log, appCfg)
 			wlMvar.Replace(&wl)
 			time.Sleep(WHITELIST_REFRESH_INTERVAL)
 		}
 	}()
 	log.Fatal(http.ListenAndServe(DELEGATION_BACKEND_LISTEN_TO, nil))
-}
-
-type AwsConfig struct {
-	Region   string
-	Key      string
-	Secret   string
-	Endpoint string
-}
-
-type Config struct {
-	BucketName  string
-	NetworkName string
-	GsheetId    string
-	AwsConfig   AwsConfig
 }

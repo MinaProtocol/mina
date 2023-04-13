@@ -148,3 +148,14 @@ type MetaToBeSaved struct {
 	Submitter          Pk      `json:"submitter"`  // is base58check-encoded submitter's public key
 	BlockHash          string  `json:"block_hash"` // is base58check-encoded hash of a block
 }
+
+type AppConfig struct {
+	BucketName  string `json:"bucket_name"`
+	NetworkName string `json:"network_name"`
+	GsheetId    string `json:"gsheet_id"`
+}
+
+type AwsCredentials struct {
+	AccessKey       string `json:"access_key"`
+	SecretAccessKey string `json:"secret_access_key"`
+}
