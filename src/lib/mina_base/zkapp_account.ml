@@ -82,7 +82,7 @@ struct
               (event, events) )
     in
     Field.Assert.equal
-      (Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_events
+      (Random_oracle.Checked.hash ~init:Inputs.hash_prefix
          [| Data_as_hash.hash tl; Data_as_hash.hash hd |] )
       (Data_as_hash.hash events) ;
     (hd, tl)
