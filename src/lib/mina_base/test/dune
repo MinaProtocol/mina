@@ -1,5 +1,5 @@
 (tests
- (names zkapp_account_test)
+ (names mina_base_test)
  (libraries
   ;; opam libraries
   alcotest

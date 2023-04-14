@@ -64,14 +64,3 @@ let checked_pop_reverses_push (module E : Events_list_intf) () =
           ()
       | Error err ->
           failwithf "Error from run_and_check: %s" (Error.to_string_hum err) () )
-
-let () =
-  let open Alcotest in
-  run "Test zkApp accounts."
-    [ ( "zkapp-accounts"
-      , [ test_case "Events pop after push is idempotent." `Quick
-            (checked_pop_reverses_push (module Events))
-        ; test_case "Actions pop after push is idempotent." `Quick
-            (checked_pop_reverses_push (module Actions))
-        ] )
-    ]
