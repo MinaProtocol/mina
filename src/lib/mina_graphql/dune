@@ -25,6 +25,7 @@
    mina_wire_types
    network_pool
    cli_lib
+   itn_crypto
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    mina_base.util
@@ -85,6 +86,7 @@
    random_oracle
    coda_genesis_proof
    mina_version
+   mina_compile_config
    mina_runtime_config
    mina_base.import
    pickles.backend
@@ -100,4 +102,5 @@
    mina_transaction_logic
  )
  (instrumentation (backend bisect_ppx))
+ (preprocessor_deps ../../config.mlh)
  (preprocess (pps ppx_mina ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make)))

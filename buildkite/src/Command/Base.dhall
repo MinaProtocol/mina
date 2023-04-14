@@ -182,20 +182,20 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                     -- per https://buildkite.com/docs/agent/v3#exit-codes:
                     ([
                       -- infra error
-                      Retry::{ exit_status = ExitStatus.Code -1, limit = Some 2 },
+                      Retry::{ exit_status = ExitStatus.Code -1, limit = Some 4 },
                       -- infra error
-                      Retry::{ exit_status = ExitStatus.Code +255, limit = Some 2 },
+                      Retry::{ exit_status = ExitStatus.Code +255, limit = Some 4 },
                       -- common/flake error
-                      Retry::{ exit_status = ExitStatus.Code +1, limit = Some 1 },
+                      Retry::{ exit_status = ExitStatus.Code +1, limit = Some 4 },
                       -- apt-get update race condition error
-                      Retry::{ exit_status = ExitStatus.Code +100, limit = Some 2 },
+                      Retry::{ exit_status = ExitStatus.Code +100, limit = Some 4 },
                       -- Git checkout error
-                      Retry::{ exit_status = ExitStatus.Code +128, limit = Some 2 }
+                      Retry::{ exit_status = ExitStatus.Code +128, limit = Some 4 }
                     ] #
                     -- and the retries that are passed in (if any)
                     c.retries #
                     -- Other job-specific errors
-                    [ Retry::{ exit_status = ExitStatus.Any, limit = Some 1 } ])
+                    [ Retry::{ exit_status = ExitStatus.Any, limit = Some 4 } ])
                 in
                 B/Retry.ListAutomaticRetry/Type xs),
               manual = Some (B/Manual.Manual/Type {

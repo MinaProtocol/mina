@@ -95,11 +95,13 @@ let setup_daemon logger =
          daemon.json config file"
       (optional string)
   and itn_keys =
-    flag "--itn-keys" ~aliases:[ "itn-keys" ] (optional string)
-      ~doc:
-        "PUBLICKEYS A comma-delimited list of Ed25519 public keys that are \
-         permitted to send signed requests to the incentivized testnet GraphQL \
-         server"
+    if Mina_compile_config.itn_features then
+      flag "--itn-keys" ~aliases:[ "itn-keys" ] (optional string)
+        ~doc:
+          "PUBLICKEYS A comma-delimited list of Ed25519 public keys that are \
+           permitted to send signed requests to the incentivized testnet \
+           GraphQL server"
+    else Command.Param.return None
   and demo_mode =
     flag "--demo-mode" ~aliases:[ "demo-mode" ] no_arg
       ~doc:
@@ -152,7 +154,12 @@ let setup_daemon logger =
   and client_port = Flag.Port.Daemon.client
   and rest_server_port = Flag.Port.Daemon.rest_server
   and limited_graphql_port = Flag.Port.Daemon.limited_graphql_server
-  and itn_graphql_port = Flag.Port.Daemon.itn_graphql_server
+  and itn_graphql_port =
+    if Mina_compile_config.itn_features then
+      flag "--itn-graphql-port" ~aliases:[ "itn-graphql-port" ]
+        ~doc:"PORT GraphQL-server for incentivized testnet interaction"
+        (optional int)
+    else Command.Param.return None
   and open_limited_graphql_port =
     flag "--open-limited-graphql-port"
       ~aliases:[ "open-limited-graphql-port" ]
@@ -796,12 +803,6 @@ let setup_daemon logger =
           let limited_graphql_port =
             let ({ value; name } : int option Flag.Types.with_name) =
               limited_graphql_port
-            in
-            maybe_from_config YJ.Util.to_int_option name value
-          in
-          let itn_graphql_port =
-            let ({ value; name } : int option Flag.Types.with_name) =
-              itn_graphql_port
             in
             maybe_from_config YJ.Util.to_int_option name value
           in

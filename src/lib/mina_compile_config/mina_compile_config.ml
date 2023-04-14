@@ -16,6 +16,8 @@
 
 [%%inject "minimum_user_command_fee_string", minimum_user_command_fee]
 
+[%%inject "itn_features", itn_features]
+
 [%%ifndef compaction_interval]
 
 let compaction_interval_ms = None
