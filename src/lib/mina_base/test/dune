@@ -3,8 +3,6 @@
  (libraries
   ;; opam libraries
   alcotest
-  async_kernel
-  async_unix
   base
   base.caml
   core_kernel
@@ -18,12 +16,9 @@
   pickles
   pickles_types
   ppx_version.runtime
-  signature_lib
   random_oracle
-  sgn
   snarky.backendless
-  snark_params
-  with_hash)
+  snark_params)
  (preprocess
   (pps
    ppx_base
