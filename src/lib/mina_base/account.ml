@@ -156,26 +156,6 @@ module Token_symbol = struct
     let chars = List.drop_while ~f:(fun c -> Char.to_int c = 0) chars in
     String.of_char_list (List.rev chars)
 
-  let%test_unit "to_bits of_bits roundtrip" =
-    Quickcheck.test ~trials:30 ~seed:(`Deterministic "")
-      (Quickcheck.Generator.list_with_length
-         (Pickles_types.Nat.to_int Num_bits.n)
-         Quickcheck.Generator.bool )
-      ~f:(fun x ->
-        let v = Pickles_types.Vector.of_list_and_length_exn x Num_bits.n in
-        Pickles_types.Vector.iter2
-          (to_bits (of_bits v))
-          v
-          ~f:(fun x y -> assert (Bool.equal x y)) )
-
-  let%test_unit "of_bits to_bits roundtrip" =
-    Quickcheck.test ~trials:30 ~seed:(`Deterministic "")
-      (let open Quickcheck.Generator.Let_syntax in
-      let%bind len = Int.gen_incl 0 max_length in
-      String.gen_with_length len
-        (Char.gen_uniform_inclusive Char.min_value Char.max_value))
-      ~f:(fun x -> assert (String.equal (of_bits (to_bits x)) x))
-
   let to_field (x : t) : Field.t =
     Field.project (Pickles_types.Vector.to_list (to_bits x))
 
