@@ -189,7 +189,7 @@ clone:
 depends_on: [ deploy-to-cluster-custom ]
 
 trigger:
-  event: [ custom ]
+  event: [ none ]
 
 steps:
 
@@ -214,8 +214,7 @@ clone:
 trigger:
   event:
   - custom
-depends_on:
-- split
+depends_on: [ deploy-to-cluster-custom ]
 
 defs:
 - &wrk
@@ -232,7 +231,7 @@ defs:
   - kubectl exec $${POD_NAME} -c mina -- /bin/bash -c /tmp/install_wrk2_and_run_test.sh
   - kubectl cp -c mina $${POD_NAME}:/tmp/wrk_output.txt wrk_output.txt
   - cat wrk_output.txt
-  - export TIMEOUTS=$(grep 'Socket errors' wrk_output.txt | cut -d' ' -f10)
+  - export TIMEOUTS=$(grep 'Socket errors' wrk_output.txt | cut -d ' ' -f 10)
   - if [ "$${TIMEOUTS:-0}" -gt 0 ]; then echo "There were $${TIMEOUTS} timeouts during the test"; exit 1; else echo "No timeouts occurred during the test"; fi
 
 steps:
