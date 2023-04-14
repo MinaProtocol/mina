@@ -132,6 +132,13 @@ let
       rpc_parallel = super.rpc_parallel.overrideAttrs
         (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes ]; });
 
+      ocurl = super.ocurl.overrideAttrs (_: {
+        preBuild = ''
+          export LD_LIBRARY_PATH="${pkgs.curl}/lib:$LD_LIBRARY_PATH";
+          export PATH="${pkgs.curl.dev}/bin:${pkgs.curl.bin}/bin:$PATH"
+        '';
+      });
+
       # Some "core" Mina executables, without the version info.
       mina-dev = pkgs.stdenv.mkDerivation ({
         pname = "mina";

@@ -43,6 +43,7 @@ RUN apt-get update --quiet --yes \
     procps \
     python3 \
     tzdata \
+    libcurl4-gnutls-dev \
   && rm -rf /var/lib/apt/lists/*
 
 # Install google-cloud-sdk for GCLOUD_UPLOAD feature

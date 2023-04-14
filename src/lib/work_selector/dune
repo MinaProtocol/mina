@@ -16,6 +16,8 @@
    async_kernel
    ppx_inline_test.config
    async_unix
+   ezcurl
+   uri
    ;; local libraries
    transaction_protocol_state
    transaction_snark_work
