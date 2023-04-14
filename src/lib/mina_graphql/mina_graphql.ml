@@ -3747,7 +3747,7 @@ module Mutations = struct
 
   let internal_send_zkapp =
     io_field "internalSendZkapp"
-      ~doc:"Send a zkApp (for internal testing purposes)"
+      ~doc:"Send zkApp transactions (for internal testing purposes)"
       ~args:
         Arg.
           [ arg "zkappCommands"
