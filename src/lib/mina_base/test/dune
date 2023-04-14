@@ -9,9 +9,13 @@
   integers
   sexplib0
   ;; local libraries
+  currency
   mina_base
   mina_numbers
+  mina_wire_types
   pickles
+  pickles_types
+  ppx_version.runtime
   random_oracle
   snarky.backendless
   snark_params)
