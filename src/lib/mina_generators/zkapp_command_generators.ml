@@ -1646,6 +1646,7 @@ let%test_module _ =
           generate
             (list_with_length 100
                (gen_zkapp_command_from ~fee_payer_keypair ~keymap
+                  ~no_token_accounts:true
                   ~account_state_tbl:(Account_id.Table.create ())
                   ~generate_new_accounts:false ~ledger () ) )
             ~size:100
