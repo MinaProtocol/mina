@@ -5005,7 +5005,8 @@
             },
             {
               "name": "internalSendZkapp",
-              "description": "Send a zkApp (for internal testing purposes)",
+              "description":
+                "Send zkApp transactions (for internal testing purposes)",
               "args": [
                 {
                   "name": "zkappCommands",
