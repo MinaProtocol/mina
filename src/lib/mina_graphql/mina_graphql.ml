@@ -571,6 +571,12 @@ module Types = struct
                 Mina_lib.config mina
                 |> fun Mina_lib.Config.{ gossip_net_params; _ } ->
                 Mina_net2.Keypair.to_peer_id gossip_net_params.keypair )
+          ; field "isBlockProducer"
+              ~args:Arg.[]
+              ~doc:"Is the node a block producer" ~typ:(non_null bool)
+              ~resolve:(fun { ctx = _, mina; _ } _ ->
+                let bp_keys = Mina_lib.block_production_pubkeys mina in
+                not (Public_key.Compressed.Set.is_empty bp_keys) )
           ] )
   end
 
@@ -5363,28 +5369,23 @@ module Queries = struct
         ~args:Arg.[]
         ~doc:"Slots won by a block producer for current epoch"
         ~resolve:(fun { ctx = with_seq_no, mina; _ } () ->
-          if not with_seq_no then return @@ Error "Missing sequence information"
+          Io.return
+          @@
+          if not with_seq_no then Error "Missing sequence information"
           else
             let bp_keys = Mina_lib.block_production_pubkeys mina in
             if Public_key.Compressed.Set.is_empty bp_keys then
-              return @@ Error "Not a block producing node"
+              Error "Not a block producing node"
             else
-              let vrf_evaluator = Mina_lib.vrf_evaluator mina in
-              let logger = Mina_lib.top_level_logger mina in
-              let%map vrf_result =
-                Block_producer.Vrf_evaluation_state.poll_vrf_evaluator ~logger
-                  vrf_evaluator
+              let open Block_producer.Vrf_evaluation_state in
+              let vrf_state = Mina_lib.vrf_evaluation_state mina in
+              let%map.Result () =
+                Result.ok_if_true (finished vrf_state)
+                  ~error:"Vrf evaluation not completed for current epoch"
               in
-              match vrf_result.evaluator_status with
-              | Completed ->
-                  let slots_since_hard_fork =
-                    List.map vrf_result.slots_won ~f:(fun { global_slot; _ } ->
-                        Unsigned.UInt32.to_int global_slot )
-                    |> List.sort ~compare:Int.compare
-                  in
-                  Ok slots_since_hard_fork
-              | _ ->
-                  Error "Vrf evaluation not completed for current epoch" )
+              List.map (Queue.to_list vrf_state.queue)
+                ~f:(fun { global_slot; _ } ->
+                  Unsigned.UInt32.to_int global_slot ) )
 
     let commands = [ auth; slots_won ]
   end
