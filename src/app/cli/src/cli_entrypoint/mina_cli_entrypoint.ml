@@ -1705,6 +1705,13 @@ let internal_commands logger =
                         , second_pass_output_ledger
                         , fully_applied )
                       in
+                      [%log info] "Application status out of snark $status"
+                        ~metadata:
+                          [ ( "status"
+                            , Transaction_status.to_yojson
+                                (Ledger.Transaction_applied.transaction_status
+                                   fully_applied ) )
+                          ] ;
                       () )
                 in
                 match res with

@@ -76,7 +76,6 @@
    snarky.backendless
    o1trace
    ppx_version.runtime
-   internal_tracing
    mina_transaction_logic
    mina_state
  )

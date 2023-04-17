@@ -354,17 +354,17 @@ let key_gen = Public_key.Compressed.gen
 let initialize account_id : t =
   let public_key = Account_id.public_key account_id in
   let token_id = Account_id.token_id account_id in
-  let delegate =
-    (* Only allow delegation if this account is for the default token. *)
-    if Token_id.(equal default token_id) then Some public_key else None
-  in
+  (*let delegate =
+      (* Only allow delegation if this account is for the default token. *)
+      if Token_id.(equal default token_id) then Some public_key else None
+    in*)
   { public_key
   ; token_id
   ; token_symbol = ""
   ; balance = Balance.zero
   ; nonce = Nonce.zero
   ; receipt_chain_hash = Receipt.Chain_hash.empty
-  ; delegate
+  ; delegate = None
   ; voting_for = State_hash.dummy
   ; timing = Timing.Untimed
   ; permissions = Permissions.user_default
@@ -642,17 +642,17 @@ let empty_digest = digest empty
 let create account_id balance =
   let public_key = Account_id.public_key account_id in
   let token_id = Account_id.token_id account_id in
-  let delegate =
-    (* Only allow delegation if this account is for the default token. *)
-    if Token_id.(equal default) token_id then Some public_key else None
-  in
+  (*let delegate =
+      (* Only allow delegation if this account is for the default token. *)
+      if Token_id.(equal default) token_id then Some public_key else None
+    in*)
   { Poly.public_key
   ; token_id
   ; token_symbol = Token_symbol.default
   ; balance
   ; nonce = Nonce.zero
   ; receipt_chain_hash = Receipt.Chain_hash.empty
-  ; delegate
+  ; delegate = None
   ; voting_for = State_hash.dummy
   ; timing = Timing.Untimed
   ; permissions = Permissions.user_default
