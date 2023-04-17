@@ -103,4 +103,13 @@ let () =
           ; test_case "Test fee_payer public key." `Quick fee_payer_pk
           ; test_case "Test fee_excess." `Quick fee_excess
           ] )
+    ; Merkle_tree_test.
+        ( "merkle tree"
+        , [ test_case "Test isomorphism between lists and merkle trees." `Quick
+              merkle_tree_isomorphic_to_list
+          ; test_case "Test item retrieval by index." `Quick index_retrieval
+          ; test_case "Test non-existent index retrieval." `Quick
+              index_non_existent
+          ; test_case "Test merkle root soundness." `Quick merkle_root
+          ] )
     ]
