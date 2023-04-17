@@ -1,4 +1,4 @@
-package itn_script
+package itn_uptime_analyzer
 
 import (
 	"time"
