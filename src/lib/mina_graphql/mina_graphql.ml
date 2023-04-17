@@ -3113,13 +3113,15 @@ module Types = struct
           ; transactions_per_second : float
           ; duration_in_minutes : int
           ; memo_prefix : string
+          ; no_precondition : bool option
           }
 
         let arg_typ =
           obj "ZkappCommandsDetails"
             ~doc:"Keys and other information for scheduling zkapp commands"
             ~coerce:(fun fee_payers num_zkapps_to_deploy num_new_accounts
-                         transactions_per_second duration_in_minutes memo_prefix ->
+                         transactions_per_second duration_in_minutes memo_prefix
+                         no_precondition ->
               Result.return
                 { fee_payers
                 ; num_zkapps_to_deploy
@@ -3127,10 +3129,12 @@ module Types = struct
                 ; transactions_per_second
                 ; duration_in_minutes
                 ; memo_prefix
+                ; no_precondition
                 } )
             ~split:(fun f (t : input) ->
               f t.fee_payers t.num_zkapps_to_deploy t.num_new_accounts
-                t.transactions_per_second t.duration_in_minutes t.memo_prefix )
+                t.transactions_per_second t.duration_in_minutes t.memo_prefix
+                t.no_precondition )
             ~fields:
               Arg.
                 [ arg "feePayers"
@@ -3151,6 +3155,8 @@ module Types = struct
                 ; arg "durationInMinutes" ~doc:"Length of scheduler run"
                     ~typ:(non_null int)
                 ; arg "memoPrefix" ~doc:"Prefix of memo" ~typ:(non_null string)
+                ; arg "noPrecondition"
+                    ~doc:"Disable the precondition in account updates" ~typ:bool
                 ]
       end
     end
@@ -4664,11 +4670,21 @@ module Mutations = struct
                                            fee_payer_account.nonce )
                                         (Int.to_string_hum counter)
                                     in
+                                    let no_account_precondition =
+                                      match
+                                        zkapp_command_details.no_precondition
+                                      with
+                                      | Some b ->
+                                          b
+                                      | None ->
+                                          false
+                                    in
                                     let zkapp_command_with_dummy_auth =
                                       Quickcheck.Generator.generate
                                         (Mina_generators
                                          .Zkapp_command_generators
                                          .gen_zkapp_command_from ~memo
+                                           ~no_account_precondition
                                            ~ignore_sequence_events_precond:true
                                            ~no_token_accounts:true ~limited:true
                                            ~fee_payer_keypair:fee_payer ~keymap

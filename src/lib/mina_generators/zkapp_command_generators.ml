@@ -21,223 +21,228 @@ type role =
   [ `Fee_payer | `New_account | `Ordinary_participant | `New_token_account ]
 
 let gen_account_precondition_from_account ?failure
-    ?(ignore_sequence_events_precond = false) ?(is_nonce_precondition = false)
-    ~first_use_of_account account =
+    ?(ignore_sequence_events_precond = false) ?(no_account_precondition = false)
+    ?(is_nonce_precondition = false) ~first_use_of_account account =
   let open Quickcheck.Let_syntax in
-  let { Account.Poly.balance; nonce; delegate; receipt_chain_hash; zkapp; _ } =
-    account
-  in
-  (* choose constructor *)
-  let%bind b =
-    if is_nonce_precondition then return false else Quickcheck.Generator.bool
-  in
-  if b then
-    (* Full *)
-    let open Zkapp_basic in
-    let%bind (predicate_account : Zkapp_precondition.Account.t) =
-      let%bind balance =
-        let%bind balance_change_int = Int.gen_uniform_incl 1 10_000_000 in
-        let balance_change =
-          Currency.Amount.of_nanomina_int_exn balance_change_int
-        in
-        let lower =
-          match Currency.Balance.sub_amount balance balance_change with
-          | None ->
-              Currency.Balance.zero
-          | Some bal ->
-              bal
-        in
-        let upper =
-          match Currency.Balance.add_amount balance balance_change with
-          | None ->
-              Currency.Balance.max_int
-          | Some bal ->
-              bal
-        in
-        Or_ignore.gen
-          (return { Zkapp_precondition.Closed_interval.lower; upper })
-      in
-      let%bind nonce =
-        let%bind nonce_change_int = Int.gen_uniform_incl 1 100 in
-        let nonce_change = Account.Nonce.of_int nonce_change_int in
-        let lower =
-          match Account.Nonce.sub nonce nonce_change with
-          | None ->
-              Account.Nonce.zero
-          | Some nonce ->
-              nonce
-        in
-        let upper =
-          (* Nonce.add doesn't check for overflow, so check here *)
-          match Account.Nonce.(sub max_value) nonce_change with
-          | None ->
-              (* unreachable *)
-              failwith
-                "gen_account_precondition_from: nonce subtraction failed \
-                 unexpectedly"
-          | Some n ->
-              if Account.Nonce.( < ) n nonce then Account.Nonce.max_value
-              else Account.Nonce.add nonce nonce_change
-        in
-        Or_ignore.gen
-          (return { Zkapp_precondition.Closed_interval.lower; upper })
-      in
-      let receipt_chain_hash =
-        if first_use_of_account then Or_ignore.Check receipt_chain_hash
-        else Or_ignore.Ignore
-      in
-      let%bind delegate =
-        match delegate with
-        | None ->
-            return Or_ignore.Ignore
-        | Some pk ->
-            Or_ignore.gen (return pk)
-      in
-      let%bind state, action_state, proved_state, is_new =
-        match zkapp with
-        | None ->
-            let len = Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n in
-            (* won't raise, correct length given *)
-            let state =
-              Zkapp_state.V.of_list_exn
-                (List.init len ~f:(fun _ -> Or_ignore.Ignore))
-            in
-            let action_state = Or_ignore.Ignore in
-            let proved_state = Or_ignore.Ignore in
-            let is_new = Or_ignore.Ignore in
-            return (state, action_state, proved_state, is_new)
-        | Some { Zkapp_account.app_state; action_state; proved_state; _ } ->
-            let state =
-              Zkapp_state.V.map app_state ~f:(fun field ->
-                  Quickcheck.random_value (Or_ignore.gen (return field)) )
-            in
-            let%bind action_state =
-              if ignore_sequence_events_precond then return Or_ignore.Ignore
-              else
-                (* choose a value from account action state *)
-                let fields =
-                  Pickles_types.Vector.Vector_5.to_list action_state
-                in
-                let%bind ndx =
-                  Int.gen_uniform_incl 0 (List.length fields - 1)
-                in
-                return (Or_ignore.Check (List.nth_exn fields ndx))
-            in
-            let proved_state = Or_ignore.Check proved_state in
-            let is_new =
-              (* when we apply the generated Zkapp_command.t, the account is always in the ledger
-              *)
-              Or_ignore.Check false
-            in
-            return (state, action_state, proved_state, is_new)
-      in
-      return
-        { Zkapp_precondition.Account.balance
-        ; nonce
-        ; receipt_chain_hash
-        ; delegate
-        ; state
-        ; action_state
-        ; proved_state
-        ; is_new
-        }
-    in
-    match failure with
-    | Some Invalid_account_precondition ->
-        let module Tamperable = struct
-          type t =
-            | Balance
-            | Nonce
-            | Receipt_chain_hash
-            | Delegate
-            | State
-            | Sequence_state
-            | Proved_state
-        end in
-        let%bind faulty_predicate_account =
-          (* tamper with account using randomly chosen item *)
-          let tamperable : Tamperable.t list =
-            [ Balance
-            ; Nonce
-            ; Receipt_chain_hash
-            ; Delegate
-            ; State
-            ; Sequence_state
-            ; Proved_state
-            ]
-          in
-          match%bind Quickcheck.Generator.of_list tamperable with
-          | Balance ->
-              let new_balance =
-                if Currency.Balance.equal balance Currency.Balance.zero then
-                  Currency.Balance.max_int
-                else Currency.Balance.zero
-              in
-              let balance =
-                Or_ignore.Check
-                  { Zkapp_precondition.Closed_interval.lower = new_balance
-                  ; upper = new_balance
-                  }
-              in
-              return { predicate_account with balance }
-          | Nonce ->
-              let new_nonce =
-                if Account.Nonce.equal nonce Account.Nonce.zero then
-                  Account.Nonce.max_value
-                else Account.Nonce.zero
-              in
-              let%bind nonce =
-                Zkapp_precondition.Numeric.gen (return new_nonce)
-                  Account.Nonce.compare
-              in
-              return { predicate_account with nonce }
-          | Receipt_chain_hash ->
-              let%bind new_receipt_chain_hash = Receipt.Chain_hash.gen in
-              let%bind receipt_chain_hash =
-                Or_ignore.gen (return new_receipt_chain_hash)
-              in
-              return { predicate_account with receipt_chain_hash }
-          | Delegate ->
-              let%bind delegate =
-                Or_ignore.gen Signature_lib.Public_key.Compressed.gen
-              in
-              return { predicate_account with delegate }
-          | State ->
-              let fields =
-                Zkapp_state.V.to_list predicate_account.state |> Array.of_list
-              in
-              let%bind ndx = Int.gen_incl 0 (Array.length fields - 1) in
-              let%bind field = Snark_params.Tick.Field.gen in
-              fields.(ndx) <- Or_ignore.Check field ;
-              let state = Zkapp_state.V.of_list_exn (Array.to_list fields) in
-              return { predicate_account with state }
-          | Sequence_state ->
-              let%bind field = Snark_params.Tick.Field.gen in
-              let action_state = Or_ignore.Check field in
-              return { predicate_account with action_state }
-          | Proved_state ->
-              let%bind proved_state =
-                match predicate_account.proved_state with
-                | Check b ->
-                    return (Or_ignore.Check (not b))
-                | Ignore ->
-                    return (Or_ignore.Check true)
-              in
-              return { predicate_account with proved_state }
-        in
-        return
-          (Account_update.Account_precondition.Full faulty_predicate_account)
-    | _ ->
-        return (Account_update.Account_precondition.Full predicate_account)
+  if no_account_precondition then
+    return Account_update.Account_precondition.Accept
   else
-    (* Nonce *)
-    let { Account.Poly.nonce; _ } = account in
-    match failure with
-    | Some Invalid_account_precondition ->
+    let { Account.Poly.balance; nonce; delegate; receipt_chain_hash; zkapp; _ }
+        =
+      account
+    in
+    (* choose constructor *)
+    let%bind b =
+      if is_nonce_precondition then return false else Quickcheck.Generator.bool
+    in
+    if b then
+      (* Full *)
+      let open Zkapp_basic in
+      let%bind (predicate_account : Zkapp_precondition.Account.t) =
+        let%bind balance =
+          let%bind balance_change_int = Int.gen_uniform_incl 1 10_000_000 in
+          let balance_change =
+            Currency.Amount.of_nanomina_int_exn balance_change_int
+          in
+          let lower =
+            match Currency.Balance.sub_amount balance balance_change with
+            | None ->
+                Currency.Balance.zero
+            | Some bal ->
+                bal
+          in
+          let upper =
+            match Currency.Balance.add_amount balance balance_change with
+            | None ->
+                Currency.Balance.max_int
+            | Some bal ->
+                bal
+          in
+          Or_ignore.gen
+            (return { Zkapp_precondition.Closed_interval.lower; upper })
+        in
+        let%bind nonce =
+          let%bind nonce_change_int = Int.gen_uniform_incl 1 100 in
+          let nonce_change = Account.Nonce.of_int nonce_change_int in
+          let lower =
+            match Account.Nonce.sub nonce nonce_change with
+            | None ->
+                Account.Nonce.zero
+            | Some nonce ->
+                nonce
+          in
+          let upper =
+            (* Nonce.add doesn't check for overflow, so check here *)
+            match Account.Nonce.(sub max_value) nonce_change with
+            | None ->
+                (* unreachable *)
+                failwith
+                  "gen_account_precondition_from: nonce subtraction failed \
+                   unexpectedly"
+            | Some n ->
+                if Account.Nonce.( < ) n nonce then Account.Nonce.max_value
+                else Account.Nonce.add nonce nonce_change
+          in
+          Or_ignore.gen
+            (return { Zkapp_precondition.Closed_interval.lower; upper })
+        in
+        let receipt_chain_hash =
+          if first_use_of_account then Or_ignore.Check receipt_chain_hash
+          else Or_ignore.Ignore
+        in
+        let%bind delegate =
+          match delegate with
+          | None ->
+              return Or_ignore.Ignore
+          | Some pk ->
+              Or_ignore.gen (return pk)
+        in
+        let%bind state, action_state, proved_state, is_new =
+          match zkapp with
+          | None ->
+              let len = Pickles_types.Nat.to_int Zkapp_state.Max_state_size.n in
+              (* won't raise, correct length given *)
+              let state =
+                Zkapp_state.V.of_list_exn
+                  (List.init len ~f:(fun _ -> Or_ignore.Ignore))
+              in
+              let action_state = Or_ignore.Ignore in
+              let proved_state = Or_ignore.Ignore in
+              let is_new = Or_ignore.Ignore in
+              return (state, action_state, proved_state, is_new)
+          | Some { Zkapp_account.app_state; action_state; proved_state; _ } ->
+              let state =
+                Zkapp_state.V.map app_state ~f:(fun field ->
+                    Quickcheck.random_value (Or_ignore.gen (return field)) )
+              in
+              let%bind action_state =
+                if ignore_sequence_events_precond then return Or_ignore.Ignore
+                else
+                  (* choose a value from account action state *)
+                  let fields =
+                    Pickles_types.Vector.Vector_5.to_list action_state
+                  in
+                  let%bind ndx =
+                    Int.gen_uniform_incl 0 (List.length fields - 1)
+                  in
+                  return (Or_ignore.Check (List.nth_exn fields ndx))
+              in
+              let proved_state = Or_ignore.Check proved_state in
+              let is_new =
+                (* when we apply the generated Zkapp_command.t, the account is always in the ledger
+              *)
+                Or_ignore.Check false
+              in
+              return (state, action_state, proved_state, is_new)
+        in
         return
-          (Account_update.Account_precondition.Nonce (Account.Nonce.succ nonce))
-    | _ ->
-        return (Account_update.Account_precondition.Nonce nonce)
+          { Zkapp_precondition.Account.balance
+          ; nonce
+          ; receipt_chain_hash
+          ; delegate
+          ; state
+          ; action_state
+          ; proved_state
+          ; is_new
+          }
+      in
+      match failure with
+      | Some Invalid_account_precondition ->
+          let module Tamperable = struct
+            type t =
+              | Balance
+              | Nonce
+              | Receipt_chain_hash
+              | Delegate
+              | State
+              | Sequence_state
+              | Proved_state
+          end in
+          let%bind faulty_predicate_account =
+            (* tamper with account using randomly chosen item *)
+            let tamperable : Tamperable.t list =
+              [ Balance
+              ; Nonce
+              ; Receipt_chain_hash
+              ; Delegate
+              ; State
+              ; Sequence_state
+              ; Proved_state
+              ]
+            in
+            match%bind Quickcheck.Generator.of_list tamperable with
+            | Balance ->
+                let new_balance =
+                  if Currency.Balance.equal balance Currency.Balance.zero then
+                    Currency.Balance.max_int
+                  else Currency.Balance.zero
+                in
+                let balance =
+                  Or_ignore.Check
+                    { Zkapp_precondition.Closed_interval.lower = new_balance
+                    ; upper = new_balance
+                    }
+                in
+                return { predicate_account with balance }
+            | Nonce ->
+                let new_nonce =
+                  if Account.Nonce.equal nonce Account.Nonce.zero then
+                    Account.Nonce.max_value
+                  else Account.Nonce.zero
+                in
+                let%bind nonce =
+                  Zkapp_precondition.Numeric.gen (return new_nonce)
+                    Account.Nonce.compare
+                in
+                return { predicate_account with nonce }
+            | Receipt_chain_hash ->
+                let%bind new_receipt_chain_hash = Receipt.Chain_hash.gen in
+                let%bind receipt_chain_hash =
+                  Or_ignore.gen (return new_receipt_chain_hash)
+                in
+                return { predicate_account with receipt_chain_hash }
+            | Delegate ->
+                let%bind delegate =
+                  Or_ignore.gen Signature_lib.Public_key.Compressed.gen
+                in
+                return { predicate_account with delegate }
+            | State ->
+                let fields =
+                  Zkapp_state.V.to_list predicate_account.state |> Array.of_list
+                in
+                let%bind ndx = Int.gen_incl 0 (Array.length fields - 1) in
+                let%bind field = Snark_params.Tick.Field.gen in
+                fields.(ndx) <- Or_ignore.Check field ;
+                let state = Zkapp_state.V.of_list_exn (Array.to_list fields) in
+                return { predicate_account with state }
+            | Sequence_state ->
+                let%bind field = Snark_params.Tick.Field.gen in
+                let action_state = Or_ignore.Check field in
+                return { predicate_account with action_state }
+            | Proved_state ->
+                let%bind proved_state =
+                  match predicate_account.proved_state with
+                  | Check b ->
+                      return (Or_ignore.Check (not b))
+                  | Ignore ->
+                      return (Or_ignore.Check true)
+                in
+                return { predicate_account with proved_state }
+          in
+          return
+            (Account_update.Account_precondition.Full faulty_predicate_account)
+      | _ ->
+          return (Account_update.Account_precondition.Full predicate_account)
+    else
+      (* Nonce *)
+      let { Account.Poly.nonce; _ } = account in
+      match failure with
+      | Some Invalid_account_precondition ->
+          return
+            (Account_update.Account_precondition.Nonce
+               (Account.Nonce.succ nonce) )
+      | _ ->
+          return (Account_update.Account_precondition.Nonce nonce)
 
 let gen_fee ~num_updates (account : Account.t) =
   let balance = account.balance in
@@ -977,11 +982,12 @@ let gen_account_update_body_components (type a b c d) ?global_slot
   ; authorization_kind
   }
 
-let gen_account_update_from ?global_slot ?(update = None) ?failure
-    ?(new_account = false) ?(zkapp_account = false) ?account_id ?token_id
-    ?may_use_token ?permissions_auth ?required_balance_change ~zkapp_account_ids
-    ~authorization ~account_ids_seen ~available_public_keys ~account_state_tbl
-    ?protocol_state_view ?vk ~ignore_sequence_events_precond () =
+let gen_account_update_from ?(no_account_precondition = false) ?global_slot
+    ?(update = None) ?failure ?(new_account = false) ?(zkapp_account = false)
+    ?account_id ?token_id ?may_use_token ?permissions_auth
+    ?required_balance_change ~zkapp_account_ids ~authorization ~account_ids_seen
+    ~available_public_keys ~account_state_tbl ?protocol_state_view ?vk
+    ~ignore_sequence_events_precond () =
   let open Quickcheck.Let_syntax in
   let increment_nonce =
     (* permissions_auth is used to generate updated permissions consistent with a contemplated authorization;
@@ -1009,7 +1015,7 @@ let gen_account_update_from ?global_slot ?(update = None) ?failure
       ~f_balance_change:Fn.id () ~f_token_id:Fn.id
       ~f_account_precondition:(fun ~first_use_of_account acct ->
         gen_account_precondition_from_account ~ignore_sequence_events_precond
-          ~first_use_of_account acct )
+          ~no_account_precondition ~first_use_of_account acct )
       ~f_account_update_account_precondition:Fn.id
       ~gen_use_full_commitment:(fun ~account_precondition ->
         gen_use_full_commitment ~increment_nonce ~account_precondition
@@ -1078,7 +1084,7 @@ let max_account_updates = 2
 
 let max_token_updates = 2
 
-let gen_zkapp_command_from ?global_slot ?memo
+let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
     ?(ignore_sequence_events_precond = false) ?(no_token_accounts = false)
     ?(limited = false) ?(generate_new_accounts = true) ?failure
     ?(max_account_updates = max_account_updates)
@@ -1279,9 +1285,9 @@ let gen_zkapp_command_from ?global_slot ?memo
         let%bind account_update0 =
           (* Signature authorization to start *)
           let authorization = Control.Signature Signature.dummy in
-          gen_account_update_from ?global_slot ~zkapp_account_ids
-            ~account_ids_seen ~update ?failure ~authorization ~new_account
-            ~permissions_auth ~zkapp_account ~available_public_keys
+          gen_account_update_from ~no_account_precondition ?global_slot
+            ~zkapp_account_ids ~account_ids_seen ~update ?failure ~authorization
+            ~new_account ~permissions_auth ~zkapp_account ~available_public_keys
             ~may_use_token:No ~account_state_tbl ?protocol_state_view ?vk
             ~ignore_sequence_events_precond ()
         in
@@ -1354,11 +1360,11 @@ let gen_zkapp_command_from ?global_slot ?memo
               account_update0.body.token_id
           in
           let permissions_auth = Control.Tag.Signature in
-          gen_account_update_from ?global_slot ~update ?failure
-            ~zkapp_account_ids ~account_ids_seen ~account_id ~authorization
-            ~permissions_auth ~zkapp_account ~available_public_keys
-            ~may_use_token:No ~account_state_tbl ?protocol_state_view ?vk
-            ~ignore_sequence_events_precond ()
+          gen_account_update_from ~no_account_precondition ?global_slot ~update
+            ?failure ~zkapp_account_ids ~account_ids_seen ~account_id
+            ~authorization ~permissions_auth ~zkapp_account
+            ~available_public_keys ~may_use_token:No ~account_state_tbl
+            ?protocol_state_view ?vk ~ignore_sequence_events_precond ()
         in
         (* this list will be reversed, so `account_update0` will execute before `account_update` *)
         go
@@ -1413,7 +1419,7 @@ let gen_zkapp_command_from ?global_slot ?memo
   let balance_change = Currency.Amount.Signed.negate balance_change_sum in
   let%bind balancing_account_update =
     let authorization = Control.Signature Signature.dummy in
-    gen_account_update_from ?global_slot ?failure
+    gen_account_update_from ~no_account_precondition ?global_slot ?failure
       ~permissions_auth:Control.Tag.Signature ~zkapp_account_ids
       ~account_ids_seen ~authorization ~new_account:false ~available_public_keys
       ~may_use_token:No ~account_state_tbl
@@ -1435,10 +1441,10 @@ let gen_zkapp_command_from ?global_slot ?memo
                       Genesis_constants.Constraint_constants.compiled
                         .account_creation_fee ) ))
           in
-          gen_account_update_from ?global_slot ~zkapp_account_ids
-            ~account_ids_seen ~authorization ~permissions_auth
-            ~available_public_keys ~may_use_token:No ~account_state_tbl
-            ~required_balance_change ?protocol_state_view ?vk
+          gen_account_update_from ~no_account_precondition ?global_slot
+            ~zkapp_account_ids ~account_ids_seen ~authorization
+            ~permissions_auth ~available_public_keys ~may_use_token:No
+            ~account_state_tbl ~required_balance_change ?protocol_state_view ?vk
             ~ignore_sequence_events_precond ()
         in
         let token_id =
@@ -1447,8 +1453,8 @@ let gen_zkapp_command_from ?global_slot ?memo
               (Account_id.create parent.body.public_key parent.body.token_id)
         in
         let%bind child =
-          gen_account_update_from ?global_slot ~zkapp_account_ids
-            ~account_ids_seen ~new_account:true ~token_id
+          gen_account_update_from ~no_account_precondition ?global_slot
+            ~zkapp_account_ids ~account_ids_seen ~new_account:true ~token_id
             ~may_use_token:Parents_own_token ~authorization ~permissions_auth
             ~available_public_keys ~account_state_tbl ?protocol_state_view ?vk
             ~ignore_sequence_events_precond ()
