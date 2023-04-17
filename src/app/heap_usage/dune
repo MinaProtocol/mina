@@ -18,6 +18,7 @@
    yojson
    sexplib0
    ;; local libraries
+   mina_block ; temp
    mina_base
    mina_base.import
    mina_numbers
