@@ -66,7 +66,7 @@ module type Element_intf = sig
   val fits :
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
-    -> 'field t
+    -> 'field standard_limbs
     -> bool
 end
 
@@ -120,4 +120,4 @@ val mul :
   -> 'f standard_limbs (* foreign_field_modulus *)
   -> 'f Element.Standard.t * 'f External_checks.t
 (* remainder, external_checks *)
-*)
+ *)
