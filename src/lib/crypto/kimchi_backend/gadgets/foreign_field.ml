@@ -374,12 +374,12 @@ module External_checks = struct
   type 'field t =
     { mutable multi_ranges : 'field Cvar.t standard_limbs list
     ; mutable compact_multi_ranges : 'field Cvar.t compact_limbs list
-    ; mutable bounds : 'field Cvar.t standard_limbs list
+    ; mutable bound_additions : 'field Cvar.t standard_limbs list
     }
 
   let create (type field)
       (module Circuit : Snark_intf.Run with type field = field) : field t =
-    { multi_ranges = []; compact_multi_ranges = []; bounds = [] }
+    { multi_ranges = []; compact_multi_ranges = []; bound_additions = [] }
 
   (* Track a multi-range-check *)
   let add_multi_range_check (external_checks : 'field t)
@@ -392,10 +392,10 @@ module External_checks = struct
     external_checks.compact_multi_ranges <-
       x :: external_checks.compact_multi_ranges
 
-  (* Track a bound check *)
-  let add_bound_check (external_checks : 'field t)
+  (* Track a bound addition *)
+  let add_bound_addition (external_checks : 'field t)
       (x : 'field Cvar.t standard_limbs) =
-    external_checks.bounds <- x :: external_checks.bounds
+    external_checks.bound_additions <- x :: external_checks.bound_additions
 end
 
 (* Common auxiliary functions for foreign field gadgets *)
@@ -1104,7 +1104,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     (quotient_bound01, quotient_bound2) ;
   External_checks.add_multi_range_check external_checks
     (remainder_bound0, remainder_bound1, remainder_bound2) ;
-  External_checks.add_bound_check external_checks
+  External_checks.add_bound_addition external_checks
     (remainder0, remainder1, remainder2) ;
 
   (* Create ForeignFieldMul gate *)
@@ -1438,7 +1438,8 @@ let%test_unit "foreign_field_mul gadget" =
               assert_eq product expected ) ;
 
           (* TODO: 2) Add result bound addition gate *)
-          assert (Mina_stdlib.List.Length.equal external_checks.bounds 2) ;
+          assert (
+            Mina_stdlib.List.Length.equal external_checks.bound_additions 2 ) ;
 
           (* 3) Add multi-range-check left input *)
           let left_input0, left_input1, left_input2 =
