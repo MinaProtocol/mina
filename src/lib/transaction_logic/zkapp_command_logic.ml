@@ -1218,17 +1218,15 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (* delegate to public key if new account using default token *)
     let self_delegate =
-      let account_update_token_id =
-        Account_update.token_id account_update
-      in
-      Bool.(account_is_new &&&
-            Token_id.equal account_update_token_id Token_id.default)
+      let account_update_token_id = Account_update.token_id account_update in
+      Bool.(
+        account_is_new
+        &&& Token_id.equal account_update_token_id Token_id.default)
     in
     let a =
       Account.set_delegate
-        (Public_key.if_ self_delegate
-        ~then_:(Account.public_key a)
-        ~else_:(Account.delegate a))
+        (Public_key.if_ self_delegate ~then_:(Account.public_key a)
+           ~else_:(Account.delegate a) )
     in
     let matching_verification_key_hashes =
       Inputs.Bool.(
