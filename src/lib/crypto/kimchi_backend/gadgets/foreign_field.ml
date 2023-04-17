@@ -892,6 +892,7 @@ let tuple24_of_array array =
 
 (* Foreign field multiplication gadget definition *)
 let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
+    ?(external_checks : f External_checks.t option)
     (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
     (foreign_field_modulus : f standard_limbs) :
     f Element.Standard.t * f External_checks.t =
@@ -1090,7 +1091,13 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
   in
 
   (* Prepare external checks *)
-  let external_checks = External_checks.create (module Circuit) in
+  let external_checks =
+    match external_checks with
+    | Some external_checks ->
+        external_checks
+    | None ->
+        External_checks.create (module Circuit)
+  in
   External_checks.add_multi_range_check external_checks
     (carry1_lo, product1_lo, product1_hi_0) ;
   External_checks.add_compact_multi_range_check external_checks
@@ -1406,10 +1413,16 @@ let%test_unit "foreign_field_mul gadget" =
            *   7) compact-multi-range-check (quotient range check) *)
 
           (* 1) Create the foreign field mul gadget *)
-          let product, external_checks =
+          let _product, external_checks =
             mul
               (module Runner.Impl)
               left_input right_input foreign_field_modulus
+          in
+          (* Add another foreign field mul to test chaining of external_checks *)
+          let product, external_checks =
+            mul
+              (module Runner.Impl)
+              ~external_checks left_input right_input foreign_field_modulus
           in
 
           (* Sanity check product matches expected result *)
@@ -1425,7 +1438,7 @@ let%test_unit "foreign_field_mul gadget" =
               assert_eq product expected ) ;
 
           (* TODO: 2) Add result bound addition gate *)
-          assert (Mina_stdlib.List.Length.equal external_checks.bounds 1) ;
+          assert (Mina_stdlib.List.Length.equal external_checks.bounds 2) ;
 
           (* 3) Add multi-range-check left input *)
           let left_input0, left_input1, left_input2 =
@@ -1452,7 +1465,7 @@ let%test_unit "foreign_field_mul gadget" =
               let v0, v1, v2 = multi_range in
               Range_check.multi (module Runner.Impl) v0 v1 v2 ;
               () ) ;
-          assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 2) ;
+          assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 4) ;
 
           (* 7) Add gates for external compact-multi-range-checks
            *   In this case:
@@ -1464,7 +1477,7 @@ let%test_unit "foreign_field_mul gadget" =
               Range_check.compact_multi (module Runner.Impl) v01 v2 ;
               () ) ;
           assert (
-            Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges 1 ) )
+            Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges 2 ) )
     in
 
     cs

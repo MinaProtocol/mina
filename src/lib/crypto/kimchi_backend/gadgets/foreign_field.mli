@@ -108,13 +108,17 @@ end
  *   where remainder is the product.
  *
  *   Inputs:
- *     left_input            := multiplicand in [0, foreign_field_modulus)
- *     right_input           := multiplicand in [0, foreign_field_modulus)
- *     foreign_field_modulus := must be less than than max foreign field modulus
- *   Outputs: tuple of product and required external checks
+ *     external_checks       := Optional context to track required external checks.
+ *                              When omitted, creates and returns new external_checks structure.
+ *                              Otherwise, appends new required external checks to supplied structure.
+ *     left_input            := Multiplicand in [0, foreign_field_modulus)
+ *     right_input           := Multiplicand in [0, foreign_field_modulus)
+ *     foreign_field_modulus := Must be less than than max foreign field modulus
+ *   Outputs: tuple of product and external_checks
  *)
 val mul :
      (module Snark_intf.Run with type field = 'f)
+  -> ?external_checks:'f External_checks.t (* external_checks *)
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
