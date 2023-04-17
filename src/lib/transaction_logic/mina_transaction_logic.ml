@@ -27,7 +27,7 @@ module Transaction_applied = struct
     module Body = struct
       [%%versioned
       module Stable = struct
-        module V3 = struct
+        module V2 = struct
           type t =
             | Payment of { new_accounts : Account_id.Stable.V2.t list }
             | Stake_delegation of
@@ -42,8 +42,8 @@ module Transaction_applied = struct
 
     [%%versioned
     module Stable = struct
-      module V3 = struct
-        type t = { common : Common.Stable.V2.t; body : Body.Stable.V3.t }
+      module V2 = struct
+        type t = { common : Common.Stable.V2.t; body : Body.Stable.V2.t }
         [@@deriving sexp, to_yojson]
 
         let to_latest = Fn.id
@@ -80,7 +80,7 @@ module Transaction_applied = struct
     module Stable = struct
       module V2 = struct
         type t =
-          | Signed_command of Signed_command_applied.Stable.V3.t
+          | Signed_command of Signed_command_applied.Stable.V2.t
           | Zkapp_command of Zkapp_command_applied.Stable.V1.t
         [@@deriving sexp, to_yojson]
 
