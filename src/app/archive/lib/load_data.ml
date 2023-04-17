@@ -686,14 +686,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
   let receipt_chain_hash =
     receipt_chain_hash |> Receipt.Chain_hash.of_base58_check_exn
   in
-  let%bind delegate =
-    let%map pk_str_opt =
-      Mina_caqti.get_opt_item delegate_id
-        ~f:(with_pool ~f:Processor.Public_key.find_by_id)
-    in
-    Option.map pk_str_opt
-      ~f:Signature_lib.Public_key.Compressed.of_base58_check_exn
-  in
+  let%bind delegate = pk_of_id delegate_id in
   let%bind voting_for =
     let%map hash_str =
       query_db ~f:(fun db -> Processor.Voting_for.load db voting_for_id)

@@ -181,7 +181,7 @@ CREATE TABLE accounts_accessed
 , balance                 text    NOT NULL
 , nonce                   bigint  NOT NULL
 , receipt_chain_hash      text    NOT NULL
-, delegate_id             int               REFERENCES public_keys(id)
+, delegate_id             int     NOT NULL  REFERENCES public_keys(id)
 , voting_for_id           int     NOT NULL  REFERENCES voting_for(id)
 , timing_id               int               REFERENCES timing_info(id)
 , permissions_id          int     NOT NULL  REFERENCES zkapp_permissions(id)

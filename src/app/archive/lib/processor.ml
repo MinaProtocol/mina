@@ -2537,7 +2537,7 @@ module Accounts_accessed = struct
     ; balance : string
     ; nonce : int64
     ; receipt_chain_hash : string
-    ; delegate_id : int option
+    ; delegate_id : int
     ; voting_for_id : int
     ; timing_id : int
     ; permissions_id : int
@@ -2555,7 +2555,7 @@ module Accounts_accessed = struct
         ; string
         ; int64
         ; string
-        ; option int
+        ; int
         ; int
         ; int
         ; int
@@ -2601,9 +2601,7 @@ module Accounts_accessed = struct
           account.receipt_chain_hash |> Receipt.Chain_hash.to_base58_check
         in
         let%bind delegate_id =
-          Mina_caqti.add_if_some
-            (Public_key.add_if_doesn't_exist (module Conn))
-            account.delegate
+          Public_key.add_if_doesn't_exist (module Conn) account.delegate
         in
         let%bind voting_for_id =
           Voting_for.add_if_doesn't_exist (module Conn) account.voting_for

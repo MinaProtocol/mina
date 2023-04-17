@@ -288,7 +288,7 @@ module Binable_arg = struct
         , Balance.Stable.V1.t
         , Nonce.Stable.V1.t
         , Receipt.Chain_hash.Stable.V1.t
-        , Public_key.Compressed.Stable.V1.t option
+        , Public_key.Compressed.Stable.V1.t
         , State_hash.Stable.V1.t
         , Timing.Stable.V1.t
         , Permissions.Stable.V2.t
@@ -341,7 +341,7 @@ type value =
   , Balance.t
   , Nonce.t
   , Receipt.Chain_hash.t
-  , Public_key.Compressed.t option
+  , Public_key.Compressed.t
   , State_hash.t
   , Timing.t
   , Permissions.t
@@ -354,10 +354,7 @@ let key_gen = Public_key.Compressed.gen
 let initialize account_id : t =
   let public_key = Account_id.public_key account_id in
   let token_id = Account_id.token_id account_id in
-  let delegate =
-    (* Only allow delegation if this account is for the default token. *)
-    if Token_id.(equal default token_id) then Some public_key else None
-  in
+  let delegate = public_key in
   { public_key
   ; token_id
   ; token_symbol = ""
@@ -387,7 +384,7 @@ let to_input (t : t) =
     ~token_id:(f Token_id.to_input) ~balance:(f Balance.to_input)
     ~token_symbol:(f Token_symbol.to_input) ~nonce:(f Nonce.to_input)
     ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
-    ~delegate:(f (Fn.compose Public_key.Compressed.to_input delegate_opt))
+    ~delegate:(f Public_key.Compressed.to_input)
     ~voting_for:(f State_hash.to_input) ~timing:(f Timing.to_input)
     ~zkapp:(f (Fn.compose field hash_zkapp_account_opt))
     ~permissions:(f Permissions.to_input)
@@ -427,10 +424,7 @@ let typ' zkapp =
     ; Balance.typ
     ; Nonce.typ
     ; Receipt.Chain_hash.typ
-    ; Typ.transport Public_key.Compressed.typ ~there:delegate_opt
-        ~back:(fun delegate ->
-          if Public_key.Compressed.(equal empty) delegate then None
-          else Some delegate )
+    ; Public_key.Compressed.typ
     ; State_hash.typ
     ; Timing.typ
     ; Permissions.typ
@@ -473,7 +467,7 @@ let var_of_t
   ; balance = Balance.var_of_t balance
   ; nonce = Nonce.Checked.constant nonce
   ; receipt_chain_hash = Receipt.Chain_hash.var_of_t receipt_chain_hash
-  ; delegate = Public_key.Compressed.var_of_t (delegate_opt delegate)
+  ; delegate = Public_key.Compressed.var_of_t delegate
   ; voting_for = State_hash.var_of_t voting_for
   ; timing = Timing.var_of_t timing
   ; permissions = Permissions.Checked.constant permissions
@@ -628,7 +622,7 @@ let empty =
   ; balance = Balance.zero
   ; nonce = Nonce.zero
   ; receipt_chain_hash = Receipt.Chain_hash.empty
-  ; delegate = None
+  ; delegate = Public_key.Compressed.empty
   ; voting_for = State_hash.dummy
   ; timing = Timing.Untimed
   ; permissions =
@@ -642,10 +636,7 @@ let empty_digest = digest empty
 let create account_id balance =
   let public_key = Account_id.public_key account_id in
   let token_id = Account_id.token_id account_id in
-  let delegate =
-    (* Only allow delegation if this account is for the default token. *)
-    if Token_id.(equal default) token_id then Some public_key else None
-  in
+  let delegate = public_key in
   { Poly.public_key
   ; token_id
   ; token_symbol = Token_symbol.default
@@ -669,10 +660,7 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
   else
     let public_key = Account_id.public_key account_id in
     let token_id = Account_id.token_id account_id in
-    let delegate =
-      (* Only allow delegation if this account is for the default token. *)
-      if Token_id.(equal default) token_id then Some public_key else None
-    in
+    let delegate = public_key in
     Or_error.return
       { Poly.public_key
       ; token_id

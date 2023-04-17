@@ -27,11 +27,11 @@ module Transaction_applied = struct
     module Body = struct
       [%%versioned
       module Stable = struct
-        module V2 = struct
+        module V3 = struct
           type t =
             | Payment of { new_accounts : Account_id.Stable.V2.t list }
             | Stake_delegation of
-                { previous_delegate : Public_key.Compressed.Stable.V1.t option }
+                { previous_delegate : Public_key.Compressed.Stable.V1.t }
             | Failed
           [@@deriving sexp, to_yojson]
 
@@ -42,8 +42,8 @@ module Transaction_applied = struct
 
     [%%versioned
     module Stable = struct
-      module V2 = struct
-        type t = { common : Common.Stable.V2.t; body : Body.Stable.V2.t }
+      module V3 = struct
+        type t = { common : Common.Stable.V2.t; body : Body.Stable.V3.t }
         [@@deriving sexp, to_yojson]
 
         let to_latest = Fn.id
@@ -80,7 +80,7 @@ module Transaction_applied = struct
     module Stable = struct
       module V2 = struct
         type t =
-          | Signed_command of Signed_command_applied.Stable.V2.t
+          | Signed_command of Signed_command_applied.Stable.V3.t
           | Zkapp_command of Zkapp_command_applied.Stable.V1.t
         [@@deriving sexp, to_yojson]
 
@@ -264,8 +264,7 @@ module type S = sig
       module Body : sig
         type t = Transaction_applied.Signed_command_applied.Body.t =
           | Payment of { new_accounts : Account_id.t list }
-          | Stake_delegation of
-              { previous_delegate : Public_key.Compressed.t option }
+          | Stake_delegation of { previous_delegate : Public_key.Compressed.t }
           | Failed
         [@@deriving sexp]
       end
@@ -942,7 +941,7 @@ module Make (L : Ledger_intf.S) :
           in
           let source_account =
             { source_account with
-              delegate = Some (Account_id.public_key receiver)
+              delegate = Account_id.public_key receiver
             ; timing
             }
           in
@@ -1575,15 +1574,9 @@ module Make (L : Ledger_intf.S) :
 
       let set_public_key public_key (a : t) = { a with public_key }
 
-      let delegate (a : t) = Account.delegate_opt a.delegate
+      let delegate (a : t) = a.delegate
 
-      let set_delegate delegate (a : t) =
-        let delegate =
-          if Signature_lib.Public_key.Compressed.(equal empty) delegate then
-            None
-          else Some delegate
-        in
-        { a with delegate }
+      let set_delegate delegate (a : t) = { a with delegate }
 
       let nonce (a : t) = a.nonce
 
@@ -2566,7 +2559,7 @@ module For_tests = struct
       , Balance.t
       , Account_nonce.t
       , unit
-      , Public_key.Compressed.t option
+      , Public_key.Compressed.t
       , State_hash.t
       , Account_timing.t
       , Permissions.t

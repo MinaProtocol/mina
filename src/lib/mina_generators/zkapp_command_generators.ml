@@ -85,13 +85,7 @@ let gen_account_precondition_from_account ?failure
         if first_use_of_account then Or_ignore.Check receipt_chain_hash
         else Or_ignore.Ignore
       in
-      let%bind delegate =
-        match delegate with
-        | None ->
-            return Or_ignore.Ignore
-        | Some pk ->
-            Or_ignore.gen (return pk)
-      in
+      let%bind delegate = Or_ignore.gen (return delegate) in
       let%bind state, action_state, proved_state, is_new =
         match zkapp with
         | None ->
@@ -868,11 +862,7 @@ let gen_account_update_body_components (type a b c d) ?global_slot
    in
    let delegate (account : Account.t) =
      if is_fee_payer then account.delegate
-     else
-       Option.map
-         ~f:(fun delegate ->
-           value_to_be_updated update.delegate ~default:delegate )
-         account.delegate
+     else value_to_be_updated update.delegate ~default:account.delegate
    in
    let zkapp (account : Account.t) =
      if is_fee_payer then account.zkapp

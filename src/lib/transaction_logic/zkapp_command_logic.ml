@@ -1616,14 +1616,10 @@ module Make (Inputs : Inputs_intf) = struct
     let a, local_state =
       let delegate = Account_update.Update.delegate account_update in
       let base_delegate =
-        let should_set_new_account_delegate =
-          (* Only accounts for the default token may delegate. *)
-          Bool.(account_is_new &&& account_update_token_is_default)
-        in
         (* New accounts should have the delegate equal to the public key of the
            account.
         *)
-        Public_key.if_ should_set_new_account_delegate
+        Public_key.if_ account_is_new
           ~then_:(Account_update.public_key account_update)
           ~else_:(Account.delegate a)
       in
@@ -1632,11 +1628,8 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.Permissions.set_delegate a)
       in
       let local_state =
-        (* Note: only accounts for the default token can delegate. *)
         Local_state.add_check local_state Update_not_permitted_delegate
-          Bool.(
-            Set_or_keep.is_keep delegate
-            ||| (has_permission &&& account_update_token_is_default))
+          Bool.(Set_or_keep.is_keep delegate ||| has_permission)
       in
       let delegate =
         Set_or_keep.set_or_keep ~if_:Public_key.if_ delegate base_delegate

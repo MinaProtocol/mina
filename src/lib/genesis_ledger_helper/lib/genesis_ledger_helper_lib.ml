@@ -12,10 +12,6 @@ module Accounts = struct
      fun t ->
       let open Or_error.Let_syntax in
       let pk = Signature_lib.Public_key.Compressed.of_base58_check_exn t.pk in
-      let delegate =
-        Option.map ~f:Signature_lib.Public_key.Compressed.of_base58_check_exn
-          t.delegate
-      in
       let token_id =
         Option.value_map t.token ~default:Token_id.default
           ~f:Mina_base.Token_id.of_string
@@ -163,8 +159,7 @@ module Accounts = struct
         ; balance = account.balance
         ; timing = account.timing
         ; token_symbol
-        ; delegate =
-            (if Option.is_some delegate then delegate else account.delegate)
+        ; delegate = account.delegate
         ; token_id
         ; nonce = Account.Nonce.of_uint32 t.nonce
         ; receipt_chain_hash =
@@ -279,8 +274,9 @@ module Accounts = struct
       ; sk = Option.map ~f:Signature_lib.Private_key.to_base58_check sk
       ; balance = account.balance
       ; delegate =
-          Option.map ~f:Signature_lib.Public_key.Compressed.to_base58_check
-            account.delegate
+          Some
+            (Signature_lib.Public_key.Compressed.to_base58_check
+               account.delegate )
       ; timing
       ; token = Some (Mina_base.Token_id.to_string account.token_id)
       ; nonce = account.nonce
@@ -730,41 +726,11 @@ let%test_module "Runtime config" =
       assert (
         Receipt.Chain_hash.equal account.receipt_chain_hash
           test_account.receipt_chain_hash ) ;
-      assert (Option.is_some account.delegate) ;
-      assert (
-        Option.equal Public_key.Compressed.equal account.delegate
-          test_account.delegate ) ;
+      assert (Public_key.Compressed.equal account.delegate test_account.delegate) ;
       assert (State_hash.equal account.voting_for test_account.voting_for) ;
       assert (Account.Timing.equal account.timing test_account.timing) ;
       assert (Permissions.equal account.permissions test_account.permissions) ;
       assert (Option.equal Zkapp_account.equal account.zkapp test_account.zkapp)
-
-    (* if nondefault token, no delegate created from runtime config *)
-    let%test_unit "non-zkApp ledger, nondefault token" =
-      let runtime_accounts =
-        match non_zkapp_ledger_nondefault_token.base with
-        | Runtime_config.Ledger.Accounts accts ->
-            accts
-        | _ ->
-            failwith "Expected accounts in ledger"
-      in
-      let accounts =
-        Accounts.to_full runtime_accounts
-        |> List.map ~f:(fun (_sk, account) -> account)
-      in
-      assert (List.length accounts = 1) ;
-      let account = List.hd_exn accounts in
-      let test_account =
-        let account_id =
-          Mina_base.Account_id.create
-            (Public_key.Compressed.of_base58_check_exn pk)
-            nondefault_token
-        in
-        let balance = Currency.Balance.of_mina_int_exn 49_000_000 in
-        Mina_base.Account.create account_id balance
-      in
-      assert (Option.is_none test_account.delegate) ;
-      assert (Option.is_none account.delegate)
 
     (* zkApp account fields in runtime config are all required, but we can make verification key `null` *)
     let%test_unit "zkApp ledger" =

@@ -54,14 +54,9 @@ module Make_str (A : Wire_types.Concrete) = struct
     let open Mina_base in
     let outer_table = Public_key.Compressed.Table.create () in
     iter_accounts (fun i (acct : Account.t) ->
-        if
-          Option.is_some acct.delegate
-          (* Only default tokens may delegate. *)
-          && Token_id.equal acct.token_id Token_id.default
-          && Public_key.Compressed.Set.mem keys (Option.value_exn acct.delegate)
-        then
-          Public_key.Compressed.Table.update outer_table
-            (Option.value_exn acct.delegate) ~f:(function
+        if Public_key.Compressed.Set.mem keys acct.delegate then
+          Public_key.Compressed.Table.update outer_table acct.delegate
+            ~f:(function
             | None ->
                 Account.Index.Table.of_alist_exn [ (i, acct) ]
             | Some table ->

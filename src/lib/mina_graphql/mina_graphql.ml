@@ -1066,7 +1066,7 @@ module Types = struct
               ; token_id = Account_id.token_id account_id
               ; token_symbol = None
               ; nonce = None
-              ; delegate = None
+              ; delegate = Account_id.public_key account_id
               ; balance =
                   { AnnotatedBalance.total = Balance.zero
                   ; unknown = Balance.zero
@@ -1092,7 +1092,7 @@ module Types = struct
           , AnnotatedBalance.t
           , Account.Nonce.t option
           , Receipt.Chain_hash.t option
-          , Public_key.Compressed.t option
+          , Public_key.Compressed.t
           , State_hash.t option
           , Account.Timing.t
           , Permissions.t option
@@ -1334,7 +1334,7 @@ module Types = struct
                  ~args:Arg.[]
                  ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.receipt_chain_hash )
-             ; field "delegate" ~typ:public_key
+             ; field "delegate" ~typ:(non_null public_key)
                  ~doc:
                    "The public key to which you are delegating - if you are \
                     not delegating to anybody, this would return your public \
@@ -1342,15 +1342,12 @@ module Types = struct
                  ~args:Arg.[]
                  ~deprecated:(Deprecated (Some "use delegateAccount instead"))
                  ~resolve:(fun _ { account; _ } -> account.Account.Poly.delegate)
-             ; field "delegateAccount" ~typ:(Lazy.force account)
+             ; field "delegateAccount" ~typ:(non_null public_key)
                  ~doc:
                    "The account to which you are delegating - if you are not \
                     delegating to anybody, this would return your public key"
                  ~args:Arg.[]
-                 ~resolve:(fun { ctx = mina; _ } { account; _ } ->
-                   Option.map
-                     ~f:(get_best_ledger_account_pk mina)
-                     account.Account.Poly.delegate )
+                 ~resolve:(fun _ { account; _ } -> account.Account.Poly.delegate)
              ; field "delegators"
                  ~typ:(list @@ non_null @@ Lazy.force account)
                  ~doc:

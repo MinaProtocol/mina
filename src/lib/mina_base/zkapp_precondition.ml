@@ -718,9 +718,7 @@ module Account = struct
             receipt_chain_hash a.receipt_chain_hash) )
     ; ( Transaction_status.Failure.Account_delegate_precondition_unsatisfied
       , let tc = Eq_data.Tc.public_key () in
-        Eq_data.(
-          check ~label:"delegate" tc delegate
-            (Option.value ~default:tc.default a.delegate)) )
+        Eq_data.(check ~label:"delegate" tc delegate a.delegate) )
     ]
     @
     let zkapp = Option.value ~default:Zkapp_account.default a.zkapp in

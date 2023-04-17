@@ -11786,9 +11786,13 @@
                 "The public key to which you are delegating - if you are not delegating to anybody, this would return your public key",
               "args": [],
               "type": {
-                "kind": "SCALAR",
-                "name": "PublicKey",
-                "ofType": null
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "PublicKey",
+                  "ofType": null
+                }
               },
               "isDeprecated": true,
               "deprecationReason": "use delegateAccount instead"
@@ -11798,7 +11802,15 @@
               "description":
                 "The account to which you are delegating - if you are not delegating to anybody, this would return your public key",
               "args": [],
-              "type": { "kind": "OBJECT", "name": "Account", "ofType": null },
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "PublicKey",
+                  "ofType": null
+                }
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
