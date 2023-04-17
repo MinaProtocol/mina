@@ -16,7 +16,8 @@
    async_kernel
    ppx_inline_test.config
    async_unix
-   ezcurl
+   cohttp
+   cohttp-async
    uri
    ;; local libraries
    transaction_protocol_state

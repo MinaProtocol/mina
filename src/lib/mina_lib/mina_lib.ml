@@ -875,9 +875,10 @@ let best_chain ?max_length t =
       Transition_frontier.root frontier :: best_tip_path
 
 let request_work t =
+  let open Deferred.Let_syntax in
   let (module Work_selection_method) = t.config.work_selection_method in
   let fee = snark_work_fee t in
-  let instances_opt =
+  let%map instances_opt =
     Work_selection_method.work ~logger:t.config.logger ~fee
       ~snark_pool:(snark_pool t) (snark_job_state t)
   in
@@ -887,17 +888,18 @@ let request_work t =
 let work_selection_method t = t.config.work_selection_method
 
 let add_work t (work : Snark_worker_lib.Work.Result.t) =
+  let open Deferred.Let_syntax in
   let (module Work_selection_method) = t.config.work_selection_method in
   let update_metrics () =
     let snark_pool = snark_pool t in
     let fee_opt =
       Option.map (snark_worker_key t) ~f:(fun _ -> snark_work_fee t)
     in
-    let pending_work =
+    let%map pending_work =
       Work_selection_method.pending_work_statements ~snark_pool ~fee_opt
         t.snark_job_state
-      |> List.length
     in
+    let pending_work = List.length pending_work in
     Mina_metrics.(
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
@@ -908,7 +910,9 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
      * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
     Work_selection_method.remove t.snark_job_state spec
   in
-  ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
+  ignore
+    ( Or_error.try_with (fun () -> don't_wait_for @@ update_metrics ())
+      : unit Or_error.t ) ;
   Network_pool.Snark_pool.Local_sink.push t.pipes.snark_local_sink
     (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, cb)
   |> Deferred.don't_wait_for

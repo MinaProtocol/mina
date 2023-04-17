@@ -133,13 +133,14 @@ module type Lib_intf = sig
     -> (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
        One_or_two.t
        list
+       Async.Deferred.t
 
   (**jobs that are not in the snark pool yet*)
   val pending_work_statements :
        snark_pool:Snark_pool.t
     -> fee_opt:Fee.t option
     -> State.t
-    -> Transaction_snark.Statement.t One_or_two.t list
+    -> Transaction_snark.Statement.t One_or_two.t list Async.Deferred.t
 
   module For_tests : sig
     val does_not_have_better_fee :
@@ -168,13 +169,13 @@ module type Selection_method_intf = sig
     -> fee:Currency.Fee.t
     -> logger:Logger.t
     -> State.t
-    -> work One_or_two.t option
+    -> work One_or_two.t option Async.Deferred.t
 
   val pending_work_statements :
        snark_pool:snark_pool
     -> fee_opt:Currency.Fee.t option
     -> State.t
-    -> Transaction_snark.Statement.t One_or_two.t list
+    -> Transaction_snark.Statement.t One_or_two.t list Async.Deferred.t
 end
 
 module type Make_selection_method_intf = functor

@@ -1,11 +1,14 @@
+open Async_kernel
+
 module Make
     (Inputs : Intf.Inputs_intf)
     (Lib : Intf.Lib_intf with module Inputs := Inputs) =
 struct
   let work ~snark_pool ~fee ~logger (state : Lib.State.t) =
+    let open Deferred.Let_syntax in
     Lib.State.remove_old_assignments state ~logger ;
     let unseen_jobs = Lib.State.all_unseen_works state in
-    match Lib.get_expensive_work ~snark_pool ~fee unseen_jobs with
+    match%map Lib.get_expensive_work ~snark_pool ~fee unseen_jobs with
     | [] ->
         None
     | x :: _ ->

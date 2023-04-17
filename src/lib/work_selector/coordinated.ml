@@ -1,22 +1,24 @@
 open Core_kernel
+open Async_kernel
 
 let coordinator_url =
   Sys.getenv_opt "MINA_SNARK_COORDINATOR_URL"
   |> Option.value ~default:"http://localhost:8080"
 
 let query_coordinator identifiers =
-  let url = String.concat ~sep:"/" [ coordinator_url; "get-job" ] in
-  match
-    Ezcurl.put ~url ~content:(`String (String.concat ~sep:"\n" identifiers)) ()
-  with
-  | Ok response ->
-      Stdlib.Printf.printf "+++ querying coordinator: %s -> %d \n%!" url
-        response.Ezcurl.code ;
-      if response.Ezcurl.code = 201 then Some response.Ezcurl.body else None
-  | Error (_curl_code, msg) ->
-      Stdlib.Printf.printf "+++ querying coordinator: %s -> failed: %s \n%!" url
-        msg ;
-      None
+  let url =
+    Uri.of_string @@ String.concat ~sep:"/" [ coordinator_url; "get-job" ]
+  in
+  let%bind.Deferred response, body =
+    Cohttp_async.Client.put
+      ~body:(`String (String.concat ~sep:"\n" identifiers))
+      url
+  in
+  let status_code = Cohttp.Response.status response in
+  if 201 = Cohttp.Code.code_of_status status_code then
+    let%map.Deferred body = Cohttp_async.Body.to_string body in
+    Some body
+  else Deferred.return None
 
 module Make
     (Inputs : Intf.Inputs_intf)
@@ -71,7 +73,8 @@ struct
 
   let get_work_from_coordinator ~logger identifiers expensive_work
       (state : Lib.State.t) =
-    query_coordinator identifiers
+    let%map.Deferred result = query_coordinator identifiers in
+    result
     |> Option.bind ~f:(fun identifier ->
            find_matching_job ~logger identifier identifiers expensive_work )
     |> Option.map ~f:(fun (x, remaining_identifiers, remaining_jobs) ->
@@ -82,9 +85,9 @@ struct
   let work_uncached ~snark_pool ~fee ~logger (state : Lib.State.t) =
     Lib.State.remove_old_assignments state ~logger ;
     let unseen_jobs = Lib.State.all_unseen_works state in
-    match Lib.get_expensive_work ~snark_pool ~fee unseen_jobs with
+    match%bind.Deferred Lib.get_expensive_work ~snark_pool ~fee unseen_jobs with
     | [] ->
-        (None, [], [])
+        Deferred.return (None, [], [])
     | expensive_work ->
         let identifiers = List.map ~f:work_identifier expensive_work in
         get_work_from_coordinator ~logger identifiers expensive_work state
@@ -97,14 +100,14 @@ struct
       (* only recompute list every few seconds to avoid stalling the scheduler *)
       if Float.(now - !cached_at > 6.0) then (
         cached_at := now ;
-        let work_opt, expensive_work, identifiers =
+        let%map.Deferred work_opt, expensive_work, identifiers =
           work_uncached ~snark_pool ~fee ~logger state
         in
         result_cache := (expensive_work, identifiers) ;
         work_opt )
       else
         let expensive_work, identifiers = !result_cache in
-        let work_opt, expensive_work, identifiers =
+        let%map.Deferred work_opt, expensive_work, identifiers =
           get_work_from_coordinator ~logger identifiers expensive_work state
         in
         result_cache := (expensive_work, identifiers) ;

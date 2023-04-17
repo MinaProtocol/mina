@@ -128,14 +128,16 @@ module Make (Inputs : Intf.Inputs_intf) = struct
 
   let get_expensive_work ~snark_pool ~fee
       (jobs : ('a, 'b) Work_spec.t One_or_two.t list) :
-      ('a, 'b) Work_spec.t One_or_two.t list =
-    List.filter jobs ~f:(fun job ->
-        does_not_have_better_fee ~snark_pool ~fee
-          (One_or_two.map job ~f:Work_spec.statement) )
+      ('a, 'b) Work_spec.t One_or_two.t list Deferred.t =
+    Deferred.List.filter jobs ~f:(fun job ->
+        Deferred.return
+        @@ does_not_have_better_fee ~snark_pool ~fee
+             (One_or_two.map job ~f:Work_spec.statement) )
 
   let all_pending_work ~snark_pool statements =
-    List.filter statements ~f:(fun st ->
-        Option.is_none (Inputs.Snark_pool.get_completed_work snark_pool st) )
+    Deferred.List.filter statements ~f:(fun st ->
+        Deferred.return
+        @@ Option.is_none (Inputs.Snark_pool.get_completed_work snark_pool st) )
 
   (*Seen/Unseen jobs that are not in the snark pool yet*)
   let pending_work_statements ~snark_pool ~fee_opt (state : State.t) =
@@ -143,7 +145,10 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       List.map state.available_jobs ~f:(One_or_two.map ~f:Work_spec.statement)
     in
     let expensive_work statements ~fee =
-      List.filter statements ~f:(does_not_have_better_fee ~snark_pool ~fee)
+      Deferred.List.filter statements
+        ~f:
+          (Fn.compose Deferred.return
+             (does_not_have_better_fee ~snark_pool ~fee) )
     in
     match fee_opt with
     | None ->

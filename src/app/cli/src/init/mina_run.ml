@@ -472,17 +472,16 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           let received_time = Unix.gettimeofday () in
           let request_work_start_time = ref (-1.0) in
           let request_work_end_time = ref (-1.0) in
-          let result =
-            let open Option.Let_syntax in
+          let%map.Deferred result =
+            let open Deferred.Option.Let_syntax in
             let%bind key =
-              Option.merge
-                (Mina_lib.snark_worker_key coda)
-                (Mina_lib.snark_coordinator_key coda)
-                ~f:Fn.const
+              Deferred.return
+              @@ Option.merge
+                   (Mina_lib.snark_worker_key coda)
+                   (Mina_lib.snark_coordinator_key coda)
+                   ~f:Fn.const
             in
-            request_work_start_time := Unix.gettimeofday () ;
             let%map r = Mina_lib.request_work coda in
-            request_work_end_time := Unix.gettimeofday () ;
             [%log trace]
               ~metadata:[ ("work_spec", Snark_worker.Work.Spec.to_yojson r) ]
               "responding to a Get_work request with some new work" ;
@@ -496,7 +495,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             , !request_work_end_time
             , respond_time )
           in
-          Deferred.return (result, times) )
+          (result, times) )
     ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Work.Result.t) ->
           let received_time = Unix.gettimeofday () in
