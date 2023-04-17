@@ -85,5 +85,12 @@ internalTrace:
   enable: true
   image: openmina/mina-internal-trace-consumer:61bd44d
 
+aggregator:
+  image: openmina/mina-aggregator:68584f29
+
+ciFrontend:
+  image: directcuteo/mina-ci-frontend:reports35
+  nodePort: 31356
+
 nodeSelector:
   preemptible: false

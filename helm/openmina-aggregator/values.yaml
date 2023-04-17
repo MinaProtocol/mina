@@ -1,0 +1,3 @@
+testnetName: testnet
+aggregator:
+  image: openmina/mina-aggregator:latest

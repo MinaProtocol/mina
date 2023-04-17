@@ -223,6 +223,7 @@ defs:
     KUBECONFIG: kube-config
     ENDPOINT_URL: http://localhost:3085/graphql
   commands:
+  - sleep $${SLEEP_SECONDS}
   - apk add --no-cache openssl
   - export POD_NAME=$(kubectl get pods -o json | jq '.items[] | select(.metadata.name | startswith(env.POD_PREFIX)) | .metadata.name' | tr -d '"')
   - echo $${POD_NAME}
@@ -231,7 +232,7 @@ defs:
   - kubectl exec $${POD_NAME} -c mina -- /bin/bash -c /tmp/install_wrk2_and_run_test.sh
   - kubectl cp -c mina $${POD_NAME}:/tmp/wrk_output.txt wrk_output.txt
   - cat wrk_output.txt
-  - export TIMEOUTS=$(grep 'Socket errors' wrk_output.txt | cut -d ' ' -f 10)
+  - export TIMEOUTS=$(grep 'Socket errors' wrk_output.txt | cut -d ' ' -f 12)
   - if [ "$${TIMEOUTS:-0}" -gt 0 ]; then echo "There were $${TIMEOUTS} timeouts during the test"; exit 1; else echo "No timeouts occurred during the test"; fi
 
 steps:
@@ -250,21 +251,25 @@ steps:
   <<: *wrk
   environment:
     POD_PREFIX: "snarker001"
+    SLEEP_SECONDS: 5
 
 - name: run-test-in-producer
   <<: *wrk
   environment:
     POD_PREFIX: "prod01"
+    SLEEP_SECONDS: 10
 
 - name: run-test-in-seed
   <<: *wrk
   environment:
     POD_PREFIX: "seed1"
+    SLEEP_SECONDS: 15
 
 - name: run-test-in-plain-node
   <<: *wrk
   environment:
     POD_PREFIX: "node1"
+    SLEEP_SECONDS: 20
 
 - name: wait-for-all-tests
   image: alpine/k8s:1.26.1
