@@ -594,11 +594,22 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (result, sign, field_overflow)
 
-(* This function adds a FFAdd gate to check that a given value is smaller than the modulus *)
-let add_bound_check (type f)
+(* This function adds a FFAdd gate to check that a given value is smaller than the modulus.
+ * - value                 := the value to check 
+ * - external_checks       := Optional context to track required external checks.
+ *                            When omitted, creates and returns new external_checks structure.
+ *                            Otherwise, appends new required external checks to supplied structure.
+ * - foreign_field_modulus := the modulus of the foreign field
+ * If called from a FFMul gadget, the external_checks structure is updated with a new range check, 
+ * so that the circuit writer can iterate over them all to make them effective.
+ * If called from a FFAdd gadget, the external_checks structure is updated with a new range check, 
+ * but this one should be effective right after the current gate. 
+ *)
+let less_than_fmod (type f)
     (module Circuit : Snark_intf.Run with type field = f)
+    ?(external_checks : f External_checks.t option)
     (value : f Element.Standard.t) (foreign_field_modulus : f standard_limbs) :
-    f Element.Standard.t =
+    f Element.Standard.t * f External_checks.t =
   let open Circuit in
   (* Compute the value for the right input of the addition as 2^264 *)
   let offset =
@@ -613,6 +624,11 @@ let add_bound_check (type f)
   let bound0, bound1, bound2 =
     Element.Standard.to_field_limbs (module Circuit) bound
   in
+  let bound0 = Field.constant bound0 in
+  let bound1 = Field.constant bound1 in
+  let bound2 = Field.constant bound2 in
+
+  (* Create the external check for the multi range check *)
 
   (* Check that the correct expected values were obtained *)
   assert (Field.Constant.(equal sign one)) ;
@@ -627,11 +643,7 @@ let add_bound_check (type f)
             Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
               (Raw
                  { kind = Zero
-                 ; values =
-                     [| Field.constant bound0
-                      ; Field.constant bound1
-                      ; Field.constant bound2
-                     |]
+                 ; values = [| bound0; bound1; bound2 |]
                  ; coeffs = [||]
                  } )
         } ) ;
@@ -639,7 +651,18 @@ let add_bound_check (type f)
   (* Set up copy constraints with overflow with the overflow check*)
   Field.Assert.equal (Field.constant ovf) Field.one ;
 
-  bound
+  (* Prepare external check for multi range check *)
+  let external_checks =
+    match external_checks with
+    | Some external_checks ->
+        external_checks
+    | None ->
+        External_checks.create (module Circuit)
+  in
+  External_checks.add_multi_range_check external_checks (bound0, bound1, bound2) ;
+
+  (* Return the bound value *)
+  (Element.Standard.of_limbs (bound0, bound1, bound2), external_checks)
 
 (* FOREIGN FIELD ADDITION CHAIN GADGET *)
 
@@ -684,10 +707,12 @@ let add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
   (* Add the final gate for the bound *)
   (* result + (2^264 - f) = bound *)
   let result = left.(0) in
-  let bound = add_bound_check (module Circuit) result foreign_field_modulus in
+  let bound, _external_checks =
+    less_than_fmod (module Circuit) result foreign_field_modulus
+  in
   let bound0, bound1, bound2 = Element.Standard.to_limbs bound in
 
-  (* Range check bound *)
+  (* Include Multi range check for the bound right after *)
   Range_check.multi (module Circuit) bound0 bound1 bound2 ;
 
   (* Return result *)

@@ -99,7 +99,41 @@ module External_checks : sig
   val create : (module Snark_intf.Run with type field = 'field) -> 'field t
 end
 
-(*
+(* This function adds a FFAdd gate to check that a given value is smaller than the modulus.
+ * - value                 := the value to check 
+ * - external_checks       := Optional context to track required external checks.
+ *                            When omitted, creates and returns new external_checks structure.
+ *                            Otherwise, appends new required external checks to supplied structure.
+ * - foreign_field_modulus := the modulus of the foreign field
+ * If called from a FFMul gadget, the external_checks structure is updated with a new range check, 
+ * so that the circuit writer can iterate over them all to make them effective.
+ * If called from a FFAdd gadget, the external_checks structure is updated with a new range check, 
+ * but this one should be effective right after the current gate. 
+ *)
+ val less_than_fmod:
+      (module Snark_intf.Run with type field = 'f)
+    -> 'f Element.Standard.t (* value *)
+    -> 'f standard_limbs (* foreign_field_modulus *)
+    -> 'f Element.Standard.t (* result, sign, overflow *)
+
+(* Definition of a gadget for a single foreign field addition
+   * - left_input of the addition as 3 limbs element
+   * - right_input of the addition as 4 limbs element
+   * - is_sub: a flag indicating whether the corresponding gate is addition or a subtraction
+   * - foreign_field_modulus: the modulus of the foreign field
+   * - Returns the result of the addition/subtraction as a 3 limbs element
+   *
+*)
+ val add :
+     (module Snark_intf.Run with type field = 'f)
+  -> 'f Element.Standard.t (* left_input *)
+  -> 'f Element.Extended.t (* right_input *)
+  -> bool (* is_sub *)
+  -> 'f standard_limbs (* foreign_field_modulus *)
+  -> 'f Element.Standard.t * 'f * 'f (* result, sign, overflow *)
+
+
+
 (** Foreign field multiplication gadget
  *   Constrains that
  *
@@ -122,6 +156,6 @@ val mul :
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
-  -> 'f Element.Standard.t * 'f External_checks.t
-(* remainder, external_checks *)
- *)
+  -> 'f Element.Standard.t * 'f External_checks.t (* remainder, external_checks *)
+
+
