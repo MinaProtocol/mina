@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ci-frontend-service
+spec:
+  {{ if .Values.ciFrontend.nodePort }}
+  type: NodePort
+  {{ else }}
+  type: ClusterIp
+  {{ end }}
+  selector:
+    app: ci-frontend
+  ports:
+  - name: ci-frontend-entrypoint
+    port: 80
+    targetPort: "http"
+    {{ if .Values.ciFrontend.nodePort }}
+    nodePort: {{ .Values.ciFrontend.nodePort }}
+    {{ end }}

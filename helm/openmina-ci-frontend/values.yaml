@@ -1,0 +1,3 @@
+testnetName: testnet
+aggregator:
+  image: directcuteo/mina-ci-frontend:reports3

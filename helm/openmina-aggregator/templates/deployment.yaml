@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aggregator
+  labels:
+    app: aggregator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aggregator
+  template:
+    metadata:
+      labels:
+        app: aggregator
+        component: aggregator
+    spec:
+      containers:
+        - name: main
+          image: {{ .Values.aggregator.image }}
+          command: ["mina-aggregator"]
+          env:
+            - name: CLUSTER_BASE_URL
+              value: http://1.k8.openmina.com:31355
+            - name: PLAIN_NODE_COUNT
+              value: {{ .Values.plainNodesConfig.count | quote }}
+            - name: SEED_NODE_COUNT
+              value: {{ len .Values.seedConfigs | quote }}
+            - name: SNARKER_NODE_COUNT
+              value: {{ .Values.snarkWorkersConfig.count | quote }}
+            - name: TRANSACTION_GENERATOR_NODE_COUNT
+              value: "0"
+            - name: PRODUCER_NODE_COUNT
+              value: {{ len .Values.blockProducerConfigs | quote }}
+            - name: DATA_PULL_INTERVAL
+              value: "5"
+            - name: USE_INTERNAL_ENDPOINTS
+              value: "1"
+            - name: REMOTE_STORAGE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: aggregator-remote-storage
+                  key: username
+            - name: REMOTE_STORAGE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: aggregator-remote-storage
+                  key: password
+          ports:
+            - name: http-aggregator
+              containerPort: 8000
+              protocol: TCP
+
+
