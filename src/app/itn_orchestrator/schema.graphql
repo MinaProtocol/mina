@@ -43,6 +43,9 @@ type ItnAuth {
 
   """Peer id"""
   peerId: String!
+
+  """Is the node a block producer"""
+  isBlockProducer: Boolean!
 }
 
 type mutation {
