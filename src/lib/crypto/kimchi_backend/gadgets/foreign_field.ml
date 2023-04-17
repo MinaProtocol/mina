@@ -193,16 +193,14 @@ end = struct
       let open Circuit in
       let l12, l0 = Common.(bignum_bigint_div_rem x two_to_limb) in
       let l2, l1 = Common.(bignum_bigint_div_rem l12 two_to_limb) in
-      let l0 =
-        Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l0
+      let limb_vars =
+        exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
+            [| Common.bignum_bigint_to_field (module Circuit) l0
+             ; Common.bignum_bigint_to_field (module Circuit) l1
+             ; Common.bignum_bigint_to_field (module Circuit) l2
+            |] )
       in
-      let l1 =
-        Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l1
-      in
-      let l2 =
-        Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l2
-      in
-      of_limbs (l0, l1, l2)
+      of_limbs (limb_vars.(0), limb_vars.(1), limb_vars.(2))
 
     let to_limbs x = x
 
@@ -257,19 +255,15 @@ end = struct
       let l123, l0 = Common.(bignum_bigint_div_rem x two_to_limb) in
       let l23, l1 = Common.(bignum_bigint_div_rem l123 two_to_limb) in
       let l3, l2 = Common.(bignum_bigint_div_rem l23 two_to_limb) in
-      let l0 =
-        Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l0
+      let limb_vars =
+        exists (Typ.array ~length:4 Field.typ) ~compute:(fun () ->
+            [| Common.bignum_bigint_to_field (module Circuit) l0
+             ; Common.bignum_bigint_to_field (module Circuit) l1
+             ; Common.bignum_bigint_to_field (module Circuit) l2
+             ; Common.bignum_bigint_to_field (module Circuit) l3
+            |] )
       in
-      let l1 =
-        Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l1
-      in
-      let l2 =
-        Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l2
-      in
-      let l3 =
-        Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l3
-      in
-      of_limbs (l0, l1, l2, l3)
+      of_limbs (limb_vars.(0), limb_vars.(1), limb_vars.(2), limb_vars.(3))
 
     let to_limbs x = x
 
@@ -324,13 +318,13 @@ end = struct
       let open Circuit in
       let l2, l01 = Common.(bignum_bigint_div_rem x two_to_2limb) in
 
-      let l01 =
-        Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l01
+      let limb_vars =
+        exists (Typ.array ~length:2 Field.typ) ~compute:(fun () ->
+            [| Common.bignum_bigint_to_field (module Circuit) l01
+             ; Common.bignum_bigint_to_field (module Circuit) l2
+            |] )
       in
-      let l2 =
-        Field.constant @@ Common.bignum_bigint_to_field (module Circuit) l2
-      in
-      of_limbs (l01, l2)
+      of_limbs (limb_vars.(0), limb_vars.(1))
 
     let to_limbs x = x
 
@@ -1289,20 +1283,19 @@ let%test_unit "foreign_field_add gadget" =
   (* Disabling temporarily to unbreak tests *)
   (* Currently failing with: foreign_field_add gadget threw (Failure "Can't evaluate prover code outside an as_prover block") *)
   (* let cs = test_add Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus in
-  let _cs =
-    test_add ~is_sub:false Bignum_bigint.zero Bignum_bigint.zero
-      secp256k1_modulus
-  in *)
+     let _cs =
+       test_add ~is_sub:false Bignum_bigint.zero Bignum_bigint.zero
+         secp256k1_modulus
+     in *)
 
   (* let _cs =
-    test_add ~cs
-      (Common.bignum_bigint_of_hex
-         "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
-      (Common.bignum_bigint_of_hex
-         "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
-      secp256k1_modulus
-  in *)
-
+       test_add ~cs
+         (Common.bignum_bigint_of_hex
+            "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
+         (Common.bignum_bigint_of_hex
+            "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
+         secp256k1_modulus
+     in *)
   ()
 
 let%test_unit "foreign_field_mul gadget" =
@@ -1322,11 +1315,11 @@ let%test_unit "foreign_field_mul gadget" =
   in
 
   (* Helper to test foreign_field_mul gadget
-   *   Inputs:
-   *     - left_input
-   *     - right_input
-   *     - foreign_field_modulus
-   *     - expected product
+   *  Inputs:
+   *     cs                    := optional constraint system to reuse
+   *     left_input            := left multiplicand
+   *     right_input           := right multiplicand
+   *     foreign_field_modulus := foreign field modulus
    *)
   let test_mul ?cs (left_input : Bignum_bigint.t)
       (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
@@ -1375,122 +1368,106 @@ let%test_unit "foreign_field_mul gadget" =
 
   (* Helper to test foreign_field_mul gadget with external checks
    *   Inputs:
-   *     - left_input
-   *     - right_input
-   *     - foreign_field_modulus
-   *     - expected product
+   *     cs                    := optional constraint system to reuse
+   *     left_input            := left multiplicand
+   *     right_input           := right multiplicand
+   *     foreign_field_modulus := foreign field modulus
    *)
-  let test_mul_full (left_input : Bignum_bigint.t)
+  let test_mul_full ?cs (left_input : Bignum_bigint.t)
       (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
-      : unit =
-    (* Circuit definition function *)
-    let make_circuit left_input right_input foreign_field_modulus =
-      let open Runner.Impl in
-      (* Prepare test inputs *)
-      let expected =
-        Bignum_bigint.(left_input * right_input % foreign_field_modulus)
-      in
-      let foreign_field_modulus =
-        bignum_bigint_to_field_standard_limbs
-          (module Runner.Impl)
-          foreign_field_modulus
-      in
-      let left_input =
-        Element.Standard.of_bignum_bigint (module Runner.Impl) left_input
-      in
-      let right_input =
-        Element.Standard.of_bignum_bigint (module Runner.Impl) right_input
-      in
-
-      (* External checks for this test (example, circuit designer has complete flexibility about organization)
-       *   1) ForeignFieldMul
-       *   2) ForeignFieldAdd (result bound addition)
-       *   3) multi-range-check (left multiplicand)
-       *   4) multi-range-check (right multiplicand)
-       *   5) multi-range-check (product1_lo, product1_hi_0, carry1_lo)
-       *   6) multi-range-check (remainder bound / product / result range check)
-       *   7) compact-multi-range-check (quotient range check) *)
-
-      (* 1) Create the foreign field mul gadget *)
-      let product, external_checks =
-        mul (module Runner.Impl) left_input right_input foreign_field_modulus
-      in
-
-      (* Sanity check product matches expected result *)
-      as_prover (fun () ->
-          let expected =
-            bignum_bigint_to_field_standard_limbs (module Runner.Impl) expected
-          in
-          let product =
-            Element.Standard.to_field_limbs (module Runner.Impl) product
-          in
-          assert_eq product expected ) ;
-
-      (* TODO: 2) Add result bound addition gate *)
-      assert (Mina_stdlib.List.Length.equal external_checks.bounds 1) ;
-
-      (* 3) Add multi-range-check left input *)
-      let left_input0, left_input1, left_input2 =
-        Element.Standard.to_limbs left_input
-      in
-      Range_check.multi (module Runner.Impl) left_input0 left_input1 left_input2 ;
-
-      (* 4) Add multi-range-check right input *)
-      let right_input0, right_input1, right_input2 =
-        Element.Standard.to_limbs right_input
-      in
-      Range_check.multi
-        (module Runner.Impl)
-        right_input0 right_input1 right_input2 ;
-
-      (* 5-6) Add gates for external multi-range-checks
-       *   In this case:
-       *     carry1_lo, product1_lo, product1_hi_0
-       *     remainder_bound0, remainder_bound1, remainder_bound2
-       *)
-      Core_kernel.List.iter external_checks.multi_ranges ~f:(fun multi_range ->
-          let v0, v1, v2 = multi_range in
-          Range_check.multi (module Runner.Impl) v0 v1 v2 ;
-          () ) ;
-      assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 2) ;
-
-      (* 7) Add gates for external compact-multi-range-checks
-       *   In this case:
-       *     quotient_bound01, quotient_bound2
-       *)
-      Core_kernel.List.iter external_checks.compact_multi_ranges
-        ~f:(fun compact_multi_range ->
-          let v01, v2 = compact_multi_range in
-          Range_check.compact_multi (module Runner.Impl) v01 v2 ;
-          () ) ;
-      assert (
-        Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges 1 ) ;
-
-      ()
-    in
-
+      =
     (* Generate and verify first proof *)
     let cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof (fun () ->
-          make_circuit left_input right_input foreign_field_modulus )
+      Runner.generate_and_verify_proof ?cs (fun () ->
+          let open Runner.Impl in
+          (* Prepare test inputs *)
+          let expected =
+            Bignum_bigint.(left_input * right_input % foreign_field_modulus)
+          in
+          let foreign_field_modulus =
+            bignum_bigint_to_field_standard_limbs
+              (module Runner.Impl)
+              foreign_field_modulus
+          in
+          let left_input =
+            Element.Standard.of_bignum_bigint (module Runner.Impl) left_input
+          in
+          let right_input =
+            Element.Standard.of_bignum_bigint (module Runner.Impl) right_input
+          in
+
+          (* External checks for this test (example, circuit designer has complete flexibility about organization)
+           *   1) ForeignFieldMul
+           *   2) ForeignFieldAdd (result bound addition)
+           *   3) multi-range-check (left multiplicand)
+           *   4) multi-range-check (right multiplicand)
+           *   5) multi-range-check (product1_lo, product1_hi_0, carry1_lo)
+           *   6) multi-range-check (remainder bound / product / result range check)
+           *   7) compact-multi-range-check (quotient range check) *)
+
+          (* 1) Create the foreign field mul gadget *)
+          let product, external_checks =
+            mul
+              (module Runner.Impl)
+              left_input right_input foreign_field_modulus
+          in
+
+          (* Sanity check product matches expected result *)
+          as_prover (fun () ->
+              let expected =
+                bignum_bigint_to_field_standard_limbs
+                  (module Runner.Impl)
+                  expected
+              in
+              let product =
+                Element.Standard.to_field_limbs (module Runner.Impl) product
+              in
+              assert_eq product expected ) ;
+
+          (* TODO: 2) Add result bound addition gate *)
+          assert (Mina_stdlib.List.Length.equal external_checks.bounds 1) ;
+
+          (* 3) Add multi-range-check left input *)
+          let left_input0, left_input1, left_input2 =
+            Element.Standard.to_limbs left_input
+          in
+          Range_check.multi
+            (module Runner.Impl)
+            left_input0 left_input1 left_input2 ;
+
+          (* 4) Add multi-range-check right input *)
+          let right_input0, right_input1, right_input2 =
+            Element.Standard.to_limbs right_input
+          in
+          Range_check.multi
+            (module Runner.Impl)
+            right_input0 right_input1 right_input2 ;
+
+          (* 5-6) Add gates for external multi-range-checks
+           *   In this case:
+           *     carry1_lo, product1_lo, product1_hi_0
+           *     remainder_bound0, remainder_bound1, remainder_bound2
+           *)
+          List.iter external_checks.multi_ranges ~f:(fun multi_range ->
+              let v0, v1, v2 = multi_range in
+              Range_check.multi (module Runner.Impl) v0 v1 v2 ;
+              () ) ;
+          assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 2) ;
+
+          (* 7) Add gates for external compact-multi-range-checks
+           *   In this case:
+           *     quotient_bound01, quotient_bound2
+           *)
+          List.iter external_checks.compact_multi_ranges
+            ~f:(fun compact_multi_range ->
+              let v01, v2 = compact_multi_range in
+              Range_check.compact_multi (module Runner.Impl) v01 v2 ;
+              () ) ;
+          assert (
+            Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges 1 ) )
     in
 
-    (* Set up another witness *)
-    let _mutate_witness value =
-      Bignum_bigint.(if equal zero value then value + one else value - one)
-    in
-
-    (* TODO: fix this case
-       let left_input = mutate_witness left_input in
-       let right_input = mutate_witness right_input in
-    *)
-
-    (* Generate and verify second proof, reusing constraint system *)
-    let _cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof ~cs (fun () ->
-          make_circuit left_input right_input foreign_field_modulus )
-    in
-    ()
+    cs
   in
 
   (* Test constants *)
@@ -1599,10 +1576,18 @@ let%test_unit "foreign_field_mul gadget" =
   in
 
   (* Full test including all external checks *)
-  test_mul_full
-    (Common.bignum_bigint_of_hex
-       "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
-    (Common.bignum_bigint_of_hex
-       "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
-    secp256k1_modulus ;
+  let cs =
+    test_mul_full
+      (Common.bignum_bigint_of_hex "2")
+      (Common.bignum_bigint_of_hex "3")
+      secp256k1_modulus
+  in
+  let _cs =
+    test_mul_full ~cs
+      (Common.bignum_bigint_of_hex
+         "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
+      (Common.bignum_bigint_of_hex
+         "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
+      secp256k1_modulus
+  in
   ()
