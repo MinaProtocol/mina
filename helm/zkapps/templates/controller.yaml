@@ -19,7 +19,7 @@ spec:
         imagePullPolicy: {{ $.Values.pullPolicy }}
         command:
         - node
-        - --inspect
+        # - --inspect
         - build/src/main.js
         args:
         - -v
