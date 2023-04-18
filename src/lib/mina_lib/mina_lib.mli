@@ -219,4 +219,6 @@ val runtime_config : t -> Runtime_config.t
 
 val verifier : t -> Verifier.t
 
+val vrf_evaluator : t -> Vrf_evaluator.t
+
 val genesis_ledger : t -> Mina_ledger.Ledger.t Lazy.t

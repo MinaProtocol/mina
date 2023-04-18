@@ -1,0 +1,70 @@
+schema {
+  query: query
+  mutation: mutation
+}
+
+"""uint64 encoded as a json string representing an ammount of currency"""
+scalar CurrencyAmount
+
+"""uint64 encoded as a json string representing a fee"""
+scalar Fee
+ 
+"""String representing a uint16 number in base 10"""
+scalar UInt16
+
+type ItnAuth {
+  """Uuid of the ITN GraphQL server"""
+  serverUuid: String!
+
+  """Sequence number for the signer of the auth query"""
+  signerSequenceNumber: UInt16!
+}
+
+type mutation {
+  schedulePayments(
+    """Payments details"""
+    input: PaymentsDetails!
+  ): String!
+  stopPayments(
+    """Payment scheduler handle"""
+    handle: String!
+  ): String!
+}
+
+"""Keys and other information for scheduling payments"""
+input PaymentsDetails {
+  """Length of scheduler run"""
+  durationInMinutes: Int!
+
+  """Frequency of transactions"""
+  transactionsPerSecond: Float!
+
+  """Memo, up to 32 characters"""
+  memo: String!
+
+  """Maximum fee"""
+  feeMax: Fee!
+
+  """Minimum fee"""
+  feeMin: Fee!
+
+  """Amount for payments"""
+  amount: CurrencyAmount!
+
+  """Public key of receiver of payments"""
+  receiver: PublicKey!
+
+  """Private keys of accounts to send from"""
+  senders: [PrivateKey!]!
+}
+
+"""Base58Check-encoded private key"""
+scalar PrivateKey
+
+"""Public key in Base58Check format"""
+scalar PublicKey
+
+type query {
+  """Uuid for GraphQL server, sequence number for signing public key"""
+  auth: ItnAuth!
+}

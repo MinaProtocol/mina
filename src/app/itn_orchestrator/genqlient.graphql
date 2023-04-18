@@ -1,0 +1,14 @@
+query auth() {
+    auth {
+        serverUuid
+        signerSequenceNumber
+    }
+}
+
+mutation schedulePayments($input: PaymentsDetails!) {
+    schedulePayments(input: $input) 
+}
+
+mutation stopPayments($handle: String!) {
+    stopPayments(handle: $handle) 
+}

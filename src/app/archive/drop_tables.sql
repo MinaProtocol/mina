@@ -18,6 +18,8 @@ DROP TABLE accounts_created;
 
 DROP TABLE blocks;
 
+DROP TABLE protocol_versions;
+
 DROP TYPE chain_status_type;
 
 DROP TABLE epoch_data;

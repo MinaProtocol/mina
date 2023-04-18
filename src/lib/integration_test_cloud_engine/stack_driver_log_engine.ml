@@ -233,7 +233,7 @@ module Subscription = struct
         ; subscription_id
         ; "--auto-ack"
         ; "--limit"
-        ; string_of_int 5
+        ; string_of_int 10
         ; "--format"
         ; "table(DATA)"
         ]
@@ -325,7 +325,7 @@ let rec pull_subscription_in_background ~logger ~network ~event_writer
                 ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
           Deferred.unit )
     in
-    let%bind () = after (Time.Span.of_ms 10000.0) in
+    let%bind () = after (Time.Span.of_ms 5000.0) in
     pull_subscription_in_background ~logger ~network ~event_writer ~subscription
     )
   else Deferred.unit

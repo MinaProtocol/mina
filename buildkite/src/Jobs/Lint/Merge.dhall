@@ -29,6 +29,7 @@ Pipeline.build
           , label = "Check merges cleanly into compatible"
           , soft_fail = Some (B/SoftFail.Boolean True)
           , key = "clean-merge-compatible"
+          , soft_fail = Some (B/SoftFail.Boolean True)
           , target = Size.Small
           , docker = Some Docker::{
               image = (../../Constants/ContainerImages.dhall).toolchainBase
