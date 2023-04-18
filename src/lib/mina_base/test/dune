@@ -10,7 +10,9 @@
   core_kernel
   integers
   sexplib0
+  yojson
   ;; local libraries
+  codable
   currency
   fields_derivers.zkapps
   fields_derivers.json
