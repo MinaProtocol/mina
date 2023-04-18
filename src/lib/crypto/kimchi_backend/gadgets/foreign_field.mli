@@ -1,6 +1,14 @@
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
+(** Conventions used
+ *     1. Functions prefixed with "as_prover_" only happen during proving
+ *        and not during circuit creation
+ *     2. Functions suffixed with "_as_prover" can only be called outside
+ *        the circuit.  Specifically, this means within an exists, within
+ *        an as_prover or in an "as_prover_" prefixed function)
+ *)
+
 (** Foreign field modulus is abstract on two parameters
  *    Field type
  *    Limbs structure
@@ -45,25 +53,25 @@ module type Element_intf = sig
   val map : 'field t -> ('field Cvar.t -> 'g) -> 'g limbs_type
 
   (** Convert foreign field element into field limbs *)
-  val to_field_limbs :
+  val to_field_limbs_as_prover :
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> 'field limbs_type
 
   (** Convert foreign field element into Bignum_bigint.t limbs *)
-  val to_bignum_bigint_limbs :
+  val to_bignum_bigint_limbs_as_prover :
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> Bignum_bigint.t limbs_type
 
   (** Convert foreign field element into a Bignum_bigint.t *)
-  val to_bignum_bigint :
+  val to_bignum_bigint_as_prover :
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> Bignum_bigint.t
 
   (* Check that the foreign element is smaller than a given field modulus *)
-  val fits :
+  val fits_as_prover :
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> 'field standard_limbs
@@ -76,7 +84,7 @@ module Element : sig
     include Element_intf with type 'a limbs_type = 'a standard_limbs
 
     (** Convert a standard foreign element into extended limbs *)
-    val extend :
+    val extend_as_prover :
          (module Snark_intf.Run with type field = 'field)
       -> 'field t
       -> 'field Cvar.t extended_limbs
