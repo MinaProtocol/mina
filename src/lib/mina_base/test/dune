@@ -12,10 +12,16 @@
   sexplib0
   ;; local libraries
   currency
+  fields_derivers.zkapps
+  fields_derivers.json
+  fields_derivers.graphql
+  kimchi_backend.pasta
+  kimchi_backend.pasta.basic
   mina_base
   mina_numbers
   mina_wire_types
   pickles
+  pickles.backend
   pickles_types
   ppx_version.runtime
   signature_lib
