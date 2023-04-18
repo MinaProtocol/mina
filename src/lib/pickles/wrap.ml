@@ -10,8 +10,7 @@ open Backend
 (* This contains the "wrap" prover *)
 
 let challenge_polynomial =
-  let open Backend.Tick.Field in
-  Wrap_verifier.challenge_polynomial ~add ~mul ~one
+  Wrap_verifier.challenge_polynomial (module Backend.Tick.Field)
 
 module Type1 =
   Plonk_checks.Make

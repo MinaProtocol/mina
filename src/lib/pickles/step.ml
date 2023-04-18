@@ -116,8 +116,7 @@ struct
         Wrap.Statement.In_circuit.t
     end in
     let challenge_polynomial =
-      let open Backend.Tock.Field in
-      Wrap_verifier.challenge_polynomial ~add ~mul ~one
+      Wrap_verifier.challenge_polynomial (module Backend.Tock.Field)
     in
     let expand_proof :
         type var value local_max_proofs_verified m.
