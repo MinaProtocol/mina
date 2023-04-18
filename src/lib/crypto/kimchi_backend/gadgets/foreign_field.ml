@@ -431,6 +431,13 @@ let compact_limb (type f) (module Circuit : Snark_intf.Run with type field = f)
 let tuple3_of_array array =
   match array with [| a1; a2; a3 |] -> (a1, a2, a3) | _ -> assert false
 
+let tuple4_of_array array =
+  match array with
+  | [| a1; a2; a3; a4 |] ->
+      (a1, a2, a3, a4)
+  | _ ->
+      assert false
+
 let tuple11_of_array array =
   match array with
   | [| a1; a2; a3; a4; a5; a6; a7; a8; a9; a10; a11 |] ->
@@ -544,10 +551,14 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
         (* Clarification *)
         (* let right_hi = right_input[3] * F::two_to_limb() + right_input[HI]; (* This allows to store 2^88 in the high limb *) *)
         let left =
-          Element.Standard.to_bignum_bigint (module Circuit) left_input
+          Element.Standard.to_bignum_bigint_as_prover
+            (module Circuit)
+            left_input
         in
         let right =
-          Element.Extended.to_bignum_bigint (module Circuit) right_input
+          Element.Extended.to_bignum_bigint_as_prover
+            (module Circuit)
+            right_input
         in
 
         (* Make sure that inputs are smaller than the foreign modulus.
@@ -770,6 +781,7 @@ let less_than_fmod (type f)
 let add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
     (inputs : f Element.Standard.t list) (is_sub : bool list)
     (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
+  let open Circuit in
   (* Check that the number of inputs is correct *)
   let n = List.length is_sub in
   assert (List.length inputs = n + 1) ;
@@ -779,11 +791,17 @@ let add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* For all n additions, compute its values and create gates *)
   for i = 0 to n - 1 do
-    let right =
-      Element.Extended.of_limbs
-      @@ Element.Standard.extend (module Circuit)
-      @@ List.nth_exn inputs (i + 1)
+    let right = List.nth_exn inputs (i + 1) in
+    let (right0, right1, right2, right3) =
+      exists (Typ.array ~length:4 Field.typ) ~compute:(fun () ->
+          (* Parse the right input *)
+          let right0, right1, right2, right3 = 
+            Element.Standard.extend_as_prover (module Circuit) right
+          in
+          [| right0; right1; right2; right3 |] )
+      |> tuple4_of_array
     in
+    let right = Element.Extended.of_limbs (right0, right1, right2, right3) in
     let sub = List.nth_exn is_sub i in
 
     (* Create the foreign field addition row *)
