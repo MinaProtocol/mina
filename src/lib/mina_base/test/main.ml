@@ -138,6 +138,12 @@ let () =
             checked_unchecked_equivalence_zkapp_command 
         ; test_case "JSON roundtrip" `Quick json_roundtrip 
       ])
+    ; Signature_test.
+      ( "signatures"
+      , [ test_case "Signature decode after encode i identity" `Quick
+            signature_decode_after_encode_is_identity 
+        ; test_case "Base58check is stable" `Quick base58Check_stable 
+      ])
     ; Zkapp_command_test.
         ( "zkApp commands"
         , [ test_case "Account_update_or_stack.of_zkapp_command_list." `Quick
