@@ -689,15 +689,15 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
   , field_overflow )
 
 (* This function adds a FFAdd gate to check that a given value is smaller than the modulus.
- * - value                 := the value to check 
+ * - value                 := the value to check
  * - external_checks       := Optional context to track required external checks.
  *                            When omitted, creates and returns new external_checks structure.
  *                            Otherwise, appends new required external checks to supplied structure.
  * - foreign_field_modulus := the modulus of the foreign field
- * If called from a FFMul gadget, the external_checks structure is updated with a new range check, 
+ * If called from a FFMul gadget, the external_checks structure is updated with a new range check,
  * so that the circuit writer can iterate over them all to make them effective.
- * If called from a FFAdd gadget, the external_checks structure is updated with a new range check, 
- * but this one should be effective right after the current gate. 
+ * If called from a FFAdd gadget, the external_checks structure is updated with a new range check,
+ * but this one should be effective right after the current gate.
  *)
 let less_than_fmod (type f)
     (module Circuit : Snark_intf.Run with type field = f)
@@ -710,20 +710,21 @@ let less_than_fmod (type f)
     Element.Extended.of_limbs (Field.zero, Field.zero, Field.zero, Field.one)
   in
 
+  (* Create the foreign field addition gate *)
+  let bound, sign, ovf =
+    add (module Circuit) value offset false foreign_field_modulus
+  in
+
   let bound0, bound1, bound2, ovf =
     exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
-        (* Create the foreign field addition gate *)
-        let bound, sign, ovf =
-          add (module Circuit) value offset false foreign_field_modulus
-        in
         (* Parse the bound outcome *)
         let bound0, bound1, bound2 =
           Element.Standard.to_field_limbs (module Circuit) bound
         in
 
         (* Check that the correct expected values were obtained *)
-        let sign = Common.cvar_field_to_field_as_prover sign in
-        let ovf = Common.cvar_field_to_field_as_prover ovf in
+        let sign = Common.cvar_field_to_field_as_prover (module Circuit) sign in
+        let ovf = Common.cvar_field_to_field_as_prover (module Circuit) ovf in
         assert (Field.Constant.(equal sign one)) ;
         assert (Field.Constant.(equal ovf one)) ;
 
