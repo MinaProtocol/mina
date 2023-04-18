@@ -158,9 +158,12 @@ let%test_unit "rot gadget" =
   (* 0x5A5A5A5A5A5A5A5A is 0xA5A5A5A5A5A5A5A5 both when rotate 4 bits Left or Right*)
   let _cs = test_rot ~cs "6510615555426900570" 4 Right "11936128518282651045" in
   let _cs = test_rot "6510615555426900570" 4 Left "11936128518282651045" in
-  let _cs = test_rot "1234567890" 32 Right "5302428712241725440" in
+  let cs = test_rot "1234567890" 32 Right "5302428712241725440" in
+  let _cs = test_rot ~cs "2651214356120862720" 32 Right "617283945" in
+  let _cs = test_rot ~cs "1153202983878524928" 32 Right "268500993" in
 
   (* Negatve tests *)
   assert (Common.is_error (fun () -> test_rot "0" 1 Left "1")) ;
   assert (Common.is_error (fun () -> test_rot "1" 64 Left "1")) ;
+  assert (Common.is_error (fun () -> test_rot ~cs "0" 0 Left "0")) ;
   ()
