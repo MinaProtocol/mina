@@ -129,5 +129,13 @@ let () =
           ; test_case "Test non-existent index retrieval." `Quick
               index_non_existent
           ; test_case "Test merkle root soundness." `Quick merkle_root
-          ] )
+        ] )
+    ; Receipt_test.
+      ( "receipts"
+      , [ test_case "Checked-unmchecked equivalence for signed command" `Quick
+            checked_unchecked_equivalence_signed_command 
+        ; test_case "Checked-unchecked equivalenece in zkApp command" `Quick
+            checked_unchecked_equivalence_zkapp_command 
+        ; test_case "JSON roundtrip" `Quick json_roundtrip 
+      ])
     ]
