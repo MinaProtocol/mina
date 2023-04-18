@@ -2203,8 +2203,7 @@ module Make (L : Ledger_intf.S) :
         ( init_account
         , `Added
         , `Has_permission_to_receive
-            (Account.has_permission ~control:Control.Tag.None_given
-               ~to_:`Receive init_account ) )
+            (Account.has_permission_to_receive init_account) )
     | Some loc -> (
         match get ledger loc with
         | None ->
@@ -2213,8 +2212,7 @@ module Make (L : Ledger_intf.S) :
             ( receiver_account
             , `Existed
             , `Has_permission_to_receive
-                (Account.has_permission ~control:Control.Tag.None_given
-                   ~to_:`Receive receiver_account ) ) )
+                (Account.has_permission_to_receive receiver_account) ) )
 
   let no_failure = []
 
