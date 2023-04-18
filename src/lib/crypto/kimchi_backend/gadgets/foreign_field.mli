@@ -1,6 +1,14 @@
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
+(** Conventions used
+ *     1. Functions prefixed with "as_prover_" only happen during proving
+ *        and not during circuit creation
+ *     2. Functions suffixed with "_as_prover" can only be called outside
+ *        the circuit.  Specifically, this means within an exists, within
+ *        an as_prover or in an "as_prover_" prefixed function)
+ *)
+
 (** Foreign field modulus is abstract on two parameters
  *    Field type
  *    Limbs structure
@@ -45,25 +53,25 @@ module type Element_intf = sig
   val map : 'field t -> ('field Cvar.t -> 'g) -> 'g limbs_type
 
   (** Convert foreign field element into field limbs *)
-  val to_field_limbs :
+  val to_field_limbs_as_prover :
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> 'field limbs_type
 
   (** Convert foreign field element into Bignum_bigint.t limbs *)
-  val to_bignum_bigint_limbs :
+  val to_bignum_bigint_limbs_as_prover :
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> Bignum_bigint.t limbs_type
 
   (** Convert foreign field element into a Bignum_bigint.t *)
-  val to_bignum_bigint :
+  val to_bignum_bigint_as_prover :
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> Bignum_bigint.t
 
   (* Check that the foreign element is smaller than a given field modulus *)
-  val fits :
+  val fits_as_prover :
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> 'field standard_limbs
@@ -76,7 +84,7 @@ module Element : sig
     include Element_intf with type 'a limbs_type = 'a standard_limbs
 
     (** Convert a standard foreign element into extended limbs *)
-    val extend :
+    val extend_as_prover :
          (module Snark_intf.Run with type field = 'field)
       -> 'field t
       -> 'field Cvar.t extended_limbs
@@ -100,22 +108,23 @@ module External_checks : sig
 end
 
 (* This function adds a FFAdd gate to check that a given value is smaller than the modulus.
- * - value                 := the value to check 
+ * - value                 := the value to check
  * - external_checks       := Optional context to track required external checks.
  *                            When omitted, creates and returns new external_checks structure.
  *                            Otherwise, appends new required external checks to supplied structure.
  * - foreign_field_modulus := the modulus of the foreign field
- * If called from a FFMul gadget, the external_checks structure is updated with a new range check, 
+ * If called from a FFMul gadget, the external_checks structure is updated with a new range check,
  * so that the circuit writer can iterate over them all to make them effective.
- * If called from a FFAdd gadget, the external_checks structure is updated with a new range check, 
- * but this one should be effective right after the current gate. 
+ * If called from a FFAdd gadget, the external_checks structure is updated with a new range check,
+ * but this one should be effective right after the current gate.
  *)
- val less_than_fmod:
-      (module Snark_intf.Run with type field = 'f)
-    -> ?external_checks: 'f External_checks.t (* external_checks *)
-    -> 'f Element.Standard.t (* value *)
-    -> 'f standard_limbs (* foreign_field_modulus *)
-    -> 'f Element.Standard.t * 'f External_checks.t (* result, external_checks *)
+val less_than_fmod :
+     (module Snark_intf.Run with type field = 'f)
+  -> ?external_checks:'f External_checks.t (* external_checks *)
+  -> 'f Element.Standard.t (* value *)
+  -> 'f standard_limbs (* foreign_field_modulus *)
+  -> 'f Element.Standard.t * 'f External_checks.t
+(* result, external_checks *)
 
 (* Definition of a gadget for a single foreign field addition
    * - left_input of the addition as 3 limbs element
@@ -125,15 +134,14 @@ end
    * - Returns the result of the addition/subtraction as a 3 limbs element
    *
 *)
- val add :
+val add :
      (module Snark_intf.Run with type field = 'f)
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Extended.t (* right_input *)
   -> bool (* is_sub *)
   -> 'f standard_limbs (* foreign_field_modulus *)
-  -> 'f Element.Standard.t * 'f * 'f (* result, sign, overflow *)
-
-
+  -> 'f Element.Standard.t * 'f * 'f
+(* result, sign, overflow *)
 
 (** Foreign field multiplication gadget
  *   Constrains that
@@ -157,6 +165,5 @@ val mul :
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
-  -> 'f Element.Standard.t * 'f External_checks.t (* remainder, external_checks *)
-
-
+  -> 'f Element.Standard.t * 'f External_checks.t
+(* remainder, external_checks *)

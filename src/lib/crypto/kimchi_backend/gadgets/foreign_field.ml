@@ -134,25 +134,25 @@ module type Element_intf = sig
   val map : 'field t -> ('field Cvar.t -> 'g) -> 'g limbs_type
 
   (* Convert foreign field element into field limbs *)
-  val to_field_limbs :
+  val to_field_limbs_as_prover :
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> 'field limbs_type
 
   (* Convert foreign field element into Bignum_bigint.t limbs *)
-  val to_bignum_bigint_limbs :
+  val to_bignum_bigint_limbs_as_prover :
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> Bignum_bigint.t limbs_type
 
   (* Convert foreign field element into a Bignum_bigint.t *)
-  val to_bignum_bigint :
+  val to_bignum_bigint_as_prover :
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> Bignum_bigint.t
 
   (* Check that the foreign element is smaller than a given field modulus *)
-  val fits :
+  val fits_as_prover :
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> 'field standard_limbs
@@ -166,7 +166,7 @@ module Element : sig
     include Element_intf with type 'a limbs_type = 'a standard_limbs
 
     (* Convert a standard foreign element into extended limbs *)
-    val extend :
+    val extend_as_prover :
          (module Snark_intf.Run with type field = 'field)
       -> 'field t
       -> 'field Cvar.t extended_limbs
@@ -208,31 +208,31 @@ end = struct
       let l0, l1, l2 = to_limbs x in
       (func l0, func l1, func l2)
 
-    let to_field_limbs (type field)
+    let to_field_limbs_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         : field limbs_type =
       map x (Common.cvar_field_to_field_as_prover (module Circuit))
 
-    let to_bignum_bigint_limbs (type field)
+    let to_bignum_bigint_limbs_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         : Bignum_bigint.t limbs_type =
       map x (Common.cvar_field_to_bignum_bigint_as_prover (module Circuit))
 
-    let to_bignum_bigint (type field)
+    let to_bignum_bigint_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         : Bignum_bigint.t =
-      let l0, l1, l2 = to_bignum_bigint_limbs (module Circuit) x in
+      let l0, l1, l2 = to_bignum_bigint_limbs_as_prover (module Circuit) x in
       Bignum_bigint.(l0 + (Common.two_to_limb * l1) + (two_to_2limb * l2))
 
-    let fits (type field)
+    let fits_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         (modulus : field standard_limbs) : bool =
       let modulus =
         field_standard_limbs_to_bignum_bigint (module Circuit) modulus
       in
-      Bignum_bigint.(to_bignum_bigint (module Circuit) x < modulus)
+      Bignum_bigint.(to_bignum_bigint_as_prover (module Circuit) x < modulus)
 
-    let extend (type field)
+    let extend_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         =
       let l0, l1, l2 = to_limbs x in
@@ -271,36 +271,33 @@ end = struct
       let l0, l1, l2, l3 = to_limbs x in
       (func l0, func l1, func l2, func l3)
 
-    let to_field_limbs (type field)
+    let to_field_limbs_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         : field limbs_type =
       map x (Common.cvar_field_to_field_as_prover (module Circuit))
 
-    let to_bignum_bigint_limbs (type field)
+    let to_bignum_bigint_limbs_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         : Bignum_bigint.t limbs_type =
       map x (Common.cvar_field_to_bignum_bigint_as_prover (module Circuit))
 
-    let to_bignum_bigint (type field)
+    let to_bignum_bigint_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         : Bignum_bigint.t =
-      let l0, l1, l2, l3 = to_bignum_bigint_limbs (module Circuit) x in
+      let l0, l1, l2, l3 =
+        to_bignum_bigint_limbs_as_prover (module Circuit) x
+      in
       Bignum_bigint.(
         l0 + (Common.two_to_limb * l1) + (two_to_2limb * l2)
         + (two_to_3limb * l3))
 
-    let fits (type field)
+    let fits_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         (modulus : field standard_limbs) : bool =
       let modulus =
         field_standard_limbs_to_bignum_bigint (module Circuit) modulus
       in
-      Bignum_bigint.(to_bignum_bigint (module Circuit) x < modulus)
-
-    let _extend (type field)
-        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
-        =
-      to_limbs x
+      Bignum_bigint.(to_bignum_bigint_as_prover (module Circuit) x < modulus)
   end
 
   (* Compact limbs foreign field element *)
@@ -332,36 +329,29 @@ end = struct
       let l0, l1 = to_limbs x in
       (func l0, func l1)
 
-    let to_field_limbs (type field)
+    let to_field_limbs_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         : field limbs_type =
       map x (Common.cvar_field_to_field_as_prover (module Circuit))
 
-    let to_bignum_bigint_limbs (type field)
+    let to_bignum_bigint_limbs_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         : Bignum_bigint.t limbs_type =
       map x (Common.cvar_field_to_bignum_bigint_as_prover (module Circuit))
 
-    let to_bignum_bigint (type field)
+    let to_bignum_bigint_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         =
-      let l01, l2 = to_bignum_bigint_limbs (module Circuit) x in
+      let l01, l2 = to_bignum_bigint_limbs_as_prover (module Circuit) x in
       Bignum_bigint.(l01 + (two_to_2limb * l2))
 
-    let fits (type field)
+    let fits_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         (modulus : field standard_limbs) : bool =
       let modulus =
         field_standard_limbs_to_bignum_bigint (module Circuit) modulus
       in
-      Bignum_bigint.(to_bignum_bigint (module Circuit) x < modulus)
-
-    let _extend (type field)
-        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
-        =
-      Extended.to_limbs
-      @@ Extended.of_bignum_bigint (module Circuit)
-      @@ to_bignum_bigint (module Circuit) x
+      Bignum_bigint.(to_bignum_bigint_as_prover (module Circuit) x < modulus)
   end
 end
 
@@ -432,26 +422,31 @@ let compact_limb (type f) (module Circuit : Snark_intf.Run with type field = f)
 
 (* Given a left and right inputs to an addition or subtraction, and a modulus, it computes
  * all necessary values needed for the witness layout. Meaning, it returns an [FFAddValues] instance
- * - the result of the addition/subtraction as a ForeignElement
- * - the sign of the operation
- * - the overflow flag
- * - the carry value *)
+ *   Result of the addition/subtraction as a ForeignElement
+ *   Sign of the operation
+ *   Overflow flag
+ *   Carry value
+ *
+ * Preconditions: This is a witness function and, as such, must be executed within an `exists` call
+ *)
 let compute_ffadd_values (type f)
     (module Circuit : Snark_intf.Run with type field = f)
     (left_input : f Element.Standard.t) (right_input : f Element.Extended.t)
     (is_sub : bool) (foreign_field_modulus : f standard_limbs) :
     f Element.Standard.t * f * f * f =
   let open Circuit in
-
-  
   (* Compute bigint version of the inputs *)
   let modulus =
     field_standard_limbs_to_bignum_bigint (module Circuit) foreign_field_modulus
   in
   (* Clarification *)
   (* let right_hi = right_input[3] * F::two_to_limb() + right_input[HI]; (* This allows to store 2^88 in the high limb *) *)
-  let left = Element.Standard.to_bignum_bigint (module Circuit) left_input in
-  let right = Element.Extended.to_bignum_bigint (module Circuit) right_input in
+  let left =
+    Element.Standard.to_bignum_bigint_as_prover (module Circuit) left_input
+  in
+  let right =
+    Element.Extended.to_bignum_bigint_as_prover (module Circuit) right_input
+  in
 
   (* Addition or subtraction *)
   let sign = Field.Constant.(if is_sub then negate one else one) in
@@ -495,13 +490,15 @@ let compute_ffadd_values (type f)
     foreign_field_modulus
   in
   let left_input0, left_input1, left_input2 =
-    Element.Standard.to_field_limbs (module Circuit) left_input
+    (* Use of to_field_limbs_as_prover is safe because this entire
+     * function is witness code and executed in an exists *)
+    Element.Standard.to_field_limbs_as_prover (module Circuit) left_input
   in
   let right_input0, right_input1, right_input2, right_input3 =
-    Element.Extended.to_field_limbs (module Circuit) right_input
+    Element.Extended.to_field_limbs_as_prover (module Circuit) right_input
   in
   let result0, result1, result2 =
-    Element.Standard.to_field_limbs (module Circuit) result
+    Element.Standard.to_field_limbs_as_prover (module Circuit) result
   in
   (* This allows to store 2^88 in the high limb*)
   let offset = Common.(bignum_bigint_to_field (module Circuit) two_to_limb) in
@@ -550,16 +547,19 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
   let foreign_field_modulus0, foreign_field_modulus1, foreign_field_modulus2 =
     foreign_field_modulus
   in
-  print_endline "after check mod";
+  print_endline "after check mod" ;
   (* Make sure that inputs are smaller than the foreign modulus *)
-  as_prover ( fun() -> 
-  assert (
-    Element.Standard.fits (module Circuit) left_input foreign_field_modulus ) ;
-  assert (
-    Element.Extended.fits (module Circuit) right_input foreign_field_modulus ) ;
-    ()
-  );
-  print_endline "after fits";
+  as_prover (fun () ->
+      assert (
+        Element.Standard.fits_as_prover
+          (module Circuit)
+          left_input foreign_field_modulus ) ;
+      assert (
+        Element.Extended.fits_as_prover
+          (module Circuit)
+          right_input foreign_field_modulus ) ;
+      () ) ;
+  print_endline "after fits" ;
 
   (* Compute values for the ffadd *)
   let result, sign, field_overflow, carry =
@@ -568,7 +568,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
       left_input right_input is_sub foreign_field_modulus
   in
 
-  print_endline "after compute";
+  print_endline "after compute" ;
 
   (* Parse inputs *)
   let right_input0, right_input1, right_input2, _right_input3 =
@@ -604,15 +604,15 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
   (result, sign, field_overflow)
 
 (* This function adds a FFAdd gate to check that a given value is smaller than the modulus.
- * - value                 := the value to check 
+ * - value                 := the value to check
  * - external_checks       := Optional context to track required external checks.
  *                            When omitted, creates and returns new external_checks structure.
  *                            Otherwise, appends new required external checks to supplied structure.
  * - foreign_field_modulus := the modulus of the foreign field
- * If called from a FFMul gadget, the external_checks structure is updated with a new range check, 
+ * If called from a FFMul gadget, the external_checks structure is updated with a new range check,
  * so that the circuit writer can iterate over them all to make them effective.
- * If called from a FFAdd gadget, the external_checks structure is updated with a new range check, 
- * but this one should be effective right after the current gate. 
+ * If called from a FFAdd gadget, the external_checks structure is updated with a new range check,
+ * but this one should be effective right after the current gate.
  *)
 let less_than_fmod (type f)
     (module Circuit : Snark_intf.Run with type field = f)
@@ -621,31 +621,33 @@ let less_than_fmod (type f)
     f Element.Standard.t * f External_checks.t =
   let open Circuit in
   (* Compute the value for the right input of the addition as 2^264 *)
-  let offset = Element.Extended.of_limbs (Field.zero, Field.zero, Field.zero, Field.one) in
+  let offset =
+    Element.Extended.of_limbs (Field.zero, Field.zero, Field.zero, Field.one)
+  in
 
-  print_endline "after offset";
+  print_endline "after offset" ;
 
   (* Create the foreign field addition gate *)
   let bound, sign, ovf =
     add (module Circuit) value offset false foreign_field_modulus
   in
-  print_endline "after add";
+  print_endline "after add" ;
 
   (* Parse the bound outcome *)
   let bound0, bound1, bound2 =
-    Element.Standard.to_field_limbs (module Circuit) bound
+    (* TODO: Anais -- is less_than_fmod always called as prover? *)
+    Element.Standard.to_field_limbs_as_prover (module Circuit) bound
   in
   let bound0 = Field.constant bound0 in
   let bound1 = Field.constant bound1 in
   let bound2 = Field.constant bound2 in
-  print_endline "after bound";
+  print_endline "after bound" ;
 
   (* Check that the correct expected values were obtained *)
   assert (Field.Constant.(equal sign one)) ;
   assert (Field.Constant.(equal ovf one)) ;
 
-  print_endline "after field cnstant";
-
+  print_endline "after field cnstant" ;
 
   (* Final Zero gate*)
   with_label "final_add_zero_gate" (fun () ->
@@ -661,15 +663,14 @@ let less_than_fmod (type f)
                  } )
         } ) ;
 
-        print_endline "after with label";
-
+  print_endline "after with label" ;
 
   (* Set up copy constraints with overflow with the overflow check*)
   as_prover (fun () ->
       Field.Assert.equal (Field.constant ovf) Field.one ;
       () ) ;
 
-      print_endline "after as_prover";
+  print_endline "after as_prover" ;
 
   (* Prepare external check for multi range check *)
   let external_checks =
@@ -681,7 +682,7 @@ let less_than_fmod (type f)
   in
   External_checks.add_multi_range_check external_checks (bound0, bound1, bound2) ;
 
-  print_endline "after external checks";
+  print_endline "after external checks" ;
 
   (* Return the bound value *)
   (Element.Standard.of_limbs (bound0, bound1, bound2), external_checks)
@@ -712,7 +713,7 @@ let add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
   for i = 0 to n - 1 do
     let right =
       Element.Extended.of_limbs
-      @@ Element.Standard.extend (module Circuit)
+      @@ Element.Standard.extend_as_prover (module Circuit)
       @@ List.nth_exn inputs (i + 1)
     in
     let sub = List.nth_exn is_sub i in
@@ -744,8 +745,12 @@ let add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
 
 (* Compute non-zero intermediate products
  *
- * For more details see the "Intermediate products" Section of
- * the [Foreign Field Multiplication RFC](../rfcs/foreign_field_mul.md) *)
+ *   For more details see the "Intermediate products" Section of
+ *   the [Foreign Field Multiplication RFC](../rfcs/foreign_field_mul.md)
+ *
+ *   Preconditions: this entire function is witness code and, therefore, must be
+ *                  only called from an exists construct.
+ *)
 let compute_intermediate_products (type f)
     (module Circuit : Snark_intf.Run with type field = f)
     (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
@@ -753,10 +758,10 @@ let compute_intermediate_products (type f)
     : f * f * f =
   let open Circuit in
   let left_input0, left_input1, left_input2 =
-    Element.Standard.to_field_limbs (module Circuit) left_input
+    Element.Standard.to_field_limbs_as_prover (module Circuit) left_input
   in
   let right_input0, right_input1, right_input2 =
-    Element.Standard.to_field_limbs (module Circuit) right_input
+    Element.Standard.to_field_limbs_as_prover (module Circuit) right_input
   in
   let quotient0, quotient1, quotient2 = quotient in
   let ( neg_foreign_field_modulus0
@@ -1002,10 +1007,14 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
         let quotient, remainder =
           (* Bignum_bigint computations *)
           let left_input =
-            Element.Standard.to_bignum_bigint (module Circuit) left_input
+            Element.Standard.to_bignum_bigint_as_prover
+              (module Circuit)
+              left_input
           in
           let right_input =
-            Element.Standard.to_bignum_bigint (module Circuit) right_input
+            Element.Standard.to_bignum_bigint_as_prover
+              (module Circuit)
+              right_input
           in
           let foreign_field_modulus =
             field_standard_limbs_to_bignum_bigint
@@ -1091,10 +1100,10 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
 
         (* Compute the rest of the witness data *)
         let left_input0, left_input1, left_input2 =
-          Element.Standard.to_field_limbs (module Circuit) left_input
+          Element.Standard.to_field_limbs_as_prover (module Circuit) left_input
         in
         let right_input0, right_input1, right_input2 =
-          Element.Standard.to_field_limbs (module Circuit) right_input
+          Element.Standard.to_field_limbs_as_prover (module Circuit) right_input
         in
         let quotient0, quotient1, quotient2 =
           bignum_bigint_to_field_standard_limbs (module Circuit) quotient
@@ -1260,7 +1269,9 @@ let%test_unit "foreign_field_add gadget" =
                   expected
               in
               let sum =
-                Element.Standard.to_field_limbs (module Runner.Impl) sum
+                Element.Standard.to_field_limbs_as_prover
+                  (module Runner.Impl)
+                  sum
               in
               assert_eq sum expected ) ;
           () )
@@ -1320,7 +1331,9 @@ let%test_unit "foreign_field_add gadget" =
                   chain_result.(0)
               in
               let sum =
-                Element.Standard.to_field_limbs (module Runner.Impl) sum
+                Element.Standard.to_field_limbs_as_prover
+                  (module Runner.Impl)
+                  sum
               in
               assert_eq sum expected ) ;
           () )
@@ -1411,7 +1424,9 @@ let%test_unit "foreign_field_mul gadget" =
                   expected
               in
               let product =
-                Element.Standard.to_field_limbs (module Runner.Impl) product
+                Element.Standard.to_field_limbs_as_prover
+                  (module Runner.Impl)
+                  product
               in
               assert_eq product expected ) ;
           () )
@@ -1480,11 +1495,13 @@ let%test_unit "foreign_field_mul gadget" =
                   expected
               in
               let product =
-                Element.Standard.to_field_limbs (module Runner.Impl) product2
+                Element.Standard.to_field_limbs_as_prover
+                  (module Runner.Impl)
+                  product2
               in
               assert_eq product expected ) ;
 
-              (*
+          (*
           print_endline "before first less than fmod";
           (* 2) Add result bound addition gate. Corresponding range check happens in 6 *)
           let _out1 =

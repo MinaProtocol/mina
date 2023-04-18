@@ -55,12 +55,6 @@ let cvar_field_to_field_as_prover (type f)
     (field_element : Circuit.Field.t) : f =
   Circuit.As_prover.read Circuit.Field.typ field_element
 
-(* Convert field element to a cvar field element *)
-let field_to_cvar_field (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (field_element : f) : Circuit.Field.t =
-  Circuit.Field.constant field_element
-
 (* field_bits_le_to_field - Create a field element from contiguous bits of another
  *
  *   Inputs:
