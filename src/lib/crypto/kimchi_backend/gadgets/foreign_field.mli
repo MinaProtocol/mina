@@ -112,9 +112,10 @@ end
  *)
  val less_than_fmod:
       (module Snark_intf.Run with type field = 'f)
+    -> ?external_checks: 'f External_checks.t (* external_checks *)
     -> 'f Element.Standard.t (* value *)
     -> 'f standard_limbs (* foreign_field_modulus *)
-    -> 'f Element.Standard.t (* result, sign, overflow *)
+    -> 'f Element.Standard.t * 'f External_checks.t (* result, external_checks *)
 
 (* Definition of a gadget for a single foreign field addition
    * - left_input of the addition as 3 limbs element
