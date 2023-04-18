@@ -7,31 +7,37 @@ open Plonk_types
 open Tuple_lib
 open Import
 
+(* G is for Generic. This module is just to protect {!val:challenge_polynomial}
+   below from being hidden by the included functor application at the end of
+   the module, so that we can re-export it in the end. *)
 module G = struct
   let lookup_verification_enabled = false
 
   (* given [chals], compute
      \prod_i (1 + chals.(i) * x^{2^{k - 1 - i}}) *)
-  let challenge_polynomial ~one ~add ~mul chals =
-    let ( + ) = add and ( * ) = mul in
+  let challenge_polynomial (type a)
+      (module M : Pickles_types.Shifted_value.Field_intf with type t = a) chals
+      : (a -> a) Staged.t =
     stage (fun pt ->
         let k = Array.length chals in
         let pow_two_pows =
           let res = Array.init k ~f:(fun _ -> pt) in
           for i = 1 to k - 1 do
             let y = res.(i - 1) in
-            res.(i) <- y * y
+            res.(i) <- M.(y * y)
           done ;
           res
         in
         let prod f =
           let r = ref (f 0) in
           for i = 1 to k - 1 do
-            r := f i * !r
+            r := M.(f i * !r)
           done ;
           !r
         in
-        prod (fun i -> one + (chals.(i) * pow_two_pows.(k - 1 - i))) )
+        prod (fun i ->
+            let idx = k - 1 - i in
+            M.(one + (chals.(i) * pow_two_pows.(idx))) ) )
 
   let num_possible_domains = Nat.S Wrap_hack.Padded_length.n
 
@@ -749,8 +755,7 @@ struct
     Vector.map chals ~f:(fun prechallenge ->
         scalar @@ Bulletproof_challenge.pack prechallenge )
 
-  let challenge_polynomial chals =
-    Field.(G.challenge_polynomial ~add ~mul ~one chals)
+  let challenge_polynomial = G.challenge_polynomial (module Field)
 
   let pow2pow (pt : Field.t) (n : int) : Field.t =
     with_label __LOC__ (fun () ->
