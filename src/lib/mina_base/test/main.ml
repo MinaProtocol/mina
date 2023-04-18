@@ -51,7 +51,25 @@ let () =
               token_symbol_to_bits_of_bits_roundtrip
           ; test_case "Token symbol of_bits to_bits roundtrip." `Quick
               token_symbol_of_bits_to_bits_roundtrip
-          ] )
+        ] )
+    ; Account_update_test.
+      ( "account updates"
+      , [ test_case "Update JSON roundtrip" `Quick update_json_roundtrip 
+        ; test_case "Precondition JSON roundtrip accept" `Quick
+            precondition_json_roundtrip_accept 
+        ; test_case "Precondition JSON roundtrip nonce" `Quick
+            precondition_json_roundtrip_nonce 
+        ; test_case "Precondition JSON roundtrip with full nonce" `Quick
+            precondition_json_roundtrip_full_with_nonce 
+        ; test_case "Precondition JSON roundtrip full" `Quick
+            precondition_json_roundtrip_full 
+        ; test_case "Precondition to JSON" `Quick precondition_to_json 
+        ; test_case "Body fee payer JSON roundtrip" `Quick
+            body_fee_payer_json_roundtrip 
+        ; test_case "Body JSON roundtrip" `Quick body_json_roundtrip 
+        ; test_case "Fee payer JSON roundtrip" `Quick fee_payer_json_roundtrip 
+        ; test_case "JSON roundtrip dummy" `Quick json_roundtrip_dummy
+      ])
     ; Call_forest_test.
         ( "call forest"
         , [ test_case "Test fold_forest." `Quick Tree_test.fold_forest
