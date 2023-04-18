@@ -23,6 +23,7 @@ let main () =
   print_heap_usage "Parallel_scan.Base.t (payment)" scan_state_base_node_payment ;
   print_heap_usage "Parallel_scan.Base.t (zkApp)" scan_state_base_node_zkapp ;
   print_heap_usage "Parallel_scan.Merge.t" scan_state_merge_node ;
+  print_heap_usage "Transaction_snark.Statement.t" transaction_snark_statement ;
   Deferred.unit
 
 let () =
