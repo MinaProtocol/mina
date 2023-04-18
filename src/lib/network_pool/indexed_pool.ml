@@ -742,7 +742,7 @@ let revalidate :
        t
     -> logger:Logger.t
     -> [ `Entire_pool | `Subset of Account_id.Set.t ]
-    -> (Account_id.t -> Account_nonce.t * Currency.Amount.t)
+    -> (Account_id.t -> Account.t)
     -> t * Transaction_hash.User_command_with_valid_signature.t Sequence.t =
  fun ({ config = { constraint_constants; _ }; _ } as t) ~logger scope f ->
   let requires_revalidation =
@@ -760,14 +760,20 @@ let revalidate :
        ->
       if not (requires_revalidation sender) then acc
       else
-        let current_nonce, current_balance = f sender in
+        let account : Account.t = f sender in
+        let current_balance =
+          Currency.Balance.to_amount
+            (Account.liquid_balance_at_slot
+               ~global_slot:(global_slot_since_genesis t.config)
+               account )
+        in
         [%log debug]
           "Revalidating account $account in transaction pool ($account_nonce, \
            $account_balance)"
           ~metadata:
             [ ( "account"
               , `String (Sexp.to_string @@ Account_id.sexp_of_t sender) )
-            ; ("account_nonce", `Int (Account_nonce.to_int current_nonce))
+            ; ("account_nonce", `Int (Account_nonce.to_int account.nonce))
             ; ( "account_balance"
               , `String (Currency.Amount.to_mina_string current_balance) )
             ] ;
@@ -777,7 +783,16 @@ let revalidate :
           |> Transaction_hash.User_command_with_valid_signature.command
           |> User_command.applicable_at_nonce
         in
-        if Account_nonce.(current_nonce < first_nonce) then (
+        if
+          not
+            ( Account.has_permission_to_send account
+            && Account.has_permission_to_increment_nonce account )
+        then (
+          [%log debug]
+            "Account no longer has permission to send; dropping queue" ;
+          let dropped, t'' = remove_with_dependents_exn' t first_cmd in
+          (t'', Sequence.append dropped_acc dropped) )
+        else if Account_nonce.(account.nonce < first_nonce) then (
           [%log debug]
             "Current account nonce precedes first nonce in queue; dropping \
              queue" ;
@@ -792,7 +807,7 @@ let revalidate :
                     cmd'
                   |> User_command.applicable_at_nonce
                 in
-                Account_nonce.equal nonce current_nonce )
+                Account_nonce.equal nonce account.nonce )
             |> Option.value ~default:(F_sequence.length queue)
           in
           [%log debug]
@@ -1767,18 +1782,11 @@ let%test_module _ =
         revalidate pool ~logger (`Subset accounts_to_check) (fun sender ->
             match Mina_ledger.Ledger.location_of_account ledger sender with
             | None ->
-                (Account.Nonce.zero, Currency.Amount.zero)
+                Account.empty
             | Some loc ->
-                let acc =
-                  Option.value_exn
-                    ~message:
-                      "Somehow a public key has a location but no account"
-                    (Mina_ledger.Ledger.get ledger loc)
-                in
-                ( acc.nonce
-                , Account.liquid_balance_at_slot
-                    ~global_slot:Mina_numbers.Global_slot.zero acc
-                  |> Currency.Balance.to_amount ) )
+                Option.value_exn
+                  ~message:"Somehow a public key has a location but no account"
+                  (Mina_ledger.Ledger.get ledger loc) )
       in
       let lower =
         List.map ~f:Transaction_hash.User_command_with_valid_signature.hash
