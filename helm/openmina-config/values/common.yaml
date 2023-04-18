@@ -74,7 +74,7 @@ bpfDebugger:
   image: openmina/mina-network-debugger:121edfce
   cpu: "1500m"
   memory: "4Gi"
-  restartMina: true
+  restartMina: false
   runtime: kata-qemu
 
 logs:
