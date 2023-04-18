@@ -100,7 +100,7 @@ module External_checks : sig
 end
 
 (* This function adds a FFAdd gate to check that a given value is smaller than the modulus.
- * - value                 := the value to check 
+ * - value                 := the value to check
  * - external_checks       := Optional context to track required external checks.
  *                            When omitted, creates and returns new external_checks structure.
  *                            Otherwise, appends new required external checks to supplied structure.
