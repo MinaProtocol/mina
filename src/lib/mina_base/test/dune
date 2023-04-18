@@ -13,12 +13,17 @@
   yojson
   ;; local libraries
   currency
-  fields_derivers_zkapps
-  fields_derivers_graphql
+  fields_derivers.zkapps
+  fields_derivers.json
+  fields_derivers.graphql
+  kimchi_backend.pasta
+  kimchi_backend.pasta.basic
   mina_base
   mina_numbers
   mina_wire_types
   pickles
+  pickles.backend
+  pickles_types
   ppx_version.runtime
   run_in_thread
   signature_lib
