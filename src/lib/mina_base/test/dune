@@ -26,6 +26,7 @@
   pickles.backend
   pickles_types
   ppx_version.runtime
+  run_in_thread
   signature_lib
   random_oracle
   sgn
