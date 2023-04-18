@@ -619,9 +619,7 @@ struct
     with_label "compute_challenges" (fun () ->
         Vector.map chals ~f:(fun b -> Bulletproof_challenge.pack b |> scalar) )
 
-  let challenge_polynomial =
-    let open Field in
-    Wrap_verifier.challenge_polynomial ~add ~mul ~one
+  let challenge_polynomial = Wrap_verifier.challenge_polynomial (module Field)
 
   module Pseudo = Pseudo.Make (Impl)
 
