@@ -135,12 +135,12 @@ let rot_64 (type f)
         } ) ;
 
   (* Next row *)
-  Range_check.range_check64 (module Circuit) shifted ;
+  Range_check.bits64 (module Circuit) shifted ;
   rotated
 
 (* XOR *)
 
-(* Boolean Xor of length bits 
+(* Boolean Xor of length bits
  * input1 and input2 are the inputs to the Xor gate
   * length is the number of bits to Xor
   * len_xor is the number of bits of the lookup table (default is 4)
@@ -163,14 +163,18 @@ let bxor (type f)
     let input2 = Field.Constant.project input2_bits in
     let output = Field.Constant.project output_bits in
     (* Convert to cvar *)
-    let input1_cvar = Common.field_to_cvar_field (module Circuit) input1 in
-    let input2_cvar = Common.field_to_cvar_field (module Circuit) input2 in
-    let output_cvar = Common.field_to_cvar_field (module Circuit) output in
+    let param_vars =
+      exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
+          [| input1; input2; output |] )
+    in
+    let input1 = param_vars.(0) in
+    let input2 = param_vars.(1) in
+    let output = param_vars.(2) in
     (* If inputs are zero and length is zero, add the zero check *)
     if length = 0 then (
-      Field.Assert.equal Field.zero input1_cvar ;
-      Field.Assert.equal Field.zero input2_cvar ;
-      Field.Assert.equal Field.zero output_cvar ;
+      Field.Assert.equal Field.zero input1 ;
+      Field.Assert.equal Field.zero input2 ;
+      Field.Assert.equal Field.zero output ;
       with_label "xor_zero_check" (fun () ->
           assert_
             { annotation = Some __LOC__
@@ -178,19 +182,14 @@ let bxor (type f)
                 Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
                   (Raw
                      { kind = Zero
-                     ; values = [| input1_cvar; input2_cvar; output_cvar |]
+                     ; values = [| input1; input2; output |]
                      ; coeffs = [||]
                      } )
             } ) )
     else
       (* Define shorthand helper *)
-      let of_bits (type f)
-          (module Circuit : Snarky_backendless.Snark_intf.Run
-            with type field = f ) (field_element : f) (start : int) (stop : int)
-          : Circuit.Field.t =
-        Common.field_bits_le_to_cvar_field
-          (module Circuit)
-          field_element start stop
+      let of_bits =
+        Common.as_prover_cvar_field_bits_le_to_cvar_field (module Circuit)
       in
 
       (* Nibble offsets *)
@@ -206,21 +205,21 @@ let bxor (type f)
             ; basic =
                 Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
                   (Xor
-                     { in1 = Field.constant input1
-                     ; in2 = Field.constant input2
-                     ; out = Field.constant output
-                     ; in1_0 = of_bits (module Circuit) input1 0 first
-                     ; in1_1 = of_bits (module Circuit) input1 first second
-                     ; in1_2 = of_bits (module Circuit) input1 second third
-                     ; in1_3 = of_bits (module Circuit) input1 third fourth
-                     ; in2_0 = of_bits (module Circuit) input2 0 first
-                     ; in2_1 = of_bits (module Circuit) input2 first second
-                     ; in2_2 = of_bits (module Circuit) input2 second third
-                     ; in2_3 = of_bits (module Circuit) input2 third fourth
-                     ; out_0 = of_bits (module Circuit) output 0 first
-                     ; out_1 = of_bits (module Circuit) output first second
-                     ; out_2 = of_bits (module Circuit) output second third
-                     ; out_3 = of_bits (module Circuit) output third fourth
+                     { in1 = input1
+                     ; in2 = input2
+                     ; out = output
+                     ; in1_0 = of_bits input1 0 first
+                     ; in1_1 = of_bits input1 first second
+                     ; in1_2 = of_bits input1 second third
+                     ; in1_3 = of_bits input1 third fourth
+                     ; in2_0 = of_bits input2 0 first
+                     ; in2_1 = of_bits input2 first second
+                     ; in2_2 = of_bits input2 second third
+                     ; in2_3 = of_bits input2 third fourth
+                     ; out_0 = of_bits output 0 first
+                     ; out_1 = of_bits output first second
+                     ; out_2 = of_bits output second third
+                     ; out_3 = of_bits output third fourth
                      } )
             } ) ;
 
@@ -320,22 +319,22 @@ let bxor (type f)
   bxor_rec input1_bits input2_bits output_bits pad_length len_xor ;
 
   (* Convert back to field *)
-  field_to_cvar_field (module Circuit) @@ Field.Constant.project output_bits
+  exists Field.typ ~compute:(fun () -> Field.Constant.project output_bits)
 
-(* Boolean Xor of 16 bits 
+(* Boolean Xor of 16 bits
  * This is a special case of Xor for 16 bits for Xor lookup table of 4 bits of inputs.
- * Receives two input words to Xor together, of maximum 16 bits each. 
- * Returns the Xor of the two words.   
+ * Receives two input words to Xor together, of maximum 16 bits each.
+ * Returns the Xor of the two words.
  *)
 let bxor16 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (input1 : Circuit.Field.t) (input2 : Circuit.Field.t) : Circuit.Field.t =
   bxor (module Circuit) input1 input2 16 ~len_xor:4
 
-(* Boolean Xor of 64 bits 
+(* Boolean Xor of 64 bits
  * This is a special case of Xor for 64 bits for Xor lookup table of 4 bits of inputs.
  * Receives two input words to Xor together, of maximum 64 bits each.
- * Returns the Xor of the two words.   
+ * Returns the Xor of the two words.
  *)
 let bxor64 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -402,10 +401,10 @@ let band (type f)
 
   and_output
 
-(* Boolean And of 64 bits 
+(* Boolean And of 64 bits
  * This is a special case of And for 64 bits for Xor lookup table of 4 bits of inputs.
  * Receives two input words to And together, of maximum 64 bits each.
- * Returns the And of the two words.   
+ * Returns the And of the two words.
  *)
 let band64 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -434,11 +433,11 @@ let bnot64_checked (type f)
     (input : Circuit.Field.t) : Circuit.Field.t =
   bnot_checked (module Circuit) input 64
 
-(* Boolean Not of length bits for unchecked length (uses Generic subtractions inside) 
+(* Boolean Not of length bits for unchecked length (uses Generic subtractions inside)
  *  - input of word to negate
  *  - length of word to negate
  * (Note that this can negate two words per row, but it inputs need to be a copy of another
-     variable with a correct length in order to make sure that the length is correct )   
+     variable with a correct length in order to make sure that the length is correct )
  *)
 let bnot_unchecked (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -487,7 +486,7 @@ let%test_unit "bitwise rotation gadget" =
      *   Returns unit if constraints are satisfied, error otherwise.
   *)
   let test_rot word length mode result : unit =
-    let _proof_keypair, _proof =
+    let _cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
           let open Runner.Impl in
           (* Set up snarky variables for inputs and output *)
@@ -536,7 +535,7 @@ let%test_unit "bitwise xor gadget" =
      *   Returns true if constraints are satisfied, false otherwise.
   *)
   let test_xor left_input right_input output_xor length : unit =
-    let _proof_keypair, _proof =
+    let _cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
           let open Runner.Impl in
           (* Set up snarky variables for inputs and output *)
@@ -600,7 +599,7 @@ let%test_unit "bitwise and gadget" =
      *   Returns true if constraints are satisfied, false otherwise.
   *)
   let test_and left_input right_input output_and length =
-    let _proof_keypair, _proof =
+    let _cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
           let open Runner.Impl in
           (* Set up snarky variables for inputs and outputs *)
@@ -653,7 +652,7 @@ let%test_unit "bitwise not gadget" =
      *   Returns true if constraints are satisfied, false otherwise.
   *)
   let test_not input output length =
-    let _proof_keypair, _proof =
+    let _cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
           let open Runner.Impl in
           (* Set up snarky variables for input and output *)
@@ -661,18 +660,10 @@ let%test_unit "bitwise not gadget" =
             exists Field.typ ~compute:(fun () ->
                 Field.Constant.of_string input )
           in
-          (* TODO: fix this misbehaviour in permutation code:
-           * Intentionally duplicating this variable twice because 
-           * otherwise it causes a final permutation error when
-           * reusing the same output to compare the three values:
-           *   - result_checked
-           *   - result_unchecked
-           *   - output
-           *)
+
           let output =
-            exists (Typ.array ~length:2 Field.typ) ~compute:(fun () ->
-                let cvar = Field.Constant.of_string output in
-                [| cvar; cvar |] )
+            exists Field.typ ~compute:(fun () ->
+                Field.Constant.of_string output )
           in
 
           (* Use the not gate gadget *)
@@ -680,8 +671,8 @@ let%test_unit "bitwise not gadget" =
           let result_unchecked =
             bnot_unchecked (module Runner.Impl) input length
           in
-          Field.Assert.equal output.(0) result_checked ;
-          Field.Assert.equal output.(1) result_unchecked )
+          Field.Assert.equal output result_checked ;
+          Field.Assert.equal output result_unchecked )
     in
     ()
   in
