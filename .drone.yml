@@ -288,7 +288,7 @@ name: run-zkapps
 type: docker
 clone:
   depth: 1
-depends_on: [ deploy-to-cluster-custom ]
+depends_on: [ graphql-timeout-test ]
 
 trigger:
   event: [ custom ]
