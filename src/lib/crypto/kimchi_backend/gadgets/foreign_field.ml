@@ -534,10 +534,14 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
         (* Clarification *)
         (* let right_hi = right_input[3] * F::two_to_limb() + right_input[HI]; (* This allows to store 2^88 in the high limb *) *)
         let left =
-          Element.Standard.to_bignum_bigint_as_prover (module Circuit) left_input
+          Element.Standard.to_bignum_bigint_as_prover
+            (module Circuit)
+            left_input
         in
         let right =
-          Element.Extended.to_bignum_bigint_as_prover (module Circuit) right_input
+          Element.Extended.to_bignum_bigint_as_prover
+            (module Circuit)
+            right_input
         in
 
         (* Make sure that inputs are smaller than the foreign modulus.
