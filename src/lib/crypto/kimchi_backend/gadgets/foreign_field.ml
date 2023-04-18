@@ -428,12 +428,8 @@ let compact_limb (type f) (module Circuit : Snark_intf.Run with type field = f)
     (lo : f) (hi : f) : f =
   Circuit.Field.Constant.(lo + (hi * two_to_limb_field (module Circuit)))
 
-let tuple4_of_array array =
-  match array with
-  | [| a1; a2; a3; a4 |] ->
-      (a1, a2, a3, a4)
-  | _ ->
-      assert false
+let tuple3_of_array array =
+  match array with [| a1; a2; a3 |] -> (a1, a2, a3) | _ -> assert false
 
 let tuple11_of_array array =
   match array with
@@ -539,25 +535,12 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
       , field_overflow
       , carry ) =
     exists (Typ.array ~length:11 Field.typ) ~compute:(fun () ->
-        (* Make sure that inputs are smaller than the foreign modulus *)
-        assert (
-          Element.Standard.fits
-            (module Circuit)
-            left_input foreign_field_modulus ) ;
-        assert (
-          Element.Extended.fits
-            (module Circuit)
-            right_input foreign_field_modulus ) ;
-
-        (* Compute values for the ffadd *)
-
         (* Compute bigint version of the inputs *)
         let modulus =
           field_standard_limbs_to_bignum_bigint
             (module Circuit)
             foreign_field_modulus
         in
-
         (* Clarification *)
         (* let right_hi = right_input[3] * F::two_to_limb() + right_input[HI]; (* This allows to store 2^88 in the high limb *) *)
         let left =
@@ -566,6 +549,20 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
         let right =
           Element.Extended.to_bignum_bigint (module Circuit) right_input
         in
+
+        (* Make sure that inputs are smaller than the foreign modulus.
+             If the right input is 2^264, then this is also acceptable. *)
+        assert (
+          Element.Standard.fits
+            (module Circuit)
+            left_input foreign_field_modulus ) ;
+        assert (
+          Element.Extended.fits
+            (module Circuit)
+            right_input foreign_field_modulus
+          || Bignum_bigint.equal right two_to_3limb ) ;
+
+        (* Compute values for the ffadd *)
 
         (* Overflow if addition and greater than modulus or
          * underflow if subtraction and less than zero
@@ -693,11 +690,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
  * - external_checks       := Optional context to track required external checks.
  *                            When omitted, creates and returns new external_checks structure.
  *                            Otherwise, appends new required external checks to supplied structure.
- * - foreign_field_modulus := the modulus of the foreign field
- * If called from a FFMul gadget, the external_checks structure is updated with a new range check, 
- * so that the circuit writer can iterate over them all to make them effective.
- * If called from a FFAdd gadget, the external_checks structure is updated with a new range check, 
- * but this one should be effective right after the current gate. 
+ * - foreign_field_modulus := the modulus of the foreign field 
  *)
 let less_than_fmod (type f)
     (module Circuit : Snark_intf.Run with type field = f)
@@ -710,25 +703,26 @@ let less_than_fmod (type f)
     Element.Extended.of_limbs (Field.zero, Field.zero, Field.zero, Field.one)
   in
 
-  let bound0, bound1, bound2, ovf =
+  (* Create FFAdd gate for the bound check *)
+  let bound, sign, ovf =
+    add (module Circuit) value offset false foreign_field_modulus
+  in
+
+  let bound0, bound1, bound2 =
     exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
-        (* Create the foreign field addition gate *)
-        let bound, sign, ovf =
-          add (module Circuit) value offset false foreign_field_modulus
-        in
         (* Parse the bound outcome *)
         let bound0, bound1, bound2 =
           Element.Standard.to_field_limbs (module Circuit) bound
         in
 
         (* Check that the correct expected values were obtained *)
-        let sign = Common.cvar_field_to_field_as_prover sign in
-        let ovf = Common.cvar_field_to_field_as_prover ovf in
+        let sign = Common.cvar_field_to_field_as_prover (module Circuit) sign in
+        let ovf = Common.cvar_field_to_field_as_prover (module Circuit) ovf in
         assert (Field.Constant.(equal sign one)) ;
         assert (Field.Constant.(equal ovf one)) ;
 
-        [| bound0; bound1; bound2; ovf |] )
-    |> tuple4_of_array
+        [| bound0; bound1; bound2 |] )
+    |> tuple3_of_array
   in
 
   (* Final Zero gate*)
@@ -773,7 +767,7 @@ let less_than_fmod (type f)
    * foreign field addition gate for the bound check. An additional multi range check must be performed.
    * By default, the range check takes place right after the final Raw row.
 *)
-let _add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
+let add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
     (inputs : f Element.Standard.t list) (is_sub : bool list)
     (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
   (* Check that the number of inputs is correct *)
@@ -1288,7 +1282,7 @@ let%test_unit "foreign_field_add gadget" =
     in
     cs
   in
-  (*
+
   (* Helper to test foreign_field_mul gadget with external checks
      *   Inputs:
      *     - inputs
@@ -1348,7 +1342,7 @@ let%test_unit "foreign_field_add gadget" =
     in
     cs
   in
-*)
+
   (* Test foreign_field_add gadget *)
   let _secp256k1_modulus =
     Common.bignum_bigint_of_hex
@@ -1481,7 +1475,7 @@ let%test_unit "foreign_field_mul gadget" =
            *   7) compact-multi-range-check (quotient range check) *)
 
           (* 1) Create the foreign field mul gadget *)
-          let _product1, external_checks =
+          let product1, external_checks =
             mul
               (module Runner.Impl)
               left_input right_input foreign_field_modulus
@@ -1503,22 +1497,17 @@ let%test_unit "foreign_field_mul gadget" =
               let product =
                 Element.Standard.to_field_limbs (module Runner.Impl) product2
               in
+
               assert_eq product expected ) ;
 
-          (*
-          print_endline "before first less than fmod";
           (* 2) Add result bound addition gate. Corresponding range check happens in 6 *)
           let _out1 =
-            less_than_fmod
-              (module Runner.Impl)
-              ~external_checks product1 foreign_field_modulus
+            less_than_fmod (module Runner.Impl) product1 foreign_field_modulus
           in
-          print_endline "before second less than fmod";
           let _out2 =
-            less_than_fmod
-              (module Runner.Impl)
-              ~external_checks product2 foreign_field_modulus
-          in*)
+            less_than_fmod (module Runner.Impl) product2 foreign_field_modulus
+          in
+
           assert (
             Mina_stdlib.List.Length.equal external_checks.bound_additions 2 ) ;
 
@@ -1558,6 +1547,7 @@ let%test_unit "foreign_field_mul gadget" =
               let v01, v2 = compact_multi_range in
               Range_check.compact_multi (module Runner.Impl) v01 v2 ;
               () ) ;
+
           assert (
             Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges 2 ) )
     in
