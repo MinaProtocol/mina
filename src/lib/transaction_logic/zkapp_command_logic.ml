@@ -1227,6 +1227,7 @@ module Make (Inputs : Inputs_intf) = struct
       Account.set_delegate
         (Public_key.if_ self_delegate ~then_:(Account.public_key a)
            ~else_:(Account.delegate a) )
+        a
     in
     let matching_verification_key_hashes =
       Inputs.Bool.(
