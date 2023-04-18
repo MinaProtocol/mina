@@ -131,6 +131,14 @@ let () =
               index_non_existent
           ; test_case "Test merkle root soundness." `Quick merkle_root
           ] )
+    ; Receipt_test.
+        ( "receipt"
+        , [ test_case "Checked-unchecked equivalence (signed command)." `Quick
+              checked_unchecked_equivalence_signed_command
+          ; test_case "Checked-unchecked equivalence (zkApp command)." `Quick
+              checked_unchecked_equivalence_zkapp_command
+          ; test_case "JSON roundtrip." `Quick json_roundtrip
+          ] )
     ; Zkapp_command_test.
         ( "zkApp commands"
         , [ test_case "Account_update_or_stack.of_zkapp_command_list." `Quick
