@@ -10,13 +10,17 @@
   core_kernel
   integers
   sexplib0
+  yojson
   ;; local libraries
   currency
+  fields_derivers_zkapps
+  fields_derivers_graphql
   mina_base
   mina_numbers
   mina_wire_types
   pickles
   ppx_version.runtime
+  run_in_thread
   signature_lib
   random_oracle
   sgn
