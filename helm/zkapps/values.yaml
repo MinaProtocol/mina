@@ -4,7 +4,6 @@
 
 repository: akoptelov/mina-load-generator
 pullPolicy: Always
-# restartPolicy: Never
 # Overrides the image tag whose default is the chart appVersion.
 tag: ""
 

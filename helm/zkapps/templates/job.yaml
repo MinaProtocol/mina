@@ -42,5 +42,12 @@ spec:
             {{ if $.Values.mem }}
             memory: {{ $.Values.mem }}
             {{ end }}
-      restartPolicy: {{ $.Values.restartPolicy | default "OnFailure" }}
+      restartPolicy: Never
   backoffLimit: {{ $.Values.count }}
+  podFailurePolicy:
+    rules:
+    - action: FailJob
+      onExitCodes:
+        containerName: worker
+        operator: In
+        values: [125]
