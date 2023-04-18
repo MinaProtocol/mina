@@ -43,7 +43,7 @@ spec:
             memory: {{ $.Values.mem }}
             {{ end }}
       restartPolicy: Never
-  backoffLimit: {{ $.Values.count }}
+  backoffLimit: {{ $.Values.workers }}
   podFailurePolicy:
     rules:
     - action: FailJob
