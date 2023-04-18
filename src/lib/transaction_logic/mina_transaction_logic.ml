@@ -878,12 +878,7 @@ module Make (L : Ledger_intf.S) :
       pay_fee ~user_command ~signer_pk ~ledger ~current_global_slot
     in
     let%bind () =
-      if
-        Account.has_permission ~control:Control.Tag.Signature ~to_:`Access
-          fee_payer_account
-        && Account.has_permission ~control:Control.Tag.Signature ~to_:`Send
-             fee_payer_account
-      then Ok ()
+      if Account.has_permission_to_send fee_payer_account then Ok ()
       else
         Or_error.error_string
           Transaction_status.Failure.(describe Update_not_permitted_balance)
@@ -914,13 +909,9 @@ module Make (L : Ledger_intf.S) :
             get_with_location ledger source |> ok_or_reject
           in
           let%bind () =
-            if
-              Account.has_permission ~control:Control.Tag.Signature ~to_:`Access
-                source_account
-              && Account.has_permission ~control:Control.Tag.Signature
-                   ~to_:`Set_delegate source_account
-            then Ok ()
-            else Error Transaction_status.Failure.Update_not_permitted_delegate
+            Result.ok_if_true
+              (Account.has_permission_to_set_delegate source_account)
+              ~error:Transaction_status.Failure.Update_not_permitted_delegate
           in
           let%bind () =
             match (source_location, receiver_location) with
@@ -954,13 +945,9 @@ module Make (L : Ledger_intf.S) :
             get_with_location ledger receiver |> ok_or_reject
           in
           let%bind () =
-            if
-              Account.has_permission ~control:Control.Tag.None_given
-                ~to_:`Access receiver_account
-              && Account.has_permission ~control:Control.Tag.None_given
-                   ~to_:`Receive receiver_account
-            then Ok ()
-            else Error Transaction_status.Failure.Update_not_permitted_balance
+            Result.ok_if_true
+              (Account.has_permission_to_receive receiver_account)
+              ~error:Transaction_status.Failure.Update_not_permitted_balance
           in
           let%bind source_location, source_account =
             let ret =
@@ -1017,13 +1004,9 @@ module Make (L : Ledger_intf.S) :
             else ret
           in
           let%bind () =
-            if
-              Account.has_permission ~control:Control.Tag.Signature ~to_:`Access
-                source_account
-              && Account.has_permission ~control:Control.Tag.Signature
-                   ~to_:`Send source_account
-            then Ok ()
-            else Error Transaction_status.Failure.Update_not_permitted_balance
+            Result.ok_if_true
+              (Account.has_permission_to_send source_account)
+              ~error:Transaction_status.Failure.Update_not_permitted_balance
           in
           (* Charge the account creation fee. *)
           let%bind receiver_amount =

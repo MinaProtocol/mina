@@ -1238,14 +1238,9 @@ struct
             | None ->
                 Error Diff_error.Fee_payer_account_not_found
             | Some account ->
-                if
-                  not
-                    ( Account.has_permission ~to_:`Access
-                        ~control:Control.Tag.Signature account
-                    && Account.has_permission ~to_:`Send
-                         ~control:Control.Tag.Signature account )
-                then Error Diff_error.Fee_payer_not_permitted_to_send
-                else Ok ()
+                Result.ok_if_true
+                  (Account.has_permission_to_send account)
+                  ~error:Diff_error.Fee_payer_not_permitted_to_send
         in
         let pool, add_results =
           List.fold_map (Envelope.Incoming.data diff) ~init:t.pool
