@@ -129,5 +129,24 @@ let () =
           ; test_case "Test non-existent index retrieval." `Quick
               index_non_existent
           ; test_case "Test merkle root soundness." `Quick merkle_root
+        ] )
+    ; Receipt_test.
+      ( "receipts"
+      , [ test_case "Checked-unmchecked equivalence for signed command" `Quick
+            checked_unchecked_equivalence_signed_command 
+        ; test_case "Checked-unchecked equivalenece in zkApp command" `Quick
+            checked_unchecked_equivalence_zkapp_command 
+        ; test_case "JSON roundtrip" `Quick json_roundtrip 
+      ])
+    ; Zkapp_command_test.
+        ( "zkApp commands"
+        , [ test_case "Account_update_or_stack.of_zkapp_command_list." `Quick
+              account_update_or_stack_of_zkapp_command_list
+          ; test_case "Wire embedded in t." `Quick wire_embedded_in_t
+          ; test_case "Wire embedded in graphql." `Quick
+              wire_embedded_in_graphql
+          ; test_case "JSON roundtrip dummy." `Quick
+              Test_derivers.json_roundtrip_dummy
+          ; test_case "Full circuit." `Quick Test_derivers.full_circuit
           ] )
     ]
