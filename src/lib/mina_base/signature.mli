@@ -15,6 +15,8 @@ module Stable : sig
   end
 end]
 
+val gen : t Quickcheck.Generator.t
+
 include Codable.S with type t := t
 
 [%%ifdef consensus_mechanism]
