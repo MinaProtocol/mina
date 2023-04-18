@@ -3,14 +3,14 @@ package main
 import (
 	logging "github.com/ipfs/go-log/v2"
 	"cloud.google.com/go/storage"
-	// sheets "google.golang.org/api/sheets/v4"
+	sheets "google.golang.org/api/sheets/v4"
 	// "google.golang.org/api/option"
 	"fmt"
 	"strings"
 	"bytes"
 	"time"
 	"context"
-	"io/ioutil"
+	// "io/ioutil"
 	"encoding/json"
 	itn "block_producers_uptime/itn_uptime_analyzer"
 	dg "block_producers_uptime/delegation_backend"
@@ -33,7 +33,8 @@ func main (){
 
 	// Create identity struct TODO move this to itn_uptime_analyzer package
 
-	var submissionData map[string]string
+	// var submissionData map[string]string
+	var submissionData dg.MetaToBeSaved
 	identities := make(map[string]itn.Identity) // Create a map for unique identities
 
 	// Empty context object and initializing memory for application
@@ -57,9 +58,15 @@ func main (){
 
 	// Create Google Cloud client
 
-	client, err1 := storage.NewClient(ctx)
-	if err1 != nil {
-		log.Fatalf("Error creating Cloud client: %v", err1)
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		log.Fatalf("Error creating Cloud client: %v", err)
+		return
+	}
+
+	sheetsService, err := sheets.NewService(ctx)
+	if err != nil {
+		log.Fatalf("Error creating Sheets service: %v", err)
 		return
 	}
 
@@ -101,19 +108,27 @@ func main (){
 				return
 			}
 
-			contentJSON, err := ioutil.ReadAll(reader)
+			// contentJSON, err := ioutil.ReadAll(reader)
+			// if err != nil {
+			// 	fmt.Printf("Error reading json: %v\n", err)
+			// 	return
+			// }
+
+			// err = json.Unmarshal(contentJSON, &submissionData)
+			// if err != nil {
+			// 	fmt.Printf("Error converting json to string: %v\n", err)
+			// 	return
+			// }
+
+			decoder := json.NewDecoder(reader)
+
+			err = decoder.Decode(&submissionData)
 			if err != nil {
-				fmt.Printf("Error reading json: %v\n", err)
+				fmt.Printf("Error converting json to string: %v\n", err)
 				return
 			}
 
-			err1 = json.Unmarshal(contentJSON, &submissionData)
-			if err1 != nil {
-				fmt.Printf("Error converting json to string: %v\n", err1)
-				return
-			}
-
-			identity := itn.GetIdentity(submissionData["submitter"], "45.45.45.45") // change the IP back to submissionData["remote_addr"] 
+			identity := itn.GetIdentity(submissionData.Submitter.String(), "45.45.45.45") // change the IP back to submissionData["remote_addr"]
 			if _, inMap := identities[identity["id"]]; !inMap {
 				itn.AddIdentity(identity, identities)
 			}
@@ -123,6 +138,8 @@ func main (){
 	}
 
 	submissions = client.Bucket(dg.CloudBucketName()).Objects(ctx, &storage.Query{Prefix: prefixCurrent})
+
+	// Go over identities and calculate uptime
 
 	for _, identity := range identities {
 		var lastSubmissionDate string
@@ -162,19 +179,27 @@ func main (){
 					return
 				}
 				
-				contentJSON, err := ioutil.ReadAll(reader)
-				if err != nil {
-					fmt.Printf("Error reading json: %v\n", err)
-					return
-				} 
+				// contentJSON, err := ioutil.ReadAll(reader)
+				// if err != nil {
+				// 	fmt.Printf("Error reading json: %v\n", err)
+				// 	return
+				// } 
 
-				err1 = json.Unmarshal(contentJSON, &submissionData)
-				if err1 != nil {
-					fmt.Printf("Error converting json to string: %v\n", err1)
-					return
-				}
+				// err = json.Unmarshal(contentJSON, &submissionData)
+				// if err != nil {
+				// 	fmt.Printf("Error converting json to string: %v\n", err)
+				// 	return
+				// }
 					
-				if (identity["public-key"] == submissionData["submitter"]) && (identity["public-ip"] == submissionData["remote_addr"]) {
+				decoder := json.NewDecoder(reader)
+
+				err = decoder.Decode(&submissionData)
+				if err != nil {
+					fmt.Printf("Error converting json to string: %v\n", err)
+					return
+				}	
+
+				if (identity["public-key"] == submissionData.Submitter.String()) && (identity["public-ip"] == submissionData.RemoteAddr) {
 					if lastSubmissionDate != "" {
 						lastSubmissionTime, err = time.Parse(time.RFC3339, lastSubmissionDate)
 						fmt.Println(lastSubmissionTime)
@@ -184,7 +209,7 @@ func main (){
 						}	
 					}
 
-					currentSubmissionTime, err := time.Parse(time.RFC3339, submissionData["created_at"])
+					currentSubmissionTime, err := time.Parse(time.RFC3339, submissionData.CreatedAt)
 					fmt.Println(currentSubmissionTime)
 					if err != nil {
 						fmt.Println("Error parsing time:", err)
@@ -199,15 +224,30 @@ func main (){
 						fmt.Println("This is the first submission")
 					}
 
-					lastSubmissionDate = submissionData["created_at"]
+					lastSubmissionDate = submissionData.CreatedAt
 
 				}
 				reader.Close()
 			}
 		}
 		identity["uptime"] = uptime.String()
-		fmt.Println(identity)
-		fmt.Println(len(identity["uptime"]))
+	}
+
+	// Insert uptime
+
+	for _, identity := range identities {
+		
+		exactMatch, rowIndex, firstEmptyRow := identity.GetCell(sheetsService, log)
+		
+		if exactMatch {
+			identity.AppendUptime(sheetsService, log, rowIndex)
+		} else if (!exactMatch) && (rowIndex == 0) && (firstEmptyRow != 0) {
+			identity.AppendNext(sheetsService, log)
+			identity.AppendUptime(sheetsService, log, firstEmptyRow)
+		} else if (!exactMatch) && (rowIndex != 0) {
+			identity.InsertBelow(sheetsService, log, rowIndex)
+			identity.AppendUptime(sheetsService, log, rowIndex+1)
+		}
 	}
 
 }

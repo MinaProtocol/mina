@@ -14,9 +14,10 @@ import (
 // closest relative of the identity (same pubkey or same ip)
 // If nothing was found it returns false and 0 as the row index
 
-func (identity Identity) GetCell(client *sheets.Service, log *logging.ZapEventLogger) (exactMatch bool, rowIndex int) {
+func (identity Identity) GetCell(client *sheets.Service, log *logging.ZapEventLogger) (exactMatch bool, rowIndex int, firstEmptyRow int) {
 	exactMatch = false
 	rowIndex = 0
+	firstEmptyRow = 0
 	col := IDENTITY_COLUMN
 	readRange := ITN_UPTIME_ANALYZER_SHEET + "!" + col + ":" + col
 	spId := OutputSpreadsheetId()
@@ -45,13 +46,92 @@ func (identity Identity) GetCell(client *sheets.Service, log *logging.ZapEventLo
 		}
 	}
 
-	return exactMatch, rowIndex 
+	for index, value := range resp.Values[0] {
+		if value == "" {
+			firstEmptyRow = index + 1
+			break
+		}
+	}
+
+	return exactMatch, rowIndex, firstEmptyRow
 }
 
-func (identity Identity) AddNext(client *sheets.Service, log *logging.ZapEventLogger){
+// Appends the identity string of the node to the first column
 
+func (identity Identity) AppendNext(client *sheets.Service, log *logging.ZapEventLogger) {
+	col := IDENTITY_COLUMN
+	readRange := ITN_UPTIME_ANALYZER_SHEET + "!" + col + ":" + col
+	spId := OutputSpreadsheetId()
+
+	identityString := strings.Join([]string{identity["public-key"], identity["public-ip"]}, "-")
+
+	cellValue := []interface{}{identityString}
+
+	valueRange := sheets.ValueRange{
+		Values: [][]interface{}{cellValue},
+	}
+
+	_, err := client.Spreadsheets.Values.Append(spId, readRange, &valueRange).ValueInputOption("USER_ENTERED").Do()
+	if err != nil {
+		log.Fatalf("Unable to append data to sheet: %v", err)
+	}
 }
 
-func (identity Identity) InsertBelow(client *sheets.Service, log *logging.ZapEventLogger, rowIndex int){
+// Inserts the identity string of the node in the first column under rowIndex
 
+func (identity Identity) InsertBelow(client *sheets.Service, log *logging.ZapEventLogger, rowIndex int) {
+	col := IDENTITY_COLUMN
+	readRange := fmt.Sprintf("%s!%s%d:%s%d", ITN_UPTIME_ANALYZER_SHEET, col, rowIndex + 1, col, rowIndex + 1)
+	spId := OutputSpreadsheetId()
+
+	identityString := strings.Join([]string{identity["public-key"], identity["public-ip"]}, "-")
+
+	cellValue := []interface{}{identityString}
+
+	valueRange := sheets.ValueRange{
+		Values: [][]interface{}{cellValue},
+	}
+
+	_, err := client.Spreadsheets.Values.Append(spId, readRange, &valueRange).ValueInputOption("USER_ENTERED").InsertDataOption("INSERT_ROWS").Do()
+	if err != nil {
+		log.Fatalf("Unable to insert data in sheet: %v", err)
+	}
+}
+
+func (identity Identity) AppendUptime(client *sheets.Service, log *logging.ZapEventLogger, rowIndex int) {
+	readRange := fmt.Sprintf("%s!A%d:Z%d", ITN_UPTIME_ANALYZER_SHEET, rowIndex, rowIndex)
+	spId := OutputSpreadsheetId()
+
+	resp, err := client.Spreadsheets.Values.Get(spId, readRange).Do()
+	if err != nil {
+		log.Fatalf("Unable to retrieve data from sheet: %v", err)
+	}
+
+	var nextEmptyColumn int = len(resp.Values[0])
+
+	for index, value := range resp.Values[0] {
+		if value == "" {
+				nextEmptyColumn = index + 1
+				break
+		}
+	}
+
+	updateRange := fmt.Sprintf("%s!%s%d", ITN_UPTIME_ANALYZER_SHEET, string(nextEmptyColumn + 65), rowIndex)
+
+	var cellValue []interface{}
+
+	if (len(identity["uptime"]) >= 47) {
+		cellValue = []interface{}{"up"}
+	} else {
+		cellValue = []interface{}{"not up"}
+	}
+
+	valueRange := sheets.ValueRange{
+		Values: [][]interface{}{cellValue},
+	}
+
+	_, err = client.Spreadsheets.Values.Append(spId, updateRange, &valueRange).ValueInputOption("USER_ENTERED").Do()
+	if err != nil {
+		log.Fatalf("Unable to insert data in sheet: %v", err)
+	}
 }
