@@ -155,4 +155,15 @@ let () =
               Test_derivers.json_roundtrip_dummy
           ; test_case "Full circuit." `Quick Test_derivers.full_circuit
           ] )
+    ; Zkapp_command_test.
+        ( "zkApp commands"
+        , [ test_case "Account_update_or_stack.of_zkapp_command_list." `Quick
+              account_update_or_stack_of_zkapp_command_list
+          ; test_case "Wire embedded in t." `Quick wire_embedded_in_t
+          ; test_case "Wire embedded in graphql." `Quick
+              wire_embedded_in_graphql
+          ; test_case "JSON roundtrip dummy." `Quick
+              Test_derivers.json_roundtrip_dummy
+          ; test_case "Full circuit." `Quick Test_derivers.full_circuit
+          ] )
     ]
