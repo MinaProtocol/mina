@@ -631,6 +631,8 @@ module Proof_keys = struct
         (Json_layout.Proof_keys.Transaction_capacity.of_yojson json)
 
     let small : t = Log_2 2
+
+    let medium : t = Log_2 3
   end
 
   type t =

@@ -73,12 +73,11 @@ let result_field2 ~resolve =
 module Doc = struct
   let date ?(extra = "") s =
     sprintf
-      !"%s (stringified Unix time - number of milliseconds since January 1, \
-        1970)%s"
+      "%s (stringified Unix time - number of milliseconds since January 1, \
+       1970)%s"
       s extra
 
-  let bin_prot =
-    sprintf !"%s (base58-encoded janestreet/bin_prot serialization)"
+  let bin_prot = sprintf "%s (base58-encoded janestreet/bin_prot serialization)"
 end
 
 module Reflection = struct
@@ -169,6 +168,59 @@ let get_ledger_and_breadcrumb mina =
            |> Staged_ledger.ledger
          , tip ) )
 
+module Itn_sequencing = struct
+  (* we don't have compare, etc. for pubkey type to use Core_kernel.Hashtbl *)
+  module Hashtbl = Stdlib.Hashtbl
+
+  let uuid = Uuid.create_random Random.State.default
+
+  let sequence_tbl : (Itn_crypto.pubkey, Unsigned.uint16) Hashtbl.t =
+    Hashtbl.create ~random:true 1023
+
+  let get_sequence_number pubkey =
+    let key = pubkey in
+    match Hashtbl.find_opt sequence_tbl key with
+    | None ->
+        let data = Unsigned.UInt16.zero in
+        Hashtbl.add sequence_tbl key data ;
+        data
+    | Some n ->
+        n
+
+  (* used for `auth` queries, so we can return
+     the sequence number for the pubkey that signed
+     the query
+
+     this is stateful, but appears to be safe
+  *)
+  let set_sequence_number_for_auth, get_sequence_no_for_auth =
+    let pubkey_sequence_no = ref Unsigned.UInt16.zero in
+    let setter pubkey =
+      let seq_no = get_sequence_number pubkey in
+      pubkey_sequence_no := seq_no
+    in
+    let getter () = !pubkey_sequence_no in
+    (setter, getter)
+
+  let valid_sequence_number query_uuid pubkey seqno_str =
+    let%bind.Option () = Option.some_if (Uuid.equal query_uuid uuid) () in
+    let seqno = get_sequence_number pubkey in
+    if String.equal (Unsigned.UInt16.to_string seqno) seqno_str then Some seqno
+    else None
+
+  let incr_sequence_number pubkey =
+    let key = pubkey in
+    match Hashtbl.find_opt sequence_tbl key with
+    | None ->
+        failwithf
+          "Expected to find sequence number for UUID %s and public key %s"
+          (Uuid.to_string uuid)
+          (Itn_crypto.pubkey_to_base64 pubkey)
+          ()
+    | Some n ->
+        Hashtbl.replace sequence_tbl key (Unsigned.UInt16.succ n)
+end
+
 module Types = struct
   open Schema
 
@@ -178,6 +230,8 @@ module Types = struct
     let private_key : (Mina_lib.t, PrivateKey.t option) typ = PrivateKey.typ ()
 
     let public_key = PublicKey.typ ()
+
+    let uint16 = UInt16.typ ()
 
     let uint32 = UInt32.typ ()
 
@@ -488,6 +542,21 @@ module Types = struct
                ~highest_block_length_received:nn_int
                ~highest_unvalidated_block_length_received:nn_int
                ~metrics:(id ~typ:(non_null metrics)) )
+  end
+
+  module Itn = struct
+    let auth =
+      obj "ItnAuth" ~fields:(fun _ ->
+          [ field "serverUuid"
+              ~args:Arg.[]
+              ~doc:"Uuid of the ITN GraphQL server" ~typ:(non_null string)
+              ~resolve:(fun _ (uuid, _) -> uuid)
+          ; field "signerSequenceNumber"
+              ~args:Arg.[]
+              ~doc:"Sequence number for the signer of the auth query"
+              ~typ:(non_null uint16)
+              ~resolve:(fun _ (_, n) -> n)
+          ] )
   end
 
   let fee_transfer =
@@ -3431,8 +3500,33 @@ module Mutations = struct
     | `Bootstrapping ->
         return (Error "Daemon is bootstrapping")
 
+  let internal_send_zkapp_commands mina zkapp_commands =
+    match Mina_commands.setup_and_submit_zkapp_commands mina zkapp_commands with
+    | `Active f -> (
+        match%map f with
+        | Ok zkapp_commands ->
+            let cmds_with_hash =
+              List.map zkapp_commands ~f:(fun zkapp_command ->
+                  let cmd =
+                    { Types.Zkapp_command.With_status.data = zkapp_command
+                    ; status = Enqueued
+                    }
+                  in
+                  Types.Zkapp_command.With_status.map cmd ~f:(fun cmd ->
+                      { With_hash.data = cmd
+                      ; hash = Transaction_hash.hash_command (Zkapp_command cmd)
+                      } ) )
+            in
+            Ok cmds_with_hash
+        | Error e ->
+            Error
+              (sprintf "Couldn't send zkApp commands: %s"
+                 (Error.to_string_hum e) ) )
+    | `Bootstrapping ->
+        return (Error "Daemon is bootstrapping")
+
   let send_zkapp_command mina zkapp_command =
-    match Mina_commands.setup_and_submit_snapp_command mina zkapp_command with
+    match Mina_commands.setup_and_submit_zkapp_command mina zkapp_command with
     | `Active f -> (
         match%map f with
         | Ok zkapp_command ->
@@ -3722,15 +3816,17 @@ module Mutations = struct
 
   let internal_send_zkapp =
     io_field "internalSendZkapp"
-      ~doc:"Send a zkApp (for internal testing purposes)"
+      ~doc:"Send zkApp transactions (for internal testing purposes)"
       ~args:
         Arg.
-          [ arg "zkappCommand"
-              ~typ:(non_null Types.Input.SendTestZkappInput.arg_typ)
+          [ arg "zkappCommands"
+              ~typ:
+                ( non_null @@ list
+                @@ non_null Types.Input.SendTestZkappInput.arg_typ )
           ]
-      ~typ:(non_null Types.Payload.send_zkapp)
-      ~resolve:(fun { ctx = mina; _ } () zkapp_command ->
-        send_zkapp_command mina zkapp_command )
+      ~typ:(non_null @@ list @@ non_null Types.Payload.send_zkapp)
+      ~resolve:(fun { ctx = mina; _ } () zkapp_commands ->
+        internal_send_zkapp_commands mina zkapp_commands )
 
   let send_test_payments =
     io_field "sendTestPayments" ~doc:"Send a series of test payments"
@@ -4064,13 +4160,15 @@ module Mutations = struct
                 ~typ:(non_null Types.Input.Itn.PaymentDetails.arg_typ)
             ]
         ~typ:(non_null string)
-        ~resolve:(fun { ctx = mina; _ } () input ->
+        ~resolve:(fun { ctx = with_seq_no, mina; _ } () input ->
           return
           @@
-          match input with
-          | Error err ->
+          match (with_seq_no, input) with
+          | false, _ ->
+              Error "Missing sequence information"
+          | true, Error err ->
               Error (sprintf "Invalid input to payment scheduler: %s" err)
-          | Ok payment_details ->
+          | true, Ok payment_details ->
               let max_memo_len = Signed_command_memo.max_input_length in
               if List.is_empty payment_details.senders then
                 Error "Empty list of senders"
@@ -4251,29 +4349,34 @@ module Mutations = struct
                 ~typ:(non_null string)
             ]
         ~typ:(non_null string)
-        ~resolve:(fun { ctx = mina; _ } () handle ->
+        ~resolve:(fun { ctx = with_seq_no, mina; _ } () handle ->
           let logger = Mina_lib.top_level_logger mina in
-          try
-            let uuid = Uuid.of_string handle in
-            match Uuid.Table.find scheduler_tbl uuid with
-            | None ->
-                return
-                @@ Error
-                     (sprintf "Could not find scheduled payments with handle %s"
-                        handle )
-            | Some ivar ->
-                [%log info]
-                  "Requesting stop of scheduled payments with handle %s" handle ;
-                Ivar.fill_if_empty ivar () ;
-                return
-                @@ Ok
-                     (sprintf
-                        "Requesting stop of scheduled payments with handle %s"
-                        handle )
-          with _ ->
-            return
-            @@ Error
-                 (sprintf "Not a valid scheduled payments handle: %s" handle) )
+          if not with_seq_no then return @@ Error "Missing sequence information"
+          else
+            try
+              let uuid = Uuid.of_string handle in
+              match Uuid.Table.find scheduler_tbl uuid with
+              | None ->
+                  return
+                  @@ Error
+                       (sprintf
+                          "Could not find scheduled payments with handle %s"
+                          handle )
+              | Some ivar ->
+                  [%log info]
+                    "Requesting stop of scheduled payments with handle %s"
+                    handle ;
+                  Ivar.fill_if_empty ivar () ;
+                  return
+                  @@ Ok
+                       (sprintf
+                          "Requesting stop of scheduled payments with handle %s"
+                          handle )
+            with _ ->
+              return
+              @@ Error
+                   (sprintf "Not a valid scheduled payments handle: %s" handle)
+          )
 
     let commands = [ schedule_payments; stop_payments ]
   end
@@ -5105,12 +5208,44 @@ module Queries = struct
     (* incentivized testnet-specific queries *)
 
     let auth =
-      field "auth" ~typ:bool
+      field "auth"
         ~args:Arg.[]
-        ~doc:"Returns true if query is authorized"
-        ~resolve:(fun _ _ -> Some true)
+        ~typ:(non_null Types.Itn.auth)
+        ~doc:"Uuid for GraphQL server, sequence number for signing public key"
+        ~resolve:(fun _ () ->
+          ( Uuid.to_string Itn_sequencing.uuid
+          , Itn_sequencing.get_sequence_no_for_auth () ) )
 
-    let commands = [ auth ]
+    let slots_won =
+      io_field "slotsWon"
+        ~typ:(non_null (list (non_null int)))
+        ~args:Arg.[]
+        ~doc:"Slots won by a block producer for current epoch"
+        ~resolve:(fun { ctx = with_seq_no, mina; _ } () ->
+          if not with_seq_no then return @@ Error "Missing sequence information"
+          else
+            let bp_keys = Mina_lib.block_production_pubkeys mina in
+            if Public_key.Compressed.Set.is_empty bp_keys then
+              return @@ Error "Not a block producing node"
+            else
+              let vrf_evaluator = Mina_lib.vrf_evaluator mina in
+              let logger = Mina_lib.top_level_logger mina in
+              let%map vrf_result =
+                Block_producer.Vrf_evaluation_state.poll_vrf_evaluator ~logger
+                  vrf_evaluator
+              in
+              match vrf_result.evaluator_status with
+              | Completed ->
+                  let slots_since_hard_fork =
+                    List.map vrf_result.slots_won ~f:(fun { global_slot; _ } ->
+                        Unsigned.UInt32.to_int global_slot )
+                    |> List.sort ~compare:Int.compare
+                  in
+                  Ok slots_since_hard_fork
+              | _ ->
+                  Error "Vrf evaluation not completed for current epoch" )
+
+    let commands = [ auth; slots_won ]
   end
 end
 
@@ -5126,7 +5261,9 @@ let schema_limited =
       [ Queries.daemon_status; Queries.block; Queries.version ]
       ~mutations:[] ~subscriptions:[])
 
-let schema_itn : Mina_lib.t Schema.schema =
-  Graphql_async.Schema.(
-    schema Queries.Itn.commands ~mutations:Mutations.Itn.commands
-      ~subscriptions:[])
+let schema_itn : (bool * Mina_lib.t) Schema.schema =
+  if Mina_compile_config.itn_features then
+    Graphql_async.Schema.(
+      schema Queries.Itn.commands ~mutations:Mutations.Itn.commands
+        ~subscriptions:[])
+  else Graphql_async.Schema.(schema [] ~mutations:[] ~subscriptions:[])
