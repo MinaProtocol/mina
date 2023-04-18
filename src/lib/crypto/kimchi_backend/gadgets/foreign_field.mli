@@ -110,12 +110,13 @@ end
  * If called from a FFAdd gadget, the external_checks structure is updated with a new range check, 
  * but this one should be effective right after the current gate. 
  *)
- val less_than_fmod:
-      (module Snark_intf.Run with type field = 'f)
-    -> ?external_checks: 'f External_checks.t (* external_checks *)
-    -> 'f Element.Standard.t (* value *)
-    -> 'f standard_limbs (* foreign_field_modulus *)
-    -> 'f Element.Standard.t * 'f External_checks.t (* result, external_checks *)
+val less_than_fmod :
+     (module Snark_intf.Run with type field = 'f)
+  -> ?external_checks:'f External_checks.t (* external_checks *)
+  -> 'f Element.Standard.t (* value *)
+  -> 'f standard_limbs (* foreign_field_modulus *)
+  -> 'f Element.Standard.t * 'f External_checks.t
+(* result, external_checks *)
 
 (* Definition of a gadget for a single foreign field addition
    * - left_input of the addition as 3 limbs element
@@ -125,15 +126,16 @@ end
    * - Returns the result of the addition/subtraction as a 3 limbs element
    *
 *)
- val add :
+val add :
      (module Snark_intf.Run with type field = 'f)
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Extended.t (* right_input *)
   -> bool (* is_sub *)
   -> 'f standard_limbs (* foreign_field_modulus *)
-  -> 'f Element.Standard.t * 'f * 'f (* result, sign, overflow *)
-
-
+  -> 'f Element.Standard.t
+     * 'f Snarky_backendless.Cvar.t
+     * 'f Snarky_backendless.Cvar.t
+(* result, sign, overflow *)
 
 (** Foreign field multiplication gadget
  *   Constrains that
@@ -157,6 +159,5 @@ val mul :
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
-  -> 'f Element.Standard.t * 'f External_checks.t (* remainder, external_checks *)
-
-
+  -> 'f Element.Standard.t * 'f External_checks.t
+(* remainder, external_checks *)
