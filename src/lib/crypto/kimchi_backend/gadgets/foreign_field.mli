@@ -113,10 +113,6 @@ end
  *                            When omitted, creates and returns new external_checks structure.
  *                            Otherwise, appends new required external checks to supplied structure.
  * - foreign_field_modulus := the modulus of the foreign field
- * If called from a FFMul gadget, the external_checks structure is updated with a new range check,
- * so that the circuit writer can iterate over them all to make them effective.
- * If called from a FFAdd gadget, the external_checks structure is updated with a new range check,
- * but this one should be effective right after the current gate.
  *)
 val less_than_fmod :
      (module Snark_intf.Run with type field = 'f)
@@ -140,7 +136,9 @@ val add :
   -> 'f Element.Extended.t (* right_input *)
   -> bool (* is_sub *)
   -> 'f standard_limbs (* foreign_field_modulus *)
-  -> 'f Element.Standard.t * 'f * 'f
+  -> 'f Element.Standard.t
+     * 'f Snarky_backendless.Cvar.t
+     * 'f Snarky_backendless.Cvar.t
 (* result, sign, overflow *)
 
 (** Foreign field multiplication gadget

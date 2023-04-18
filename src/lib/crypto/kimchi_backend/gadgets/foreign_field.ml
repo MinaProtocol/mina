@@ -418,114 +418,69 @@ let compact_limb (type f) (module Circuit : Snark_intf.Run with type field = f)
     (lo : f) (hi : f) : f =
   Circuit.Field.Constant.(lo + (hi * two_to_limb_field (module Circuit)))
 
-(* FOREIGN FIELD ADDITION *)
+let tuple3_of_array array =
+  match array with [| a1; a2; a3 |] -> (a1, a2, a3) | _ -> assert false
 
-(* Given a left and right inputs to an addition or subtraction, and a modulus, it computes
- * all necessary values needed for the witness layout. Meaning, it returns an [FFAddValues] instance
- *   Result of the addition/subtraction as a ForeignElement
- *   Sign of the operation
- *   Overflow flag
- *   Carry value
- *
- * Preconditions: This is a witness function and, as such, must be executed within an `exists` call
- *)
-let compute_ffadd_values (type f)
-    (module Circuit : Snark_intf.Run with type field = f)
-    (left_input : f Element.Standard.t) (right_input : f Element.Extended.t)
-    (is_sub : bool) (foreign_field_modulus : f standard_limbs) :
-    f Element.Standard.t * f * f * f =
-  let open Circuit in
-  (* Compute bigint version of the inputs *)
-  let modulus =
-    field_standard_limbs_to_bignum_bigint (module Circuit) foreign_field_modulus
-  in
-  (* Clarification *)
-  (* let right_hi = right_input[3] * F::two_to_limb() + right_input[HI]; (* This allows to store 2^88 in the high limb *) *)
-  let left =
-    Element.Standard.to_bignum_bigint_as_prover (module Circuit) left_input
-  in
-  let right =
-    Element.Extended.to_bignum_bigint_as_prover (module Circuit) right_input
-  in
+let tuple11_of_array array =
+  match array with
+  | [| a1; a2; a3; a4; a5; a6; a7; a8; a9; a10; a11 |] ->
+      (a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11)
+  | _ ->
+      assert false
 
-  (* Addition or subtraction *)
-  let sign = Field.Constant.(if is_sub then negate one else one) in
-
-  (* Overflow if addition and greater than modulus or
-   * underflow if subtraction and less than zero
-   *)
-  let has_overflow =
-    Bignum_bigint.(if is_sub then left < right else left + right >= modulus)
-  in
-
-  (* 0 for no overflow
-   * -1 for underflow
-   * +1 for overflow
-   *)
-  let field_overflow = if has_overflow then sign else Field.Constant.zero in
-
-  (* Compute the result
-   * result = left + sign * right - field_overflow * modulus
-   * TODO: unluckily, we cannot do it in one line if we keep these types, because one
-   *       cannot combine field elements and biguints in the same operation automatically
-   *)
-  let result =
-    Element.Standard.of_bignum_bigint (module Circuit)
-    @@ Bignum_bigint.(
-         if is_sub then
-           if not has_overflow then (* normal subtraction *)
-             left - right
-           else (* underflow *)
-             modulus + left - right
-         else if not has_overflow then (* normal addition *)
-           left + right
-         else (* overflow *)
-           left + right - modulus)
-  in
-
-  (* c = [ (a1 * 2^88 + a0) + s * (b1 * 2^88 + b0) - q * (f1 * 2^88 + f0) - (r1 * 2^88 + r0) ] / 2^176
-   *  <=>
-   * c = r2 - a2 - s*b2 + q*f2 *)
-  let foreign_field_modulus0, foreign_field_modulus1, foreign_field_modulus2 =
-    foreign_field_modulus
-  in
-  let left_input0, left_input1, left_input2 =
-    (* Use of to_field_limbs_as_prover is safe because this entire
-     * function is witness code and executed in an exists *)
-    Element.Standard.to_field_limbs_as_prover (module Circuit) left_input
-  in
-  let right_input0, right_input1, right_input2, right_input3 =
-    Element.Extended.to_field_limbs_as_prover (module Circuit) right_input
-  in
-  let result0, result1, result2 =
-    Element.Standard.to_field_limbs_as_prover (module Circuit) result
-  in
-  (* This allows to store 2^88 in the high limb*)
-  let offset = Common.(bignum_bigint_to_field (module Circuit) two_to_limb) in
-  let right_input2 = Field.Constant.((right_input3 * offset) + right_input2) in
-
-  let carry_bot =
-    Field.Constant.(
-      ( compact_limb (module Circuit) left_input0 left_input1
-      + compact_limb (module Circuit) right_input0 (right_input1 * sign)
-      - compact_limb
-          (module Circuit)
-          foreign_field_modulus0
-          (foreign_field_modulus1 * field_overflow)
-      - compact_limb (module Circuit) result0 result1 )
-      / two_to_2limb_field (module Circuit))
-  in
-
-  let carry_top =
-    Field.Constant.(
-      result2 - left_input2 - (sign * right_input2)
-      + (field_overflow * foreign_field_modulus2))
-  in
-
-  (* Check that both ways of computing the carry value are equal *)
-  assert (Field.Constant.equal carry_top carry_bot) ;
-
-  (result, sign, field_overflow, carry_bot)
+let tuple24_of_array array =
+  match array with
+  | [| a1
+     ; a2
+     ; a3
+     ; a4
+     ; a5
+     ; a6
+     ; a7
+     ; a8
+     ; a9
+     ; a10
+     ; a11
+     ; a12
+     ; a13
+     ; a14
+     ; a15
+     ; a16
+     ; a17
+     ; a18
+     ; a19
+     ; a20
+     ; a21
+     ; a22
+     ; a23
+     ; a24
+    |] ->
+      ( a1
+      , a2
+      , a3
+      , a4
+      , a5
+      , a6
+      , a7
+      , a8
+      , a9
+      , a10
+      , a11
+      , a12
+      , a13
+      , a14
+      , a15
+      , a16
+      , a17
+      , a18
+      , a19
+      , a20
+      , a21
+      , a22
+      , a23
+      , a24 )
+  | _ ->
+      assert false
 
 (* FOREIGN FIELD ADDITION GADGET *)
 
@@ -540,42 +495,156 @@ let compute_ffadd_values (type f)
 let add (type f) (module Circuit : Snark_intf.Run with type field = f)
     (left_input : f Element.Standard.t) (right_input : f Element.Extended.t)
     (is_sub : bool) (foreign_field_modulus : f standard_limbs) :
-    f Element.Standard.t * f * f =
+    f Element.Standard.t * Circuit.Field.t * Circuit.Field.t =
   let open Circuit in
   (* Check foreign field modulus < max allowed *)
   check_modulus (module Circuit) foreign_field_modulus ;
+  (* Decompose modulus into limbs *)
   let foreign_field_modulus0, foreign_field_modulus1, foreign_field_modulus2 =
     foreign_field_modulus
   in
-  print_endline "after check mod" ;
-  (* Make sure that inputs are smaller than the foreign modulus *)
-  as_prover (fun () ->
-      assert (
-        Element.Standard.fits_as_prover
-          (module Circuit)
-          left_input foreign_field_modulus ) ;
-      assert (
-        Element.Extended.fits_as_prover
-          (module Circuit)
-          right_input foreign_field_modulus ) ;
-      () ) ;
-  print_endline "after fits" ;
 
-  (* Compute values for the ffadd *)
-  let result, sign, field_overflow, carry =
-    compute_ffadd_values
-      (module Circuit)
-      left_input right_input is_sub foreign_field_modulus
-  in
+  (* Addition or subtraction *)
+  let sign = Field.Constant.(if is_sub then negate one else one) in
 
-  print_endline "after compute" ;
+  (* Given a left and right inputs to an addition or subtraction, and a modulus, it computes
+     * all necessary values needed for the witness layout. Meaning, it returns an [FFAddValues] instance
+     * - the result of the addition/subtraction as a ForeignElement
+     * - the sign of the operation
+     * - the overflow flag
+     * - the carry value *)
+  let ( left_input0
+      , left_input1
+      , left_input2
+      , right_input0
+      , right_input1
+      , right_input2
+      , result0
+      , result1
+      , result2
+      , field_overflow
+      , carry ) =
+    exists (Typ.array ~length:11 Field.typ) ~compute:(fun () ->
+        (* Compute bigint version of the inputs *)
+        let modulus =
+          field_standard_limbs_to_bignum_bigint
+            (module Circuit)
+            foreign_field_modulus
+        in
+        (* Clarification *)
+        (* let right_hi = right_input[3] * F::two_to_limb() + right_input[HI]; (* This allows to store 2^88 in the high limb *) *)
+        let left =
+          Element.Standard.to_bignum_bigint_as_prover (module Circuit) left_input
+        in
+        let right =
+          Element.Extended.to_bignum_bigint_as_prover (module Circuit) right_input
+        in
 
-  (* Parse inputs *)
-  let right_input0, right_input1, right_input2, _right_input3 =
-    Element.Extended.to_limbs right_input
-  in
-  let left_input0, left_input1, left_input2 =
-    Element.Standard.to_limbs left_input
+        (* Make sure that inputs are smaller than the foreign modulus.
+             If the right input is 2^264, then this is also acceptable. *)
+        assert (
+          Element.Standard.fits_as_prover
+            (module Circuit)
+            left_input foreign_field_modulus ) ;
+        assert (
+          Element.Extended.fits_as_prover
+            (module Circuit)
+            right_input foreign_field_modulus
+          || Bignum_bigint.equal right two_to_3limb ) ;
+
+        (* Compute values for the ffadd *)
+
+        (* Overflow if addition and greater than modulus or
+         * underflow if subtraction and less than zero
+         *)
+        let has_overflow =
+          Bignum_bigint.(
+            if is_sub then left < right else left + right >= modulus)
+        in
+
+        (* 0 for no overflow
+         * -1 for underflow
+         * +1 for overflow
+         *)
+        let field_overflow =
+          if has_overflow then sign else Field.Constant.zero
+        in
+
+        (* Compute the result
+         * result = left + sign * right - field_overflow * modulus
+         * TODO: unluckily, we cannot do it in one line if we keep these types, because one
+         *       cannot combine field elements and biguints in the same operation automatically
+         *)
+        let result =
+          Element.Standard.of_bignum_bigint (module Circuit)
+          @@ Bignum_bigint.(
+               if is_sub then
+                 if not has_overflow then (* normal subtraction *)
+                   left - right
+                 else (* underflow *)
+                   modulus + left - right
+               else if not has_overflow then (* normal addition *)
+                 left + right
+               else (* overflow *)
+                 left + right - modulus)
+        in
+
+        (* c = [ (a1 * 2^88 + a0) + s * (b1 * 2^88 + b0) - q * (f1 * 2^88 + f0) - (r1 * 2^88 + r0) ] / 2^176
+         *  <=>
+         * c = r2 - a2 - s*b2 + q*f2 *)
+        let left_input0, left_input1, left_input2 =
+          Element.Standard.to_field_limbs_as_prover (module Circuit) left_input
+        in
+        let right_input0, right_input1, right_input2, right_input3 =
+          Element.Extended.to_field_limbs_as_prover (module Circuit) right_input
+        in
+        let result0, result1, result2 =
+          Element.Standard.to_field_limbs_as_prover (module Circuit) result
+        in
+        (* This allows to store 2^88 in the high limb*)
+        let offset =
+          Common.(bignum_bigint_to_field (module Circuit) two_to_limb)
+        in
+        let right_input2 =
+          Field.Constant.((right_input3 * offset) + right_input2)
+        in
+
+        (* Compute the carry value *)
+        let carry_bot =
+          Field.Constant.(
+            ( compact_limb (module Circuit) left_input0 left_input1
+            + compact_limb (module Circuit) right_input0 (right_input1 * sign)
+            - compact_limb
+                (module Circuit)
+                foreign_field_modulus0
+                (foreign_field_modulus1 * field_overflow)
+            - compact_limb (module Circuit) result0 result1 )
+            / two_to_2limb_field (module Circuit))
+        in
+
+        let carry_top =
+          Field.Constant.(
+            result2 - left_input2 - (sign * right_input2)
+            + (field_overflow * foreign_field_modulus2))
+        in
+
+        (* Check that both ways of computing the carry value are equal *)
+        assert (Field.Constant.equal carry_top carry_bot) ;
+
+        (* Return the ffadd values *)
+        [| left_input0
+         ; left_input1
+         ; left_input2
+         ; right_input0
+         ; right_input1
+         ; right_input2
+         ; result0
+         ; result1
+         ; result2
+         ; field_overflow
+         ; carry_bot
+        |] )
+    |> tuple11_of_array
   in
 
   (* Create the gate *)
@@ -592,8 +661,8 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
                  ; right_input_lo = right_input0
                  ; right_input_mi = right_input1
                  ; right_input_hi = right_input2
-                 ; field_overflow = Field.constant field_overflow
-                 ; carry = Field.constant carry
+                 ; field_overflow
+                 ; carry
                  ; foreign_field_modulus0
                  ; foreign_field_modulus1
                  ; foreign_field_modulus2
@@ -601,18 +670,17 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
                  } )
         } ) ;
 
-  (result, sign, field_overflow)
+  (* Return the result *)
+  ( Element.Standard.of_limbs (result0, result1, result2)
+  , Field.constant sign
+  , field_overflow )
 
 (* This function adds a FFAdd gate to check that a given value is smaller than the modulus.
  * - value                 := the value to check
  * - external_checks       := Optional context to track required external checks.
  *                            When omitted, creates and returns new external_checks structure.
  *                            Otherwise, appends new required external checks to supplied structure.
- * - foreign_field_modulus := the modulus of the foreign field
- * If called from a FFMul gadget, the external_checks structure is updated with a new range check,
- * so that the circuit writer can iterate over them all to make them effective.
- * If called from a FFAdd gadget, the external_checks structure is updated with a new range check,
- * but this one should be effective right after the current gate.
+ * - foreign_field_modulus := the modulus of the foreign field 
  *)
 let less_than_fmod (type f)
     (module Circuit : Snark_intf.Run with type field = f)
@@ -625,29 +693,27 @@ let less_than_fmod (type f)
     Element.Extended.of_limbs (Field.zero, Field.zero, Field.zero, Field.one)
   in
 
-  print_endline "after offset" ;
-
-  (* Create the foreign field addition gate *)
+  (* Create FFAdd gate for the bound check *)
   let bound, sign, ovf =
     add (module Circuit) value offset false foreign_field_modulus
   in
-  print_endline "after add" ;
 
-  (* Parse the bound outcome *)
   let bound0, bound1, bound2 =
-    (* TODO: Anais -- is less_than_fmod always called as prover? *)
-    Element.Standard.to_field_limbs_as_prover (module Circuit) bound
+    exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
+        (* Parse the bound outcome *)
+        let bound0, bound1, bound2 =
+          Element.Standard.to_field_limbs_as_prover (module Circuit) bound
+        in
+
+        (* Check that the correct expected values were obtained *)
+        let sign = Common.cvar_field_to_field_as_prover (module Circuit) sign in
+        let ovf = Common.cvar_field_to_field_as_prover (module Circuit) ovf in
+        assert (Field.Constant.(equal sign one)) ;
+        assert (Field.Constant.(equal ovf one)) ;
+
+        [| bound0; bound1; bound2 |] )
+    |> tuple3_of_array
   in
-  let bound0 = Field.constant bound0 in
-  let bound1 = Field.constant bound1 in
-  let bound2 = Field.constant bound2 in
-  print_endline "after bound" ;
-
-  (* Check that the correct expected values were obtained *)
-  assert (Field.Constant.(equal sign one)) ;
-  assert (Field.Constant.(equal ovf one)) ;
-
-  print_endline "after field cnstant" ;
 
   (* Final Zero gate*)
   with_label "final_add_zero_gate" (fun () ->
@@ -663,14 +729,8 @@ let less_than_fmod (type f)
                  } )
         } ) ;
 
-  print_endline "after with label" ;
-
   (* Set up copy constraints with overflow with the overflow check*)
-  as_prover (fun () ->
-      Field.Assert.equal (Field.constant ovf) Field.one ;
-      () ) ;
-
-  print_endline "after as_prover" ;
+  Field.Assert.equal ovf Field.one ;
 
   (* Prepare external check for multi range check *)
   let external_checks =
@@ -681,8 +741,6 @@ let less_than_fmod (type f)
         External_checks.create (module Circuit)
   in
   External_checks.add_multi_range_check external_checks (bound0, bound1, bound2) ;
-
-  print_endline "after external checks" ;
 
   (* Return the bound value *)
   (Element.Standard.of_limbs (bound0, bound1, bound2), external_checks)
@@ -887,60 +945,6 @@ let compute_bound_witness_carry (type f)
     Common.bignum_bigint_div_rem Bignum_bigint.(sums01 - bound01) two_to_2limb
   in
   Common.bignum_bigint_to_field (module Circuit) quotient_bound_carry
-
-let tuple24_of_array array =
-  match array with
-  | [| a1
-     ; a2
-     ; a3
-     ; a4
-     ; a5
-     ; a6
-     ; a7
-     ; a8
-     ; a9
-     ; a10
-     ; a11
-     ; a12
-     ; a13
-     ; a14
-     ; a15
-     ; a16
-     ; a17
-     ; a18
-     ; a19
-     ; a20
-     ; a21
-     ; a22
-     ; a23
-     ; a24
-    |] ->
-      ( a1
-      , a2
-      , a3
-      , a4
-      , a5
-      , a6
-      , a7
-      , a8
-      , a9
-      , a10
-      , a11
-      , a12
-      , a13
-      , a14
-      , a15
-      , a16
-      , a17
-      , a18
-      , a19
-      , a20
-      , a21
-      , a22
-      , a23
-      , a24 )
-  | _ ->
-      assert false
 
 (* Foreign field multiplication gadget definition *)
 let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
@@ -1475,7 +1479,7 @@ let%test_unit "foreign_field_mul gadget" =
            *   7) compact-multi-range-check (quotient range check) *)
 
           (* 1) Create the foreign field mul gadget *)
-          let _product1, external_checks =
+          let product1, external_checks =
             mul
               (module Runner.Impl)
               left_input right_input foreign_field_modulus
@@ -1499,22 +1503,17 @@ let%test_unit "foreign_field_mul gadget" =
                   (module Runner.Impl)
                   product2
               in
+
               assert_eq product expected ) ;
 
-          (*
-          print_endline "before first less than fmod";
           (* 2) Add result bound addition gate. Corresponding range check happens in 6 *)
           let _out1 =
-            less_than_fmod
-              (module Runner.Impl)
-              ~external_checks product1 foreign_field_modulus
+            less_than_fmod (module Runner.Impl) product1 foreign_field_modulus
           in
-          print_endline "before second less than fmod";
           let _out2 =
-            less_than_fmod
-              (module Runner.Impl)
-              ~external_checks product2 foreign_field_modulus
-          in*)
+            less_than_fmod (module Runner.Impl) product2 foreign_field_modulus
+          in
+
           assert (
             Mina_stdlib.List.Length.equal external_checks.bound_additions 2 ) ;
 
@@ -1554,6 +1553,7 @@ let%test_unit "foreign_field_mul gadget" =
               let v01, v2 = compact_multi_range in
               Range_check.compact_multi (module Runner.Impl) v01 v2 ;
               () ) ;
+
           assert (
             Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges 2 ) )
     in
