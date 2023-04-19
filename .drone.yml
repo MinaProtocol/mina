@@ -189,7 +189,7 @@ clone:
 depends_on: [ deploy-to-cluster-custom ]
 
 trigger:
-  event: [ none ]
+  event: [ custom ]
 
 steps:
 
