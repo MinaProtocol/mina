@@ -84,7 +84,7 @@ module Element : sig
     include Element_intf with type 'a limbs_type = 'a standard_limbs
 
     (** Convert a standard foreign element into extended limbs *)
-    val extend_as_prover :
+    val as_prover_extend :
          (module Snark_intf.Run with type field = 'field)
       -> 'field t
       -> 'field Cvar.t extended_limbs
@@ -107,7 +107,7 @@ module External_checks : sig
   val create : (module Snark_intf.Run with type field = 'field) -> 'field t
 end
 
-(* This function adds a FFAdd gate to check that a given value is smaller than the modulus.
+(** This function adds a FFAdd gate to check that a given value is smaller than the modulus.
  * - value                 := the value to check
  * - external_checks       := Optional context to track required external checks.
  *                            When omitted, creates and returns new external_checks structure.
@@ -122,7 +122,7 @@ val less_than_fmod :
   -> 'f Element.Standard.t * 'f External_checks.t
 (* result, external_checks *)
 
-(* Definition of a gadget for a single foreign field addition
+(** Definition of a gadget for a single foreign field addition
    * - left_input of the addition as 3 limbs element
    * - right_input of the addition as 4 limbs element
    * - is_sub: a flag indicating whether the corresponding gate is addition or a subtraction
@@ -137,7 +137,26 @@ val add :
   -> bool (* is_sub *)
   -> 'f standard_limbs (* foreign_field_modulus *)
   -> 'f Element.Standard.t
-(* result, sign, overflow *)
+(* result *)
+
+(*** Definition of a gadget for a chain of foreign field additions
+   * - inputs: all the inputs to the chain of additions
+   * - is_sub: a list of booleans indicating whether the corresponding addition is a subtraction
+   * - foreign_field_modulus: the modulus of the foreign field (all the same)
+   * - Returns the final result of the chain of additions
+   *
+   * For n+1 inputs, the gadget creates n foreign field addition gates, followed by a final
+   * foreign field addition gate for the bound check. An additional multi range check must be performed.
+   * By default, the range check takes place right after the final Raw row.
+*)
+val add_chain : 
+      (module Snark_intf.Run with type field = 'f)
+    -> 'f Element.Standard.t list (* inputs *)
+    -> bool list (* is_sub *)
+    -> 'f standard_limbs (* foreign_field_modulus *)
+    -> 'f Element.Standard.t
+  (* result *)
+
 
 (** Foreign field multiplication gadget
  *   Constrains that
