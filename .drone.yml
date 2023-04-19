@@ -318,7 +318,7 @@ steps:
   environment:
     KUBECONFIG: kube-config
   commands:
-  - helm install $${RELEASE_NAME} helm/zkapps --set=job=$${ZK_JOB:-sign-proof-x3} $${COUNT:+--set=count=$${COUNT}} $${WORKERS:+--set=workers=$${WORKERS}} --set=suffix=$${SUFFIX}
+  - helm install $${RELEASE_NAME} helm/zkapps --set=job=$${ZK_JOB:-sign-proof-x3} --set=count=$${COUNT:-512} $${WORKERS:+--set=workers=$${WORKERS}} --set=suffix=$${SUFFIX}
 
 - name: run
   image: alpine/k8s:1.26.1
