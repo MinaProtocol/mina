@@ -647,9 +647,9 @@ let%test_unit "bitwise not gadget" =
      *   Input and expected output and desired length : not(input) = output
      *   Returns true if constraints are satisfied, false otherwise.
   *)
-  let test_not input output length =
-    let _cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof (fun () ->
+  let test_not ?cs input output length =
+    let cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof ?cs (fun () ->
           let open Runner.Impl in
           (* Set up snarky variables for input and output *)
           let input =
@@ -670,25 +670,25 @@ let%test_unit "bitwise not gadget" =
           Field.Assert.equal output result_checked ;
           Field.Assert.equal output result_unchecked )
     in
-    ()
+    cs
   in
 
   (* Positive tests *)
-  test_not "0" "1" 1 ;
-  test_not "0" "15" 4 ;
-  test_not "0" "255" 8 ;
-  test_not "0" "2047" 11 ;
-  test_not "0" "65535" 16 ;
-  test_not "43210" "22325" 16 ;
-  test_not "767430" "281145" 20 ;
+  let _cs = test_not "0" "1" 1 in
+  let _cs = test_not "0" "15" 4 in
+  let _cs = test_not "0" "255" 8 in
+  let _cs = test_not "0" "2047" 11 in
+  let cs = test_not "0" "65535" 16 in
+  let _cs = test_not ~cs "43210" "22325" 16 in
+  let _cs = test_not "767430" "281145" 20 in
   (* not 0xA5A5A5A5A5A5A5A5 = 0x5A5A5A5A5A5A5A5A*)
-  test_not "11936128518282651045" "6510615555426900570" 64 ;
+  let cs = test_not "11936128518282651045" "6510615555426900570" 64 in
   (* not 0x5A5A5A5A5A5A5A5A = 0xA5A5A5A5A5A5A5A5 *)
-  test_not "6510615555426900570" "11936128518282651045" 64 ;
+  let _cs = test_not ~cs "6510615555426900570" "11936128518282651045" 64 in
   (* not 0xFFFFFFFFFFFFFFFF = 0 *)
-  test_not "18446744073709551615" "0" 64 ;
+  let _cs = test_not ~cs "18446744073709551615" "0" 64 in
 
-  (* Negatve tests *)
+  (* Negative tests *)
   assert (Common.is_error (fun () -> test_not "0" "0" 1)) ;
   assert (Common.is_error (fun () -> test_not "255" "0" 4)) ;
   ()
