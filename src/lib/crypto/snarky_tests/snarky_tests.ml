@@ -621,9 +621,9 @@ module Protocol_circuits = struct
     let _, hash = List.hd_exn digest in
     let digest = Md5.to_hex hash in
 
-    let check = String.(digest = expected) in
-    print_hash (not check) expected digest ;
-    assert check ;
+    let digests_match = String.(digest = expected) in
+    print_hash (not digests_match) expected digest ;
+    assert digests_match ;
     ()
 
   let transaction () : unit =
@@ -633,6 +633,7 @@ module Protocol_circuits = struct
     let digest =
       Transaction_snark.constraint_system_digests ~constraint_constants ()
     in
+    (* these are for the Base and Merge branches, if more branches were added to the digest this line should be updated *)
     let hash1, hash2 =
       match digest with
       | [ (_, a); (_, b) ] ->
@@ -640,7 +641,6 @@ module Protocol_circuits = struct
       | _ ->
           failwith "should have been length 2"
     in
-    (* let _, hash = List.hd_exn digest in *)
     let digest1 = Core.Md5.to_hex hash1 in
     let digest2 = Core.Md5.to_hex hash2 in
 
