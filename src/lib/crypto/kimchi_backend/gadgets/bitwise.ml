@@ -536,22 +536,22 @@ let%test_unit "bitwise xor gadget" =
      *   Inputs operands and expected output: left_input xor right_input
      *   Returns true if constraints are satisfied, false otherwise.
   *)
-  let test_xor left_input right_input output_xor length : unit =
-    let _cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof (fun () ->
+  let test_xor ?cs left_input right_input output_xor length =
+    let cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof ?cs (fun () ->
           let open Runner.Impl in
           (* Set up snarky variables for inputs and output *)
           let left_input =
             exists Field.typ ~compute:(fun () ->
-                Field.Constant.of_string left_input )
+                Common.field_of_hex (module Runner.Impl) left_input )
           in
           let right_input =
             exists Field.typ ~compute:(fun () ->
-                Field.Constant.of_string right_input )
+                Common.field_of_hex (module Runner.Impl) right_input )
           in
           let output_xor =
             exists Field.typ ~compute:(fun () ->
-                Field.Constant.of_string output_xor )
+                Common.field_of_hex (module Runner.Impl) output_xor )
           in
           (* Use the xor gate gadget *)
           let result =
@@ -561,32 +561,54 @@ let%test_unit "bitwise xor gadget" =
           (* Check that the result is equal to the expected output *)
           Field.Assert.equal output_xor result )
     in
-    ()
+    cs
   in
 
-  let test_2xor left1 right1 output1 left2 right2 output2 length : unit =
-    test_xor left1 right1 output1 length ;
-    test_xor left2 right2 output2 length ;
-    ()
+  let test_2xor ?cs left1 right1 output1 left2 right2 output2 length =
+    let cs_new = test_xor ?cs left1 right1 output1 length in
+    let cs = match cs with Some cs -> cs | None -> cs_new in
+    let _cs = test_xor ~cs left2 right2 output2 length in
+    cs
   in
 
   (* Positive tests *)
-  test_xor "1" "0" "1" 16 ;
-  test_xor "0" "0" "0" 8 ;
-  test_xor "0" "0" "0" 1 ;
-  test_xor "0" "0" "0" 4 ;
-  test_xor "43210" "56789" "29983" 16 ;
-  test_xor "767430" "974317" "354347" 20 ;
-  (* 0x5A5A5A5A5A5A5A5A xor 0xA5A5A5A5A5A5A5A5 = 0xFFFFFFFFFFFFFFFF*)
-  test_xor "6510615555426900570" "11936128518282651045" "18446744073709551615"
-    64 ;
-  test_2xor "43210" "56789" "29983" "767430" "974317" "354347" 20 ;
+  let cs = test_xor "1" "0" "1" 16 in
+  let _cs = test_xor ~cs "0" "1" "1" 16 in
+  let _cs = test_xor ~cs "2" "1" "3" 16 in
+  let _cs = test_xor "0" "0" "0" 8 in
+  let cs = test_xor "0" "0" "0" 1 in
+  let _cs = test_xor ~cs "1" "0" "1" 1 in
+  let cs = test_xor "0" "0" "0" 4 in
+  let _cs = test_xor ~cs "1" "1" "0" 4 in
+  let _cs = test_xor "a8ca" "ddd5" "751f" 16 in
+  let _cs = test_xor "bb5c6" "edded" "5682b" 20 in
+  let cs =
+    test_xor "5a5a5a5a5a5a5a5a" "a5a5a5a5a5a5a5a5" "ffffffffffffffff" 64
+  in
+  let _cs =
+    test_xor ~cs "f1f1f1f1f1f1f1f1" "0f0f0f0f0f0f0f0f" "fefefefefefefefe" 64
+  in
+  let _cs =
+    test_xor ~cs "cad1f05900fcad2f" "deadbeef010301db" "147c4eb601ffacf4" 64
+  in
+  let cs = test_2xor "a8ca" "ddd5" "751f" "bb5c6" "edded" "5682b" 20 in
+  let _cs = test_2xor ~cs "f7c1" "1010" "e7d1" "0000" "2222" "2222" 20 in
+
   (* Negatve tests *)
+  assert (
+    Common.is_error (fun () ->
+        (* reusing right CS with bad witness *)
+        test_xor ~cs "ed1ed1" "ed1ed1" "010101" 20 ) ) ;
+  assert (
+    Common.is_error (fun () ->
+        (* reusing wrong CS with diffent coeffs *)
+        test_xor ~cs "1" "0" "0" 16 ) ) ;
+
   assert (Common.is_error (fun () -> test_xor "1" "0" "0" 1)) ;
   assert (Common.is_error (fun () -> test_xor "1111" "2222" "0" 16)) ;
   assert (Common.is_error (fun () -> test_xor "0" "0" "0" 256)) ;
   assert (Common.is_error (fun () -> test_xor "0" "0" "0" (-4))) ;
-
+  assert (Common.is_error (fun () -> test_xor "bb5c6" "edded" "ed1ed1" 20)) ;
   ()
 
 let%test_unit "bitwise and gadget" =
