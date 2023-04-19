@@ -491,8 +491,9 @@ let check_modulus (type f) (module Circuit : Snark_intf.Run with type field = f)
       foreign_field_modulus < max_foreign_field_modulus (module Circuit)) )
 
 (* Represents two limbs as one single field element with twice as many bits *)
-let compact_limb (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (lo : f) (hi : f) : f =
+let as_prover_compact_limb (type f)
+    (module Circuit : Snark_intf.Run with type field = f) (lo : f) (hi : f) : f
+    =
   Circuit.Field.Constant.(lo + (hi * two_to_limb_field (module Circuit)))
 
 (* FOREIGN FIELD ADDITION GADGET *)
@@ -618,13 +619,14 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
         (* Compute the carry value *)
         let carry_bot =
           Field.Constant.(
-            ( compact_limb (module Circuit) left_input0 left_input1
-            + (compact_limb (module Circuit) right_input0 right_input1 * sign)
-            - compact_limb
+            ( as_prover_compact_limb (module Circuit) left_input0 left_input1
+            + as_prover_compact_limb (module Circuit) right_input0 right_input1
+              * sign
+            - as_prover_compact_limb
                 (module Circuit)
                 foreign_field_modulus0 foreign_field_modulus1
               * field_overflow
-            - compact_limb (module Circuit) result0 result1 )
+            - as_prover_compact_limb (module Circuit) result0 result1 )
             / two_to_2limb_field (module Circuit))
         in
 
@@ -853,7 +855,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
    * - right_input of the addition as 4 limbs element
    * - foreign_field_modulus: the modulus of the foreign field
    * - Returns the result of the subtraction as a 3 limbs element
-   * It adds a FFAdd gate, 
+   * It adds a FFAdd gate,
    * followed by a Zero gate,
    * a FFAdd gate for the bound check,
    * a Zero gate after this bound check,

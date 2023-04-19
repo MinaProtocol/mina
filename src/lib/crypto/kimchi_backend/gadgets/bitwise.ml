@@ -150,19 +150,13 @@ let bxor (type f)
   let rec bxor_rec (input1_bits : bool list) (input2_bits : bool list)
       (output_bits : bool list) (length : int) (len_xor : int) =
     let open Circuit in
-    (* Transform to field *)
-
-    (* TODO: [Anais] concerned that at circuit creation time these will be constants
-     *       thus the Xor and Zero gates' cvars below will be constant field cvars
-     *       resulting in extra generic gates with these constatnts baked into coeffs
-     *)
-    let input1 = Field.Constant.project input1_bits in
-    let input2 = Field.Constant.project input2_bits in
-    let output = Field.Constant.project output_bits in
     (* Convert to cvar *)
     let param_vars =
       exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
-          [| input1; input2; output |] )
+          [| Field.Constant.project input1_bits
+           ; Field.Constant.project input2_bits
+           ; Field.Constant.project output_bits
+          |] )
     in
     let input1 = param_vars.(0) in
     let input2 = param_vars.(1) in
@@ -353,12 +347,6 @@ let band (type f)
   (* Recursively build And gadget with leading Xors and a final Generic gate *)
   (* It will also check the correct lengths of the inputs, no need to do it again *)
   let xor_output = bxor (module Circuit) input1 input2 length ~len_xor in
-  (* Transform to non constant cvar *)
-  (* TODO: [Anais] once bxor is fixed not to create const cvars, below should not be needed *)
-  let xor_output_var =
-    exists Field.typ ~compute:(fun () ->
-        Common.cvar_field_to_field_as_prover (module Circuit) xor_output )
-  in
 
   let and_output =
     exists Field.typ ~compute:(fun () ->
@@ -370,13 +358,6 @@ let band (type f)
 
   (* Compute sum of a + b and constrain in the circuit *)
   let sum = Generic.add (module Circuit) input1 input2 in
-  (* TODO: [Anais] this should already be non-const cvar *)
-  (* Transform to non constant cvar *)
-  let sum_var =
-    exists Field.typ ~compute:(fun () ->
-        Common.cvar_field_to_field_as_prover (module Circuit) sum )
-  in
-
   let two = Field.of_int 2 in
 
   (* Constrain AND as 2 * and = sum - xor *)
@@ -386,10 +367,10 @@ let band (type f)
         ; basic =
             Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
               (Basic
-                 { l = (Field.Constant.one, sum_var)
+                 { l = (Field.Constant.one, sum)
                  ; r =
                      ( Option.value_exn Field.(to_constant (negate one))
-                     , xor_output_var )
+                     , xor_output )
                  ; o =
                      ( Option.value_exn Field.(to_constant (negate two))
                      , and_output )
@@ -564,23 +545,16 @@ let%test_unit "bitwise xor gadget" =
     cs
   in
 
-  let test_2xor ?cs left1 right1 output1 left2 right2 output2 length =
-    let cs_new = test_xor ?cs left1 right1 output1 length in
-    let cs = match cs with Some cs -> cs | None -> cs_new in
-    let _cs = test_xor ~cs left2 right2 output2 length in
-    cs
-  in
-
   (* Positive tests *)
   let cs = test_xor "1" "0" "1" 16 in
   let _cs = test_xor ~cs "0" "1" "1" 16 in
   let _cs = test_xor ~cs "2" "1" "3" 16 in
+  let _cs = test_xor ~cs "a8ca" "ddd5" "751f" 16 in
   let _cs = test_xor "0" "0" "0" 8 in
   let cs = test_xor "0" "0" "0" 1 in
   let _cs = test_xor ~cs "1" "0" "1" 1 in
   let cs = test_xor "0" "0" "0" 4 in
   let _cs = test_xor ~cs "1" "1" "0" 4 in
-  let _cs = test_xor "a8ca" "ddd5" "751f" 16 in
   let _cs = test_xor "bb5c6" "edded" "5682b" 20 in
   let cs =
     test_xor "5a5a5a5a5a5a5a5a" "a5a5a5a5a5a5a5a5" "ffffffffffffffff" 64
@@ -591,8 +565,6 @@ let%test_unit "bitwise xor gadget" =
   let _cs =
     test_xor ~cs "cad1f05900fcad2f" "deadbeef010301db" "147c4eb601ffacf4" 64
   in
-  let cs = test_2xor "a8ca" "ddd5" "751f" "bb5c6" "edded" "5682b" 20 in
-  let _cs = test_2xor ~cs "f7c1" "1010" "e7d1" "0000" "2222" "2222" 20 in
 
   (* Negatve tests *)
   assert (
