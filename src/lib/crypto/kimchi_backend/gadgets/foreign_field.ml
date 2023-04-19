@@ -5,6 +5,77 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
+let tuple3_of_array array =
+  match array with [| a1; a2; a3 |] -> (a1, a2, a3) | _ -> assert false
+
+let tuple4_of_array array =
+  match array with
+  | [| a1; a2; a3; a4 |] ->
+      (a1, a2, a3, a4)
+  | _ ->
+      assert false
+
+let tuple11_of_array array =
+  match array with
+  | [| a1; a2; a3; a4; a5; a6; a7; a8; a9; a10; a11 |] ->
+      (a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11)
+  | _ ->
+      assert false
+
+let tuple24_of_array array =
+  match array with
+  | [| a1
+     ; a2
+     ; a3
+     ; a4
+     ; a5
+     ; a6
+     ; a7
+     ; a8
+     ; a9
+     ; a10
+     ; a11
+     ; a12
+     ; a13
+     ; a14
+     ; a15
+     ; a16
+     ; a17
+     ; a18
+     ; a19
+     ; a20
+     ; a21
+     ; a22
+     ; a23
+     ; a24
+    |] ->
+      ( a1
+      , a2
+      , a3
+      , a4
+      , a5
+      , a6
+      , a7
+      , a8
+      , a9
+      , a10
+      , a11
+      , a12
+      , a13
+      , a14
+      , a15
+      , a16
+      , a17
+      , a18
+      , a19
+      , a20
+      , a21
+      , a22
+      , a23
+      , a24 )
+  | _ ->
+      assert false
+
 (* 2^2L *)
 let two_to_2limb = Bignum_bigint.(pow Common.two_to_limb (of_int 2))
 
@@ -169,7 +240,7 @@ module Element : sig
     include Element_intf with type 'a limbs_type = 'a standard_limbs
 
     (* Convert a standard foreign element into extended limbs *)
-    val extend_as_prover :
+    val as_prover_extend :
          (module Snark_intf.Run with type field = 'field)
       -> 'field t
       -> 'field Cvar.t extended_limbs
@@ -293,11 +364,14 @@ end = struct
       in
       Bignum_bigint.(to_bignum_bigint_as_prover (module Circuit) x < modulus)
 
-    let extend_as_prover (type field)
+    let as_prover_extend (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         =
-      let l0, l1, l2 = to_limbs x in
-      Extended.of_limbs (l0, l1, l2, Circuit.Field.zero)
+      let open Circuit in
+      exists (Typ.array ~length:4 Field.typ) ~compute:(fun () ->
+          let l0, l1, l2 = to_field_limbs_as_prover (module Circuit) x in
+          [| l0; l1; l2; Field.Constant.zero |] )
+      |> tuple4_of_array
   end
 
   (* Compact limbs foreign field element *)
@@ -418,77 +492,6 @@ let compact_limb (type f) (module Circuit : Snark_intf.Run with type field = f)
     (lo : f) (hi : f) : f =
   Circuit.Field.Constant.(lo + (hi * two_to_limb_field (module Circuit)))
 
-let tuple3_of_array array =
-  match array with [| a1; a2; a3 |] -> (a1, a2, a3) | _ -> assert false
-
-let tuple4_of_array array =
-  match array with
-  | [| a1; a2; a3; a4 |] ->
-      (a1, a2, a3, a4)
-  | _ ->
-      assert false
-
-let tuple11_of_array array =
-  match array with
-  | [| a1; a2; a3; a4; a5; a6; a7; a8; a9; a10; a11 |] ->
-      (a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11)
-  | _ ->
-      assert false
-
-let tuple24_of_array array =
-  match array with
-  | [| a1
-     ; a2
-     ; a3
-     ; a4
-     ; a5
-     ; a6
-     ; a7
-     ; a8
-     ; a9
-     ; a10
-     ; a11
-     ; a12
-     ; a13
-     ; a14
-     ; a15
-     ; a16
-     ; a17
-     ; a18
-     ; a19
-     ; a20
-     ; a21
-     ; a22
-     ; a23
-     ; a24
-    |] ->
-      ( a1
-      , a2
-      , a3
-      , a4
-      , a5
-      , a6
-      , a7
-      , a8
-      , a9
-      , a10
-      , a11
-      , a12
-      , a13
-      , a14
-      , a15
-      , a16
-      , a17
-      , a18
-      , a19
-      , a20
-      , a21
-      , a22
-      , a23
-      , a24 )
-  | _ ->
-      assert false
-
 (* FOREIGN FIELD ADDITION GADGET *)
 
 (* Internal computation for foreign field addition *)
@@ -543,18 +546,6 @@ let add_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
             (module Circuit)
             right_input
         in
-
-        (* Make sure that inputs are smaller than the foreign modulus.
-             If the right input is 2^264, then this is also acceptable. *)
-        assert (
-          Element.Standard.fits_as_prover
-            (module Circuit)
-            left_input foreign_field_modulus ) ;
-        assert (
-          Element.Extended.fits_as_prover
-            (module Circuit)
-            right_input foreign_field_modulus
-          || Bignum_bigint.equal right two_to_3limb ) ;
 
         (* Compute values for the ffadd *)
 
@@ -692,17 +683,23 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
     (is_sub : bool) (foreign_field_modulus : f standard_limbs) :
     f Element.Standard.t =
   let open Circuit in
-  let right0, right1, right2, right3 =
-    exists (Typ.array ~length:4 Field.typ) ~compute:(fun () ->
-        (* Parse the right input *)
-        let right0, right1, right2 =
-          Element.Standard.to_field_limbs_as_prover (module Circuit) right_input
-        in
-        [| right0; right1; right2; Field.Constant.zero |] )
-    |> tuple4_of_array
-  in
+  as_prover (fun () ->
+      (* Make sure that inputs are smaller than the foreign modulus.
+               If the right input is 2^264, then this is also acceptable. *)
+      assert (
+        Element.Standard.fits_as_prover
+          (module Circuit)
+          left_input foreign_field_modulus ) ;
+      assert (
+        Element.Standard.fits_as_prover
+          (module Circuit)
+          right_input foreign_field_modulus ) ;
+      () ) ;
+
   let right_input =
-    Element.Extended.of_limbs (right0, right1, right2, right3)
+    Element.(
+      Extended.of_limbs
+      @@ Standard.as_prover_extend (module Circuit) right_input)
   in
   let result, _sign, _ovf =
     add_setup
