@@ -695,14 +695,10 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
   let right0, right1, right2, right3 =
     exists (Typ.array ~length:4 Field.typ) ~compute:(fun () ->
         (* Parse the right input *)
-        let right0, right1, right2, right3 =
-          Element.Standard.extend_as_prover (module Circuit) right_input
+        let right0, right1, right2 =
+          Element.Standard.to_field_limbs_as_prover (module Circuit) right_input
         in
-        [| Common.cvar_field_to_field_as_prover (module Circuit) right0
-         ; Common.cvar_field_to_field_as_prover (module Circuit) right1
-         ; Common.cvar_field_to_field_as_prover (module Circuit) right2
-         ; Common.cvar_field_to_field_as_prover (module Circuit) right3
-        |] )
+        [| right0; right1; right2; Field.Constant.zero |] )
     |> tuple4_of_array
   in
   let right_input =
