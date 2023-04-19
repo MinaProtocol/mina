@@ -155,6 +155,11 @@ let () =
               Test_derivers.json_roundtrip_dummy
           ; test_case "Full circuit." `Quick Test_derivers.full_circuit
           ] )
+    ; Signed_command_test.
+        ( "signed command"
+        , [ test_case "Completeness." `Quick completeness
+          ; test_case "JSON." `Quick json
+          ] )
     ; Zkapp_command_test.
         ( "zkApp commands"
         , [ test_case "Account_update_or_stack.of_zkapp_command_list." `Quick
