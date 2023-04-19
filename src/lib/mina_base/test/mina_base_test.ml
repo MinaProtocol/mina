@@ -145,6 +145,11 @@ let () =
               signature_decode_after_encode_is_identity
           ; test_case "Base58Check is stable." `Quick base58Check_stable
           ] )
+    ; Signed_command_test.
+        ( "signed command"
+        , [ test_case "Completeness." `Quick completeness
+          ; test_case "JSON." `Quick json
+          ] )
     ; Zkapp_command_test.
         ( "zkApp commands"
         , [ test_case "Account_update_or_stack.of_zkapp_command_list." `Quick
