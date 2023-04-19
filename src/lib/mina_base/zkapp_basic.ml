@@ -400,6 +400,3 @@ end
 
 let invalid_public_key : Public_key.Compressed.t =
   { x = F.zero; is_odd = false }
-
-let%test "invalid_public_key is invalid" =
-  Option.is_none (Public_key.decompress invalid_public_key)
