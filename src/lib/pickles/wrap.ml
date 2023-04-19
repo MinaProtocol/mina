@@ -880,12 +880,14 @@ let wrap
         Impls.Wrap.generate_witness_conv
           ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } () ->
             [%log internal] "Backend_tock_proof_create_async" ;
-            let%map.Promise proof, traces =
-              Backend.Tock.Proof.create_async ~primary:public_inputs
-                ~auxiliary:auxiliary_inputs pk ~message:next_accumulator
+            let tracing_output = ref "" in
+            let%map.Promise proof =
+              Backend.Tock.Proof.create_async ~tracing_output
+                ~primary:public_inputs ~auxiliary:auxiliary_inputs pk
+                ~message:next_accumulator
             in
             [%log internal] "@metadata"
-              ~metadata:[ ("traces", `String traces.inner) ] ;
+              ~metadata:[ ("traces", `String !tracing_output) ] ;
             [%log internal] "Backend_tock_proof_create_async_done" ;
             proof )
           ~input_typ:input
