@@ -3114,6 +3114,7 @@ module Types = struct
           ; duration_in_minutes : int
           ; memo_prefix : string
           ; no_precondition : bool
+          ; max_size : bool
           }
 
         let arg_typ =
@@ -3121,7 +3122,7 @@ module Types = struct
             ~doc:"Keys and other information for scheduling zkapp commands"
             ~coerce:(fun fee_payers num_zkapps_to_deploy num_new_accounts
                          transactions_per_second duration_in_minutes memo_prefix
-                         no_precondition ->
+                         no_precondition max_size ->
               Result.return
                 { fee_payers
                 ; num_zkapps_to_deploy
@@ -3130,11 +3131,12 @@ module Types = struct
                 ; duration_in_minutes
                 ; memo_prefix
                 ; no_precondition
+                ; max_size
                 } )
             ~split:(fun f (t : input) ->
               f t.fee_payers t.num_zkapps_to_deploy t.num_new_accounts
                 t.transactions_per_second t.duration_in_minutes t.memo_prefix
-                t.no_precondition )
+                t.no_precondition t.max_size )
             ~fields:
               Arg.
                 [ arg "feePayers"
@@ -3157,6 +3159,8 @@ module Types = struct
                 ; arg "memoPrefix" ~doc:"Prefix of memo" ~typ:(non_null string)
                 ; arg "noPrecondition"
                     ~doc:"Disable the precondition in account updates"
+                    ~typ:(non_null bool)
+                ; arg "maxSize" ~doc:"Generate max size zkapp transactions"
                     ~typ:(non_null bool)
                 ]
       end
@@ -4689,7 +4693,13 @@ module Mutations = struct
                                            ~no_token_accounts:true ~limited:true
                                            ~fee_payer_keypair:fee_payer ~keymap
                                            ~account_state_tbl
-                                           ~generate_new_accounts ~ledger ~vk () )
+                                           ~generate_new_accounts ~ledger ~vk
+                                           ~max_size:
+                                             zkapp_command_details.max_size
+                                           ~genesis_constants:
+                                             (Mina_lib.config mina)
+                                               .precomputed_values
+                                               .genesis_constants () )
                                         ~size:1
                                         ~random:
                                           (Splittable_random.State.create
