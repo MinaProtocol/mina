@@ -364,7 +364,7 @@ let band (type f)
 
   let and_output =
     exists Field.typ ~compute:(fun () ->
-        Common.field_bits_combine_as_prover
+        Common.cvar_field_bits_combine_as_prover
           (module Circuit)
           input1 input2
           (fun b1 b2 -> b1 && b2) )

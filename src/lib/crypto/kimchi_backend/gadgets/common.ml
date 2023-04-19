@@ -60,7 +60,7 @@ let cvar_field_to_field_as_prover (type f)
   Circuit.As_prover.read Circuit.Field.typ field_element
 
 (* Combines bits of two cvars with a given boolean function and returns the resulting field element *)
-let field_bits_combine_as_prover (type f)
+let cvar_field_bits_combine_as_prover (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
     (bfun : bool -> bool -> bool) : f =
