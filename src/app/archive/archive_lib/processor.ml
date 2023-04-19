@@ -1366,6 +1366,15 @@ module Block = struct
                 (module Conn)
                 ~public_keys ~parent_id
         in
+        let global_slot_since_hard_fork =
+          Consensus.Data.Consensus_state.curr_global_slot consensus_state
+          |> Unsigned.UInt32.to_int64
+        in
+        let chain_status =
+          if Int64.equal global_slot_since_hard_fork 0L then
+            Chain_status.(to_string Canonical)
+          else Chain_status.(to_string Pending)
+        in
         let%bind block_id =
           Conn.find
             (Caqti_request.find typ Caqti_type.int
@@ -1392,9 +1401,7 @@ module Block = struct
                 |> Blockchain_state.staged_ledger_hash
                 |> Staged_ledger_hash.ledger_hash |> Ledger_hash.to_base58_check
             ; height
-            ; global_slot_since_hard_fork =
-                Consensus.Data.Consensus_state.curr_global_slot consensus_state
-                |> Unsigned.UInt32.to_int64
+            ; global_slot_since_hard_fork
             ; global_slot_since_genesis =
                 consensus_state
                 |> Consensus.Data.Consensus_state.global_slot_since_genesis
@@ -1402,8 +1409,7 @@ module Block = struct
             ; timestamp =
                 Protocol_state.blockchain_state protocol_state
                 |> Blockchain_state.timestamp |> Block_time.to_int64
-                (* we don't yet know the chain status for a block we're adding *)
-            ; chain_status = Chain_status.(to_string Pending)
+            ; chain_status
             }
         in
         let account_creation_fee_of_fees_and_balance ?additional_fee fee balance
