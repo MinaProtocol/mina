@@ -434,21 +434,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let t = Poly.{ payload; signature; signer } in
     Option.some_if (check_signature ?signature_kind t && check_valid_keys t) t
 
-  let gen_test =
-    let open Quickcheck.Let_syntax in
-    let%bind keys =
-      Quickcheck.Generator.list_with_length 2 Signature_keypair.gen
-    in
-    Gen.payment_with_random_participants ~sign_type:`Real
-      ~keys:(Array.of_list keys) ~max_amount:10000 ~fee_range:1000 ()
-
-  let%test_unit "completeness" =
-    Quickcheck.test ~trials:20 gen_test ~f:(fun t -> assert (check_signature t))
-
-  let%test_unit "json" =
-    Quickcheck.test ~trials:20 ~sexp_of:sexp_of_t gen_test ~f:(fun t ->
-        assert (Codable.For_tests.check_encoding (module Stable.Latest) ~equal t) )
-
   (* return type is `t option` here, interface coerces that to `With_valid_signature.t option` *)
   let check t = Option.some_if (check_signature t && check_valid_keys t) t
 
@@ -474,3 +459,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
 end
 
 include Wire_types.Make (Make_sig) (Make_str)
+
+let gen_test =
+  let open Quickcheck.Let_syntax in
+  let%bind keys =
+    Quickcheck.Generator.list_with_length 2 Signature_keypair.gen
+  in
+  Gen.payment_with_random_participants ~sign_type:`Real
+    ~keys:(Array.of_list keys) ~max_amount:10000 ~fee_range:1000 ()
