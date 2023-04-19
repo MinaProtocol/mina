@@ -49,11 +49,13 @@
    with_hash
    consensus
    genesis_constants
+   coda_genesis_proof
    genesis_ledger_helper.lib
    mina_compile_config
    verifier
    quickcheck_lib
    snark_params
+   protocol_version
  )
  (inline_tests)
  (modes native)
