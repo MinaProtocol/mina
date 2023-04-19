@@ -7,21 +7,13 @@ module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 (* Auxiliary functions *)
 
 (* returns a field containing the all one word of length bits *)
-let all_ones_check (type f)
+let cvar_field_all_ones (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (length : int) : Circuit.Field.t =
   let open Circuit in
-  let all_ones =
-    Field.constant
-    @@ Common.bignum_bigint_to_field (module Circuit)
-    @@ Bignum_bigint.(pow (of_int 2) (of_int length) - one)
-  in
-  let all_ones_var =
-    exists Field.typ ~compute:(fun () ->
-        Common.cvar_field_to_field_as_prover (module Circuit) all_ones )
-  in
-  Field.Assert.equal all_ones all_ones_var ;
-  all_ones_var
+  exists Field.typ ~compute:(fun () ->
+      Common.bignum_bigint_to_field (module Circuit)
+      @@ Bignum_bigint.(pow (of_int 2) (of_int length) - one) )
 
 (* ROT64 *)
 
@@ -421,7 +413,7 @@ let band64 (type f)
 let bnot_checked (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     ?(len_xor = 4) (input : Circuit.Field.t) (length : int) : Circuit.Field.t =
-  let all_ones_var = all_ones_check (module Circuit) length in
+  let all_ones_var = cvar_field_all_ones (module Circuit) length in
 
   (* Negating is equivalent to XORing with all one word *)
   bxor (module Circuit) input all_ones_var length ~len_xor
@@ -443,7 +435,7 @@ let bnot_unchecked (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (input : Circuit.Field.t) (length : int) : Circuit.Field.t =
   let open Circuit in
-  let all_ones_var = all_ones_check (module Circuit) length in
+  let all_ones_var = cvar_field_all_ones (module Circuit) length in
   let not_output = Field.(all_ones_var - input) in
   (* Negating is equivalent to subtracting with all one word *)
   (* [2^len - 1] - input = not (input) *)

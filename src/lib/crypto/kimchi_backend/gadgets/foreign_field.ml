@@ -684,7 +684,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
  * - external_checks       := Optional context to track required external checks.
  *                            When omitted, creates and returns new external_checks structure.
  *                            Otherwise, appends new required external checks to supplied structure.
- * - foreign_field_modulus := the modulus of the foreign field 
+ * - foreign_field_modulus := the modulus of the foreign field
  *)
 let less_than_fmod (type f)
     (module Circuit : Snark_intf.Run with type field = f)
