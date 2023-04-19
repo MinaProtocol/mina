@@ -1,3 +1,4 @@
+{{ if .httpSnarkWorkCoordinator }}
 {{- if $.Values.mina.exposeGraphql }}
 {{ range until ($.Values.snarkWorkersConfig.count | int) }}
 {{ $name := printf "%s%03d" $.Values.snarkWorkersConfig.namePrefix (add . 1) }}
@@ -18,3 +19,4 @@ spec:
     targetPort: {{ $.Values.mina.ports.graphql }}
 {{- end }}
 {{- end }}
+{{ end }}

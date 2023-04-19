@@ -32,10 +32,12 @@ http {
            index index.html index.htm;
            error_page 404 /usr/share/nginx/html/index.html;
         }
+        {{ if .httpSnarkWorkCoordinator }}
         location /snarker-http-coordinator {
            rewrite ^/snarker-http-coordinator($|/.*) $1 break;
            proxy_pass http://snarker-http-coordinator.{{ .namespace }}.svc.cluster.local;
         }
+        {{ end }}
         {{ range $node := .nodes }}
         location /{{ $node.name }}/graphql {
            proxy_pass http://{{ $node.name }}-graphql.{{ $node.namespace }}.svc.cluster.local/graphql;

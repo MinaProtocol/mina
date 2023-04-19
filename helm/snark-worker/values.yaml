@@ -40,7 +40,7 @@ coordinatorRpcPort: 8301
 coordinatorHostPort: 10001
 publicKey: "" #"4vsRCVadXwWMSGA9q81reJRX3BZ5ZKRtgZU7PtGsNq11w2V9tUNf4urZAGncZLUiP4SfWqur7AZsyhJKD41Ke7rJJ8yDibL41ePBeATLUnwNtMTojPDeiBfvTfgHzbAVFktD65vzxMNCvvAJ"
 snarkFee: "0.025"
-workSelectionAlgorithm: coordinated # seq OR rand OR coordinated
+workSelectionAlgorithm: seq # seq OR rand OR coordinated
 workerCpuRequest: 4
 workerMemRequest: "6.0Gi"
 

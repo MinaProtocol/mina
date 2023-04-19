@@ -28,9 +28,12 @@ plainNodesConfig:
   namePrefix: node
 
 snarkWorkersConfig:
+  httpSnarkWorkCoordinator: false
   # the number of snark workers
   count: 96
   namePrefix: snarker
+coordinatorName: snarker
+workerReplicas: 8
 
 seedConfigs:
   - name: seed1
