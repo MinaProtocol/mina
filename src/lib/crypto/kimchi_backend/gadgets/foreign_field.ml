@@ -498,13 +498,11 @@ let compact_limb (type f) (module Circuit : Snark_intf.Run with type field = f)
 (* FOREIGN FIELD ADDITION GADGET *)
 
 (* Internal computation for foreign field addition *)
-let add_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
+let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
     (left_input : f Element.Standard.t) (right_input : f Element.Extended.t)
     (operation : op_mode) (foreign_field_modulus : f standard_limbs) :
     f Element.Standard.t * f * Circuit.Field.t =
   let open Circuit in
-  (* Check foreign field modulus < max allowed *)
-  check_modulus (module Circuit) foreign_field_modulus ;
   (* Decompose modulus into limbs *)
   let foreign_field_modulus0, foreign_field_modulus1, foreign_field_modulus2 =
     foreign_field_modulus
@@ -709,7 +707,7 @@ let less_than_fmod (type f)
 
   (* Create FFAdd gate for the bound check *)
   let bound, sign, ovf =
-    add_setup (module Circuit) value offset Add foreign_field_modulus
+    sum_setup (module Circuit) value offset Add foreign_field_modulus
   in
 
   let bound0, bound1, bound2 =
@@ -770,10 +768,12 @@ let less_than_fmod (type f)
    * foreign field addition gate for the bound check. An additional multi range check must be performed.
    * By default, the range check takes place right after the final Raw row.
 *)
-let add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
+let sum_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
     (inputs : f Element.Standard.t list) (operations : op_mode list)
     (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
   let open Circuit in
+  (* Check foreign field modulus < max allowed *)
+  check_modulus (module Circuit) foreign_field_modulus ;
   (* Check that the number of inputs is correct *)
   let n = List.length operations in
   assert (List.length inputs = n + 1) ;
@@ -805,7 +805,7 @@ let add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
 
     (* Create the foreign field addition row *)
     let result, _sign, _ovf =
-      add_setup (module Circuit) left.(0) right op foreign_field_modulus
+      sum_setup (module Circuit) left.(0) right op foreign_field_modulus
     in
 
     (* Update left input for next iteration *)
@@ -829,25 +829,43 @@ let add_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
 (* FOREIGN FIELD ADDITION SINGLE GADGET *)
 
 (* Definition of a gadget for a single foreign field addition
+      * - operation: operation mode Add or Sub indicating whether the corresponding addition is a subtraction (default: Add)
    * - left_input of the addition as 3 limbs element
+      * - right_input of the addition as 4 limbs element
+      * - foreign_field_modulus: the modulus of the foreign field
+      * - Returns the result of the addition as a 3 limbs element
+      * It adds a FFAdd gate,
+      * followed by a Zero gate,
+      * a FFAdd gate for the bound check,
+      * a Zero gate after this bound check,
+      * and a Multi Range Check gadget.
+*)
+let add (type f) (module Circuit : Snark_intf.Run with type field = f)
+    (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
+    (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
+  sum_chain
+    (module Circuit)
+    [ left_input; right_input ]
+    [ Add ] foreign_field_modulus
+
+(** Definition of a gadget for a single foreign field subtraction
+* - left_input of the addition as 3 limbs element
    * - right_input of the addition as 4 limbs element
-   * - is_sub: a flag indicating whether the corresponding gate is addition or a subtraction
    * - foreign_field_modulus: the modulus of the foreign field
-   * - Returns the result of the addition/subtraction as a 3 limbs element
-   * It adds a FFAdd gate,
+   * - Returns the result of the subtraction as a 3 limbs element
+   * It adds a FFAdd gate, 
    * followed by a Zero gate,
    * a FFAdd gate for the bound check,
    * a Zero gate after this bound check,
    * and a Multi Range Check gadget.
 *)
-let add (type f) (module Circuit : Snark_intf.Run with type field = f)
+let sub (type f) (module Circuit : Snark_intf.Run with type field = f)
     (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
-    (operation : op_mode) (foreign_field_modulus : f standard_limbs) :
-    f Element.Standard.t =
-  add_chain
+    (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
+  sum_chain
     (module Circuit)
     [ left_input; right_input ]
-    [ operation ] foreign_field_modulus
+    [ Sub ] foreign_field_modulus
 
 (* FOREIGN FIELD MULTIPLICATION *)
 
@@ -1260,7 +1278,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
 (* Tests *)
 (*********)
 
-let%test_unit "foreign_field_add gadget" =
+let%test_unit "foreign_field arithmetics gadgets" =
   (* Import the gadget test runner *)
   let open Kimchi_gadgets_test_runner in
   (* Initialize the SRS cache. *)
@@ -1280,10 +1298,9 @@ let%test_unit "foreign_field_add gadget" =
      *   Inputs:
      *     - left_input
      *     - right_input
-     *     - is_sub: default is false
      *     - foreign_field_modulus
   *)
-  let test_add ?cs ?(operation = Add) (left_input : Bignum_bigint.t)
+  let test_add ?cs (left_input : Bignum_bigint.t)
       (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
       =
     (* Generate and verify proof *)
@@ -1291,17 +1308,8 @@ let%test_unit "foreign_field_add gadget" =
       Runner.generate_and_verify_proof ?cs (fun () ->
           let open Runner.Impl in
           (* Prepare test inputs *)
-          let op_sign =
-            match operation with
-            | Add ->
-                Bignum_bigint.one
-            | Sub ->
-                Bignum_bigint.of_int (-1)
-          in
-
           let expected =
-            Bignum_bigint.(
-              (left_input + (op_sign * right_input)) % foreign_field_modulus)
+            Bignum_bigint.((left_input + right_input) % foreign_field_modulus)
           in
           let foreign_field_modulus =
             bignum_bigint_to_field_standard_limbs
@@ -1318,7 +1326,7 @@ let%test_unit "foreign_field_add gadget" =
           let sum =
             add
               (module Runner.Impl)
-              left_input right_input operation foreign_field_modulus
+              left_input right_input foreign_field_modulus
           in
           (* Check addition matches expected result *)
           as_prover (fun () ->
@@ -1385,7 +1393,7 @@ let%test_unit "foreign_field_add gadget" =
 
           (* Create the gadget *)
           let sum =
-            add_chain
+            sum_chain
               (module Runner.Impl)
               inputs operations foreign_field_modulus
           in
@@ -1405,97 +1413,6 @@ let%test_unit "foreign_field_add gadget" =
           () )
     in
     cs
-  in
-
-  (* Constants for tests *)
-  let secp256k1_modulus =
-    Common.bignum_bigint_of_hex
-      "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
-  in
-  let secp256k1_max = Bignum_bigint.(secp256k1_modulus - Bignum_bigint.one) in
-  let pallas_modulus =
-    Common.bignum_bigint_of_hex
-      "40000000000000000000000000000000224698fc094cf91b992d30ed00000001"
-  in
-  let pallas_max = Bignum_bigint.(pallas_modulus - Bignum_bigint.one) in
-  let vesta_modulus =
-    Common.bignum_bigint_of_hex
-      "40000000000000000000000000000000224698fc0994a8dd8c46eb2100000001"
-  in
-  let vesta_max = Bignum_bigint.(vesta_modulus - Bignum_bigint.one) in
-
-  (* Single tests *)
-  let cs =
-    test_add
-      (Common.bignum_bigint_of_hex
-         "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" )
-      (Common.bignum_bigint_of_hex
-         "80000000000000000000000000000000000000000000000000000000000000d0" )
-      secp256k1_modulus
-  in
-  let _cs = test_add ~cs secp256k1_max secp256k1_max secp256k1_modulus in
-  let _cs = test_add ~cs pallas_max pallas_max secp256k1_modulus in
-  let _cs = test_add ~cs vesta_modulus pallas_modulus secp256k1_modulus in
-
-  (* Chain tests *)
-  let cs =
-    test_add_chain
-      [ pallas_max
-      ; pallas_max
-      ; Common.bignum_bigint_of_hex
-          "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d"
-      ; Common.bignum_bigint_of_hex
-          "69cc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15"
-      ; vesta_max
-      ]
-      [ Add; Sub; Sub; Add ] vesta_modulus
-  in
-  let _cs =
-    test_add_chain ~cs
-      [ vesta_max
-      ; pallas_max
-      ; Common.bignum_bigint_of_hex
-          "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236"
-      ; Common.bignum_bigint_of_hex
-          "1342835834869e59534942304a03534963893045203528b523532232543"
-      ; Common.bignum_bigint_of_hex
-          "1f2d8f0d0cd52771bfb86ffdf651ddddbbddeeeebbbaaaaffccee20d"
-      ]
-      [ Add; Sub; Sub; Add ] vesta_modulus
-  in
-
-  (* Disabling temporarily to unbreak tests *)
-  (* Currently failing with: foreign_field_add gadget threw (Failure "Can't evaluate prover code outside an as_prover block") *)
-  (* let cs = test_add Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus in
-     let _cs =
-       test_add ~is_sub:false Bignum_bigint.zero Bignum_bigint.zero
-         secp256k1_modulus
-     in *)
-
-  (* let _cs =
-       test_add ~cs
-         (Common.bignum_bigint_of_hex
-            "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
-         (Common.bignum_bigint_of_hex
-            "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
-         secp256k1_modulus
-     in *)
-  ()
-
-let%test_unit "foreign_field_mul gadget" =
-  (* Import the gadget test runner *)
-  let open Kimchi_gadgets_test_runner in
-  (* Initialize the SRS cache. *)
-  let () =
-    try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
-  in
-
-  let assert_eq ((a, b, c) : 'field standard_limbs)
-      ((x, y, z) : 'field standard_limbs) =
-    let open Runner.Impl.Field in
-    Assert.equal (constant a) (constant x) ;
-    Assert.equal (constant b) (constant y) ;
-    Assert.equal (constant c) (constant z)
   in
 
   (* Helper to test foreign_field_mul gadget
@@ -1553,12 +1470,12 @@ let%test_unit "foreign_field_mul gadget" =
   in
 
   (* Helper to test foreign_field_mul gadget with external checks
-   *   Inputs:
-   *     cs                    := optional constraint system to reuse
-   *     left_input            := left multiplicand
-   *     right_input           := right multiplicand
-   *     foreign_field_modulus := foreign field modulus
-   *)
+     *   Inputs:
+     *     cs                    := optional constraint system to reuse
+     *     left_input            := left multiplicand
+     *     right_input           := right multiplicand
+     *     foreign_field_modulus := foreign field modulus
+  *)
   let test_mul_full ?cs (left_input : Bignum_bigint.t)
       (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
       =
@@ -1674,6 +1591,87 @@ let%test_unit "foreign_field_mul gadget" =
     cs
   in
 
+  (* Helper to test foreign field arithmetics together
+       * It computes a * b + a - b
+  *)
+  let test_ff ?cs (left_input : Bignum_bigint.t) (right_input : Bignum_bigint.t)
+      (foreign_field_modulus : Bignum_bigint.t) =
+    (* Generate and verify proof *)
+    let cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof ?cs (fun () ->
+          let open Runner.Impl in
+          (* Prepare test inputs *)
+          let expected_mul =
+            Bignum_bigint.(left_input * right_input % foreign_field_modulus)
+          in
+          let expected_add =
+            Bignum_bigint.((expected_mul + left_input) % foreign_field_modulus)
+          in
+          let expected_sub =
+            Bignum_bigint.((expected_add - right_input) % foreign_field_modulus)
+          in
+          let foreign_field_modulus =
+            bignum_bigint_to_field_standard_limbs
+              (module Runner.Impl)
+              foreign_field_modulus
+          in
+          let left_input =
+            Element.Standard.of_bignum_bigint (module Runner.Impl) left_input
+          in
+          let right_input =
+            Element.Standard.of_bignum_bigint (module Runner.Impl) right_input
+          in
+
+          let product, _external_checks =
+            mul
+              (module Runner.Impl)
+              left_input right_input foreign_field_modulus
+          in
+          let addition =
+            add (module Runner.Impl) product left_input foreign_field_modulus
+          in
+          let subtraction =
+            sub (module Runner.Impl) addition right_input foreign_field_modulus
+          in
+          (* Check product matches expected result *)
+          as_prover (fun () ->
+              let expected_mul =
+                bignum_bigint_to_field_standard_limbs
+                  (module Runner.Impl)
+                  expected_mul
+              in
+              let expected_add =
+                bignum_bigint_to_field_standard_limbs
+                  (module Runner.Impl)
+                  expected_add
+              in
+              let expected_sub =
+                bignum_bigint_to_field_standard_limbs
+                  (module Runner.Impl)
+                  expected_sub
+              in
+              let product =
+                Element.Standard.to_field_limbs_as_prover
+                  (module Runner.Impl)
+                  product
+              in
+              let addition =
+                Element.Standard.to_field_limbs_as_prover
+                  (module Runner.Impl)
+                  addition
+              in
+              let subtraction =
+                Element.Standard.to_field_limbs_as_prover
+                  (module Runner.Impl)
+                  subtraction
+              in
+              assert_eq product expected_mul ;
+              assert_eq addition expected_add ;
+              assert_eq subtraction expected_sub ) )
+    in
+    cs
+  in
+
   (* Test constants *)
   let secp256k1_modulus =
     Common.bignum_bigint_of_hex
@@ -1691,6 +1689,84 @@ let%test_unit "foreign_field_mul gadget" =
     Common.bignum_bigint_of_hex
       "40000000000000000000000000000000224698fc0994a8dd8c46eb2100000001"
   in
+  let vesta_max = Bignum_bigint.(vesta_modulus - Bignum_bigint.one) in
+
+  (* FFAdd TESTS *)
+
+  (* Single tests *)
+  let cs =
+    test_add
+      (Common.bignum_bigint_of_hex
+         "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" )
+      (Common.bignum_bigint_of_hex
+         "80000000000000000000000000000000000000000000000000000000000000d0" )
+      secp256k1_modulus
+  in
+  let _cs = test_add ~cs secp256k1_max secp256k1_max secp256k1_modulus in
+  let _cs = test_add ~cs pallas_max pallas_max secp256k1_modulus in
+  let _cs = test_add ~cs vesta_modulus pallas_modulus secp256k1_modulus in
+
+  (* check that the inputs need to be smaller than the modulus *)
+  assert (
+    Common.is_error (fun () ->
+        let _cs =
+          test_add ~cs secp256k1_modulus secp256k1_modulus secp256k1_modulus
+        in
+        () ) ) ;
+
+  (* Chain tests *)
+  let cs =
+    test_add_chain
+      [ pallas_max
+      ; pallas_max
+      ; Common.bignum_bigint_of_hex
+          "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d"
+      ; Common.bignum_bigint_of_hex
+          "69cc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15"
+      ; vesta_max
+      ]
+      [ Add; Sub; Sub; Add ] vesta_modulus
+  in
+  let _cs =
+    test_add_chain ~cs
+      [ vesta_max
+      ; pallas_max
+      ; Common.bignum_bigint_of_hex
+          "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236"
+      ; Common.bignum_bigint_of_hex
+          "1342835834869e59534942304a03534963893045203528b523532232543"
+      ; Common.bignum_bigint_of_hex
+          "1f2d8f0d0cd52771bfb86ffdf651ddddbbddeeeebbbaaaaffccee20d"
+      ]
+      [ Add; Sub; Sub; Add ] vesta_modulus
+  in
+  (* Check that the number of inputs need to be coherent with number of operations *)
+  assert (
+    Common.is_error (fun () ->
+        let _cs =
+          test_add_chain ~cs [ pallas_max; pallas_max ] [ Add; Sub; Sub; Add ]
+            secp256k1_modulus
+        in
+        () ) ) ;
+
+  (* Disabling temporarily to unbreak tests *)
+  (* Currently failing with: foreign_field_add gadget threw (Failure "Can't evaluate prover code outside an as_prover block") *)
+  (* let cs = test_add Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus in
+     let _cs =
+       test_add ~is_sub:false Bignum_bigint.zero Bignum_bigint.zero
+         secp256k1_modulus
+     in *)
+
+  (* let _cs =
+       test_add ~cs
+         (Common.bignum_bigint_of_hex
+            "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
+         (Common.bignum_bigint_of_hex
+            "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
+         secp256k1_modulus
+     in *)
+
+  (* FFMul TESTS*)
 
   (* Positive tests *)
   (* zero_mul: 0 * 0 *)
@@ -1794,4 +1870,15 @@ let%test_unit "foreign_field_mul gadget" =
          "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
       secp256k1_modulus
   in
+
+  (* COMBINED TESTS *)
+  let _cs =
+    test_ff
+      (Common.bignum_bigint_of_hex
+         "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" )
+      (Common.bignum_bigint_of_hex
+         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" )
+      secp256k1_modulus
+  in
+
   ()
