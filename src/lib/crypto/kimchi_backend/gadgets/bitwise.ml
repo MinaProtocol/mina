@@ -484,9 +484,9 @@ let%test_unit "bitwise rotation gadget" =
      *   Input operands and expected output: word len mode rotated
      *   Returns unit if constraints are satisfied, error otherwise.
   *)
-  let test_rot word length mode result : unit =
-    let _cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof (fun () ->
+  let test_rot ?cs word length mode result =
+    let cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof ?cs (fun () ->
           let open Runner.Impl in
           (* Set up snarky variables for inputs and output *)
           let word =
@@ -502,23 +502,26 @@ let%test_unit "bitwise rotation gadget" =
           (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
           Boolean.Assert.is_true (Field.equal output_rot output_rot) )
     in
-    ()
+    cs
   in
 
   (* Positive tests *)
-  test_rot "0" 0 Left "0" ;
-  test_rot "0" 32 Right "0" ;
-  test_rot "1" 1 Left "2" ;
-  test_rot "1" 63 Left "9223372036854775808" ;
-  test_rot "256" 4 Right "16" ;
-  test_rot "1234567890" 32 Right "5302428712241725440" ;
+  let _cs = test_rot "0" 0 Left "0" in
+  let _cs = test_rot "0" 32 Right "0" in
+  let _cs = test_rot "1" 1 Left "2" in
+  let _cs = test_rot "1" 63 Left "9223372036854775808" in
+  let cs = test_rot "256" 4 Right "16" in
   (* 0x5A5A5A5A5A5A5A5A is 0xA5A5A5A5A5A5A5A5 both when rotate 4 bits Left or Right*)
-  test_rot "6510615555426900570" 4 Left "11936128518282651045" ;
-  test_rot "6510615555426900570" 4 Right "11936128518282651045" ;
+  let _cs = test_rot ~cs "6510615555426900570" 4 Right "11936128518282651045" in
+  let _cs = test_rot "6510615555426900570" 4 Left "11936128518282651045" in
+  let cs = test_rot "1234567890" 32 Right "5302428712241725440" in
+  let _cs = test_rot ~cs "2651214356120862720" 32 Right "617283945" in
+  let _cs = test_rot ~cs "1153202983878524928" 32 Right "268500993" in
 
   (* Negatve tests *)
   assert (Common.is_error (fun () -> test_rot "0" 1 Left "1")) ;
   assert (Common.is_error (fun () -> test_rot "1" 64 Left "1")) ;
+  assert (Common.is_error (fun () -> test_rot ~cs "0" 0 Left "0")) ;
   ()
 
 let%test_unit "bitwise xor gadget" =
