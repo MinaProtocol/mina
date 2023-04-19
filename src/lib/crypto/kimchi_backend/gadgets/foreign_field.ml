@@ -1707,12 +1707,32 @@ let%test_unit "foreign_field arithmetics gadgets" =
   let _cs = test_add ~cs secp256k1_max secp256k1_max secp256k1_modulus in
   let _cs = test_add ~cs pallas_max pallas_max secp256k1_modulus in
   let _cs = test_add ~cs vesta_modulus pallas_modulus secp256k1_modulus in
+  let cs = test_add Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus in
+  let _cs =
+    test_add ~cs Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus
+  in
+  let _cs =
+    test_add ~cs
+      (Common.bignum_bigint_of_hex
+         "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
+      (Common.bignum_bigint_of_hex
+         "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
+      secp256k1_modulus
+  in
 
-  (* check that the inputs need to be smaller than the modulus *)
   assert (
     Common.is_error (fun () ->
+        (* check that the inputs need to be smaller than the modulus *)
         let _cs =
           test_add ~cs secp256k1_modulus secp256k1_modulus secp256k1_modulus
+        in
+        () ) ) ;
+
+  assert (
+    Common.is_error (fun () ->
+        (* check wrong cs fails *)
+        let _cs =
+          test_add ~cs secp256k1_modulus secp256k1_modulus pallas_modulus
         in
         () ) ) ;
 
@@ -1750,23 +1770,6 @@ let%test_unit "foreign_field arithmetics gadgets" =
             secp256k1_modulus
         in
         () ) ) ;
-
-  (* Disabling temporarily to unbreak tests *)
-  (* Currently failing with: foreign_field_add gadget threw (Failure "Can't evaluate prover code outside an as_prover block") *)
-  (* let cs = test_add Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus in
-     let _cs =
-       test_add ~is_sub:false Bignum_bigint.zero Bignum_bigint.zero
-         secp256k1_modulus
-     in *)
-
-  (* let _cs =
-       test_add ~cs
-         (Common.bignum_bigint_of_hex
-            "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
-         (Common.bignum_bigint_of_hex
-            "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
-         secp256k1_modulus
-     in *)
 
   (* FFMul TESTS*)
 
