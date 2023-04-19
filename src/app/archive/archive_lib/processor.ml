@@ -2282,6 +2282,38 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
       let add_accounts () =
         Caqti_async.Pool.use
           (fun (module Conn : CONNECTION) ->
+            (* blocks depend on having the protocol version set, which the daemon does on startup;
+               the actual value doesn't affect the block state hash, which is how we
+               identify a block in the archive db
+
+               here, we just set the protocol version to a dummy value *)
+            Protocol_version.(set_current zero) ;
+            let proof_level = Genesis_constants.Proof_level.compiled in
+            let constraint_constants =
+              Genesis_constants.Constraint_constants.compiled
+            in
+            let%bind precomputed_values =
+              match%map
+                Genesis_ledger_helper.init_from_config_file ~logger
+                  ~proof_level:(Some proof_level) runtime_config
+              with
+              | Ok (precomputed_values, _) ->
+                  precomputed_values
+              | Error err ->
+                  failwithf "Could not get precomputed values, error: %s"
+                    (Error.to_string_hum err) ()
+            in
+            let genesis_block =
+              let With_hash.{ data = block; hash = the_hashes }, _ =
+                Mina_block.genesis ~precomputed_values
+              in
+              With_hash.{ data = block; hash = the_hashes.state_hash }
+            in
+            let%bind _ =
+              Block.add_if_doesn't_exist
+                (module Conn)
+                ~constraint_constants genesis_block
+            in
             let open Deferred.Result.Let_syntax in
             let%bind () = Conn.start () in
             let rec go accounts =
