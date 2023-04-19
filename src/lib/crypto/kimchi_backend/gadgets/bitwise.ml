@@ -601,15 +601,15 @@ let%test_unit "bitwise and gadget" =
           (* Set up snarky variables for inputs and outputs *)
           let left_input =
             exists Field.typ ~compute:(fun () ->
-                Field.Constant.of_string left_input )
+                Common.field_of_hex (module Runner.Impl) left_input )
           in
           let right_input =
             exists Field.typ ~compute:(fun () ->
-                Field.Constant.of_string right_input )
+                Common.field_of_hex (module Runner.Impl) right_input )
           in
           let output_and =
             exists Field.typ ~compute:(fun () ->
-                Field.Constant.of_string output_and )
+                Common.field_of_hex (module Runner.Impl) output_and )
           in
           (* Use the and gate gadget *)
           let result =
@@ -622,17 +622,16 @@ let%test_unit "bitwise and gadget" =
 
   (* Positive tests *)
   let cs = test_and "0" "0" "0" 16 in
-  let _cs = test_and ~cs "1111" "2222" "6" 16 in
-  let _cs = test_and ~cs "43210" "56789" "35008" 16 in
+  let _cs = test_and ~cs "457" "8ae" "6" 16 in
+  let _cs = test_and ~cs "a8ca" "ddd5" "88c0" 16 in
   let _cs = test_and "0" "0" "0" 8 in
   let cs = test_and "1" "1" "1" 1 in
   let _cs = test_and ~cs "1" "0" "0" 1 in
   let _cs = test_and ~cs "0" "1" "0" 1 in
   let _cs = test_and ~cs "0" "0" "0" 1 in
-  let _cs = test_and "15" "15" "15" 4 in
-  let _cs = test_and "767430" "974317" "693700" 20 in
-  (* 0x5A5A5A5A5A5A5A5A and 0xA5A5A5A5A5A5A5A5 = 0x0000000000000000*)
-  let cs = test_and "6510615555426900570" "11936128518282651045" "0" 64 in
+  let _cs = test_and "f" "f" "f" 4 in
+  let _cs = test_and "bb5c6" "edded" "a95c4" 20 in
+  let cs = test_and "5a5a5a5a5a5a5a5a" "a5a5a5a5a5a5a5a5" "0" 64 in
   (* Negatve tests *)
   assert (
     Common.is_error (fun () ->
@@ -641,7 +640,7 @@ let%test_unit "bitwise and gadget" =
     Common.is_error (fun () ->
         (* reusing wrong CS with different coeffs *) test_and ~cs "1" "1" "1" 1 ) ) ;
   assert (Common.is_error (fun () -> test_and "1" "1" "0" 1)) ;
-  assert (Common.is_error (fun () -> test_and "255" "255" "255" 7)) ;
+  assert (Common.is_error (fun () -> test_and "ff" "ff" "ff" 7)) ;
   assert (Common.is_error (fun () -> test_and "1" "1" "1" (-1))) ;
   ()
 
