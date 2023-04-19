@@ -17,26 +17,21 @@ import (
 )
 
 func loadAwsCredentials(filename string, log logging.EventLogger) {
-	configFile := os.Getenv(filename)
-	if configFile == "" {
-		log.Fatal("Error loading credentials file: %s", filename)
-	} else {
-		file, err := os.Open(configFile)
-		if err != nil {
-			log.Errorf("Error loading credentials file: %s", err)
-			os.Exit(1)
-		}
-		defer file.Close()
-		decoder := json.NewDecoder(file)
-		var credentials AwsCredentials
-		err = decoder.Decode(&credentials)
-		if err != nil {
-			log.Errorf("Error loading credentials file: %s", err)
-			os.Exit(1)
-		}
-		os.Setenv("AWS_ACCESS_KEY_ID", credentials.AccessKeyId)
-		os.Setenv("AWS_SECRET_ACCESS_KEY", credentials.SecretAccessKey)
+	file, err := os.Open(filename)
+	if err != nil {
+		log.Errorf("Error loading credentials file: %s", err)
+		os.Exit(1)
 	}
+	defer file.Close()
+	decoder := json.NewDecoder(file)
+	var credentials AwsCredentials
+	err = decoder.Decode(&credentials)
+	if err != nil {
+		log.Errorf("Error loading credentials file: %s", err)
+		os.Exit(1)
+	}
+	os.Setenv("AWS_ACCESS_KEY_ID", credentials.AccessKeyId)
+	os.Setenv("AWS_SECRET_ACCESS_KEY", credentials.SecretAccessKey)
 }
 
 func loadEnv(log logging.EventLogger) AppConfig {
@@ -57,19 +52,33 @@ func loadEnv(log logging.EventLogger) AppConfig {
 			os.Exit(1)
 		}
 	} else {
-		bucketName := os.Getenv("BUCKET_NAME")
-		if bucketName == "" {
-			log.Fatal("missing BUCKET_NAME environment variable")
-		}
-
-		networkName := os.Getenv("NETWORK_NAME")
+		networkName := os.Getenv("CONFIG_NETWORK_NAME")
 		if networkName == "" {
 			log.Fatal("missing NETWORK_NAME environment variable")
 		}
 
-		gsheetId := os.Getenv("GSHEET_ID")
+		gsheetId := os.Getenv("CONFIG_GSHEET_ID")
 		if gsheetId == "" {
 			log.Fatal("missing GSHEET_ID environment variable")
+		}
+
+		awsRegion := os.Getenv("CONFIG_AWS_REGION")
+		if awsRegion == "" {
+			log.Fatal("missing AWS_REGION environment variable")
+		}
+
+		awsAccountId := os.Getenv("CONFIG_AWS_ACCOUNT_ID")
+		if awsAccountId == "" {
+			log.Fatal("missing AWS_ACCOUNT_ID environment variable")
+		}
+
+		config = AppConfig{
+			NetworkName: networkName,
+			GsheetId:    gsheetId,
+			Aws: AwsConfig{
+				Region:    awsRegion,
+				AccountId: awsAccountId,
+			},
 		}
 	}
 
@@ -103,10 +112,9 @@ func main() {
 
 	appCfg := loadEnv(log)
 
-	cfg, err := config.LoadDefaultConfig(ctx)
+	awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(appCfg.Aws.Region))
 	if err != nil {
-		log.Fatalf("Error creating AWS client: %v", err)
-		return
+		log.Fatalf("Error loading AWS configuration: %v", err)
 	}
 
 	app := new(App)
@@ -115,8 +123,9 @@ func main() {
 		_, _ = rw.Write([]byte("delegation backend service"))
 	})
 	http.Handle("/v1/submit", app.NewSubmitH())
-	client := s3.NewFromConfig(cfg)
-	awsctx := AwsContext{Client: client, BucketName: aws.String(appCfg.BucketName), Context: ctx, Log: log}
+	client := s3.NewFromConfig(awsCfg)
+
+	awsctx := AwsContext{Client: client, BucketName: aws.String(GetBucketName(appCfg)), Prefix: appCfg.NetworkName, Context: ctx, Log: log}
 	app.Save = func(objs ObjectsToSave) {
 		awsctx.S3Save(objs)
 	}

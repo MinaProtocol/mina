@@ -24,6 +24,10 @@ func NetworkId() uint8 {
 	return 0
 }
 
+func GetBucketName(config AppConfig) string {
+	return config.Aws.AccountId + "-block-producers-uptime"
+}
+
 const PK_LENGTH = 33  // one field element (32B) + 1 bit (encoded as full byte)
 const SIG_LENGTH = 64 // one field element (32B) and one scalar (32B)
 
