@@ -201,7 +201,7 @@ steps:
   - sleep  10 && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 show-graph --expected-components 1
   - sleep  10 && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 enable-firewall
   - sleep  90 && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 show-graph --expected-components 2
-  - sleep 1800 && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 disable-firewall # wait 30 minutes before disable firewall
+  - sleep $$(($${SPLIT_DURATION:-30} * 60)) && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 disable-firewall # wait 30 minutes before disable firewall
   - sleep 120 && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 show-graph --expected-components 1
 
 ---
