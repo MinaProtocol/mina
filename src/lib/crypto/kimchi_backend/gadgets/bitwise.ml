@@ -573,7 +573,7 @@ let%test_unit "bitwise xor gadget" =
         test_xor ~cs "ed1ed1" "ed1ed1" "010101" 20 ) ) ;
   assert (
     Common.is_error (fun () ->
-        (* reusing wrong CS with diffent coeffs *)
+        (* reusing wrong CS with different coeffs *)
         test_xor ~cs "1" "0" "0" 16 ) ) ;
 
   assert (Common.is_error (fun () -> test_xor "1" "0" "0" 1)) ;
@@ -594,9 +594,9 @@ let%test_unit "bitwise and gadget" =
      *   Inputs operands and expected output: left_input and right_input = output
      *   Returns true if constraints are satisfied, false otherwise.
   *)
-  let test_and left_input right_input output_and length =
-    let _cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof (fun () ->
+  let test_and ?cs left_input right_input output_and length =
+    let cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof ?cs (fun () ->
           let open Runner.Impl in
           (* Set up snarky variables for inputs and outputs *)
           let left_input =
@@ -617,20 +617,29 @@ let%test_unit "bitwise and gadget" =
           in
           Field.Assert.equal output_and result )
     in
-    ()
+    cs
   in
 
   (* Positive tests *)
-  test_and "0" "0" "0" 16 ;
-  test_and "0" "0" "0" 8 ;
-  test_and "1" "1" "1" 1 ;
-  test_and "15" "15" "15" 4 ;
-  test_and "1111" "2222" "6" 16 ;
-  test_and "43210" "56789" "35008" 16 ;
-  test_and "767430" "974317" "693700" 20 ;
+  let cs = test_and "0" "0" "0" 16 in
+  let _cs = test_and ~cs "1111" "2222" "6" 16 in
+  let _cs = test_and ~cs "43210" "56789" "35008" 16 in
+  let _cs = test_and "0" "0" "0" 8 in
+  let cs = test_and "1" "1" "1" 1 in
+  let _cs = test_and ~cs "1" "0" "0" 1 in
+  let _cs = test_and ~cs "0" "1" "0" 1 in
+  let _cs = test_and ~cs "0" "0" "0" 1 in
+  let _cs = test_and "15" "15" "15" 4 in
+  let _cs = test_and "767430" "974317" "693700" 20 in
   (* 0x5A5A5A5A5A5A5A5A and 0xA5A5A5A5A5A5A5A5 = 0x0000000000000000*)
-  test_and "6510615555426900570" "11936128518282651045" "0" 64 ;
+  let cs = test_and "6510615555426900570" "11936128518282651045" "0" 64 in
   (* Negatve tests *)
+  assert (
+    Common.is_error (fun () ->
+        (* reusing right CS with wrong witness *) test_and ~cs "1" "1" "0" 20 ) ) ;
+  assert (
+    Common.is_error (fun () ->
+        (* reusing wrong CS with different coeffs *) test_and ~cs "1" "1" "1" 1 ) ) ;
   assert (Common.is_error (fun () -> test_and "1" "1" "0" 1)) ;
   assert (Common.is_error (fun () -> test_and "255" "255" "255" 7)) ;
   assert (Common.is_error (fun () -> test_and "1" "1" "1" (-1))) ;
