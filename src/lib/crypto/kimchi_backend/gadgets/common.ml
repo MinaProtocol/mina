@@ -75,12 +75,7 @@ let cvar_field_bits_combine_as_prover (type f)
     @@ cvar_field_to_field_as_prover (module Circuit)
     @@ input2
   in
-
-  let combined = List.map2_exn list1 list2 ~f:bfun in
-
-  Field.Constant.project combined
-
-(* Convert field element to a cvar field element *)
+  Field.Constant.project @@ List.map2_exn list1 list2 ~f:bfun
 
 (* field_bits_le_to_field - Create a field element from contiguous bits of another
  *
