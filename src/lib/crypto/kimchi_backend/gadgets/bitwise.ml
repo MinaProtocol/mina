@@ -151,6 +151,11 @@ let bxor (type f)
       (output_bits : bool list) (length : int) (len_xor : int) =
     let open Circuit in
     (* Transform to field *)
+
+    (* TODO: [Anais] concerned that at circuit creation time these will be constants
+     *       thus the Xor and Zero gates' cvars below will be constant field cvars
+     *       resulting in extra generic gates with these constatnts baked into coeffs
+     *)
     let input1 = Field.Constant.project input1_bits in
     let input2 = Field.Constant.project input2_bits in
     let output = Field.Constant.project output_bits in
@@ -234,7 +239,7 @@ let bxor (type f)
   (* Check that the length fits in the field *)
   assert (length <= Field.size_in_bits) ;
 
-  (* Initialize array of 255 bools *)
+  (* Initialize array of 255 bools all set to false *)
   let input1_array = Array.create ~len:Field.size_in_bits false in
   let input2_array = Array.create ~len:Field.size_in_bits false in
 
@@ -349,6 +354,7 @@ let band (type f)
   (* It will also check the correct lengths of the inputs, no need to do it again *)
   let xor_output = bxor (module Circuit) input1 input2 length ~len_xor in
   (* Transform to non constant cvar *)
+  (* TODO: [Anais] once bxor is fixed not to create const cvars, below should not be needed *)
   let xor_output_var =
     exists Field.typ ~compute:(fun () ->
         Common.cvar_field_to_field_as_prover (module Circuit) xor_output )
@@ -364,6 +370,7 @@ let band (type f)
 
   (* Compute sum of a + b and constrain in the circuit *)
   let sum = Generic.add (module Circuit) input1 input2 in
+  (* TODO: [Anais] this should already be non-const cvar *)
   (* Transform to non constant cvar *)
   let sum_var =
     exists Field.typ ~compute:(fun () ->
