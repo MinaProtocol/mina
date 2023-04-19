@@ -160,6 +160,13 @@ let () =
         , [ test_case "Completeness." `Quick completeness
           ; test_case "JSON." `Quick json
           ] )
+    ; Zkapp_basic_test.
+        ( "zkApp basic"
+        , [ test_case "Int to bits and back to int is identity." `Quick
+              int_to_bits_roundtrip
+          ; test_case "Invalid public key is invalid." `Quick
+              invalid_public_key_is_invalid
+          ] )
     ; Zkapp_command_test.
         ( "zkApp commands"
         , [ test_case "Account_update_or_stack.of_zkapp_command_list." `Quick
