@@ -38,7 +38,7 @@ func (ctx *AwsContext) S3Save(objs ObjectsToSave) {
 	for path, bs := range objs {
 		_, err := ctx.Client.HeadObject(ctx.Context, &s3.HeadObjectInput{
 			Bucket: ctx.BucketName,
-			Key:    aws.String(path),
+			Key:    aws.String(ctx.Prefix + "/" + path),
 		})
 		if err == nil {
 			ctx.Log.Warnf("object already exists: %s", path)
@@ -46,7 +46,7 @@ func (ctx *AwsContext) S3Save(objs ObjectsToSave) {
 
 		_, err = ctx.Client.PutObject(ctx.Context, &s3.PutObjectInput{
 			Bucket:     ctx.BucketName,
-			Key:        aws.String(path),
+			Key:        aws.String(ctx.Prefix + "/" + path),
 			Body:       bytes.NewReader(bs),
 			ContentMD5: nil,
 		})
@@ -61,6 +61,7 @@ type ObjectsToSave map[string][]byte
 type AwsContext struct {
 	Client     *s3.Client
 	BucketName *string
+	Prefix     string
 	Context    context.Context
 	Log        *logging.ZapEventLogger
 }
