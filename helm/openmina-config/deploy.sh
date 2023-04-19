@@ -160,7 +160,12 @@ if [ $# -lt 1 ]; then
 fi
 
 case $1 in
-    'deploy'|'install'|'delete'|'lint'|'template')
+    'deploy'|'install'|'delete')
+        OP="$1"
+        WARN_NAMESPACE_MISMATCH=1
+        shift
+    ;;
+    'lint'|'template')
         OP="$1"
         shift
     ;;
@@ -173,7 +178,7 @@ esac
 KUBECTL_NAMESPACE=$(kubectl_ns)
 if [ -z "$NAMESPACE" ]; then
     echo "Using current namespace ${KUBECTL_NAMESPACE:-default}"
-    if [ "$OP" != "lint" ] && [ -z "$DRY_RUN" ] && [ -z "$FORCE" ]; then
+    if [ -n "$WARN_NAMESPACE_MISMATCH" ] && [ -z "$DRY_RUN" ] && [ -z "$FORCE" ]; then
         echo "You are using current namespace ${KUBECTL_NAMESPACE:-default}. Continue? [y/N]"
         read -r CONFIRM
         if ! [ "$CONFIRM" = y ] && ! [ "$CONFIRM" = Y ]; then
