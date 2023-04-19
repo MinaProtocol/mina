@@ -149,10 +149,15 @@ type MetaToBeSaved struct {
 	BlockHash          string  `json:"block_hash"` // is base58check-encoded hash of a block
 }
 
+type AwsConfig struct {
+	Region    string `json:"region"`
+	AccountId string `json:"account_id"`
+}
+
 type AppConfig struct {
-	BucketName  string `json:"bucket_name"`
-	NetworkName string `json:"network_name"`
-	GsheetId    string `json:"gsheet_id"`
+	Aws         AwsConfig `json:"aws"`
+	NetworkName string    `json:"network_name"`
+	GsheetId    string    `json:"gsheet_id"`
 }
 
 type AwsCredentials struct {
