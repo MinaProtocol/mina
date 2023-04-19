@@ -45,7 +45,7 @@ let rot_64 (type f)
   let big_2_pow_rot = Bignum_bigint.(pow (of_int 2) (of_int rot_bits)) in
 
   (* Compute the rotated word *)
-  let values =
+  let rotated, excess, shifted, bound =
     exists (Typ.array ~length:4 Field.typ) ~compute:(fun () ->
         (* Assert that word is at most 64 bits*)
         let word_big =
@@ -86,12 +86,8 @@ let rot_64 (type f)
         let bound = Common.bignum_bigint_to_field (module Circuit) bound_big in
 
         [| rotated; excess; shifted; bound |] )
+    |> Common.tuple4_of_array
   in
-
-  let rotated = values.(0) in
-  let excess = values.(1) in
-  let shifted = values.(2) in
-  let bound = values.(3) in
 
   let of_bits =
     Common.as_prover_cvar_field_bits_le_to_cvar_field (module Circuit)
@@ -152,16 +148,14 @@ let bxor (type f)
       (output_bits : bool list) (length : int) (len_xor : int) =
     let open Circuit in
     (* Convert to cvar *)
-    let param_vars =
+    let input1, input2, output =
       exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
           [| Field.Constant.project input1_bits
            ; Field.Constant.project input2_bits
            ; Field.Constant.project output_bits
           |] )
+      |> Common.tuple3_of_array
     in
-    let input1 = param_vars.(0) in
-    let input2 = param_vars.(1) in
-    let output = param_vars.(2) in
     (* If inputs are zero and length is zero, add the zero check *)
     if length = 0 then (
       Field.Assert.equal Field.zero input1 ;

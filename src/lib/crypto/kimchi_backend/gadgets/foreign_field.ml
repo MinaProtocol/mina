@@ -5,16 +5,6 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
-let tuple3_of_array array =
-  match array with [| a1; a2; a3 |] -> (a1, a2, a3) | _ -> assert false
-
-let tuple4_of_array array =
-  match array with
-  | [| a1; a2; a3; a4 |] ->
-      (a1, a2, a3, a4)
-  | _ ->
-      assert false
-
 let tuple11_of_array array =
   match array with
   | [| a1; a2; a3; a4; a5; a6; a7; a8; a9; a10; a11 |] ->
@@ -313,7 +303,7 @@ end = struct
       exists (Typ.array ~length:4 Field.typ) ~compute:(fun () ->
           let l0, l1, l2 = to_field_limbs_as_prover (module Circuit) x in
           [| l0; l1; l2; Field.Constant.zero |] )
-      |> tuple4_of_array
+      |> Common.tuple4_of_array
   end
 
   (* Extended limbs foreign field element *)
@@ -725,7 +715,7 @@ let less_than_fmod (type f)
         assert (Field.Constant.(equal ovf one)) ;
 
         [| bound0; bound1; bound2 |] )
-    |> tuple3_of_array
+    |> Common.tuple3_of_array
   in
 
   (* Final Zero gate*)
