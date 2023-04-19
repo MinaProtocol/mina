@@ -133,12 +133,10 @@ val less_than_fmod :
 val add :
      (module Snark_intf.Run with type field = 'f)
   -> 'f Element.Standard.t (* left_input *)
-  -> 'f Element.Extended.t (* right_input *)
+  -> 'f Element.Standard.t (* right_input *)
   -> bool (* is_sub *)
   -> 'f standard_limbs (* foreign_field_modulus *)
   -> 'f Element.Standard.t
-     * 'f Snarky_backendless.Cvar.t
-     * 'f Snarky_backendless.Cvar.t
 (* result, sign, overflow *)
 
 (** Foreign field multiplication gadget
