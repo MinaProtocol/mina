@@ -21,11 +21,12 @@ let cvar_field_all_ones (type f)
 type rot_mode = Left | Right
 
 (* 64-bit Rotation of rot_bits to the `mode` side
-   *  - word of maximum 64 bits to be rotated
-   * - rot_bits: number of bits to be rotated
-   * - mode: Left or Right
-   * Returns rotated word
-*)
+ *   Inputs
+ *     - word of maximum 64 bits to be rotated
+ *     - rot_bits: number of bits to be rotated
+ *     - mode: Left or Right
+ * Output: rotated word
+ *)
 let rot_64 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (word : Circuit.Field.t) (rot_bits : int) (mode : rot_mode) :
@@ -134,19 +135,19 @@ let rot_64 (type f)
 
 (* Boolean Xor of length bits
  * input1 and input2 are the inputs to the Xor gate
-  * length is the number of bits to Xor
-  * len_xor is the number of bits of the lookup table (default is 4)
+ * length is the number of bits to Xor
+ * len_xor is the number of bits of the lookup table (default is 4)
  *)
 let bxor (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
     (length : int) : Circuit.Field.t =
   (* Recursively builds Xor
-     * input1_bits and input2_bits are the inputs to the Xor gate as bits
-     * output_bits is the output of the Xor gate as bits
-     * length is the number of remaining bits to Xor
-     * len_xor is the number of bits of the lookup table (default is 4)
-  *)
+   * input1_bits and input2_bits are the inputs to the Xor gate as bits
+   * output_bits is the output of the Xor gate as bits
+   * length is the number of remaining bits to Xor
+   * len_xor is the number of bits of the lookup table (default is 4)
+   *)
   let rec bxor_rec (input1_bits : bool list) (input2_bits : bool list)
       (output_bits : bool list) (length : int) (len_xor : int) =
     let open Circuit in
@@ -335,10 +336,10 @@ let bxor64 (type f)
 (* AND *)
 
 (* Boolean And of length bits
-   *  input1 and input2 are the two inputs to AND
-   *  length is the number of bits to AND
-   *  len_xor is the number of bits of the inputs of the Xor lookup table (default is 4)
-*)
+ *  input1 and input2 are the two inputs to AND
+ *  length is the number of bits to AND
+ *  len_xor is the number of bits of the inputs of the Xor lookup table (default is 4)
+ *)
 let band (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
@@ -394,10 +395,10 @@ let band64 (type f)
 (* NOT *)
 
 (* Boolean Not of length bits for checked length (uses Xor gadgets inside to constrain the length)
-    *   - input of word to negate
-    *   - length of word to negate
-    *   - len_xor is the length of the Xor lookup table to use beneath (default 4)
-*)
+ *   - input of word to negate
+ *   - length of word to negate
+ *   - len_xor is the length of the Xor lookup table to use beneath (default 4)
+ *)
 let bnot_checked (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     ?(len_xor = 4) (input : Circuit.Field.t) (length : int) : Circuit.Field.t =
@@ -407,7 +408,7 @@ let bnot_checked (type f)
   bxor (module Circuit) input all_ones_var length ~len_xor
 
 (* Negates a word of 64 bits with checked length of 64 bits.
-   * This means that the bound in lenght is constrained in the circuit. *)
+ * This means that the bound in lenght is constrained in the circuit. *)
 let bnot64_checked (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (input : Circuit.Field.t) : Circuit.Field.t =
@@ -417,7 +418,7 @@ let bnot64_checked (type f)
  *  - input of word to negate
  *  - length of word to negate
  * (Note that this can negate two words per row, but it inputs need to be a copy of another
-     variable with a correct length in order to make sure that the length is correct )
+ * variable with a correct length in order to make sure that the length is correct)
  *)
 let bnot_unchecked (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -461,10 +462,10 @@ let%test_unit "bitwise rotation gadget" =
     try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
   in
 
-  (* Helper to test Rot gadget
-     *   Input operands and expected output: word len mode rotated
-     *   Returns unit if constraints are satisfied, error otherwise.
-  *)
+  (* Helper to test ROT gadget
+   *   Input operands and expected output: word len mode rotated
+   *   Returns unit if constraints are satisfied, error otherwise.
+   *)
   let test_rot ?cs word length mode result =
     let cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof ?cs (fun () ->
@@ -513,10 +514,10 @@ let%test_unit "bitwise xor gadget" =
     try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
   in
 
-  (* Helper to test Xor gadget
-     *   Inputs operands and expected output: left_input xor right_input
-     *   Returns true if constraints are satisfied, false otherwise.
-  *)
+  (* Helper to test XOR gadget
+   *   Inputs operands and expected output: left_input xor right_input
+   *   Returns true if constraints are satisfied, false otherwise.
+   *)
   let test_xor ?cs left_input right_input output_xor length =
     let cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof ?cs (fun () ->
@@ -569,12 +570,12 @@ let%test_unit "bitwise xor gadget" =
   (* Negatve tests *)
   assert (
     Common.is_error (fun () ->
-        (* reusing right CS with bad witness *)
+        (* Reusing right CS with bad witness *)
         test_xor ~cs "ed1ed1" "ed1ed1" "010101" 20 ) ) ;
   assert (
     Common.is_error (fun () ->
-        (* reusing wrong CS with different coeffs *)
-        test_xor ~cs "1" "0" "0" 16 ) ) ;
+        (* Reusing wrong CS with right witness *)
+        test_xor ~cs "1" "1" "0" 16 ) ) ;
 
   assert (Common.is_error (fun () -> test_xor "1" "0" "0" 1)) ;
   assert (Common.is_error (fun () -> test_xor "1111" "2222" "0" 16)) ;
@@ -590,10 +591,10 @@ let%test_unit "bitwise and gadget" =
   let () =
     try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
   in
-  (* Helper to test And gadget
-     *   Inputs operands and expected output: left_input and right_input = output
-     *   Returns true if constraints are satisfied, false otherwise.
-  *)
+  (* Helper to test AND gadget
+   *   Inputs operands and expected output: left_input and right_input = output
+   *   Returns true if constraints are satisfied, false otherwise.
+   *)
   let test_and ?cs left_input right_input output_and length =
     let cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof ?cs (fun () ->
@@ -632,13 +633,16 @@ let%test_unit "bitwise and gadget" =
   let _cs = test_and "f" "f" "f" 4 in
   let _cs = test_and "bb5c6" "edded" "a95c4" 20 in
   let cs = test_and "5a5a5a5a5a5a5a5a" "a5a5a5a5a5a5a5a5" "0" 64 in
+  let cs =
+    test_and ~cs "385e243cb60654fd" "010fde9342c0d700" "e041002005400" 64
+  in
   (* Negatve tests *)
   assert (
     Common.is_error (fun () ->
-        (* reusing right CS with wrong witness *) test_and ~cs "1" "1" "0" 20 ) ) ;
+        (* Reusing right CS with wrong witness *) test_and ~cs "1" "1" "0" 20 ) ) ;
   assert (
     Common.is_error (fun () ->
-        (* reusing wrong CS with different coeffs *) test_and ~cs "1" "1" "1" 1 ) ) ;
+        (* Reusing wrong CS with right witness *) test_and ~cs "1" "1" "1" 1 ) ) ;
   assert (Common.is_error (fun () -> test_and "1" "1" "0" 1)) ;
   assert (Common.is_error (fun () -> test_and "ff" "ff" "ff" 7)) ;
   assert (Common.is_error (fun () -> test_and "1" "1" "1" (-1))) ;
@@ -651,10 +655,10 @@ let%test_unit "bitwise not gadget" =
   let () =
     try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
   in
-  (* Helper to test not gadget with both checked and unchecked length procedures
-     *   Input and expected output and desired length : not(input) = output
-     *   Returns true if constraints are satisfied, false otherwise.
-  *)
+  (* Helper to test NOT gadget with both checked and unchecked length procedures
+   *   Input and expected output and desired length : not(input) = output
+   *   Returns true if constraints are satisfied, false otherwise.
+   *)
   let test_not ?cs input output length =
     let cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof ?cs (fun () ->
@@ -662,12 +666,12 @@ let%test_unit "bitwise not gadget" =
           (* Set up snarky variables for input and output *)
           let input =
             exists Field.typ ~compute:(fun () ->
-                Field.Constant.of_string input )
+                Common.field_of_hex (module Runner.Impl) input )
           in
 
           let output =
             exists Field.typ ~compute:(fun () ->
-                Field.Constant.of_string output )
+                Common.field_of_hex (module Runner.Impl) output )
           in
 
           (* Use the not gate gadget *)
@@ -683,20 +687,29 @@ let%test_unit "bitwise not gadget" =
 
   (* Positive tests *)
   let _cs = test_not "0" "1" 1 in
-  let _cs = test_not "0" "15" 4 in
-  let _cs = test_not "0" "255" 8 in
-  let _cs = test_not "0" "2047" 11 in
-  let cs = test_not "0" "65535" 16 in
-  let _cs = test_not ~cs "43210" "22325" 16 in
-  let _cs = test_not "767430" "281145" 20 in
-  (* not 0xA5A5A5A5A5A5A5A5 = 0x5A5A5A5A5A5A5A5A*)
-  let cs = test_not "11936128518282651045" "6510615555426900570" 64 in
-  (* not 0x5A5A5A5A5A5A5A5A = 0xA5A5A5A5A5A5A5A5 *)
-  let _cs = test_not ~cs "6510615555426900570" "11936128518282651045" 64 in
-  (* not 0xFFFFFFFFFFFFFFFF = 0 *)
-  let _cs = test_not ~cs "18446744073709551615" "0" 64 in
+  let _cs = test_not "0" "f" 4 in
+  let _cs = test_not "0" "ff" 8 in
+  let _cs = test_not "0" "7ff" 11 in
+  let cs = test_not "0" "ffff" 16 in
+  let _cs = test_not ~cs "a8ca" "5735" 16 in
+  let _cs = test_not "bb5c6" "44a39" 20 in
+  let cs = test_not "a5a5a5a5a5a5a5a5" "5a5a5a5a5a5a5a5a" 64 in
+  let _cs = test_not ~cs "5a5a5a5a5a5a5a5a" "a5a5a5a5a5a5a5a5" 64 in
+  let _cs = test_not ~cs "7b3f28d7496d75f0" "84c0d728b6928a0f" 64 in
+  let _cs = test_not ~cs "ffffffffffffffff" "0" 64 in
+  let _cs = test_not ~cs "00000fffffffffff" "fffff00000000000" 64 in
+  let _cs = test_not ~cs "fffffffffffff000" "fff" 64 in
+  let _cs = test_not ~cs "0" "ffffffffffffffff" 64 in
 
   (* Negative tests *)
+  assert (
+    Common.is_error (fun () ->
+        (* Reusing right CS with bad witness *)
+        test_not ~cs "0" "ff" 64 ) ) ;
+  assert (
+    Common.is_error (fun () ->
+        (* Reusing wrong CS with right witness *)
+        test_not ~cs "1" "0" 1 ) ) ;
   assert (Common.is_error (fun () -> test_not "0" "0" 1)) ;
-  assert (Common.is_error (fun () -> test_not "255" "0" 4)) ;
+  assert (Common.is_error (fun () -> test_not "ff" "0" 4)) ;
   ()
