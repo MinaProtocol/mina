@@ -128,11 +128,12 @@ func (boe *BufferOrError) Write(b []byte) {
 }
 
 type submitRequestData struct {
-	PeerId             string    `json:"peer_id"`
-	Block              *Base64   `json:"block"`
-	SnarkWork          *Base64   `json:"snark_work,omitempty"`
-	GraphqlControlPort uint16    `json:"graphql_control_port,omitempty"`
-	CreatedAt          time.Time `json:"created_at"`
+	PeerId               string    `json:"peer_id"`
+	Block                *Base64   `json:"block"`
+	SnarkWork            *Base64   `json:"snark_work,omitempty"`
+	GraphqlControlPort   uint16    `json:"graphql_control_port,omitempty"`
+	CreatedAt            time.Time `json:"created_at"`
+	BlockProducerVersion string    `json:"block_producer_version"`
 }
 type submitRequest struct {
 	Data      submitRequestData `json:"data"`
