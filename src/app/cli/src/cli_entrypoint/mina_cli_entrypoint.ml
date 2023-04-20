@@ -68,9 +68,10 @@ let setup_daemon logger =
     flag "--block-producer-key" ~aliases:[ "block-producer-key" ]
       ~doc:
         (sprintf
-           "KEYFILE Private key file for the block producer. You cannot \
-            provide both `block-producer-key` and `block-producer-pubkey`. \
-            (default: don't produce blocks). %s"
+           "DEPRECATED. KEYFILE Private key file for the block producer. You \
+            cannot provide both `block-producer-key` and \
+            `block-producer-pubkey`. (default: use PRIVATE_KEY environment \
+            variable). %s"
            receiver_key_warning )
       (optional string)
   and block_production_pubkey =
