@@ -40,6 +40,8 @@ func TestSignPayloadGeneration(t *testing.T) {
 		t.FailNow()
 	}
 	req.SnarkWork = mkB64("Bjtox/3Yu4cT5eVCQz/JQ+P3Ce1JmCIE7N6b1MAa")
+	req.GraphqlControlPort = 1234
+	req.BlockProducerVersion = "26f4f27810edd44b991e7942ffc49daebbf99a80"
 	json, err = makeSignPayload(req)
 	if err != nil || !bytes.Equal(json, []byte(TSPG_EXPECTED_2)) {
 		t.FailNow()

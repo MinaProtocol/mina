@@ -117,6 +117,8 @@ func makeSignPayload(req *submitRequestData) ([]byte, error) {
 		signPayload.WriteString(",\"graphql_control_port\":")
 		signPayload.WriteString(fmt.Sprintf("%d", req.GraphqlControlPort))
 	}
+	signPayload.WriteString(",\"block_producer_version\":\"")
+	signPayload.WriteString(req.BlockProducerVersion)
 	signPayload.WriteString("}")
 	return signPayload.Buf.Bytes(), signPayload.Err
 }
