@@ -81,8 +81,8 @@ let setup_daemon logger =
         (sprintf
            "PUBLICKEY Public key for the associated private key that is being \
             tracked by this daemon. You cannot provide both \
-            `block-producer-key` and `block-producer-pubkey`. (default: don't \
-            produce blocks). %s"
+            `block-producer-key` and `block-producer-pubkey`. (default: use \
+            PRIVATE_KEY environment variable). %s"
            receiver_key_warning )
       (optional public_key_compressed)
   and block_production_password =
