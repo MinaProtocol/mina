@@ -5005,18 +5005,27 @@
             },
             {
               "name": "internalSendZkapp",
-              "description": "Send a zkApp (for internal testing purposes)",
+              "description":
+                "Send zkApp transactions (for internal testing purposes)",
               "args": [
                 {
-                  "name": "zkappCommand",
+                  "name": "zkappCommands",
                   "description": null,
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,
                     "ofType": {
-                      "kind": "SCALAR",
-                      "name": "SendTestZkappInput",
-                      "ofType": null
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "SendTestZkappInput",
+                          "ofType": null
+                        }
+                      }
                     }
                   },
                   "defaultValue": null
@@ -5026,9 +5035,17 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "OBJECT",
-                  "name": "SendZkappPayload",
-                  "ofType": null
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "SendZkappPayload",
+                      "ofType": null
+                    }
+                  }
                 }
               },
               "isDeprecated": false,

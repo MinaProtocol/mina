@@ -47,19 +47,11 @@ RUN apt-get update --yes \
     postgresql-contrib \
     perl \
     pkg-config \
+    python3-sexpdata \
     rubygems \
+    wget \
     zlib1g-dev \
   && rm -rf /var/lib/apt/lists/*
-
-# -- Debian Bullseye python dependencies (largely installed above from apt)
-# Ocaml lints tool `scripts/require-ppxs.py` requires python3 sexpdata
-# but debian stretch does not have this package, so only install in bullseye
-RUN test "$deb_codename" = "bullseye" \
-      && apt-get update --yes \
-      && apt-get install --yes --no-install-recommends \
-          python3-sexpdata \
-      && pip install readchar \
-      || exit 0
 
 # --- deb-s3 tool
 # Custom version, with lock only on manifest upload
@@ -98,8 +90,8 @@ RUN curl https://baltocdn.com/helm/signing.asc | apt-key add - \
     && apt-get install --yes --no-install-recommends helm \
     && rm -rf /var/lib/apt/lists/*
 
-# --- yarn + nodejs
-RUN curl -sL https://deb.nodesource.com/setup_lts.x | bash - \
+# --- yarn + nodejs, pinned version
+RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - \
     && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add - \
     && echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list \
     && apt update --yes \

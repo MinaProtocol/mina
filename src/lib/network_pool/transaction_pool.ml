@@ -907,6 +907,8 @@ struct
 
       let (_ : (t, Diff_versioned.t) Type_equal.t) = Type_equal.T
 
+      let label = label
+
       module Diff_error = struct
         type t = Diff_versioned.Diff_error.t =
           (*Indexed_pool*)
