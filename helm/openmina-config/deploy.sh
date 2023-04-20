@@ -193,13 +193,13 @@ if [ "$NAMESPACE" = testnet ] && [ -z "$DRY_RUN" ]; then
     if [ -z "$FORCE" ]; then
         echo "ERRO: 'testnet' namespace shouldn't be used"
         exit 1
-    else
-        echo "WARN: 'testnet' namespace shouldn't be used. Continue? [y/N]"
-        read -r CONFIRM
-        if ! [ "$CONFIRM" = y ] && ! [ "$CONFIRM" = Y ]; then
-            echo "Aborting deployment"
-            exit 1
-        fi
+    # else
+    #     echo "WARN: 'testnet' namespace shouldn't be used. Continue? [y/N]"
+    #     read -r CONFIRM
+    #     if ! [ "$CONFIRM" = y ] && ! [ "$CONFIRM" = Y ]; then
+    #         echo "Aborting deployment"
+    #         exit 1
+    #     fi
     fi
 fi
 
