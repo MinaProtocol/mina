@@ -3114,6 +3114,7 @@ module Types = struct
           ; duration_in_minutes : int
           ; memo_prefix : string
           ; no_precondition : bool
+          ; recently_used_accounts : int
           }
 
         let arg_typ =
@@ -3121,7 +3122,7 @@ module Types = struct
             ~doc:"Keys and other information for scheduling zkapp commands"
             ~coerce:(fun fee_payers num_zkapps_to_deploy num_new_accounts
                          transactions_per_second duration_in_minutes memo_prefix
-                         no_precondition ->
+                         no_precondition recently_used_accounts ->
               Result.return
                 { fee_payers
                 ; num_zkapps_to_deploy
@@ -3130,11 +3131,12 @@ module Types = struct
                 ; duration_in_minutes
                 ; memo_prefix
                 ; no_precondition
+                ; recently_used_accounts
                 } )
             ~split:(fun f (t : input) ->
               f t.fee_payers t.num_zkapps_to_deploy t.num_new_accounts
                 t.transactions_per_second t.duration_in_minutes t.memo_prefix
-                t.no_precondition )
+                t.no_precondition t.recently_used_accounts )
             ~fields:
               Arg.
                 [ arg "feePayers"
@@ -3158,6 +3160,16 @@ module Types = struct
                 ; arg "noPrecondition"
                     ~doc:"Disable the precondition in account updates"
                     ~typ:(non_null bool)
+<<<<<<< HEAD
+=======
+                ; arg "maxSize" ~doc:"Generate max size zkapp transactions"
+                    ~typ:(non_null bool)
+                ; arg "recently_used_accounts"
+                    ~doc:
+                      "Avoid recently used accounts when generating new zkApp \
+                       commands"
+                    ~typ:(non_null int)
+>>>>>>> 6d2718e668 (add a cache for recently used accounts)
                 ]
       end
     end
@@ -4619,8 +4631,27 @@ module Mutations = struct
                                 (Public_key.compress public_key, private_key) )
                             |> Public_key.Compressed.Map.of_alist_exn
                           in
-                          let rec go ~vk ~prover account_state_tbl ndx tm_next
-                              counter =
+                          let insert_recently_used_accounts
+                              ~recently_used_accounts ~account_state_tbl id =
+                            let a =
+                              Account_id.Table.find_and_remove account_state_tbl
+                                id
+                            in
+                            Queue.enqueue recently_used_accounts
+                              (Option.value_exn a) ;
+                            if
+                              Queue.length recently_used_accounts
+                              > zkapp_command_details.recently_used_accounts
+                            then
+                              let a =
+                                Queue.dequeue_exn recently_used_accounts
+                              in
+                              Account_id.Table.add_exn account_state_tbl ~key:id
+                                ~data:a
+                            else ()
+                          in
+                          let rec go ~vk ~prover ~account_state_tbl ~ndx
+                              ~tm_next ~counter ~recently_used_accounts =
                             if Time.( >= ) (Time.now ()) tm_end then (
                               [%log info]
                                 "Scheduled zkApp commands with handle %s has \
@@ -4695,6 +4726,15 @@ module Mutations = struct
                                           (Splittable_random.State.create
                                              Random.State.default )
                                     in
+                                    let accounts =
+                                      Zkapp_command.accounts_referenced
+                                        zkapp_command_with_dummy_auth
+                                    in
+                                    List.iter accounts
+                                      ~f:
+                                        (insert_recently_used_accounts
+                                           ~recently_used_accounts
+                                           ~account_state_tbl ) ;
                                     let%bind zkapp_command =
                                       Zkapp_command_builder
                                       .replace_authorizations ~prover ~keymap
@@ -4723,9 +4763,10 @@ module Mutations = struct
                               in
                               let%bind () = Async_unix.at tm_next in
                               let next_tm_next = Time.add tm_next wait_span in
-                              go ~vk ~prover account_state_tbl
-                                ((ndx + 1) mod num_fee_payers)
-                                next_tm_next (counter + 1)
+                              go ~vk ~prover ~account_state_tbl
+                                ~ndx:((ndx + 1) mod num_fee_payers)
+                                ~tm_next:next_tm_next ~counter:(counter + 1)
+                                ~recently_used_accounts
                           in
                           upon
                             (wait_until_zkapps_deployed ~mina ~ledger
@@ -4743,6 +4784,7 @@ module Mutations = struct
                                       List.map ids ~f:(fun id ->
                                           (id, (account_of_id id ledger, role)) )
                                     in
+
                                     Account_id.Table.of_alist_exn
                                       ( get_account fee_payer_ids `Fee_payer
                                       @ get_account zkapp_account_ids
@@ -4756,9 +4798,13 @@ module Mutations = struct
                                   let tm_next =
                                     Time.add (Time.now ()) wait_span
                                   in
+                                  let recently_used_accounts =
+                                    Queue.create ()
+                                  in
                                   don't_wait_for
-                                  @@ go account_state_tbl ~vk ~prover 0 tm_next
-                                       0 ) ;
+                                  @@ go ~account_state_tbl ~vk ~prover ~ndx:0
+                                       ~tm_next ~counter:0
+                                       ~recently_used_accounts ) ;
 
                           Ok (Uuid.to_string uuid) ) ) )
 
