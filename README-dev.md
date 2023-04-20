@@ -5,7 +5,7 @@ Mina is a cryptocurrency protocol with a lightweight, constant-sized blockchain.
 - [Node Developers Overview](https://docs.minaprotocol.com/node-developers)
 - [Mina README](README)
 
-For information about our development process and how to contribute, see [CONTRIBUTING.md](CONTRIBUTING). If you want to build
+For information about our development process and how to contribute, see [CONTRIBUTING.md](CONTRIBUTING.md). If you want to build
 Mina, this is the right file!
 
 ## Building Mina
@@ -126,7 +126,7 @@ To get all of the required the opam dependencies, run:
 opam switch import opam.export
 ```
 
-> *_NOTE:_*  The `switch` command provides a `dune_wrapper` binary that you can use instead of dune and fails early if your switch becomes out of sync with the `opam.export` file.
+*_NOTE:_*  The `switch` command provides a `dune_wrapper` binary that you can use instead of dune and fails early if your switch becomes out of sync with the `opam.export` file.
 
 Some dependencies that are not taken from `opam` or integrated with `dune` must be added manually. Run the `scripts/pin-external-packages.sh` script.
 
