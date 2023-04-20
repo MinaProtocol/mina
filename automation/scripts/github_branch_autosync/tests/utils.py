@@ -77,15 +77,15 @@ class BranchNamesGenerator(object):
             Then stores branches in inner dict for later clean up
         """
         rand = str(random.randint(0, 100_000))
-        stage_1_branch = "develop_" + rand
-        stage_2_branch = "berkeley_" + rand
+        compatible_branch = "compatible" + rand
+        develop_branch = "develop_" + rand
         file_to_edit = f"README_{rand}.md"
-        self.github.create_new_branch(stage_1_branch,"main")
-        self.github.create_new_branch(stage_2_branch,"main")
+        self.github.create_new_branch(compatible_branch,"main")
+        self.github.create_new_branch(develop_branch,"main")
 
-        config.branches[stage_1_branch] = stage_2_branch
-        self.store.extend([stage_1_branch,stage_2_branch,config.tmp_branch_name(stage_1_branch,stage_2_branch)])
-        return (stage_1_branch,stage_2_branch,file_to_edit)
+        config.branches[compatible_branch] = develop_branch
+        self.store.extend([compatible_branch,develop_branch,config.tmp_branch_name(compatible_branch,develop_branch)])
+        return (compatible_branch,develop_branch,file_to_edit)
 
     def tear_down(self):
         """

@@ -35,7 +35,7 @@ It is prepared to receive github webhook payload json on new commit to specified
 
 Configuration is defined as module in `./github_autosync/gcloud_entrypoint/lib/config.py`
 
-Below more detailed description of each setion
+Below more detailed description of each section
 
 ## Branches
 

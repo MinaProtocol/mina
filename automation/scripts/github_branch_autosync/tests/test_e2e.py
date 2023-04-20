@@ -1,5 +1,6 @@
 """ E2E tests for auto-sync merges"""
 
+import random
 import unittest
 from github_autosync.gcloud_entrypoint.main import handle_incoming_commit_push_json
 from tests import config,utils
@@ -15,34 +16,24 @@ class TestEndToEndFlow(unittest.TestCase):
         cls.generator = utils.BranchNamesGenerator()
         cls.github = GithubApi(config.github)
 
-    def test_no_conflict(self):
-        stage_1_branch,stage_2_branch,file_to_edit = self.generator.generate_unique_names()
+    def push_commit_to(self, branch,some_source_file):
+        change = "change" + str(random.randint(0, 100_000))
+        utils.create_simple_commit(self.github, config.github,branch,"commit", some_source_file, change)
 
-        change = """develop
-        """
-        utils.create_simple_commit(self.github, config.github,stage_1_branch,"commit", file_to_edit, change)
-
-        self.fire_commit_event(stage_1_branch)
-
-        left_sha = self.github.branch(stage_1_branch).commit.sha
-        right_sha = self.github.branch(stage_2_branch).commit.sha
+    def assert_on_the_same_commit(self, left, right):
+        left_sha = self.github.branch(left).commit.sha
+        right_sha = self.github.branch(right).commit.sha
 
         self.assertEqual(left_sha,right_sha)
 
-    def test_conflict(self):
-        stage_1_branch,stage_2_branch,file_to_edit = self.generator.generate_unique_names()        
+    def assert_temp_sync_branch_created(self, new_branch):
+        self.assertTrue(self.github.branch_exists(new_branch))
 
-        change = """first_change
-        """
-        utils.create_simple_commit(self.github, config.github,stage_1_branch,"commit on stable branch", file_to_edit, change)
+    def assert_temp_sync_branch_was_cleaned(self,base,head):
+        self.assertFalse(self.github.branch_exists(config.tmp_branch_name(base,head)))
 
-        change = """merge_conflict
-        """
-        utils.create_simple_commit(self.github, config.github,stage_2_branch,"commit on unstable branch", file_to_edit, change)
-
-        self.fire_commit_event(stage_1_branch)
-
-        prs = self.github.repository().get_pulls(base=stage_2_branch).get_page(0)
+    def assert_pr_created(self,base,head):
+        prs = self.github.repository().get_pulls(base,head).get_page(0)
 
         self.assertEqual(len(prs),1)
 
@@ -53,67 +44,81 @@ class TestEndToEndFlow(unittest.TestCase):
         self.assertTrue(config.pr["body_prefix"] in pr.body)
         self.assertEqual(bool(config.pr["draft"]),pr.draft)
 
+    def handle_commit_event(self,branch):
+        handle_incoming_commit_push_json(json={ "ref": "refs/heads/" + branch},config=config)
+
+    def test_no_conflict(self):
+        compatible,develop,some_source_file = self.generator.generate_unique_names()
+        
+        
+        self.push_commit_to(compatible,some_source_file)
+        self.handle_commit_event(compatible)
+       
+        self.assert_on_the_same_commit(compatible,develop)
+        self.assert_temp_sync_branch_was_cleaned(compatible,develop)
+
+    def test_conflict(self):
+        compatible,develop,some_source_file = self.generator.generate_unique_names()     
+
+        # Creating conflict
+        self.push_commit_to(develop,some_source_file)
+        self.push_commit_to(compatible,some_source_file)
+
+        self.handle_commit_event(compatible)
+
+        temp_sync_branch = config.tmp_branch_name(compatible,develop)
+        self.assert_temp_sync_branch_created(temp_sync_branch)
+        self.assert_pr_created(base=develop,head=temp_sync_branch)
+
     def test_update_stable_branch_while_conflict(self):
-        stage_1_branch,stage_2_branch,file_to_edit = self.generator.generate_unique_names()        
+        compatible,develop,some_source_file = self.generator.generate_unique_names()        
 
+        # Creating conflict
+        self.push_commit_to(develop,some_source_file)
+        self.push_commit_to(compatible,some_source_file)
 
-        change = """hot-fix
-        """
-        utils.create_simple_commit(self.github, config.github,stage_2_branch,"commit on unstable branch", file_to_edit, change)
+        self.handle_commit_event(compatible)
 
+        temp_sync_branch = config.tmp_branch_name(compatible,develop)
+        self.assert_pr_created(base=develop,head=temp_sync_branch)
 
-        change = """first_merge_conflict
-        """
-        utils.create_simple_commit(self.github, config.github,stage_1_branch,"commit on stable branch", file_to_edit, change)
+        self.push_commit_to(compatible,some_source_file)
+        self.handle_commit_event(compatible)
 
-        self.fire_commit_event(stage_1_branch)
+        # sync branch should fast forward to compatible head
+        temp_branch_head = self.github.branch(temp_sync_branch).commit.sha
+        compatible_head = self.github.branch(compatible).commit.sha
+        develop_head = self.github.branch(develop).commit.sha
 
-        change = """update_merge_conflict
-        """
-        utils.create_simple_commit(self.github, config.github,stage_1_branch,"another commit on stable branch", file_to_edit, change)
-
-        self.fire_commit_event(stage_1_branch)
-
-        temp_branch_sha = self.github.branch(config.tmp_branch_name(stage_1_branch,stage_2_branch)).commit.sha
-        stable_branch_sha = self.github.branch(stage_1_branch).commit.sha
-        hotfix_branch_sha = self.github.branch(stage_2_branch).commit.sha
-
-        self.assertEqual(temp_branch_sha,stable_branch_sha)
-        self.assertNotEqual(temp_branch_sha,hotfix_branch_sha)
+        self.assertEqual(temp_branch_head,compatible_head)
+        self.assertNotEqual(compatible_head,develop_head)
 
     def test_update_stable_branch_while_conflict_causes_conflict_with_temp_branch(self):
-        stage_1_branch,stage_2_branch,file_to_edit = self.generator.generate_unique_names()
-        temp_branch = config.tmp_branch_name(stage_1_branch,stage_2_branch)    
+        compatible,develop,some_source_file = self.generator.generate_unique_names()
+        temp_branch = config.tmp_branch_name(compatible,develop)
 
-        change = """hot-fix
-        """
-        utils.create_simple_commit(self.github, config.github,stage_2_branch,"commit on unstable branch", file_to_edit, change)
+        # Creating conflict
+        self.push_commit_to(develop,some_source_file)
+        self.push_commit_to(compatible,some_source_file)
 
-        change = """first_merge_conflict
-        """
-        utils.create_simple_commit(self.github, config.github,stage_1_branch,"commit on stable branch", file_to_edit, change)
+        self.handle_commit_event(compatible)
 
-        self.fire_commit_event(stage_1_branch)
+        # attempt to fix merge conflict
+        self.push_commit_to(temp_branch,some_source_file)
 
-        change = """attempt_to_fix_merge_conflict
-        """
-        utils.create_simple_commit(self.github, config.github,temp_branch,"commit on temp branch", file_to_edit, change)
- 
-        change = """update_merge_conflict
-        """
-        utils.create_simple_commit(self.github, config.github,stage_1_branch,"another commit on stable branch", file_to_edit, change)
+        # but then compatible got yet another commit which now creates conflict not only with develop
+        # but also with sync branch
+        self.push_commit_to(compatible,some_source_file)
 
-        self.fire_commit_event(stage_1_branch)
+        self.handle_commit_event(compatible)
 
-        prs = self.github.repository().get_pulls(base=temp_branch,head=stage_1_branch).get_page(0)
+        # as a result we should have two prs original one and new for fixing intermittent conflict
+        self.assert_pr_exist(base=temp_branch,head=compatible)
+        self.assert_pr_exist(base=temp_branch,head=develop)
+
+    def assert_pr_exist(self,base,head):
+        prs = self.github.repository().get_pulls(base,head).get_page(0)
         self.assertEqual(1,len(prs))
-
-        prs = self.github.repository().get_pulls(base=temp_branch,head=stage_2_branch).get_page(0)
-        self.assertEqual(1,len(prs))
-
-
-    def fire_commit_event(self,branch):
-        handle_incoming_commit_push_json(json={ "ref": "refs/heads/" + branch},config=config)
 
     @classmethod
     def tearDownClass(cls):
