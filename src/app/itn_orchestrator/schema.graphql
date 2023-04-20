@@ -96,4 +96,6 @@ input ZkappCommandsDetails {
   feePayers: [PrivateKey!]!
 
   noPrecondition: Boolean!
+
+  maxSize: Boolean!
 }
