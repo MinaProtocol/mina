@@ -1,11 +1,11 @@
 # Mina
 
-Mina is a cryptocurrency protocol with a lightweight, constant-sized blockchain. Mina is a layer 1 blockchain with a 22 KB blockchain and zero-knowledge smart contracts (zkApps).
+Mina is a cryptocurrency protocol with a lightweight, constant-sized blockchain.
 
-- [Node Developers Overview Page](https://docs.minaprotocol.com/node-developers)
-- [Repository Readme](README.md)
+- [Node Developers Overview](https://docs.minaprotocol.com/node-developers)
+- [Mina README](README)
 
-For information about our development process and how to contribute, see [CONTRIBUTING.md](CONTRIBUTING.md. If you want to build
+For information about our development process and how to contribute, see [CONTRIBUTING.md](CONTRIBUTING). If you want to build
 Mina, this is the right file!
 
 ## Building Mina
