@@ -198,6 +198,7 @@ steps:
   environment:
     URL: http://1.k8.openmina.com:31355
   commands:
+  - if [ -n "$${SPLIT_SKIP}" ]; then exit; fi
   - sleep  10 && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 show-graph --expected-components 1
   - sleep  10 && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 enable-firewall
   - sleep  90 && topology-tool --url=$URL --nodes=8 --snarkers=96 --prods=3 --prod0s=3 --seeds=2 show-graph --expected-components 2
