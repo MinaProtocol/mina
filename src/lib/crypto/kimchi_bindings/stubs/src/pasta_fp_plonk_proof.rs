@@ -18,7 +18,10 @@ use kimchi::{
     },
     verifier::Context,
 };
-use kimchi::{prover::caml::{CamlProverProof, CamlProverTraces}, verifier_index::VerifierIndex};
+use kimchi::{
+    prover::caml::{CamlProverProof, CamlProverTraces},
+    verifier_index::VerifierIndex,
+};
 use mina_curves::pasta::{Fp, Fq, Pallas, Vesta, VestaParameters};
 use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
@@ -38,7 +41,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
     witness: Vec<CamlFpVector>,
     prev_challenges: Vec<CamlFp>,
     prev_sgs: Vec<CamlGVesta>,
-) -> Result<(CamlProverProof<CamlGVesta, CamlFp>, CamlProverTraces), ocaml::Error> {
+) -> Result<CamlProverProof<CamlGVesta, CamlFp>, ocaml::Error> {
     internal_traces::start_tracing();
     internal_tracing::checkpoint!(internal_traces; pasta_fp_plonk_proof_create);
     {
@@ -94,11 +97,14 @@ pub fn caml_pasta_fp_plonk_proof_create(
             None,
         )
         .map_err(|e| ocaml::Error::Error(e.into()))?;
-        Ok((
-            (proof, public_input).into(),
-            internal_traces::take_traces().into(),
-        ))
+        Ok((proof, public_input).into())
     })
+}
+
+#[ocaml_gen::func]
+#[ocaml::func]
+pub fn caml_pasta_fp_plonk_proof_take_trace() -> CamlProverTraces {
+    internal_traces::take_traces().into()
 }
 
 #[ocaml_gen::func]

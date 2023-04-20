@@ -361,8 +361,10 @@ module Protocol = struct
         -> Pasta_bindings.Fq.t Kimchi_types.or_infinity array
         -> ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
            , Pasta_bindings.Fp.t )
-           Kimchi_types.prover_proof
-           * Kimchi_types.prover_traces = "caml_pasta_fp_plonk_proof_create"
+           Kimchi_types.prover_proof = "caml_pasta_fp_plonk_proof_create"
+
+      external take_trace : unit -> Kimchi_types.prover_traces
+        = "caml_pasta_fp_plonk_proof_take_trace"
 
       external example_with_lookup :
            SRS.Fp.t
@@ -472,8 +474,10 @@ module Protocol = struct
         -> Pasta_bindings.Fp.t Kimchi_types.or_infinity array
         -> ( Pasta_bindings.Fp.t Kimchi_types.or_infinity
            , Pasta_bindings.Fq.t )
-           Kimchi_types.prover_proof
-           * Kimchi_types.prover_traces = "caml_pasta_fq_plonk_proof_create"
+           Kimchi_types.prover_proof = "caml_pasta_fq_plonk_proof_create"
+
+      external take_trace : unit -> Kimchi_types.prover_traces
+        = "caml_pasta_fq_plonk_proof_take_trace"
 
       external verify :
            ( Pasta_bindings.Fq.t

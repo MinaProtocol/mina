@@ -109,7 +109,8 @@ module Proof = Plonk_dlog_proof.Make (struct
 
     let create_traced ?tracing_output pk auxiliary_input prev_challenges
         prev_sgs =
-      let proof, traces = create pk auxiliary_input prev_challenges prev_sgs in
+      let proof = create pk auxiliary_input prev_challenges prev_sgs in
+      let traces = take_trace () in
       Option.iter tracing_output ~f:(fun tracing_output ->
           tracing_output := traces.inner ) ;
       proof

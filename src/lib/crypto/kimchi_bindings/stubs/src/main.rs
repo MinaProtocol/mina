@@ -452,6 +452,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
         decl_module!(w, env, "Proof", {
             decl_module!(w, env, "Fp", {
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_create => "create");
+                decl_func!(w, env, caml_pasta_fp_plonk_proof_take_trace => "take_trace");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_lookup => "example_with_lookup");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_ffadd => "example_with_ffadd");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_xor => "example_with_xor");
@@ -467,6 +468,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
 
             decl_module!(w, env, "Fq", {
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_create => "create");
+                decl_func!(w, env, caml_pasta_fq_plonk_proof_take_trace => "take_trace");
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_verify => "verify");
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_batch_verify => "batch_verify");
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_dummy => "dummy");
