@@ -102,6 +102,8 @@ func main() {
 	srcBucketName := os.Args[1]
 	dstBucketName := os.Args[2]
 	visitedFilePath := os.Args[3]
+	srcNetwork := os.Args[4]
+	dstNetwork := os.Args[5]
 	visited := make(map[string]bool)
 	{
 		// Read file and insert lines into visited map
@@ -124,8 +126,8 @@ func main() {
 		return
 	}
 	client := s3.NewFromConfig(cfg)
-	srcActx := dg.AwsContext{Client: client, BucketName: aws.String(srcBucketName), Context: ctx, Log: log}
-	dstActx := dg.AwsContext{Client: client, BucketName: aws.String(dstBucketName), Context: ctx, Log: log}
+	srcActx := dg.AwsContext{Client: client, BucketName: aws.String(srcBucketName), Prefix: srcNetwork, Context: ctx, Log: log}
+	dstActx := dg.AwsContext{Client: client, BucketName: aws.String(dstBucketName), Prefix: dstNetwork, Context: ctx, Log: log}
 	prefix := "submissions/"
 	suffix := ".json"
 	q := &s3.ListObjectsV2Input{
