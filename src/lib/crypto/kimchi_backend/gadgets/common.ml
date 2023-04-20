@@ -7,11 +7,11 @@ let tuple3_of_array array =
   match array with [| a1; a2; a3 |] -> (a1, a2, a3) | _ -> assert false
 
 let tuple4_of_array array =
-    match array with
-    | [| a1; a2; a3; a4 |] ->
-        (a1, a2, a3, a4)
-    | _ ->
-        assert false
+  match array with
+  | [| a1; a2; a3; a4 |] ->
+      (a1, a2, a3, a4)
+  | _ ->
+      assert false
 
 (* Foreign field element limb size *)
 let limb_bits = 88
