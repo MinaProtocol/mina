@@ -17,7 +17,7 @@ import (
 func (identity Identity) GetCell(client *sheets.Service, log *logging.ZapEventLogger) (exactMatch bool, rowIndex int, firstEmptyRow int) {
 	exactMatch = false
 	rowIndex = 0
-	firstEmptyRow = 0
+	firstEmptyRow = 1
 	col := IDENTITY_COLUMN
 	readRange := ITN_UPTIME_ANALYZER_SHEET + "!" + col + ":" + col
 	spId := OutputSpreadsheetId()
@@ -34,6 +34,7 @@ func (identity Identity) GetCell(client *sheets.Service, log *logging.ZapEventLo
 			exactMatch = true
 			break
 		}
+		firstEmptyRow = firstEmptyRow + 1
 	}
 
 	if exactMatch == false {
@@ -43,13 +44,6 @@ func (identity Identity) GetCell(client *sheets.Service, log *logging.ZapEventLo
 				rowIndex = index + 1
 				exactMatch = false
 			}
-		}
-	}
-
-	for index, value := range resp.Values[0] {
-		if value == "" {
-			firstEmptyRow = index + 1
-			break
 		}
 	}
 
