@@ -94,4 +94,6 @@ input ZkappCommandsDetails {
   Private keys of fee payers (fee payers also function as the account creators)
   """
   feePayers: [PrivateKey!]!
+
+  noPrecondition: Boolean!
 }
