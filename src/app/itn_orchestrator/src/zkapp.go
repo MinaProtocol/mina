@@ -7,20 +7,21 @@ import (
 )
 
 type ZkappCommandParams struct {
-	ExperimentName    string
-	Tps               float64
-	DurationInMinutes int
-	ZkappsToDeploy    int
-	NewAccounts       int
-	FeePayers         []itn_json_types.MinaPrivateKey
-	Nodes             []NodeAddress
-	NoPrecondition    bool
-	MinBalanceChange  string 
-	MaxBalanceChange  string 
-	InitBalance       string
-	MinFee            string 
-	MaxFee            string 
-	DeploymentFee     string
+	ExperimentName       string
+	Tps                  float64
+	DurationInMinutes    int
+	ZkappsToDeploy       int
+	NewAccounts          int
+	FeePayers            []itn_json_types.MinaPrivateKey
+	Nodes                []NodeAddress
+	NoPrecondition       bool
+	MinBalanceChange     string
+	MaxBalanceChange     string
+	InitBalance          string
+	MinFee               string
+	MaxFee               string
+	DeploymentFee        string
+	RecentlyUsedAccounts int
 }
 
 type ScheduledZkappCommandsReceipt struct {
@@ -39,12 +40,13 @@ func SendZkappCommands(config Config, params ZkappCommandParams, output func(Sch
 			NumNewAccounts:        params.NewAccounts,
 			FeePayers:             params.FeePayers[nodeIx*feePayersPerNode : (nodeIx+1)*feePayersPerNode],
 			NoPrecondition:        params.NoPrecondition,
-			MinBalanceChange:      params.MinBalanceChange, 
-			MaxBalanceChange:      params.MaxBalanceChange, 
+			MinBalanceChange:      params.MinBalanceChange,
+			MaxBalanceChange:      params.MaxBalanceChange,
 			InitBalance:           params.InitBalance,
-			MinFee:                params.MinFee, 
+			MinFee:                params.MinFee,
 			MaxFee:                params.MaxFee,
 			DeploymentFee:         params.DeploymentFee,
+			RecentlyUsedAccounts:  params.RecentlyUsedAccounts,
 		}
 		client, err := config.GetGqlClient(config.Ctx, nodeAddress)
 		if err != nil {
