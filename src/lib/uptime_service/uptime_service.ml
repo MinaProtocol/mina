@@ -16,6 +16,7 @@ type block_data =
   ; peer_id : string
   ; snark_work : string option [@default None]
   ; graphql_control_port : int option [@default None]
+  ; block_producer_version : string option [@default None]
   }
 [@@deriving to_yojson]
 
@@ -201,7 +202,7 @@ let block_base64_of_breadcrumb breadcrumb =
 
 let send_produced_block_at ~logger ~interruptor ~url ~peer_id
     ~(submitter_keypair : Keypair.t) ~graphql_control_port ~block_produced_bvar
-    tm =
+    ~block_producer_version tm =
   let open Interruptible.Let_syntax in
   let make_interruptible f = Interruptible.lift f interruptor in
   let timeout_min = 3.0 in
@@ -227,6 +228,7 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
         ; peer_id
         ; snark_work = None
         ; graphql_control_port
+        ; block_producer_version
         }
       in
       send_uptime_data ~logger ~interruptor ~submitter_keypair ~url ~state_hash
@@ -234,7 +236,7 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
 
 let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
     ~transition_frontier ~peer_id ~(submitter_keypair : Keypair.t)
-    ~snark_work_fee ~graphql_control_port =
+    ~snark_work_fee ~graphql_control_port ~block_producer_version =
   match Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       (* expected during daemon boot, so not logging as error *)
@@ -268,6 +270,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
           ; peer_id
           ; snark_work = None
           ; graphql_control_port
+          ; block_producer_version
           }
         in
         send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
@@ -308,6 +311,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
               ; peer_id
               ; snark_work = None
               ; graphql_control_port
+              ; block_producer_version
               }
             in
             send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
@@ -351,6 +355,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                   ; peer_id
                   ; snark_work = None
                   ; graphql_control_port
+                  ; block_producer_version
                   }
                 in
                 send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
@@ -391,6 +396,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                       ; peer_id
                       ; snark_work = Some snark_work_base64
                       ; graphql_control_port
+                      ; block_producer_version
                       }
                     in
                     send_uptime_data ~logger ~interruptor ~submitter_keypair
@@ -399,7 +405,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
 let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
     ~time_controller ~block_produced_bvar ~uptime_submitter_keypair
     ~get_next_producer_timing ~get_snark_work_fee ~get_peer
-    ~graphql_control_port =
+    ~graphql_control_port ~block_producer_version =
   match uptime_url with
   | None ->
       [%log info] "Not running uptime service, no URL given" ;
@@ -491,7 +497,8 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                      block" ;
                   send_produced_block_at ~logger ~interruptor ~url ~peer_id
                     ~submitter_keypair ~graphql_control_port
-                    ~block_produced_bvar next_producer_time
+                    ~block_producer_version ~block_produced_bvar
+                    next_producer_time
                 in
                 let send_block_and_snark_work () =
                   [%log info]
@@ -500,6 +507,7 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                   send_block_and_transaction_snark ~logger ~interruptor ~url
                     ~snark_worker ~transition_frontier ~peer_id
                     ~submitter_keypair ~snark_work_fee ~graphql_control_port
+                    ~block_producer_version
                 in
                 match get_next_producer_time_opt () with
                 | None ->
