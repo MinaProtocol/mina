@@ -1420,6 +1420,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             let register_verification_key ({ data = a; _ } : t) =
               match spec.auth_type with
               | Proof ->
+                  let feature_flags = Pickles_types.Plonk_types.Features.none in
                   let vk =
                     exists (Side_loaded_verification_key.typ feature_flags)
                       ~compute:(fun () ->
