@@ -1521,13 +1521,19 @@ let%test_unit "foreign_field arithmetics gadgets" =
                   (module Runner.Impl)
                   expected
               in
-              let product =
+              let product1 =
+                Element.Standard.to_field_limbs_as_prover
+                  (module Runner.Impl)
+                  product1
+              in
+              let product2 =
                 Element.Standard.to_field_limbs_as_prover
                   (module Runner.Impl)
                   product2
               in
 
-              assert_eq product expected ) ;
+              assert_eq product1 expected ;
+              assert_eq product2 expected ) ;
 
           (* 2) Add result bound addition gate. Corresponding range check happens in 6 *)
           let _out1 =
