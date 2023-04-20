@@ -4,13 +4,14 @@ import (
 	"time"
 )
 
+
 func GetCurrentTime() time.Time {
 	currentTime := time.Now()
 	return currentTime
 }
 
+// Get last execution time of application
 func GetLastExecutionTime(currentTime time.Time) time.Time {
-	// Get last execution of application
 
 	pastTime := currentTime.Add(-12 * time.Hour)
 

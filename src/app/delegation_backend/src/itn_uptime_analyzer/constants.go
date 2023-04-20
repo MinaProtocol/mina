@@ -2,7 +2,6 @@ package itn_uptime_analyzer
 
 import (
 	"os"
-	// "time"
 )
 
 const ITN_UPTIME_ANALYZER_SHEET = "Sheet1"

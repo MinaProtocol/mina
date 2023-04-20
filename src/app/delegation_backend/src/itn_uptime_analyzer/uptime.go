@@ -3,19 +3,22 @@ package itn_uptime_analyzer
 import (
 	"encoding/json"
 	"strings"
+	"strconv"
 	"time"
 	"cloud.google.com/go/storage"
 	dg "block_producers_uptime/delegation_backend"
 	logging "github.com/ipfs/go-log/v2"
 	"context"
 	"google.golang.org/api/iterator"
-	"bytes"
 )
+
+// This function tries to match the identities with the submission data and if there is a match it appends
+// To the uptime array, the length of which determines if the node was up or not
+// Length of 47 is enough  
 
 func (identity Identity) GetUptime(ctx context.Context, client *storage.Client, log *logging.ZapEventLogger) {
 
-	// currentTime := GetCurrentTime()
-	currentTime := time.Date(2023, time.April, 1, 23, 59, 59, 0, time.UTC)
+	currentTime := GetCurrentTime()
 	currentDateString := currentTime.Format(time.RFC3339)[:10]
 	lastExecutionTime := GetLastExecutionTime(currentTime)
 
@@ -25,7 +28,7 @@ func (identity Identity) GetUptime(ctx context.Context, client *storage.Client, 
 	var submissionData dg.MetaToBeSaved
 	var lastSubmissionDate string
 	var lastSubmissionTime time.Time
-	var uptime bytes.Buffer
+	var uptime []bool
 
 	for {
 		obj, err := submissions.Next()
@@ -57,7 +60,7 @@ func (identity Identity) GetUptime(ctx context.Context, client *storage.Client, 
 				log.Fatalf("Error converting json to string: %v\n", err)
 			}	
 
-			if (identity["public-key"] == submissionData.Submitter.String()) && (identity["public-ip"] == "45.45.45.45") { //submissionData.RemoteAddr
+			if (identity["public-key"] == submissionData.Submitter.String()) && (identity["public-ip"] == submissionData.RemoteAddr) {
 				if lastSubmissionDate != "" {
 					lastSubmissionTime, err = time.Parse(time.RFC3339, lastSubmissionDate)
 					if err != nil {
@@ -71,7 +74,7 @@ func (identity Identity) GetUptime(ctx context.Context, client *storage.Client, 
 				}
 				
 				if (lastSubmissionDate != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(14 * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(16 * time.Minute))) {
-					uptime.WriteString("1")
+					uptime = append(uptime, true)
 					lastSubmissionDate = submissionData.CreatedAt
 				} else if lastSubmissionDate == "" {
 					lastSubmissionDate = submissionData.CreatedAt
@@ -81,6 +84,7 @@ func (identity Identity) GetUptime(ctx context.Context, client *storage.Client, 
 			reader.Close()
 		}
 	}
-	identity["uptime"] = uptime.String()
-
+	log.Infof("In int format: %v\n", len(uptime))
+	identity["uptime"] = strconv.Itoa(len(uptime))
+	log.Infof("In string format: %v\n", identity["uptime"])
 }

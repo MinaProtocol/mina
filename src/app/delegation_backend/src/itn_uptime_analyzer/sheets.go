@@ -3,10 +3,10 @@ package itn_uptime_analyzer
 import (
 	sheets "google.golang.org/api/sheets/v4"
 	"strings"
+	"strconv"
 	"fmt"
 	"time"
 	logging "github.com/ipfs/go-log/v2"
-	// "google.golang.org/api/option"
 )
 
 // This function returns true if the identity is present
@@ -93,13 +93,15 @@ func (identity Identity) InsertBelow(client *sheets.Service, log *logging.ZapEve
 	}
 }
 
+// Finds the first empty column on the row specified and puts up or not up
+
 func (identity Identity) AppendUptime(client *sheets.Service, log *logging.ZapEventLogger, rowIndex int) {
 	readRange := fmt.Sprintf("%s!A%d:Z%d", ITN_UPTIME_ANALYZER_SHEET, 1, 1)
 	spId := OutputSpreadsheetId()
 
 	resp, err := client.Spreadsheets.Values.Get(spId, readRange).Do()
 	if err != nil {
-		log.Fatalf("Unable to retrieve data from sheet: %v", err)
+		log.Fatalf("Unable to retrieve data from sheet: %v\n", err)
 	}
 
 	var nextEmptyColumn int = len(resp.Values[0])
@@ -108,7 +110,14 @@ func (identity Identity) AppendUptime(client *sheets.Service, log *logging.ZapEv
 
 	var cellValue []interface{}
 
-	if (len(identity["uptime"]) >= 47) {
+	uptimeArrayLength, err := strconv.Atoi(identity["uptime"])
+	if err != nil {
+		log.Fatalf("Unable to retrieve data from sheet: %v\n", err)
+	}
+
+	log.Infof("Length: %v\n", uptimeArrayLength)
+
+	if (uptimeArrayLength >= 47) {
 		cellValue = []interface{}{"up"}
 	} else {
 		cellValue = []interface{}{"not up"}
@@ -120,9 +129,11 @@ func (identity Identity) AppendUptime(client *sheets.Service, log *logging.ZapEv
 
 	_, err = client.Spreadsheets.Values.Append(spId, updateRange, &valueRange).ValueInputOption("USER_ENTERED").Do()
 	if err != nil {
-		log.Fatalf("Unable to insert data in sheet: %v", err)
+		log.Fatalf("Unable to insert data in sheet: %v\n", err)
 	}
 }
+
+// Tracks the date of execution on the top row of the spreadsheet
 
 func MarkExecution(client *sheets.Service, log *logging.ZapEventLogger){
 	readRange := fmt.Sprintf("%s!A%d:Z%d", ITN_UPTIME_ANALYZER_SHEET, 1, 1)

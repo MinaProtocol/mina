@@ -15,10 +15,11 @@ import (
 
 type Identity map[string]string
 
+// Goes through each submission and adds an identity type to a map
+
 func CreateIdentities(ctx context.Context, client *storage.Client, log *logging.ZapEventLogger) map[string]Identity {
 
-	// currentTime := itn.GetCurrentTime()
-	currentTime := time.Date(2023, time.April, 1, 23, 59, 59, 0, time.UTC)
+	currentTime := GetCurrentTime()
 	currentDateString := currentTime.Format(time.RFC3339)[:10]
 	lastExecutionTime := GetLastExecutionTime(currentTime)
 
@@ -64,7 +65,7 @@ func CreateIdentities(ctx context.Context, client *storage.Client, log *logging.
 					log.Fatalf("Error converting json to string: %v\n", err)
 				}
 		
-				identity := GetIdentity(submissionData.Submitter.String(), "45.45.45.46") // change the IP back to submissionData["remote_addr"]
+				identity := GetIdentity(submissionData.Submitter.String(), submissionData.RemoteAddr) // change the IP back to submissionData["remote_addr"]
 				if _, inMap := identities[identity["id"]]; !inMap {
 					AddIdentity(identity, identities)
 				}
@@ -76,7 +77,9 @@ func CreateIdentities(ctx context.Context, client *storage.Client, log *logging.
 	return identities
 }
 
-func GetIdentity(pubKey string, ip string) map[string]string {
+// Returns and Identity type identified by a hash value as an id 
+
+func GetIdentity(pubKey string, ip string) Identity {
 	s := strings.Join([]string{pubKey, ip}, "-")
 	id := md5.Sum([]byte(s)) // Create a hash value and use it as id
 
@@ -88,6 +91,8 @@ func GetIdentity(pubKey string, ip string) map[string]string {
 
 	return identity
 }
+
+// Adds an identity to the map
 
 func AddIdentity(identity Identity, identities map[string]Identity) {
 	identities[identity["id"]] = identity
