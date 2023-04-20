@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 	"cloud.google.com/go/storage"
-	"fmt"
 	dg "block_producers_uptime/delegation_backend"
 	logging "github.com/ipfs/go-log/v2"
 	"context"
@@ -64,10 +63,8 @@ func CreateIdentities(ctx context.Context, client *storage.Client, log *logging.
 				if err != nil {
 					log.Fatalf("Error converting json to string: %v\n", err)
 				}
-	
-				fmt.Println(submissionData.Submitter.String())
-	
-				identity := GetIdentity(submissionData.Submitter.String(), "45.45.45.45") // change the IP back to submissionData["remote_addr"]
+		
+				identity := GetIdentity(submissionData.Submitter.String(), "45.45.45.46") // change the IP back to submissionData["remote_addr"]
 				if _, inMap := identities[identity["id"]]; !inMap {
 					AddIdentity(identity, identities)
 				}

@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 	"cloud.google.com/go/storage"
-	"fmt"
 	dg "block_producers_uptime/delegation_backend"
 	logging "github.com/ipfs/go-log/v2"
 	"context"
@@ -15,7 +14,7 @@ import (
 
 func (identity Identity) GetUptime(ctx context.Context, client *storage.Client, log *logging.ZapEventLogger) {
 
-	// currentTime := itn.GetCurrentTime()
+	// currentTime := GetCurrentTime()
 	currentTime := time.Date(2023, time.April, 1, 23, 59, 59, 0, time.UTC)
 	currentDateString := currentTime.Format(time.RFC3339)[:10]
 	lastExecutionTime := GetLastExecutionTime(currentTime)
@@ -34,7 +33,7 @@ func (identity Identity) GetUptime(ctx context.Context, client *storage.Client, 
 			break
 		}
 		if err != nil {
-			log.Fatalf("Failed to iterate over objects: %v", err)
+			log.Fatalf("Failed to iterate over objects: %v\n", err)
 		}
 
 		// Convert time of submission to time object for filtering
@@ -42,45 +41,39 @@ func (identity Identity) GetUptime(ctx context.Context, client *storage.Client, 
 		submissionTimeString := obj.Name[23:43]
 		submissionTime, err := time.Parse(time.RFC3339, submissionTimeString)
 		if err != nil {
-			fmt.Println("Error parsing time:", err)
-			return
+			log.Fatalf("Error parsing time: %v\n", err)
 		}
 
 		if (submissionTime.After(lastExecutionTime)) && (submissionTime.Before(currentTime)) {
 			reader, err := client.Bucket(dg.CloudBucketName()).Object(obj.Name).NewReader(ctx)
 			if err != nil {
-				fmt.Printf("Error getting creating reader for json: %v\n", err)
-				return
+				log.Fatalf("Error getting creating reader for json: %v\n", err)
 			}
 				
 			decoder := json.NewDecoder(reader)
 
 			err = decoder.Decode(&submissionData)
 			if err != nil {
-				fmt.Printf("Error converting json to string: %v\n", err)
-				return
+				log.Fatalf("Error converting json to string: %v\n", err)
 			}	
 
 			if (identity["public-key"] == submissionData.Submitter.String()) && (identity["public-ip"] == "45.45.45.45") { //submissionData.RemoteAddr
 				if lastSubmissionDate != "" {
 					lastSubmissionTime, err = time.Parse(time.RFC3339, lastSubmissionDate)
 					if err != nil {
-						fmt.Println("Error parsing time:", err)
-						return
+						log.Fatalf("Error parsing time: %v\n", err)
 					}
 				}
 
 				currentSubmissionTime, err := time.Parse(time.RFC3339, submissionData.CreatedAt)
 				if err != nil {
-					fmt.Println("Error parsing time:", err)
-					return
+					log.Fatalf("Error parsing time: %v", err)
 				}
 				
 				if (lastSubmissionDate != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(14 * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(16 * time.Minute))) {
 					uptime.WriteString("1")
 					lastSubmissionDate = submissionData.CreatedAt
 				} else if lastSubmissionDate == "" {
-					fmt.Println("This is the first submission")
 					lastSubmissionDate = submissionData.CreatedAt
 				}
 
@@ -89,6 +82,5 @@ func (identity Identity) GetUptime(ctx context.Context, client *storage.Client, 
 		}
 	}
 	identity["uptime"] = uptime.String()
-	fmt.Printf("Uptime: %d\n", len(identity["uptime"]))
 
 }

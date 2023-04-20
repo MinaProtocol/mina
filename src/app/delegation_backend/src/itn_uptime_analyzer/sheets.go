@@ -4,6 +4,7 @@ import (
 	sheets "google.golang.org/api/sheets/v4"
 	"strings"
 	"fmt"
+	"time"
 	logging "github.com/ipfs/go-log/v2"
 	// "google.golang.org/api/option"
 )
@@ -93,7 +94,7 @@ func (identity Identity) InsertBelow(client *sheets.Service, log *logging.ZapEve
 }
 
 func (identity Identity) AppendUptime(client *sheets.Service, log *logging.ZapEventLogger, rowIndex int) {
-	readRange := fmt.Sprintf("%s!A%d:Z%d", ITN_UPTIME_ANALYZER_SHEET, rowIndex, rowIndex)
+	readRange := fmt.Sprintf("%s!A%d:Z%d", ITN_UPTIME_ANALYZER_SHEET, 1, 1)
 	spId := OutputSpreadsheetId()
 
 	resp, err := client.Spreadsheets.Values.Get(spId, readRange).Do()
@@ -102,13 +103,6 @@ func (identity Identity) AppendUptime(client *sheets.Service, log *logging.ZapEv
 	}
 
 	var nextEmptyColumn int = len(resp.Values[0])
-
-	for index, value := range resp.Values[0] {
-		if value == "" {
-				nextEmptyColumn = index + 1
-				break
-		}
-	}
 
 	updateRange := fmt.Sprintf("%s!%s%d", ITN_UPTIME_ANALYZER_SHEET, string(nextEmptyColumn + 65), rowIndex)
 
@@ -119,6 +113,37 @@ func (identity Identity) AppendUptime(client *sheets.Service, log *logging.ZapEv
 	} else {
 		cellValue = []interface{}{"not up"}
 	}
+
+	valueRange := sheets.ValueRange{
+		Values: [][]interface{}{cellValue},
+	}
+
+	_, err = client.Spreadsheets.Values.Append(spId, updateRange, &valueRange).ValueInputOption("USER_ENTERED").Do()
+	if err != nil {
+		log.Fatalf("Unable to insert data in sheet: %v", err)
+	}
+}
+
+func MarkExecution(client *sheets.Service, log *logging.ZapEventLogger){
+	readRange := fmt.Sprintf("%s!A%d:Z%d", ITN_UPTIME_ANALYZER_SHEET, 1, 1)
+	spId := OutputSpreadsheetId()
+
+	// currentTime := GetCurrentTime()
+	currentTime := time.Date(2023, time.April, 1, 23, 59, 59, 0, time.UTC)
+	lastExecutionTime := GetLastExecutionTime(currentTime)
+
+	timeInterval := strings.Join([]string{currentTime.Format(time.RFC3339), lastExecutionTime.Format(time.RFC3339)}, " - ")
+
+	resp, err := client.Spreadsheets.Values.Get(spId, readRange).Do()
+	if err != nil {
+		log.Fatalf("Unable to retrieve data from sheet: %v", err)
+	}
+
+	var nextEmptyColumn int = len(resp.Values[0])
+
+	updateRange := fmt.Sprintf("%s!%s%d", ITN_UPTIME_ANALYZER_SHEET, string(nextEmptyColumn + 65), 1)
+
+	cellValue := []interface{}{timeInterval}
 
 	valueRange := sheets.ValueRange{
 		Values: [][]interface{}{cellValue},

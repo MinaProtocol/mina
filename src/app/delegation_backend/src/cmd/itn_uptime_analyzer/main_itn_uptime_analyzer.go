@@ -4,7 +4,6 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"cloud.google.com/go/storage"
 	sheets "google.golang.org/api/sheets/v4"
-	"fmt"
 	"context"
 	itn "block_producers_uptime/itn_uptime_analyzer"
 	dg "block_producers_uptime/delegation_backend"
@@ -46,8 +45,6 @@ func main (){
 
 	identities := itn.CreateIdentities(ctx, client, log)
 
-	fmt.Println(identities)
-
 	// Go over identities and calculate uptime
 
 	for _, identity := range identities {
@@ -55,7 +52,6 @@ func main (){
 		identity.GetUptime(ctx, client, log)
 
 		exactMatch, rowIndex, firstEmptyRow := identity.GetCell(sheetsService, log)
-		fmt.Printf("ExactMatch: %t, RowIndex: %d, FirstEmptyRow: %d", exactMatch, rowIndex, firstEmptyRow)
 
 		if exactMatch {
 			identity.AppendUptime(sheetsService, log, rowIndex)
@@ -67,5 +63,7 @@ func main (){
 			identity.AppendUptime(sheetsService, log, rowIndex+1)
 		}
 	}
+
+	itn.MarkExecution(sheetsService, log)
 
 }
