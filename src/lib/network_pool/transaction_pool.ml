@@ -1211,7 +1211,7 @@ struct
           match t.best_tip_ledger with
           | None ->
               Or_error.error_string
-                "Got transaction pool diff when transitin frontier is \
+                "Got transaction pool diff when transition frontier is \
                  unavailable, ignoring."
           | Some ledger ->
               return ledger
@@ -1596,6 +1596,29 @@ let%test_module _ =
         global_slot_since_genesis = Mina_numbers.Global_slot.zero
       }
 
+    module Test_Account = struct
+      type t =
+        { name : string
+        ; balance : string
+        ; timing : Mina_base.Account_timing.t
+        ; permissions: Permissions.t
+        ; zkappify: bool 
+        }
+
+      let default = { name = ""
+        ; balance = "900000000.0"
+        ; timing = Mina_base.Account_timing.Untimed
+        ; permissions = Permissions.user_default
+        ; zkappify = false
+      }
+    end
+
+    let test_accounts = Array.mapi test_keys ~f:(fun i _ -> 
+          if i mod 2 = 0 then Test_Account.default else {Test_Account.default with zkappify = true}      
+      )  
+    
+    let test_accounts_with_keypairs = StdLabels.Array.combine test_accounts test_keys 
+
     module Mock_transition_frontier = struct
       module Breadcrumb = struct
         type t = Mock_staged_ledger.t
@@ -1611,8 +1634,8 @@ let%test_module _ =
 
       type t = best_tip_diff Broadcast_pipe.Reader.t * Breadcrumb.t ref
 
-      let create : unit -> t * best_tip_diff Broadcast_pipe.Writer.t =
-       fun () ->
+      let create : (Test_Account.t * Keypair.t) array-> t * best_tip_diff Broadcast_pipe.Writer.t =
+       fun (test_accounts_with_keypairs) ->
         let zkappify_account (account : Account.t) : Account.t =
           let zkapp =
             Some { Zkapp_account.default with verification_key = Some vk }
@@ -1623,11 +1646,8 @@ let%test_module _ =
           Broadcast_pipe.create
             { new_commands = []; removed_commands = []; reorg_best_tip = false }
         in
-        let initial_balance =
-          Currency.Balance.of_mina_string_exn "900000000.0"
-        in
         let ledger = Mina_ledger.Ledger.create_ephemeral ~depth:10 () in
-        Array.iteri test_keys ~f:(fun i kp ->
+        Array.iter test_accounts_with_keypairs ~f:(fun (account_template, kp) ->
             let account_id =
               Account_id.create
                 (Public_key.compress kp.public_key)
@@ -1637,11 +1657,13 @@ let%test_module _ =
               Or_error.ok_exn
               @@ Mina_ledger.Ledger.Ledger_inner.get_or_create ledger account_id
             in
-            (* set the account balance *)
-            let account = { account with balance = initial_balance } in
-            (* zkappify every other account *)
+            (* set the account balance, timing and permission *)
+            let account = { account with 
+              balance = (Currency.Balance.of_mina_string_exn account_template.balance)
+            } in
+            (* zkappify account *)
             let account =
-              if i mod 2 = 0 then account else zkappify_account account
+              if account_template.zkappify then account else zkappify_account account
             in
             Mina_ledger.Ledger.Ledger_inner.set ledger loc account ) ;
         ((pipe_r, ref ledger), pipe_w)
@@ -1797,8 +1819,8 @@ let%test_module _ =
                 User_command.forget_check )
            txs )
 
-    let setup_test () =
-      let frontier, best_tip_diff_w = Mock_transition_frontier.create () in
+    let setup_test_with test_accounts = 
+      let frontier, best_tip_diff_w = Mock_transition_frontier.create (StdLabels.Array.combine test_accounts test_keys) in
       let _, best_tip_ref = frontier in
       let frontier_pipe_r, frontier_pipe_w =
         Broadcast_pipe.create @@ Some frontier
@@ -1817,6 +1839,10 @@ let%test_module _ =
       let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
       { txn_pool; best_tip_diff_w; best_tip_ref; frontier_pipe_w }
 
+
+    let setup_test () =
+      setup_test_with test_accounts 
+   
     let independent_cmds : User_command.Valid.t list =
       let rec go n cmds =
         let open Quickcheck.Generator.Let_syntax in
@@ -2322,6 +2348,38 @@ let%test_module _ =
           let%bind test = setup_test () in
           mk_expired_not_accepted_test test ~padding:10 independent_cmds )
 
+    let%test_unit "transactions withtout Send permission are not accepted (user cmds)" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind test = setup_test_with [|
+            {
+              Test_Account.default 
+                with name = "Alice" 
+                ; permissions = {
+                                      Permissions.empty 
+                                        with access = Signature 
+                                        ; send = None
+                                   }
+            };
+            {
+              Test_Account.default 
+                with name = "Bob" 
+            }          
+          |]
+          in
+          assert_pool_txs test [] ;
+          let curr_slot = current_global_slot () in
+          let curr_slot_plus_three =
+            Mina_numbers.Global_slot.(add curr_slot (of_int 3))
+          in
+          let tx_without_permission = [mk_payment ~valid_until:curr_slot_plus_three ~sender_idx:0
+          ~fee:minimum_fee ~nonce:1 ~receiver_idx:1 ~amount:1_000 ()]
+          in
+          let%bind () = add_commands test (tx_without_permission) >>| assert_pool_apply []
+          in
+          assert_pool_txs test [] ;
+          Deferred.unit
+        )
+
     let%test_unit "expired transactions are not accepted (zkapps)" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind test = setup_test () in
@@ -2468,7 +2526,7 @@ let%test_module _ =
           let%bind _ = Broadcast_pipe.Writer.write t.frontier_pipe_w None in
           (* Set up second frontier *)
           let ((_, ledger_ref2) as frontier2), _best_tip_diff_w2 =
-            Mock_transition_frontier.create ()
+            Mock_transition_frontier.create test_accounts_with_keypairs
           in
           modify_ledger !ledger_ref2 ~idx:0 ~balance:20_000_000_000_000 ~nonce:5 ;
           modify_ledger !ledger_ref2 ~idx:1 ~balance:0 ~nonce:0 ;
