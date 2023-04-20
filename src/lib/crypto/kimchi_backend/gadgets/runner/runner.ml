@@ -4,10 +4,13 @@ module Impl = Snarky_backendless.Snark.Run.Make (Tick)
 
 let generate_and_verify_proof ?cs circuit =
   (* Generate constraint system for the circuit *)
-  let constraint_system = match cs with
-  | Some(cs) -> cs
-  | None -> Impl.constraint_system ~input_typ:Impl.Typ.unit ~return_typ:Impl.Typ.unit
-      (fun () () -> circuit ())
+  let constraint_system =
+    match cs with
+    | Some cs ->
+        cs
+    | None ->
+        Impl.constraint_system ~input_typ:Impl.Typ.unit
+          ~return_typ:Impl.Typ.unit (fun () () -> circuit ())
   in
   (* Generate the indexes from the constraint system *)
   let proof_keypair =
