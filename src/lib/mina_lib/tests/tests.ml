@@ -87,6 +87,7 @@ let%test_module "Epoch ledger sync tests" =
         Verifier.create ~logger ~proof_level:precomputed_values.proof_level
           ~constraint_constants:precomputed_values.constraint_constants ~pids
           ~conf_dir:(Some (make_dirname "verifier"))
+          ()
       in
       let _transaction_pool, tx_remote_sink, _tx_local_sink =
         let config =

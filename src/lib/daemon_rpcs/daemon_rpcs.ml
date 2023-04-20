@@ -242,6 +242,26 @@ module Stop_tracing = struct
     Rpc.Rpc.create ~name:"Stop_tracing" ~version:0 ~bin_query ~bin_response
 end
 
+module Start_internal_tracing = struct
+  type query = unit [@@deriving bin_io_unversioned]
+
+  type response = unit [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Start_internal_tracing" ~version:0 ~bin_query
+      ~bin_response
+end
+
+module Stop_internal_tracing = struct
+  type query = unit [@@deriving bin_io_unversioned]
+
+  type response = unit [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Stop_internal_tracing" ~version:0 ~bin_query
+      ~bin_response
+end
+
 module Visualization = struct
   module Frontier = struct
     type query = string [@@deriving bin_io_unversioned]
