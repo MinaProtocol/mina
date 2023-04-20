@@ -98,4 +98,9 @@ input ZkappCommandsDetails {
   noPrecondition: Boolean!
 
   maxSize: Boolean!
+
+  """
+  Avoid recently used accounts when generating new zkapp commands
+  """
+  recentlyUsedAccounts: Int!
 }

@@ -7,15 +7,16 @@ import (
 )
 
 type ZkappCommandParams struct {
-	ExperimentName    string
-	Tps               float64
-	DurationInMinutes int
-	ZkappsToDeploy    int
-	NewAccounts       int
-	FeePayers         []itn_json_types.MinaPrivateKey
-	Nodes             []NodeAddress
-	NoPrecondition    bool
-	MaxSize           bool
+	ExperimentName       string
+	Tps                  float64
+	DurationInMinutes    int
+	ZkappsToDeploy       int
+	NewAccounts          int
+	FeePayers            []itn_json_types.MinaPrivateKey
+	Nodes                []NodeAddress
+	NoPrecondition       bool
+	MaxSize              bool
+	RecentlyUsedAccounts int
 }
 
 type ScheduledZkappCommandsReceipt struct {
@@ -35,6 +36,7 @@ func SendZkappCommands(config Config, params ZkappCommandParams, output func(Sch
 			FeePayers:             params.FeePayers[nodeIx*feePayersPerNode : (nodeIx+1)*feePayersPerNode],
 			NoPrecondition:        params.NoPrecondition,
 			MaxSize:               params.MaxSize,
+			RecentlyUsedAccounts:  params.RecentlyUsedAccounts,
 		}
 		client, err := config.GetGqlClient(config.Ctx, nodeAddress)
 		if err != nil {
