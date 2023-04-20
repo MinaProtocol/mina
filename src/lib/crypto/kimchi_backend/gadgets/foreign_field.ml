@@ -439,18 +439,18 @@ module External_checks = struct
     { multi_ranges = []; compact_multi_ranges = []; bound_additions = [] }
 
   (* Track a multi-range-check *)
-  let add_multi_range_check (external_checks : 'field t)
+  let append_multi_range_check (external_checks : 'field t)
       (x : 'field Cvar.t standard_limbs) =
     external_checks.multi_ranges <- x :: external_checks.multi_ranges
 
   (* Track a compact-multi-range-check *)
-  let add_compact_multi_range_check (external_checks : 'field t)
+  let append_compact_multi_range_check (external_checks : 'field t)
       (x : 'field Cvar.t compact_limbs) =
     external_checks.compact_multi_ranges <-
       x :: external_checks.compact_multi_ranges
 
   (* Track a bound addition *)
-  let add_bound_addition (external_checks : 'field t)
+  let append_bound_addition (external_checks : 'field t)
       (x : 'field Cvar.t standard_limbs) =
     external_checks.bound_additions <- x :: external_checks.bound_additions
 end
@@ -743,7 +743,8 @@ let less_than_fmod (type f)
     | None ->
         External_checks.create (module Circuit)
   in
-  External_checks.add_multi_range_check external_checks (bound0, bound1, bound2) ;
+  External_checks.append_multi_range_check external_checks
+    (bound0, bound1, bound2) ;
 
   (* Return the bound value *)
   (Element.Standard.of_limbs (bound0, bound1, bound2), external_checks)
@@ -1218,13 +1219,13 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     | None ->
         External_checks.create (module Circuit)
   in
-  External_checks.add_multi_range_check external_checks
+  External_checks.append_multi_range_check external_checks
     (carry1_lo, product1_lo, product1_hi_0) ;
-  External_checks.add_compact_multi_range_check external_checks
+  External_checks.append_compact_multi_range_check external_checks
     (quotient_bound01, quotient_bound2) ;
-  External_checks.add_multi_range_check external_checks
+  External_checks.append_multi_range_check external_checks
     (remainder_bound0, remainder_bound1, remainder_bound2) ;
-  External_checks.add_bound_addition external_checks
+  External_checks.append_bound_addition external_checks
     (remainder0, remainder1, remainder2) ;
 
   (* Create ForeignFieldMul gate *)
