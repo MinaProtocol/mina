@@ -3164,7 +3164,7 @@ module Types = struct
                     ~typ:(non_null bool)
                 ; arg "maxSize" ~doc:"Generate max size zkapp transactions"
                     ~typ:(non_null bool)
-                ; arg "recently_used_accounts"
+                ; arg "recentlyUsedAccounts"
                     ~doc:
                       "Avoid recently used accounts when generating new zkApp \
                        commands"
