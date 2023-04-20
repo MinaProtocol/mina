@@ -672,11 +672,11 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
   (Element.Standard.of_limbs (result0, result1, result2), sign, field_overflow)
 
 (* This function adds a FFAdd gate to check that a given value is smaller than the modulus.
- * - value                 := the value to check
- * - external_checks       := Optional context to track required external checks.
+ *   - value                 := the value to check
+ *   - external_checks       := Optional context to track required external checks.
  *                            When omitted, creates and returns new external_checks structure.
  *                            Otherwise, appends new required external checks to supplied structure.
- * - foreign_field_modulus := the modulus of the foreign field
+ *   - foreign_field_modulus := the modulus of the foreign field
  *)
 let less_than_fmod (type f)
     (module Circuit : Snark_intf.Run with type field = f)
@@ -1536,13 +1536,14 @@ let%test_unit "foreign_field arithmetics gadgets" =
               assert_eq product2 expected ) ;
 
           (* 2) Add result bound addition gate. Corresponding range check happens in 6 *)
-          let _out1 =
-            less_than_fmod (module Runner.Impl) product1 foreign_field_modulus
-          in
-          let _out2 =
-            less_than_fmod (module Runner.Impl) product2 foreign_field_modulus
-          in
-
+          List.iter external_checks.bound_additions ~f:(fun product ->
+              let _remainder_bound, _external_checks =
+                less_than_fmod
+                  (module Runner.Impl)
+                  (Element.Standard.of_limbs product)
+                  foreign_field_modulus
+              in
+              () ) ;
           assert (
             Mina_stdlib.List.Length.equal external_checks.bound_additions 2 ) ;
 
