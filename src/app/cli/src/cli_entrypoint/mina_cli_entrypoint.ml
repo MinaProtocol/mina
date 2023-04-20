@@ -943,7 +943,7 @@ let setup_daemon logger =
                   "You cannot provide both `block-producer-key` and \
                    `block_production_pubkey`"
             | None, None ->
-                Deferred.return None
+                Core_kernel.Sys.getenv_opt "PRIVATE_KEY" |> Deferred.return
             | Some sk_file, _ ->
                 let%map kp =
                   Secrets.Keypair.Terminal_stdin.read_exn
