@@ -75,7 +75,7 @@ bpfDebugger:
   cpu: "1500m"
   memory: "4Gi"
   restartMina: false
-  runtime: kata-qemu
+  runtime: kata-clh
 
 logs:
   enable: true
