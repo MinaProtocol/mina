@@ -120,7 +120,7 @@ You can build Mina using Docker. Using Docker works in any dev environment. See 
 
 Mina has a variety of opam and system dependencies.
 
-To get all of the required the opam dependencies, run:
+To get all of the required opam dependencies, run:
 
 ```sh
 opam switch import opam.export
@@ -214,8 +214,7 @@ Additionally, you must provide a list of peers to connect to to bootstrap the no
 The list of peers depends on the network you want to connect to and is announced when the network is being launched. For Mainnet, the list of peers is avaialable at:
 https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt.
 
-The `daemon.json` config file also contains bootstrap data that is specific to the network the node is trying to connect to and must be tailored specifically for
-a particular network. This file can also override some of the configuration options selected during compilation. The `daemon.json` file can be extracted from the Docker image
+The `daemon.json` config file also contains bootstrap data that is specific to the network the node is trying to connect to and must be tailored specifically for a particular network. This file can also override some of the configuration options selected during compilation. The `daemon.json` file can be extracted from the Docker image
 that is dedicated to running a particular network. If it's not located in the `config` directory, it can be pointed to with `--config-file` option.
 
 When all of this setup is complete, you can launch the daemon. The following command assumes the key passphrase is set to `pass`:
