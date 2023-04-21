@@ -73,7 +73,7 @@ func (identity Identity) GetUptime(ctx context.Context, client *storage.Client, 
 					log.Fatalf("Error parsing time: %v", err)
 				}
 				
-				if (lastSubmissionDate != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(14 * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(16 * time.Minute))) {
+				if (lastSubmissionDate != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(10 * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(20 * time.Minute))) {
 					uptime = append(uptime, true)
 					lastSubmissionDate = submissionData.CreatedAt
 				} else if lastSubmissionDate == "" {
