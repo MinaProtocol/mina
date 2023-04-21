@@ -1,2 +1,2 @@
 frontend:
-  image: directcuteo/mina-frontend:c359d0a
+  image: directcuteo/mina-frontend:e917899
