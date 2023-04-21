@@ -20,15 +20,6 @@ module Snark_intf = Snarky_backendless.Snark_intf
  *)
 type 'field standard_limbs = 'field * 'field * 'field
 
-type 'field extended_limbs = 'field * 'field * 'field * 'field
-
-type 'field compact_limbs = 'field * 'field
-
-type 'field limbs =
-  | Standard of 'field standard_limbs
-  | Extended of 'field extended_limbs
-  | Compact of 'field compact_limbs
-
 (** Foreign field element base type - not used directly *)
 module type Element_intf = sig
   type 'field t
@@ -82,19 +73,7 @@ module Element : sig
   (** Foreign field element type (standard limbs) *)
   module Standard : sig
     include Element_intf with type 'a limbs_type = 'a standard_limbs
-
-    (** Convert a standard foreign element into extended limbs *)
-    val as_prover_extend :
-         (module Snark_intf.Run with type field = 'field)
-      -> 'field t
-      -> 'field Cvar.t extended_limbs
   end
-
-  (** Foreign field element type (extended limbs) *)
-  module Extended : Element_intf with type 'a limbs_type = 'a extended_limbs
-
-  (** Foreign field element type (compact limbs) *)
-  module Compact : Element_intf with type 'a limbs_type = 'a compact_limbs
 end
 
 (** Structure for tracking external checks that must be made

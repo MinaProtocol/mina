@@ -119,11 +119,6 @@ type 'field extended_limbs = 'field * 'field * 'field * 'field
 
 type 'field compact_limbs = 'field * 'field
 
-type 'field limbs =
-  | Standard of 'field standard_limbs
-  | Extended of 'field extended_limbs
-  | Compact of 'field compact_limbs
-
 (* Convert Bignum_bigint.t to Bignum_bigint standard_limbs *)
 let bignum_bigint_to_standard_limbs (bigint : Bignum_bigint.t) :
     Bignum_bigint.t standard_limbs =
