@@ -1463,8 +1463,8 @@ include struct
 
   let connection_gating_config t = lift connection_gating t
 
-  let set_connection_gating_config t config =
-    lift set_connection_gating t config
+  let set_connection_gating_config t ?clean_added_peers config =
+    lift (set_connection_gating ?clean_added_peers) t config
 end
 
 (* TODO: Have better pushback behavior *)

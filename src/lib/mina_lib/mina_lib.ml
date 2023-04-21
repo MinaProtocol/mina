@@ -117,8 +117,11 @@ type t =
       ([ `Path of string ] option * [ `Log ] option) ref
   ; block_production_status :
       [ `Producing | `Producing_in_ms of float | `Free ] ref
+  ; vrf_evaluation_state : Block_producer.Vrf_evaluation_state.t
   }
 [@@deriving fields]
+
+let vrf_evaluation_state t = t.vrf_evaluation_state
 
 let time_controller t = t.config.time_controller
 
@@ -1313,7 +1316,8 @@ let start t =
       ~transition_writer:t.pipes.producer_transition_writer
       ~log_block_creation:t.config.log_block_creation
       ~block_reward_threshold:t.config.block_reward_threshold
-      ~block_produced_bvar:t.components.block_produced_bvar ;
+      ~block_produced_bvar:t.components.block_produced_bvar
+      ~vrf_evaluation_state:t.vrf_evaluation_state ;
   perform_compaction t ;
   let () =
     match t.config.node_status_url with
@@ -2176,6 +2180,8 @@ let create ?wallets (config : Config.t) =
             ; sync_status
             ; precomputed_block_writer
             ; block_production_status = ref `Free
+            ; vrf_evaluation_state =
+                Block_producer.Vrf_evaluation_state.create ()
             } ) )
 
 let net { components = { net; _ }; _ } = net
