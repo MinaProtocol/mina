@@ -159,6 +159,16 @@ let () =
         , [ test_case "Completeness." `Quick completeness
           ; test_case "JSON." `Quick json
           ] )
+    ; Transaction_union_tag_test.
+        ( "transaction union tag"
+        , [ test_case "Is payment." `Quick is_payment
+          ; test_case "Is stake_delegation." `Quick is_stake_delegation
+          ; test_case "Is free transfer." `Quick is_fee_transfer
+          ; test_case "Is coinbase." `Quick is_coinbase
+          ; test_case "Is user command." `Quick is_user_command
+          ; test_case "Not user command." `Quick not_user_command
+          ; test_case "Test bit representation." `Quick bit_representation
+          ] )
     ; Zkapp_basic_test.
         ( "zkApp basic"
         , [ test_case "Int to bits and back to int is identity." `Quick
