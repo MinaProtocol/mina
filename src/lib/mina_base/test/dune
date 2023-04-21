@@ -25,6 +25,7 @@
   pickles
   pickles.backend
   pickles_types
+  ppx_deriving.runtime
   ppx_version.runtime
   run_in_thread
   signature_lib
@@ -32,6 +33,7 @@
   sgn
   snarky.backendless
   snark_params
+  test_util
   with_hash)
  (preprocess
   (pps

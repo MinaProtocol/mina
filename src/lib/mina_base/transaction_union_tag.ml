@@ -278,45 +278,4 @@ let unpacked_typ =
 
 let bits_typ = Typ.transport Bits.typ ~there:bits_t_of_t ~back:t_of_bits_t
 
-let%test_module "predicates" =
-  ( module struct
-    let test_predicate checked unchecked =
-      let checked x = Checked.return (checked x) in
-      for i = min to max do
-        Test_util.test_equal unpacked_typ Boolean.typ checked unchecked
-          (Option.value_exn (of_enum i))
-      done
-
-    let one_of xs t = List.mem xs ~equal t
-
-    let%test_unit "is_payment" =
-      test_predicate Unpacked.is_payment (equal Payment)
-
-    let%test_unit "is_stake_delegation" =
-      test_predicate Unpacked.is_stake_delegation (equal Stake_delegation)
-
-    let%test_unit "is_fee_transfer" =
-      test_predicate Unpacked.is_fee_transfer (equal Fee_transfer)
-
-    let%test_unit "is_coinbase" =
-      test_predicate Unpacked.is_coinbase (equal Coinbase)
-
-    let%test_unit "is_user_command" =
-      test_predicate Unpacked.is_user_command
-        (one_of [ Payment; Stake_delegation ])
-
-    let%test_unit "not_user_command" =
-      test_predicate
-        (fun x -> Boolean.not (Unpacked.is_user_command x))
-        (one_of [ Fee_transfer; Coinbase ])
-
-    let%test_unit "bit_representation" =
-      for i = min to max do
-        Test_util.test_equal unpacked_typ Bits.typ
-          (Fn.compose Checked.return Unpacked.to_bits_var)
-          bits_t_of_t
-          (Option.value_exn (of_enum i))
-      done
-  end )
-
 [%%endif]
