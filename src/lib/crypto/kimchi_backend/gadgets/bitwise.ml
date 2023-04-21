@@ -11,9 +11,23 @@ let cvar_field_all_ones (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (length : int) : Circuit.Field.t =
   let open Circuit in
+  (* Check it is not 255 or else 2^255-1 will not fit in Pallas *)
+  assert (length < Circuit.Field.size_in_bits) ;
   exists Field.typ ~compute:(fun () ->
       Common.bignum_bigint_to_field (module Circuit)
       @@ Bignum_bigint.(pow (of_int 2) (of_int length) - one) )
+
+let fits_in_bits_as_prover (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (word : Circuit.Field.t) (length : int) =
+  let open Circuit in
+  let open Common in
+  assert (
+    Bignum_bigint.(
+      field_to_bignum_bigint
+        (module Circuit)
+        (cvar_field_to_field_as_prover (module Circuit) word)
+      < pow (of_int 2) (of_int length) - one) )
 
 (* ROT64 *)
 
@@ -36,6 +50,11 @@ let rot_64 (type f)
   assert (rot_bits < 64) ;
   (* Check that the rotation bits is non-negative *)
   assert (rot_bits >= 0) ;
+
+  (* Check that the input word has at most 64 bits *)
+  as_prover (fun () ->
+      fits_in_bits_as_prover (module Circuit) word 64 ;
+      () ) ;
 
   (* Compute actual length depending on whether the rotation mode is Left or Right *)
   let rot_bits = match mode with Left -> rot_bits | Right -> 64 - rot_bits in
@@ -242,21 +261,9 @@ let bxor (type f)
         cvar_field_to_field_as_prover (module Circuit) input2
       in
 
-      (* Transform to big integer *)
-      let input1_big = field_to_bignum_bigint (module Circuit) input1_field in
-      let input2_big = field_to_bignum_bigint (module Circuit) input2_field in
-
       (* Check real lengths are at most the desired length *)
-      let two_big = Bignum_bigint.of_int 2 in
-      let length_big = Bignum_bigint.of_int length in
-
-      (* Checks inputs are smaller than 2^length *)
-      assert (Bignum_bigint.(input1_big < pow two_big length_big)) ;
-      assert (Bignum_bigint.(input2_big < pow two_big length_big)) ;
-
-      (* Checks inputs fit in field *)
-      assert (Bignum_bigint.(input1_big < Field.size)) ;
-      assert (Bignum_bigint.(input2_big < Field.size)) ;
+      fits_in_bits_as_prover (module Circuit) input1 length ;
+      fits_in_bits_as_prover (module Circuit) input2 length ;
 
       (* Convert inputs field elements to list of bits of length 255 *)
       let input1_bits = Field.Constant.unpack @@ input1_field in
@@ -392,6 +399,7 @@ let band64 (type f)
  *   - input of word to negate
  *   - length of word to negate
  *   - len_xor is the length of the Xor lookup table to use beneath (default 4)
+ * Note that the length needs to be less than the bit length of the field.
  *)
 let bnot_checked (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -418,6 +426,11 @@ let bnot_unchecked (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (input : Circuit.Field.t) (length : int) : Circuit.Field.t =
   let open Circuit in
+  (* Check that the input word has at most 64 bits *)
+  as_prover (fun () ->
+      fits_in_bits_as_prover (module Circuit) input length ;
+      () ) ;
+
   let all_ones_var = cvar_field_all_ones (module Circuit) length in
   let not_output = Field.(all_ones_var - input) in
   (* Negating is equivalent to subtracting with all one word *)
