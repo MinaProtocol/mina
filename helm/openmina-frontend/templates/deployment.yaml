@@ -36,6 +36,10 @@ spec:
           volumeMounts:
             - name: nginx-conf
               mountPath: /nginx-conf
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
       volumes:
         - name: nginx-conf
           configMap:
