@@ -702,21 +702,14 @@ let less_than_fmod (type f)
     sum_setup (module Circuit) value offset Add foreign_field_modulus
   in
 
-  let bound0, bound1, bound2 =
-    exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
-        (* Parse the bound outcome *)
-        let bound0, bound1, bound2 =
-          Element.Standard.to_field_limbs_as_prover (module Circuit) bound
-        in
+  let bound0, bound1, bound2 = Element.Standard.to_limbs bound in
 
-        (* Check that the correct expected values were obtained *)
-        let ovf = Common.cvar_field_to_field_as_prover (module Circuit) ovf in
-        assert (Field.Constant.(equal sign one)) ;
-        assert (Field.Constant.(equal ovf one)) ;
-
-        [| bound0; bound1; bound2 |] )
-    |> Common.tuple3_of_array
-  in
+  (* Sanity check *)
+  as_prover (fun () ->
+      (* Check that the correct expected values were obtained *)
+      let ovf = Common.cvar_field_to_field_as_prover (module Circuit) ovf in
+      assert (Field.Constant.(equal sign one)) ;
+      assert (Field.Constant.(equal ovf one)) ) ;
 
   (* Final Zero gate*)
   with_label "final_add_zero_gate" (fun () ->
