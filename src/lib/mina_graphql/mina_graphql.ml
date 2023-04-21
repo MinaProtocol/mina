@@ -3160,16 +3160,11 @@ module Types = struct
                 ; arg "noPrecondition"
                     ~doc:"Disable the precondition in account updates"
                     ~typ:(non_null bool)
-<<<<<<< HEAD
-=======
-                ; arg "maxSize" ~doc:"Generate max size zkapp transactions"
-                    ~typ:(non_null bool)
                 ; arg "recentlyUsedAccounts"
                     ~doc:
                       "Avoid recently used accounts when generating new zkApp \
                        commands"
                     ~typ:(non_null int)
->>>>>>> 6d2718e668 (add a cache for recently used accounts)
                 ]
       end
     end
