@@ -142,3 +142,21 @@ let json_roundtrip_dummy () =
   let module Fd = Fields_derivers_zkapps.Derivers in
   let full = Graphql_repr.deriver @@ Fd.o () in
   [%test_eq: Graphql_repr.t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)
+
+let precodition_digest_well_behaved =
+  Utils.hashes_well_behaved
+    ( module struct
+      include Account_precondition
+      module Hash = Snark_params.Tick.Field
+
+      let hash = digest
+    end )
+
+let body_digest_well_behaved =
+  Utils.hashes_well_behaved
+    ( module struct
+      include Body
+      module Hash = Snark_params.Tick.Field
+
+      let hash = Body.digest
+    end )

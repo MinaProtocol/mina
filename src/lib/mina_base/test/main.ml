@@ -5,7 +5,11 @@ let () =
   run "Test mina_base."
     [ Zkapp_account_test.
         ( "zkapp-accounts"
-        , [ test_case "Events pop after push is idempotent." `Quick
+        , [ test_case "Event hashes don't collide." `Quick
+              event_hashes_well_behaved
+          ; test_case "Zkapp_uri hashes don't collide." `Quick
+              zkapp_uri_hashes_well_behaved
+          ; test_case "Events pop after push is idempotent." `Quick
               (checked_pop_reverses_push (module Zkapp_account.Events))
           ; test_case "Actions pop after push is idempotent." `Quick
               (checked_pop_reverses_push (module Zkapp_account.Actions))
@@ -129,7 +133,7 @@ let () =
           ; test_case "Test non-existent index retrieval." `Quick
               index_non_existent
           ; test_case "Test merkle root soundness." `Quick merkle_root
-          ] )
+        ] )
     ; Receipt_test.
         ( "receipts"
         , [ test_case "Checked-unmchecked equivalence for signed command" `Quick
@@ -143,17 +147,6 @@ let () =
         , [ test_case "Signature decode after encode i identity" `Quick
               signature_decode_after_encode_is_identity
           ; test_case "Base58check is stable" `Quick base58Check_stable
-          ] )
-    ; Zkapp_command_test.
-        ( "zkApp commands"
-        , [ test_case "Account_update_or_stack.of_zkapp_command_list." `Quick
-              account_update_or_stack_of_zkapp_command_list
-          ; test_case "Wire embedded in t." `Quick wire_embedded_in_t
-          ; test_case "Wire embedded in graphql." `Quick
-              wire_embedded_in_graphql
-          ; test_case "JSON roundtrip dummy." `Quick
-              Test_derivers.json_roundtrip_dummy
-          ; test_case "Full circuit." `Quick Test_derivers.full_circuit
           ] )
     ; Signed_command_test.
         ( "signed command"

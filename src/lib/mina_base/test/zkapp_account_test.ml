@@ -36,6 +36,30 @@ let gen_events =
   in
   List.map ~f:Array.of_list events
 
+let event_hashes_well_behaved =
+  Utils.hashes_well_behaved
+    ( module struct
+      include Event
+      module Hash = Field
+
+      let equal a b = compare a b = 0
+
+      let gen =
+        Quickcheck.Generator.(
+          map ~f:Array.of_list @@ List.gen_non_empty Field.gen)
+    end )
+
+let zkapp_uri_hashes_well_behaved =
+  Utils.hashes_well_behaved
+    ( module struct
+      include Zkapp_uri
+      module Hash = Field
+
+      let gen = String.gen_nonempty
+
+      let hash = hash_zkapp_uri
+    end )
+
 let checked_pop_reverses_push (module E : Events_list_intf) () =
   Quickcheck.test gen_events ~trials:50 ~f:(fun events ->
       let events_vars = List.map events ~f:(Array.map ~f:Field.Var.constant) in

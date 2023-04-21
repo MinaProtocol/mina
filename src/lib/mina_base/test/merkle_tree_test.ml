@@ -34,17 +34,33 @@ module Free_hash = struct
           1 )
 end
 
+let merge x y = Free_hash.Merge (x, y)
+
+let hash =
+  Option.value_map ~default:Free_hash.Hash_empty ~f:(fun x ->
+      Free_hash.Hash_value x )
+
 module Elem = struct
   include Int
 
   let gen = gen_incl min_value max_value
 end
 
-let merge x y = Free_hash.Merge (x, y)
+let free_hash_well_behaved =
+  Utils.hashes_well_behaved
+    ( module struct
+      type t = Elem.t [@@deriving equal, sexp]
 
-let hash =
-  Option.value_map ~default:Free_hash.Hash_empty ~f:(fun x ->
-      Free_hash.Hash_value x )
+      let gen = Elem.gen
+
+      let hash (t : t) = hash (Some t)
+
+      module Hash = struct
+        type t = Elem.t Free_hash.t
+
+        let equal a b = Free_hash.compare Int.compare a b = 0
+      end
+    end )
 
 let gen_tree =
   let open Quickcheck in
