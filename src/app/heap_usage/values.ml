@@ -54,6 +54,12 @@ let zkapp_proof =
     ~finish:Fn.id
   |> Option.value_exn
 
+let dummy_proof =
+  Pickles.Proof.dummy Pickles_types.Nat.N2.n Pickles_types.Nat.N2.n
+    Pickles_types.Nat.N2.n ~domain_log2:16
+
+let dummy_vk = Mina_base.Side_loaded_verification_key.dummy
+
 let verification_key =
   let `VK vk, `Prover _ =
     Transaction_snark.For_tests.create_trivial_snapp
