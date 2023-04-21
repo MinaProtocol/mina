@@ -20,7 +20,6 @@ let cvar_field_all_ones (type f)
 let fits_in_bits_as_prover (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (word : Circuit.Field.t) (length : int) =
-  let open Circuit in
   let open Common in
   assert (
     Bignum_bigint.(
