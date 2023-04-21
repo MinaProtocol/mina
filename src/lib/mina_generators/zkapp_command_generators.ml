@@ -632,11 +632,11 @@ end
    a nonce for the fee payer, and `Account_precondition.t` for other zkapp_command
 *)
 let gen_account_update_body_components (type a b c d) ?global_slot
-    ?num_action_elements ?num_event_elements ?(update = None) ?account_id
-    ?token_id ?may_use_token ?account_ids_seen ~account_state_tbl ?vk ?failure
-    ?(new_account = false) ?(zkapp_account = false) ?(is_fee_payer = false)
-    ?available_public_keys ?permissions_auth
-    ?(required_balance_change : a option) ?protocol_state_view
+    ?(max_size = false) ?num_action_elements ?num_event_elements
+    ?(update = None) ?account_id ?token_id ?may_use_token ?account_ids_seen
+    ~account_state_tbl ?vk ?failure ?(new_account = false)
+    ?(zkapp_account = false) ?(is_fee_payer = false) ?available_public_keys
+    ?permissions_auth ?(required_balance_change : a option) ?protocol_state_view
     ~zkapp_account_ids
     ~(gen_balance_change : Account.t -> a Quickcheck.Generator.t)
     ~(gen_use_full_commitment :
@@ -657,7 +657,7 @@ let gen_account_update_body_components (type a b c d) ?global_slot
   let%bind update =
     match update with
     | None ->
-        Account_update.Update.gen ?permissions_auth ?vk ~zkapp_account
+        Account_update.Update.gen ?permissions_auth ?vk ~zkapp_account ~max_size
           ~token_account ()
     | Some update ->
         return update
@@ -721,7 +721,7 @@ let gen_account_update_body_components (type a b c d) ?global_slot
     else
       match account_id with
       | None ->
-          if zkapp_account then
+          if zkapp_account || max_size then
             let%map zkapp_account_id =
               Quickcheck.Generator.of_list zkapp_account_ids
             in
@@ -1001,11 +1001,12 @@ let gen_account_update_body_components (type a b c d) ?global_slot
   }
 
 let gen_account_update_from ?(no_account_precondition = false) ?global_slot
-    ?num_event_elements ?num_action_elements ?(update = None) ?failure
-    ?(new_account = false) ?(zkapp_account = false) ?account_id ?token_id
-    ?may_use_token ?permissions_auth ?required_balance_change ~zkapp_account_ids
-    ~authorization ~account_ids_seen ~available_public_keys ~account_state_tbl
-    ?protocol_state_view ?vk ~ignore_sequence_events_precond () =
+    ?(max_size = false) ?num_event_elements ?num_action_elements
+    ?(update = None) ?failure ?(new_account = false) ?(zkapp_account = false)
+    ?account_id ?token_id ?may_use_token ?permissions_auth
+    ?required_balance_change ~zkapp_account_ids ~authorization ~account_ids_seen
+    ~available_public_keys ~account_state_tbl ?protocol_state_view ?vk
+    ~ignore_sequence_events_precond () =
   let open Quickcheck.Let_syntax in
   let increment_nonce =
     (* permissions_auth is used to generate updated permissions consistent with a contemplated authorization;
@@ -1022,8 +1023,9 @@ let gen_account_update_from ?(no_account_precondition = false) ?global_slot
         false
   in
   let%bind body_components =
-    gen_account_update_body_components ?global_slot ?num_event_elements
-      ?num_action_elements ~update ?failure ~new_account ~zkapp_account
+    gen_account_update_body_components ?global_slot ~max_size
+      ?num_event_elements ?num_action_elements ~update ?failure ~new_account
+      ~zkapp_account
       ~increment_nonce:(increment_nonce, increment_nonce)
       ?permissions_auth ?account_id ?token_id ?may_use_token
       ?protocol_state_view ?vk ~zkapp_account_ids ~account_ids_seen
@@ -1316,9 +1318,9 @@ let gen_zkapp_command_from ?global_slot ?memo ?(max_size = false)
             match num_action_elements with Some _ -> Some 0 | None -> None
           in
           gen_account_update_from ~no_account_precondition ?global_slot
-            ?num_event_elements ?num_action_elements ~zkapp_account_ids
-            ~account_ids_seen ~update ?failure ~authorization ~new_account
-            ~permissions_auth ~zkapp_account ~available_public_keys
+            ~max_size ?num_event_elements ?num_action_elements
+            ~zkapp_account_ids ~account_ids_seen ~update ?failure ~authorization
+            ~new_account ~permissions_auth ~zkapp_account ~available_public_keys
             ~may_use_token:No ~account_state_tbl ?protocol_state_view ?vk
             ~ignore_sequence_events_precond ()
         in
@@ -1392,7 +1394,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(max_size = false)
           in
           let permissions_auth = Control.Tag.Signature in
           gen_account_update_from ~no_account_precondition ?global_slot
-            ?num_action_elements ?num_event_elements ~update ?failure
+            ~max_size ?num_action_elements ?num_event_elements ~update ?failure
             ~zkapp_account_ids ~account_ids_seen ~account_id ~authorization
             ~permissions_auth ~zkapp_account ~available_public_keys
             ~may_use_token:No ~account_state_tbl ?protocol_state_view ?vk
@@ -1469,7 +1471,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(max_size = false)
   let%bind balancing_account_update =
     let authorization = Control.Signature Signature.dummy in
     if max_size then
-      gen_account_update_from ~no_account_precondition ?global_slot
+      gen_account_update_from ~no_account_precondition ?global_slot ~max_size
         ~num_event_elements:0 ~num_action_elements:0 ?failure
         ~permissions_auth:Control.Tag.Signature ~zkapp_account_ids
         ~account_ids_seen ~authorization ~new_account:false

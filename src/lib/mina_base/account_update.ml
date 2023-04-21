@@ -701,8 +701,8 @@ module Update = struct
     end
   end]
 
-  let gen ?(token_account = false) ?(zkapp_account = false) ?vk
-      ?permissions_auth () : t Quickcheck.Generator.t =
+  let gen ?(token_account = false) ?(zkapp_account = false) ?(max_size = false)
+      ?vk ?permissions_auth () : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     let%bind app_state =
       let%bind fields =
@@ -717,16 +717,18 @@ module Update = struct
       else return Set_or_keep.Keep
     in
     let%bind verification_key =
-      if zkapp_account then
-        Set_or_keep.gen
-          (Quickcheck.Generator.return
-             ( match vk with
-             | None ->
-                 let data = Pickles.Side_loaded.Verification_key.dummy in
-                 let hash = Zkapp_account.digest_vk data in
-                 { With_hash.data; hash }
-             | Some vk ->
-                 vk ) )
+      if zkapp_account || max_size then
+        let vk =
+          match vk with
+          | None ->
+              let data = Pickles.Side_loaded.Verification_key.dummy in
+              let hash = Zkapp_account.digest_vk data in
+              { With_hash.data; hash }
+          | Some vk ->
+              vk
+        in
+        if max_size then return @@ Set_or_keep.Set vk
+        else Set_or_keep.gen @@ return vk
       else return Set_or_keep.Keep
     in
     let%bind permissions =
