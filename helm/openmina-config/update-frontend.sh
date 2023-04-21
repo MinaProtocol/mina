@@ -150,5 +150,4 @@ fi
 COMMON_VALUES="$(values frontend)"
 GENERATED_VALUES="$(generate_values)"
 $HELM upgrade --install frontend "$FRONTEND_CHART" --values="$COMMON_VALUES" --values="$GENERATED_VALUES" "$@"
-$KUBECTL scale deployment frontend --replicas=0
-$KUBECTL scale deployment frontend --replicas=1
+$KUBECTL rollout restart deploy/frontend
