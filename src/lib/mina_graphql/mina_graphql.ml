@@ -4787,11 +4787,11 @@ module Mutations = struct
                               Queue.length recently_used_accounts
                               > zkapp_command_details.recently_used_accounts
                             then
-                              let a =
+                              let a, role =
                                 Queue.dequeue_exn recently_used_accounts
                               in
-                              Account_id.Table.add_exn account_state_tbl ~key:id
-                                ~data:a
+                              Account_id.Table.add_exn account_state_tbl
+                                ~key:(Account.identifier a) ~data:(a, role)
                             else ()
                           in
                           let rec go account_state_tbl ndx tm_next counter
@@ -4829,6 +4829,7 @@ module Mutations = struct
                                 | Some (ledger, _) -> (
                                     let number_of_accounts_generated =
                                       Account_id.Table.data account_state_tbl
+                                      @ Queue.to_list recently_used_accounts
                                       |> List.filter ~f:(function
                                            | _, `New_account ->
                                                true
@@ -4836,6 +4837,7 @@ module Mutations = struct
                                                false )
                                       |> List.length
                                     in
+
                                     let generate_new_accounts =
                                       number_of_accounts_generated
                                       < zkapp_command_details.num_new_accounts
