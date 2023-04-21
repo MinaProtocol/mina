@@ -26,7 +26,7 @@ let fits_in_bits_as_prover (type f)
       field_to_bignum_bigint
         (module Circuit)
         (cvar_field_to_field_as_prover (module Circuit) word)
-      < pow (of_int 2) (of_int length) - one) )
+      < pow (of_int 2) (of_int length)) )
 
 (* ROT64 *)
 
