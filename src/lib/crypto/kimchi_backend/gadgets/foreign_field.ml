@@ -678,7 +678,7 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
  *                            Otherwise, appends new required external checks to supplied structure.
  *   - foreign_field_modulus := the modulus of the foreign field
  *)
-let less_than_fmod (type f)
+let bound_addition (type f)
     (module Circuit : Snark_intf.Run with type field = f)
     ?(external_checks : f External_checks.t option)
     (value : f Element.Standard.t) (foreign_field_modulus : f standard_limbs) :
@@ -802,7 +802,7 @@ let sum_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
   (* result + (2^264 - f) = bound *)
   let result = left.(0) in
   let bound, _external_checks =
-    less_than_fmod (module Circuit) result foreign_field_modulus
+    bound_addition (module Circuit) result foreign_field_modulus
   in
   let bound0, bound1, bound2 = Element.Standard.to_limbs bound in
 
@@ -1531,7 +1531,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
           (* 2) Add result bound addition gate. Corresponding range check happens in 6 *)
           List.iter external_checks.bound_additions ~f:(fun product ->
               let _remainder_bound, _external_checks =
-                less_than_fmod
+                bound_addition
                   (module Runner.Impl)
                   (Element.Standard.of_limbs product)
                   foreign_field_modulus
