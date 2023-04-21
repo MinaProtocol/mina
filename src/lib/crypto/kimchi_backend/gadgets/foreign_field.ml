@@ -209,13 +209,6 @@ module type Element_intf = sig
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> Bignum_bigint.t
-
-  (* Check that the foreign element is smaller than a given field modulus *)
-  val fits_as_prover :
-       (module Snark_intf.Run with type field = 'field)
-    -> 'field t
-    -> 'field standard_limbs
-    -> bool
 end
 
 (* Foreign field element structures *)
@@ -223,6 +216,13 @@ module Element : sig
   (* Foreign field element (standard limbs) *)
   module Standard : sig
     include Element_intf with type 'a limbs_type = 'a standard_limbs
+
+    (* Check that the foreign element is smaller than a given field modulus *)
+    val fits_as_prover :
+         (module Snark_intf.Run with type field = 'field)
+      -> 'field t
+      -> 'field standard_limbs
+      -> bool
 
     (* Convert a standard foreign element into extended limbs *)
     val as_prover_extend :
@@ -352,14 +352,6 @@ end = struct
       Bignum_bigint.(
         l0 + (Common.two_to_limb * l1) + (two_to_2limb * l2)
         + (two_to_3limb * l3))
-
-    let fits_as_prover (type field)
-        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
-        (modulus : field standard_limbs) : bool =
-      let modulus =
-        field_standard_limbs_to_bignum_bigint (module Circuit) modulus
-      in
-      Bignum_bigint.(to_bignum_bigint_as_prover (module Circuit) x < modulus)
   end
 
   (* Compact limbs foreign field element *)
@@ -406,14 +398,6 @@ end = struct
         =
       let l01, l2 = to_bignum_bigint_limbs_as_prover (module Circuit) x in
       Bignum_bigint.(l01 + (two_to_2limb * l2))
-
-    let fits_as_prover (type field)
-        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
-        (modulus : field standard_limbs) : bool =
-      let modulus =
-        field_standard_limbs_to_bignum_bigint (module Circuit) modulus
-      in
-      Bignum_bigint.(to_bignum_bigint_as_prover (module Circuit) x < modulus)
   end
 end
 

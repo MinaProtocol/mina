@@ -60,13 +60,6 @@ module type Element_intf = sig
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> Bignum_bigint.t
-
-  (* Check that the foreign element is smaller than a given field modulus *)
-  val fits_as_prover :
-       (module Snark_intf.Run with type field = 'field)
-    -> 'field t
-    -> 'field standard_limbs
-    -> bool
 end
 
 module Element : sig
