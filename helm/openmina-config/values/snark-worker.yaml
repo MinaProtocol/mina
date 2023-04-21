@@ -10,3 +10,6 @@ healthcheck:
 
 workerCpuRequest: 4
 workerMemRequest: 6Gi
+
+coordinatorName: snarker
+workerReplicas: 8

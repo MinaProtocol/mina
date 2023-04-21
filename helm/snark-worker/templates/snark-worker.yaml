@@ -42,7 +42,7 @@ spec:
           "snark-worker", 
           "-proof-level","full",
           "-shutdown-on-disconnect", "false", "-daemon-address",
-          "{{ $.Values.coordinatorHostName }}:{{ $.Values.coordinatorRpcPort }}"
+          "{{ $.Values.coordinatorName }}:{{ $.Values.coordinatorRpcPort }}"
         ]
         env:
           - name: "RAYON_NUM_THREADS"
