@@ -5,7 +5,11 @@ let () =
   run "Test mina_base."
     [ Zkapp_account_test.
         ( "zkapp-accounts"
-        , [ test_case "Events pop after push is idempotent." `Quick
+        , [ test_case "Event hashes don't collide." `Quick
+              event_hashes_well_behaved
+          ; test_case "Zkapp_uri hashes don't collide." `Quick
+              zkapp_uri_hashes_well_behaved
+          ; test_case "Events pop after push is idempotent." `Quick
               (checked_pop_reverses_push (module Zkapp_account.Events))
           ; test_case "Actions pop after push is idempotent." `Quick
               (checked_pop_reverses_push (module Zkapp_account.Actions))
@@ -70,6 +74,10 @@ let () =
           ; test_case "Fee payer JSON roundtrip." `Quick
               fee_payer_json_roundtrip
           ; test_case "JSON roundtrip." `Quick json_roundtrip_dummy
+          ; test_case "Account precondition digests don't collide." `Quick
+              precodition_digest_well_behaved
+          ; test_case "Account update body digests don't collide." `Quick
+              body_digest_well_behaved
           ] )
     ; Call_forest_test.
         ( "call forest"
@@ -130,6 +138,7 @@ let () =
           ; test_case "Test non-existent index retrieval." `Quick
               index_non_existent
           ; test_case "Test merkle root soundness." `Quick merkle_root
+          ; test_case "Free hashes don't collide." `Quick free_hash_well_behaved
           ] )
     ; Receipt_test.
         ( "receipt"
