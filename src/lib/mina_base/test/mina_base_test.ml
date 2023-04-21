@@ -158,7 +158,11 @@ let () =
         ( "signed command"
         , [ test_case "Completeness." `Quick completeness
           ; test_case "JSON." `Quick json
-          ] )
+        ] )
+    ; Transaction_status_test.
+      ( "transaction status"
+      , [ test_case "To string roundtrip," `Quick of_string_to_string_roundtrip
+      ])
     ; Transaction_union_tag_test.
         ( "transaction union tag"
         , [ test_case "Is payment." `Quick is_payment
