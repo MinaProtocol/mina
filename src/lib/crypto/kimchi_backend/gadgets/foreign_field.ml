@@ -1509,12 +1509,43 @@ let%test_unit "foreign_field arithmetics gadgets" =
 
           (* 2) Add result bound addition gate. Corresponding range check happens in 6 *)
           List.iter external_checks.bound_additions ~f:(fun product ->
-              let _remainder_bound, _external_checks =
+              let remainder_bound, _external_checks =
                 bound_addition
                   (module Runner.Impl)
                   (Element.Standard.of_limbs product)
                   foreign_field_modulus
               in
+              (* Sanity check remainder_bounds *)
+              let ( expected_remainder_bound0
+                  , expected_remainder_bound1
+                  , expected_remainder_bound2 ) =
+                match external_checks.multi_ranges with
+                | [ a; _; _; _ ] ->
+                    (* Okay because both products (and thus result bounds)
+                       in this test are the same *)
+                    a
+                | _ ->
+                    invalid_arg "wrong number of multi-ranges"
+              in
+
+              as_prover (fun () ->
+                  let remainder_bound =
+                    Element.Standard.to_field_limbs_as_prover
+                      (module Runner.Impl)
+                      remainder_bound
+                  in
+                  let expected_remainder_bound =
+                    ( Common.cvar_field_to_field_as_prover
+                        (module Runner.Impl)
+                        expected_remainder_bound0
+                    , Common.cvar_field_to_field_as_prover
+                        (module Runner.Impl)
+                        expected_remainder_bound1
+                    , Common.cvar_field_to_field_as_prover
+                        (module Runner.Impl)
+                        expected_remainder_bound2 )
+                  in
+                  assert_eq remainder_bound expected_remainder_bound ) ;
               () ) ;
           assert (
             Mina_stdlib.List.Length.equal external_checks.bound_additions 2 ) ;
