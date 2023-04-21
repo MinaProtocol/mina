@@ -732,49 +732,57 @@ module Node = struct
     send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let send_zkapp ~logger (t : t) ~(zkapp_command : Mina_base.Zkapp_command.t) =
-    [%log info] "Sending a zkapp"
+  let send_zkapp_batch ~logger (t : t)
+      ~(zkapp_commands : Mina_base.Zkapp_command.t list) =
+    [%log info] "Sending zkapp transactions"
       ~metadata:
         [ ("namespace", `String t.config.namespace)
         ; ("pod_id", `String (id t))
         ] ;
     let open Deferred.Or_error.Let_syntax in
-    let zkapp_command_json =
-      Mina_base.Zkapp_command.to_json zkapp_command |> Yojson.Safe.to_basic
+    let zkapp_commands_json =
+      List.map zkapp_commands ~f:(fun zkapp_command ->
+          Mina_base.Zkapp_command.to_json zkapp_command |> Yojson.Safe.to_basic )
+      |> Array.of_list
     in
     let send_zkapp_graphql () =
       let send_zkapp_obj =
         Graphql.Send_test_zkapp.(
-          make @@ makeVariables ~zkapp_command:zkapp_command_json ())
+          make @@ makeVariables ~zkapp_commands:zkapp_commands_json ())
       in
       exec_graphql_request ~logger ~node:t ~query_name:"send_zkapp_graphql"
         send_zkapp_obj
     in
     let%bind sent_zkapp_obj = send_zkapp_graphql () in
-    let%bind () =
-      match sent_zkapp_obj.internalSendZkapp.zkapp.failureReason with
-      | None ->
-          return ()
-      | Some s ->
-          Deferred.Or_error.errorf "Zkapp failed, reason: %s"
-            ( Array.fold ~init:[] s ~f:(fun acc f ->
-                  match f with
-                  | None ->
-                      acc
-                  | Some f ->
-                      let t =
-                        ( Option.value_exn f.index
-                        , f.failures |> Array.to_list |> List.rev )
-                      in
-                      t :: acc )
-            |> Mina_base.Transaction_status.Failure.Collection.Display.to_yojson
-            |> Yojson.Safe.to_string )
+    let%bind zkapp_ids =
+      Deferred.Array.fold ~init:(Ok []) sent_zkapp_obj.internalSendZkapp
+        ~f:(fun acc (zkapp_obj : Graphql.Send_test_zkapp.t_internalSendZkapp) ->
+          let%bind res =
+            match zkapp_obj.zkapp.failureReason with
+            | None ->
+                let zkapp_id = transaction_id_to_string zkapp_obj.zkapp.id in
+                [%log info] "Sent zkapp transaction"
+                  ~metadata:[ ("zkapp_id", `String zkapp_id) ] ;
+                return zkapp_id
+            | Some s ->
+                Deferred.Or_error.errorf "Zkapp failed, reason: %s"
+                  ( Array.fold ~init:[] s ~f:(fun acc f ->
+                        match f with
+                        | None ->
+                            acc
+                        | Some f ->
+                            let t =
+                              ( Option.value_exn f.index
+                              , f.failures |> Array.to_list |> List.rev )
+                            in
+                            t :: acc )
+                  |> Mina_base.Transaction_status.Failure.Collection.Display
+                     .to_yojson |> Yojson.Safe.to_string )
+          in
+          let%map acc = Deferred.return acc in
+          res :: acc )
     in
-    let zkapp_id =
-      transaction_id_to_string sent_zkapp_obj.internalSendZkapp.zkapp.id
-    in
-    [%log info] "Sent zkapp" ~metadata:[ ("zkapp_id", `String zkapp_id) ] ;
-    return zkapp_id
+    return (List.rev zkapp_ids)
 
   let get_pooled_zkapp_commands ~logger (t : t)
       ~(pk : Signature_lib.Public_key.Compressed.t) =
@@ -795,34 +803,6 @@ module Node = struct
         ~query_name:"get_pooled_zkapp_commands" get_pooled_zkapp_commands
     in
     let%bind zkapp_pool_obj = get_pooled_zkapp_commands_graphql () in
-    let%bind () =
-      match zkapp_pool_obj.pooledZkappCommands with
-      | [||] ->
-          return ()
-      | zkapp_commands ->
-          Deferred.Or_error.errorf "Zkapp failed, reasons: %s"
-            ( Array.fold ~init:[] zkapp_commands
-                ~f:(fun failures zkapp_command ->
-                  match zkapp_command.failureReason with
-                  | None ->
-                      failures
-                  | Some f ->
-                      let inner_failures =
-                        Array.fold ~init:[] f ~f:(fun failures failure ->
-                            match failure with
-                            | None ->
-                                failures
-                            | Some f ->
-                                ( Option.value_exn f.index
-                                , f.failures |> Array.to_list |> List.rev )
-                                :: failures )
-                      in
-                      List.map inner_failures ~f:(fun f -> f :: failures)
-                      |> List.concat )
-            |> Mina_base.Transaction_status.Failure.Collection.Display.to_yojson
-            |> Yojson.Safe.to_string )
-    in
-
     let transaction_ids =
       Array.map zkapp_pool_obj.pooledZkappCommands ~f:(fun zkapp_command ->
           zkapp_command.id |> Transaction_id.to_base64 )
