@@ -3114,6 +3114,7 @@ module Types = struct
           ; duration_in_minutes : int
           ; memo_prefix : string
           ; no_precondition : bool
+          ; max_cost : bool
           }
 
         let arg_typ =
@@ -3121,7 +3122,7 @@ module Types = struct
             ~doc:"Keys and other information for scheduling zkapp commands"
             ~coerce:(fun fee_payers num_zkapps_to_deploy num_new_accounts
                          transactions_per_second duration_in_minutes memo_prefix
-                         no_precondition ->
+                         no_precondition max_cost ->
               Result.return
                 { fee_payers
                 ; num_zkapps_to_deploy
@@ -3130,11 +3131,12 @@ module Types = struct
                 ; duration_in_minutes
                 ; memo_prefix
                 ; no_precondition
+                ; max_cost
                 } )
             ~split:(fun f (t : input) ->
               f t.fee_payers t.num_zkapps_to_deploy t.num_new_accounts
                 t.transactions_per_second t.duration_in_minutes t.memo_prefix
-                t.no_precondition )
+                t.no_precondition t.max_cost )
             ~fields:
               Arg.
                 [ arg "feePayers"
@@ -3157,6 +3159,8 @@ module Types = struct
                 ; arg "memoPrefix" ~doc:"Prefix of memo" ~typ:(non_null string)
                 ; arg "noPrecondition"
                     ~doc:"Disable the precondition in account updates"
+                    ~typ:(non_null bool)
+                ; arg "maxCost" ~doc:"Generate max cost zkApp command"
                     ~typ:(non_null bool)
                 ]
       end
@@ -4526,6 +4530,99 @@ module Mutations = struct
           ~constraint_constants ~logger ~uuid ~stop_signal ~stop_time
           ~memo_prefix keypairs
 
+    let update_vk ~vk : Account_update.Update.t =
+      { Account_update.Update.dummy with
+        verification_key = Zkapp_basic.Set_or_keep.Set vk
+      }
+
+    let mk_account_update_body ~pk ~vk : Account_update.Body.Simple.t =
+      { public_key = pk
+      ; token_id = Token_id.default
+      ; update = update_vk ~vk
+      ; balance_change = { magnitude = Currency.Amount.zero; sgn = Sgn.Pos }
+      ; increment_nonce = false
+      ; events = []
+      ; actions = []
+      ; call_data = Pickles.Backend.Tick.Field.zero
+      ; call_depth = 0
+      ; preconditions = Account_update.Preconditions.accept
+      ; use_full_commitment = true
+      ; implicit_account_creation_fee = false
+      ; may_use_token = Account_update.May_use_token.No
+      ; authorization_kind = Proof (With_hash.hash vk)
+      }
+
+    let mk_account_update ~pk ~vk : Account_update.Simple.t =
+      { body = mk_account_update_body ~pk ~vk
+      ; authorization = Control.(dummy_of_tag Proof)
+      }
+
+    let mk_fee_payer ~pk ~nonce : Account_update.Fee_payer.t =
+      { body =
+          { public_key = pk
+          ; fee = Currency.Fee.of_mina_string_exn "1.0"
+          ; valid_until = None
+          ; nonce
+          }
+      ; authorization = Signature.dummy
+      }
+
+    let gen_max_size_zkapp_commands
+        ~(fee_payer_keypair : Signature_lib.Keypair.t)
+        ~(account_state_tbl :
+           (Account.t * Mina_generators.Zkapp_command_generators.role)
+           Account_id.Table.t ) ~vk ~(genesis_constants : Genesis_constants.t) =
+      let open Quickcheck.Generator.Let_syntax in
+      let zkapp_accounts =
+        Account_id.Table.data account_state_tbl
+        |> List.filter_map ~f:(fun (a, role) ->
+               match role with
+               | `Ordinary_participant ->
+                   Option.map a.zkapp ~f:(fun _ -> a)
+               | _ ->
+                   None )
+      in
+      let zkapp_pks = List.map zkapp_accounts ~f:(fun a -> a.public_key) in
+      let%bind pks =
+        Quickcheck.Generator.(of_list zkapp_pks |> list_with_length 5)
+      in
+      let[@warning "-8"] (head :: tail) =
+        List.map pks ~f:(fun pk -> mk_account_update ~pk ~vk)
+      in
+      let%bind events =
+        Snark_params.Tick.Field.gen
+        |> Quickcheck.Generator.map ~f:(fun x -> [| x |])
+        |> Quickcheck.Generator.list_with_length
+             genesis_constants.max_event_elements
+      in
+      let%map actions =
+        Snark_params.Tick.Field.gen
+        |> Quickcheck.Generator.map ~f:(fun x -> [| x |])
+        |> Quickcheck.Generator.list_with_length
+             genesis_constants.max_action_elements
+      in
+
+      let account_updates =
+        { head with body = { head.body with events; actions } } :: tail
+      in
+      let fee_payer_pk =
+        Signature_lib.Public_key.compress fee_payer_keypair.public_key
+      in
+      let fee_payer_id = Account_id.create fee_payer_pk Token_id.default in
+      let fee_payer_account, _ =
+        Account_id.Table.find_exn account_state_tbl fee_payer_id
+      in
+      let fee_payer =
+        mk_fee_payer ~pk:fee_payer_pk ~nonce:fee_payer_account.nonce
+      in
+      Account_id.Table.change account_state_tbl fee_payer_id ~f:(function
+        | None ->
+            None
+        | Some (a, role) ->
+            Some ({ a with nonce = Account.Nonce.succ a.nonce }, role) ) ;
+      Zkapp_command.of_simple
+        { fee_payer; account_updates; memo = Signed_command_memo.empty }
+
     let schedule_zkapp_commands =
       io_field "scheduleZkappCommands"
         ~args:
@@ -4679,17 +4776,28 @@ module Mutations = struct
                                     in
                                     let zkapp_command_with_dummy_auth =
                                       Quickcheck.Generator.generate
-                                        (Mina_generators
-                                         .Zkapp_command_generators
-                                         .gen_zkapp_command_from ~memo
-                                           ~no_account_precondition:
-                                             zkapp_command_details
-                                               .no_precondition
-                                           ~ignore_sequence_events_precond:true
-                                           ~no_token_accounts:true ~limited:true
-                                           ~fee_payer_keypair:fee_payer ~keymap
-                                           ~account_state_tbl
-                                           ~generate_new_accounts ~ledger ~vk () )
+                                        ( if zkapp_command_details.max_cost then
+                                          gen_max_size_zkapp_commands
+                                            ~fee_payer_keypair:fee_payer
+                                            ~account_state_tbl ~vk
+                                            ~genesis_constants:
+                                              (Mina_lib.config mina)
+                                                .precomputed_values
+                                                .genesis_constants
+                                        else
+                                          Mina_generators
+                                          .Zkapp_command_generators
+                                          .gen_zkapp_command_from ~memo
+                                            ~no_account_precondition:
+                                              zkapp_command_details
+                                                .no_precondition
+                                            ~ignore_sequence_events_precond:true
+                                            ~no_token_accounts:true
+                                            ~limited:true
+                                            ~fee_payer_keypair:fee_payer ~keymap
+                                            ~account_state_tbl
+                                            ~generate_new_accounts ~ledger ~vk
+                                            () )
                                         ~size:1
                                         ~random:
                                           (Splittable_random.State.create
