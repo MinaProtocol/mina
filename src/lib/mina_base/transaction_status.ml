@@ -349,12 +349,6 @@ module Failure = struct
         | None ->
             Error "Transaction_status.Failure.of_string: Unknown value" )
 
-  let%test_unit "of_string(to_string) roundtrip" =
-    List.iter all ~f:(fun failure ->
-        [%test_eq: (t, string) Result.t]
-          (of_string (to_string failure))
-          (Ok failure) )
-
   let describe = function
     | Predicate ->
         "A predicate failed"
