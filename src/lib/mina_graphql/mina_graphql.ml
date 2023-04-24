@@ -4447,7 +4447,13 @@ module Mutations = struct
           in
           let zkapp_command =
             Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-              ~default_permissions:true spec
+              ~permissions:
+                { Permissions.user_default with
+                  set_verification_key = Permissions.Auth_required.Proof
+                ; edit_state = Permissions.Auth_required.Proof
+                ; edit_action_state = Proof
+                }
+              spec
           in
           let rec go () =
             match%bind send_zkapp_command mina zkapp_command with
