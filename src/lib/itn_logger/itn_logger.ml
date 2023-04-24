@@ -55,6 +55,6 @@ let flush_queue end_log_counter =
 
 let set_queue_bound _ = failwith "Not implemented"
 
-let log ~module_:_ ~location:_ ~message:_ ~metadata:_ = ()
+let log ~message:_ ~metadata:_ = ()
 
 [%%endif]
