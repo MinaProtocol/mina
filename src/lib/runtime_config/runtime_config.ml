@@ -40,9 +40,10 @@ let result_opt ~f x =
   | None ->
       Result.return None
 
-let dump_on_error yojson x =
+let dump_on_error _yojson x =
   Result.map_error x ~f:(fun str ->
-      str ^ "\n\nCould not parse JSON:\n" ^ Yojson.Safe.pretty_to_string yojson )
+      str ^ "\n\nCould not parse JSON:\n"
+      (*^ Yojson.Safe.pretty_to_string yojson*) )
 
 let of_yojson_generic ~fields of_yojson json =
   dump_on_error json @@ of_yojson
@@ -465,6 +466,7 @@ module Accounts = struct
     List.map ~f:Single.to_json_layout
 
   let of_json_layout (t : Json_layout.Accounts.t) : (t, string) Result.t =
+    printf "Accounts.of_json_yojson\n%!" ;
     let exception Stop of string in
     try
       Result.return
@@ -527,6 +529,7 @@ module Ledger = struct
       ({ accounts; num_accounts; balances; hash; name; add_genesis_winner } :
         Json_layout.Ledger.t ) : (t, string) Result.t =
     let open Result.Let_syntax in
+    printf "Ledger.of_json_yojson\n%!" ;
     let%map base =
       match accounts with
       | Some accounts ->
@@ -881,6 +884,7 @@ let to_json_layout { daemon; genesis; proof; ledger; epoch_data } =
 
 let of_json_layout { Json_layout.daemon; genesis; proof; ledger; epoch_data } =
   let open Result.Let_syntax in
+  printf "Runtime_config.of_yojson_layout\n%!" ;
   let%map daemon = result_opt ~f:Daemon.of_json_layout daemon
   and genesis = result_opt ~f:Genesis.of_json_layout genesis
   and proof = result_opt ~f:Proof_keys.of_json_layout proof
@@ -890,7 +894,9 @@ let of_json_layout { Json_layout.daemon; genesis; proof; ledger; epoch_data } =
 
 let to_yojson x = Json_layout.to_yojson (to_json_layout x)
 
-let of_yojson json = Result.bind ~f:of_json_layout (Json_layout.of_yojson json)
+let of_yojson json =
+  printf "Runtime_config.of_yojson\n%!" ;
+  Result.bind ~f:of_json_layout (Json_layout.of_yojson json)
 
 let default =
   { daemon = None

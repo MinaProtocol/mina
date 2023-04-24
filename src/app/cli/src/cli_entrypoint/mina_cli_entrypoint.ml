@@ -689,14 +689,21 @@ let setup_daemon logger =
               ~metadata:[ ("config_files", `List config_files_paths) ] ;
             Deferred.List.filter_map config_files
               ~f:(fun (config_file, handle_missing) ->
+                [%log info] "Reading config file %s" config_file ;
+                let time_start = Time.now () in
                 match%bind
                   Genesis_ledger_helper.load_config_json config_file
                 with
                 | Ok config_json ->
+                    [%log info] "Loaded config json  in %f secs\n%!"
+                      Time.(diff (now ()) time_start |> Span.to_sec) ;
+                    let time_start = Time.now () in
                     let%map config_json =
                       Genesis_ledger_helper.upgrade_old_config ~logger
                         config_file config_json
                     in
+                    [%log info] "upgrade_old_config in %f secs\n%!"
+                      Time.(diff (now ()) time_start |> Span.to_sec) ;
                     Some (config_file, config_json)
                 | Error err -> (
                     match handle_missing with
@@ -714,18 +721,22 @@ let setup_daemon logger =
                             ] ;
                         return None ) )
           in
+          let time_start = Time.now () in
           let config =
             List.fold ~init:Runtime_config.default config_jsons
               ~f:(fun config (config_file, config_json) ->
+                [%log info] "Loading run time config" ;
                 match Runtime_config.of_yojson config_json with
                 | Ok loaded_config ->
+                    [%log info] "Loaded run time config in %f secs\n%!"
+                      Time.(diff (now ()) time_start |> Span.to_sec) ;
                     Runtime_config.combine config loaded_config
                 | Error err ->
                     [%log fatal]
                       "Could not parse configuration from $config_file: $error"
                       ~metadata:
                         [ ("config_file", `String config_file)
-                        ; ("config_json", config_json)
+                          (*; ("config_json", config_json)*)
                         ; ("error", `String err)
                         ] ;
                     failwithf "Could not parse configuration file: %s" err () )
@@ -734,18 +745,22 @@ let setup_daemon logger =
             Option.value ~default:(conf_dir ^/ "genesis") genesis_dir
           in
           let%bind precomputed_values =
+            let time_start = Time.now () in
             match%map
               Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
                 ~proof_level config
             with
             | Ok (precomputed_values, _) ->
+                [%log info] "Generated precomputed values in %f secs\n%!"
+                  Time.(diff (now ()) time_start |> Span.to_sec) ;
                 precomputed_values
             | Error err ->
                 [%log fatal]
                   "Failed initializing with configuration $config: $error"
                   ~metadata:
-                    [ ("config", Runtime_config.to_yojson config)
-                    ; ("error", Error_json.error_to_yojson err)
+                    [ (*("config", Runtime_config.to_yojson config)
+                        ; *)
+                      ("error", Error_json.error_to_yojson err)
                     ] ;
                 Error.raise err
           in

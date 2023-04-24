@@ -107,14 +107,14 @@ module Ledger = struct
     let file_exists filename path =
       let filename = path ^/ filename in
       if%map file_exists ~follow_symlinks:true filename then (
-        [%log trace] "Found $ledger file at $path"
+        [%log info] "Found $ledger file at $path"
           ~metadata:
             [ ("ledger", `String ledger_name_prefix)
             ; ("path", `String filename)
             ] ;
         Some filename )
       else (
-        [%log trace] "Ledger file $path does not exist"
+        [%log debug] "Ledger file $path does not exist"
           ~metadata:[ ("path", `String filename) ] ;
         None )
     in
@@ -322,17 +322,27 @@ module Ledger = struct
             ~ledger_name_prefix config
         in
         let open Deferred.Let_syntax in
+        let start = Time.now () in
         let%bind tar_path =
           find_tar ~logger ~genesis_dir ~constraint_constants
             ~ledger_name_prefix config
         in
+        [%log debug] "Looked for ledger tar file, took $time"
+          ~metadata:
+            [ ("time", `Float Time.(diff (Time.now ()) start |> Span.to_sec)) ] ;
         match tar_path with
         | Some tar_path -> (
+            let start = Time.now () in
             match%map
               load_from_tar ~genesis_dir ~logger ~constraint_constants
                 ?accounts:padded_accounts_opt ~ledger_name_prefix tar_path
             with
             | Ok ledger ->
+                [%log debug] "Loaded ledger from tar, took $time"
+                  ~metadata:
+                    [ ( "time"
+                      , `Float Time.(diff (Time.now ()) start |> Span.to_sec) )
+                    ] ;
                 Ok (ledger, config, tar_path)
             | Error err ->
                 [%log error] "Could not load ledger from $path: $error"
@@ -376,14 +386,26 @@ module Ledger = struct
                     Deferred.Or_error.errorf "ledger '%s' not found" ledger_name
                 )
             | Some accounts -> (
+                let start = Time.now () in
                 let packed =
                   packed_genesis_ledger_of_accounts
                     ~depth:constraint_constants.ledger_depth accounts
                 in
                 let ledger = Lazy.force (Genesis_ledger.Packed.t packed) in
+                [%log debug] "Packed genesis ledger, took $time secs"
+                  ~metadata:
+                    [ ( "time"
+                      , `Float Time.(diff (Time.now ()) start |> Span.to_sec) )
+                    ] ;
+                let start = Time.now () in
                 let%bind tar_path =
                   generate_tar ~genesis_dir ~logger ~ledger_name_prefix ledger
                 in
+                [%log debug] "generated genesis ledger tar, took $time secs"
+                  ~metadata:
+                    [ ( "time"
+                      , `Float Time.(diff (Time.now ()) start |> Span.to_sec) )
+                    ] ;
                 let config =
                   { config with
                     hash =
@@ -455,17 +477,23 @@ module Epoch_data = struct
     | None ->
         Deferred.Or_error.return (None, None)
     | Some config ->
+        [%log info] "Processsing epoch data config" ;
         let ledger_name_prefix = "epoch_ledger" in
         let load_ledger ledger =
           Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
             ~ledger_name_prefix ledger
         in
         let%bind staking, config' =
+          let start = Time.now () in
           let%map staking_ledger, config', ledger_file =
             load_ledger config.staking.ledger
           in
-          [%log trace] "Loaded staking epoch ledger from $ledger_file"
-            ~metadata:[ ("ledger_file", `String ledger_file) ] ;
+          [%log info]
+            "Loaded staking epoch ledger from $ledger_file in $time sec"
+            ~metadata:
+              [ ("ledger_file", `String ledger_file)
+              ; ("time", `Float Time.(diff (Time.now ()) start |> Span.to_sec))
+              ] ;
           ( { Consensus.Genesis_epoch_data.Data.ledger =
                 Genesis_ledger.Packed.t staking_ledger
             ; seed = Epoch_seed.of_base58_check_exn config.staking.seed
@@ -475,14 +503,19 @@ module Epoch_data = struct
         let%map next, config'' =
           match config.next with
           | None ->
-              [%log trace]
+              [%log info]
                 "Configured next epoch ledger to be the same as the staking \
                  epoch ledger" ;
               Deferred.Or_error.return (None, None)
           | Some { ledger; seed } ->
+              let start = Time.now () in
               let%map next_ledger, config'', ledger_file = load_ledger ledger in
-              [%log trace] "Loaded next epoch ledger from $ledger_file"
-                ~metadata:[ ("ledger_file", `String ledger_file) ] ;
+              [%log trace] "Loaded next epoch ledger from $ledger_file in $time"
+                ~metadata:
+                  [ ("ledger_file", `String ledger_file)
+                  ; ( "time"
+                    , `Float Time.(diff (Time.now ()) start |> Span.to_sec) )
+                  ] ;
               ( Some
                   { Consensus.Genesis_epoch_data.Data.ledger =
                       Genesis_ledger.Packed.t next_ledger
@@ -889,6 +922,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
           "Proof level %s is not compatible with compile-time proof level %s"
           (str proof_level) (str compiled)
   in
+  let start = Time.now () in
   let%bind genesis_ledger, ledger_config, ledger_file =
     Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
       (Option.value config.ledger
@@ -901,12 +935,19 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
            ; add_genesis_winner = None
            } )
   in
-  [%log info] "Loaded genesis ledger from $ledger_file"
-    ~metadata:[ ("ledger_file", `String ledger_file) ] ;
+  [%log info] "Loaded genesis ledger from $ledger_file in $time sec"
+    ~metadata:
+      [ ("ledger_file", `String ledger_file)
+      ; ("time", `Float Time.(diff (Time.now ()) start |> Span.to_sec))
+      ] ;
+  let start = Time.now () in
   let%bind genesis_epoch_data, genesis_epoch_data_config =
     Epoch_data.load ~proof_level ~genesis_dir ~logger ~constraint_constants
       config.epoch_data
   in
+  [%log info] "Loaded epoch data in $time secs"
+    ~metadata:
+      [ ("time", `Float Time.(diff (Time.now ()) start |> Span.to_sec)) ] ;
   let config =
     { config with
       ledger = Option.map config.ledger ~f:(fun _ -> ledger_config)
