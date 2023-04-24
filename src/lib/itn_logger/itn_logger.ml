@@ -12,7 +12,7 @@ open Core_kernel
 [%%if itn_features]
 
 (* queue of sequence no, message, metadata *)
-let log_queue : (int * string * (string * string) list) Queue.t =
+let log_queue : (int * string * (string * Yojson.Basic.t) list) Queue.t =
   Queue.create ()
 
 let get_queue_bound, set_queue_bound =
@@ -28,11 +28,11 @@ let get_counter, incr_counter =
   (get, incr)
 
 let log ~message ~metadata =
-  (* convert JSON to strings in queue, so we don't have to in GraphQL response *)
-  let metadata_with_strings =
-    List.map metadata ~f:(fun (s, json) -> (s, Yojson.Safe.to_string json))
+  (* convert JSON to Basic.t in queue, so we don't have to in GraphQL response *)
+  let metadata_basic =
+    List.map metadata ~f:(fun (s, json) -> (s, Yojson.Safe.to_basic json))
   in
-  Queue.enqueue log_queue (get_counter (), message, metadata_with_strings) ;
+  Queue.enqueue log_queue (get_counter (), message, metadata_basic) ;
   if Queue.length log_queue > get_queue_bound () then
     ignore (Queue.dequeue_exn log_queue) ;
   incr_counter ()
