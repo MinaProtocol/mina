@@ -372,8 +372,8 @@ let log t ~level ~module_ ~location ?tags ?(metadata = []) ?event_id fmt =
     in
     match level with
     | Internal ->
-        (* ITN logger is no-op on mainnet *)
-        Itn_logger.log ~message ~metadata ;
+        if Mina_compile_config.itn_features then
+          Itn_logger.log ~message ~metadata ;
         res
     | _ ->
         res

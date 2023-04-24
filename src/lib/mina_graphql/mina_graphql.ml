@@ -4561,7 +4561,7 @@ module Mutations = struct
         ~doc:"Returns number of logs deleted from queue"
         ~args:
           Arg.
-            [ arg "endLogId" ~doc:"Greatest log ID to be flushed"
+            [ arg "endLogId" ~doc:"Greatest log ID to be deleted"
                 ~typ:(non_null int)
             ]
         ~typ:(non_null string)

@@ -1,15 +1,6 @@
 (* itn_logger.ml -- bounded queue of `internal` logs *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
-
-(* `itn_features` is available in Mina_compile_config
-   using that module here introduces a cycle
-*)
-[%%inject "itn_features", itn_features]
-
-[%%if itn_features]
 
 (* queue of sequence no, message, metadata *)
 let log_queue : (int * string * (string * Yojson.Basic.t) list) Queue.t =
@@ -50,15 +41,3 @@ let flush_queue end_log_counter =
       n > end_log_counter ) ;
   let len' = Queue.length log_queue in
   len - len'
-
-[%%else]
-
-let set_queue_bound _ = failwith "Not implemented"
-
-let log ~message:_ ~metadata:_ = ()
-
-let get_logs _start_log_id = failwith "Not implemented"
-
-let flush_queue _end_log_counter = failwith "Not implemented"
-
-[%%endif]
