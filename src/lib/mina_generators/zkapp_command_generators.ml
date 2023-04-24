@@ -244,7 +244,7 @@ let gen_account_precondition_from_account ?failure
       | _ ->
           return (Account_update.Account_precondition.Nonce nonce)
 
-let gen_fee ~num_updates (account : Account.t) =
+let gen_fee ?fee_range ~num_updates (account : Account.t) =
   let balance = account.balance in
   let lo_fee =
     Option.value_exn
@@ -255,7 +255,9 @@ let gen_fee ~num_updates (account : Account.t) =
   assert (
     Currency.(
       Fee.(hi_fee <= (Balance.to_amount balance |> Currency.Amount.to_fee))) ) ;
-  Currency.Fee.gen_incl lo_fee hi_fee
+  Option.value_map fee_range ~default:(Currency.Fee.gen_incl lo_fee hi_fee)
+    ~f:(fun (lo, hi) ->
+      Currency.Fee.(gen_incl (of_mina_string_exn lo) (of_mina_string_exn hi)) )
 
 (*Fee payer balance change is Neg*)
 let fee_to_amt fee =
@@ -1046,9 +1048,10 @@ let gen_account_update_from ?(no_account_precondition = false)
   return { Account_update.Simple.body; authorization }
 
 (* takes an account id, if we want to sign this data *)
-let gen_account_update_body_fee_payer ?global_slot ?failure ?permissions_auth
-    ~account_id ?vk ?protocol_state_view ~account_state_tbl ~num_account_updates
-    () : Account_update.Body.Fee_payer.t Quickcheck.Generator.t =
+let gen_account_update_body_fee_payer ?global_slot ?fee_range ?failure
+    ?permissions_auth ~account_id ?vk ?protocol_state_view ~account_state_tbl
+    ~num_account_updates () :
+    Account_update.Body.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let account_precondition_gen (account : Account.t) =
     Quickcheck.Generator.return account.nonce
@@ -1057,7 +1060,7 @@ let gen_account_update_body_fee_payer ?global_slot ?failure ?permissions_auth
     gen_account_update_body_components ?global_slot ?failure ?permissions_auth
       ~account_id ~account_state_tbl ?vk ~zkapp_account_ids:[]
       ~is_fee_payer:true ~increment_nonce:((), true)
-      ~gen_balance_change:(gen_fee ~num_updates:num_account_updates)
+      ~gen_balance_change:(gen_fee ?fee_range ~num_updates:num_account_updates)
       ~f_balance_change:fee_to_amt
       ~f_token_id:(fun token_id ->
         (* make sure the fee payer's token id is the default,
@@ -1073,13 +1076,13 @@ let gen_account_update_body_fee_payer ?global_slot ?failure ?permissions_auth
   in
   Account_update_body_components.to_fee_payer body_components
 
-let gen_fee_payer ?global_slot ?failure ?permissions_auth ~account_id
+let gen_fee_payer ?global_slot ?fee_range ?failure ?permissions_auth ~account_id
     ?protocol_state_view ?vk ~account_state_tbl ~num_account_updates () :
     Account_update.Fee_payer.t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%map body =
-    gen_account_update_body_fee_payer ?global_slot ?failure ?permissions_auth
-      ~account_id ?vk ?protocol_state_view ~account_state_tbl
+    gen_account_update_body_fee_payer ?global_slot ?fee_range ?failure
+      ?permissions_auth ~account_id ?vk ?protocol_state_view ~account_state_tbl
       ~num_account_updates ()
   in
   (* real signature to be added when this data inserted into a Zkapp_command.t *)
@@ -1101,7 +1104,7 @@ let max_account_updates = 2
 let max_token_updates = 2
 
 let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
-    ?balance_change_range ?(ignore_sequence_events_precond = false)
+    ?fee_range ?balance_change_range ?(ignore_sequence_events_precond = false)
     ?(no_token_accounts = false) ?(limited = false)
     ?(generate_new_accounts = true) ?failure
     ?(max_account_updates = max_account_updates)
@@ -1175,9 +1178,9 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
   let account_ids_seen = Account_id.Hash_set.create () in
   let%bind num_zkapp_command = Int.gen_uniform_incl 1 max_account_updates in
   let%bind fee_payer =
-    gen_fee_payer ?global_slot ?failure ~permissions_auth:Control.Tag.Signature
-      ~account_id:fee_payer_acct_id ?vk ~account_state_tbl
-      ~num_account_updates:num_zkapp_command ()
+    gen_fee_payer ?global_slot ?fee_range ?failure
+      ~permissions_auth:Control.Tag.Signature ~account_id:fee_payer_acct_id ?vk
+      ~account_state_tbl ~num_account_updates:num_zkapp_command ()
   in
   let zkapp_account_ids =
     Account_id.Table.filteri account_state_tbl ~f:(fun ~key:_ ~data:(a, role) ->

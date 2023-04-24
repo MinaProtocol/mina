@@ -102,4 +102,10 @@ input ZkappCommandsDetails {
   maxBalanceChange: String!
 
   initBalance: String!
+
+  minFee: String! 
+
+  maxFee: String! 
+
+  deploymentFee: String!
 }

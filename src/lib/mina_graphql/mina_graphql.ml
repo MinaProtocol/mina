@@ -3117,6 +3117,9 @@ module Types = struct
           ; min_balance_change : string
           ; max_balance_change : string
           ; init_balance : string
+          ; min_fee : string
+          ; max_fee : string
+          ; deployment_fee : string
           }
 
         let arg_typ =
@@ -3125,7 +3128,7 @@ module Types = struct
             ~coerce:(fun fee_payers num_zkapps_to_deploy num_new_accounts
                          transactions_per_second duration_in_minutes memo_prefix
                          no_precondition min_balance_change max_balance_change
-                         init_balance ->
+                         init_balance min_fee max_fee deployment_fee ->
               Result.return
                 { fee_payers
                 ; num_zkapps_to_deploy
@@ -3137,12 +3140,15 @@ module Types = struct
                 ; min_balance_change
                 ; max_balance_change
                 ; init_balance
+                ; min_fee
+                ; max_fee
+                ; deployment_fee
                 } )
             ~split:(fun f (t : input) ->
               f t.fee_payers t.num_zkapps_to_deploy t.num_new_accounts
                 t.transactions_per_second t.duration_in_minutes t.memo_prefix
                 t.no_precondition t.min_balance_change t.max_balance_change
-                t.init_balance )
+                t.init_balance t.min_fee t.max_fee t.deployment_fee )
             ~fields:
               Arg.
                 [ arg "feePayers"
@@ -3152,8 +3158,8 @@ module Types = struct
                        the account creators)"
                 ; arg "numZkappsToDeploy" ~typ:(non_null int)
                     ~doc:
-                      "Number of zkApp accounts that we deploy for the purpose \
-                       of test"
+                      "Number of zkApp accounts that we initially deploy for \
+                       the purpose of test"
                 ; arg "numNewAccounts" ~typ:(non_null int)
                     ~doc:
                       "Number of zkapp accounts that the scheduler generates \
@@ -3172,8 +3178,13 @@ module Types = struct
                     ~typ:(non_null string)
                 ; arg "initBalance" ~typ:(non_null string)
                     ~doc:
-                      "Initial balance for zkApp accounts that we deploy for \
-                       the purpose of test"
+                      "Initial balance for zkApp accounts that we initially \
+                       deploy for the purpose of test"
+                ; arg "minFee" ~doc:"Minimum fee" ~typ:(non_null string)
+                ; arg "maxFee" ~doc:"Maximum fee" ~typ:(non_null string)
+                ; arg "deploymentFee"
+                    ~doc:"Fee for the initial deployment of zkApp accounts"
+                    ~typ:(non_null string)
                 ]
       end
     end
@@ -4429,7 +4440,7 @@ module Mutations = struct
     let account_of_kp (kp : Signature_lib.Keypair.t) ledger =
       account_of_id (id_of_kp kp) ledger
 
-    let deploy_zkapps ~mina ~ledger ~init_balance
+    let deploy_zkapps ~mina ~ledger ~deployment_fee ~init_balance
         ~(fee_payer_array : Signature_lib.Keypair.t Array.t)
         ~constraint_constants ~logger ~memo_prefix keypairs =
       let fee_payer_accounts =
@@ -4446,7 +4457,7 @@ module Mutations = struct
           let spec =
             { Transaction_snark.For_tests.Deploy_snapp_spec.sender =
                 (fee_payer_keypair, !(fee_payer_nonces.(!ndx)))
-            ; fee = Currency.Fee.of_mina_string_exn "1.0"
+            ; fee = Currency.Fee.of_mina_string_exn deployment_fee
             ; fee_payer = None
             ; amount = Currency.Amount.of_mina_string_exn init_balance
             ; zkapp_account_keypairs = [ kp ]
@@ -4499,7 +4510,8 @@ module Mutations = struct
       |> List.for_all ~f:Fn.id
 
     let rec wait_until_zkapps_deployed ?(deployed = false) ~mina ~ledger
-        ~init_balance ~(fee_payer_array : Signature_lib.Keypair.t Array.t)
+        ~deployment_fee ~init_balance
+        ~(fee_payer_array : Signature_lib.Keypair.t Array.t)
         ~constraint_constants ~logger ~uuid ~stop_signal ~stop_time ~memo_prefix
         (keypairs : Signature_lib.Keypair.t list) =
       if Time.( >= ) (Time.now ()) stop_time then (
@@ -4519,8 +4531,9 @@ module Mutations = struct
         let%bind () =
           if not deployed then (
             [%log info] "Start deploying zkApp accounts" ;
-            deploy_zkapps ~mina ~ledger ~init_balance ~fee_payer_array
-              ~constraint_constants ~logger ~memo_prefix keypairs )
+            deploy_zkapps ~mina ~ledger ~deployment_fee ~init_balance
+              ~fee_payer_array ~constraint_constants ~logger ~memo_prefix
+              keypairs )
           else return ()
         in
         [%log debug] "The accounts were not in the best tip $ledger, try again"
@@ -4538,9 +4551,9 @@ module Mutations = struct
           |> Option.value_map ~default:ledger ~f:(fun (new_ledger, _) ->
                  new_ledger )
         in
-        wait_until_zkapps_deployed ~deployed:true ~mina ~ledger ~init_balance
-          ~fee_payer_array ~constraint_constants ~logger ~uuid ~stop_signal
-          ~stop_time ~memo_prefix keypairs
+        wait_until_zkapps_deployed ~deployed:true ~mina ~ledger ~deployment_fee
+          ~init_balance ~fee_payer_array ~constraint_constants ~logger ~uuid
+          ~stop_signal ~stop_time ~memo_prefix keypairs
 
     let schedule_zkapp_commands =
       io_field "scheduleZkappCommands"
@@ -4704,6 +4717,9 @@ module Mutations = struct
                                            ~no_account_precondition:
                                              zkapp_command_details
                                                .no_precondition
+                                           ~fee_range:
+                                             ( zkapp_command_details.min_fee
+                                             , zkapp_command_details.max_fee )
                                            ~balance_change_range:
                                              ( zkapp_command_details
                                                  .min_balance_change
@@ -4753,6 +4769,8 @@ module Mutations = struct
                           in
                           upon
                             (wait_until_zkapps_deployed ~mina ~ledger
+                               ~deployment_fee:
+                                 zkapp_command_details.deployment_fee
                                ~init_balance:zkapp_command_details.init_balance
                                ~fee_payer_array ~constraint_constants
                                zkapp_account_keypairs ~logger ~uuid
