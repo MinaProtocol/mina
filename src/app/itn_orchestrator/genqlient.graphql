@@ -2,6 +2,9 @@ query auth() {
     auth {
         serverUuid
         signerSequenceNumber
+        libp2pPort
+        peerId
+        isBlockProducer
     }
 }
 
@@ -15,4 +18,12 @@ mutation stopScheduledTransactions($handle: String!) {
 
 mutation scheduleZkappCommands($input: ZkappCommandsDetails!) {
     scheduleZkappCommands(input: $input) 
+}
+
+query slotsWon() {
+    slotsWon
+}
+
+mutation updateGating($input: GatingUpdate!) {
+    updateGating(input: $input)
 }

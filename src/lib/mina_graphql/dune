@@ -103,6 +103,7 @@
    sgn_type
    mina_transaction_logic
    zkapp_command_builder
+   gossip_net
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../config.mlh)
