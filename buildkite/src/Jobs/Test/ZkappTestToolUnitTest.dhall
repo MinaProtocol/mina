@@ -15,7 +15,7 @@ let Size = ../../Command/Size.dhall
 let buildTestCmd : Text -> Text -> Size -> Command.Type = \(profile : Text) -> \(path : Text) -> \(cmd_target : Size) ->
   Command.build
     Command.Config::{
-      commands = RunInToolchain.runInToolchain ([] : List Text) "buildkite/scripts/unit-test.sh ${profile} ${path}",
+      commands = RunInToolchain.runInToolchainStretch ["DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN"] "buildkite/scripts/unit-test.sh ${profile} ${path} && buildkite/scripts/upload-partial-coverage-data.sh",
       label = "Zkapps test transaction tool unit tests",
       key = "zkapp-tool-unit-test-${profile}",
       target = cmd_target,

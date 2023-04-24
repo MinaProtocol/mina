@@ -10,7 +10,8 @@ let dependsOn =  [
     { name = "DaemonUnitTest", key = "unit-test-dev" },
     { name = "DelegationBackendUnitTest", key = "delegation-backend-unit-tests" },
     { name = "FuzzyZkappTest", key = "fuzzy-zkapp-unit-test-dev" },
-    { name = "SnarkyJSTest", key = "snarkyjs-bindings-test" }
+    { name = "SnarkyJSTest", key = "snarkyjs-bindings-test" },
+    { name = "ZkappTestToolUnitTest", key = "zkapp-tool-unit-test-dev" }
 ]
 
 in Pipeline.build Pipeline.Config::{
