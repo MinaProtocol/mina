@@ -15,6 +15,7 @@ type ZkappCommandParams struct {
 	FeePayers         []itn_json_types.MinaPrivateKey
 	Nodes             []NodeAddress
 	NoPrecondition    bool
+	MaxSize           bool
 }
 
 type ScheduledZkappCommandsReceipt struct {
@@ -33,6 +34,7 @@ func SendZkappCommands(config Config, params ZkappCommandParams, output func(Sch
 			NumNewAccounts:        params.NewAccounts,
 			FeePayers:             params.FeePayers[nodeIx*feePayersPerNode : (nodeIx+1)*feePayersPerNode],
 			NoPrecondition:        params.NoPrecondition,
+			MaxSize:               params.MaxSize,
 		}
 		client, err := config.GetGqlClient(config.Ctx, nodeAddress)
 		if err != nil {
