@@ -96,4 +96,10 @@ input ZkappCommandsDetails {
   feePayers: [PrivateKey!]!
 
   noPrecondition: Boolean!
+
+  minBalanceChange: String!
+
+  maxBalanceChange: String!
+
+  initBalance: String!
 }
