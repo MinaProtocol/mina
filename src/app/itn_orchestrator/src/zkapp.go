@@ -22,7 +22,7 @@ type ZkappCommandParams struct {
 	MaxFee            string
 	DeploymentFee     string
 	AccountQueueSize  int
-	MaxSize           bool
+	MaxCost           bool
 }
 
 type ScheduledZkappCommandsReceipt struct {
@@ -48,7 +48,7 @@ func SendZkappCommands(config Config, params ZkappCommandParams, output func(Sch
 			MaxFee:                params.MaxFee,
 			DeploymentFee:         params.DeploymentFee,
 			AccountQueueSize:      params.AccountQueueSize,
-			MaxSize:               params.MaxSize,
+			MaxCost:               params.MaxCost,
 		}
 		client, err := config.GetGqlClient(config.Ctx, nodeAddress)
 		if err != nil {
