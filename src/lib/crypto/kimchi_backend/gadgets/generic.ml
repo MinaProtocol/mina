@@ -16,6 +16,7 @@ let add (type f)
         Field.Constant.add left_input right_input )
   in
 
+  let neg_one = Field.Constant.(negate one) in
   (* Set up generic add gate *)
   with_label "generic_add_gadget" (fun () ->
       assert_
@@ -25,7 +26,7 @@ let add (type f)
               (Basic
                  { l = (Field.Constant.one, left_input)
                  ; r = (Field.Constant.one, right_input)
-                 ; o = (Option.value_exn Field.(to_constant (negate one)), sum)
+                 ; o = (neg_one, sum)
                  ; m = Field.Constant.zero
                  ; c = Field.Constant.zero
                  } )
@@ -47,7 +48,7 @@ let sub (type f)
   in
 
   (* Negative one gate coefficient *)
-  let neg_one = Option.value_exn Field.(to_constant (negate one)) in
+  let neg_one = Field.Constant.(negate one) in
 
   (* Set up generic sub gate *)
   with_label "generic_sub_gadget" (fun () ->
@@ -79,8 +80,10 @@ let mul (type f)
         Field.Constant.mul left_input right_input )
   in
 
+  let neg_one = Field.Constant.(negate one) in
   (* Set up generic mul gate *)
-  with_label "generic_mul_gadget" (fun () ->
+  with_label "generic_mul_gadget"
+    (fun () ->
       assert_
         { annotation = Some __LOC__
         ; basic =
@@ -88,7 +91,7 @@ let mul (type f)
               (Basic
                  { l = (Field.Constant.zero, left_input)
                  ; r = (Field.Constant.zero, right_input)
-                 ; o = (Option.value_exn Field.(to_constant (negate one)), prod)
+                 ; o = (neg_one, prod)
                  ; m = Field.Constant.one
                  ; c = Field.Constant.zero
                  } )
@@ -221,4 +224,4 @@ let%test_unit "generic gadgets" =
   assert (Common.is_error (fun () -> test_generic_mul ~cs 1 0 1)) ;
   assert (Common.is_error (fun () -> test_generic_mul ~cs 2 4 7)) ;
 
-  ()
+    ()

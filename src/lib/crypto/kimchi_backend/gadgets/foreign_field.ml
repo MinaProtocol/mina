@@ -1305,8 +1305,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
                   (module Runner.Impl)
                   sum
               in
-              assert_eq sum expected ;
-              Boolean.Assert.is_true Field.(equal one one) ) ;
+              assert_eq sum expected ) ;
           () )
     in
     cs
@@ -1876,6 +1875,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
          "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
       secp256k1_modulus
   in
+
 
   (* COMBINED TESTS *)
   let _cs =

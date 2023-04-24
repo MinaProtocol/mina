@@ -359,7 +359,8 @@ let band (type f)
 
   (* Compute sum of a + b and constrain in the circuit *)
   let sum = Generic.add (module Circuit) input1 input2 in
-  let two = Field.of_int 2 in
+  let neg_one = Field.Constant.(negate one) in
+  let neg_two = Field.Constant.(neg_one + neg_one) in
 
   (* Constrain AND as 2 * and = sum - xor *)
   with_label "and_equation" (fun () ->
@@ -370,10 +371,10 @@ let band (type f)
               (Basic
                  { l = (Field.Constant.one, sum)
                  ; r =
-                     ( Option.value_exn Field.(to_constant (negate one))
+                     ( neg_one
                      , xor_output )
                  ; o =
-                     ( Option.value_exn Field.(to_constant (negate two))
+                     ( neg_two
                      , and_output )
                  ; m = Field.Constant.zero
                  ; c = Field.Constant.zero
@@ -431,25 +432,10 @@ let bnot_unchecked (type f)
       () ) ;
 
   let all_ones_var = cvar_field_all_ones (module Circuit) length in
-  let not_output = Field.(all_ones_var - input) in
   (* Negating is equivalent to subtracting with all one word *)
   (* [2^len - 1] - input = not (input) *)
-  with_label "not_subtraction" (fun () ->
-      assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (Basic
-                 { l = (Field.Constant.one, all_ones_var)
-                 ; r = (Option.value_exn Field.(to_constant (negate one)), input)
-                 ; o =
-                     ( Option.value_exn Field.(to_constant (negate one))
-                     , not_output )
-                 ; m = Field.Constant.zero
-                 ; c = Field.Constant.zero
-                 } )
-        } ) ;
-  not_output
+  Generic.sub (module Circuit) all_ones_var input
+
 
 (* Negates a word of 64 bits, but its length goes unconstrained in the circuit
    (unless it is copied from a checked length value) *)
@@ -486,13 +472,12 @@ let%test_unit "bitwise rotation gadget" =
           in
           (* Use the xor gate gadget *)
           let output_rot = rot_64 (module Runner.Impl) word length mode in
-          Field.Assert.equal output_rot result ;
+          Field.Assert.equal output_rot result 
           (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
-          Boolean.Assert.is_true (Field.equal output_rot output_rot) )
+           )
     in
     cs
   in
-
   (* Positive tests *)
   let _cs = test_rot "0" 0 Left "0" in
   let _cs = test_rot "0" 32 Right "0" in
@@ -553,41 +538,42 @@ let%test_unit "bitwise xor gadget" =
   in
 
   (* Positive tests *)
-  let cs = test_xor "1" "0" "1" 16 in
-  let _cs = test_xor ~cs "0" "1" "1" 16 in
-  let _cs = test_xor ~cs "2" "1" "3" 16 in
-  let _cs = test_xor ~cs "a8ca" "ddd5" "751f" 16 in
-  let _cs = test_xor "0" "0" "0" 8 in
-  let cs = test_xor "0" "0" "0" 1 in
-  let _cs = test_xor ~cs "1" "0" "1" 1 in
-  let cs = test_xor "0" "0" "0" 4 in
-  let _cs = test_xor ~cs "1" "1" "0" 4 in
-  let _cs = test_xor "bb5c6" "edded" "5682b" 20 in
-  let cs =
+  let cs16 = test_xor "1" "0" "1" 16 in
+  let _cs = test_xor ~cs:cs16 "0" "1" "1" 16 in
+  let _cs = test_xor ~cs:cs16 "2" "1" "3" 16 in
+  let _cs = test_xor ~cs:cs16 "a8ca" "ddd5" "751f" 16 in
+  let _cs = test_xor ~cs:cs16 "0" "0" "0" 8 in
+  let _cs = test_xor ~cs:cs16 "0" "0" "0" 1 in
+  let _cs = test_xor ~cs:cs16 "1" "0" "1" 1 in
+  let _cs = test_xor ~cs:cs16 "0" "0" "0" 4 in
+  let _cs = test_xor ~cs:cs16 "1" "1" "0" 4 in
+  let cs32 = test_xor "bb5c6" "edded" "5682b" 20 in
+  let cs64 =
     test_xor "5a5a5a5a5a5a5a5a" "a5a5a5a5a5a5a5a5" "ffffffffffffffff" 64
   in
   let _cs =
-    test_xor ~cs "f1f1f1f1f1f1f1f1" "0f0f0f0f0f0f0f0f" "fefefefefefefefe" 64
+    test_xor ~cs:cs64 "f1f1f1f1f1f1f1f1" "0f0f0f0f0f0f0f0f" "fefefefefefefefe" 64
   in
   let _cs =
-    test_xor ~cs "cad1f05900fcad2f" "deadbeef010301db" "147c4eb601ffacf4" 64
+    test_xor ~cs:cs64 "cad1f05900fcad2f" "deadbeef010301db" "147c4eb601ffacf4" 64
   in
 
   (* Negatve tests *)
   assert (
     Common.is_error (fun () ->
         (* Reusing right CS with bad witness *)
-        test_xor ~cs "ed1ed1" "ed1ed1" "010101" 20 ) ) ;
+        test_xor ~cs:cs32 "ed1ed1" "ed1ed1" "010101" 20 ) ) ;
   assert (
     Common.is_error (fun () ->
         (* Reusing wrong CS with right witness *)
-        test_xor ~cs "1" "1" "0" 16 ) ) ;
+        test_xor ~cs:cs32 "1" "1" "0" 16 ) ) ;
 
-  assert (Common.is_error (fun () -> test_xor "1" "0" "0" 1)) ;
-  assert (Common.is_error (fun () -> test_xor "1111" "2222" "0" 16)) ;
+  assert (Common.is_error (fun () -> test_xor ~cs:cs16 "1" "0" "1" 0)) ;
+  assert (Common.is_error (fun () -> test_xor ~cs:cs16 "1" "0" "0" 1)) ;
+  assert (Common.is_error (fun () -> test_xor ~cs:cs16 "1111" "2222" "0" 16)) ;
   assert (Common.is_error (fun () -> test_xor "0" "0" "0" 256)) ;
   assert (Common.is_error (fun () -> test_xor "0" "0" "0" (-4))) ;
-  assert (Common.is_error (fun () -> test_xor "bb5c6" "edded" "ed1ed1" 20)) ;
+  assert (Common.is_error (fun () -> test_xor ~cs:cs32 "bb5c6" "edded" "ed1ed1" 20)) ;
   ()
 
 let%test_unit "bitwise and gadget" =
@@ -692,10 +678,10 @@ let%test_unit "bitwise not gadget" =
   in
 
   (* Positive tests *)
-  let _cs = test_not "0" "1" 1 in
+  let cs = test_not "0" "1" 1 in
   let _cs = test_not "0" "f" 4 in
   let _cs = test_not "0" "ff" 8 in
-  let _cs = test_not "0" "7ff" 11 in
+  let _cs = test_not ~cs "0" "7ff" 11 in
   let cs = test_not "0" "ffff" 16 in
   let _cs = test_not ~cs "a8ca" "5735" 16 in
   let _cs = test_not "bb5c6" "44a39" 20 in
@@ -706,6 +692,8 @@ let%test_unit "bitwise not gadget" =
   let _cs = test_not ~cs "00000fffffffffff" "fffff00000000000" 64 in
   let _cs = test_not ~cs "fffffffffffff000" "fff" 64 in
   let _cs = test_not ~cs "0" "ffffffffffffffff" 64 in
+  let _cs = test_not ~cs "0" "ffffffffffffffff" 64 in
+  let _cs = test_not "3FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" "0" 254 in
 
   (* Negative tests *)
   assert (
@@ -718,4 +706,5 @@ let%test_unit "bitwise not gadget" =
         test_not ~cs "1" "0" 1 ) ) ;
   assert (Common.is_error (fun () -> test_not "0" "0" 1)) ;
   assert (Common.is_error (fun () -> test_not "ff" "0" 4)) ;
+  assert (Common.is_error (fun () -> test_not "7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" "0" 255)) ;
   ()
