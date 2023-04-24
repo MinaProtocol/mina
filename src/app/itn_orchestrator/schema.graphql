@@ -143,8 +143,8 @@ input ZkappCommandsDetails {
 
   noPrecondition: Boolean!
 
-  maxSize: Boolean!
-  
+  maxCost: Boolean!
+
   minBalanceChange: String!
 
   maxBalanceChange: String!
