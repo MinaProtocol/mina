@@ -101,6 +101,7 @@
    sgn_type
    mina_transaction_logic
    gossip_net
+   itn_logger
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../config.mlh)

@@ -102,6 +102,13 @@ let setup_daemon logger =
            permitted to send signed requests to the incentivized testnet \
            GraphQL server"
     else Command.Param.return None
+  and itn_max_logs =
+    if Mina_compile_config.itn_features then
+      flag "--itn-max-logs" ~aliases:[ "itn-max-logs" ] (optional int)
+        ~doc:
+          "NN Maximum number of logs to store to be made available via GraphQL \
+           for incentivized testnet"
+    else Command.Param.return None
   and demo_mode =
     flag "--demo-mode" ~aliases:[ "demo-mode" ] no_arg
       ~doc:
@@ -1307,6 +1314,11 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                   "Cannot provide both uptime submitter public key and uptime \
                    submitter keyfile"
           in
+          if Mina_compile_config.itn_features then
+            (* set queue bound directly in Itn_logger
+               adding bound to Mina_lib config introduces cycle
+            *)
+            Option.iter itn_max_logs ~f:Itn_logger.set_queue_bound ;
           let start_time = Time.now () in
           let%map mina =
             Mina_lib.create ~wallets

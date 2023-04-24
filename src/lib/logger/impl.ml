@@ -365,9 +365,18 @@ let add_tags_to_metadata metadata tags =
 let log t ~level ~module_ ~location ?tags ?(metadata = []) ?event_id fmt =
   let metadata = add_tags_to_metadata metadata tags in
   let f message =
-    raw t
-    @@ make_message t ~level ~module_ ~location ~metadata ~message ~event_id
-         ~skip_merge_global_metadata:(Level.equal level Level.Internal)
+    let res =
+      raw t
+      @@ make_message t ~level ~module_ ~location ~metadata ~message ~event_id
+           ~skip_merge_global_metadata:(Level.equal level Level.Internal)
+    in
+    match level with
+    | Internal ->
+        (* ITN logger is no-op on mainnet *)
+        Itn_logger.log ~message ~metadata ;
+        res
+    | _ ->
+        res
   in
   ksprintf f fmt
 

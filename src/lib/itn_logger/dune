@@ -1,0 +1,14 @@
+(library
+ (name itn_logger)
+ (public_name itn_logger)
+ (inline_tests)
+ (libraries
+   ;; opam libraries
+   base
+   core_kernel
+   yojson
+   ;; local libraries
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocessor_deps ../../config.mlh)
+ (preprocess (pps ppx_optcomp ppx_version)))

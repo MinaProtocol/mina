@@ -12,6 +12,7 @@
    base.caml
    base.base_internalhash_types
    ;; local libraries
+   itn_logger
    interpolator_lib
    ppx_version.runtime
  )
