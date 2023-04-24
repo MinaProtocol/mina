@@ -156,6 +156,8 @@ input ZkappCommandsDetails {
   deploymentFee: String!
 
   accountQueueSize: Int!
+
+  maxSize: Boolean!
 }
 
 """String representing a uint16 number in base 10"""
