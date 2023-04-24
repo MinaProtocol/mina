@@ -57,4 +57,8 @@ let set_queue_bound _ = failwith "Not implemented"
 
 let log ~message:_ ~metadata:_ = ()
 
+let get_logs _start_log_id = failwith "Not implemented"
+
+let flush_queue _end_log_counter = failwith "Not implemented"
+
 [%%endif]
