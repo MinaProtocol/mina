@@ -168,7 +168,8 @@ let multi (type f)
   range_check0
     (module Circuit)
     ~label:"multi_range_check" ~is_64bit:false ~is_compact:false v1 ;
-  range_check1 (module Circuit) ~label:"multi_range_check" v0 v1 v2 Field.zero
+  let zero = exists Field.typ ~compute:(fun () -> Field.Constant.zero) in
+  range_check1 (module Circuit) ~label:"multi_range_check" v0 v1 v2 zero
 
 (* compact multi-range-check gadget - checks
  *     - v0,v1,v2 \in [0, 2^88)
