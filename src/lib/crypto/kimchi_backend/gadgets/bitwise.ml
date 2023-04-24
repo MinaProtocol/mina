@@ -370,12 +370,8 @@ let band (type f)
             Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
               (Basic
                  { l = (Field.Constant.one, sum)
-                 ; r =
-                     ( neg_one
-                     , xor_output )
-                 ; o =
-                     ( neg_two
-                     , and_output )
+                 ; r = (neg_one, xor_output)
+                 ; o = (neg_two, and_output)
                  ; m = Field.Constant.zero
                  ; c = Field.Constant.zero
                  } )
@@ -436,7 +432,6 @@ let bnot_unchecked (type f)
   (* [2^len - 1] - input = not (input) *)
   Generic.sub (module Circuit) all_ones_var input
 
-
 (* Negates a word of 64 bits, but its length goes unconstrained in the circuit
    (unless it is copied from a checked length value) *)
 let bnot64_unchecked (type f)
@@ -472,9 +467,8 @@ let%test_unit "bitwise rotation gadget" =
           in
           (* Use the xor gate gadget *)
           let output_rot = rot_64 (module Runner.Impl) word length mode in
-          Field.Assert.equal output_rot result 
-          (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
-           )
+          Field.Assert.equal output_rot result
+          (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *) )
     in
     cs
   in
@@ -552,10 +546,12 @@ let%test_unit "bitwise xor gadget" =
     test_xor "5a5a5a5a5a5a5a5a" "a5a5a5a5a5a5a5a5" "ffffffffffffffff" 64
   in
   let _cs =
-    test_xor ~cs:cs64 "f1f1f1f1f1f1f1f1" "0f0f0f0f0f0f0f0f" "fefefefefefefefe" 64
+    test_xor ~cs:cs64 "f1f1f1f1f1f1f1f1" "0f0f0f0f0f0f0f0f" "fefefefefefefefe"
+      64
   in
   let _cs =
-    test_xor ~cs:cs64 "cad1f05900fcad2f" "deadbeef010301db" "147c4eb601ffacf4" 64
+    test_xor ~cs:cs64 "cad1f05900fcad2f" "deadbeef010301db" "147c4eb601ffacf4"
+      64
   in
 
   (* Negatve tests *)
@@ -573,7 +569,8 @@ let%test_unit "bitwise xor gadget" =
   assert (Common.is_error (fun () -> test_xor ~cs:cs16 "1111" "2222" "0" 16)) ;
   assert (Common.is_error (fun () -> test_xor "0" "0" "0" 256)) ;
   assert (Common.is_error (fun () -> test_xor "0" "0" "0" (-4))) ;
-  assert (Common.is_error (fun () -> test_xor ~cs:cs32 "bb5c6" "edded" "ed1ed1" 20)) ;
+  assert (
+    Common.is_error (fun () -> test_xor ~cs:cs32 "bb5c6" "edded" "ed1ed1" 20) ) ;
   ()
 
 let%test_unit "bitwise and gadget" =
@@ -693,7 +690,10 @@ let%test_unit "bitwise not gadget" =
   let _cs = test_not ~cs "fffffffffffff000" "fff" 64 in
   let _cs = test_not ~cs "0" "ffffffffffffffff" 64 in
   let _cs = test_not ~cs "0" "ffffffffffffffff" 64 in
-  let _cs = test_not "3FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" "0" 254 in
+  let _cs =
+    test_not "3FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+      "0" 254
+  in
 
   (* Negative tests *)
   assert (
@@ -706,5 +706,9 @@ let%test_unit "bitwise not gadget" =
         test_not ~cs "1" "0" 1 ) ) ;
   assert (Common.is_error (fun () -> test_not "0" "0" 1)) ;
   assert (Common.is_error (fun () -> test_not "ff" "0" 4)) ;
-  assert (Common.is_error (fun () -> test_not "7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" "0" 255)) ;
+  assert (
+    Common.is_error (fun () ->
+        test_not
+          "7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" "0"
+          255 ) ) ;
   ()

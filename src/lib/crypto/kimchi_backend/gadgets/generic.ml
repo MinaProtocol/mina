@@ -82,8 +82,7 @@ let mul (type f)
 
   let neg_one = Field.Constant.(negate one) in
   (* Set up generic mul gate *)
-  with_label "generic_mul_gadget"
-    (fun () ->
+  with_label "generic_mul_gadget" (fun () ->
       assert_
         { annotation = Some __LOC__
         ; basic =
@@ -224,4 +223,4 @@ let%test_unit "generic gadgets" =
   assert (Common.is_error (fun () -> test_generic_mul ~cs 1 0 1)) ;
   assert (Common.is_error (fun () -> test_generic_mul ~cs 2 4 7)) ;
 
-    ()
+  ()

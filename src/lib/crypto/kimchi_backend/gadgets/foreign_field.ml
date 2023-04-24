@@ -1876,7 +1876,6 @@ let%test_unit "foreign_field arithmetics gadgets" =
       secp256k1_modulus
   in
 
-
   (* COMBINED TESTS *)
   let _cs =
     test_ff
