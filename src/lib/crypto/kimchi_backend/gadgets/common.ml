@@ -19,30 +19,9 @@ let limb_bits = 88
 (* Foreign field element limb size 2^L where L=88 *)
 let two_to_limb = Bignum_bigint.(pow (of_int 2) (of_int limb_bits))
 
-(* pad_upto - Pad a list with a value until it reaches a given length *)
-let pad_upto ~length ~value list =
-  let len = List.length list in
-  assert (len <= length) ;
-  let padding = List.init (length - len) ~f:(fun _ -> value) in
-  list @ padding
-
 (* Length of bigint in bits *)
 let bignum_bigint_bit_length (bigint : Bignum_bigint.t) : int =
   Z.log2up (Bignum_bigint.to_zarith_bigint bigint)
-
-(* Removes leading zero bits of a list of booleans (at least needs length 1) *)
-let rec rm_lead_zero_bits (bitstring : bool list) : bool list =
-  match bitstring with
-  | [] ->
-      [ false ]
-  | false :: x ->
-      rm_lead_zero_bits x
-  | _ ->
-      bitstring
-
-(* Removes leading zero bits of a list of booleans (least significant bit first) *)
-let bool_list_wo_zero_bits (bitstring : bool list) : bool list =
-  List.rev @@ rm_lead_zero_bits @@ List.rev @@ bitstring
 
 (* Conventions used in this interface
  *     1. Functions prefixed with "as_prover_" only happen during proving

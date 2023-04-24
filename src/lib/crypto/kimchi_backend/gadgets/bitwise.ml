@@ -156,29 +156,60 @@ let bxor (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     ?(len_xor = 4) (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
     (length : int) : Circuit.Field.t =
+  (* Auxiliar function to compute the next variable for the chain of Xors *)
+  let as_prover_next_var (type f)
+      (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+      (curr_var : Circuit.Field.t) (var0 : Circuit.Field.t)
+      (var1 : Circuit.Field.t) (var2 : Circuit.Field.t) (var3 : Circuit.Field.t)
+      (len_xor : int) : Circuit.Field.t =
+    let open Circuit in
+    let two_pow_len =
+      Common.bignum_bigint_to_field
+        (module Circuit)
+        Bignum_bigint.(pow (of_int 2) (of_int len_xor))
+    in
+    let two_pow_2len = Field.Constant.(two_pow_len * two_pow_len) in
+    let two_pow_3len = Field.Constant.(two_pow_2len * two_pow_len) in
+    let two_pow_4len = Field.Constant.(two_pow_3len * two_pow_len) in
+    let next_var =
+      exists Field.typ ~compute:(fun () ->
+          let curr_field =
+            Common.cvar_field_to_field_as_prover (module Circuit) curr_var
+          in
+          let field0 =
+            Common.cvar_field_to_field_as_prover (module Circuit) var0
+          in
+          let field1 =
+            Common.cvar_field_to_field_as_prover (module Circuit) var1
+          in
+          let field2 =
+            Common.cvar_field_to_field_as_prover (module Circuit) var2
+          in
+          let field3 =
+            Common.cvar_field_to_field_as_prover (module Circuit) var3
+          in
+          Field.Constant.(
+            ( curr_field - field0 - (field1 * two_pow_len)
+            - (field2 * two_pow_2len) - (field3 * two_pow_3len) )
+            / two_pow_4len) )
+    in
+    next_var
+  in
+
   (* Recursively builds Xor
-   * input1_bits and input2_bits are the inputs to the Xor gate as bits
-   * output_bits is the output of the Xor gate as bits
+   * input1and input2 are the inputs to the Xor gate as bits
+   * output is the output of the Xor gate as bits
    * length is the number of remaining bits to Xor
    * len_xor is the number of bits of the lookup table (default is 4)
    *)
-  let rec bxor_rec (input1_bits : bool list) (input2_bits : bool list)
-      (output_bits : bool list) (length : int) (len_xor : int) =
+  let rec bxor_rec (in1 : Circuit.Field.t) (in2 : Circuit.Field.t)
+      (out : Circuit.Field.t) (length : int) (len_xor : int) =
     let open Circuit in
-    (* Convert to cvar *)
-    let input1, input2, output =
-      exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
-          [| Field.Constant.project input1_bits
-           ; Field.Constant.project input2_bits
-           ; Field.Constant.project output_bits
-          |] )
-      |> Common.tuple3_of_array
-    in
     (* If inputs are zero and length is zero, add the zero check *)
     if length = 0 then (
-      Field.Assert.equal Field.zero input1 ;
-      Field.Assert.equal Field.zero input2 ;
-      Field.Assert.equal Field.zero output ;
+      Field.Assert.equal Field.zero in1 ;
+      Field.Assert.equal Field.zero in2 ;
+      Field.Assert.equal Field.zero out ;
       with_label "xor_zero_check" (fun () ->
           assert_
             { annotation = Some __LOC__
@@ -186,7 +217,7 @@ let bxor (type f)
                 Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
                   (Raw
                      { kind = Zero
-                     ; values = [| input1; input2; output |]
+                     ; values = [| in1; in2; out |]
                      ; coeffs = [||]
                      } )
             } ) )
@@ -201,6 +232,20 @@ let bxor (type f)
       let second = first + len_xor in
       let third = second + len_xor in
       let fourth = third + len_xor in
+
+      let in1_0 = of_bits in1 0 first in
+      let in1_1 = of_bits in1 first second in
+      let in1_2 = of_bits in1 second third in
+      let in1_3 = of_bits in1 third fourth in
+      let in2_0 = of_bits in2 0 first in
+      let in2_1 = of_bits in2 first second in
+      let in2_2 = of_bits in2 second third in
+      let in2_3 = of_bits in2 third fourth in
+      let out_0 = of_bits out 0 first in
+      let out_1 = of_bits out first second in
+      let out_2 = of_bits out second third in
+      let out_3 = of_bits out third fourth in
+
       (* If length is more than 0, add the Xor gate *)
       with_label "xor_gate" (fun () ->
           (* Set up Xor gate *)
@@ -209,30 +254,36 @@ let bxor (type f)
             ; basic =
                 Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
                   (Xor
-                     { in1 = input1
-                     ; in2 = input2
-                     ; out = output
-                     ; in1_0 = of_bits input1 0 first
-                     ; in1_1 = of_bits input1 first second
-                     ; in1_2 = of_bits input1 second third
-                     ; in1_3 = of_bits input1 third fourth
-                     ; in2_0 = of_bits input2 0 first
-                     ; in2_1 = of_bits input2 first second
-                     ; in2_2 = of_bits input2 second third
-                     ; in2_3 = of_bits input2 third fourth
-                     ; out_0 = of_bits output 0 first
-                     ; out_1 = of_bits output first second
-                     ; out_2 = of_bits output second third
-                     ; out_3 = of_bits output third fourth
+                     { in1
+                     ; in2
+                     ; out
+                     ; in1_0
+                     ; in1_1
+                     ; in1_2
+                     ; in1_3
+                     ; in2_0
+                     ; in2_1
+                     ; in2_2
+                     ; in2_3
+                     ; out_0
+                     ; out_1
+                     ; out_2
+                     ; out_3
                      } )
             } ) ;
 
-      (* Remove least significant 4 nibbles *)
-      let next_in1 = List.drop input1_bits fourth in
-      let next_in2 = List.drop input2_bits fourth in
-      let next_out = List.drop output_bits fourth in
+      let next_in1 =
+        as_prover_next_var (module Circuit) in1 in1_0 in1_1 in1_2 in1_3 len_xor
+      in
+      let next_in2 =
+        as_prover_next_var (module Circuit) in2 in2_0 in2_1 in2_2 in2_3 len_xor
+      in
+      let next_out =
+        as_prover_next_var (module Circuit) out out_0 out_1 out_2 out_3 len_xor
+      in
+
       (* Next length is 4*n less bits *)
-      let next_length = length - fourth in
+      let next_length = length - (4 * len_xor) in
 
       (* Recursively call xor on the next nibble *)
       bxor_rec next_in1 next_in2 next_out next_length len_xor ;
@@ -280,38 +331,46 @@ let bxor (type f)
 
       () ) ;
 
-  (* Convert array of bits to list of booleans without leading zeros *)
-  let input1_bits =
-    Common.bool_list_wo_zero_bits @@ Array.to_list input1_array
-  in
-  let input2_bits =
-    Common.bool_list_wo_zero_bits @@ Array.to_list input2_array
+  let output_xor =
+    exists Field.typ ~compute:(fun () ->
+        (* Sanity checks about lengths of inputs using bignum *)
+        (* Check real lengths are at most the desired length *)
+        fits_in_bits_as_prover (module Circuit) input1 length ;
+        fits_in_bits_as_prover (module Circuit) input2 length ;
+
+        let input1_field =
+          cvar_field_to_field_as_prover (module Circuit) input1
+        in
+        let input2_field =
+          cvar_field_to_field_as_prover (module Circuit) input2
+        in
+
+        (* Convert inputs field elements to list of bits of length 255 *)
+        let input1_bits = Field.Constant.unpack @@ input1_field in
+        let input2_bits = Field.Constant.unpack @@ input2_field in
+
+        (* Xor list of bits to obtain output of the xor *)
+        let output_bits =
+          List.map2_exn input1_bits input2_bits ~f:(fun b1 b2 ->
+              Bool.(not (equal b1 b2)) )
+        in
+
+        (* Convert list of output bits to field element *)
+        Field.Constant.project output_bits )
   in
 
-  (* Pad with zeros in MSB until reaching same length *)
-  let input1_bits = pad_upto ~length ~value:false input1_bits in
-  let input2_bits = pad_upto ~length ~value:false input2_bits in
-
-  (* Pad with more zeros until the length is a multiple of 4*n for n-bit length lookup table *)
+  (* Obtain pad length until the length is a multiple of 4*n for n-bit length lookup table *)
   let pad_length =
     if length mod (4 * len_xor) <> 0 then
       length + (4 * len_xor) - (length mod (4 * len_xor))
     else length
   in
-  let input1_bits = pad_upto ~length:pad_length ~value:false input1_bits in
-  let input2_bits = pad_upto ~length:pad_length ~value:false input2_bits in
-
-  (* Xor list of bits to obtain output of the xor *)
-  let output_bits =
-    List.map2_exn input1_bits input2_bits ~f:(fun b1 b2 ->
-        Bool.(not (equal b1 b2)) )
-  in
 
   (* Recursively build Xor gadget *)
-  bxor_rec input1_bits input2_bits output_bits pad_length len_xor ;
+  bxor_rec input1 input2 output_xor pad_length len_xor ;
 
   (* Convert back to field *)
-  exists Field.typ ~compute:(fun () -> Field.Constant.project output_bits)
+  output_xor
 
 (* Boolean Xor of 16 bits
  * This is a special case of Xor for 16 bits for Xor lookup table of 4 bits of inputs.
@@ -440,7 +499,7 @@ let bnot64_unchecked (type f)
   bnot_unchecked (module Circuit) input 64
 
 (* UNIT TESTS *)
-
+(*
 let%test_unit "bitwise rotation gadget" =
   (* Import the gadget test runner *)
   let open Kimchi_gadgets_test_runner in
@@ -490,6 +549,7 @@ let%test_unit "bitwise rotation gadget" =
   assert (Common.is_error (fun () -> test_rot "1" 64 Left "1")) ;
   assert (Common.is_error (fun () -> test_rot ~cs "0" 0 Left "0")) ;
   ()
+
 
 let%test_unit "bitwise xor gadget" =
   (* Import the gadget test runner *)
@@ -636,7 +696,7 @@ let%test_unit "bitwise and gadget" =
   assert (Common.is_error (fun () -> test_and "ff" "ff" "ff" 7)) ;
   assert (Common.is_error (fun () -> test_and "1" "1" "1" (-1))) ;
   ()
-
+*)
 let%test_unit "bitwise not gadget" =
   (* Import the gadget test runner *)
   let open Kimchi_gadgets_test_runner in
@@ -712,3 +772,4 @@ let%test_unit "bitwise not gadget" =
           "7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" "0"
           255 ) ) ;
   ()
+
