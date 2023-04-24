@@ -3114,6 +3114,9 @@ module Types = struct
           ; duration_in_minutes : int
           ; memo_prefix : string
           ; no_precondition : bool
+          ; min_balance_change : string
+          ; max_balance_change : string
+          ; init_balance : string
           }
 
         let arg_typ =
@@ -3121,7 +3124,8 @@ module Types = struct
             ~doc:"Keys and other information for scheduling zkapp commands"
             ~coerce:(fun fee_payers num_zkapps_to_deploy num_new_accounts
                          transactions_per_second duration_in_minutes memo_prefix
-                         no_precondition ->
+                         no_precondition min_balance_change max_balance_change
+                         init_balance ->
               Result.return
                 { fee_payers
                 ; num_zkapps_to_deploy
@@ -3130,11 +3134,15 @@ module Types = struct
                 ; duration_in_minutes
                 ; memo_prefix
                 ; no_precondition
+                ; min_balance_change
+                ; max_balance_change
+                ; init_balance
                 } )
             ~split:(fun f (t : input) ->
               f t.fee_payers t.num_zkapps_to_deploy t.num_new_accounts
                 t.transactions_per_second t.duration_in_minutes t.memo_prefix
-                t.no_precondition )
+                t.no_precondition t.min_balance_change t.max_balance_change
+                t.init_balance )
             ~fields:
               Arg.
                 [ arg "feePayers"
@@ -3144,7 +3152,7 @@ module Types = struct
                        the account creators)"
                 ; arg "numZkappsToDeploy" ~typ:(non_null int)
                     ~doc:
-                      "Number of zkapp accounts that we deploy for the purpose \
+                      "Number of zkApp accounts that we deploy for the purpose \
                        of test"
                 ; arg "numNewAccounts" ~typ:(non_null int)
                     ~doc:
@@ -3158,6 +3166,14 @@ module Types = struct
                 ; arg "noPrecondition"
                     ~doc:"Disable the precondition in account updates"
                     ~typ:(non_null bool)
+                ; arg "minBalanceChange" ~doc:"Minimum balance change"
+                    ~typ:(non_null string)
+                ; arg "maxBalanceChange" ~doc:"Maximum balance change"
+                    ~typ:(non_null string)
+                ; arg "initBalance" ~typ:(non_null string)
+                    ~doc:
+                      "Initial balance for zkApp accounts that we deploy for \
+                       the purpose of test"
                 ]
       end
     end
@@ -4413,7 +4429,7 @@ module Mutations = struct
     let account_of_kp (kp : Signature_lib.Keypair.t) ledger =
       account_of_id (id_of_kp kp) ledger
 
-    let deploy_zkapps ~mina ~ledger
+    let deploy_zkapps ~mina ~ledger ~init_balance
         ~(fee_payer_array : Signature_lib.Keypair.t Array.t)
         ~constraint_constants ~logger ~memo_prefix keypairs =
       let fee_payer_accounts =
@@ -4432,7 +4448,7 @@ module Mutations = struct
                 (fee_payer_keypair, !(fee_payer_nonces.(!ndx)))
             ; fee = Currency.Fee.of_mina_string_exn "1.0"
             ; fee_payer = None
-            ; amount = Currency.Amount.of_mina_string_exn "20000.0"
+            ; amount = Currency.Amount.of_mina_string_exn init_balance
             ; zkapp_account_keypairs = [ kp ]
             ; memo = Signed_command_memo.create_from_string_exn memo
             ; new_zkapp_account = true
@@ -4483,7 +4499,7 @@ module Mutations = struct
       |> List.for_all ~f:Fn.id
 
     let rec wait_until_zkapps_deployed ?(deployed = false) ~mina ~ledger
-        ~(fee_payer_array : Signature_lib.Keypair.t Array.t)
+        ~init_balance ~(fee_payer_array : Signature_lib.Keypair.t Array.t)
         ~constraint_constants ~logger ~uuid ~stop_signal ~stop_time ~memo_prefix
         (keypairs : Signature_lib.Keypair.t list) =
       if Time.( >= ) (Time.now ()) stop_time then (
@@ -4503,8 +4519,8 @@ module Mutations = struct
         let%bind () =
           if not deployed then (
             [%log info] "Start deploying zkApp accounts" ;
-            deploy_zkapps ~mina ~ledger ~fee_payer_array ~constraint_constants
-              ~logger ~memo_prefix keypairs )
+            deploy_zkapps ~mina ~ledger ~init_balance ~fee_payer_array
+              ~constraint_constants ~logger ~memo_prefix keypairs )
           else return ()
         in
         [%log debug] "The accounts were not in the best tip $ledger, try again"
@@ -4522,9 +4538,9 @@ module Mutations = struct
           |> Option.value_map ~default:ledger ~f:(fun (new_ledger, _) ->
                  new_ledger )
         in
-        wait_until_zkapps_deployed ~deployed:true ~mina ~ledger ~fee_payer_array
-          ~constraint_constants ~logger ~uuid ~stop_signal ~stop_time
-          ~memo_prefix keypairs
+        wait_until_zkapps_deployed ~deployed:true ~mina ~ledger ~init_balance
+          ~fee_payer_array ~constraint_constants ~logger ~uuid ~stop_signal
+          ~stop_time ~memo_prefix keypairs
 
     let schedule_zkapp_commands =
       io_field "scheduleZkappCommands"
@@ -4619,8 +4635,11 @@ module Mutations = struct
                                 (Public_key.compress public_key, private_key) )
                             |> Public_key.Compressed.Map.of_alist_exn
                           in
-                          let rec go ~vk ~prover account_state_tbl ndx tm_next
-                              counter =
+                          let `VK vk, `Prover prover =
+                            Transaction_snark.For_tests.create_trivial_snapp
+                              ~constraint_constants ()
+                          in
+                          let rec go account_state_tbl ndx tm_next counter =
                             if Time.( >= ) (Time.now ()) tm_end then (
                               [%log info]
                                 "Scheduled zkApp commands with handle %s has \
@@ -4685,6 +4704,11 @@ module Mutations = struct
                                            ~no_account_precondition:
                                              zkapp_command_details
                                                .no_precondition
+                                           ~balance_change_range:
+                                             ( zkapp_command_details
+                                                 .min_balance_change
+                                             , zkapp_command_details
+                                                 .max_balance_change )
                                            ~ignore_sequence_events_precond:true
                                            ~no_token_accounts:true ~limited:true
                                            ~fee_payer_keypair:fee_payer ~keymap
@@ -4723,12 +4747,13 @@ module Mutations = struct
                               in
                               let%bind () = Async_unix.at tm_next in
                               let next_tm_next = Time.add tm_next wait_span in
-                              go ~vk ~prover account_state_tbl
+                              go account_state_tbl
                                 ((ndx + 1) mod num_fee_payers)
                                 next_tm_next (counter + 1)
                           in
                           upon
                             (wait_until_zkapps_deployed ~mina ~ledger
+                               ~init_balance:zkapp_command_details.init_balance
                                ~fee_payer_array ~constraint_constants
                                zkapp_account_keypairs ~logger ~uuid
                                ~stop_signal:ivar ~stop_time:tm_end
@@ -4748,17 +4773,11 @@ module Mutations = struct
                                       @ get_account zkapp_account_ids
                                           `Ordinary_participant )
                                   in
-                                  let `VK vk, `Prover prover =
-                                    Transaction_snark.For_tests
-                                    .create_trivial_snapp ~constraint_constants
-                                      ()
-                                  in
                                   let tm_next =
                                     Time.add (Time.now ()) wait_span
                                   in
                                   don't_wait_for
-                                  @@ go account_state_tbl ~vk ~prover 0 tm_next
-                                       0 ) ;
+                                  @@ go account_state_tbl 0 tm_next 0 ) ;
 
                           Ok (Uuid.to_string uuid) ) ) )
 
