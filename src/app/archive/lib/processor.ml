@@ -94,36 +94,68 @@ module Token = struct
   let find_opt (module Conn : CONNECTION) =
     make_finder Conn.find_opt Caqti_request.find_opt
 
+  let find_no_owner_opt (module Conn : CONNECTION) token_id =
+    let value = Token_id.to_string token_id in
+    Conn.find_opt
+      (Caqti_request.find_opt Caqti_type.string Caqti_type.int
+         {sql| SELECT id
+               FROM tokens
+               WHERE value = $1
+               AND owner_public_key_id IS NULL
+               AND owner_token_id IS NULL
+         |sql} )
+      value
+
+  let set_owner (module Conn : CONNECTION) ~id ~owner_public_key_id
+      ~owner_token_id =
+    Conn.find
+      (Caqti_request.find
+         Caqti_type.(tup3 int int int)
+         Caqti_type.int
+         {sql| UPDATE tokens
+               SET owner_public_key_id = $2, owner_token_id = $3
+               WHERE id = $1
+               RETURNING id
+         |sql} )
+      (id, owner_public_key_id, owner_token_id)
+
   let add_if_doesn't_exist (module Conn : CONNECTION) token_id =
     let open Deferred.Result.Let_syntax in
-    let value = Token_id.(to_string token_id) in
+    let value = Token_id.to_string token_id in
     match Token_owners.find_owner token_id with
     | None ->
-        assert (Token_id.(equal default) token_id) ;
+        (* not necessarily the default token *)
         Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
           ~table_name ~cols:(Fields.names, typ)
           (module Conn)
           { value; owner_public_key_id = None; owner_token_id = None }
-    | Some acct_id ->
+    | Some acct_id -> (
         assert (not @@ Token_id.(equal default) token_id) ;
+        assert (
+          Token_id.equal (Account_id.derive_token_id ~owner:acct_id) token_id ) ;
         (* we can only add this token if its owner exists
            that means if we add several tokens in a block,
            we must add them in topologically sorted order
         *)
         let%bind owner_public_key_id =
           let owner_pk = Account_id.public_key acct_id in
-          let%map id = Public_key.add_if_doesn't_exist (module Conn) owner_pk in
-          Some id
+          Public_key.add_if_doesn't_exist (module Conn) owner_pk
         in
         let%bind owner_token_id =
           let owner_tid = Account_id.token_id acct_id in
-          let%map id = find (module Conn) owner_tid in
-          Some id
+          find (module Conn) owner_tid
         in
-        Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-          ~table_name ~cols:(Fields.names, typ)
-          (module Conn)
-          { value; owner_public_key_id; owner_token_id }
+        match%bind find_no_owner_opt (module Conn) token_id with
+        | Some id ->
+            (* existing entry, no owner *)
+            set_owner (module Conn) ~id ~owner_public_key_id ~owner_token_id
+        | None ->
+            let owner_public_key_id = Some owner_public_key_id in
+            let owner_token_id = Some owner_token_id in
+            Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+              ~table_name ~cols:(Fields.names, typ)
+              (module Conn)
+              { value; owner_public_key_id; owner_token_id } )
 end
 
 module Voting_for = struct
@@ -2671,6 +2703,37 @@ module Accounts_created = struct
       block_id
 end
 
+module Protocol_versions = struct
+  type t = { major : int; minor : int; patch : int } [@@deriving hlist, fields]
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ int; int; int ]
+
+  let table_name = "protocol_versions"
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~major ~minor ~patch =
+    let t = { major; minor; patch } in
+    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
+      ~table_name ~cols:(Fields.names, typ)
+      (module Conn)
+      t
+
+  let find (module Conn : CONNECTION) ~major ~minor ~patch =
+    Conn.find
+      (Caqti_request.find
+         Caqti_type.(tup3 int int int)
+         Caqti_type.int
+         (Mina_caqti.select_cols ~select:"id" ~table_name ~cols:Fields.names ()) )
+      (major, minor, patch)
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
+      id
+end
+
 module Block = struct
   type t =
     { state_hash : string
@@ -2689,6 +2752,8 @@ module Block = struct
     ; height : int64
     ; global_slot_since_hard_fork : int64
     ; global_slot_since_genesis : int64
+    ; protocol_version_id : int
+    ; proposed_protocol_version_id : int option
     ; timestamp : string
     ; chain_status : string
     }
@@ -2713,6 +2778,8 @@ module Block = struct
         ; int64
         ; int64
         ; int64
+        ; int
+        ; option int
         ; string
         ; string
         ]
@@ -2737,7 +2804,8 @@ module Block = struct
       id
 
   let add_parts_if_doesn't_exist (module Conn : CONNECTION)
-      ~constraint_constants ~protocol_state ~staged_ledger_diff ~hash =
+      ~constraint_constants ~protocol_state ~staged_ledger_diff
+      ~protocol_version ~proposed_protocol_version ~hash =
     let open Deferred.Result.Let_syntax in
     match%bind find_opt (module Conn) ~state_hash:hash with
     | Some block_id ->
@@ -2804,6 +2872,27 @@ module Block = struct
           Consensus.Data.Consensus_state.curr_global_slot consensus_state
           |> Unsigned.UInt32.to_int64
         in
+        let%bind protocol_version_id =
+          let major = Protocol_version.major protocol_version in
+          let minor = Protocol_version.minor protocol_version in
+          let patch = Protocol_version.patch protocol_version in
+          Protocol_versions.add_if_doesn't_exist
+            (module Conn)
+            ~major ~minor ~patch
+        in
+        let%bind proposed_protocol_version_id =
+          Option.value_map proposed_protocol_version ~default:(return None)
+            ~f:(fun ppv ->
+              let major = Protocol_version.major ppv in
+              let minor = Protocol_version.minor ppv in
+              let patch = Protocol_version.patch ppv in
+              let%map id =
+                Protocol_versions.add_if_doesn't_exist
+                  (module Conn)
+                  ~major ~minor ~patch
+              in
+              Some id )
+        in
         let chain_status =
           if Int64.equal global_slot_since_hard_fork 0L then
             (* at-launch genesis block, or genesis block at hard fork *)
@@ -2858,6 +2947,8 @@ module Block = struct
                 consensus_state
                 |> Consensus.Data.Consensus_state.global_slot_since_genesis
                 |> Unsigned.UInt32.to_int64
+            ; protocol_version_id
+            ; proposed_protocol_version_id
             ; timestamp =
                 blockchain_state |> Blockchain_state.timestamp
                 |> Block_time.to_string_exn
@@ -3111,11 +3202,16 @@ module Block = struct
     add_parts_if_doesn't_exist conn ~constraint_constants
       ~protocol_state:(Header.protocol_state @@ Mina_block.header t)
       ~staged_ledger_diff:(Body.staged_ledger_diff @@ Mina_block.body t)
+      ~protocol_version:(Header.current_protocol_version @@ Mina_block.header t)
+      ~proposed_protocol_version:
+        (Header.proposed_protocol_version_opt @@ Mina_block.header t)
       ~hash
 
   let add_from_precomputed conn ~constraint_constants (t : Precomputed.t) =
     add_parts_if_doesn't_exist conn ~constraint_constants
       ~protocol_state:t.protocol_state ~staged_ledger_diff:t.staged_ledger_diff
+      ~protocol_version:t.protocol_version
+      ~proposed_protocol_version:t.proposed_protocol_version
       ~hash:(Protocol_state.hashes t.protocol_state).state_hash
 
   let add_from_extensional (module Conn : CONNECTION)
@@ -3152,6 +3248,27 @@ module Block = struct
           let%bind next_epoch_data_id =
             Epoch_data.add_if_doesn't_exist (module Conn) block.next_epoch_data
           in
+          let%bind protocol_version_id =
+            let major = Protocol_version.major block.protocol_version in
+            let minor = Protocol_version.minor block.protocol_version in
+            let patch = Protocol_version.patch block.protocol_version in
+            Protocol_versions.add_if_doesn't_exist
+              (module Conn)
+              ~major ~minor ~patch
+          in
+          let%bind proposed_protocol_version_id =
+            Option.value_map block.proposed_protocol_version
+              ~default:(return None) ~f:(fun ppv ->
+                let major = Protocol_version.major ppv in
+                let minor = Protocol_version.minor ppv in
+                let patch = Protocol_version.patch ppv in
+                let%map id =
+                  Protocol_versions.add_if_doesn't_exist
+                    (module Conn)
+                    ~major ~minor ~patch
+                in
+                Some id )
+          in
           Conn.find
             (Caqti_request.find typ Caqti_type.int
                {sql| INSERT INTO blocks
@@ -3160,9 +3277,11 @@ module Block = struct
                       snarked_ledger_hash_id, staking_epoch_data_id,
                       next_epoch_data_id,
                       min_window_density, sub_window_densities, total_currency,
-                      ledger_hash, height, global_slot_since_hard_fork,
-                      global_slot_since_genesis, timestamp, chain_status)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::bigint[], ?, ?, ?, ?, ?, ?::chain_status_type)
+                      ledger_hash, height,
+                      global_slot_since_hard_fork, global_slot_since_genesis,
+                      protocol_version, proposed_protocol_version,
+                      timestamp, chain_status)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::bigint[], ?, ?, ?, ?, ?, ?, ?, ?, ?::chain_status_type)
                      RETURNING id
                |sql} )
             { state_hash = block.state_hash |> State_hash.to_base58_check
@@ -3190,6 +3309,8 @@ module Block = struct
                 block.global_slot_since_hard_fork |> Unsigned.UInt32.to_int64
             ; global_slot_since_genesis =
                 block.global_slot_since_genesis |> Unsigned.UInt32.to_int64
+            ; protocol_version_id
+            ; proposed_protocol_version_id
             ; timestamp = Block_time.to_string_exn block.timestamp
             ; chain_status = Chain_status.to_string block.chain_status
             }
@@ -3319,25 +3440,25 @@ module Block = struct
       (parent_id, State_hash.to_base58_check parent_hash)
 
   let get_subchain (module Conn : CONNECTION) ~start_block_id ~end_block_id =
+    (* derive query from type `t` *)
+    let concat = String.concat ~sep:"," in
+    let columns_with_id = concat ("id" :: Fields.names) in
+    let b_columns_with_id =
+      concat (List.map ("id" :: Fields.names) ~f:(fun s -> "b." ^ s))
+    in
+    let columns = concat Fields.names in
     Conn.collect_list
       (Caqti_request.collect
          Caqti_type.(tup2 int int)
          typ
-         {sql| WITH RECURSIVE chain AS (
-              SELECT id,state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,
-                     staking_epoch_data_id,next_epoch_data_id,
-                     min_window_density,total_currency,
-                     ledger_hash,height,global_slot_since_hard_fork,global_slot_since_genesis,
-                     timestamp,chain_status
+         (sprintf
+            {sql| WITH RECURSIVE chain AS (
+              SELECT %s
               FROM blocks b WHERE b.id = $1
 
               UNION ALL
 
-              SELECT b.id,b.state_hash,b.parent_id,b.parent_hash,b.creator_id,b.block_winner_id,b.snarked_ledger_hash_id,
-                     b.staking_epoch_data_id,b.next_epoch_data_id,
-                     b.min_window_density,b.total_currency,
-                     b.ledger_hash,b.height,b.global_slot_since_hard_fork,b.global_slot_since_genesis,
-                     b.timestamp,b.chain_status
+              SELECT %s
               FROM blocks b
 
               INNER JOIN chain
@@ -3346,14 +3467,10 @@ module Block = struct
 
            )
 
-           SELECT state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,
-                  staking_epoch_data_id, next_epoch_data_id,
-                  min_window_density, total_currency,
-                  ledger_hash,height,
-                  global_slot_since_hard_fork,global_slot_since_genesis,
-                  timestamp,chain_status
+           SELECT %s
            FROM chain ORDER BY height ASC
-      |sql} )
+         |sql}
+            columns_with_id b_columns_with_id columns ) )
       (end_block_id, start_block_id)
 
   let get_highest_canonical_block_opt (module Conn : CONNECTION) =

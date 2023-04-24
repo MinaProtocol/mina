@@ -367,7 +367,7 @@ module T = struct
       in
       partial_txn
     in
-    let%bind first_pass_ledger_target =
+    let%bind (`First_pass_ledger_hash first_pass_ledger_target) =
       Scan_state.get_staged_ledger_async
         ~async_batch_size:transaction_application_scheduler_batch_size
         ~ledger:snarked_ledger ~get_protocol_state:get_state ~apply_first_pass
@@ -2657,13 +2657,21 @@ let%test_module "staged ledger tests" =
                 Ledger.Maskable.register_mask casted
                   (Ledger.Mask.create ~depth:(Ledger.depth snarked_ledger) ())
               in
-              let%map _first_pass_ledger_target =
-                Scan_state.get_staged_ledger_async
-                  ~async_batch_size:transaction_application_scheduler_batch_size
-                  ~ledger:sl_of_snarked_ledger ~get_protocol_state:get_state
-                  ~apply_first_pass ~apply_second_pass
-                  ~apply_first_pass_sparse_ledger !sl.scan_state
+              let expected_staged_ledger_merkle_root =
+                Ledger.merkle_root !sl.ledger
               in
+              let%map construction_result =
+                Sl.of_scan_state_pending_coinbases_and_snarked_ledger ~logger
+                  ~snarked_local_state:
+                    Mina_state.(
+                      Protocol_state.blockchain_state current_state
+                      |> Blockchain_state.snarked_local_state)
+                  ~verifier ~constraint_constants ~scan_state:!sl.scan_state
+                  ~snarked_ledger:sl_of_snarked_ledger
+                  ~expected_merkle_root:expected_staged_ledger_merkle_root
+                  ~pending_coinbases:!sl.pending_coinbase_collection ~get_state
+              in
+              let _result = Or_error.ok_exn construction_result in
               [%test_eq: Ledger_hash.t]
                 (Ledger.merkle_root sl_of_snarked_ledger)
                 (Ledger.merkle_root !sl.ledger) ;
