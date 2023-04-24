@@ -505,6 +505,15 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
             (Staged_ledger.scan_state
                (Breadcrumb.staged_ledger new_root_node.breadcrumb) )
           : unit Or_error.t ) ;
+      (*Check that the new snarked ledger is as expected*)
+      let new_snarked_ledger_hash = Ledger.merkle_root mt in
+      let expected_snarked_ledger_hash =
+        Breadcrumb.protocol_state new_root_node.breadcrumb
+        |> Protocol_state.blockchain_state
+        |> Blockchain_state.snarked_ledger_hash
+      in
+      assert (
+        Ledger_hash.equal new_snarked_ledger_hash expected_snarked_ledger_hash ) ;
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)

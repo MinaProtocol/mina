@@ -484,6 +484,8 @@ module type Full = sig
 
       val sub_or_zero : var -> var -> var Checked.t
 
+      val sub_amount_or_zero : var -> Amount.var -> var Checked.t
+
       val ( + ) : var -> Amount.var -> var Checked.t
 
       val ( - ) : var -> Amount.var -> var Checked.t
