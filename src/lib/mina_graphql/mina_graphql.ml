@@ -556,6 +556,27 @@ module Types = struct
               ~doc:"Sequence number for the signer of the auth query"
               ~typ:(non_null uint16)
               ~resolve:(fun _ (_, n) -> n)
+          ; field "libp2pPort"
+              ~args:Arg.[]
+              ~doc:"Libp2p port" ~typ:(non_null uint16)
+              ~resolve:(fun { ctx = _, mina; _ } _ ->
+                Mina_lib.config mina
+                |> fun Mina_lib.Config.{ gossip_net_params; _ } ->
+                gossip_net_params.addrs_and_ports.libp2p_port
+                |> Unsigned.UInt16.of_int )
+          ; field "peerId"
+              ~args:Arg.[]
+              ~doc:"Peer id" ~typ:(non_null string)
+              ~resolve:(fun { ctx = _, mina; _ } _ ->
+                Mina_lib.config mina
+                |> fun Mina_lib.Config.{ gossip_net_params; _ } ->
+                Mina_net2.Keypair.to_peer_id gossip_net_params.keypair )
+          ; field "isBlockProducer"
+              ~args:Arg.[]
+              ~doc:"Is the node a block producer" ~typ:(non_null bool)
+              ~resolve:(fun { ctx = _, mina; _ } _ ->
+                let bp_keys = Mina_lib.block_production_pubkeys mina in
+                not (Public_key.Compressed.Set.is_empty bp_keys) )
           ] )
   end
 
@@ -3024,17 +3045,19 @@ module Types = struct
     end
 
     module SetConnectionGatingConfigInput = struct
-      type input = Mina_net2.connection_gating
+      type input =
+        Mina_net2.connection_gating * [ `Clean_added_peers of bool option ]
 
       let arg_typ =
         obj "SetConnectionGatingConfigInput"
-          ~coerce:(fun trusted_peers banned_peers isolate ->
+          ~coerce:(fun trusted_peers banned_peers isolate clean_added_peers ->
             let open Result.Let_syntax in
             let%bind trusted_peers = Result.all trusted_peers in
             let%map banned_peers = Result.all banned_peers in
-            Mina_net2.{ isolate; trusted_peers; banned_peers } )
-          ~split:(fun f (t : input) ->
-            f t.trusted_peers t.banned_peers t.isolate )
+            ( Mina_net2.{ isolate; trusted_peers; banned_peers }
+            , `Clean_added_peers clean_added_peers ) )
+          ~split:(fun f ((t, `Clean_added_peers clean_added_peers) : input) ->
+            f t.trusted_peers t.banned_peers t.isolate clean_added_peers )
           ~fields:
             Arg.
               [ arg "trustedPeers"
@@ -3049,6 +3072,10 @@ module Types = struct
                   ~doc:
                     "If true, no connections will be allowed unless they are \
                      from a trusted peer"
+              ; arg "cleanAddedPeers" ~typ:bool
+                  ~doc:
+                    "If true, resets added peers to an empty list (including \
+                     seeds)"
               ]
     end
 
@@ -3185,6 +3212,55 @@ module Types = struct
                 ; arg "deploymentFee"
                     ~doc:"Fee for the initial deployment of zkApp accounts"
                     ~typ:(non_null string)
+                ]
+      end
+
+      module GatingUpdate = struct
+        type input =
+          { trusted_peers : Network_peer.Peer.t list
+          ; banned_peers : Network_peer.Peer.t list
+          ; isolate : bool
+          ; clean_added_peers : bool
+          ; added_peers : Network_peer.Peer.t list
+          }
+
+        let arg_typ =
+          obj "GatingUpdate" ~doc:"Update to gating config and added peers"
+            ~coerce:(fun trusted_peers banned_peers isolate clean_added_peers
+                         added_peers ->
+              let%bind.Result trusted_peers = Result.all trusted_peers in
+              let%bind.Result banned_peers = Result.all banned_peers in
+              let%map.Result added_peers = Result.all added_peers in
+              { trusted_peers
+              ; banned_peers
+              ; isolate
+              ; clean_added_peers
+              ; added_peers
+              } )
+            ~split:(fun f (t : input) ->
+              f t.trusted_peers t.banned_peers t.isolate t.clean_added_peers
+                t.added_peers )
+            ~fields:
+              Arg.
+                [ arg "trustedPeers"
+                    ~typ:(non_null (list (non_null NetworkPeer.arg_typ)))
+                    ~doc:"Peers we will always allow connections from"
+                ; arg "bannedPeers"
+                    ~typ:(non_null (list (non_null NetworkPeer.arg_typ)))
+                    ~doc:
+                      "Peers we will never allow connections from (unless they \
+                       are also trusted!)"
+                ; arg "isolate" ~typ:(non_null bool)
+                    ~doc:
+                      "If true, no connections will be allowed unless they are \
+                       from a trusted peer"
+                ; arg "cleanAddedPeers" ~typ:(non_null bool)
+                    ~doc:
+                      "If true, resets added peers to an empty list (including \
+                       seeds)"
+                ; arg "addedPeers"
+                    ~typ:(non_null (list (non_null NetworkPeer.arg_typ)))
+                    ~doc:"Peers to connect to"
                 ]
       end
     end
@@ -4091,9 +4167,12 @@ module Mutations = struct
       ~typ:(non_null Types.Payload.set_connection_gating_config)
       ~resolve:(fun { ctx = mina; _ } () config ->
         let open Deferred.Result.Let_syntax in
-        let%bind config = Deferred.return config in
+        let%bind config, `Clean_added_peers clean_added_peers =
+          Deferred.return config
+        in
         let open Deferred.Let_syntax in
-        Mina_networking.set_connection_gating_config (Mina_lib.net mina) config
+        Mina_networking.set_connection_gating_config ?clean_added_peers
+          (Mina_lib.net mina) config
         >>| Result.return )
 
   let add_peer =
@@ -4837,10 +4916,79 @@ module Mutations = struct
                    (sprintf "Not a valid scheduled transactions handle: %s"
                       handle ) )
 
+    let update_gating =
+      io_field "updateGating"
+        ~args:
+          Arg.
+            [ arg "input" ~doc:"Gating update"
+                ~typ:(non_null Types.Input.Itn.GatingUpdate.arg_typ)
+            ]
+        ~typ:(non_null string)
+        ~resolve:(fun { ctx = with_seq_no, mina; _ } () input ->
+          if not with_seq_no then return @@ Error "Missing sequence information"
+          else
+            let%bind.Deferred.Result { trusted_peers
+                                     ; banned_peers
+                                     ; isolate
+                                     ; clean_added_peers
+                                     ; added_peers
+                                     } =
+              Deferred.return input
+            in
+            let config = Mina_net2.{ trusted_peers; banned_peers; isolate } in
+            let net = Mina_lib.net mina in
+            let%bind _new_gating_config =
+              Mina_networking.set_connection_gating_config ~clean_added_peers
+                net config
+            in
+            let%bind failures =
+              (* Add all peers *)
+              Deferred.List.filter_map added_peers ~f:(fun peer ->
+                  match%map.Deferred
+                    Mina_networking.add_peer net peer ~is_seed:false
+                  with
+                  | Ok () ->
+                      None
+                  | Error err ->
+                      Some (Error.to_string_hum err) )
+            in
+            if List.is_empty failures then Deferred.Result.return "success"
+            else
+              let%bind.Deferred.Result { trusted_peers
+                                       ; banned_peers
+                                       ; isolate
+                                       ; clean_added_peers
+                                       ; added_peers
+                                       } =
+                Deferred.return input
+              in
+              let config = Mina_net2.{ trusted_peers; banned_peers; isolate } in
+              let net = Mina_lib.net mina in
+              let%bind _new_gating_config =
+                Mina_networking.set_connection_gating_config ~clean_added_peers
+                  net config
+              in
+              let%bind failures =
+                (* Add all peers *)
+                Deferred.List.filter_map added_peers ~f:(fun peer ->
+                    match%map.Deferred
+                      Mina_networking.add_peer net peer ~is_seed:false
+                    with
+                    | Ok () ->
+                        None
+                    | Error err ->
+                        Some (Error.to_string_hum err) )
+              in
+              if List.is_empty failures then Deferred.Result.return "success"
+              else
+                Deferred.Result.failf "failed to add peers: %s"
+                  (String.concat ~sep:", " failures) )
+
     let commands =
       [ schedule_payments
       ; schedule_zkapp_commands
       ; stop_scheduled_transactions
+      ; update_gating
       ]
   end
 end
@@ -5685,28 +5833,23 @@ module Queries = struct
         ~args:Arg.[]
         ~doc:"Slots won by a block producer for current epoch"
         ~resolve:(fun { ctx = with_seq_no, mina; _ } () ->
-          if not with_seq_no then return @@ Error "Missing sequence information"
+          Io.return
+          @@
+          if not with_seq_no then Error "Missing sequence information"
           else
             let bp_keys = Mina_lib.block_production_pubkeys mina in
             if Public_key.Compressed.Set.is_empty bp_keys then
-              return @@ Error "Not a block producing node"
+              Error "Not a block producing node"
             else
-              let vrf_evaluator = Mina_lib.vrf_evaluator mina in
-              let logger = Mina_lib.top_level_logger mina in
-              let%map vrf_result =
-                Block_producer.Vrf_evaluation_state.poll_vrf_evaluator ~logger
-                  vrf_evaluator
+              let open Block_producer.Vrf_evaluation_state in
+              let vrf_state = Mina_lib.vrf_evaluation_state mina in
+              let%map.Result () =
+                Result.ok_if_true (finished vrf_state)
+                  ~error:"Vrf evaluation not completed for current epoch"
               in
-              match vrf_result.evaluator_status with
-              | Completed ->
-                  let slots_since_hard_fork =
-                    List.map vrf_result.slots_won ~f:(fun { global_slot; _ } ->
-                        Unsigned.UInt32.to_int global_slot )
-                    |> List.sort ~compare:Int.compare
-                  in
-                  Ok slots_since_hard_fork
-              | _ ->
-                  Error "Vrf evaluation not completed for current epoch" )
+              List.map (Queue.to_list vrf_state.queue)
+                ~f:(fun { global_slot; _ } ->
+                  Unsigned.UInt32.to_int global_slot ) )
 
     let commands = [ auth; slots_won ]
   end
