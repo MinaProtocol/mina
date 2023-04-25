@@ -1,7 +1,7 @@
 terraform {
   required_version = ">= 0.14.0"
   backend "s3" {
-    key     = "terraform-itn3.tfstate"
+    key     = "terraform-itn3-testnet.tfstate"
     encrypt = true
     region  = "us-west-2"
     bucket  = "o1labs-terraform-state"
@@ -59,7 +59,7 @@ variable "plain_node_count" {
 }
 
 locals {
-  testnet_name       = "itn3"
+  testnet_name       = "itn3-testnet"
   mina_image         = "minaprotocol/mina-daemon:1.3.2beta2-release-2.0.0-05c2f73-focal-berkeley" #"minaprotocol/mina-daemon:1.3.2beta2-release-2.0.0-6f9d956-focal-berkeley"
   mina_archive_image = "minaprotocol/mina-archive:1.3.2beta2-release-2.0.0-05c2f73-focal"         #"minaprotocol/mina-archive:1.3.2beta2-release-2.0.0-6f9d956-focal"
   seed_region        = "us-central1"
@@ -75,7 +75,7 @@ locals {
   make_report_accounts = ""
 }
 
-module "itn3" {
+module "itn3-testnet" {
   providers = { google.gke = google.google-us-central1 }
   source    = "../../modules/o1-testnet"
 
@@ -176,7 +176,7 @@ module "itn3" {
   make_report_every_mins          = "5"
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
-  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/itn3_seeds.txt"
+  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/itn3-testnet_seeds.txt"
 
 }
 
