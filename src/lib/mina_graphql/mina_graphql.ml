@@ -4958,7 +4958,13 @@ module Mutations = struct
                                             ; ("error", `String e)
                                             ] )
                               in
-                              let%bind () = Async_unix.at tm_next in
+                              let%bind () =
+                                Async_unix.at
+                                  (Time.max
+                                     (Time.add (Time.now ())
+                                        (Time.Span.of_sec 0.1) )
+                                     tm_next )
+                              in
                               let next_tm_next = Time.add tm_next wait_span in
                               go account_state_tbl
                                 ((ndx + 1) mod num_fee_payers)
