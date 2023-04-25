@@ -53,7 +53,7 @@ in
               "COVERALLS_TOKEN",
               "BUILDKITE_TEST_ANALYTICS_TOKEN",
               "MINA_DEB_CODENAME=bullseye"
-            ] "source ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/run-test-executive.sh ${testName} && buildkite/scripts/upload-partial-coverage-data.sh && ./buildkite/scripts/upload-test-results.sh ${testName}",
+            ] "source ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/run-test-executive.sh ${testName} && buildkite/scripts/upload-partial-coverage-data.sh ${testName} && ./buildkite/scripts/upload-test-results.sh ${testName}",
         artifact_paths = [SelectFiles.exactly "." "${testName}.test.log"],
         label = "${testName} integration test",
         key = "integration-test-${testName}",

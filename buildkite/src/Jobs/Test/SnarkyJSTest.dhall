@@ -8,6 +8,8 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
+
+let key = "snarkyjs-bindings-test"
 in
 
 Pipeline.build
@@ -25,9 +27,9 @@ Pipeline.build
     steps = [
       Command.build
         Command.Config::{
-            commands = RunInToolchain.runInToolchainBuster ["DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN"] "buildkite/scripts/test-snarkyjs-bindings.sh && buildkite/scripts/upload-partial-coverage-data.sh"
+            commands = RunInToolchain.runInToolchainBuster ["DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN"] "buildkite/scripts/test-snarkyjs-bindings.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
           , label = "SnarkyJS unit tests"
-          , key = "snarkyjs-bindings-test"
+          , key = key
           , target = Size.XLarge
           , docker = None Docker.Type
         }
