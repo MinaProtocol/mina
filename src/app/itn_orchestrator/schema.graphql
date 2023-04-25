@@ -9,6 +9,45 @@ scalar CurrencyAmount
 """uint64 encoded as a json string representing a fee"""
 scalar Fee
 
+"""Update to gating config and added peers"""
+input GatingUpdate {
+  """Peers to connect to"""
+  addedPeers: [NetworkPeer!]!
+
+  """If true, resets added peers to an empty list (including seeds)"""
+  cleanAddedPeers: Boolean!
+
+  """
+  If true, no connections will be allowed unless they are from a trusted peer
+  """
+  isolate: Boolean!
+
+  """
+  Peers we will never allow connections from (unless they are also trusted!)
+  """
+  bannedPeers: [NetworkPeer!]!
+
+  """Peers we will always allow connections from"""
+  trustedPeers: [NetworkPeer!]!
+}
+
+type ItnAuth {
+  """Uuid of the ITN GraphQL server"""
+  serverUuid: String!
+
+  """Sequence number for the signer of the auth query"""
+  signerSequenceNumber: UInt16!
+
+  """Libp2p port"""
+  libp2pPort: UInt16!
+
+  """Peer id"""
+  peerId: String!
+
+  """Is the node a block producer"""
+  isBlockProducer: Boolean!
+}
+
 type mutation {
   schedulePayments(
     """Payments details"""
@@ -18,6 +57,21 @@ type mutation {
     """Payment scheduler handle"""
     handle: String!
   ): String!
+  updateGating(
+    """Gating update"""
+    input: GatingUpdate!
+  ): String!
+}
+
+"""Network identifiers for another protocol participant"""
+input NetworkPeer {
+  libp2pPort: Int!
+
+  """IP address of the remote host"""
+  host: String!
+
+  """base58-encoded peer ID"""
+  peerId: String!
 }
 
 """Keys and other information for scheduling payments"""
@@ -54,6 +108,12 @@ scalar PrivateKey
 scalar PublicKey
 
 type query {
-  """Returns true if query is authorized"""
-  auth: Boolean
+  """Uuid for GraphQL server, sequence number for signing public key"""
+  auth: ItnAuth!
+
+  """Slots won by a block producer for current epoch"""
+  slotsWon: [Int!]!
 }
+
+"""String representing a uint16 number in base 10"""
+scalar UInt16

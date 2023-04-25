@@ -117,12 +117,13 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> signed_command_result Malleable_error.t
 
-      (** returned string is the transaction id *)
-      val send_zkapp :
+      (** Send a batch of zkApp transactions.
+          Returned is a list of transaction id *)
+      val send_zkapp_batch :
            logger:Logger.t
         -> t
-        -> zkapp_command:Mina_base.Zkapp_command.t
-        -> string Deferred.Or_error.t
+        -> zkapp_commands:Mina_base.Zkapp_command.t list
+        -> string list Deferred.Or_error.t
 
       val must_send_test_payments :
            repeat_count:Unsigned.UInt32.t
@@ -382,7 +383,11 @@ module Dsl = struct
       -> node_included_in:[ `Any_node | `Node of Engine.Network.Node.t ]
       -> t
 
-    val ledger_proofs_emitted_since_genesis : num_proofs:int -> t
+    val ledger_proofs_emitted_since_genesis :
+         soft_timeout:Network_time_span.t
+      -> hard_timeout:Network_time_span.t
+      -> num_proofs:int
+      -> t
 
     val zkapp_to_be_included_in_frontier :
       has_failures:bool -> zkapp_command:Mina_base.Zkapp_command.t -> t

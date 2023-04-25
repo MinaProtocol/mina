@@ -376,6 +376,9 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
+	if gc.CleanAddedPeers() {
+		app.AddedPeers = nil
+	}
 
 	stateDir, err := m.Statedir()
 	if err != nil {
@@ -595,7 +598,9 @@ func (m SetGatingConfigReq) handle(app *app, seqno uint64) *capnp.Message {
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
-
+	if gc.CleanAddedPeers() {
+		app.AddedPeers = nil
+	}
 	app.P2p.SetGatingState(gatingConfig)
 
 	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {

@@ -1,5 +1,11 @@
 query auth() {
-    auth
+    auth {
+        serverUuid
+        signerSequenceNumber
+        libp2pPort
+        peerId
+        isBlockProducer
+    }
 }
 
 mutation schedulePayments($input: PaymentsDetails!) {
@@ -8,4 +14,12 @@ mutation schedulePayments($input: PaymentsDetails!) {
 
 mutation stopPayments($handle: String!) {
     stopPayments(handle: $handle) 
+}
+
+query slotsWon() {
+    slotsWon
+}
+
+mutation updateGating($input: GatingUpdate!) {
+    updateGating(input: $input)
 }

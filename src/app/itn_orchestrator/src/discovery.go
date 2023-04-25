@@ -1,7 +1,6 @@
 package itn_orchestrator
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -19,8 +18,6 @@ func prefixByTime(t time.Time) string {
 	return strings.Join([]string{"submissions", dStr, tStr}, "/")
 }
 
-type NodeAddress string
-
 type Node struct {
 	Address NodeAddress
 	Client  graphql.Client
@@ -29,25 +26,6 @@ type Node struct {
 type DiscoveryParams struct {
 	OffsetMin int
 	Limit     int
-}
-
-type GetGqlClientF = func(context.Context, NodeAddress) (graphql.Client, error)
-
-func GetGqlClient(authClient *AuthenticatedClient, cache map[NodeAddress]graphql.Client) GetGqlClientF {
-	return func(ctx context.Context, addr NodeAddress) (graphql.Client, error) {
-		if client, has := cache[addr]; has {
-			return client, nil
-		}
-		client := graphql.NewClient("http://"+string(addr)+"/graphql", authClient)
-		authRes, err := Auth(ctx, client)
-		if err != nil {
-			return nil, err
-		}
-		if !authRes {
-			return nil, fmt.Errorf("failed to authorize client %s", addr)
-		}
-		return client, nil
-	}
 }
 
 func DiscoverParticipants(config Config, params DiscoveryParams, output func(NodeAddress)) error {
@@ -92,7 +70,7 @@ func DiscoverParticipants(config Config, params DiscoveryParams, output func(Nod
 		}
 		cache[addr] = struct{}{}
 		output(addr)
-		if len(cache) >= params.Limit {
+		if params.Limit > 0 && len(cache) >= params.Limit {
 			break
 		}
 	}

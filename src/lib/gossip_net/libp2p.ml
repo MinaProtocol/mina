@@ -951,9 +951,9 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       let%map net2 = !(t.net2) in
       Mina_net2.connection_gating_config net2
 
-    let set_connection_gating t config =
+    let set_connection_gating ?clean_added_peers t config =
       let%bind net2 = !(t.net2) in
-      Mina_net2.set_connection_gating_config net2 config
+      Mina_net2.set_connection_gating_config ?clean_added_peers net2 config
 
     let restart_helper t = t.restart_helper ()
   end

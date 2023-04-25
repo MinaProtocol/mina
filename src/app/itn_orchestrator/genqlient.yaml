@@ -18,3 +18,7 @@ bindings:
     type: itn_json_types.MinaPublicKey
   PrivateKey:
     type: itn_json_types.MinaPrivateKey
+  UInt16:
+    type: uint16
+    marshaler: itn_json_types.MarshalUint16
+    unmarshaler: itn_json_types.UnmarshalUint16
