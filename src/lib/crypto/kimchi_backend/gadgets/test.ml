@@ -28,12 +28,14 @@ let%test_unit "custom gates integration" =
   (* Helper to test all custom gates for Ethereum primitives.
    * The circuit being created is the following:
    * - rotate first 64-bit word by 5 bits to the right
-   * - multiply the outcome by 2^190 to obtain an element that fits in native field
-   * - compute the native field from limbs (at most 254 bits)
+   * - multiply by 2^176 
    * - xor it with the second word which is a native field element (255 bits)
    * - and it with the first word (254 bits)
    * - not the output for 254 bits
-   * - ffadd it with the third output which is a foreign element (256 bits)
+   * - create limbs for the output and decompose
+   * - multi range check the 3 limbs of the output
+   * - multiply it by the third input which is a foreign element (256 bits)
+   * - ffadd it with the third input which is a foreign element (256 bits)
    *)
   let test_gates ?cs word_64bit native_elem foreign_elem =
     let cs, _proof_keypair, _proof =
@@ -59,46 +61,39 @@ let%test_unit "custom gates integration" =
             Element.Standard.of_bignum_bigint (module Runner.Impl)
             @@ Common.bignum_bigint_of_hex foreign_elem
           in
-          let inp_ffmul =
-            Element.Standard.of_bignum_bigint (module Runner.Impl)
-            @@ Common.bignum_bigint_of_hex
-                 "400000000000000000000000000000000000000000000000"
-          in
           let out_rot = rot_64 (module Runner.Impl) word_64bit 5 Right in
-          let out_rot =
-            Element.Standard.of_limbs (out_rot, Field.zero, Field.zero)
+
+          let two_to_88 = exists Field.typ ~compute:(fun () -> 
+            Common.field_of_hex (module Runner.Impl) "10000000000000000000000") in 
+          let two_to_176 = Field.(two_to_88 * two_to_88) in
+
+          let out_mul =
+            Generic.mul (module Runner.Impl) out_rot two_to_176
           in
-          let out_ffmul, _checks =
-            mul (module Runner.Impl) out_rot inp_ffmul secp256k1_modulus
-          in
-          let out_ffmul =
-            exists Field.typ ~compute:(fun () ->
-                let big =
-                  Element.Standard.to_bignum_bigint_as_prover
-                    (module Runner.Impl)
-                    out_ffmul
-                in
-                Common.bignum_bigint_to_field (module Runner.Impl) big )
-          in
-          let out_xor = bxor (module Runner.Impl) out_ffmul native_elem 255 in
+          let out_xor = bxor (module Runner.Impl) out_mul native_elem 255 in
           let out_and = band (module Runner.Impl) out_xor word_64bit 254 in
           let out_not_c = bnot_checked (module Runner.Impl) out_and 254 in
           let out_not_u = bnot_unchecked (module Runner.Impl) out_and 254 in
           Field.Assert.equal out_not_u out_not_c ;
-          let l0, l1, l2 =
-            exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
-                let l0, l1, l2 =
-                  bignum_bigint_to_field_standard_limbs (module Runner.Impl)
-                  @@ Common.cvar_field_to_bignum_bigint_as_prover
-                       (module Runner.Impl)
-                       out_not_c
-                in
-                [| l0; l1; l2 |] )
-            |> Common.tuple3_of_array
-          in
-          let out_not_c = Element.Standard.of_limbs (l0, l1, l2) in
+          let (l0,l1,l2) = exists (Typ.array ~length:3 Field.typ) ~compute:(fun () -> 
+            let big = Common.cvar_field_to_bignum_bigint_as_prover(module Runner.Impl) out_not_c in
+            let two_to_88 = Bignum_bigint.(pow (of_int 2) (of_int 88)) in
+            let two_to_176 = Bignum_bigint.(pow (of_int 2) (of_int 176)) in 
+            let l2 = Bignum_bigint.(big % two_to_176 ) in 
+            let l1 = Bignum_bigint.((big - l2 * two_to_176 ) % two_to_88 ) in
+            let l0 = Bignum_bigint.(big - l2 * two_to_176 - l1 * two_to_88) in
+            let l2 = Common.bignum_bigint_to_field (module Runner.Impl) l2 in
+            let l1 = Common.bignum_bigint_to_field (module Runner.Impl) l1 in
+            let l0 = Common.bignum_bigint_to_field (module Runner.Impl) l0 in
+            [|l0;l1;l2|] )|>Common.tuple3_of_array in
+          let out_l1 = Generic.mul (module Runner.Impl) l1 two_to_88 in
+          let out_l1l0 = Generic.add (module Runner.Impl) out_l1 l0 in
+          let out_l2 = Generic.mul (module Runner.Impl) l2 two_to_176 in
+          let out_limbs = Generic.add (module Runner.Impl) out_l1l0 out_l2 in
+          Field.Assert.equal out_limbs out_not_c ;
+          let limbs = Element.Standard.of_limbs (l0, l1, l2) in
           let _out_ffadd =
-            add (module Runner.Impl) out_not_c foreign_elem secp256k1_modulus
+            Foreign_field.add (module Runner.Impl) limbs foreign_elem secp256k1_modulus
           in
           () )
     in
