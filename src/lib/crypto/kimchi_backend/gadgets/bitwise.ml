@@ -499,7 +499,7 @@ let bnot64_unchecked (type f)
   bnot_unchecked (module Circuit) input 64
 
 (* UNIT TESTS *)
-(*
+
 let%test_unit "bitwise rotation gadget" =
   (* Import the gadget test runner *)
   let open Kimchi_gadgets_test_runner in
@@ -696,7 +696,7 @@ let%test_unit "bitwise and gadget" =
   assert (Common.is_error (fun () -> test_and "ff" "ff" "ff" 7)) ;
   assert (Common.is_error (fun () -> test_and "1" "1" "1" (-1))) ;
   ()
-*)
+
 let%test_unit "bitwise not gadget" =
   (* Import the gadget test runner *)
   let open Kimchi_gadgets_test_runner in
