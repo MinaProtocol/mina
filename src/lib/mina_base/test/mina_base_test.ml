@@ -121,7 +121,11 @@ let () =
               `Quick to_account_updates_is_the_inverse_of_of_account_updates
           ; test_case "Test to_zkapp_command with hashes list." `Quick
               to_zkapp_command_with_hashes_list
-          ] )
+        ] )
+    ; Control_test.
+      ( "contol"
+      , [ test_case "JSON roundtrip." `Quick json_roundtrip
+      ])
     ; Fee_related_test.
         ( "fee-related"
         , [ test_case "Test fee." `Quick test_fee
