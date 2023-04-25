@@ -33,9 +33,9 @@ let%test_unit "custom gates integration" =
    * - and it with the first word (254 bits)
    * - not the output for 254 bits
    * - create limbs for the output and decompose
-   * - multi range check the 3 limbs of the output
-   * - multiply it by the third input which is a foreign element (256 bits)
+   * - multiply it with itself (256 bits)
    * - ffadd it with the third input which is a foreign element (256 bits)
+   * - multi range check the 3 limbs of the output
    *)
   let test_gates ?cs word_64bit native_elem foreign_elem =
     let cs, _proof_keypair, _proof =
@@ -75,12 +75,13 @@ let%test_unit "custom gates integration" =
           let out_not_c = bnot_checked (module Runner.Impl) out_and 254 in
           let out_not_u = bnot_unchecked (module Runner.Impl) out_and 254 in
           Field.Assert.equal out_not_u out_not_c ;
+          
           let (l0,l1,l2) = exists (Typ.array ~length:3 Field.typ) ~compute:(fun () -> 
             let big = Common.cvar_field_to_bignum_bigint_as_prover(module Runner.Impl) out_not_c in
             let two_to_88 = Bignum_bigint.(pow (of_int 2) (of_int 88)) in
             let two_to_176 = Bignum_bigint.(pow (of_int 2) (of_int 176)) in 
-            let l2 = Bignum_bigint.(big % two_to_176 ) in 
-            let l1 = Bignum_bigint.((big - l2 * two_to_176 ) % two_to_88 ) in
+            let l2 = Bignum_bigint.(big / two_to_176 ) in 
+            let l1 = Bignum_bigint.((big - l2 * two_to_176 ) / two_to_88 ) in
             let l0 = Bignum_bigint.(big - l2 * two_to_176 - l1 * two_to_88) in
             let l2 = Common.bignum_bigint_to_field (module Runner.Impl) l2 in
             let l1 = Common.bignum_bigint_to_field (module Runner.Impl) l1 in
@@ -92,9 +93,12 @@ let%test_unit "custom gates integration" =
           let out_limbs = Generic.add (module Runner.Impl) out_l1l0 out_l2 in
           Field.Assert.equal out_limbs out_not_c ;
           let limbs = Element.Standard.of_limbs (l0, l1, l2) in
-          let _out_ffadd =
-            Foreign_field.add (module Runner.Impl) limbs foreign_elem secp256k1_modulus
+          let out_ffmul, _checks = Foreign_field.mul (module Runner.Impl) limbs limbs secp256k1_modulus in
+          let out_ffadd =
+            Foreign_field.add (module Runner.Impl) out_ffmul foreign_elem secp256k1_modulus
           in
+          let l0, l1, l2 = Element.Standard.to_limbs out_ffadd in
+          Range_check.multi (module Runner.Impl) l0 l1 l2 ;
           () )
     in
     cs
