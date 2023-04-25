@@ -155,10 +155,7 @@ input ZkappCommandsDetails {
 
   deploymentFee: String!
 
-  """
-  Avoid recently used accounts when generating new zkapp commands
-  """
-  recentlyUsedAccounts: Int!
+  accountQueueSize: Int!
 }
 
 """String representing a uint16 number in base 10"""

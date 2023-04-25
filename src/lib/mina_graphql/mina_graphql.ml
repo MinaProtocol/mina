@@ -3182,7 +3182,7 @@ module Types = struct
           ; min_fee : string
           ; max_fee : string
           ; deployment_fee : string
-          ; recently_used_accounts : int
+          ; account_queue_size : int
           }
 
         let arg_typ =
@@ -3192,7 +3192,7 @@ module Types = struct
                          transactions_per_second duration_in_minutes memo_prefix
                          no_precondition min_balance_change max_balance_change
                          init_balance min_fee max_fee deployment_fee
-                         recently_used_accounts ->
+                         account_queue_size ->
               Result.return
                 { fee_payers
                 ; num_zkapps_to_deploy
@@ -3207,14 +3207,14 @@ module Types = struct
                 ; min_fee
                 ; max_fee
                 ; deployment_fee
-                ; recently_used_accounts
+                ; account_queue_size
                 } )
             ~split:(fun f (t : input) ->
               f t.fee_payers t.num_zkapps_to_deploy t.num_new_accounts
                 t.transactions_per_second t.duration_in_minutes t.memo_prefix
                 t.no_precondition t.min_balance_change t.max_balance_change
                 t.init_balance t.min_fee t.max_fee t.deployment_fee
-                t.recently_used_accounts )
+                t.account_queue_size )
             ~fields:
               Arg.
                 [ arg "feePayers"
@@ -3251,10 +3251,8 @@ module Types = struct
                 ; arg "deploymentFee"
                     ~doc:"Fee for the initial deployment of zkApp accounts"
                     ~typ:(non_null string)
-                ; arg "recentlyUsedAccounts"
-                    ~doc:
-                      "Avoid recently used accounts when generating new zkApp \
-                       commands"
+                ; arg "accountQueueSize"
+                    ~doc:"The size of queue for recently used accounts"
                     ~typ:(non_null int)
                 ]
       end
@@ -4775,21 +4773,18 @@ module Mutations = struct
                             Transaction_snark.For_tests.create_trivial_snapp
                               ~constraint_constants ()
                           in
-                          let insert_recently_used_accounts
-                              ~recently_used_accounts ~account_state_tbl id =
+                          let account_queue = Queue.create () in
+                          let insert_account_queue ~account_state_tbl id =
                             let a =
                               Account_id.Table.find_and_remove account_state_tbl
                                 id
                             in
-                            Queue.enqueue recently_used_accounts
-                              (Option.value_exn a) ;
+                            Queue.enqueue account_queue (Option.value_exn a) ;
                             if
-                              Queue.length recently_used_accounts
-                              > zkapp_command_details.recently_used_accounts
+                              Queue.length account_queue
+                              > zkapp_command_details.account_queue_size
                             then
-                              let a, role =
-                                Queue.dequeue_exn recently_used_accounts
-                              in
+                              let a, role = Queue.dequeue_exn account_queue in
                               Account_id.Table.add_exn account_state_tbl
                                 ~key:(Account.identifier a) ~data:(a, role)
                             else ()
@@ -4829,7 +4824,7 @@ module Mutations = struct
                                 | Some (ledger, _) -> (
                                     let number_of_accounts_generated =
                                       Account_id.Table.data account_state_tbl
-                                      @ Queue.to_list recently_used_accounts
+                                      @ Queue.to_list account_queue
                                       |> List.filter ~f:(function
                                            | _, `New_account ->
                                                true
@@ -4886,9 +4881,7 @@ module Mutations = struct
                                     in
                                     List.iter accounts
                                       ~f:
-                                        (insert_recently_used_accounts
-                                           ~recently_used_accounts
-                                           ~account_state_tbl ) ;
+                                        (insert_account_queue ~account_state_tbl) ;
                                     let%bind zkapp_command =
                                       Zkapp_command_builder
                                       .replace_authorizations ~prover ~keymap
