@@ -598,16 +598,20 @@ module Types = struct
           [ field "id"
               ~args:Arg.[]
               ~doc:"the log ID" ~typ:(non_null int)
-              ~resolve:(fun _ (n, _, _) -> n)
+              ~resolve:(fun _ (log : Itn_logger.t) -> log.sequence_no)
+          ; field "timestamp"
+              ~args:Arg.[]
+              ~doc:"timestamp of the log" ~typ:(non_null string)
+              ~resolve:(fun _ (log : Itn_logger.t) -> log.timestamp)
           ; field "message"
               ~args:Arg.[]
               ~doc:"the log message" ~typ:(non_null string)
-              ~resolve:(fun _ (_, msg, _) -> msg)
+              ~resolve:(fun _ (log : Itn_logger.t) -> log.message)
           ; field "metadata"
               ~args:Arg.[]
               ~doc:"metadata for the log"
               ~typ:(non_null (list (non_null metadatum)))
-              ~resolve:(fun _ (_, _, metadata) -> metadata)
+              ~resolve:(fun _ (log : Itn_logger.t) -> log.metadata)
           ] )
   end
 
