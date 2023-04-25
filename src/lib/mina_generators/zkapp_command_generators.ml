@@ -308,10 +308,10 @@ let gen_balance_change ?permissions_auth (account : Account.t) ?failure
         if new_account then
           Currency.Amount.(
             gen_incl
-              ( scale (of_mina_string_exn max_balance_change) 50000
-              |> Option.value_exn )
-              ( scale (of_mina_string_exn max_balance_change) 100000
-              |> Option.value_exn ))
+              ( Option.value (scale (of_mina_string_exn max_balance_change) 100) ~default:(of_mina_string_exn "50.0")
+               )
+              ( Option.value (scale (of_mina_string_exn max_balance_change) 200) ~default:(of_mina_string_exn "100.0")
+               ))
         else
           Currency.Amount.(
             gen_incl
