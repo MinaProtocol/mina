@@ -3141,7 +3141,7 @@ module Types = struct
           ; duration_in_minutes : int
           ; memo_prefix : string
           ; no_precondition : bool
-          ; recently_used_accounts : int
+          ; account_queue_size : int
           ; min_balance_change : string
           ; max_balance_change : string
           ; init_balance : string
@@ -3155,7 +3155,7 @@ module Types = struct
             ~doc:"Keys and other information for scheduling zkapp commands"
             ~coerce:(fun fee_payers num_zkapps_to_deploy num_new_accounts
                          transactions_per_second duration_in_minutes memo_prefix
-                         no_precondition recently_used_accounts
+                         no_precondition account_queue_size
                          min_balance_change max_balance_change init_balance
                          min_fee max_fee deployment_fee ->
               Result.return
@@ -3166,7 +3166,7 @@ module Types = struct
                 ; duration_in_minutes
                 ; memo_prefix
                 ; no_precondition
-                ; recently_used_accounts
+                ; account_queue_size
                 ; min_balance_change
                 ; max_balance_change
                 ; init_balance
@@ -3177,7 +3177,7 @@ module Types = struct
             ~split:(fun f (t : input) ->
               f t.fee_payers t.num_zkapps_to_deploy t.num_new_accounts
                 t.transactions_per_second t.duration_in_minutes t.memo_prefix
-                t.no_precondition t.recently_used_accounts t.min_balance_change
+                t.no_precondition t.account_queue_size t.min_balance_change
                 t.max_balance_change t.init_balance t.min_fee t.max_fee
                 t.deployment_fee )
             ~fields:
@@ -3203,10 +3203,9 @@ module Types = struct
                 ; arg "noPrecondition"
                     ~doc:"Disable the precondition in account updates"
                     ~typ:(non_null bool)
-                ; arg "recentlyUsedAccounts"
+                ; arg "accountQueueSize"
                     ~doc:
-                      "Avoid recently used accounts when generating new zkApp \
-                       commands"
+                      "The size of queue for recently used accounts"
                     ~typ:(non_null int)
                 ; arg "minBalanceChange" ~doc:"Minimum balance change"
                     ~typ:(non_null string)
@@ -4740,21 +4739,21 @@ module Mutations = struct
                             Transaction_snark.For_tests.create_trivial_snapp
                               ~constraint_constants ()
                           in
-                          let recently_used_accounts = Queue.create () in
-                          let insert_recently_used_accounts ~account_state_tbl
+                          let account_queue = Queue.create () in
+                          let insert_account_queue ~account_state_tbl
                               id =
                             let a =
                               Account_id.Table.find_and_remove account_state_tbl
                                 id
                             in
-                            Queue.enqueue recently_used_accounts
+                            Queue.enqueue account_queue
                               (Option.value_exn a) ;
                             if
-                              Queue.length recently_used_accounts
-                              > zkapp_command_details.recently_used_accounts
+                              Queue.length account_queue
+                              > zkapp_command_details.account_queue_size
                             then
                               let a, role =
-                                Queue.dequeue_exn recently_used_accounts
+                                Queue.dequeue_exn account_queue
                               in
                               Account_id.Table.add_exn account_state_tbl
                                 ~key:(Account.identifier a) ~data:(a, role)
@@ -4794,7 +4793,7 @@ module Mutations = struct
                                 | Some (ledger, _) -> (
                                     let number_of_accounts_generated =
                                       Account_id.Table.data account_state_tbl
-                                      @ Queue.to_list recently_used_accounts
+                                      @ Queue.to_list account_queue
                                       |> List.filter ~f:(function
                                            | _, `New_account ->
                                                true
@@ -4851,7 +4850,7 @@ module Mutations = struct
                                     in
                                     List.iter accounts
                                       ~f:
-                                        (insert_recently_used_accounts
+                                        (insert_account_queue
                                            ~account_state_tbl ) ;
                                     let%bind zkapp_command =
                                       Zkapp_command_builder

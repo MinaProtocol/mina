@@ -143,11 +143,8 @@ input ZkappCommandsDetails {
 
   noPrecondition: Boolean!
 
-  """
-  Avoid recently used accounts when generating new zkapp commands
-  """
-  recentlyUsedAccounts: Int!
-  
+  accountQueueSize: Int!
+
   minBalanceChange: String!
 
   maxBalanceChange: String!
