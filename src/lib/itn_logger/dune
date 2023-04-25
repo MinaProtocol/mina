@@ -1,7 +1,6 @@
 (library
  (name itn_logger)
  (public_name itn_logger)
- (inline_tests)
  (libraries
    ;; opam libraries
    base
