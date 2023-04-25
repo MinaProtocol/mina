@@ -28,12 +28,12 @@ steps:
     label: "Export Epoch Seeds"
     depends_on: "initial_healthcheck"
 
-  - command: "./buildkite/pipelines/hardfork/scripts/export_hardfork_env_vars.sh && ./.buildkite/scripts/debian_build.sh"
+  - command: "./buildkite/pipelines/hardfork/scripts/export_hardfork_env_vars.sh && ./buildkite/pipelines/hardfork/scripts/debian_build.sh"
     key: "deb_build"
     label: "Debian Package Builds"
     # depends_on: "export_ledger"
   
-  - command: "./buildkite/pipelines/hardfork/scripts/export_hardfork_env_vars.sh && ./.buildkite/scripts/docker_build.sh"
+  - command: "./buildkite/pipelines/hardfork/scripts/export_hardfork_env_vars.sh && ./buildkite/pipelines/hardfork/scripts/docker_build.sh"
     key: "docker_build"
     label: "Docker Container Builds"
     # depends_on: "deb_build"
