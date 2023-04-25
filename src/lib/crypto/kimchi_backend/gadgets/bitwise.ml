@@ -772,4 +772,3 @@ let%test_unit "bitwise not gadget" =
           "7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" "0"
           255 ) ) ;
   ()
-
