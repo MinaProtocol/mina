@@ -49,6 +49,8 @@ val gen_zkapp_command_from :
      ?global_slot:Mina_numbers.Global_slot.t
   -> ?memo:string
   -> ?no_account_precondition:bool
+  -> ?fee_range:string * string
+  -> ?balance_change_range:string * string
   -> ?ignore_sequence_events_precond:bool
   -> ?no_token_accounts:bool
   -> ?limited:bool

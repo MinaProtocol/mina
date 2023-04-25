@@ -57,6 +57,8 @@
 
      - ["@current_block"]: used to notify of a execution context change that
        brings a different block into context.
+     - ["@current_call_id"]: used to notify of a execution context change that
+       brings a different concurrent verifier or prover call into context.
      - ["@internal_tracing_enabled"]: issued whenever internal tracing is enabled.
      - ["@internal_tracing_disabled"]: issued whenever internal tracing is disabled.
      - ["@mina_node_metadata"]: associates global metadata about the current node
@@ -90,18 +92,36 @@
 (** [is_enabled ()] returns [true] if internal tracing is enabled, and [false] otherwise. *)
 val is_enabled : unit -> bool
 
+(** [register_toggle_callback callback] will register [callback] to be called whenever
+    internal tracing is toggled.
+
+    This is useful to synchronize internal tracing done by subprocesses like the verifier
+    and prover.
+
+    [callback] will be called with [true] if internal tracing must be enabled, and with
+    [false] if it must be disabled. It must return a [Deferred.t] that will be resolved
+    once the call completes. *)
+val register_toggle_callback : (bool -> unit Async_kernel.Deferred.t) -> unit
+
 (** [toggle `Enabled] will enable tracing.
     [toggle `Disabled] will disable tracing.
 
     If [force] is [false] (the default), and if tracing is already active,
-    then trying to enable tracing is a noop. *)
-val toggle : logger:Logger.t -> ?force:bool -> [ `Enabled | `Disabled ] -> unit
+    then trying to enable tracing is a noop.
+
+    The returned promise will be resolved when all the calls to the registered toggle
+    callbacks have been resolved. *)
+val toggle :
+     logger:Logger.t
+  -> ?force:bool
+  -> [ `Enabled | `Disabled ]
+  -> unit Async_kernel.Deferred.t
 
 (** [with_state_hash state_hash f] runs [f] in a context in which checkpoints
     and metadata will be associated to a block with state hash equal to [state_hash].
 
     Any context in which checkpoints or metadata are recorded must be wrapped
-    in either [with_state_hash] or [with_slot] for the checkpoints to be
+    in either {!val:with_state_hash} or {!val:with_slot} for the checkpoints to be
     properly associated to the block being processed/produced. *)
 val with_state_hash : Mina_base.State_hash.t -> (unit -> 'a) -> 'a
 
@@ -110,7 +130,7 @@ val with_state_hash : Mina_base.State_hash.t -> (unit -> 'a) -> 'a
     equal to [global_slot].
 
     Any context in which checkpoints or metadata are recorded must be wrapped
-    in either [with_state_hash] or [with_slot] for the checkpoints to be
+    in either {!val:with_state_hash} or {!val:with_slot} for the checkpoints to be
     properly associated to the block being processed/produced. *)
 val with_slot : Mina_numbers.Global_slot.t -> (unit -> 'a) -> 'a
 
@@ -128,3 +148,7 @@ module For_logger : sig
   (** Processor for the "internal" log level used to record checkpoints *)
   val processor : Logger.Processor.t
 end
+
+module Context_logger : module type of Internal_tracing_context_logger
+
+module Context_call : module type of Internal_tracing_context_call

@@ -556,6 +556,27 @@ module Types = struct
               ~doc:"Sequence number for the signer of the auth query"
               ~typ:(non_null uint16)
               ~resolve:(fun _ (_, n) -> n)
+          ; field "libp2pPort"
+              ~args:Arg.[]
+              ~doc:"Libp2p port" ~typ:(non_null uint16)
+              ~resolve:(fun { ctx = _, mina; _ } _ ->
+                Mina_lib.config mina
+                |> fun Mina_lib.Config.{ gossip_net_params; _ } ->
+                gossip_net_params.addrs_and_ports.libp2p_port
+                |> Unsigned.UInt16.of_int )
+          ; field "peerId"
+              ~args:Arg.[]
+              ~doc:"Peer id" ~typ:(non_null string)
+              ~resolve:(fun { ctx = _, mina; _ } _ ->
+                Mina_lib.config mina
+                |> fun Mina_lib.Config.{ gossip_net_params; _ } ->
+                Mina_net2.Keypair.to_peer_id gossip_net_params.keypair )
+          ; field "isBlockProducer"
+              ~args:Arg.[]
+              ~doc:"Is the node a block producer" ~typ:(non_null bool)
+              ~resolve:(fun { ctx = _, mina; _ } _ ->
+                let bp_keys = Mina_lib.block_production_pubkeys mina in
+                not (Public_key.Compressed.Set.is_empty bp_keys) )
           ] )
   end
 
@@ -3024,17 +3045,19 @@ module Types = struct
     end
 
     module SetConnectionGatingConfigInput = struct
-      type input = Mina_net2.connection_gating
+      type input =
+        Mina_net2.connection_gating * [ `Clean_added_peers of bool option ]
 
       let arg_typ =
         obj "SetConnectionGatingConfigInput"
-          ~coerce:(fun trusted_peers banned_peers isolate ->
+          ~coerce:(fun trusted_peers banned_peers isolate clean_added_peers ->
             let open Result.Let_syntax in
             let%bind trusted_peers = Result.all trusted_peers in
             let%map banned_peers = Result.all banned_peers in
-            Mina_net2.{ isolate; trusted_peers; banned_peers } )
-          ~split:(fun f (t : input) ->
-            f t.trusted_peers t.banned_peers t.isolate )
+            ( Mina_net2.{ isolate; trusted_peers; banned_peers }
+            , `Clean_added_peers clean_added_peers ) )
+          ~split:(fun f ((t, `Clean_added_peers clean_added_peers) : input) ->
+            f t.trusted_peers t.banned_peers t.isolate clean_added_peers )
           ~fields:
             Arg.
               [ arg "trustedPeers"
@@ -3049,6 +3072,10 @@ module Types = struct
                   ~doc:
                     "If true, no connections will be allowed unless they are \
                      from a trusted peer"
+              ; arg "cleanAddedPeers" ~typ:bool
+                  ~doc:
+                    "If true, resets added peers to an empty list (including \
+                     seeds)"
               ]
     end
 
@@ -3115,6 +3142,12 @@ module Types = struct
           ; memo_prefix : string
           ; no_precondition : bool
           ; recently_used_accounts : int
+          ; min_balance_change : string
+          ; max_balance_change : string
+          ; init_balance : string
+          ; min_fee : string
+          ; max_fee : string
+          ; deployment_fee : string
           }
 
         let arg_typ =
@@ -3122,7 +3155,9 @@ module Types = struct
             ~doc:"Keys and other information for scheduling zkapp commands"
             ~coerce:(fun fee_payers num_zkapps_to_deploy num_new_accounts
                          transactions_per_second duration_in_minutes memo_prefix
-                         no_precondition recently_used_accounts ->
+                         no_precondition recently_used_accounts
+                         min_balance_change max_balance_change init_balance
+                         min_fee max_fee deployment_fee ->
               Result.return
                 { fee_payers
                 ; num_zkapps_to_deploy
@@ -3132,11 +3167,19 @@ module Types = struct
                 ; memo_prefix
                 ; no_precondition
                 ; recently_used_accounts
+                ; min_balance_change
+                ; max_balance_change
+                ; init_balance
+                ; min_fee
+                ; max_fee
+                ; deployment_fee
                 } )
             ~split:(fun f (t : input) ->
               f t.fee_payers t.num_zkapps_to_deploy t.num_new_accounts
                 t.transactions_per_second t.duration_in_minutes t.memo_prefix
-                t.no_precondition t.recently_used_accounts )
+                t.no_precondition t.recently_used_accounts t.min_balance_change
+                t.max_balance_change t.init_balance t.min_fee t.max_fee
+                t.deployment_fee )
             ~fields:
               Arg.
                 [ arg "feePayers"
@@ -3146,8 +3189,8 @@ module Types = struct
                        the account creators)"
                 ; arg "numZkappsToDeploy" ~typ:(non_null int)
                     ~doc:
-                      "Number of zkapp accounts that we deploy for the purpose \
-                       of test"
+                      "Number of zkApp accounts that we initially deploy for \
+                       the purpose of test"
                 ; arg "numNewAccounts" ~typ:(non_null int)
                     ~doc:
                       "Number of zkapp accounts that the scheduler generates \
@@ -3165,6 +3208,68 @@ module Types = struct
                       "Avoid recently used accounts when generating new zkApp \
                        commands"
                     ~typ:(non_null int)
+                ; arg "minBalanceChange" ~doc:"Minimum balance change"
+                    ~typ:(non_null string)
+                ; arg "maxBalanceChange" ~doc:"Maximum balance change"
+                    ~typ:(non_null string)
+                ; arg "initBalance" ~typ:(non_null string)
+                    ~doc:
+                      "Initial balance for zkApp accounts that we initially \
+                       deploy for the purpose of test"
+                ; arg "minFee" ~doc:"Minimum fee" ~typ:(non_null string)
+                ; arg "maxFee" ~doc:"Maximum fee" ~typ:(non_null string)
+                ; arg "deploymentFee"
+                    ~doc:"Fee for the initial deployment of zkApp accounts"
+                    ~typ:(non_null string)
+                ]
+      end
+
+      module GatingUpdate = struct
+        type input =
+          { trusted_peers : Network_peer.Peer.t list
+          ; banned_peers : Network_peer.Peer.t list
+          ; isolate : bool
+          ; clean_added_peers : bool
+          ; added_peers : Network_peer.Peer.t list
+          }
+
+        let arg_typ =
+          obj "GatingUpdate" ~doc:"Update to gating config and added peers"
+            ~coerce:(fun trusted_peers banned_peers isolate clean_added_peers
+                         added_peers ->
+              let%bind.Result trusted_peers = Result.all trusted_peers in
+              let%bind.Result banned_peers = Result.all banned_peers in
+              let%map.Result added_peers = Result.all added_peers in
+              { trusted_peers
+              ; banned_peers
+              ; isolate
+              ; clean_added_peers
+              ; added_peers
+              } )
+            ~split:(fun f (t : input) ->
+              f t.trusted_peers t.banned_peers t.isolate t.clean_added_peers
+                t.added_peers )
+            ~fields:
+              Arg.
+                [ arg "trustedPeers"
+                    ~typ:(non_null (list (non_null NetworkPeer.arg_typ)))
+                    ~doc:"Peers we will always allow connections from"
+                ; arg "bannedPeers"
+                    ~typ:(non_null (list (non_null NetworkPeer.arg_typ)))
+                    ~doc:
+                      "Peers we will never allow connections from (unless they \
+                       are also trusted!)"
+                ; arg "isolate" ~typ:(non_null bool)
+                    ~doc:
+                      "If true, no connections will be allowed unless they are \
+                       from a trusted peer"
+                ; arg "cleanAddedPeers" ~typ:(non_null bool)
+                    ~doc:
+                      "If true, resets added peers to an empty list (including \
+                       seeds)"
+                ; arg "addedPeers"
+                    ~typ:(non_null (list (non_null NetworkPeer.arg_typ)))
+                    ~doc:"Peers to connect to"
                 ]
       end
     end
@@ -4071,9 +4176,12 @@ module Mutations = struct
       ~typ:(non_null Types.Payload.set_connection_gating_config)
       ~resolve:(fun { ctx = mina; _ } () config ->
         let open Deferred.Result.Let_syntax in
-        let%bind config = Deferred.return config in
+        let%bind config, `Clean_added_peers clean_added_peers =
+          Deferred.return config
+        in
         let open Deferred.Let_syntax in
-        Mina_networking.set_connection_gating_config (Mina_lib.net mina) config
+        Mina_networking.set_connection_gating_config ?clean_added_peers
+          (Mina_lib.net mina) config
         >>| Result.return )
 
   let add_peer =
@@ -4420,7 +4528,7 @@ module Mutations = struct
     let account_of_kp (kp : Signature_lib.Keypair.t) ledger =
       account_of_id (id_of_kp kp) ledger
 
-    let deploy_zkapps ~mina ~ledger
+    let deploy_zkapps ~mina ~ledger ~deployment_fee ~init_balance
         ~(fee_payer_array : Signature_lib.Keypair.t Array.t)
         ~constraint_constants ~logger ~memo_prefix keypairs =
       let fee_payer_accounts =
@@ -4437,9 +4545,9 @@ module Mutations = struct
           let spec =
             { Transaction_snark.For_tests.Deploy_snapp_spec.sender =
                 (fee_payer_keypair, !(fee_payer_nonces.(!ndx)))
-            ; fee = Currency.Fee.of_mina_string_exn "1.0"
+            ; fee = Currency.Fee.of_mina_string_exn deployment_fee
             ; fee_payer = None
-            ; amount = Currency.Amount.of_mina_string_exn "20000.0"
+            ; amount = Currency.Amount.of_mina_string_exn init_balance
             ; zkapp_account_keypairs = [ kp ]
             ; memo = Signed_command_memo.create_from_string_exn memo
             ; new_zkapp_account = true
@@ -4490,6 +4598,7 @@ module Mutations = struct
       |> List.for_all ~f:Fn.id
 
     let rec wait_until_zkapps_deployed ?(deployed = false) ~mina ~ledger
+        ~deployment_fee ~init_balance
         ~(fee_payer_array : Signature_lib.Keypair.t Array.t)
         ~constraint_constants ~logger ~uuid ~stop_signal ~stop_time ~memo_prefix
         (keypairs : Signature_lib.Keypair.t list) =
@@ -4510,8 +4619,9 @@ module Mutations = struct
         let%bind () =
           if not deployed then (
             [%log info] "Start deploying zkApp accounts" ;
-            deploy_zkapps ~mina ~ledger ~fee_payer_array ~constraint_constants
-              ~logger ~memo_prefix keypairs )
+            deploy_zkapps ~mina ~ledger ~deployment_fee ~init_balance
+              ~fee_payer_array ~constraint_constants ~logger ~memo_prefix
+              keypairs )
           else return ()
         in
         [%log debug] "The accounts were not in the best tip $ledger, try again"
@@ -4529,9 +4639,9 @@ module Mutations = struct
           |> Option.value_map ~default:ledger ~f:(fun (new_ledger, _) ->
                  new_ledger )
         in
-        wait_until_zkapps_deployed ~deployed:true ~mina ~ledger ~fee_payer_array
-          ~constraint_constants ~logger ~uuid ~stop_signal ~stop_time
-          ~memo_prefix keypairs
+        wait_until_zkapps_deployed ~deployed:true ~mina ~ledger ~deployment_fee
+          ~init_balance ~fee_payer_array ~constraint_constants ~logger ~uuid
+          ~stop_signal ~stop_time ~memo_prefix keypairs
 
     let schedule_zkapp_commands =
       io_field "scheduleZkappCommands"
@@ -4626,8 +4736,13 @@ module Mutations = struct
                                 (Public_key.compress public_key, private_key) )
                             |> Public_key.Compressed.Map.of_alist_exn
                           in
-                          let insert_recently_used_accounts
-                              ~recently_used_accounts ~account_state_tbl id =
+                          let `VK vk, `Prover prover =
+                            Transaction_snark.For_tests.create_trivial_snapp
+                              ~constraint_constants ()
+                          in
+                          let recently_used_accounts = Queue.create () in
+                          let insert_recently_used_accounts ~account_state_tbl
+                              id =
                             let a =
                               Account_id.Table.find_and_remove account_state_tbl
                                 id
@@ -4645,8 +4760,7 @@ module Mutations = struct
                                 ~key:(Account.identifier a) ~data:(a, role)
                             else ()
                           in
-                          let rec go ~vk ~prover ~account_state_tbl ~ndx
-                              ~tm_next ~counter ~recently_used_accounts =
+                          let rec go ~account_state_tbl ~ndx ~tm_next ~counter =
                             if Time.( >= ) (Time.now ()) tm_end then (
                               [%log info]
                                 "Scheduled zkApp commands with handle %s has \
@@ -4713,6 +4827,14 @@ module Mutations = struct
                                            ~no_account_precondition:
                                              zkapp_command_details
                                                .no_precondition
+                                           ~fee_range:
+                                             ( zkapp_command_details.min_fee
+                                             , zkapp_command_details.max_fee )
+                                           ~balance_change_range:
+                                             ( zkapp_command_details
+                                                 .min_balance_change
+                                             , zkapp_command_details
+                                                 .max_balance_change )
                                            ~ignore_sequence_events_precond:true
                                            ~no_token_accounts:true ~limited:true
                                            ~fee_payer_keypair:fee_payer ~keymap
@@ -4730,7 +4852,6 @@ module Mutations = struct
                                     List.iter accounts
                                       ~f:
                                         (insert_recently_used_accounts
-                                           ~recently_used_accounts
                                            ~account_state_tbl ) ;
                                     let%bind zkapp_command =
                                       Zkapp_command_builder
@@ -4760,13 +4881,16 @@ module Mutations = struct
                               in
                               let%bind () = Async_unix.at tm_next in
                               let next_tm_next = Time.add tm_next wait_span in
-                              go ~vk ~prover ~account_state_tbl
+                              go ~account_state_tbl
                                 ~ndx:((ndx + 1) mod num_fee_payers)
                                 ~tm_next:next_tm_next ~counter:(counter + 1)
-                                ~recently_used_accounts
                           in
+
                           upon
                             (wait_until_zkapps_deployed ~mina ~ledger
+                               ~deployment_fee:
+                                 zkapp_command_details.deployment_fee
+                               ~init_balance:zkapp_command_details.init_balance
                                ~fee_payer_array ~constraint_constants
                                zkapp_account_keypairs ~logger ~uuid
                                ~stop_signal:ivar ~stop_time:tm_end
@@ -4787,21 +4911,12 @@ module Mutations = struct
                                       @ get_account zkapp_account_ids
                                           `Ordinary_participant )
                                   in
-                                  let `VK vk, `Prover prover =
-                                    Transaction_snark.For_tests
-                                    .create_trivial_snapp ~constraint_constants
-                                      ()
-                                  in
                                   let tm_next =
                                     Time.add (Time.now ()) wait_span
                                   in
-                                  let recently_used_accounts =
-                                    Queue.create ()
-                                  in
                                   don't_wait_for
-                                  @@ go ~account_state_tbl ~vk ~prover ~ndx:0
-                                       ~tm_next ~counter:0
-                                       ~recently_used_accounts ) ;
+                                  @@ go ~account_state_tbl ~ndx:0 ~tm_next
+                                       ~counter:0 ) ;
 
                           Ok (Uuid.to_string uuid) ) ) )
 
@@ -4843,10 +4958,79 @@ module Mutations = struct
                    (sprintf "Not a valid scheduled transactions handle: %s"
                       handle ) )
 
+    let update_gating =
+      io_field "updateGating"
+        ~args:
+          Arg.
+            [ arg "input" ~doc:"Gating update"
+                ~typ:(non_null Types.Input.Itn.GatingUpdate.arg_typ)
+            ]
+        ~typ:(non_null string)
+        ~resolve:(fun { ctx = with_seq_no, mina; _ } () input ->
+          if not with_seq_no then return @@ Error "Missing sequence information"
+          else
+            let%bind.Deferred.Result { trusted_peers
+                                     ; banned_peers
+                                     ; isolate
+                                     ; clean_added_peers
+                                     ; added_peers
+                                     } =
+              Deferred.return input
+            in
+            let config = Mina_net2.{ trusted_peers; banned_peers; isolate } in
+            let net = Mina_lib.net mina in
+            let%bind _new_gating_config =
+              Mina_networking.set_connection_gating_config ~clean_added_peers
+                net config
+            in
+            let%bind failures =
+              (* Add all peers *)
+              Deferred.List.filter_map added_peers ~f:(fun peer ->
+                  match%map.Deferred
+                    Mina_networking.add_peer net peer ~is_seed:false
+                  with
+                  | Ok () ->
+                      None
+                  | Error err ->
+                      Some (Error.to_string_hum err) )
+            in
+            if List.is_empty failures then Deferred.Result.return "success"
+            else
+              let%bind.Deferred.Result { trusted_peers
+                                       ; banned_peers
+                                       ; isolate
+                                       ; clean_added_peers
+                                       ; added_peers
+                                       } =
+                Deferred.return input
+              in
+              let config = Mina_net2.{ trusted_peers; banned_peers; isolate } in
+              let net = Mina_lib.net mina in
+              let%bind _new_gating_config =
+                Mina_networking.set_connection_gating_config ~clean_added_peers
+                  net config
+              in
+              let%bind failures =
+                (* Add all peers *)
+                Deferred.List.filter_map added_peers ~f:(fun peer ->
+                    match%map.Deferred
+                      Mina_networking.add_peer net peer ~is_seed:false
+                    with
+                    | Ok () ->
+                        None
+                    | Error err ->
+                        Some (Error.to_string_hum err) )
+              in
+              if List.is_empty failures then Deferred.Result.return "success"
+              else
+                Deferred.Result.failf "failed to add peers: %s"
+                  (String.concat ~sep:", " failures) )
+
     let commands =
       [ schedule_payments
       ; schedule_zkapp_commands
       ; stop_scheduled_transactions
+      ; update_gating
       ]
   end
 end
@@ -5691,28 +5875,23 @@ module Queries = struct
         ~args:Arg.[]
         ~doc:"Slots won by a block producer for current epoch"
         ~resolve:(fun { ctx = with_seq_no, mina; _ } () ->
-          if not with_seq_no then return @@ Error "Missing sequence information"
+          Io.return
+          @@
+          if not with_seq_no then Error "Missing sequence information"
           else
             let bp_keys = Mina_lib.block_production_pubkeys mina in
             if Public_key.Compressed.Set.is_empty bp_keys then
-              return @@ Error "Not a block producing node"
+              Error "Not a block producing node"
             else
-              let vrf_evaluator = Mina_lib.vrf_evaluator mina in
-              let logger = Mina_lib.top_level_logger mina in
-              let%map vrf_result =
-                Block_producer.Vrf_evaluation_state.poll_vrf_evaluator ~logger
-                  vrf_evaluator
+              let open Block_producer.Vrf_evaluation_state in
+              let vrf_state = Mina_lib.vrf_evaluation_state mina in
+              let%map.Result () =
+                Result.ok_if_true (finished vrf_state)
+                  ~error:"Vrf evaluation not completed for current epoch"
               in
-              match vrf_result.evaluator_status with
-              | Completed ->
-                  let slots_since_hard_fork =
-                    List.map vrf_result.slots_won ~f:(fun { global_slot; _ } ->
-                        Unsigned.UInt32.to_int global_slot )
-                    |> List.sort ~compare:Int.compare
-                  in
-                  Ok slots_since_hard_fork
-              | _ ->
-                  Error "Vrf evaluation not completed for current epoch" )
+              List.map (Queue.to_list vrf_state.queue)
+                ~f:(fun { global_slot; _ } ->
+                  Unsigned.UInt32.to_int global_slot ) )
 
     let commands = [ auth; slots_won ]
   end
