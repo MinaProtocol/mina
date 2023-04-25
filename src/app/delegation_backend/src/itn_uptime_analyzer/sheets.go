@@ -115,8 +115,6 @@ func (identity Identity) AppendUptime(client *sheets.Service, log *logging.ZapEv
 		log.Fatalf("Unable to retrieve data from sheet: %v\n", err)
 	}
 
-	log.Infof("Length: %v\n", uptimeArrayLength)
-
 	if (uptimeArrayLength >= 47) {
 		cellValue = []interface{}{"up"}
 	} else {
@@ -139,8 +137,7 @@ func MarkExecution(client *sheets.Service, log *logging.ZapEventLogger){
 	readRange := fmt.Sprintf("%s!A%d:Z%d", ITN_UPTIME_ANALYZER_SHEET, 1, 1)
 	spId := OutputSpreadsheetId()
 
-	// currentTime := GetCurrentTime()
-	currentTime := time.Date(2023, time.April, 1, 23, 59, 59, 0, time.UTC)
+	currentTime := GetCurrentTime()
 	lastExecutionTime := GetLastExecutionTime(currentTime)
 
 	timeInterval := strings.Join([]string{currentTime.Format(time.RFC3339), lastExecutionTime.Format(time.RFC3339)}, " - ")

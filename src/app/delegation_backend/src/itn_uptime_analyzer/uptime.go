@@ -84,7 +84,5 @@ func (identity Identity) GetUptime(ctx context.Context, client *storage.Client, 
 			reader.Close()
 		}
 	}
-	log.Infof("In int format: %v\n", len(uptime))
 	identity["uptime"] = strconv.Itoa(len(uptime))
-	log.Infof("In string format: %v\n", identity["uptime"])
 }
