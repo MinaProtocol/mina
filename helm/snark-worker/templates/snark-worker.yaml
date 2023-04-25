@@ -4,6 +4,7 @@ metadata:
   name: {{ $.Values.workerName }}
   labels:
     app: {{$.Values.workerName}}
+    billing: itn3-testnet
 spec:
   replicas: {{ $.Values.workerReplicas }}
   selector:

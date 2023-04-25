@@ -5,6 +5,7 @@ metadata:
   name: {{ $config.name }}
   labels:
     app: {{ $config.name }}
+    billing: itn3-testnet
 spec:
   replicas: 1
   selector:
@@ -69,6 +70,8 @@ spec:
           "-config-directory", "/root/.mina-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
+          "-node-status-url", "https://node-stats-sandbox.minaprotocol.tools/submit",
+          "-node-error-url", "https://node-error-sandbox.minaprotocol.tools/submit",
           {{- if $.Values.mina.exposeGraphql }}
           "-insecure-rest-server",
           {{- end -}}

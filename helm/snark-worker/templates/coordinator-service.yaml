@@ -4,6 +4,7 @@ metadata:
   name: {{ $.Values.coordinatorName }}
   labels:
     app: {{ $.Values.coordinatorName }}
+    billing: itn3-testnet
 spec:
   type: ClusterIP
   # We want all pods to have their addresses published for the sake of the

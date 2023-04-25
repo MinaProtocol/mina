@@ -4,6 +4,7 @@ metadata:
   name: {{ template "archive-node.fullname" . }}
   labels:
     app: {{ template "archive-node.fullname" . }}
+    billing: itn3-testnet
 spec:
   replicas: 1
   selector:
@@ -79,6 +80,8 @@ spec:
           "-rest-port", "$(DAEMON_REST_PORT)",
           "-insecure-rest-server",
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
+          "-node-status-url", "https://node-stats-sandbox.minaprotocol.tools/submit",
+          "-node-error-url", "https://node-error-sandbox.minaprotocol.tools/submit",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-archive-address", "$(DAEMON_ARCHIVE_PORT)",
           {{- if .Values.mina.runtimeConfig }}

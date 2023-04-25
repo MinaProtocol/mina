@@ -4,6 +4,7 @@ metadata:
   name: {{ .Values.name }}
   labels:
     app: {{ .Values.name }}
+    billing: itn3-testnet
 spec:
   replicas: 1
   selector:

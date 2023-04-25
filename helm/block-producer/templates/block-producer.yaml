@@ -5,6 +5,7 @@ metadata:
   name: {{ $config.name }}
   labels:
     app: {{ $config.name }}
+    billing: itn3-testnet
 spec:
   replicas: 1
   selector:
@@ -224,6 +225,8 @@ spec:
           {{- end -}}
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
+          "-node-status-url", "https://node-stats-sandbox.minaprotocol.tools/submit",
+          "-node-error-url", "https://node-error-sandbox.minaprotocol.tools/submit",
           "-block-producer-key", "/root/wallet-keys/key",
           {{- if $.Values.mina.uploadBlocksToGCloud }}
           "-upload-blocks-to-gcloud", "true",

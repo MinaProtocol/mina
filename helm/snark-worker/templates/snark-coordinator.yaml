@@ -4,6 +4,7 @@ metadata:
   name: {{$.Values.coordinatorName }}
   labels:
     app: {{$.Values.coordinatorName}}
+    billing: itn3-testnet
 spec:
   replicas: 1
   selector:
@@ -59,6 +60,8 @@ spec:
           "-snark-worker-fee", "$(CODA_SNARK_FEE)",
           "-work-selection", "$(WORK_SELECTION)",
           "-enable-peer-exchange", "true",
+          "-node-status-url", "https://node-stats-sandbox.minaprotocol.tools/submit",
+          "-node-error-url", "https://node-error-sandbox.minaprotocol.tools/submit",
           "-libp2p-keypair", "/root/libp2p-keys/key",
           {{- if $.Values.mina.logTxnPoolGossip }}
           "-log-txn-pool-gossip", "true",
