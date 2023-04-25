@@ -122,6 +122,14 @@ let () =
           ; test_case "Test to_zkapp_command with hashes list." `Quick
               to_zkapp_command_with_hashes_list
         ] )
+    ; Coinbase_test.
+      ( "coinbase"
+      , [ test_case "Accessed accounts are also those referenced." `Quick
+            accessed_accounts_are_also_referenced
+        ; test_case "Refrenced accounts are either one or two." `Quick
+            referenced_accounts_either_1_or_2
+          
+      ])
     ; Control_test.
       ( "contol"
       , [ test_case "JSON roundtrip." `Quick json_roundtrip
