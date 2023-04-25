@@ -95,11 +95,13 @@ let setup_daemon logger =
          daemon.json config file"
       (optional string)
   and itn_keys =
-    flag "--itn-keys" ~aliases:[ "itn-keys" ] (optional string)
-      ~doc:
-        "PUBLICKEYS A comma-delimited list of Ed25519 public keys that are \
-         permitted to send signed requests to the incentivized testnet GraphQL \
-         server"
+    if Mina_compile_config.itn_features then
+      flag "--itn-keys" ~aliases:[ "itn-keys" ] (optional string)
+        ~doc:
+          "PUBLICKEYS A comma-delimited list of Ed25519 public keys that are \
+           permitted to send signed requests to the incentivized testnet \
+           GraphQL server"
+    else Command.Param.return None
   and demo_mode =
     flag "--demo-mode" ~aliases:[ "demo-mode" ] no_arg
       ~doc:
@@ -152,7 +154,12 @@ let setup_daemon logger =
   and client_port = Flag.Port.Daemon.client
   and rest_server_port = Flag.Port.Daemon.rest_server
   and limited_graphql_port = Flag.Port.Daemon.limited_graphql_server
-  and itn_graphql_port = Flag.Port.Daemon.itn_graphql_server
+  and itn_graphql_port =
+    if Mina_compile_config.itn_features then
+      flag "--itn-graphql-port" ~aliases:[ "itn-graphql-port" ]
+        ~doc:"PORT GraphQL-server for incentivized testnet interaction"
+        (optional int)
+    else Command.Param.return None
   and open_limited_graphql_port =
     flag "--open-limited-graphql-port"
       ~aliases:[ "open-limited-graphql-port" ]
@@ -799,12 +806,6 @@ let setup_daemon logger =
             in
             maybe_from_config YJ.Util.to_int_option name value
           in
-          let itn_graphql_port =
-            let ({ value; name } : int option Flag.Types.with_name) =
-              itn_graphql_port
-            in
-            maybe_from_config YJ.Util.to_int_option name value
-          in
           let client_port = get_port client_port in
           let snark_work_fee_flag =
             let json_to_currency_fee_option json =
@@ -989,39 +990,45 @@ let setup_daemon logger =
             | None ->
                 client_trustlist
           in
+          let get_monitor_infos monitor =
+            let rec get_monitors accum monitor =
+              match Async_kernel.Monitor.parent monitor with
+              | None ->
+                  List.rev accum
+              | Some parent ->
+                  get_monitors (parent :: accum) parent
+            in
+            let monitors = get_monitors [ monitor ] monitor in
+            List.map monitors ~f:(fun monitor ->
+                match Async_kernel.Monitor.sexp_of_t monitor with
+                | Sexp.List sexps ->
+                    `List (List.map ~f:Error_json.sexp_record_to_yojson sexps)
+                | Sexp.Atom _ ->
+                    failwith "Expeted a sexp list" )
+          in
           Stream.iter
             (Async_kernel.Async_kernel_scheduler.long_cycles_with_context
                ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest) )
             ~f:(fun (span, context) ->
               let secs = Time_ns.Span.to_sec span in
-              let rec get_monitors accum monitor =
-                match Async_kernel.Monitor.parent monitor with
-                | None ->
-                    List.rev accum
-                | Some parent ->
-                    get_monitors (parent :: accum) parent
-              in
-              let monitors = get_monitors [ context.monitor ] context.monitor in
-              let monitor_infos =
-                List.map monitors ~f:(fun monitor ->
-                    Async_kernel.Monitor.sexp_of_t monitor
-                    |> Error_json.sexp_to_yojson )
-              in
+              let monitor_infos = get_monitor_infos context.monitor in
               [%log debug]
                 ~metadata:
                   [ ("long_async_cycle", `Float secs)
                   ; ("monitors", `List monitor_infos)
                   ]
-                "Long async cycle, $long_async_cycle seconds" ;
+                "Long async cycle, $long_async_cycle seconds, $monitors" ;
               Mina_metrics.(
                 Runtime.Long_async_histogram.observe Runtime.long_async_cycle
                   secs) ) ;
           Stream.iter Async_kernel.Async_kernel_scheduler.long_jobs_with_context
             ~f:(fun (context, span) ->
               let secs = Time_ns.Span.to_sec span in
+              let monitor_infos = get_monitor_infos context.monitor in
               [%log debug]
                 ~metadata:
                   [ ("long_async_job", `Float secs)
+                  ; ("monitors", `List monitor_infos)
                   ; ( "most_recent_2_backtrace"
                     , `String
                         (String.concat ~sep:"␤"
@@ -1150,8 +1157,11 @@ let setup_daemon logger =
               ~default:Cli_lib.Default.stop_time stop_time
           in
           if enable_tracing then Mina_tracing.start conf_dir |> don't_wait_for ;
-          if enable_internal_tracing then
-            Internal_tracing.toggle ~logger `Enabled ;
+          let%bind () =
+            if enable_internal_tracing then
+              Internal_tracing.toggle ~logger `Enabled
+            else Deferred.unit
+          in
           let seed_peer_list_url =
             Option.value_map seed_peer_list_url ~f:Option.some
               ~default:
@@ -1608,7 +1618,7 @@ let internal_commands logger =
                      ~proof_level:Genesis_constants.Proof_level.compiled
                      ~constraint_constants:
                        Genesis_constants.Constraint_constants.compiled
-                     ~pids:(Pid.Table.create ()) ~conf_dir
+                     ~pids:(Pid.Table.create ()) ~conf_dir ()
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->
@@ -1706,7 +1716,7 @@ let internal_commands logger =
               ~proof_level:Genesis_constants.Proof_level.compiled
               ~constraint_constants:
                 Genesis_constants.Constraint_constants.compiled
-              ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir)
+              ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir) ()
           in
           let%bind result =
             match input with
@@ -1801,25 +1811,6 @@ let mina_commands logger =
 
 [%%endif]
 
-let print_version_help coda_exe version =
-  (* mimic Jane Street command help *)
-  let lines =
-    [ "print version information"
-    ; ""
-    ; sprintf "  %s %s" (Filename.basename coda_exe) version
-    ; ""
-    ; "=== flags ==="
-    ; ""
-    ; "  [-help]  print this help text and exit"
-    ; "           (alias: -?)"
-    ]
-  in
-  List.iter lines ~f:(Core.printf "%s\n%!")
-
-let print_version_info () =
-  Core.printf "Commit %s on branch %s\n" Mina_version.commit_id
-    Mina_version.branch
-
 let () =
   Random.self_init () ;
   let logger = Logger.create () in
@@ -1829,15 +1820,12 @@ let () =
   (* intercept command-line processing for "version", because we don't
      use the Jane Street scripts that generate their version information
   *)
-  (let make_list_mem ss s = List.mem ss s ~equal:String.equal in
-   let is_version_cmd = make_list_mem [ "version"; "-version"; "--version" ] in
-   let is_help_flag = make_list_mem [ "-help"; "-?" ] in
+  (let is_version_cmd s =
+     List.mem [ "version"; "-version"; "--version" ] s ~equal:String.equal
+   in
    match Sys.get_argv () with
-   | [| _coda_exe; version |] when is_version_cmd version ->
+   | [| _mina_exe; version |] when is_version_cmd version ->
        Mina_version.print_version ()
-   | [| coda_exe; version; help |]
-     when is_version_cmd version && is_help_flag help ->
-       print_version_help coda_exe version
    | _ ->
        Command.run
          (Command.group ~summary:"Mina" ~preserve_subcommand_order:()

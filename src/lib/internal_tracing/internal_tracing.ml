@@ -17,9 +17,13 @@ let no_block = Block_id.Global_slot Mina_numbers.Global_slot.zero
 
 let last_block_id = ref no_block
 
+let last_call_id = ref 0
+
 let enabled = ref false
 
 let is_enabled () = !enabled
+
+let toggle_callbacks = ref []
 
 let disable_tracing ~logger () =
   [%log internal] "@internal_tracing_disabled" ;
@@ -36,11 +40,24 @@ let enable_tracing ~logger () =
       ; ("branch", `String Mina_version.branch)
       ]
 
+let register_toggle_callback (f : bool -> unit Async_kernel.Deferred.t) =
+  toggle_callbacks := !toggle_callbacks @ [ f ]
+
+let call_toggle_callbacks enable =
+  Async_kernel.Deferred.List.iter
+    ~f:(fun cb -> cb enable)
+    ~how:`Parallel !toggle_callbacks
+
 let toggle ~logger ?(force = false) = function
   | `Enabled ->
-      if force || not (is_enabled ()) then enable_tracing ~logger ()
+      if force || not (is_enabled ()) then (
+        enable_tracing ~logger () ; call_toggle_callbacks true )
+      else Async_kernel.Deferred.unit
   | `Disabled ->
-      disable_tracing ~logger ()
+      if force || is_enabled () then (
+        disable_tracing ~logger () ;
+        call_toggle_callbacks false )
+      else Async_kernel.Deferred.unit
 
 let current_block_id_key =
   Univ_map.Key.create ~name:"current_block_id" Block_id.sexp_of_t
@@ -67,11 +84,22 @@ let handling_current_block_id_change' block_id =
     events that relate to a block to detect and record context switches
     made by the Async scheduler. *)
 let handling_current_block_id_change events =
-  match get_current_block_id () with
-  | None ->
-      handling_current_block_id_change' no_block @ events
-  | Some block_id ->
-      handling_current_block_id_change' block_id @ events
+  let block_id = Option.value ~default:no_block @@ get_current_block_id () in
+  handling_current_block_id_change' block_id @ events
+
+let handling_current_call_id_change' call_id =
+  if Int.equal !last_call_id call_id then []
+  else (
+    last_call_id := call_id ;
+    [ `Assoc [ ("current_call_id", `Int call_id) ] ] )
+
+(** If the current context has a different call ID from last time,
+    record a call ID context change. It is important to call this when generating
+    events that relate to different concurrent calls to detect and record
+    context switches made by the Async scheduler. *)
+let handling_current_call_id_change events =
+  let call_id = Internal_tracing_context_call.get () in
+  handling_current_call_id_change' call_id @ events
 
 module For_logger = struct
   module Json_lines_rotate_transport = struct
@@ -131,8 +159,9 @@ module For_logger = struct
         let json_lines : Yojson.Safe.t list =
           match message with
           | "@metadata" ->
-              handling_current_block_id_change
-                [ Event.checkpoint_metadata metadata ]
+              handling_current_call_id_change
+              @@ handling_current_block_id_change
+                   [ Event.checkpoint_metadata metadata ]
           | "@block_metadata" ->
               handling_current_block_id_change [ Event.block_metadata metadata ]
           | "@internal_tracing_enabled" ->
@@ -152,8 +181,9 @@ module For_logger = struct
                 if String.Map.is_empty metadata then []
                 else [ Event.checkpoint_metadata metadata ]
               in
-              handling_current_block_id_change
-                (checkpoint_event_json :: metadata_event_json)
+              handling_current_call_id_change
+              @@ handling_current_block_id_change
+                   (checkpoint_event_json :: metadata_event_json)
         in
         Some
           ( String.concat ~sep:"\n"
@@ -171,3 +201,6 @@ module For_logger = struct
 
   let processor = Logger.Processor.create (module Processor) ()
 end
+
+module Context_logger = Internal_tracing_context_logger
+module Context_call = Internal_tracing_context_call

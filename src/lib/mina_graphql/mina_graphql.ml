@@ -73,12 +73,11 @@ let result_field2 ~resolve =
 module Doc = struct
   let date ?(extra = "") s =
     sprintf
-      !"%s (stringified Unix time - number of milliseconds since January 1, \
-        1970)%s"
+      "%s (stringified Unix time - number of milliseconds since January 1, \
+       1970)%s"
       s extra
 
-  let bin_prot =
-    sprintf !"%s (base58-encoded janestreet/bin_prot serialization)"
+  let bin_prot = sprintf "%s (base58-encoded janestreet/bin_prot serialization)"
 end
 
 module Reflection = struct
@@ -169,6 +168,59 @@ let get_ledger_and_breadcrumb mina =
            |> Staged_ledger.ledger
          , tip ) )
 
+module Itn_sequencing = struct
+  (* we don't have compare, etc. for pubkey type to use Core_kernel.Hashtbl *)
+  module Hashtbl = Stdlib.Hashtbl
+
+  let uuid = Uuid.create_random Random.State.default
+
+  let sequence_tbl : (Itn_crypto.pubkey, Unsigned.uint16) Hashtbl.t =
+    Hashtbl.create ~random:true 1023
+
+  let get_sequence_number pubkey =
+    let key = pubkey in
+    match Hashtbl.find_opt sequence_tbl key with
+    | None ->
+        let data = Unsigned.UInt16.zero in
+        Hashtbl.add sequence_tbl key data ;
+        data
+    | Some n ->
+        n
+
+  (* used for `auth` queries, so we can return
+     the sequence number for the pubkey that signed
+     the query
+
+     this is stateful, but appears to be safe
+  *)
+  let set_sequence_number_for_auth, get_sequence_no_for_auth =
+    let pubkey_sequence_no = ref Unsigned.UInt16.zero in
+    let setter pubkey =
+      let seq_no = get_sequence_number pubkey in
+      pubkey_sequence_no := seq_no
+    in
+    let getter () = !pubkey_sequence_no in
+    (setter, getter)
+
+  let valid_sequence_number query_uuid pubkey seqno_str =
+    let%bind.Option () = Option.some_if (Uuid.equal query_uuid uuid) () in
+    let seqno = get_sequence_number pubkey in
+    if String.equal (Unsigned.UInt16.to_string seqno) seqno_str then Some seqno
+    else None
+
+  let incr_sequence_number pubkey =
+    let key = pubkey in
+    match Hashtbl.find_opt sequence_tbl key with
+    | None ->
+        failwithf
+          "Expected to find sequence number for UUID %s and public key %s"
+          (Uuid.to_string uuid)
+          (Itn_crypto.pubkey_to_base64 pubkey)
+          ()
+    | Some n ->
+        Hashtbl.replace sequence_tbl key (Unsigned.UInt16.succ n)
+end
+
 module Types = struct
   open Schema
 
@@ -178,6 +230,8 @@ module Types = struct
     let private_key : (Mina_lib.t, PrivateKey.t option) typ = PrivateKey.typ ()
 
     let public_key = PublicKey.typ ()
+
+    let uint16 = UInt16.typ ()
 
     let uint32 = UInt32.typ ()
 
@@ -488,6 +542,42 @@ module Types = struct
                ~highest_block_length_received:nn_int
                ~highest_unvalidated_block_length_received:nn_int
                ~metrics:(id ~typ:(non_null metrics)) )
+  end
+
+  module Itn = struct
+    let auth =
+      obj "ItnAuth" ~fields:(fun _ ->
+          [ field "serverUuid"
+              ~args:Arg.[]
+              ~doc:"Uuid of the ITN GraphQL server" ~typ:(non_null string)
+              ~resolve:(fun _ (uuid, _) -> uuid)
+          ; field "signerSequenceNumber"
+              ~args:Arg.[]
+              ~doc:"Sequence number for the signer of the auth query"
+              ~typ:(non_null uint16)
+              ~resolve:(fun _ (_, n) -> n)
+          ; field "libp2pPort"
+              ~args:Arg.[]
+              ~doc:"Libp2p port" ~typ:(non_null uint16)
+              ~resolve:(fun { ctx = _, mina; _ } _ ->
+                Mina_lib.config mina
+                |> fun Mina_lib.Config.{ gossip_net_params; _ } ->
+                gossip_net_params.addrs_and_ports.libp2p_port
+                |> Unsigned.UInt16.of_int )
+          ; field "peerId"
+              ~args:Arg.[]
+              ~doc:"Peer id" ~typ:(non_null string)
+              ~resolve:(fun { ctx = _, mina; _ } _ ->
+                Mina_lib.config mina
+                |> fun Mina_lib.Config.{ gossip_net_params; _ } ->
+                Mina_net2.Keypair.to_peer_id gossip_net_params.keypair )
+          ; field "isBlockProducer"
+              ~args:Arg.[]
+              ~doc:"Is the node a block producer" ~typ:(non_null bool)
+              ~resolve:(fun { ctx = _, mina; _ } _ ->
+                let bp_keys = Mina_lib.block_production_pubkeys mina in
+                not (Public_key.Compressed.Set.is_empty bp_keys) )
+          ] )
   end
 
   let fee_transfer =
@@ -2955,17 +3045,19 @@ module Types = struct
     end
 
     module SetConnectionGatingConfigInput = struct
-      type input = Mina_net2.connection_gating
+      type input =
+        Mina_net2.connection_gating * [ `Clean_added_peers of bool option ]
 
       let arg_typ =
         obj "SetConnectionGatingConfigInput"
-          ~coerce:(fun trusted_peers banned_peers isolate ->
+          ~coerce:(fun trusted_peers banned_peers isolate clean_added_peers ->
             let open Result.Let_syntax in
             let%bind trusted_peers = Result.all trusted_peers in
             let%map banned_peers = Result.all banned_peers in
-            Mina_net2.{ isolate; trusted_peers; banned_peers } )
-          ~split:(fun f (t : input) ->
-            f t.trusted_peers t.banned_peers t.isolate )
+            ( Mina_net2.{ isolate; trusted_peers; banned_peers }
+            , `Clean_added_peers clean_added_peers ) )
+          ~split:(fun f ((t, `Clean_added_peers clean_added_peers) : input) ->
+            f t.trusted_peers t.banned_peers t.isolate clean_added_peers )
           ~fields:
             Arg.
               [ arg "trustedPeers"
@@ -2980,6 +3072,10 @@ module Types = struct
                   ~doc:
                     "If true, no connections will be allowed unless they are \
                      from a trusted peer"
+              ; arg "cleanAddedPeers" ~typ:bool
+                  ~doc:
+                    "If true, resets added peers to an empty list (including \
+                     seeds)"
               ]
     end
 
@@ -3033,6 +3129,55 @@ module Types = struct
                     ~typ:(non_null float)
                 ; arg "durationInMinutes" ~doc:"Length of scheduler run"
                     ~typ:(non_null int)
+                ]
+      end
+
+      module GatingUpdate = struct
+        type input =
+          { trusted_peers : Network_peer.Peer.t list
+          ; banned_peers : Network_peer.Peer.t list
+          ; isolate : bool
+          ; clean_added_peers : bool
+          ; added_peers : Network_peer.Peer.t list
+          }
+
+        let arg_typ =
+          obj "GatingUpdate" ~doc:"Update to gating config and added peers"
+            ~coerce:(fun trusted_peers banned_peers isolate clean_added_peers
+                         added_peers ->
+              let%bind.Result trusted_peers = Result.all trusted_peers in
+              let%bind.Result banned_peers = Result.all banned_peers in
+              let%map.Result added_peers = Result.all added_peers in
+              { trusted_peers
+              ; banned_peers
+              ; isolate
+              ; clean_added_peers
+              ; added_peers
+              } )
+            ~split:(fun f (t : input) ->
+              f t.trusted_peers t.banned_peers t.isolate t.clean_added_peers
+                t.added_peers )
+            ~fields:
+              Arg.
+                [ arg "trustedPeers"
+                    ~typ:(non_null (list (non_null NetworkPeer.arg_typ)))
+                    ~doc:"Peers we will always allow connections from"
+                ; arg "bannedPeers"
+                    ~typ:(non_null (list (non_null NetworkPeer.arg_typ)))
+                    ~doc:
+                      "Peers we will never allow connections from (unless they \
+                       are also trusted!)"
+                ; arg "isolate" ~typ:(non_null bool)
+                    ~doc:
+                      "If true, no connections will be allowed unless they are \
+                       from a trusted peer"
+                ; arg "cleanAddedPeers" ~typ:(non_null bool)
+                    ~doc:
+                      "If true, resets added peers to an empty list (including \
+                       seeds)"
+                ; arg "addedPeers"
+                    ~typ:(non_null (list (non_null NetworkPeer.arg_typ)))
+                    ~doc:"Peers to connect to"
                 ]
       end
     end
@@ -3939,9 +4084,12 @@ module Mutations = struct
       ~typ:(non_null Types.Payload.set_connection_gating_config)
       ~resolve:(fun { ctx = mina; _ } () config ->
         let open Deferred.Result.Let_syntax in
-        let%bind config = Deferred.return config in
+        let%bind config, `Clean_added_peers clean_added_peers =
+          Deferred.return config
+        in
         let open Deferred.Let_syntax in
-        Mina_networking.set_connection_gating_config (Mina_lib.net mina) config
+        Mina_networking.set_connection_gating_config ?clean_added_peers
+          (Mina_lib.net mina) config
         >>| Result.return )
 
   let add_peer =
@@ -4091,13 +4239,15 @@ module Mutations = struct
                 ~typ:(non_null Types.Input.Itn.PaymentDetails.arg_typ)
             ]
         ~typ:(non_null string)
-        ~resolve:(fun { ctx = mina; _ } () input ->
+        ~resolve:(fun { ctx = with_seq_no, mina; _ } () input ->
           return
           @@
-          match input with
-          | Error err ->
+          match (with_seq_no, input) with
+          | false, _ ->
+              Error "Missing sequence information"
+          | true, Error err ->
               Error (sprintf "Invalid input to payment scheduler: %s" err)
-          | Ok payment_details ->
+          | true, Ok payment_details ->
               let max_memo_len = Signed_command_memo.max_input_length in
               if List.is_empty payment_details.senders then
                 Error "Empty list of senders"
@@ -4278,31 +4428,104 @@ module Mutations = struct
                 ~typ:(non_null string)
             ]
         ~typ:(non_null string)
-        ~resolve:(fun { ctx = mina; _ } () handle ->
+        ~resolve:(fun { ctx = with_seq_no, mina; _ } () handle ->
           let logger = Mina_lib.top_level_logger mina in
-          try
-            let uuid = Uuid.of_string handle in
-            match Uuid.Table.find scheduler_tbl uuid with
-            | None ->
-                return
-                @@ Error
-                     (sprintf "Could not find scheduled payments with handle %s"
-                        handle )
-            | Some ivar ->
-                [%log info]
-                  "Requesting stop of scheduled payments with handle %s" handle ;
-                Ivar.fill_if_empty ivar () ;
-                return
-                @@ Ok
-                     (sprintf
-                        "Requesting stop of scheduled payments with handle %s"
-                        handle )
-          with _ ->
-            return
-            @@ Error
-                 (sprintf "Not a valid scheduled payments handle: %s" handle) )
+          if not with_seq_no then return @@ Error "Missing sequence information"
+          else
+            try
+              let uuid = Uuid.of_string handle in
+              match Uuid.Table.find scheduler_tbl uuid with
+              | None ->
+                  return
+                  @@ Error
+                       (sprintf
+                          "Could not find scheduled payments with handle %s"
+                          handle )
+              | Some ivar ->
+                  [%log info]
+                    "Requesting stop of scheduled payments with handle %s"
+                    handle ;
+                  Ivar.fill_if_empty ivar () ;
+                  return
+                  @@ Ok
+                       (sprintf
+                          "Requesting stop of scheduled payments with handle %s"
+                          handle )
+            with _ ->
+              return
+              @@ Error
+                   (sprintf "Not a valid scheduled payments handle: %s" handle)
+          )
 
-    let commands = [ schedule_payments; stop_payments ]
+    let update_gating =
+      io_field "updateGating"
+        ~args:
+          Arg.
+            [ arg "input" ~doc:"Gating update"
+                ~typ:(non_null Types.Input.Itn.GatingUpdate.arg_typ)
+            ]
+        ~typ:(non_null string)
+        ~resolve:(fun { ctx = with_seq_no, mina; _ } () input ->
+          if not with_seq_no then return @@ Error "Missing sequence information"
+          else
+            let%bind.Deferred.Result { trusted_peers
+                                     ; banned_peers
+                                     ; isolate
+                                     ; clean_added_peers
+                                     ; added_peers
+                                     } =
+              Deferred.return input
+            in
+            let config = Mina_net2.{ trusted_peers; banned_peers; isolate } in
+            let net = Mina_lib.net mina in
+            let%bind _new_gating_config =
+              Mina_networking.set_connection_gating_config ~clean_added_peers
+                net config
+            in
+            let%bind failures =
+              (* Add all peers *)
+              Deferred.List.filter_map added_peers ~f:(fun peer ->
+                  match%map.Deferred
+                    Mina_networking.add_peer net peer ~is_seed:false
+                  with
+                  | Ok () ->
+                      None
+                  | Error err ->
+                      Some (Error.to_string_hum err) )
+            in
+            if List.is_empty failures then Deferred.Result.return "success"
+            else
+              let%bind.Deferred.Result { trusted_peers
+                                       ; banned_peers
+                                       ; isolate
+                                       ; clean_added_peers
+                                       ; added_peers
+                                       } =
+                Deferred.return input
+              in
+              let config = Mina_net2.{ trusted_peers; banned_peers; isolate } in
+              let net = Mina_lib.net mina in
+              let%bind _new_gating_config =
+                Mina_networking.set_connection_gating_config ~clean_added_peers
+                  net config
+              in
+              let%bind failures =
+                (* Add all peers *)
+                Deferred.List.filter_map added_peers ~f:(fun peer ->
+                    match%map.Deferred
+                      Mina_networking.add_peer net peer ~is_seed:false
+                    with
+                    | Ok () ->
+                        None
+                    | Error err ->
+                        Some (Error.to_string_hum err) )
+              in
+              if List.is_empty failures then Deferred.Result.return "success"
+              else
+                Deferred.Result.failf "failed to add peers: %s"
+                  (String.concat ~sep:", " failures) )
+
+    let commands = [ schedule_payments; stop_payments; update_gating ]
   end
 end
 
@@ -5132,37 +5355,37 @@ module Queries = struct
     (* incentivized testnet-specific queries *)
 
     let auth =
-      field "auth" ~typ:bool
+      field "auth"
         ~args:Arg.[]
-        ~doc:"Returns true if query is authorized"
-        ~resolve:(fun _ () -> Some true)
+        ~typ:(non_null Types.Itn.auth)
+        ~doc:"Uuid for GraphQL server, sequence number for signing public key"
+        ~resolve:(fun _ () ->
+          ( Uuid.to_string Itn_sequencing.uuid
+          , Itn_sequencing.get_sequence_no_for_auth () ) )
 
     let slots_won =
       io_field "slotsWon"
         ~typ:(non_null (list (non_null int)))
         ~args:Arg.[]
         ~doc:"Slots won by a block producer for current epoch"
-        ~resolve:(fun { ctx = mina; _ } () ->
-          let bp_keys = Mina_lib.block_production_pubkeys mina in
-          if Public_key.Compressed.Set.is_empty bp_keys then
-            return @@ Error "Not a block producing node"
+        ~resolve:(fun { ctx = with_seq_no, mina; _ } () ->
+          Io.return
+          @@
+          if not with_seq_no then Error "Missing sequence information"
           else
-            let vrf_evaluator = Mina_lib.vrf_evaluator mina in
-            let logger = Mina_lib.top_level_logger mina in
-            let%map vrf_result =
-              Block_producer.Vrf_evaluation_state.poll_vrf_evaluator ~logger
-                vrf_evaluator
-            in
-            match vrf_result.evaluator_status with
-            | Completed ->
-                let slots_since_hard_fork =
-                  List.map vrf_result.slots_won ~f:(fun { global_slot; _ } ->
-                      Unsigned.UInt32.to_int global_slot )
-                  |> List.sort ~compare:Int.compare
-                in
-                Ok slots_since_hard_fork
-            | _ ->
-                Error "Vrf evaluation not completed for current epoch" )
+            let bp_keys = Mina_lib.block_production_pubkeys mina in
+            if Public_key.Compressed.Set.is_empty bp_keys then
+              Error "Not a block producing node"
+            else
+              let open Block_producer.Vrf_evaluation_state in
+              let vrf_state = Mina_lib.vrf_evaluation_state mina in
+              let%map.Result () =
+                Result.ok_if_true (finished vrf_state)
+                  ~error:"Vrf evaluation not completed for current epoch"
+              in
+              List.map (Queue.to_list vrf_state.queue)
+                ~f:(fun { global_slot; _ } ->
+                  Unsigned.UInt32.to_int global_slot ) )
 
     let commands = [ auth; slots_won ]
   end
@@ -5180,7 +5403,9 @@ let schema_limited =
       [ Queries.daemon_status; Queries.block; Queries.version ]
       ~mutations:[] ~subscriptions:[])
 
-let schema_itn : Mina_lib.t Schema.schema =
-  Graphql_async.Schema.(
-    schema Queries.Itn.commands ~mutations:Mutations.Itn.commands
-      ~subscriptions:[])
+let schema_itn : (bool * Mina_lib.t) Schema.schema =
+  if Mina_compile_config.itn_features then
+    Graphql_async.Schema.(
+      schema Queries.Itn.commands ~mutations:Mutations.Itn.commands
+        ~subscriptions:[])
+  else Graphql_async.Schema.(schema [] ~mutations:[] ~subscriptions:[])
