@@ -15,7 +15,7 @@ gcloud container clusters get-credentials coda-infra-central1 --region us-centra
 export DATE=$(date +%F_%H%M)
 export TARGET_NAMESPACE=berkeley
 export TARGET_NODE=$(kubectl get pod --namespace=$TARGET_NAMESPACE | grep seed-1 | grep -o '^\S*')
-export HARDFORK_BLOCK=3903
+export HARDFORK_BLOCK=5283
 echo
 
 
