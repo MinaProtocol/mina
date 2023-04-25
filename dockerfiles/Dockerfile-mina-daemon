@@ -1,9 +1,9 @@
-ARG image=debian:stretch-slim
+ARG image=debian:bullseye-slim
 FROM ${image}
 # Run with `docker build --build-arg deb_version=<version>`
 ARG deb_version
 ARG deb_release=unstable
-ARG deb_codename=stretch
+ARG deb_codename=bullseye
 ARG network=mainnet
 
 ENV DEBIAN_FRONTEND noninteractive

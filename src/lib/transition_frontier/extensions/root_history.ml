@@ -14,6 +14,8 @@ module T = struct
 
   type view = t
 
+  let name = "root_registry"
+
   let create ~logger:_ frontier =
     let capacity = 2 * Full_frontier.max_length frontier in
     let history = Queue.create () in

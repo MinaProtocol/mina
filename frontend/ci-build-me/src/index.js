@@ -79,7 +79,8 @@ const handler = async (event, req) => {
         req.body.sender.login == "aneesharaines" ||
         req.body.sender.login == "bkase" ||
         req.body.sender.login == "deepthiskumar" ||
-        req.body.sender.login == "mrmr1993" 
+        req.body.sender.login == "mrmr1993" ||
+        req.body.sender.login == "nholland94"
       ) {
         const prData = await getRequest(req.body.issue.pull_request.url);
         const buildkite = await runBuild(

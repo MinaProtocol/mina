@@ -198,29 +198,39 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Inputs.Engine
 
-  let send_zkapp ~logger node zkapp_command =
-    [%log info] "Sending zkApp"
-      ~metadata:
-        [ ("zkapp_command", Mina_base.Zkapp_command.to_yojson zkapp_command)
-        ; ( "memo"
-          , `String
-              (Mina_base.Signed_command_memo.to_string_hum zkapp_command.memo)
-          )
-        ] ;
-    match%bind.Deferred Network.Node.send_zkapp ~logger node ~zkapp_command with
-    | Ok _zkapp_id ->
-        [%log info] "ZkApp transaction sent" ;
+  let send_zkapp_batch ~logger node zkapp_commands =
+    List.iter zkapp_commands ~f:(fun zkapp_command ->
+        [%log info] "Sending zkApp"
+          ~metadata:
+            [ ("zkapp_command", Mina_base.Zkapp_command.to_yojson zkapp_command)
+            ; ( "memo"
+              , `String
+                  (Mina_base.Signed_command_memo.to_string_hum
+                     zkapp_command.memo ) )
+            ] ) ;
+    match%bind.Deferred
+      Network.Node.send_zkapp_batch ~logger node ~zkapp_commands
+    with
+    | Ok _zkapp_ids ->
+        [%log info] "ZkApp transactions sent" ;
         Malleable_error.return ()
     | Error err ->
         let err_str = Error.to_string_mach err in
-        [%log error] "Error sending zkApp"
+        [%log error] "Error sending zkApp transactions"
           ~metadata:[ ("error", `String err_str) ] ;
-        Malleable_error.hard_error_format "Error sending zkApp: %s" err_str
+        Malleable_error.hard_error_format "Error sending zkApp transactions: %s"
+          err_str
+
+  let send_zkapp ~logger node zkapp_command =
+    send_zkapp_batch ~logger node [ zkapp_command ]
 
   let send_invalid_zkapp ~logger node zkapp_command substring =
     [%log info] "Sending zkApp, expected to fail" ;
-    match%bind.Deferred Network.Node.send_zkapp ~logger node ~zkapp_command with
-    | Ok _zkapp_id ->
+    match%bind.Deferred
+      Network.Node.send_zkapp_batch ~logger node
+        ~zkapp_commands:[ zkapp_command ]
+    with
+    | Ok _zkapp_ids ->
         [%log error] "ZkApp transaction succeeded, expected error \"%s\""
           substring ;
         Malleable_error.hard_error_format
