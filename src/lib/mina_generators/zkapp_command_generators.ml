@@ -234,10 +234,10 @@ let gen_account_precondition_from_account ?failure
 
 let gen_fee (account : Account.t) =
   let balance = account.balance in
-  let lo_fee = Mina_compile_config.minimum_user_command_fee in
+  let lo_fee = Currency.Fee.minimum_user_command_fee in
   let hi_fee =
     Option.value_exn
-      Currency.Fee.(scale Mina_compile_config.minimum_user_command_fee 2)
+      Currency.Fee.(scale Currency.Fee.minimum_user_command_fee 2)
   in
   assert (
     Currency.(
