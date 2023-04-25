@@ -378,16 +378,18 @@ let rebalance_checked { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } =
 
 (** Combine the fee excesses from two transitions. *)
 let combine
-    { fee_token_l = fee_token1_l
-    ; fee_excess_l = fee_excess1_l
-    ; fee_token_r = fee_token1_r
-    ; fee_excess_r = fee_excess1_r
-    }
-    { fee_token_l = fee_token2_l
-    ; fee_excess_l = fee_excess2_l
-    ; fee_token_r = fee_token2_r
-    ; fee_excess_r = fee_excess2_r
-    } =
+    ({ fee_token_l = fee_token1_l
+     ; fee_excess_l = fee_excess1_l
+     ; fee_token_r = fee_token1_r
+     ; fee_excess_r = fee_excess1_r
+     } :
+      t )
+    ({ fee_token_l = fee_token2_l
+     ; fee_excess_l = fee_excess2_l
+     ; fee_token_r = fee_token2_r
+     ; fee_excess_r = fee_excess2_r
+     } :
+      t ) : t Or_error.t =
   let open Or_error.Let_syntax in
   (* Eliminate fee_excess1_r. *)
   let%bind (fee_token1_l, fee_excess1_l), (fee_token2_l, fee_excess2_l) =
@@ -555,11 +557,13 @@ let to_one_or_two ({ fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } : t)
 
 [%%ifdef consensus_mechanism]
 
-let gen =
+let gen_single ?(token_id = Token_id.gen) ?(excess = Fee.Signed.gen) () :
+    (Token_id.t * Fee.Signed.t) Quickcheck.Generator.t =
+  Quickcheck.Generator.tuple2 token_id excess
+
+let gen : t Quickcheck.Generator.t =
   let open Quickcheck.Generator.Let_syntax in
-  let%map excesses =
-    One_or_two.gen (Quickcheck.Generator.tuple2 Token_id.gen Fee.Signed.gen)
-  in
+  let%map excesses = One_or_two.gen @@ gen_single () in
   match of_one_or_two excesses with
   | Ok ret ->
       ret
@@ -573,51 +577,5 @@ let gen =
           ; fee_token_r = Token_id.default
           ; fee_excess_r = Fee.Signed.zero
           } )
-
-let%test_unit "Checked and unchecked behaviour is consistent" =
-  Quickcheck.test (Quickcheck.Generator.tuple2 gen gen) ~f:(fun (fe1, fe2) ->
-      let fe = combine fe1 fe2 in
-      let fe_checked =
-        Or_error.try_with (fun () ->
-            Test_util.checked_to_unchecked
-              Typ.(typ * typ)
-              typ
-              (fun (fe1, fe2) -> combine_checked fe1 fe2)
-              (fe1, fe2) )
-      in
-      match (fe, fe_checked) with
-      | Ok fe, Ok fe_checked ->
-          [%test_eq: t] fe fe_checked
-      | Error _, Error _ ->
-          ()
-      | _ ->
-          [%test_eq: t Or_error.t] fe fe_checked )
-
-let%test_unit "Combine succeeds when the middle excess is zero" =
-  Quickcheck.test
-    Quickcheck.Generator.(
-      filter (tuple3 gen Token_id.gen Fee.Signed.gen)
-        ~f:(fun (fe1, tid, _excess) ->
-          (* The tokens before and after should be distinct. Especially in this
-             scenario, we may get an overflow error otherwise.
-          *)
-          not (Token_id.equal fe1.fee_token_l tid) ))
-    ~f:(fun (fe1, tid, excess) ->
-      let fe2 =
-        if Fee.Signed.(equal zero) fe1.fee_excess_r then of_single (tid, excess)
-        else
-          match
-            of_one_or_two
-              (`Two
-                ( (fe1.fee_token_r, Fee.Signed.negate fe1.fee_excess_r)
-                , (tid, excess) ) )
-          with
-          | Ok fe2 ->
-              fe2
-          | Error _ ->
-              (* The token is the same, and rebalancing causes an overflow. *)
-              of_single (fe1.fee_token_r, Fee.Signed.negate fe1.fee_excess_r)
-      in
-      ignore @@ Or_error.ok_exn (combine fe1 fe2) )
 
 [%%endif]
