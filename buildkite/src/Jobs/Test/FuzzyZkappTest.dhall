@@ -14,12 +14,13 @@ let Size = ../../Command/Size.dhall
 
 let buildTestCmd : Text -> Text -> Natural -> Size -> Command.Type = \(profile : Text) -> \(path : Text) -> \(trials : Natural) -> \(cmd_target : Size) ->
   let trials = Natural/show trials in
+  let key = "fuzzy-zkapp-unit-test-${profile}" in
   Command.build
     Command.Config::{
-      commands = RunInToolchain.runInToolchain ([] : List Text)
-        "buildkite/scripts/fuzzy-zkapp-test.sh ${profile} ${path} ${trials}",
+      commands = RunInToolchain.runInToolchain ["DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN"]
+        "buildkite/scripts/fuzzy-zkapp-test.sh ${profile} ${path} ${trials} && buildkite/scripts/upload-partial-coverage-data.sh ${key}",
       label = "Fuzzy zkapp unit tests",
-      key = "fuzzy-zkapp-unit-test-${profile}",
+      key = key,
       target = cmd_target,
       docker = None Docker.Type,
       artifact_paths = [ S.contains "core_dumps/*" ]
