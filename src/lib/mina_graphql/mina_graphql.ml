@@ -4556,11 +4556,13 @@ module Mutations = struct
           let zkapp_command =
             Transaction_snark.For_tests.deploy_snapp ~constraint_constants
               ~permissions:
-                { Permissions.user_default with
-                  set_verification_key = Permissions.Auth_required.Proof
-                ; edit_state = Permissions.Auth_required.Proof
-                ; edit_action_state = Proof
-                }
+                ( if zkapp_command_details.max_cost then
+                  { Permissions.user_default with
+                    set_verification_key = Permissions.Auth_required.Proof
+                  ; edit_state = Permissions.Auth_required.Proof
+                  ; edit_action_state = Proof
+                  }
+                else Permissions.user_default )
               spec
           in
           let rec go () =
