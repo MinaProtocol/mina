@@ -1,0 +1,50 @@
+# this pipeline performs an automated hardfork of a Mina blockchain network.
+# this pipeline is intended to be run manually from within the Buildkite UI. 
+
+# certain depends_on values have been disabled for testing
+
+steps:
+  - command: "./buildkite/pipelines/hardfork/scripts/pre_hardfork_qa.sh"
+    key: "initial_healthcheck"
+    label: "Initial Healthcheck"
+
+  - command: "./buildkite/pipelines/hardfork/scripts/ledger_export.sh"
+    key: "export_ledger"
+    label: "Export Ledger"
+    depends_on: "initial_healthcheck"
+
+  # - command: "python3 ./buildkite/pipelines/hardfork/scripts/archive_export.py"
+  #   key: "export_archive"
+  #   label: "Export Archive"
+  #   depends_on: "initial_healthcheck"
+
+  # - command: "python3 ./buildkite/pipelines/hardfork/scripts/rosetta_export.py"
+  #   key: "export_rosetta"
+  #   label: "Export Rosetta"
+  #   depends_on: "initial_healthcheck"
+
+  - command: "./buildkite/pipelines/hardfork/scripts/epoch_seeds_export.sh"
+    key: "export_epoch_seed"
+    label: "Export Epoch Seeds"
+    depends_on: "initial_healthcheck"
+
+  - command: "./buildkite/pipelines/hardfork/scripts/export_hardfork_env_vars.sh && ./.buildkite/scripts/debian_build.sh"
+    key: "deb_build"
+    label: "Debian Package Builds"
+    # depends_on: "export_ledger"
+  
+  - command: "./buildkite/pipelines/hardfork/scripts/export_hardfork_env_vars.sh && ./.buildkite/scripts/docker_build.sh"
+    key: "docker_build"
+    label: "Docker Container Builds"
+    # depends_on: "deb_build"
+
+  # - command: "python3 ./buildkite/pipelines/hardfork/scripts/terraform_deploy.py"
+  #   key: "deployment"
+  #   label: "Deploy Network Fork"
+  #   # depends_on: "docker_build"
+
+  # - command: "python3 ./buildkite/pipelines/hardfork/scripts/post_hardfork_qa.py"
+  #   key: "post_qa"
+  #   label: "Final Healthcheck"
+  #   # depends_on: "deployment"
+
