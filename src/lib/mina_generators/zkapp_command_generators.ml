@@ -1679,4 +1679,22 @@ let%test_module _ =
             ~random:(Splittable_random.State.create Random.State.default))
       in
       ()
+
+    let%test_unit "generate zkapps with balance and fee range" =
+      let ledger, fee_payer_keypair, keymap =
+        mk_ledger ~num_of_unused_keys:3 ()
+      in
+      let _ =
+        Quickcheck.Generator.(
+          generate
+            (list_with_length 100
+               (gen_zkapp_command_from ~no_account_precondition:true
+                  ~fee_payer_keypair ~keymap ~no_token_accounts:true
+                  ~fee_range:("2", "4") ~balance_change_range:("0", "0.00001")
+                  ~account_state_tbl:(Account_id.Table.create ())
+                  ~generate_new_accounts:false ~ledger () ) )
+            ~size:100
+            ~random:(Splittable_random.State.create Random.State.default))
+      in
+      ()
   end )
