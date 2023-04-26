@@ -883,6 +883,12 @@ module Make (L : Ledger_intf.S) :
         Or_error.error_string
           Transaction_status.Failure.(describe Update_not_permitted_balance)
     in
+    let%bind () =
+      if Account.has_permission_to_increment_nonce fee_payer_account then Ok ()
+      else
+        Or_error.error_string
+          Transaction_status.Failure.(describe Update_not_permitted_nonce)
+    in
     (* Charge the fee. This must happen, whether or not the command itself
        succeeds, to ensure that the network is compensated for processing this
        command.

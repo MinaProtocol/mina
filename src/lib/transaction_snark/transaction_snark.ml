@@ -2403,6 +2403,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                   Account.Checked.has_permission
                     ~signature_verifies:is_user_command ~to_:`Access account
                 in
+                let permitted_to_increment_nonce =
+                  Account.Checked.has_permission ~to_:`Increment_nonce account
+                in
                 let permitted_to_send =
                   Account.Checked.has_permission ~to_:`Send account
                 in
@@ -2413,6 +2416,13 @@ module Make_str (A : Wire_types.Concrete) = struct
                   [%with_label_
                     "Fee payer access should be permitted for all commands"]
                     (fun () -> Boolean.Assert.is_true permitted_to_access)
+                in
+                let%bind () =
+                  [%with_label_
+                    "Fee payer increment nonce should be permitted for all \
+                     commands"] (fun () ->
+                      Boolean.Assert.any
+                        [ Boolean.not is_user_command; permitted_to_increment_nonce ] )
                 in
                 let%bind () =
                   [%with_label_
