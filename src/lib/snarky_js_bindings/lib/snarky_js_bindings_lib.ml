@@ -3270,11 +3270,7 @@ let test =
           let kp = keypair () in
           let payload : Signed_command_payload.t =
             { Signed_command_payload.dummy with
-              body =
-                Payment
-                  { Mina_base.Payment_payload.dummy with
-                    source_pk = Signature_lib.Public_key.compress kp.public_key
-                  }
+              body = Payment Mina_base.Payment_payload.dummy
             }
           in
           let payment = Signed_command.sign kp payload in
