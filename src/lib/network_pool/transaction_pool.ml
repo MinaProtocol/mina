@@ -2788,7 +2788,7 @@ let%test_module _ =
 
     let%test_unit "commands are rejected if fee payer permissions are not \
                    handled" =
-      let test_permissions ~is_able_to_send permissions =
+      let test_permissions ~is_able_to_send send_command permissions =
         let%bind t = setup_test () in
         assert_pool_txs t [] ;
         (* DEBUG: Core.Printf.printf !"executing test: %{Yojson.Safe}\n" (Permissions.to_yojson permissions) ; *)
@@ -2799,75 +2799,97 @@ let%test_module _ =
         let%bind () = add_commands' t [ set_permissions_command ] in
         let%bind () = advance_chain t [ set_permissions_command ] in
         assert_pool_txs t [] ;
-
-        let send_command =
-          mk_payment ~sender_idx:0 ~fee:minimum_fee ~nonce:1 ~receiver_idx:1
-            ~amount:1_000_000 ()
-        in
         let%map result = add_commands t [ send_command ] in
         let expectation = if is_able_to_send then [ send_command ] else [] in
         assert_pool_apply expectation result
       in
-      Thread_safe.block_on_async_exn (fun () ->
+      let run_test_cases send_cmd =
           let%bind () =
             test_permissions ~is_able_to_send:true
+              send_cmd
               { Permissions.user_default with
                 send = Permissions.Auth_required.Signature
               }
           in
           let%bind () =
             test_permissions ~is_able_to_send:true
+              send_cmd
               { Permissions.user_default with
                 send = Permissions.Auth_required.Either
               }
           in
           let%bind () =
             test_permissions ~is_able_to_send:true
+              send_cmd
               { Permissions.user_default with
                 send = Permissions.Auth_required.None
               }
           in
           let%bind () =
             test_permissions ~is_able_to_send:false
+              send_cmd
               { Permissions.user_default with
                 send = Permissions.Auth_required.Impossible
               }
           in
           let%bind () =
             test_permissions ~is_able_to_send:false
+              send_cmd
               { Permissions.user_default with
                 send = Permissions.Auth_required.Proof
               }
           in
           let%bind () =
             test_permissions ~is_able_to_send:true
+              send_cmd
               { Permissions.user_default with
                 increment_nonce = Permissions.Auth_required.Signature
               }
           in
           let%bind () =
             test_permissions ~is_able_to_send:true
+              send_cmd
               { Permissions.user_default with
                 increment_nonce = Permissions.Auth_required.Either
               }
           in
           let%bind () =
             test_permissions ~is_able_to_send:true
+              send_cmd
               { Permissions.user_default with
                 increment_nonce = Permissions.Auth_required.None
               }
           in
           let%bind () =
             test_permissions ~is_able_to_send:false
+              send_cmd
               { Permissions.user_default with
                 increment_nonce = Permissions.Auth_required.Impossible
               }
           in
           let%bind () =
             test_permissions ~is_able_to_send:false
+              send_cmd
               { Permissions.user_default with
                 increment_nonce = Permissions.Auth_required.Proof
               }
+          in
+          return ()
+      in
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind () =
+            let send_command =
+              mk_payment ~sender_idx:0 ~fee:minimum_fee ~nonce:1 ~receiver_idx:1
+                ~amount:1_000_000 ()
+            in
+            run_test_cases send_command
+          in
+          let%bind () =
+            let send_command =
+              mk_transfer_zkapp_command ~fee_payer_idx:(0, 1) ~sender_idx:0 ~fee:minimum_fee ~nonce:2 ~receiver_idx:1
+                ~amount:1_000_000 ()
+            in
+            run_test_cases send_command
           in
           return () )
   end )
