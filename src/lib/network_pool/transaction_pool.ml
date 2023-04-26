@@ -2791,7 +2791,6 @@ let%test_module _ =
       let test_permissions ~is_able_to_send send_command permissions =
         let%bind t = setup_test () in
         assert_pool_txs t [] ;
-        (* DEBUG: Core.Printf.printf !"executing test: %{Yojson.Safe}\n" (Permissions.to_yojson permissions) ; *)
         let%bind set_permissions_command =
           mk_basic_zkapp 0 test_keys.(0) ~permissions
           |> mk_zkapp_user_cmd t.txn_pool
