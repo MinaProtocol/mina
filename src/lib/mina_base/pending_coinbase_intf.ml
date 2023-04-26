@@ -186,7 +186,7 @@ module type S = sig
             | Update_one
             | Update_two_coinbase_in_first
             | Update_two_coinbase_in_second
-          [@@deriving sexp, to_yojson]
+          [@@deriving equal, sexp, to_yojson]
         end
       end]
 

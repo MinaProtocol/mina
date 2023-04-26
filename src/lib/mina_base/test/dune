@@ -21,6 +21,7 @@
   kimchi_backend.pasta
   kimchi_backend.pasta.basic
   mina_base
+  mina_base_import
   mina_numbers
   mina_wire_types
   pickles

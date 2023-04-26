@@ -121,19 +121,16 @@ let () =
               `Quick to_account_updates_is_the_inverse_of_of_account_updates
           ; test_case "Test to_zkapp_command with hashes list." `Quick
               to_zkapp_command_with_hashes_list
-        ] )
+          ] )
     ; Coinbase_test.
-      ( "coinbase"
-      , [ test_case "Accessed accounts are also those referenced." `Quick
-            accessed_accounts_are_also_referenced
-        ; test_case "Refrenced accounts are either one or two." `Quick
-            referenced_accounts_either_1_or_2
-          
-      ])
+        ( "coinbase"
+        , [ test_case "Accessed accounts are also those referenced." `Quick
+              accessed_accounts_are_also_referenced
+          ; test_case "Refrenced accounts are either one or two." `Quick
+              referenced_accounts_either_1_or_2
+          ] )
     ; Control_test.
-      ( "contol"
-      , [ test_case "JSON roundtrip." `Quick json_roundtrip
-      ])
+        ("contol", [ test_case "JSON roundtrip." `Quick json_roundtrip ])
     ; Fee_related_test.
         ( "fee-related"
         , [ test_case "Test fee." `Quick test_fee
@@ -152,6 +149,19 @@ let () =
           ; test_case "Test merkle root soundness." `Quick merkle_root
           ; test_case "Free hashes don't collide." `Quick free_hash_well_behaved
         ] )
+    ; Pending_coinbase_test.
+        ( "pending coinbase"
+        , [ test_case "Add stack + remove stack = initial tree." `Quick
+              add_stack_plus_remove_stack_equals_initial_tree
+          ; test_case "Checked_stack = unchecked_stack." `Quick
+              checked_stack_equals_unchecked_stack
+          ; test_case "Checked_tree = unchecked_tree." `Quick
+              checked_tree_equals_unchecked_tree
+          ; test_case "Checked_tree = unchecked_tree after pop." `Quick
+              checked_tree_equals_unchecked_tree_after_pop
+          ; test_case "Push and pop multiple stacks." `Quick
+              push_and_pop_multiple_stacks
+          ] )
     ; Receipt_test.
       ( "receipts"
       , [ test_case "Checked-unmchecked equivalence for signed command" `Quick
@@ -170,11 +180,12 @@ let () =
         ( "signed command"
         , [ test_case "Completeness." `Quick completeness
           ; test_case "JSON." `Quick json
-        ] )
+          ] )
     ; Transaction_status_test.
-      ( "transaction status"
-      , [ test_case "To string roundtrip," `Quick of_string_to_string_roundtrip
-      ])
+        ( "transaction status"
+        , [ test_case "To string roundtrip," `Quick
+              of_string_to_string_roundtrip
+          ] )
     ; Transaction_union_tag_test.
         ( "transaction union tag"
         , [ test_case "Is payment." `Quick is_payment
