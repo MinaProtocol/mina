@@ -524,10 +524,8 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
  *      - 1 Zero gate
  *      - Adds 1 external check for multi range
  *)
-let less_than_mod (type f)
-    (module Circuit : Snark_intf.Run with type field = f)
-    (value : f Element.Standard.t)
-    (foreign_field_modulus : f standard_limbs) 
+let less_than_mod (type f) (module Circuit : Snark_intf.Run with type field = f)
+    (value : f Element.Standard.t) (foreign_field_modulus : f standard_limbs)
     (external_checks : f External_checks.t) : f Element.Standard.t =
   let open Circuit in
   (* Compute the value for the right input of the addition as 2^264 *)
@@ -581,7 +579,7 @@ let less_than_mod (type f)
 
   (* Check that the highest limb of right input is 2^88*)
   let two_to_88 = two_to_limb_field (module Circuit) in
-  Field.Assert.equal (Field.constant two_to_88) offset2  ;
+  Field.Assert.equal (Field.constant two_to_88) offset2 ;
 
   (* Add external check for multi range check *)
   External_checks.append_multi_range_check external_checks
@@ -888,8 +886,7 @@ let compute_bound_witness_carry (type f)
 
 (* Foreign field multiplication gadget definition *)
 let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (left_input : f Element.Standard.t)
-    (right_input : f Element.Standard.t)
+    (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
     (foreign_field_modulus : f standard_limbs)
     (external_checks : f External_checks.t) : f Element.Standard.t =
   let open Circuit in
@@ -1169,12 +1166,12 @@ let%test_unit "foreign_field arithmetics gadgets" =
               left_input right_input foreign_field_modulus
           in
           (* Create external checks context for tracking extra constraints *)
-             let external_checks =
-              External_checks.create (module Runner.Impl)
-            in
+          let external_checks = External_checks.create (module Runner.Impl) in
           (* Check that the inputs were foreign field elements*)
           let _out =
-            less_than_mod (module Runner.Impl) left_input foreign_field_modulus external_checks
+            less_than_mod
+              (module Runner.Impl)
+              left_input foreign_field_modulus external_checks
           in
           let _out =
             less_than_mod
@@ -1313,8 +1310,8 @@ let%test_unit "foreign_field arithmetics gadgets" =
           let product =
             mul
               (module Runner.Impl)
-              left_input right_input
-              foreign_field_modulus unused_external_checks
+              left_input right_input foreign_field_modulus
+              unused_external_checks
           in
           (* Check product matches expected result *)
           as_prover (fun () ->
@@ -1421,8 +1418,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
                 less_than_mod
                   (module Runner.Impl)
                   (Element.Standard.of_limbs product)
-                  foreign_field_modulus
-                  external_checks
+                  foreign_field_modulus external_checks
               in
               () ) ;
 
@@ -1502,14 +1498,17 @@ let%test_unit "foreign_field arithmetics gadgets" =
 
           (* Create external checks context for tracking extra constraints
              that are required for soundness *)
-          let unused_external_checks = External_checks.create (module Runner.Impl) in
+          let unused_external_checks =
+            External_checks.create (module Runner.Impl)
+          in
 
           let product =
             mul
               (module Runner.Impl)
-              left_input right_input foreign_field_modulus unused_external_checks
+              left_input right_input foreign_field_modulus
+              unused_external_checks
           in
-          
+
           let addition =
             add (module Runner.Impl) product left_input foreign_field_modulus
           in
@@ -1521,7 +1520,9 @@ let%test_unit "foreign_field arithmetics gadgets" =
           (* Check product matches expected result *)
           (* Check that the inputs were foreign field elements*)
           let _out =
-            less_than_mod (module Runner.Impl) left_input foreign_field_modulus external_checks
+            less_than_mod
+              (module Runner.Impl)
+              left_input foreign_field_modulus external_checks
           in
           let _out =
             less_than_mod
