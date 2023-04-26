@@ -1,3 +1,10 @@
+(** Testing
+    -------
+    Component:  Mina base
+    Invocation: dune exec src/lib/mina_base/test/main.exe -- test '^fee excess$'
+    Subject:    Test fee excess.
+ *)
+
 open Core_kernel
 open Currency
 open Mina_base
@@ -87,16 +94,3 @@ let combine_succeed_with_0_middle () =
               of_single (fe1.fee_token_r, Fee.Signed.negate fe1.fee_excess_r)
       in
       ignore @@ Or_error.ok_exn (combine fe1 fe2) )
-
-let () =
-  let open Alcotest in
-  run "Test fee excesses."
-    [ ( "fee-excess"
-      , [ test_case "Checked and unchecked behaviour consistent." `Quick
-            combine_checked_unchecked_consistent
-        ; test_case "Combine succeeds when the middle excess is zero." `Quick
-            combine_succeed_with_0_middle
-        ; test_case "Rebalanced fee excess is really rebalanced." `Quick
-            rebalancing_properties_hold
-        ] )
-    ]
