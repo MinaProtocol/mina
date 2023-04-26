@@ -499,12 +499,11 @@ let bnot_unchecked (type f)
 
   let all_ones_f = all_ones_field (module Circuit) length in
   let all_ones_var = exists Field.typ ~compute:(fun () -> all_ones_f) in
-  Field.Assert.equal all_ones_var (Field.constant all_ones_f);
+  Field.Assert.equal all_ones_var (Field.constant all_ones_f) ;
 
   (* Negating is equivalent to subtracting with all one word *)
   (* [2^len - 1] - input = not (input) *)
   Generic.sub (module Circuit) all_ones_var input
-  
 
 (* Negates a word of 64 bits, but its length goes unconstrained in the circuit
    (unless it is copied from a checked length value) *)
@@ -785,4 +784,4 @@ let%test_unit "bitwise not gadget" =
         test_not
           "7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" "0"
           255 ) ) ;
-          ()
+  ()
