@@ -11,7 +11,16 @@ end
 type t = Stable.V1.t
 
 module Level : sig
-  type t = Spam | Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
+  type t =
+    | Internal
+    | Spam
+    | Trace
+    | Debug
+    | Info
+    | Warn
+    | Error
+    | Faulty_peer
+    | Fatal
   [@@deriving
     sexp, equal, compare, yojson, show { with_path = false }, enumerate]
 
@@ -24,6 +33,8 @@ module Time : sig
   val to_yojson : t -> Yojson.Safe.t
 
   val of_yojson : Yojson.Safe.t -> (t, string) Result.t
+
+  val pp : Format.formatter -> t -> unit
 
   val pretty_to_string : t -> string
 
@@ -68,7 +79,15 @@ end
  *  messages into strings. This is used as part of defining
  *  a Consumer. *)
 module Processor : sig
+  module type S = sig
+    type t
+
+    val process : t -> Message.t -> string option
+  end
+
   type t
+
+  val create : (module S with type t = 'processor_data) -> 'processor_data -> t
 
   val raw : ?log_level:Level.t -> unit -> t
 
@@ -129,6 +148,8 @@ val change_id : t -> id:string -> t
 val raw : t -> Message.t -> unit
 
 val trace : _ log_function
+
+val internal : _ log_function
 
 val debug : _ log_function
 
