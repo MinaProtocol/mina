@@ -228,5 +228,12 @@ let () =
           ; test_case "JSON roundtrip dummy." `Quick
               Test_derivers.json_roundtrip_dummy
           ; test_case "Full circuit." `Quick Test_derivers.full_circuit
-          ] )
+        ] )
+    ; Zkapp_precondition_test.
+      ( "zkApp precondition"
+      , [ test_case "Account JSON roundtrip." `Quick account_json_roundtrip
+        ; test_case "Epoch data JSON roundtrip." `Quick epoch_data_json_roundtrip
+        ; test_case "Protocol_state JSON roundtrip." `Quick protocol_state_json_roundtrip
+        ; test_case "Closed interval JSON roundtrip." `Quick closed_interval_json_roundtrip
+      ])
     ]
