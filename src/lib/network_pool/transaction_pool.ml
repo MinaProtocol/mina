@@ -2861,6 +2861,36 @@ let%test_module _ =
               increment_nonce = Permissions.Auth_required.Proof
             }
         in
+        let%bind () =
+          test_permissions ~is_able_to_send:true send_cmd
+            { Permissions.user_default with
+              access = Permissions.Auth_required.Signature
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:true send_cmd
+            { Permissions.user_default with
+              access = Permissions.Auth_required.Either
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:true send_cmd
+            { Permissions.user_default with
+              access = Permissions.Auth_required.None
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:false send_cmd
+            { Permissions.user_default with
+              access = Permissions.Auth_required.Impossible
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:false send_cmd
+            { Permissions.user_default with
+              access = Permissions.Auth_required.Proof
+            }
+        in
         return ()
       in
       Thread_safe.block_on_async_exn (fun () ->
