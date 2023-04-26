@@ -144,6 +144,8 @@ input ZkappCommandsDetails {
   noPrecondition: Boolean!
 
   maxCost: Boolean!
+  
+  accountQueueSize: Int!
 
   minBalanceChange: String!
 

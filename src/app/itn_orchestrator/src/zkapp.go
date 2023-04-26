@@ -16,6 +16,7 @@ type ZkappCommandParams struct {
 	Nodes             []NodeAddress
 	NoPrecondition    bool
 	MaxCost           bool
+	AccountQueueSize  int
 	MinBalanceChange  string 
 	MaxBalanceChange  string 
 	InitBalance       string
@@ -41,6 +42,7 @@ func SendZkappCommands(config Config, params ZkappCommandParams, output func(Sch
 			FeePayers:             params.FeePayers[nodeIx*feePayersPerNode : (nodeIx+1)*feePayersPerNode],
 			NoPrecondition:        params.NoPrecondition,
 			MaxCost:               params.MaxCost,
+			AccountQueueSize:      params.AccountQueueSize,
 			MinBalanceChange:      params.MinBalanceChange, 
 			MaxBalanceChange:      params.MaxBalanceChange, 
 			InitBalance:           params.InitBalance,
