@@ -20,12 +20,41 @@ open Currency
 module Wire_types = Mina_wire_types.Mina_base.Pending_coinbase
 
 module Make_sig (A : Wire_types.Types.S) = struct
-  module type S =
-    Pending_coinbase_intf.S
-      with type State_stack.Stable.V1.t = A.State_stack.V1.t
-       and type Stack_versioned.Stable.V1.t = A.Stack_versioned.V1.t
-       and type Hash.t = A.Hash_builder.V1.t
-       and type Hash_versioned.Stable.V1.t = A.Hash_versioned.V1.t
+  module type S = sig
+    include
+      Pending_coinbase_intf.S
+        with type State_stack.Stable.V1.t = A.State_stack.V1.t
+         and type Stack_versioned.Stable.V1.t = A.Stack_versioned.V1.t
+         and type Hash.t = A.Hash_builder.V1.t
+         and type Hash_versioned.Stable.V1.t = A.Hash_versioned.V1.t
+
+    val add_coinbase :
+      depth:int -> t -> coinbase:Coinbase.t -> is_new_stack:bool -> t Or_error.t
+
+    val add_coinbase_with_zero_checks_preapplied :
+         t
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
+      -> coinbase:Coinbase.t
+      -> supercharged_coinbase:bool
+      -> state_body_hash:field
+      -> global_slot:Unsigned.uint32
+      -> is_new_stack:bool
+      -> t
+
+    val incr_index : depth:int -> t -> is_new_stack:bool -> t Base.Or_error.t
+
+    val add_state :
+         depth:int
+      -> t
+      -> field
+      -> Unsigned.uint32
+      -> is_new_stack:bool
+      -> t Base.Or_error.t
+
+    val create_exn : depth:int -> unit -> t
+
+    val max_coinbase_stack_count : depth:int -> int
+  end
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -1034,7 +1063,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                    !cur_hash ) ) ) ;
         !cached.(i)
 
-    let create_exn' ~depth () =
+    let create_exn ~depth () =
       let rec create_path height path key =
         if height < 0 then path
         else
@@ -1060,7 +1089,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     [%%define_locally Or_error.(try_with)]
 
-    let create ~depth () = try_with (fun () -> create_exn' ~depth ())
+    let create ~depth () = try_with (fun () -> create_exn ~depth ())
 
     let merkle_root (t : t) = Merkle_tree.merkle_root t.tree
 
@@ -1290,38 +1319,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
 
-  let%test_unit "add stack + remove stack = initial tree " =
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
-    in
-    let depth = constraint_constants.pending_coinbase_depth in
-    let coinbases_gen =
-      Quickcheck.Generator.list_non_empty
-        (Coinbase.Gen.gen ~constraint_constants)
-    in
-    let pending_coinbases = ref (create ~depth () |> Or_error.ok_exn) in
-    Quickcheck.test coinbases_gen ~trials:50 ~f:(fun cbs ->
-        Run_in_thread.block_on_async_exn (fun () ->
-            let is_new_stack = ref true in
-            let init = merkle_root !pending_coinbases in
-            let after_adding =
-              List.fold cbs ~init:!pending_coinbases
-                ~f:(fun acc (coinbase, _) ->
-                  let t =
-                    add_coinbase ~depth acc ~coinbase
-                      ~is_new_stack:!is_new_stack
-                    |> Or_error.ok_exn
-                  in
-                  is_new_stack := false ;
-                  t )
-            in
-            let _, after_del =
-              remove_coinbase_stack ~depth after_adding |> Or_error.ok_exn
-            in
-            pending_coinbases := after_del ;
-            assert (Hash.equal (merkle_root after_del) init) ;
-            Async_kernel.Deferred.return () ) )
-
   module type Pending_coinbase_intf = sig
     type t [@@deriving sexp]
 
@@ -1374,279 +1371,22 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~is_new_stack:false
         |> Or_error.ok_exn
 
-  let%test_unit "Checked_stack = Unchecked_stack" =
-    let open Quickcheck in
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
-    in
-    test ~trials:20
-      (Generator.tuple2 Stack.gen (Coinbase.Gen.gen ~constraint_constants))
-      ~f:(fun (base, (cb, _supercharged_coinbase)) ->
-        let coinbase_data = Coinbase_data.of_coinbase cb in
-        let unchecked = Stack.push_coinbase cb base in
-        let checked =
-          let comp =
-            let open Snark_params.Tick in
-            let cb_var = Coinbase_data.(var_of_t coinbase_data) in
-            let%map res =
-              Stack.Checked.push_coinbase cb_var (Stack.var_of_t base)
-            in
-            As_prover.read Stack.typ res
-          in
-          Or_error.ok_exn (run_and_check comp)
-        in
-        assert (Stack.equal unchecked checked) )
-
-  let%test_unit "Checked_tree = Unchecked_tree" =
-    let open Quickcheck in
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
-    in
-    let depth = constraint_constants.pending_coinbase_depth in
-    let pending_coinbases = create ~depth () |> Or_error.ok_exn in
-    test ~trials:20
-      (Generator.tuple3
-         (Coinbase.Gen.gen ~constraint_constants)
-         State_body_hash.gen Mina_numbers.Global_slot.gen )
-      ~f:(fun ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
-              , state_body_hash
-              , global_slot ) ->
-        let amount = coinbase.amount in
-        let is_new_stack, action =
-          Currency.Amount.(
-            if equal coinbase.amount zero then (true, Update.Action.Update_none)
-            else (true, Update_one))
-        in
-        let unchecked =
-          add_coinbase_with_zero_checks ~constraint_constants
-            (module T)
-            pending_coinbases ~coinbase ~is_new_stack ~state_body_hash
-            ~global_slot ~supercharged_coinbase
-        in
-        (* inside the `open' below, Checked means something else, so define this function *)
-        let f_add_coinbase = Checked.add_coinbase ~constraint_constants in
-        let checked_merkle_root =
-          let comp =
-            let open Snark_params.Tick in
-            let amount_var = Amount.var_of_t amount in
-            let action_var = Update.Action.var_of_t action in
-            let coinbase_receiver_var =
-              Public_key.Compressed.var_of_t coinbase.receiver
-            in
-            let supercharge_coinbase_var =
-              Boolean.var_of_value supercharged_coinbase
-            in
-            let state_body_hash_var =
-              State_body_hash.var_of_t state_body_hash
-            in
-            let global_slot_var =
-              Mina_numbers.Global_slot.Checked.constant global_slot
-            in
-            let%map result =
-              handle
-                (fun () ->
-                  f_add_coinbase
-                    (Hash.var_of_t (merkle_root pending_coinbases))
-                    { Update.Poly.action = action_var
-                    ; coinbase_amount = amount_var
-                    }
-                    ~coinbase_receiver:coinbase_receiver_var
-                    ~supercharge_coinbase:supercharge_coinbase_var
-                    state_body_hash_var global_slot_var )
-                (unstage (handler ~depth pending_coinbases ~is_new_stack))
-            in
-            As_prover.read Hash.typ result
-          in
-          Or_error.ok_exn (run_and_check comp)
-        in
-        assert (Hash.equal (merkle_root unchecked) checked_merkle_root) )
-
-  let%test_unit "Checked_tree = Unchecked_tree after pop" =
-    let open Quickcheck in
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
-    in
-    let depth = constraint_constants.pending_coinbase_depth in
-    test ~trials:20
-      (Generator.tuple3
-         (Coinbase.Gen.gen ~constraint_constants)
-         State_body_hash.gen Mina_numbers.Global_slot.gen )
-      ~f:(fun ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
-              , state_body_hash
-              , global_slot ) ->
-        let pending_coinbases = create ~depth () |> Or_error.ok_exn in
-        let amount = coinbase.amount in
-        let action =
-          Currency.Amount.(
-            if equal coinbase.amount zero then Update.Action.Update_none
-            else Update_one)
-        in
-        let unchecked =
-          add_coinbase_with_zero_checks ~constraint_constants
-            (module T)
-            pending_coinbases ~coinbase ~is_new_stack:true ~state_body_hash
-            ~global_slot ~supercharged_coinbase
-        in
-        (* inside the `open' below, Checked means something else, so define these functions *)
-        let f_add_coinbase = Checked.add_coinbase ~constraint_constants in
-        let f_pop_coinbase = Checked.pop_coinbases ~constraint_constants in
-        let checked_merkle_root =
-          let comp =
-            let open Snark_params.Tick in
-            let amount_var = Amount.var_of_t amount in
-            let action_var = Update.Action.(var_of_t action) in
-            let coinbase_receiver_var =
-              Public_key.Compressed.var_of_t coinbase.receiver
-            in
-            let supercharge_coinbase_var =
-              Boolean.var_of_value supercharged_coinbase
-            in
-            let state_body_hash_var =
-              State_body_hash.var_of_t state_body_hash
-            in
-            let global_slot_var =
-              Mina_numbers.Global_slot.Checked.constant global_slot
-            in
-            let%map result =
-              handle
-                (fun () ->
-                  f_add_coinbase
-                    (Hash.var_of_t (merkle_root pending_coinbases))
-                    { Update.Poly.action = action_var
-                    ; coinbase_amount = amount_var
-                    }
-                    ~coinbase_receiver:coinbase_receiver_var
-                    ~supercharge_coinbase:supercharge_coinbase_var
-                    state_body_hash_var global_slot_var )
-                (unstage (handler ~depth pending_coinbases ~is_new_stack:true))
-            in
-            As_prover.read Hash.typ result
-          in
-          Or_error.ok_exn (run_and_check comp)
-        in
-        assert (Hash.equal (merkle_root unchecked) checked_merkle_root) ;
-        (*deleting the coinbase stack we just created. therefore if there was no update then don't try to delete*)
-        let proof_emitted = not Update.Action.(equal action Update_none) in
-        let unchecked_after_pop =
-          if proof_emitted then
-            remove_coinbase_stack ~depth unchecked |> Or_error.ok_exn |> snd
-          else unchecked
-        in
-        let checked_merkle_root_after_pop =
-          let comp =
-            let open Snark_params.Tick in
-            let%map current, _previous =
-              handle
-                (fun () ->
-                  f_pop_coinbase ~proof_emitted:Boolean.true_
-                    (Hash.var_of_t checked_merkle_root) )
-                (unstage (handler ~depth unchecked ~is_new_stack:false))
-            in
-            As_prover.read Hash.typ current
-          in
-          Or_error.ok_exn (run_and_check comp)
-        in
-        assert (
-          Hash.equal
-            (merkle_root unchecked_after_pop)
-            checked_merkle_root_after_pop ) )
-
-  let%test_unit "push and pop multiple stacks" =
-    let open Quickcheck in
-    let module Pending_coinbase = T in
-    let constraint_constants =
-      { Genesis_constants.Constraint_constants.for_unit_tests with
-        pending_coinbase_depth = 3
-      }
-    in
-    let depth = constraint_constants.pending_coinbase_depth in
-    let t_of_coinbases t = function
-      | [] ->
-          let t' =
-            Pending_coinbase.incr_index ~depth t ~is_new_stack:true
-            |> Or_error.ok_exn
-          in
-          (Pending_coinbase.Stack.empty, t')
-      | ( (initial_coinbase, _supercharged_coinbase)
-        , state_body_hash
-        , global_slot )
-        :: coinbases ->
-          let t' =
-            Pending_coinbase.add_state ~depth t state_body_hash global_slot
-              ~is_new_stack:true
-            |> Or_error.ok_exn
-            |> Pending_coinbase.add_coinbase ~depth ~coinbase:initial_coinbase
-                 ~is_new_stack:false
-            |> Or_error.ok_exn
-          in
-          let updated =
-            List.fold coinbases ~init:t'
-              ~f:(fun
-                   pending_coinbases
-                   ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
-                   , state_body_hash
-                   , global_slot )
-                 ->
-                add_coinbase_with_zero_checks ~constraint_constants
-                  (module Pending_coinbase)
-                  pending_coinbases ~coinbase ~is_new_stack:false
-                  ~state_body_hash ~global_slot ~supercharged_coinbase )
-          in
-          let new_stack =
-            Or_error.ok_exn
-            @@ Pending_coinbase.latest_stack updated ~is_new_stack:false
-          in
-          (new_stack, updated)
-    in
-    (* Create pending coinbase stacks from coinbase lists and add it to the pending coinbase merkle tree *)
-    let add coinbase_lists pending_coinbases =
-      List.fold ~init:([], pending_coinbases) coinbase_lists
-        ~f:(fun (stacks, pc) coinbases ->
-          let new_stack, pc = t_of_coinbases pc coinbases in
-          (new_stack :: stacks, pc) )
-    in
-    (* remove the oldest stack and check if that's the expected one *)
-    let remove_check t expected_stack =
-      let popped_stack, updated_pending_coinbases =
-        Pending_coinbase.remove_coinbase_stack ~depth t |> Or_error.ok_exn
-      in
-      assert (Pending_coinbase.Stack.equal_data popped_stack expected_stack) ;
-      updated_pending_coinbases
-    in
-    let add_remove_check coinbase_lists =
-      let max_coinbase_stack_count =
-        Pending_coinbase.max_coinbase_stack_count ~depth
-      in
-      let pending_coinbases = Pending_coinbase.create_exn' ~depth () in
-      let rec go coinbase_lists pc =
-        if List.is_empty coinbase_lists then ()
-        else
-          let coinbase_lists' =
-            List.take coinbase_lists max_coinbase_stack_count
-          in
-          let added_stacks, pending_coinbases_updated =
-            add coinbase_lists' pc
-          in
-          let pending_coinbases' =
-            List.fold ~init:pending_coinbases_updated (List.rev added_stacks)
-              ~f:(fun pc expected_stack -> remove_check pc expected_stack)
-          in
-          let remaining_lists =
-            List.drop coinbase_lists max_coinbase_stack_count
-          in
-          go remaining_lists pending_coinbases'
-      in
-      go coinbase_lists pending_coinbases
-    in
-    let coinbase_lists_gen =
-      Quickcheck.Generator.(
-        list
-          (list
-             (Generator.tuple3
-                (Coinbase.Gen.gen ~constraint_constants)
-                State_body_hash.gen Mina_numbers.Global_slot.gen ) ))
-    in
-    test ~trials:100 coinbase_lists_gen ~f:add_remove_check
+  let add_coinbase_with_zero_checks_preapplied =
+    add_coinbase_with_zero_checks (module T)
 end
 
 include Wire_types.Make (Make_sig) (Make_str)
+
+module For_tests = struct
+  let add_coinbase = add_coinbase
+
+  let add_coinbase_with_zero_checks = add_coinbase_with_zero_checks_preapplied
+
+  let incr_index = incr_index
+
+  let add_state = add_state
+
+  let create_exn = create_exn
+
+  let max_coinbase_stack_count = max_coinbase_stack_count
+end
