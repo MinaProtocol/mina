@@ -542,7 +542,7 @@ module T = struct
               let sender_pk = pk_of_sk sender_sk in
               User_command_input.create ~fee ~fee_payer_pk:sender_pk
                 ~signer:sender_pk ~memo ~valid_until:None
-                ~body:(Payment { source_pk = sender_pk; receiver_pk; amount })
+                ~body:(Payment { receiver_pk; amount })
                 ~sign_choice:
                   (User_command_input.Sign_choice.Keypair
                      (Keypair.of_private_key_exn sender_sk) )

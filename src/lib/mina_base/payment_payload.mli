@@ -6,7 +6,7 @@ module Poly : sig
         ( 'public_key
         , 'amount )
         Mina_wire_types.Mina_base.Payment_payload.Poly.V2.t =
-    { source_pk : 'public_key; receiver_pk : 'public_key; amount : 'amount }
+    { receiver_pk : 'public_key; amount : 'amount }
   [@@deriving equal, sexp, hash, yojson]
 
   module Stable : sig
@@ -57,16 +57,10 @@ end]
 val dummy : t
 
 (** [gen ?source_pk max_amount] *)
-val gen :
-     ?source_pk:Public_key.Compressed.t
-  -> Currency.Amount.t
-  -> t Quickcheck.Generator.t
+val gen : Currency.Amount.t -> t Quickcheck.Generator.t
 
 (** [gen_default_token ?source_pk max_amount] *)
-val gen_default_token :
-     ?source_pk:Public_key.Compressed.t
-  -> Currency.Amount.t
-  -> t Quickcheck.Generator.t
+val gen_default_token : Currency.Amount.t -> t Quickcheck.Generator.t
 
 type var = (Public_key.Compressed.var, Currency.Amount.var) Poly.t
 

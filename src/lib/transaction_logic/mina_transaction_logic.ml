@@ -874,6 +874,14 @@ module Make (L : Ledger_intf.S) :
     in
     (* Fee-payer information *)
     let fee_payer = Signed_command.fee_payer user_command in
+    let%bind () =
+      Result.ok_if_true
+        (Public_key.Compressed.equal signer_pk
+           (Account_id.public_key fee_payer) )
+        ~error:
+          (Error.of_string
+             "signer public key does not match fee payer public key" )
+    in
     let%bind fee_payer_location, fee_payer_account =
       pay_fee ~user_command ~signer_pk ~ledger ~current_global_slot
     in
@@ -896,7 +904,6 @@ module Make (L : Ledger_intf.S) :
     let%bind () =
       set_with_location ledger fee_payer_location fee_payer_account
     in
-    let source = Signed_command.source user_command in
     let receiver = Signed_command.receiver user_command in
     let exception Reject of Error.t in
     let ok_or_reject = function Ok x -> x | Error err -> raise (Reject err) in
@@ -911,39 +918,34 @@ module Make (L : Ledger_intf.S) :
             (* Check that receiver account exists. *)
             get_with_location ledger receiver |> ok_or_reject
           in
-          let source_location, source_account =
-            get_with_location ledger source |> ok_or_reject
+          let%bind () =
+            match receiver_location with
+            | `Existing _ ->
+                return ()
+            | `New ->
+                Result.fail Transaction_status.Failure.Receiver_not_present
           in
           let%bind () =
             Result.ok_if_true
-              (Account.has_permission_to_set_delegate source_account)
+              (Account.has_permission_to_set_delegate fee_payer_account)
               ~error:Transaction_status.Failure.Update_not_permitted_delegate
           in
-          let%bind () =
-            match (source_location, receiver_location) with
-            | `Existing _, `Existing _ ->
-                return ()
-            | `New, _ ->
-                Result.fail Transaction_status.Failure.Source_not_present
-            | _, `New ->
-                Result.fail Transaction_status.Failure.Receiver_not_present
-          in
-          let previous_delegate = source_account.delegate in
+          let previous_delegate = fee_payer_account.delegate in
           (* Timing is always valid, but we need to record any switch from
              timed to untimed here to stay in sync with the snark.
           *)
-          let%map timing =
-            validate_timing ~txn_amount:Amount.zero
-              ~txn_global_slot:current_global_slot ~account:source_account
-            |> Result.map_error ~f:timing_error_to_user_command_status
-          in
-          let source_account =
-            { source_account with
+          let%map fee_payer_account =
+            let%map timing =
+              validate_timing ~txn_amount:Amount.zero
+                ~txn_global_slot:current_global_slot ~account:fee_payer_account
+              |> Result.map_error ~f:timing_error_to_user_command_status
+            in
+            { fee_payer_account with
               delegate = Some (Account_id.public_key receiver)
             ; timing
             }
           in
-          ( [ (source_location, source_account) ]
+          ( [ (fee_payer_location, fee_payer_account) ]
           , Transaction_applied.Signed_command_applied.Body.Stake_delegation
               { previous_delegate } )
       | Payment { amount; _ } ->
@@ -952,67 +954,26 @@ module Make (L : Ledger_intf.S) :
           in
           let%bind () =
             Result.ok_if_true
-              (Account.has_permission_to_receive receiver_account)
+              (Account.has_permission_to_send fee_payer_account)
               ~error:Transaction_status.Failure.Update_not_permitted_balance
-          in
-          let%bind source_location, source_account =
-            let ret =
-              if Account_id.equal source receiver then
-                (*just check if the timing needs updating*)
-                let%bind location, account =
-                  match receiver_location with
-                  | `Existing _ ->
-                      return (receiver_location, receiver_account)
-                  | `New ->
-                      Result.fail Transaction_status.Failure.Source_not_present
-                in
-                let%map timing =
-                  validate_timing ~txn_amount:amount
-                    ~txn_global_slot:current_global_slot ~account
-                  |> Result.map_error ~f:timing_error_to_user_command_status
-                in
-                (location, { account with timing })
-              else
-                let location, account =
-                  get_with_location ledger source |> ok_or_reject
-                in
-                let%bind () =
-                  match location with
-                  | `Existing _ ->
-                      return ()
-                  | `New ->
-                      Result.fail Transaction_status.Failure.Source_not_present
-                in
-                let%bind timing =
-                  validate_timing ~txn_amount:amount
-                    ~txn_global_slot:current_global_slot ~account
-                  |> Result.map_error ~f:timing_error_to_user_command_status
-                in
-                let%map balance =
-                  Result.map_error (sub_amount account.balance amount)
-                    ~f:(fun _ ->
-                      Transaction_status.Failure.Source_insufficient_balance )
-                in
-                (location, { account with timing; balance })
-            in
-            if Account_id.equal fee_payer source then
-              (* Don't process transactions with insufficient balance from the
-                 fee-payer.
-              *)
-              match ret with
-              | Ok x ->
-                  Ok x
-              | Error failure ->
-                  raise
-                    (Reject
-                       (Error.createf "%s"
-                          (Transaction_status.Failure.describe failure) ) )
-            else ret
           in
           let%bind () =
             Result.ok_if_true
-              (Account.has_permission_to_send source_account)
+              (Account.has_permission_to_receive receiver_account)
               ~error:Transaction_status.Failure.Update_not_permitted_balance
+          in
+          let%bind fee_payer_account =
+            let%bind timing =
+              validate_timing ~txn_amount:amount
+                ~txn_global_slot:current_global_slot ~account:fee_payer_account
+              |> Result.map_error ~f:timing_error_to_user_command_status
+            in
+            let%map balance =
+              Result.map_error (sub_amount fee_payer_account.balance amount)
+                ~f:(fun _ ->
+                  Transaction_status.Failure.Source_insufficient_balance )
+            in
+            { fee_payer_account with balance; timing }
           in
           (* Charge the account creation fee. *)
           let%bind receiver_amount =
@@ -1037,7 +998,7 @@ module Make (L : Ledger_intf.S) :
                 [ receiver ]
           in
           ( [ (receiver_location, receiver_account)
-            ; (source_location, source_account)
+            ; (fee_payer_location, fee_payer_account)
             ]
           , Transaction_applied.Signed_command_applied.Body.Payment
               { new_accounts } )
@@ -2730,7 +2691,7 @@ module For_tests = struct
           ; valid_until = Global_slot.max_value
           ; memo = Signed_command_memo.dummy
           }
-      ; body = Payment { source_pk = sender_pk; receiver_pk = receiver; amount }
+      ; body = Payment { receiver_pk = receiver; amount }
       }
     |> Signed_command.forget_check
 

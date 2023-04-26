@@ -100,8 +100,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             match payload.body with
             | Payment payment_payload ->
                 let payload' : Payment_payload.t =
-                  { source_pk = payment_payload.source_pk
-                  ; receiver_pk = payment_payload.receiver_pk
+                  { receiver_pk = payment_payload.receiver_pk
                   ; amount = payment_payload.amount
                   }
                 in
@@ -145,10 +144,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let fee_excess ({ payload; _ } : t) = Payload.fee_excess payload
 
   let token ({ payload; _ } : t) = Payload.token payload
-
-  let source_pk ({ payload; _ } : t) = Payload.source_pk payload
-
-  let source ({ payload; _ } : t) = Payload.source payload
 
   let receiver_pk ({ payload; _ } : t) = Payload.receiver_pk payload
 
@@ -231,10 +226,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           >>| Currency.Amount.of_nanomina_int_exn
         in
         Signed_command_payload.Body.Payment
-          { receiver_pk = Public_key.compress receiver
-          ; source_pk = Public_key.compress signer
-          ; amount
-          }
+          { receiver_pk = Public_key.compress receiver; amount }
 
       let gen ?(sign_type = `Fake) =
         match sign_type with
@@ -256,9 +248,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             Quickcheck.Generator.return
             @@ Signed_command_payload.Body.Stake_delegation
                  (Set_delegate
-                    { delegator = Public_key.compress signer
-                    ; new_delegate = Public_key.compress new_delegate
-                    } ) )
+                    { new_delegate = Public_key.compress new_delegate } ) )
 
       let gen_with_random_participants ~keys ?nonce ~fee_range =
         with_random_participants ~keys ~gen:(gen ?nonce ~fee_range)
@@ -370,10 +360,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               let sender_pk = Public_key.compress sender_pk.public_key in
               Payload.create ~fee ~fee_payer_pk:sender_pk ~valid_until:None
                 ~nonce ~memo
-                ~body:
-                  (Payment
-                     { source_pk = sender_pk; receiver_pk = receiver; amount }
-                  )
+                ~body:(Payment { receiver_pk = receiver; amount })
             in
             let sign' =
               match sign_type with
@@ -431,9 +418,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let public_keys t =
     let fee_payer = fee_payer_pk t in
-    let source = source_pk t in
     let receiver = receiver_pk t in
-    [ fee_payer; source; receiver ]
+    [ fee_payer; receiver ]
 
   let check_valid_keys t =
     List.for_all (public_keys t) ~f:(fun pk ->

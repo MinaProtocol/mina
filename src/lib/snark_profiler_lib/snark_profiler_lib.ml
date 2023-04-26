@@ -41,7 +41,7 @@ let create_ledger_and_transactions num_transactions :
     let payload : Signed_command.Payload.t =
       Signed_command.Payload.create ~fee ~fee_payer_pk:from_pk ~nonce
         ~memo:Signed_command_memo.dummy ~valid_until:None
-        ~body:(Payment { source_pk = from_pk; receiver_pk = to_pk; amount })
+        ~body:(Payment { receiver_pk = to_pk; amount })
     in
     Signed_command.sign from_kp payload
   in

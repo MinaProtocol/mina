@@ -10,7 +10,7 @@ module Poly = struct
 
   module V2 = struct
     type ('public_key, 'amount) t =
-      { source_pk : 'public_key; receiver_pk : 'public_key; amount : 'amount }
+      { receiver_pk : 'public_key; amount : 'amount }
   end
 end
 

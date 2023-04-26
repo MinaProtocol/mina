@@ -1824,8 +1824,7 @@ let%test_module _ =
            ~memo:(Signed_command_memo.create_by_digesting_string_exn "foo")
            ~body:
              (Signed_command_payload.Body.Payment
-                { source_pk = get_pk sender_idx
-                ; receiver_pk = get_pk receiver_idx
+                { receiver_pk = get_pk receiver_idx
                 ; amount = Currency.Amount.of_nanomina_int_exn amount
                 } ) )
 
@@ -2469,13 +2468,11 @@ let%test_module _ =
           match tx.payload with
           | { common; body = Payment payload } ->
               { common = { common with fee_payer_pk = sender_pk }
-              ; body = Payment { payload with source_pk = sender_pk }
+              ; body = Payment payload
               }
           | { common; body = Stake_delegation (Set_delegate payload) } ->
               { common = { common with fee_payer_pk = sender_pk }
-              ; body =
-                  Stake_delegation
-                    (Set_delegate { payload with delegator = sender_pk })
+              ; body = Stake_delegation (Set_delegate payload)
               }
         in
         User_command.Signed_command (Signed_command.sign sender_kp payload)
@@ -2804,77 +2801,67 @@ let%test_module _ =
         assert_pool_apply expectation result
       in
       let run_test_cases send_cmd =
-          let%bind () =
-            test_permissions ~is_able_to_send:true
-              send_cmd
-              { Permissions.user_default with
-                send = Permissions.Auth_required.Signature
-              }
-          in
-          let%bind () =
-            test_permissions ~is_able_to_send:true
-              send_cmd
-              { Permissions.user_default with
-                send = Permissions.Auth_required.Either
-              }
-          in
-          let%bind () =
-            test_permissions ~is_able_to_send:true
-              send_cmd
-              { Permissions.user_default with
-                send = Permissions.Auth_required.None
-              }
-          in
-          let%bind () =
-            test_permissions ~is_able_to_send:false
-              send_cmd
-              { Permissions.user_default with
-                send = Permissions.Auth_required.Impossible
-              }
-          in
-          let%bind () =
-            test_permissions ~is_able_to_send:false
-              send_cmd
-              { Permissions.user_default with
-                send = Permissions.Auth_required.Proof
-              }
-          in
-          let%bind () =
-            test_permissions ~is_able_to_send:true
-              send_cmd
-              { Permissions.user_default with
-                increment_nonce = Permissions.Auth_required.Signature
-              }
-          in
-          let%bind () =
-            test_permissions ~is_able_to_send:true
-              send_cmd
-              { Permissions.user_default with
-                increment_nonce = Permissions.Auth_required.Either
-              }
-          in
-          let%bind () =
-            test_permissions ~is_able_to_send:true
-              send_cmd
-              { Permissions.user_default with
-                increment_nonce = Permissions.Auth_required.None
-              }
-          in
-          let%bind () =
-            test_permissions ~is_able_to_send:false
-              send_cmd
-              { Permissions.user_default with
-                increment_nonce = Permissions.Auth_required.Impossible
-              }
-          in
-          let%bind () =
-            test_permissions ~is_able_to_send:false
-              send_cmd
-              { Permissions.user_default with
-                increment_nonce = Permissions.Auth_required.Proof
-              }
-          in
-          return ()
+        let%bind () =
+          test_permissions ~is_able_to_send:true send_cmd
+            { Permissions.user_default with
+              send = Permissions.Auth_required.Signature
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:true send_cmd
+            { Permissions.user_default with
+              send = Permissions.Auth_required.Either
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:true send_cmd
+            { Permissions.user_default with
+              send = Permissions.Auth_required.None
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:false send_cmd
+            { Permissions.user_default with
+              send = Permissions.Auth_required.Impossible
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:false send_cmd
+            { Permissions.user_default with
+              send = Permissions.Auth_required.Proof
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:true send_cmd
+            { Permissions.user_default with
+              increment_nonce = Permissions.Auth_required.Signature
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:true send_cmd
+            { Permissions.user_default with
+              increment_nonce = Permissions.Auth_required.Either
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:true send_cmd
+            { Permissions.user_default with
+              increment_nonce = Permissions.Auth_required.None
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:false send_cmd
+            { Permissions.user_default with
+              increment_nonce = Permissions.Auth_required.Impossible
+            }
+        in
+        let%bind () =
+          test_permissions ~is_able_to_send:false send_cmd
+            { Permissions.user_default with
+              increment_nonce = Permissions.Auth_required.Proof
+            }
+        in
+        return ()
       in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind () =
@@ -2886,8 +2873,8 @@ let%test_module _ =
           in
           let%bind () =
             let send_command =
-              mk_transfer_zkapp_command ~fee_payer_idx:(0, 1) ~sender_idx:0 ~fee:minimum_fee ~nonce:2 ~receiver_idx:1
-                ~amount:1_000_000 ()
+              mk_transfer_zkapp_command ~fee_payer_idx:(0, 1) ~sender_idx:0
+                ~fee:minimum_fee ~nonce:2 ~receiver_idx:1 ~amount:1_000_000 ()
             in
             run_test_cases send_command
           in

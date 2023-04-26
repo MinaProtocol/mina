@@ -74,10 +74,7 @@ let%test_unit "invalid transactions do not dirty the ledger" =
   in
   let invalid_command =
     let payment : Payment_payload.t =
-      { source_pk = sender_pk
-      ; receiver_pk
-      ; amount = Amount.of_nanomina_int_exn 15
-      }
+      { receiver_pk; amount = Amount.of_nanomina_int_exn 15 }
     in
     let payload =
       Signed_command_payload.create

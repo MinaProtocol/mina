@@ -597,6 +597,8 @@ module Checked = struct
               Boolean.false_
           | `Set_delegate ->
               Boolean.true_
+          | `Increment_nonce ->
+              Boolean.true_
           | `Access ->
               failwith
                 "Account.Checked.has_permission: signature_verifies argument \
@@ -612,6 +614,9 @@ module Checked = struct
     | `Set_delegate ->
         Permissions.Auth_required.Checked.eval_no_proof
           account.permissions.set_delegate ~signature_verifies
+    | `Increment_nonce ->
+        Permissions.Auth_required.Checked.eval_no_proof
+          account.permissions.increment_nonce ~signature_verifies
     | `Access ->
         Permissions.Auth_required.Checked.eval_no_proof
           account.permissions.access ~signature_verifies

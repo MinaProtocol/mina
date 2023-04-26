@@ -2422,7 +2422,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                     "Fee payer increment nonce should be permitted for all \
                      commands"] (fun () ->
                       Boolean.Assert.any
-                        [ Boolean.not is_user_command; permitted_to_increment_nonce ] )
+                        [ Boolean.not is_user_command
+                        ; permitted_to_increment_nonce
+                        ] )
                 in
                 let%bind () =
                   [%with_label_

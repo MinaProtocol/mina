@@ -145,24 +145,16 @@ module Api = struct
     user_cmd
 
   let delegate_stake t i delegator_sk delegate_pk fee valid_until =
-    let delegator =
-      Public_key.compress @@ Public_key.of_private_key_exn delegator_sk
-    in
     run_user_command
       ~memo:(Signed_command_memo.create_from_string_exn (sprintf "sd%i" i))
       t i delegator_sk fee valid_until
-      ~body:
-        (Stake_delegation
-           (Set_delegate { delegator; new_delegate = delegate_pk }) )
+      ~body:(Stake_delegation (Set_delegate { new_delegate = delegate_pk }))
 
   let send_payment t i sender_sk receiver_pk amount fee valid_until =
-    let source_pk =
-      Public_key.compress @@ Public_key.of_private_key_exn sender_sk
-    in
     run_user_command
       ~memo:(Signed_command_memo.create_from_string_exn (sprintf "pay%i" i))
       t i sender_sk fee valid_until
-      ~body:(Payment { source_pk; receiver_pk; amount })
+      ~body:(Payment { receiver_pk; amount })
 
   let new_block t i key =
     run_online_worker
