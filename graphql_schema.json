@@ -8748,8 +8748,8 @@
                 "name": null,
                 "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
-              "isDeprecated": false,
-              "deprecationReason": null
+              "isDeprecated": true,
+              "deprecationReason": "use fee payer field instead"
             },
             {
               "name": "source",
@@ -9055,8 +9055,8 @@
                   "ofType": null
                 }
               },
-              "isDeprecated": false,
-              "deprecationReason": null
+              "isDeprecated": true,
+              "deprecationReason": "use fee payer field instead"
             },
             {
               "name": "delegatee",
@@ -9132,8 +9132,8 @@
                 "name": null,
                 "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
-              "isDeprecated": false,
-              "deprecationReason": null
+              "isDeprecated": true,
+              "deprecationReason": "use fee payer field instead"
             },
             {
               "name": "source",
