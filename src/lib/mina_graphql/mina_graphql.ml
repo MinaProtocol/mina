@@ -3176,14 +3176,14 @@ module Types = struct
           ; duration_in_minutes : int
           ; memo_prefix : string
           ; no_precondition : bool
-          ; max_cost : bool
-          ; account_queue_size : int
           ; min_balance_change : string
           ; max_balance_change : string
           ; init_balance : string
           ; min_fee : string
           ; max_fee : string
           ; deployment_fee : string
+          ; account_queue_size : int
+          ; max_cost : bool
           }
 
         let arg_typ =
@@ -3191,9 +3191,9 @@ module Types = struct
             ~doc:"Keys and other information for scheduling zkapp commands"
             ~coerce:(fun fee_payers num_zkapps_to_deploy num_new_accounts
                          transactions_per_second duration_in_minutes memo_prefix
-                         no_precondition max_cost account_queue_size
-                         min_balance_change max_balance_change init_balance
-                         min_fee max_fee deployment_fee ->
+                         no_precondition min_balance_change max_balance_change
+                         init_balance min_fee max_fee deployment_fee
+                         account_queue_size max_cost ->
               Result.return
                 { fee_payers
                 ; num_zkapps_to_deploy
@@ -3202,21 +3202,21 @@ module Types = struct
                 ; duration_in_minutes
                 ; memo_prefix
                 ; no_precondition
-                ; max_cost
-                ; account_queue_size
                 ; min_balance_change
                 ; max_balance_change
                 ; init_balance
                 ; min_fee
                 ; max_fee
                 ; deployment_fee
+                ; account_queue_size
+                ; max_cost
                 } )
             ~split:(fun f (t : input) ->
               f t.fee_payers t.num_zkapps_to_deploy t.num_new_accounts
                 t.transactions_per_second t.duration_in_minutes t.memo_prefix
-                t.no_precondition t.max_cost t.account_queue_size
-                t.min_balance_change t.max_balance_change t.init_balance
-                t.min_fee t.max_fee t.deployment_fee )
+                t.no_precondition t.min_balance_change t.max_balance_change
+                t.init_balance t.min_fee t.max_fee t.deployment_fee
+                t.account_queue_size t.max_cost )
             ~fields:
               Arg.
                 [ arg "feePayers"
@@ -3240,11 +3240,6 @@ module Types = struct
                 ; arg "noPrecondition"
                     ~doc:"Disable the precondition in account updates"
                     ~typ:(non_null bool)
-                ; arg "maxCost" ~doc:"Generate max cost zkApp command"
-                    ~typ:(non_null bool)
-                ; arg "accountQueueSize"
-                    ~doc:"The size of queue for recently used accounts"
-                    ~typ:(non_null int)
                 ; arg "minBalanceChange" ~doc:"Minimum balance change"
                     ~typ:(non_null string)
                 ; arg "maxBalanceChange" ~doc:"Maximum balance change"
@@ -3258,6 +3253,11 @@ module Types = struct
                 ; arg "deploymentFee"
                     ~doc:"Fee for the initial deployment of zkApp accounts"
                     ~typ:(non_null string)
+                ; arg "accountQueueSize"
+                    ~doc:"The size of queue for recently used accounts"
+                    ~typ:(non_null int)
+                ; arg "maxCost" ~doc:"Generate max cost zkApp command"
+                    ~typ:(non_null bool)
                 ]
       end
 
