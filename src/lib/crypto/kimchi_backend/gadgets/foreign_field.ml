@@ -12,51 +12,10 @@ let tuple11_of_array array =
   | _ ->
       assert false
 
-let tuple21_of_array array =
+let tuple15_of_array array =
   match array with
-  | [| a1
-     ; a2
-     ; a3
-     ; a4
-     ; a5
-     ; a6
-     ; a7
-     ; a8
-     ; a9
-     ; a10
-     ; a11
-     ; a12
-     ; a13
-     ; a14
-     ; a15
-     ; a16
-     ; a17
-     ; a18
-     ; a19
-     ; a20
-     ; a21
-    |] ->
-      ( a1
-      , a2
-      , a3
-      , a4
-      , a5
-      , a6
-      , a7
-      , a8
-      , a9
-      , a10
-      , a11
-      , a12
-      , a13
-      , a14
-      , a15
-      , a16
-      , a17
-      , a18
-      , a19
-      , a20
-      , a21 )
+  | [| a1; a2; a3; a4; a5; a6; a7; a8; a9; a10; a11; a12; a13; a14; a15 |] ->
+      (a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15)
   | _ ->
       assert false
 
@@ -1001,13 +960,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
   in
 
   (* Compute witness values *)
-  let ( left_input0
-      , left_input1
-      , left_input2
-      , right_input0
-      , right_input1
-      , right_input2
-      , carry1_lo
+  let ( carry1_lo
       , carry1_hi
       , product1_hi_1
       , carry0
@@ -1022,7 +975,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
       , quotient_bound2
       , product1_lo
       , product1_hi_0 ) =
-    exists (Typ.array ~length:21 Field.typ) ~compute:(fun () ->
+    exists (Typ.array ~length:15 Field.typ) ~compute:(fun () ->
         (* Compute quotient remainder and negative foreign field modulus *)
         let quotient, remainder =
           (* Bignum_bigint computations *)
@@ -1116,12 +1069,6 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
         in
 
         (* Compute the rest of the witness data *)
-        let left_input0, left_input1, left_input2 =
-          Element.Standard.to_field_limbs_as_prover (module Circuit) left_input
-        in
-        let right_input0, right_input1, right_input2 =
-          Element.Standard.to_field_limbs_as_prover (module Circuit) right_input
-        in
         let quotient0, quotient1, quotient2 =
           bignum_bigint_to_field_standard_limbs (module Circuit) quotient
         in
@@ -1132,13 +1079,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
           bignum_bigint_to_field_compact_limbs (module Circuit) quotient_bound
         in
 
-        [| left_input0
-         ; left_input1
-         ; left_input2
-         ; right_input0
-         ; right_input1
-         ; right_input2
-         ; carry1_lo
+        [| carry1_lo
          ; carry1_hi
          ; product1_hi_1
          ; carry0
@@ -1154,7 +1095,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
          ; product1_lo
          ; product1_hi_0
         |] )
-    |> tuple21_of_array
+    |> tuple15_of_array
   in
 
   (* Add external checks *)
@@ -1164,6 +1105,13 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     (quotient_bound01, quotient_bound2) ;
   External_checks.append_bound_check external_checks
     (remainder0, remainder1, remainder2) ;
+
+  let left_input0, left_input1, left_input2 =
+    Element.Standard.to_limbs left_input
+  in
+  let right_input0, right_input1, right_input2 =
+    Element.Standard.to_limbs right_input
+  in
 
   (* Create ForeignFieldMul gate *)
   with_label "foreign_field_mul" (fun () ->
