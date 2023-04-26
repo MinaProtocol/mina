@@ -656,14 +656,10 @@ let%test_module "Transaction union tests" =
       let user_command = Signed_command.sign signer payload in
       U.test_transaction_union ledger (Command (Signed_command user_command)) ;
       let fee_payer = Signed_command.Payload.fee_payer payload in
-      let source = Signed_command.Payload.source payload in
       let receiver = Signed_command.Payload.receiver payload in
       let fee_payer_account = get_account fee_payer in
-      let source_account = get_account source in
       let receiver_account = get_account receiver in
-      ( `Fee_payer_account fee_payer_account
-      , `Source_account source_account
-      , `Receiver_account receiver_account )
+      (`Fee_payer_account fee_payer_account, `Receiver_account receiver_account)
 
     let random_int_incl l u = Quickcheck.random_value (Int.gen_incl l u)
 
@@ -881,17 +877,13 @@ let%test_module "Transaction union tests" =
               in
               let fee = Fee.of_mina_int_exn @@ random_int_incl 2 15 in
               let ( `Fee_payer_account fee_payer_account
-                  , `Source_account source_account
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
                   ~fee_payer_pk ~fee_token
-                  (Stake_delegation
-                     (Set_delegate
-                        { delegator = source_pk; new_delegate = receiver_pk } )
+                  (Stake_delegation (Set_delegate { new_delegate = receiver_pk })
                   )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
-              let source_account = Option.value_exn source_account in
               let expected_fee_payer_balance =
                 accounts.(0).balance |> sub_fee fee
               in
@@ -900,7 +892,7 @@ let%test_module "Transaction union tests" =
                   expected_fee_payer_balance ) ;
               assert (
                 Public_key.Compressed.equal
-                  (Option.value_exn source_account.delegate)
+                  (Option.value_exn fee_payer_account.delegate)
                   source_pk ) ;
               assert (Option.is_none receiver_account) ) )
 
@@ -910,7 +902,6 @@ let%test_module "Transaction union tests" =
               let wallets = U.Wallet.random_wallets ~n:3 () in
               let signer = wallets.(0).private_key in
               let fee_payer_pk = wallets.(0).account.public_key in
-              let source_pk = wallets.(1).account.public_key in
               let receiver_pk = wallets.(2).account.public_key in
               let fee_token = Token_id.default in
               let token_id = Token_id.default in
@@ -921,13 +912,10 @@ let%test_module "Transaction union tests" =
               in
               let fee = Fee.of_mina_int_exn @@ random_int_incl 2 15 in
               let ( `Fee_payer_account fee_payer_account
-                  , `Source_account source_account
                   , `Receiver_account receiver_account ) =
                 test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
                   ~fee_payer_pk ~fee_token
-                  (Stake_delegation
-                     (Set_delegate
-                        { delegator = source_pk; new_delegate = receiver_pk } )
+                  (Stake_delegation (Set_delegate { new_delegate = receiver_pk })
                   )
               in
               let fee_payer_account = Option.value_exn fee_payer_account in
@@ -937,7 +925,6 @@ let%test_module "Transaction union tests" =
               assert (
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
-              assert (Option.is_none source_account) ;
               assert (Option.is_some receiver_account) ) )
 
     let%test_unit "timed account - transactions" =
@@ -2122,6 +2109,50 @@ let%test_module "legacy transactions using zkApp accounts" =
                     ~new_kp ~spec ledger ;
                   Async.Deferred.return () ) ) )
 
+    let%test_unit "Failed payments from zkapp accounts- Access=Proof" =
+      let open Mina_transaction_logic.For_tests in
+      Quickcheck.test ~trials:5 U.gen_snapp_ledger
+        ~f:(fun ({ init_ledger; specs }, new_kp) ->
+          Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  let spec = List.hd_exn specs in
+                  let permissions =
+                    Some
+                      { Permissions.user_default with
+                        access = Permissions.Auth_required.Proof
+                      }
+                  in
+                  test_payments ?permissions
+                    ~expected_failure_sender:
+                      Transaction_status.Failure.Update_not_permitted_balance
+                    ~new_kp ~spec ledger ;
+                  Async.Deferred.return () ) ) )
+
+    let%test_unit "Failed payments from zkapp accounts- Increment_nonce=Proof" =
+      let open Mina_transaction_logic.For_tests in
+      Quickcheck.test ~trials:5 U.gen_snapp_ledger
+        ~f:(fun ({ init_ledger; specs }, new_kp) ->
+          Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  Init_ledger.init
+                    (module Ledger.Ledger_inner)
+                    init_ledger ledger ;
+                  let spec = List.hd_exn specs in
+                  let permissions =
+                    Some
+                      { Permissions.user_default with
+                        increment_nonce = Permissions.Auth_required.Proof
+                      }
+                  in
+                  test_payments ?permissions
+                    ~expected_failure_sender:
+                      Transaction_status.Failure.Update_not_permitted_nonce
+                    ~new_kp ~spec ledger ;
+                  Async.Deferred.return () ) ) )
+
     let test_delegations ?expected_failure_sender
         ~(new_kp : Signature_lib.Keypair.t)
         ~(spec : Mina_transaction_logic.For_tests.Transaction_spec.t)
@@ -2132,6 +2163,13 @@ let%test_module "legacy transactions using zkApp accounts" =
       let snapp_pk = Signature_lib.Public_key.compress new_kp.public_key in
       Transaction_snark.For_tests.create_trivial_zkapp_account ?permissions ~vk
         ~ledger snapp_pk ;
+      let receiver_id = Account_id.create spec.receiver Token_id.default in
+      if
+        Option.is_none
+          (Mina_ledger.Ledger.location_of_account ledger receiver_id)
+      then
+        Mina_ledger.Ledger.create_new_account_exn ledger receiver_id
+          (Account.initialize receiver_id) ;
       let txn_fee = Fee.of_nanomina_int_exn 1_000_000 in
       let sender_kp, sender_nonce = spec.sender in
       (*Delegator is a zkapp account*)
