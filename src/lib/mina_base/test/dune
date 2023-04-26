@@ -14,6 +14,7 @@
   ;; local libraries
   codable
   currency
+  data_hash_lib
   fields_derivers.zkapps
   fields_derivers.json
   fields_derivers.graphql
@@ -39,9 +40,11 @@
   with_hash)
  (preprocess
   (pps
+   ppx_annot
+   ppx_assert
    ppx_base
-   ppx_let
-   ppx_assert))
+   ppx_fields_conv
+   ppx_let))
  (instrumentation
   (backend bisect_ppx)))
 
