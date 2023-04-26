@@ -550,7 +550,6 @@ let%test_unit "bitwise rotation gadget" =
   assert (Common.is_error (fun () -> test_rot ~cs "0" 0 Left "0")) ;
   ()
 
-
 let%test_unit "bitwise xor gadget" =
   (* Import the gadget test runner *)
   let open Kimchi_gadgets_test_runner in

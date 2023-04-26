@@ -87,22 +87,20 @@ type op_mode = Add | Sub
  *
  *    Inputs:
  *      value                 := the value to check
- *      external_checks       := Optional context to track required external checks.
- *                               When omitted, creates and returns new external_checks structure.
- *                               Otherwise, appends new required external checks to supplied structure.
+ *      external_checks       := Context to track required external checks
  *      foreign_field_modulus := the modulus of the foreign field
  *
  *    Outputs:
  *      Bound addition gate (an ForeignFieldAdd gate) is added
- *      Returns bound value and External_checks containing multi-range-check for bound
+ *      Returns bound value
  *)
 val bound_addition :
      (module Snark_intf.Run with type field = 'f)
-  -> ?external_checks:'f External_checks.t (* external_checks *)
+  -> 'f External_checks.t (* external_checks *)
   -> 'f Element.Standard.t (* value *)
   -> 'f standard_limbs (* foreign_field_modulus *)
-  -> 'f Element.Standard.t * 'f External_checks.t
-(* result, external_checks *)
+  -> 'f Element.Standard.t
+(* result *)
 
 (** Definition of a gadget for a chain of foreign field sums (additions or subtractions)
  *
@@ -187,22 +185,20 @@ val sub :
  *   where remainder is the product.
  *
  *   Inputs:
- *     external_checks       := Optional context to track required external checks.
- *                              When omitted, creates and returns new external_checks structure.
- *                              Otherwise, appends new required external checks to supplied structure.
+ *     external_checks       := Context to track required external checks
  *     left_input            := Multiplicand foreign field element
  *     right_input           := Multiplicand foreign field element
  *     foreign_field_modulus := Must be less than than max foreign field modulus
  *
  *   Outputs:
  *     Inserts the ForeignFieldMul gate, followed by Zero gate into the circuit
- *     Tuple of product and External_checks necessary to make multiplication sound
+ *     Returns the product
  *)
 val mul :
      (module Snark_intf.Run with type field = 'f)
-  -> ?external_checks:'f External_checks.t (* external_checks *)
+  -> 'f External_checks.t (* external_checks *)
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
-  -> 'f Element.Standard.t * 'f External_checks.t
-(* remainder, external_checks *)
+  -> 'f Element.Standard.t
+(* product *)
