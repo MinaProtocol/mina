@@ -131,6 +131,15 @@ let () =
           ] )
     ; Control_test.
         ("contol", [ test_case "JSON roundtrip." `Quick json_roundtrip ])
+    ; Fee_excess_test.
+        ( "fee-excess"
+        , [ test_case "Checked and unchecked behaviour consistent." `Quick
+              combine_checked_unchecked_consistent
+          ; test_case "Combine succeeds when the middle excess is zero." `Quick
+              combine_succeed_with_0_middle
+          ; test_case "Rebalanced fee excess is really rebalanced." `Quick
+              rebalancing_properties_hold
+          ] )
     ; Fee_related_test.
         ( "fee-related"
         , [ test_case "Test fee." `Quick test_fee
