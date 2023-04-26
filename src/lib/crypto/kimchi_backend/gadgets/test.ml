@@ -120,8 +120,7 @@ let%test_unit "custom gates integration" =
           let out_ffmul =
             Foreign_field.mul
               (module Runner.Impl)
-              external_checks
-              limbs limbs secp256k1_modulus
+              limbs limbs secp256k1_modulus external_checks
           in
 
           let out_ffadd =
