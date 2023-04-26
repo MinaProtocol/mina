@@ -60,15 +60,12 @@ type op_mode = Add | Sub
  *   - Field type
  *   - Limbs structure
  *
- *   There are 3 specific limb structures required
+ *   There are 2 specific limb structures required
  *     - Standard mode : 3 limbs of L-bits each
- *     - Extended mode : 4 limbs of L-bits each, used by bound addition (i.e. Matthew's trick)
  *     - Compact mode  : 2 limbs where the lowest is 2L bits and the highest is L bits
  *)
 
 type 'field standard_limbs = 'field * 'field * 'field
-
-type 'field extended_limbs = 'field * 'field * 'field * 'field
 
 type 'field compact_limbs = 'field * 'field
 
@@ -178,9 +175,6 @@ module Element : sig
       -> bool
   end
 
-  (* Foreign field element (extended limbs) *)
-  module Extended : Element_intf with type 'a limbs_type = 'a extended_limbs
-
   (* Foreign field element (compact limbs) *)
   module Compact : Element_intf with type 'a limbs_type = 'a compact_limbs
 end = struct
@@ -237,59 +231,6 @@ end = struct
         field_standard_limbs_to_bignum_bigint (module Circuit) modulus
       in
       Bignum_bigint.(to_bignum_bigint_as_prover (module Circuit) x < modulus)
-  end
-
-  (* Extended limbs foreign field element *)
-  module Extended = struct
-    module Cvar = Snarky_backendless.Cvar
-
-    type 'field limbs_type = 'field extended_limbs
-
-    type 'field t = 'field Cvar.t extended_limbs
-
-    let of_limbs x = x
-
-    let of_bignum_bigint (type field)
-        (module Circuit : Snark_intf.Run with type field = field) x : field t =
-      let open Circuit in
-      let l123, l0 = Common.(bignum_bigint_div_rem x two_to_limb) in
-      let l23, l1 = Common.(bignum_bigint_div_rem l123 two_to_limb) in
-      let l3, l2 = Common.(bignum_bigint_div_rem l23 two_to_limb) in
-      let limb_vars =
-        exists (Typ.array ~length:4 Field.typ) ~compute:(fun () ->
-            [| Common.bignum_bigint_to_field (module Circuit) l0
-             ; Common.bignum_bigint_to_field (module Circuit) l1
-             ; Common.bignum_bigint_to_field (module Circuit) l2
-             ; Common.bignum_bigint_to_field (module Circuit) l3
-            |] )
-      in
-      of_limbs (limb_vars.(0), limb_vars.(1), limb_vars.(2), limb_vars.(3))
-
-    let to_limbs x = x
-
-    let map (x : 'field t) (func : 'field Cvar.t -> 'g) : 'g limbs_type =
-      let l0, l1, l2, l3 = to_limbs x in
-      (func l0, func l1, func l2, func l3)
-
-    let to_field_limbs_as_prover (type field)
-        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
-        : field limbs_type =
-      map x (Common.cvar_field_to_field_as_prover (module Circuit))
-
-    let to_bignum_bigint_limbs_as_prover (type field)
-        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
-        : Bignum_bigint.t limbs_type =
-      map x (Common.cvar_field_to_bignum_bigint_as_prover (module Circuit))
-
-    let to_bignum_bigint_as_prover (type field)
-        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
-        : Bignum_bigint.t =
-      let l0, l1, l2, l3 =
-        to_bignum_bigint_limbs_as_prover (module Circuit) x
-      in
-      Bignum_bigint.(
-        l0 + (Common.two_to_limb * l1) + (two_to_2limb * l2)
-        + (two_to_3limb * l3))
   end
 
   (* Compact limbs foreign field element *)
