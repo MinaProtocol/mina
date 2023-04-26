@@ -248,8 +248,7 @@ let gen_fee ?fee_range ~num_updates (account : Account.t) =
   let balance = account.balance in
   let lo_fee =
     Option.value_exn
-      Currency.Fee.(
-        scale Mina_compile_config.minimum_user_command_fee (num_updates * 2))
+      Currency.Fee.(scale minimum_user_command_fee (num_updates * 2))
   in
   let hi_fee = Option.value_exn Currency.Fee.(scale lo_fee 2) in
   assert (
@@ -307,11 +306,7 @@ let gen_balance_change ?permissions_auth (account : Account.t) ?failure
       ~f:(fun (min_balance_change, max_balance_change) ->
         if new_account then
           Currency.Amount.(
-            gen_incl
-              ( scale (of_mina_string_exn max_balance_change) 50000
-              |> Option.value_exn )
-              ( scale (of_mina_string_exn max_balance_change) 100000
-              |> Option.value_exn ))
+            gen_incl (of_mina_string_exn "50.0") (of_mina_string_exn "100.0"))
         else
           Currency.Amount.(
             gen_incl
@@ -1673,6 +1668,24 @@ let%test_module _ =
             (list_with_length 100
                (gen_zkapp_command_from ~fee_payer_keypair ~keymap
                   ~no_token_accounts:true
+                  ~account_state_tbl:(Account_id.Table.create ())
+                  ~generate_new_accounts:false ~ledger () ) )
+            ~size:100
+            ~random:(Splittable_random.State.create Random.State.default))
+      in
+      ()
+
+    let%test_unit "generate zkapps with balance and fee range" =
+      let ledger, fee_payer_keypair, keymap =
+        mk_ledger ~num_of_unused_keys:3 ()
+      in
+      let _ =
+        Quickcheck.Generator.(
+          generate
+            (list_with_length 100
+               (gen_zkapp_command_from ~no_account_precondition:true
+                  ~fee_payer_keypair ~keymap ~no_token_accounts:true
+                  ~fee_range:("2", "4") ~balance_change_range:("0", "0.00001")
                   ~account_state_tbl:(Account_id.Table.create ())
                   ~generate_new_accounts:false ~ledger () ) )
             ~size:100

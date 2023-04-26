@@ -578,6 +578,41 @@ module Types = struct
                 let bp_keys = Mina_lib.block_production_pubkeys mina in
                 not (Public_key.Compressed.Set.is_empty bp_keys) )
           ] )
+
+    let metadatum =
+      (* different type than `json` above *)
+      let json = Graphql_lib.Scalars.JSON.typ () in
+      obj "logMetadatum" ~fields:(fun _ ->
+          [ field "item"
+              ~args:Arg.[]
+              ~doc:"metadatum item" ~typ:(non_null string)
+              ~resolve:(fun _ (item, _) -> item)
+          ; field "value"
+              ~args:Arg.[]
+              ~doc:"metadatum value" ~typ:(non_null json)
+              ~resolve:(fun _ (_, value) -> value)
+          ] )
+
+    let log =
+      obj "ItnLog" ~fields:(fun _ ->
+          [ field "id"
+              ~args:Arg.[]
+              ~doc:"the log ID" ~typ:(non_null int)
+              ~resolve:(fun _ (log : Itn_logger.t) -> log.sequence_no)
+          ; field "timestamp"
+              ~args:Arg.[]
+              ~doc:"timestamp of the log" ~typ:(non_null string)
+              ~resolve:(fun _ (log : Itn_logger.t) -> log.timestamp)
+          ; field "message"
+              ~args:Arg.[]
+              ~doc:"the log message" ~typ:(non_null string)
+              ~resolve:(fun _ (log : Itn_logger.t) -> log.message)
+          ; field "metadata"
+              ~args:Arg.[]
+              ~doc:"metadata for the log"
+              ~typ:(non_null (list (non_null metadatum)))
+              ~resolve:(fun _ (log : Itn_logger.t) -> log.metadata)
+          ] )
   end
 
   let fee_transfer =
@@ -3141,13 +3176,13 @@ module Types = struct
           ; duration_in_minutes : int
           ; memo_prefix : string
           ; no_precondition : bool
-          ; account_queue_size : int
           ; min_balance_change : string
           ; max_balance_change : string
           ; init_balance : string
           ; min_fee : string
           ; max_fee : string
           ; deployment_fee : string
+          ; account_queue_size : int
           }
 
         let arg_typ =
@@ -3155,9 +3190,9 @@ module Types = struct
             ~doc:"Keys and other information for scheduling zkapp commands"
             ~coerce:(fun fee_payers num_zkapps_to_deploy num_new_accounts
                          transactions_per_second duration_in_minutes memo_prefix
-                         no_precondition account_queue_size
-                         min_balance_change max_balance_change init_balance
-                         min_fee max_fee deployment_fee ->
+                         no_precondition min_balance_change max_balance_change
+                         init_balance min_fee max_fee deployment_fee
+                         account_queue_size ->
               Result.return
                 { fee_payers
                 ; num_zkapps_to_deploy
@@ -3166,20 +3201,20 @@ module Types = struct
                 ; duration_in_minutes
                 ; memo_prefix
                 ; no_precondition
-                ; account_queue_size
                 ; min_balance_change
                 ; max_balance_change
                 ; init_balance
                 ; min_fee
                 ; max_fee
                 ; deployment_fee
+                ; account_queue_size
                 } )
             ~split:(fun f (t : input) ->
               f t.fee_payers t.num_zkapps_to_deploy t.num_new_accounts
                 t.transactions_per_second t.duration_in_minutes t.memo_prefix
-                t.no_precondition t.account_queue_size t.min_balance_change
-                t.max_balance_change t.init_balance t.min_fee t.max_fee
-                t.deployment_fee )
+                t.no_precondition t.min_balance_change t.max_balance_change
+                t.init_balance t.min_fee t.max_fee t.deployment_fee
+                t.account_queue_size )
             ~fields:
               Arg.
                 [ arg "feePayers"
@@ -3203,10 +3238,6 @@ module Types = struct
                 ; arg "noPrecondition"
                     ~doc:"Disable the precondition in account updates"
                     ~typ:(non_null bool)
-                ; arg "accountQueueSize"
-                    ~doc:
-                      "The size of queue for recently used accounts"
-                    ~typ:(non_null int)
                 ; arg "minBalanceChange" ~doc:"Minimum balance change"
                     ~typ:(non_null string)
                 ; arg "maxBalanceChange" ~doc:"Maximum balance change"
@@ -3220,6 +3251,9 @@ module Types = struct
                 ; arg "deploymentFee"
                     ~doc:"Fee for the initial deployment of zkApp accounts"
                     ~typ:(non_null string)
+                ; arg "accountQueueSize"
+                    ~doc:"The size of queue for recently used accounts"
+                    ~typ:(non_null int)
                 ]
       end
 
@@ -4740,21 +4774,17 @@ module Mutations = struct
                               ~constraint_constants ()
                           in
                           let account_queue = Queue.create () in
-                          let insert_account_queue ~account_state_tbl
-                              id =
+                          let insert_account_queue ~account_state_tbl id =
                             let a =
                               Account_id.Table.find_and_remove account_state_tbl
                                 id
                             in
-                            Queue.enqueue account_queue
-                              (Option.value_exn a) ;
+                            Queue.enqueue account_queue (Option.value_exn a) ;
                             if
                               Queue.length account_queue
                               > zkapp_command_details.account_queue_size
                             then
-                              let a, role =
-                                Queue.dequeue_exn account_queue
-                              in
+                              let a, role = Queue.dequeue_exn account_queue in
                               Account_id.Table.add_exn account_state_tbl
                                 ~key:(Account.identifier a) ~data:(a, role)
                             else ()
@@ -4850,8 +4880,7 @@ module Mutations = struct
                                     in
                                     List.iter accounts
                                       ~f:
-                                        (insert_account_queue
-                                           ~account_state_tbl ) ;
+                                        (insert_account_queue ~account_state_tbl) ;
                                     let%bind zkapp_command =
                                       Zkapp_command_builder
                                       .replace_authorizations ~prover ~keymap
@@ -5025,11 +5054,28 @@ module Mutations = struct
                 Deferred.Result.failf "failed to add peers: %s"
                   (String.concat ~sep:", " failures) )
 
+    let flush_internal_logs =
+      io_field "flushInternalLogs"
+        ~doc:"Returns number of logs deleted from queue"
+        ~args:
+          Arg.
+            [ arg "endLogId" ~doc:"Greatest log ID to be deleted"
+                ~typ:(non_null int)
+            ]
+        ~typ:(non_null string)
+        ~resolve:(fun { ctx = with_seq_no, _; _ } () end_log_id ->
+          if not with_seq_no then return @@ Error "Missing sequence information"
+          else
+            let n = Itn_logger.flush_queue end_log_id in
+            let s = sprintf "Deleted %d log%s" n (if n > 1 then "s" else "") in
+            return @@ Ok s )
+
     let commands =
       [ schedule_payments
       ; schedule_zkapp_commands
       ; stop_scheduled_transactions
       ; update_gating
+      ; flush_internal_logs
       ]
   end
 end
@@ -5892,7 +5938,22 @@ module Queries = struct
                 ~f:(fun { global_slot; _ } ->
                   Unsigned.UInt32.to_int global_slot ) )
 
-    let commands = [ auth; slots_won ]
+    let internal_logs =
+      io_field "internalLogs"
+        ~args:
+          Arg.
+            [ arg "startLogId" ~doc:"Least log ID to start with"
+                ~typ:(non_null int)
+            ]
+        ~typ:(non_null (list (non_null Types.Itn.log)))
+        ~doc:"Internal logs generated by the daemon"
+        ~resolve:(fun { ctx = with_seq_no, _mina; _ } _ start_log_id ->
+          Io.return
+          @@
+          if not with_seq_no then Error "Missing sequence information"
+          else Ok (Itn_logger.get_logs start_log_id) )
+
+    let commands = [ auth; slots_won; internal_logs ]
   end
 end
 

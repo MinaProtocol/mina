@@ -143,8 +143,6 @@ input ZkappCommandsDetails {
 
   noPrecondition: Boolean!
 
-  accountQueueSize: Int!
-
   minBalanceChange: String!
 
   maxBalanceChange: String!
@@ -156,6 +154,8 @@ input ZkappCommandsDetails {
   maxFee: String! 
 
   deploymentFee: String!
+
+  accountQueueSize: Int!
 }
 
 """String representing a uint16 number in base 10"""
