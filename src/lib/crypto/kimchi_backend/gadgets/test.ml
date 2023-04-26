@@ -120,10 +120,9 @@ let%test_unit "custom gates integration" =
           let out_ffmul =
             Foreign_field.mul
               (module Runner.Impl)
-              external_checks limbs limbs secp256k1_modulus
+              limbs limbs secp256k1_modulus external_checks
           in
-          (* TODO: [Anais] Maybe add the external checks (see above) to this test,
-                           in different order? or name and comment above as unused_ *)
+
           let out_ffadd =
             Foreign_field.add
               (module Runner.Impl)

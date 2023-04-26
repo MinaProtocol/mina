@@ -7,15 +7,11 @@ module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 (* Auxiliary functions *)
 
 (* returns a field containing the all one word of length bits *)
-let cvar_field_all_ones (type f)
+let all_ones_field (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (length : int) : Circuit.Field.t =
-  let open Circuit in
-  (* Check it is not 255 or else 2^255-1 will not fit in Pallas *)
-  assert (length < Circuit.Field.size_in_bits) ;
-  exists Field.typ ~compute:(fun () ->
-      Common.bignum_bigint_to_field (module Circuit)
-      @@ Bignum_bigint.(pow (of_int 2) (of_int length) - one) )
+    (length : int) : f =
+  Common.bignum_bigint_to_field (module Circuit)
+  @@ Bignum_bigint.(pow (of_int 2) (of_int length) - one)
 
 let fits_in_bits_as_prover (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -459,10 +455,20 @@ let band64 (type f)
 let bnot_checked (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     ?(len_xor = 4) (input : Circuit.Field.t) (length : int) : Circuit.Field.t =
-  let all_ones_var = cvar_field_all_ones (module Circuit) length in
+  let open Circuit in
+  (* Check it is not 255 or else 2^255-1 will not fit in Pallas *)
+  assert (length < Circuit.Field.size_in_bits) ;
+
+  let all_ones_f = all_ones_field (module Circuit) length in
+  let all_ones_var = exists Field.typ ~compute:(fun () -> all_ones_f) in
 
   (* Negating is equivalent to XORing with all one word *)
-  bxor (module Circuit) input all_ones_var length ~len_xor
+  let out_not = bxor (module Circuit) input all_ones_var length ~len_xor in
+
+  (* Doing this afterwards or else it can break chainability with Xor16's and Zero *)
+  Field.Assert.equal (Field.constant all_ones_f) all_ones_var ;
+
+  out_not
 
 (* Negates a word of 64 bits with checked length of 64 bits.
  * This means that the bound in lenght is constrained in the circuit. *)
@@ -481,15 +487,24 @@ let bnot_unchecked (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (input : Circuit.Field.t) (length : int) : Circuit.Field.t =
   let open Circuit in
-  (* Check that the input word has at most 64 bits *)
+  (* Check it is not 255 or else 2^255-1 will not fit in Pallas *)
+  assert (length < Circuit.Field.size_in_bits) ;
+  assert (length > 0) ;
+
+  (* Check that the input word has at most length bits.
+     In the checked version this is done in the Xor *)
   as_prover (fun () ->
       fits_in_bits_as_prover (module Circuit) input length ;
       () ) ;
 
-  let all_ones_var = cvar_field_all_ones (module Circuit) length in
+  let all_ones_f = all_ones_field (module Circuit) length in
+  let all_ones_var = exists Field.typ ~compute:(fun () -> all_ones_f) in
+  Field.Assert.equal all_ones_var (Field.constant all_ones_f);
+
   (* Negating is equivalent to subtracting with all one word *)
   (* [2^len - 1] - input = not (input) *)
   Generic.sub (module Circuit) all_ones_var input
+  
 
 (* Negates a word of 64 bits, but its length goes unconstrained in the circuit
    (unless it is copied from a checked length value) *)
@@ -734,21 +749,21 @@ let%test_unit "bitwise not gadget" =
   in
 
   (* Positive tests *)
-  let cs = test_not "0" "1" 1 in
+  let _cs = test_not "0" "1" 1 in
   let _cs = test_not "0" "f" 4 in
   let _cs = test_not "0" "ff" 8 in
-  let _cs = test_not ~cs "0" "7ff" 11 in
-  let cs = test_not "0" "ffff" 16 in
-  let _cs = test_not ~cs "a8ca" "5735" 16 in
+  let _cs = test_not "0" "7ff" 11 in
+  let cs16 = test_not "0" "ffff" 16 in
+  let _cs = test_not ~cs:cs16 "a8ca" "5735" 16 in
   let _cs = test_not "bb5c6" "44a39" 20 in
-  let cs = test_not "a5a5a5a5a5a5a5a5" "5a5a5a5a5a5a5a5a" 64 in
-  let _cs = test_not ~cs "5a5a5a5a5a5a5a5a" "a5a5a5a5a5a5a5a5" 64 in
-  let _cs = test_not ~cs "7b3f28d7496d75f0" "84c0d728b6928a0f" 64 in
-  let _cs = test_not ~cs "ffffffffffffffff" "0" 64 in
-  let _cs = test_not ~cs "00000fffffffffff" "fffff00000000000" 64 in
-  let _cs = test_not ~cs "fffffffffffff000" "fff" 64 in
-  let _cs = test_not ~cs "0" "ffffffffffffffff" 64 in
-  let _cs = test_not ~cs "0" "ffffffffffffffff" 64 in
+  let cs64 = test_not "a5a5a5a5a5a5a5a5" "5a5a5a5a5a5a5a5a" 64 in
+  let _cs = test_not ~cs:cs64 "5a5a5a5a5a5a5a5a" "a5a5a5a5a5a5a5a5" 64 in
+  let _cs = test_not ~cs:cs64 "7b3f28d7496d75f0" "84c0d728b6928a0f" 64 in
+  let _cs = test_not ~cs:cs64 "ffffffffffffffff" "0" 64 in
+  let _cs = test_not ~cs:cs64 "00000fffffffffff" "fffff00000000000" 64 in
+  let _cs = test_not ~cs:cs64 "fffffffffffff000" "fff" 64 in
+  let _cs = test_not ~cs:cs64 "0" "ffffffffffffffff" 64 in
+  let _cs = test_not ~cs:cs64 "0" "ffffffffffffffff" 64 in
   let _cs =
     test_not "3FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
       "0" 254
@@ -758,11 +773,11 @@ let%test_unit "bitwise not gadget" =
   assert (
     Common.is_error (fun () ->
         (* Reusing right CS with bad witness *)
-        test_not ~cs "0" "ff" 64 ) ) ;
+        test_not ~cs:cs64 "0" "ff" 64 ) ) ;
   assert (
     Common.is_error (fun () ->
         (* Reusing wrong CS with right witness *)
-        test_not ~cs "1" "0" 1 ) ) ;
+        test_not ~cs:cs16 "1" "0" 1 ) ) ;
   assert (Common.is_error (fun () -> test_not "0" "0" 1)) ;
   assert (Common.is_error (fun () -> test_not "ff" "0" 4)) ;
   assert (
@@ -770,4 +785,4 @@ let%test_unit "bitwise not gadget" =
         test_not
           "7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" "0"
           255 ) ) ;
-  ()
+          ()

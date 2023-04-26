@@ -5,10 +5,10 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
-let tuple11_of_array array =
+let tuple5_of_array array =
   match array with
-  | [| a1; a2; a3; a4; a5; a6; a7; a8; a9; a10; a11 |] ->
-      (a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11)
+  | [| a1; a2; a3; a4; a5 |] ->
+      (a1, a2, a3, a4, a5)
   | _ ->
       assert false
 
@@ -176,12 +176,6 @@ module Element : sig
       -> 'field t
       -> 'field standard_limbs
       -> bool
-
-    (* Convert a standard foreign element into extended limbs *)
-    val as_prover_extend :
-         (module Snark_intf.Run with type field = 'field)
-      -> 'field t
-      -> 'field Cvar.t extended_limbs
   end
 
   (* Foreign field element (extended limbs) *)
@@ -243,15 +237,6 @@ end = struct
         field_standard_limbs_to_bignum_bigint (module Circuit) modulus
       in
       Bignum_bigint.(to_bignum_bigint_as_prover (module Circuit) x < modulus)
-
-    let as_prover_extend (type field)
-        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
-        =
-      let open Circuit in
-      exists (Typ.array ~length:4 Field.typ) ~compute:(fun () ->
-          let l0, l1, l2 = to_field_limbs_as_prover (module Circuit) x in
-          [| l0; l1; l2; Field.Constant.zero |] )
-      |> Common.tuple4_of_array
   end
 
   (* Extended limbs foreign field element *)
@@ -422,13 +407,21 @@ let as_prover_compact_limb (type f)
 
 (* Internal computation for foreign field addition *)
 let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (left_input : f Element.Standard.t) (right_input : f Element.Extended.t)
+    (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
     (operation : op_mode) (foreign_field_modulus : f standard_limbs) :
     f Element.Standard.t * f * Circuit.Field.t =
   let open Circuit in
   (* Decompose modulus into limbs *)
   let foreign_field_modulus0, foreign_field_modulus1, foreign_field_modulus2 =
     foreign_field_modulus
+  in
+  (* Decompose left input into limbs *)
+  let left_input0, left_input1, left_input2 =
+    Element.Standard.to_limbs left_input
+  in
+  (* Decompose right input into limbs. If final check, right_input2 will contain 2^limb *)
+  let right_input0, right_input1, right_input2 =
+    Element.Standard.to_limbs right_input
   in
 
   (* Addition or subtraction *)
@@ -446,33 +439,21 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
      * - the sign of the operation
      * - the overflow flag
      * - the carry value *)
-  let ( left_input0
-      , left_input1
-      , left_input2
-      , right_input0
-      , right_input1
-      , right_input2
-      , result0
-      , result1
-      , result2
-      , field_overflow
-      , carry ) =
-    exists (Typ.array ~length:11 Field.typ) ~compute:(fun () ->
+  let result0, result1, result2, field_overflow, carry =
+    exists (Typ.array ~length:5 Field.typ) ~compute:(fun () ->
         (* Compute bigint version of the inputs *)
         let modulus =
           field_standard_limbs_to_bignum_bigint
             (module Circuit)
             foreign_field_modulus
         in
-        (* Clarification *)
-        (* let right_hi = right_input[3] * F::two_to_limb() + right_input[HI]; (* This allows to store 2^88 in the high limb *) *)
         let left =
           Element.Standard.to_bignum_bigint_as_prover
             (module Circuit)
             left_input
         in
         let right =
-          Element.Extended.to_bignum_bigint_as_prover
+          Element.Standard.to_bignum_bigint_as_prover
             (module Circuit)
             right_input
         in
@@ -524,18 +505,11 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
         let left_input0, left_input1, left_input2 =
           Element.Standard.to_field_limbs_as_prover (module Circuit) left_input
         in
-        let right_input0, right_input1, right_input2, right_input3 =
-          Element.Extended.to_field_limbs_as_prover (module Circuit) right_input
+        let right_input0, right_input1, right_input2 =
+          Element.Standard.to_field_limbs_as_prover (module Circuit) right_input
         in
         let result0, result1, result2 =
           Element.Standard.to_field_limbs_as_prover (module Circuit) result
-        in
-        (* This allows to store 2^88 in the high limb*)
-        let offset =
-          Common.(bignum_bigint_to_field (module Circuit) two_to_limb)
-        in
-        let right_input2 =
-          Field.Constant.((right_input3 * offset) + right_input2)
         in
 
         (* Compute the carry value *)
@@ -562,19 +536,8 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
         assert (Field.Constant.equal carry_top carry_bot) ;
 
         (* Return the ffadd values *)
-        [| left_input0
-         ; left_input1
-         ; left_input2
-         ; right_input0
-         ; right_input1
-         ; right_input2
-         ; result0
-         ; result1
-         ; result2
-         ; field_overflow
-         ; carry_bot
-        |] )
-    |> tuple11_of_array
+        [| result0; result1; result2; field_overflow; carry_bot |] )
+    |> tuple5_of_array
   in
 
   (* Create the gate *)
@@ -603,20 +566,38 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
   (* Return the result *)
   (Element.Standard.of_limbs (result0, result1, result2), sign, field_overflow)
 
-(* This function adds a FFAdd gate to check that a given value is smaller than the modulus.
- *   - value                 := the value to check
- *   - external_checks       := Context to track required external checks
- *   - foreign_field_modulus := the modulus of the foreign field
+(* This function checks in the circuit that a value is less than the foreign field modulus. 
+ *
+ *    Inputs:
+ *      value                 := the value to check
+ *      external_checks       := Optional context to track required external checks.
+ *                               When omitted, creates and returns new external_checks structure.
+ *                               Otherwise, appends new required external checks to supplied structure.
+ *      foreign_field_modulus := the modulus of the foreign field
+ *
+ *    Outputs:
+ *      Returns bound value and External_checks containing multi-range-check for bound
+ * 
+ *    Effects to the circuit:
+ *      - 1 FFAdd gate
+ *      - 1 Zero gate
+ *      - Adds 1 external check for multi range
  *)
-let bound_addition (type f)
+let less_than_mod (type f)
     (module Circuit : Snark_intf.Run with type field = f)
-    (external_checks : f External_checks.t) (value : f Element.Standard.t)
-    (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
+    (value : f Element.Standard.t)
+    (foreign_field_modulus : f standard_limbs) 
+    (external_checks : f External_checks.t) : f Element.Standard.t =
   let open Circuit in
   (* Compute the value for the right input of the addition as 2^264 *)
-  let offset =
-    Element.Extended.of_limbs (Field.zero, Field.zero, Field.zero, Field.one)
+  let offset0 = Field.zero in
+  let offset1 = Field.zero in
+  let offset2 =
+    exists Field.typ ~compute:(fun () -> two_to_limb_field (module Circuit))
   in
+  (*let offset2 = Field.(mul one two_to_88) in*)
+  (* Checks that these cvars have constant values are added as generics *)
+  let offset = Element.Standard.of_limbs (offset0, offset1, offset2) in
 
   (* Check that the value fits in the foreign field *)
   as_prover (fun () ->
@@ -656,6 +637,10 @@ let bound_addition (type f)
 
   (* Set up copy constraints with overflow with the overflow check*)
   Field.Assert.equal ovf Field.one ;
+
+  (* Check that the highest limb of right input is 2^88*)
+  let two_to_88 = two_to_limb_field (module Circuit) in
+  Field.Assert.equal (Field.constant two_to_88) offset2  ;
 
   (* Add external check for multi range check *)
   External_checks.append_multi_range_check external_checks
@@ -706,10 +691,6 @@ let sum_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
             (module Circuit)
             right foreign_field_modulus ) ;
         () ) ;
-    let right =
-      Element.(
-        Extended.of_limbs @@ Standard.as_prover_extend (module Circuit) right)
-    in
 
     (* Create the foreign field addition row *)
     let result, _sign, _ovf =
@@ -725,9 +706,9 @@ let sum_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
   let result = left.(0) in
   let unused_external_checks = External_checks.create (module Circuit) in
   let bound =
-    bound_addition
+    less_than_mod
       (module Circuit)
-      unused_external_checks result foreign_field_modulus
+      result foreign_field_modulus unused_external_checks
   in
   let bound0, bound1, bound2 = Element.Standard.to_limbs bound in
 
@@ -740,43 +721,82 @@ let sum_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
 (* FOREIGN FIELD ADDITION SINGLE GADGET *)
 
 (* Definition of a gadget for a single foreign field addition
-      * - operation: operation mode Add or Sub indicating whether the corresponding addition is a subtraction (default: Add)
-   * - left_input of the addition as 3 limbs element
-      * - right_input of the addition as 4 limbs element
-      * - foreign_field_modulus: the modulus of the foreign field
-      * - Returns the result of the addition as a 3 limbs element
-      * It adds a FFAdd gate,
-      * followed by a Zero gate,
-      * a FFAdd gate for the bound check,
-      * a Zero gate after this bound check,
-      * and a Multi Range Check gadget.
-*)
+ *
+ *    Inputs:
+ *      full                  := flag for whether to perform a full addition with bound check (default true) or just a single FFAdd row (false)
+ *      left_input            := 3 limbs foreign field element
+ *      right_input           := 3 limbs foreign field element
+ *      foreign_field_modulus := The modulus of the foreign field
+ *
+ *    Outputs:
+ *      Inserts the gates (described below) into the circuit
+ *      Returns the result of the addition as a 3 limbs element
+ *  
+ * In default mode: 
+ *  It adds a FFAdd gate,
+ *  followed by a Zero gate,
+ *  a FFAdd gate for the bound check,
+ *  a Zero gate after this bound check,
+ *  and a Multi Range Check gadget.
+ * In false mode:
+ *  It adds a FFAdd gate.
+ *)
 let add (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
+    ?(full = true) (left_input : f Element.Standard.t)
+    (right_input : f Element.Standard.t)
     (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
-  sum_chain
-    (module Circuit)
-    [ left_input; right_input ]
-    [ Add ] foreign_field_modulus
+  match full with
+  | true ->
+      sum_chain
+        (module Circuit)
+        [ left_input; right_input ]
+        [ Add ] foreign_field_modulus
+  | false ->
+      let result, _sign, _ovf =
+        sum_setup
+          (module Circuit)
+          left_input right_input Add foreign_field_modulus
+      in
+      result
 
-(** Definition of a gadget for a single foreign field subtraction
-* - left_input of the addition as 3 limbs element
-   * - right_input of the addition as 4 limbs element
-   * - foreign_field_modulus: the modulus of the foreign field
-   * - Returns the result of the subtraction as a 3 limbs element
-   * It adds a FFAdd gate,
-   * followed by a Zero gate,
-   * a FFAdd gate for the bound check,
-   * a Zero gate after this bound check,
-   * and a Multi Range Check gadget.
-*)
+(* Definition of a gadget for a single foreign field subtraction
+ *
+ *    Inputs:
+ *      full                  := flag for whether to perform a full addition with bound check (default true) or just a single FFAdd row (false)
+ *      left_input            := 3 limbs foreign field element
+ *      right_input           := 3 limbs foreign field element
+ *      foreign_field_modulus := The modulus of the foreign field
+ *
+ *    Outputs:
+ *      Inserts the gates (described below) into the circuit
+ *      Returns the result of the addition as a 3 limbs element
+ *  
+ * In default mode: 
+ *  It adds a FFAdd gate,
+ *  followed by a Zero gate,
+ *  a FFAdd gate for the bound check,
+ *  a Zero gate after this bound check,
+ *  and a Multi Range Check gadget.
+ * In false mode:
+ *  It adds a FFAdd gate.
+ *)
 let sub (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
+    ?(full = true) (left_input : f Element.Standard.t)
+    (right_input : f Element.Standard.t)
     (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
-  sum_chain
-    (module Circuit)
-    [ left_input; right_input ]
-    [ Sub ] foreign_field_modulus
+  match full with
+  | true ->
+      sum_chain
+        (module Circuit)
+        [ left_input; right_input ]
+        [ Sub ] foreign_field_modulus
+  | false ->
+      let result, _sign, _ovf =
+        sum_setup
+          (module Circuit)
+          left_input right_input Sub foreign_field_modulus
+      in
+      result
 
 (* FOREIGN FIELD MULTIPLICATION *)
 
@@ -927,9 +947,10 @@ let compute_bound_witness_carry (type f)
 
 (* Foreign field multiplication gadget definition *)
 let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (external_checks : f External_checks.t) (left_input : f Element.Standard.t)
+    (left_input : f Element.Standard.t)
     (right_input : f Element.Standard.t)
-    (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
+    (foreign_field_modulus : f standard_limbs)
+    (external_checks : f External_checks.t) : f Element.Standard.t =
   let open Circuit in
   (* Check foreign field modulus < max allowed *)
   check_modulus (module Circuit) foreign_field_modulus ;
@@ -1176,6 +1197,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
      *     - left_input
      *     - right_input
      *     - foreign_field_modulus
+     * Checks with multi range checks the size of the inputs.
   *)
   let test_add ?cs (left_input : Bignum_bigint.t)
       (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
@@ -1205,7 +1227,26 @@ let%test_unit "foreign_field arithmetics gadgets" =
               (module Runner.Impl)
               left_input right_input foreign_field_modulus
           in
-          (* Check addition matches expected result *)
+          (* Create external checks context for tracking extra constraints *)
+             let external_checks =
+              External_checks.create (module Runner.Impl)
+            in
+          (* Check that the inputs were foreign field elements*)
+          let _out =
+            less_than_mod (module Runner.Impl) left_input foreign_field_modulus external_checks
+          in
+          let _out =
+            less_than_mod
+              (module Runner.Impl)
+              right_input foreign_field_modulus external_checks
+          in
+
+          assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 2) ;
+          List.iter external_checks.multi_ranges ~f:(fun multi_range ->
+              let v0, v1, v2 = multi_range in
+              Range_check.multi (module Runner.Impl) v0 v1 v2 ;
+              () ) ;
+
           as_prover (fun () ->
               let expected =
                 bignum_bigint_to_field_standard_limbs
@@ -1331,8 +1372,8 @@ let%test_unit "foreign_field arithmetics gadgets" =
           let product =
             mul
               (module Runner.Impl)
-              unused_external_checks left_input right_input
-              foreign_field_modulus
+              left_input right_input
+              foreign_field_modulus unused_external_checks
           in
           (* Check product matches expected result *)
           as_prover (fun () ->
@@ -1400,13 +1441,13 @@ let%test_unit "foreign_field arithmetics gadgets" =
           let product1 =
             mul
               (module Runner.Impl)
-              external_checks left_input right_input foreign_field_modulus
+              left_input right_input foreign_field_modulus external_checks
           in
           (* Add another foreign field mul to test chaining of external_checks *)
           let product2 =
             mul
               (module Runner.Impl)
-              external_checks left_input right_input foreign_field_modulus
+              left_input right_input foreign_field_modulus external_checks
           in
 
           (* Sanity check product matches expected result *)
@@ -1436,11 +1477,11 @@ let%test_unit "foreign_field arithmetics gadgets" =
           assert (Mina_stdlib.List.Length.equal external_checks.bounds 2) ;
           List.iter external_checks.bounds ~f:(fun product ->
               let _remainder_bound =
-                bound_addition
+                less_than_mod
                   (module Runner.Impl)
-                  external_checks
                   (Element.Standard.of_limbs product)
                   foreign_field_modulus
+                  external_checks
               in
               () ) ;
 
@@ -1520,21 +1561,38 @@ let%test_unit "foreign_field arithmetics gadgets" =
 
           (* Create external checks context for tracking extra constraints
              that are required for soundness *)
-          let external_checks = External_checks.create (module Runner.Impl) in
+          let unused_external_checks = External_checks.create (module Runner.Impl) in
 
           let product =
             mul
               (module Runner.Impl)
-              external_checks left_input right_input foreign_field_modulus
+              left_input right_input foreign_field_modulus unused_external_checks
           in
-          (* TODO: [Anais] Maybe add the external checks (see above) to this test,
-                           in different order? or name and comment above as unused_ *)
+          
           let addition =
             add (module Runner.Impl) product left_input foreign_field_modulus
           in
           let subtraction =
             sub (module Runner.Impl) addition right_input foreign_field_modulus
           in
+          let external_checks = External_checks.create (module Runner.Impl) in
+
+          (* Check product matches expected result *)
+          (* Check that the inputs were foreign field elements*)
+          let _out =
+            less_than_mod (module Runner.Impl) left_input foreign_field_modulus external_checks
+          in
+          let _out =
+            less_than_mod
+              (module Runner.Impl)
+              right_input foreign_field_modulus external_checks
+          in
+
+          assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 2) ;
+          List.iter external_checks.multi_ranges ~f:(fun multi_range ->
+              let v0, v1, v2 = multi_range in
+              Range_check.multi (module Runner.Impl) v0 v1 v2 ;
+              () ) ;
           (* Check product matches expected result *)
           as_prover (fun () ->
               let expected_mul =
@@ -1594,7 +1652,6 @@ let%test_unit "foreign_field arithmetics gadgets" =
   let vesta_max = Bignum_bigint.(vesta_modulus - Bignum_bigint.one) in
 
   (* FFAdd TESTS *)
-
   (* Single tests *)
   let cs =
     test_add
