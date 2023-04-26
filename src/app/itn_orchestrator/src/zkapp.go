@@ -20,9 +20,10 @@ type ZkappCommandParams struct {
 	MinBalanceChange  string 
 	MaxBalanceChange  string 
 	InitBalance       string
-	MinFee            string 
-	MaxFee            string 
+	MinFee            string
+	MaxFee            string
 	DeploymentFee     string
+	AccountQueueSize  int
 }
 
 type ScheduledZkappCommandsReceipt struct {
@@ -46,9 +47,10 @@ func SendZkappCommands(config Config, params ZkappCommandParams, output func(Sch
 			MinBalanceChange:      params.MinBalanceChange, 
 			MaxBalanceChange:      params.MaxBalanceChange, 
 			InitBalance:           params.InitBalance,
-			MinFee:                params.MinFee, 
+			MinFee:                params.MinFee,
 			MaxFee:                params.MaxFee,
 			DeploymentFee:         params.DeploymentFee,
+			AccountQueueSize:      params.AccountQueueSize,
 		}
 		client, err := config.GetGqlClient(config.Ctx, nodeAddress)
 		if err != nil {
