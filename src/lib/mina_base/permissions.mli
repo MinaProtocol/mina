@@ -49,6 +49,14 @@ module Auth_required : sig
   val typ : (Checked.t, t) Typ.t
 
   [%%endif]
+
+  module For_test : sig
+    type 'a encoding
+
+    val encode : t -> bool encoding
+
+    val decode : bool encoding -> t
+  end
 end
 
 module Poly : sig

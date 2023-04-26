@@ -242,10 +242,6 @@ module Auth_required = struct
           "Permissions.decode: Found encoding of Both, but Both is not an \
            exposed option"
 
-  let%test_unit "decode encode" =
-    List.iter [ Impossible; Proof; Signature; Either ] ~f:(fun t ->
-        [%test_eq: t] t (decode (encode t)) )
-
   [%%ifdef consensus_mechanism]
 
   module Checked = struct
@@ -336,6 +332,14 @@ module Auth_required = struct
         false
     | (Proof | Signature | Either), None_given ->
         false
+
+  module For_test = struct
+    type 'a encoding = 'a Encoding.t
+
+    let encode = encode
+
+    let decode = decode
+  end
 end
 
 module Poly = struct
@@ -533,32 +537,3 @@ let deriver obj =
     ~set_voting_for:!.auth_required ~set_timing:!.auth_required
     ~access:!.auth_required
   |> finish "Permissions" ~t_toplevel_annots:Poly.t_toplevel_annots
-
-let%test_unit "json roundtrip" =
-  let open Fields_derivers_zkapps.Derivers in
-  let full = o () in
-  let _a = deriver full in
-  [%test_eq: t] user_default (user_default |> to_json full |> of_json full)
-
-let%test_unit "json value" =
-  let open Fields_derivers_zkapps.Derivers in
-  let full = o () in
-  let _a = deriver full in
-  [%test_eq: string]
-    (user_default |> to_json full |> Yojson.Safe.to_string)
-    ( {json|{
-        editState: "Signature",
-        access: "None",
-        send: "Signature",
-        receive: "None",
-        setDelegate: "Signature",
-        setPermissions: "Signature",
-        setVerificationKey: "Signature",
-        setZkappUri: "Signature",
-        editActionState: "Signature",
-        setTokenSymbol: "Signature",
-        incrementNonce: "Signature",
-        setVotingFor: "Signature",
-        setTiming: "Signature"
-      }|json}
-    |> Yojson.Safe.from_string |> Yojson.Safe.to_string )
