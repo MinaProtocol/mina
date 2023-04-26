@@ -15,7 +15,10 @@
   logger
   mina_base
   mina_version
-  mina_numbers)
+  mina_numbers
+  internal_tracing.context_call
+  internal_tracing.context_logger
+  )
  (preprocess
   (pps ppx_jane ppx_mina ppx_version ppx_deriving_yojson))
  (instrumentation
