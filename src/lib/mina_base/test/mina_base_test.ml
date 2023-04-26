@@ -3,18 +3,7 @@ open Mina_base
 
 let () =
   run "Test mina_base."
-    [ Zkapp_account_test.
-        ( "zkapp-accounts"
-        , [ test_case "Event hashes don't collide." `Quick
-              event_hashes_well_behaved
-          ; test_case "Zkapp_uri hashes don't collide." `Quick
-              zkapp_uri_hashes_well_behaved
-          ; test_case "Events pop after push is idempotent." `Quick
-              (checked_pop_reverses_push (module Zkapp_account.Events))
-          ; test_case "Actions pop after push is idempotent." `Quick
-              (checked_pop_reverses_push (module Zkapp_account.Actions))
-          ] )
-    ; Account_test.
+    [ Account_test.
         ( "accounts"
         , [ test_case "Test fine-tuning of the account generation." `Quick
               fine_tuning_of_the_account_generation
@@ -210,6 +199,17 @@ let () =
           ; test_case "Is user command." `Quick is_user_command
           ; test_case "Not user command." `Quick not_user_command
           ; test_case "Test bit representation." `Quick bit_representation
+        ] )
+    ; Zkapp_account_test.
+        ( "zkapp-accounts"
+        , [ test_case "Event hashes don't collide." `Quick
+              event_hashes_well_behaved
+          ; test_case "Zkapp_uri hashes don't collide." `Quick
+              zkapp_uri_hashes_well_behaved
+          ; test_case "Events pop after push is idempotent." `Quick
+              (checked_pop_reverses_push (module Zkapp_account.Events))
+          ; test_case "Actions pop after push is idempotent." `Quick
+              (checked_pop_reverses_push (module Zkapp_account.Actions))
           ] )
     ; Zkapp_basic_test.
         ( "zkApp basic"
