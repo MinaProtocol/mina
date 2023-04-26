@@ -162,6 +162,12 @@ let () =
           ; test_case "Push and pop multiple stacks." `Quick
               push_and_pop_multiple_stacks
           ] )
+    ; Permissions_test.
+        ( "permissions"
+        , [ test_case "Decode-encode roundtrip." `Quick decode_encode_roundtrip
+          ; test_case "JSON roundtrip." `Quick json_roundtrip
+          ; test_case "JSON value." `Quick json_value
+          ] )
     ; Receipt_test.
       ( "receipts"
       , [ test_case "Checked-unmchecked equivalence for signed command" `Quick
