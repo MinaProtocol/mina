@@ -30,15 +30,6 @@ let compaction_interval_ms = Some compaction_interval
 
 [%%endif]
 
-let minimum_user_command_fee =
-  Currency.Fee.of_mina_string_exn minimum_user_command_fee_string
-
-let default_transaction_fee =
-  Currency.Fee.of_mina_string_exn default_transaction_fee_string
-
-let default_snark_worker_fee =
-  Currency.Fee.of_mina_string_exn default_snark_worker_fee_string
-
 [%%inject "block_window_duration_ms", block_window_duration]
 
 [%%inject "vrf_poll_interval_ms", vrf_poll_interval]
@@ -57,9 +48,9 @@ let rpc_heartbeat_send_every_sec = 10.0 (*same as the default*)
     n2: number of pairs of signed/no-auth update
     n1: number of single signed/no-auth update
     and their coefficients representing the cost
-  The formula was generated based on benchmarking data conducted on bare 
+  The formula was generated based on benchmarking data conducted on bare
   metal i9 processor with room to include lower spec.
-  69.45 was the total time for a combination of updates that was considered 
+  69.45 was the total time for a combination of updates that was considered
   acceptable.
   The method used to estimate the cost was linear least squares.
 *)
