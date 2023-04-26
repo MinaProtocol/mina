@@ -4557,13 +4557,8 @@ module Mutations = struct
       |> Mina_ledger.Ledger.get ledger
       |> Option.value_exn
 
-    let id_of_kp (kp : Signature_lib.Keypair.t) =
-      Account_id.create
-        (Signature_lib.Public_key.compress kp.public_key)
-        Token_id.default
-
     let account_of_kp (kp : Signature_lib.Keypair.t) ledger =
-      account_of_id (id_of_kp kp) ledger
+      account_of_id (Account_id.of_public_key kp.public_key) ledger
 
     let deploy_zkapps ~mina ~ledger ~deployment_fee ~max_cost ~init_balance
         ~(fee_payer_array : Signature_lib.Keypair.t Array.t)
@@ -4757,10 +4752,12 @@ module Mutations = struct
                           ~f:Signature_lib.Keypair.of_private_key_exn
                       in
                       let fee_payer_ids =
-                        List.map fee_payer_keypairs ~f:id_of_kp
+                        List.map fee_payer_keypairs ~f:(fun kp ->
+                            Account_id.of_public_key kp.public_key )
                       in
                       let zkapp_account_ids =
-                        List.map zkapp_account_keypairs ~f:id_of_kp
+                        List.map zkapp_account_keypairs ~f:(fun kp ->
+                            Account_id.of_public_key kp.public_key )
                       in
                       let num_fee_payers = List.length fee_payer_keypairs in
                       let fee_payer_array = Array.of_list fee_payer_keypairs in
@@ -4850,7 +4847,9 @@ module Mutations = struct
                                     in
                                     let (fee_payer_account : Account.t), _ =
                                       Account_id.Table.find_exn
-                                        account_state_tbl (id_of_kp fee_payer)
+                                        account_state_tbl
+                                        (Account_id.of_public_key
+                                           fee_payer.public_key )
                                     in
                                     let memo =
                                       Printf.sprintf "%s-%s-%s-%s"
