@@ -12,7 +12,7 @@ let tuple11_of_array array =
   | _ ->
       assert false
 
-let tuple24_of_array array =
+let tuple21_of_array array =
   match array with
   | [| a1
      ; a2
@@ -35,9 +35,6 @@ let tuple24_of_array array =
      ; a19
      ; a20
      ; a21
-     ; a22
-     ; a23
-     ; a24
     |] ->
       ( a1
       , a2
@@ -59,10 +56,7 @@ let tuple24_of_array array =
       , a18
       , a19
       , a20
-      , a21
-      , a22
-      , a23
-      , a24 )
+      , a21 )
   | _ ->
       assert false
 
@@ -410,12 +404,12 @@ module External_checks = struct
   type 'field t =
     { mutable multi_ranges : 'field Cvar.t standard_limbs list
     ; mutable compact_multi_ranges : 'field Cvar.t compact_limbs list
-    ; mutable bound_additions : 'field Cvar.t standard_limbs list
+    ; mutable bounds : 'field Cvar.t standard_limbs list
     }
 
   let create (type field)
       (module Circuit : Snark_intf.Run with type field = field) : field t =
-    { multi_ranges = []; compact_multi_ranges = []; bound_additions = [] }
+    { multi_ranges = []; compact_multi_ranges = []; bounds = [] }
 
   (* Track a multi-range-check *)
   let append_multi_range_check (external_checks : 'field t)
@@ -428,10 +422,10 @@ module External_checks = struct
     external_checks.compact_multi_ranges <-
       x :: external_checks.compact_multi_ranges
 
-  (* Track a bound addition *)
-  let append_bound_addition (external_checks : 'field t)
+  (* Track a bound check *)
+  let append_bound_check (external_checks : 'field t)
       (x : 'field Cvar.t standard_limbs) =
-    external_checks.bound_additions <- x :: external_checks.bound_additions
+    external_checks.bounds <- x :: external_checks.bounds
 end
 
 (* Common auxiliary functions for foreign field gadgets *)
@@ -1034,12 +1028,9 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
       , remainder2
       , quotient_bound01
       , quotient_bound2
-      , remainder_bound0
-      , remainder_bound1
-      , remainder_bound2
       , product1_lo
       , product1_hi_0 ) =
-    exists (Typ.array ~length:24 Field.typ) ~compute:(fun () ->
+    exists (Typ.array ~length:21 Field.typ) ~compute:(fun () ->
         (* Compute quotient remainder and negative foreign field modulus *)
         let quotient, remainder =
           (* Bignum_bigint computations *)
@@ -1123,9 +1114,6 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
 
         (* Compute bounds for multi-range-checks on quotient and remainder *)
         let quotient_bound = compute_bound quotient neg_foreign_field_modulus in
-        let remainder_bound =
-          compute_bound remainder neg_foreign_field_modulus
-        in
 
         (* Compute quotient bound addition witness variables *)
         let quotient_bound_carry =
@@ -1151,9 +1139,6 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
         let quotient_bound01, quotient_bound2 =
           bignum_bigint_to_field_compact_limbs (module Circuit) quotient_bound
         in
-        let remainder_bound0, remainder_bound1, remainder_bound2 =
-          bignum_bigint_to_field_standard_limbs (module Circuit) remainder_bound
-        in
 
         [| left_input0
          ; left_input1
@@ -1174,13 +1159,10 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
          ; remainder2
          ; quotient_bound01
          ; quotient_bound2
-         ; remainder_bound0
-         ; remainder_bound1
-         ; remainder_bound2
          ; product1_lo
          ; product1_hi_0
         |] )
-    |> tuple24_of_array
+    |> tuple21_of_array
   in
 
   (* Prepare external checks *)
@@ -1195,9 +1177,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     (carry1_lo, product1_lo, product1_hi_0) ;
   External_checks.append_compact_multi_range_check external_checks
     (quotient_bound01, quotient_bound2) ;
-  External_checks.append_multi_range_check external_checks
-    (remainder_bound0, remainder_bound1, remainder_bound2) ;
-  External_checks.append_bound_addition external_checks
+  External_checks.append_bound_check external_checks
     (remainder0, remainder1, remainder2) ;
 
   (* Create ForeignFieldMul gate *)
@@ -1506,48 +1486,19 @@ let%test_unit "foreign_field arithmetics gadgets" =
               assert_eq product1 expected ;
               assert_eq product2 expected ) ;
 
-          (* 2) Add result bound addition gate. Corresponding range check happens in 6 *)
-          List.iter external_checks.bound_additions ~f:(fun product ->
-              let remainder_bound, _external_checks =
+          (* 2) Add result bound addition gate. This adds multi-range-checks for the
+                computed bound to the external_checks.multi-ranges, which are then
+                constrainted in (6) *)
+          assert (Mina_stdlib.List.Length.equal external_checks.bounds 2) ;
+          List.iter external_checks.bounds ~f:(fun product ->
+              let _remainder_bound, _external_checks =
                 bound_addition
                   (module Runner.Impl)
+                  ~external_checks
                   (Element.Standard.of_limbs product)
                   foreign_field_modulus
               in
-              (* Sanity check remainder_bounds *)
-              let ( expected_remainder_bound0
-                  , expected_remainder_bound1
-                  , expected_remainder_bound2 ) =
-                match external_checks.multi_ranges with
-                | [ a; _; _; _ ] ->
-                    (* Okay because both products (and thus result bounds)
-                       in this test are the same *)
-                    a
-                | _ ->
-                    invalid_arg "wrong number of multi-ranges"
-              in
-
-              as_prover (fun () ->
-                  let remainder_bound =
-                    Element.Standard.to_field_limbs_as_prover
-                      (module Runner.Impl)
-                      remainder_bound
-                  in
-                  let expected_remainder_bound =
-                    ( Common.cvar_field_to_field_as_prover
-                        (module Runner.Impl)
-                        expected_remainder_bound0
-                    , Common.cvar_field_to_field_as_prover
-                        (module Runner.Impl)
-                        expected_remainder_bound1
-                    , Common.cvar_field_to_field_as_prover
-                        (module Runner.Impl)
-                        expected_remainder_bound2 )
-                  in
-                  assert_eq remainder_bound expected_remainder_bound ) ;
               () ) ;
-          assert (
-            Mina_stdlib.List.Length.equal external_checks.bound_additions 2 ) ;
 
           (* 3) Add multi-range-check left input *)
           let left_input0, left_input1, left_input2 =
@@ -1567,27 +1518,26 @@ let%test_unit "foreign_field arithmetics gadgets" =
 
           (* 5-6) Add gates for external multi-range-checks
            *   In this case:
-           *     carry1_lo, product1_lo, product1_hi_0
            *     remainder_bound0, remainder_bound1, remainder_bound2
+           *     carry1_lo, product1_lo, product1_hi_0
            *)
+          assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 4) ;
           List.iter external_checks.multi_ranges ~f:(fun multi_range ->
               let v0, v1, v2 = multi_range in
               Range_check.multi (module Runner.Impl) v0 v1 v2 ;
               () ) ;
-          assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 4) ;
 
           (* 7) Add gates for external compact-multi-range-checks
            *   In this case:
            *     quotient_bound01, quotient_bound2
            *)
+          assert (
+            Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges 2 ) ;
           List.iter external_checks.compact_multi_ranges
             ~f:(fun compact_multi_range ->
               let v01, v2 = compact_multi_range in
               Range_check.compact_multi (module Runner.Impl) v01 v2 ;
-              () ) ;
-
-          assert (
-            Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges 2 ) )
+              () ) )
     in
 
     cs
