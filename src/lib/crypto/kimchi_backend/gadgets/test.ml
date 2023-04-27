@@ -1,9 +1,9 @@
 let tests_enabled = true
 
 let%test_unit "custom gates integration" =
-  if tests_enabled then (
-    (* Import the gadget test runner *)
-    let open Kimchi_gadgets_test_runner in
+  ( if tests_enabled then
+    let (* Import the gadget test runner *)
+    open Kimchi_gadgets_test_runner in
     let open Foreign_field in
     (* Initialize the SRS cache. *)
     let () =
@@ -119,13 +119,15 @@ let%test_unit "custom gates integration" =
             let limbs = Element.Standard.of_limbs (l0, l1, l2) in
 
             (* Create external checks context for tracking extra constraints
-               that are required for soundness *)
-            let external_checks = External_checks.create (module Runner.Impl) in
+               that are required for soundness (not used in this test) *)
+            let unused_external_checks =
+              External_checks.create (module Runner.Impl)
+            in
 
             let out_ffmul =
               Foreign_field.mul
                 (module Runner.Impl)
-                limbs limbs secp256k1_modulus external_checks
+                unused_external_checks limbs limbs secp256k1_modulus
             in
 
             let out_ffadd =

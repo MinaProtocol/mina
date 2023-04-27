@@ -193,9 +193,9 @@ let is_error (func : unit -> _) = Result.is_error (Or_error.try_with func)
 (*********)
 
 let%test_unit "helper field_bits_le_to_field" =
-  if tests_enabled then (
-    (* Import the gadget test runner *)
-    let open Kimchi_gadgets_test_runner in
+  ( if tests_enabled then
+    let (* Import the gadget test runner *)
+    open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
       try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()

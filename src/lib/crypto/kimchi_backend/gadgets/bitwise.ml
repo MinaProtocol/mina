@@ -518,8 +518,8 @@ let bnot64_unchecked (type f)
 
 let%test_unit "bitwise rotation gadget" =
   if tests_enabled then (
-    (* Import the gadget test runner *)
-    let open Kimchi_gadgets_test_runner in
+    let (* Import the gadget test runner *)
+    open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
       try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
@@ -576,8 +576,8 @@ let%test_unit "bitwise rotation gadget" =
 
 let%test_unit "bitwise xor gadget" =
   if tests_enabled then (
-    (* Import the gadget test runner *)
-    let open Kimchi_gadgets_test_runner in
+    let (* Import the gadget test runner *)
+    open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
       try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
@@ -660,8 +660,8 @@ let%test_unit "bitwise xor gadget" =
 
 let%test_unit "bitwise and gadget" =
   if tests_enabled then (
-    (* Import the gadget test runner *)
-    let open Kimchi_gadgets_test_runner in
+    let (* Import the gadget test runner *)
+    open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
       try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
@@ -725,8 +725,8 @@ let%test_unit "bitwise and gadget" =
 
 let%test_unit "bitwise not gadget" =
   if tests_enabled then (
-    (* Import the gadget test runner *)
-    let open Kimchi_gadgets_test_runner in
+    let (* Import the gadget test runner *)
+    open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
       try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()

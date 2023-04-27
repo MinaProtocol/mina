@@ -232,8 +232,8 @@ let compact_multi (type f)
 
 let%test_unit "range_check64 gadget" =
   if tests_enabled then (
-    (* Import the gadget test runner *)
-    let open Kimchi_gadgets_test_runner in
+    let (* Import the gadget test runner *)
+    open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
       try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
@@ -278,8 +278,8 @@ let%test_unit "range_check64 gadget" =
 
 let%test_unit "multi_range_check gadget" =
   if tests_enabled then (
-    (* Import the gadget test runner *)
-    let open Kimchi_gadgets_test_runner in
+    let (* Import the gadget test runner *)
+    open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
       try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
@@ -354,8 +354,8 @@ let%test_unit "multi_range_check gadget" =
 
 let%test_unit "compact_multi_range_check gadget" =
   if tests_enabled then (
-    (* Import the gadget test runner *)
-    let open Kimchi_gadgets_test_runner in
+    let (* Import the gadget test runner *)
+    open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
       try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()

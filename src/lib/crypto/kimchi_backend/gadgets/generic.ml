@@ -105,8 +105,8 @@ let mul (type f)
 
 let%test_unit "generic gadgets" =
   if tests_enabled then (
-    (* Import the gadget test runner *)
-    let open Kimchi_gadgets_test_runner in
+    let (* Import the gadget test runner *)
+    open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
       try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
