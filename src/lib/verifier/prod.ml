@@ -373,7 +373,6 @@ module Worker = struct
         if enable_internal_tracing then
           don't_wait_for @@ Internal_tracing.toggle ~logger `Enabled ;
         [%log info] "Verifier started" ;
-        [%log internal] "VERIFIER UP" ;
         Worker_state.create
           { conf_dir
           ; enable_internal_tracing
