@@ -83,7 +83,6 @@ while true; do
             PRODUCERS=1
             SNARK_WORKERS=1
             NODES=1
-            FRONTEND=1
             shift
             continue
         ;;
