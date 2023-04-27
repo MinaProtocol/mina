@@ -15,7 +15,6 @@ module Snark_intf = Snarky_backendless.Snark_intf
  *
  *   There are 3 specific limb structures required
  *     Standard mode := 3 limbs of L-bits each
- *     Extended mode := 4 limbs of L-bits each, used by bound addition (i.e. Matthew's trick)
  *     Compact mode  := 2 limbs where the lowest is 2L bits and the highest is L bits
  *)
 type 'field standard_limbs = 'field * 'field * 'field
@@ -82,7 +81,7 @@ end
 (* Type of operation *)
 type op_mode = Add | Sub
 
-(** This function checks in the circuit that a value is less than the foreign field modulus. 
+(** This function checks in the circuit that a value is less than the foreign field modulus.
  *
  *    Inputs:
  *      value                 := the value to check
@@ -91,7 +90,7 @@ type op_mode = Add | Sub
  *
  *    Outputs:
  *      Returns bound value and External_checks containing multi-range-check for bound
- * 
+ *
  *    Effects to the circuit:
  *      - 1 FFAdd gate
  *      - 1 Zero gate
@@ -140,8 +139,8 @@ val sum_chain :
  *    Outputs:
  *      Inserts the gates (described below) into the circuit
  *      Returns the result of the addition as a 3 limbs element
- *  
- * In default mode: 
+ *
+ * In default mode:
  *  It adds a FFAdd gate,
  *  followed by a Zero gate,
  *  a FFAdd gate for the bound check,
@@ -170,8 +169,8 @@ val add :
  *    Outputs:
  *      Inserts the gates (described below) into the circuit
  *      Returns the result of the addition as a 3 limbs element
- *  
- * In default mode: 
+ *
+ * In default mode:
  *  It adds a FFAdd gate,
  *  followed by a Zero gate,
  *  a FFAdd gate for the bound check,
