@@ -96,11 +96,11 @@ type op_mode = Add | Sub
  *      - 1 Zero gate
  *      - 1 Multi Range gadget
  *)
-val less_than_mod :
+val valid_element :
      (module Snark_intf.Run with type field = 'f)
+  -> 'f External_checks.t (* external_checks *)
   -> 'f Element.Standard.t (* value *)
   -> 'f standard_limbs (* foreign_field_modulus *)
-  -> 'f External_checks.t (* external_checks *)
   -> 'f Element.Standard.t
 (* result *)
 
@@ -207,9 +207,9 @@ val sub :
  *)
 val mul :
      (module Snark_intf.Run with type field = 'f)
+  -> 'f External_checks.t (* external_checks *)
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
-  -> 'f External_checks.t (* external_checks *)
   -> 'f Element.Standard.t
 (* product *)

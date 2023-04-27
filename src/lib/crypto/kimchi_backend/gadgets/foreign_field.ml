@@ -759,7 +759,7 @@ let sub (type f) (module Circuit : Snark_intf.Run with type field = f)
 (* Compute non-zero intermediate products
  *
  *   For more details see the "Intermediate products" Section of
- *   the [Foreign Field Multiplication RFC](../rfcs/foreign_field_mul.md)
+ *   the [Foreign Field Multiplication RFC](https://o1-labs.github.io/proof-systems/rfcs/foreign_field_mul.html)
  *
  *   Preconditions: this entire function is witness code and, therefore, must be
  *                  only called from an exists construct.
@@ -802,7 +802,7 @@ let compute_intermediate_products (type f)
 
 (* Compute intermediate sums
  *   For more details see the "Optimizations" Section of
- *   the [Foreign Field Multiplication RFC](../rfcs/foreign_field_mul.md) *)
+ *   the [Foreign Field Multiplication RFC](https://o1-labs.github.io/proof-systems/rfcs/foreign_field_mul.html) *)
 let compute_intermediate_sums (type f)
     (module Circuit : Snark_intf.Run with type field = f)
     (quotient : f standard_limbs) (neg_foreign_field_modulus : f standard_limbs)
