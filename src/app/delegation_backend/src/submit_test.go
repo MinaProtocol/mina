@@ -196,6 +196,7 @@ func TestSuccess(t *testing.T) {
 		meta.PeerId = req.Data.PeerId
 		meta.SnarkWork = req.Data.SnarkWork
 		meta.RemoteAddr = "192.0.2.1:1234"
+		meta.BlockProducerVersion = req.Data.BlockProducerVersion
 		meta.BlockHash = bhStr
 		meta.Submitter = req.Submitter
 		metaBytes, err2 := json.Marshal(meta)

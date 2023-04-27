@@ -199,13 +199,14 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ps, blockHash := makePaths(submittedAt, &req)
 
 	meta := MetaToBeSaved{
-		CreatedAt:          req.Data.CreatedAt.Format(time.RFC3339),
-		PeerId:             req.Data.PeerId,
-		SnarkWork:          req.Data.SnarkWork,
-		RemoteAddr:         r.RemoteAddr,
-		BlockHash:          blockHash,
-		Submitter:          req.Submitter,
-		GraphqlControlPort: req.Data.GraphqlControlPort,
+		CreatedAt:            req.Data.CreatedAt.Format(time.RFC3339),
+		PeerId:               req.Data.PeerId,
+		SnarkWork:            req.Data.SnarkWork,
+		RemoteAddr:           r.RemoteAddr,
+		BlockHash:            blockHash,
+		Submitter:            req.Submitter,
+		GraphqlControlPort:   req.Data.GraphqlControlPort,
+		BlockProducerVersion: req.Data.BlockProducerVersion,
 	}
 
 	metaBytes, err1 := json.Marshal(meta)
