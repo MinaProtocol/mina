@@ -4789,8 +4789,7 @@ module Mutations = struct
                                 ~key:(Account.identifier a) ~data:(a, role)
                             else ()
                           in
-                          let rec go account_state_tbl ndx tm_next counter
-                              ~recently_used_accounts =
+                          let rec go ~account_state_tbl ~ndx ~tm_next ~counter =
                             if Time.( >= ) (Time.now ()) tm_end then (
                               [%log info]
                                 "Scheduled zkApp commands with handle %s has \
@@ -4910,11 +4909,11 @@ module Mutations = struct
                               in
                               let%bind () = Async_unix.at tm_next in
                               let next_tm_next = Time.add tm_next wait_span in
-                              go account_state_tbl
-                                ((ndx + 1) mod num_fee_payers)
-                                next_tm_next (counter + 1)
-                                ~recently_used_accounts
+                              go ~account_state_tbl
+                                ~ndx:((ndx + 1) mod num_fee_payers)
+                                ~tm_next:next_tm_next ~counter:(counter + 1)
                           in
+
                           upon
                             (wait_until_zkapps_deployed ~mina ~ledger
                                ~deployment_fee:
@@ -4943,12 +4942,9 @@ module Mutations = struct
                                   let tm_next =
                                     Time.add (Time.now ()) wait_span
                                   in
-                                  let recently_used_accounts =
-                                    Queue.create ()
-                                  in
                                   don't_wait_for
-                                  @@ go account_state_tbl 0 tm_next 0
-                                       ~recently_used_accounts ) ;
+                                  @@ go ~account_state_tbl ~ndx:0 ~tm_next
+                                       ~counter:0 ) ;
 
                           Ok (Uuid.to_string uuid) ) ) )
 
