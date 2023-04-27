@@ -166,6 +166,9 @@ let () =
           ; test_case "JSON roundtrip." `Quick json_roundtrip
           ; test_case "JSON value." `Quick json_value
           ] )
+    ; Protocol_constants_checked_test.
+        ( "protocol constans checked"
+        , [ test_case "value = var." `Quick value_equals_var ] )
     ; Receipt_test.
       ( "receipts"
       , [ test_case "Checked-unmchecked equivalence for signed command" `Quick

@@ -12,6 +12,7 @@
   sexplib0
   yojson
   ;; local libraries
+  block_time
   codable
   currency
   data_hash_lib
