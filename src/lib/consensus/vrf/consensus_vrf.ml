@@ -75,7 +75,7 @@ module Group = struct
 end
 
 module Message = struct
-  module Global_slot = Mina_numbers.Global_slot
+  module Global_slot = Mina_numbers.Global_slot_since_genesis
 
   type ('global_slot, 'epoch_seed, 'delegator) t =
     { global_slot : 'global_slot; seed : 'epoch_seed; delegator : 'delegator }
@@ -492,7 +492,8 @@ module Layout = struct
   *)
   module Message = struct
     type t =
-      { global_slot : Mina_numbers.Global_slot.t [@key "globalSlot"]
+      { global_slot : Mina_numbers.Global_slot_since_genesis.t
+            [@key "globalSlot"]
       ; epoch_seed : Mina_base.Epoch_seed.t [@key "epochSeed"]
       ; delegator_index : int [@key "delegatorIndex"]
       }

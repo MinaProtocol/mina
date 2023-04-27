@@ -530,12 +530,15 @@ module Checked = struct
 
   let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
       ~vesting_increment ~initial_minimum_balance =
-    let%bind before_cliff = Global_slot.Checked.(global_slot < cliff_time) in
+    let%bind before_cliff =
+      Global_slot_since_genesis.Checked.(global_slot < cliff_time)
+    in
     let%bind else_branch =
       make_checked (fun () ->
           let _, slot_diff =
             Tick.Run.run_checked
-              (Global_slot.Checked.sub_or_zero global_slot cliff_time)
+              (Global_slot_since_genesis.Checked.sub_or_zero global_slot
+                 cliff_time )
           in
           let cliff_decrement = cliff_amount in
           let min_balance_less_cliff_decrement =
@@ -545,11 +548,12 @@ module Checked = struct
           in
           let num_periods, _ =
             Tick.Run.run_checked
-              (Global_slot.Checked.div_mod slot_diff vesting_period)
+              (Global_slot_since_genesis.Checked.div_mod slot_diff
+                 vesting_period )
           in
           let vesting_decrement =
             Tick.Run.Field.mul
-              (Global_slot.Checked.to_field num_periods)
+              (Global_slot_since_genesis.Checked.to_field num_periods)
               (Amount.pack_var vesting_increment)
           in
           let min_balance_less_cliff_and_vesting_decrements =
@@ -661,7 +665,7 @@ let create account_id balance =
 
 let create_timed account_id balance ~initial_minimum_balance ~cliff_time
     ~cliff_amount ~vesting_period ~vesting_increment =
-  if Global_slot.(equal vesting_period zero) then
+  if Global_slot_since_genesis.(equal vesting_period zero) then
     Or_error.errorf
       !"Error creating timed account for account id %{sexp: Account_id.t}: \
         vesting period must be greater than zero"
@@ -697,7 +701,7 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
 (* no vesting after cliff time + 1 slot *)
 let create_time_locked public_key balance ~initial_minimum_balance ~cliff_time =
   create_timed public_key balance ~initial_minimum_balance ~cliff_time
-    ~vesting_period:Global_slot.(succ zero)
+    ~vesting_period:Global_slot_since_genesis.(succ zero)
     ~vesting_increment:initial_minimum_balance
 
 let initial_minimum_balance Poly.{ timing; _ } =
@@ -726,9 +730,11 @@ let vesting_period Poly.{ timing; _ } =
 let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
     ~vesting_increment ~initial_minimum_balance =
   let open Unsigned in
-  if Global_slot.(global_slot < cliff_time) then initial_minimum_balance
+  if Global_slot_since_genesis.(global_slot < cliff_time) then
+    initial_minimum_balance
     (* If vesting period is zero then everything vests immediately at the cliff *)
-  else if Global_slot.(equal vesting_period zero) then Balance.zero
+  else if Global_slot_since_genesis.(equal vesting_period zero) then
+    Balance.zero
   else
     match Balance.(initial_minimum_balance - cliff_amount) with
     | None ->
@@ -763,7 +769,7 @@ let incremental_balance_between_slots ~start_slot ~end_slot ~cliff_time
     ~cliff_amount ~vesting_period ~vesting_increment ~initial_minimum_balance :
     Unsigned.UInt64.t =
   let open Unsigned in
-  if Global_slot.(end_slot <= start_slot) then UInt64.zero
+  if Global_slot_since_genesis.(end_slot <= start_slot) then UInt64.zero
   else
     let min_balance_at_start_slot =
       min_balance_at_slot ~global_slot:start_slot ~cliff_time ~cliff_amount
@@ -810,13 +816,14 @@ let final_vesting_slot ~initial_minimum_balance ~cliff_time ~cliff_amount
   in
   let open UInt32 in
   let open Infix in
-  Global_slot.of_uint32
-  @@ Global_slot.to_uint32 cliff_time
-     + (UInt64.to_uint32 periods * Global_slot.to_uint32 vesting_period)
+  Global_slot_since_genesis.of_uint32
+  @@ Global_slot_since_genesis.to_uint32 cliff_time
+     + UInt64.to_uint32 periods
+       * Global_slot_since_genesis.to_uint32 vesting_period
 
 let timing_final_vesting_slot = function
   | Timing.Untimed ->
-      Global_slot.zero
+      Global_slot_since_genesis.zero
   | Timed
       { initial_minimum_balance
       ; cliff_time
@@ -871,19 +878,21 @@ let gen_with_constrained_balance ~low ~high : t Quickcheck.Generator.t =
 
 let gen_any_vesting_range =
   let open Quickcheck.Generator.Let_syntax in
-  let open Global_slot in
+  let open Global_slot_since_genesis in
   (* vesting period must be at least oe to avoid division by zero *)
-  let%bind vesting_period = Int.gen_incl 1 1000 >>| Global_slot.of_int in
+  let%bind vesting_period =
+    Int.gen_incl 1 1000 >>| Global_slot_since_genesis.of_int
+  in
   let%bind vesting_end = gen_incl (of_int 1) max_value in
   let%map cliff_time = gen_incl (of_int 1) vesting_end in
   (cliff_time, vesting_end, vesting_period)
 
 let gen_at_least_one_vesting_period ?(min_vesting_periods = 1) =
   let open Quickcheck.Generator.Let_syntax in
-  let open Global_slot in
+  let open Global_slot_since_genesis in
   (* vesting period must be at least one to avoid division by zero *)
   let%bind vesting_period =
-    min_vesting_periods |> return >>| Global_slot.of_int
+    min_vesting_periods |> return >>| Global_slot_since_genesis.of_int
   in
   let min_vesting_end = succ vesting_period in
   let%bind vesting_end = gen_incl min_vesting_end max_value in
@@ -891,15 +900,16 @@ let gen_at_least_one_vesting_period ?(min_vesting_periods = 1) =
   let%map cliff_time = gen_incl (of_int 1) max_cliff_time in
   (cliff_time, vesting_end, vesting_period)
 
-let gen_vesting_details ~(cliff_time : Global_slot.t)
-    ~(vesting_end : Global_slot.t) ~(vesting_period : Global_slot.t)
+let gen_vesting_details ~(cliff_time : Global_slot_since_genesis.t)
+    ~(vesting_end : Global_slot_since_genesis.t)
+    ~(vesting_period : Global_slot_since_genesis.t)
     (initial_minimum_balance : Balance.t) :
     Timing.as_record Quickcheck.Generator.t =
   let open Unsigned in
   let open Quickcheck in
   let open Generator.Let_syntax in
   let vesting_slots =
-    let open Global_slot in
+    let open Global_slot_since_genesis in
     let open UInt32.Infix in
     to_uint32 vesting_end - to_uint32 cliff_time
   in

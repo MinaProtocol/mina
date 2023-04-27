@@ -144,7 +144,7 @@ module Numeric = struct
         }
 
     let global_slot =
-      Global_slot.
+      Global_slot_since_genesis.
         { zero
         ; max_value
         ; compare
@@ -956,7 +956,7 @@ module Protocol_state = struct
         ( Frozen_ledger_hash.Stable.V1.t Hash.Stable.V1.t
         , Length.Stable.V1.t Numeric.Stable.V1.t
         , unit (* TODO *)
-        , Global_slot.Stable.V1.t Numeric.Stable.V1.t
+        , Global_slot_since_genesis.Stable.V1.t Numeric.Stable.V1.t
         , Currency.Amount.Stable.V1.t Numeric.Stable.V1.t
         , Epoch_data.Stable.V1.t )
         Poly.Stable.V1.t
@@ -1004,7 +1004,8 @@ module Protocol_state = struct
       Numeric.gen Currency.Amount.gen Currency.Amount.compare
     in
     let%bind global_slot_since_genesis =
-      Numeric.gen Global_slot.gen Global_slot.compare
+      Numeric.gen Global_slot_since_genesis.gen
+        Global_slot_since_genesis.compare
     in
     let%bind staking_epoch_data = Epoch_data.gen in
     let%map next_epoch_data = Epoch_data.gen in
@@ -1055,7 +1056,7 @@ module Protocol_state = struct
           ( Frozen_ledger_hash.Stable.V1.t
           , Length.Stable.V1.t
           , unit (* TODO *)
-          , Global_slot.Stable.V1.t
+          , Global_slot_since_genesis.Stable.V1.t
           , Currency.Amount.Stable.V1.t
           , ( ( Frozen_ledger_hash.Stable.V1.t
               , Currency.Amount.Stable.V1.t )
@@ -1077,7 +1078,7 @@ module Protocol_state = struct
         ( Frozen_ledger_hash.var
         , Length.Checked.t
         , unit (* TODO *)
-        , Global_slot.Checked.t
+        , Global_slot_since_genesis.Checked.t
         , Currency.Amount.var
         , ( (Frozen_ledger_hash.var, Currency.Amount.var) Epoch_ledger.Poly.t
           , Epoch_seed.var
@@ -1125,7 +1126,7 @@ module Protocol_state = struct
       ( Frozen_ledger_hash.var Hash.Checked.t
       , Length.Checked.t Numeric.Checked.t
       , unit (* TODO *)
-      , Global_slot.Checked.t Numeric.Checked.t
+      , Global_slot_since_genesis.Checked.t Numeric.Checked.t
       , Currency.Amount.var Numeric.Checked.t
       , Epoch_data.Checked.t )
       Poly.Stable.Latest.t
@@ -1356,7 +1357,7 @@ module Valid_while = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Global_slot.Stable.V1.t Numeric.Stable.V1.t
+      type t = Global_slot_since_genesis.Stable.V1.t Numeric.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
@@ -1365,7 +1366,8 @@ module Valid_while = struct
 
   let deriver = Numeric.Derivers.global_slot
 
-  let gen = Numeric.gen Global_slot.gen Global_slot.compare
+  let gen =
+    Numeric.gen Global_slot_since_genesis.gen Global_slot_since_genesis.compare
 
   let typ = Numeric.(typ Tc.global_slot)
 
@@ -1376,7 +1378,7 @@ module Valid_while = struct
       valid_while global_slot
 
   module Checked = struct
-    type t = Global_slot.Checked.t Numeric.Checked.t
+    type t = Global_slot_since_genesis.Checked.t Numeric.Checked.t
 
     let check (valid_while : t) global_slot =
       Numeric.(Checked.check Tc.global_slot) valid_while global_slot

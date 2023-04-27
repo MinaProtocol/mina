@@ -24,7 +24,7 @@ module Global_state : sig
     ; fee_excess : Currency.Amount.Signed.t
     ; supply_increase : Currency.Amount.Signed.t
     ; protocol_state : Zkapp_precondition.Protocol_state.View.t
-    ; block_global_slot : Mina_numbers.Global_slot.t
+    ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
     }
   [@@deriving sexp, to_yojson]
 end
@@ -64,4 +64,7 @@ val iteri : t -> f:(Account.Index.t -> Account.t -> unit) -> unit
 val handler : t -> Handler.t Staged.t
 
 val has_locked_tokens_exn :
-  global_slot:Mina_numbers.Global_slot.t -> account_id:Account_id.t -> t -> bool
+     global_slot:Mina_numbers.Global_slot_since_genesis.t
+  -> account_id:Account_id.t
+  -> t
+  -> bool

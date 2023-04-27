@@ -96,8 +96,8 @@ module type Concrete = sig
             ( Mina_numbers.Length.V1.t
             , Consensus_vrf.Output.Truncated.V1.t
             , Currency.Amount.V1.t
-            , Consensus_global_slot.V1.t
-            , Mina_numbers.Global_slot.V1.t
+            , Consensus_global_slot_since_hard_fork.V1.t
+            , Mina_numbers.Global_slot_since_genesis.V1.t
             , Epoch_data.Staking_value_versioned.Value.V1.t
             , Epoch_data.Next_value_versioned.Value.V1.t
             , bool

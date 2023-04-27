@@ -37,7 +37,7 @@ end
 module Stable = struct
   module V1 = struct
     type t =
-      ( Global_slot.Stable.V1.t
+      ( Global_slot_since_genesis.Stable.V1.t
       , Balance.Stable.V1.t
       , Amount.Stable.V1.t )
       Poly.Stable.V1.t
@@ -80,7 +80,7 @@ end
 
 type as_record =
   ( bool
-  , Global_slot.Stable.V1.t
+  , Global_slot_since_genesis.Stable.V1.t
   , Balance.Stable.V1.t
   , Amount.Stable.V1.t )
   As_record.t
@@ -89,8 +89,8 @@ type as_record =
 let to_record t =
   match t with
   | Untimed ->
-      let slot_unused = Global_slot.zero in
-      let slot_one = Global_slot.(succ zero) in
+      let slot_unused = Global_slot_since_genesis.zero in
+      let slot_one = Global_slot_since_genesis.(succ zero) in
       let balance_unused = Balance.zero in
       let amount_unused = Amount.zero in
       { As_record.is_timed = false
@@ -159,16 +159,20 @@ let to_input t =
   Array.reduce_exn ~f:append
     [| packed ((if is_timed then Field.one else Field.zero), 1)
      ; Balance.to_input initial_minimum_balance
-     ; Global_slot.to_input cliff_time
+     ; Global_slot_since_genesis.to_input cliff_time
      ; Amount.to_input cliff_amount
-     ; Global_slot.to_input vesting_period
+     ; Global_slot_since_genesis.to_input vesting_period
      ; Amount.to_input vesting_increment
     |]
 
 [%%ifdef consensus_mechanism]
 
 type var =
-  (Boolean.var, Global_slot.Checked.var, Balance.var, Amount.var) As_record.t
+  ( Boolean.var
+  , Global_slot_since_genesis.Checked.var
+  , Balance.var
+  , Amount.var )
+  As_record.t
 
 let var_to_input
     As_record.
@@ -183,9 +187,9 @@ let var_to_input
   Array.reduce_exn ~f:append
     [| packed ((is_timed :> Field.Var.t), 1)
      ; Balance.var_to_input initial_minimum_balance
-     ; Global_slot.Checked.to_input cliff_time
+     ; Global_slot_since_genesis.Checked.to_input cliff_time
      ; Amount.var_to_input cliff_amount
-     ; Global_slot.Checked.to_input vesting_period
+     ; Global_slot_since_genesis.Checked.to_input vesting_period
      ; Amount.var_to_input vesting_increment
     |]
 
@@ -201,9 +205,9 @@ let var_of_t (t : t) : var =
   in
   { is_timed = Boolean.var_of_value is_timed
   ; initial_minimum_balance = Balance.var_of_t initial_minimum_balance
-  ; cliff_time = Global_slot.Checked.constant cliff_time
+  ; cliff_time = Global_slot_since_genesis.Checked.constant cliff_time
   ; cliff_amount = Amount.var_of_t cliff_amount
-  ; vesting_period = Global_slot.Checked.constant vesting_period
+  ; vesting_period = Global_slot_since_genesis.Checked.constant vesting_period
   ; vesting_increment = Amount.var_of_t vesting_increment
   }
 
@@ -218,9 +222,9 @@ let typ : (var, t) Typ.t =
          ( unit
          ,    Boolean.value
            -> Balance.t
-           -> Global_slot.t
+           -> Global_slot_since_genesis.t
            -> Amount.t
-           -> Global_slot.t
+           -> Global_slot_since_genesis.t
            -> Amount.t
            -> unit )
          H_list.t
@@ -268,9 +272,9 @@ let typ : (var, t) Typ.t =
   Typ.of_hlistable
     [ Boolean.typ
     ; Balance.typ
-    ; Global_slot.typ
+    ; Global_slot_since_genesis.typ
     ; Amount.typ
-    ; Global_slot.typ
+    ; Global_slot_since_genesis.typ
     ; Amount.typ
     ]
     ~var_to_hlist ~var_of_hlist ~value_to_hlist ~value_of_hlist
@@ -287,13 +291,14 @@ let if_ b ~(then_ : var) ~(else_ : var) =
       ~else_:else_.initial_minimum_balance
   in
   let%bind cliff_time =
-    Global_slot.Checked.if_ b ~then_:then_.cliff_time ~else_:else_.cliff_time
+    Global_slot_since_genesis.Checked.if_ b ~then_:then_.cliff_time
+      ~else_:else_.cliff_time
   in
   let%bind cliff_amount =
     Amount.Checked.if_ b ~then_:then_.cliff_amount ~else_:else_.cliff_amount
   in
   let%bind vesting_period =
-    Global_slot.Checked.if_ b ~then_:then_.vesting_period
+    Global_slot_since_genesis.Checked.if_ b ~then_:then_.vesting_period
       ~else_:else_.vesting_period
   in
   let%map vesting_increment =

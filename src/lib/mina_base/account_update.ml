@@ -529,9 +529,9 @@ module Update = struct
         type t =
               Mina_wire_types.Mina_base.Account_update.Update.Timing_info.V1.t =
           { initial_minimum_balance : Balance.Stable.V1.t
-          ; cliff_time : Global_slot.Stable.V1.t
+          ; cliff_time : Global_slot_since_genesis.Stable.V1.t
           ; cliff_amount : Amount.Stable.V1.t
-          ; vesting_period : Global_slot.Stable.V1.t
+          ; vesting_period : Global_slot_since_genesis.Stable.V1.t
           ; vesting_increment : Amount.Stable.V1.t
           }
         [@@deriving annot, compare, equal, sexp, hash, yojson, hlist, fields]
@@ -545,12 +545,14 @@ module Update = struct
     let gen =
       let open Quickcheck.Let_syntax in
       let%bind initial_minimum_balance = Balance.gen in
-      let%bind cliff_time = Global_slot.gen in
+      let%bind cliff_time = Global_slot_since_genesis.gen in
       let%bind cliff_amount =
         Amount.gen_incl Amount.zero (Balance.to_amount initial_minimum_balance)
       in
       let%bind vesting_period =
-        Global_slot.gen_incl Global_slot.(succ zero) (Global_slot.of_int 10)
+        Global_slot_since_genesis.gen_incl
+          Global_slot_since_genesis.(succ zero)
+          (Global_slot_since_genesis.of_int 10)
       in
       let%map vesting_increment =
         Amount.gen_incl Amount.one (Amount.of_nanomina_int_exn 100)
@@ -565,14 +567,14 @@ module Update = struct
     let to_input (t : t) =
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
         [ Balance.to_input t.initial_minimum_balance
-        ; Global_slot.to_input t.cliff_time
+        ; Global_slot_since_genesis.to_input t.cliff_time
         ; Amount.to_input t.cliff_amount
-        ; Global_slot.to_input t.vesting_period
+        ; Global_slot_since_genesis.to_input t.vesting_period
         ; Amount.to_input t.vesting_increment
         ]
 
     let dummy =
-      let slot_unused = Global_slot.zero in
+      let slot_unused = Global_slot_since_genesis.zero in
       let balance_unused = Balance.zero in
       let amount_unused = Amount.zero in
       { initial_minimum_balance = balance_unused
@@ -607,18 +609,19 @@ module Update = struct
     module Checked = struct
       type t =
         { initial_minimum_balance : Balance.Checked.t
-        ; cliff_time : Global_slot.Checked.t
+        ; cliff_time : Global_slot_since_genesis.Checked.t
         ; cliff_amount : Amount.Checked.t
-        ; vesting_period : Global_slot.Checked.t
+        ; vesting_period : Global_slot_since_genesis.Checked.t
         ; vesting_increment : Amount.Checked.t
         }
       [@@deriving hlist]
 
       let constant (t : value) : t =
         { initial_minimum_balance = Balance.var_of_t t.initial_minimum_balance
-        ; cliff_time = Global_slot.Checked.constant t.cliff_time
+        ; cliff_time = Global_slot_since_genesis.Checked.constant t.cliff_time
         ; cliff_amount = Amount.var_of_t t.cliff_amount
-        ; vesting_period = Global_slot.Checked.constant t.vesting_period
+        ; vesting_period =
+            Global_slot_since_genesis.Checked.constant t.vesting_period
         ; vesting_increment = Amount.var_of_t t.vesting_increment
         }
 
@@ -632,9 +635,9 @@ module Update = struct
             t ) =
         List.reduce_exn ~f:Random_oracle_input.Chunked.append
           [ Balance.var_to_input initial_minimum_balance
-          ; Global_slot.Checked.to_input cliff_time
+          ; Global_slot_since_genesis.Checked.to_input cliff_time
           ; Amount.var_to_input cliff_amount
-          ; Global_slot.Checked.to_input vesting_period
+          ; Global_slot_since_genesis.Checked.to_input vesting_period
           ; Amount.var_to_input vesting_increment
           ]
 
@@ -659,9 +662,9 @@ module Update = struct
     let typ : (Checked.t, t) Typ.t =
       Typ.of_hlistable
         [ Balance.typ
-        ; Global_slot.typ
+        ; Global_slot_since_genesis.typ
         ; Amount.typ
-        ; Global_slot.typ
+        ; Global_slot_since_genesis.typ
         ; Amount.typ
         ]
         ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
@@ -1151,7 +1154,7 @@ module Preconditions = struct
         { network : Zkapp_precondition.Protocol_state.Stable.V1.t
         ; account : Account_precondition.Stable.V1.t
         ; valid_while :
-            Mina_numbers.Global_slot.Stable.V1.t
+            Mina_numbers.Global_slot_since_genesis.Stable.V1.t
             Zkapp_precondition.Numeric.Stable.V1.t
         }
       [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
@@ -1441,7 +1444,8 @@ module Body = struct
         type t = Mina_wire_types.Mina_base.Account_update.Body.Fee_payer.V1.t =
           { public_key : Public_key.Compressed.Stable.V1.t
           ; fee : Fee.Stable.V1.t
-          ; valid_until : Global_slot.Stable.V1.t option [@name "validUntil"]
+          ; valid_until : Global_slot_since_genesis.Stable.V1.t option
+                [@name "validUntil"]
           ; nonce : Account_nonce.Stable.V1.t
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, hlist, fields]
@@ -1454,7 +1458,8 @@ module Body = struct
       let open Quickcheck.Generator.Let_syntax in
       let%map public_key = Public_key.Compressed.gen
       and fee = Currency.Fee.gen
-      and valid_until = Option.quickcheck_generator Global_slot.gen
+      and valid_until =
+        Option.quickcheck_generator Global_slot_since_genesis.gen
       and nonce = Account.Nonce.gen in
       { public_key; fee; valid_until; nonce }
 
@@ -1499,11 +1504,15 @@ module Body = struct
     ; preconditions =
         { Preconditions.network =
             (let valid_until =
-               Option.value ~default:Global_slot.max_value t.valid_until
+               Option.value ~default:Global_slot_since_genesis.max_value
+                 t.valid_until
              in
              { Zkapp_precondition.Protocol_state.accept with
                global_slot_since_genesis =
-                 Check { lower = Global_slot.zero; upper = valid_until }
+                 Check
+                   { lower = Global_slot_since_genesis.zero
+                   ; upper = valid_until
+                   }
              } )
         ; account = Account_precondition.Nonce t.nonce
         ; valid_while = Ignore
@@ -1527,11 +1536,15 @@ module Body = struct
     ; preconditions =
         { Preconditions.network =
             (let valid_until =
-               Option.value ~default:Global_slot.max_value t.valid_until
+               Option.value ~default:Global_slot_since_genesis.max_value
+                 t.valid_until
              in
              { Zkapp_precondition.Protocol_state.accept with
                global_slot_since_genesis =
-                 Check { lower = Global_slot.zero; upper = valid_until }
+                 Check
+                   { lower = Global_slot_since_genesis.zero
+                   ; upper = valid_until
+                   }
              } )
         ; account = Account_precondition.Nonce t.nonce
         ; valid_while = Ignore
@@ -1937,7 +1950,7 @@ let protocol_state_precondition (t : t) : Zkapp_precondition.Protocol_state.t =
   t.body.preconditions.network
 
 let valid_while_precondition (t : t) :
-    Mina_numbers.Global_slot.t Zkapp_precondition.Numeric.t =
+    Mina_numbers.Global_slot_since_genesis.t Zkapp_precondition.Numeric.t =
   t.body.preconditions.valid_while
 
 let public_key (t : t) : Public_key.Compressed.t = t.body.public_key

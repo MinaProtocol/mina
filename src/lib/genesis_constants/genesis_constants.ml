@@ -28,7 +28,8 @@ module Fork_constants = struct
   type t =
     { previous_state_hash : Pickles.Backend.Tick.Field.Stable.Latest.t
     ; previous_length : Mina_numbers.Length.Stable.Latest.t
-    ; previous_global_slot : Mina_numbers.Global_slot.Stable.Latest.t
+    ; previous_global_slot :
+        Mina_numbers.Global_slot_since_genesis.Stable.Latest.t
     }
   [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
 end

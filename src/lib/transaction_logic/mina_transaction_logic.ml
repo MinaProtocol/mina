@@ -4,7 +4,7 @@ open Currency
 open Signature_lib
 open Mina_transaction
 module Zkapp_command_logic = Zkapp_command_logic
-module Global_slot = Mina_numbers.Global_slot
+module Global_slot = Mina_numbers.Global_slot_since_genesis
 
 module Transaction_applied = struct
   module UC = Signed_command
@@ -337,7 +337,7 @@ module type S = sig
       ; fee_excess : Amount.Signed.t
       ; supply_increase : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
-      ; block_global_slot : Mina_numbers.Global_slot.t
+      ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
             (* Slot of block when the transaction is applied. NOTE: This is at least 1 slot after the protocol_state's view, which is for the *previous* slot. *)
       }
   end
@@ -402,7 +402,7 @@ module type S = sig
 
   val apply_zkapp_command_unchecked :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> global_slot:Mina_numbers.Global_slot.t
+    -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
     -> ledger
     -> Zkapp_command.t
@@ -436,7 +436,7 @@ module type S = sig
   *)
   val apply_zkapp_command_unchecked_aux :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> global_slot:Mina_numbers.Global_slot.t
+    -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
     -> init:'acc
     -> f:
@@ -461,7 +461,7 @@ module type S = sig
 
   val apply_zkapp_command_first_pass_aux :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> global_slot:Mina_numbers.Global_slot.t
+    -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
     -> init:'acc
     -> f:
@@ -534,7 +534,7 @@ module type S = sig
 
   val apply_transactions :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> global_slot:Mina_numbers.Global_slot.t
+    -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
     -> ledger
     -> Transaction.t list
@@ -1337,7 +1337,7 @@ module Make (L : Ledger_intf.S) :
     end
 
     module Global_slot = struct
-      include Mina_numbers.Global_slot
+      include Mina_numbers.Global_slot_since_genesis
 
       let if_ = value_if
     end

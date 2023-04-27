@@ -22,7 +22,7 @@ let sub a b = UInt32.sub a b
 let constant a = a
 
 module Checked = struct
-  module T = Mina_numbers.Global_slot
+  module T = Mina_numbers.Global_slot_since_hard_fork
 
   type t = T.Checked.t
 

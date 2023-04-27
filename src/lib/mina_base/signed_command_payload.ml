@@ -7,7 +7,7 @@ open Snark_params.Tick
 open Signature_lib
 module Memo = Signed_command_memo
 module Account_nonce = Mina_numbers.Account_nonce
-module Global_slot = Mina_numbers.Global_slot
+module Global_slot = Mina_numbers.Global_slot_since_genesis
 
 (* This represents the random oracle input corresponding to the old form of the token
    ID, which was a 64-bit integer. The default token id was the number 1.

@@ -1,7 +1,7 @@
 open Unsigned
 open Core
 open Snark_params.Tick
-module Wire_types = Mina_wire_types.Consensus_global_slot
+module Wire_types = Mina_wire_types.Consensus_global_slot_since_hard_fork
 
 module Make_sig (A : Wire_types.Types.S) = struct
   module type S =
@@ -12,7 +12,7 @@ module Make_sig (A : Wire_types.Types.S) = struct
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
-  module T = Mina_numbers.Global_slot
+  module T = Mina_numbers.Global_slot_since_hard_fork
   module Length = Mina_numbers.Length
 
   module Poly = struct

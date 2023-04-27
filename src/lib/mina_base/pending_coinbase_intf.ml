@@ -143,7 +143,8 @@ module type S = sig
 
     val push_coinbase : Coinbase.t -> t -> t
 
-    val push_state : State_body_hash.t -> Mina_numbers.Global_slot.t -> t -> t
+    val push_state :
+      State_body_hash.t -> Mina_numbers.Global_slot_since_genesis.t -> t -> t
 
     module Checked : sig
       type t = var
@@ -152,7 +153,7 @@ module type S = sig
 
       val push_state :
            State_body_hash.var
-        -> Mina_numbers.Global_slot.Checked.var
+        -> Mina_numbers.Global_slot_since_genesis.Checked.var
         -> t
         -> t Tick.Checked.t
 
@@ -288,7 +289,7 @@ module type S = sig
       -> coinbase_receiver:Public_key.Compressed.var
       -> supercharge_coinbase:Boolean.var
       -> State_body_hash.var
-      -> Mina_numbers.Global_slot.Checked.t
+      -> Mina_numbers.Global_slot_since_genesis.Checked.t
       -> var Tick.Checked.t
 
     (**
