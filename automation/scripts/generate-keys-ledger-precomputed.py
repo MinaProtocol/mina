@@ -1,7 +1,7 @@
 # This script is to produce genesis ledger for the daemon config file
 # The script expects
 # 1. csv file that contains the spec for each account (balance, delegate, nonce) were delegate is the index of an account in the same list
-# 2. path to keys folder which contains a sub-drifolder for block producer keys "block_producers/"and another sub-folder for any other keys "others/"
+# 2. path to keys folder which contains a sub-drifolder for community block producer keys "community/" generated using https://github.com/MinaProtocol/mina/blob/lk86/keygen-script-with-random-passwords/scripts/generate-community-keys.sh and another sub-folder for any other keys "others/"
 # 3. path where genesis ledger file is to be written
 
 import csv
@@ -10,6 +10,7 @@ import subprocess
 import sys
 import json
 import random
+import functools
 
 block_producer_count = 330
 block_producer_accounts = []
@@ -19,7 +20,7 @@ ledger = []
 
 def key_directory(is_block_producer, directory):
     if is_block_producer:
-        key_folder = "block_producers/"
+        key_folder = "community/"
     else:
         key_folder = "others/"
     return (directory+"/"+key_folder)
@@ -57,7 +58,7 @@ def execute_command(command):
     return output.decode('utf-8')
 
 
-block_producer_filename = "mina_block_producer_"
+block_producer_filename = "community-"
 other_key = "mina_key_"
 
 
@@ -69,16 +70,17 @@ def get_pk(path):
 
 def get_mina_key(i, is_block_producer, directory, password):
     if is_block_producer:
-        keyfile = block_producer_filename + str(i)
+        keyfile = "community-"+str(i+1)+"/" + \
+            block_producer_filename + str(i+1)+"-key"
         sub_dir = key_directory(True, directory)
     else:
         keyfile = other_key + str(i)
         sub_dir = key_directory(False, directory)
     pk_file = keyfile+".pub"
-    if os.path.exists(sub_dir+"/"+pk_file):
-        return (get_pk(sub_dir+"/"+pk_file))
+    if os.path.exists(sub_dir+pk_file):
+        return (get_pk(sub_dir+pk_file))
     else:
-        print("keyfor %dth row not found", i)
+        print("key for %dth row not found %s" % (i, sub_dir+pk_file))
         # command=generate_keypair_command(keyfile,sub_dir,password)
         # execute_command(command)
         # return (get_pk(sub_dir+"/"+pk_file))
@@ -105,7 +107,6 @@ def read_csv(filename):
 
 def get_delegate_key(delegate_index: str):
     try:
-        print(ledger[int(delegate_index)])
         return (ledger[int(delegate_index)]['pk'])
     except:
         ""
@@ -150,6 +151,45 @@ def generate_ledger(output_dir):
         json.dump(ledger, fl, indent=2)
 
 
+def foldl(func, xs, init):
+    return (functools.reduce(func, xs, init))
+
+
+pk_stake = dict()
+
+
+def update_pk_stake(pk, balance):
+    if pk_stake.get(pk) == None:
+        pk_stake[pk] = float(balance)
+    else:
+        old_balance = pk_stake[pk]
+        pk_stake[pk] = old_balance + float(balance)
+
+
+def get_pk_stake():
+    for account in ledger:
+        pk = account['pk']
+        delegate = account['delegate']
+        if delegate == "" or delegate == None or delegate == pk:
+            # if not delegating/sef delegating
+            update_pk_stake(pk, account['balance'])
+        else:
+            update_pk_stake(delegate, account['balance'])
+
+
+def add_balance(acc, account):
+    return (acc + float(account['balance']))
+
+
+def show_stake(total_currency):
+    get_pk_stake()
+    values = sorted(pk_stake.items(), key=lambda x: x[1], reverse=True)
+    for pk, balance in values:
+        stake = (balance/total_currency)*100
+        if stake > 0.001:
+            print("pk: %s stake %s%%" % (pk, "{:10.3f}".format(stake)))
+
+
 def main():
     args = sys.argv
     csv_file = args[1]
@@ -157,6 +197,9 @@ def main():
     output_dir = args[3]
     read_csv(csv_file)
     create_accounts(keys_directory, 90000)
+    total_currency = foldl(add_balance, ledger, 0)
+    print("Total currency %f" % total_currency)
+    show_stake(total_currency)
     generate_ledger(output_dir)
 
 
