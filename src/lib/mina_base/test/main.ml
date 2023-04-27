@@ -175,11 +175,20 @@ let () =
         ; test_case "JSON roundtrip" `Quick json_roundtrip 
       ])
     ; Signature_test.
-      ( "signatures"
-      , [ test_case "Signature decode after encode i identity" `Quick
-            signature_decode_after_encode_is_identity 
-        ; test_case "Base58check is stable" `Quick base58Check_stable 
-      ])
+        ( "signature"
+        , [ test_case "Signature decode after encode is identity." `Quick
+              signature_decode_after_encode_is_identity
+          ; test_case "Base58Check is stable." `Quick base58Check_stable
+          ] )
+    ; Signed_command_memo_test.
+        ( "signed command memo"
+        , [ test_case "String digest." `Quick digest_string
+          ; test_case "String digest too long." `Quick digest_too_long_string
+          ; test_case "Memo from string." `Quick memo_from_string
+          ; test_case "Memo from too-long string." `Quick
+              memo_from_too_long_string
+          ; test_case "Typ is identity." `Quick typ_is_identity
+          ] )
     ; Signed_command_test.
         ( "signed command"
         , [ test_case "Completeness." `Quick completeness
@@ -199,7 +208,7 @@ let () =
           ; test_case "Is user command." `Quick is_user_command
           ; test_case "Not user command." `Quick not_user_command
           ; test_case "Test bit representation." `Quick bit_representation
-        ] )
+          ] )
     ; Zkapp_account_test.
         ( "zkapp-accounts"
         , [ test_case "Event hashes don't collide." `Quick
@@ -228,5 +237,15 @@ let () =
           ; test_case "JSON roundtrip dummy." `Quick
               Test_derivers.json_roundtrip_dummy
           ; test_case "Full circuit." `Quick Test_derivers.full_circuit
+          ] )
+    ; Zkapp_precondition_test.
+        ( "zkApp precondition"
+        , [ test_case "Account JSON roundtrip." `Quick account_json_roundtrip
+          ; test_case "Epoch data JSON roundtrip." `Quick
+              epoch_data_json_roundtrip
+          ; test_case "Protocol_state JSON roundtrip." `Quick
+              protocol_state_json_roundtrip
+          ; test_case "Closed interval JSON roundtrip." `Quick
+              closed_interval_json_roundtrip
           ] )
     ]

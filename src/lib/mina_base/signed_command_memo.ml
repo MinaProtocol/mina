@@ -9,7 +9,15 @@ open Snark_params
 module Wire_types = Mina_wire_types.Mina_base.Signed_command_memo
 
 module Make_sig (A : Wire_types.Types.S) = struct
-  module type S = Signed_command_memo_intf.S with type t = A.V1.t
+  module type S = sig
+    include Signed_command_memo_intf.S with type t = A.V1.t
+
+    val string_of_memo : t -> string
+
+    val length : t -> int
+
+    val length_index : int
+  end
 end
 
 module Make_str (_ : Wire_types.Concrete) = struct
@@ -253,65 +261,15 @@ module Make_str (_ : Wire_types.Concrete) = struct
     Fields_derivers_zkapps.iso_string obj ~name:"Memo" ~js_type:String
       ~to_string:to_base58_check ~of_string:of_base58_check_exn
 
-  let%test_module "user_command_memo" =
-    ( module struct
-      let data memo = String.sub memo ~pos:(length_index + 1) ~len:(length memo)
-
-      let%test "digest string" =
-        let s = "this is a string" in
-        let memo = create_by_digesting_string_exn s in
-        is_valid memo
-
-      let%test "digest too-long string" =
-        let s =
-          String.init (max_digestible_string_length + 1) ~f:(fun _ -> '\xFF')
-        in
-        try
-          let (_ : t) = create_by_digesting_string_exn s in
-          false
-        with Too_long_digestible_string -> true
-
-      let%test "memo from string" =
-        let s = "time and tide wait for no one" in
-        let memo = create_from_string_exn s in
-        is_valid memo && String.equal s (data memo)
-
-      let%test "memo from too-long string" =
-        let s = String.init (max_input_length + 1) ~f:(fun _ -> '\xFF') in
-        try
-          let (_ : t) = create_from_string_exn s in
-          false
-        with Too_long_user_memo_input -> true
-
-      [%%ifdef consensus_mechanism]
-
-      let%test_unit "typ is identity" =
-        let s = "this is a string" in
-        let memo = create_by_digesting_string_exn s in
-        let read_constant = function
-          | Snarky_backendless.Cvar.Constant x ->
-              x
-          | _ ->
-              assert false
-        in
-        let (Typ typ) = typ in
-        let memo_var =
-          memo |> typ.value_to_fields
-          |> (fun (arr, aux) ->
-               ( Array.map arr ~f:(fun x -> Snarky_backendless.Cvar.Constant x)
-               , aux ) )
-          |> typ.var_of_fields
-        in
-        let memo_read =
-          memo_var |> typ.var_to_fields
-          |> (fun (arr, aux) ->
-               (Array.map arr ~f:(fun x -> read_constant x), aux) )
-          |> typ.value_of_fields
-        in
-        [%test_eq: string] memo memo_read
-
-      [%%endif]
-    end )
+  let string_of_memo = Fn.id
 end
 
 include Wire_types.Make (Make_sig) (Make_str)
+
+module For_test = struct
+  let string_of_memo = string_of_memo
+
+  let length = length
+
+  let length_index = length_index
+end
