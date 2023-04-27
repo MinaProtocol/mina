@@ -131,6 +131,10 @@ Side-Car - BpfDebugger: container definition
       value: "80"
     - name: DEBUGGER_NAME
       value: "debugger"
+    - name: FIREWALL_DEFAULT_WHITELIST
+      valueFrom:
+        fieldRef:
+          fieldPath: status.hostIP
   ports:
     - name: http-bpf-dbg
       containerPort: 80
