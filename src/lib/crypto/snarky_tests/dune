@@ -65,4 +65,8 @@
   kimchi_backend.common
   ppx_version.runtime
   qcheck-core
-  qcheck-alcotest))
+  qcheck-alcotest
+  blockchain_snark
+  transaction_snark
+  genesis_constants
+  core))
