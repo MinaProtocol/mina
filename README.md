@@ -15,7 +15,7 @@ Mina is the first cryptocurrency with a lightweight, constant-sized blockchain. 
 ### Mina Walkthrough
 
 - [Docs](https://minaprotocol.com/docs/)
-- [Using a 3rd Party wallet] (https://docs.minaprotocol.com/using-mina/install-a-wallet)
+- [Using a 3rd Party wallet](https://docs.minaprotocol.com/using-mina/install-a-wallet)
 - [Sending a Payment using Mina's CLI](https://docs.minaprotocol.com/node-operators/sending-a-payment)
 - [Become a Node Operator](https://minaprotocol.com/docs/getting-started/)
 
