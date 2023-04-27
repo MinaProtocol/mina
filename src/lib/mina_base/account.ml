@@ -878,13 +878,9 @@ let gen_any_vesting_range =
   let%map cliff_time = gen_incl (of_int 1) vesting_end in
   (cliff_time, vesting_end, vesting_period)
 
-let gen_at_least_one_vesting_period ?(min_vesting_periods = 1) =
+let gen_with_vesting_period vesting_period =
   let open Quickcheck.Generator.Let_syntax in
   let open Global_slot in
-  (* vesting period must be at least one to avoid division by zero *)
-  let%bind vesting_period =
-    min_vesting_periods |> return >>| Global_slot.of_int
-  in
   let min_vesting_end = succ vesting_period in
   let%bind vesting_end = gen_incl min_vesting_end max_value in
   let max_cliff_time = Option.value_exn @@ sub vesting_end vesting_period in
@@ -948,8 +944,9 @@ let gen_timing (account_balance : Balance.t) =
 let gen_timing_at_least_one_vesting_period (account_balance : Balance.t) =
   let open Quickcheck.Generator.Let_syntax in
   let%bind initial_minimum_balance = Balance.(gen_incl one account_balance)
+  (* vesting period must be at least one to avoid division by zero *)
   and cliff_time, vesting_end, vesting_period =
-    gen_at_least_one_vesting_period ~min_vesting_periods:2
+    gen_with_vesting_period @@ Global_slot.of_int 2
   in
   gen_vesting_details ~vesting_period ~cliff_time ~vesting_end
     initial_minimum_balance
