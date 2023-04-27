@@ -169,7 +169,7 @@ steps:
     KUBECONFIG: kube-config
   commands:
   - export MINA_IMAGE=openmina/mina:$${MINA_BRANCH:-$${DRONE_BRANCH}}-${DRONE_COMMIT_SHA:0:8}
-  - $${OM}/deploy.sh deploy --producers --snarkers --nodes --frontend --force $${SET_ARGS}
+  - $${OM}/deploy.sh deploy --producers --snarkers --nodes --force $${SET_ARGS}
 
 - name: testnet-is-ready
   image: alpine/k8s:1.26.1
