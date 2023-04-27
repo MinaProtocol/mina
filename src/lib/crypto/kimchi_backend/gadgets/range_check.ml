@@ -2,6 +2,8 @@ open Core_kernel
 
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
+let tests_enabled = true
+
 (* Helper to create RangeCheck0 gate, configured in various ways
  *     - is_64bit   : create 64-bit range check
  *     - is_compact : compact limbs mode (only used by compact multi-range-check)
@@ -229,189 +231,201 @@ let compact_multi (type f)
 (*********)
 
 let%test_unit "range_check64 gadget" =
-  (* Import the gadget test runner *)
-  let open Kimchi_gadgets_test_runner in
-  (* Initialize the SRS cache. *)
-  let () =
-    try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
-  in
+  if tests_enabled then (
+    printf "\nRunning range_check64 tests\n" ;
 
-  (* Helper to test range_check64 gadget
-   *   Input: value to be range checked in [0, 2^64)
-   *)
-  let test_range_check64 ?cs base10 =
-    let open Runner.Impl in
-    let value = Common.field_of_base10 (module Runner.Impl) base10 in
-
-    let make_circuit value =
-      (* Circuit definition *)
-      let value = exists Field.typ ~compute:(fun () -> value) in
-      bits64 (module Runner.Impl) value ;
-      (* Padding *)
-      Boolean.Assert.is_true (Field.equal value value)
+    (* Import the gadget test runner *)
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
     in
 
-    (* Generate and verify proof *)
-    let cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof ?cs (fun () -> make_circuit value)
-    in
-    cs
-  in
+    (* Helper to test range_check64 gadget
+     *   Input: value to be range checked in [0, 2^64)
+     *)
+    let test_range_check64 ?cs base10 =
+      let open Runner.Impl in
+      let value = Common.field_of_base10 (module Runner.Impl) base10 in
 
-  (* Positive tests *)
-  let cs = test_range_check64 "0" in
-  let _cs = test_range_check64 ~cs "4294967" in
-  let _cs = test_range_check64 ~cs "18446744073709551615" in
-  (* 2^64 - 1 *)
-  (* Negative tests *)
-  assert (
-    Common.is_error (fun () ->
-        test_range_check64 ~cs "18446744073709551616" (* 2^64 *) ) ) ;
-  assert (
-    Common.is_error (fun () ->
-        test_range_check64 ~cs "170141183460469231731687303715884105728"
-        (* 2^127  *) ) ) ;
+      let make_circuit value =
+        (* Circuit definition *)
+        let value = exists Field.typ ~compute:(fun () -> value) in
+        bits64 (module Runner.Impl) value ;
+        (* Padding *)
+        Boolean.Assert.is_true (Field.equal value value)
+      in
+
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () -> make_circuit value)
+      in
+      cs
+    in
+
+    (* Positive tests *)
+    let cs = test_range_check64 "0" in
+    let _cs = test_range_check64 ~cs "4294967" in
+    let _cs = test_range_check64 ~cs "18446744073709551615" in
+    (* 2^64 - 1 *)
+    (* Negative tests *)
+    assert (
+      Common.is_error (fun () ->
+          test_range_check64 ~cs "18446744073709551616" (* 2^64 *) ) ) ;
+    assert (
+      Common.is_error (fun () ->
+          test_range_check64 ~cs "170141183460469231731687303715884105728"
+          (* 2^127  *) ) ) ) ;
   ()
 
 let%test_unit "multi_range_check gadget" =
-  (* Import the gadget test runner *)
-  let open Kimchi_gadgets_test_runner in
-  (* Initialize the SRS cache. *)
-  let () =
-    try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
-  in
+  if tests_enabled then (
+    printf "\nRunning multi_range_check tests\n" ;
 
-  (* Helper to test multi_range_check gadget *)
-  let test_multi_range_check ?cs v0 v1 v2 =
-    let open Runner.Impl in
-    let v0 = Common.field_of_base10 (module Runner.Impl) v0 in
-    let v1 = Common.field_of_base10 (module Runner.Impl) v1 in
-    let v2 = Common.field_of_base10 (module Runner.Impl) v2 in
+    (* Import the gadget test runner *)
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
 
-    let make_circuit v0 v1 v2 =
-      (* Circuit definition *)
-      let values =
-        exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
-            [| v0; v1; v2 |] )
+    (* Helper to test multi_range_check gadget *)
+    let test_multi_range_check ?cs v0 v1 v2 =
+      let open Runner.Impl in
+      let v0 = Common.field_of_base10 (module Runner.Impl) v0 in
+      let v1 = Common.field_of_base10 (module Runner.Impl) v1 in
+      let v2 = Common.field_of_base10 (module Runner.Impl) v2 in
+
+      let make_circuit v0 v1 v2 =
+        (* Circuit definition *)
+        let values =
+          exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
+              [| v0; v1; v2 |] )
+        in
+        multi (module Runner.Impl) values.(0) values.(1) values.(2)
       in
-      multi (module Runner.Impl) values.(0) values.(1) values.(2)
+
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () -> make_circuit v0 v1 v2)
+      in
+
+      cs
     in
 
-    (* Generate and verify proof *)
-    let cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof ?cs (fun () -> make_circuit v0 v1 v2)
+    (* Positive tests *)
+    let cs =
+      test_multi_range_check "0" "4294967" "309485009821345068724781055"
     in
-
-    cs
-  in
-
-  (* Positive tests *)
-  let cs = test_multi_range_check "0" "4294967" "309485009821345068724781055" in
-  let _cs =
-    test_multi_range_check ~cs "267475740839011166017999907"
-      "120402749546803056196583080" "1159834292458813579124542"
-  in
-  let _cs =
-    test_multi_range_check ~cs "309485009821345068724781055"
-      "309485009821345068724781055" "309485009821345068724781055"
-  in
-  let _cs = test_multi_range_check ~cs "0" "0" "0" in
-  (* Negative tests *)
-  assert (
-    Common.is_error (fun () ->
-        test_multi_range_check ~cs "0" "4294967" "309485009821345068724781056" ) ) ;
-  assert (
-    Common.is_error (fun () ->
-        test_multi_range_check ~cs "0" "309485009821345068724781056"
-          "309485009821345068724781055" ) ) ;
-  assert (
-    Common.is_error (fun () ->
-        test_multi_range_check ~cs "309485009821345068724781056" "4294967"
-          "309485009821345068724781055" ) ) ;
-  assert (
-    Common.is_error (fun () ->
-        test_multi_range_check ~cs
-          "28948022309329048855892746252171976963317496166410141009864396001978282409984"
-          "0170141183460469231731687303715884105728"
-          "170141183460469231731687303715884105728" ) ) ;
-  assert (
-    Common.is_error (fun () ->
-        test_multi_range_check ~cs "0" "0"
-          "28948022309329048855892746252171976963317496166410141009864396001978282409984" ) ) ;
-  assert (
-    Common.is_error (fun () ->
-        test_multi_range_check ~cs "0170141183460469231731687303715884105728"
-          "0"
-          "28948022309329048855892746252171976963317496166410141009864396001978282409984" ) ) ;
+    let _cs =
+      test_multi_range_check ~cs "267475740839011166017999907"
+        "120402749546803056196583080" "1159834292458813579124542"
+    in
+    let _cs =
+      test_multi_range_check ~cs "309485009821345068724781055"
+        "309485009821345068724781055" "309485009821345068724781055"
+    in
+    let _cs = test_multi_range_check ~cs "0" "0" "0" in
+    (* Negative tests *)
+    assert (
+      Common.is_error (fun () ->
+          test_multi_range_check ~cs "0" "4294967" "309485009821345068724781056" ) ) ;
+    assert (
+      Common.is_error (fun () ->
+          test_multi_range_check ~cs "0" "309485009821345068724781056"
+            "309485009821345068724781055" ) ) ;
+    assert (
+      Common.is_error (fun () ->
+          test_multi_range_check ~cs "309485009821345068724781056" "4294967"
+            "309485009821345068724781055" ) ) ;
+    assert (
+      Common.is_error (fun () ->
+          test_multi_range_check ~cs
+            "28948022309329048855892746252171976963317496166410141009864396001978282409984"
+            "0170141183460469231731687303715884105728"
+            "170141183460469231731687303715884105728" ) ) ;
+    assert (
+      Common.is_error (fun () ->
+          test_multi_range_check ~cs "0" "0"
+            "28948022309329048855892746252171976963317496166410141009864396001978282409984" ) ) ;
+    assert (
+      Common.is_error (fun () ->
+          test_multi_range_check ~cs "0170141183460469231731687303715884105728"
+            "0"
+            "28948022309329048855892746252171976963317496166410141009864396001978282409984" ) )
+    ) ;
   ()
 
 let%test_unit "compact_multi_range_check gadget" =
-  (* Import the gadget test runner *)
-  let open Kimchi_gadgets_test_runner in
-  (* Initialize the SRS cache. *)
-  let () =
-    try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
-  in
+  if tests_enabled then (
+    printf "\nRunning compact_multi_range_check tests\n" ;
 
-  (* Helper to test compact_multi_range_check gadget *)
-  let test_compact_multi_range_check v01 v2 : unit =
-    let open Runner.Impl in
-    let v01 = Common.field_of_base10 (module Runner.Impl) v01 in
-    let v2 = Common.field_of_base10 (module Runner.Impl) v2 in
+    (* Import the gadget test runner *)
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
 
-    let make_circuit v01 v2 =
-      (* Circuit definition *)
-      let v01, v2 =
-        exists Typ.(Field.typ * Field.typ) ~compute:(fun () -> (v01, v2))
+    (* Helper to test compact_multi_range_check gadget *)
+    let test_compact_multi_range_check v01 v2 : unit =
+      let open Runner.Impl in
+      let v01 = Common.field_of_base10 (module Runner.Impl) v01 in
+      let v2 = Common.field_of_base10 (module Runner.Impl) v2 in
+
+      let make_circuit v01 v2 =
+        (* Circuit definition *)
+        let v01, v2 =
+          exists Typ.(Field.typ * Field.typ) ~compute:(fun () -> (v01, v2))
+        in
+        compact_multi (module Runner.Impl) v01 v2
       in
-      compact_multi (module Runner.Impl) v01 v2
+
+      (* Generate and verify first proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof (fun () -> make_circuit v01 v2)
+      in
+
+      (* Set up another witness *)
+      let mutate_witness value =
+        Field.Constant.(if equal zero value then value + one else value - one)
+      in
+      let v01 = mutate_witness v01 in
+      let v2 = mutate_witness v2 in
+
+      (* Generate and verify second proof, reusing constraint system *)
+      let _cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ~cs (fun () -> make_circuit v01 v2)
+      in
+
+      ()
     in
 
-    (* Generate and verify first proof *)
-    let cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof (fun () -> make_circuit v01 v2)
-    in
-
-    (* Set up another witness *)
-    let mutate_witness value =
-      Field.Constant.(if equal zero value then value + one else value - one)
-    in
-    let v01 = mutate_witness v01 in
-    let v2 = mutate_witness v2 in
-
-    (* Generate and verify second proof, reusing constraint system *)
-    let _cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof ~cs (fun () -> make_circuit v01 v2)
-    in
-
-    ()
-  in
-
-  (* Positive tests *)
-  test_compact_multi_range_check "0" "0" ;
-  test_compact_multi_range_check
-    "95780971304118053647396689196894323976171195136475135" (* 2^176 - 1 *)
-    "309485009821345068724781055"
-  (* 2^88 - 1 *) ;
-  (* Negative tests *)
-  assert (
-    Common.is_error (fun () ->
-        test_compact_multi_range_check
-          "28948022309329048855892746252171976963317496166410141009864396001978282409984"
-          "0" ) ) ;
-  assert (
-    Common.is_error (fun () ->
-        test_compact_multi_range_check "0"
-          "28948022309329048855892746252171976963317496166410141009864396001978282409984" ) ) ;
-  assert (
-    Common.is_error (fun () ->
-        test_compact_multi_range_check
-          "95780971304118053647396689196894323976171195136475136" (* 2^176 *)
-          "309485009821345068724781055" ) (* 2^88 - 1 *) ) ;
-  assert (
-    Common.is_error (fun () ->
-        test_compact_multi_range_check
-          "95780971304118053647396689196894323976171195136475135"
-          (* 2^176 - 1 *)
-          "309485009821345068724781056" ) (* 2^88 *) ) ;
+    (* Positive tests *)
+    test_compact_multi_range_check "0" "0" ;
+    test_compact_multi_range_check
+      "95780971304118053647396689196894323976171195136475135" (* 2^176 - 1 *)
+      "309485009821345068724781055"
+    (* 2^88 - 1 *) ;
+    (* Negative tests *)
+    assert (
+      Common.is_error (fun () ->
+          test_compact_multi_range_check
+            "28948022309329048855892746252171976963317496166410141009864396001978282409984"
+            "0" ) ) ;
+    assert (
+      Common.is_error (fun () ->
+          test_compact_multi_range_check "0"
+            "28948022309329048855892746252171976963317496166410141009864396001978282409984" ) ) ;
+    assert (
+      Common.is_error (fun () ->
+          test_compact_multi_range_check
+            "95780971304118053647396689196894323976171195136475136" (* 2^176 *)
+            "309485009821345068724781055" ) (* 2^88 - 1 *) ) ;
+    assert (
+      Common.is_error (fun () ->
+          test_compact_multi_range_check
+            "95780971304118053647396689196894323976171195136475135"
+            (* 2^176 - 1 *)
+            "309485009821345068724781056" ) (* 2^88 *) ) ) ;
   ()

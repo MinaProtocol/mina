@@ -5,6 +5,8 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
+let tests_enabled = true
+
 let tuple5_of_array array =
   match array with
   | [| a1; a2; a3; a4; a5 |] ->
@@ -507,7 +509,7 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
   (* Return the result *)
   (Element.Standard.of_limbs (result0, result1, result2), sign, field_overflow)
 
-(* This function checks in the circuit that a value is less than the foreign field modulus. 
+(* This function checks in the circuit that a value is less than the foreign field modulus.
  *
  *    Inputs:
  *      value                 := the value to check
@@ -518,7 +520,7 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
  *
  *    Outputs:
  *      Returns bound value and External_checks containing multi-range-check for bound
- * 
+ *
  *    Effects to the circuit:
  *      - 1 FFAdd gate
  *      - 1 Zero gate
@@ -670,8 +672,8 @@ let sum_chain (type f) (module Circuit : Snark_intf.Run with type field = f)
  *    Outputs:
  *      Inserts the gates (described below) into the circuit
  *      Returns the result of the addition as a 3 limbs element
- *  
- * In default mode: 
+ *
+ * In default mode:
  *  It adds a FFAdd gate,
  *  followed by a Zero gate,
  *  a FFAdd gate for the bound check,
@@ -709,8 +711,8 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
  *    Outputs:
  *      Inserts the gates (described below) into the circuit
  *      Returns the result of the addition as a 3 limbs element
- *  
- * In default mode: 
+ *
+ * In default mode:
  *  It adds a FFAdd gate,
  *  followed by a Zero gate,
  *  a FFAdd gate for the bound check,
@@ -1115,674 +1117,684 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
 (*********)
 
 let%test_unit "foreign_field arithmetics gadgets" =
-  (* Import the gadget test runner *)
-  let open Kimchi_gadgets_test_runner in
-  (* Initialize the SRS cache. *)
-  let () =
-    try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
-  in
+  if tests_enabled then (
+    printf "\nRunning ffa tests\n" ;
 
-  let assert_eq ((a, b, c) : 'field standard_limbs)
-      ((x, y, z) : 'field standard_limbs) =
-    let open Runner.Impl.Field in
-    Assert.equal (constant a) (constant x) ;
-    Assert.equal (constant b) (constant y) ;
-    Assert.equal (constant c) (constant z)
-  in
-
-  (* Helper to test foreign_field_add gadget
-     *   Inputs:
-     *     - left_input
-     *     - right_input
-     *     - foreign_field_modulus
-     * Checks with multi range checks the size of the inputs.
-  *)
-  let test_add ?cs (left_input : Bignum_bigint.t)
-      (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
-      =
-    (* Generate and verify proof *)
-    let cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof ?cs (fun () ->
-          let open Runner.Impl in
-          (* Prepare test inputs *)
-          let expected =
-            Bignum_bigint.((left_input + right_input) % foreign_field_modulus)
-          in
-          let foreign_field_modulus =
-            bignum_bigint_to_field_standard_limbs
-              (module Runner.Impl)
-              foreign_field_modulus
-          in
-          let left_input =
-            Element.Standard.of_bignum_bigint (module Runner.Impl) left_input
-          in
-          let right_input =
-            Element.Standard.of_bignum_bigint (module Runner.Impl) right_input
-          in
-          (* Create the gadget *)
-          let sum =
-            add
-              (module Runner.Impl)
-              left_input right_input foreign_field_modulus
-          in
-          (* Create external checks context for tracking extra constraints *)
-          let external_checks = External_checks.create (module Runner.Impl) in
-          (* Check that the inputs were foreign field elements*)
-          let _out =
-            less_than_mod
-              (module Runner.Impl)
-              left_input foreign_field_modulus external_checks
-          in
-          let _out =
-            less_than_mod
-              (module Runner.Impl)
-              right_input foreign_field_modulus external_checks
-          in
-
-          assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 2) ;
-          List.iter external_checks.multi_ranges ~f:(fun multi_range ->
-              let v0, v1, v2 = multi_range in
-              Range_check.multi (module Runner.Impl) v0 v1 v2 ;
-              () ) ;
-
-          as_prover (fun () ->
-              let expected =
-                bignum_bigint_to_field_standard_limbs
-                  (module Runner.Impl)
-                  expected
-              in
-              let sum =
-                Element.Standard.to_field_limbs_as_prover
-                  (module Runner.Impl)
-                  sum
-              in
-              assert_eq sum expected ) ;
-          () )
+    (* Import the gadget test runner *)
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
     in
-    cs
-  in
 
-  (* Helper to test foreign_field_mul gadget with external checks
-     *   Inputs:
-     *     - inputs
-     *     - foreign_field_modulus
-     *     - is_sub: list of operations to perform
-  *)
-  let test_add_chain ?cs (inputs : Bignum_bigint.t list)
-      (operations : op_mode list) (foreign_field_modulus : Bignum_bigint.t) =
-    (* Generate and verify proof *)
-    let cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof ?cs (fun () ->
-          let open Runner.Impl in
-          (* compute result of the chain *)
-          let n = List.length operations in
-          let chain_result = [| List.nth_exn inputs 0 |] in
-          for i = 0 to n - 1 do
-            let operation = List.nth_exn operations i in
-            let op_sign =
-              match operation with
-              | Add ->
-                  Bignum_bigint.one
-              | Sub ->
-                  Bignum_bigint.of_int (-1)
+    let assert_eq ((a, b, c) : 'field standard_limbs)
+        ((x, y, z) : 'field standard_limbs) =
+      let open Runner.Impl.Field in
+      Assert.equal (constant a) (constant x) ;
+      Assert.equal (constant b) (constant y) ;
+      Assert.equal (constant c) (constant z)
+    in
+
+    (* Helper to test foreign_field_add gadget
+       *   Inputs:
+       *     - left_input
+       *     - right_input
+       *     - foreign_field_modulus
+       * Checks with multi range checks the size of the inputs.
+    *)
+    let test_add ?cs (left_input : Bignum_bigint.t)
+        (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
+        =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            let open Runner.Impl in
+            (* Prepare test inputs *)
+            let expected =
+              Bignum_bigint.((left_input + right_input) % foreign_field_modulus)
             in
-            let inp = List.nth_exn inputs (i + 1) in
+            let foreign_field_modulus =
+              bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                foreign_field_modulus
+            in
+            let left_input =
+              Element.Standard.of_bignum_bigint (module Runner.Impl) left_input
+            in
+            let right_input =
+              Element.Standard.of_bignum_bigint (module Runner.Impl) right_input
+            in
+            (* Create the gadget *)
             let sum =
-              Bignum_bigint.(
-                (chain_result.(0) + (op_sign * inp)) % foreign_field_modulus)
+              add
+                (module Runner.Impl)
+                left_input right_input foreign_field_modulus
             in
-            chain_result.(0) <- sum ; ()
-          done ;
+            (* Create external checks context for tracking extra constraints *)
+            let external_checks = External_checks.create (module Runner.Impl) in
+            (* Check that the inputs were foreign field elements*)
+            let _out =
+              less_than_mod
+                (module Runner.Impl)
+                left_input foreign_field_modulus external_checks
+            in
+            let _out =
+              less_than_mod
+                (module Runner.Impl)
+                right_input foreign_field_modulus external_checks
+            in
 
-          let inputs =
-            List.map
-              ~f:(fun x ->
-                Element.Standard.of_bignum_bigint (module Runner.Impl) x )
-              inputs
-          in
-          let foreign_field_modulus =
-            bignum_bigint_to_field_standard_limbs
-              (module Runner.Impl)
-              foreign_field_modulus
-          in
+            assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 2) ;
+            List.iter external_checks.multi_ranges ~f:(fun multi_range ->
+                let v0, v1, v2 = multi_range in
+                Range_check.multi (module Runner.Impl) v0 v1 v2 ;
+                () ) ;
 
-          (* Create the gadget *)
-          let sum =
-            sum_chain
-              (module Runner.Impl)
-              inputs operations foreign_field_modulus
-          in
-          (* Check sum matches expected result *)
-          as_prover (fun () ->
-              let expected =
-                bignum_bigint_to_field_standard_limbs
-                  (module Runner.Impl)
-                  chain_result.(0)
+            as_prover (fun () ->
+                let expected =
+                  bignum_bigint_to_field_standard_limbs
+                    (module Runner.Impl)
+                    expected
+                in
+                let sum =
+                  Element.Standard.to_field_limbs_as_prover
+                    (module Runner.Impl)
+                    sum
+                in
+                assert_eq sum expected ) ;
+            () )
+      in
+      cs
+    in
+
+    (* Helper to test foreign_field_mul gadget with external checks
+       *   Inputs:
+       *     - inputs
+       *     - foreign_field_modulus
+       *     - is_sub: list of operations to perform
+    *)
+    let test_add_chain ?cs (inputs : Bignum_bigint.t list)
+        (operations : op_mode list) (foreign_field_modulus : Bignum_bigint.t) =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            let open Runner.Impl in
+            (* compute result of the chain *)
+            let n = List.length operations in
+            let chain_result = [| List.nth_exn inputs 0 |] in
+            for i = 0 to n - 1 do
+              let operation = List.nth_exn operations i in
+              let op_sign =
+                match operation with
+                | Add ->
+                    Bignum_bigint.one
+                | Sub ->
+                    Bignum_bigint.of_int (-1)
               in
+              let inp = List.nth_exn inputs (i + 1) in
               let sum =
-                Element.Standard.to_field_limbs_as_prover
-                  (module Runner.Impl)
-                  sum
+                Bignum_bigint.(
+                  (chain_result.(0) + (op_sign * inp)) % foreign_field_modulus)
               in
-              assert_eq sum expected ) ;
-          () )
-    in
-    cs
-  in
+              chain_result.(0) <- sum ; ()
+            done ;
 
-  (* Helper to test foreign_field_mul gadget
-   *  Inputs:
-   *     cs                    := optional constraint system to reuse
-   *     left_input            := left multiplicand
-   *     right_input           := right multiplicand
-   *     foreign_field_modulus := foreign field modulus
-   *)
-  let test_mul ?cs (left_input : Bignum_bigint.t)
-      (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
-      =
-    (* Generate and verify proof *)
-    let cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof ?cs (fun () ->
-          let open Runner.Impl in
-          (* Prepare test inputs *)
-          let expected =
-            Bignum_bigint.(left_input * right_input % foreign_field_modulus)
-          in
-          let foreign_field_modulus =
-            bignum_bigint_to_field_standard_limbs
-              (module Runner.Impl)
-              foreign_field_modulus
-          in
-          let left_input =
-            Element.Standard.of_bignum_bigint (module Runner.Impl) left_input
-          in
-          let right_input =
-            Element.Standard.of_bignum_bigint (module Runner.Impl) right_input
-          in
+            let inputs =
+              List.map
+                ~f:(fun x ->
+                  Element.Standard.of_bignum_bigint (module Runner.Impl) x )
+                inputs
+            in
+            let foreign_field_modulus =
+              bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                foreign_field_modulus
+            in
 
-          (* Create external checks context for tracking extra constraints
-             that are required for soundness (unused in this simple test) *)
-          let unused_external_checks =
-            External_checks.create (module Runner.Impl)
-          in
-
-          (* Create the gadget *)
-          let product =
-            mul
-              (module Runner.Impl)
-              left_input right_input foreign_field_modulus
-              unused_external_checks
-          in
-          (* Check product matches expected result *)
-          as_prover (fun () ->
-              let expected =
-                bignum_bigint_to_field_standard_limbs
-                  (module Runner.Impl)
-                  expected
-              in
-              let product =
-                Element.Standard.to_field_limbs_as_prover
-                  (module Runner.Impl)
-                  product
-              in
-              assert_eq product expected ) ;
-          () )
+            (* Create the gadget *)
+            let sum =
+              sum_chain
+                (module Runner.Impl)
+                inputs operations foreign_field_modulus
+            in
+            (* Check sum matches expected result *)
+            as_prover (fun () ->
+                let expected =
+                  bignum_bigint_to_field_standard_limbs
+                    (module Runner.Impl)
+                    chain_result.(0)
+                in
+                let sum =
+                  Element.Standard.to_field_limbs_as_prover
+                    (module Runner.Impl)
+                    sum
+                in
+                assert_eq sum expected ) ;
+            () )
+      in
+      cs
     in
 
-    cs
-  in
-
-  (* Helper to test foreign_field_mul gadget with external checks
-     *   Inputs:
+    (* Helper to test foreign_field_mul gadget
+     *  Inputs:
      *     cs                    := optional constraint system to reuse
      *     left_input            := left multiplicand
      *     right_input           := right multiplicand
      *     foreign_field_modulus := foreign field modulus
-  *)
-  let test_mul_full ?cs (left_input : Bignum_bigint.t)
-      (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
-      =
-    (* Generate and verify first proof *)
-    let cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof ?cs (fun () ->
-          let open Runner.Impl in
-          (* Prepare test inputs *)
-          let expected =
-            Bignum_bigint.(left_input * right_input % foreign_field_modulus)
-          in
-          let foreign_field_modulus =
-            bignum_bigint_to_field_standard_limbs
-              (module Runner.Impl)
-              foreign_field_modulus
-          in
-          let left_input =
-            Element.Standard.of_bignum_bigint (module Runner.Impl) left_input
-          in
-          let right_input =
-            Element.Standard.of_bignum_bigint (module Runner.Impl) right_input
-          in
+     *)
+    let test_mul ?cs (left_input : Bignum_bigint.t)
+        (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
+        =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            let open Runner.Impl in
+            (* Prepare test inputs *)
+            let expected =
+              Bignum_bigint.(left_input * right_input % foreign_field_modulus)
+            in
+            let foreign_field_modulus =
+              bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                foreign_field_modulus
+            in
+            let left_input =
+              Element.Standard.of_bignum_bigint (module Runner.Impl) left_input
+            in
+            let right_input =
+              Element.Standard.of_bignum_bigint (module Runner.Impl) right_input
+            in
 
-          (* Create external checks context for tracking extra constraints
-             that are required for soundness *)
-          let external_checks = External_checks.create (module Runner.Impl) in
+            (* Create external checks context for tracking extra constraints
+               that are required for soundness (unused in this simple test) *)
+            let unused_external_checks =
+              External_checks.create (module Runner.Impl)
+            in
 
-          (* External checks for this test (example, circuit designer has complete flexibility about organization)
-           *   1) ForeignFieldMul
-           *   2) ForeignFieldAdd (result bound addition)
-           *   3) multi-range-check (left multiplicand)
-           *   4) multi-range-check (right multiplicand)
-           *   5) multi-range-check (product1_lo, product1_hi_0, carry1_lo)
-           *   6) multi-range-check (remainder bound / product / result range check)
-           *   7) compact-multi-range-check (quotient range check) *)
+            (* Create the gadget *)
+            let product =
+              mul
+                (module Runner.Impl)
+                left_input right_input foreign_field_modulus
+                unused_external_checks
+            in
+            (* Check product matches expected result *)
+            as_prover (fun () ->
+                let expected =
+                  bignum_bigint_to_field_standard_limbs
+                    (module Runner.Impl)
+                    expected
+                in
+                let product =
+                  Element.Standard.to_field_limbs_as_prover
+                    (module Runner.Impl)
+                    product
+                in
+                assert_eq product expected ) ;
+            () )
+      in
 
-          (* 1) Create the foreign field mul gadget *)
-          let product1 =
-            mul
-              (module Runner.Impl)
-              left_input right_input foreign_field_modulus external_checks
-          in
-          (* Add another foreign field mul to test chaining of external_checks *)
-          let product2 =
-            mul
-              (module Runner.Impl)
-              left_input right_input foreign_field_modulus external_checks
-          in
-
-          (* Sanity check product matches expected result *)
-          as_prover (fun () ->
-              let expected =
-                bignum_bigint_to_field_standard_limbs
-                  (module Runner.Impl)
-                  expected
-              in
-              let product1 =
-                Element.Standard.to_field_limbs_as_prover
-                  (module Runner.Impl)
-                  product1
-              in
-              let product2 =
-                Element.Standard.to_field_limbs_as_prover
-                  (module Runner.Impl)
-                  product2
-              in
-
-              assert_eq product1 expected ;
-              assert_eq product2 expected ) ;
-
-          (* 2) Add result bound addition gate. This adds multi-range-checks for the
-                computed bound to the external_checks.multi-ranges, which are then
-                constrainted in (6) *)
-          assert (Mina_stdlib.List.Length.equal external_checks.bounds 2) ;
-          List.iter external_checks.bounds ~f:(fun product ->
-              let _remainder_bound =
-                less_than_mod
-                  (module Runner.Impl)
-                  (Element.Standard.of_limbs product)
-                  foreign_field_modulus external_checks
-              in
-              () ) ;
-
-          (* 3) Add multi-range-check left input *)
-          let left_input0, left_input1, left_input2 =
-            Element.Standard.to_limbs left_input
-          in
-          Range_check.multi
-            (module Runner.Impl)
-            left_input0 left_input1 left_input2 ;
-
-          (* 4) Add multi-range-check right input *)
-          let right_input0, right_input1, right_input2 =
-            Element.Standard.to_limbs right_input
-          in
-          Range_check.multi
-            (module Runner.Impl)
-            right_input0 right_input1 right_input2 ;
-
-          (* 5-6) Add gates for external multi-range-checks
-           *   In this case:
-           *     remainder_bound0, remainder_bound1, remainder_bound2
-           *     carry1_lo, product1_lo, product1_hi_0
-           *)
-          assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 4) ;
-          List.iter external_checks.multi_ranges ~f:(fun multi_range ->
-              let v0, v1, v2 = multi_range in
-              Range_check.multi (module Runner.Impl) v0 v1 v2 ;
-              () ) ;
-
-          (* 7) Add gates for external compact-multi-range-checks
-           *   In this case:
-           *     quotient_bound01, quotient_bound2
-           *)
-          assert (
-            Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges 2 ) ;
-          List.iter external_checks.compact_multi_ranges
-            ~f:(fun compact_multi_range ->
-              let v01, v2 = compact_multi_range in
-              Range_check.compact_multi (module Runner.Impl) v01 v2 ;
-              () ) )
+      cs
     in
 
-    cs
-  in
+    (* Helper to test foreign_field_mul gadget with external checks
+       *   Inputs:
+       *     cs                    := optional constraint system to reuse
+       *     left_input            := left multiplicand
+       *     right_input           := right multiplicand
+       *     foreign_field_modulus := foreign field modulus
+    *)
+    let test_mul_full ?cs (left_input : Bignum_bigint.t)
+        (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
+        =
+      (* Generate and verify first proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            let open Runner.Impl in
+            (* Prepare test inputs *)
+            let expected =
+              Bignum_bigint.(left_input * right_input % foreign_field_modulus)
+            in
+            let foreign_field_modulus =
+              bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                foreign_field_modulus
+            in
+            let left_input =
+              Element.Standard.of_bignum_bigint (module Runner.Impl) left_input
+            in
+            let right_input =
+              Element.Standard.of_bignum_bigint (module Runner.Impl) right_input
+            in
 
-  (* Helper to test foreign field arithmetics together
-       * It computes a * b + a - b
-  *)
-  let test_ff ?cs (left_input : Bignum_bigint.t) (right_input : Bignum_bigint.t)
-      (foreign_field_modulus : Bignum_bigint.t) =
-    (* Generate and verify proof *)
-    let cs, _proof_keypair, _proof =
-      Runner.generate_and_verify_proof ?cs (fun () ->
-          let open Runner.Impl in
-          (* Prepare test inputs *)
-          let expected_mul =
-            Bignum_bigint.(left_input * right_input % foreign_field_modulus)
-          in
-          let expected_add =
-            Bignum_bigint.((expected_mul + left_input) % foreign_field_modulus)
-          in
-          let expected_sub =
-            Bignum_bigint.((expected_add - right_input) % foreign_field_modulus)
-          in
-          let foreign_field_modulus =
-            bignum_bigint_to_field_standard_limbs
+            (* Create external checks context for tracking extra constraints
+               that are required for soundness *)
+            let external_checks = External_checks.create (module Runner.Impl) in
+
+            (* External checks for this test (example, circuit designer has complete flexibility about organization)
+             *   1) ForeignFieldMul
+             *   2) ForeignFieldAdd (result bound addition)
+             *   3) multi-range-check (left multiplicand)
+             *   4) multi-range-check (right multiplicand)
+             *   5) multi-range-check (product1_lo, product1_hi_0, carry1_lo)
+             *   6) multi-range-check (remainder bound / product / result range check)
+             *   7) compact-multi-range-check (quotient range check) *)
+
+            (* 1) Create the foreign field mul gadget *)
+            let product1 =
+              mul
+                (module Runner.Impl)
+                left_input right_input foreign_field_modulus external_checks
+            in
+            (* Add another foreign field mul to test chaining of external_checks *)
+            let product2 =
+              mul
+                (module Runner.Impl)
+                left_input right_input foreign_field_modulus external_checks
+            in
+
+            (* Sanity check product matches expected result *)
+            as_prover (fun () ->
+                let expected =
+                  bignum_bigint_to_field_standard_limbs
+                    (module Runner.Impl)
+                    expected
+                in
+                let product1 =
+                  Element.Standard.to_field_limbs_as_prover
+                    (module Runner.Impl)
+                    product1
+                in
+                let product2 =
+                  Element.Standard.to_field_limbs_as_prover
+                    (module Runner.Impl)
+                    product2
+                in
+
+                assert_eq product1 expected ;
+                assert_eq product2 expected ) ;
+
+            (* 2) Add result bound addition gate. This adds multi-range-checks for the
+                  computed bound to the external_checks.multi-ranges, which are then
+                  constrainted in (6) *)
+            assert (Mina_stdlib.List.Length.equal external_checks.bounds 2) ;
+            List.iter external_checks.bounds ~f:(fun product ->
+                let _remainder_bound =
+                  less_than_mod
+                    (module Runner.Impl)
+                    (Element.Standard.of_limbs product)
+                    foreign_field_modulus external_checks
+                in
+                () ) ;
+
+            (* 3) Add multi-range-check left input *)
+            let left_input0, left_input1, left_input2 =
+              Element.Standard.to_limbs left_input
+            in
+            Range_check.multi
               (module Runner.Impl)
-              foreign_field_modulus
-          in
-          let left_input =
-            Element.Standard.of_bignum_bigint (module Runner.Impl) left_input
-          in
-          let right_input =
-            Element.Standard.of_bignum_bigint (module Runner.Impl) right_input
-          in
+              left_input0 left_input1 left_input2 ;
 
-          (* Create external checks context for tracking extra constraints
-             that are required for soundness *)
-          let unused_external_checks =
-            External_checks.create (module Runner.Impl)
-          in
-
-          let product =
-            mul
+            (* 4) Add multi-range-check right input *)
+            let right_input0, right_input1, right_input2 =
+              Element.Standard.to_limbs right_input
+            in
+            Range_check.multi
               (module Runner.Impl)
-              left_input right_input foreign_field_modulus
-              unused_external_checks
-          in
+              right_input0 right_input1 right_input2 ;
 
-          let addition =
-            add (module Runner.Impl) product left_input foreign_field_modulus
-          in
-          let subtraction =
-            sub (module Runner.Impl) addition right_input foreign_field_modulus
-          in
-          let external_checks = External_checks.create (module Runner.Impl) in
+            (* 5-6) Add gates for external multi-range-checks
+             *   In this case:
+             *     remainder_bound0, remainder_bound1, remainder_bound2
+             *     carry1_lo, product1_lo, product1_hi_0
+             *)
+            assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 4) ;
+            List.iter external_checks.multi_ranges ~f:(fun multi_range ->
+                let v0, v1, v2 = multi_range in
+                Range_check.multi (module Runner.Impl) v0 v1 v2 ;
+                () ) ;
 
-          (* Check product matches expected result *)
-          (* Check that the inputs were foreign field elements*)
-          let _out =
-            less_than_mod
-              (module Runner.Impl)
-              left_input foreign_field_modulus external_checks
-          in
-          let _out =
-            less_than_mod
-              (module Runner.Impl)
-              right_input foreign_field_modulus external_checks
-          in
+            (* 7) Add gates for external compact-multi-range-checks
+             *   In this case:
+             *     quotient_bound01, quotient_bound2
+             *)
+            assert (
+              Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges
+                2 ) ;
+            List.iter external_checks.compact_multi_ranges
+              ~f:(fun compact_multi_range ->
+                let v01, v2 = compact_multi_range in
+                Range_check.compact_multi (module Runner.Impl) v01 v2 ;
+                () ) )
+      in
 
-          assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 2) ;
-          List.iter external_checks.multi_ranges ~f:(fun multi_range ->
-              let v0, v1, v2 = multi_range in
-              Range_check.multi (module Runner.Impl) v0 v1 v2 ;
-              () ) ;
-          (* Check product matches expected result *)
-          as_prover (fun () ->
-              let expected_mul =
-                bignum_bigint_to_field_standard_limbs
-                  (module Runner.Impl)
-                  expected_mul
-              in
-              let expected_add =
-                bignum_bigint_to_field_standard_limbs
-                  (module Runner.Impl)
-                  expected_add
-              in
-              let expected_sub =
-                bignum_bigint_to_field_standard_limbs
-                  (module Runner.Impl)
-                  expected_sub
-              in
-              let product =
-                Element.Standard.to_field_limbs_as_prover
-                  (module Runner.Impl)
-                  product
-              in
-              let addition =
-                Element.Standard.to_field_limbs_as_prover
-                  (module Runner.Impl)
-                  addition
-              in
-              let subtraction =
-                Element.Standard.to_field_limbs_as_prover
-                  (module Runner.Impl)
-                  subtraction
-              in
-              assert_eq product expected_mul ;
-              assert_eq addition expected_add ;
-              assert_eq subtraction expected_sub ) )
+      cs
     in
-    cs
-  in
 
-  (* Test constants *)
-  let secp256k1_modulus =
-    Common.bignum_bigint_of_hex
-      "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
-  in
-  let secp256k1_max = Bignum_bigint.(secp256k1_modulus - Bignum_bigint.one) in
-  let secp256k1_sqrt = Common.bignum_biguint_sqrt secp256k1_max in
-  let pallas_modulus =
-    Common.bignum_bigint_of_hex
-      "40000000000000000000000000000000224698fc094cf91b992d30ed00000001"
-  in
-  let pallas_max = Bignum_bigint.(pallas_modulus - Bignum_bigint.one) in
-  let pallas_sqrt = Common.bignum_biguint_sqrt pallas_max in
-  let vesta_modulus =
-    Common.bignum_bigint_of_hex
-      "40000000000000000000000000000000224698fc0994a8dd8c46eb2100000001"
-  in
-  let vesta_max = Bignum_bigint.(vesta_modulus - Bignum_bigint.one) in
+    (* Helper to test foreign field arithmetics together
+         * It computes a * b + a - b
+    *)
+    let test_ff ?cs (left_input : Bignum_bigint.t)
+        (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
+        =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            let open Runner.Impl in
+            (* Prepare test inputs *)
+            let expected_mul =
+              Bignum_bigint.(left_input * right_input % foreign_field_modulus)
+            in
+            let expected_add =
+              Bignum_bigint.(
+                (expected_mul + left_input) % foreign_field_modulus)
+            in
+            let expected_sub =
+              Bignum_bigint.(
+                (expected_add - right_input) % foreign_field_modulus)
+            in
+            let foreign_field_modulus =
+              bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                foreign_field_modulus
+            in
+            let left_input =
+              Element.Standard.of_bignum_bigint (module Runner.Impl) left_input
+            in
+            let right_input =
+              Element.Standard.of_bignum_bigint (module Runner.Impl) right_input
+            in
 
-  (* FFAdd TESTS *)
-  (* Single tests *)
-  let cs =
-    test_add
-      (Common.bignum_bigint_of_hex
-         "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" )
-      (Common.bignum_bigint_of_hex
-         "80000000000000000000000000000000000000000000000000000000000000d0" )
-      secp256k1_modulus
-  in
-  let _cs = test_add ~cs secp256k1_max secp256k1_max secp256k1_modulus in
-  let _cs = test_add ~cs pallas_max pallas_max secp256k1_modulus in
-  let _cs = test_add ~cs vesta_modulus pallas_modulus secp256k1_modulus in
-  let cs = test_add Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus in
-  let _cs =
-    test_add ~cs Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus
-  in
-  let _cs =
-    test_add ~cs
-      (Common.bignum_bigint_of_hex
-         "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
-      (Common.bignum_bigint_of_hex
-         "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
-      secp256k1_modulus
-  in
+            (* Create external checks context for tracking extra constraints
+               that are required for soundness *)
+            let unused_external_checks =
+              External_checks.create (module Runner.Impl)
+            in
 
-  assert (
-    Common.is_error (fun () ->
-        (* check that the inputs need to be smaller than the modulus *)
-        let _cs =
-          test_add ~cs secp256k1_modulus secp256k1_modulus secp256k1_modulus
-        in
-        () ) ) ;
+            let product =
+              mul
+                (module Runner.Impl)
+                left_input right_input foreign_field_modulus
+                unused_external_checks
+            in
 
-  assert (
-    Common.is_error (fun () ->
-        (* check wrong cs fails *)
-        let _cs =
-          test_add ~cs secp256k1_modulus secp256k1_modulus pallas_modulus
-        in
-        () ) ) ;
+            let addition =
+              add (module Runner.Impl) product left_input foreign_field_modulus
+            in
+            let subtraction =
+              sub
+                (module Runner.Impl)
+                addition right_input foreign_field_modulus
+            in
+            let external_checks = External_checks.create (module Runner.Impl) in
 
-  (* Chain tests *)
-  let cs =
-    test_add_chain
-      [ pallas_max
-      ; pallas_max
-      ; Common.bignum_bigint_of_hex
-          "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d"
-      ; Common.bignum_bigint_of_hex
-          "69cc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15"
-      ; vesta_max
-      ]
-      [ Add; Sub; Sub; Add ] vesta_modulus
-  in
-  let _cs =
-    test_add_chain ~cs
-      [ vesta_max
-      ; pallas_max
-      ; Common.bignum_bigint_of_hex
-          "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236"
-      ; Common.bignum_bigint_of_hex
-          "1342835834869e59534942304a03534963893045203528b523532232543"
-      ; Common.bignum_bigint_of_hex
-          "1f2d8f0d0cd52771bfb86ffdf651ddddbbddeeeebbbaaaaffccee20d"
-      ]
-      [ Add; Sub; Sub; Add ] vesta_modulus
-  in
-  (* Check that the number of inputs need to be coherent with number of operations *)
-  assert (
-    Common.is_error (fun () ->
-        let _cs =
-          test_add_chain ~cs [ pallas_max; pallas_max ] [ Add; Sub; Sub; Add ]
-            secp256k1_modulus
-        in
-        () ) ) ;
+            (* Check product matches expected result *)
+            (* Check that the inputs were foreign field elements*)
+            let _out =
+              less_than_mod
+                (module Runner.Impl)
+                left_input foreign_field_modulus external_checks
+            in
+            let _out =
+              less_than_mod
+                (module Runner.Impl)
+                right_input foreign_field_modulus external_checks
+            in
 
-  (* FFMul TESTS*)
+            assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 2) ;
+            List.iter external_checks.multi_ranges ~f:(fun multi_range ->
+                let v0, v1, v2 = multi_range in
+                Range_check.multi (module Runner.Impl) v0 v1 v2 ;
+                () ) ;
+            (* Check product matches expected result *)
+            as_prover (fun () ->
+                let expected_mul =
+                  bignum_bigint_to_field_standard_limbs
+                    (module Runner.Impl)
+                    expected_mul
+                in
+                let expected_add =
+                  bignum_bigint_to_field_standard_limbs
+                    (module Runner.Impl)
+                    expected_add
+                in
+                let expected_sub =
+                  bignum_bigint_to_field_standard_limbs
+                    (module Runner.Impl)
+                    expected_sub
+                in
+                let product =
+                  Element.Standard.to_field_limbs_as_prover
+                    (module Runner.Impl)
+                    product
+                in
+                let addition =
+                  Element.Standard.to_field_limbs_as_prover
+                    (module Runner.Impl)
+                    addition
+                in
+                let subtraction =
+                  Element.Standard.to_field_limbs_as_prover
+                    (module Runner.Impl)
+                    subtraction
+                in
+                assert_eq product expected_mul ;
+                assert_eq addition expected_add ;
+                assert_eq subtraction expected_sub ) )
+      in
+      cs
+    in
 
-  (* Positive tests *)
-  (* zero_mul: 0 * 0 *)
-  let cs = test_mul Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus in
-  (* one_mul: max * 1 *)
-  let _cs = test_mul ~cs secp256k1_max Bignum_bigint.one secp256k1_modulus in
-  (* max_native_square: pallas_sqrt * pallas_sqrt *)
-  let _cs = test_mul ~cs pallas_sqrt pallas_sqrt secp256k1_modulus in
-  (* max_foreign_square: secp256k1_sqrt * secp256k1_sqrt *)
-  let _cs = test_mul ~cs secp256k1_sqrt secp256k1_sqrt secp256k1_modulus in
-  (* max_native_multiplicands: pallas_max * pallas_max *)
-  let _cs = test_mul ~cs pallas_max pallas_max secp256k1_modulus in
-  (* max_foreign_multiplicands: secp256k1_max * secp256k1_max *)
-  let _cs = test_mul ~cs secp256k1_max secp256k1_max secp256k1_modulus in
-  (* nonzero carry0 bits *)
-  let _cs =
-    test_mul ~cs
-      (Common.bignum_bigint_of_hex
-         "fbbbd91e03b48cebbac38855289060f8b29fa6ad3cffffffffffffffffffffff" )
-      (Common.bignum_bigint_of_hex
-         "d551c3d990f42b6d780275d9ca7e30e72941aa29dcffffffffffffffffffffff" )
-      secp256k1_modulus
-  in
-  (* test nonzero carry10 *)
-  let _cs =
-    test_mul
-      (Common.bignum_bigint_of_hex
-         "4000000000000000000000000000000000000000000000000000000000000000" )
-      (Common.bignum_bigint_of_hex
-         "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0" )
-      Bignum_bigint.(pow (of_int 2) (of_int 259))
-  in
-  (* test nonzero carry1_hi *)
-  let _cs =
-    test_mul
-      (Common.bignum_bigint_of_hex
-         "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" )
-      (Common.bignum_bigint_of_hex
-         "8000000000000000000000000000000000000000000000000000000000000000d0" )
-      Bignum_bigint.(pow (of_int 2) (of_int 259) - one)
-  in
-  (* test nonzero_second_bit_carry1_hi *)
-  let _cs =
-    test_mul ~cs
-      (Common.bignum_bigint_of_hex
-         "ffffffffffffffffffffffffffffffffffffffffffffffff8a9dec7cfd1acdeb" )
-      (Common.bignum_bigint_of_hex
-         "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e" )
-      secp256k1_modulus
-  in
-  (* test random_multiplicands_carry1_lo *)
-  let _cs =
-    test_mul ~cs
-      (Common.bignum_bigint_of_hex
-         "ffd913aa9e17a63c7a0ff2354218037aafcd6ecaa67f56af1de882594a434dd3" )
-      (Common.bignum_bigint_of_hex
-         "7d313d6b42719a39acea5f51de9d50cd6a4ec7147c003557e114289e9d57dffc" )
-      secp256k1_modulus
-  in
-  (* test random_multiplicands_valid *)
-  let _cs =
-    test_mul ~cs
-      (Common.bignum_bigint_of_hex
-         "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
-      (Common.bignum_bigint_of_hex
-         "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
-      secp256k1_modulus
-  in
-  (* test smaller foreign field modulus *)
-  let _cs =
-    test_mul
-      (Common.bignum_bigint_of_hex
-         "5945fa400436f458cb9e994dcd315ded43e9b60eb68e2ae7b5cf1d07b48ca1c" )
-      (Common.bignum_bigint_of_hex
-         "747109f882b8e26947dfcd887273c0b0720618cb7f6d407c9ba74dbe0eda22f" )
-      (Common.bignum_bigint_of_hex
-         "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" )
-  in
-  (* vesta non-native on pallas native modulus *)
-  let _cs =
-    test_mul
-      (Common.bignum_bigint_of_hex
-         "69cc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15" )
-      (Common.bignum_bigint_of_hex
-         "1fffe27b14baa740db0c8bb6656de61d2871a64093908af6181f46351a1c1909" )
-      vesta_modulus
-  in
+    (* Test constants *)
+    let secp256k1_modulus =
+      Common.bignum_bigint_of_hex
+        "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
+    in
+    let secp256k1_max = Bignum_bigint.(secp256k1_modulus - Bignum_bigint.one) in
+    let secp256k1_sqrt = Common.bignum_biguint_sqrt secp256k1_max in
+    let pallas_modulus =
+      Common.bignum_bigint_of_hex
+        "40000000000000000000000000000000224698fc094cf91b992d30ed00000001"
+    in
+    let pallas_max = Bignum_bigint.(pallas_modulus - Bignum_bigint.one) in
+    let pallas_sqrt = Common.bignum_biguint_sqrt pallas_max in
+    let vesta_modulus =
+      Common.bignum_bigint_of_hex
+        "40000000000000000000000000000000224698fc0994a8dd8c46eb2100000001"
+    in
+    let vesta_max = Bignum_bigint.(vesta_modulus - Bignum_bigint.one) in
 
-  (* Full test including all external checks *)
-  let cs =
-    test_mul_full
-      (Common.bignum_bigint_of_hex "2")
-      (Common.bignum_bigint_of_hex "3")
-      secp256k1_modulus
-  in
-  let _cs =
-    test_mul_full ~cs
-      (Common.bignum_bigint_of_hex
-         "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
-      (Common.bignum_bigint_of_hex
-         "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
-      secp256k1_modulus
-  in
+    (* FFAdd TESTS *)
+    (* Single tests *)
+    let cs =
+      test_add
+        (Common.bignum_bigint_of_hex
+           "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" )
+        (Common.bignum_bigint_of_hex
+           "80000000000000000000000000000000000000000000000000000000000000d0" )
+        secp256k1_modulus
+    in
+    let _cs = test_add ~cs secp256k1_max secp256k1_max secp256k1_modulus in
+    let _cs = test_add ~cs pallas_max pallas_max secp256k1_modulus in
+    let _cs = test_add ~cs vesta_modulus pallas_modulus secp256k1_modulus in
+    let cs = test_add Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus in
+    let _cs =
+      test_add ~cs Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus
+    in
+    let _cs =
+      test_add ~cs
+        (Common.bignum_bigint_of_hex
+           "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
+        (Common.bignum_bigint_of_hex
+           "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
+        secp256k1_modulus
+    in
 
-  (* COMBINED TESTS *)
-  let _cs =
-    test_ff
-      (Common.bignum_bigint_of_hex
-         "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" )
-      (Common.bignum_bigint_of_hex
-         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" )
-      secp256k1_modulus
-  in
+    assert (
+      Common.is_error (fun () ->
+          (* check that the inputs need to be smaller than the modulus *)
+          let _cs =
+            test_add ~cs secp256k1_modulus secp256k1_modulus secp256k1_modulus
+          in
+          () ) ) ;
 
+    assert (
+      Common.is_error (fun () ->
+          (* check wrong cs fails *)
+          let _cs =
+            test_add ~cs secp256k1_modulus secp256k1_modulus pallas_modulus
+          in
+          () ) ) ;
+
+    (* Chain tests *)
+    let cs =
+      test_add_chain
+        [ pallas_max
+        ; pallas_max
+        ; Common.bignum_bigint_of_hex
+            "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d"
+        ; Common.bignum_bigint_of_hex
+            "69cc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15"
+        ; vesta_max
+        ]
+        [ Add; Sub; Sub; Add ] vesta_modulus
+    in
+    let _cs =
+      test_add_chain ~cs
+        [ vesta_max
+        ; pallas_max
+        ; Common.bignum_bigint_of_hex
+            "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236"
+        ; Common.bignum_bigint_of_hex
+            "1342835834869e59534942304a03534963893045203528b523532232543"
+        ; Common.bignum_bigint_of_hex
+            "1f2d8f0d0cd52771bfb86ffdf651ddddbbddeeeebbbaaaaffccee20d"
+        ]
+        [ Add; Sub; Sub; Add ] vesta_modulus
+    in
+    (* Check that the number of inputs need to be coherent with number of operations *)
+    assert (
+      Common.is_error (fun () ->
+          let _cs =
+            test_add_chain ~cs [ pallas_max; pallas_max ] [ Add; Sub; Sub; Add ]
+              secp256k1_modulus
+          in
+          () ) ) ;
+
+    (* FFMul TESTS*)
+
+    (* Positive tests *)
+    (* zero_mul: 0 * 0 *)
+    let cs = test_mul Bignum_bigint.zero Bignum_bigint.zero secp256k1_modulus in
+    (* one_mul: max * 1 *)
+    let _cs = test_mul ~cs secp256k1_max Bignum_bigint.one secp256k1_modulus in
+    (* max_native_square: pallas_sqrt * pallas_sqrt *)
+    let _cs = test_mul ~cs pallas_sqrt pallas_sqrt secp256k1_modulus in
+    (* max_foreign_square: secp256k1_sqrt * secp256k1_sqrt *)
+    let _cs = test_mul ~cs secp256k1_sqrt secp256k1_sqrt secp256k1_modulus in
+    (* max_native_multiplicands: pallas_max * pallas_max *)
+    let _cs = test_mul ~cs pallas_max pallas_max secp256k1_modulus in
+    (* max_foreign_multiplicands: secp256k1_max * secp256k1_max *)
+    let _cs = test_mul ~cs secp256k1_max secp256k1_max secp256k1_modulus in
+    (* nonzero carry0 bits *)
+    let _cs =
+      test_mul ~cs
+        (Common.bignum_bigint_of_hex
+           "fbbbd91e03b48cebbac38855289060f8b29fa6ad3cffffffffffffffffffffff" )
+        (Common.bignum_bigint_of_hex
+           "d551c3d990f42b6d780275d9ca7e30e72941aa29dcffffffffffffffffffffff" )
+        secp256k1_modulus
+    in
+    (* test nonzero carry10 *)
+    let _cs =
+      test_mul
+        (Common.bignum_bigint_of_hex
+           "4000000000000000000000000000000000000000000000000000000000000000" )
+        (Common.bignum_bigint_of_hex
+           "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0" )
+        Bignum_bigint.(pow (of_int 2) (of_int 259))
+    in
+    (* test nonzero carry1_hi *)
+    let _cs =
+      test_mul
+        (Common.bignum_bigint_of_hex
+           "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" )
+        (Common.bignum_bigint_of_hex
+           "8000000000000000000000000000000000000000000000000000000000000000d0" )
+        Bignum_bigint.(pow (of_int 2) (of_int 259) - one)
+    in
+    (* test nonzero_second_bit_carry1_hi *)
+    let _cs =
+      test_mul ~cs
+        (Common.bignum_bigint_of_hex
+           "ffffffffffffffffffffffffffffffffffffffffffffffff8a9dec7cfd1acdeb" )
+        (Common.bignum_bigint_of_hex
+           "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e" )
+        secp256k1_modulus
+    in
+    (* test random_multiplicands_carry1_lo *)
+    let _cs =
+      test_mul ~cs
+        (Common.bignum_bigint_of_hex
+           "ffd913aa9e17a63c7a0ff2354218037aafcd6ecaa67f56af1de882594a434dd3" )
+        (Common.bignum_bigint_of_hex
+           "7d313d6b42719a39acea5f51de9d50cd6a4ec7147c003557e114289e9d57dffc" )
+        secp256k1_modulus
+    in
+    (* test random_multiplicands_valid *)
+    let _cs =
+      test_mul ~cs
+        (Common.bignum_bigint_of_hex
+           "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
+        (Common.bignum_bigint_of_hex
+           "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
+        secp256k1_modulus
+    in
+    (* test smaller foreign field modulus *)
+    let _cs =
+      test_mul
+        (Common.bignum_bigint_of_hex
+           "5945fa400436f458cb9e994dcd315ded43e9b60eb68e2ae7b5cf1d07b48ca1c" )
+        (Common.bignum_bigint_of_hex
+           "747109f882b8e26947dfcd887273c0b0720618cb7f6d407c9ba74dbe0eda22f" )
+        (Common.bignum_bigint_of_hex
+           "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" )
+    in
+    (* vesta non-native on pallas native modulus *)
+    let _cs =
+      test_mul
+        (Common.bignum_bigint_of_hex
+           "69cc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15" )
+        (Common.bignum_bigint_of_hex
+           "1fffe27b14baa740db0c8bb6656de61d2871a64093908af6181f46351a1c1909" )
+        vesta_modulus
+    in
+
+    (* Full test including all external checks *)
+    let _cs =
+      test_mul_full
+        (Common.bignum_bigint_of_hex "2")
+        (Common.bignum_bigint_of_hex "3")
+        secp256k1_modulus
+    in
+
+    let _cs =
+      test_mul_full ~cs
+        (Common.bignum_bigint_of_hex
+           "1f2d8f0d0cd52771bfb86ffdf651b7907e2e0fa87f7c9c2a41b0918e2a7820d" )
+        (Common.bignum_bigint_of_hex
+           "b58c271d1f2b1c632a61a548872580228430495e9635842591d9118236bacfa2" )
+        secp256k1_modulus
+    in
+
+    (* COMBINED TESTS *)
+    let _cs =
+      test_ff
+        (Common.bignum_bigint_of_hex
+           "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" )
+        (Common.bignum_bigint_of_hex
+           "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" )
+        secp256k1_modulus
+    in
+    () ) ;
   ()
