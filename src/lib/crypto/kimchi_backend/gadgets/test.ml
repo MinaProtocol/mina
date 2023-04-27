@@ -2,8 +2,6 @@ let tests_enabled = true
 
 let%test_unit "custom gates integration" =
   if tests_enabled then (
-    Core_kernel.printf "\nRunning integration tests\n" ;
-
     (* Import the gadget test runner *)
     let open Kimchi_gadgets_test_runner in
     let open Foreign_field in

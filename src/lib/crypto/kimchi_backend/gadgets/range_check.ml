@@ -232,8 +232,6 @@ let compact_multi (type f)
 
 let%test_unit "range_check64 gadget" =
   if tests_enabled then (
-    printf "\nRunning range_check64 tests\n" ;
-
     (* Import the gadget test runner *)
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
@@ -280,8 +278,6 @@ let%test_unit "range_check64 gadget" =
 
 let%test_unit "multi_range_check gadget" =
   if tests_enabled then (
-    printf "\nRunning multi_range_check tests\n" ;
-
     (* Import the gadget test runner *)
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
@@ -358,8 +354,6 @@ let%test_unit "multi_range_check gadget" =
 
 let%test_unit "compact_multi_range_check gadget" =
   if tests_enabled then (
-    printf "\nRunning compact_multi_range_check tests\n" ;
-
     (* Import the gadget test runner *)
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)

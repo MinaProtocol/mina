@@ -518,8 +518,6 @@ let bnot64_unchecked (type f)
 
 let%test_unit "bitwise rotation gadget" =
   if tests_enabled then (
-    printf "\nRunning rot tests\n" ;
-
     (* Import the gadget test runner *)
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
@@ -578,8 +576,6 @@ let%test_unit "bitwise rotation gadget" =
 
 let%test_unit "bitwise xor gadget" =
   if tests_enabled then (
-    printf "\nRunning xor tests\n" ;
-
     (* Import the gadget test runner *)
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
@@ -664,8 +660,6 @@ let%test_unit "bitwise xor gadget" =
 
 let%test_unit "bitwise and gadget" =
   if tests_enabled then (
-    printf "\nRunning and tests\n" ;
-
     (* Import the gadget test runner *)
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
@@ -731,8 +725,6 @@ let%test_unit "bitwise and gadget" =
 
 let%test_unit "bitwise not gadget" =
   if tests_enabled then (
-    printf "\nRunning not tests\n" ;
-
     (* Import the gadget test runner *)
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)

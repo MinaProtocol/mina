@@ -1118,8 +1118,6 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
 
 let%test_unit "foreign_field arithmetics gadgets" =
   if tests_enabled then (
-    printf "\nRunning ffa tests\n" ;
-
     (* Import the gadget test runner *)
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)

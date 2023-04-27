@@ -105,8 +105,6 @@ let mul (type f)
 
 let%test_unit "generic gadgets" =
   if tests_enabled then (
-    printf "\nRunning generic tests\n" ;
-
     (* Import the gadget test runner *)
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
