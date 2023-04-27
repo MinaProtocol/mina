@@ -13,30 +13,44 @@ Mina, this is the right file!
 
 Building Mina can be slightly involved. There are many C library dependencies that need
 to be present in the system, as well as some OCaml-specific setup.
+Mina can be build in different ways and on different platforms. Currently, Mina
+supports Linux and MacOS.
+
+### Building from sources
+
+You will need first to setup a development environment using [this
+section](#setting-up-the-development-environment).
+
+Git submodules are used to track some dependencies. To get them, run
+```
+git submodule update --init --recursive
+```
+
+#### Nix users
 
 If you are already a Nix user, or are comfortable installing Nix, it
 can be an easy way to build Mina locally. See
 [nix/README.md](./nix/README.md) for more information and
 instructions.
 
-Currently, Mina builds/runs on Linux & macOS. MacOS may have some issues that you can track [here](https://github.com/MinaProtocol/coda/issues/962).
+#### Linux (Ubuntu)
 
-The short version:
+A switch export is provided with the dependencies. To setup a switch, use
+```
+opam switch import --switch mina opam.export
+eval $(opam env)
+```
 
-1.  Start with Ubuntu 18 or run it in a virtual machine
-2.  Set github repos to pull and push over ssh: `git config --global url.ssh://git@github.com/.insteadOf https://github.com/`
-    - To push branches to repos in the MinaProtocol or o1-labs organisations, you must complete this step. These repositories do not accept the password authentication used by the https URLs.
-3.  Pull in our submodules: `git submodule update --init --recursive`
-    - This might fail with `git@github.com: Permission denied (publickey).`. If that happens it means
-      you need to [set up SSH keys on your machine](https://help.github.com/en/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent).
-4.  Run `git config --local --add submodule.recurse true`
+Some of our dependencies aren't taken from `opam`, and aren't integrated
+with `dune`, so you need to add them manually, by running
 
-### Developer Setup (Docker)
+```
+./scripts/pin-external-packages.sh
+```
 
-You can build Mina using Docker. This should work in any dev environment.
-Refer to [/dev](/dev).
+#### MacOS
 
-### Developer Setup (MacOS)
+MacOS may have some issues that you can track [here](https://github.com/MinaProtocol/coda/issues/962).
 
 1. Make sure you're on the latest verion of MacOS
 2. Make sure xcode is installed: `xcode-select --install`
@@ -76,17 +90,39 @@ Refer to [/dev](/dev).
 9. Install language server protocol `opam install ocaml-lsp-server` for better IDE support
 10. Set up your IDE (see [customizing your editor for autocomplete](#customizing-your-dev-environment-for-autocompletemerlin))
 
-### Developer Setup (Linux)
 
-#### Building
+### Building with Docker
 
-Mina has a variety of opam and system dependencies.
+You can build Mina using Docker. This should work in any dev environment.
+Refer to [/dev](/dev).
 
-To get all the opam dependencies you need, you run `opam switch import opam.export`.
-> *_NOTE:_*  The switch provides a `dune_wrapper` binary that you can use instead of dune, and will fail early if your switch becomes out of sync with the `opam.export` file.
 
-Some of our dependencies aren't taken from `opam`, and aren't integrated
-with `dune`, so you need to add them manually, by running `scripts/pin-external-packages.sh`.
+### Setting up the development environment
+
+Mina is written in different programming languages and require to install different compilers before building it from sources.
+
+#### Go
+
+The p2p layer uses Go.
+It is recommended to use [gvm](https://github.com/moovweb/gvm) to install Go.
+Follow the instructions provided in the project repository to install a Go
+compiler.
+The recommended version for Go is `1.18.10`.
+
+#### Rust
+
+The proving system is written in Rust.
+It is recommended to use [rustup](https://rustup.rs/) to install a Rust compiler.
+Mina uses currently Rust 1.67.0.
+
+#### OCaml
+
+Mina is mainly implemented in OCaml.
+Install [opam](https://opam.ocaml.org/doc/Install.html)
+Be sure you initialize `opam` before starting:
+```
+opam init --bare
+```
 
 There are a variety of C libraries we expect to be available in the system.
 These are also listed in the dockerfiles. Unlike most of the C libraries,
@@ -98,7 +134,8 @@ ocaml-rocksdb.
 
 - [Ubuntu Setup Instructions](https://docs.docker.com/install/linux/docker-ce/ubuntu/)
 
-#### Customizing your dev environment for autocomplete/merlin
+### Customizing your dev environment for autocomplete/merlin
+
 [dev-env]: #dev-env
 
 - If you use vim, add this snippet in your vimrc to use merlin. (REMEMBER to change the HOME directory to match yours)
