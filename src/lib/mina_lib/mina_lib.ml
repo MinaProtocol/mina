@@ -1395,6 +1395,12 @@ let send_resource_pool_diff_or_wait ~rl ~diff_score ~max_per_15_seconds diff =
   in
   able_to_send_or_wait ()
 
+module type Itn_settable = sig
+  type t
+
+  val set_itn_logger_data : t -> daemon_port:int -> unit Deferred.Or_error.t
+end
+
 let create ?wallets (config : Config.t) =
   let module Context = (val context config) in
   let catchup_mode = if config.super_catchup then `Super else `Normal in
@@ -1402,6 +1408,21 @@ let create ?wallets (config : Config.t) =
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
+      let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)
+          =
+        if Mina_compile_config.itn_features then
+          let ({ client_port; _ } : Node_addrs_and_ports.t) =
+            config.gossip_net_params.addrs_and_ports
+          in
+          match%map M.set_itn_logger_data t ~daemon_port:client_port with
+          | Ok () ->
+              ()
+          | Error err ->
+              [%log' warn config.logger]
+                "Error when setting ITN logger data: %s"
+                (Error.to_string_hum err)
+        else Deferred.unit
+      in
       O1trace.thread "mina_lib" (fun () ->
           let%bind prover =
             Monitor.try_with ~here:[%here]
@@ -1423,24 +1444,7 @@ let create ?wallets (config : Config.t) =
                         ~constraint_constants ~pids:config.pids
                         ~conf_dir:config.conf_dir ()
                     in
-                    let%map () =
-                      if Mina_compile_config.itn_features then
-                        let ({ client_port; _ } : Node_addrs_and_ports.t) =
-                          config.gossip_net_params.addrs_and_ports
-                        in
-                        match%map
-                          Prover.set_itn_logger_data prover
-                            ~daemon_port:client_port
-                        with
-                        | Ok () ->
-                            ()
-                        | Error err ->
-                            [%log' warn config.logger]
-                              "Error when setting ITN logger data for prover: \
-                               %s"
-                              (Error.to_string_hum err)
-                      else Deferred.unit
-                    in
+                    let%map () = set_itn_data (module Prover) prover in
                     prover ) )
             >>| Result.ok_exn
           in
@@ -1466,24 +1470,7 @@ let create ?wallets (config : Config.t) =
                           config.precomputed_values.constraint_constants
                         ~pids:config.pids ~conf_dir:(Some config.conf_dir) ()
                     in
-                    let%map () =
-                      if Mina_compile_config.itn_features then
-                        let ({ client_port; _ } : Node_addrs_and_ports.t) =
-                          config.gossip_net_params.addrs_and_ports
-                        in
-                        match%map
-                          Verifier.set_itn_logger_data verifier
-                            ~daemon_port:client_port
-                        with
-                        | Ok () ->
-                            ()
-                        | Error err ->
-                            [%log' warn config.logger]
-                              "Error when setting ITN logger data for \
-                               verifier: %s"
-                              (Error.to_string_hum err)
-                      else Deferred.unit
-                    in
+                    let%map () = set_itn_data (module Verifier) verifier in
                     verifier ) )
             >>| Result.ok_exn
           in

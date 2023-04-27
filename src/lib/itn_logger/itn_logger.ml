@@ -48,11 +48,8 @@ let daemon_where_to_connect, set_daemon_port =
     Async.Tcp.Where_to_connect.of_host_and_port
       (Host_and_port.create ~host:"127.0.0.1" ~port)
   in
-  let where =
-    (* placeholder, never used *)
-    ref (mk_where 0)
-  in
-  let set port = where := mk_where port in
+  let where = ref None in
+  let set port = where := Some (mk_where port) in
   let get_where () = !where in
   (get_where, set)
 
@@ -73,31 +70,40 @@ end
 let dispatch_remote_log log =
   let open Async.Deferred.Let_syntax in
   let rpc = Submit_internal_log.rpc in
-  let%map res =
-    Async.Rpc.Connection.with_client
-      ~handshake_timeout:
-        (Time.Span.of_sec Mina_compile_config.rpc_handshake_timeout_sec)
-      ~heartbeat_config:
-        (Async.Rpc.Connection.Heartbeat_config.create
-           ~timeout:
-             (Time_ns.Span.of_sec Mina_compile_config.rpc_heartbeat_timeout_sec)
-           ~send_every:
-             (Time_ns.Span.of_sec
-                Mina_compile_config.rpc_heartbeat_send_every_sec )
-           () )
-      (daemon_where_to_connect ())
-      (fun conn -> Async.Rpc.Rpc.dispatch rpc conn log)
-  in
-  (* not ideal that errors are not themselves logged *)
-  match res with
-  | Ok (Ok ()) ->
-      ()
-  | Ok (Error err) ->
-      eprintf "Error sending internal log via RPC: %s"
-        (Error.to_string_mach err)
-  | Error exn ->
-      eprintf "Exception when sending internal log via RPC: %s"
-        (Exn.to_string_mach exn)
+  match daemon_where_to_connect () with
+  | None ->
+      (* daemon port is set just after verifier, prover are created
+         so should never happen
+      *)
+      eprintf "No daemon port set for ITN logger" ;
+      Async.Deferred.unit
+  | Some where_to_connect -> (
+      let%map res =
+        Async.Rpc.Connection.with_client
+          ~handshake_timeout:
+            (Time.Span.of_sec Mina_compile_config.rpc_handshake_timeout_sec)
+          ~heartbeat_config:
+            (Async.Rpc.Connection.Heartbeat_config.create
+               ~timeout:
+                 (Time_ns.Span.of_sec
+                    Mina_compile_config.rpc_heartbeat_timeout_sec )
+               ~send_every:
+                 (Time_ns.Span.of_sec
+                    Mina_compile_config.rpc_heartbeat_send_every_sec )
+               () )
+          where_to_connect
+          (fun conn -> Async.Rpc.Rpc.dispatch rpc conn log)
+      in
+      (* not ideal that errors are not themselves logged *)
+      match res with
+      | Ok (Ok ()) ->
+          ()
+      | Ok (Error err) ->
+          eprintf "Error sending internal log via RPC: %s"
+            (Error.to_string_mach err)
+      | Error exn ->
+          eprintf "Exception when sending internal log via RPC: %s"
+            (Exn.to_string_mach exn) )
 
 (* this function can be called:
    (1) by the logging process (daemon, verifier, or prover) from the logger in Logger, or
