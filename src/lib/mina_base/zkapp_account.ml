@@ -18,6 +18,10 @@ module Event = struct
     Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_event x
 
   [%%endif]
+
+  let gen : t Quickcheck.Generator.t =
+    let open Quickcheck in
+    Generator.map ~f:Array.of_list @@ Generator.list Field.gen
 end
 
 module Make_events (Inputs : sig
@@ -423,3 +427,33 @@ let deriver obj =
        ~zkapp_version:!.uint32 ~action_state:!.action_state_deriver
        ~last_action_slot:!.global_slot ~proved_state:!.bool ~zkapp_uri:!.string
        obj
+
+let gen_uri =
+  let open Quickcheck in
+  let open Generator.Let_syntax in
+  let%bind parts =
+    String.gen_with_length 8 Char.gen_alphanum |> Generator.list_with_length 3
+  in
+  let%map domain = Generator.of_list [ "com"; "org"; "net"; "info" ] in
+  Printf.sprintf "https://%s.%s" (String.concat ~sep:"." parts) domain
+
+let gen : t Quickcheck.Generator.t =
+  let open Quickcheck in
+  let open Generator.Let_syntax in
+  let app_state =
+    Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
+        F.random () )
+  in
+  let%bind zkapp_version = Mina_numbers.Zkapp_version.gen in
+  let%bind seq_state = Generator.list_with_length 5 Field.gen in
+  let%bind last_sequence_slot = Mina_numbers.Global_slot.gen in
+  let%map zkapp_uri = gen_uri in
+  let five = Pickles_types.Nat.(S (S (S (S (S Z))))) in
+  { app_state
+  ; verification_key = None
+  ; zkapp_version
+  ; action_state = Pickles_types.(Vector.of_list_and_length_exn seq_state five)
+  ; last_action_slot = Mina_numbers.Global_slot.zero
+  ; proved_state = false
+  ; zkapp_uri
+  }
