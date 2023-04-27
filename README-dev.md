@@ -3,7 +3,7 @@
 Mina is a cryptocurrency protocol with a lightweight, constant-sized blockchain.
 
 - [Node Developers Overview](https://docs.minaprotocol.com/node-developers)
-- [Mina README](README)
+- [Mina README](README.md)
 
 For information about our development process and how to contribute, see [CONTRIBUTING.md](CONTRIBUTING.md). If you want to build
 Mina, this is the right file!
@@ -183,11 +183,14 @@ Emacs autocompletion packages; see [Emacs from scratch](https://github.com/ocaml
 
 ## Running a node
 
-The source code for the Mina node is located in `src/app/cli/`. After it is compiled, you can run the source code like this:
+The source code for the Mina node is located in `src/app/cli/`. After it is compiled, you can run the compiled binary like this:
 
 ```shell
 $ dune exec src/app/cli/src/mina.exe -- daemon --libp2p-keypair /path/to/key
 ```
+
+
+The results of a successful build appear in `_build/default/src/app/cli/src/mina.exe`.
 
 The default configuration of the node depends on the build profile that is used during compilation. To connect to some networks, you need to compile the daemon with a specific profile.
 
@@ -210,7 +213,7 @@ $ chmod 0600 /path/to/key
 $ chmod 0700 /path/to
 ```
 
-Additionally, you must provide a list of peers to connect to to bootstrap the node.
+Additionally, you must provide a list of peers to connect to bootstrap the node.
 The list of peers depends on the network you want to connect to and is announced when the network is being launched. For Mainnet, the list of peers is avaialable at:
 https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt.
 
@@ -229,11 +232,11 @@ The `--seed` flag tells the daemon to run a fresh network of its own. When this 
 $ dune exec src/app/cli/src/mina.exe -- -help
 ```
 
-The command line help is the place to learn about other options to the Mina zkApp CLI and how to connect to an existing network, such as Mainnet.
+The command line help is the place to learn about other options to the Mina CLI and how to connect to an existing network, such as Mainnet.
 
 ## Using the Makefile
 
-The makefile contains placeholder targets for all the common tasks that need to be done and automatically knows how to use Docker. 
+The Makefile contains placeholder targets for all the common tasks that need to be done and automatically knows how to use Docker. 
 
 The most important `make` targets are:
 
@@ -250,7 +253,7 @@ OCaml dependencies live in the [`opam.export`](./opam.export) file. This file is
 
 To add a new dependency, you most likely will need to create a new fresh switch to avoid pushing in any local dependency (like `ocaml-lsp`). The following commands assume that the version of the OCaml compiler used in the codebase is 4.14.0:
 
-```console
+```shell
 $ opam switch create mina_fresh 4.14.0
 $ opam switch import opam.export
 ```
