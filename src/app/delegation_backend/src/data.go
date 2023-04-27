@@ -133,7 +133,7 @@ type submitRequestData struct {
 	SnarkWork            *Base64   `json:"snark_work,omitempty"`
 	GraphqlControlPort   uint16    `json:"graphql_control_port,omitempty"`
 	CreatedAt            time.Time `json:"created_at"`
-	BlockProducerVersion string    `json:"block_producer_version"`
+	BlockProducerVersion string    `json:"block_producer_version,omitempty"`
 }
 type submitRequest struct {
 	Data      submitRequestData `json:"data"`
