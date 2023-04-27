@@ -1866,7 +1866,7 @@ let%test_module _ =
     let%test_unit "support for zkapp_command commands" =
       let open Currency in
       (* let open Mina_transaction_logic.For_tests in *)
-      let fee = Mina_compile_config.minimum_user_command_fee in
+      let fee = Currency.Fee.minimum_user_command_fee in
       let amount = Amount.of_nanomina_int_exn @@ Fee.to_nanomina_int fee in
       let balance = Option.value_exn (Amount.scale amount 100) in
       let kp1 =
@@ -1901,7 +1901,7 @@ let%test_module _ =
     let%test_unit "nonce increment side effects from other zkapp_command are \
                    handled properly" =
       let open Currency in
-      let fee = Mina_compile_config.minimum_user_command_fee in
+      let fee = Currency.Fee.minimum_user_command_fee in
       let amount = Amount.of_nanomina_int_exn @@ Fee.to_nanomina_int fee in
       let balance = Option.value_exn (Amount.scale amount 100) in
       let kp1 =
@@ -1940,7 +1940,7 @@ let%test_module _ =
     let%test_unit "nonce invariant violations on committed transactions does \
                    not trigger a crash" =
       let open Currency in
-      let fee = Mina_compile_config.minimum_user_command_fee in
+      let fee = Currency.Fee.minimum_user_command_fee in
       let amount = Amount.of_nanomina_int_exn @@ Fee.to_nanomina_int fee in
       let balance = Option.value_exn (Amount.scale amount 100) in
       let kp1 =

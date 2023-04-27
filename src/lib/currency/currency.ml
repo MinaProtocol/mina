@@ -952,6 +952,15 @@ module Make_str (A : Wire_types.Concrete) = struct
     end]
 
     let (_ : (Signed.t, (t, Sgn.t) Signed_poly.t) Type_equal.t) = Type_equal.T
+
+    let minimum_user_command_fee =
+      of_mina_string_exn Mina_compile_config.minimum_user_command_fee_string
+
+    let default_transaction_fee =
+      of_mina_string_exn Mina_compile_config.default_transaction_fee_string
+
+    let default_snark_worker_fee =
+      of_mina_string_exn Mina_compile_config.default_snark_worker_fee_string
   end
 
   module Amount = struct
