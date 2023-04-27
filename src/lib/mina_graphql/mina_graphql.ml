@@ -612,6 +612,13 @@ module Types = struct
               ~doc:"metadata for the log"
               ~typ:(non_null (list (non_null metadatum)))
               ~resolve:(fun _ (log : Itn_logger.t) -> log.metadata)
+          ; field "process"
+              ~args:Arg.[]
+              ~doc:
+                "if not the daemon, which process sent the log (prover or \
+                 verifier)"
+              ~typ:string
+              ~resolve:(fun _ (log : Itn_logger.t) -> log.process)
           ] )
   end
 

@@ -373,7 +373,8 @@ let log t ~level ~module_ ~location ?tags ?(metadata = []) ?event_id fmt =
     match level with
     | Internal ->
         if Mina_compile_config.itn_features then
-          Itn_logger.log ~timestamp:message'.timestamp ~message ~metadata
+          let timestamp = message'.timestamp in
+          Itn_logger.log ~timestamp ~message ~metadata ()
     | _ ->
         ()
   in

@@ -1414,12 +1414,34 @@ let create ?wallets (config : Config.t) =
                       ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
               (fun () ->
                 O1trace.thread "manage_prover_subprocess" (fun () ->
-                    Prover.create ~logger:config.logger
-                      ~enable_internal_tracing:(Internal_tracing.is_enabled ())
-                      ~internal_trace_filename:"prover-internal-trace.jsonl"
-                      ~proof_level:config.precomputed_values.proof_level
-                      ~constraint_constants ~pids:config.pids
-                      ~conf_dir:config.conf_dir () ) )
+                    let%bind prover =
+                      Prover.create ~logger:config.logger
+                        ~enable_internal_tracing:
+                          (Internal_tracing.is_enabled ())
+                        ~internal_trace_filename:"prover-internal-trace.jsonl"
+                        ~proof_level:config.precomputed_values.proof_level
+                        ~constraint_constants ~pids:config.pids
+                        ~conf_dir:config.conf_dir ()
+                    in
+                    let%map () =
+                      if Mina_compile_config.itn_features then
+                        let ({ client_port; _ } : Node_addrs_and_ports.t) =
+                          config.gossip_net_params.addrs_and_ports
+                        in
+                        match%map
+                          Prover.set_itn_logger_data prover
+                            ~daemon_port:client_port
+                        with
+                        | Ok () ->
+                            ()
+                        | Error err ->
+                            [%log' warn config.logger]
+                              "Error when setting ITN logger data for prover: \
+                               %s"
+                              (Error.to_string_hum err)
+                      else Deferred.unit
+                    in
+                    prover ) )
             >>| Result.ok_exn
           in
           let%bind verifier =
@@ -1434,13 +1456,35 @@ let create ?wallets (config : Config.t) =
                       ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
               (fun () ->
                 O1trace.thread "manage_verifier_subprocess" (fun () ->
-                    Verifier.create ~logger:config.logger
-                      ~enable_internal_tracing:(Internal_tracing.is_enabled ())
-                      ~internal_trace_filename:"verifier-internal-trace.jsonl"
-                      ~proof_level:config.precomputed_values.proof_level
-                      ~constraint_constants:
-                        config.precomputed_values.constraint_constants
-                      ~pids:config.pids ~conf_dir:(Some config.conf_dir) () ) )
+                    let%bind verifier =
+                      Verifier.create ~logger:config.logger
+                        ~enable_internal_tracing:
+                          (Internal_tracing.is_enabled ())
+                        ~internal_trace_filename:"verifier-internal-trace.jsonl"
+                        ~proof_level:config.precomputed_values.proof_level
+                        ~constraint_constants:
+                          config.precomputed_values.constraint_constants
+                        ~pids:config.pids ~conf_dir:(Some config.conf_dir) ()
+                    in
+                    let%map () =
+                      if Mina_compile_config.itn_features then
+                        let ({ client_port; _ } : Node_addrs_and_ports.t) =
+                          config.gossip_net_params.addrs_and_ports
+                        in
+                        match%map
+                          Verifier.set_itn_logger_data verifier
+                            ~daemon_port:client_port
+                        with
+                        | Ok () ->
+                            ()
+                        | Error err ->
+                            [%log' warn config.logger]
+                              "Error when setting ITN logger data for \
+                               verifier: %s"
+                              (Error.to_string_hum err)
+                      else Deferred.unit
+                    in
+                    verifier ) )
             >>| Result.ok_exn
           in
           (* This setup is required for the dynamic enabling/disabling of internal
