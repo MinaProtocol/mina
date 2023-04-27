@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-
 	"github.com/Khan/genqlient/graphql"
 )
 
@@ -125,11 +124,19 @@ func SchedulePaymentsGql(ctx context.Context, client graphql.Client, input Payme
 }
 
 func StopTransactionsGql(ctx context.Context, client graphql.Client, handle string) (string, error) {
-	resp, err := stopPayments(ctx, client, handle)
+	resp, err := stopScheduledTransactions(ctx, client, handle)
 	if err != nil {
 		return "", err
 	}
-	return resp.StopPayments, nil
+	return resp.StopScheduledTransactions, nil
+}
+
+func ScheduleZkappCommands(ctx context.Context, client graphql.Client, input ZkappCommandsDetails) (string, error) {
+	resp, err := scheduleZkappCommands(ctx, client, input)
+	if err != nil {
+		return "", err
+	}
+	return resp.ScheduleZkappCommands, nil
 }
 
 func SlotsWonGql(ctx context.Context, client graphql.Client) ([]int, error) {
