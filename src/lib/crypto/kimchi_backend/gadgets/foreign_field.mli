@@ -13,7 +13,7 @@ module Snark_intf = Snarky_backendless.Snark_intf
  *    Field type
  *    Limbs structure
  *
- *   There are 3 specific limb structures required
+ *   There are 2 specific limb structures required
  *     Standard mode := 3 limbs of L-bits each
  *     Compact mode  := 2 limbs where the lowest is 2L bits and the highest is L bits
  *)
@@ -68,7 +68,7 @@ module Element : sig
   end
 end
 
-(** Structure for tracking external checks that must be made
+(** Context for tracking external checks that must be made
  *  (using other gadgets) in order to acheive soundess for a
  *  given multiplication
  *)
@@ -81,30 +81,36 @@ end
 (* Type of operation *)
 type op_mode = Add | Sub
 
-(** This function checks in the circuit that a value is less than the foreign field modulus.
+(** Gadget to check the supplied value is a valid foreign field element for the
+ *  supplied foreign field modulus
+ *
+ *    This gadget checks in the circuit that a value is less than the foreign field modulus.
+ *    Part of this involves computing a bound value that is both added to external_checks
+ *    and also returned.  The caller may use either one, depending on the situation.
  *
  *    Inputs:
- *      value                 := the value to check
  *      external_checks       := Context to track required external checks
+ *      value                 := the value to check
  *      foreign_field_modulus := the modulus of the foreign field
  *
  *    Outputs:
- *      Returns bound value and External_checks containing multi-range-check for bound
+ *      Inserts the gates (described below) into the circuit
+ *      Adds bound value to be multi-range-checked to external_checks
+ *      Returns bound value
  *
  *    Effects to the circuit:
  *      - 1 FFAdd gate
  *      - 1 Zero gate
- *      - 1 Multi Range gadget
  *)
 val valid_element :
      (module Snark_intf.Run with type field = 'f)
-  -> 'f External_checks.t (* external_checks *)
+  -> 'f External_checks.t (* external_checks context *)
   -> 'f Element.Standard.t (* value *)
   -> 'f standard_limbs (* foreign_field_modulus *)
   -> 'f Element.Standard.t
 (* result *)
 
-(** Definition of a gadget for a chain of foreign field sums (additions or subtractions)
+(** Gadget for a chain of foreign field sums (additions or subtractions)
  *
  *    Inputs:
  *      inputs                := All the inputs to the chain of sums
@@ -117,7 +123,8 @@ val valid_element :
  *      Returns the final result of the chain of sums
  *
  *    For n+1 inputs, the gadget creates n foreign field addition gates, followed by a final
- *    foreign field addition gate for the bound check. An additional multi range check must be performed.
+ *    foreign field addition gate for the bound check (i.e. valid_element check). For this, a
+ *    an additional multi range check must also be performed.
  *    By default, the range check takes place right after the final Raw row.
  *)
 val sum_chain :
@@ -128,10 +135,11 @@ val sum_chain :
   -> 'f Element.Standard.t
 (* result *)
 
-(** Definition of a gadget for a single foreign field addition
+(** Gadget for a single foreign field addition
  *
  *    Inputs:
- *      full                  := flag for whether to perform a full addition with bound check (default true) or just a single FFAdd row (false)
+ *      full                  := flag for whether to perform a full addition with valid_element check
+ *                               on the result (default true) or just a single FFAdd row (false)
  *      left_input            := 3 limbs foreign field element
  *      right_input           := 3 limbs foreign field element
  *      foreign_field_modulus := The modulus of the foreign field
@@ -141,13 +149,14 @@ val sum_chain :
  *      Returns the result of the addition as a 3 limbs element
  *
  * In default mode:
- *  It adds a FFAdd gate,
- *  followed by a Zero gate,
- *  a FFAdd gate for the bound check,
- *  a Zero gate after this bound check,
- *  and a Multi Range Check gadget.
+ *     It adds a FFAdd gate,
+ *     followed by a Zero gate,
+ *     a FFAdd gate for the bound check,
+ *     a Zero gate after this bound check,
+ *     and a Multi Range Check gadget.
+ *
  * In false mode:
- *  It adds a FFAdd gate.
+ *     It adds a FFAdd gate.
  *)
 val add :
      (module Snark_intf.Run with type field = 'f)
@@ -158,10 +167,11 @@ val add :
   -> 'f Element.Standard.t
 (* result *)
 
-(** Definition of a gadget for a single foreign field subtraction
+(** Gadget for a single foreign field subtraction
  *
  *    Inputs:
- *      full                  := flag for whether to perform a full addition with bound check (default true) or just a single FFAdd row (false)
+ *      full                  := flag for whether to perform a full subtraction with valid_element check
+ *                               on the result (default true) or just a single FFAdd row (false)
  *      left_input            := 3 limbs foreign field element
  *      right_input           := 3 limbs foreign field element
  *      foreign_field_modulus := The modulus of the foreign field
@@ -171,14 +181,15 @@ val add :
  *      Returns the result of the addition as a 3 limbs element
  *
  * In default mode:
- *  It adds a FFAdd gate,
- *  followed by a Zero gate,
- *  a FFAdd gate for the bound check,
- *  a Zero gate after this bound check,
- *  and a Multi Range Check gadget.
+ *     It adds a FFAdd gate,
+ *     followed by a Zero gate,
+ *     a FFAdd gate for the bound check,
+ *     a Zero gate after this bound check,
+ *     and a Multi Range Check gadget.
+ *
  * In false mode:
- *  It adds a FFAdd gate.
-*)
+ *     It adds a FFAdd gate.
+ *)
 val sub :
      (module Snark_intf.Run with type field = 'f)
   -> ?full:bool (* full *)
@@ -188,7 +199,8 @@ val sub :
   -> 'f Element.Standard.t
 (* result *)
 
-(** Foreign field multiplication gadget
+(** Gadget for foreign field multiplication
+ *
  *   Constrains that
  *
  *     left_input * right_input = quotient * foreign_field_modulus + remainder
@@ -196,13 +208,14 @@ val sub :
  *   where remainder is the product.
  *
  *   Inputs:
+ *     external_checks       := Context to track required external checks
  *     left_input            := Multiplicand foreign field element
  *     right_input           := Multiplicand foreign field element
  *     foreign_field_modulus := Must be less than than max foreign field modulus
- *     external_checks       := Context to track required external checks
  *
  *   Outputs:
  *     Inserts the ForeignFieldMul gate, followed by Zero gate into the circuit
+ *     Appends required values to external_checks
  *     Returns the product
  *)
 val mul :
