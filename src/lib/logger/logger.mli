@@ -1,14 +1,11 @@
 open Core_kernel
 
+[%%versioned:
 module Stable : sig
   module V1 : sig
-    type t [@@deriving bin_io, version]
+    type t
   end
-
-  module Latest = V1
-end
-
-type t = Stable.V1.t
+end]
 
 module Level : sig
   type t =
@@ -47,15 +44,12 @@ module Source : sig
 end
 
 module Metadata : sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t = Yojson.Safe.t String.Map.t [@@deriving yojson, bin_io, version]
+      type t = Yojson.Safe.t String.Map.t [@@deriving yojson]
     end
-
-    module Latest = V1
-  end
-
-  type t = Stable.V1.t
+  end]
 end
 
 (** Used only when dealing with the raw logging function *)
@@ -128,7 +122,6 @@ type 'a log_function =
      t
   -> module_:string
   -> location:string
-  -> ?tags:Tags.t list
   -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
   -> ?event_id:Structured_log_events.id
   -> ('a, unit, string, unit) format4
@@ -160,7 +153,6 @@ val error : _ log_function
 (** spam is a special log level that omits location information *)
 val spam :
      t
-  -> ?tags:Tags.t list
   -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
   -> ('a, unit, string, unit) format4
   -> 'a
@@ -180,7 +172,6 @@ module Structured : sig
        t
     -> module_:string
     -> location:string
-    -> ?tags:Tags.t list
     -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
     -> Structured_log_events.t
     -> unit
@@ -201,7 +192,6 @@ module Structured : sig
 
   val best_tip_diff :
        t
-    -> ?tags:Tags.t list
     -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
     -> Structured_log_events.t
     -> unit
@@ -209,3 +199,15 @@ end
 
 (** Short alias for Structured. *)
 module Str = Structured
+
+module Logger_id : sig
+  val mina : Consumer_registry.id
+
+  val best_tip_diff : Consumer_registry.id
+
+  val rejected_blocks : Consumer_registry.id
+
+  val snark_worker : Consumer_registry.id
+
+  val oversized_logs : Consumer_registry.id
+end

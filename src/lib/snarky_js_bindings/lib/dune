@@ -61,7 +61,8 @@
   mina_metrics.none
   promise.js
   promise.js_helpers
-  run_in_thread.fake)
+  run_in_thread.fake
+  logger.fake)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
