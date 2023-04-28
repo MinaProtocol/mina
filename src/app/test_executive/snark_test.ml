@@ -135,7 +135,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               Hence, 6*2 = 12 transactions untill we get the first snarked ledger.
   *)
            send_payments ~logger ~sender_pub_key ~receiver_pub_key
-             ~amount:Currency.Amount.one ~fee ~node:sender 12
+             ~amount:Currency.Amount.one ~fee ~node:sender 13
          in
          wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
@@ -199,7 +199,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Hence, 6*2 = 12 transactions untill we get the first snarked ledger.
 *)
            send_payments ~logger ~sender_pub_key ~receiver_pub_key
-             ~amount:Currency.Amount.one ~fee ~node:sender 12
+             ~amount:Currency.Amount.one ~fee ~node:sender 13
          in
          wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:2) )
