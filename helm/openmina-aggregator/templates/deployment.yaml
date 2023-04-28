@@ -21,7 +21,7 @@ spec:
           command: ["mina-aggregator"]
           env:
             - name: CLUSTER_BASE_URL
-              value: http://1.k8.openmina.com:31355
+              value: http://1.k8.openmina.com:{{ index (lookup "v1" "Namespace" "" .Release.Namespace) "metadata" "annotations" "openmina.com/testnet.nodePort" }}
             - name: PLAIN_NODE_COUNT
               value: {{ .Values.plainNodesConfig.count | quote }}
             - name: SEED_NODE_COUNT
@@ -46,6 +46,10 @@ spec:
                 secretKeyRef:
                   name: aggregator-remote-storage
                   key: password
+            - name: REMOTE_STORAGE_PATH
+              value: /home/aggregator/{{ .Release.Namespace }}.json
+            - name: CI_REPO
+              value: {{ .Values.aggregator.ciRepo | default "openmina/mina" }}
           ports:
             - name: http-aggregator
               containerPort: 8000
