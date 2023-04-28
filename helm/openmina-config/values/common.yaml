@@ -92,7 +92,7 @@ aggregator:
 
 ciFrontend:
   image: directcuteo/mina-ci-frontend:reports35
-  nodePort: 31356
+  nodePort: 31309
 
 nodeSelector:
   preemptible: false
