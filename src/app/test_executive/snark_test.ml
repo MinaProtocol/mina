@@ -135,7 +135,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               Hence, 6*2 = 12 transactions untill we get the first snarked ledger.
   *)
            send_payments ~logger ~sender_pub_key ~receiver_pub_key
-             ~amount:Currency.Amount.one ~fee ~node:sender 13
+             ~amount:Currency.Amount.one ~fee ~node:sender 12
          in
          wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
@@ -164,7 +164,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               be %d.  snark fee is %d"
              (Currency.Balance.to_int snark_worker_balance)
              (Currency.Amount.to_int snark_worker_expected_balance)
-             (Currency.Fee.to_int fee) )
+             (Currency.Amount.to_int
+                (Currency.Amount.of_formatted_string config.snark_worker_fee) )
+        )
     in
     let%bind () =
       section_hard
@@ -197,7 +199,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Hence, 6*2 = 12 transactions untill we get the first snarked ledger.
 *)
            send_payments ~logger ~sender_pub_key ~receiver_pub_key
-             ~amount:Currency.Amount.one ~fee ~node:sender 13
+             ~amount:Currency.Amount.one ~fee ~node:sender 12
          in
          wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:2) )
@@ -225,5 +227,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             be %d.  snark fee is %d"
            (Currency.Balance.to_int snark_worker_balance)
            (Currency.Amount.to_int snark_worker_expected_balance)
-           (Currency.Fee.to_int fee) )
+           (Currency.Amount.to_int
+              (Currency.Amount.of_formatted_string config.snark_worker_fee) ) )
 end
