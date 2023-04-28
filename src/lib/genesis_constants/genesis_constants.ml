@@ -74,7 +74,8 @@ module Constraint_constants = struct
               ; previous_state_hash =
                   Pickles.Backend.Tick.Field.to_string previous_state_hash
               ; previous_global_slot =
-                  Unsigned.UInt32.to_int previous_global_slot
+                  Unsigned.UInt32.to_int
+                    (previous_global_slot :> Unsigned.UInt32.t)
               }
         | None ->
             None )

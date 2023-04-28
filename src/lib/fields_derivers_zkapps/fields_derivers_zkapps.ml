@@ -229,9 +229,44 @@ module Make (Schema : Graphql_intf.Schema) = struct
     Fields_derivers_json.Of_yojson.bool obj
 
   let global_slot obj =
-    iso_string obj ~name:"GlobalSlot" ~js_type:UInt32
-      ~to_string:Unsigned.UInt32.to_string
-      ~of_string:(except ~f:Unsigned.UInt32.of_string `Uint)
+    let module M = struct
+      module Wire_types = Mina_wire_types.Mina_numbers.Global_slot_since_genesis
+
+      module Make_sig (A : Wire_types.Types.S) = struct
+        module type S = sig
+          val deriver :
+               (< contramap : (A.V1.t -> Yojson.Safe.t) ref
+                ; graphql_arg : (unit -> Yojson.Safe.t Schema.Arg.arg_typ) ref
+                ; graphql_fields : Yojson.Safe.t Graphql.Fields.Input.T.t ref
+                ; graphql_query : string option ref
+                ; js_layout : [> `Assoc of (string * Yojson.Safe.t) list ] ref
+                ; map : (Yojson.Safe.t -> A.V1.t) ref
+                ; nullable_graphql_arg :
+                    (unit -> Yojson.Safe.t option Schema.Arg.arg_typ) ref
+                ; nullable_graphql_fields :
+                    Yojson.Safe.t option Graphql.Fields.Input.T.t ref
+                ; of_json : (Yojson.Safe.t -> Yojson.Safe.t) ref
+                ; skip : bool ref
+                ; to_json : (Yojson.Safe.t -> Yojson.Safe.t) ref
+                ; .. >
+                as
+                'a )
+               Unified_input.t
+               Unified_input.t
+            -> 'a Unified_input.t
+        end
+      end
+
+      module Make_str (A : Wire_types.Concrete) : Make_sig(A).S = struct
+        let deriver obj =
+          iso_string obj ~name:"GlobalSlot" ~js_type:UInt32
+            ~to_string:Unsigned.UInt32.to_string
+            ~of_string:(except ~f:Unsigned.UInt32.of_string `Uint)
+      end
+
+      include Wire_types.Make (Make_sig) (Make_str)
+    end in
+    M.deriver obj
 
   let amount obj =
     iso_string obj ~name:"CurrencyAmount" ~js_type:UInt64

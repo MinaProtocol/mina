@@ -9,7 +9,7 @@ end
 
 module T = Nat.Make32 ()
 
-module Make_str (_ : Wire_types.Concrete) = struct
+module Make_str (A : Wire_types.Concrete) : Make_sig(A).S = struct
   include T
 end
 
