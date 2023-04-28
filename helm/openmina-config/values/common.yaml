@@ -86,7 +86,8 @@ internalTrace:
   image: openmina/mina-internal-trace-consumer:2794c20
 
 aggregator:
-  image: openmina/mina-aggregator:68584f29
+  image: openmina/mina-aggregator:60795c47
+  ciRepo: openmina/mina-daily-testnet
 
 ciFrontend:
   image: directcuteo/mina-ci-frontend:reports35
