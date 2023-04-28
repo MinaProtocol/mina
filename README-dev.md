@@ -10,7 +10,7 @@ Mina, this is the right file!
 
 ## Building Mina
 
-Building Mina is involved because many C library dependencies must be present in the system. OCaml-specific setup is also required.
+Building Mina is involved because many C library dependencies must be present in the system. Furthermore, these libraries need to be in correct versions, or else the system will fail to build. OCaml-specific setup is also required. Therefore, it is recommended to build Mina with Nix, which offers a great help in managing these dependencies. Manual dependency management is fragile and prone to break with every system update.
 
 If you are already a Nix user, or are comfortable installing Nix, you already have a way to build Mina locally. For information and
 instructions, see [nix/README.md](./nix/README.md).
@@ -20,7 +20,13 @@ Mina builds and runs on Linux and macOS.
 Quick start instructions:
 
 1.  Start with Ubuntu 18 or run it in a virtual machine
-2.  The MinaProtocol and o1-labs repositories do not accept the password authentication used by the https URLs. You must set GitHub repos to pull and push over ssh: 
+2.  Clone the Mina repository (if you have not done that already):
+
+    ```sh
+    git clone git@github.com:MinaProtocol/mina.git
+    ```
+
+If you have already done that, remember that the MinaProtocol and o1-labs repositories do not accept the password authentication used by the https URLs. You must set GitHub repos to pull and push over ssh: 
 
     ```sh
     git config --global url.ssh://git@github.com/.insteadOf https://github.com/
@@ -219,6 +225,8 @@ https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt.
 
 The `daemon.json` config file also contains bootstrap data that is specific to the network the node is trying to connect to and must be tailored specifically for a particular network. This file can also override some of the configuration options selected during compilation. The `daemon.json` file can be extracted from the Docker image
 that is dedicated to running a particular network. If it's not located in the `config` directory, it can be pointed to with `--config-file` option.
+
+The aforementioned bootstrap data includes the genesis ledger, i.e. the initial state of the blockchain. It is crucial for all the nodes on the network to have the same genesis ledger. While starting a new network, it is important that it contains at least one account possessing some funds. Otherwise, the network will not be able to bootstrap, as there will be no way to determine the next block producer.
 
 When all of this setup is complete, you can launch the daemon. The following command assumes the key passphrase is set to `pass`:
 
