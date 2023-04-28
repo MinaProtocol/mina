@@ -23,7 +23,6 @@ let%test_module "Valid_while precondition tests" =
         new_kp global_slot : Spec.t =
       let fee = Fee.of_nanomina_int_exn 1_000_000 in
       let spec = List.hd_exn specs in
-
       { sender = spec.sender
       ; fee
       ; fee_payer = None
@@ -538,12 +537,12 @@ let%test_module "Account precondition tests" =
         let open Quickcheck.Generator.Let_syntax in
         let%bind ((_, new_kp) as l) = U.gen_snapp_ledger in
         let snapp_pk = Signature_lib.Public_key.compress new_kp.public_key in
-        let snapp_account =
+        let zkapp_account =
           Transaction_snark.For_tests.trivial_zkapp_account ~vk snapp_pk
         in
         let%map account_precondition =
           Mina_generators.Zkapp_command_generators
-          .gen_account_precondition_from_account snapp_account
+          .gen_account_precondition_from_account zkapp_account
             ~first_use_of_account:true
         in
         (l, account_precondition)
@@ -555,15 +554,15 @@ let%test_module "Account precondition tests" =
                   let state_body = U.genesis_state_body in
                   let fee = Fee.of_nanomina_int_exn 1_000_000 in
                   let spec = List.hd_exn specs in
-                  let snapp_pk =
+                  let zkapp_pk =
                     Signature_lib.Public_key.compress new_kp.public_key
                   in
                   Mina_transaction_logic.For_tests.Init_ledger.init
                     (module Mina_ledger.Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  (*create a snapp account*)
+                  (*create a zkAapp account*)
                   Transaction_snark.For_tests.create_trivial_zkapp_account ~vk
-                    ~ledger snapp_pk ;
+                    ~ledger zkapp_pk ;
                   let open Async.Deferred.Let_syntax in
                   let test_spec : Spec.t =
                     { sender = spec.sender
@@ -594,6 +593,173 @@ let%test_module "Account precondition tests" =
                   in
                   U.check_zkapp_command_with_merges_exn ~state_body ledger
                     [ zkapp_command ] ) ) )
+
+    let mk_delegate_precondition pk : Account_update.Account_precondition.t =
+      let open Zkapp_basic.Or_ignore in
+      let state =
+        Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
+            Ignore )
+      in
+      Full
+        { balance = Ignore
+        ; nonce = Ignore
+        ; receipt_chain_hash = Ignore
+        ; delegate = Check pk
+        ; state
+        ; action_state = Ignore
+        ; proved_state = Ignore
+        ; is_new = Check true
+        }
+
+    let add_account_precondition ~at precondition account_updates =
+      Zkapp_command.Call_forest.mapi account_updates
+        ~f:(fun i (update : Account_update.t) ->
+          if i = at then
+            { update with
+              body =
+                { update.body with
+                  preconditions =
+                    { update.body.preconditions with account = precondition }
+                }
+            }
+          else update )
+
+    let%test_unit "delegate precondition on new account" =
+      let gen = U.gen_snapp_ledger in
+      Quickcheck.test ~trials:5 gen ~f:(fun ({ specs; _ }, new_kp) ->
+          Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  let state_body = U.genesis_state_body in
+                  let fee = Fee.of_nanomina_int_exn 1_000_000 in
+                  let spec = List.hd_exn specs in
+                  let sender_kp, _ = spec.sender in
+                  let sender_pk =
+                    Signature_lib.Public_key.compress sender_kp.public_key
+                  in
+                  Transaction_snark.For_tests.create_trivial_zkapp_account ~vk
+                    ~ledger sender_pk ;
+                  let open Async.Deferred.Let_syntax in
+                  let test_spec : Spec.t =
+                    { sender = spec.sender
+                    ; fee
+                    ; fee_payer = None
+                    ; receivers = []
+                    ; amount = Amount.of_mina_int_exn 5
+                    ; zkapp_account_keypairs = [ new_kp ]
+                    ; memo
+                    ; new_zkapp_account = true
+                    ; snapp_update
+                    ; current_auth = Permissions.Auth_required.Signature
+                    ; call_data = Snark_params.Tick.Field.zero
+                    ; events = []
+                    ; actions = []
+                    ; preconditions = None
+                    }
+                  in
+                  let%bind zkapp_command0 =
+                    Transaction_snark.For_tests.update_states
+                      ~zkapp_prover_and_vk ~constraint_constants test_spec
+                  in
+                  (* add delegate precondition for new account *)
+                  let%bind zkapp_command =
+                    let zkapp_pk = Public_key.compress new_kp.public_key in
+                    let delegate_precondition =
+                      mk_delegate_precondition zkapp_pk
+                    in
+                    let zkapp =
+                      { zkapp_command0 with
+                        account_updates =
+                          add_account_precondition ~at:1 delegate_precondition
+                            zkapp_command0.account_updates
+                          |> Zkapp_command.Call_forest
+                             .accumulate_hashes_predicated
+                      }
+                    in
+                    let keymap =
+                      Public_key.Compressed.Map.of_alist_exn
+                        [ (sender_pk, sender_kp.private_key)
+                        ; (zkapp_pk, new_kp.private_key)
+                        ]
+                    in
+                    Zkapp_command_builder.replace_authorizations ~keymap zkapp
+                  in
+                  U.check_zkapp_command_with_merges_exn ~state_body ledger
+                    [ zkapp_command ] ) ) )
+
+    let%test_unit "unsatisfied delegate precondition, custom token" =
+      (* when new account has a custom token, it doesn't get a self-delegation *)
+      let constraint_constants = U.constraint_constants in
+      let account_creation_fee =
+        Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
+      in
+      Quickcheck.test ~trials:5 Signature_lib.Keypair.gen ~f:(fun new_kp ->
+          Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  let module Init_ledger =
+                    Mina_transaction_logic.For_tests.Init_ledger
+                  in
+                  let open Async.Deferred.Let_syntax in
+                  let token_owner = new_kp in
+                  let token_owner_pk =
+                    Signature_lib.Public_key.compress token_owner.public_key
+                  in
+                  Init_ledger.init
+                    (module Mina_ledger.Ledger.Ledger_inner)
+                    [| (token_owner, 5_000_000_000L) |]
+                    ledger ;
+                  let custom_token_id =
+                    Account_id.derive_token_id
+                      ~owner:(Account_id.create token_owner_pk Token_id.default)
+                  in
+                  let token_account = Keypair.create () in
+                  let token_account_pk =
+                    Public_key.compress token_account.public_key
+                  in
+                  let keymap =
+                    List.fold [ token_owner; token_account ]
+                      ~init:Public_key.Compressed.Map.empty
+                      ~f:(fun map { private_key; public_key } ->
+                        Public_key.Compressed.Map.add_exn map
+                          ~key:(Public_key.compress public_key)
+                          ~data:private_key )
+                  in
+                  let%bind mint_token_zkapp_command =
+                    let open Zkapp_command_builder in
+                    let nonce = Account.Nonce.zero in
+                    let zkapp0 =
+                      mk_forest
+                        [ mk_node
+                            (mk_account_update_body Signature No token_owner
+                               Token_id.default (-account_creation_fee) )
+                            [ mk_node
+                                (mk_account_update_body Signature
+                                   Parents_own_token token_account
+                                   custom_token_id 100 )
+                                []
+                            ]
+                        ]
+                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:token_owner_pk
+                           ~fee_payer_nonce:nonce
+                    in
+                    let zkapp_dummy_signatures =
+                      let delegate_precondition =
+                        mk_delegate_precondition token_account_pk
+                      in
+                      { zkapp0 with
+                        account_updates =
+                          add_account_precondition ~at:1 delegate_precondition
+                            zkapp0.account_updates
+                          |> Zkapp_command.Call_forest
+                             .accumulate_hashes_predicated
+                      }
+                    in
+                    replace_authorizations ~keymap zkapp_dummy_signatures
+                  in
+                  U.check_zkapp_command_with_merges_exn
+                    ~expected_failure:
+                      (Account_delegate_precondition_unsatisfied, U.Pass_2)
+                    ledger
+                    [ mint_token_zkapp_command ] ) ) )
 
     let%test_unit "invalid account predicate in other zkapp_command" =
       let state_body = U.genesis_state_body in

@@ -34,7 +34,10 @@ module type Gossip_net_intf = sig
   val connection_gating : t -> Mina_net2.connection_gating Deferred.t
 
   val set_connection_gating :
-    t -> Mina_net2.connection_gating -> Mina_net2.connection_gating Deferred.t
+       ?clean_added_peers:bool
+    -> t
+    -> Mina_net2.connection_gating
+    -> Mina_net2.connection_gating Deferred.t
 
   val random_peers : t -> int -> Peer.t list Deferred.t
 
