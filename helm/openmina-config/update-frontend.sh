@@ -139,15 +139,11 @@ if [ -z "$NODE_PORT" ]; then
     exit 1
 fi
 
-# if [ -z "$IMAGE" ]; then
-#     IMAGE=$($KUBECTL get deployment/frontend --output=jsonpath='{.spec.template.spec.containers[0].image}')
-#     if [ -z "$NODE_PORT" ]; then
-#         echo "Cannot determine frontend image. Use '--image'."
-#         exit 1
-#     fi
-# fi
+if [ -z "$IMAGE" ]; then
+    IMAGE=$($KUBECTL get deployment/frontend --output=jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)
+fi
 
 COMMON_VALUES="$(values frontend)"
 GENERATED_VALUES="$(generate_values)"
-$HELM upgrade --install frontend "$FRONTEND_CHART" --values="$COMMON_VALUES" --values="$GENERATED_VALUES" "$@"
+$HELM upgrade --install frontend "$FRONTEND_CHART" --values="$COMMON_VALUES" --values="$GENERATED_VALUES" ${IMAGE:+--set=frontend.image="${IMAGE}"} "$@"
 $KUBECTL rollout restart deploy/frontend
