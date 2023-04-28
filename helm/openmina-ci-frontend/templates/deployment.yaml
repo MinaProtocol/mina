@@ -25,7 +25,7 @@ spec:
               exec nginx -c /nginx-conf/nginx.conf -g 'daemon off;'
           env:
             - name: AGGREGATOR_URL
-              value: http://1.k8.openmina.com:31356/aggregator
+              value: /aggregator
           ports:
             - name: http
               containerPort: 80
