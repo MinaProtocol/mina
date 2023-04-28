@@ -45,7 +45,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; account_name = "snark-node-key1"
           ; worker_nodes = 8
           }
-    ; snark_worker_fee = "11"
+    ; snark_worker_fee = "0.0001"
     ; proof_config =
         { proof_config_default with
           work_delay = Some 1
@@ -81,8 +81,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info] "snark node keypairs: %s"
       (List.to_string [ snark_node_key1.keypair; snark_node_key2.keypair ]
          ~f:(fun { Signature_lib.Keypair.public_key; _ } ->
-           public_key |> Signature_lib.Public_key.to_bigstring
-           |> Bigstring.to_string ) ) ;
+           public_key |> Signature_lib.Public_key.to_yojson
+           |> Yojson.Safe.to_string ) ) ;
     (* let amount = Currency.Amount.of_formatted_string "10" in *)
     let fee = Currency.Fee.of_formatted_string "1" in
     (* let test_constants = Engine.Network.constraint_constants network in *)
@@ -108,7 +108,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               should be %d.  snark fee is %d"
              (Currency.Balance.to_int snark_worker_balance)
              (Currency.Amount.to_int snark_worker_expected_balance)
-             (Currency.Fee.to_int fee) )
+             (Currency.Amount.to_int
+                (Currency.Amount.of_formatted_string config.snark_worker_fee) )
+        )
     in
     let%bind () =
       section_hard
@@ -198,7 +200,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~amount:Currency.Amount.one ~fee ~node:sender 13
          in
          wait_for t
-           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
+           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:2) )
     in
     section_hard
       "check account balance of snark-node-key2, should be greater than or \

@@ -626,12 +626,18 @@ module Node = struct
         ~query_name:"set_snark_worker_graphql" set_snark_worker_obj
     in
     let%map result_obj = set_snark_worker_graphql () in
-    let returned_last_snark_worker =
-      result_obj.setSnarkWorker.lastSnarkWorker |> Option.value_exn
-      |> Account.Key.to_yojson |> Yojson.Safe.to_string
+    let returned_last_snark_worker_opt =
+      result_obj.setSnarkWorker.lastSnarkWorker
     in
-    [%log info] "snark worker changed"
-      ~metadata:[ ("lastSnarkWorker", `String returned_last_snark_worker) ] ;
+    let last_snark_worker =
+      match returned_last_snark_worker_opt with
+      | None ->
+          "<no last snark worker>"
+      | Some last ->
+          last |> Account.Key.to_yojson |> Yojson.Safe.to_string
+    in
+    [%log info] "snark worker changed, lastSnarkWorker: %s" last_snark_worker
+      ~metadata:[ ("lastSnarkWorker", `String last_snark_worker) ] ;
     ()
 
   let must_set_snark_worker ~logger t ~new_snark_pub_key =
