@@ -36,9 +36,11 @@ instructions.
 #### Linux (Ubuntu)
 
 A switch export is provided with the dependencies. To setup a switch, use
+
 ```
-opam switch import --switch mina opam.export
+opam switch create ./ 4.14.0 --no-install
 eval $(opam env)
+opam switch import opam.export
 ```
 
 Some of our dependencies aren't taken from `opam`, and aren't integrated
@@ -46,6 +48,17 @@ with `dune`, so you need to add them manually, by running
 
 ```
 ./scripts/pin-external-packages.sh
+```
+
+Before building, you may need to install some system dependencies. If you are running Ubuntu, use:
+
+```
+sudo apt-get install capnproto libcapnp-dev jemalloc
+```
+
+Now, you should be able to compile using:
+```
+make build
 ```
 
 #### MacOS
@@ -108,6 +121,11 @@ It is recommended to use [gvm](https://github.com/moovweb/gvm) to install Go.
 Follow the instructions provided in the project repository to install a Go
 compiler.
 The recommended version for Go is `1.18.10`.
+With `gvm`, you can use
+```
+gvm install go1.18.10
+gvm use go1.18.10
+```
 
 #### Rust
 
@@ -118,11 +136,8 @@ Mina uses currently Rust 1.67.0.
 #### OCaml
 
 Mina is mainly implemented in OCaml.
-Install [opam](https://opam.ocaml.org/doc/Install.html)
-Be sure you initialize `opam` before starting:
-```
-opam init --bare
-```
+Refer to the [official documentation](https://ocaml.org/docs/up-and-running) to
+install OPAM and a OCaml version.
 
 There are a variety of C libraries we expect to be available in the system.
 These are also listed in the dockerfiles. Unlike most of the C libraries,
@@ -246,7 +261,7 @@ as mainnet.
 ## Using the Makefile
 
 The makefile contains phony targets for all the common tasks that need to be done.
-It also knows how to use Docker automatically. 
+It also knows how to use Docker automatically.
 
 These are the most important `make` targets:
 
@@ -254,8 +269,6 @@ These are the most important `make` targets:
 - `libp2p_helper`: build the libp2p helper
 - `reformat`: automatically use `ocamlformat` to reformat the source files (use
     it if the hook fails during a commit)
-
-We use the [dune](https://github.com/ocaml/dune/) buildsystem for our OCaml code.
 
 ## Steps for adding a new OCaml dependency
 
