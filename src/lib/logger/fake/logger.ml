@@ -72,8 +72,6 @@ module Metadata = struct
   [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
 
   let empty = String.Map.empty
-
-  let extend _ _ = not_implemented ()
 end
 
 let append_to_global_metadata _ = not_implemented ()
@@ -137,13 +135,12 @@ end]
 
 let metadata t = t.metadata
 
-let create ?(metadata = []) ?(id = "default") () =
-  { null = false; metadata = Metadata.extend Metadata.empty metadata; id }
+let create ?metadata:_ ?(id = "default") () =
+  { null = false; metadata = Metadata.empty; id }
 
 let null () = { null = true; metadata = Metadata.empty; id = "default" }
 
-let extend t metadata =
-  { t with metadata = Metadata.extend t.metadata metadata }
+let extend t _ = t
 
 let change_id { null; metadata; id = _ } ~id = { null; metadata; id }
 
