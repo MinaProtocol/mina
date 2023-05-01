@@ -10,7 +10,7 @@ Mina is the first cryptocurrency with a lightweight, constant-sized blockchain. 
 
 Mina is still under active development and APIs are evolving. If you build on the APIs, be aware that breaking changes can occur.
 
-The Mina implementation of the Rosetta API offers a more stable and useful interface for retrieving the blockchain's state. Because Rosetta is run as a separate process, it relies on an archive being connected to a node. The source code for the archive and Rosetta implementation are in [src/app/archive](https://github.com/MinaProtocol/mina/tree/develop/src/app/archive) and [src/app/rosetta](https://github.com/MinaProtocol/mina/tree/develop/src/app/rosetta). Be sure to follow updates in the project if these resources are relocated. 
+The Mina implementation of the Rosetta API offers a more stable and useful interface for retrieving the blockchain's state. Rosetta is run as a separate process and it relies on an archive being connected to a node. The source code for the archive and Rosetta implementation are in [src/app/archive](https://github.com/MinaProtocol/mina/tree/develop/src/app/archive) and [src/app/rosetta](https://github.com/MinaProtocol/mina/tree/develop/src/app/rosetta). Be sure to follow updates in the project if these resources are relocated. 
 
 ## What is Mina?
 
