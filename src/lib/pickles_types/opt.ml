@@ -40,6 +40,14 @@ let value_exn = function
 let of_option (t : 'a option) : ('a, 'bool) t =
   match t with None -> None | Some x -> Some x
 
+let lift ?on_maybe ~none f = function
+  | None ->
+      none
+  | Some v ->
+      f v
+  | Maybe (b, v) -> (
+      match on_maybe with None -> f v | Some g -> g b v )
+
 module Flag = struct
   type t = Yes | No | Maybe [@@deriving sexp, compare, yojson, hash, equal]
 end
