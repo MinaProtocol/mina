@@ -121,47 +121,52 @@ mina_block_params() {
 }
 
 mina_testnet_same_block_() {
-    mina_pods_ns $* | {
-        PREV_HEIGHT=""
-        PREV_HASH=""
-        while read NAMESPACE POD; do
-            mina_block_params $POD $NAMESPACE | {
-                read HASH PHASH HEIGHT
-                if [ -z "$HEIGHT" ]; then
-                    echo "$POD did not respond height"
-                    exit 1
-                fi
-                echo "$POD is at $HEIGHT, hash is $HASH"
-                if [ "$HEIGHT" -eq 1 ]; then
-                    echo "Genesis block"
-                    exit 1
-                elif [ -z "$PREV_HEIGHT" ]; then
-                    PREV_HEIGHT="${HEIGHT}"
-                    PREV_HASH="${HASH}"
-                elif [ "$HEIGHT" -eq "$PREV_HEIGHT" ]; then
-                    if [ "$HASH" = "$PREV_HASH" ]; then
-                        continue
-                    else
-                        echo "Height is the same but hash mismatch"
-                        exit 1
-                    fi
-                elif [ "$HEIGHT" -eq "$((PREV_HEIGHT + 1))" ]; then
-                    echo "Height increased by one, expected previous hash is $PREV_HASH"
-                    if [ "$PHASH" = "$PREV_HASH" ]; then
-                        PREV_HEIGHT=$HEIGHT
-                        PREV_HASH=$HASH
-                        continue
-                    else
-                        echo "Previous hash mismatch"
-                        exit 1
-                    fi
-                else
-                    echo "Height is different, $PREV_HEIGHT vs $HEIGHT"
-                    return 1
-                fi
-            }
-        done
-    }
+    NAMESPACE=$1
+    PREV_HEIGHT=""
+    PREV_HASH=""
+    for POD in $(mina_pods_ns); do
+        PARAMS=$(mina_block_params $POD $NAMESPACE)
+        HASH=${PARAMS%% *}
+        PARAMS=${PARAMS#* }
+        PHASH=${PARAMS%% *}
+        PARAMS=${PARAMS#* }
+        HEIGHT=${PARAMS%% *}
+        PARAMS=${PARAMS#* }
+
+        if [ -z "$HEIGHT" ]; then
+            echo "$POD did not respond height"
+            exit 1
+        fi
+        echo "$POD is at $HEIGHT, hash is $HASH"
+        if [ "$HEIGHT" -eq 1 ]; then
+            echo "Genesis block"
+            exit 1
+        elif [ -z "$PREV_HEIGHT" ]; then
+            echo "First"
+            PREV_HEIGHT="${HEIGHT}"
+            PREV_HASH="${HASH}"
+        elif [ "$HEIGHT" -eq "$PREV_HEIGHT" ]; then
+            if [ "$HASH" = "$PREV_HASH" ]; then
+                continue
+            else
+                echo "Height is the same but hash mismatch"
+                exit 1
+            fi
+        elif [ "$HEIGHT" -eq "$((PREV_HEIGHT + 1))" ]; then
+            echo "Height increased by one, expected previous hash is $PREV_HASH"
+            if [ "$PHASH" = "$PREV_HASH" ]; then
+                PREV_HEIGHT=$HEIGHT
+                PREV_HASH=$HASH
+                continue
+            else
+                echo "Previous hash mismatch"
+                exit 1
+            fi
+        else
+            echo "Height is different, $PREV_HEIGHT vs $HEIGHT"
+            return 1
+        fi
+    done
 }
 
 mina_testnet_same_height_() {
