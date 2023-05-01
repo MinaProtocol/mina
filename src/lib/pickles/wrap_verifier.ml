@@ -555,11 +555,11 @@ struct
         let index_digest =
           with_label "absorb verifier index" (fun () ->
               let index_sponge = Sponge.create sponge_params in
-              Array.iter
-                (Types.index_to_field_elements
-                   ~g:(fun (z : Inputs.Inner_curve.t) ->
-                     List.to_array (Inner_curve.to_field_elements z) )
-                   m )
+              let g (z : Inputs.Inner_curve.t) =
+                List.to_array (Inner_curve.to_field_elements z)
+              in
+              let g_opt = Pickles_types.Opt.lift ~none:[||] g in
+              Array.iter (Types.index_to_field_elements ~g ~g_opt m)
                 ~f:(fun x -> Sponge.absorb index_sponge x) ;
               Sponge.squeeze_field index_sponge )
         in

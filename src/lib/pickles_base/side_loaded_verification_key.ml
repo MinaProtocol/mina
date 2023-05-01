@@ -168,8 +168,8 @@ let index_to_field_elements
       ; mul_comm
       ; emul_comm
       ; endomul_scalar_comm
-      ; optional_columns_comm = _ (* FIXME: Do something with it *)
-      } ~g =
+      ; optional_columns_comm
+      } ~g ~g_opt =
   List.map
     ( Vector.to_list sigma_comm
     @ Vector.to_list coefficients_comm
@@ -181,10 +181,19 @@ let index_to_field_elements
       ; endomul_scalar_comm
       ] )
     ~f:g
+  @ List.map
+      (Plonk_verification_key_evals.Optional_columns.to_list
+         optional_columns_comm )
+      ~f:g_opt
   |> Array.concat
 
 let wrap_index_to_input (type gs f) (g : gs -> f array) t =
-  Random_oracle_input.Chunked.field_elements (index_to_field_elements t ~g)
+  Random_oracle_input.Chunked.field_elements
+    (index_to_field_elements t ~g ~g_opt:(function
+      | None ->
+          [||]
+      | Some v ->
+          g v ) )
 
 let to_input (type a) ~(field_of_int : int -> a) :
     (a * a, _, _) Poly.t -> a Random_oracle_input.Chunked.t =
