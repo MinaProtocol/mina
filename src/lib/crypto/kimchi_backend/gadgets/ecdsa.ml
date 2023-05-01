@@ -97,6 +97,119 @@ end = struct
       && equal_as_prover (module Circuit) left_y right_y)
 end
 
+(* Elliptic curve group addition *)
+let add (type f) (module Circuit : Snark_intf.Run with type field = f)
+    (external_checks : f Foreign_field.External_checks.t)
+    (left_input : f Affine.t) (right_input : f Affine.t)
+    (foreign_field_modulus : f Foreign_field.standard_limbs) : f Affine.t =
+  let open Circuit in
+  let left_x, left_y = Affine.to_coordinates left_input in
+  let right_x, right_y = Affine.to_coordinates right_input in
+
+  (* C1: Constrain slope numerator and denominator computaion *)
+  let delta_y =
+    Foreign_field.sub (module Circuit) right_y left_y foreign_field_modulus
+  in
+  let delta_x =
+    Foreign_field.sub (module Circuit) right_x left_x foreign_field_modulus
+  in
+
+  (* Compute slope witness value *)
+  let slope0, slope1, slope2 =
+    exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
+        let delta_y =
+          Foreign_field.Element.Standard.to_bignum_bigint_as_prover
+            (module Circuit)
+            delta_y
+        in
+        let delta_x =
+          Foreign_field.Element.Standard.to_bignum_bigint_as_prover
+            (module Circuit)
+            delta_x
+        in
+        let slope = Bignum_bigint.(delta_y / delta_x) in
+        let slope0, slope1, slope2 =
+          let slope =
+            Foreign_field.Element.Standard.of_bignum_bigint
+              (module Circuit)
+              slope
+          in
+          Foreign_field.Element.Standard.to_field_limbs_as_prover
+            (module Circuit)
+            slope
+        in
+
+        [| slope0; slope1; slope2 |] )
+    |> Common.tuple3_of_array
+  in
+
+  let slope =
+    Foreign_field.Element.Standard.of_limbs (slope0, slope1, slope2)
+  in
+
+  (* C2: Constrain that
+   *
+   *     slope * (right_x - left_x) = right_y - left_y
+   *)
+  let slope_product =
+    Foreign_field.mul
+      (module Circuit)
+      external_checks slope delta_x foreign_field_modulus
+  in
+
+  (* Sanity check *)
+  as_prover (fun () ->
+      assert (
+        Foreign_field.Element.Standard.equal_as_prover
+          (module Circuit)
+          slope_product delta_x ) ) ;
+
+  let product0, product1, product2 =
+    Foreign_field.Element.Standard.to_limbs slope_product
+  in
+  let delta_y0, delta_y1, delta_y2 =
+    Foreign_field.Element.Standard.to_limbs delta_y
+  in
+  Field.Assert.equal product0 delta_y0 ;
+  Field.Assert.equal product1 delta_y1 ;
+  Field.Assert.equal product2 delta_y2 ;
+
+  (* C3: Constrain computation of slope squared *)
+  let slope_squared =
+    Foreign_field.mul
+      (module Circuit)
+      external_checks slope slope foreign_field_modulus
+  in
+
+  (* C4: Constrain result x-coordinate computation
+   *
+   *    x = slope^2 - right_x - left_x
+   *)
+  let x_sum =
+    Foreign_field.add (module Circuit) right_x left_x foreign_field_modulus
+  in
+  let result_x =
+    Foreign_field.sub (module Circuit) slope_squared x_sum foreign_field_modulus
+  in
+
+  (* C5: Constrain result y-coordinate computation
+   *
+   *    y = slope * (left_x - result_x) - left_y
+   *)
+  let x_sub =
+    Foreign_field.sub (module Circuit) left_x result_x foreign_field_modulus
+  in
+  let left_mul =
+    Foreign_field.mul
+      (module Circuit)
+      external_checks slope x_sub foreign_field_modulus
+  in
+  let result_y =
+    Foreign_field.sub (module Circuit) left_mul left_y foreign_field_modulus
+  in
+
+  Affine.of_coordinates (result_x, result_y)
+
 (*********)
 (* Tests *)
 (*********)
