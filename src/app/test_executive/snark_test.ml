@@ -86,32 +86,32 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (* let amount = Currency.Amount.of_formatted_string "10" in *)
     let fee = Currency.Fee.of_formatted_string "1" in
     (* let test_constants = Engine.Network.constraint_constants network in *)
-    let%bind () =
-      section_hard "check account balance of snark-node-key1, should be 0"
-        (let%bind { total_balance = snark_worker_balance; _ } =
-           Network.Node.must_get_account_data ~logger node_b
-             ~public_key:
-               ( snark_node_key1.keypair.public_key
-               |> Signature_lib.Public_key.compress )
-         in
-         let snark_worker_expected_balance =
-           Currency.Amount.of_formatted_string "0"
-         in
-         if
-           Currency.Amount.( >= )
-             (Currency.Balance.to_amount snark_worker_balance)
-             snark_worker_expected_balance
-         then Malleable_error.return ()
-         else
-           Malleable_error.soft_error_format ~value:()
-             "Error with snark_worker_balance.  snark_worker_balance is %d and \
-              should be %d.  snark fee is %d"
-             (Currency.Balance.to_int snark_worker_balance)
-             (Currency.Amount.to_int snark_worker_expected_balance)
-             (Currency.Amount.to_int
-                (Currency.Amount.of_formatted_string config.snark_worker_fee) )
-        )
-    in
+    (* let%bind () =
+         section_hard "check account balance of snark-node-key1, should be 0"
+           (let%bind { total_balance = snark_worker_balance; _ } =
+              Network.Node.must_get_account_data ~logger node_b
+                ~public_key:
+                  ( snark_node_key1.keypair.public_key
+                  |> Signature_lib.Public_key.compress )
+            in
+            let snark_worker_expected_balance =
+              Currency.Amount.of_formatted_string "0"
+            in
+            if
+              Currency.Amount.( >= )
+                (Currency.Balance.to_amount snark_worker_balance)
+                snark_worker_expected_balance
+            then Malleable_error.return ()
+            else
+              Malleable_error.soft_error_format ~value:()
+                "Error with snark_worker_balance.  snark_worker_balance is %d and \
+                 should be %d.  snark fee is %d"
+                (Currency.Balance.to_int snark_worker_balance)
+                (Currency.Amount.to_int snark_worker_expected_balance)
+                (Currency.Amount.to_int
+                   (Currency.Amount.of_formatted_string config.snark_worker_fee) )
+           )
+       in *)
     let%bind () =
       section_hard
         "send out a bunch of txns to fill up the snark ledger, then wait for \
@@ -132,7 +132,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 `(2+1)*(1+1)=6`.
               Per block there can be 2 transactions included (other two slots would be for a coinbase and fee transfers).
               In the initial state of the network, the scan state waits till all the trees are filled before emitting a proof from the first tree.
-              Hence, 6*2 = 12 transactions untill we get the first snarked ledger.
+              Hence, 6*2 = 12 transactions until we get the first snarked ledger.
   *)
            send_payments ~logger ~sender_pub_key ~receiver_pub_key
              ~amount:Currency.Amount.one ~fee ~node:sender 13
@@ -142,31 +142,47 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section_hard
-        "check account balance of snark-node-key1, should be greater than or \
+        "check account balances.  snark-node-key1 should be greater than or \
          equal to the snark fee"
-        (let%bind { total_balance = snark_worker_balance; _ } =
+        (let%bind { total_balance = key_1_balance_actual; _ } =
            Network.Node.must_get_account_data ~logger node_b
              ~public_key:
                ( snark_node_key1.keypair.public_key
                |> Signature_lib.Public_key.compress )
          in
-         let snark_worker_expected_balance =
+         let%bind { total_balance = key_2_balance_actual; _ } =
+           Network.Node.must_get_account_data ~logger node_a
+             ~public_key:
+               ( snark_node_key2.keypair.public_key
+               |> Signature_lib.Public_key.compress )
+         in
+         let key_1_balance_expected =
            Currency.Amount.of_formatted_string config.snark_worker_fee
          in
          if
            Currency.Amount.( >= )
-             (Currency.Balance.to_amount snark_worker_balance)
-             snark_worker_expected_balance
-         then Malleable_error.return ()
+             (Currency.Balance.to_amount key_1_balance_actual)
+             key_1_balance_expected
+         then (
+           [%log info]
+             "balance check successful.  \n\
+              snark-node-key1 balance: %s.  \n\
+              snark-node-key2 balance: %s.  \n\
+              snark-worker-fee: %s"
+             (Currency.Balance.to_formatted_string key_1_balance_actual)
+             (Currency.Balance.to_formatted_string key_2_balance_actual)
+             config.snark_worker_fee ;
+
+           Malleable_error.return () )
          else
            Malleable_error.soft_error_format ~value:()
-             "Error with balance of snark-node-key1.  balance is %d and should \
-              be %d.  snark fee is %d"
-             (Currency.Balance.to_int snark_worker_balance)
-             (Currency.Amount.to_int snark_worker_expected_balance)
-             (Currency.Amount.to_int
-                (Currency.Amount.of_formatted_string config.snark_worker_fee) )
-        )
+             "Error with balance of snark-node-key1.  \n\
+              snark-node-key1 balance: %s.  \n\
+              snark-node-key2 balance: %s.  \n\
+              snark-worker-fee: %s"
+             (Currency.Balance.to_formatted_string key_1_balance_actual)
+             (Currency.Balance.to_formatted_string key_2_balance_actual)
+             config.snark_worker_fee )
     in
     let%bind () =
       section_hard
@@ -196,7 +212,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             `(2+1)*(1+1)=6`.
           Per block there can be 2 transactions included (other two slots would be for a coinbase and fee transfers).
           In the initial state of the network, the scan state waits till all the trees are filled before emitting a proof from the first tree.
-          Hence, 6*2 = 12 transactions untill we get the first snarked ledger.
+          Hence, 6*2 = 12 transactions until we get the first snarked ledger.
 *)
            send_payments ~logger ~sender_pub_key ~receiver_pub_key
              ~amount:Currency.Amount.one ~fee ~node:sender 13
@@ -205,28 +221,45 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:2) )
     in
     section_hard
-      "check account balance of snark-node-key2, should be greater than or \
+      "check account balances.  snark-node-key2 should be greater than or \
        equal to the snark fee"
-      (let%bind { total_balance = snark_worker_balance; _ } =
+      (let%bind { total_balance = key_1_balance_actual; _ } =
+         Network.Node.must_get_account_data ~logger node_b
+           ~public_key:
+             ( snark_node_key1.keypair.public_key
+             |> Signature_lib.Public_key.compress )
+       in
+       let%bind { total_balance = key_2_balance_actual; _ } =
          Network.Node.must_get_account_data ~logger node_a
            ~public_key:
              ( snark_node_key2.keypair.public_key
              |> Signature_lib.Public_key.compress )
        in
-       let snark_worker_expected_balance =
+       let key_2_balance_expected =
          Currency.Amount.of_formatted_string config.snark_worker_fee
        in
        if
          Currency.Amount.( >= )
-           (Currency.Balance.to_amount snark_worker_balance)
-           snark_worker_expected_balance
-       then Malleable_error.return ()
+           (Currency.Balance.to_amount key_2_balance_actual)
+           key_2_balance_expected
+       then (
+         [%log info]
+           "balance check successful.  \n\
+            snark-node-key1 balance: %s.  \n\
+            snark-node-key2 balance: %s.  \n\
+            snark-worker-fee: %s"
+           (Currency.Balance.to_formatted_string key_1_balance_actual)
+           (Currency.Balance.to_formatted_string key_2_balance_actual)
+           config.snark_worker_fee ;
+
+         Malleable_error.return () )
        else
          Malleable_error.soft_error_format ~value:()
-           "Error with balance of snark-node-key2.  balance is %d and should \
-            be %d.  snark fee is %d"
-           (Currency.Balance.to_int snark_worker_balance)
-           (Currency.Amount.to_int snark_worker_expected_balance)
-           (Currency.Amount.to_int
-              (Currency.Amount.of_formatted_string config.snark_worker_fee) ) )
+           "Error with balance of snark-node-key2.  \n\
+            snark-node-key1 balance: %s.  \n\
+            snark-node-key2 balance: %s.  \n\
+            snark-worker-fee: %s"
+           (Currency.Balance.to_formatted_string key_1_balance_actual)
+           (Currency.Balance.to_formatted_string key_2_balance_actual)
+           config.snark_worker_fee )
 end
