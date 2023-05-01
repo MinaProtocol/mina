@@ -24,9 +24,6 @@ let tuple15_of_array array =
 (* 2^2L *)
 let two_to_2limb = Bignum_bigint.(pow Common.two_to_limb (of_int 2))
 
-(* 2^3L *)
-let two_to_3limb = Bignum_bigint.(pow Common.two_to_limb (of_int 3))
-
 let two_to_limb_field (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f) =
   Common.(bignum_bigint_to_field (module Circuit) two_to_limb)
@@ -36,7 +33,7 @@ let two_to_2limb_field (type f)
   Common.(bignum_bigint_to_field (module Circuit) two_to_2limb)
 
 (* Binary modulus *)
-let binary_modulus = two_to_3limb
+let binary_modulus = Common.two_to_3limb
 
 (* Maximum foreign field modulus for multiplication m = sqrt(2^t * n), see RFC for more details
  *   For simplicity and efficiency we use the approximation m = floor(sqrt(2^t * n))
@@ -161,6 +158,13 @@ module type Element_intf = sig
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> Bignum_bigint.t
+
+  (* Compare if two foreign field elements are equal *)
+  val equal_as_prover :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> 'field t
+    -> bool
 end
 
 (* Foreign field element structures *)
@@ -226,6 +230,19 @@ end = struct
       let l0, l1, l2 = to_bignum_bigint_limbs_as_prover (module Circuit) x in
       Bignum_bigint.(l0 + (Common.two_to_limb * l1) + (two_to_2limb * l2))
 
+    let equal_as_prover (type field)
+        (module Circuit : Snark_intf.Run with type field = field)
+        (left : field t) (right : field t) : bool =
+      let open Circuit in
+      let left0, left1, left2 =
+        to_field_limbs_as_prover (module Circuit) left
+      in
+      let right0, right1, right2 =
+        to_field_limbs_as_prover (module Circuit) right
+      in
+      Field.Constant.(
+        equal left0 right0 && equal left1 right1 && equal left2 right2)
+
     let fits_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         (modulus : field standard_limbs) : bool =
@@ -279,6 +296,14 @@ end = struct
         =
       let l01, l2 = to_bignum_bigint_limbs_as_prover (module Circuit) x in
       Bignum_bigint.(l01 + (two_to_2limb * l2))
+
+    let equal_as_prover (type field)
+        (module Circuit : Snark_intf.Run with type field = field)
+        (left : field t) (right : field t) : bool =
+      let open Circuit in
+      let left01, left2 = to_field_limbs_as_prover (module Circuit) left in
+      let right01, right2 = to_field_limbs_as_prover (module Circuit) right in
+      Field.Constant.(equal left01 right01 && equal left2 right2)
   end
 end
 
@@ -1140,14 +1165,6 @@ let%test_unit "foreign_field arithmetics gadgets" =
       try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
     in
 
-    let assert_eq ((a, b, c) : 'field standard_limbs)
-        ((x, y, z) : 'field standard_limbs) =
-      let open Runner.Impl.Field in
-      Assert.equal (constant a) (constant x) ;
-      Assert.equal (constant b) (constant y) ;
-      Assert.equal (constant c) (constant z)
-    in
-
     (* Helper to test foreign_field_add gadget
        *   Inputs:
        *     - left_input
@@ -1205,16 +1222,14 @@ let%test_unit "foreign_field arithmetics gadgets" =
 
             as_prover (fun () ->
                 let expected =
-                  bignum_bigint_to_field_standard_limbs
+                  Element.Standard.of_bignum_bigint
                     (module Runner.Impl)
                     expected
                 in
-                let sum =
-                  Element.Standard.to_field_limbs_as_prover
+                assert (
+                  Element.Standard.equal_as_prover
                     (module Runner.Impl)
-                    sum
-                in
-                assert_eq sum expected ) ;
+                    expected sum ) ) ;
             () )
       in
       cs
@@ -1273,16 +1288,14 @@ let%test_unit "foreign_field arithmetics gadgets" =
             (* Check sum matches expected result *)
             as_prover (fun () ->
                 let expected =
-                  bignum_bigint_to_field_standard_limbs
+                  Element.Standard.of_bignum_bigint
                     (module Runner.Impl)
                     chain_result.(0)
                 in
-                let sum =
-                  Element.Standard.to_field_limbs_as_prover
+                assert (
+                  Element.Standard.equal_as_prover
                     (module Runner.Impl)
-                    sum
-                in
-                assert_eq sum expected ) ;
+                    expected sum ) ) ;
             () )
       in
       cs
@@ -1334,16 +1347,14 @@ let%test_unit "foreign_field arithmetics gadgets" =
             (* Check product matches expected result *)
             as_prover (fun () ->
                 let expected =
-                  bignum_bigint_to_field_standard_limbs
+                  Element.Standard.of_bignum_bigint
                     (module Runner.Impl)
                     expected
                 in
-                let product =
-                  Element.Standard.to_field_limbs_as_prover
+                assert (
+                  Element.Standard.equal_as_prover
                     (module Runner.Impl)
-                    product
-                in
-                assert_eq product expected ) ;
+                    expected product ) ) ;
             () )
       in
 
@@ -1403,17 +1414,14 @@ let%test_unit "foreign_field arithmetics gadgets" =
             (* Sanity check product matches expected result *)
             as_prover (fun () ->
                 let expected =
-                  bignum_bigint_to_field_standard_limbs
+                  Element.Standard.of_bignum_bigint
                     (module Runner.Impl)
                     expected
                 in
-                let product =
-                  Element.Standard.to_field_limbs_as_prover
+                assert (
+                  Element.Standard.equal_as_prover
                     (module Runner.Impl)
-                    product
-                in
-
-                assert_eq product expected ) ;
+                    expected product ) ) ;
 
             (* 2) Add result bound addition gate. This adds multi-range-checks for the
                   computed bound to the external_checks.multi-ranges, which are then
@@ -1551,38 +1559,32 @@ let%test_unit "foreign_field arithmetics gadgets" =
             (* Check product matches expected result *)
             as_prover (fun () ->
                 let expected_mul =
-                  bignum_bigint_to_field_standard_limbs
+                  Element.Standard.of_bignum_bigint
                     (module Runner.Impl)
                     expected_mul
                 in
                 let expected_add =
-                  bignum_bigint_to_field_standard_limbs
+                  Element.Standard.of_bignum_bigint
                     (module Runner.Impl)
                     expected_add
                 in
                 let expected_sub =
-                  bignum_bigint_to_field_standard_limbs
+                  Element.Standard.of_bignum_bigint
                     (module Runner.Impl)
                     expected_sub
                 in
-                let product =
-                  Element.Standard.to_field_limbs_as_prover
+                assert (
+                  Element.Standard.equal_as_prover
                     (module Runner.Impl)
-                    product
-                in
-                let addition =
-                  Element.Standard.to_field_limbs_as_prover
+                    expected_mul product ) ;
+                assert (
+                  Element.Standard.equal_as_prover
                     (module Runner.Impl)
-                    addition
-                in
-                let subtraction =
-                  Element.Standard.to_field_limbs_as_prover
+                    expected_add addition ) ;
+                assert (
+                  Element.Standard.equal_as_prover
                     (module Runner.Impl)
-                    subtraction
-                in
-                assert_eq product expected_mul ;
-                assert_eq addition expected_add ;
-                assert_eq subtraction expected_sub ) )
+                    expected_sub subtraction ) ) )
       in
       cs
     in
@@ -1800,3 +1802,63 @@ let%test_unit "foreign_field arithmetics gadgets" =
     in
     () ) ;
   ()
+
+let%test_unit "foreign_field equal_as_prover" =
+  if tests_enabled then
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+    (* Check equal_as_prover *)
+    let _cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof (fun () ->
+          let open Runner.Impl in
+          let x =
+            Element.Standard.of_bignum_bigint (module Runner.Impl)
+            @@ Common.bignum_bigint_of_hex
+                 "5925fa400436f458cb9e994dcd315ded43e9b60eb68e2ae7b5cf1d07b48ca1c"
+          in
+          let y =
+            Element.Standard.of_bignum_bigint (module Runner.Impl)
+            @@ Common.bignum_bigint_of_hex
+                 "69bc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15"
+          in
+          let z =
+            Element.Standard.of_bignum_bigint (module Runner.Impl)
+            @@ Common.bignum_bigint_of_hex
+                 "69bc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15"
+          in
+          as_prover (fun () ->
+              assert (
+                not (Element.Standard.equal_as_prover (module Runner.Impl) x y) ) ;
+              assert (Element.Standard.equal_as_prover (module Runner.Impl) y z) ) ;
+
+          let x =
+            Element.Compact.of_bignum_bigint (module Runner.Impl)
+            @@ Common.bignum_bigint_of_hex
+                 "5925fa400436f458cb9e994dcd315ded43e9b60eb68e2ae7b5cf1d07b48ca1c"
+          in
+          let y =
+            Element.Compact.of_bignum_bigint (module Runner.Impl)
+            @@ Common.bignum_bigint_of_hex
+                 "69bc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15"
+          in
+          let z =
+            Element.Compact.of_bignum_bigint (module Runner.Impl)
+            @@ Common.bignum_bigint_of_hex
+                 "69bc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15"
+          in
+          as_prover (fun () ->
+              assert (
+                not (Element.Compact.equal_as_prover (module Runner.Impl) x y) ) ;
+              assert (Element.Compact.equal_as_prover (module Runner.Impl) y z) ) ;
+
+          (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
+          let fake =
+            exists Field.typ ~compute:(fun () -> Field.Constant.zero)
+          in
+          Boolean.Assert.is_true (Field.equal fake Field.zero) ;
+          () )
+    in
+    ()

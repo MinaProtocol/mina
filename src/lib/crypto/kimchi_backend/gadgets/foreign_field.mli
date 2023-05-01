@@ -59,6 +59,13 @@ module type Element_intf = sig
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> Bignum_bigint.t
+
+  (** Compare if two foreign field elements are equal *)
+  val equal_as_prover :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> 'field t
+    -> bool
 end
 
 module Element : sig

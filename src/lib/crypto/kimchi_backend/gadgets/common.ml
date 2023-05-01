@@ -21,6 +21,9 @@ let limb_bits = 88
 (* Foreign field element limb size 2^L where L=88 *)
 let two_to_limb = Bignum_bigint.(pow (of_int 2) (of_int limb_bits))
 
+(* 2^3L *)
+let two_to_3limb = Bignum_bigint.(pow two_to_limb (of_int 3))
+
 (* Length of bigint in bits *)
 let bignum_bigint_bit_length (bigint : Bignum_bigint.t) : int =
   Z.log2up (Bignum_bigint.to_zarith_bigint bigint)
