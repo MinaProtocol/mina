@@ -1,3 +1,5 @@
+# container build branch: fix/track3-genesis-ledger
+
 terraform {
   required_version = ">= 0.14.0"
   backend "s3" {
@@ -60,8 +62,8 @@ variable "plain_node_count" {
 
 locals {
   testnet_name       = "itn3-testnet"
-  mina_image         = "minaprotocol/mina-daemon:1.3.2beta2-release-2.0.0-05c2f73-focal-berkeley" #"minaprotocol/mina-daemon:1.3.2beta2-release-2.0.0-6f9d956-focal-berkeley"
-  mina_archive_image = "minaprotocol/mina-archive:1.3.2beta2-release-2.0.0-05c2f73-focal"         #"minaprotocol/mina-archive:1.3.2beta2-release-2.0.0-6f9d956-focal"
+  mina_image         = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup2-fix-track3-genesis-ledger-9a9bacb-focal-berkeley" #"minaprotocol/mina-daemon:1.3.2beta2-release-2.0.0-6f9d956-focal-berkeley"
+  mina_archive_image = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup2-fix-track3-genesis-ledger-9a9bacb-focal"         #"minaprotocol/mina-archive:1.3.2beta2-release-2.0.0-6f9d956-focal"
   seed_region        = "us-central1"
   seed_zone          = "us-central1-b"
 
@@ -96,7 +98,7 @@ module "itn3-testnet" {
 
   archive_node_count            = 3
   mina_archive_schema           = "create_schema.sql"
-  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/05c2f73d0f6e4f1341286843814ce02dcb3919e0/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/05c2f73d0f6e4f1341286843814ce02dcb3919e0/src/app/archive/zkapp_tables.sql"]
+  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/9a9bacb6684f704bc7717e35bd6b446c73dc13ea/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/9a9bacb6684f704bc7717e35bd6b446c73dc13ea/src/app/archive/zkapp_tables.sql"]
 
   archive_configs = [
     {
