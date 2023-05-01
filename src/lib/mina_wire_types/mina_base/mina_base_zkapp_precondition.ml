@@ -37,7 +37,6 @@ module Protocol_state = struct
         { snarked_ledger_hash : 'snarked_ledger_hash
         ; blockchain_length : 'length
         ; min_window_density : 'length
-        ; last_vrf_output : 'vrf_output
         ; total_currency : 'amount
         ; global_slot_since_genesis : 'global_slot
         ; staking_epoch_data : 'epoch_data
