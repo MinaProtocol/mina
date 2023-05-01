@@ -34,6 +34,7 @@ let rec fold_over_files ~path ~process_path ~init ~f =
           return acc )
 
 let main dry_run check path =
+  let is_dune_file file = String.equal (Filename.basename file) "dune" in
   let%bind _all =
     fold_over_files ~path ~init:()
       ~process_path:(fun kind path ->
@@ -47,14 +48,14 @@ let main dry_run check path =
                (List.exists trustlist ~f:(fun s ->
                     String.is_suffix ~suffix:s path )))
             && ( String.is_suffix ~suffix:".ml" path
-               || String.is_suffix ~suffix:".mli" path ) )
+               || String.is_suffix ~suffix:".mli" path || is_dune_file path))
       ~f:(fun () file ->
         let dump prog args =
           printf !"%s %{sexp: string List.t}\n" prog args ;
           return ()
         in
         if check then
-          let prog, args = ("ocamlformat", ["--doc-comments=before"; file]) in
+          let prog, args = ("ocamlformat", [ "--doc-comments=before"; file ]) in
           let%bind formatted = Process.run_exn ~prog ~args () in
           let%bind raw = Reader.file_contents file in
           if not (String.equal formatted raw) then (
@@ -63,7 +64,7 @@ let main dry_run check path =
           else return ()
         else
           let prog, args =
-            ("ocamlformat", ["--doc-comments=before"; "-i"; file])
+            ("ocamlformat", [ "--doc-comments=before"; "-i"; file ])
           in
           if dry_run then dump prog args
           else
@@ -76,16 +77,16 @@ let _cli =
   let open Command.Let_syntax in
   Command.async ~summary:"Format all ml and mli files"
     (let%map_open path =
-       flag "--path" ~aliases:["path"] ~doc:"Path to traverse"
+       flag "--path" ~aliases:[ "path" ] ~doc:"Path to traverse"
          (required string)
-     and dry_run = flag "--dry-run" ~aliases:["dry-run"] no_arg ~doc:"Dry run"
+     and dry_run = flag "--dry-run" ~aliases:[ "dry-run" ] no_arg ~doc:"Dry run"
      and check =
-       flag "--check" ~aliases:["check"] no_arg
+       flag "--check" ~aliases:[ "check" ] no_arg
          ~doc:
            "Return with an error code if there exists an ml file that was \
             formatted improperly"
      in
-     fun () -> main dry_run check path)
+     fun () -> main dry_run check path )
   |> Command.run
 
 let () = never_returns (Scheduler.go ())
