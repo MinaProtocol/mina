@@ -1080,12 +1080,13 @@ struct
 
   let sponge_after_index index =
     let sponge = Sponge.create sponge_params in
-    Array.iter
-      (Types.index_to_field_elements
-         ~g:(fun (z : Inputs.Inner_curve.t) ->
-           List.to_array (Inner_curve.to_field_elements z) )
-         index )
-      ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
+    let g (z : Inputs.Inner_curve.t) =
+      List.to_array (Inner_curve.to_field_elements z)
+    in
+    let g_opt = Opt.lift ~none:[||] g in
+
+    Array.iter (Types.index_to_field_elements ~g ~g_opt index) ~f:(fun x ->
+        Sponge.absorb sponge (`Field x) ) ;
     sponge
 
   let hash_messages_for_next_step_proof (type s) ~index

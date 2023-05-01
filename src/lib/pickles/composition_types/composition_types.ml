@@ -631,7 +631,9 @@ module Wrap = struct
         ; old_bulletproof_challenges
         } ~app_state:app_state_to_field_elements ~comm ~(g : g -> f list) =
       Array.concat
-        [ index_to_field_elements ~g:comm dlog_plonk_index
+        [ index_to_field_elements ~g:comm
+            ~g_opt:(function None -> [||] | Some v -> comm v)
+            dlog_plonk_index
         ; app_state_to_field_elements app_state
         ; Vector.map2 challenge_polynomial_commitments
             old_bulletproof_challenges ~f:(fun comm chals ->

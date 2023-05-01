@@ -666,7 +666,7 @@ module Wrap : sig
 
     val to_field_elements :
          ( 'a
-         , 'a option
+         , 'a Option.t
          , 'b
          , ('g, 'c) Vector.t
          , (('f, 'd) Vector.t, 'c) Vector.t )
@@ -1705,6 +1705,9 @@ module Challenges_vector : sig
 end
 
 (** Alias for
- ** {!val:Pickles_base.Side_loaded_verification_key.index_to_field_elements} *)
+    {!val:Pickles_base.Side_loaded_verification_key.index_to_field_elements} *)
 val index_to_field_elements :
-  ('a, 'c) Plonk_verification_key_evals.t -> g:('a -> 'b array) -> 'b array
+     ('a, 'c) Plonk_verification_key_evals.t
+  -> g:('a -> 'b array)
+  -> g_opt:('c -> 'b array)
+  -> 'b array
