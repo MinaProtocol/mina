@@ -7,15 +7,18 @@ use crate::srs::fp::CamlFpSrs;
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-use kimchi::circuits::constraints::FeatureFlags;
-use kimchi::circuits::lookup::lookups::{LookupFeatures, LookupPatterns};
-use kimchi::circuits::polynomials::permutation::Shifts;
-use kimchi::circuits::polynomials::permutation::{zk_polynomial, zk_w3};
-use kimchi::circuits::wires::{COLUMNS, PERMUTS};
 use kimchi::{
+    circuits::{
+        constraints::FeatureFlags,
+        lookup::lookups::{LookupFeatures, LookupPatterns},
+        polynomials::permutation::Shifts,
+        polynomials::permutation::{zk_polynomial, zk_w3},
+        wires::{COLUMNS, PERMUTS},
+    },
     linearization::expr_linearization,
     verifier_index::{LookupVerifierIndex, VerifierIndex},
 };
+
 use mina_curves::pasta::{Fp, Pallas, Vesta};
 use poly_commitment::commitment::caml::CamlPolyComm;
 use poly_commitment::{commitment::PolyComm, srs::SRS};
@@ -323,6 +326,7 @@ mod tests {
         CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerifierIndex,
     };
     use crate::srs::fp::CamlFpSrs;
+    use kimchi::circuits::expr::Linearization;
 
     fn comm() -> CamlPolyComm<CamlGVesta> {
         let g: CamlGVesta = Vesta::prime_subgroup_generator().into();
@@ -390,6 +394,40 @@ mod tests {
         let caml_vi = CamlPastaFpPlonkVerifierIndex::from(vi.clone());
         let vi2 = VerifierIndex::<Vesta>::from(caml_vi);
 
+        // Use pattern-matching to signal that the type has changed through fields warnings
+        let VerifierIndex {
+            domain,
+            max_poly_size,
+            srs,
+            public,
+            prev_challenges,
+            xor_comm,
+            sigma_comm,
+            coefficients_comm,
+            generic_comm,
+            psm_comm,
+            complete_add_comm,
+            mul_comm,
+            emul_comm,
+            endomul_scalar_comm,
+            range_check0_comm,
+            range_check1_comm,
+            foreign_field_mul_comm,
+            foreign_field_add_comm,
+            rot_comm,
+            shift,
+            zkpm,
+            w,
+            endo,
+            powers_of_alpha,
+            lookup_index,
+            linearization:
+                Linearization {
+                    constant_term,
+                    index_terms,
+                },
+        } = vi;
+
         //////////////////////////////////////////////////////////////////////////////
         // The full equality assertion is divided up into assertions on fields.     //
         // This helps in localizing errors when they fail.                          //
@@ -401,44 +439,38 @@ mod tests {
         // last equality assertion below                                            //
         //////////////////////////////////////////////////////////////////////////////
 
-        assert_eq!(vi.domain, vi2.domain);
-        assert_eq!(vi.max_poly_size, vi2.max_poly_size);
-        assert_eq!(debug_string(vi.srs), debug_string(vi2.srs));
-        assert_eq!(vi.public, vi2.public);
-        assert_eq!(vi.prev_challenges, vi.prev_challenges);
+        assert_eq!(domain, vi2.domain);
+        assert_eq!(max_poly_size, vi2.max_poly_size);
+        assert_eq!(debug_string(srs), debug_string(vi2.srs));
+        assert_eq!(public, vi2.public);
+        assert_eq!(prev_challenges, vi2.prev_challenges);
 
-        assert_eq!(vi.xor_comm, vi2.xor_comm);
-        assert_eq!(vi.sigma_comm, vi2.sigma_comm);
-        assert_eq!(vi.coefficients_comm, vi2.coefficients_comm);
-        assert_eq!(vi.generic_comm, vi2.generic_comm);
-        assert_eq!(vi.psm_comm, vi2.psm_comm);
-        assert_eq!(vi.complete_add_comm, vi2.complete_add_comm);
-        assert_eq!(vi.mul_comm, vi2.mul_comm);
-        assert_eq!(vi.emul_comm, vi2.emul_comm);
-        assert_eq!(vi.endomul_scalar_comm, vi2.endomul_scalar_comm);
-        assert_eq!(vi.range_check0_comm, vi2.range_check0_comm);
-        assert_eq!(vi.range_check1_comm, vi2.range_check1_comm);
-        assert_eq!(vi.foreign_field_mul_comm, vi2.foreign_field_mul_comm);
-        assert_eq!(vi.foreign_field_add_comm, vi2.foreign_field_add_comm);
-        assert_eq!(vi.rot_comm, vi2.rot_comm);
-        assert_eq!(vi.shift, vi2.shift);
-        assert_eq!(vi.zkpm, vi2.zkpm);
-        assert_eq!(vi.w, vi2.w);
-        assert_eq!(vi.endo, vi2.endo);
-        assert_eq!(vi.powers_of_alpha, vi2.powers_of_alpha);
-        assert_eq!(
-            debug_string(vi.lookup_index),
-            debug_string(vi2.lookup_index)
-        );
+        assert_eq!(xor_comm, vi2.xor_comm);
+        assert_eq!(sigma_comm, vi2.sigma_comm);
+        assert_eq!(coefficients_comm, vi2.coefficients_comm);
+        assert_eq!(generic_comm, vi2.generic_comm);
+        assert_eq!(psm_comm, vi2.psm_comm);
+        assert_eq!(complete_add_comm, vi2.complete_add_comm);
+        assert_eq!(mul_comm, vi2.mul_comm);
+        assert_eq!(emul_comm, vi2.emul_comm);
+        assert_eq!(endomul_scalar_comm, vi2.endomul_scalar_comm);
+        assert_eq!(range_check0_comm, vi2.range_check0_comm);
+        assert_eq!(range_check1_comm, vi2.range_check1_comm);
+        assert_eq!(foreign_field_mul_comm, vi2.foreign_field_mul_comm);
+        assert_eq!(foreign_field_add_comm, vi2.foreign_field_add_comm);
+        assert_eq!(rot_comm, vi2.rot_comm);
+        assert_eq!(shift, vi2.shift);
+        assert_eq!(zkpm, vi2.zkpm);
+        assert_eq!(w, vi2.w);
+        assert_eq!(endo, vi2.endo);
+        assert_eq!(powers_of_alpha, vi2.powers_of_alpha);
+        assert_eq!(debug_string(lookup_index), debug_string(vi2.lookup_index));
 
-        assert_eq!(
-            vi.linearization.constant_term,
-            vi2.linearization.constant_term
-        );
+        assert_eq!(constant_term, vi2.linearization.constant_term);
 
         // Serialization back and forth seems to change the order in
         // vector. Sort it before applying equality comparison.
-        let mut it1 = vi.linearization.index_terms.to_vec();
+        let mut it1 = index_terms.to_vec();
         let mut it2 = vi2.linearization.index_terms.to_vec();
         assert_eq!(it1.sort(), it2.sort());
     }
