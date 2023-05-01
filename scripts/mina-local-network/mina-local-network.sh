@@ -12,7 +12,7 @@ trap "killall background" EXIT
 MINA_EXE=_build/default/src/app/cli/src/mina.exe
 ARCHIVE_EXE=_build/default/src/app/archive/archive.exe
 LOGPROC_EXE=_build/default/src/app/logproc/logproc.exe
-ZKAPP_EXE=_build/default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe 
+ZKAPP_EXE=_build/default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe
 
 export MINA_PRIVKEY_PASS='naughty blue worm'
 export MINA_LIBP2P_PASS="${MINA_PRIVKEY_PASS}"
@@ -97,6 +97,8 @@ help() {
   echo "                                         |   Default: ${LOG_LEVEL}"
   echo "-fll |--file-log-level <level>           | File output logging level"
   echo "                                         |   Default: ${FILE_LOG_LEVEL}"
+  echo "-it |--internal-tracing                  | Whether to enable internal tracing (presence of argument)"
+  echo "                                         |   Default: ${INTERNAL_TRACING:-false}"
   echo "-ph  |--pg-host <host>                   | PostgreSQL host"
   echo "                                         |   Default: ${PG_HOST}"
   echo "-pp  |--pg-port <#>                      | PostgreSQL port"
@@ -164,6 +166,7 @@ exec-daemon() {
     -log-json \
     -log-level ${LOG_LEVEL} \
     -file-log-level ${FILE_LOG_LEVEL} \
+    ${INTERNAL_TRACING:+-internal-tracing} \
     $@
 }
 
@@ -273,6 +276,7 @@ while [[ "$#" -gt 0 ]]; do
     FILE_LOG_LEVEL="${2}"
     shift
     ;;
+  -it | --internal-tracing) INTERNAL_TRACING=true ;;
   -ph | --pg-host)
     PG_HOST="${2}"
     shift
@@ -669,14 +673,14 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   KEY_FILE=${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0
   PUB_KEY=$(cat ${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0.pub)
   REST_SERVER="http://127.0.0.1:$((${FISH_START_PORT} + 1))/graphql"
-  
+
   echo "Waiting for Node (${REST_SERVER}) to be up to start sending value transfer transactions..."
   printf "\n"
 
   until ${MINA_EXE} client status -daemon-port ${FISH_START_PORT} &>/dev/null; do
     sleep 1
   done
-  
+
   SYNCED=0
 
   echo "Waiting for Node (${REST_SERVER})'s transition frontier to be up"

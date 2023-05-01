@@ -95,11 +95,20 @@ let setup_daemon logger =
          daemon.json config file"
       (optional string)
   and itn_keys =
-    flag "--itn-keys" ~aliases:[ "itn-keys" ] (optional string)
-      ~doc:
-        "PUBLICKEYS A comma-delimited list of Ed25519 public keys that are \
-         permitted to send signed requests to the incentivized testnet GraphQL \
-         server"
+    if Mina_compile_config.itn_features then
+      flag "--itn-keys" ~aliases:[ "itn-keys" ] (optional string)
+        ~doc:
+          "PUBLICKEYS A comma-delimited list of Ed25519 public keys that are \
+           permitted to send signed requests to the incentivized testnet \
+           GraphQL server"
+    else Command.Param.return None
+  and itn_max_logs =
+    if Mina_compile_config.itn_features then
+      flag "--itn-max-logs" ~aliases:[ "itn-max-logs" ] (optional int)
+        ~doc:
+          "NN Maximum number of logs to store to be made available via GraphQL \
+           for incentivized testnet"
+    else Command.Param.return None
   and demo_mode =
     flag "--demo-mode" ~aliases:[ "demo-mode" ] no_arg
       ~doc:
@@ -152,7 +161,12 @@ let setup_daemon logger =
   and client_port = Flag.Port.Daemon.client
   and rest_server_port = Flag.Port.Daemon.rest_server
   and limited_graphql_port = Flag.Port.Daemon.limited_graphql_server
-  and itn_graphql_port = Flag.Port.Daemon.itn_graphql_server
+  and itn_graphql_port =
+    if Mina_compile_config.itn_features then
+      flag "--itn-graphql-port" ~aliases:[ "itn-graphql-port" ]
+        ~doc:"PORT GraphQL-server for incentivized testnet interaction"
+        (optional int)
+    else Command.Param.return None
   and open_limited_graphql_port =
     flag "--open-limited-graphql-port"
       ~aliases:[ "open-limited-graphql-port" ]
@@ -211,8 +225,7 @@ let setup_daemon logger =
         (sprintf
            "FEE Amount a worker wants to get compensated for generating a \
             snark proof (default: %d)"
-           (Currency.Fee.to_nanomina_int
-              Mina_compile_config.default_snark_worker_fee ) )
+           (Currency.Fee.to_nanomina_int Currency.Fee.default_snark_worker_fee) )
       (optional txn_fee)
   and work_reassignment_wait =
     flag "--work-reassignment-wait"
@@ -225,6 +238,11 @@ let setup_daemon logger =
   and enable_tracing =
     flag "--tracing" ~aliases:[ "tracing" ] no_arg
       ~doc:"Trace into $config-directory/trace/$pid.trace"
+  and enable_internal_tracing =
+    flag "--internal-tracing" ~aliases:[ "internal-tracing" ] no_arg
+      ~doc:
+        "Enables internal tracing into \
+         $config-directory/internal-tracing/internal-trace.jsonl"
   and insecure_rest_server =
     flag "--insecure-rest-server" ~aliases:[ "insecure-rest-server" ] no_arg
       ~doc:
@@ -517,6 +535,13 @@ let setup_daemon logger =
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-oversized-logs.log"
                ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate ) ;
+        (* Consumer for `[%log internal]` logging used for internal tracing *)
+        Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
+          ~processor:Internal_tracing.For_logger.processor
+          ~transport:
+            (Internal_tracing.For_logger.json_lines_rotate_transport
+               ~directory:(conf_dir ^ "/internal-tracing")
+               () ) ;
         let version_metadata =
           [ ("commit", `String Mina_version.commit_id)
           ; ("branch", `String Mina_version.branch)
@@ -787,12 +812,6 @@ let setup_daemon logger =
             in
             maybe_from_config YJ.Util.to_int_option name value
           in
-          let itn_graphql_port =
-            let ({ value; name } : int option Flag.Types.with_name) =
-              itn_graphql_port
-            in
-            maybe_from_config YJ.Util.to_int_option name value
-          in
           let client_port = get_port client_port in
           let snark_work_fee_flag =
             let json_to_currency_fee_option json =
@@ -800,8 +819,7 @@ let setup_daemon logger =
               |> Option.map ~f:Currency.Fee.of_nanomina_int_exn
             in
             or_from_config json_to_currency_fee_option "snark-worker-fee"
-              ~default:Mina_compile_config.default_snark_worker_fee
-              snark_work_fee
+              ~default:Currency.Fee.default_snark_worker_fee snark_work_fee
           in
           let node_status_url =
             maybe_from_config YJ.Util.to_string_option "node-status-url"
@@ -1144,6 +1162,11 @@ let setup_daemon logger =
               ~default:Cli_lib.Default.stop_time stop_time
           in
           if enable_tracing then Mina_tracing.start conf_dir |> don't_wait_for ;
+          let%bind () =
+            if enable_internal_tracing then
+              Internal_tracing.toggle ~logger `Enabled
+            else Deferred.unit
+          in
           let seed_peer_list_url =
             Option.value_map seed_peer_list_url ~f:Option.some
               ~default:
@@ -1289,6 +1312,11 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                   "Cannot provide both uptime submitter public key and uptime \
                    submitter keyfile"
           in
+          if Mina_compile_config.itn_features then
+            (* set queue bound directly in Itn_logger
+               adding bound to Mina_lib config introduces cycle
+            *)
+            Option.iter itn_max_logs ~f:Itn_logger.set_queue_bound ;
           let start_time = Time.now () in
           let%map mina =
             Mina_lib.create ~wallets
@@ -1600,7 +1628,7 @@ let internal_commands logger =
                      ~proof_level:Genesis_constants.Proof_level.compiled
                      ~constraint_constants:
                        Genesis_constants.Constraint_constants.compiled
-                     ~pids:(Pid.Table.create ()) ~conf_dir
+                     ~pids:(Pid.Table.create ()) ~conf_dir ()
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->
@@ -1698,7 +1726,7 @@ let internal_commands logger =
               ~proof_level:Genesis_constants.Proof_level.compiled
               ~constraint_constants:
                 Genesis_constants.Constraint_constants.compiled
-              ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir)
+              ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir) ()
           in
           let%bind result =
             match input with

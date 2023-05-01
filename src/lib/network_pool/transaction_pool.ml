@@ -1559,7 +1559,7 @@ let%test_module _ =
     let proof_level = precomputed_values.proof_level
 
     let minimum_fee =
-      Currency.Fee.to_nanomina_int Mina_compile_config.minimum_user_command_fee
+      Currency.Fee.to_nanomina_int Currency.Fee.minimum_user_command_fee
 
     let logger = Logger.create ()
 
@@ -1569,7 +1569,8 @@ let%test_module _ =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ()) )
+            ~pids:(Child_processes.Termination.create_pid_table ())
+            () )
 
     let `VK vk, `Prover prover =
       Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
