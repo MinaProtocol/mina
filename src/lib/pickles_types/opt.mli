@@ -51,6 +51,16 @@ val to_option : ('a, bool) t -> 'a option
 *)
 val of_option : 'a option -> ('a, 'bool) t
 
+(** [lift ?on_maybe ~none f] lifts the application of function [f] to a value
+    of type !{type:('a, 'bool) t} as follows:
+    - [Some v]: apply [f] to contained value [v]
+    - [None]: return the value specified by [none]
+    - [Maybe (b, v)]: defaults to the case [Some v] when [on_maybe] is
+      unspecified, otherwise apply [on_maybe b v]
+*)
+val lift :
+  ?on_maybe:('a -> 'b -> 'c) -> none:'c -> ('b -> 'c) -> ('b, 'a) t -> 'c
+
 module Flag : sig
   type t = Yes | No | Maybe [@@deriving sexp, compare, yojson, hash, equal]
 end
