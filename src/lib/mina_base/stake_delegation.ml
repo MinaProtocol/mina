@@ -5,14 +5,28 @@ open Signature_lib
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     [@@@with_all_version_tags]
 
-    type t = Mina_wire_types.Mina_base.Stake_delegation.V1.t =
+    type t = Mina_wire_types.Mina_base.Stake_delegation.V2.t =
       | Set_delegate of { new_delegate : Public_key.Compressed.Stable.V1.t }
     [@@deriving compare, equal, sexp, hash, yojson]
 
     let to_latest = Fn.id
+  end
+
+  module V1 = struct
+    [@@@with_all_version_tags]
+
+    type t = Mina_wire_types.Mina_base.Stake_delegation.V1.t =
+      | Set_delegate of
+          { delegator : Public_key.Compressed.Stable.V1.t
+          ; new_delegate : Public_key.Compressed.Stable.V1.t
+          }
+    [@@deriving compare, equal, sexp, hash, yojson]
+
+    let to_latest (Set_delegate { delegator = _; new_delegate }) =
+      V2.Set_delegate { new_delegate }
   end
 end]
 

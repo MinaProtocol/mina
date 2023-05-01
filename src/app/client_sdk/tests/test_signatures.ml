@@ -38,45 +38,41 @@ let make_common ~fee ~fee_payer_pk ~nonce ~valid_until memo =
   Signed_command_payload.Common.Poly.
     { fee; fee_payer_pk; nonce; valid_until; memo }
 
-let make_payment ~amount ~fee ~fee_payer_pk ~source_pk ~receiver_pk ~nonce
-    ~valid_until memo =
+let make_payment ~amount ~fee ~fee_payer_pk ~receiver_pk ~nonce ~valid_until
+    memo =
   let common = make_common ~fee ~fee_payer_pk ~nonce ~valid_until memo in
   let amount = Currency.Amount.of_nanomina_int_exn amount in
-  let body =
-    Signed_command_payload.Body.Payment { source_pk; receiver_pk; amount }
-  in
+  let body = Signed_command_payload.Body.Payment { receiver_pk; amount } in
   Signed_command_payload.Poly.{ common; body }
 
 let payments =
   let receiver_pk = receiver in
-  let source_pk = signer_pk in
   let fee_payer_pk = signer_pk in
-  [ make_payment ~receiver_pk ~source_pk ~fee_payer_pk ~amount:42 ~fee:3
-      ~nonce:200 ~valid_until:10000 "this is a memo"
-  ; make_payment ~receiver_pk ~source_pk ~fee_payer_pk ~amount:2048 ~fee:15
-      ~nonce:212 ~valid_until:305 "this is not a pipe"
-  ; make_payment ~receiver_pk ~source_pk ~fee_payer_pk ~amount:109 ~fee:2001
-      ~nonce:3050 ~valid_until:9000 "blessed be the geek"
+  [ make_payment ~receiver_pk ~fee_payer_pk ~amount:42 ~fee:3 ~nonce:200
+      ~valid_until:10000 "this is a memo"
+  ; make_payment ~receiver_pk ~fee_payer_pk ~amount:2048 ~fee:15 ~nonce:212
+      ~valid_until:305 "this is not a pipe"
+  ; make_payment ~receiver_pk ~fee_payer_pk ~amount:109 ~fee:2001 ~nonce:3050
+      ~valid_until:9000 "blessed be the geek"
   ]
 
-let make_stake_delegation ~delegator ~new_delegate ~fee ~fee_payer_pk ~nonce
-    ~valid_until memo =
+let make_stake_delegation ~new_delegate ~fee ~fee_payer_pk ~nonce ~valid_until
+    memo =
   let common = make_common ~fee ~fee_payer_pk ~nonce ~valid_until memo in
   let body =
     Signed_command_payload.Body.Stake_delegation
-      (Stake_delegation.Set_delegate { delegator; new_delegate })
+      (Stake_delegation.Set_delegate { new_delegate })
   in
   Signed_command_payload.Poly.{ common; body }
 
 let delegations =
-  let delegator = signer_pk in
   let fee_payer_pk = signer_pk in
-  [ make_stake_delegation ~fee_payer_pk ~delegator ~new_delegate ~fee:3
-      ~nonce:10 ~valid_until:4000 "more delegates, more fun"
-  ; make_stake_delegation ~fee_payer_pk ~delegator ~new_delegate ~fee:10
-      ~nonce:1000 ~valid_until:8192 "enough stake to kill a vampire"
-  ; make_stake_delegation ~fee_payer_pk ~delegator ~new_delegate ~fee:8
-      ~nonce:1010 ~valid_until:100000 "another memo"
+  [ make_stake_delegation ~fee_payer_pk ~new_delegate ~fee:3 ~nonce:10
+      ~valid_until:4000 "more delegates, more fun"
+  ; make_stake_delegation ~fee_payer_pk ~new_delegate ~fee:10 ~nonce:1000
+      ~valid_until:8192 "enough stake to kill a vampire"
+  ; make_stake_delegation ~fee_payer_pk ~new_delegate ~fee:8 ~nonce:1010
+      ~valid_until:100000 "another memo"
   ]
 
 let strings =

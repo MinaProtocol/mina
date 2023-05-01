@@ -8748,8 +8748,8 @@
                 "name": null,
                 "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
-              "isDeprecated": true,
-              "deprecationReason": "use fee payer field instead"
+              "isDeprecated": false,
+              "deprecationReason": null
             },
             {
               "name": "source",
@@ -8764,8 +8764,8 @@
                   "ofType": null
                 }
               },
-              "isDeprecated": false,
-              "deprecationReason": null
+              "isDeprecated": true,
+              "deprecationReason": "use fee payer field instead"
             },
             {
               "name": "receiver",
@@ -9132,8 +9132,8 @@
                 "name": null,
                 "ofType": { "kind": "SCALAR", "name": "Int", "ofType": null }
               },
-              "isDeprecated": true,
-              "deprecationReason": "use fee payer field instead"
+              "isDeprecated": false,
+              "deprecationReason": null
             },
             {
               "name": "source",
@@ -9148,8 +9148,8 @@
                   "ofType": null
                 }
               },
-              "isDeprecated": false,
-              "deprecationReason": null
+              "isDeprecated": true,
+              "deprecationReason": "use fee payer field instead"
             },
             {
               "name": "receiver",

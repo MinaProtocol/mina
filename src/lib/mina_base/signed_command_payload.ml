@@ -186,7 +186,7 @@ module Body = struct
     module V2 = struct
       type t = Mina_wire_types.Mina_base.Signed_command_payload.Body.V2.t =
         | Payment of Payment_payload.Stable.V2.t
-        | Stake_delegation of Stake_delegation.Stable.V1.t
+        | Stake_delegation of Stake_delegation.Stable.V2.t
       [@@deriving sexp, compare, equal, sexp, hash, yojson]
 
       let to_latest = Fn.id

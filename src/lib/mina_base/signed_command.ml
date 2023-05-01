@@ -106,7 +106,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 in
                 Payment payload'
             | Stake_delegation stake_delegation_payload ->
-                Stake_delegation stake_delegation_payload
+                Stake_delegation
+                  (Stake_delegation.Stable.V1.to_latest stake_delegation_payload)
           in
           { common; body }
         in

@@ -1719,13 +1719,13 @@ module Types = struct
           ~resolve:(fun _ cmd -> to_kind cmd.With_hash.data)
       ; field_no_status "nonce" ~typ:(non_null int) ~args:[]
           ~doc:"Sequence number of command for the fee-payer's account"
-          ~deprecated:(Deprecated (Some "use fee payer field instead"))
           ~resolve:(fun _ payment ->
             Signed_command_payload.nonce
             @@ Signed_command.payload payment.With_hash.data
             |> Account.Nonce.to_int )
       ; field_no_status "source" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account that the command is sent from"
+          ~deprecated:(Deprecated (Some "use fee payer field instead"))
           ~resolve:(fun { ctx = mina; _ } cmd ->
             AccountObj.get_best_ledger_account mina
               (Signed_command.fee_payer cmd.With_hash.data) )

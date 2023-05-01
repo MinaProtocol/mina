@@ -34,7 +34,7 @@ describe("Rosetta", () => {
     );
 
     expect(signedRosettaTnxMockJson.payment.from).toEqual(
-      signedGraphQLCommandJson.data.payload.body[1].source_pk
+      signedGraphQLCommandJson.data.payload.common.fee_payer_pk
     );
 
     expect(signedRosettaTnxMockJson.payment.amount).toEqual(
