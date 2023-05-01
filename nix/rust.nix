@@ -161,7 +161,7 @@ in
         "^lib(/snarkyjs(/src(/snarkyjs-bindings(/kimchi(/wasm(/.*)?)?)?)?)?)?$"
         "^lib(/crypto(/proof-systems(/.*)?)?)?$"
       ];
-      sourceRoot = "source//lib/snarkyjs/src/snarkyjs-bindings/kimchi/wasm";
+      sourceRoot = "source/lib/snarkyjs/src/snarkyjs-bindings/kimchi/wasm";
       nativeBuildInputs = [ final.wasm-pack wasm-bindgen-cli ];
       buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
       cargoLock.lockFile = lock;
