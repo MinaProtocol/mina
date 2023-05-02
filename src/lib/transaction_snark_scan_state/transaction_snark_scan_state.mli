@@ -94,6 +94,7 @@ val empty :
 
 val fill_work_and_enqueue_transactions :
      t
+  -> logger:Logger.t
   -> Transaction_with_witness.t list
   -> Transaction_snark_work.t list
   -> ( ( Ledger_proof.t
@@ -114,7 +115,7 @@ val latest_ledger_proof :
        list )
      option
 
-(** Apply transactions coorresponding to the last emitted proof based on the 
+(** Apply transactions coorresponding to the last emitted proof based on the
     two-pass system- first pass includes legacy transactions and zkapp payments
     and the second pass includes account updates. [ignore_incomplete] is to
     ignore the account updates that were not completed in a single scan state
@@ -170,11 +171,11 @@ val get_snarked_ledger_async :
   -> t
   -> unit Deferred.Or_error.t
 
-(** Apply all the staged transactions to snarked ledger based on the 
-    two-pass system to obtain the staged ledger- first pass includes legacy 
-    transactions and zkapp payments and the second pass includes account 
+(** Apply all the staged transactions to snarked ledger based on the
+    two-pass system to obtain the staged ledger- first pass includes legacy
+    transactions and zkapp payments and the second pass includes account
     updates.
-    Returns the target first pass ledger hash after all the transactions have 
+    Returns the target first pass ledger hash after all the transactions have
     been applied
     *)
 val get_staged_ledger_async :

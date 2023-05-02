@@ -1411,9 +1411,11 @@ let create ?wallets (config : Config.t) =
               (fun () ->
                 O1trace.thread "manage_prover_subprocess" (fun () ->
                     Prover.create ~logger:config.logger
+                      ~enable_internal_tracing:(Internal_tracing.is_enabled ())
+                      ~internal_trace_filename:"prover-internal-trace.jsonl"
                       ~proof_level:config.precomputed_values.proof_level
                       ~constraint_constants ~pids:config.pids
-                      ~conf_dir:config.conf_dir ) )
+                      ~conf_dir:config.conf_dir () ) )
             >>| Result.ok_exn
           in
           let%bind verifier =
@@ -1429,12 +1431,30 @@ let create ?wallets (config : Config.t) =
               (fun () ->
                 O1trace.thread "manage_verifier_subprocess" (fun () ->
                     Verifier.create ~logger:config.logger
+                      ~enable_internal_tracing:(Internal_tracing.is_enabled ())
+                      ~internal_trace_filename:"verifier-internal-trace.jsonl"
                       ~proof_level:config.precomputed_values.proof_level
                       ~constraint_constants:
                         config.precomputed_values.constraint_constants
-                      ~pids:config.pids ~conf_dir:(Some config.conf_dir) ) )
+                      ~pids:config.pids ~conf_dir:(Some config.conf_dir) () ) )
             >>| Result.ok_exn
           in
+          (* This setup is required for the dynamic enabling/disabling of internal
+             tracing to also work with the verifier and prover sub-processes. *)
+          Internal_tracing.register_toggle_callback (fun enabled ->
+              let%map result =
+                Verifier.toggle_internal_tracing verifier enabled
+              in
+              Or_error.iter_error result ~f:(fun error ->
+                  [%log' warn config.logger]
+                    "Failed to toggle verifier internal tracing: $error"
+                    ~metadata:[ ("error", `String (Error.to_string_hum error)) ] ) ) ;
+          Internal_tracing.register_toggle_callback (fun enabled ->
+              let%map result = Prover.toggle_internal_tracing prover enabled in
+              Or_error.iter_error result ~f:(fun error ->
+                  [%log' warn config.logger]
+                    "Failed to toggle prover internal tracing: $error"
+                    ~metadata:[ ("error", `String (Error.to_string_hum error)) ] ) ) ;
           let%bind vrf_evaluator =
             Monitor.try_with ~here:[%here]
               ~rest:
@@ -2164,5 +2184,7 @@ let runtime_config { config = { precomputed_values; _ }; _ } =
   Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values
 
 let verifier { processes = { verifier; _ }; _ } = verifier
+
+let vrf_evaluator { processes = { vrf_evaluator; _ }; _ } = vrf_evaluator
 
 let genesis_ledger t = Genesis_proof.genesis_ledger t.config.precomputed_values

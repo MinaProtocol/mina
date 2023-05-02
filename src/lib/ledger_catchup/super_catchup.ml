@@ -161,6 +161,11 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
   let open Deferred.Let_syntax in
   match cached_initially_validated_transition_result with
   | Ok x ->
+      Internal_tracing.with_state_hash
+        ( Validation.block_with_hash transition_with_hash
+        |> State_hash.With_state_hashes.state_hash )
+      @@ fun () ->
+      [%log internal] "Validate_transition_done" ;
       [%log trace]
         ~metadata:[ ("state_hash", state_hash) ]
         "initial_validate: validation is successful" ;
@@ -649,11 +654,22 @@ let download s d ~key ~attempts =
     "Download download $key" ;
   Downloader.download d ~key ~attempts
 
-let create_node ~downloader t x =
+let create_node ~logger ~downloader t x =
   let attempts = Attempt_history.empty in
   let state, h, blockchain_length, parent, result =
     match x with
     | `Root root ->
+        let blockchain_length =
+          Breadcrumb.block root |> Mina_block.blockchain_length
+        in
+        Internal_tracing.with_state_hash (Breadcrumb.state_hash root)
+        @@ fun () ->
+        [%log internal] "@block_metadata"
+          ~metadata:
+            [ ( "blockchain_length"
+              , Mina_numbers.Length.to_yojson blockchain_length )
+            ] ;
+        [%log internal] "Catchup_job_finished" ;
         ( Node.State.Finished
         , Breadcrumb.state_hash root
         , Breadcrumb.consensus_state root
@@ -661,6 +677,11 @@ let create_node ~downloader t x =
         , Breadcrumb.parent_hash root
         , Ivar.create_full (Ok `Added_to_frontier) )
     | `Hash (h, l, parent) ->
+        Internal_tracing.with_state_hash h
+        @@ fun () ->
+        [%log internal] "@block_metadata"
+          ~metadata:[ ("blockchain_length", Mina_numbers.Length.to_yojson l) ] ;
+        [%log internal] "To_download" ;
         ( Node.State.To_download
             (download "create_node" downloader ~key:(h, l) ~attempts)
         , h
@@ -669,9 +690,23 @@ let create_node ~downloader t x =
         , Ivar.create () )
     | `Initial_validated (b, valid_cb) ->
         let t = (Cached.peek b).Envelope.Incoming.data in
-        ( Node.State.To_verify (b, valid_cb)
-        , Validation.block_with_hash t
+        let state_hash =
+          Validation.block_with_hash t
           |> State_hash.With_state_hashes.state_hash
+        in
+        let blockchain_length =
+          Validation.block t |> Mina_block.blockchain_length
+        in
+        Internal_tracing.with_state_hash state_hash
+        @@ fun () ->
+        [%log internal] "@block_metadata"
+          ~metadata:
+            [ ( "blockchain_length"
+              , Mina_numbers.Length.to_yojson blockchain_length )
+            ] ;
+        [%log internal] "To_verify" ;
+        ( Node.State.To_verify (b, valid_cb)
+        , state_hash
         , Validation.block t |> Mina_block.blockchain_length
         , Validation.block t |> Mina_block.header
           |> Mina_block.Header.protocol_state
@@ -1293,7 +1328,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                         (* If we hit this case we should probably remove the parent from the
                             table and prune, although in theory that should be handled by
                            the frontier calling [Full_catchup_tree.apply_diffs]. *)
-                        create_node ~downloader t (`Root root)
+                        create_node ~logger ~downloader t (`Root root)
                     | `Node node ->
                         (* TODO: Log what is going on with transition frontier. *)
                         node
@@ -1306,7 +1341,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                     ~f:
                       (Rose_tree.iter ~f:(fun b_and_c ->
                            let node =
-                             create_node ~downloader t
+                             create_node ~logger ~downloader t
                                (`Initial_validated b_and_c)
                            in
                            ignore
@@ -1319,7 +1354,8 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                           let l = Length.succ l in
                           ( if not (Hashtbl.mem t.nodes h) then
                             let node =
-                              create_node t ~downloader (`Hash (h, l, parent))
+                              create_node ~logger t ~downloader
+                                (`Hash (h, l, parent))
                             in
                             don't_wait_for (run_state_machine node >>| ignore)
                           ) ;
@@ -1372,7 +1408,8 @@ let%test_module "Ledger_catchup tests" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ()) )
+            ~pids:(Child_processes.Termination.create_pid_table ())
+            () )
 
     module Context = struct
       let logger = logger

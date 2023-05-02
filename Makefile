@@ -130,7 +130,7 @@ client_sdk_test_sigs_nonconsensus: ocaml_checks
 
 snarkyjs: ocaml_checks
 	$(info Starting Build)
-	((ulimit -s 65532) || true) && (ulimit -n 10240 || true) \
+	(((ulimit -s 65532) || true) || true) && (ulimit -n 10240 || true) \
 	&& bash ./src/lib/snarkyjs/src/bindings/scripts/build-snarkyjs-node.sh
 	$(info Build complete)
 
@@ -186,7 +186,12 @@ genesis_ledger_from_tsv: ocaml_checks
 
 swap_bad_balances: ocaml_checks
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/swap_bad_balances/swap_bad_balances.exe --profile=testnet_postake_medium_curves
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/swap_bad_balances/swap_bad_balances.exe --profile=testnet_postake_medium_curves
+	$(info Build complete)
+
+heap_usage: ocaml_checks
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/heap_usage/heap_usage.exe --profile=testnet_postake_medium_curves
 	$(info Build complete)
 
 dev: build
@@ -220,7 +225,7 @@ check-snarky-submodule:
 #######################################
 ## Environment setup
 
-macos-setup-download:
+macos-setup:
 	./scripts/macos-setup-brew.sh
 
 ########################################
@@ -337,4 +342,4 @@ ml-docs: ocaml_checks
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
 
-.PHONY: all build check-format clean client_sdk client_sdk_test_sigs deb dev mina-docker reformat doc_diagrams ml-docs macos-setup macos-setup-download setup-opam libp2p_helper dhall_types replayer missing_blocks_auditor extract_blocks archive_blocks genesis_ledger_from_tsv ocaml_version ocaml_word_size ocaml_checks
+.PHONY: all build check-format clean client_sdk client_sdk_test_sigs deb dev mina-docker reformat doc_diagrams ml-docs macos-setup setup-opam libp2p_helper dhall_types replayer missing_blocks_auditor extract_blocks archive_blocks genesis_ledger_from_tsv ocaml_version ocaml_word_size ocaml_checks

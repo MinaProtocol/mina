@@ -29,6 +29,8 @@ module T = struct
           *)
     }
 
+  let name = "snark_pool_refcount"
+
   let get_work = Staged_ledger.Scan_state.all_work_statements_exn
 
   (** Returns true if this update changed which elements are in the table
