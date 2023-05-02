@@ -68,10 +68,12 @@ let setup_daemon logger =
     flag "--block-producer-key" ~aliases:[ "block-producer-key" ]
       ~doc:
         (sprintf
-           "DEPRECATED. KEYFILE Private key file for the block producer. You \
-            cannot provide both `block-producer-key` and \
-            `block-producer-pubkey`. (default: use MINA_BP_PRIVKEY environment \
-            variable). %s"
+           "DEPRECATED: Use environment variable `MINA_BP_PRIVKEY` instead. \
+            Private key file for the block producer. Providing this flag will \
+            enable block production. You cannot provide both \
+            `block-producer-key` and `block-producer-pubkey`. (default: if \
+            provided, use environment variable `MINA_BP_PRIVKEY`, and \
+            otherwise don't produce blocks) %s"
            receiver_key_warning )
       (optional string)
   and block_production_pubkey =
@@ -81,8 +83,9 @@ let setup_daemon logger =
         (sprintf
            "PUBLICKEY Public key for the associated private key that is being \
             tracked by this daemon. You cannot provide both \
-            `block-producer-key` and `block-producer-pubkey`. (default: use \
-            MINA_BP_PRIVKEY environment variable). %s"
+            `block-producer-key` and `block-producer-pubkey`. (default: if \
+            provided, use environment variable `MINA_BP_PRIVKEY`, and \
+            otherwise don't produce blocks) %s"
            receiver_key_warning )
       (optional public_key_compressed)
   and block_production_password =
