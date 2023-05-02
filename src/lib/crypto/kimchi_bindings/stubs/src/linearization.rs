@@ -7,7 +7,9 @@ use kimchi::{
 pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
 ) -> (String, Vec<(String, String)>) {
     let evaluated_cols = linearization_columns::<F>(None);
-    let (linearization, _powers_of_alpha) = constraints_expr::<F>(None, true);
+    // TODO: num_chunks
+    let num_chunks = 1;
+    let (linearization, _powers_of_alpha) = constraints_expr::<F>(None, true, num_chunks);
 
     let Linearization {
         constant_term,
