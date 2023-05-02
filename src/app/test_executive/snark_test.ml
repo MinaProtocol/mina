@@ -68,6 +68,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let node_b =
       Core.String.Map.find_exn (Network.block_producers network) "node-b"
     in
+    let snark_coordinator =
+      Core.String.Map.find_exn (Network.all_nodes network) "snark-node"
+    in
     let snark_node_key1 =
       Core.String.Map.find_exn
         (Network.genesis_keypairs network)
@@ -187,7 +190,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard
         "change snark worker key from snark-node-key1 to snark-node-key2"
-        (Network.Node.must_set_snark_worker ~logger node_a
+        (Network.Node.must_set_snark_worker ~logger snark_coordinator
            ~new_snark_pub_key:
              ( snark_node_key2.keypair.public_key
              |> Signature_lib.Public_key.compress ) )
@@ -215,7 +218,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Hence, 6*2 = 12 transactions until we get the first snarked ledger.
 *)
            send_payments ~logger ~sender_pub_key ~receiver_pub_key
-             ~amount:Currency.Amount.one ~fee ~node:sender 13
+             ~amount:Currency.Amount.one ~fee ~node:sender 26
          in
          wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:2) )
