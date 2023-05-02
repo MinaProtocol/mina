@@ -724,7 +724,6 @@ module Metrics = struct
       curr_global_slot cs |> Mina_numbers.Global_slot_since_genesis.to_uint32
     in
     let start =
-      let open Consensus.Data.Consensus_state in
       let slot = intprop curr_global_slot_u32 in
       let best_tip_slot = slot best_tip in
       let k = Unsigned.UInt32.to_int consensus_constants.k in
