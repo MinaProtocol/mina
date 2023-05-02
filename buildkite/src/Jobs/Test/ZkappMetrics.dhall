@@ -15,18 +15,18 @@ Pipeline.build
     { spec =
       JobSpec::
         { dirtyWhen =
-          [ S.strictlyStart (S.contains "buildkite/src/Jobs/Test/HeapUsage")
+          [ S.strictlyStart (S.contains "buildkite/src/Jobs/Test/ZkappMetrics")
           , S.strictlyStart (S.contains "src")
           ]
         , path = "Test"
-        , name = "HeapUsage"
+        , name = "ZkappMetrics"
         }
     , steps =
       [ Command.build
           Command.Config::
-            { commands = RunInToolchain.runInToolchain ([] : List Text) "./buildkite/scripts/heap_usage.sh"
-            , label = "Heap usage"
-            , key = "heap-usage"
+            { commands = RunInToolchain.runInToolchain ([] : List Text) "./buildkite/scripts/zkapp_metrics.sh"
+            , label = "Zkapp Metrics"
+            , key = "zkapp-metrics"
             , target = Size.Medium
             , docker = None Docker.Type
             }

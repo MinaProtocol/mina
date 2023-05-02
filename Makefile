@@ -201,7 +201,12 @@ swap_bad_balances: ocaml_checks
 
 heap_usage: ocaml_checks
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/heap_usage/heap_usage.exe --profile=testnet_postake_medium_curves
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/heap_usage/heap_usage.exe --profile=devnet
+	$(info Build complete)
+
+zkapp_limits: ocaml_checks
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/zkapp_limits/zkapp_limits.exe --profile=devnet
 	$(info Build complete)
 
 dev: build
