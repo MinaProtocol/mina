@@ -198,6 +198,7 @@ spec:
     protocol: TCP
     port: 80
     targetPort: "http-bpf-dbg"
+  publishNotReadyAddresses: true
 {{- end }}
 {{- end }}
 
@@ -274,6 +275,7 @@ spec:
     protocol: TCP
     port: 80
     targetPort: "http-logs"
+  publishNotReadyAddresses: true
 {{- end }}
 {{- end }}
 
@@ -325,5 +327,6 @@ spec:
     protocol: TCP
     port: 80
     targetPort: "trace-graphql"
+  publishNotReadyAddresses: true
 {{- end }}
 {{- end }}
