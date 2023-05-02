@@ -883,9 +883,7 @@ let gen_at_least_one_vesting_period ~min_vesting_periods =
   let open Global_slot in
   (* vesting period must be at least one to avoid division by zero *)
   assert (Int.(min_vesting_periods >= 1)) ;
-  let%bind vesting_period =
-    min_vesting_periods |> return >>| Global_slot.of_int
-  in
+  let vesting_period = Global_slot.of_int min_vesting_periods in
   let min_vesting_end = succ vesting_period in
   let%bind vesting_end = gen_incl min_vesting_end max_value in
   let max_cliff_time = Option.value_exn @@ sub vesting_end vesting_period in
