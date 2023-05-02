@@ -943,10 +943,18 @@ let setup_daemon logger =
                 Mina_user_error.raise
                   "You cannot provide both `block-producer-key` and \
                    `block_production_pubkey`"
-            | None, None ->
-                let private_key_b64 = Core_kernel.Sys.getenv "PRIVATE_KEY" in
-                let private_key_data = Base64.decode_exn private_key_b64 in
-                Keypair.of_seed private_key_data
+            | None, None -> (
+                match Sys.getenv "PRIVATE_KEY" with
+                | Some env_key ->
+                    let private_key =
+                      Signature_lib.Private_key.of_base58_check_exn env_key
+                    in
+                    let keypair =
+                      Signature_lib.Keypair.of_private_key_exn private_key
+                    in
+                    return (Some keypair)
+                | None ->
+                    return None )
             | Some sk_file, _ ->
                 let%map kp =
                   Secrets.Keypair.Terminal_stdin.read_exn
