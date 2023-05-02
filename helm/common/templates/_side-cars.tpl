@@ -126,7 +126,7 @@ Side-Car - BpfDebugger: container definition
     privileged: true
   env:
     - name: RUST_LOG
-      value: info
+      value: {{ .bpfDebugger.logLevel | default "info" }}
     - name: SERVER_PORT
       value: "80"
     - name: DEBUGGER_NAME
