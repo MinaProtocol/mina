@@ -70,7 +70,7 @@ let setup_daemon logger =
         (sprintf
            "DEPRECATED. KEYFILE Private key file for the block producer. You \
             cannot provide both `block-producer-key` and \
-            `block-producer-pubkey`. (default: use MINA_BP_KEY environment \
+            `block-producer-pubkey`. (default: use MINA_BP_PRIVKEY environment \
             variable). %s"
            receiver_key_warning )
       (optional string)
@@ -82,7 +82,7 @@ let setup_daemon logger =
            "PUBLICKEY Public key for the associated private key that is being \
             tracked by this daemon. You cannot provide both \
             `block-producer-key` and `block-producer-pubkey`. (default: use \
-            MINA_BP_KEY environment variable). %s"
+            MINA_BP_PRIVKEY environment variable). %s"
            receiver_key_warning )
       (optional public_key_compressed)
   and block_production_password =
@@ -944,7 +944,7 @@ let setup_daemon logger =
                   "You cannot provide both `block-producer-key` and \
                    `block_production_pubkey`"
             | None, None -> (
-                match Core_kernel.Sys.getenv_opt "MINA_BP_KEY" with
+                match Core_kernel.Sys.getenv_opt "MINA_BP_PRIVKEY" with
                 | Some env_key ->
                     let private_key =
                       Signature_lib.Private_key.of_base58_check_exn env_key
