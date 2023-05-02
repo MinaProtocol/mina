@@ -56,7 +56,9 @@ let payload_common_of_js (payload_common_js : payload_common_js) =
   let nonce_js = payload_common_js##.nonce in
   let nonce = Js.to_string nonce_js |> Mina_numbers.Account_nonce.of_string in
   let valid_until_js = payload_common_js##.validUntil in
-  let valid_until = Js.to_string valid_until_js |> Global_slot.of_string in
+  let valid_until =
+    Js.to_string valid_until_js |> Global_slot_since_genesis.of_string
+  in
   let memo_js = payload_common_js##.memo in
   let memo = Js.to_string memo_js |> Memo.create_from_string_exn in
   Signed_command_payload.Common.Poly.

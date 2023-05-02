@@ -81,7 +81,8 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
   let global_slot =
     Option.value global_slot
       ~default:
-        (Mina_numbers.Global_slot.succ state_view.global_slot_since_genesis)
+        (Mina_numbers.Global_slot_since_genesis.succ
+           state_view.global_slot_since_genesis )
   in
   let check_failure failure err =
     printf
@@ -558,7 +559,8 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
     Mina_state.Protocol_state.Body.view state_body
   in
   let global_slot =
-    Option.value txn_global_slot ~default:Mina_numbers.Global_slot.zero
+    Option.value txn_global_slot
+      ~default:Mina_numbers.Global_slot_since_genesis.zero
   in
   let mentioned_keys, pending_coinbase_stack_target =
     let pending_coinbase_stack =

@@ -18,8 +18,8 @@ let%test_module "account timing check" =
     let account_with_default_vesting_schedule ?(token = Token_id.default)
         ?(initial_minimum_balance = Balance.of_mina_int_exn 10_000)
         ?(cliff_amount = Amount.zero)
-        ?(cliff_time = Mina_numbers.Global_slot.of_int 1000)
-        ?(vesting_period = Mina_numbers.Global_slot.of_int 10)
+        ?(cliff_time = Mina_numbers.Global_slot_since_genesis.of_int 1000)
+        ?(vesting_period = Mina_numbers.Global_slot_since_genesis.of_int 10)
         ?(vesting_increment = Amount.of_mina_int_exn 100) balance =
       let pk = Public_key.Compressed.empty in
       let account_id = Account_id.create pk token in
@@ -31,7 +31,7 @@ let%test_module "account timing check" =
       let account = Account.var_of_t account in
       let txn_amount = Amount.var_of_t txn_amount in
       let txn_global_slot =
-        Mina_numbers.Global_slot.Checked.constant txn_global_slot
+        Mina_numbers.Global_slot_since_genesis.Checked.constant txn_global_slot
       in
       let%map `Min_balance min_balance, timing =
         Transaction_snark.Base.check_timing
@@ -87,7 +87,7 @@ let%test_module "account timing check" =
        funds, this transaction is expected to succeed. *)
     let%test "before_cliff_time" =
       let txn_amount = Currency.Amount.of_mina_int_exn 100 in
-      let txn_global_slot = Mina_numbers.Global_slot.of_int 45 in
+      let txn_global_slot = Mina_numbers.Global_slot_since_genesis.of_int 45 in
       let account =
         account_with_default_vesting_schedule
           ~initial_minimum_balance:(Balance.of_mina_int_exn 80_000)
@@ -121,11 +121,13 @@ let%test_module "account timing check" =
         account_with_default_vesting_schedule (Balance.of_mina_int_exn 100_000)
       in
       let txn_amount = Currency.Amount.of_mina_int_exn 100 in
-      let txn_global_slot = Mina_numbers.Global_slot.of_int 1_900 in
+      let txn_global_slot =
+        Mina_numbers.Global_slot_since_genesis.of_int 1_900
+      in
       let timing_with_min_balance =
         validate_timing_with_min_balance ~account
           ~txn_amount:(Currency.Amount.of_mina_int_exn 100)
-          ~txn_global_slot:(Mina_numbers.Global_slot.of_int 1_900)
+          ~txn_global_slot:(Mina_numbers.Global_slot_since_genesis.of_int 1_900)
       in
       match timing_with_min_balance with
       | Ok ((Timed _ as unchecked_timing), `Min_balance unchecked_min_balance)
@@ -152,7 +154,9 @@ let%test_module "account timing check" =
           (Balance.of_mina_int_exn 100_000)
       in
       let txn_amount = Currency.Amount.of_mina_int_exn 100 in
-      let txn_global_slot = Mina_numbers.Global_slot.of_int 2_000 in
+      let txn_global_slot =
+        Mina_numbers.Global_slot_since_genesis.of_int 2_000
+      in
       let timing_with_min_balance =
         validate_timing_with_min_balance ~txn_amount ~txn_global_slot ~account
       in
@@ -176,7 +180,9 @@ let%test_module "account timing check" =
         account_with_default_vesting_schedule (Balance.of_mina_int_exn 10_000)
       in
       let txn_amount = Currency.Amount.of_mina_int_exn 101 in
-      let txn_global_slot = Mina_numbers.Global_slot.of_int 1_010 in
+      let txn_global_slot =
+        Mina_numbers.Global_slot_since_genesis.of_int 1_010
+      in
       let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
       match timing with
       | Error err ->
@@ -198,7 +204,9 @@ let%test_module "account timing check" =
         account_with_default_vesting_schedule (Balance.of_mina_int_exn 100_000)
       in
       let txn_amount = Currency.Amount.of_mina_int_exn 100_001 in
-      let txn_global_slot = Mina_numbers.Global_slot.of_int 2_000_000_000_000 in
+      let txn_global_slot =
+        Mina_numbers.Global_slot_since_genesis.of_int 2_000_000_000_000
+      in
       let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
       match timing with
       | Error err ->
@@ -222,7 +230,9 @@ let%test_module "account timing check" =
         account_with_default_vesting_schedule (Balance.of_mina_int_exn 100_000)
       in
       let txn_amount = Currency.Amount.of_mina_int_exn 100_000 in
-      let txn_global_slot = Mina_numbers.Global_slot.of_int 3000 in
+      let txn_global_slot =
+        Mina_numbers.Global_slot_since_genesis.of_int 3000
+      in
       let timing_with_min_balance =
         validate_timing_with_min_balance ~txn_amount ~txn_global_slot ~account
       in
@@ -239,12 +249,14 @@ let%test_module "account timing check" =
         account_with_default_vesting_schedule
           ~cliff_amount:(Amount.of_mina_int_exn 10_000)
             (* The same as initial minimum balance. *)
-          ~vesting_period:(Mina_numbers.Global_slot.of_int 1)
+          ~vesting_period:(Mina_numbers.Global_slot_since_genesis.of_int 1)
           ~vesting_increment:Amount.zero
           (Balance.of_mina_int_exn 100_000)
       in
       let txn_amount = Currency.Amount.of_mina_int_exn 100_000 in
-      let txn_global_slot = Mina_numbers.Global_slot.of_int slot in
+      let txn_global_slot =
+        Mina_numbers.Global_slot_since_genesis.of_int slot
+      in
       (txn_amount, txn_global_slot, account)
 
     (* Before the cliff, only the initial_minimum_balance matters.
@@ -309,7 +321,8 @@ let%test_module "account timing check" =
       in
       validated_uc
 
-    let check_transaction_snark ~(txn_global_slot : Mina_numbers.Global_slot.t)
+    let check_transaction_snark
+        ~(txn_global_slot : Mina_numbers.Global_slot_since_genesis.t)
         (sparse_ledger_before : Mina_ledger.Sparse_ledger.t)
         (transaction : Mina_transaction.Transaction.t) =
       let sok_message =
@@ -427,9 +440,11 @@ let%test_module "account timing check" =
                 Timed
                   { initial_minimum_balance =
                       Currency.Balance.of_mina_int_exn 50
-                  ; cliff_time = Mina_numbers.Global_slot.of_int 10_000
+                  ; cliff_time =
+                      Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.of_nanomina_int_exn 100
-                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_period =
+                      Mina_numbers.Global_slot_since_genesis.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -463,7 +478,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               apply_user_commands_at_slot ledger
-                Mina_numbers.Global_slot.(succ zero)
+                Mina_numbers.Global_slot_since_genesis.(succ zero)
                 user_commands ) )
 
     (* Before cliff, transactions fail if they would have to violate minimum
@@ -487,9 +502,11 @@ let%test_module "account timing check" =
                 Timed
                   { initial_minimum_balance =
                       Currency.Balance.of_mina_int_exn 9_995
-                  ; cliff_time = Mina_numbers.Global_slot.of_int 10_000
+                  ; cliff_time =
+                      Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.of_nanomina_int_exn 100
-                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_period =
+                      Mina_numbers.Global_slot_since_genesis.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -525,7 +542,8 @@ let%test_module "account timing check" =
               let validated_uc = validate_user_command uc in
               match
                 Mina_ledger.Ledger.apply_user_command ~constraint_constants
-                  ~txn_global_slot:Mina_numbers.Global_slot.(succ zero)
+                  ~txn_global_slot:
+                    Mina_numbers.Global_slot_since_genesis.(succ zero)
                   ledger validated_uc
               with
               | Ok _txn_applied ->
@@ -557,9 +575,11 @@ let%test_module "account timing check" =
                 Timed
                   { initial_minimum_balance =
                       Currency.Balance.of_mina_int_exn 9_995
-                  ; cliff_time = Mina_numbers.Global_slot.of_int 10_000
+                  ; cliff_time =
+                      Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.of_mina_int_exn 9_995
-                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_period =
+                      Mina_numbers.Global_slot_since_genesis.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -586,7 +606,8 @@ let%test_module "account timing check" =
               let validated_uc = validate_user_command user_command in
               match
                 Mina_ledger.Ledger.apply_user_command ~constraint_constants
-                  ~txn_global_slot:(Mina_numbers.Global_slot.of_int 9999)
+                  ~txn_global_slot:
+                    (Mina_numbers.Global_slot_since_genesis.of_int 9999)
                   ledger validated_uc
               with
               | Ok _txn_applied ->
@@ -617,9 +638,11 @@ let%test_module "account timing check" =
                 Timed
                   { initial_minimum_balance =
                       Currency.Balance.of_mina_int_exn 9_995
-                  ; cliff_time = Mina_numbers.Global_slot.of_int 10000
+                  ; cliff_time =
+                      Mina_numbers.Global_slot_since_genesis.of_int 10000
                   ; cliff_amount = Currency.Amount.of_mina_int_exn 9_995
-                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_period =
+                      Mina_numbers.Global_slot_since_genesis.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -649,7 +672,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               apply_user_commands_at_slot ledger
-                (Mina_numbers.Global_slot.of_int 10000)
+                (Mina_numbers.Global_slot_since_genesis.of_int 10000)
                 [ user_command ] ) )
 
     let%test_unit "user command, while vesting, sufficient balance" =
@@ -665,9 +688,11 @@ let%test_module "account timing check" =
                 Timed
                   { initial_minimum_balance =
                       Currency.Balance.of_nanomina_int_exn init_min_bal_int
-                  ; cliff_time = Mina_numbers.Global_slot.of_int 10_000
+                  ; cliff_time =
+                      Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.zero
-                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_period =
+                      Mina_numbers.Global_slot_since_genesis.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -708,7 +733,7 @@ let%test_module "account timing check" =
                 ledger_init_state ;
               (* 100 vesting periods after cliff *)
               apply_user_commands_at_slot ledger
-                (Mina_numbers.Global_slot.of_int 10100)
+                (Mina_numbers.Global_slot_since_genesis.of_int 10100)
                 [ user_command ] ) )
 
     let%test_unit "user command, after vesting, sufficient balance" =
@@ -722,9 +747,11 @@ let%test_module "account timing check" =
                 Timed
                   { initial_minimum_balance =
                       Currency.Balance.of_mina_int_exn 9_995
-                  ; cliff_time = Mina_numbers.Global_slot.of_int 10000
+                  ; cliff_time =
+                      Mina_numbers.Global_slot_since_genesis.of_int 10000
                   ; cliff_amount = Currency.Amount.of_mina_int_exn 9_995
-                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_period =
+                      Mina_numbers.Global_slot_since_genesis.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -755,7 +782,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               apply_user_commands_at_slot ledger
-                Mina_numbers.Global_slot.(of_int 20_000)
+                Mina_numbers.Global_slot_since_genesis.(of_int 20_000)
                 [ user_command ] ) )
 
     let%test_unit "user command, after vesting, insufficient balance" =
@@ -769,9 +796,11 @@ let%test_module "account timing check" =
                 Timed
                   { initial_minimum_balance =
                       Currency.Balance.of_mina_int_exn 9_995
-                  ; cliff_time = Mina_numbers.Global_slot.of_int 10000
+                  ; cliff_time =
+                      Mina_numbers.Global_slot_since_genesis.of_int 10000
                   ; cliff_amount = Currency.Amount.of_mina_int_exn 9_995
-                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_period =
+                      Mina_numbers.Global_slot_since_genesis.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -797,7 +826,8 @@ let%test_module "account timing check" =
               (* slot well past cliff *)
               match
                 Mina_ledger.Ledger.apply_user_command ~constraint_constants
-                  ~txn_global_slot:(Mina_numbers.Global_slot.of_int 200_000)
+                  ~txn_global_slot:
+                    (Mina_numbers.Global_slot_since_genesis.of_int 200_000)
                   ledger validated_uc
               with
               | Ok _txn_applied ->
@@ -828,11 +858,11 @@ let%test_module "account timing check" =
         type t =
           { balance : Currency.Balance.t
           ; init_min_bal : Currency.Balance.t
-          ; cliff_time : Mina_numbers.Global_slot.t
+          ; cliff_time : Mina_numbers.Global_slot_since_genesis.t
           ; cliff_amt : Currency.Amount.t
-          ; vest_period : Mina_numbers.Global_slot.t
+          ; vest_period : Mina_numbers.Global_slot_since_genesis.t
           ; vest_incr : Currency.Amount.t
-          ; slot : Mina_numbers.Global_slot.t
+          ; slot : Mina_numbers.Global_slot_since_genesis.t
           ; available_funds : Currency.Amount.t
           ; cmd : Signed_command.t
           }
@@ -859,14 +889,14 @@ let%test_module "account timing check" =
           let init_min_amt = Currency.Balance.to_amount init_min_bal in
           let%bind cliff_time =
             unless_fixed ?fixed:cliff_time
-              Global_slot.(gen_incl (of_int 100) (of_int 1_000))
+              Global_slot_since_genesis.(gen_incl (of_int 100) (of_int 1_000))
           in
           let%bind cliff_amt =
             unless_fixed ?fixed:cliff_amt Amount.(gen_incl zero init_min_amt)
           in
           let%bind vest_period =
             unless_fixed ?fixed:vest_period
-              Global_slot.(gen_incl (of_int 1) (of_int 20))
+              Global_slot_since_genesis.(gen_incl (of_int 1) (of_int 20))
           in
           let to_vest =
             Amount.(
@@ -884,27 +914,29 @@ let%test_module "account timing check" =
           in
           let vest_time =
             if Amount.(vest_incr > zero) then
-              Global_slot.to_int vest_period
+              Global_slot_since_genesis.to_int vest_period
               * (to_vest / Amount.to_nanomina_int vest_incr)
             else 0
           in
           let%bind slot =
             unless_fixed ?fixed:slot
-              Global_slot.(
+              Global_slot_since_genesis.(
                 gen_incl
                   (of_int @@ Int.max 0 (to_int cliff_time - vest_time))
                   (of_int @@ (to_int cliff_time + (2 * vest_time))))
           in
           let available_funds =
             let open Currency in
-            let slot_int = Mina_numbers.Global_slot.to_int slot in
-            let cliff_int = Mina_numbers.Global_slot.to_int cliff_time in
+            let slot_int = Mina_numbers.Global_slot_since_genesis.to_int slot in
+            let cliff_int =
+              Mina_numbers.Global_slot_since_genesis.to_int cliff_time
+            in
             let vested_cliff_amt =
               if slot_int < cliff_int then Amount.zero else cliff_amt
             in
             let vested =
               max 0 (slot_int - cliff_int)
-              / Mina_numbers.Global_slot.to_int vest_period
+              / Mina_numbers.Global_slot_since_genesis.to_int vest_period
               |> Amount.scale vest_incr
               |> Option.value ~default:Amount.max_int
             in
@@ -953,26 +985,26 @@ let%test_module "account timing check" =
         let examples =
           let open Mina_numbers in
           let balance = Balance.of_mina_int_exn 10_000 in
-          let cliff_time = Global_slot.of_int 10_000 in
+          let cliff_time = Global_slot_since_genesis.of_int 10_000 in
           [ (* Before cliff only balance in excess of the initial minimum may be spent. *)
             Quickcheck.random_value
             @@ gen ~balance ~cliff_time
                  ~init_min_bal:(Balance.of_mina_int_exn 50)
-                 ~slot:(Global_slot.of_int 1)
+                 ~slot:(Global_slot_since_genesis.of_int 1)
                  ~amount:(Amount.of_mina_int_exn 10)
                  ()
           ; (* Before cliff time funds below the minimum balance cannot be spent. *)
             Quickcheck.random_value
             @@ gen ~balance ~cliff_time
                  ~init_min_bal:(Balance.of_mina_int_exn 9_995)
-                 ~slot:(Global_slot.of_int 1)
+                 ~slot:(Global_slot_since_genesis.of_int 1)
                  ~amount:(Amount.of_mina_int_exn 100)
                  ()
           ; (* Just before cliff the balance still can't fall below the minimum. *)
             Quickcheck.random_value
             @@ gen ~balance ~cliff_time
                  ~init_min_bal:(Balance.of_mina_int_exn 9_995)
-                 ~slot:(Global_slot.of_int 9_999)
+                 ~slot:(Global_slot_since_genesis.of_int 9_999)
                  ~amount:(Amount.of_mina_int_exn 100)
                  ()
           ; (* At cliff time the cliff amount may immediately be spent. *)
@@ -988,7 +1020,7 @@ let%test_module "account timing check" =
             @@ gen ~balance ~cliff_time
                  ~cliff_amt:(Amount.of_mina_int_exn 9_995)
                  ~init_min_bal:(Balance.of_mina_int_exn 9_995)
-                 ~slot:(Global_slot.of_int 20_000)
+                 ~slot:(Global_slot_since_genesis.of_int 20_000)
                  ~amount:(Amount.of_mina_int_exn 9_000)
                  ()
           ; (* After vesting, still can't spend more than the current balance. *)
@@ -996,7 +1028,7 @@ let%test_module "account timing check" =
             @@ gen ~balance ~cliff_time
                  ~cliff_amt:(Amount.of_mina_int_exn 9_995)
                  ~init_min_bal:(Balance.of_mina_int_exn 9_995)
-                 ~slot:(Global_slot.of_int 200_000)
+                 ~slot:(Global_slot_since_genesis.of_int 200_000)
                  ~amount:(Amount.of_mina_int_exn 100_000)
                  ()
           ]
@@ -1151,9 +1183,11 @@ let%test_module "account timing check" =
                 Timed
                   { initial_minimum_balance =
                       Currency.Balance.of_mina_int_exn 50
-                  ; cliff_time = Mina_numbers.Global_slot.of_int 10_000
+                  ; cliff_time =
+                      Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.of_nanomina_int_exn 100
-                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_period =
+                      Mina_numbers.Global_slot_since_genesis.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -1205,7 +1239,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               apply_zkapp_commands_at_slot ledger
-                Mina_numbers.Global_slot.(succ zero)
+                Mina_numbers.Global_slot_since_genesis.(succ zero)
                 [ txn ] ) )
 
     let%test_unit "zkApp command, before cliff time, min balance violation" =
@@ -1220,9 +1254,11 @@ let%test_module "account timing check" =
                 Timed
                   { initial_minimum_balance =
                       Currency.Balance.of_mina_int_exn 99_000
-                  ; cliff_time = Mina_numbers.Global_slot.of_int 10_000
+                  ; cliff_time =
+                      Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.of_nanomina_int_exn 100
-                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_period =
+                      Mina_numbers.Global_slot_since_genesis.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -1276,7 +1312,8 @@ let%test_module "account timing check" =
               let result =
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
                   ~constraint_constants
-                  ~global_slot:Mina_numbers.Global_slot.(succ zero)
+                  ~global_slot:
+                    Mina_numbers.Global_slot_since_genesis.(succ zero)
                   ~state_view:Transaction_snark_tests.Util.genesis_state_view
                   ledger zkapp_command
               in
@@ -1299,9 +1336,11 @@ let%test_module "account timing check" =
                 Timed
                   { initial_minimum_balance =
                       Currency.Balance.of_mina_int_exn 100_000
-                  ; cliff_time = Mina_numbers.Global_slot.of_int 10000
+                  ; cliff_time =
+                      Mina_numbers.Global_slot_since_genesis.of_int 10000
                   ; cliff_amount = Currency.Amount.of_nanomina_int_exn 100
-                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_period =
+                      Mina_numbers.Global_slot_since_genesis.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -1355,7 +1394,8 @@ let%test_module "account timing check" =
               match
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
                   ~constraint_constants
-                  ~global_slot:Mina_numbers.Global_slot.(succ zero)
+                  ~global_slot:
+                    Mina_numbers.Global_slot_since_genesis.(succ zero)
                   ~state_view:Transaction_snark_tests.Util.genesis_state_view
                   ledger zkapp_command
               with
@@ -1406,10 +1446,12 @@ let%test_module "account timing check" =
                Zkapp_basic.Set_or_keep.Set
                  ( { initial_minimum_balance =
                        Currency.Balance.of_nanomina_int_exn min_balance
-                   ; cliff_time = Mina_numbers.Global_slot.of_int 1000
+                   ; cliff_time =
+                       Mina_numbers.Global_slot_since_genesis.of_int 1000
                    ; cliff_amount =
                        Currency.Amount.of_nanomina_int_exn 100_000_000
-                   ; vesting_period = Mina_numbers.Global_slot.of_int 10
+                   ; vesting_period =
+                       Mina_numbers.Global_slot_since_genesis.of_int 10
                    ; vesting_increment =
                        Currency.Amount.of_nanomina_int_exn 100_000_000
                    }
@@ -1452,7 +1494,8 @@ let%test_module "account timing check" =
               let result =
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
                   ~constraint_constants
-                  ~global_slot:Mina_numbers.Global_slot.(succ zero)
+                  ~global_slot:
+                    Mina_numbers.Global_slot_since_genesis.(succ zero)
                   ~state_view:Transaction_snark_tests.Util.genesis_state_view
                   ledger zkapp_command
               in
@@ -1475,7 +1518,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               apply_zkapp_commands_at_slot ledger
-                Mina_numbers.Global_slot.(succ zero)
+                Mina_numbers.Global_slot_since_genesis.(succ zero)
                 [ zkapp_command ] ) )
 
     let%test_unit "zkApp command, account creation, min_balance < balance" =
@@ -1493,7 +1536,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               apply_zkapp_commands_at_slot ledger
-                Mina_numbers.Global_slot.(succ zero)
+                Mina_numbers.Global_slot_since_genesis.(succ zero)
                 [ zkapp_command ] ) )
 
     let%test_unit "zkApp command, just before cliff time, insufficient balance"
@@ -1508,9 +1551,11 @@ let%test_module "account timing check" =
                 Timed
                   { initial_minimum_balance =
                       Currency.Balance.of_mina_int_exn 100_000
-                  ; cliff_time = Mina_numbers.Global_slot.of_int 10000
+                  ; cliff_time =
+                      Mina_numbers.Global_slot_since_genesis.of_int 10000
                   ; cliff_amount = Currency.Amount.of_mina_int_exn 100_000
-                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_period =
+                      Mina_numbers.Global_slot_since_genesis.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -1564,7 +1609,8 @@ let%test_module "account timing check" =
               match
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
                   ~constraint_constants
-                  ~global_slot:Mina_numbers.Global_slot.(of_int 9999)
+                  ~global_slot:
+                    Mina_numbers.Global_slot_since_genesis.(of_int 9999)
                   ~state_view:Transaction_snark_tests.Util.genesis_state_view
                   ledger zkapp_command
               with
@@ -1593,9 +1639,11 @@ let%test_module "account timing check" =
                 Timed
                   { initial_minimum_balance =
                       Currency.Balance.of_mina_int_exn 100_000
-                  ; cliff_time = Mina_numbers.Global_slot.of_int 10000
+                  ; cliff_time =
+                      Mina_numbers.Global_slot_since_genesis.of_int 10000
                   ; cliff_amount = Currency.Amount.of_mina_int_exn 100_000
-                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_period =
+                      Mina_numbers.Global_slot_since_genesis.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -1646,7 +1694,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               apply_zkapp_commands_at_slot ledger
-                Mina_numbers.Global_slot.(of_int 10000)
+                Mina_numbers.Global_slot_since_genesis.(of_int 10000)
                 [ zkapp_command ] ) )
 
     let%test_unit "zkApp command, while vesting, sufficient balance" =
@@ -1662,9 +1710,11 @@ let%test_module "account timing check" =
                 Timed
                   { initial_minimum_balance =
                       Currency.Balance.of_nanomina_int_exn init_min_balance_int
-                  ; cliff_time = Mina_numbers.Global_slot.of_int 10_000
+                  ; cliff_time =
+                      Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.zero
-                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_period =
+                      Mina_numbers.Global_slot_since_genesis.of_int 1
                   ; vesting_increment =
                       Currency.Amount.of_nanomina_int_exn 100_000
                   }
@@ -1721,7 +1771,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               apply_zkapp_commands_at_slot ledger
-                Mina_numbers.Global_slot.(of_int 10_100)
+                Mina_numbers.Global_slot_since_genesis.(of_int 10_100)
                 [ zkapp_command ] ) )
 
     let%test_unit "zkApp command, while vesting, insufficient balance" =
@@ -1737,9 +1787,11 @@ let%test_module "account timing check" =
                 Timed
                   { initial_minimum_balance =
                       Currency.Balance.of_nanomina_int_exn init_min_balance_int
-                  ; cliff_time = Mina_numbers.Global_slot.of_int 10_000
+                  ; cliff_time =
+                      Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.zero
-                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_period =
+                      Mina_numbers.Global_slot_since_genesis.of_int 1
                   ; vesting_increment =
                       Currency.Amount.of_nanomina_int_exn 100_000
                   }
@@ -1799,7 +1851,8 @@ let%test_module "account timing check" =
               let result =
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
                   ~constraint_constants
-                  ~global_slot:Mina_numbers.Global_slot.(of_int 10_100)
+                  ~global_slot:
+                    Mina_numbers.Global_slot_since_genesis.(of_int 10_100)
                   ~state_view:Transaction_snark_tests.Util.genesis_state_view
                   ledger zkapp_command
               in
@@ -1820,9 +1873,11 @@ let%test_module "account timing check" =
                 Timed
                   { initial_minimum_balance =
                       Currency.Balance.of_nanomina_int_exn init_min_balance_int
-                  ; cliff_time = Mina_numbers.Global_slot.of_int 10_000
+                  ; cliff_time =
+                      Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.zero
-                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_period =
+                      Mina_numbers.Global_slot_since_genesis.of_int 1
                   ; vesting_increment = Currency.Amount.of_mina_int_exn 1
                   }
               in
@@ -1875,7 +1930,8 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               apply_zkapp_commands_at_slot ledger
-                Mina_numbers.Global_slot.(of_int (100_000 + 10_000))
+                Mina_numbers.Global_slot_since_genesis.(
+                  of_int (100_000 + 10_000))
                 [ zkapp_command ] ) )
 
     (* same as previous test, amount is incremented by 1 *)
@@ -1892,9 +1948,11 @@ let%test_module "account timing check" =
                 Timed
                   { initial_minimum_balance =
                       Currency.Balance.of_nanomina_int_exn init_min_balance_int
-                  ; cliff_time = Mina_numbers.Global_slot.of_int 10_000
+                  ; cliff_time =
+                      Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.zero
-                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_period =
+                      Mina_numbers.Global_slot_since_genesis.of_int 1
                   ; vesting_increment = Currency.Amount.of_mina_int_exn 1
                   }
               in
@@ -1950,7 +2008,8 @@ let%test_module "account timing check" =
               let result =
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
                   ~constraint_constants
-                  ~global_slot:Mina_numbers.Global_slot.(of_int 110_000)
+                  ~global_slot:
+                    Mina_numbers.Global_slot_since_genesis.(of_int 110_000)
                   ~state_view:Transaction_snark_tests.Util.genesis_state_view
                   ledger zkapp_command
               in
@@ -1982,9 +2041,11 @@ let%test_module "account timing check" =
             (let timing =
                Zkapp_basic.Set_or_keep.Set
                  ( { initial_minimum_balance = Currency.Balance.of_mina_int_exn 1
-                   ; cliff_time = Mina_numbers.Global_slot.of_int 10
+                   ; cliff_time =
+                       Mina_numbers.Global_slot_since_genesis.of_int 10
                    ; cliff_amount = Currency.Amount.of_mina_int_exn 1
-                   ; vesting_period = Mina_numbers.Global_slot.of_int 10
+                   ; vesting_period =
+                       Mina_numbers.Global_slot_since_genesis.of_int 10
                    ; vesting_increment = Currency.Amount.of_mina_int_exn 1
                    }
                    : Account_update.Update.Timing_info.value )
@@ -2060,9 +2121,11 @@ let%test_module "account timing check" =
                    Zkapp_basic.Set_or_keep.Set
                      ( { initial_minimum_balance =
                            Currency.Balance.of_mina_int_exn 1
-                       ; cliff_time = Mina_numbers.Global_slot.of_int 10
+                       ; cliff_time =
+                           Mina_numbers.Global_slot_since_genesis.of_int 10
                        ; cliff_amount = Currency.Amount.of_mina_int_exn 1
-                       ; vesting_period = Mina_numbers.Global_slot.of_int 10
+                       ; vesting_period =
+                           Mina_numbers.Global_slot_since_genesis.of_int 10
                        ; vesting_increment = Currency.Amount.of_mina_int_exn 1
                        }
                        : Account_update.Update.Timing_info.value )
@@ -2114,9 +2177,11 @@ let%test_module "account timing check" =
                     Account_timing.Timed
                       { initial_minimum_balance =
                           Currency.Balance.of_mina_int_exn 10
-                      ; cliff_time = Mina_numbers.Global_slot.of_int 10_000
+                      ; cliff_time =
+                          Mina_numbers.Global_slot_since_genesis.of_int 10_000
                       ; cliff_amount = Currency.Amount.zero
-                      ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                      ; vesting_period =
+                          Mina_numbers.Global_slot_since_genesis.of_int 1
                       ; vesting_increment =
                           Currency.Amount.of_nanomina_int_exn 100_000
                       }
@@ -2141,9 +2206,11 @@ let%test_module "account timing check" =
                    Zkapp_basic.Set_or_keep.Set
                      ( { initial_minimum_balance =
                            Currency.Balance.of_mina_int_exn 1
-                       ; cliff_time = Mina_numbers.Global_slot.of_int 10
+                       ; cliff_time =
+                           Mina_numbers.Global_slot_since_genesis.of_int 10
                        ; cliff_amount = Currency.Amount.of_mina_int_exn 1
-                       ; vesting_period = Mina_numbers.Global_slot.of_int 10
+                       ; vesting_period =
+                           Mina_numbers.Global_slot_since_genesis.of_int 10
                        ; vesting_increment = Currency.Amount.of_mina_int_exn 1
                        }
                        : Account_update.Update.Timing_info.value )

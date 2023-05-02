@@ -137,7 +137,7 @@ let mk_scan_state_base_node
       ; init_stack
       ; first_pass_ledger_witness = ledger_witness
       ; second_pass_ledger_witness = ledger_witness
-      ; block_global_slot = Mina_numbers.Global_slot.zero
+      ; block_global_slot = Mina_numbers.Global_slot_since_genesis.zero
       }
     in
     let record : _ Parallel_scan.Base.Record.t =
@@ -176,7 +176,7 @@ let scan_state_base_node_payment =
         { fee = Currency.Fee.zero
         ; fee_payer_pk = sample_pk_compressed
         ; nonce = Mina_numbers.Account_nonce.zero
-        ; valid_until = Mina_numbers.Global_slot.max_value
+        ; valid_until = Mina_numbers.Global_slot_since_genesis.max_value
         ; memo = Mina_base.Signed_command_memo.empty
         }
       in

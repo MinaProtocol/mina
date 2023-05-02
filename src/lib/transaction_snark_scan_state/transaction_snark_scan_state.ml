@@ -49,7 +49,7 @@ module Transaction_with_witness = struct
             (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
         ; second_pass_ledger_witness :
             (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
-        ; block_global_slot : Mina_numbers.Global_slot.Stable.V1.t
+        ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         }
       [@@deriving sexp, to_yojson]
 

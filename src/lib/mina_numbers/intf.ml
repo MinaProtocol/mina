@@ -66,8 +66,6 @@ end
 module type S_checked = sig
   type unchecked
 
-  open Snark_params.Tick
-
   type var
 
   val constant : unchecked -> var

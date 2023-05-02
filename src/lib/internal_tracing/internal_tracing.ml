@@ -2,18 +2,18 @@ open Core
 
 module Block_id = struct
   type t =
-    | Global_slot of Mina_numbers.Global_slot.t
+    | Global_slot of Mina_numbers.Global_slot_since_genesis.t
     | State_hash of Mina_base.State_hash.t
   [@@deriving sexp, hash, compare, equal]
 
   let to_string = function
     | Global_slot slot ->
-        Mina_numbers.Global_slot.to_string slot
+        Mina_numbers.Global_slot_since_genesis.to_string slot
     | State_hash hash ->
         Mina_base.State_hash.to_base58_check hash
 end
 
-let no_block = Block_id.Global_slot Mina_numbers.Global_slot.zero
+let no_block = Block_id.Global_slot Mina_numbers.Global_slot_since_genesis.zero
 
 let last_block_id = ref no_block
 

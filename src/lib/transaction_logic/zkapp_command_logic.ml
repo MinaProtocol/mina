@@ -125,7 +125,7 @@ module type Account_id_intf = sig
   val derive_token_id : owner:t -> token_id
 end
 
-module type Global_slot_intf = sig
+module type Global_slot_since_genesis_intf = sig
   include Iffable
 
   val zero : t
@@ -133,6 +133,14 @@ module type Global_slot_intf = sig
   val ( > ) : t -> t -> bool
 
   val equal : t -> t -> bool
+end
+
+module type Global_slot_span_intf = sig
+  include Iffable
+
+  val zero : t
+
+  val ( > ) : t -> t -> bool
 end
 
 module type Verification_key_hash_intf = sig
@@ -146,9 +154,9 @@ end
 module type Timing_intf = sig
   include Iffable
 
-  type global_slot
+  type global_slot_span
 
-  val vesting_period : t -> global_slot
+  val vesting_period : t -> global_slot_span
 end
 
 module type Token_id_intf = sig
@@ -724,7 +732,10 @@ module type Inputs_intf = sig
 
   module Controller : Controller_intf with type bool := Bool.t
 
-  module Global_slot : Global_slot_intf with type bool := Bool.t
+  module Global_slot_since_genesis :
+    Global_slot_since_genesis_intf with type bool := Bool.t
+
+  module Global_slot_span : Global_slot_span_intf with type bool := Bool.t
 
   module Nonce : sig
     include Iffable with type bool := Bool.t
@@ -735,7 +746,9 @@ module type Inputs_intf = sig
   module State_hash : Iffable with type bool := Bool.t
 
   module Timing :
-    Timing_intf with type bool := Bool.t and type global_slot := Global_slot.t
+    Timing_intf
+      with type bool := Bool.t
+       and type global_slot_span := Global_slot_span.t
 
   module Zkapp_uri : Iffable with type bool := Bool.t
 
@@ -760,7 +773,7 @@ module type Inputs_intf = sig
        and type balance := Balance.t
        and type receipt_chain_hash := Receipt_chain_hash.t
        and type bool := Bool.t
-       and type global_slot := Global_slot.t
+       and type global_slot := Global_slot_since_genesis.t
        and type field := Field.t
        and type verification_key := Verification_key.t
        and type verification_key_hash := Verification_key_hash.t
@@ -891,7 +904,7 @@ module type Inputs_intf = sig
 
     val set_supply_increase : t -> Amount.Signed.t -> t
 
-    val block_global_slot : t -> Global_slot.t
+    val block_global_slot : t -> Global_slot_since_genesis.t
   end
 end
 
@@ -1046,14 +1059,17 @@ module Make (Inputs : Inputs_intf) = struct
     let s1_updated = Actions.push_events s1' actions in
     let s1 = Field.if_ is_empty ~then_:s1' ~else_:s1_updated in
     (* Shift along if not empty and last update wasn't this slot *)
-    let is_this_slot = Global_slot.equal txn_global_slot last_action_slot in
+    let is_this_slot =
+      Global_slot_since_genesis.equal txn_global_slot last_action_slot
+    in
     let is_empty_or_this_slot = Bool.(is_empty ||| is_this_slot) in
     let s5 = Field.if_ is_empty_or_this_slot ~then_:s5' ~else_:s4' in
     let s4 = Field.if_ is_empty_or_this_slot ~then_:s4' ~else_:s3' in
     let s3 = Field.if_ is_empty_or_this_slot ~then_:s3' ~else_:s2' in
     let s2 = Field.if_ is_empty_or_this_slot ~then_:s2' ~else_:s1' in
     let last_action_slot =
-      Global_slot.if_ is_empty ~then_:last_action_slot ~else_:txn_global_slot
+      Global_slot_since_genesis.if_ is_empty ~then_:last_action_slot
+        ~else_:txn_global_slot
     in
     (([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t), last_action_slot)
 
@@ -1340,7 +1356,7 @@ module Make (Inputs : Inputs_intf) = struct
       in
       let vesting_period = Timing.vesting_period timing in
       (* Assert that timing is valid, otherwise we may have a division by 0. *)
-      assert_ ~pos:__POS__ Global_slot.(vesting_period > zero) ;
+      assert_ ~pos:__POS__ Global_slot_span.(vesting_period > zero) ;
       let a = Account.set_timing a timing in
       (a, local_state)
     in

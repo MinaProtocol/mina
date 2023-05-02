@@ -436,7 +436,8 @@ let batch_send_payments =
       { receiver : string
       ; amount : Currency.Amount.t
       ; fee : Currency.Fee.t
-      ; valid_until : Mina_numbers.Global_slot.t option [@sexp.option]
+      ; valid_until : Mina_numbers.Global_slot_since_genesis.t option
+            [@sexp.option]
       }
     [@@deriving sexp]
   end in
@@ -453,7 +454,8 @@ let batch_send_payments =
           { Payment_info.receiver =
               Public_key.(
                 Compressed.to_base58_check (compress keypair.public_key))
-          ; valid_until = Some (Mina_numbers.Global_slot.random ())
+          ; valid_until =
+              Some (Mina_numbers.Global_slot_since_genesis.random ())
           ; amount = Currency.Amount.of_nanomina_int_exn (Random.int 100)
           ; fee = Currency.Fee.of_nanomina_int_exn (Random.int 100)
           }

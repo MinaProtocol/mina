@@ -7,8 +7,12 @@ let succ = UInt32.succ
 
 let equal a b = UInt32.compare a b = 0
 
-let of_global_slot ~(constants : Constants.t) (s : Global_slot.t) : t =
-  UInt32.Infix.(Global_slot.slot_number s / constants.slots_per_sub_window)
+let of_global_slot ~(constants : Constants.t) (slot : Global_slot.t) : t =
+  let slot_number_u32 =
+    Mina_numbers.Global_slot_since_genesis.to_uint32
+    @@ Global_slot.slot_number slot
+  in
+  UInt32.Infix.(slot_number_u32 / constants.slots_per_sub_window)
 
 let sub_window ~(constants : Constants.t) t =
   UInt32.rem t constants.sub_windows_per_window
@@ -22,7 +26,7 @@ let sub a b = UInt32.sub a b
 let constant a = a
 
 module Checked = struct
-  module T = Mina_numbers.Global_slot
+  module T = Mina_numbers.Global_slot_since_genesis
 
   type t = T.Checked.t
 

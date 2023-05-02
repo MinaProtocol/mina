@@ -129,7 +129,7 @@ module Transaction_key = struct
     in
     let _partial_stmt =
       Mina_ledger.Ledger.apply_transaction_first_pass ~constraint_constants
-        ~global_slot:Mina_numbers.Global_slot.zero
+        ~global_slot:Mina_numbers.Global_slot_since_genesis.zero
         ~txn_state_view:Transaction_snark_tests.Util.genesis_state_view
         second_pass_ledger
         (Mina_transaction.Transaction.Command (Zkapp_command p))
@@ -137,7 +137,7 @@ module Transaction_key = struct
     in
     let segments =
       Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
-        ~global_slot:Mina_numbers.Global_slot.zero
+        ~global_slot:Mina_numbers.Global_slot_since_genesis.zero
         ~state_body:Transaction_snark_tests.Util.genesis_state_body
         ~fee_excess:Currency.Amount.Signed.zero
         [ ( `Pending_coinbase_init_stack Pending_coinbase.Stack.empty
@@ -147,7 +147,8 @@ module Transaction_key = struct
               ; target =
                   Pending_coinbase.Stack.push_state
                     Transaction_snark_tests.Util.genesis_state_body_hash
-                    Mina_numbers.Global_slot.zero Pending_coinbase.Stack.empty
+                    Mina_numbers.Global_slot_since_genesis.zero
+                    Pending_coinbase.Stack.empty
               }
           , `Ledger ledger
           , `Ledger second_pass_ledger

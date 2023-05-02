@@ -28,7 +28,7 @@ module Common = struct
       , Public_key.Compressed.V1.t
       , Mina_base_token_id.V2.t
       , Mina_numbers.Account_nonce.V1.t
-      , Mina_numbers.Global_slot.V1.t
+      , Mina_numbers.Global_slot_since_genesis.V1.t
       , Mina_base_signed_command_memo.V1.t )
       Poly.V1.t
   end
@@ -38,7 +38,7 @@ module Common = struct
       ( Currency.Fee.V1.t
       , Public_key.Compressed.V1.t
       , Mina_numbers.Account_nonce.V1.t
-      , Mina_numbers.Global_slot.V1.t
+      , Mina_numbers.Global_slot_since_genesis.V1.t
       , Mina_base_signed_command_memo.V1.t )
       Poly.V2.t
   end

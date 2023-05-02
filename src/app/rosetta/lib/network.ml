@@ -284,7 +284,7 @@ module Status = struct
           stateHash = "GENESIS_HASH";
           protocolState = {
             consensusState = {
-              blockHeight = Mina_numbers.Global_slot.of_int 1;
+              blockHeight = Mina_numbers.Global_slot_since_genesis.of_int 1;
             };
           };
         };

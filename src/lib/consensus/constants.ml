@@ -238,7 +238,9 @@ let create' (type a b c)
         slots
     | Some f ->
         M.( + )
-          (M.constant (Unsigned.UInt32.to_int f.previous_global_slot))
+          (M.constant
+             (Mina_numbers.Global_slot_since_genesis.to_int
+                f.previous_global_slot ) )
           slots
   in
   let res : (a, b, c) Poly.t =

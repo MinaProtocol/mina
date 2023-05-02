@@ -33,7 +33,7 @@ let new_delegate =
 let make_common ~fee ~fee_payer_pk ~nonce ~valid_until memo =
   let fee = Currency.Fee.of_nanomina_int_exn fee in
   let nonce = Account.Nonce.of_int nonce in
-  let valid_until = Mina_numbers.Global_slot.of_int valid_until in
+  let valid_until = Mina_numbers.Global_slot_since_genesis.of_int valid_until in
   let memo = Signed_command_memo.create_from_string_exn memo in
   Signed_command_payload.Common.Poly.
     { fee; fee_payer_pk; nonce; valid_until; memo }

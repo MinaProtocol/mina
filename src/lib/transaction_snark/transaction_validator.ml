@@ -60,9 +60,9 @@ let%test_unit "invalid transactions do not dirty the ledger" =
       (Account.create_timed sender_id
          (Balance.of_nanomina_int_exn 20)
          ~initial_minimum_balance:(Balance.of_nanomina_int_exn 20)
-         ~cliff_time:(Global_slot.of_int 1)
+         ~cliff_time:(Global_slot_since_genesis.of_int 1)
          ~cliff_amount:(Amount.of_nanomina_int_exn 10)
-         ~vesting_period:(Global_slot.of_int 1)
+         ~vesting_period:(Global_slot_span.of_int 1)
          ~vesting_increment:(Amount.of_nanomina_int_exn 1) )
   in
   let receiver_pk =
@@ -95,7 +95,8 @@ let%test_unit "invalid transactions do not dirty the ledger" =
   Ledger.create_new_account_exn ledger receiver_id receiver_account ;
   ( match
       apply_user_command ~constraint_constants
-        ~txn_global_slot:(Global_slot.of_int 1) ledger invalid_command
+        ~txn_global_slot:(Global_slot_since_genesis.of_int 1)
+        ledger invalid_command
     with
   | Ok _ ->
       failwith "successfully applied an invalid transaction"

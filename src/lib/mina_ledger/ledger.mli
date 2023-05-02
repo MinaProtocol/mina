@@ -115,20 +115,20 @@ val create_new_account_exn : t -> Account_id.t -> Account.t -> unit
 val update_action_state :
      Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
   -> Zkapp_account.Actions.t
-  -> txn_global_slot:Mina_numbers.Global_slot.t
-  -> last_action_slot:Mina_numbers.Global_slot.t
+  -> txn_global_slot:Mina_numbers.Global_slot_since_genesis.t
+  -> last_action_slot:Mina_numbers.Global_slot_since_genesis.t
   -> Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
-     * Mina_numbers.Global_slot.t
+     * Mina_numbers.Global_slot_since_genesis.t
 
 val has_locked_tokens :
-     global_slot:Mina_numbers.Global_slot.t
+     global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> account_id:Account_id.t
   -> t
   -> bool Or_error.t
 
 val merkle_root_after_zkapp_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> global_slot:Mina_numbers.Global_slot.t
+  -> global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
   -> t
   -> Zkapp_command.Valid.t
@@ -136,7 +136,7 @@ val merkle_root_after_zkapp_command_exn :
 
 val merkle_root_after_user_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_global_slot:Mina_numbers.Global_slot.t
+  -> txn_global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> t
   -> Signed_command.With_valid_signature.t
   -> Ledger_hash.t
@@ -171,12 +171,12 @@ module For_tests : sig
   val validate_timing_with_min_balance :
        account:Account.t
     -> txn_amount:Amount.t
-    -> txn_global_slot:Global_slot.t
+    -> txn_global_slot:Global_slot_since_genesis.t
     -> (Account.Timing.t * [> `Min_balance of Balance.t ]) Or_error.t
 
   val validate_timing :
        account:Account.t
     -> txn_amount:Amount.t
-    -> txn_global_slot:Global_slot.t
+    -> txn_global_slot:Global_slot_since_genesis.t
     -> Account.Timing.t Or_error.t
 end

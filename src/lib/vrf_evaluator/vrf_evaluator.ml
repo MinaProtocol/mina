@@ -2,7 +2,7 @@ open Core
 open Async
 open Signature_lib
 module Epoch = Mina_numbers.Length
-module Global_slot = Mina_numbers.Global_slot
+module Global_slot_since_genesis = Mina_numbers.Global_slot_since_genesis
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -13,7 +13,7 @@ module type CONTEXT = sig
 end
 
 (*Slot number within an epoch*)
-module Slot = Mina_numbers.Global_slot
+module Slot = Mina_numbers.Global_slot_since_genesis
 
 (* Can extract both slot numbers and epoch number*)
 module Consensus_time = Consensus.Data.Consensus_time
@@ -40,13 +40,14 @@ module Evaluator_status = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = At of Global_slot.Stable.V1.t | Completed
+      type t = At of Global_slot_since_genesis.Stable.V1.t | Completed
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t = At of Global_slot.t | Completed [@@deriving sexp]
+  type t = Stable.Latest.t = At of Global_slot_since_genesis.t | Completed
+  [@@deriving sexp]
 end
 
 module Vrf_evaluation_result = struct
@@ -96,7 +97,7 @@ module Worker_state = struct
         (Epoch.t * Slot.t) Public_key.Compressed.Table.t
     ; slots_won : Consensus.Data.Slot_won.t Queue.t
           (*possibly multiple producers per slot*)
-    ; mutable current_slot : Global_slot.t option
+    ; mutable current_slot : Global_slot_since_genesis.t option
     ; mutable epoch_data :
         unit Ivar.t * Consensus.Data.Epoch_data_for_vrf.t option
     ; mutable block_producer_keys : Block_producer_keys.t
@@ -151,7 +152,7 @@ module Worker_state = struct
         let%bind () =
           Interruptible.lift Deferred.unit (Ivar.read interrupt_ivar)
         in
-        let module Slot = Mina_numbers.Global_slot in
+        let module Slot = Mina_numbers.Global_slot_since_genesis in
         let epoch = epoch_data.epoch in
         [%log info] "Starting VRF evaluation for epoch: $epoch"
           ~metadata:[ ("epoch", Epoch.to_yojson epoch) ] ;
@@ -170,7 +171,9 @@ module Worker_state = struct
         let evaluate_vrf ~consensus_time =
           (* Try vrfs for all keypairs that are unseen within this slot until one wins or all lose *)
           (* TODO: Don't do this, and instead pick the one that has the highest chance of winning. See #2573 *)
-          let slot = Consensus_time.slot consensus_time in
+          let slot : Slot.t =
+            Slot.of_uint32 @@ Consensus_time.slot consensus_time
+          in
           let global_slot = Consensus_time.to_global_slot consensus_time in
           [%log info] "Checking VRF evaluations for epoch: $epoch, slot: $slot"
             ~metadata:
@@ -182,8 +185,11 @@ module Worker_state = struct
                 Interruptible.return None
             | ((keypair : Keypair.t), public_key_compressed) :: keypairs -> (
                 let global_slot_since_genesis =
-                  let slot_diff =
-                    match Global_slot.sub global_slot start_global_slot with
+                  let slot_diff : Mina_numbers.Global_slot_span.t =
+                    match
+                      Global_slot_since_genesis.diff global_slot
+                        start_global_slot
+                    with
                     | None ->
                         failwith
                           "Checking slot-winner for a slot which is older than \
@@ -192,7 +198,8 @@ module Worker_state = struct
                     | Some diff ->
                         diff
                   in
-                  Global_slot.add start_global_slot_since_genesis slot_diff
+                  Global_slot_since_genesis.add start_global_slot_since_genesis
+                    slot_diff
                 in
                 [%log info]
                   "Checking VRF evaluations at epoch: $epoch, slot: $slot"
@@ -231,7 +238,7 @@ module Worker_state = struct
           go keypairs
         in
         let rec find_winning_slot (consensus_time : Consensus_time.t) =
-          let slot = Consensus_time.slot consensus_time in
+          let slot = Slot.of_uint32 @@ Consensus_time.slot consensus_time in
           let global_slot = Consensus_time.to_global_slot consensus_time in
           t.current_slot <- Some global_slot ;
           let epoch' = Consensus_time.epoch consensus_time in
@@ -265,7 +272,7 @@ module Worker_state = struct
     ; slots_won =
         Queue.create
           ~capacity:
-            (Global_slot.to_int config.consensus_constants.slots_per_epoch)
+            (Unsigned.UInt32.to_int config.consensus_constants.slots_per_epoch)
           ()
     ; current_slot = None
     ; epoch_data = (Ivar.create (), None)

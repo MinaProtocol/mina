@@ -171,7 +171,7 @@ module Payload_common = struct
     , Public_key.Compressed.t
     , Token_id.t
     , Mina_numbers.Account_nonce.t
-    , Mina_numbers.Global_slot.t
+    , Mina_numbers.Global_slot_since_genesis.t
     , Signed_command_memo.t )
     Poly.t
   [@@deriving sexp]
@@ -186,7 +186,7 @@ module Payload_common = struct
       , Public_key.Compressed.var
       , Token_id.Checked.t
       , Mina_numbers.Account_nonce.Checked.t
-      , Mina_numbers.Global_slot.Checked.t
+      , Mina_numbers.Global_slot_since_genesis.Checked.t
       , Signed_command_memo.Checked.t )
       Poly.t
 
@@ -198,7 +198,8 @@ module Payload_common = struct
       ; fee_token = Token_id.Checked.constant fee_token
       ; nonce = Mina_numbers.Account_nonce.Checked.constant nonce
       ; memo = Signed_command_memo.Checked.constant memo
-      ; valid_until = Mina_numbers.Global_slot.Checked.constant valid_until
+      ; valid_until =
+          Mina_numbers.Global_slot_since_genesis.Checked.constant valid_until
       }
   end
 
@@ -209,7 +210,7 @@ module Payload_common = struct
       ; Token_id.typ
       ; Public_key.Compressed.typ
       ; Mina_numbers.Account_nonce.typ
-      ; Mina_numbers.Global_slot.typ
+      ; Mina_numbers.Global_slot_since_genesis.typ
       ; Signed_command_memo.typ
       ]
       ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist ~var_of_hlist:of_hlist
