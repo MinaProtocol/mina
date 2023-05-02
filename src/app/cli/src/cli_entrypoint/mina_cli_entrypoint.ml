@@ -944,7 +944,7 @@ let setup_daemon logger =
                   "You cannot provide both `block-producer-key` and \
                    `block_production_pubkey`"
             | None, None -> (
-                match Sys.getenv "PRIVATE_KEY" with
+                match Core_kernel.Sys.getenv_opt "PRIVATE_KEY" with
                 | Some env_key ->
                     let private_key =
                       Signature_lib.Private_key.of_base58_check_exn env_key
