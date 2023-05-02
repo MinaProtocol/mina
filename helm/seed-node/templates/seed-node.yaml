@@ -17,6 +17,7 @@ spec:
         app: {{ $config.name }}
         testnet: {{ $.Values.testnetName }}
         role: seed
+        billing: itn3-testnet
         class: {{ default "undefined" $config.class }}
         version: {{ trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-" }}
         syncStatus: INIT

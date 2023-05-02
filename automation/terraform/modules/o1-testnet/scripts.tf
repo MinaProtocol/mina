@@ -13,10 +13,10 @@ resource "null_resource" "block_producer_uploads" {
       CLUSTER = var.k8s_context
     }
   }
-  # depends_on = [
-  #   module.kubernetes_testnet.testnet_namespace,
-  #   null_resource.block_producer_key_generation
-  # ]
+  depends_on = [
+    module.kubernetes_testnet.testnet_namespace,
+    # null_resource.block_producer_key_generation
+  ]
 }
 
 resource "null_resource" "seed_list" {
@@ -24,8 +24,8 @@ resource "null_resource" "seed_list" {
     working_dir = "${path.module}/../../.."
     command     = "./scripts/make-seeds-list.sh --testnet=${var.testnet_name} --artifact-path=${var.artifact_path}"
   }
-  # depends_on = [
-  #   module.kubernetes_testnet.testnet_namespace,
-  #   null_resource.block_producer_key_generation
-  # ]
+  depends_on = [
+    module.kubernetes_testnet.testnet_namespace,
+    # null_resource.block_producer_key_generation
+  ]
 }

@@ -15,6 +15,7 @@ spec:
       labels:
         app: {{ template "archive-node.fullname" . }}
         testnet: {{ .Values.testnetName }}
+        billing: itn3-testnet
         role: archive-node
         version: {{ trunc 6 (split ":" .Values.mina.image)._1 | trimSuffix "-" }}
         {{- if .Values.archive.enableLocalDaemon }}

@@ -16,6 +16,7 @@ spec:
         app: {{$.Values.coordinatorName}}
         testnet: {{ $.Values.testnetName }}
         role: snark-coordinator
+        billing: itn3-testnet
         version: {{ trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-" }}
         syncStatus: INIT
       annotations:
