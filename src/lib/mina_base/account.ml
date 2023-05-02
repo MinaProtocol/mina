@@ -878,13 +878,12 @@ let gen_any_vesting_range =
   let%map cliff_time = gen_incl (of_int 1) vesting_end in
   (cliff_time, vesting_end, vesting_period)
 
-let gen_at_least_one_vesting_period ?(min_vesting_periods = 1) =
+let gen_at_least_one_vesting_period ~min_vesting_periods =
   let open Quickcheck.Generator.Let_syntax in
   let open Global_slot in
   (* vesting period must be at least one to avoid division by zero *)
-  let%bind vesting_period =
-    min_vesting_periods |> return >>| Global_slot.of_int
-  in
+  assert (Int.(min_vesting_periods >= 1)) ;
+  let vesting_period = Global_slot.of_int min_vesting_periods in
   let min_vesting_end = succ vesting_period in
   let%bind vesting_end = gen_incl min_vesting_end max_value in
   let max_cliff_time = Option.value_exn @@ sub vesting_end vesting_period in
