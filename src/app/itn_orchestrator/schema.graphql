@@ -53,8 +53,12 @@ type mutation {
     """Payments details"""
     input: PaymentsDetails!
   ): String!
-  stopPayments(
-    """Payment scheduler handle"""
+  scheduleZkappCommands(
+    """Zkapp commands details"""
+    input: ZkappCommandsDetails!
+  ): String!
+  stopScheduledTransactions(
+    """Transaction scheduler handle"""
     handle: String!
   ): String!
   updateGating(
@@ -113,6 +117,43 @@ type query {
 
   """Slots won by a block producer for current epoch"""
   slotsWon: [Int!]!
+}
+
+"""Keys and other information for scheduling zkapp commands"""
+input ZkappCommandsDetails {
+  """Prefix of memo"""
+  memoPrefix: String!
+
+  """Length of scheduler run"""
+  durationInMinutes: Int!
+
+  """Frequency of transactions"""
+  transactionsPerSecond: Float!
+
+  """Number of zkapp accounts that the scheduler generates during the test"""
+  numNewAccounts: Int!
+
+  """Number of zkapp accounts that we deploy for the purpose of test"""
+  numZkappsToDeploy: Int!
+
+  """
+  Private keys of fee payers (fee payers also function as the account creators)
+  """
+  feePayers: [PrivateKey!]!
+
+  noPrecondition: Boolean!
+
+  minBalanceChange: String!
+
+  maxBalanceChange: String!
+
+  initBalance: String!
+
+  minFee: String! 
+
+  maxFee: String! 
+
+  deploymentFee: String!
 }
 
 """String representing a uint16 number in base 10"""
