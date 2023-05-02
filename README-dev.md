@@ -1,4 +1,4 @@
-# Mina
+# Mina README-dev
 
 Mina is a cryptocurrency protocol with a lightweight, constant-sized blockchain.
 
