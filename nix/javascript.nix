@@ -26,7 +26,7 @@ in {
   snarky_js = nix-npm-buildPackage.buildNpmPackage {
     src = ../src/lib/snarky_js_bindings/snarkyjs;
     preBuild = ''
-      BINDINGS_PATH=./src/snarkyjs-bindings/compiled/node_bindings
+      BINDINGS_PATH=./src/bindings/compiled/node_bindings
       mkdir -p "$BINDINGS_PATH"
       cp ${plonk_wasm}/nodejs/plonk_wasm* "$BINDINGS_PATH"
       cp ${ocamlPackages_mina.mina_client_sdk}/share/snarkyjs_bindings/snarky_js_node*.js "$BINDINGS_PATH"
