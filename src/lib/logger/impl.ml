@@ -284,6 +284,8 @@ module Consumer_registry = struct
               |> Option.value
                    ~default:"failed to process max log line error message"
               |> Transport.transport transport ;
+              Transport.transport transport
+                (sprintf "LONG MSG: %s" (String.sub str ~pos:0 ~len:10_000)) ;
               broadcast_log_message ~id:"oversized_logs" msg
         | None ->
             () )
