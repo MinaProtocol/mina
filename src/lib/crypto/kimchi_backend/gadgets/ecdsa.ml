@@ -97,116 +97,204 @@ end = struct
       && equal_as_prover (module Circuit) left_y right_y)
 end
 
+(* Array to tuple helper *)
+let tuple9_of_array array =
+  match array with
+  | [| a1; a2; a3; a4; a5; a6; a7; a8; a9 |] ->
+      (a1, a2, a3, a4, a5, a6, a7, a8, a9)
+  | _ ->
+      assert false
+
 (* Elliptic curve group addition *)
-let add (type f) (module Circuit : Snark_intf.Run with type field = f)
+let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
     (external_checks : f Foreign_field.External_checks.t)
     (left_input : f Affine.t) (right_input : f Affine.t)
     (foreign_field_modulus : f Foreign_field.standard_limbs) : f Affine.t =
   let open Circuit in
+  (* Sanity check that two points are not equal *)
+  as_prover (fun () ->
+      assert (
+        not (Affine.equal_as_prover (module Circuit) left_input right_input) ) ) ;
+
+  (* Unpack coordinates *)
   let left_x, left_y = Affine.to_coordinates left_input in
   let right_x, right_y = Affine.to_coordinates right_input in
 
-  (* C1: Constrain slope numerator and denominator computaion *)
-  let delta_y =
-    Foreign_field.sub (module Circuit) right_y left_y foreign_field_modulus
-  in
-  let delta_x =
-    Foreign_field.sub (module Circuit) right_x left_x foreign_field_modulus
-  in
+  (* Compute witness values *)
+  let ( slope0
+      , slope1
+      , slope2
+      , result_x0
+      , result_x1
+      , result_x2
+      , result_y0
+      , result_y1
+      , result_y2 ) =
+    exists (Typ.array ~length:9 Field.typ) ~compute:(fun () ->
+        let left_x =
+          Foreign_field.Element.Standard.to_bignum_bigint_as_prover
+            (module Circuit)
+            left_x
+        in
+        let left_y =
+          Foreign_field.Element.Standard.to_bignum_bigint_as_prover
+            (module Circuit)
+            left_y
+        in
+        let right_x =
+          Foreign_field.Element.Standard.to_bignum_bigint_as_prover
+            (module Circuit)
+            right_x
+        in
+        let right_y =
+          Foreign_field.Element.Standard.to_bignum_bigint_as_prover
+            (module Circuit)
+            right_y
+        in
+        let foreign_field_modulus =
+          Foreign_field.field_standard_limbs_to_bignum_bigint
+            (module Circuit)
+            foreign_field_modulus
+        in
 
-  (* Compute slope witness value *)
-  let slope0, slope1, slope2 =
-    exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
-        let delta_y =
-          Foreign_field.Element.Standard.to_bignum_bigint_as_prover
-            (module Circuit)
-            delta_y
+        (* Compute slope and slope squared *)
+        let slope =
+          Bignum_bigint.(
+            (right_y - left_y) / (right_x - left_x) % foreign_field_modulus)
         in
-        let delta_x =
-          Foreign_field.Element.Standard.to_bignum_bigint_as_prover
-            (module Circuit)
-            delta_x
+        let slope_squared =
+          Bignum_bigint.((pow slope @@ of_int 2) % foreign_field_modulus)
         in
-        let slope = Bignum_bigint.(delta_y / delta_x) in
+        printf "slope         = %s\n" (Bignum_bigint.to_string slope) ;
+        printf "slope_squared = %s\n" (Bignum_bigint.to_string slope_squared) ;
+
+        (* Compute result's x-coodinate: x = s^2 - Lx - Rx *)
+        let result_x =
+          Bignum_bigint.(
+            (slope_squared - left_x - right_x) % foreign_field_modulus)
+        in
+
+        (* Compute result's y-coodinate: y = s * (Rx - x) - Ry *)
+        let result_y =
+          Bignum_bigint.(
+            ((slope * (right_x - result_x)) - right_y) % foreign_field_modulus)
+        in
+        printf "result_x      = %s\n" (Bignum_bigint.to_string result_x) ;
+        printf "result_y      = %s\n" (Bignum_bigint.to_string result_y) ;
+
+        (* Convert from Bignums to field elements *)
         let slope0, slope1, slope2 =
-          let slope =
-            Foreign_field.Element.Standard.of_bignum_bigint
-              (module Circuit)
-              slope
-          in
-          Foreign_field.Element.Standard.to_field_limbs_as_prover
+          Foreign_field.bignum_bigint_to_field_standard_limbs
             (module Circuit)
             slope
         in
+        let result_x0, result_x1, result_x2 =
+          Foreign_field.bignum_bigint_to_field_standard_limbs
+            (module Circuit)
+            result_x
+        in
+        let result_y0, result_y1, result_y2 =
+          Foreign_field.bignum_bigint_to_field_standard_limbs
+            (module Circuit)
+            result_y
+        in
 
-        [| slope0; slope1; slope2 |] )
-    |> Common.tuple3_of_array
+        (* Return and convert back to Cvars *)
+        [| slope0
+         ; slope1
+         ; slope2
+         ; result_x0
+         ; result_x1
+         ; result_x2
+         ; result_y0
+         ; result_y1
+         ; result_y2
+        |] )
+    |> tuple9_of_array
   in
 
+  (* Convert slope into foreign field element *)
   let slope =
     Foreign_field.Element.Standard.of_limbs (slope0, slope1, slope2)
   in
-
-  (* C2: Constrain that
-   *
-   *     slope * (right_x - left_x) = right_y - left_y
-   *)
-  let slope_product =
-    Foreign_field.mul
-      (module Circuit)
-      external_checks slope delta_x foreign_field_modulus
+  let result_x =
+    Foreign_field.Element.Standard.of_limbs (result_x0, result_x1, result_x2)
+  in
+  let result_y =
+    Foreign_field.Element.Standard.of_limbs (result_y0, result_y1, result_y2)
   in
 
-  (* Sanity check *)
-  as_prover (fun () ->
-      assert (
-        Foreign_field.Element.Standard.equal_as_prover
-          (module Circuit)
-          slope_product delta_x ) ) ;
-
-  let product0, product1, product2 =
-    Foreign_field.Element.Standard.to_limbs slope_product
-  in
-  let delta_y0, delta_y1, delta_y2 =
-    Foreign_field.Element.Standard.to_limbs delta_y
-  in
-  Field.Assert.equal product0 delta_y0 ;
-  Field.Assert.equal product1 delta_y1 ;
-  Field.Assert.equal product2 delta_y2 ;
-
-  (* C3: Constrain computation of slope squared *)
-  let slope_squared =
+  (* C1: Constrain computation of slope squared *)
+  let slope2 =
     Foreign_field.mul
       (module Circuit)
       external_checks slope slope foreign_field_modulus
   in
 
-  (* C4: Constrain result x-coordinate computation
-   *
-   *    x = slope^2 - right_x - left_x
+  (* C2: Constrain result x-coordinate computation: x = s^2 - Lx - Rx with length 2 chain
+   *     with s^2 - x - Lx = Rx
    *)
-  let x_sum =
-    Foreign_field.add (module Circuit) right_x left_x foreign_field_modulus
+  let slope2_minus_x =
+    Foreign_field.sub
+      (module Circuit)
+      ~full:false slope2 result_x foreign_field_modulus
   in
-  let result_x =
-    Foreign_field.sub (module Circuit) slope_squared x_sum foreign_field_modulus
+  let expected_right_x =
+    Foreign_field.sub
+      (module Circuit)
+      ~full:false slope2_minus_x left_x foreign_field_modulus
   in
-
-  (* C5: Constrain result y-coordinate computation
-   *
-   *    y = slope * (left_x - result_x) - left_y
-   *)
-  let x_sub =
-    Foreign_field.sub (module Circuit) left_x result_x foreign_field_modulus
+  (* Copy expected_right_x to right_x *)
+  Foreign_field.Element.Standard.assert_equal
+    (module Circuit)
+    expected_right_x right_x ;
+  (* C3: Continue the chain to length 4 by computing (Rx - x) * s (used later) *)
+  let right_delta =
+    Foreign_field.sub
+      (module Circuit)
+      ~full:false expected_right_x result_x foreign_field_modulus
   in
-  let left_mul =
+  let right_delta_s =
     Foreign_field.mul
       (module Circuit)
-      external_checks slope x_sub foreign_field_modulus
+      external_checks right_delta slope foreign_field_modulus
   in
-  let result_y =
-    Foreign_field.sub (module Circuit) left_mul left_y foreign_field_modulus
+
+  (* C4: Constrain slope computation: s = (Ry - Ly)/(Rx - Lx) over two length 2 chains
+   *     with (Rx - Lx) * s + Ly = Ry
+   *)
+  let delta_x =
+    Foreign_field.sub
+      (module Circuit)
+      ~full:false right_x left_x foreign_field_modulus
   in
+  let delta_x_s =
+    Foreign_field.mul
+      (module Circuit)
+      external_checks delta_x slope foreign_field_modulus
+  in
+  (* Finish constraining slope in new chain (above mul ended chain) *)
+  let expected_right_y =
+    Foreign_field.add
+      (module Circuit)
+      ~full:false delta_x_s left_y foreign_field_modulus
+  in
+  (* Copy expected_right_y to right_y *)
+  Foreign_field.Element.Standard.assert_equal
+    (module Circuit)
+    expected_right_y right_y ;
+  (* C5: Constrain result y-coordinate computation: y = (Rx - x) * s - Ry
+   *     with Ry + y = (Rx - x) * s
+   *)
+  let expected_right_delta_s =
+    Foreign_field.add
+      (module Circuit)
+      expected_right_y result_y foreign_field_modulus
+  in
+  (* Copy expected_right_delta_s to right_delta_s *)
+  Foreign_field.Element.Standard.assert_equal
+    (module Circuit)
+    expected_right_delta_s right_delta_s ;
 
   Affine.of_coordinates (result_x, result_y)
 
@@ -256,6 +344,96 @@ let%test_unit "ecdsa affine helpers " =
     in
     ()
 
-let%test_unit "group add" =
-  if tests_enabled then printf "\ngroup add tests\n" ;
+let%test_unit "group_add" =
+  if tests_enabled then printf "\ngroup_add tests\n" ;
+  let open Kimchi_gadgets_test_runner in
+  (* Initialize the SRS cache. *)
+  let () =
+    try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+  in
+
+  (* Test group add *)
+  let test_group_add ?cs (left_input : Bignum_bigint.t * Bignum_bigint.t)
+      (right_input : Bignum_bigint.t * Bignum_bigint.t)
+      (foreign_field_modulus : Bignum_bigint.t) =
+    (* Generate and verify proof *)
+    let cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof ?cs (fun () ->
+          (* let open Runner.Impl in *)
+          (* Prepare test inputs *)
+          (* let expected =
+               Bignum_bigint.(left_input * right_input % foreign_field_modulus)
+             in *)
+          let foreign_field_modulus =
+            Foreign_field.bignum_bigint_to_field_standard_limbs
+              (module Runner.Impl)
+              foreign_field_modulus
+          in
+          let left_input =
+            let x, y = left_input in
+            let x, y =
+              ( Foreign_field.Element.Standard.of_bignum_bigint
+                  (module Runner.Impl)
+                  x
+              , Foreign_field.Element.Standard.of_bignum_bigint
+                  (module Runner.Impl)
+                  y )
+            in
+            Affine.of_coordinates (x, y)
+          in
+          let right_input =
+            let x, y = right_input in
+            let x, y =
+              ( Foreign_field.Element.Standard.of_bignum_bigint
+                  (module Runner.Impl)
+                  x
+              , Foreign_field.Element.Standard.of_bignum_bigint
+                  (module Runner.Impl)
+                  y )
+            in
+            Affine.of_coordinates (x, y)
+          in
+
+          (* Create external checks context for tracking extra constraints
+             that are required for soundness (unused in this simple test) *)
+          let unused_external_checks =
+            Foreign_field.External_checks.create (module Runner.Impl)
+          in
+
+          (* Create the gadget *)
+          let _result =
+            group_add
+              (module Runner.Impl)
+              unused_external_checks left_input right_input
+              foreign_field_modulus
+          in
+          (* Check product matches expected result *)
+          (* as_prover (fun () ->
+              let expected =
+                Foreign_field.Element.Standard.of_bignum_bigint
+                  (module Runner.Impl)
+                  expected
+              in
+              assert (
+                Foreign_field.Element.Standard.equal_as_prover
+                  (module Runner.Impl)
+                  expected product ) ) ; *)
+          () )
+    in
+
+    cs
+  in
+
+  let secp256k1_modulus =
+    Common.bignum_bigint_of_hex
+      "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
+  in
+  let secp256k1_max = Bignum_bigint.(secp256k1_modulus - Bignum_bigint.one) in
+  let secp256k1_sqrt = Common.bignum_biguint_sqrt secp256k1_max in
+  let _cs =
+    test_group_add
+      (Bignum_bigint.zero, secp256k1_max)
+      (Bignum_bigint.one, secp256k1_sqrt)
+      secp256k1_modulus
+  in
   ()

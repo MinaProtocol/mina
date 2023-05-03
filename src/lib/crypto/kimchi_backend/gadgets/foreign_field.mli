@@ -19,6 +19,16 @@ module Snark_intf = Snarky_backendless.Snark_intf
  *)
 type 'field standard_limbs = 'field * 'field * 'field
 
+val bignum_bigint_to_field_standard_limbs :
+     (module Snark_intf.Run with type field = 'field)
+  -> Bignum_bigint.t
+  -> 'field standard_limbs
+
+val field_standard_limbs_to_bignum_bigint :
+     (module Snark_intf.Run with type field = 'field)
+  -> 'field standard_limbs
+  -> Bignum_bigint.t
+
 (** Foreign field element base type - not used directly *)
 module type Element_intf = sig
   type 'field t
@@ -66,6 +76,13 @@ module type Element_intf = sig
     -> 'field t
     -> 'field t
     -> bool
+
+  (* Add copy constraints that two foreign field elements are equal *)
+  val assert_equal :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> 'field t
+    -> unit
 end
 
 module Element : sig

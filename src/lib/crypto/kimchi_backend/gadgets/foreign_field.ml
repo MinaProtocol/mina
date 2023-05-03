@@ -165,6 +165,13 @@ module type Element_intf = sig
     -> 'field t
     -> 'field t
     -> bool
+
+  (* Add copy constraints that two foreign field elements are equal *)
+  val assert_equal :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> 'field t
+    -> unit
 end
 
 (* Foreign field element structures *)
@@ -243,6 +250,16 @@ end = struct
       Field.Constant.(
         equal left0 right0 && equal left1 right1 && equal left2 right2)
 
+    let assert_equal (type field)
+        (module Circuit : Snark_intf.Run with type field = field)
+        (left : field t) (right : field t) : unit =
+      let open Circuit in
+      let left0, left1, left2 = to_limbs left in
+      let right0, right1, right2 = to_limbs right in
+      Field.Assert.equal left0 right0 ;
+      Field.Assert.equal left1 right1 ;
+      Field.Assert.equal left2 right2
+
     let fits_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         (modulus : field standard_limbs) : bool =
@@ -304,6 +321,15 @@ end = struct
       let left01, left2 = to_field_limbs_as_prover (module Circuit) left in
       let right01, right2 = to_field_limbs_as_prover (module Circuit) right in
       Field.Constant.(equal left01 right01 && equal left2 right2)
+
+    let assert_equal (type field)
+        (module Circuit : Snark_intf.Run with type field = field)
+        (left : field t) (right : field t) : unit =
+      let open Circuit in
+      let left01, left2 = to_limbs left in
+      let right01, right2 = to_limbs right in
+      Field.Assert.equal left01 right01 ;
+      Field.Assert.equal left2 right2
   end
 end
 
