@@ -59,7 +59,7 @@ spec:
         {{- end }}
         args: [ "daemon",
           "-log-level", "Debug",
-          # "-log-json",
+          "-log-json",
           "-config-directory", "/root/.mina-config",
           "-log-snark-work-gossip", "true",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
