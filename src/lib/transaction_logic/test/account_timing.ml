@@ -91,7 +91,9 @@ let%test_module "Test account timing." =
         let%bind amount = Amount.(gen_incl zero available_amount) in
         let final_slot =
           Global_slot_since_genesis.(
-            sub (Account.timing_final_vesting_slot account.timing) (of_int 1))
+            sub
+              (Account.timing_final_vesting_slot account.timing)
+              (Global_slot_span.of_int 1))
           |> Option.value ~default:Global_slot_since_genesis.zero
         in
         let%map slot = Global_slot_since_genesis.(gen_incl zero final_slot) in

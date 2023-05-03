@@ -958,7 +958,7 @@ let%test_module "Transaction union tests" =
           let cliff_time = Mina_numbers.Global_slot_since_genesis.of_int 1000 in
           let cliff_amount = Amount.of_nanomina_int_exn 10_000 in
           let vesting_period =
-            Mina_numbers.Global_slot_since_genesis.of_int 10
+            Mina_numbers.Global_slot_span.of_int 10
           in
           let vesting_increment = Amount.of_nanomina_int_exn 1 in
           let txn_global_slot =
@@ -1905,7 +1905,7 @@ let%test_module "Transaction union tests" =
             let cliff_time = Mina_numbers.Global_slot_since_genesis.of_int 2 in
             let cliff_amount = Amount.of_mina_int_exn 5 in
             let vesting_period =
-              Mina_numbers.Global_slot_since_genesis.of_int 2
+              Mina_numbers.Global_slot_span.of_int 2
             in
             let vesting_increment = Amount.of_mina_int_exn 40 in
             Or_error.ok_exn

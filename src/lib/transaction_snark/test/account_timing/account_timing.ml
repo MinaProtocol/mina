@@ -19,7 +19,7 @@ let%test_module "account timing check" =
         ?(initial_minimum_balance = Balance.of_mina_int_exn 10_000)
         ?(cliff_amount = Amount.zero)
         ?(cliff_time = Mina_numbers.Global_slot_since_genesis.of_int 1000)
-        ?(vesting_period = Mina_numbers.Global_slot_since_genesis.of_int 10)
+        ?(vesting_period = Mina_numbers.Global_slot_span.of_int 10)
         ?(vesting_increment = Amount.of_mina_int_exn 100) balance =
       let pk = Public_key.Compressed.empty in
       let account_id = Account_id.create pk token in
@@ -249,7 +249,7 @@ let%test_module "account timing check" =
         account_with_default_vesting_schedule
           ~cliff_amount:(Amount.of_mina_int_exn 10_000)
             (* The same as initial minimum balance. *)
-          ~vesting_period:(Mina_numbers.Global_slot_since_genesis.of_int 1)
+          ~vesting_period:(Mina_numbers.Global_slot_span.of_int 1)
           ~vesting_increment:Amount.zero
           (Balance.of_mina_int_exn 100_000)
       in
@@ -443,8 +443,7 @@ let%test_module "account timing check" =
                   ; cliff_time =
                       Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.of_nanomina_int_exn 100
-                  ; vesting_period =
-                      Mina_numbers.Global_slot_since_genesis.of_int 1
+                  ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -505,8 +504,7 @@ let%test_module "account timing check" =
                   ; cliff_time =
                       Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.of_nanomina_int_exn 100
-                  ; vesting_period =
-                      Mina_numbers.Global_slot_since_genesis.of_int 1
+                  ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -578,8 +576,7 @@ let%test_module "account timing check" =
                   ; cliff_time =
                       Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.of_mina_int_exn 9_995
-                  ; vesting_period =
-                      Mina_numbers.Global_slot_since_genesis.of_int 1
+                  ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -641,8 +638,7 @@ let%test_module "account timing check" =
                   ; cliff_time =
                       Mina_numbers.Global_slot_since_genesis.of_int 10000
                   ; cliff_amount = Currency.Amount.of_mina_int_exn 9_995
-                  ; vesting_period =
-                      Mina_numbers.Global_slot_since_genesis.of_int 1
+                  ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -691,8 +687,7 @@ let%test_module "account timing check" =
                   ; cliff_time =
                       Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.zero
-                  ; vesting_period =
-                      Mina_numbers.Global_slot_since_genesis.of_int 1
+                  ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -750,8 +745,7 @@ let%test_module "account timing check" =
                   ; cliff_time =
                       Mina_numbers.Global_slot_since_genesis.of_int 10000
                   ; cliff_amount = Currency.Amount.of_mina_int_exn 9_995
-                  ; vesting_period =
-                      Mina_numbers.Global_slot_since_genesis.of_int 1
+                  ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -799,8 +793,7 @@ let%test_module "account timing check" =
                   ; cliff_time =
                       Mina_numbers.Global_slot_since_genesis.of_int 10000
                   ; cliff_amount = Currency.Amount.of_mina_int_exn 9_995
-                  ; vesting_period =
-                      Mina_numbers.Global_slot_since_genesis.of_int 1
+                  ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -860,7 +853,7 @@ let%test_module "account timing check" =
           ; init_min_bal : Currency.Balance.t
           ; cliff_time : Mina_numbers.Global_slot_since_genesis.t
           ; cliff_amt : Currency.Amount.t
-          ; vest_period : Mina_numbers.Global_slot_since_genesis.t
+          ; vest_period : Mina_numbers.Global_slot_span.t
           ; vest_incr : Currency.Amount.t
           ; slot : Mina_numbers.Global_slot_since_genesis.t
           ; available_funds : Currency.Amount.t
@@ -896,7 +889,7 @@ let%test_module "account timing check" =
           in
           let%bind vest_period =
             unless_fixed ?fixed:vest_period
-              Global_slot_since_genesis.(gen_incl (of_int 1) (of_int 20))
+              Global_slot_span.(gen_incl (of_int 1) (of_int 20))
           in
           let to_vest =
             Amount.(
@@ -914,7 +907,7 @@ let%test_module "account timing check" =
           in
           let vest_time =
             if Amount.(vest_incr > zero) then
-              Global_slot_since_genesis.to_int vest_period
+              Global_slot_span.to_int vest_period
               * (to_vest / Amount.to_nanomina_int vest_incr)
             else 0
           in
@@ -936,7 +929,7 @@ let%test_module "account timing check" =
             in
             let vested =
               max 0 (slot_int - cliff_int)
-              / Mina_numbers.Global_slot_since_genesis.to_int vest_period
+              / Mina_numbers.Global_slot_span.to_int vest_period
               |> Amount.scale vest_incr
               |> Option.value ~default:Amount.max_int
             in
@@ -1186,8 +1179,7 @@ let%test_module "account timing check" =
                   ; cliff_time =
                       Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.of_nanomina_int_exn 100
-                  ; vesting_period =
-                      Mina_numbers.Global_slot_since_genesis.of_int 1
+                  ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -1257,8 +1249,7 @@ let%test_module "account timing check" =
                   ; cliff_time =
                       Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.of_nanomina_int_exn 100
-                  ; vesting_period =
-                      Mina_numbers.Global_slot_since_genesis.of_int 1
+                  ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -1339,8 +1330,7 @@ let%test_module "account timing check" =
                   ; cliff_time =
                       Mina_numbers.Global_slot_since_genesis.of_int 10000
                   ; cliff_amount = Currency.Amount.of_nanomina_int_exn 100
-                  ; vesting_period =
-                      Mina_numbers.Global_slot_since_genesis.of_int 1
+                  ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -1450,8 +1440,7 @@ let%test_module "account timing check" =
                        Mina_numbers.Global_slot_since_genesis.of_int 1000
                    ; cliff_amount =
                        Currency.Amount.of_nanomina_int_exn 100_000_000
-                   ; vesting_period =
-                       Mina_numbers.Global_slot_since_genesis.of_int 10
+                   ; vesting_period = Mina_numbers.Global_slot_span.of_int 10
                    ; vesting_increment =
                        Currency.Amount.of_nanomina_int_exn 100_000_000
                    }
@@ -1554,8 +1543,7 @@ let%test_module "account timing check" =
                   ; cliff_time =
                       Mina_numbers.Global_slot_since_genesis.of_int 10000
                   ; cliff_amount = Currency.Amount.of_mina_int_exn 100_000
-                  ; vesting_period =
-                      Mina_numbers.Global_slot_since_genesis.of_int 1
+                  ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -1642,8 +1630,7 @@ let%test_module "account timing check" =
                   ; cliff_time =
                       Mina_numbers.Global_slot_since_genesis.of_int 10000
                   ; cliff_amount = Currency.Amount.of_mina_int_exn 100_000
-                  ; vesting_period =
-                      Mina_numbers.Global_slot_since_genesis.of_int 1
+                  ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -1713,8 +1700,7 @@ let%test_module "account timing check" =
                   ; cliff_time =
                       Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.zero
-                  ; vesting_period =
-                      Mina_numbers.Global_slot_since_genesis.of_int 1
+                  ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                   ; vesting_increment =
                       Currency.Amount.of_nanomina_int_exn 100_000
                   }
@@ -1790,8 +1776,7 @@ let%test_module "account timing check" =
                   ; cliff_time =
                       Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.zero
-                  ; vesting_period =
-                      Mina_numbers.Global_slot_since_genesis.of_int 1
+                  ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                   ; vesting_increment =
                       Currency.Amount.of_nanomina_int_exn 100_000
                   }
@@ -1876,8 +1861,7 @@ let%test_module "account timing check" =
                   ; cliff_time =
                       Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.zero
-                  ; vesting_period =
-                      Mina_numbers.Global_slot_since_genesis.of_int 1
+                  ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                   ; vesting_increment = Currency.Amount.of_mina_int_exn 1
                   }
               in
@@ -1951,8 +1935,7 @@ let%test_module "account timing check" =
                   ; cliff_time =
                       Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.zero
-                  ; vesting_period =
-                      Mina_numbers.Global_slot_since_genesis.of_int 1
+                  ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                   ; vesting_increment = Currency.Amount.of_mina_int_exn 1
                   }
               in
@@ -2044,8 +2027,7 @@ let%test_module "account timing check" =
                    ; cliff_time =
                        Mina_numbers.Global_slot_since_genesis.of_int 10
                    ; cliff_amount = Currency.Amount.of_mina_int_exn 1
-                   ; vesting_period =
-                       Mina_numbers.Global_slot_since_genesis.of_int 10
+                   ; vesting_period = Mina_numbers.Global_slot_span.of_int 10
                    ; vesting_increment = Currency.Amount.of_mina_int_exn 1
                    }
                    : Account_update.Update.Timing_info.value )
@@ -2125,7 +2107,7 @@ let%test_module "account timing check" =
                            Mina_numbers.Global_slot_since_genesis.of_int 10
                        ; cliff_amount = Currency.Amount.of_mina_int_exn 1
                        ; vesting_period =
-                           Mina_numbers.Global_slot_since_genesis.of_int 10
+                           Mina_numbers.Global_slot_span.of_int 10
                        ; vesting_increment = Currency.Amount.of_mina_int_exn 1
                        }
                        : Account_update.Update.Timing_info.value )
@@ -2180,8 +2162,7 @@ let%test_module "account timing check" =
                       ; cliff_time =
                           Mina_numbers.Global_slot_since_genesis.of_int 10_000
                       ; cliff_amount = Currency.Amount.zero
-                      ; vesting_period =
-                          Mina_numbers.Global_slot_since_genesis.of_int 1
+                      ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                       ; vesting_increment =
                           Currency.Amount.of_nanomina_int_exn 100_000
                       }
@@ -2210,7 +2191,7 @@ let%test_module "account timing check" =
                            Mina_numbers.Global_slot_since_genesis.of_int 10
                        ; cliff_amount = Currency.Amount.of_mina_int_exn 1
                        ; vesting_period =
-                           Mina_numbers.Global_slot_since_genesis.of_int 10
+                           Mina_numbers.Global_slot_span.of_int 10
                        ; vesting_increment = Currency.Amount.of_mina_int_exn 1
                        }
                        : Account_update.Update.Timing_info.value )
