@@ -454,7 +454,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ]
             ]
           |> mk_zkapp_command ~memo:"mint token" ~fee:12_000_000 ~fee_payer_pk
-               ~fee_payer_nonce:(Account.Nonce.of_int 2)
+               ~fee_payer_nonce:(Account.Nonce.of_int 1)
         in
         replace_authorizations ~keymap with_dummy_signatures
       in
@@ -477,7 +477,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ]
             ]
           |> mk_zkapp_command ~memo:"zkapp to mint token2" ~fee:11_500_000
-               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 3)
+               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 2)
         in
         replace_authorizations ~keymap with_dummy_signatures
       in
@@ -509,7 +509,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ]
             ]
           |> mk_zkapp_command ~memo:"zkapp for tokens transfer" ~fee:11_000_000
-               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 4)
+               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 3)
         in
         replace_authorizations ~keymap with_dummy_signatures
       in
@@ -546,7 +546,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
           |> mk_zkapp_command ~memo:"zkapp for tokens transfer 2"
                ~fee:10_000_000 ~fee_payer_pk
-               ~fee_payer_nonce:(Account.Nonce.of_int 5)
+               ~fee_payer_nonce:(Account.Nonce.of_int 4)
         in
         replace_authorizations ~keymap with_dummy_signatures
       in
@@ -843,9 +843,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~n:padding_payments
     in
     let%bind () =
+      (*TODO: wait for blocks required to produce 1 proof given 0.75 slot fill rate*)
+      let soft_timeout = Network_time_span.Slots 15 in
+      let hard_timeout = Network_time_span.Slots 20 in
       section_hard "Wait for proof to be emitted"
         (wait_for t
-           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
+           (Wait_condition.ledger_proofs_emitted_since_genesis ~soft_timeout
+              ~hard_timeout ~num_proofs:1 ) )
     in
     Event_router.cancel (event_router t) snark_work_event_subscription () ;
     Event_router.cancel (event_router t) snark_work_failure_subscription () ;

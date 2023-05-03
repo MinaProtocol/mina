@@ -20,7 +20,9 @@
    async_unix
    uri
    core_kernel
+   core_kernel.uuid
    core
+   core.uuid
    base
    async
    cohttp
@@ -117,6 +119,7 @@
    mina_signature_kind
    string_sign
    zkapp_command_builder
+   internal_tracing
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../../config.mlh

@@ -81,8 +81,8 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
   let connection_gating (Any ((module M), t)) = M.connection_gating t
 
-  let set_connection_gating (Any ((module M), t)) config =
-    M.set_connection_gating t config
+  let set_connection_gating ?clean_added_peers (Any ((module M), t)) config =
+    M.set_connection_gating ?clean_added_peers t config
 
   let restart_helper (Any ((module M), t)) = M.restart_helper t
 end

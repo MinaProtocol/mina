@@ -1605,11 +1605,23 @@ module Circuit = struct
 
   let () =
     circuit##.runAndCheck :=
-      Js.wrap_callback (fun (f : unit -> 'a) ->
-          let result =
-            try Impl.run_and_check (fun () -> f) with exn -> raise_exn exn
-          in
-          Or_error.ok_exn result ) ;
+      Js.wrap_callback (fun (f : unit -> unit) ->
+          try
+            Impl.run_and_check_exn (fun () ->
+                f () ;
+                fun () -> () )
+          with exn -> raise_exn exn ) ;
+
+    circuit##.runUnchecked :=
+      Js.wrap_callback (fun (f : unit -> unit) ->
+          try
+            Impl.run_and_check_exn (fun () ->
+                Snarky_backendless.Snark0.set_eval_constraints false ;
+                f () ;
+                Snarky_backendless.Snark0.set_eval_constraints true ;
+                fun () -> () )
+          with exn -> raise_exn exn ) ;
+
     circuit##.asProver :=
       Js.wrap_callback (fun (f : (unit -> unit) Js.callback) : unit ->
           Impl.as_prover (fun () -> Js.Unsafe.fun_call f [||]) ) ;
