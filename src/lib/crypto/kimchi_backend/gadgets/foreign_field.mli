@@ -19,6 +19,8 @@ module Snark_intf = Snarky_backendless.Snark_intf
  *)
 type 'field standard_limbs = 'field * 'field * 'field
 
+type 'field compact_limbs = 'field * 'field
+
 val bignum_bigint_to_field_standard_limbs :
      (module Snark_intf.Run with type field = 'field)
   -> Bignum_bigint.t
@@ -97,9 +99,19 @@ end
  *  given multiplication
  *)
 module External_checks : sig
+  module Cvar = Snarky_backendless.Cvar
+
   type 'field t
 
   val create : (module Snark_intf.Run with type field = 'field) -> 'field t
+
+  val append_multi_range_check :
+    'field t -> 'field Cvar.t standard_limbs -> unit
+
+  val append_compact_multi_range_check :
+    'field t -> 'field Cvar.t compact_limbs -> unit
+
+  val append_bound_check : 'field t -> 'field Cvar.t standard_limbs -> unit
 end
 
 (* Type of operation *)

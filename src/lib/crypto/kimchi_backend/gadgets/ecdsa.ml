@@ -225,7 +225,7 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
   in
 
   (* C1: Constrain computation of slope squared *)
-  let slope2 =
+  let slope_squared =
     Foreign_field.mul
       (module Circuit)
       external_checks slope slope foreign_field_modulus
@@ -234,15 +234,15 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
   (* C2: Constrain result x-coordinate computation: x = s^2 - Lx - Rx with length 2 chain
    *     with s^2 - x - Lx = Rx
    *)
-  let slope2_minus_x =
+  let slope_squared_minus_x =
     Foreign_field.sub
       (module Circuit)
-      ~full:false slope2 result_x foreign_field_modulus
+      ~full:false slope_squared result_x foreign_field_modulus
   in
   let expected_right_x =
     Foreign_field.sub
       (module Circuit)
-      ~full:false slope2_minus_x left_x foreign_field_modulus
+      ~full:false slope_squared_minus_x left_x foreign_field_modulus
   in
   (* Copy expected_right_x to right_x *)
   Foreign_field.Element.Standard.assert_equal
@@ -315,6 +315,14 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
   Foreign_field.Element.Standard.assert_equal
     (module Circuit)
     expected_right_delta_s right_delta_s ;
+
+  (* Append appropriate required external checks *)
+  Foreign_field.External_checks.append_bound_check external_checks
+    (slope0, slope1, slope2) ;
+  Foreign_field.External_checks.append_bound_check external_checks
+  @@ Foreign_field.Element.Standard.to_limbs right_delta_s ;
+  Foreign_field.External_checks.append_bound_check external_checks
+  @@ Foreign_field.Element.Standard.to_limbs delta_x_s ;
 
   Affine.of_coordinates (result_x, result_y)
 
