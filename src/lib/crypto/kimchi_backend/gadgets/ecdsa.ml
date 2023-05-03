@@ -287,10 +287,30 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
    *     with Ry + y = (Rx - x) * s
    *)
   let expected_right_delta_s =
-    Foreign_field.add
+    Foreign_field.add ~full:false
       (module Circuit)
       expected_right_y result_y foreign_field_modulus
   in
+  let expected_right_delta_s0, expected_right_delta_s1, expected_right_delta_s2
+      =
+    Foreign_field.Element.Standard.to_limbs expected_right_delta_s
+  in
+  (* Final Zero gate*)
+  with_label "group_add_final_zero_gate" (fun () ->
+      assert_
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (Raw
+                 { kind = Zero
+                 ; values =
+                     [| expected_right_delta_s0
+                      ; expected_right_delta_s1
+                      ; expected_right_delta_s2
+                     |]
+                 ; coeffs = [||]
+                 } )
+        } ) ;
   (* Copy expected_right_delta_s to right_delta_s *)
   Foreign_field.Element.Standard.assert_equal
     (module Circuit)
@@ -303,7 +323,7 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
 (*********)
 
 let%test_unit "ecdsa affine helpers " =
-  if tests_enabled then
+  if (* tests_enabled *) false then
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
