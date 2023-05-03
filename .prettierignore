@@ -1,2 +1,2 @@
 src/lib/crypto/**/*.js
-src/lib/snarkyjs/src/snarkyjs-bindings/kimchi/js/**/*.js
+src/lib/snarkyjs/src/bindings/kimchi/js/**/*.js
