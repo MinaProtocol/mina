@@ -117,7 +117,6 @@ module Sql = struct
         (timing_info : Archive_lib.Processor.Timing_info.t)
         ~start_slot
         ~end_slot =
-    let open Unsigned in
     let cliff_time =
       Mina_numbers.Global_slot_since_genesis.of_int (Int.of_int64_exn timing_info.cliff_time)
     in
