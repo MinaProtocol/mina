@@ -31,6 +31,18 @@ module Send_user_commands = struct
       ~bin_response
 end
 
+module Send_zkapp_commands = struct
+  type query = Zkapp_command.Stable.Latest.t list
+  [@@deriving bin_io_unversioned]
+
+  type response = Zkapp_command.Stable.Latest.t list Or_error.t
+  [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Send_zkapp_commands" ~version:0 ~bin_query
+      ~bin_response
+end
+
 module Get_ledger = struct
   type query = State_hash.Stable.Latest.t option [@@deriving bin_io_unversioned]
 
@@ -240,6 +252,26 @@ module Stop_tracing = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Stop_tracing" ~version:0 ~bin_query ~bin_response
+end
+
+module Start_internal_tracing = struct
+  type query = unit [@@deriving bin_io_unversioned]
+
+  type response = unit [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Start_internal_tracing" ~version:0 ~bin_query
+      ~bin_response
+end
+
+module Stop_internal_tracing = struct
+  type query = unit [@@deriving bin_io_unversioned]
+
+  type response = unit [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Stop_internal_tracing" ~version:0 ~bin_query
+      ~bin_response
 end
 
 module Visualization = struct

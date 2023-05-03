@@ -21,14 +21,18 @@
    sexplib0
    ppx_deriving_yojson.runtime
    graphql_parser
+   splittable_random
    ;; local libraries
+   mina_generators
    mina_wire_types
    network_pool
    cli_lib
+   itn_crypto
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    mina_base.util
    mina_ledger
+   block_producer
    pickles
    pickles_unix
    mina_incremental
@@ -37,6 +41,7 @@
    error_json
    mina_networking
    consensus.vrf
+   vrf_evaluator
    trust_system
    with_hash
    data_hash_lib
@@ -83,6 +88,7 @@
    random_oracle
    coda_genesis_proof
    mina_version
+   mina_compile_config
    mina_runtime_config
    mina_base.import
    pickles.backend
@@ -96,6 +102,10 @@
    kimchi_backend
    sgn_type
    mina_transaction_logic
+   zkapp_command_builder
+   gossip_net
+   itn_logger
  )
  (instrumentation (backend bisect_ppx))
+ (preprocessor_deps ../../config.mlh)
  (preprocess (pps ppx_mina ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make)))

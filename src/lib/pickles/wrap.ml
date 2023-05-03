@@ -665,6 +665,8 @@ let wrap
         , max_proofs_verified )
         Vector.t )
       P.Base.Step.t ) =
+  let logger = Internal_tracing_context_logger.get () in
+  [%log internal] "Pickles_wrap_proof" ;
   let messages_for_next_wrap_proof =
     let module M =
       H1.Map
@@ -814,10 +816,12 @@ let wrap
          (M.f messages_for_next_wrap_proof) )
       lte
   in
+  [%log internal] "Wrap_compute_deferred_values" ;
   let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
     deferred_values ~sgs ~prev_challenges ~step_vk ~public_input ~proof
       ~actual_proofs_verified ~feature_flags ~actual_feature_flags
   in
+  [%log internal] "Wrap_compute_deferred_values_done" ;
   let next_statement : _ Types.Wrap.Statement.In_circuit.t =
     let messages_for_next_wrap_proof :
         _ P.Base.Messages_for_next_proof_over_same_field.Wrap.t =
@@ -872,10 +876,16 @@ let wrap
   let%map.Promise next_proof =
     let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
     Common.time "wrap proof" (fun () ->
+        [%log internal] "Wrap_generate_witness_conv" ;
         Impls.Wrap.generate_witness_conv
           ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } () ->
-            Backend.Tock.Proof.create_async ~primary:public_inputs
-              ~auxiliary:auxiliary_inputs pk ~message:next_accumulator )
+            [%log internal] "Backend_tock_proof_create_async" ;
+            let%map.Promise proof =
+              Backend.Tock.Proof.create_async ~primary:public_inputs
+                ~auxiliary:auxiliary_inputs pk ~message:next_accumulator
+            in
+            [%log internal] "Backend_tock_proof_create_async_done" ;
+            proof )
           ~input_typ:input
           ~return_typ:(Snarky_backendless.Typ.unit ())
           (fun x () : unit ->
@@ -913,6 +923,7 @@ let wrap
               }
           } )
   in
+  [%log internal] "Pickles_wrap_proof_done" ;
   ( { proof = next_proof
     ; statement =
         Types.Wrap.Statement.to_minimal next_statement
