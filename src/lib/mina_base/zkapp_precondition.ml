@@ -907,14 +907,12 @@ module Protocol_state = struct
       module V1 = struct
         type ( 'snarked_ledger_hash
              , 'length
-             , 'vrf_output
              , 'global_slot
              , 'amount
              , 'epoch_data )
              t =
               ( 'snarked_ledger_hash
               , 'length
-              , 'vrf_output
               , 'global_slot
               , 'amount
               , 'epoch_data )
@@ -954,7 +952,6 @@ module Protocol_state = struct
       type t =
         ( Frozen_ledger_hash.Stable.V1.t Hash.Stable.V1.t
         , Length.Stable.V1.t Numeric.Stable.V1.t
-        , unit (* TODO *)
         , Global_slot.Stable.V1.t Numeric.Stable.V1.t
         , Currency.Amount.Stable.V1.t Numeric.Stable.V1.t
         , Epoch_data.Stable.V1.t )
@@ -1047,7 +1044,6 @@ module Protocol_state = struct
         type t =
           ( Frozen_ledger_hash.Stable.V1.t
           , Length.Stable.V1.t
-          , unit (* TODO *)
           , Global_slot.Stable.V1.t
           , Currency.Amount.Stable.V1.t
           , ( ( Frozen_ledger_hash.Stable.V1.t
@@ -1069,7 +1065,6 @@ module Protocol_state = struct
       type t =
         ( Frozen_ledger_hash.var
         , Length.Checked.t
-        , unit (* TODO *)
         , Global_slot.Checked.t
         , Currency.Amount.var
         , ( (Frozen_ledger_hash.var, Currency.Amount.var) Epoch_ledger.Poly.t
@@ -1115,7 +1110,6 @@ module Protocol_state = struct
     type t =
       ( Frozen_ledger_hash.var Hash.Checked.t
       , Length.Checked.t Numeric.Checked.t
-      , unit (* TODO *)
       , Global_slot.Checked.t Numeric.Checked.t
       , Currency.Amount.var Numeric.Checked.t
       , Epoch_data.Checked.t )
