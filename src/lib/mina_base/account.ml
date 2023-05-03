@@ -826,8 +826,7 @@ let final_vesting_slot ~initial_minimum_balance ~cliff_time ~cliff_amount
   let open Infix in
   Global_slot_since_genesis.of_uint32
   @@ Global_slot_since_genesis.to_uint32 cliff_time
-     + UInt64.to_uint32 periods
-       * Global_slot_since_genesis.to_uint32 vesting_period
+     + (UInt64.to_uint32 periods * Global_slot_span.to_uint32 vesting_period)
 
 let timing_final_vesting_slot = function
   | Timing.Untimed ->
