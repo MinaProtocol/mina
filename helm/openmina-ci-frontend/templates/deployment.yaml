@@ -21,11 +21,13 @@ spec:
           command: ["sh", "-ce"]
           args:
             - |
-              AGGREGATOR_URL=$(echo $AGGREGATOR_URL) envsubst < /usr/share/nginx/html/assets/env.template.js > /usr/share/nginx/html/assets/env.js
+              envsubst < /usr/share/nginx/html/assets/env.template.js > /usr/share/nginx/html/assets/env.js
               exec nginx -c /nginx-conf/nginx.conf -g 'daemon off;'
           env:
             - name: AGGREGATOR_URL
               value: /aggregator
+            - name: DRONE_URL
+              value: https://ci.openmina.com/{{ .Values.aggregator.ciRepo | default "openmina/mina-daily-testnet" }}
           ports:
             - name: http
               containerPort: 80
@@ -33,6 +35,10 @@ spec:
           volumeMounts:
             - name: nginx-conf
               mountPath: /nginx-conf
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
       volumes:
         - name: nginx-conf
           configMap:
