@@ -29,7 +29,7 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
       in
       let cliff_time = Mina_numbers.Global_slot_since_genesis.of_int 1_000 in
       let cliff_amount = Currency.Amount.zero in
-      let vesting_period = Mina_numbers.Global_slot_since_genesis.of_int 10 in
+      let vesting_period = Mina_numbers.Global_slot_span.of_int 10 in
       let vesting_increment = Currency.Amount.of_mina_int_exn 100 in
       Array.map fee_payer_account_ids ~f:(fun fee_payer_account_id ->
           Account.create_timed fee_payer_account_id initial_balance
