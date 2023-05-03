@@ -40,8 +40,8 @@ seedConfigs:
 healthcheck:
   enabled: true
   failureThreshold: 60
-  periodSeconds: 5
-  initialDelaySeconds: 30
+  periodSeconds: 60
+  initialDelaySeconds: 600
 
 nodeSelector:
   preemptible: false
