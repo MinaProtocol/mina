@@ -965,7 +965,7 @@ module Make (L : Ledger_intf.S) :
           let%bind source_location, source_account =
             let ret =
               if Account_id.equal source receiver then
-                (*just check if the timing needs updating*)
+                (*just check if the timing needs updating and balance change is a no-op*)
                 let%bind location, account =
                   match receiver_location with
                   | `Existing _ ->
@@ -1047,6 +1047,8 @@ module Make (L : Ledger_intf.S) :
             | `New ->
                 [ receiver ]
           in
+          (*Order of accounts is important here. When source = receiver, source
+            update with no balance change overwrite's receiver update with positive balance change*)
           ( [ (receiver_location, receiver_account)
             ; (source_location, source_account)
             ]

@@ -940,6 +940,35 @@ let%test_module "Transaction union tests" =
               assert (Option.is_none source_account) ;
               assert (Option.is_some receiver_account) ) )
 
+    let%test_unit "Payment to and from same key" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = U.Wallet.random_wallets ~n:2 () in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let source_pk = fee_payer_pk in
+              let receiver_pk = wallets.(0).account.public_key in
+              let token_id = Token_id.default in
+              let accounts =
+                [| create_account fee_payer_pk token_id 50_000_000_000 |]
+              in
+              let fee = Fee.of_nanomina_int_exn 1_000_000_000 in
+              let amount = Amount.of_nanomina_int_exn 4_000_000_000 in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Source_account _source_account
+                  , `Receiver_account _receiver_account ) =
+                test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
+                  ~fee_payer_pk ~fee_token:token_id
+                  (Payment { source_pk; receiver_pk; amount })
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ) )
+
     let%test_unit "timed account - transactions" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = U.Wallet.random_wallets ~n:3 () in
