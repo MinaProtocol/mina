@@ -97,7 +97,7 @@ let generate_zkapp_commands_and_apply_them_consecutively ~trials
     mk_ledgers_and_fee_payers ~num_of_fee_payers:trials ()
   in
   let account_state_tbl = Account_id.Table.create () in
-  let global_slot = Mina_numbers.Global_slot_since_genesis.of_int 1 in
+  let global_slot = Mina_numbers.Global_slot_since_genesis.one in
   Test_util.with_randomness 123456789 (fun () ->
       let test i =
         Quickcheck.test ~trials:1

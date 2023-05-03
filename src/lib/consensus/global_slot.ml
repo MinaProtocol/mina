@@ -91,10 +91,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let ( < ) (t : t) (t' : t) = T.compare t.slot_number t'.slot_number < 0
 
-  let ( - ) (t : t) (t' : t) =
-    T.sub t.slot_number
-      (Mina_numbers.Global_slot_span.of_uint32 @@ T.to_uint32 t'.slot_number)
-
   let diff_slots (t1 : t) (t2 : t) = T.diff t1.slot_number t2.slot_number
 
   let max (t1 : t) (t2 : t) = if t1 < t2 then t2 else t1

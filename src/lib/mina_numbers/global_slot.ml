@@ -65,6 +65,8 @@ module Make (M : S) = struct
 
   let zero = of_uint32 T.zero
 
+  let one = of_uint32 T.one
+
   let succ t =
     let u32 = to_uint32 t in
     of_uint32 (T.succ u32)

@@ -896,8 +896,8 @@ let gen_with_vesting_period vesting_period =
   let open Quickcheck.Generator.Let_syntax in
   let open Global_slot_since_genesis in
   let min_vesting_end =
-    Global_slot_span.to_uint32 vesting_period
-    |> Unsigned.UInt32.succ |> Global_slot_since_genesis.of_uint32
+    Global_slot_span.(succ vesting_period |> to_uint32)
+    |> Global_slot_since_genesis.of_uint32
   in
   let%bind vesting_end = gen_incl min_vesting_end max_value in
   let max_cliff_time = Option.value_exn @@ sub vesting_end vesting_period in

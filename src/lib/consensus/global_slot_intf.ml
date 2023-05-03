@@ -33,8 +33,6 @@ module type Full = sig
 
   val ( + ) : t -> int -> t
 
-  val ( - ) : t -> t -> Mina_numbers.Global_slot_since_genesis.t option
-
   val ( < ) : t -> t -> bool
 
   val diff_slots : t -> t -> Mina_numbers.Global_slot_span.t option

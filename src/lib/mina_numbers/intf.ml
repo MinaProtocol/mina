@@ -27,6 +27,8 @@ module type S_unchecked = sig
 
   val zero : t
 
+  val one : t
+
   val succ : t -> t
 
   val add : t -> t -> t

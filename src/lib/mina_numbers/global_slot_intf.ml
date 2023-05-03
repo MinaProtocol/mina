@@ -24,6 +24,8 @@ module type S_base = sig
 
   val zero : t
 
+  val one : t
+
   val succ : t -> t
 
   val of_int : int -> t

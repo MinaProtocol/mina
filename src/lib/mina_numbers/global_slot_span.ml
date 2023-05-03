@@ -62,6 +62,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let zero = of_uint32 T.zero
 
+  let one = of_uint32 T.one
+
   let succ t = of_uint32 (T.succ @@ to_uint32 t)
 
   let max_value = of_uint32 Unsigned.UInt32.max_int
