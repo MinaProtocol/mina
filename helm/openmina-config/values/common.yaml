@@ -63,6 +63,24 @@ blockProducerConfigs:
     keypairName: prod3-privkey-secret
     isolated: false
 
+minaSnarkCoordinatorsConfig:
+- name: snarker001
+  publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
+  workSelectionAlgorithm: seq
+  workers: 32
+- name: snarker002
+  publicKey: B62qos2NxSras7juEwPVnkoV23YTFvWawyko8pgcf8S5nccTFCzVpdy
+  workSelectionAlgorithm: rand
+  workers: 16
+- name: snarker003
+  publicKey: B62qjW2AZJBc3H17pMvz73JLRLxSdFHjymkzMTTA9sv3bVKSm63B5FQ
+  workSelectionAlgorithm: rand
+  workers: 16
+- name: snarker004
+  publicKey: B62qrsEWVgwRMJatJzQCrepPisMF4QcB2PPBbu9pbodZRvxWM7ochkx
+  workSelectionAlgorithm: rand
+  workers: 16
+
 resources:
   enable: true
   image: adrnagy/mina-node-monitoring:17c9127

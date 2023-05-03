@@ -1,19 +1,21 @@
-{{ if (not .httpSnarkWorkCoordinator) }}
+{{ range .Values.minaSnarkCoordinatorsConfig }}
+{{ $name := .workerName | default (printf "snark-worker-%s" .name) }}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ $.Values.workerName }}
+  name: {{ $name }}
   labels:
-    app: {{$.Values.workerName}}
+    app: {{ $name }}
 spec:
-  replicas: {{ $.Values.workerReplicas }}
+  replicas: {{ .workers | default 8 }}
   selector:
     matchLabels:
-      app: {{$.Values.workerName}}
+      app: {{ $name }}
   template:
     metadata:
       labels:
-        app: {{$.Values.workerName}}
+        app: {{ $name }}
         testnet: {{ $.Values.testnetName }}
         role: snark-worker
         version: {{ trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-" }}
@@ -42,7 +44,7 @@ spec:
           "snark-worker", 
           "-proof-level","full",
           "-shutdown-on-disconnect", "false", "-daemon-address",
-          "{{ $.Values.coordinatorName }}:{{ $.Values.coordinatorRpcPort }}"
+          "{{ .name }}:{{ $.Values.coordinatorRpcPort }}"
         ]
         env:
           - name: "RAYON_NUM_THREADS"

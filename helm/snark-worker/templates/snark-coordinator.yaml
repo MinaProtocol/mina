@@ -1,19 +1,19 @@
-{{ if (not .httpSnarkWorkCoordinator) }}
+{{ range .Values.minaSnarkCoordinatorsConfig }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{$.Values.coordinatorName }}
+  name: {{ .name }}
   labels:
-    app: {{$.Values.coordinatorName}}
+    app: {{ .name }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{$.Values.coordinatorName }}
+      app: {{ .name }}
   template:
     metadata:
       labels:
-        app: {{$.Values.coordinatorName}}
+        app: {{ .name }}
         testnet: {{ $.Values.testnetName }}
         role: snark-coordinator
         version: {{ trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-" }}
@@ -109,9 +109,9 @@ spec:
         - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         - name: CODA_SNARK_KEY
-          value: {{ $.Values.publicKey | trim | quote }}
+          value: {{ .publicKey | trim | quote }}
         - name: CODA_SNARK_FEE
-          value: {{ $.Values.snarkFee | quote }}
+          value: {{ .snarkFee | default $.Values.snarkFee | quote }}
         - name: DAEMON_POD_IP
           valueFrom:
             fieldRef:
@@ -119,7 +119,7 @@ spec:
         - name: DAEMON_EXTERNAL_PORT
           value: {{ $.Values.mina.ports.p2p | quote }}
         - name: WORK_SELECTION
-          value: {{$.Values.workSelectionAlgorithm | quote }}
+          value: {{ .workSelectionAlgorithm | default "seq" | quote }}
         - name: MINA_LIBP2P_PASS
           value: {{ $.Values.mina.privkeyPass | quote }}
         {{ include "sideCar.bpfDebugger.envVar" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 8 }}
@@ -177,9 +177,9 @@ spec:
             path: "unset-k8s-env.sh"
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
 ---
-{{ include "sideCar.resources.service" (dict "name" $name "resources" $.Values.resources) }}
-{{ include "sideCar.bpfDebugger.service" (dict "name" $name "bpfDebugger" $.Values.bpfDebugger) }}
-{{ include "sideCar.logs.service" (dict "name" $name "logs" $.Values.logs) }}
-{{ include "sideCar.internalTrace.service" (dict "name" $name "internalTrace" $.Values.internalTrace) }}
+{{ include "sideCar.resources.service" (dict "name" .name "resources" $.Values.resources) }}
+{{ include "sideCar.bpfDebugger.service" (dict "name" .name "bpfDebugger" $.Values.bpfDebugger) }}
+{{ include "sideCar.logs.service" (dict "name" .name "logs" $.Values.logs) }}
+{{ include "sideCar.internalTrace.service" (dict "name" .name "internalTrace" $.Values.internalTrace) }}
 ---
 {{ end }}
