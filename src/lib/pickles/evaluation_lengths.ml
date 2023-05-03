@@ -10,4 +10,5 @@ let create ~of_int =
     ; generic_selector = one
     ; poseidon_selector = one
     ; lookup = None
+    ; public = one
     }
