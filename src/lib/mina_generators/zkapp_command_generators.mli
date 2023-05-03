@@ -17,9 +17,21 @@ type failure =
 type role =
   [ `Fee_payer | `New_account | `Ordinary_participant | `New_token_account ]
 
+type generator_options =
+  { txn_global_slot : Mina_numbers.Global_slot.t option
+  ; failure : failure option
+  ; max_account_updates : int
+  ; max_token_updates : int
+  ; account_state_tbl : (Account.t * role) Account_id.Table.t
+  ; protocol_state_view : Zkapp_precondition.Protocol_state.View.t option
+  ; vk : (Side_loaded_verification_key.t, State_hash.t) With_hash.t option
+  }
+
 val max_account_updates : int
 
 val max_token_updates : int
+
+val default : generator_options
 
 val gen_account_precondition_from_account :
      ?failure:failure
@@ -44,34 +56,22 @@ val gen_protocol_state_precondition :
     Generated zkapp_command uses dummy signatures and dummy proofs.
   *)
 val gen_zkapp_command_from :
-     ?global_slot:Mina_numbers.Global_slot.t
-  -> ?failure:failure
-  -> ?max_account_updates:int
-  -> ?max_token_updates:int
+     ?generator_options:generator_options
   -> fee_payer_keypair:Signature_lib.Keypair.t
   -> keymap:
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t
-  -> ?account_state_tbl:(Account.t * role) Account_id.Table.t
   -> ledger:Mina_ledger.Ledger.t
-  -> ?protocol_state_view:Zkapp_precondition.Protocol_state.View.t
-  -> ?vk:(Side_loaded_verification_key.t, State_hash.t) With_hash.Stable.V1.t
   -> unit
   -> Zkapp_command.t Quickcheck.Generator.t
 
 (** Generate a list of zkapp_command, `fee_payer_keypairs` contains a list of possible fee payers
   *)
 val gen_list_of_zkapp_command_from :
-     ?global_slot:Mina_numbers.Global_slot.t
-  -> ?failure:failure
-  -> ?max_account_updates:int
-  -> ?max_token_updates:int
+     ?generator_options:generator_options
   -> fee_payer_keypairs:Signature_lib.Keypair.t list
   -> keymap:
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t
-  -> ?account_state_tbl:(Account.t * role) Account_id.Table.t
   -> ledger:Mina_ledger.Ledger.t
-  -> ?protocol_state_view:Zkapp_precondition.Protocol_state.View.t
-  -> ?vk:(Side_loaded_verification_key.t, State_hash.t) With_hash.Stable.V1.t
   -> ?length:int
   -> unit
   -> Zkapp_command.t list Quickcheck.Generator.t
