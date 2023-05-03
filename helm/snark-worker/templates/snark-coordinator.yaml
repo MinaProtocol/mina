@@ -122,6 +122,7 @@ spec:
           value: {{$.Values.workSelectionAlgorithm | quote }}
         - name: MINA_LIBP2P_PASS
           value: {{ $.Values.mina.privkeyPass | quote }}
+        {{ include "sideCar.bpfDebugger.envVar" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 8 }}
         ports:
         - name: client-port
           protocol: TCP 
@@ -147,6 +148,10 @@ spec:
         {{- end }}
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
+        {{- if $.Values.logs.enable }}
+        - name: {{ template "sideCar.logs.minaLogsVolumeName" }}
+          mountPath: "/root/.mina-config"
+        {{- end }}
         - name: scripts
           mountPath: "/scripts"
       {{ include "sideCar.resources.containerSpec" (dict "resources" $.Values.resources) | nindent 6 }}
