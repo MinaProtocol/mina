@@ -8,6 +8,7 @@ open Signature_lib
 module Memo = Signed_command_memo
 module Account_nonce = Mina_numbers.Account_nonce
 module Global_slot_since_genesis = Mina_numbers.Global_slot_since_genesis
+module Global_slot_legacy = Mina_numbers.Global_slot_legacy
 
 (* This represents the random oracle input corresponding to the old form of the token
    ID, which was a 64-bit integer. The default token id was the number 1.
@@ -92,7 +93,7 @@ module Common = struct
         , Public_key.Compressed.Stable.V1.t
         , Token_id.Stable.V1.t
         , Account_nonce.Stable.V1.t
-        , Global_slot_since_genesis.Stable.V1.t
+        , Global_slot_legacy.Stable.V1.t
         , Memo.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving compare, equal, sexp, hash, yojson]

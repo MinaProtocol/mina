@@ -119,6 +119,7 @@ module Mina_numbers = struct
   module O = Mina_numbers
   module W = WT.Mina_numbers
   include Assert_equal0V1 (O.Account_nonce.Stable) (W.Account_nonce)
+  include Assert_equal0V1 (O.Global_slot_legacy.Stable) (W.Global_slot_legacy)
   include
     Assert_equal0V1
       (O.Global_slot_since_genesis.Stable)

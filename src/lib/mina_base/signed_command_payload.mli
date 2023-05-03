@@ -107,7 +107,7 @@ module Common : sig
         , Public_key.Compressed.Stable.V1.t
         , Token_id.Stable.V1.t
         , Mina_numbers.Account_nonce.Stable.V1.t
-        , Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+        , Mina_numbers.Global_slot_legacy.Stable.V1.t
         , Signed_command_memo.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving compare, equal, sexp, hash, yojson]
