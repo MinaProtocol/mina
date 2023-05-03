@@ -3320,7 +3320,7 @@ module Block = struct
             ; height = block.height |> Unsigned.UInt32.to_int64
             ; global_slot_since_hard_fork =
                 block.global_slot_since_hard_fork
-                |> Mina_numbers.Global_slot_since_genesis.to_uint32
+                |> Mina_numbers.Global_slot_since_hard_fork.to_uint32
                 |> Unsigned.UInt32.to_int64
             ; global_slot_since_genesis =
                 block.global_slot_since_genesis

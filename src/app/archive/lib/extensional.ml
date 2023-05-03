@@ -121,7 +121,7 @@ module Block = struct
         ; ledger_hash : Ledger_hash.Stable.V1.t
         ; height : Unsigned_extended.UInt32.Stable.V1.t
         ; global_slot_since_hard_fork :
-            Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+            Mina_numbers.Global_slot_since_hard_fork.Stable.V1.t
         ; global_slot_since_genesis :
             Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         ; timestamp : Block_time.Stable.V1.t

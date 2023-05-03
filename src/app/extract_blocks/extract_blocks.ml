@@ -87,9 +87,11 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   let height = Unsigned.UInt32.of_int64 block.height in
   let global_slot_since_hard_fork =
     Unsigned.UInt32.of_int64 block.global_slot_since_hard_fork
+    |> Mina_numbers.Global_slot_since_hard_fork.of_uint32
   in
   let global_slot_since_genesis =
     Unsigned.UInt32.of_int64 block.global_slot_since_genesis
+    |> Mina_numbers.Global_slot_since_genesis.of_uint32
   in
   let timestamp = Block_time.of_string_exn block.timestamp in
   let chain_status = Chain_status.of_string block.chain_status in
