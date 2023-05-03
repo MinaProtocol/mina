@@ -683,7 +683,7 @@ let%test_module "account timing check" =
         *)
         let amount =
           liquid_bal_100_slots
-          - Fee.to_nanomina_int Mina_compile_config.minimum_user_command_fee
+          - Fee.to_nanomina_int Currency.Fee.minimum_user_command_fee
         in
         let%map user_command =
           let%map payment =
@@ -1014,7 +1014,7 @@ let%test_module "account timing check" =
             Option.value ~default:zero @@ Signed_command.amount cmd
           in
           let fee =
-            Currency.Fee.to_uint64 Mina_compile_config.minimum_user_command_fee
+            Currency.Fee.to_uint64 Currency.Fee.minimum_user_command_fee
             |> of_uint64
           in
           let total = Option.value ~default:max_int (amount + fee) in

@@ -222,3 +222,5 @@ val verifier : t -> Verifier.t
 val vrf_evaluator : t -> Vrf_evaluator.t
 
 val genesis_ledger : t -> Mina_ledger.Ledger.t Lazy.t
+
+val vrf_evaluation_state : t -> Block_producer.Vrf_evaluation_state.t
