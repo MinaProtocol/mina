@@ -214,6 +214,7 @@ module Evals : sig
       ; generic_selector : 'f
       ; poseidon_selector : 'f
       ; lookup : (('f, 'bool) Lookup.In_circuit.t, 'bool) Opt.t
+      ; public : 'f
       }
 
     (** {4 Accessors} *)
@@ -248,6 +249,7 @@ module Evals : sig
     ; generic_selector : 'a
     ; poseidon_selector : 'a
     ; lookup : 'a Lookup.t option
+    ; public : 'a
     }
 
   (** {4 Iterators} *)

@@ -27,7 +27,8 @@ type nonrec 'caml_f lookup_evaluations =
   }
 
 type nonrec 'caml_f proof_evaluations =
-  { w :
+  { public : 'caml_f array point_evaluations
+  ; w :
       'caml_f array point_evaluations
       * 'caml_f array point_evaluations
       * 'caml_f array point_evaluations
@@ -174,7 +175,6 @@ type nonrec curr_or_next = Curr | Next
 
 type nonrec 'f oracles =
   { o : 'f random_oracles
-  ; p_eval : 'f * 'f
   ; opening_prechallenges : 'f array
   ; digest_before_evaluations : 'f
   }

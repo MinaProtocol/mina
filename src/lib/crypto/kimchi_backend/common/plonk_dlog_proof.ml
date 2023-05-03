@@ -243,7 +243,15 @@ module Make (Inputs : Inputs_intf) = struct
     { sorted; aggreg; table; runtime }
 
   let eval_of_backend
-      ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+      ({ w
+       ; coefficients
+       ; z
+       ; s
+       ; generic_selector
+       ; poseidon_selector
+       ; lookup
+       ; public
+       } :
         Evaluations_backend.t ) : _ Pickles_types.Plonk_types.Evals.t =
     { w = tuple15_to_vec w
     ; coefficients = tuple15_to_vec coefficients
@@ -252,6 +260,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; generic_selector
     ; poseidon_selector
     ; lookup = Option.map ~f:lookup_eval_of_backend lookup
+    ; public
     }
 
   let of_backend (t : Backend.t) : t =
@@ -293,6 +302,7 @@ module Make (Inputs : Inputs_intf) = struct
       : 'f Kimchi_types.lookup_evaluations =
     { sorted; aggreg; table; runtime }
 
+  (* TODO: add public field  *)
   let eval_to_backend
       { Pickles_types.Plonk_types.Evals.w
       ; coefficients
@@ -301,6 +311,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; generic_selector
       ; poseidon_selector
       ; lookup
+      ; public
       } : Evaluations_backend.t =
     { w = tuple15_of_vec w
     ; coefficients = tuple15_of_vec coefficients
@@ -309,6 +320,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; generic_selector
     ; poseidon_selector
     ; lookup = Option.map ~f:lookup_eval_to_backend lookup
+    ; public
     }
 
   let vec_to_array (type t elt)

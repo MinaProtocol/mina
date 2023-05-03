@@ -101,7 +101,7 @@ module Env = struct
     ; endo_coefficient : 'a
     ; mds : int * int -> 'a
     ; srs_length_log2 : int
-    ; vanishes_on_last_4_rows : 'a
+    ; vanishes_on_zero_knowledge_and_previous_rows : 'a
     ; joint_combiner : 'a
     ; beta : 'a
     ; gamma : 'a
@@ -135,7 +135,7 @@ module Tick : S = struct
        ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows
+       ; vanishes_on_zero_knowledge_and_previous_rows
        ; joint_combiner = _
        ; beta
        ; gamma
@@ -173,7 +173,7 @@ let () =
        ; mds = _
        ; endo_coefficient
        ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows
+       ; vanishes_on_zero_knowledge_and_previous_rows
        ; joint_combiner
        ; beta
        ; gamma
@@ -222,7 +222,7 @@ module Tock : S = struct
        ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows
+       ; vanishes_on_zero_knowledge_and_previous_rows
        ; joint_combiner = _
        ; beta
        ; gamma
@@ -260,7 +260,7 @@ let () =
        ; mds = _
        ; endo_coefficient
        ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows
+       ; vanishes_on_zero_knowledge_and_previous_rows
        ; joint_combiner
        ; beta
        ; gamma

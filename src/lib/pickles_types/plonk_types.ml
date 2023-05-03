@@ -429,16 +429,24 @@ module Evals = struct
         ; generic_selector : 'a
         ; poseidon_selector : 'a
         ; lookup : 'a Lookup.Stable.V1.t option
+        ; public : 'a
         }
       [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
     end
   end]
 
   let to_absorption_sequence
-      { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
-      _ list =
+      { w
+      ; coefficients
+      ; z
+      ; s
+      ; generic_selector
+      ; poseidon_selector
+      ; lookup
+      ; public
+      } : _ list =
     let always_present =
-      [ z; generic_selector; poseidon_selector ]
+      [ z; generic_selector; poseidon_selector; public ]
       @ Vector.to_list w
       @ Vector.to_list coefficients
       @ Vector.to_list s
@@ -461,11 +469,20 @@ module Evals = struct
       ; generic_selector : 'f
       ; poseidon_selector : 'f
       ; lookup : (('f, 'bool) Lookup.In_circuit.t, 'bool) Opt.t
+      ; public : 'f
       }
     [@@deriving hlist, fields]
 
     let map (type bool a b)
-        ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+        ({ w
+         ; coefficients
+         ; z
+         ; s
+         ; generic_selector
+         ; poseidon_selector
+         ; lookup
+         ; public
+         } :
           (a, bool) t ) ~(f : a -> b) : (b, bool) t =
       { w = Vector.map w ~f
       ; coefficients = Vector.map coefficients ~f
@@ -474,14 +491,23 @@ module Evals = struct
       ; generic_selector = f generic_selector
       ; poseidon_selector = f poseidon_selector
       ; lookup = Opt.map ~f:(Lookup.In_circuit.map ~f) lookup
+      ; public = f public
       }
 
     let to_list
-        { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } =
+        { w
+        ; coefficients
+        ; z
+        ; s
+        ; generic_selector
+        ; poseidon_selector
+        ; lookup
+        ; public
+        } =
       let some x = Opt.Some x in
       let always_present =
         List.map ~f:some
-          ( [ z; generic_selector; poseidon_selector ]
+          ( [ z; generic_selector; poseidon_selector; public ]
           @ Vector.to_list w
           @ Vector.to_list coefficients
           @ Vector.to_list s )
@@ -506,10 +532,17 @@ module Evals = struct
           with_lookup ~f:(fun x -> Maybe (b, x)) lookup
 
     let to_absorption_sequence
-        { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
-        _ Opt.Early_stop_sequence.t =
+        { w
+        ; coefficients
+        ; z
+        ; s
+        ; generic_selector
+        ; poseidon_selector
+        ; lookup
+        ; public
+        } : _ Opt.Early_stop_sequence.t =
       let always_present =
-        [ z; generic_selector; poseidon_selector ]
+        [ z; generic_selector; poseidon_selector; public ]
         @ Vector.to_list w
         @ Vector.to_list coefficients
         @ Vector.to_list s
@@ -532,7 +565,15 @@ module Evals = struct
   end
 
   let to_in_circuit (type bool a)
-      ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+      ({ w
+       ; coefficients
+       ; z
+       ; s
+       ; generic_selector
+       ; poseidon_selector
+       ; lookup
+       ; public
+       } :
         a t ) : (a, bool) In_circuit.t =
     { w
     ; coefficients
@@ -541,10 +582,19 @@ module Evals = struct
     ; generic_selector
     ; poseidon_selector
     ; lookup = Opt.of_option (Option.map ~f:Lookup.to_in_circuit lookup)
+    ; public
     }
 
   let map (type a b)
-      ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+      ({ w
+       ; coefficients
+       ; z
+       ; s
+       ; generic_selector
+       ; poseidon_selector
+       ; lookup
+       ; public
+       } :
         a t ) ~(f : a -> b) : b t =
     { w = Vector.map w ~f
     ; coefficients = Vector.map coefficients ~f
@@ -553,6 +603,7 @@ module Evals = struct
     ; generic_selector = f generic_selector
     ; poseidon_selector = f poseidon_selector
     ; lookup = Option.map ~f:(Lookup.map ~f) lookup
+    ; public = f public
     }
 
   let map2 (type a b c) (t1 : a t) (t2 : b t) ~(f : a -> b -> c) : c t =
@@ -563,6 +614,7 @@ module Evals = struct
     ; generic_selector = f t1.generic_selector t2.generic_selector
     ; poseidon_selector = f t1.poseidon_selector t2.poseidon_selector
     ; lookup = Option.map2 t1.lookup t2.lookup ~f:(Lookup.map2 ~f)
+    ; public = f t1.public t2.public
     }
 
   (*
@@ -586,9 +638,17 @@ module Evals = struct
   *)
 
   let to_list
-      { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } =
+      { w
+      ; coefficients
+      ; z
+      ; s
+      ; generic_selector
+      ; poseidon_selector
+      ; lookup
+      ; public
+      } =
     let always_present =
-      [ z; generic_selector; poseidon_selector ]
+      [ z; generic_selector; poseidon_selector; public ]
       @ Vector.to_list w
       @ Vector.to_list coefficients
       @ Vector.to_list s
@@ -617,6 +677,7 @@ module Evals = struct
       ; e
       ; e
       ; lookup_typ
+      ; e
       ]
       ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
