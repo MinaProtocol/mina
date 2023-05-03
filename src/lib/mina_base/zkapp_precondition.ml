@@ -1117,7 +1117,7 @@ module Protocol_state = struct
       Poly.Fields.make_creator obj ~snarked_ledger_hash:!.field
         ~blockchain_length:!.uint32 ~min_window_density:!.uint32
         ~last_vrf_output ~total_currency:!.amount
-        ~global_slot_since_genesis:!.uint32
+        ~global_slot_since_genesis:!.global_slot_since_genesis
         ~staking_epoch_data:!.epoch_data_deriver
         ~next_epoch_data:!.epoch_data_deriver
       |> finish "NetworkView" ~t_toplevel_annots:Poly.t_toplevel_annots
