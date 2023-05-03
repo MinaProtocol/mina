@@ -135,14 +135,13 @@ mina_testnet_same_block_() {
 
         if [ -z "$HEIGHT" ]; then
             echo "$POD did not respond height"
-            exit 1
+            return 1
         fi
         echo "$POD is at $HEIGHT, hash is $HASH"
         if [ "$HEIGHT" -eq 1 ]; then
             echo "Genesis block"
-            exit 1
+            return 1
         elif [ -z "$PREV_HEIGHT" ]; then
-            echo "First"
             PREV_HEIGHT="${HEIGHT}"
             PREV_HASH="${HASH}"
         elif [ "$HEIGHT" -eq "$PREV_HEIGHT" ]; then
@@ -150,7 +149,7 @@ mina_testnet_same_block_() {
                 continue
             else
                 echo "Height is the same but hash mismatch"
-                exit 1
+                return 1
             fi
         elif [ "$HEIGHT" -eq "$((PREV_HEIGHT + 1))" ]; then
             echo "Height increased by one, expected previous hash is $PREV_HASH"
@@ -160,7 +159,7 @@ mina_testnet_same_block_() {
                 continue
             else
                 echo "Previous hash mismatch"
-                exit 1
+                return 1
             fi
         else
             echo "Height is different, $PREV_HEIGHT vs $HEIGHT"
