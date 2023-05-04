@@ -103,8 +103,6 @@ module Inner_curve : sig
 
   type t = Inputs.F.t * Inputs.F.t
 
-  val double : t -> t
-
   val add' : div:(Inputs.F.t -> Inputs.F.t -> Inputs.F.t) -> t -> t -> t
 
   val add_exn : t -> t -> t
@@ -150,19 +148,13 @@ module Inner_curve : sig
   end
 
   module Shifted : functor
-    (M : sig
+    (_ : sig
        val shift : t
      end)
     ()
     -> Shifted_intf
 
   val shifted : unit -> (module Shifted_intf)
-
-  val scale :
-       ?init:Inputs.F.t * Inputs.F.t
-    -> t
-    -> Inputs.Impl.Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
-    -> Inputs.F.t * Inputs.F.t
 
   module Window_table : sig
     type t = Inputs.Constant.t Tuple_lib.Quadruple.t array
