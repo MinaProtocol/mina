@@ -411,7 +411,9 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
   let%bind receive = auth_required_gen in
   let%bind set_delegate = auth_required_gen in
   let%bind set_permissions = auth_required_gen in
-  let%bind set_verification_key = auth_required_gen in
+  let%bind set_verification_key =
+    Auth_required.gen_for_signature_authorization
+  in
   let%bind set_zkapp_uri = auth_required_gen in
   let%bind edit_action_state = auth_required_gen in
   let%bind set_token_symbol = auth_required_gen in

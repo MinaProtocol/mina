@@ -5,6 +5,7 @@
    ppx_inline_test.config
    async_unix
    async
+   async_kernel
    core
    base
    core_kernel
