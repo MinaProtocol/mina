@@ -230,6 +230,12 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
       (module Circuit)
       external_checks slope slope foreign_field_modulus
   in
+  (* Bounds 1: Multiplication left input (slope) and right input (slope)
+   *           bound checks with single bound check.
+   *           Result bound check already tracked by external_checks.
+   *)
+  Foreign_field.External_checks.append_bound_check external_checks
+    (slope0, slope1, slope2) ;
 
   (* C2: Constrain result x-coordinate computation: x = s^2 - Lx - Rx with length 2 chain
    *     with s^2 - x - Lx = Rx
@@ -239,11 +245,17 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
       (module Circuit)
       ~full:false slope_squared result_x foreign_field_modulus
   in
+  (* Bounds 2: Left input bound check covered by (Bounds 1).
+   *           Right input bound check value is gadget output so checked externally.
+   *)
   let expected_right_x =
     Foreign_field.sub
       (module Circuit)
       ~full:false slope_squared_minus_x left_x foreign_field_modulus
   in
+  (* Bounds 3: Left input bound check is chained.
+   *           Right input bound check value is gadget input so checked externally.
+   *)
   (* Copy expected_right_x to right_x *)
   Foreign_field.Element.Standard.assert_equal
     (module Circuit)
@@ -254,11 +266,22 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
       (module Circuit)
       ~full:false expected_right_x result_x foreign_field_modulus
   in
+  (* Bounds 4: Addition chain result (right_delta) bound check added below.
+   *           Left input bound check is chained.
+   *           Right input bound check value is gadget output so checked externally.
+   *)
+  Foreign_field.External_checks.append_bound_check external_checks
+  @@ Foreign_field.Element.Standard.to_limbs right_delta ;
   let right_delta_s =
     Foreign_field.mul
       (module Circuit)
       external_checks right_delta slope foreign_field_modulus
   in
+
+  (* Bounds 5: Multiplication result bound checks for left input (right_delta)
+   *           and right input (slope) already covered by (Bounds 4) and (Bounds 1).
+   *           Result bound check already tracked by external_checks.
+   *)
 
   (* C4: Constrain slope computation: s = (Ry - Ly)/(Rx - Lx) over two length 2 chains
    *     with (Rx - Lx) * s + Ly = Ry
@@ -268,17 +291,29 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
       (module Circuit)
       ~full:false right_x left_x foreign_field_modulus
   in
+  (* Bounds 6: Addition chain result (delta_x) bound check below.
+   *           Addition inputs are gadget inputs and tracked externally.
+   *)
+  Foreign_field.External_checks.append_bound_check external_checks
+  @@ Foreign_field.Element.Standard.to_limbs delta_x ;
   let delta_x_s =
     Foreign_field.mul
       (module Circuit)
       external_checks delta_x slope foreign_field_modulus
   in
+  (* Bounds 7: Multiplication bound checks for left input (delta_x) and
+   *           right input (slope) are already covered by (Bounds 6) and (Bounds 1).
+   *           Result bound check tracked by external_checks.
+   *)
   (* Finish constraining slope in new chain (above mul ended chain) *)
   let expected_right_y =
     Foreign_field.add
       (module Circuit)
       ~full:false delta_x_s left_y foreign_field_modulus
   in
+  (* Bounds 8: Left input bound check is tracked by (Bounds 7).
+   *           Right input bound check value is gadget input so checked externally.
+   *)
   (* Copy expected_right_y to right_y *)
   Foreign_field.Element.Standard.assert_equal
     (module Circuit)
@@ -291,6 +326,11 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
       (module Circuit)
       expected_right_y result_y foreign_field_modulus
   in
+  (* Bounds 9: Addition chain result (expected_right_delta_s) bound check already
+   *           covered by (Bounds 5).
+   *           Left input bound check is chained.
+   *           Right input bound check value is gadget output so checked externally.
+   *)
   let expected_right_delta_s0, expected_right_delta_s1, expected_right_delta_s2
       =
     Foreign_field.Element.Standard.to_limbs expected_right_delta_s
@@ -316,14 +356,7 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
     (module Circuit)
     expected_right_delta_s right_delta_s ;
 
-  (* Append appropriate required external checks *)
-  Foreign_field.External_checks.append_bound_check external_checks
-    (slope0, slope1, slope2) ;
-  Foreign_field.External_checks.append_bound_check external_checks
-  @@ Foreign_field.Element.Standard.to_limbs right_delta_s ;
-  Foreign_field.External_checks.append_bound_check external_checks
-  @@ Foreign_field.Element.Standard.to_limbs delta_x_s ;
-
+  (* Return result point *)
   Affine.of_coordinates (result_x, result_y)
 
 (*********)
