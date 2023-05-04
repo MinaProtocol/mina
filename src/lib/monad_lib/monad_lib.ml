@@ -19,6 +19,12 @@ module Make_ext (M : Monad.S) = struct
         y :: acc )
     |> M.map ~f:List.rev
 
+  let concat_map_m ~f xs =
+    let open M.Let_syntax in
+    fold_m xs ~init:[] ~f:(fun acc x ->
+        let%map ys = f x in
+        List.append acc ys )
+
   let iter_m ~f xs = fold_m ~f:(fun () x -> f x) ~init:() xs
 end
 
@@ -39,6 +45,12 @@ module Make_ext2 (M : Monad.S2) = struct
         let%map y = f x in
         y :: acc )
     |> M.map ~f:List.rev
+
+  let concat_map_m ~f xs =
+    let open M.Let_syntax in
+    fold_m xs ~init:[] ~f:(fun acc x ->
+        let%map ys = f x in
+        List.append acc ys )
 
   let iter_m ~f xs = fold_m ~f:(fun () x -> f x) ~init:() xs
 end

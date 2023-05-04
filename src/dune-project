@@ -74,6 +74,7 @@
 (package (name interpolator_lib))
 (package (name interruptible))
 (package (name itn_crypto))
+(package (name itn_logger))
 (package (name key_cache))
 (package (name key_gen))
 (package (name keys_lib))
@@ -244,3 +245,4 @@
 (package (name zexe_backend))
 (package (name zkapp_command_builder))
 (package (name zkapps_examples))
+(package (name zkapp_limits))

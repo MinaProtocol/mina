@@ -8,9 +8,28 @@ scalar CurrencyAmount
 
 """uint64 encoded as a json string representing a fee"""
 scalar Fee
- 
-"""String representing a uint16 number in base 10"""
-scalar UInt16
+
+"""Update to gating config and added peers"""
+input GatingUpdate {
+  """Peers to connect to"""
+  addedPeers: [NetworkPeer!]!
+
+  """If true, resets added peers to an empty list (including seeds)"""
+  cleanAddedPeers: Boolean!
+
+  """
+  If true, no connections will be allowed unless they are from a trusted peer
+  """
+  isolate: Boolean!
+
+  """
+  Peers we will never allow connections from (unless they are also trusted!)
+  """
+  bannedPeers: [NetworkPeer!]!
+
+  """Peers we will always allow connections from"""
+  trustedPeers: [NetworkPeer!]!
+}
 
 type ItnAuth {
   """Uuid of the ITN GraphQL server"""
@@ -18,6 +37,15 @@ type ItnAuth {
 
   """Sequence number for the signer of the auth query"""
   signerSequenceNumber: UInt16!
+
+  """Libp2p port"""
+  libp2pPort: UInt16!
+
+  """Peer id"""
+  peerId: String!
+
+  """Is the node a block producer"""
+  isBlockProducer: Boolean!
 }
 
 type mutation {
@@ -25,10 +53,29 @@ type mutation {
     """Payments details"""
     input: PaymentsDetails!
   ): String!
-  stopPayments(
-    """Payment scheduler handle"""
+  scheduleZkappCommands(
+    """Zkapp commands details"""
+    input: ZkappCommandsDetails!
+  ): String!
+  stopScheduledTransactions(
+    """Transaction scheduler handle"""
     handle: String!
   ): String!
+  updateGating(
+    """Gating update"""
+    input: GatingUpdate!
+  ): String!
+}
+
+"""Network identifiers for another protocol participant"""
+input NetworkPeer {
+  libp2pPort: Int!
+
+  """IP address of the remote host"""
+  host: String!
+
+  """base58-encoded peer ID"""
+  peerId: String!
 }
 
 """Keys and other information for scheduling payments"""
@@ -67,4 +114,51 @@ scalar PublicKey
 type query {
   """Uuid for GraphQL server, sequence number for signing public key"""
   auth: ItnAuth!
+
+  """Slots won by a block producer for current epoch"""
+  slotsWon: [Int!]!
 }
+
+"""Keys and other information for scheduling zkapp commands"""
+input ZkappCommandsDetails {
+  """Prefix of memo"""
+  memoPrefix: String!
+
+  """Length of scheduler run"""
+  durationInMinutes: Int!
+
+  """Frequency of transactions"""
+  transactionsPerSecond: Float!
+
+  """Number of zkapp accounts that the scheduler generates during the test"""
+  numNewAccounts: Int!
+
+  """Number of zkapp accounts that we deploy for the purpose of test"""
+  numZkappsToDeploy: Int!
+
+  """
+  Private keys of fee payers (fee payers also function as the account creators)
+  """
+  feePayers: [PrivateKey!]!
+
+  noPrecondition: Boolean!
+
+  minBalanceChange: String!
+
+  maxBalanceChange: String!
+
+  initBalance: String!
+
+  minFee: String! 
+
+  maxFee: String! 
+
+  deploymentFee: String!
+
+  accountQueueSize: Int!
+
+  maxCost: Boolean!
+}
+
+"""String representing a uint16 number in base 10"""
+scalar UInt16

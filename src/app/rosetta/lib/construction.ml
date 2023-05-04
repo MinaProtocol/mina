@@ -363,7 +363,7 @@ module Metadata = struct
             , Amount.to_yojson
                 (Amount_of.mina
                    (Mina_currency.Fee.to_uint64
-                      Mina_compile_config.minimum_user_command_fee)) )
+                      Mina_currency.Fee.minimum_user_command_fee)) )
           ]
       in
       let receiver_exists =
@@ -691,7 +691,7 @@ module Parse = struct
   end
 
   module Impl (M : Monad_fail.S) = struct
-    let check_sufficient_fee (type a) (payment : a -> Transaction.Unsigned.Rendered.Payment.t option) (transaction : a) : (unit, Errors.t) Result.t = 
+    let check_sufficient_fee (type a) (payment : a -> Transaction.Unsigned.Rendered.Payment.t option) (transaction : a) : (unit, Errors.t) Result.t =
       match payment transaction with
     | Some pay -> if Transaction.Unsigned.Rendered.Payment.is_fee_sufficient pay then Ok () else  Result.fail @@ Errors.create `Transaction_submit_fee_small
     | None -> Ok ()

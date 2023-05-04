@@ -45,7 +45,7 @@ let add_fast (type f)
   let p3 = (x3, y3) in
   with_label "add_fast" (fun () ->
       assert_
-        { annotation = Some __LOC__
+        { Snarky_backendless.Constraint.annotation = Some __LOC__
         ; basic =
             Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
               (EC_add_complete
@@ -125,7 +125,7 @@ struct
         :: !rounds_rev
     done ;
     assert_
-      { annotation = Some __LOC__
+      { Snarky_backendless.Constraint.annotation = Some __LOC__
       ; basic =
           Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
             (EC_scale { state = Array.of_list_rev !rounds_rev })
@@ -200,7 +200,7 @@ struct
         :: !rounds_rev
     done ;
     assert_
-      { annotation = Some __LOC__
+      { Snarky_backendless.Constraint.annotation = Some __LOC__
       ; basic =
           Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
             (EC_scale { state = Array.of_list_rev !rounds_rev })
@@ -289,7 +289,8 @@ struct
        in the other field. *)
     with_label __LOC__ (fun () ->
         Field.Assert.equal Field.((of_int 2 * s_div_2) + (s_odd :> Field.t)) s ) ;
-    scale_fast2 g (Shifted_value s_parts) ~num_bits
+    scale_fast2 g (Pickles_types.Shifted_value.Type2.Shifted_value s_parts)
+      ~num_bits
 
   let scale_fast a b = with_label __LOC__ (fun () -> scale_fast a b)
 
@@ -319,7 +320,8 @@ struct
               G.typ
               (fun (g, s) ->
                 make_checked (fun () ->
-                    scale_fast2 ~num_bits:n g (Shifted_value s) ) )
+                    scale_fast2 ~num_bits:n g
+                      (Pickles_types.Shifted_value.Type2.Shifted_value s) ) )
               (fun (g, _) ->
                 let x =
                   let chunks_needed = chunks_needed ~num_bits:(n - 1) in
@@ -351,15 +353,16 @@ struct
                 G.typ
                 (fun (g, s) ->
                   make_checked (fun () ->
-                      scale_fast ~num_bits:n g (Shifted_value (Field.project s)) )
-                  )
+                      scale_fast ~num_bits:n g
+                        (Pickles_types.Shifted_value.Type1.Shifted_value
+                           (Field.project s) ) ) )
                 (fun (g, s) ->
                   let open G.Constant.Scalar in
                   let s = project s in
                   let x =
                     Shifted_value.Type1.to_field
                       (module G.Constant.Scalar)
-                      ~shift (Shifted_value s)
+                      ~shift (Pickles_types.Shifted_value.Type1.Shifted_value s)
                   in
                   G.Constant.scale g x )
                 (random_point, xs)

@@ -108,6 +108,14 @@ module type Inputs_intf = sig
       -> Curve.Affine.Backend.t array
       -> t Promise.t
 
+    val create_and_verify_async :
+         Index.t
+      -> Scalar_field.Vector.t
+      -> Scalar_field.Vector.t
+      -> Scalar_field.t array
+      -> Curve.Affine.Backend.t array
+      -> t Promise.t
+
     val verify : Verifier_index.t -> t -> bool
 
     val batch_verify : Verifier_index.t array -> t array -> bool Promise.t
@@ -394,16 +402,44 @@ module Make (Inputs : Inputs_intf) = struct
     in
     of_backend res
 
+  let create_and_verify_async ?message pk ~primary ~auxiliary =
+    let chal_polys =
+      match (message : message option) with Some s -> s | None -> []
+    in
+    let challenges =
+      List.map chal_polys ~f:(fun { Challenge_polynomial.challenges; _ } ->
+          challenges )
+      |> Array.concat
+    in
+    let commitments =
+      Array.of_list_map chal_polys
+        ~f:(fun { Challenge_polynomial.commitment; _ } ->
+          G.Affine.to_backend (Finite commitment) )
+    in
+    let%map.Promise res =
+      Backend.create_and_verify_async pk primary auxiliary challenges
+        commitments
+    in
+    of_backend res
+
   let batch_verify' (conv : 'a -> Fq.t array)
       (ts : (Verifier_index.t * t * 'a * message option) list) =
+    let logger = Internal_tracing_context_logger.get () in
+    [%log internal] "Batch_verify_backend_convert_inputs" ;
     let vks_and_v =
       Array.of_list_map ts ~f:(fun (vk, t, xs, m) ->
           let p = to_backend' (Option.value ~default:[] m) (conv xs) t in
           (vk, p) )
     in
-    Backend.batch_verify
-      (Array.map ~f:fst vks_and_v)
-      (Array.map ~f:snd vks_and_v)
+    [%log internal] "Batch_verify_backend_convert_inputs_done" ;
+    [%log internal] "Batch_verify_backend" ;
+    let%map.Promise result =
+      Backend.batch_verify
+        (Array.map ~f:fst vks_and_v)
+        (Array.map ~f:snd vks_and_v)
+    in
+    [%log internal] "Batch_verify_backend_done" ;
+    result
 
   let batch_verify = batch_verify' (fun xs -> List.to_array xs)
 
