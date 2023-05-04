@@ -2,15 +2,19 @@
 # The "production" Stage
 # - sets up the final container with built binaries and a running postgresql archive node setup
 #################################################################################################
-# Supports debian:stretch-slim, debian:buster-slim, and ubuntu:focal
+# Supports debian:buster-slim, debian:bullseye-slim, and ubuntu:focal
 ARG image=ubuntu:focal
 FROM ${image} AS production
 ARG deb_codename=focal
+
+ARG psql_version=13
 
 ARG MINA_DAEMON_PORT=10101
 ARG MINA_CONFIG_DIR=/data/.mina-config
 # Sample public key for use in dev profile / demo mode genesis block
 ARG PK=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p
+
+ARG ROSETTA_CLI_VERSION=v0.10.1
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -19,20 +23,37 @@ RUN apt-get update --quiet --yes \
   && apt-get upgrade --quiet --yes \
   && apt-get install --quiet --yes --no-install-recommends \
     apt-utils \
+    apt-transport-https \
     curl \
     ca-certificates \
     dnsutils \
     dumb-init \
     gettext \
+    gnupg2 \
     libgmp10 \
     libgomp1 \
     libssl1.1 \
-    postgresql \
-    postgresql-contrib \
     tzdata \
     jq \
     sudo \
   && rm -rf /var/lib/apt/lists/*
+
+# --- Install Postgresql
+RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
+    && echo deb https://apt-archive.postgresql.org/pub/repos/apt/ "$deb_codename"-pgdg-archive main | tee /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update -y \
+    && apt-get install -y \
+       postgresql-"$psql_version" \
+       postgresql-client-"$psql_version"
+
+# --- Debian 11 "Bullseye" Dependencies
+RUN test "$deb_codename" = "bullseye" \
+     && apt-get update -y \
+     && apt-get install -y \
+         libjemalloc2 \
+         libprocps8 \
+         libffi7 \
+     || exit 0
 
 # --- Debian 10 "Buster" Dependencies
 RUN test "$deb_codename" = "buster" \
@@ -40,15 +61,6 @@ RUN test "$deb_codename" = "buster" \
      && apt-get install --quiet --yes --no-install-recommends \
          libjemalloc2 \
          libprocps7 \
-         libffi6 \
-     || exit 0
-
-# --- Debian 9 "Stretch" Dependencies
-RUN test "$deb_codename" = "stretch" \
-     && apt-get update --quiet --yes \
-     && apt-get install --quiet --yes --no-install-recommends \
-         libjemalloc1 \
-         libprocps6 \
          libffi6 \
      || exit 0
 
@@ -61,8 +73,21 @@ RUN test "$deb_codename" = "focal" \
          libffi7 \
      || exit 0
 
-# --- Install the latest version of rosetta-cli
-RUN curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/master/scripts/install.sh | sh -s
+# --- Install rosetta-cli
+
+# The following commands install rosetta-cli with an updated rosetta-sdk-go dependency, which supports delegation transactions.
+# Upstream PR to rosetta-sdk-go: https://github.com/coinbase/rosetta-sdk-go/pull/457
+# They can be replaced once there is a new release of rosetta-cli containing the above change by:
+# RUN curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/${ROSETTA_CLI_VERSION}/scripts/install.sh | sh -s
+COPY --from=builder /usr/lib/go /usr/lib/go
+RUN apt-get install -y gcc
+RUN export GOBIN="$(pwd)/bin" \
+  && curl -L "https://github.com/coinbase/rosetta-cli/archive/refs/tags/v0.10.1.tar.gz" -o "/tmp/v0.10.1.tar.gz" \
+  && tar xzf "/tmp/v0.10.1.tar.gz" -C "/tmp" \
+  && cd "/tmp/rosetta-cli-0.10.1" \
+  && /usr/lib/go/bin/go mod edit -replace github.com/coinbase/rosetta-sdk-go@v0.8.1=github.com/MinaProtocol/rosetta-sdk-go@stake-delegation-v1 \
+  && /usr/lib/go/bin/go mod tidy \
+  && /usr/lib/go/bin/go install
 
 # --- Generate en_US.UTF-8 locale to allow use of O(1) Labs DB dumps
 RUN locale-gen en_US.UTF-8
@@ -79,6 +104,9 @@ COPY --from=builder /home/opam/app/* /usr/local/bin/
 COPY --from=builder /home/opam/mina/src/app/rosetta/*.sh /rosetta/
 COPY --from=builder /home/opam/mina/src/app/rosetta/*.conf /rosetta/
 COPY --from=builder /home/opam/mina/src/app/rosetta/README.md /rosetta/
+COPY --from=builder /home/opam/mina/src/app/rosetta/rosetta-cli-config/*.json /rosetta/rosetta-cli-config/
+COPY --from=builder /home/opam/mina/src/app/rosetta/rosetta-cli-config/*.ros /rosetta/rosetta-cli-config/
+COPY --from=builder /home/opam/mina/src/app/archive/*.sql /archive/
 COPY --from=builder /home/opam/mina/genesis_ledgers /genesis_ledgers/
 
 # --- Set up postgres

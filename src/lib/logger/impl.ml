@@ -1,10 +1,18 @@
-open Core
-open Async
+open Core_kernel
 
 let max_log_line_length = 1 lsl 20
 
 module Level = struct
-  type t = Spam | Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
+  type t =
+    | Internal
+    | Spam
+    | Trace
+    | Debug
+    | Info
+    | Warn
+    | Error
+    | Faulty_peer
+    | Fatal
   [@@deriving sexp, equal, compare, show { with_path = false }, enumerate]
 
   let of_string str =
@@ -24,6 +32,29 @@ module Time = struct
 
   let of_yojson json =
     json |> Yojson.Safe.Util.to_string |> fun s -> Ok (Time.of_string s)
+
+  let pp ppf timestamp =
+    (* This used to be
+       [Core.Time.format timestamp "%Y-%m-%d %H:%M:%S UTC"
+        ~zone:Time.Zone.utc]
+       which uses the Unix string formatting under the hood, but we
+       don't want to load that just for the pretty printing. Instead,
+       we simulate it here.
+    *)
+    let zone = Time.Zone.utc in
+    let date, time = Time.to_date_ofday ~zone timestamp in
+    let time_parts = Time.Ofday.to_parts time in
+    Format.fprintf ppf "%i-%02d-%02d %02d:%02d:%02d UTC" (Date.year date)
+      (Date.month date |> Month.to_int)
+      (Date.day date) time_parts.hr time_parts.min time_parts.sec
+
+  let pretty_to_string timestamp = Format.asprintf "%a" pp timestamp
+
+  let pretty_to_string_ref = ref pretty_to_string
+
+  let set_pretty_to_string x = pretty_to_string_ref := x
+
+  let pretty_to_string x = !pretty_to_string_ref x
 end
 
 module Source = struct
@@ -99,7 +130,7 @@ module Message = struct
   [@@deriving yojson]
 
   let check_invariants (t : t) =
-    match Logproc_lib.Interpolator.parse t.message with
+    match Interpolator_lib.Interpolator.parse t.message with
     | Error _ ->
         false
     | Ok items ->
@@ -118,6 +149,8 @@ module Processor = struct
   end
 
   type t = T : (module S with type t = 't) * 't -> t
+
+  let create m t = T (m, t)
 
   module Raw = struct
     type t = Level.t
@@ -141,7 +174,8 @@ module Processor = struct
   end
 
   module Pretty = struct
-    type t = { log_level : Level.t; config : Logproc_lib.Interpolator.config }
+    type t =
+      { log_level : Level.t; config : Interpolator_lib.Interpolator.config }
 
     let create ~log_level ~config = { log_level; config }
 
@@ -150,25 +184,24 @@ module Processor = struct
       if Level.compare msg.level log_level < 0 then None
       else
         match
-          Logproc_lib.Interpolator.interpolate config msg.message msg.metadata
+          Interpolator_lib.Interpolator.interpolate config msg.message
+            msg.metadata
         with
         | Error err ->
             Option.iter msg.source ~f:(fun source ->
-                Core.printf "logproc interpolation error in %s: %s\n"
-                  source.location err ) ;
+                printf "logproc interpolation error in %s: %s\n" source.location
+                  err ) ;
             None
         | Ok (str, extra) ->
-            let formatted_extra =
-              extra
-              |> List.map ~f:(fun (k, v) -> "\n\t" ^ k ^ ": " ^ v)
-              |> String.concat ~sep:""
+            let msg =
+              (* The previously existing \t has been changed to 2 spaces. *)
+              Format.asprintf "@[<v 2>%a [%a] %s@,%a@]" Time.pp msg.timestamp
+                Level.pp msg.level str
+                (Format.pp_print_list ~pp_sep:Format.pp_print_cut
+                   (fun ppf (k, v) -> Format.fprintf ppf "%s: %s" k v) )
+                extra
             in
-            let time =
-              Core.Time.format msg.timestamp "%Y-%m-%d %H:%M:%S UTC"
-                ~zone:Time.Zone.utc
-            in
-            Some
-              (time ^ " [" ^ Level.show msg.level ^ "] " ^ str ^ formatted_extra)
+            Some msg
   end
 
   let raw ?(log_level = Level.Spam) () = T ((module Raw), Raw.create ~log_level)
@@ -186,88 +219,17 @@ module Transport = struct
 
   type t = T : (module S with type t = 't) * 't -> t
 
+  let create m t = T (m, t)
+
   module Stdout = struct
     type t = unit
 
     let create () = ()
 
-    let transport () = Core.print_endline
+    let transport () = print_endline
   end
 
   let stdout () = T ((module Stdout), Stdout.create ())
-
-  module File_system = struct
-    module Dumb_logrotate = struct
-      open Core.Unix
-
-      let log_perm = 0o644
-
-      type t =
-        { directory : string
-        ; log_filename : string
-        ; max_size : int
-        ; num_rotate : int
-        ; mutable curr_index : int
-        ; mutable primary_log : File_descr.t
-        ; mutable primary_log_size : int
-        }
-
-      let create ~directory ~max_size ~log_filename ~num_rotate =
-        if not (Result.is_ok (access directory [ `Exists ])) then
-          mkdir_p ~perm:0o755 directory ;
-        if not (Result.is_ok (access directory [ `Exists; `Read; `Write ])) then
-          failwithf
-            "cannot create log files: read/write permissions required on %s"
-            directory () ;
-        let primary_log_loc = Filename.concat directory log_filename in
-        let primary_log_size, mode =
-          if Result.is_ok (access primary_log_loc [ `Exists; `Read; `Write ])
-          then
-            let log_stats = stat primary_log_loc in
-            (Int64.to_int_exn log_stats.st_size, [ O_RDWR; O_APPEND ])
-          else (0, [ O_RDWR; O_CREAT ])
-        in
-        let primary_log = openfile ~perm:log_perm ~mode primary_log_loc in
-        { directory
-        ; log_filename
-        ; max_size
-        ; primary_log
-        ; primary_log_size
-        ; num_rotate
-        ; curr_index = 0
-        }
-
-      let rotate t =
-        let primary_log_loc = Filename.concat t.directory t.log_filename in
-        let secondary_log_filename =
-          t.log_filename ^ "." ^ string_of_int t.curr_index
-        in
-        if t.curr_index < t.num_rotate then t.curr_index <- t.curr_index + 1
-        else t.curr_index <- 0 ;
-        let secondary_log_loc =
-          Filename.concat t.directory secondary_log_filename
-        in
-        close t.primary_log ;
-        rename ~src:primary_log_loc ~dst:secondary_log_loc ;
-        t.primary_log <-
-          openfile ~perm:log_perm ~mode:[ O_RDWR; O_CREAT ] primary_log_loc ;
-        t.primary_log_size <- 0
-
-      let transport t str =
-        if t.primary_log_size > t.max_size then rotate t ;
-        let str = str ^ "\n" in
-        let len = String.length str in
-        if write t.primary_log ~buf:(Bytes.of_string str) ~len <> len then
-          printf "unexpected error writing to persistent log" ;
-        t.primary_log_size <- t.primary_log_size + len
-    end
-
-    let dumb_logrotate ~directory ~log_filename ~max_size ~num_rotate =
-      T
-        ( (module Dumb_logrotate)
-        , Dumb_logrotate.create ~directory ~log_filename ~max_size ~num_rotate
-        )
-  end
 end
 
 module Consumer_registry = struct
@@ -337,9 +299,7 @@ end]
 let metadata t = t.metadata
 
 let create ?(metadata = []) ?(id = "default") () =
-  let pid = lazy (Unix.getpid () |> Pid.to_int) in
-  let metadata' = ("pid", `Int (Lazy.force pid)) :: metadata in
-  { null = false; metadata = Metadata.extend Metadata.empty metadata'; id }
+  { null = false; metadata = Metadata.extend Metadata.empty metadata; id }
 
 let null () = { null = true; metadata = Metadata.empty; id = "default" }
 
@@ -349,7 +309,7 @@ let extend t metadata =
 let change_id { null; metadata; id = _ } ~id = { null; metadata; id }
 
 let make_message (t : t) ~level ~module_ ~location ~metadata ~message ~event_id
-    =
+    ~skip_merge_global_metadata =
   let global_metadata' =
     let m = !global_metadata in
     let key_cmp (k1, _) (k2, _) = String.compare k1 k2 in
@@ -365,9 +325,12 @@ let make_message (t : t) ~level ~module_ ~location ~metadata ~message ~event_id
   ; source = Some (Source.create ~module_ ~location)
   ; message
   ; metadata =
-      Metadata.extend
-        (Metadata.merge (Metadata.of_alist_exn global_metadata') t.metadata)
-        metadata
+      ( if skip_merge_global_metadata then
+        Metadata.extend Metadata.empty metadata
+      else
+        Metadata.extend
+          (Metadata.merge (Metadata.of_alist_exn global_metadata') t.metadata)
+          metadata )
   ; event_id
   }
 
@@ -400,9 +363,19 @@ let add_tags_to_metadata metadata tags =
 let log t ~level ~module_ ~location ?tags ?(metadata = []) ?event_id fmt =
   let metadata = add_tags_to_metadata metadata tags in
   let f message =
-    raw t
-    @@ make_message t ~level ~module_ ~location ~metadata ~message ~event_id
+    let message' =
+      make_message t ~level ~module_ ~location ~metadata ~message ~event_id
+        ~skip_merge_global_metadata:(Level.equal level Level.Internal)
+    in
+    raw t message' ;
+    match level with
+    | Internal ->
+        if Mina_compile_config.itn_features then
+          Itn_logger.log ~timestamp:message'.timestamp ~message ~metadata
+    | _ ->
+        ()
   in
+
   ksprintf f fmt
 
 type 'a log_function =
@@ -416,6 +389,8 @@ type 'a log_function =
   -> 'a
 
 let trace = log ~level:Trace
+
+let internal = log ~level:Internal
 
 let debug = log ~level:Debug
 
@@ -450,6 +425,7 @@ module Structured = struct
     let metadata = add_tags_to_metadata (str_metadata @ metadata) tags in
     raw t
     @@ make_message t ~level ~module_ ~location ~metadata ~message ~event_id
+         ~skip_merge_global_metadata:(Level.equal level Level.Internal)
 
   let trace = log ~level:Trace
 

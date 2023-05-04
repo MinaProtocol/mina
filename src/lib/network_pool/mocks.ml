@@ -1,29 +1,11 @@
 open Core_kernel
 open Async_kernel
 open Pipe_lib
-open Mina_base
 
 let trust_system = Trust_system.null ()
 
 module Transaction_snark_work = Transaction_snark_work
-
-module Base_ledger = struct
-  type t = Account.t Account_id.Map.t [@@deriving sexp]
-
-  module Location = struct
-    type t = Account_id.t
-  end
-
-  let location_of_account _t k = Some k
-
-  let location_of_account_batch _t ks = List.map ks ~f:(fun k -> (k, Some k))
-
-  let get t l = Map.find t l
-
-  let get_batch t ls = List.map ls ~f:(fun l -> (l, get t l))
-
-  let detached_signal _ = Deferred.never ()
-end
+module Base_ledger = Mina_ledger.Ledger
 
 module Staged_ledger = struct
   type t = Base_ledger.t [@@deriving sexp]
@@ -75,7 +57,7 @@ module Transition_frontier = struct
     in
     { refcount_table
     ; best_tip_table
-    ; ledger = Account_id.Map.empty
+    ; ledger = Mina_ledger.Ledger.create_ephemeral ~depth:10 ()
     ; diff_writer
     ; diff_reader
     }

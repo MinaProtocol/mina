@@ -26,7 +26,8 @@ let%test_module "network pool test" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ()) )
+            ~pids:(Child_processes.Termination.create_pid_table ())
+            () )
 
     module Mock_snark_pool =
       Snark_pool.Make (Mocks.Base_ledger) (Mocks.Staged_ledger)
@@ -49,7 +50,7 @@ let%test_module "network pool test" =
         { Priced_proof.proof =
             One_or_two.map ~f:Ledger_proof.For_tests.mk_dummy_proof work
         ; fee =
-            { fee = Currency.Fee.of_int 0
+            { fee = Currency.Fee.zero
             ; prover = Signature_lib.Public_key.Compressed.empty
             }
         }
@@ -101,7 +102,7 @@ let%test_module "network pool test" =
               { proof =
                   One_or_two.map ~f:Ledger_proof.For_tests.mk_dummy_proof work
               ; fee =
-                  { fee = Currency.Fee.of_int 0
+                  { fee = Currency.Fee.zero
                   ; prover = Signature_lib.Public_key.Compressed.empty
                   }
               } )
