@@ -200,7 +200,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           edit_state = Permissions.Auth_required.Proof
         ; edit_action_state = Proof
         ; set_delegate = Proof
-        ; set_verification_key = Proof
+        ; set_verification_key = Signature
         ; set_permissions = Proof
         ; set_zkapp_uri = Proof
         ; set_token_symbol = Proof
@@ -263,11 +263,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let new_delegate =
         Quickcheck.random_value Signature_lib.Public_key.Compressed.gen
       in
-      let new_verification_key =
-        let data = Pickles.Side_loaded.Verification_key.dummy in
-        let hash = Zkapp_account.digest_vk data in
-        ({ data; hash } : _ With_hash.t)
-      in
       let new_permissions =
         Quickcheck.random_value (Permissions.gen ~auth_tag:Proof)
       in
@@ -277,7 +272,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let snapp_update : Account_update.Update.t =
         { app_state
         ; delegate = Set new_delegate
-        ; verification_key = Set new_verification_key
+        ; verification_key = Keep
         ; permissions = Set new_permissions
         ; zkapp_uri = Set new_zkapp_uri
         ; token_symbol = Set new_token_symbol
@@ -369,6 +364,39 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 | _ ->
                     other_p )
         }
+    in
+    let make_update_vk_spec auth : Transaction_snark.For_tests.Update_states_spec.t =
+    { sender = (fish2_kp, Account.Nonce.of_int 2)
+    ; fee = Currency.Fee.of_nanomina_int_exn 10_000_000
+    ; fee_payer = None
+    ; receivers = []
+    ; amount = Currency.Amount.zero
+    ; zkapp_account_keypairs = zkapp_keypairs
+    ; memo =
+        Signed_command_memo.create_from_string_exn "update vk"
+    ; new_zkapp_account = false
+    ; snapp_update =
+        { Account_update.Update.dummy with
+          permissions =
+            Zkapp_basic.Set_or_keep.Set
+              { Permissions.user_default with
+                set_verification_key = auth
+              }
+        }
+    ; current_auth = Permissions.Auth_required.Signature
+    ; call_data = Snark_params.Tick.Field.zero
+    ; events = []
+    ; actions = []
+    ; preconditions = None
+    }
+  in     
+    let%bind.Deferred zkapp_command_update_vk_proof =
+      Transaction_snark.For_tests.update_states ~constraint_constants 
+        (make_update_vk_spec Permissions.Auth_required.Proof) 
+    in
+    let%bind.Deferred zkapp_command_update_vk_impossible =
+      Transaction_snark.For_tests.update_states ~constraint_constants 
+        (make_update_vk_spec Permissions.Auth_required.Impossible)
     in
     let%bind.Deferred zkapp_command_nonexistent_fee_payer =
       let new_kp = Signature_lib.Keypair.create () in
@@ -765,6 +793,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Send a zkApp transaction with a nonexistent fee payer"
         (send_invalid_zkapp ~logger node zkapp_command_nonexistent_fee_payer
            "Fee_payer_account_not_found" )
+    in
+    let%bind () =
+      section_hard "Send a zkApp transaction that set the permission for updating vk to be Proof"
+        (send_invalid_zkapp ~logger node zkapp_command_update_vk_proof 
+          "Permission_for_update_vk_can_not_be_proof_or_impossible")
+    in
+    let%bind () =
+      section_hard "Send a zkApp transaction that set the permission for updating vk to be Impossible"
+        (send_invalid_zkapp ~logger node zkapp_command_update_vk_impossible
+          "Permission_for_update_vk_can_not_be_proof_or_impossible")
     in
     let%bind () =
       section_hard
