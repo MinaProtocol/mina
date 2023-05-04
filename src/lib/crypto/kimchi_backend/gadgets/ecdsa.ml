@@ -164,11 +164,12 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
             let delta_y = (right_y - left_y) % foreign_field_modulus in
             let delta_x = (right_x - left_x) % foreign_field_modulus in
 
-            (* Since foreign_field_modulus is prime we can compute the
-             * modular inverse of as as a^{m - 2}
-             * (Need a better way to compute this) *)
-            let m_minus_two = foreign_field_modulus - of_int 2 in
-            let delta_x_inv = pow delta_x m_minus_two % foreign_field_modulus in
+            (* Compute delta_x inverse *)
+            let delta_x_inv =
+              let delta_x = (Bignum_bigint.to_zarith_bigint delta_x) in
+              let foreign_field_modulus = (Bignum_bigint.to_zarith_bigint foreign_field_modulus) in
+              let delta_x_inv = Z.invert delta_x foreign_field_modulus in
+              Bignum_bigint.of_zarith_bigint delta_x_inv in
 
             delta_y * delta_x_inv % foreign_field_modulus)
         in
@@ -506,6 +507,7 @@ let%test_unit "group_add" =
     cs
   in
 
+  (* Tests for random points *)
   let _cs =
     test_group_add
       (Bignum_bigint.of_int 4, Bignum_bigint.one) (* left_input *)
@@ -522,36 +524,33 @@ let%test_unit "group_add" =
   in
 
   (* Tests with secp256k1 curve points *)
-  let _secp256k1_modulus =
+  let secp256k1_modulus =
     Common.bignum_bigint_of_hex
       "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
   in
-  let _secp256k1_generator =
+  let secp256k1_generator =
     ( Bignum_bigint.of_string
         "55066263022277343669578718895168534326250603453777594175500187360389116729240"
     , Bignum_bigint.of_string
-        "32670510020758816978083085130507043184471273380659243275938904335757337482424"
-    )
+        "32670510020758816978083085130507043184471273380659243275938904335757337482424" )
   in
-  let _random_point1 =
+  let random_point1 =
     ( Bignum_bigint.of_string
         "11498799051185379176527662983290644419148625795866197242742376646044820710107"
     , Bignum_bigint.of_string
-        "87365548140897354715632623292744880448736648603030553868546115582681395400362"
-    )
+        "87365548140897354715632623292744880448736648603030553868546115582681395400362" )
   in
-  let _expected_result1 =
+  let expected_result1 =
     ( Bignum_bigint.of_string
         "29271032301589161601163082898984274448470999636237808164579416118817375265766"
     , Bignum_bigint.of_string
-        "70576057075545750224511488165986665682391544714639291167940534165970533739040"
-    )
+        "70576057075545750224511488165986665682391544714639291167940534165970533739040" )
   in
 
-  (* let _cs =
+  let _cs =
     test_group_add random_point1 (* left_input *)
       secp256k1_generator (* right_input *)
       expected_result1 (* expected result *)
       secp256k1_modulus
-  in *)
+  in
   ()
