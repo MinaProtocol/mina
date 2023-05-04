@@ -76,8 +76,6 @@ module Side_loaded = struct
 end
 
 module Compiled = struct
-  type f = Impls.Wrap.field
-
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) basic =
     { public_input : ('a_var, 'a_value) Impls.Step.Typ.t
     ; proofs_verifieds : (int, 'branches) Vector.t
@@ -108,9 +106,9 @@ module Compiled = struct
     | T : ('var, 'value, 'n1, 'n2) Tag.id * ('var, 'value, 'n1, 'n2) t -> packed
 
   let to_basic
-      { branches
+      { branches = _
       ; max_proofs_verified
-      ; proofs_verifieds
+      ; proofs_verifieds = _
       ; public_input
       ; wrap_vk
       ; wrap_domains
@@ -145,7 +143,7 @@ module For_step = struct
     ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
     }
 
-  let of_side_loaded (type a b c d e f)
+  let of_side_loaded (type a b c d)
       ({ ephemeral
        ; permanent =
            { branches; max_proofs_verified; public_input; feature_flags }
@@ -178,6 +176,7 @@ module For_step = struct
        ; wrap_domains
        ; step_domains
        ; feature_flags
+       ; wrap_vk = _
        } :
         _ Compiled.t ) =
     { branches
@@ -260,13 +259,13 @@ let feature_flags :
   | Side_loaded ->
       (lookup_side_loaded tag.id).permanent.feature_flags
 
-let value_to_field_elements :
-    type a. (_, a, _, _) Tag.t -> a -> Tick.Field.t array =
+let _value_to_field_elements :
+    type a. (_, a, _, _) Tag.t -> a -> Backend.Tick.Field.t array =
  fun t ->
   let (Typ typ) = public_input t in
   fun x -> fst (typ.value_to_fields x)
 
-let lookup_map (type var value c d) (t : (var, value, c, d) Tag.t) ~self
+let _lookup_map (type var value c d) (t : (var, value, c, d) Tag.t) ~self
     ~default
     ~(f :
           [ `Compiled of (var, value, c, d) Compiled.t
@@ -295,7 +294,7 @@ let add_side_loaded ~name permanent =
   tag
 
 let set_ephemeral { Tag.kind; id } (eph : Side_loaded.Ephemeral.t) =
-  (match kind with Side_loaded -> () | _ -> failwith "Expected Side_loaded") ;
+  assert (match kind with Side_loaded -> true | Compiled -> false) ;
   Hashtbl.update univ.side_loaded (Type_equal.Id.uid id) ~f:(function
     | None ->
         assert false
