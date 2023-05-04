@@ -134,7 +134,7 @@ module "testworld-2-0" {
   seed_zone   = local.seed_zone
   seed_region = local.seed_region
 
-  log_level           = "Info"
+  log_level           = "Debug"
   log_txn_pool_gossip = false
 
   block_producer_key_pass           = "naughty blue worm"

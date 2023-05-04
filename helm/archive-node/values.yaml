@@ -2,7 +2,7 @@ testnetName: "testnet"
 mina:
   runtimeConfig:
   generateGenesisProof: true
-  logLevel: "Info"
+  logLevel: "Debug"
   logSnarkWorkGossip: false
   logTxnPoolGossip: false
   image: gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet

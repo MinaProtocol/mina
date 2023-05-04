@@ -31,8 +31,8 @@ locals {
   healthcheck_vars = {
     enabled             = var.healthcheck_enabled
     failureThreshold    = 60
-    periodSeconds       = 60
-    initialDelaySeconds = 600
+    periodSeconds       = 20
+    initialDelaySeconds = 30
   }
 
   seed_vars = {
