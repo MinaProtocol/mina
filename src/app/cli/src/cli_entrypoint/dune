@@ -72,6 +72,8 @@
    snarky.backendless
    o1trace
    ppx_version.runtime
+   internal_tracing
+   itn_logger
  )
  (preprocessor_deps ../../../../config.mlh)
  (instrumentation (backend bisect_ppx))

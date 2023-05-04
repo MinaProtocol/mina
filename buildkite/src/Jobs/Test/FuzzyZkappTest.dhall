@@ -16,7 +16,7 @@ let buildTestCmd : Text -> Text -> Natural -> Size -> Command.Type = \(profile :
   let trials = Natural/show trials in
   Command.build
     Command.Config::{
-      commands = RunInToolchain.runInToolchainStretch ([] : List Text)
+      commands = RunInToolchain.runInToolchain ([] : List Text)
         "buildkite/scripts/fuzzy-zkapp-test.sh ${profile} ${path} ${trials}",
       label = "Fuzzy zkapp unit tests",
       key = "fuzzy-zkapp-unit-test-${profile}",

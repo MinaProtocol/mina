@@ -2,7 +2,7 @@
 # The "production" Stage
 # - sets up the final container with built binaries and a running postgresql archive node setup
 #################################################################################################
-# Supports debian:stretch-slim, debian:buster-slim, and ubuntu:focal
+# Supports debian:buster-slim, debian:bullseye-slim, and ubuntu:focal
 ARG image=ubuntu:focal
 FROM ${image} AS production
 ARG deb_codename=focal
@@ -64,15 +64,6 @@ RUN test "$deb_codename" = "buster" \
          libffi6 \
      || exit 0
 
-# --- Debian 9 "Stretch" Dependencies
-RUN test "$deb_codename" = "stretch" \
-     && apt-get update --quiet --yes \
-     && apt-get install --quiet --yes --no-install-recommends \
-         libjemalloc1 \
-         libprocps6 \
-         libffi6 \
-     || exit 0
-
 # --- Ubuntu 20.04 "Focal Fossa" Dependencies
 RUN test "$deb_codename" = "focal" \
      && apt-get update --quiet --yes \
@@ -80,15 +71,6 @@ RUN test "$deb_codename" = "focal" \
          libjemalloc2 \
          libprocps8 \
          libffi7 \
-     || exit 0
-
-# --- Ubuntu 18.04 "Bionic Beaver" Dependencies
-RUN test "$deb_codename" = "bionic" \
-     && apt-get update -y \
-     && apt-get install -y \
-         libjemalloc1 \
-         libprocps6 \
-         libffi6 \
      || exit 0
 
 # --- Install rosetta-cli

@@ -388,7 +388,14 @@ let root_snarked_ledger { persistent_root_instance; _ } =
 
 let add_breadcrumb_exn t breadcrumb =
   let open Deferred.Let_syntax in
+  let state_hash = Breadcrumb.state_hash breadcrumb in
+  Internal_tracing.with_state_hash state_hash
+  @@ fun () ->
+  let logger = t.logger in
+  [%log internal] "Add_breadcrumb_to_frontier" ;
+  [%log internal] "Calculate_diffs" ;
   let diffs = Full_frontier.calculate_diffs t.full_frontier breadcrumb in
+  [%log internal] "Calculate_diffs_done" ;
   [%log' trace t.logger]
     ~metadata:
       [ ( "state_hash"
@@ -400,7 +407,10 @@ let add_breadcrumb_exn t breadcrumb =
     "PRE: ($state_hash, $n)" ;
   [%str_log' trace t.logger]
     (Applying_diffs { diffs = List.map ~f:Diff.Full.E.to_yojson diffs }) ;
+  [%log internal] "Apply_catchup_tree_diffs" ;
   Catchup_tree.apply_diffs t.catchup_tree diffs ;
+  [%log internal] "Apply_full_frontier_diffs"
+    ~metadata:[ ("count", `Int (List.length diffs)) ] ;
   let (`New_root_and_diffs_with_mutants
         (new_root_identifier, diffs_with_mutants) ) =
     (* Root DB moves here *)
@@ -409,6 +419,7 @@ let add_breadcrumb_exn t breadcrumb =
         (Catchup_tree.max_catchup_chain_length t.catchup_tree > 5)
       ~enable_epoch_ledger_sync:(`Enabled (root_snarked_ledger t))
   in
+  [%log internal] "Apply_full_frontier_diffs_done" ;
   Option.iter new_root_identifier
     ~f:(Persistent_root.Instance.set_root_identifier t.persistent_root_instance) ;
   [%log' trace t.logger]
@@ -435,6 +446,7 @@ let add_breadcrumb_exn t breadcrumb =
   let lite_diffs =
     List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
   in
+  [%log internal] "Synchronize_persistent_frontier" ;
   let%bind sync_result =
     (* Diffs get put into a buffer here. They're processed asynchronously, except for root transitions *)
     Persistent_frontier.Instance.notify_sync t.persistent_frontier_instance
@@ -447,7 +459,14 @@ let add_breadcrumb_exn t breadcrumb =
             running, which indicates that transition frontier initialization \
             has not been performed correctly" )
   |> Result.ok_exn ;
-  Extensions.notify t.extensions ~frontier:t.full_frontier ~diffs_with_mutants
+  [%log internal] "Synchronize_persistent_frontier_done" ;
+  [%log internal] "Notify_frontier_extensions" ;
+  let%map () =
+    Extensions.notify t.extensions ~logger ~frontier:t.full_frontier
+      ~diffs_with_mutants
+  in
+  [%log internal] "Notify_frontier_extensions_done" ;
+  [%log internal] "Add_breadcrumb_to_frontier_done"
 
 (* proxy full frontier functions *)
 include struct
