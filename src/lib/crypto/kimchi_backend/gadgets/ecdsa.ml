@@ -160,27 +160,39 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
         (* Compute slope and slope squared *)
         let slope =
           Bignum_bigint.(
-            (right_y - left_y) / (right_x - left_x) % foreign_field_modulus)
+            (* Computes 2 = (Ry - Ly)/(Rx - Lx) *)
+            let delta_y = (right_y - left_y) % foreign_field_modulus in
+            let delta_x = (right_x - left_x) % foreign_field_modulus in
+
+            (* Since foreign_field_modulus is prime we can compute the
+             * modular inverse of as as a^{m - 2}
+             * (Need a better way to compute this) *)
+            let m_minus_two = foreign_field_modulus - of_int 2 in
+            let delta_x_inv = pow delta_x m_minus_two % foreign_field_modulus in
+
+            delta_y * delta_x_inv % foreign_field_modulus)
         in
+
         let slope_squared =
           Bignum_bigint.((pow slope @@ of_int 2) % foreign_field_modulus)
         in
-        printf "slope         = %s\n" (Bignum_bigint.to_string slope) ;
-        printf "slope_squared = %s\n" (Bignum_bigint.to_string slope_squared) ;
 
         (* Compute result's x-coodinate: x = s^2 - Lx - Rx *)
         let result_x =
           Bignum_bigint.(
-            (slope_squared - left_x - right_x) % foreign_field_modulus)
+            let slope_squared_x =
+              (slope_squared - left_x) % foreign_field_modulus
+            in
+            (slope_squared_x - right_x) % foreign_field_modulus)
         in
 
         (* Compute result's y-coodinate: y = s * (Rx - x) - Ry *)
         let result_y =
           Bignum_bigint.(
-            ((slope * (right_x - result_x)) - right_y) % foreign_field_modulus)
+            let x_diff = (right_x - result_x) % foreign_field_modulus in
+            let x_diff_s = slope * x_diff % foreign_field_modulus in
+            (x_diff_s - right_y) % foreign_field_modulus)
         in
-        printf "result_x      = %s\n" (Bignum_bigint.to_string result_x) ;
-        printf "result_y      = %s\n" (Bignum_bigint.to_string result_y) ;
 
         (* Convert from Bignums to field elements *)
         let slope0, slope1, slope2 =
@@ -416,6 +428,7 @@ let%test_unit "group_add" =
   (* Test group add *)
   let test_group_add ?cs (left_input : Bignum_bigint.t * Bignum_bigint.t)
       (right_input : Bignum_bigint.t * Bignum_bigint.t)
+      (expected_result : Bignum_bigint.t * Bignum_bigint.t)
       (foreign_field_modulus : Bignum_bigint.t) =
     (* Generate and verify proof *)
     let cs, _proof_keypair, _proof =
@@ -454,6 +467,18 @@ let%test_unit "group_add" =
             in
             Affine.of_coordinates (x, y)
           in
+          let expected_result =
+            let x, y = expected_result in
+            let x, y =
+              ( Foreign_field.Element.Standard.of_bignum_bigint
+                  (module Runner.Impl)
+                  x
+              , Foreign_field.Element.Standard.of_bignum_bigint
+                  (module Runner.Impl)
+                  y )
+            in
+            Affine.of_coordinates (x, y)
+          in
 
           (* Create external checks context for tracking extra constraints
              that are required for soundness (unused in this simple test) *)
@@ -462,39 +487,71 @@ let%test_unit "group_add" =
           in
 
           (* Create the gadget *)
-          let _result =
+          let result =
             group_add
               (module Runner.Impl)
               unused_external_checks left_input right_input
               foreign_field_modulus
           in
-          (* Check product matches expected result *)
-          (* as_prover (fun () ->
-              let expected =
-                Foreign_field.Element.Standard.of_bignum_bigint
-                  (module Runner.Impl)
-                  expected
-              in
+
+          (* Check output matches expected result *)
+          Runner.Impl.as_prover (fun () ->
               assert (
-                Foreign_field.Element.Standard.equal_as_prover
+                Affine.equal_as_prover
                   (module Runner.Impl)
-                  expected product ) ) ; *)
+                  result expected_result ) ) ;
           () )
     in
 
     cs
   in
 
-  let secp256k1_modulus =
+  let _cs =
+    test_group_add
+      (Bignum_bigint.of_int 4, Bignum_bigint.one) (* left_input *)
+      (Bignum_bigint.of_int 0, Bignum_bigint.of_int 3) (* right_input *)
+      (Bignum_bigint.of_int 0, Bignum_bigint.of_int 2) (* expected result *)
+      (Bignum_bigint.of_int 5)
+  in
+  let _cs =
+    test_group_add
+      (Bignum_bigint.of_int 2, Bignum_bigint.of_int 3) (* left_input *)
+      (Bignum_bigint.of_int 1, Bignum_bigint.of_int 0) (* right_input *)
+      (Bignum_bigint.of_int 1, Bignum_bigint.of_int 0) (* expected result *)
+      (Bignum_bigint.of_int 5)
+  in
+
+  (* Tests with secp256k1 curve points *)
+  let _secp256k1_modulus =
     Common.bignum_bigint_of_hex
       "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
   in
-  let secp256k1_max = Bignum_bigint.(secp256k1_modulus - Bignum_bigint.one) in
-  let secp256k1_sqrt = Common.bignum_biguint_sqrt secp256k1_max in
-  let _cs =
-    test_group_add
-      (Bignum_bigint.zero, secp256k1_max)
-      (Bignum_bigint.one, secp256k1_sqrt)
-      secp256k1_modulus
+  let _secp256k1_generator =
+    ( Bignum_bigint.of_string
+        "55066263022277343669578718895168534326250603453777594175500187360389116729240"
+    , Bignum_bigint.of_string
+        "32670510020758816978083085130507043184471273380659243275938904335757337482424"
+    )
   in
+  let _random_point1 =
+    ( Bignum_bigint.of_string
+        "11498799051185379176527662983290644419148625795866197242742376646044820710107"
+    , Bignum_bigint.of_string
+        "87365548140897354715632623292744880448736648603030553868546115582681395400362"
+    )
+  in
+  let _expected_result1 =
+    ( Bignum_bigint.of_string
+        "29271032301589161601163082898984274448470999636237808164579416118817375265766"
+    , Bignum_bigint.of_string
+        "70576057075545750224511488165986665682391544714639291167940534165970533739040"
+    )
+  in
+
+  (* let _cs =
+    test_group_add random_point1 (* left_input *)
+      secp256k1_generator (* right_input *)
+      expected_result1 (* expected result *)
+      secp256k1_modulus
+  in *)
   ()
