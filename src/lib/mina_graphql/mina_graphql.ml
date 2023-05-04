@@ -1818,7 +1818,15 @@ module Types = struct
             | Applied | Enqueued ->
                 None
             | Included_but_failed failures ->
-                List.concat failures |> List.hd )
+                let rec first_failure = function
+                  | (failure :: _) :: _ ->
+                      Some failure
+                  | [] :: others ->
+                      first_failure others
+                  | [] ->
+                      None
+                in
+                first_failure failures )
       ]
 
     let payment =
@@ -3182,6 +3190,8 @@ module Types = struct
           ; min_fee : string
           ; max_fee : string
           ; deployment_fee : string
+          ; account_queue_size : int
+          ; max_cost : bool
           }
 
         let arg_typ =
@@ -3190,7 +3200,8 @@ module Types = struct
             ~coerce:(fun fee_payers num_zkapps_to_deploy num_new_accounts
                          transactions_per_second duration_in_minutes memo_prefix
                          no_precondition min_balance_change max_balance_change
-                         init_balance min_fee max_fee deployment_fee ->
+                         init_balance min_fee max_fee deployment_fee
+                         account_queue_size max_cost ->
               Result.return
                 { fee_payers
                 ; num_zkapps_to_deploy
@@ -3205,12 +3216,15 @@ module Types = struct
                 ; min_fee
                 ; max_fee
                 ; deployment_fee
+                ; account_queue_size
+                ; max_cost
                 } )
             ~split:(fun f (t : input) ->
               f t.fee_payers t.num_zkapps_to_deploy t.num_new_accounts
                 t.transactions_per_second t.duration_in_minutes t.memo_prefix
                 t.no_precondition t.min_balance_change t.max_balance_change
-                t.init_balance t.min_fee t.max_fee t.deployment_fee )
+                t.init_balance t.min_fee t.max_fee t.deployment_fee
+                t.account_queue_size t.max_cost )
             ~fields:
               Arg.
                 [ arg "feePayers"
@@ -3247,6 +3261,11 @@ module Types = struct
                 ; arg "deploymentFee"
                     ~doc:"Fee for the initial deployment of zkApp accounts"
                     ~typ:(non_null string)
+                ; arg "accountQueueSize"
+                    ~doc:"The size of queue for recently used accounts"
+                    ~typ:(non_null int)
+                ; arg "maxCost" ~doc:"Generate max cost zkApp command"
+                    ~typ:(non_null bool)
                 ]
       end
 
@@ -4546,15 +4565,10 @@ module Mutations = struct
       |> Mina_ledger.Ledger.get ledger
       |> Option.value_exn
 
-    let id_of_kp (kp : Signature_lib.Keypair.t) =
-      Account_id.create
-        (Signature_lib.Public_key.compress kp.public_key)
-        Token_id.default
-
     let account_of_kp (kp : Signature_lib.Keypair.t) ledger =
-      account_of_id (id_of_kp kp) ledger
+      account_of_id (Account_id.of_public_key kp.public_key) ledger
 
-    let deploy_zkapps ~mina ~ledger ~deployment_fee ~init_balance
+    let deploy_zkapps ~mina ~ledger ~deployment_fee ~max_cost ~init_balance
         ~(fee_payer_array : Signature_lib.Keypair.t Array.t)
         ~constraint_constants ~logger ~memo_prefix keypairs =
       let fee_payer_accounts =
@@ -4584,7 +4598,15 @@ module Mutations = struct
           in
           let zkapp_command =
             Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-              ~default_permissions:true spec
+              ~permissions:
+                ( if max_cost then
+                  { Permissions.user_default with
+                    set_verification_key = Permissions.Auth_required.Proof
+                  ; edit_state = Permissions.Auth_required.Proof
+                  ; edit_action_state = Proof
+                  }
+                else Permissions.user_default )
+              spec
           in
           let rec go () =
             match%bind send_zkapp_command mina zkapp_command with
@@ -4624,7 +4646,7 @@ module Mutations = struct
       |> List.for_all ~f:Fn.id
 
     let rec wait_until_zkapps_deployed ?(deployed = false) ~mina ~ledger
-        ~deployment_fee ~init_balance
+        ~deployment_fee ~max_cost ~init_balance
         ~(fee_payer_array : Signature_lib.Keypair.t Array.t)
         ~constraint_constants ~logger ~uuid ~stop_signal ~stop_time ~memo_prefix
         (keypairs : Signature_lib.Keypair.t list) =
@@ -4645,7 +4667,7 @@ module Mutations = struct
         let%bind () =
           if not deployed then (
             [%log info] "Start deploying zkApp accounts" ;
-            deploy_zkapps ~mina ~ledger ~deployment_fee ~init_balance
+            deploy_zkapps ~mina ~ledger ~deployment_fee ~max_cost ~init_balance
               ~fee_payer_array ~constraint_constants ~logger ~memo_prefix
               keypairs )
           else return ()
@@ -4666,8 +4688,8 @@ module Mutations = struct
                  new_ledger )
         in
         wait_until_zkapps_deployed ~deployed:true ~mina ~ledger ~deployment_fee
-          ~init_balance ~fee_payer_array ~constraint_constants ~logger ~uuid
-          ~stop_signal ~stop_time ~memo_prefix keypairs
+          ~max_cost ~init_balance ~fee_payer_array ~constraint_constants ~logger
+          ~uuid ~stop_signal ~stop_time ~memo_prefix keypairs
 
     let schedule_zkapp_commands =
       io_field "scheduleZkappCommands"
@@ -4738,10 +4760,12 @@ module Mutations = struct
                           ~f:Signature_lib.Keypair.of_private_key_exn
                       in
                       let fee_payer_ids =
-                        List.map fee_payer_keypairs ~f:id_of_kp
+                        List.map fee_payer_keypairs ~f:(fun kp ->
+                            Account_id.of_public_key kp.public_key )
                       in
                       let zkapp_account_ids =
-                        List.map zkapp_account_keypairs ~f:id_of_kp
+                        List.map zkapp_account_keypairs ~f:(fun kp ->
+                            Account_id.of_public_key kp.public_key )
                       in
                       let num_fee_payers = List.length fee_payer_keypairs in
                       let fee_payer_array = Array.of_list fee_payer_keypairs in
@@ -4766,7 +4790,23 @@ module Mutations = struct
                             Transaction_snark.For_tests.create_trivial_snapp
                               ~constraint_constants ()
                           in
-                          let rec go account_state_tbl ndx tm_next counter =
+                          let account_queue = Queue.create () in
+                          let insert_account_queue ~account_state_tbl id =
+                            let a =
+                              Account_id.Table.find_and_remove account_state_tbl
+                                id
+                            in
+                            Queue.enqueue account_queue (Option.value_exn a) ;
+                            if
+                              Queue.length account_queue
+                              > zkapp_command_details.account_queue_size
+                            then
+                              let a, role = Queue.dequeue_exn account_queue in
+                              Account_id.Table.add_exn account_state_tbl
+                                ~key:(Account.identifier a) ~data:(a, role)
+                            else ()
+                          in
+                          let rec go ~account_state_tbl ~ndx ~tm_next ~counter =
                             if Time.( >= ) (Time.now ()) tm_end then (
                               [%log info]
                                 "Scheduled zkApp commands with handle %s has \
@@ -4800,6 +4840,7 @@ module Mutations = struct
                                 | Some (ledger, _) -> (
                                     let number_of_accounts_generated =
                                       Account_id.Table.data account_state_tbl
+                                      @ Queue.to_list account_queue
                                       |> List.filter ~f:(function
                                            | _, `New_account ->
                                                true
@@ -4807,13 +4848,16 @@ module Mutations = struct
                                                false )
                                       |> List.length
                                     in
+
                                     let generate_new_accounts =
                                       number_of_accounts_generated
                                       < zkapp_command_details.num_new_accounts
                                     in
                                     let (fee_payer_account : Account.t), _ =
                                       Account_id.Table.find_exn
-                                        account_state_tbl (id_of_kp fee_payer)
+                                        account_state_tbl
+                                        (Account_id.of_public_key
+                                           fee_payer.public_key )
                                     in
                                     let memo =
                                       Printf.sprintf "%s-%s-%s-%s"
@@ -4825,30 +4869,50 @@ module Mutations = struct
                                     in
                                     let zkapp_command_with_dummy_auth =
                                       Quickcheck.Generator.generate
-                                        (Mina_generators
-                                         .Zkapp_command_generators
-                                         .gen_zkapp_command_from ~memo
-                                           ~no_account_precondition:
-                                             zkapp_command_details
-                                               .no_precondition
-                                           ~fee_range:
-                                             ( zkapp_command_details.min_fee
-                                             , zkapp_command_details.max_fee )
-                                           ~balance_change_range:
-                                             ( zkapp_command_details
-                                                 .min_balance_change
-                                             , zkapp_command_details
-                                                 .max_balance_change )
-                                           ~ignore_sequence_events_precond:true
-                                           ~no_token_accounts:true ~limited:true
-                                           ~fee_payer_keypair:fee_payer ~keymap
-                                           ~account_state_tbl
-                                           ~generate_new_accounts ~ledger ~vk () )
+                                        ( if zkapp_command_details.max_cost then
+                                          Mina_generators
+                                          .Zkapp_command_generators
+                                          .gen_max_cost_zkapp_command_from
+                                            ~fee_payer_keypair:fee_payer
+                                            ~account_state_tbl ~vk
+                                            ~genesis_constants:
+                                              (Mina_lib.config mina)
+                                                .precomputed_values
+                                                .genesis_constants
+                                        else
+                                          Mina_generators
+                                          .Zkapp_command_generators
+                                          .gen_zkapp_command_from ~memo
+                                            ~no_account_precondition:
+                                              zkapp_command_details
+                                                .no_precondition
+                                            ~fee_range:
+                                              ( zkapp_command_details.min_fee
+                                              , zkapp_command_details.max_fee )
+                                            ~balance_change_range:
+                                              ( zkapp_command_details
+                                                  .min_balance_change
+                                              , zkapp_command_details
+                                                  .max_balance_change )
+                                            ~ignore_sequence_events_precond:true
+                                            ~no_token_accounts:true
+                                            ~limited:true
+                                            ~fee_payer_keypair:fee_payer ~keymap
+                                            ~account_state_tbl
+                                            ~generate_new_accounts ~ledger ~vk
+                                            () )
                                         ~size:1
                                         ~random:
                                           (Splittable_random.State.create
                                              Random.State.default )
                                     in
+                                    let accounts =
+                                      Zkapp_command.accounts_referenced
+                                        zkapp_command_with_dummy_auth
+                                    in
+                                    List.iter accounts
+                                      ~f:
+                                        (insert_account_queue ~account_state_tbl) ;
                                     let%bind zkapp_command =
                                       Zkapp_command_builder
                                       .replace_authorizations ~prover ~keymap
@@ -4877,14 +4941,16 @@ module Mutations = struct
                               in
                               let%bind () = Async_unix.at tm_next in
                               let next_tm_next = Time.add tm_next wait_span in
-                              go account_state_tbl
-                                ((ndx + 1) mod num_fee_payers)
-                                next_tm_next (counter + 1)
+                              go ~account_state_tbl
+                                ~ndx:((ndx + 1) mod num_fee_payers)
+                                ~tm_next:next_tm_next ~counter:(counter + 1)
                           in
+
                           upon
                             (wait_until_zkapps_deployed ~mina ~ledger
                                ~deployment_fee:
                                  zkapp_command_details.deployment_fee
+                               ~max_cost:zkapp_command_details.max_cost
                                ~init_balance:zkapp_command_details.init_balance
                                ~fee_payer_array ~constraint_constants
                                zkapp_account_keypairs ~logger ~uuid
@@ -4900,6 +4966,7 @@ module Mutations = struct
                                       List.map ids ~f:(fun id ->
                                           (id, (account_of_id id ledger, role)) )
                                     in
+
                                     Account_id.Table.of_alist_exn
                                       ( get_account fee_payer_ids `Fee_payer
                                       @ get_account zkapp_account_ids
@@ -4909,7 +4976,8 @@ module Mutations = struct
                                     Time.add (Time.now ()) wait_span
                                   in
                                   don't_wait_for
-                                  @@ go account_state_tbl 0 tm_next 0 ) ;
+                                  @@ go ~account_state_tbl ~ndx:0 ~tm_next
+                                       ~counter:0 ) ;
 
                           Ok (Uuid.to_string uuid) ) ) )
 
