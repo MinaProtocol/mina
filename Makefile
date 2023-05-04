@@ -128,20 +128,10 @@ client_sdk_test_sigs_nonconsensus: ocaml_checks
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/client_sdk/tests/test_signatures_nonconsensus.exe --profile=nonconsensus_mainnet
 	$(info Build complete)
 
-mina_signer: ocaml_checks
-	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) \
-	&& dune b src/lib/crypto/kimchi_bindings/js/node_js \
-	&& dune b src/app/client_sdk/client_sdk.bc.js \
-	&& (cd frontend/mina-signer; \
-	([ -d node_modules ] || npm i) && npm run copy-jsoo && npm run build; \
-	cd ../..)
-	$(info Build complete)
-
 snarkyjs: ocaml_checks
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) \
-	&& bash ./scripts/build-snarkyjs-node.sh
+	((ulimit -s 65532) || true) && (ulimit -n 10240 || true) \
+	&& bash ./src/lib/snarkyjs/src/bindings/scripts/build-snarkyjs-node.sh
 	$(info Build complete)
 
 rosetta_lib_encodings: ocaml_checks
@@ -201,7 +191,12 @@ swap_bad_balances: ocaml_checks
 
 heap_usage: ocaml_checks
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/heap_usage/heap_usage.exe --profile=testnet_postake_medium_curves
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/heap_usage/heap_usage.exe --profile=devnet
+	$(info Build complete)
+
+zkapp_limits: ocaml_checks
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/zkapp_limits/zkapp_limits.exe --profile=devnet
 	$(info Build complete)
 
 dev: build
