@@ -2666,8 +2666,8 @@ module Types = struct
 
       let arg_typ =
         obj "VrfMessageInput" ~doc:"The inputs to a vrf evaluation"
-          ~coerce:(fun global_slot epoch_seed delegator_index ->
-            { Consensus_vrf.Layout.Message.global_slot
+          ~coerce:(fun global_slot_since_genesis epoch_seed delegator_index ->
+            { Consensus_vrf.Layout.Message.global_slot_since_genesis
             ; epoch_seed = Mina_base.Epoch_seed.of_base58_check_exn epoch_seed
             ; delegator_index
             } )
@@ -2680,7 +2680,7 @@ module Types = struct
                 ~typ:(non_null int)
             ]
           ~split:(fun f (t : input) ->
-            f t.global_slot
+            f t.global_slot_since_genesis
               (Mina_base.Epoch_seed.to_base58_check t.epoch_seed)
               t.delegator_index )
     end
@@ -3223,7 +3223,8 @@ module Types = struct
     obj "VrfMessage" ~doc:"The inputs to a vrf evaluation" ~fields:(fun _ ->
         [ field "globalSlot" ~typ:(non_null global_slot)
             ~args:Arg.[]
-            ~resolve:(fun _ { global_slot; _ } -> global_slot)
+            ~resolve:(fun _ { global_slot_since_genesis; _ } ->
+              global_slot_since_genesis )
         ; field "epochSeed" ~typ:(non_null epoch_seed)
             ~args:Arg.[]
             ~resolve:(fun _ { epoch_seed; _ } -> epoch_seed)

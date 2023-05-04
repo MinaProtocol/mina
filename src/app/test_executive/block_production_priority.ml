@@ -54,6 +54,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           }
     ; txpool_max_size = 10_000_000
     ; snark_worker_fee = "0.0001"
+    ; proof_config =
+        { proof_config_default with
+          fork =
+            Some
+              { previous_state_hash =
+                  "3NK7737N7wtHWHqCLsXbtHb5c3UWpPvGyhBBj9QJcAtqGtaXC1AA"
+              ; previous_length = 50234
+              ; previous_global_slot = 66978
+              }
+        }
     }
 
   let fee = Currency.Fee.of_nanomina_int_exn 10_000_000

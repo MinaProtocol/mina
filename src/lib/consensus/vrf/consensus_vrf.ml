@@ -77,8 +77,11 @@ end
 module Message = struct
   module Global_slot = Mina_numbers.Global_slot
 
-  type ('global_slot, 'epoch_seed, 'delegator) t =
-    { global_slot : 'global_slot; seed : 'epoch_seed; delegator : 'delegator }
+  type ('global_slot_since_genesis, 'epoch_seed, 'delegator) t =
+    { global_slot_since_genesis : 'global_slot_since_genesis
+    ; seed : 'epoch_seed
+    ; delegator : 'delegator
+    }
   [@@deriving sexp, hlist]
 
   type value =
@@ -93,11 +96,11 @@ module Message = struct
 
   let to_input
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ({ global_slot; seed; delegator } : value) =
+      ({ global_slot_since_genesis; seed; delegator } : value) =
     let open Random_oracle.Input.Chunked in
     Array.reduce_exn ~f:append
       [| field (seed :> Tick.field)
-       ; Global_slot.to_input global_slot
+       ; Global_slot.to_input global_slot_since_genesis
        ; Mina_base.Account.Index.to_input
            ~ledger_depth:constraint_constants.ledger_depth delegator
       |]
@@ -119,11 +122,11 @@ module Message = struct
     |> Group_map.to_group |> Tick.Inner_curve.of_affine
 
   module Checked = struct
-    let to_input ({ global_slot; seed; delegator } : var) =
+    let to_input ({ global_slot_since_genesis; seed; delegator } : var) =
       let open Random_oracle.Input.Chunked in
       Array.reduce_exn ~f:append
         [| field (Mina_base.Epoch_seed.var_to_hash_packed seed)
-         ; Global_slot.Checked.to_input global_slot
+         ; Global_slot.Checked.to_input global_slot_since_genesis
          ; Mina_base.Account.Index.Unpacked.to_input delegator
         |]
 
@@ -137,13 +140,13 @@ module Message = struct
 
   let gen ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
     let open Quickcheck.Let_syntax in
-    let%map global_slot = Global_slot.gen
+    let%map global_slot_since_genesis = Global_slot.gen
     and seed = Mina_base.Epoch_seed.gen
     and delegator =
       Mina_base.Account.Index.gen
         ~ledger_depth:constraint_constants.ledger_depth
     in
-    { global_slot; seed; delegator }
+    { global_slot_since_genesis; seed; delegator }
 end
 
 (* c is a constant factor on vrf-win likelihood *)
@@ -492,20 +495,21 @@ module Layout = struct
   *)
   module Message = struct
     type t =
-      { global_slot : Mina_numbers.Global_slot.t [@key "globalSlot"]
+      { global_slot_since_genesis : Mina_numbers.Global_slot.t
+            [@key "globalSlotSinceGenesis"]
       ; epoch_seed : Mina_base.Epoch_seed.t [@key "epochSeed"]
       ; delegator_index : int [@key "delegatorIndex"]
       }
     [@@deriving yojson]
 
     let to_message (t : t) : Message.value =
-      { global_slot = t.global_slot
+      { global_slot_since_genesis = t.global_slot_since_genesis
       ; seed = t.epoch_seed
       ; delegator = t.delegator_index
       }
 
     let of_message (t : Message.value) : t =
-      { global_slot = t.global_slot
+      { global_slot_since_genesis = t.global_slot_since_genesis
       ; epoch_seed = t.seed
       ; delegator_index = t.delegator
       }

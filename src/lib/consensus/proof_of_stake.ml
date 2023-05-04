@@ -769,7 +769,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let%snarkydef.Tick check
             ~(constraint_constants : Genesis_constants.Constraint_constants.t)
             shifted ~(epoch_ledger : Epoch_ledger.var) ~block_stake_winner
-            ~block_creator ~global_slot ~seed =
+            ~block_creator ~global_slot_since_genesis ~seed =
           let open Snark_params.Tick in
           let%bind winner_addr =
             request_witness
@@ -780,7 +780,11 @@ module Make_str (A : Wire_types.Concrete) = struct
           let%bind result, winner_account =
             get_vrf_evaluation ~constraint_constants shifted
               ~ledger:epoch_ledger.hash ~block_stake_winner ~block_creator
-              ~message:{ Message.global_slot; seed; delegator = winner_addr }
+              ~message:
+                { Message.global_slot_since_genesis
+                ; seed
+                ; delegator = winner_addr
+                }
           in
           let my_stake = winner_account.balance in
           let%bind truncated_result = Output.Checked.truncate result in
@@ -866,8 +870,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                         request ) )
       end
 
-      let check ~context:(module Context : CONTEXT) ~global_slot ~seed
-          ~producer_private_key ~producer_public_key ~total_stake
+      let check ~context:(module Context : CONTEXT) ~global_slot_since_genesis
+          ~seed ~producer_private_key ~producer_public_key ~total_stake
           ~(get_delegators :
                 Public_key.Compressed.t
              -> Mina_base.Account.t Mina_base.Account.Index.Table.t option ) =
@@ -885,7 +889,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               let%bind () = Interruptible.return () in
               let vrf_result =
                 T.eval ~constraint_constants ~private_key:producer_private_key
-                  { global_slot; seed; delegator }
+                  { global_slot_since_genesis; seed; delegator }
               in
               let truncated_vrf_result = Output.truncate vrf_result in
               [%log debug]
@@ -2121,10 +2125,15 @@ module Make_str (A : Wire_types.Concrete) = struct
           Option.value_map genesis_epoch_data ~default:Epoch_seed.initial
             ~f:(fun data -> data.staking.seed)
         in
+        let consensus_state =
+          negative_one ~genesis_ledger ~genesis_epoch_data ~constants
+            ~constraint_constants
+        in
         let producer_vrf_result =
           let _, sk = Vrf.Precomputed.genesis_winner in
           Vrf.eval ~constraint_constants ~private_key:sk
-            { Vrf.Message.global_slot = consensus_transition
+            { Vrf.Message.global_slot_since_genesis =
+                consensus_state.global_slot_since_genesis
             ; seed = staking_seed
             ; delegator = 0
             }
@@ -2139,9 +2148,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         *)
         Or_error.ok_exn
           (update ~constants ~producer_vrf_result
-             ~previous_consensus_state:
-               (negative_one ~genesis_ledger ~genesis_epoch_data ~constants
-                  ~constraint_constants )
+             ~previous_consensus_state:consensus_state
              ~previous_protocol_state_hash:negative_one_protocol_state_hash
              ~consensus_transition ~supply_increase:Currency.Amount.Signed.zero
              ~snarked_ledger_hash ~genesis_ledger_hash:snarked_ledger_hash
@@ -2216,7 +2223,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         and prev_epoch, _prev_slot =
           Global_slot.Checked.to_epoch_and_slot prev_global_slot
         in
-        let%bind global_slot_since_genesis =
+        let%bind next_global_slot_since_genesis =
           Mina_numbers.Global_slot.Checked.add
             previous_state.global_slot_since_genesis slot_diff
         in
@@ -2225,7 +2232,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           Epoch_data.if_ epoch_increased ~then_:previous_state.next_epoch_data
             ~else_:previous_state.staking_epoch_data
         in
-        let next_slot_number = Global_slot.slot_number next_global_slot in
         let%bind block_stake_winner =
           exists Public_key.Compressed.typ
             ~request:As_prover.(return Vrf.Winner_pk)
@@ -2249,12 +2255,12 @@ module Make_str (A : Wire_types.Concrete) = struct
           Vrf.Checked.check ~constraint_constants
             (module M)
             ~epoch_ledger:staking_epoch_data.ledger
-            ~global_slot:next_slot_number ~block_stake_winner ~block_creator
-            ~seed:staking_epoch_data.seed
+            ~global_slot_since_genesis:next_global_slot_since_genesis
+            ~block_stake_winner ~block_creator ~seed:staking_epoch_data.seed
         in
         let%bind supercharge_coinbase =
           compute_supercharge_coinbase ~winner_account
-            ~global_slot:global_slot_since_genesis
+            ~global_slot:next_global_slot_since_genesis
         in
         let%bind new_total_currency, `Overflow overflow =
           Currency.Amount.Checked.add_signed_flagged
@@ -2338,7 +2344,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; sub_window_densities
             ; last_vrf_output = truncated_vrf_result
             ; curr_global_slot = next_global_slot
-            ; global_slot_since_genesis
+            ; global_slot_since_genesis = next_global_slot_since_genesis
             ; total_currency = new_total_currency
             ; staking_epoch_data
             ; next_epoch_data
@@ -3605,6 +3611,15 @@ module Make_str (A : Wire_types.Concrete) = struct
           |> Epoch_and_slot.of_time_exn ~constants
           |> Global_slot.of_epoch_and_slot ~constants
         in
+        let slot_diff =
+          Option.value_exn
+            Global_slot.(
+              global_slot - previous_consensus_state.curr_global_slot)
+        in
+        let global_slot_since_genesis =
+          Mina_numbers.Global_slot.add
+            previous_consensus_state.global_slot_since_genesis slot_diff
+        in
         let consensus_transition : Consensus_transition.t =
           Global_slot.slot_number global_slot
         in
@@ -3646,10 +3661,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             else previous_consensus_state.staking_epoch_data.seed
           in
           Vrf.eval ~constraint_constants ~private_key:producer_private_key
-            { global_slot = Global_slot.slot_number global_slot
-            ; seed
-            ; delegator
-            }
+            { global_slot_since_genesis; seed; delegator }
         in
         let next_consensus_state =
           update ~constants ~previous_consensus_state ~consensus_transition
@@ -3666,11 +3678,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         | None ->
             ()
         | Some fork ->
-            let slot_diff =
-              Option.value_exn
-                Global_slot.(
-                  global_slot - previous_consensus_state.curr_global_slot)
-            in
             assert (
               Mina_numbers.Global_slot.(
                 equal
@@ -3830,12 +3837,13 @@ module Make_str (A : Wire_types.Concrete) = struct
         let expected = stake_fraction *. 0.75 in
         let samples = 1000 in
         let check i =
-          let global_slot = UInt32.of_int i in
+          let global_slot_since_genesis = UInt32.of_int i in
           let%map result =
             Interruptible.force
               (Vrf.check
                  ~context:(module Context)
-                 ~global_slot ~seed ~producer_private_key:private_key
+                 ~global_slot_since_genesis ~seed
+                 ~producer_private_key:private_key
                  ~producer_public_key:public_key_compressed ~total_stake
                  ~get_delegators:
                    (Local_state.Snapshot.delegators epoch_snapshot) )

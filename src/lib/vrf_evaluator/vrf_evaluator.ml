@@ -203,7 +203,7 @@ module Worker_state = struct
                 match%bind
                   Consensus.Data.Vrf.check
                     ~context:(module Context)
-                    ~global_slot ~seed:epoch_data.epoch_seed
+                    ~global_slot_since_genesis ~seed:epoch_data.epoch_seed
                     ~get_delegators:
                       (Public_key.Compressed.Table.find delegatee_table)
                     ~producer_private_key:keypair.private_key

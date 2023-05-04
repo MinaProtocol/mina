@@ -373,7 +373,7 @@ module type S = sig
     module Vrf : sig
       val check :
            context:(module CONTEXT)
-        -> global_slot:Mina_numbers.Global_slot.t
+        -> global_slot_since_genesis:Mina_numbers.Global_slot.t
         -> seed:Mina_base.Epoch_seed.t
         -> producer_private_key:Signature_lib.Private_key.t
         -> producer_public_key:Signature_lib.Public_key.Compressed.t
