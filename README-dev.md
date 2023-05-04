@@ -38,13 +38,43 @@ Refer to [/dev](/dev).
 
 ### Developer Setup (MacOS)
 
-- Invoke `make macos-setup`
+1. Make sure you're on the latest verion of MacOS
+2. Make sure xcode is installed: `xcode-select --install`
+3. Invoke `make macos-setup`
   - You will be prompted to add a number of `export`s in your shell config file. Do so.
+  - Make sure to `source` your shell config file OR just create a new terminal
   - If this is your first time using OCaml, be sure to run `eval $(opam config env)`
-- Install [rustup](https://rustup.rs/).
-- Invoke `make build`
-- Jump to [customizing your editor for autocomplete](#customizing-your-dev-environment-for-autocompletemerlin)
-- Note: If you are seeing conf-openssl install errors, try running `export PKG_CONFIG_PATH=$(brew --prefix openssl@1.1)/lib/pkgconfig` and try `opam switch import opam.export` again.
+4. Install [rustup](https://rustup.rs/)
+5. Create your switch with deps `opam switch import --switch mina opam.export`
+  - M1-related issues (because Homebrew does not link include files automatically):
+    - If you find an error failing to find `gmp.h`, update your `~/.zshrc` or `~/.bashrc` with:
+     ```export CFLAGS="-I/opt/homebrew/Cellar/gmp/6.2.1_1/include/"
+     ```
+     or run in the shell the command `env CFLAGS="/opt/homebrew/Cellar/gmp/6.2.1_1/include/" opam install conf-gmp.2`
+    - If you find an error failing to find `lmdb.h`, update your `~/.zshrc` or `~/.bashrc` with:
+    ```
+    export CPATH="$HOMEBREW_PREFIX/include:$CPATH"
+    export LIBRARY_PATH="$HOMEBREW_PREFIX/lib:$LIBRARY_PATH"
+    export PATH="$(brew --prefix lmdb)/bin:$PATH"
+    export PKG_CONFIG_PATH=$(brew --prefix lmdb)/lib/pkgconfig:$PKG_CONFIG_PATH
+    ```
+  - Note: If you are seeing conf-openssl install errors, try running `export PKG_CONFIG_PATH=$(brew --prefix openssl@1.1)/lib/pkgconfig` and try `opam switch import opam.export` again.
+  - If prompted, then run `opam user-setup install` to enable opam-user-setup support for Merlin
+6. Pin dependencies that should override opam versions: `scripts/pin-external-packages.sh`
+7. Install correct version of golang:
+   - `goenv init`
+   - To make sure the right `goenv` is used, update your shell env script with
+     ```text
+     eval "$(goenv init -)"
+     export PATH="/Users/$USER/.goenv/shims:$PATH"
+     ```
+   - `goenv install 1.18.10`
+   - `goenv global 1.18.10`
+   - Check that the `go version` returns the right version or else you will see the mesage `compile: version "go1.18.10" does not match go tool version "go1.20.2"`. If so, run `brew remove go` or get the matching version.
+8. Invoke `make build`
+  - If you get errors about `libp2p` and `capnp` try with `brew install capnp`
+9. Install language server protocol `opam install ocaml-lsp-server` for better IDE support
+10. Set up your IDE (see [customizing your editor for autocomplete](#customizing-your-dev-environment-for-autocompletemerlin))
 
 ### Developer Setup (Linux)
 
@@ -85,10 +115,7 @@ let g:syntastic_ocaml_checkers=['merlin']
 - Now `/usr/bin/opam install merlin ocp-indent core async ppx_jane ppx_deriving` (everything we depend on, that you want autocompletes for) for doc reasons
 - Make sure you have `au FileType ocaml set omnifunc=merlin#Complete` in your vimrc
 - Install an auto-completer (such as YouCompleteMe) and a syntastic (such syntastic or ALE)
-- If you use vscode, you might like this extension
-
-  - [OCaml and Reason IDE](https://marketplace.visualstudio.com/items?itemName=freebroccolo.reasonml)
-  - [OCaml Platform](https://marketplace.visualstudio.com/items?itemName=ocamllabs.ocaml-platform)
+- If you use VSCode, then use [OCaml Platform](https://marketplace.visualstudio.com/items?itemName=ocamllabs.ocaml-platform)
 
 - If you use emacs, besides the `opam` packages mentioned above, also install `tuareg`, and add the following to your .emacs file:
 
@@ -106,6 +133,17 @@ let g:syntastic_ocaml_checkers=['merlin']
 
 Emacs has a built-in autocomplete, via `M-x completion-at-point`, or simply `M-tab`. There are other
 Emacs autocompletion packages; see [Emacs from scratch](https://github.com/ocaml/merlin/wiki/emacs-from-scratch).
+
+- If you use VSCode:
+  - Make sure to be in the right switch (mina)
+  - Install OCaml Platform extension
+  - You might get a prompt to install `ocaml-lsp-server` as well in the Sandbox
+  - You might get a prompt to install `ocamlformat-rpc` as well in the Sandbox
+  - Type "shell command: install code command in PATH"
+  - Close all windows and instances of VSCode
+  - From terminal, in your mina directory, run `code .`
+  - Run `dune build` in the terminal inside VSCode
+  - Now Merlin should work inside VSCode.
 
 ## Running a node
 
