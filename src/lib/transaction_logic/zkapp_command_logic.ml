@@ -1731,7 +1731,7 @@ module Make (Inputs : Inputs_intf) = struct
       let a = Account.set_permissions permissions a in
       let update_vk_not_proof_or_impossible =
         let set_vk = Account.Permissions.set_verification_key a in
-        Controller.is_proof_or_impossible set_vk
+        Controller.is_proof_or_impossible set_vk |> Bool.not
       in
       let local_state =
         Local_state.add_check local_state
