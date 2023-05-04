@@ -1334,6 +1334,13 @@ module Make (L : Ledger_intf.S) :
           else Control.Tag.None_given
         in
         Permissions.Auth_required.check perm tag
+
+      let is_proof_or_impossible perm =
+        match perm with
+        | Permissions.Auth_required.Proof | Impossible ->
+            true
+        | _ ->
+            false
     end
 
     module Global_slot = struct

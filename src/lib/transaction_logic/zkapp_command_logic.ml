@@ -502,6 +502,8 @@ module type Controller_intf = sig
   include Iffable
 
   val check : proof_verifies:bool -> signature_verifies:bool -> t -> bool
+
+  val is_proof_or_impossible : t -> bool
 end
 
 module type Account_intf = sig
@@ -1727,6 +1729,15 @@ module Make (Inputs : Inputs_intf) = struct
           (Account.permissions a)
       in
       let a = Account.set_permissions permissions a in
+      let update_vk_not_proof_or_impossible =
+        let set_vk = Account.Permissions.set_verification_key a in
+        Controller.is_proof_or_impossible set_vk
+      in
+      let local_state =
+        Local_state.add_check local_state
+          Permission_for_update_vk_can_not_be_proof_or_impossible
+          update_vk_not_proof_or_impossible
+      in
       (a, local_state)
     in
     (* Initialize account's pk, in case it is new. *)
