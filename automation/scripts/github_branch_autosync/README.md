@@ -31,6 +31,20 @@ It is prepared to receive github webhook payload json on new commit to specified
     
     c) if there are not conflicts : start buildkite pipeline (TBD) to verify changes. If they passes merge pr and exit
 
+##### Examples:
+
+###### No conflict 
+
+![No conflict](./docs/res/CASE1.jpg)
+
+###### Conflict
+
+![Conflict](./docs/res/CASE2.jpg)
+
+###### Update sync branch while on conflict
+
+![Update branch while conflict](./docs/res/CASE3.jpg)
+
 # Configuration
 
 Configuration is defined as module in `./github_autosync/gcloud_entrypoint/lib/config.py`
