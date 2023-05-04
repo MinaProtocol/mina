@@ -9,6 +9,22 @@ $0 <command> [<args> ...]
 EOF
 }
 
+debug() {
+    [ -z "$KUBE_UTILS_DEBUG" ] || echo "[DEBUG] $*"
+}
+
+info() {
+    echo "[INFO]  $*"
+}
+
+warn() {
+    echo "[WARN]  $*"
+}
+
+error() {
+    echo "[ERROR] $*"
+}
+
 KUBECTL="kubectl"
 
 frontend_port() {
@@ -137,9 +153,9 @@ mina_testnet_same_block_() {
             echo "$POD did not respond height"
             return 1
         fi
-        echo "$POD is at $HEIGHT, hash is $HASH"
+        debug "$POD is at $HEIGHT, hash is $HASH"
         if [ "$HEIGHT" -eq 1 ]; then
-            echo "Genesis block"
+            warn "$POD: Genesis block"
             return 1
         elif [ -z "$PREV_HEIGHT" ]; then
             PREV_HEIGHT="${HEIGHT}"
@@ -148,21 +164,21 @@ mina_testnet_same_block_() {
             if [ "$HASH" = "$PREV_HASH" ]; then
                 continue
             else
-                echo "Height is the same but hash mismatch"
+                warn "$POD: Height is the same but hash mismatch"
                 return 1
             fi
         elif [ "$HEIGHT" -eq "$((PREV_HEIGHT + 1))" ]; then
-            echo "Height increased by one, expected previous hash is $PREV_HASH"
+            debug "Height increased by one, expected previous hash is $PREV_HASH"
             if [ "$PHASH" = "$PREV_HASH" ]; then
                 PREV_HEIGHT=$HEIGHT
                 PREV_HASH=$HASH
                 continue
             else
-                echo "Previous hash mismatch"
+                warn "$POD: Previous hash mismatch"
                 return 1
             fi
         else
-            echo "Height is different, $PREV_HEIGHT vs $HEIGHT"
+            warn "$POD: Height is different, $PREV_HEIGHT vs $HEIGHT"
             return 1
         fi
     done
@@ -213,15 +229,18 @@ mina_testnet_same_chain() {
     RETRIES="$1"
     PERIOD="$2"
     shift 2
+    info "Waiting for merge at blockchain level of abstraction..."
     for _ in $(seq "$RETRIES"); do
-        echo "Checking testnet height..."
+        debug "Checking testnet height..."
         if mina_testnet_same_block_ $*; then
+            info "Blockchain merge detected. All nodes have the same history again."
             exit
         else
-            echo "Retrying in ${PERIOD}s"
+            info "Retrying in ${PERIOD}s"
             sleep "$PERIOD"
         fi
     done
+    error "Blockchain merge is not detected. Some nodes have different histories."
     exit 1
 }
 
@@ -245,19 +264,21 @@ mina_wait_for_epoch_slot() {
     NS=$2
     TEPOCH=$3
     TSLOT=$4
+    info "Waiting for network to reach slot $TSLOT of epoch $TEPOCH..."
     while true; do
         SLOT_EPOCH=$(mina_node_epoch_slot $RES $NS)
         EPOCH=${SLOT_EPOCH%% *}
         SLOT=${SLOT_EPOCH##* }
-        echo "epoch $EPOCH, slot $SLOT"
+        debug "epoch $EPOCH, slot $SLOT"
         if [ $EPOCH -gt $TEPOCH ]; then
             exit
         elif [ $EPOCH -eq $TEPOCH ]; then
             if [ $SLOT -ge $TSLOT ]; then
+                info "Slot $TSLOT of epoch $TEPOCH is reached."
                 exit
             fi
         fi
-        echo Waiting...
+        debug Waiting...
         sleep 10
     done
 }
@@ -272,18 +293,20 @@ assert_different_history() {
     NS1=$2
     RES2=$3
     NS2=$4
+    info "Waiting for split at blockchain level of abstraction..."
     HASH1=$(mina_graphql_ns $RES1 $NS1 'query {bestChain(maxLength: 1) {stateHash}}' | jq -r '.data.bestChain[0].stateHash')
     HASH2=$(mina_graphql_ns $RES2 $NS2 'query {bestChain(maxLength: 1) {stateHash}}' | jq -r '.data.bestChain[0].stateHash')
     R1=$(mina_graphql_ns $RES2 $NS2 "query {block(stateHash: \\\"$HASH1\\\") {stateHash}}" | jq -r '.data')
     R2=$(mina_graphql_ns $RES1 $NS1 "query {block(stateHash: \\\"$HASH2\\\") {stateHash}}" | jq -r '.data')
     if [ "$R1" != null ]; then
-        echo "Block both segments share block $HASH1"
+        error "Block both segments share block $HASH1"
         exit 1
     elif [ "$R2" != null ]; then
-        echo "Block both segments share block $HASH2"
+        error "Block both segments share block $HASH2"
         exit 1
     fi
-    echo "Diverged history detected: blocks $HASH1 and $HASH2 belong to different branches"
+    debug "Diverged history detected: blocks $HASH1 and $HASH2 belong to different branches"
+    info "Blockchain split detected. Nodes in different components have different histories."
 }
 
 CMD=$1
