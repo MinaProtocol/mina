@@ -1,0 +1,12 @@
+(library
+ (name itn_logger)
+ (public_name itn_logger)
+ (libraries
+   ;; opam libraries
+   base
+   core_kernel
+   yojson
+   ;; local libraries
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version)))
