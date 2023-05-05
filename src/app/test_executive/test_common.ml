@@ -26,13 +26,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       if n = 0 then return hashlist
       else
         let%bind hash =
-          let%map { hash; _ } =
+          let%map { hash; nonce; _ } =
             Engine.Network.Node.must_send_payment ~logger ~sender_pub_key
               ~receiver_pub_key ~amount ~fee node
           in
           [%log info]
-            "sending multiple payments: payment #%d sent with hash %s." n
-            (Transaction_hash.to_base58_check hash) ;
+            "sending multiple payments: payment #%d sent with hash of %s and \
+             nonce of %d."
+            n
+            (Transaction_hash.to_base58_check hash)
+            (Unsigned.UInt32.to_int nonce) ;
           hash
         in
         go (n - 1) (List.append hashlist [ hash ])
