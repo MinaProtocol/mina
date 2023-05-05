@@ -371,7 +371,10 @@ val shutdown : t -> unit Deferred.t
 
     This will fail if any of the trusted or banned peers are on IPv6. *)
 val set_connection_gating_config :
-  t -> connection_gating -> connection_gating Deferred.t
+     t
+  -> ?clean_added_peers:bool
+  -> connection_gating
+  -> connection_gating Deferred.t
 
 val connection_gating_config : t -> connection_gating
 
