@@ -412,13 +412,16 @@ let wrap_main
             , (`Success bulletproof_success, bulletproof_challenges_actual) ) =
           let messages =
             with_label __LOC__ (fun () ->
+                let commitment_lengths =
+                  let length = 1 in
+                  (* TODO: Make it variable *)
+                  Commitment_lengths.of_length length
+                in
                 exists
                   (Plonk_types.Messages.typ
                      (module Impl)
                      Inner_curve.typ ~bool:Boolean.typ feature_flags
-                     ~dummy:Inner_curve.Params.one
-                     ~commitment_lengths:
-                       (Commitment_lengths.create ~of_int:Fn.id) )
+                     ~dummy:Inner_curve.Params.one ~commitment_lengths )
                   ~request:(fun () -> Req.Messages) )
           in
           let sponge = Wrap_verifier.Opt.create sponge_params in
