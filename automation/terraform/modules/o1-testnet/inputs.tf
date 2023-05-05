@@ -145,7 +145,7 @@ variable "seed_count" {
 
 variable "plain_node_count" {
   type    = number
-  default = 1
+  default = 0
 }
 
 variable "log_level" {
