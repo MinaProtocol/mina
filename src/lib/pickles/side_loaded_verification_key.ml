@@ -213,6 +213,7 @@ module Stable = struct
                   ; group_gen = Backend.Tock.Field.domain_generator ~log2_size
                   }
               ; max_poly_size = 1 lsl Nat.to_int Backend.Tock.Rounds.n
+              ; zk_rows = 3
               ; public
               ; prev_challenges = 2 (* Due to Wrap_hack *)
               ; srs

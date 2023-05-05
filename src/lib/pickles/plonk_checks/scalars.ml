@@ -131,6 +131,7 @@ module Tick : S = struct
        ; if_feature
        } :
         a Env.t ) =
+    (* fp linearization *)
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
     let x_1 = pow (cell (var (Witness 1, Curr)), 7) in
     let x_2 = pow (cell (var (Witness 2, Curr)), 7) in
@@ -3949,6 +3950,7 @@ module Tock : S = struct
        ; if_feature
        } :
         a Env.t ) =
+    (* fq linearization terms *)
     let x_0 = pow (cell (var (Witness 0, Curr)), 7) in
     let x_1 = pow (cell (var (Witness 1, Curr)), 7) in
     let x_2 = pow (cell (var (Witness 2, Curr)), 7) in
@@ -4428,6 +4430,7 @@ module Tock : S = struct
             field
               "0x0000000000000000000000000000000000000000000000000000000000000000"
         )
+  (* end fq *)
 
   let index_terms (type a)
       ({ add = ( + )

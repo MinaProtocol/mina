@@ -36,7 +36,7 @@ let pad_accumulator (xs : (Tock.Proof.Challenge_polynomial.t, _) Vector.t) =
   pad_vector xs
     ~dummy:
       { Tock.Proof.Challenge_polynomial.commitment =
-          Lazy.force Dummy.Ipa.Wrap.sg
+          Lazy.force Dummy.Ipa.Wrap.sg ~num_chunks:Common.default_num_chunks
       ; challenges = Vector.to_array Dummy.Ipa.Wrap.challenges_computed
       }
   |> Vector.to_list
@@ -90,7 +90,7 @@ module Checked = struct
     pad_vector
       ~dummy:
         (Tuple_lib.Double.map ~f:Impls.Step.Field.constant
-           (Lazy.force Dummy.Ipa.Wrap.sg) )
+           (Lazy.force Dummy.Ipa.Wrap.sg ~num_chunks:Common.default_num_chunks) )
       commitments
 
   (* We precompute the sponge states that would result from absorbing

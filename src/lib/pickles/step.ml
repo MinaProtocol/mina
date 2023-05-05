@@ -308,7 +308,8 @@ struct
               (Vector.extend_front_exn
                  statement.messages_for_next_step_proof
                    .challenge_polynomial_commitments Local_max_proofs_verified.n
-                 (Lazy.force Dummy.Ipa.Wrap.sg) )
+                 (Lazy.force Dummy.Ipa.Wrap.sg
+                    ~num_chunks:Common.default_num_chunks ) )
               (* This should indeed have length Max_proofs_verified... No! It should have type Max_proofs_verified_a. That is, the max_proofs_verified specific to a proof of this type...*)
               prev_challenges
               ~f:(fun commitment chals ->
@@ -384,7 +385,9 @@ struct
         (prechals, b)
       in
       let challenge_polynomial_commitment =
-        if not must_verify then Ipa.Wrap.compute_sg new_bulletproof_challenges
+        if not must_verify then
+          let num_chunks = Common.default_num_chunks in
+          Ipa.Wrap.compute_sg new_bulletproof_challenges ~num_chunks
         else t.proof.openings.proof.challenge_polynomial_commitment
       in
       let witness : _ Per_proof_witness.Constant.No_app_state.t =
@@ -398,7 +401,8 @@ struct
             Vector.extend_front_exn
               t.statement.messages_for_next_step_proof
                 .challenge_polynomial_commitments Local_max_proofs_verified.n
-              (Lazy.force Dummy.Ipa.Wrap.sg)
+              (Lazy.force Dummy.Ipa.Wrap.sg
+                 ~num_chunks:Common.default_num_chunks )
             (* TODO: This computation is also redone elsewhere. *)
         ; prev_challenges =
             Vector.extend_front_exn
@@ -714,7 +718,9 @@ struct
             x :: pad xs ms n
         | [], _m :: ms, S n ->
             let t : _ Types.Wrap.Proof_state.Messages_for_next_wrap_proof.t =
-              { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
+              { challenge_polynomial_commitment =
+                  Lazy.force Dummy.Ipa.Step.sg
+                    ~num_chunks:Common.default_num_chunks
               ; old_bulletproof_challenges =
                   Vector.init Max_proofs_verified.n ~f:(fun _ ->
                       Dummy.Ipa.Wrap.challenges_computed )

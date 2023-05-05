@@ -1,4 +1,4 @@
-(** [Ipa] *)
+(** {1 Ipa} *)
 module Ipa : sig
   module Wrap : sig
     val challenges :
@@ -13,7 +13,8 @@ module Ipa : sig
       , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
       Pickles_types.Vector.t
 
-    val sg : (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t) lazy_t
+    val sg :
+      (num_chunks:int -> Pasta_bindings.Fp.t * Pasta_bindings.Fp.t) lazy_t
   end
 
   module Step : sig
@@ -29,12 +30,10 @@ module Ipa : sig
       , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
       Pickles_types.Vector.t
 
-    val sg : (Pasta_bindings.Fq.t * Pasta_bindings.Fq.t) lazy_t
+    val sg :
+      (num_chunks:int -> Pasta_bindings.Fq.t * Pasta_bindings.Fq.t) lazy_t
   end
 end
-
-(* (\** [wrap_domains ~proofs_verified] *\)
-   val wrap_domains : proofs_verified:int -> Import.Domains.t *)
 
 (** {2 Constants} *)
 

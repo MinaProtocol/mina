@@ -354,7 +354,8 @@ let verify_heterogenous (ts : Instance.t list) =
                (Vector.extend_front_exn
                   t.statement.messages_for_next_step_proof
                     .challenge_polynomial_commitments Max_proofs_verified.n
-                  (Lazy.force Dummy.Ipa.Wrap.sg) )
+                  (Lazy.force Dummy.Ipa.Wrap.sg
+                     ~num_chunks:Common.default_num_chunks ) )
                t.statement.proof_state.messages_for_next_wrap_proof
                  .old_bulletproof_challenges )
         in

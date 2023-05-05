@@ -60,7 +60,8 @@ let pad_messages_for_next_wrap_proof
    fun pad maxes messages_for_next_wrap_proofs ->
     match (pad, maxes, messages_for_next_wrap_proofs) with
     | S pad, m :: maxes, _ ->
-        { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
+        { challenge_polynomial_commitment =
+            Lazy.force Dummy.Ipa.Step.sg ~num_chunks:Common.default_num_chunks
         ; old_bulletproof_challenges = Vector.init m ~f:(fun _ -> dummy_chals)
         }
         :: go pad maxes messages_for_next_wrap_proofs

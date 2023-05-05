@@ -39,6 +39,7 @@ module Step = struct
                     (Backend.Tick.Keypair.load_urs ()) )
                 path
             in
+            let index = index 1 (* or 3 *) in
             [%test_eq: int] header.header_version header_read.header_version ;
             [%test_eq: Snark_keys_header.Kind.t] header.kind header_read.kind ;
             [%test_eq: Snark_keys_header.Constraint_constants.t]
@@ -167,6 +168,7 @@ module Wrap = struct
                     (Backend.Tock.Keypair.load_urs ()) )
                 path
             in
+            let index = index Common.default_num_chunks in
             [%test_eq: int] header.header_version header_read.header_version ;
             [%test_eq: Snark_keys_header.Kind.t] header.kind header_read.kind ;
             [%test_eq: Snark_keys_header.Constraint_constants.t]
