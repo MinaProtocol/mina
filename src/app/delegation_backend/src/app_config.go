@@ -76,13 +76,6 @@ func LoadEnv(log logging.EventLogger) AppConfig {
 	awsCredentialsFile := os.Getenv("AWS_CREDENTIALS_FILE")
 	if awsCredentialsFile != "" {
 		loadAwsCredentials(awsCredentialsFile, log)
-	} else {
-		if os.Getenv("AWS_ACCESS_KEY_ID") == "" {
-			log.Fatal("missing AWS_ACCESS_KEY_ID environment variable")
-		}
-		if os.Getenv("AWS_SECRET_ACCESS_KEY") == "" {
-			log.Fatal("missing AWS_SECRET_ACCESS_KEY environment variable")
-		}
 	}
 
 	return config

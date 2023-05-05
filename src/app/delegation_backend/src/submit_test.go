@@ -41,7 +41,7 @@ func TestSignPayloadGeneration(t *testing.T) {
 	}
 	req.SnarkWork = mkB64("Bjtox/3Yu4cT5eVCQz/JQ+P3Ce1JmCIE7N6b1MAa")
 	req.GraphqlControlPort = 1234
-	req.BlockProducerVersion = "26f4f27810edd44b991e7942ffc49daebbf99a80"
+	req.BuiltWithCommitSha = "26f4f27810edd44b991e7942ffc49daebbf99a80"
 	json, err = makeSignPayload(req)
 	if err != nil || !bytes.Equal(json, []byte(TSPG_EXPECTED_2)) {
 		t.FailNow()
@@ -196,7 +196,11 @@ func TestSuccess(t *testing.T) {
 		meta.PeerId = req.Data.PeerId
 		meta.SnarkWork = req.Data.SnarkWork
 		meta.RemoteAddr = "192.0.2.1:1234"
+<<<<<<< HEAD
 		meta.BlockProducerVersion = req.Data.BlockProducerVersion
+=======
+		meta.BuiltWithCommitSha = req.Data.BuiltWithCommitSha
+>>>>>>> 9c1023fa65c10b9e979e6a493a17c1675c56b7e6
 		meta.BlockHash = bhStr
 		meta.Submitter = req.Submitter
 		metaBytes, err2 := json.Marshal(meta)

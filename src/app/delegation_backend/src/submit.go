@@ -117,9 +117,9 @@ func makeSignPayload(req *submitRequestData) ([]byte, error) {
 		signPayload.WriteString(",\"graphql_control_port\":")
 		signPayload.WriteString(fmt.Sprintf("%d", req.GraphqlControlPort))
 	}
-	if req.BlockProducerVersion != "" {
-		signPayload.WriteString(",\"block_producer_version\":\"")
-		signPayload.WriteString(req.BlockProducerVersion)
+	if req.BuiltWithCommitSha != "" {
+		signPayload.WriteString(",\"built_with_commit_sha\":\"")
+		signPayload.WriteString(req.BuiltWithCommitSha)
 		signPayload.WriteString("\"")
 	}
 	signPayload.WriteString("}")
@@ -198,15 +198,21 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	ps, blockHash := makePaths(submittedAt, &req)
 
+	remoteAddr := r.Header.Get("X-Forwarded-For")
+	if remoteAddr == "" {
+		// If there is no X-Forwarded-For header, use the remote address
+		remoteAddr = r.RemoteAddr
+	}
+
 	meta := MetaToBeSaved{
-		CreatedAt:            req.Data.CreatedAt.Format(time.RFC3339),
-		PeerId:               req.Data.PeerId,
-		SnarkWork:            req.Data.SnarkWork,
-		RemoteAddr:           r.RemoteAddr,
-		BlockHash:            blockHash,
-		Submitter:            req.Submitter,
-		GraphqlControlPort:   req.Data.GraphqlControlPort,
-		BlockProducerVersion: req.Data.BlockProducerVersion,
+		CreatedAt:          req.Data.CreatedAt.Format(time.RFC3339),
+		PeerId:             req.Data.PeerId,
+		SnarkWork:          req.Data.SnarkWork,
+		RemoteAddr:         r.RemoteAddr,
+		BlockHash:          blockHash,
+		Submitter:          req.Submitter,
+		GraphqlControlPort: req.Data.GraphqlControlPort,
+		BuiltWithCommitSha: req.Data.BuiltWithCommitSha,
 	}
 
 	metaBytes, err1 := json.Marshal(meta)

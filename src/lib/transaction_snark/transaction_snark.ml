@@ -4475,8 +4475,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
     end
 
-    let deploy_snapp ?(no_auth = false) ?(default_permissions = false)
-        ~constraint_constants (spec : Deploy_snapp_spec.t) =
+    let deploy_snapp ?(no_auth = false) ?permissions ~constraint_constants
+        (spec : Deploy_snapp_spec.t) =
       let `VK vk, `Prover _trivial_prover =
         create_trivial_snapp ~constraint_constants ()
       in
@@ -4494,14 +4494,13 @@ module Make_str (A : Wire_types.Concrete) = struct
           { update with
             verification_key = Zkapp_basic.Set_or_keep.Set vk
           ; permissions =
-              ( if default_permissions then
-                Zkapp_basic.Set_or_keep.Set Permissions.user_default
-              else
-                Zkapp_basic.Set_or_keep.Set
-                  { Permissions.user_default with
-                    edit_state = Permissions.Auth_required.Proof
-                  ; edit_action_state = Proof
-                  } )
+              Zkapp_basic.Set_or_keep.Set
+                (Option.value permissions
+                   ~default:
+                     { Permissions.user_default with
+                       edit_state = Permissions.Auth_required.Proof
+                     ; edit_action_state = Proof
+                     } )
           }
       in
       let ( `Zkapp_command { Zkapp_command.fee_payer; account_updates; memo }

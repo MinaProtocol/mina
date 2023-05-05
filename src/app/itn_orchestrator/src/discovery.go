@@ -24,8 +24,9 @@ type Node struct {
 }
 
 type DiscoveryParams struct {
-	OffsetMin int
-	Limit     int
+	OffsetMin          int
+	Limit              int
+	OnlyBlockProducers bool `json:"omitempty"`
 }
 
 func DiscoverParticipants(config Config, params DiscoveryParams, output func(NodeAddress)) error {
@@ -66,6 +67,9 @@ func DiscoverParticipants(config Config, params DiscoveryParams, output func(Nod
 		_, err = config.GetGqlClient(ctx, addr)
 		if err != nil {
 			log.Errorf("Error on auth for %s: %v", addr, err)
+			continue
+		}
+		if !config.NodeData[addr].IsBlockProducer && params.OnlyBlockProducers {
 			continue
 		}
 		cache[addr] = struct{}{}

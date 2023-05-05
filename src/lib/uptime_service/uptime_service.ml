@@ -16,7 +16,7 @@ type block_data =
   ; peer_id : string
   ; snark_work : string option [@default None]
   ; graphql_control_port : int option [@default None]
-  ; block_producer_version : string option [@default None]
+  ; built_with_commit_sha : string option [@default None]
   }
 [@@deriving to_yojson]
 
@@ -202,7 +202,11 @@ let block_base64_of_breadcrumb breadcrumb =
 
 let send_produced_block_at ~logger ~interruptor ~url ~peer_id
     ~(submitter_keypair : Keypair.t) ~graphql_control_port ~block_produced_bvar
+<<<<<<< HEAD
     ~block_producer_version tm =
+=======
+    ~built_with_commit_sha tm =
+>>>>>>> 9c1023fa65c10b9e979e6a493a17c1675c56b7e6
   let open Interruptible.Let_syntax in
   let make_interruptible f = Interruptible.lift f interruptor in
   let timeout_min = 3.0 in
@@ -228,7 +232,11 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
         ; peer_id
         ; snark_work = None
         ; graphql_control_port
+<<<<<<< HEAD
         ; block_producer_version
+=======
+        ; built_with_commit_sha
+>>>>>>> 9c1023fa65c10b9e979e6a493a17c1675c56b7e6
         }
       in
       send_uptime_data ~logger ~interruptor ~submitter_keypair ~url ~state_hash
@@ -236,7 +244,11 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
 
 let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
     ~transition_frontier ~peer_id ~(submitter_keypair : Keypair.t)
+<<<<<<< HEAD
     ~snark_work_fee ~graphql_control_port ~block_producer_version =
+=======
+    ~snark_work_fee ~graphql_control_port ~built_with_commit_sha =
+>>>>>>> 9c1023fa65c10b9e979e6a493a17c1675c56b7e6
   match Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       (* expected during daemon boot, so not logging as error *)
@@ -270,7 +282,11 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
           ; peer_id
           ; snark_work = None
           ; graphql_control_port
+<<<<<<< HEAD
           ; block_producer_version
+=======
+          ; built_with_commit_sha
+>>>>>>> 9c1023fa65c10b9e979e6a493a17c1675c56b7e6
           }
         in
         send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
@@ -311,7 +327,11 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
               ; peer_id
               ; snark_work = None
               ; graphql_control_port
+<<<<<<< HEAD
               ; block_producer_version
+=======
+              ; built_with_commit_sha
+>>>>>>> 9c1023fa65c10b9e979e6a493a17c1675c56b7e6
               }
             in
             send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
@@ -355,7 +375,11 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                   ; peer_id
                   ; snark_work = None
                   ; graphql_control_port
+<<<<<<< HEAD
                   ; block_producer_version
+=======
+                  ; built_with_commit_sha
+>>>>>>> 9c1023fa65c10b9e979e6a493a17c1675c56b7e6
                   }
                 in
                 send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
@@ -396,7 +420,11 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                       ; peer_id
                       ; snark_work = Some snark_work_base64
                       ; graphql_control_port
+<<<<<<< HEAD
                       ; block_producer_version
+=======
+                      ; built_with_commit_sha
+>>>>>>> 9c1023fa65c10b9e979e6a493a17c1675c56b7e6
                       }
                     in
                     send_uptime_data ~logger ~interruptor ~submitter_keypair
@@ -405,7 +433,11 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
 let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
     ~time_controller ~block_produced_bvar ~uptime_submitter_keypair
     ~get_next_producer_timing ~get_snark_work_fee ~get_peer
+<<<<<<< HEAD
     ~graphql_control_port ~block_producer_version =
+=======
+    ~graphql_control_port ~built_with_commit_sha =
+>>>>>>> 9c1023fa65c10b9e979e6a493a17c1675c56b7e6
   match uptime_url with
   | None ->
       [%log info] "Not running uptime service, no URL given" ;
@@ -497,7 +529,11 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                      block" ;
                   send_produced_block_at ~logger ~interruptor ~url ~peer_id
                     ~submitter_keypair ~graphql_control_port
+<<<<<<< HEAD
                     ~block_producer_version ~block_produced_bvar
+=======
+                    ~built_with_commit_sha ~block_produced_bvar
+>>>>>>> 9c1023fa65c10b9e979e6a493a17c1675c56b7e6
                     next_producer_time
                 in
                 let send_block_and_snark_work () =
@@ -507,7 +543,11 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                   send_block_and_transaction_snark ~logger ~interruptor ~url
                     ~snark_worker ~transition_frontier ~peer_id
                     ~submitter_keypair ~snark_work_fee ~graphql_control_port
+<<<<<<< HEAD
                     ~block_producer_version
+=======
+                    ~built_with_commit_sha
+>>>>>>> 9c1023fa65c10b9e979e6a493a17c1675c56b7e6
                 in
                 match get_next_producer_time_opt () with
                 | None ->
