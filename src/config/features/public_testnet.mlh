@@ -1,1 +1,1 @@
-[%%define mainnet false]
+[%%define network "testnet"]
