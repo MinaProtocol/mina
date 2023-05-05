@@ -28,20 +28,20 @@ steps:
     label: "Export Epoch Seeds"
     depends_on: "initial_healthcheck"
 
-  - command: "./buildkite/pipelines/hardfork/scripts/export_hardfork_env_vars.sh && ./buildkite/pipelines/hardfork/scripts/debian_build.sh"
-    key: "deb_build"
-    label: "Debian Package Builds"
-    # depends_on: "export_ledger"
+  # - command: "./buildkite/pipelines/hardfork/scripts/export_hardfork_env_vars.sh && ./buildkite/pipelines/hardfork/scripts/debian_build.sh"
+  #   key: "deb_build"
+  #   label: "Debian Package Builds"
+  #   # depends_on: "export_ledger"
   
   - command: "./buildkite/pipelines/hardfork/scripts/export_hardfork_env_vars.sh && ./buildkite/pipelines/hardfork/scripts/docker_build.sh"
     key: "docker_build"
     label: "Docker Container Builds"
     # depends_on: "deb_build"
 
-  # - command: "python3 ./buildkite/pipelines/hardfork/scripts/terraform_deploy.py"
-  #   key: "deployment"
-  #   label: "Deploy Network Fork"
-  #   # depends_on: "docker_build"
+  - command: "./buildkite/pipelines/hardfork/scripts/terraform_deploy.sh"
+    key: "deployment"
+    label: "Deploy Network Fork"
+    # depends_on: "docker_build"
 
   # - command: "python3 ./buildkite/pipelines/hardfork/scripts/post_hardfork_qa.py"
   #   key: "post_qa"
