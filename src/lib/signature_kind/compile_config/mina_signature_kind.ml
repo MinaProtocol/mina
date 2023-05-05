@@ -2,11 +2,11 @@
 
 type t = Testnet | Mainnet
 
-[%%if mainnet]
+[%%if network = "mainnet"]
 
 let t = Mainnet
 
-[%%else]
+[%%elif network = "testnet"]
 
 let t = Testnet
 
