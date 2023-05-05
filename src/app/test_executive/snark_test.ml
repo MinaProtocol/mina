@@ -111,7 +111,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~amount:Currency.Amount.one ~fee ~node:sender 13
          in
          wait_for t
-           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
+           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1
+              ~test_config:config ) )
     in
     let%bind () =
       section_hard
@@ -191,7 +192,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~amount:Currency.Amount.one ~fee ~node:sender 26
          in
          wait_for t
-           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:2) )
+           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:2
+              ~test_config:config ) )
     in
     section_hard
       "check account balances.  snark-node-key2 should be greater than or \
