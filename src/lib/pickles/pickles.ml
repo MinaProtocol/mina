@@ -1742,7 +1742,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                            .messages_for_next_step_proof
                                            .challenge_polynomial_commitments
                                          max_proofs_verified
-                                         (Lazy.force Dummy.Ipa.Wrap.sg) )
+                                         (Lazy.force Dummy.Ipa.Wrap.sg
+                                            ~num_chunks:
+                                              Common.default_num_chunks ) )
                                       messages_for_next_wrap_proof_prepared
                                         .old_bulletproof_challenges
                                       ~f:(fun sg chals ->

@@ -152,7 +152,9 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
             ; sponge_digest_before_evaluations =
                 Digest.Constant.of_tock_field Tock.Field.zero
             ; messages_for_next_wrap_proof =
-                { challenge_polynomial_commitment = Lazy.force Dummy.Ipa.Step.sg
+                { challenge_polynomial_commitment =
+                    Lazy.force Dummy.Ipa.Step.sg
+                      ~num_chunks:Common.default_num_chunks
                 ; old_bulletproof_challenges =
                     Vector.init h ~f:(fun _ -> Dummy.Ipa.Wrap.challenges)
                 }
@@ -166,7 +168,8 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
                 (* TODO: Should this be wrap? *)
             ; challenge_polynomial_commitments =
                 Vector.init most_recent_width ~f:(fun _ ->
-                    Lazy.force Dummy.Ipa.Wrap.sg )
+                    Lazy.force Dummy.Ipa.Wrap.sg
+                      ~num_chunks:Common.default_num_chunks )
             }
         }
     ; proof =
