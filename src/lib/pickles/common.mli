@@ -1,5 +1,9 @@
 open Pickles_types
 
+val default_zk_rows : int
+
+val default_num_chunks : int
+
 val wrap_domains : proofs_verified:int -> Import.Domains.Stable.V2.t
 
 val actual_wrap_domain_size :

@@ -3,6 +3,10 @@ open Pickles_types
 open Import
 open Backend
 
+let default_zk_rows = 3
+
+let default_num_chunks = 1
+
 module Max_degree = struct
   let step_log2 = Nat.to_int Backend.Tick.Rounds.n
 
