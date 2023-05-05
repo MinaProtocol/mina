@@ -1,0 +1,28 @@
+# this pipeline performs import operations for network archives and berkeley nodes
+# this pipeline is intended to be run manually after a hardfork operation is completed. 
+
+steps:
+  # - command: "python3 ./buildkite/pipelines/hardfork/scripts/pre_hardfork_qa.py"
+  #   key: "initial_healthcheck"
+  #   label: "Initial Healthcheck"
+
+  # - command: "python3 ./buildkite/pipelines/hardfork/scripts/archive_import.py"
+  #   key: "import_archive"
+  #   label: "Import Archive"
+  #   depends_on: "initial_healthcheck"
+
+  # - command: "python3 ./buildkite/pipelines/hardfork/scripts/rosetta_import.py"
+  #   key: "import_rosetta"
+  #   label: "Import Rosetta"
+  #   depends_on: "initial_healthcheck"
+
+  # - command: "python3 ./buildkite/pipelines/hardfork/scripts/archive_import_qa.py"
+  #   key: "archive_qa"
+  #   label: "Archive QA"
+  #   depends_on: "import_archive"
+
+  # - command: "python3 ./buildkite/pipelines/hardfork/scripts/rosetta_import_qa.py"
+  #   key: "rosetta_qa"
+  #   label: "Rosetta QA"
+  #   depends_on: "import_rosetta"
+
