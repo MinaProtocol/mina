@@ -64,7 +64,7 @@ let%test_unit "custom gates integration" =
               Element.Standard.of_bignum_bigint (module Runner.Impl)
               @@ Common.bignum_bigint_of_hex foreign_elem
             in
-            let out_rot = rot_64 (module Runner.Impl) word_64bit 5 Right in
+            let out_rot = rot64 (module Runner.Impl) word_64bit 5 Right in
 
             let two_to_88 =
               exists Field.typ ~compute:(fun () ->

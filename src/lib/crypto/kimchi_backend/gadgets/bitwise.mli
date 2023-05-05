@@ -7,7 +7,7 @@ type rot_mode = Left | Right
    * - mode: Left or Right
    * Returns rotated word
 *)
-val rot_64 :
+val rot64 :
      (module Snarky_backendless.Snark_intf.Run with type field = 'f)
   -> 'f Snarky_backendless.Cvar.t
   -> int

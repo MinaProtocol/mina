@@ -38,7 +38,7 @@ type rot_mode = Left | Right
  *     - mode: Left or Right
  * Output: rotated word
  *)
-let rot_64 (type f)
+let rot64 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (word : Circuit.Field.t) (rot_bits : int) (mode : rot_mode) :
     Circuit.Field.t =
@@ -543,7 +543,7 @@ let%test_unit "bitwise rotation gadget" =
                   Field.Constant.of_string result )
             in
             (* Use the xor gate gadget *)
-            let output_rot = rot_64 (module Runner.Impl) word length mode in
+            let output_rot = rot64 (module Runner.Impl) word length mode in
             Field.Assert.equal output_rot result
             (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *) )
       in
