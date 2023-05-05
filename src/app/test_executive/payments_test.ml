@@ -416,23 +416,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let sender = untimed_node_b in
          let%bind sender_pub_key = pub_key_of_node sender in
          let%bind _ =
-           (*
-            To fill up a `small` transaction capacity with work delay of 1,
-            there needs to be 12 total txns sent.
-
-            Calculation is as follows:
-            Max number trees in the scan state is
-              `(transaction_capacity_log+1) * (work_delay+1)`
-            and for 2^2 transaction capacity and work delay 1 it is
-              `(2+1)*(1+1)=6`.
-            Per block there can be 2 transactions included (other two slots would be for a coinbase and fee transfers).
-            In the initial state of the network, the scan state waits till all the trees are filled before emitting a proof from the first tree.
-            Hence, 6*2 = 12 transactions untill we get the first snarked ledger.
-
-            2 successful txn are sent in the prior course of this test,
-            so spamming out at least 10 more here will trigger a ledger proof to be emitted *)
            send_payments ~logger ~sender_pub_key ~receiver_pub_key
-             ~amount:Currency.Amount.one ~fee ~node:sender 10
+             ~amount:Currency.Amount.one ~fee ~node:sender
+             (Test_config.transactions_needed_for_ledger_proofs ~num_proofs:1
+                config )
          in
          wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis

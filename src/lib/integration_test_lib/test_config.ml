@@ -129,6 +129,20 @@ let slots_for_blocks blocks =
   (*Given 0.75 slots are filled*)
   Float.round_up (Float.of_int blocks *. 4.0 /. 3.0) |> Float.to_int
 
+(*
+As an example for transactions_needed_for_ledger_proofs, 
+to fill up a `small` transaction capacity with work delay of 1,
+there needs to be 12 total txns sent.
+
+Calculation is as follows:
+Max number trees in the scan state is
+  `(transaction_capacity_log+1) * (work_delay+1)`
+and for 2^2 transaction capacity and work delay 1 it is
+  `(2+1)*(1+1)=6`.
+Per block there can be 2 transactions included (other two slots would be for a coinbase and fee transfers).
+In the initial state of the network, the scan state waits till all the trees are filled before emitting a proof from the first tree.
+Hence, 6*2 = 12 transactions until we get the first snarked ledger.
+*)
 let transactions_needed_for_ledger_proofs ?(num_proofs = 1) config =
   let transactions_per_block = transaction_capacity config in
   (blocks_for_first_ledger_proof config * transactions_per_block)
