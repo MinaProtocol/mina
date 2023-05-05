@@ -125,16 +125,16 @@ variable "seed_discovery_keypairs" {
 
 variable "whales" {
   description = "individual whale block producer node deployment configurations"
-  default = null
+  default     = null
 }
 
 variable "fishes" {
   description = "individual fish block producer node deployment configurations"
-  default = null
+  default     = null
 }
 
 variable "nodes_with_user_agent" {
-  type = list(string)
+  type    = list(string)
   default = []
 }
 
@@ -145,7 +145,7 @@ variable "seed_count" {
 
 variable "plain_node_count" {
   type    = number
-  default = 1
+  default = 0
 }
 
 variable "log_level" {
@@ -181,8 +181,8 @@ variable "seed_starting_host_port" {
 
 variable "snark_coordinators" {
   description = "configurations for not just the snark coordinators but also the snark workers they coordinate"
-  type    = list(any)
-  default = []
+  type        = list(any)
+  default     = []
 }
 
 variable "agent_min_fee" {
@@ -253,7 +253,7 @@ variable "make_report_accounts" {
 }
 
 variable "log_precomputed_blocks" {
-  type = bool
+  type    = bool
   default = false
 }
 
@@ -286,7 +286,7 @@ variable "archive_node_count" {
 
 variable "archive_configs" {
   description = "individual archive-node deployment configurations"
-  default = null
+  default     = null
 }
 
 variable "upload_blocks_to_gcloud" {
