@@ -14,4 +14,4 @@ let of_length length =
   if length <= 0 then invalid_arg "of_length: length must be > 0" ;
   create_unsafe length
 
-let one = create_unsafe 1
+let one = create_unsafe Common.default_num_chunks
