@@ -370,9 +370,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     other_p )
         }
     in
-    let make_update_vk_spec auth :
+    let make_update_vk_spec ~auth ~nonce :
         Transaction_snark.For_tests.Update_states_spec.t =
-      { sender = (fish2_kp, Account.Nonce.of_int 2)
+      { sender = (fish2_kp, Account.Nonce.of_int nonce)
       ; fee = Currency.Fee.of_nanomina_int_exn 10_000_000
       ; fee_payer = None
       ; receivers = []
@@ -395,11 +395,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind.Deferred zkapp_command_update_vk_proof =
       Transaction_snark.For_tests.update_states ~constraint_constants
-        (make_update_vk_spec Permissions.Auth_required.Proof)
+        (make_update_vk_spec ~auth:Permissions.Auth_required.Proof ~nonce:2)
     in
     let%bind.Deferred zkapp_command_update_vk_impossible =
       Transaction_snark.For_tests.update_states ~constraint_constants
-        (make_update_vk_spec Permissions.Auth_required.Impossible)
+        (make_update_vk_spec ~auth:Permissions.Auth_required.Impossible ~nonce:3)
     in
     let%bind.Deferred zkapp_command_nonexistent_fee_payer =
       let new_kp = Signature_lib.Keypair.create () in
@@ -592,10 +592,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
       Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
     in
-    let wait_for_zkapp zkapp_command =
+    let wait_for_zkapp zkapp_command ~has_failures =
       let%map () =
         wait_for t @@ with_timeout
-        @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures:false
+        @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures
              ~zkapp_command
       in
       [%log info] "ZkApp transaction included in transition frontier"
@@ -703,7 +703,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard
         "Wait for zkapp to create accounts to be included in transition \
          frontier"
-        (wait_for_zkapp zkapp_command_create_accounts)
+        (wait_for_zkapp zkapp_command_create_accounts ~has_failures:false)
     in
     let%bind () =
       let sender = List.hd_exn zkapp_keypairs in
@@ -720,7 +720,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard
         "Wait for zkApp transaction to update permissions to be included in \
          transition frontier"
-        (wait_for_zkapp zkapp_command_update_permissions)
+        (wait_for_zkapp zkapp_command_update_permissions ~has_failures:false)
     in
     let%bind () =
       let sender = List.hd_exn zkapp_keypairs in
@@ -801,8 +801,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard
         "Send a zkApp transaction that set the permission for updating vk to \
          be Proof"
-        (send_invalid_zkapp ~logger node zkapp_command_update_vk_proof
-           "Permission_for_update_vk_can_not_be_proof_or_impossible" )
+        (send_zkapp ~logger node zkapp_command_update_vk_proof)
+    in
+    let%bind () =
+      section_hard
+        "Wait for zkApp transaction that set the permission for updating vk to \
+         Proof to fail in a block"
+        (wait_for_zkapp zkapp_command_update_vk_proof ~has_failures:true)
     in
     let%bind () =
       section_hard
@@ -813,9 +818,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section_hard
+        "Wait for zkapp transaction that set the permission for updating vk to \
+         Impossible to fail in a block"
+        (wait_for_zkapp zkapp_command_update_vk_impossible ~has_failures:true)
+    in
+    let%bind () =
+      section_hard
         "Wait for zkApp transaction to update all fields to be included in \
          transition frontier"
-        (wait_for_zkapp zkapp_command_update_all)
+        (wait_for_zkapp zkapp_command_update_all ~has_failures:false)
     in
     let%bind () =
       section_hard "Send a zkApp transaction to mint token"
@@ -835,19 +846,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section_hard "Wait for zkApp transaction to mint token"
-        (wait_for_zkapp zkapp_command_mint_token)
+        (wait_for_zkapp zkapp_command_mint_token ~has_failures:false)
     in
     let%bind () =
       section_hard "Wait for zkApp transaction to mint 2nd token"
-        (wait_for_zkapp zkapp_command_mint_token2)
+        (wait_for_zkapp zkapp_command_mint_token2 ~has_failures:false)
     in
     let%bind () =
       section_hard "Wait for zkApp transaction to transfer tokens"
-        (wait_for_zkapp zkapp_command_token_transfer)
+        (wait_for_zkapp zkapp_command_token_transfer ~has_failures:false)
     in
     let%bind () =
       section_hard "Wait for zkApp transaction to transfer tokens (2)"
-        (wait_for_zkapp zkapp_command_token_transfer2)
+        (wait_for_zkapp zkapp_command_token_transfer2 ~has_failures:false)
     in
     let%bind () =
       section_hard "Verify zkApp transaction updates in ledger"
