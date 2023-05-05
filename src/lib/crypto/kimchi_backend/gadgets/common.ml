@@ -21,6 +21,8 @@ let limb_bits = 88
 (* Foreign field element limb size 2^L where L=88 *)
 let two_to_limb = Bignum_bigint.(pow (of_int 2) (of_int limb_bits))
 
+(* Foreign field element limb size 2^L where L=88 *)
+
 (* Length of bigint in bits *)
 let bignum_bigint_bit_length (bigint : Bignum_bigint.t) : int =
   Z.log2up (Bignum_bigint.to_zarith_bigint bigint)
@@ -187,6 +189,14 @@ let field_of_hex (type f)
 
 (* Negative test helper *)
 let is_error (func : unit -> _) = Result.is_error (Or_error.try_with func)
+
+(* Two to the power of n as a field element *)
+let two_pow (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (n : int) =
+  bignum_bigint_to_field
+    (module Circuit)
+    Bignum_bigint.(pow (of_int 2) (of_int n))
 
 (*********)
 (* Tests *)
