@@ -168,6 +168,7 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
             let delta_x_inv =
               let delta_x = (Bignum_bigint.to_zarith_bigint delta_x) in
               let foreign_field_modulus = (Bignum_bigint.to_zarith_bigint foreign_field_modulus) in
+
               let delta_x_inv = Z.invert delta_x foreign_field_modulus in
               Bignum_bigint.of_zarith_bigint delta_x_inv in
 
@@ -521,6 +522,29 @@ let%test_unit "group_add" =
       (Bignum_bigint.of_int 1, Bignum_bigint.of_int 0) (* right_input *)
       (Bignum_bigint.of_int 1, Bignum_bigint.of_int 0) (* expected result *)
       (Bignum_bigint.of_int 5)
+  in
+  let cs =
+    test_group_add
+      (Bignum_bigint.of_int 3, Bignum_bigint.of_int 8) (* left_input *)
+      (Bignum_bigint.of_int 5, Bignum_bigint.of_int 11) (* right_input *)
+      (Bignum_bigint.of_int 4, Bignum_bigint.of_int 10) (* expected result *)
+      (Bignum_bigint.of_int 13)
+  in
+  let _cs =
+    test_group_add
+      ~cs
+      (Bignum_bigint.of_int 10, Bignum_bigint.of_int 4) (* left_input *)
+      (Bignum_bigint.of_int 12, Bignum_bigint.of_int 7) (* right_input *)
+      (Bignum_bigint.of_int 3, Bignum_bigint.of_int 0) (* expected result *)
+      (Bignum_bigint.of_int 13)
+  in
+  let _cs =
+    test_group_add
+      ~cs
+      (Bignum_bigint.of_int 8, Bignum_bigint.of_int 6) (* left_input *)
+      (Bignum_bigint.of_int 2, Bignum_bigint.of_int 1) (* right_input *)
+      (Bignum_bigint.of_int 12, Bignum_bigint.of_int 8) (* expected result *)
+      (Bignum_bigint.of_int 13)
   in
 
   (* Tests with secp256k1 curve points *)
