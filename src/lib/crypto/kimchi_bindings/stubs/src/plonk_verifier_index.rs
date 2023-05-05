@@ -171,6 +171,7 @@ where
 pub struct CamlPlonkVerifierIndex<Fr, SRS, PolyComm> {
     pub domain: CamlPlonkDomain<Fr>,
     pub max_poly_size: ocaml::Int,
+    pub zk_rows: ocaml::Int,
     pub public: ocaml::Int,
     pub prev_challenges: ocaml::Int,
     pub srs: SRS,
