@@ -15,6 +15,8 @@ module type Input_intf = sig
   val failure_expected : Mina_base.Transaction_status.Failure.t * U.pass_number
 
   val is_non_zkapp_update : bool
+
+  val is_update_verification_key : bool
 end
 
 module Make (Input : Input_intf) = struct
@@ -50,32 +52,34 @@ module Make (Input : Input_intf) = struct
           ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
   let%test_unit "update a snapp account with proof" =
-    Quickcheck.test ~trials:1 U.gen_snapp_ledger
-      ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
-        let fee = Fee.of_nanomina_int_exn 1_000_000 in
-        let amount = Amount.of_mina_int_exn 10 in
-        let test_spec : Spec.t =
-          { sender = (new_kp, Mina_base.Account.Nonce.zero)
-          ; fee
-          ; fee_payer = None
-          ; receivers = []
-          ; amount
-          ; zkapp_account_keypairs = [ new_kp ]
-          ; memo
-          ; new_zkapp_account = false
-          ; snapp_update
-          ; current_auth = Permissions.Auth_required.Proof
-          ; call_data = Snark_params.Tick.Field.zero
-          ; events = []
-          ; actions = []
-          ; preconditions = None
-          }
-        in
-        U.test_snapp_update
-          ~snapp_permissions:
-            (U.permissions_from_update snapp_update ~auth:Proof)
-          test_spec ~init_ledger ~vk ~zkapp_prover
-          ~snapp_pk:(Public_key.compress new_kp.public_key) )
+    if is_update_verification_key then ()
+    else
+      Quickcheck.test ~trials:1 U.gen_snapp_ledger
+        ~f:(fun ({ init_ledger; specs = _ }, new_kp) ->
+          let fee = Fee.of_nanomina_int_exn 1_000_000 in
+          let amount = Amount.of_mina_int_exn 10 in
+          let test_spec : Spec.t =
+            { sender = (new_kp, Mina_base.Account.Nonce.zero)
+            ; fee
+            ; fee_payer = None
+            ; receivers = []
+            ; amount
+            ; zkapp_account_keypairs = [ new_kp ]
+            ; memo
+            ; new_zkapp_account = false
+            ; snapp_update
+            ; current_auth = Permissions.Auth_required.Proof
+            ; call_data = Snark_params.Tick.Field.zero
+            ; events = []
+            ; actions = []
+            ; preconditions = None
+            }
+          in
+          U.test_snapp_update
+            ~snapp_permissions:
+              (U.permissions_from_update snapp_update ~auth:Proof)
+            test_spec ~init_ledger ~vk ~zkapp_prover
+            ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
   let%test_unit "update a snapp account with None permission" =
     Quickcheck.test ~trials:1 U.gen_snapp_ledger
@@ -251,42 +255,45 @@ module Make (Input : Input_intf) = struct
           ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
   let%test_unit "Update when not permitted but transaction is applied" =
-    let open Mina_transaction_logic.For_tests in
-    Quickcheck.test ~trials:1 U.gen_snapp_ledger
-      ~f:(fun ({ init_ledger; specs }, new_kp) ->
-        Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
-            let spec = List.hd_exn specs in
-            let fee = Fee.of_nanomina_int_exn 1_000_000 in
-            let amount = Amount.of_mina_int_exn 10 in
-            let test_spec : Spec.t =
-              { sender = spec.sender
-              ; fee
-              ; fee_payer = None
-              ; receivers = []
-              ; amount
-              ; zkapp_account_keypairs = [ new_kp ]
-              ; memo
-              ; new_zkapp_account = false
-              ; snapp_update
-              ; current_auth = Permissions.Auth_required.Signature
-              ; call_data = Snark_params.Tick.Field.zero
-              ; events = []
-              ; actions = []
-              ; preconditions = None
-              }
-            in
-            let snapp_pk = Public_key.compress new_kp.public_key in
-            Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-            (*Create snapp transaction*)
-            Transaction_snark.For_tests.create_trivial_zkapp_account
-              ~permissions:(U.permissions_from_update snapp_update ~auth:Proof)
-              ~vk ~ledger snapp_pk ;
-            (*Ledger.apply_transaction should be successful if fee payer update
-              is successful*)
-            U.test_snapp_update ~expected_failure:failure_expected
-              ~snapp_permissions:
-                (U.permissions_from_update snapp_update ~auth:Proof)
-              ~vk ~zkapp_prover test_spec ~init_ledger ~snapp_pk ) )
+    if is_update_verification_key then ()
+    else
+      let open Mina_transaction_logic.For_tests in
+      Quickcheck.test ~trials:1 U.gen_snapp_ledger
+        ~f:(fun ({ init_ledger; specs }, new_kp) ->
+          Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
+              let spec = List.hd_exn specs in
+              let fee = Fee.of_nanomina_int_exn 1_000_000 in
+              let amount = Amount.of_mina_int_exn 10 in
+              let test_spec : Spec.t =
+                { sender = spec.sender
+                ; fee
+                ; fee_payer = None
+                ; receivers = []
+                ; amount
+                ; zkapp_account_keypairs = [ new_kp ]
+                ; memo
+                ; new_zkapp_account = false
+                ; snapp_update
+                ; current_auth = Permissions.Auth_required.Signature
+                ; call_data = Snark_params.Tick.Field.zero
+                ; events = []
+                ; actions = []
+                ; preconditions = None
+                }
+              in
+              let snapp_pk = Public_key.compress new_kp.public_key in
+              Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
+              (*Create snapp transaction*)
+              Transaction_snark.For_tests.create_trivial_zkapp_account
+                ~permissions:
+                  (U.permissions_from_update snapp_update ~auth:Proof)
+                ~vk ~ledger snapp_pk ;
+              (*Ledger.apply_transaction should be successful if fee payer update
+                is successful*)
+              U.test_snapp_update ~expected_failure:failure_expected
+                ~snapp_permissions:
+                  (U.permissions_from_update snapp_update ~auth:Proof)
+                ~vk ~zkapp_prover test_spec ~init_ledger ~snapp_pk ) )
 
   let test_non_zkapp_to_zkapp ?(new_account = true) test_spec init_ledger
       (zkapp_kp : Keypair.t) =

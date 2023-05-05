@@ -393,7 +393,15 @@ let permissions_from_update (update : Account_update.Update.t) ~auth =
   ; set_verification_key =
       ( if Zkapp_basic.Set_or_keep.is_keep update.verification_key then
         default.set_verification_key
-      else auth )
+      else
+        match auth with
+        | Permissions.Auth_required.Proof | Permissions.Auth_required.Impossible
+          ->
+            failwith
+              "the permission for updating verification key can not be set to \
+               be proof or impossible"
+        | _ ->
+            auth )
   ; set_permissions =
       ( if Zkapp_basic.Set_or_keep.is_keep update.permissions then
         default.set_permissions

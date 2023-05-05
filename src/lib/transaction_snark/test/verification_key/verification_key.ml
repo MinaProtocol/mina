@@ -21,6 +21,8 @@ struct
     }
 
   let is_non_zkapp_update = false
+
+  let is_update_verification_key = true
 end
 
 let%test_module "Update account verification key" =

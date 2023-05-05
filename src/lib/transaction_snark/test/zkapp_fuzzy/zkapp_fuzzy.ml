@@ -251,10 +251,6 @@ let () =
            ~type_of_failure:(Update_not_permitted `App_state)
            ~expected_failure_status:(Update_not_permitted_app_state, Pass_2) ;
          mk_invalid_test ~trials ~max_account_updates
-           ~type_of_failure:(Update_not_permitted `Verification_key)
-           ~expected_failure_status:
-             (Update_not_permitted_verification_key, Pass_2) ;
-         mk_invalid_test ~trials ~max_account_updates
            ~type_of_failure:(Update_not_permitted `Zkapp_uri)
            ~expected_failure_status:(Update_not_permitted_zkapp_uri, Pass_2) ;
          mk_invalid_test ~trials ~max_account_updates

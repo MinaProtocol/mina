@@ -8,7 +8,6 @@ type failure =
       [ `Delegate
       | `App_state
       | `Voting_for
-      | `Verification_key
       | `Zkapp_uri
       | `Token_symbol
       | `Send

@@ -11,7 +11,6 @@ type failure =
       [ `Delegate
       | `App_state
       | `Voting_for
-      | `Verification_key
       | `Zkapp_uri
       | `Token_symbol
       | `Send
@@ -1235,14 +1234,6 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
                             edit_state = Auth_required.from ~auth_tag
                           }
                     }
-                | `Verification_key ->
-                    { Account_update.Update.dummy with
-                      permissions =
-                        Set_or_keep.Set
-                          { perm with
-                            set_verification_key = Auth_required.from ~auth_tag
-                          }
-                    }
                 | `Zkapp_uri ->
                     { Account_update.Update.dummy with
                       permissions =
@@ -1341,14 +1332,6 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
                         Zkapp_state.V.of_list_exn fields
                       in
                       { Account_update.Update.dummy with app_state }
-                  | `Verification_key ->
-                      let data = Pickles.Side_loaded.Verification_key.dummy in
-                      let hash = Zkapp_account.digest_vk data in
-                      let verification_key =
-                        Set_or_keep.Set { With_hash.data; hash }
-                      in
-                      return
-                        { Account_update.Update.dummy with verification_key }
                   | `Zkapp_uri ->
                       let zkapp_uri = Set_or_keep.Set "https://o1labs.org" in
                       return { Account_update.Update.dummy with zkapp_uri }

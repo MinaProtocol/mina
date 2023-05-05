@@ -16,6 +16,8 @@ struct
     }
 
   let is_non_zkapp_update = true
+
+  let is_update_verification_key = false
 end
 
 let%test_module "Update account voting-for" =
