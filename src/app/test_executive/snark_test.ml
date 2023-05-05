@@ -27,8 +27,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; genesis_ledger =
         [ { account_name = "node-a-key"; balance = "400000"; timing = Untimed }
         ; { account_name = "node-b-key"; balance = "300000"; timing = Untimed }
-          (* ; { account_name = "fish1"; balance = "100"; timing = Untimed }
-             ; { account_name = "fish2"; balance = "100"; timing = Untimed } *)
         ; { account_name = "snark-node-key1"; balance = "0"; timing = Untimed }
         ; { account_name = "snark-node-key2"; balance = "0"; timing = Untimed }
         ]
@@ -86,35 +84,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          ~f:(fun { Signature_lib.Keypair.public_key; _ } ->
            public_key |> Signature_lib.Public_key.to_yojson
            |> Yojson.Safe.to_string ) ) ;
-    (* let amount = Currency.Amount.of_formatted_string "10" in *)
     let fee = Currency.Fee.of_formatted_string "1" in
-    (* let test_constants = Engine.Network.constraint_constants network in *)
-    (* let%bind () =
-         section_hard "check account balance of snark-node-key1, should be 0"
-           (let%bind { total_balance = snark_worker_balance; _ } =
-              Network.Node.must_get_account_data ~logger node_b
-                ~public_key:
-                  ( snark_node_key1.keypair.public_key
-                  |> Signature_lib.Public_key.compress )
-            in
-            let snark_worker_expected_balance =
-              Currency.Amount.of_formatted_string "0"
-            in
-            if
-              Currency.Amount.( >= )
-                (Currency.Balance.to_amount snark_worker_balance)
-                snark_worker_expected_balance
-            then Malleable_error.return ()
-            else
-              Malleable_error.soft_error_format ~value:()
-                "Error with snark_worker_balance.  snark_worker_balance is %d and \
-                 should be %d.  snark fee is %d"
-                (Currency.Balance.to_int snark_worker_balance)
-                (Currency.Amount.to_int snark_worker_expected_balance)
-                (Currency.Amount.to_int
-                   (Currency.Amount.of_formatted_string config.snark_worker_fee) )
-           )
-       in *)
     let%bind () =
       section_hard
         "send out a bunch of txns to fill up the snark ledger, then wait for \

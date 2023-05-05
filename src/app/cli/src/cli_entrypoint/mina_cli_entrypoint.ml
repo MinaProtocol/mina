@@ -1325,10 +1325,10 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
         in
         coda_ref := Some coda ;
         (*This pipe is consumed only by integration tests*)
-        don't_wait_for
-          (Pipe_lib.Strict_pipe.Reader.iter_without_pushback
-             (Mina_lib.validated_transitions coda)
-             ~f:ignore ) ;
+        (* don't_wait_for
+           (Pipe_lib.Strict_pipe.Reader.iter_without_pushback
+              (Mina_lib.validated_transitions coda)
+              ~f:ignore ) ; *)
         Coda_run.setup_local_server ?client_trustlist ~rest_server_port
           ~insecure_rest_server ~open_limited_graphql_port ?limited_graphql_port
           coda ;
@@ -1689,30 +1689,6 @@ let mina_commands logger =
   ; (Parallel.worker_command_name, Parallel.worker_command)
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
   ]
-
-[%%if integration_tests]
-
-module type Integration_test = sig
-  val name : string
-
-  val command : Async.Command.t
-end
-
-let mina_commands logger =
-  let open Tests in
-  let group =
-    List.map
-      ~f:(fun (module T) -> (T.name, T.command))
-      ( [ (* (module Coda_shared_state_test)
-             ; (module Coda_transitive_peers_test) *)
-          (module Coda_change_snark_worker_test)
-        ]
-        : (module Integration_test) list )
-  in
-  mina_commands logger
-  @ [ ("integration-tests", Command.group ~summary:"Integration tests" group) ]
-
-[%%endif]
 
 let print_version_help coda_exe version =
   (* mimic Jane Street command help *)

@@ -13,7 +13,6 @@
    core_kernel
    core
    init
-   tests
    async
    core.daemon
    base.caml
