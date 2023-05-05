@@ -1,7 +1,5 @@
 open Core
 open Integration_test_lib
-(* open Mina_base *)
-(* open Async *)
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
@@ -19,7 +17,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   (* TODO: refactor all currency values to decimal represenation *)
   (* TODO: test account creation fee *)
-  (* TODO: test snark work *)
   let config =
     let open Test_config in
     { default with

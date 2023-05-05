@@ -19,7 +19,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   (* TODO: refactor all currency values to decimal represenation *)
   (* TODO: test account creation fee *)
-  (* TODO: test snark work *)
   let config =
     let open Test_config in
     let make_timing ~min_balance ~cliff_time ~cliff_amount ~vesting_period
