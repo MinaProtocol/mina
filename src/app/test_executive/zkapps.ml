@@ -813,8 +813,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard
         "Send a zkApp transaction that set the permission for updating vk to \
          be Impossible"
-        (send_invalid_zkapp ~logger node zkapp_command_update_vk_impossible
-           "Permission_for_update_vk_can_not_be_proof_or_impossible" )
+        (send_zkapp ~logger node zkapp_command_update_vk_impossible)
     in
     let%bind () =
       section_hard
