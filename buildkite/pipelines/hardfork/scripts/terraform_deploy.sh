@@ -13,7 +13,7 @@ git clone https://github.com/MinaProtocol/mina.git
 echo "--- Initializing terraform network configuration"
 
 cd ./mina/ && git checkout itn3-testnet-deployment
-cd ./automations/terraform/testnets/testworld-2-0/ && terraform init
+cd ./automation/terraform/testnets/testworld-2-0/ && terraform init
 
 
 
