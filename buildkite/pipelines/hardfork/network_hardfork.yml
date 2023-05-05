@@ -40,7 +40,7 @@ steps:
 
   - command: "./buildkite/pipelines/hardfork/scripts/terraform_deploy.sh"
     key: "deployment"
-    label: "Deploy Network Fork"
+    label: "Deploy Hardfork"
     # depends_on: "docker_build"
 
   # - command: "python3 ./buildkite/pipelines/hardfork/scripts/post_hardfork_qa.py"
