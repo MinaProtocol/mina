@@ -31,6 +31,23 @@ let eth_capacity = 512
 (* Bitrate in Keccak256 (1088) *)
 let eth_bitrate = state - eth_capacity
 
+(* Creates the 5x5 table of rotation offset for Keccak modulo 64
+   * | x \ y |  0 |  1 |  2 |  3 |  4 |
+   * | ----- | -- | -- | -- | -- | -- |
+   * | 0     |  0 | 36 |  3 | 41 | 18 |
+   * | 1     |  1 | 44 | 10 | 45 |  2 |
+   * | 2     | 62 |  6 | 43 | 15 | 61 |
+   * | 3     | 28 | 55 | 25 | 21 | 56 |
+   * | 4     | 27 | 20 | 39 |  8 | 14 |
+*)
+let rot_table =
+  [| [| 0; 36; 3; 41; 18 |]
+   ; [| 1; 44; 10; 45; 2 |]
+   ; [| 62; 6; 43; 15; 61 |]
+   ; [| 28; 55; 25; 21; 56 |]
+   ; [| 27; 20; 39; 8; 14 |]
+  |]
+
 (* Auxiliary function to check composition of 8 bytes into a 64-bit word *)
 let check_bytes_to_word (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -146,65 +163,7 @@ module State = struct
       done
     done ;
     output
-
-  (* Returns a State containing the rotation values as Cvars *)
-  let table (type f)
-      (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f) :
-      Circuit.Field.t matrix =
-    let open Circuit in
-    (* Creates the 5x5 table of rotation offset for Keccak modulo 64
-       * | x \ y |  0 |  1 |  2 |  3 |  4 |
-       * | ----- | -- | -- | -- | -- | -- |
-       * | 0     |  0 | 36 |  3 | 41 | 18 |
-       * | 1     |  1 | 44 | 10 | 45 |  2 |
-       * | 2     | 62 |  6 | 43 | 15 | 61 |
-       * | 3     | 28 | 55 | 25 | 21 | 56 |
-       * | 4     | 27 | 20 | 39 |  8 | 14 |
-    *)
-    let rotations =
-      [| [| 0; 36; 3; 41; 18 |]
-       ; [| 1; 44; 10; 45; 2 |]
-       ; [| 62; 6; 43; 15; 61 |]
-       ; [| 28; 55; 25; 21; 56 |]
-       ; [| 27; 20; 39; 8; 14 |]
-      |]
-    in
-    let rotations =
-      Array.map rotations ~f:(fun row ->
-          Array.map row ~f:(fun rot -> Field.(constant @@ Constant.of_int rot)) )
-    in
-    (*TODO: require asserts for each cell to check value? *)
-    rotations
 end
-
-(*
-(* Round constants for the 24 rounds of Keccak for the iota algorithm *)
-let rc = [|
-    0x0000000000000001;
-    0x0000000000008082;
-    0x800000000000808A;
-    0x8000000080008000;
-    0x000000000000808B;
-    0x0000000080000001;
-    0x8000000080008081;
-    0x8000000000008009;
-    0x000000000000008A;
-    0x0000000000000088;
-    0x0000000080008009;
-    0x000000008000000A;
-    0x000000008000808B;
-    0x800000000000008B;
-    0x8000000000008089;
-    0x8000000000008003;
-    0x8000000000008002;
-    0x8000000000000080;
-    0x000000000000800A;
-    0x800000008000000A;
-    0x8000000080008081;
-    0x8000000000008080;
-    0x0000000080000001;
-    0x8000000080008008 |]
-*)
 
 (* KECCAK HASH FUNCTION IMPLEMENTATION *)
 
@@ -233,78 +192,6 @@ let pad (type f)
   let pad = Array.to_list pad in
   (* Return the padded message *)
   message @ pad
-
-(* Keccak sponge function for 1600 bits of state width
- * Need to split the message into blocks of 1088 bits
- *)
-let sponge (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (padded_message : Circuit.Field.t list) (bitrate : int) (capacity : int)
-    (output_length : int) : Circuit.Field.t list =
-  (* check that the padded message is a multiple of bitrate *)
-  assert (List.length padded_message * 8 mod bitrate = 0) ;
-
-  (* absorb *)
-  let root_state = State.zeros (module Circuit) in
-  (*let mut state = root_state;
-    // split into blocks of bitrate bits
-    // for each block of bitrate bits in the padded message -> this is bitrate/8 bytes
-    for block in padded_message.chunks(bitrate / 8) {
-        let mut padded_block = block.to_vec();
-        // pad the block with 0s to up to 1600 bits
-        for _ in 0..(capacity / 8) {
-            // (capacity / 8) zero bytes
-            padded_block.push(0x00);
-        }
-        // padded with zeros each block until they are 1600 bit long
-        assert_eq!(
-            padded_block.len() * 8,
-            STATE,
-            "Padded block does not have 1600 bits"
-        );
-        let block_state = from_bytes_to_state(&padded_block);
-        // xor the state with the padded block
-        state = xor_state(state, block_state);
-        // apply the permutation function to the xored state
-        state = keccak_permutation(state);
-    }
-
-    (* squeeze *)
-    let mut output = from_state_to_bytes(state)[0..(bitrate / 8)].to_vec();
-    while output.len() < output_length / 8 {
-        // apply the permutation function to the state
-        state = keccak_permutation(state);
-        // append the output of the permutation function to the output
-        output.append(&mut from_state_to_bytes(state)[0..(bitrate / 8)].to_vec());
-    }
-    // return the first 256 bits of the output
-    let hashed = output[0..(output_length / 8)].to_vec().try_into().unwrap();
-    hashed
-  *)
-  padded_message
-
-(*
- * Keccak hash function with input message passed as list of 1byte Cvars.
- * The message will be parsed as follows:
- * - the first byte of the message will be the least significant byte of the first word of the state (A[0][0])
- * - the 10*1 pad will take place after the message, until reaching the bit length BITRATE.
- * - then, {0} pad will take place to finish the 1600 bits of the state.
-*)
-let hash (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (message : Circuit.Field.t list) (bitrate : int) (capacity : int)
-    (output_length : int) : Circuit.Field.t list =
-  assert (bitrate > 0) ;
-  assert (capacity > 0) ;
-  assert (output_length > 0) ;
-  assert (bitrate + capacity = state) ;
-  assert (bitrate mod 8 = 0) ;
-  assert (output_length mod 8 = 0) ;
-
-  (*TODO: replace with output of keccak*)
-  let padded = pad (module Circuit) message bitrate in
-  let hash = sponge (module Circuit) padded bitrate capacity output_length in
-  hash
 
 (* 
  * First algrithm in the compression step of Keccak for 64-bit words.
@@ -384,12 +271,11 @@ let pi_rho (type f)
     (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix =
   let state_e = state in
   let state_b = State.zeros (module Circuit) in
-  let rots = State.table (module Circuit) in
   (* for all x in {0..4} and y in {0..4}: B[y,2x+3y] = ROT(E[x,y], r[x,y]) *)
   for x = 0 to dim do
     for y = 0 to dim do
       state_b.(y).(((2 * x) + (3 * y)) mod dim) <-
-        Bitwise.rot64 (module Circuit) state_e.(x).(y) rots.(x).(y) Left
+        Bitwise.rot64 (module Circuit) state_e.(x).(y) rot_table.(x).(y) Left
     done
   done ;
   state_b
@@ -430,7 +316,51 @@ let chi (type f)
 (*
  * Fifth step of the permutation function of Keccak for 64-bit words.
  * It takes the word located at the position (0,0) of the state and XORs it with the round constant.
-*)
+ *)
+let iota (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (state : Circuit.Field.t State.matrix) (round : int) :
+    Circuit.Field.t State.matrix =
+  let open Circuit in
+  (* Round constants for the 24 rounds of Keccak for the iota algorithm *)
+  let rc =
+    exists (Typ.array ~length:24 Field.typ) ~compute:(fun () ->
+        let rc =
+          [| "0000000000000001"
+           ; "0000000000008082"
+           ; "800000000000808A"
+           ; "8000000080008000"
+           ; "000000000000808B"
+           ; "0000000080000001"
+           ; "8000000080008081"
+           ; "8000000000008009"
+           ; "000000000000008A"
+           ; "0000000000000088"
+           ; "0000000080008009"
+           ; "000000008000000A"
+           ; "000000008000808B"
+           ; "800000000000008B"
+           ; "8000000000008089"
+           ; "8000000000008003"
+           ; "8000000000008002"
+           ; "8000000000000080"
+           ; "000000000000800A"
+           ; "800000008000000A"
+           ; "8000000080008081"
+           ; "8000000000008080"
+           ; "0000000080000001"
+           ; "8000000080008008"
+          |]
+        in
+        (* TODO: instead of Bignum_bigint and strings, perhaps use some u64 equivalent? *)
+        Array.map rc ~f:(fun x ->
+            let x = Bignum_bigint.of_string x in
+            Common.bignum_bigint_to_field (module Circuit) x ) )
+  in
+  let state_g = state in
+  state_g.(0).(0) <-
+    Bitwise.(bxor64 (module Circuit) state_g.(0).(0) rc.(round)) ;
+  state_g
 
 (* The round applies the lambda function and then chi and iota
  * It consists of the concatenation of the theta, rho, and pi algorithms.
@@ -449,3 +379,47 @@ let round (type f)
   let state_d = iota (module Circuit) state_f round in
 
   state_d
+
+(* Keccak sponge function for 1600 bits of state width
+   * Need to split the message into blocks of 1088 bits
+*)
+let sponge (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (padded_message : Circuit.Field.t list) (bitrate : int) (capacity : int)
+    (output_length : int) : Circuit.Field.t list =
+  (* check that the padded message is a multiple of bitrate *)
+  assert (List.length padded_message * 8 mod bitrate = 0) ;
+
+  (* absorb *)
+  let root_state = State.zeros (module Circuit) in
+  let state = root_state in
+
+  (* split into blocks of bitrate bits *)
+  (* for each block of bitrate bits in the padded message -> this is bitrate/8 bytes *)
+
+  
+  
+  padded_message
+
+(*
+* Keccak hash function with input message passed as list of 1byte Cvars.
+* The message will be parsed as follows:
+* - the first byte of the message will be the least significant byte of the first word of the state (A[0][0])
+* - the 10*1 pad will take place after the message, until reaching the bit length BITRATE.
+* - then, {0} pad will take place to finish the 1600 bits of the state.
+*)
+let hash (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (message : Circuit.Field.t list) (bitrate : int) (capacity : int)
+    (output_length : int) : Circuit.Field.t list =
+  assert (bitrate > 0) ;
+  assert (capacity > 0) ;
+  assert (output_length > 0) ;
+  assert (bitrate + capacity = state) ;
+  assert (bitrate mod 8 = 0) ;
+  assert (output_length mod 8 = 0) ;
+
+  (*TODO: replace with output of keccak*)
+  let padded = pad (module Circuit) message bitrate in
+  let hash = sponge (module Circuit) padded bitrate capacity output_length in
+  hash
