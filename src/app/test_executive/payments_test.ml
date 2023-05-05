@@ -436,7 +436,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ~amount:Currency.Amount.one ~fee ~node:sender 10
          in
          wait_for t
-           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
+           (Wait_condition.ledger_proofs_emitted_since_genesis
+              ~test_config:config ~num_proofs:1 ) )
     in
     section_hard "running replayer"
       (let%bind logs =
