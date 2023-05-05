@@ -12,8 +12,9 @@ git clone https://github.com/MinaProtocol/mina.git
 
 echo "--- Initializing terraform configuration"
 
-cd ./mina/automations/terraform/testnets/testworld-2-0/
-terraform init
+pwd
+
+cd ./automations/terraform/testnets/testworld-2-0/ && terraform init
 
 echo "--- Deploying hardfork network"
 
