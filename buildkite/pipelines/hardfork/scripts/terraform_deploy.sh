@@ -11,6 +11,7 @@ git clone https://github.com/MinaProtocol/mina.git
 ##########################################################
 
 echo "--- Initializing terraform configuration"
+cd ./mina/ && git checkout itn3-testnet-deployment
 
 pwd
 ls
