@@ -119,6 +119,11 @@ let field_standard_limbs_to_bignum_bigint (type f)
   Bignum_bigint.(l0 + (Common.two_to_limb * l1) + (two_to_2limb * l2))
 
 (* Foreign field element interface *)
+(* TODO: It would be better if this were created with functor that
+ *       takes are arguments the native field and the foreign field modulus.
+ *       Then when creating foreign field elements it could check that
+ *       they are valid (less than the foreign field modulus).
+ *)
 module type Element_intf = sig
   type 'field t
 
