@@ -200,7 +200,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           edit_state = Permissions.Auth_required.Proof
         ; edit_action_state = Proof
         ; set_delegate = Proof
-        ; set_verification_key = Signature
+        ; set_verification_key = Either
         ; set_permissions = Proof
         ; set_zkapp_uri = Proof
         ; set_token_symbol = Proof
@@ -266,13 +266,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let new_permissions =
         Quickcheck.random_value (Permissions.gen ~auth_tag:Proof)
       in
+      let new_verification_key =
+        let data = Pickles.Side_loaded.Verification_key.dummy in
+        let hash = Zkapp_account.digest_vk data in
+        ({ data; hash } : _ With_hash.t)
+      in
       let new_zkapp_uri = "https://www.minaprotocol.com" in
       let new_token_symbol = "SHEKEL" in
       let new_voting_for = Quickcheck.random_value State_hash.gen in
       let snapp_update : Account_update.Update.t =
         { app_state
         ; delegate = Set new_delegate
-        ; verification_key = Keep
+        ; verification_key = Set new_verification_key
         ; permissions = Set new_permissions
         ; zkapp_uri = Set new_zkapp_uri
         ; token_symbol = Set new_token_symbol

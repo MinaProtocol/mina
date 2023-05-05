@@ -412,9 +412,11 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
   let%bind set_delegate = auth_required_gen in
   let%bind set_permissions = auth_required_gen in
   let%bind set_verification_key =
-    match auth_tag with 
-    | Control.Tag.Proof | Signature -> return Auth_required.Either
-    | None_given -> Auth_required.gen_for_none_given_authorization
+    match auth_tag with
+    | Control.Tag.Proof | Signature ->
+        return Auth_required.Either
+    | None_given ->
+        Auth_required.gen_for_none_given_authorization
   in
   let%bind set_zkapp_uri = auth_required_gen in
   let%bind edit_action_state = auth_required_gen in
