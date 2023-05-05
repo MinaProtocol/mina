@@ -39,7 +39,7 @@ module Evaluator_status = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t = At of Global_slot_since_genesis.Stable.V1.t | Completed
 
       let to_latest = Fn.id
@@ -55,10 +55,10 @@ module Vrf_evaluation_result = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t =
-        { slots_won : Consensus.Data.Slot_won.Stable.V1.t list
-        ; evaluator_status : Evaluator_status.Stable.V1.t
+        { slots_won : Consensus.Data.Slot_won.Stable.V2.t list
+        ; evaluator_status : Evaluator_status.Stable.V2.t
         }
 
       let to_latest = Fn.id

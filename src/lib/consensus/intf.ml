@@ -477,7 +477,7 @@ module type S = sig
       module Value : sig
         [%%versioned:
         module Stable : sig
-          module V1 : sig
+          module V2 : sig
             type t [@@deriving hash, equal, compare, sexp, yojson]
           end
         end]
@@ -628,7 +628,7 @@ module type S = sig
     module Slot_won : sig
       [%%versioned:
       module Stable : sig
-        module V1 : sig
+        module V2 : sig
           type t =
             { delegator :
                 Signature_lib.Public_key.Compressed.Stable.V1.t

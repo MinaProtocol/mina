@@ -290,7 +290,7 @@ module Binable_arg = struct
         , Receipt.Chain_hash.Stable.V1.t
         , Public_key.Compressed.Stable.V1.t option
         , State_hash.Stable.V1.t
-        , Timing.Stable.V1.t
+        , Timing.Stable.V2.t
         , Permissions.Stable.V2.t
         , Zkapp_account.Stable.V2.t option )
         (* TODO: Cache the digest of this? *)

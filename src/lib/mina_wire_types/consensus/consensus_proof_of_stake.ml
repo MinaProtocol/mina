@@ -10,7 +10,7 @@ module Types = struct
 
     module Data : sig
       module Consensus_state : sig
-        module Value : V1S0
+        module Value : V2S0
       end
     end
   end
@@ -91,7 +91,7 @@ module type Concrete = sig
       end
 
       module Value : sig
-        module V1 : sig
+        module V2 : sig
           type t =
             ( Mina_numbers.Length.V1.t
             , Consensus_vrf.Output.Truncated.V1.t
@@ -184,7 +184,7 @@ module M = struct
       end
 
       module Value = struct
-        module V1 = struct
+        module V2 = struct
           type t =
             ( Mina_numbers.Length.V1.t
             , Consensus_vrf.Output.Truncated.V1.t

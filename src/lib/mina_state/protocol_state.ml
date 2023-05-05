@@ -82,7 +82,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           type t =
             ( State_hash.Stable.V1.t
             , Blockchain_state.Value.Stable.V2.t
-            , Consensus.Data.Consensus_state.Value.Stable.V1.t
+            , Consensus.Data.Consensus_state.Value.Stable.V2.t
             , Protocol_constants_checked.Value.Stable.V1.t )
             Poly.Stable.V1.t
           [@@deriving equal, ord, bin_io, hash, sexp, yojson, version]

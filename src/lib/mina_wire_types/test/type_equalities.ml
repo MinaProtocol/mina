@@ -411,7 +411,7 @@ module Consensus = struct
   module W = WT.Consensus
   include Assert_equal0V1 (O.Body_reference.Stable) (W.Body_reference)
   include
-    Assert_equal0V1
+    Assert_equal0V2
       (O.Data.Consensus_state.Value.Stable)
       (W.Data.Consensus_state.Value)
 end

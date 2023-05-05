@@ -45,7 +45,7 @@ module Protocol_state = struct
       type t =
         { previous_state_hash : State_hash.Stable.V1.t
         ; blockchain_state : Mina_state.Blockchain_state.Value.Stable.V2.t
-        ; consensus_state : Consensus.Data.Consensus_state.Value.Stable.V1.t
+        ; consensus_state : Consensus.Data.Consensus_state.Value.Stable.V2.t
         }
 
       let to_latest = Fn.id

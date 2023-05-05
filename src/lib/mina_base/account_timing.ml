@@ -18,7 +18,7 @@ open Mina_numbers
 module Poly = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type ('slot, 'slot_span, 'balance, 'amount) t =
         | Untimed
         | Timed of
@@ -35,13 +35,13 @@ end
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
       ( Global_slot_since_genesis.Stable.V1.t
       , Global_slot_span.Stable.V1.t
       , Balance.Stable.V1.t
       , Amount.Stable.V1.t )
-      Poly.Stable.V1.t
+      Poly.Stable.V2.t
     [@@deriving sexp, equal, hash, compare, yojson]
 
     let to_latest = Fn.id
