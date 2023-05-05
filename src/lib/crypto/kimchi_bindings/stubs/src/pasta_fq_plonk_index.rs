@@ -123,6 +123,7 @@ pub fn caml_pasta_fq_plonk_index_read(
     offset: Option<ocaml::Int>,
     srs: CamlFqSrs,
     path: String,
+    num_chunks: usize,
 ) -> Result<CamlPastaFqPlonkIndex, ocaml::Error> {
     // open the file for reading
     let file = match File::open(path) {
@@ -146,8 +147,8 @@ pub fn caml_pasta_fq_plonk_index_read(
     let mut t = ProverIndex::<Pallas>::deserialize(&mut rmp_serde::Deserializer::new(r))?;
     t.srs = srs.clone();
 
-    // TODO: num_chunks
-    let (linearization, powers_of_alpha) = expr_linearization(Some(&t.cs.feature_flags), true, 1);
+    let (linearization, powers_of_alpha) =
+        expr_linearization(Some(&t.cs.feature_flags), true, num_chunks);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;
 

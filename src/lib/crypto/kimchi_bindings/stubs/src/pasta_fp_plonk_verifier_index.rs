@@ -96,7 +96,9 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
 
         // TODO dummy_lookup_value ?
         // TODO: num_chunks
-        let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true, 1);
+        let num_chunks = 1;
+        let (linearization, powers_of_alpha) =
+            expr_linearization(Some(&feature_flags), true, num_chunks);
 
         let zk_rows = 3;
         VerifierIndex::<Vesta> {
