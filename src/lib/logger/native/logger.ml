@@ -410,8 +410,9 @@ module Structured = struct
     -> unit
 
   let log t ~level ~module_ ~location ?(metadata = []) event =
-    let message, event_id, _str_metadata = Structured_log_events.log event in
+    let message, event_id, str_metadata = Structured_log_events.log event in
     let event_id = Some event_id in
+    let metadata = str_metadata @ metadata in
     raw t
     @@ make_message t ~level ~module_ ~location ~metadata ~message ~event_id
          ~skip_merge_global_metadata:(Level.equal level Level.Internal)
