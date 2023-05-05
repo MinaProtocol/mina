@@ -5,10 +5,10 @@ use kimchi::{
 
 /// Converts the linearization of the kimchi circuit polynomial into a printable string.
 pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
+    num_chunks: usize,
 ) -> (String, Vec<(String, String)>) {
     let evaluated_cols = linearization_columns::<F>(None);
-    // TODO: num_chunks
-    let num_chunks = 1;
+
     let (linearization, _powers_of_alpha) = constraints_expr::<F>(None, true, num_chunks);
 
     let Linearization {
@@ -30,11 +30,11 @@ pub fn linearization_strings<F: ark_ff::PrimeField + ark_ff::SquareRootField>(
 }
 
 #[ocaml::func]
-pub fn fp_linearization_strings() -> (String, Vec<(String, String)>) {
-    linearization_strings::<mina_curves::pasta::Fp>()
+pub fn fp_linearization_strings(num_chunks: usize) -> (String, Vec<(String, String)>) {
+    linearization_strings::<mina_curves::pasta::Fp>(num_chunks)
 }
 
 #[ocaml::func]
-pub fn fq_linearization_strings() -> (String, Vec<(String, String)>) {
-    linearization_strings::<mina_curves::pasta::Fq>()
+pub fn fq_linearization_strings(num_chunks: usize) -> (String, Vec<(String, String)>) {
+    linearization_strings::<mina_curves::pasta::Fq>(num_chunks)
 }

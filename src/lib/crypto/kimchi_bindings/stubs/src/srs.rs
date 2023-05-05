@@ -111,7 +111,7 @@ macro_rules! impl_srs {
                 srs: $name,
                 domain_size: ocaml::Int,
                 evals: Vec<$CamlF>,
-                // TODO: num_chunks: usize,
+                num_chunks: usize,
             ) -> Result<CamlPolyComm<$CamlG>, ocaml::Error> {
                     let x_domain = EvaluationDomain::<$F>::new(domain_size as usize).ok_or_else(|| {
                         ocaml::Error::invalid_argument("CamlSRS::evaluations")
@@ -122,7 +122,7 @@ macro_rules! impl_srs {
                 let evals = evals.into_iter().map(Into::into).collect();
                 let p = Evaluations::<$F>::from_vec_and_domain(evals, x_domain).interpolate();
 
-                Ok(srs.commit_non_hiding(&p, 1, None).into())
+                Ok(srs.commit_non_hiding(&p, num_chunks, None).into())
             }
 
             #[ocaml_gen::func]
@@ -130,13 +130,13 @@ macro_rules! impl_srs {
             pub fn [<$name:snake _b_poly_commitment>](
                 srs: $name,
                 chals: Vec<$CamlF>,
-                // TODO: num_chunks: usize,
+                num_chunks: usize,
             ) -> Result<CamlPolyComm<$CamlG>, ocaml::Error> {
                 let chals: Vec<$F> = chals.into_iter().map(Into::into).collect();
                 let coeffs = b_poly_coefficients(&chals);
                 let p = DensePolynomial::<$F>::from_coefficients_vec(coeffs);
 
-                Ok(srs.commit_non_hiding(&p, 1, None).into())
+                Ok(srs.commit_non_hiding(&p, num_chunks, None).into())
             }
 
             #[ocaml_gen::func]

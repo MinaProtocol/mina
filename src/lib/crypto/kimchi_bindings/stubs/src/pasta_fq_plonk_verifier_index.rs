@@ -93,10 +93,10 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas> {
                 uses_runtime_tables: false,
             },
         };
-
-        // TODO dummy_lookup_value ?
-        // TODO: num_chunks = 1
-        let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true, 1);
+        // TODO: num_chunks
+        let num_chunks = 1;
+        let (linearization, powers_of_alpha) =
+            expr_linearization(Some(&feature_flags), true, num_chunks);
 
         let zk_rows = 3;
         VerifierIndex::<Pallas> {
