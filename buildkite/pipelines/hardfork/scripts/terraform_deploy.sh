@@ -9,6 +9,7 @@ cd ./mina/ && git checkout itn3-testnet-deployment
 
 echo "--- Downloading network node keys"
 gsutil -m cp -r gs://hardfork/keys ./automation/terraform/testnets/testworld-2-0/
+gsutil cp gs://hardfork/gcloud-keyfile.json ./automation/terraform/testnets/testworld-2-0/
 
 echo "--- Connecting to Google Kubernetes Engine"
 gcloud container clusters get-credentials coda-infra-central1 --region us-central1 --project o1labs-192920
