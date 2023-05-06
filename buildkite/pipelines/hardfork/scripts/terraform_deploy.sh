@@ -15,9 +15,7 @@ echo "--- Initializing terraform network configuration"
 cd ./mina/ && git checkout itn3-testnet-deployment
 cd ./automation/terraform/testnets/testworld-2-0/ && terraform init
 
-
-
 echo "--- Deploying hardfork network"
-
+terraform apply --auto-approve
 
 echo "--- Waiting for mina nodes to come online"
