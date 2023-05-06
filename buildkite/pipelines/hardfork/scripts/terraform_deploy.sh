@@ -53,7 +53,9 @@ check_workloads_status() {
 
 # Loop until all workloads are running
 while ! check_workloads_status; do
-  echo "Not all workloads are running. Sleeping for 1 minute..."
+  echo "Not all workloads are running. The following workloads are not yet running:"
+  kubectl get workloads -n $NAMESPACE | awk '$3 != "Running" {print $1}'
+  echo "Sleeping for 1 minute..."
   sleep 60
 done
 
