@@ -92,9 +92,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind sender_pub_key = pub_key_of_node sender in
          let%bind _ =
            send_payments ~logger ~sender_pub_key ~receiver_pub_key
-             ~amount:Currency.Amount.one ~fee ~node:sender
-             (Test_config.transactions_needed_for_ledger_proofs ~num_proofs:1
-                config )
+             ~amount:Currency.Amount.one ~fee ~node:sender 12
+           (* (Test_config.transactions_needed_for_ledger_proofs ~num_proofs:1
+              config ) *)
          in
          wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1
@@ -162,9 +162,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind sender_pub_key = pub_key_of_node sender in
          let%bind _ =
            send_payments ~logger ~sender_pub_key ~receiver_pub_key
-             ~amount:Currency.Amount.one ~fee ~node:sender
-             (Test_config.transactions_needed_for_ledger_proofs ~num_proofs:2
-                config )
+             ~amount:Currency.Amount.one ~fee ~node:sender 12
+           (* (Test_config.transactions_needed_for_ledger_proofs ~num_proofs:2
+              config ) *)
          in
          wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:2
