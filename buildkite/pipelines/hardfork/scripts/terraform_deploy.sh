@@ -6,6 +6,9 @@ set -euo pipefail
 echo "--- Cloning Mina repository"
 git clone https://github.com/MinaProtocol/mina.git
 
+echo "--- Connecting to Google Kubernetes Engine"
+gcloud container clusters get-credentials coda-infra-central1 --region us-central1 --project o1labs-192920
+
 ##########################################################
 # Terraform network deployment
 ##########################################################
