@@ -36,25 +36,25 @@ echo "--- Waiting for mina nodes to come online"
 
 NAMESPACE="testworld-2-0"
 
-# Function to check the status of all workloads in the namespace
-check_workloads_status() {
+# Function to check the status of all pods in the namespace
+check_pods_status() {
   all_running=true
-  for workload in $(kubectl get workloads -n $NAMESPACE -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'); do
-    echo "Workload: $workload"
-    if ! kubectl rollout status workload $workload -n $NAMESPACE; then
+  for pod in $(kubectl get pods -n $NAMESPACE -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'); do
+    echo "Pod: $pod"
+    if ! kubectl wait --for=condition=Ready pod/$pod -n $NAMESPACE --timeout=120s > /dev/null 2>&1; then
       all_running=false
     fi
     echo ""
   done
 
-  # Return true if all workloads are running, false otherwise
+  # Return true if all pods are running, false otherwise
   $all_running
 }
 
-# Loop until all workloads are running
-while ! check_workloads_status; do
-  echo "Not all workloads are running. The following workloads are not yet running:"
-  kubectl get workloads -n $NAMESPACE | awk '$3 != "Running" {print $1}'
+# Loop until all pods are running
+while ! check_pods_status; do
+  echo "Not all pods are running. The following pods are not yet running:"
+  kubectl get pods -n $NAMESPACE | awk '$3 != "Running" {print $1}'
   echo "Sleeping for 1 minute..."
   sleep 60
 done
