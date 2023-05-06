@@ -41,6 +41,8 @@ steps:
   - command: "./buildkite/pipelines/hardfork/scripts/terraform_deploy.sh"
     key: "deployment"
     label: "Deploy Hardfork"
+    env:
+      REQUIRED: gcloud-keyfile.json
     # depends_on: "docker_build"
 
   # - command: "python3 ./buildkite/pipelines/hardfork/scripts/post_hardfork_qa.py"
