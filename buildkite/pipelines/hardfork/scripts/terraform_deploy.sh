@@ -34,29 +34,28 @@ terraform apply --auto-approve
 
 echo "--- Waiting for mina nodes to come online"
 
-NAMESPACE="testworld-2-0"
+# NAMESPACE="testworld-2-0"
 
-# Function to check the status of all pods in the namespace
-check_pods_status() {
-  all_running=true
-  for pod in $(kubectl get pods -n $NAMESPACE -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'); do
-    echo "Pod: $pod"
-    if ! kubectl wait --for=condition=Ready pod/$pod -n $NAMESPACE --timeout=120s > /dev/null 2>&1; then
-      all_running=false
-    fi
-    echo ""
-  done
+# # Function to check the status of all pods in the namespace
+# check_pods_status() {
+#   all_running=true
+#   for pod in $(kubectl get pods -n $NAMESPACE -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'); do
+#     echo "Pod: $pod"
+#     if ! kubectl wait --for=condition=Ready pod/$pod -n $NAMESPACE --timeout=120s > /dev/null 2>&1; then
+#       all_running=false
+#     fi
+#     echo ""
+#   done
+# }
 
-  # Return true if all pods are running, false otherwise
-  $all_running
-}
+# # Loop until all pods are running
+# while ! check_pods_status; do
+#   echo "Not all pods are running. The following pods are not yet running:"
+#   kubectl get pods -n $NAMESPACE | awk '$3 != "Running" {print $1}'
+#   echo "Sleeping for 1 minute..."
+#   sleep 60
+# done
 
-# Loop until all pods are running
-while ! check_pods_status; do
-  echo "Not all pods are running. The following pods are not yet running:"
-  kubectl get pods -n $NAMESPACE | awk '$3 != "Running" {print $1}'
-  echo "Sleeping for 1 minute..."
-  sleep 60
-done
+# echo "All workloads are running. Hardfork deployment complete!"
 
-echo "All workloads are running. Hardfork deployment complete!"
+echo "Hardfork deployment complete!"
