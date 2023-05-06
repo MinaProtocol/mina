@@ -1325,10 +1325,10 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
         in
         coda_ref := Some coda ;
         (*This pipe is consumed only by integration tests*)
-        (* don't_wait_for
-           (Pipe_lib.Strict_pipe.Reader.iter_without_pushback
-              (Mina_lib.validated_transitions coda)
-              ~f:ignore ) ; *)
+        don't_wait_for
+          (Pipe_lib.Strict_pipe.Reader.iter_without_pushback
+             (Mina_lib.validated_transitions coda)
+             ~f:ignore ) ;
         Coda_run.setup_local_server ?client_trustlist ~rest_server_port
           ~insecure_rest_server ~open_limited_graphql_port ?limited_graphql_port
           coda ;
