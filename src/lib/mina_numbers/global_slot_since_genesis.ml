@@ -24,8 +24,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        [@@@with_all_version_tags]
-
         type t = Wire_types.global_slot = Since_genesis of T.Stable.V1.t
         [@@deriving hash, sexp, compare, equal, yojson]
 

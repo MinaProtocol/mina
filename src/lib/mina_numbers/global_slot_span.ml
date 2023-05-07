@@ -19,18 +19,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      [@@@with_all_version_tags]
-
-      type t = Wire_types.span = Span of T.Stable.V1.t
+      type t = Wire_types.global_slot_span = Global_slot_span of T.Stable.V1.t
       [@@deriving hash, sexp, compare, equal, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  let to_uint32 (Span u32) : uint32 = u32
+  let to_uint32 (Global_slot_span u32) : uint32 = u32
 
-  let of_uint32 u32 : t = Span u32
+  let of_uint32 u32 : t = Global_slot_span u32
 
   module Checked = struct
     include T.Checked

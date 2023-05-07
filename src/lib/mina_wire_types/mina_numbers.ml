@@ -93,13 +93,13 @@ module Global_slot_span = struct
     module type S = V1S0
   end
 
-  type span = Span of Unsigned.UInt32.t
+  type global_slot_span = Global_slot_span of Unsigned.UInt32.t
 
-  module type Concrete = Types.S with type V1.t = span
+  module type Concrete = Types.S with type V1.t = global_slot_span
 
   module M = struct
     module V1 = struct
-      type t = span
+      type t = global_slot_span
     end
   end
 

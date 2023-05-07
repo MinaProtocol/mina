@@ -20,7 +20,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -33,7 +33,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -46,7 +46,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -59,7 +59,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -72,7 +72,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -85,7 +85,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -98,7 +98,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -111,7 +111,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -124,7 +124,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -137,7 +137,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -150,7 +150,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -163,7 +163,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -176,7 +176,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -189,7 +189,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -202,7 +202,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -215,7 +215,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -228,7 +228,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -241,7 +241,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -254,7 +254,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -267,7 +267,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -280,7 +280,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -293,7 +293,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -306,7 +306,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -319,7 +319,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -332,7 +332,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -345,7 +345,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -358,7 +358,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -371,7 +371,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -384,7 +384,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -397,7 +397,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -410,7 +410,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -423,7 +423,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -436,7 +436,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -449,7 +449,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -462,7 +462,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -475,7 +475,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -488,7 +488,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -501,7 +501,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -514,7 +514,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -527,7 +527,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -540,7 +540,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -553,7 +553,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -566,7 +566,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -579,7 +579,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -592,7 +592,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -605,7 +605,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -618,7 +618,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -631,7 +631,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -644,7 +644,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -657,7 +657,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -670,7 +670,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -683,7 +683,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -696,7 +696,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -709,7 +709,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -722,7 +722,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -735,7 +735,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -748,7 +748,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -761,7 +761,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -774,7 +774,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -787,7 +787,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -800,7 +800,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -813,7 +813,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -826,7 +826,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -839,7 +839,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -852,7 +852,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -865,7 +865,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -878,7 +878,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -891,7 +891,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -904,7 +904,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -917,7 +917,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -930,7 +930,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -943,7 +943,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -956,7 +956,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -969,7 +969,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -982,7 +982,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -995,7 +995,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1008,7 +1008,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1021,7 +1021,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1034,7 +1034,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1047,7 +1047,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1060,7 +1060,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1073,7 +1073,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1086,7 +1086,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1099,7 +1099,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1112,7 +1112,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1125,7 +1125,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1138,7 +1138,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1151,7 +1151,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1164,7 +1164,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1177,7 +1177,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1190,7 +1190,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1203,7 +1203,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1216,7 +1216,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1229,7 +1229,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1242,7 +1242,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1255,7 +1255,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1268,7 +1268,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1281,7 +1281,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1294,7 +1294,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1307,7 +1307,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1320,7 +1320,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1333,7 +1333,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1346,7 +1346,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1359,7 +1359,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1372,7 +1372,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1385,7 +1385,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1398,7 +1398,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1411,7 +1411,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1424,7 +1424,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1437,7 +1437,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1450,7 +1450,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1463,7 +1463,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1476,7 +1476,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1489,7 +1489,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1502,7 +1502,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1515,7 +1515,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1528,7 +1528,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1541,7 +1541,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1554,7 +1554,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1567,7 +1567,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1580,7 +1580,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1593,7 +1593,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1606,7 +1606,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1619,7 +1619,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1632,7 +1632,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1645,7 +1645,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1658,7 +1658,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1671,7 +1671,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1684,7 +1684,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1697,7 +1697,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1710,7 +1710,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1723,7 +1723,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1736,7 +1736,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1749,7 +1749,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1762,7 +1762,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1775,7 +1775,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1788,7 +1788,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1801,7 +1801,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1814,7 +1814,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1827,7 +1827,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1840,7 +1840,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1853,7 +1853,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1866,7 +1866,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1879,7 +1879,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1892,7 +1892,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1905,7 +1905,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1918,7 +1918,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1931,7 +1931,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1944,7 +1944,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1957,7 +1957,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1970,7 +1970,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1983,7 +1983,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -1996,7 +1996,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2009,7 +2009,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2022,7 +2022,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2035,7 +2035,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2048,7 +2048,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2061,7 +2061,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2074,7 +2074,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2087,7 +2087,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2100,7 +2100,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2113,7 +2113,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2126,7 +2126,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2139,7 +2139,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2152,7 +2152,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2165,7 +2165,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2178,7 +2178,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2191,7 +2191,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2204,7 +2204,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2217,7 +2217,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2230,7 +2230,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2243,7 +2243,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2256,7 +2256,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2269,7 +2269,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2282,7 +2282,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2295,7 +2295,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2308,7 +2308,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2321,7 +2321,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2334,7 +2334,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2347,7 +2347,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2360,7 +2360,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2373,7 +2373,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2386,7 +2386,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2399,7 +2399,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2412,7 +2412,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2425,7 +2425,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2438,7 +2438,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2451,7 +2451,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2464,7 +2464,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2477,7 +2477,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2490,7 +2490,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2503,7 +2503,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2516,7 +2516,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2529,7 +2529,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2542,7 +2542,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2555,7 +2555,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2568,7 +2568,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2581,7 +2581,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2594,7 +2594,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
@@ -2607,7 +2607,7 @@
           "initial_minimum_balance": "1000000",
           "cliff_time": ["Since_genesis","12000"],
           "cliff_amount": "500000",
-          "vesting_period": ["Span","6"],
+          "vesting_period": ["Global_slot_span","6"],
           "vesting_increment": "150"
         }
       },
