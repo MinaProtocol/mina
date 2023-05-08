@@ -19,7 +19,6 @@
 (package (name cached))
 (package (name cache_lib))
 (package (name child_processes))
-(package (name client_sdk))
 (package (name cli_lib))
 (package (name codable))
 (package (name coda_genesis_ledger))
