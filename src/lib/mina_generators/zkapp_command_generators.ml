@@ -456,7 +456,6 @@ let gen_protocol_state_precondition
   { Zkapp_precondition.Protocol_state.Poly.snarked_ledger_hash
   ; blockchain_length
   ; min_window_density
-  ; last_vrf_output = ()
   ; total_currency
   ; global_slot_since_genesis
   ; staking_epoch_data
