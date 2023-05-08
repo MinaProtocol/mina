@@ -965,10 +965,10 @@ let%test_unit "chained group_add" =
     in
 
     (* Test chained group add *)
-    let test_chained_group_add ?cs
+    let test_chained_group_add ?cs ?(chain_left = true)
         (left_input : Bignum_bigint.t * Bignum_bigint.t)
-        (right_input1 : Bignum_bigint.t * Bignum_bigint.t)
-        (right_input2 : Bignum_bigint.t * Bignum_bigint.t)
+        (right_input : Bignum_bigint.t * Bignum_bigint.t)
+        (input2 : Bignum_bigint.t * Bignum_bigint.t)
         (expected_result : Bignum_bigint.t * Bignum_bigint.t)
         (foreign_field_modulus : Bignum_bigint.t) =
       (* Generate and verify proof *)
@@ -993,8 +993,8 @@ let%test_unit "chained group_add" =
               in
               Affine.of_coordinates (x, y)
             in
-            let right_input1 =
-              let x, y = right_input1 in
+            let right_input =
+              let x, y = right_input in
               let x, y =
                 ( Foreign_field.Element.Standard.of_bignum_bigint
                     (module Runner.Impl)
@@ -1005,8 +1005,8 @@ let%test_unit "chained group_add" =
               in
               Affine.of_coordinates (x, y)
             in
-            let right_input2 =
-              let x, y = right_input2 in
+            let input2 =
+              let x, y = input2 in
               let x, y =
                 ( Foreign_field.Element.Standard.of_bignum_bigint
                     (module Runner.Impl)
@@ -1040,15 +1040,21 @@ let%test_unit "chained group_add" =
             let result1 =
               group_add
                 (module Runner.Impl)
-                unused_external_checks left_input right_input1
+                unused_external_checks left_input right_input
                 foreign_field_modulus
             in
 
             let result2 =
-              group_add
-                (module Runner.Impl)
-                unused_external_checks result1 right_input2
-                foreign_field_modulus
+              if chain_left then
+                (* Chain result to left input *)
+                group_add
+                  (module Runner.Impl)
+                  unused_external_checks result1 input2 foreign_field_modulus
+              else
+                (* Chain result to right input *)
+                group_add
+                  (module Runner.Impl)
+                  unused_external_checks input2 result1 foreign_field_modulus
             in
 
             (* Check output matches expected result *)
@@ -1102,25 +1108,73 @@ let%test_unit "chained group_add" =
     assert (secp256k1_is_on_curve pt3 secp256k1_modulus) ;
     assert (secp256k1_is_on_curve expected secp256k1_modulus) ;
 
-    (* Correct wiring for result of r1 = pt1 + pt2 and left operand of r2 = r1 + pt3
+    (* Correct wiring for left chaining
+     *   Result r1 = pt1 + pt2 and left operand of r2 = r1 + pt3
      *
-     *        ,-------------------------------------------,
-     * limb0: `-> (2, 3) -> (4, 3) -> (20, 3) -> (16, 3) /
-     *             r1_0      r1_0       Lx0        Lx0
+     *     ,--------------------------------------------,
+     * x0: `-> (2, 3) -> (4, 3) -> (20, 3) -> (16, 3) ->`
+     *          r1x0      r1x0       Lx0        Lx0
      *
-     *        ,-------------------------------------------,
-     * limb1: `-> (2, 4) -> (16, 4) -> (20, 4) -> (4, 4) /
-     *             r1_1      r1_1       Lx1        Lx1
+     *     ,--------------------------------------------,
+     * x1: `-> (2, 4) -> (16, 4) -> (20, 4) -> (4, 4) ->`
+     *          r1x1       Lx1        Lx1       r1x1
      *
-     *        ,-------------------------------------------,
-     * limb2: `-> (2, 5) -> (20, 5) -> (4, 5) -> (16, 5) /
-     *             r1_2      r1_2       Lx2        Lx2
+     *     ,--------------------------------------------,
+     * x2: `-> (2, 5) -> (20, 5) -> (4, 5) -> (16, 5) ->`
+     *          r1x2       Lx2       r1x2       Lx2
+     *
+     *     ,------------------------,
+     * y0: `-> (11, 3) -> (23, 3) ->`
+     *          r1y0        Ly0
+     *
+     *     ,------------------------,
+     * y1: `-> (11, 4) -> (23, 4) ->`
+     *          r1y1        Ly1
+     *
+     *     ,------------------------,
+     * y2: `-> (11, 5) -> (23, 5) ->`
+     *          r1y2        Ly2
      *)
     let _cs =
       test_chained_group_add pt1 (* left_input *)
-        pt2 (* right_input1 *)
-        pt3 (* right_input2 *)
+        pt2 (* right_input *)
+        pt3 (* input2 *)
         expected (* expected result *)
         secp256k1_modulus
     in
+
+    (* Correct wiring for right chaining
+     *   Result r1 = pt1 + pt2 and right operand of r2 = pt3 + r1
+     *
+     *     ,-------------------------------------------,
+     * x0: `-> (2, 3) -> (17, 0) -> (4, 3) -> (20, 0) /
+     *          r1x0       Rx0       r1x0       Rx0
+     *
+     *     ,-------------------------------------------,
+     * x1: `-> (2, 4) -> (17, 1) -> (20, 1) -> (4, 4) /
+     *          r1x1       Rx1        Rx1       r1x1
+     *
+     *     ,-------------------------------------------,
+     * x2: `-> (2, 5) -> (4, 5) -> (17, 2) -> (20, 2) /
+     *          r1x2      r1x2       Rx2        Rx2
+     *
+     *     ,------------------------,
+     * y0: `-> (11, 3) -> (24, 0) ->`
+     *          r1y0        Ry0
+     *
+     *     ,------------------------,
+     * y1: `-> (11, 4) -> (24, 1) ->`
+     *          r1y1        Ry1
+     *
+     *     ,------------------------,
+     * y2: `-> (11, 5) -> (24, 2) ->`
+     *          r1y2        Ry2
+     *)
+    let _cs =
+         test_chained_group_add ~chain_left:false pt1 (* left_input *)
+           pt2 (* right_input *)
+           pt3 (* input2 *)
+           expected (* expected result *)
+           secp256k1_modulus
+       in
     () )
