@@ -78,7 +78,8 @@ module Vector_15 : VECTOR with type 'a t = ('a, Nat.N15.n) vec
 (** Vector of size 16 *)
 module Vector_16 : VECTOR with type 'a t = ('a, Nat.N16.n) vec
 
-(** Vector of size 8 *)
+module Vector_9 : VECTOR with type 'a t = ('a, Nat.N9.n) vec
+
 module Vector_8 : VECTOR with type 'a t = ('a, Nat.N8.n) vec
 
 module Vector_7 : VECTOR with type 'a t = ('a, Nat.N7.n) vec
@@ -89,9 +90,37 @@ module Vector_5 : VECTOR with type 'a t = ('a, Nat.N5.n) vec
 
 module Vector_4 : VECTOR with type 'a t = ('a, Nat.N4.n) vec
 
+module Vector_3 : VECTOR with type 'a t = ('a, Nat.N3.n) vec
+
 module Vector_2 : VECTOR with type 'a t = ('a, Nat.N2.n) vec
 
+module Vector_1 : VECTOR with type 'a t = ('a, Nat.N1.n) vec
+
 module With_length (N : Nat_intf) : S with type 'a t = ('a, N.n) vec
+
+(** {3 Type aliases} *)
+
+type 'a vec1 = 'a Vector_1.t
+
+type 'a vec2 = 'a Vector_2.t
+
+type 'a vec3 = 'a Vector_3.t
+
+type 'a vec4 = 'a Vector_4.t
+
+type 'a vec5 = 'a Vector_5.t
+
+type 'a vec6 = 'a Vector_6.t
+
+type 'a vec7 = 'a Vector_7.t
+
+type 'a vec8 = 'a Vector_8.t
+
+type 'a vec9 = 'a Vector_9.t
+
+type 'a vec15 = 'a Vector_15.t
+
+type 'a vec16 = 'a Vector_16.t
 
 (** {1 Functions} *)
 
