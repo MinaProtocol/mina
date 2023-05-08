@@ -101,7 +101,11 @@ end
 module External_checks : sig
   module Cvar = Snarky_backendless.Cvar
 
-  type 'field t
+  type 'field t =
+    { mutable multi_ranges : 'field Cvar.t standard_limbs list
+    ; mutable compact_multi_ranges : 'field Cvar.t compact_limbs list
+    ; mutable bounds : 'field Cvar.t standard_limbs list
+    }
 
   val create : (module Snark_intf.Run with type field = 'field) -> 'field t
 

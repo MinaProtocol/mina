@@ -1454,9 +1454,10 @@ let%test_unit "foreign_field arithmetics gadgets" =
                     (module Runner.Impl)
                     expected product ) ) ;
 
-            (* 2) Add result bound addition gate. This adds multi-range-checks for the
-                  computed bound to the external_checks.multi-ranges, which are then
-                  constrainted in (6) *)
+            (* 2) Add result bound addition gates. This adds multi-range-checks for the
+             *    computed bound to the external_checks.multi-ranges, which are then
+             *    constrainted in (6)
+             *)
             assert (Mina_stdlib.List.Length.equal external_checks.bounds 1) ;
             List.iter external_checks.bounds ~f:(fun product ->
                 let _remainder_bound =
