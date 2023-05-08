@@ -17,10 +17,11 @@ import (
 	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
-	discovery "github.com/libp2p/go-libp2p-discovery"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
+	discovery "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	"github.com/multiformats/go-multiaddr"
+	"golang.org/x/crypto/blake2b"
 )
 
 type BeginAdvertisingReqT = ipc.Libp2pHelperInterface_BeginAdvertising_Request
@@ -154,6 +155,18 @@ func configurePubsub(app *app, validationQueueSize int, directPeers []peer.AddrI
 			pubsub.WithMaxMessageSize(1024 * 1024 * 32),
 			pubsub.WithDirectPeers(directPeers),
 			pubsub.WithValidateQueueSize(validationQueueSize),
+			pubsub.WithMessageIdFn(func(pmsg *pb.Message) string {
+				hmacKey := []byte(pmsg.GetTopic())
+				if len(hmacKey) > 64 {
+					hmacKey2 := blake2b.Sum256(hmacKey)
+					hmacKey = hmacKey2[:]
+				}
+				hash, err := blake2b.New256(hmacKey)
+				panicOnErr(err)
+				_, err = hash.Write(pmsg.GetData())
+				panicOnErr(err)
+				return string(hash.Sum(nil))
+			}),
 		}, opts...)...,
 	)
 	app.P2p.Pubsub = ps
@@ -363,6 +376,9 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
+	if gc.CleanAddedPeers() {
+		app.AddedPeers = nil
+	}
 
 	stateDir, err := m.Statedir()
 	if err != nil {
@@ -419,8 +435,8 @@ func (msg ConfigureReq) handle(app *app, seqno uint64) *capnp.Message {
 		gatingConfig,
 		int(m.MinConnections()),
 		int(m.MaxConnections()),
-		m.MinaPeerExchange(),
-		time.Millisecond,
+		m.PeerProtectionRatio(),
+		time.Second*15,
 		knownPrivateIpNets,
 	)
 	if err != nil {
@@ -582,7 +598,9 @@ func (m SetGatingConfigReq) handle(app *app, seqno uint64) *capnp.Message {
 	if err != nil {
 		return mkRpcRespError(seqno, badRPC(err))
 	}
-
+	if gc.CleanAddedPeers() {
+		app.AddedPeers = nil
+	}
 	app.P2p.SetGatingState(gatingConfig)
 
 	return mkRpcRespSuccess(seqno, func(m *ipc.Libp2pHelperInterface_RpcResponseSuccess) {

@@ -14,8 +14,12 @@
    tuple_lib
    snarky.intf
  )
+ (enabled_if
+  (or
+   (= %{profile} nonconsensus_mainnet)
+   (= %{profile} nonconsensus_medium_curves)))
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_version ppx_optcomp ppx_let ppx_compare ppx_inline_test))
+  (pps ppx_version ppx_optcomp ppx_let ppx_compare ppx_inline_test ppx_snarky))
  (instrumentation (backend bisect_ppx))
  (synopsis "Snark parameters"))

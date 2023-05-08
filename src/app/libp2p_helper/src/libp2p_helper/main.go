@@ -107,8 +107,6 @@ func main() {
 	// The levels below set the **minimum** log level for each subsystem.
 	// Messages emitted at lower levels than the given level will not be
 	// emitted.
-	setLogLevel("mplex", "debug")
-	setLogLevel("addrutil", "info")     // Logs every resolve call at debug
 	setLogLevel("net/identify", "info") // Logs every message sent/received at debug
 	setLogLevel("ping", "info")         // Logs every ping timeout at debug
 	setLogLevel("basichost", "info")    // Spammy at debug
@@ -126,12 +124,10 @@ func main() {
 	setLogLevel("peerstore", "debug")
 	setLogLevel("diversityFilter", "debug")
 	setLogLevel("table", "debug")
-	setLogLevel("stream-upgrader", "debug")
 	setLogLevel("helper top-level JSON handling", "debug")
 	setLogLevel("dht.pb", "debug")
 	setLogLevel("tcp-tpt", "debug")
 	setLogLevel("autonat", "debug")
-	setLogLevel("discovery", "debug")
 	setLogLevel("routing/record", "debug")
 	setLogLevel("pubsub", "info")
 	setLogLevel("badger", "debug")

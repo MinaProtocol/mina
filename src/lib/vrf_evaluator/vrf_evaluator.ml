@@ -4,6 +4,14 @@ open Signature_lib
 module Epoch = Mina_numbers.Length
 module Global_slot = Mina_numbers.Global_slot
 
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
 (*Slot number within an epoch*)
 module Slot = Mina_numbers.Global_slot
 
@@ -71,6 +79,17 @@ module Worker_state = struct
     }
   [@@deriving bin_io_unversioned]
 
+  let context_of_config
+      ({ constraint_constants; consensus_constants; logger; conf_dir = _ } :
+        init_arg ) : (module CONTEXT) =
+    ( module struct
+      let constraint_constants = constraint_constants
+
+      let consensus_constants = consensus_constants
+
+      let logger = logger
+    end )
+
   type t =
     { config : init_arg
     ; mutable last_checked_slot_and_epoch :
@@ -122,6 +141,8 @@ module Worker_state = struct
         ; epoch_data = interrupt_ivar, epoch_data
         ; _
         } as t ) : (unit, unit) Interruptible.t =
+    let (module Context) = context_of_config config in
+    let open Context in
     match epoch_data with
     | None ->
         Interruptible.return ()
@@ -131,22 +152,19 @@ module Worker_state = struct
           Interruptible.lift Deferred.unit (Ivar.read interrupt_ivar)
         in
         let module Slot = Mina_numbers.Global_slot in
-        let logger = config.logger in
         let epoch = epoch_data.epoch in
         [%log info] "Starting VRF evaluation for epoch: $epoch"
           ~metadata:[ ("epoch", Epoch.to_yojson epoch) ] ;
         let keypairs = block_producer_keys in
-        let logger = config.logger in
         let start_global_slot = epoch_data.global_slot in
         let start_global_slot_since_genesis =
           epoch_data.global_slot_since_genesis
         in
-        let constants = config.consensus_constants in
         let delegatee_table = epoch_data.delegatee_table in
         (*slot in the epoch*)
         let start_consensus_time =
           Consensus.Data.Consensus_time.(
-            of_global_slot ~constants start_global_slot)
+            of_global_slot ~constants:consensus_constants start_global_slot)
         in
         let total_stake = epoch_data.epoch_ledger.total_currency in
         let evaluate_vrf ~consensus_time =
@@ -184,13 +202,12 @@ module Worker_state = struct
                     ] ;
                 match%bind
                   Consensus.Data.Vrf.check
-                    ~constraint_constants:config.constraint_constants
+                    ~context:(module Context)
                     ~global_slot ~seed:epoch_data.epoch_seed
                     ~get_delegators:
                       (Public_key.Compressed.Table.find delegatee_table)
                     ~producer_private_key:keypair.private_key
                     ~producer_public_key:public_key_compressed ~total_stake
-                    ~logger
                 with
                 | None ->
                     go keypairs
@@ -362,8 +379,7 @@ module Worker = struct
         Logger.Consumer_registry.register ~id:"default"
           ~processor:(Logger.Processor.raw ())
           ~transport:
-            (Logger.Transport.File_system.dumb_logrotate
-               ~directory:init_arg.conf_dir
+            (Logger_file_system.dumb_logrotate ~directory:init_arg.conf_dir
                ~log_filename:"mina-vrf-evaluator.log" ~max_size ~num_rotate ) ;
         [%log info] "Vrf_evaluator started" ;
         return (Worker_state.create init_arg)
