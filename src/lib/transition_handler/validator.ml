@@ -4,7 +4,6 @@ open Pipe_lib.Strict_pipe
 open Mina_base
 open Mina_state
 open Cache_lib
-open Mina_block
 open Network_peer
 
 module type CONTEXT = sig
@@ -87,6 +86,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
        Writer.t ) ~unprocessed_transition_cache =
   let open Context in
   let module Lru = Core_extended_cache.Lru in
+  let outdated_root_cache = Lru.create ~destruct:None 1000 in
   O1trace.background_thread "validate_blocks_against_frontier" (fun () ->
       Reader.iter transition_reader
         ~f:(fun (`Block transition_env, `Valid_cb vc) ->
@@ -115,8 +115,9 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
               in
               let transition_time =
                 Mina_block.header transition
-                |> Header.protocol_state |> Protocol_state.blockchain_state
-                |> Blockchain_state.timestamp |> Block_time.to_time_exn
+                |> Mina_block.Header.protocol_state
+                |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
+                |> Block_time.to_time_exn
               in
               Perf_histograms.add_span
                 ~name:"accepted_transition_remote_latency"
@@ -140,18 +141,44 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
               [%log internal] "Failure"
                 ~metadata:[ ("reason", `String "Disconnected") ] ;
               Mina_metrics.(Counter.inc_one Rejected_blocks.worse_than_root) ;
+              let protocol_state =
+                Mina_block.Header.protocol_state (Mina_block.header transition)
+              in
               [%log error]
                 ~metadata:
                   [ ("state_hash", State_hash.to_yojson transition_hash)
                   ; ("reason", `String "not selected over current root")
                   ; ( "protocol_state"
-                    , Header.protocol_state (Mina_block.header transition)
-                      |> Protocol_state.value_to_yojson )
+                    , Protocol_state.value_to_yojson protocol_state )
                   ]
                 "Validation error: external transition with state hash \
                  $state_hash was rejected for reason $reason" ;
+              let is_in_root_history =
+                let open Transition_frontier.Extensions in
+                get_extension
+                  (Transition_frontier.extensions frontier)
+                  Root_history
+                |> Root_history.mem
+              in
+              let parent_hash =
+                Protocol_state.previous_state_hash protocol_state
+              in
+              let action =
+                if
+                  is_in_root_history transition_hash
+                  || Option.is_some
+                       (Lru.find outdated_root_cache transition_hash)
+                then Trust_system.Actions.Sent_old_gossip
+                else if
+                  is_in_root_history parent_hash
+                  || Option.is_some (Lru.find outdated_root_cache parent_hash)
+                then (
+                  Lru.add outdated_root_cache ~key:transition_hash ~data:() ;
+                  Sent_useless_gossip )
+                else Disconnected_chain
+              in
               Trust_system.record_envelope_sender trust_system logger sender
-                ( Trust_system.Actions.Disconnected_chain
+                ( action
                 , Some
                     ( "received transition that was not connected to our chain \
                        from $sender"
