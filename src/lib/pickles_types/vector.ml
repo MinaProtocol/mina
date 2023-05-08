@@ -490,6 +490,27 @@ module With_version (N : Nat.Intf) = struct
   end
 end
 
+module Vector_1 = struct
+  module T = With_length (Nat.N1)
+
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type 'a t = ('a, Nat.N1.n) vec
+
+      include Make.Binable (Nat.N1)
+
+      include (T : module type of T with type 'a t := 'a t)
+    end
+  end]
+
+  include T
+
+  let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
+end
+
 module Vector_2 = struct
   module T = With_length (Nat.N2)
 
@@ -501,6 +522,27 @@ module Vector_2 = struct
       type 'a t = ('a, Nat.N2.n) vec
 
       include Make.Binable (Nat.N2)
+
+      include (T : module type of T with type 'a t := 'a t)
+    end
+  end]
+
+  include T
+
+  let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
+end
+
+module Vector_3 = struct
+  module T = With_length (Nat.N3)
+
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type 'a t = ('a, Nat.N3.n) vec
+
+      include Make.Binable (Nat.N3)
 
       include (T : module type of T with type 'a t := 'a t)
     end
@@ -616,6 +658,27 @@ module Vector_8 = struct
   let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
 end
 
+module Vector_9 = struct
+  module T = With_length (Nat.N9)
+
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type 'a t = ('a, Nat.N9.n) vec
+
+      include Make.Binable (Nat.N9)
+
+      include (T : module type of T with type 'a t := 'a t)
+    end
+  end]
+
+  include T
+
+  let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
+end
+
 module Vector_15 = struct
   module T = With_length (Nat.N15)
 
@@ -657,3 +720,27 @@ module Vector_16 = struct
 
   let _type_equal : type a. (a t, a Stable.Latest.t) Type_equal.t = Type_equal.T
 end
+
+(* Aliases here *)
+
+type 'a vec1 = 'a Vector_1.t
+
+type 'a vec2 = 'a Vector_2.t
+
+type 'a vec3 = 'a Vector_3.t
+
+type 'a vec4 = 'a Vector_4.t
+
+type 'a vec5 = 'a Vector_5.t
+
+type 'a vec6 = 'a Vector_6.t
+
+type 'a vec7 = 'a Vector_7.t
+
+type 'a vec8 = 'a Vector_8.t
+
+type 'a vec9 = 'a Vector_9.t
+
+type 'a vec15 = 'a Vector_15.t
+
+type 'a vec16 = 'a Vector_16.t
