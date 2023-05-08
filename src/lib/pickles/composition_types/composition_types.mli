@@ -886,13 +886,13 @@ module Wrap : sig
       [@@warning "-34"]
 
       type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'fp_opt, 'bool) flat_repr :=
-        ( ('a, Nat.N9.n) Vector.t
-        * ( 'b Vector.Vector_2.t
-          * ( ('c, Nat.N3.n) Vector.t
-            * ( ('d, Nat.N3.n) Vector.t
+        ( 'a Vector.vec9
+        * ( 'b Vector.vec2
+          * ( 'c Vector.vec3
+            * ( 'd Vector.vec3
               * ( 'e
-                * ( ('f, Nat.N1.n) Vector.t
-                  * ('bool vec8 * ('g * ('fp_opt vec8 * unit))) ) ) ) ) ) )
+                * ('f Vector.vec1 * ('bool vec8 * ('g * ('fp_opt vec8 * unit))))
+                ) ) ) ) )
         Hlist.HlistId.t
 
       (** A layout of the raw data in a statement, which is needed for
@@ -1169,14 +1169,14 @@ module Step : sig
              , 'fp_opt
              , 'num_bulletproof_challenges )
              flat_repr :=
-          ( ('field, Nat.N9.n) Vector.t
-          * ( ('digest, Nat.N1.n) Vector.t
-            * ( ('challenge, Nat.N2.n) Vector.t
-              * ( ('challenge Scalar_challenge.t, Nat.N3.n) Vector.t
+          ( 'field Vector.vec9
+          * ( 'digest Vector.vec1
+            * ( 'challenge Vector.vec2
+              * ( 'challenge Scalar_challenge.t Vector.vec3
                 * ( ( 'bulletproof_challenge
                     , 'num_bulletproof_challenges )
                     Vector.t
-                  * ( ('bool, Nat.N1.n) Vector.t
+                  * ( 'bool Vector.vec1
                     * ('bool vec8 * ('optional * ('fp_opt vec8 * unit))) ) ) )
               ) ) )
           Hlist.HlistId.t
@@ -1234,22 +1234,22 @@ module Step : sig
                       -> ('h * unit) Hlist.HlistId.t )
                 -> 'j Hlist0.Id.t )
           -> to_opt:('fp_opt -> 'fp_opt2)
-          -> ( ('c, Nat.N9.n) Vector.t
-             * ( ('f, Nat.N1.n) Vector.t
-               * ( ('a, Nat.N2.n) Vector.t
-                 * ( ('b, Nat.N3.n) Vector.t
+          -> ( 'c Vector.vec9
+             * ( 'f Vector.vec1
+               * ( 'a Vector.vec2
+                 * ( 'b Vector.vec3
                    * ( 'e
-                     * ( ('g, Nat.N1.n) Vector.t
+                     * ( 'g Vector.vec1
                        * ('g vec8 * ('j * ('fp_opt2 vec8 * unit))) ) ) ) ) ) )
              Hlist.HlistId.t
 
         val of_data :
-             ( ('a, Nat.N9.n) Vector.t
-             * ( ('b, Nat.N1.n) Vector.t
-               * ( ('c, Nat.N2.n) Vector.t
-                 * ( ('d, Nat.N3.n) Vector.t
+             ( 'a Vector.vec9
+             * ( 'b Vector.vec1
+               * ( 'c Vector.vec2
+                 * ( 'd Vector.vec3
                    * ( 'e
-                     * ( ('f, Nat.N1.n) Vector.t
+                     * ( 'f Vector.vec1
                        * ('f vec8 * ('g * ('fp option vec8 * unit))) ) ) ) ) )
              )
              Hlist.HlistId.t

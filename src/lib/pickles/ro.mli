@@ -9,9 +9,6 @@ val tock : unit -> Backend.Tock.Field.t
 val tick : unit -> Backend.Tick.Field.t
 
 val scalar_chal :
-     unit
-  -> (Core_kernel.Int64.t, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
-     Import.Scalar_challenge.t
+  unit -> int64 Pickles_types.Vector.vec2 Import.Scalar_challenge.t
 
-val chal :
-  unit -> (Core_kernel.Int64.t, Pickles_types.Nat.N2.n) Pickles_types.Vector.t
+val chal : unit -> int64 Pickles_types.Vector.vec2
