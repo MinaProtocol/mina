@@ -27,13 +27,6 @@ let%test_module "merkle_tree" =
 
     let%test "key_nonexist" = Option.is_none (get tree n)
 
-    let%test_unit "modify" =
-      let key = 5 in
-      assert (key = get_exn tree key) ;
-      let new_value = 123 in
-      let tree = update tree key new_value in
-      assert (new_value = get_exn tree key)
-
     let%test_unit "merkle_root" =
       for key = 0 to n - 1 do
         let path = get_path tree key in

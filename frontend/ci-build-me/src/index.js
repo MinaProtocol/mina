@@ -64,9 +64,8 @@ const getRequest = async (url) => {
 
 const handler = async (event, req) => {
   const buildkiteTrigger = {};
-  if (event == "issue_comment") {
-    // PR Gating Lifting section
-    if (
+  // PR Gating Lifting section
+  if (
       // we are creating the comment
       req.body.action == "created" &&
       // and this is actually a pull request
@@ -77,10 +76,11 @@ const handler = async (event, req) => {
     ) {
       // TODO #7711: Actually look at @MinaProtocol/stakeholder-reviewers team instead of hardcoding the users here
       if (
-        req.body.sender.login == "es92" ||
         req.body.sender.login == "aneesharaines" ||
         req.body.sender.login == "bkase" ||
-        req.body.sender.login == "imeckler"
+        req.body.sender.login == "deepthiskumar" ||
+        req.body.sender.login == "mrmr1993" ||
+        req.body.sender.login == "nholland94"
       ) {
         const prData = await getRequest(req.body.issue.pull_request.url);
         const buildkite = await runBuild(
@@ -91,11 +91,11 @@ const handler = async (event, req) => {
           "mina-pr-gating",
           { PR_GATE: "lifted" }
         );
-        return [buildkite, null];
+        return buildkite;
       } else {
         return [
-          "comment author is not (publically) a member of the core team",
-          "comment author is not (publically) a member of the core team",
+          "comment author is not authorized to approve for mainnet",
+          "comment author is not authorized to approve for mainnet",
         ];
       }
     }
@@ -113,7 +113,10 @@ const handler = async (event, req) => {
       const orgData = await getRequest(req.body.sender.organizations_url);
       // and the comment author is part of the core team
       if (
-        orgData.data.filter((org) => org.login == "MinaProtocol").length > 0
+          orgData.data.filter((org) => org.login == "MinaProtocol").length > 0 ||
+          req.body.sender.login == "ylecornec" ||
+          req.body.sender.login == "balsoft" ||
+          req.body.sender.login == "bryanhonof"
       ) {
         const prData = await getRequest(req.body.issue.pull_request.url);
         const buildkite = await runBuild(
@@ -124,10 +127,7 @@ const handler = async (event, req) => {
           "mina",
           {}
         );
-        const circle = await runCircleBuild({
-          pull_request: prData.data,
-        });
-        return [buildkite, circle];
+        return buildkite;
       } else {
         // NB: Users that are 'privately' a member of the org will not be able to trigger CI jobs
         return [
@@ -136,9 +136,8 @@ const handler = async (event, req) => {
         ];
       }
     }
-  }
-  return [null, null];
-};
+    return null;
+  };
 
 /**
  * HTTP Cloud Function for GitHub Webhook events.
@@ -166,24 +165,16 @@ exports.githubWebhookHandler = async (req, res) => {
     github.validateWebhook(req);
 
     const githubEvent = req.headers["x-github-event"];
-    const [buildkite, circle] = await handler(githubEvent, req);
+    const buildkite = await handler(githubEvent, req);
     if (buildkite && buildkite.web_url) {
       console.info(`Triggered buildkite build at ${buildkite.web_url}`);
     } else {
       console.error(`Failed to trigger buildkite build for some reason:`);
       console.error(buildkite);
     }
-
-    if (circle && circle.number) {
-      console.info(`Triggered circle build #${circle.number}`);
-    } else {
-      console.error(`Failed to trigger circle build for some reason:`);
-      console.error(circle);
-    }
-
     res.status(200);
     console.info(`HTTP 200: ${githubEvent} event`);
-    res.send({ buildkite, circle } || {});
+    res.send({ buildkite } || {});
   } catch (e) {
     if (e instanceof HTTPError) {
       res.status(e.statusCode).send(e.message);

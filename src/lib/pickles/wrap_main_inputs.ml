@@ -1,21 +1,19 @@
 open Core_kernel
-open Common
 open Backend
 module Me = Tock
 module Other = Tick
 module Impl = Impls.Wrap
-open Pickles_types
-open Import
 
-let high_entropy_bits = 128
+let _high_entropy_bits = 128
 
 let sponge_params_constant =
-  Sponge.Params.(map pasta_q ~f:Impl.Field.Constant.of_string)
+  Sponge.Params.(map pasta_q_kimchi ~f:Impl.Field.Constant.of_string)
 
 let field_random_oracle ?(length = Me.Field.size_in_bits - 1) s =
-  Me.Field.of_bits (bits_random_oracle ~length s)
+  Me.Field.of_bits (Ro.bits_random_oracle ~length s)
 
-let unrelated_g =
+let _unrelated_g =
+  let open Common in
   let group_map =
     unstage
       (group_map
@@ -25,6 +23,12 @@ let unrelated_g =
   fun (x, y) -> group_map (field_random_oracle (str x ^ str y))
 
 open Impl
+
+(* Debug helper to convert wrap circuit field element to a hex string *)
+let read_wrap_circuit_field_element_as_hex fe =
+  let prover_fe = As_prover.read Field.typ fe in
+  Kimchi_backend.Pasta.Pallas_based_plonk.(
+    Bigint.to_hex (Field.to_bigint prover_fe))
 
 module Other_field = struct
   type t = Impls.Step.Field.Constant.t [@@deriving sexp]
@@ -60,34 +64,44 @@ module Sponge = struct
         let params = Tock_field_sponge.params
       end)
 
-  module S = Sponge.Make_sponge (Permutation)
+  module S = Sponge.Make_debug_sponge (struct
+    include Permutation
+    module Circuit = Impls.Wrap
+
+    (* Optional sponge name used in debug mode *)
+    let sponge_name = "wrap"
+
+    (* To enable debug mode, set environment variable [sponge_name] to "t", "1" or "true". *)
+    let debug_helper_fn = read_wrap_circuit_field_element_as_hex
+  end)
+
   include S
 
   let squeeze_field = squeeze
 
-  let squeeze =
-    Util.squeeze_with_packed (module Impl) ~squeeze ~high_entropy_bits
+  let squeeze = squeeze
 end
 
 let%test_unit "sponge" =
   let module T = Make_sponge.Test (Impl) (Tock_field_sponge.Field) (Sponge.S) in
   T.test Tock_field_sponge.params
 
-module Input_domain = struct
-  let lagrange_commitments domain : Me.Inner_curve.Affine.t array =
-    let domain_size = Domain.size domain in
-    time "lagrange" (fun () ->
-        Array.init domain_size ~f:(fun i ->
-            (Marlin_plonk_bindings.Pasta_fp_urs.lagrange_commitment
-               (Tick.Keypair.load_urs ()) domain_size i )
-              .unshifted.(0)
-            |> Or_infinity.finite_exn ) )
+(* module Input_domain = struct
+     let _lagrange_commitments domain : Backend.Tock.Inner_curve.Affine.t array =
+       let domain_size = Import.Domain.size domain in
+       Common.time "lagrange" (fun () ->
+           Array.init domain_size ~f:(fun i ->
+               (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment
+                  (Backend.Tick.Keypair.load_urs ())
+                  domain_size i )
+                 .unshifted.(0)
+               |> Common.finite_exn ) )
 
-  let domain = Domain.Pow_2_roots_of_unity 7
-end
+     let _domain = Import.Domain.Pow_2_roots_of_unity 7
+   end *)
 
 module Inner_curve = struct
-  module C = Pasta.Vesta
+  module C = Kimchi_pasta.Pasta.Vesta
 
   module Inputs = struct
     module Impl = Impl
@@ -164,7 +178,9 @@ module Inner_curve = struct
 
   module Scaling_precomputation = T.Scaling_precomputation
 
-  let ( + ) = T.add_exn
+  let ( + ) t1 t2 = Plonk_curve_ops.add_fast (module Impl) t1 t2
+
+  let double t = t + t
 
   let scale t bs =
     with_label __LOC__ (fun () ->
@@ -202,6 +218,6 @@ module Ops = Plonk_curve_ops.Make (Impl) (Inner_curve)
 module Generators = struct
   let h =
     lazy
-      ( Marlin_plonk_bindings.Pasta_fp_urs.h (Backend.Tick.Keypair.load_urs ())
-      |> Or_infinity.finite_exn )
+      ( Kimchi_bindings.Protocol.SRS.Fp.urs_h (Backend.Tick.Keypair.load_urs ())
+      |> Common.finite_exn )
 end

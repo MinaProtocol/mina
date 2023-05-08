@@ -1,14 +1,9 @@
-open Core
-
+[%%versioned:
 module Stable : sig
   module V1 : sig
-    type t [@@deriving bin_io, version]
+    type t
   end
-
-  module Latest = V1
-end
-
-type t = Stable.Latest.t
+end]
 
 module type S = sig
   val init : unit -> t
@@ -23,6 +18,6 @@ end
 val decay_rate : float
 
 module Make (Now : sig
-  val now : unit -> Time.t
+  val now : unit -> Core.Time.t
 end) : S
 [@@warning "-67"]

@@ -1,0 +1,19 @@
+(library
+ (name itn_crypto)
+ (public_name itn_crypto)
+ (inline_tests)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   base64
+   cstruct
+   mirage-crypto-ec
+   mirage-crypto-rng
+   mirage-crypto-rng-async
+   ppx_inline_test.config
+   ;; local libraries
+   codable
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_jane ppx_version ppx_inline_test)))
+

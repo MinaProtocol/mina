@@ -23,7 +23,9 @@ Pipeline.build
           S.strictlyStart (S.contains "dockerfiles/stages/2-"),
           S.strictlyStart (S.contains "dockerfiles/stages/3-"),
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaToolchainArtifact"),
-          S.strictly (S.contains "opam.export")
+          S.strictly (S.contains "opam.export"),
+          -- Rust version has changed
+          S.strictlyEnd (S.contains "rust-toolchain.toml")
         ],
         path = "Release",
         name = "MinaToolchainArtifact"
@@ -52,19 +54,7 @@ Pipeline.build
 
       in
 
-      DockerImage.generateStep toolchainBusterSpec,
-
-      -- mina-toolchain Debian 9 "Stretch" Toolchain
-      let toolchainStretchSpec = DockerImage.ReleaseSpec::{
-        service="mina-toolchain",
-        deb_codename="stretch",
-        extra_args="--no-cache",
-        step_key="toolchain-stretch-docker-image"
-      }
-
-      in
-
-      DockerImage.generateStep toolchainStretchSpec
+      DockerImage.generateStep toolchainBusterSpec
 
     ]
   }

@@ -1,0 +1,9 @@
+(library
+ (public_name mina_base.import)
+ (name mina_base_import)
+ (libraries signature_lib)
+ (preprocessor_deps ../../../config.mlh)
+ (preprocess (pps
+    ppx_version
+    ppx_optcomp))
+ (instrumentation (backend bisect_ppx)))
