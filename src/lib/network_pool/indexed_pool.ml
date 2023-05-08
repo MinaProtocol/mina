@@ -330,13 +330,17 @@ let global_slot_since_genesis conf =
   match conf.constraint_constants.fork with
   | Some { previous_global_slot; _ } ->
       let slot_span =
-        Mina_numbers.Global_slot_since_genesis.to_uint32 current_slot
+        Mina_numbers.Global_slot_since_hard_fork.to_uint32 current_slot
         |> Mina_numbers.Global_slot_span.of_uint32
       in
       Mina_numbers.Global_slot_since_genesis.(
         add previous_global_slot slot_span)
   | None ->
-      current_slot
+      (* we're in the genesis "hard fork", so consider current slot as
+         since-genesis
+      *)
+      Mina_numbers.Global_slot_since_hard_fork.to_uint32 current_slot
+      |> Mina_numbers.Global_slot_since_genesis.of_uint32
 
 let check_expiry t (cmd : User_command.t) =
   let global_slot_since_genesis = global_slot_since_genesis t in

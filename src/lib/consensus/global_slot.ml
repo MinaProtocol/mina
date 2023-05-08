@@ -12,7 +12,7 @@ module Make_sig (A : Wire_types.Types.S) = struct
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
-  module T = Mina_numbers.Global_slot_since_genesis
+  module T = Mina_numbers.Global_slot_since_hard_fork
   module Length = Mina_numbers.Length
 
   module Poly = struct
@@ -153,7 +153,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       ( Epoch.Checked.Unsafe.of_field (T.Checked.to_field epoch)
       , Slot.Checked.Unsafe.of_field (T.Checked.to_field slot) )
 
-    let sub (t : t) (t' : t) = T.Checked.sub t.slot_number t'.slot_number
+    let diff_slots (t : t) (t' : t) =
+      T.Checked.diff t.slot_number t'.slot_number
   end
 
   module For_tests = struct

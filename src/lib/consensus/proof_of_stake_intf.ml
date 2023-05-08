@@ -35,7 +35,7 @@ module type Full = sig
         val dummy_advance :
              Value.t
           -> ?increase_epoch_count:bool
-          -> new_global_slot:Mina_numbers.Global_slot_since_genesis.t
+          -> new_global_slot:Mina_numbers.Global_slot_since_hard_fork.t
           -> Value.t
       end
     end

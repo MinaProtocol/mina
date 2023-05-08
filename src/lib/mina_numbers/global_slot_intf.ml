@@ -55,6 +55,12 @@ module type S = sig
 
     open Snark_params.Tick
 
+    val add : t -> global_slot_span_checked -> t Checked.t
+
+    val sub : t -> global_slot_span_checked -> t Checked.t
+
+    val diff : t -> t -> global_slot_span_checked Checked.t
+
     val diff_or_zero :
          t
       -> t

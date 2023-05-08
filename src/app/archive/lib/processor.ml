@@ -2880,7 +2880,7 @@ module Block = struct
               Error.raise (Staged_ledger.Pre_diff_info.Error.to_error e)
         in
         let global_slot_since_hard_fork =
-          Mina_numbers.Global_slot_since_genesis.to_uint32
+          Mina_numbers.Global_slot_since_hard_fork.to_uint32
           @@ Consensus.Data.Consensus_state.curr_global_slot consensus_state
           |> Unsigned.UInt32.to_int64
         in

@@ -5838,7 +5838,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "GlobalslotSinceGenesis",
+                  "name": "GlobalSlotSinceHardFork",
                   "ofType": null
                 }
               },
@@ -7634,16 +7634,6 @@
         },
         {
           "kind": "SCALAR",
-          "name": "GlobalSlotSpan",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
           "name": "CurrencyAmount",
           "description": null,
           "fields": null,
@@ -8831,7 +8821,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "GlobalslotSinceGenesis",
+                  "name": "Globalslot",
                   "ofType": null
                 }
               },
@@ -9215,7 +9205,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "GlobalslotSinceGenesis",
+                  "name": "Globalslot",
                   "ofType": null
                 }
               },
@@ -9527,7 +9517,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "GlobalslotSinceGenesis",
+                  "name": "Globalslot",
                   "ofType": null
                 }
               },
@@ -10313,7 +10303,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "GlobalslotSinceGenesis",
+                  "name": "Globalslot",
                   "ofType": null
                 }
               },
@@ -11603,8 +11593,8 @@
         },
         {
           "kind": "SCALAR",
-          "name": "GlobalslotSpan",
-          "description": "globalslotspan",
+          "name": "GlobalSlotSpan",
+          "description": "global slot span",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -11651,7 +11641,7 @@
               "args": [],
               "type": {
                 "kind": "SCALAR",
-                "name": "GlobalslotSinceGenesis",
+                "name": "Globalslot",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -11671,7 +11661,7 @@
               "args": [],
               "type": {
                 "kind": "SCALAR",
-                "name": "GlobalslotSpan",
+                "name": "GlobalSlotSpan",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -12405,7 +12395,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "GlobalslotSinceGenesis",
+                  "name": "Globalslot",
                   "ofType": null
                 }
               },
@@ -12415,6 +12405,16 @@
           ],
           "inputFields": null,
           "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "Globalslot",
+          "description": "global slot",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
         },
@@ -12463,7 +12463,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "SCALAR",
-                      "name": "GlobalslotSinceGenesis",
+                      "name": "Globalslot",
                       "ofType": null
                     }
                   }
@@ -12507,8 +12507,8 @@
         },
         {
           "kind": "SCALAR",
-          "name": "GlobalslotSinceGenesis",
-          "description": "globalslotsincegenesis",
+          "name": "GlobalSlotSinceHardFork",
+          "description": "global slot since hard fork",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -12571,7 +12571,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "GlobalslotSinceGenesis",
+                  "name": "GlobalSlotSinceHardFork",
                   "ofType": null
                 }
               },

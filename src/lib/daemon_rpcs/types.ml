@@ -162,7 +162,7 @@ module Status = struct
 
   module Next_producer_timing = struct
     type slot =
-      { slot : Mina_numbers.Global_slot_since_genesis.Stable.Latest.t
+      { slot : Mina_numbers.Global_slot_since_hard_fork.Stable.Latest.t
       ; global_slot_since_genesis :
           Mina_numbers.Global_slot_since_genesis.Stable.Latest.t
       }
@@ -176,7 +176,8 @@ module Status = struct
       | Check_again of Block_time.Stable.Latest.t
       | Produce of producing_time
       | Produce_now of producing_time
-      | Evaluating_vrf of Mina_numbers.Global_slot_since_genesis.Stable.Latest.t
+      | Evaluating_vrf of
+          Mina_numbers.Global_slot_since_hard_fork.Stable.Latest.t
     [@@deriving to_yojson, bin_io_unversioned]
 
     type t = { generated_from_consensus_at : slot; timing : timing }
@@ -294,7 +295,7 @@ module Status = struct
           in
           let slot_str (slot : Next_producer_timing.slot) =
             sprintf "slot: %s slot-since-genesis: %s"
-              (Mina_numbers.Global_slot_since_genesis.to_string slot.slot)
+              (Mina_numbers.Global_slot_since_hard_fork.to_string slot.slot)
               (Mina_numbers.Global_slot_since_genesis.to_string
                  slot.global_slot_since_genesis )
           in
@@ -308,7 +309,7 @@ module Status = struct
                 generated_from
           | Evaluating_vrf last_checked_slot ->
               sprintf "Evaluating VRF… Last checked global slot %s (%s)"
-                (Mina_numbers.Global_slot_since_genesis.to_string
+                (Mina_numbers.Global_slot_since_hard_fork.to_string
                    last_checked_slot )
                 generated_from
           | Produce { time; for_slot } ->

@@ -205,7 +205,7 @@ module Vrf = struct
             let evaluation =
               Evaluation.of_message_and_sk ~constraint_constants
                 { global_slot =
-                    Mina_numbers.Global_slot_since_genesis.of_int global_slot
+                    Mina_numbers.Global_slot_since_hard_fork.of_int global_slot
                 ; epoch_seed =
                     Mina_base.Epoch_seed.of_base58_check_exn epoch_seed
                 ; delegator_index

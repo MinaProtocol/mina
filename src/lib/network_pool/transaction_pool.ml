@@ -2241,9 +2241,12 @@ let%test_module _ =
 
     let current_global_slot () =
       let current_time = Block_time.now time_controller in
+      (* for testing, consider this slot to be a since-genesis slot *)
       Consensus.Data.Consensus_time.(
         of_time_exn ~constants:consensus_constants current_time
         |> to_global_slot)
+      |> Mina_numbers.Global_slot_since_hard_fork.to_uint32
+      |> Mina_numbers.Global_slot_since_genesis.of_uint32
 
     let mk_now_invalid_test t _cmds ~mk_command =
       let cmd1 =

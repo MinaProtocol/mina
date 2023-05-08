@@ -9,7 +9,7 @@ let equal a b = UInt32.compare a b = 0
 
 let of_global_slot ~(constants : Constants.t) (slot : Global_slot.t) : t =
   let slot_number_u32 =
-    Mina_numbers.Global_slot_since_genesis.to_uint32
+    Mina_numbers.Global_slot_since_hard_fork.to_uint32
     @@ Global_slot.slot_number slot
   in
   UInt32.Infix.(slot_number_u32 / constants.slots_per_sub_window)
@@ -26,7 +26,7 @@ let sub a b = UInt32.sub a b
 let constant a = a
 
 module Checked = struct
-  module T = Mina_numbers.Global_slot_since_genesis
+  module T = Mina_numbers.Nat.Make32 ()
 
   type t = T.Checked.t
 
@@ -36,8 +36,12 @@ module Checked = struct
   let of_global_slot ~(constants : Constants.var) (s : Global_slot.Checked.t) :
       t Checked.t =
     let%map q, _ =
+      let slot_as_field =
+        Global_slot.slot_number s
+        |> Mina_numbers.Global_slot_since_hard_fork.Checked.to_field
+      in
       T.Checked.div_mod
-        (Global_slot.slot_number s)
+        (T.Checked.Unsafe.of_field slot_as_field)
         (of_length constants.slots_per_sub_window)
     in
     q

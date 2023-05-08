@@ -173,7 +173,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Block_data = struct
       type t =
         { stake_proof : Stake_proof.t
-        ; global_slot : Mina_numbers.Global_slot_since_genesis.t
+        ; global_slot : Mina_numbers.Global_slot_since_hard_fork.t
         ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
         ; vrf_result : Random_oracle.Digest.t
         }
@@ -201,7 +201,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             { epoch_ledger : Mina_base.Epoch_ledger.Value.Stable.V1.t
             ; epoch_seed : Mina_base.Epoch_seed.Stable.V1.t
             ; epoch : Mina_numbers.Length.Stable.V1.t
-            ; global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+            ; global_slot : Mina_numbers.Global_slot_since_hard_fork.Stable.V1.t
             ; global_slot_since_genesis :
                 Mina_numbers.Global_slot_since_genesis.Stable.V1.t
             ; delegatee_table :
@@ -219,7 +219,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         { epoch_ledger : Mina_base.Epoch_ledger.Value.t
         ; epoch_seed : Mina_base.Epoch_seed.t
         ; epoch : Mina_numbers.Length.t
-        ; global_slot : Mina_numbers.Global_slot_since_genesis.t
+        ; global_slot : Mina_numbers.Global_slot_since_hard_fork.t
         ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
         ; delegatee_table :
             Mina_base.Account.t Mina_base.Account.Index.Table.t
@@ -239,7 +239,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 Public_key.Compressed.Stable.V1.t
                 * Mina_base.Account.Index.Stable.V1.t
             ; producer : Keypair.Stable.V1.t
-            ; global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+            ; global_slot : Mina_numbers.Global_slot_since_hard_fork.Stable.V1.t
             ; global_slot_since_genesis :
                 Mina_numbers.Global_slot_since_genesis.Stable.V1.t
             ; vrf_result : Consensus_vrf.Output_hash.Stable.V1.t
@@ -253,7 +253,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       type t = Stable.Latest.t =
         { delegator : Public_key.Compressed.t * Mina_base.Account.Index.t
         ; producer : Keypair.t
-        ; global_slot : Mina_numbers.Global_slot_since_genesis.t
+        ; global_slot : Mina_numbers.Global_slot_since_hard_fork.t
         ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
         ; vrf_result : Consensus_vrf.Output_hash.t
         }
@@ -868,7 +868,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                         request ) )
       end
 
-      let check ~context:(module Context : CONTEXT) ~global_slot ~seed
+      let check ~context:(module Context : CONTEXT)
+          ~(global_slot : Mina_numbers.Global_slot_since_hard_fork.t) ~seed
           ~producer_private_key ~producer_public_key ~total_stake
           ~(get_delegators :
                 Public_key.Compressed.t
@@ -1184,8 +1185,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
 
     module Consensus_transition = struct
-      include Mina_numbers.Global_slot_since_genesis
-      module Value = Mina_numbers.Global_slot_since_genesis
+      module Value = Mina_numbers.Global_slot_since_hard_fork
+      include Value
 
       type var = Checked.t
 
@@ -1193,6 +1194,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
 
     module Consensus_time = struct
+      (* since hard fork *)
       include Global_slot
 
       let to_string_hum = time_hum
@@ -1219,7 +1221,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let to_uint32 t =
         Global_slot.slot_number t
-        |> Mina_numbers.Global_slot_since_genesis.to_uint32
+        |> Mina_numbers.Global_slot_since_hard_fork.to_uint32
 
       let to_global_slot = slot_number
 
@@ -1332,7 +1334,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           if
             same_sub_window
             || UInt32.compare
-                 ( Mina_numbers.Global_slot_since_genesis.to_uint32
+                 ( Mina_numbers.Global_slot_since_hard_fork.to_uint32
                  @@ Global_slot.slot_number next_global_slot )
                  constants.grace_period_end
                < 0
@@ -1431,7 +1433,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             let%bind in_grace_period =
               Global_slot.Checked.( < ) next_global_slot
                 (Global_slot.Checked.of_slot_number ~constants
-                   (Mina_numbers.Global_slot_since_genesis.Checked.Unsafe
+                   (Mina_numbers.Global_slot_since_hard_fork.Checked.Unsafe
                     .of_field
                       (Length.Checked.to_field constants.grace_period_end) ) )
             in
@@ -1499,7 +1501,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               if
                 sub_window_diff = 0
                 || UInt32.compare
-                     ( Mina_numbers.Global_slot_since_genesis.to_uint32
+                     ( Mina_numbers.Global_slot_since_hard_fork.to_uint32
                      @@ Global_slot.slot_number next_global_slot )
                      constants.grace_period_end
                    < 0
@@ -1558,7 +1560,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               (Global_slot.t * Global_slot.t list) Quickcheck.Generator.t =
             let open Quickcheck.Generator in
             let open Quickcheck.Generator.Let_syntax in
-            let module GS = Mina_numbers.Global_slot_since_genesis in
+            let module GS = Mina_numbers.Global_slot_since_hard_fork in
             let%bind prev_global_slot = small_positive_int in
             let%bind slot_diffs =
               Core.List.gen_with_length num_global_slots_to_test gen_slot_diff
@@ -1941,7 +1943,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let checkpoint_window ~(constants : Constants.t) (slot : Global_slot.t) =
         UInt32.Infix.(
-          ( Mina_numbers.Global_slot_since_genesis.to_uint32
+          ( Mina_numbers.Global_slot_since_hard_fork.to_uint32
           @@ Global_slot.slot_number slot )
           / constants.checkpoint_window_size_in_slots)
 
@@ -2052,7 +2054,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let same_checkpoint_window ~(constants : Constants.var)
           ~prev:(slot1 : Global_slot.Checked.t)
           ~next:(slot2 : Global_slot.Checked.t) =
-        let module Slot = Mina_numbers.Global_slot_since_genesis in
+        let module Slot = Mina_numbers.Global_slot_since_hard_fork in
         let slot1 : Slot.Checked.t = Global_slot.slot_number slot1 in
         let checkpoint_window_size_in_slots =
           constants.checkpoint_window_size_in_slots
@@ -2166,14 +2168,14 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~consensus_transition:Consensus_transition.genesis ~genesis_ledger
           ~genesis_epoch_data ~constraint_constants ~constants
 
-      (* Check that both epoch and slot are zero.
-       *)
+      (* ??? do these mean, genesis-of-all-time, or genesis-at-hard-fork? *)
+      (* Check that both epoch and slot are zero. *)
       let is_genesis_state (t : Value.t) =
-        Mina_numbers.Global_slot_since_genesis.(
+        Mina_numbers.Global_slot_since_hard_fork.(
           equal zero (Global_slot.slot_number t.curr_global_slot))
 
       let is_genesis (global_slot : Global_slot.Checked.t) =
-        let open Mina_numbers.Global_slot_since_genesis in
+        let open Mina_numbers.Global_slot_since_hard_fork in
         Checked.equal (Checked.constant zero)
           (Global_slot.slot_number global_slot)
 
@@ -2211,9 +2213,9 @@ module Make_str (A : Wire_types.Concrete) = struct
           Global_slot.Checked.of_slot_number ~constants transition_data
         in
         let%bind slot_diff =
-          [%with_label_ "Next global slot is less that previous global slot"]
+          [%with_label_ "Next global slot is less than previous global slot"]
             (fun () ->
-              Global_slot.Checked.sub next_global_slot prev_global_slot )
+              Global_slot.Checked.diff_slots next_global_slot prev_global_slot )
         in
         let%bind () =
           let%bind global_slot_increased =
@@ -2439,17 +2441,17 @@ module Make_str (A : Wire_types.Concrete) = struct
             if increase_epoch_count then Length.succ t.epoch_count
             else t.epoch_count
           in
-          let global_slot_since_genesis_to_span global_slot =
-            Mina_numbers.Global_slot_since_genesis.to_uint32 global_slot
+          let global_slot_since_hard_fork_to_span global_slot =
+            Mina_numbers.Global_slot_since_hard_fork.to_uint32 global_slot
             |> Mina_numbers.Global_slot_span.of_uint32
           in
           let global_slot_since_genesis =
             Mina_numbers.Global_slot_since_genesis.(
               add
                 ( sub t.global_slot_since_genesis
-                    (global_slot_since_genesis_to_span (curr_global_slot t))
+                    (global_slot_since_hard_fork_to_span (curr_global_slot t))
                 |> Option.value_exn )
-                (global_slot_since_genesis_to_span new_global_slot))
+                (global_slot_since_hard_fork_to_span new_global_slot))
           in
           { t with
             epoch_count = new_epoch_count
@@ -3141,7 +3143,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let global_slot_since_genesis =
         let slot_diff =
           match
-            Mina_numbers.Global_slot_since_genesis.diff global_slot
+            Mina_numbers.Global_slot_since_hard_fork.diff global_slot
               (Consensus_state.curr_global_slot state)
           with
           | None ->
@@ -3332,10 +3334,13 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let curr_global_slot = Global_slot.of_epoch_and_slot ~constants curr in
       let consensus_state =
-        { negative_one with
-          curr_global_slot
-        ; global_slot_since_genesis = Global_slot.slot_number curr_global_slot
-        }
+        let global_slot_since_genesis =
+          (* for testing, consider slot-since-hard-fork as since-genesis *)
+          Global_slot.slot_number curr_global_slot
+          |> Mina_numbers.Global_slot_since_hard_fork.to_uint32
+          |> Mina_numbers.Global_slot_since_genesis.of_uint32
+        in
+        { negative_one with curr_global_slot; global_slot_since_genesis }
       in
       let too_early =
         (* TODO: Does this make sense? *)
@@ -3387,7 +3392,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           global_slot =
         if
           not
-            (Mina_numbers.Global_slot_since_genesis.equal
+            (Mina_numbers.Global_slot_since_hard_fork.equal
                (Global_slot.slot_number global_slot)
                block_data.global_slot )
         then
@@ -3853,7 +3858,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let expected = stake_fraction *. 0.75 in
         let samples = 1000 in
         let check i =
-          let global_slot = Mina_numbers.Global_slot_since_genesis.of_int i in
+          let global_slot = Mina_numbers.Global_slot_since_hard_fork.of_int i in
           let%map result =
             Interruptible.force
               (Vrf.check
@@ -4152,7 +4157,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; staking_epoch_data
         ; next_epoch_data = next_staking_epoch_data
         ; global_slot_since_genesis =
+            (* OK if we're in genesis "hard fork" *)
             Global_slot.slot_number curr_global_slot
+            |> Mina_numbers.Global_slot_since_hard_fork.to_uint32
+            |> Mina_numbers.Global_slot_since_genesis.of_uint32
             (* These values are not used in selection, so we just set them to something. *)
         ; has_ancestor_in_same_checkpoint_window = true
         ; block_stake_winner = staker_pk

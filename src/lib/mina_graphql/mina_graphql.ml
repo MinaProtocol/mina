@@ -322,7 +322,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ global_slot -> C.slot global_slot)
         ; field "globalSlot"
-            ~typ:(non_null global_slot_since_genesis)
+            ~typ:(non_null global_slot_since_hard_fork)
             ~args:Arg.[]
             ~resolve:(fun _ (global_slot : Consensus.Data.Consensus_time.t) ->
               C.to_global_slot global_slot )
@@ -2694,7 +2694,7 @@ module Types = struct
         obj "VrfMessageInput" ~doc:"The inputs to a vrf evaluation"
           ~coerce:(fun global_slot epoch_seed delegator_index ->
             { Consensus_vrf.Layout.Message.global_slot =
-                Mina_numbers.Global_slot_since_genesis.of_uint32 global_slot
+                Mina_numbers.Global_slot_since_hard_fork.of_uint32 global_slot
             ; epoch_seed = Mina_base.Epoch_seed.of_base58_check_exn epoch_seed
             ; delegator_index
             } )
@@ -2708,7 +2708,7 @@ module Types = struct
             ]
           ~split:(fun f (t : input) ->
             f
-              (Mina_numbers.Global_slot_since_genesis.to_uint32 t.global_slot)
+              (Mina_numbers.Global_slot_since_hard_fork.to_uint32 t.global_slot)
               (Mina_base.Epoch_seed.to_base58_check t.epoch_seed)
               t.delegator_index )
     end
@@ -3344,7 +3344,7 @@ module Types = struct
     let open Consensus_vrf.Layout.Message in
     obj "VrfMessage" ~doc:"The inputs to a vrf evaluation" ~fields:(fun _ ->
         [ field "globalSlot"
-            ~typ:(non_null global_slot_since_genesis)
+            ~typ:(non_null global_slot_since_hard_fork)
             ~args:Arg.[]
             ~resolve:(fun _ { global_slot; _ } -> global_slot)
         ; field "epochSeed" ~typ:(non_null epoch_seed)
@@ -3855,7 +3855,8 @@ module Mutations = struct
                   Ledger.apply_zkapp_command_unchecked ~constraint_constants
                     ~global_slot:
                       ( Transition_frontier.Breadcrumb.consensus_state breadcrumb
-                      |> Consensus.Data.Consensus_state.curr_global_slot )
+                      |> Consensus.Data.Consensus_state
+                         .global_slot_since_genesis )
                     ~state_view ledger zkapp_command
                 in
                 (* rearrange data to match result type of `send_zkapp_command` *)
@@ -6009,7 +6010,8 @@ module Queries = struct
               in
               List.map (Queue.to_list vrf_state.queue)
                 ~f:(fun { global_slot; _ } ->
-                  Mina_numbers.Global_slot_since_genesis.to_int global_slot ) )
+                  Mina_numbers.Global_slot_since_hard_fork.to_int global_slot )
+          )
 
     let internal_logs =
       io_field "internalLogs"

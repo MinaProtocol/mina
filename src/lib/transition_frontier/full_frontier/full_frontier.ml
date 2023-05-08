@@ -721,7 +721,7 @@ module Metrics = struct
             find_ancestor ~f parent
     in
     let curr_global_slot_u32 cs =
-      curr_global_slot cs |> Mina_numbers.Global_slot_since_genesis.to_uint32
+      curr_global_slot cs |> Mina_numbers.Global_slot_since_hard_fork.to_uint32
     in
     let start =
       let slot = intprop curr_global_slot_u32 in

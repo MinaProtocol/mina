@@ -531,7 +531,7 @@ let retry ?(max = 3) ~logger ~error_message f =
 
 module Vrf_evaluation_state = struct
   type status =
-    | At of Mina_numbers.Global_slot_since_genesis.t
+    | At of Mina_numbers.Global_slot_since_hard_fork.t
     | Start
     | Completed
 
@@ -585,7 +585,7 @@ module Vrf_evaluation_state = struct
         [ ( "slots"
           , `List
               (List.map vrf_result.slots_won ~f:(fun s ->
-                   Mina_numbers.Global_slot_since_genesis.to_yojson
+                   Mina_numbers.Global_slot_since_hard_fork.to_yojson
                      s.global_slot ) ) )
         ]
 
@@ -1058,7 +1058,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                    let%bind () =
                      (*Poll once every slot if the evaluation for the epoch is not completed or the evaluation is completed*)
                      if
-                       Mina_numbers.Global_slot_since_genesis.(
+                       Mina_numbers.Global_slot_since_hard_fork.(
                          new_global_slot > slot)
                        && not
                             (Vrf_evaluation_state.finished vrf_evaluation_state)
@@ -1140,7 +1140,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                            ~coinbase_receiver:!coinbase_receiver
                        in
                        if
-                         Mina_numbers.Global_slot_since_genesis.(
+                         Mina_numbers.Global_slot_since_hard_fork.(
                            curr_global_slot = winning_global_slot)
                        then (
                          (*produce now*)
@@ -1158,7 +1158,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                              : (_, _) Interruptible.t ) )
                        else
                          match
-                           Mina_numbers.Global_slot_since_genesis.diff
+                           Mina_numbers.Global_slot_since_hard_fork.diff
                              winning_global_slot curr_global_slot
                          with
                          | None ->
@@ -1168,10 +1168,10 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                                 global slot is $curr_slot"
                                ~metadata:
                                  [ ( "slot_won"
-                                   , Mina_numbers.Global_slot_since_genesis
+                                   , Mina_numbers.Global_slot_since_hard_fork
                                      .to_yojson winning_global_slot )
                                  ; ( "curr_slot"
-                                   , Mina_numbers.Global_slot_since_genesis
+                                   , Mina_numbers.Global_slot_since_hard_fork
                                      .to_yojson curr_global_slot )
                                  ] ;
                              return
@@ -1236,7 +1236,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                              Deferred.return () ) ) )
       in
       let start () =
-        check_next_block_timing Mina_numbers.Global_slot_since_genesis.zero
+        check_next_block_timing Mina_numbers.Global_slot_since_hard_fork.zero
           Mina_numbers.Length.zero ()
       in
       let genesis_state_timestamp =

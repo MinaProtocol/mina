@@ -10,7 +10,7 @@ module Types : sig
 
     module V1 : sig
       type t =
-        ( Mina_numbers.Global_slot_since_genesis.V1.t
+        ( Mina_numbers.Global_slot_since_hard_fork.V1.t
         , Mina_numbers.Length.V1.t )
         Poly.V1.t
     end
@@ -27,7 +27,7 @@ module type Concrete = sig
 
   module V1 : sig
     type t =
-      ( Mina_numbers.Global_slot_since_genesis.V1.t
+      ( Mina_numbers.Global_slot_since_hard_fork.V1.t
       , Mina_numbers.Length.V1.t )
       Poly.V1.t
   end

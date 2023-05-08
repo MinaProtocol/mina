@@ -35,6 +35,20 @@ module Make (M : S) = struct
 
     open Snark_params.Tick
 
+    let add t (span : global_slot_span_checked) =
+      let t' = Global_slot_span.Checked.to_field span |> Unsafe.of_field in
+      add t t'
+
+    let sub t (span : global_slot_span_checked) =
+      let t' = Global_slot_span.Checked.to_field span |> Unsafe.of_field in
+      sub t t'
+
+    let diff t1 t2 : global_slot_span_checked Checked.t =
+      let%map diff = T.Checked.sub t1 t2 in
+      let field = T.Checked.to_field diff in
+      (* `of_field` is the identity function, here applied to a checked field *)
+      Global_slot_span.Checked.Unsafe.of_field field
+
     let typ = Typ.transport T.Checked.typ ~there:to_uint32 ~back:of_uint32
 
     let diff_or_zero t1 t2 =

@@ -2,7 +2,7 @@ open Core
 open Async
 open Signature_lib
 module Epoch = Mina_numbers.Length
-module Global_slot_since_genesis = Mina_numbers.Global_slot_since_genesis
+module Global_slot_since_hard_fork = Mina_numbers.Global_slot_since_hard_fork
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -13,7 +13,7 @@ module type CONTEXT = sig
 end
 
 (*Slot number within an epoch*)
-module Slot = Mina_numbers.Global_slot_since_genesis
+module Slot = Mina_numbers.Nat.Make32 ()
 
 (* Can extract both slot numbers and epoch number*)
 module Consensus_time = Consensus.Data.Consensus_time
@@ -40,13 +40,13 @@ module Evaluator_status = struct
     [@@@no_toplevel_latest_type]
 
     module V2 = struct
-      type t = At of Global_slot_since_genesis.Stable.V1.t | Completed
+      type t = At of Global_slot_since_hard_fork.Stable.V1.t | Completed
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t = At of Global_slot_since_genesis.t | Completed
+  type t = Stable.Latest.t = At of Global_slot_since_hard_fork.t | Completed
   [@@deriving sexp]
 end
 
@@ -97,7 +97,7 @@ module Worker_state = struct
         (Epoch.t * Slot.t) Public_key.Compressed.Table.t
     ; slots_won : Consensus.Data.Slot_won.t Queue.t
           (*possibly multiple producers per slot*)
-    ; mutable current_slot : Global_slot_since_genesis.t option
+    ; mutable current_slot : Global_slot_since_hard_fork.t option
     ; mutable epoch_data :
         unit Ivar.t * Consensus.Data.Epoch_data_for_vrf.t option
     ; mutable block_producer_keys : Block_producer_keys.t
@@ -152,7 +152,6 @@ module Worker_state = struct
         let%bind () =
           Interruptible.lift Deferred.unit (Ivar.read interrupt_ivar)
         in
-        let module Slot = Mina_numbers.Global_slot_since_genesis in
         let epoch = epoch_data.epoch in
         [%log info] "Starting VRF evaluation for epoch: $epoch"
           ~metadata:[ ("epoch", Epoch.to_yojson epoch) ] ;
@@ -187,7 +186,7 @@ module Worker_state = struct
                 let global_slot_since_genesis =
                   let slot_diff : Mina_numbers.Global_slot_span.t =
                     match
-                      Global_slot_since_genesis.diff global_slot
+                      Global_slot_since_hard_fork.diff global_slot
                         start_global_slot
                     with
                     | None ->
@@ -198,8 +197,8 @@ module Worker_state = struct
                     | Some diff ->
                         diff
                   in
-                  Global_slot_since_genesis.add start_global_slot_since_genesis
-                    slot_diff
+                  Mina_numbers.Global_slot_since_genesis.add
+                    start_global_slot_since_genesis slot_diff
                 in
                 [%log info]
                   "Checking VRF evaluations at epoch: $epoch, slot: $slot"
@@ -239,8 +238,10 @@ module Worker_state = struct
         in
         let rec find_winning_slot (consensus_time : Consensus_time.t) =
           let slot = Slot.of_uint32 @@ Consensus_time.slot consensus_time in
-          let global_slot = Consensus_time.to_global_slot consensus_time in
-          t.current_slot <- Some global_slot ;
+          t.current_slot <-
+            Some
+              ( Consensus_time.to_uint32 consensus_time
+              |> Global_slot_since_hard_fork.of_uint32 ) ;
           let epoch' = Consensus_time.epoch consensus_time in
           if Epoch.(epoch' > epoch) then (
             t.current_slot <- None ;

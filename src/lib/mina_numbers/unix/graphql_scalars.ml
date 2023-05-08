@@ -6,9 +6,9 @@ module Make (Schema : Schema) = struct
     Make_scalar_using_to_string
       (Mina_numbers.Global_slot_since_genesis)
       (struct
-        let name = "GlobalslotSinceGenesis"
+        let name = "Globalslot"
 
-        let doc = "globalslotsincegenesis"
+        let doc = "global slot"
       end)
       (Schema)
 
@@ -16,9 +16,9 @@ module Make (Schema : Schema) = struct
     Make_scalar_using_to_string
       (Mina_numbers.Global_slot_since_hard_fork)
       (struct
-        let name = "GlobalslotSinceHardFork"
+        let name = "GlobalSlotSinceHardFork"
 
-        let doc = "globalslotsincehardfork"
+        let doc = "global slot since hard fork"
       end)
       (Schema)
 
@@ -26,9 +26,9 @@ module Make (Schema : Schema) = struct
     Make_scalar_using_to_string
       (Mina_numbers.Global_slot_span)
       (struct
-        let name = "GlobalslotSpan"
+        let name = "GlobalSlotSpan"
 
-        let doc = "globalslotspan"
+        let doc = "global slot span"
       end)
       (Schema)
 
