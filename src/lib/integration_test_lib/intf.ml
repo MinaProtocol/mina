@@ -396,14 +396,11 @@ module Dsl = struct
 
     val ledger_proofs_emitted_since_genesis :
       test_config:Test_config.t -> num_proofs:int -> t
-<<<<<<< HEAD
-=======
 
     val zkapp_to_be_included_in_frontier :
       has_failures:bool -> zkapp_command:Mina_base.Zkapp_command.t -> t
 
     val persisted_frontier_loaded : Engine.Network.Node.t -> t
->>>>>>> origin/berkeley
   end
 
   module type S = sig

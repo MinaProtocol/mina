@@ -215,7 +215,6 @@ module Node = struct
       }
     |}]
 
-<<<<<<< HEAD
     module Set_snark_worker =
     [%graphql
     {|
@@ -238,12 +237,10 @@ module Node = struct
         }
       }
     |}]
-=======
     (* TODO: temporary version *)
     module Send_test_zkapp = Generated_graphql_queries.Send_test_zkapp
     module Pooled_zkapp_commands =
       Generated_graphql_queries.Pooled_zkapp_commands
->>>>>>> origin/berkeley
 
     module Query_peer_id =
     [%graphql
