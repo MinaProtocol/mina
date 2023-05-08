@@ -84,10 +84,10 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let to_epoch_and_slot t = (epoch t, slot t)
 
-  let ( + ) (x : t) n : t =
-    { x with
-      slot_number = T.add x.slot_number (Mina_numbers.Global_slot_span.of_int n)
-    }
+  let add (t : t) (span : Mina_numbers.Global_slot_span.t) =
+    { t with slot_number = T.add t.slot_number span }
+
+  let ( + ) (t : t) n : t = add t (Mina_numbers.Global_slot_span.of_int n)
 
   let ( < ) (t : t) (t' : t) = T.compare t.slot_number t'.slot_number < 0
 

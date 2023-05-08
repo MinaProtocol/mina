@@ -31,6 +31,8 @@ module type Full = sig
 
   val gen : constants:Constants.t -> t Quickcheck.Generator.t
 
+  val add : t -> Mina_numbers.Global_slot_span.t -> t
+
   val ( + ) : t -> int -> t
 
   val ( < ) : t -> t -> bool

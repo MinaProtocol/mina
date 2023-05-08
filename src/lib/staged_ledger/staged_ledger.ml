@@ -2245,23 +2245,16 @@ let%test_module "staged ledger tests" =
         | Some global_slot ->
             (*Protocol state views are always from previous block*)
             let prev_global_slot =
-              (* TODO:; the global slot that's passed in is since-genesis, but `dummy_advance` wants
-                 a since-hard-fork
-              *)
-              let global_slot =
-                Mina_numbers.Global_slot_since_genesis.to_uint32 global_slot
-                |> Mina_numbers.Global_slot_since_hard_fork.of_uint32
-              in
-              Option.value
-                ~default:Mina_numbers.Global_slot_since_hard_fork.zero
-                (Mina_numbers.Global_slot_since_hard_fork.sub global_slot
+              Option.value ~default:Mina_numbers.Global_slot_since_genesis.zero
+                (Mina_numbers.Global_slot_since_genesis.sub global_slot
                    Mina_numbers.Global_slot_span.one )
             in
             let consensus_state =
               Consensus.Proof_of_stake.Exported.Consensus_state.Unsafe
               .dummy_advance
                 (Mina_state.Protocol_state.consensus_state state)
-                ~new_global_slot:prev_global_slot ~increase_epoch_count:false
+                ~new_global_slot_since_genesis:prev_global_slot
+                ~increase_epoch_count:false
             in
             let body =
               Mina_state.Protocol_state.Body.For_tests.with_consensus_state

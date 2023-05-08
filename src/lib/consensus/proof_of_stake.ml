@@ -2436,29 +2436,20 @@ module Make_str (A : Wire_types.Concrete) = struct
       module Unsafe = struct
         (* TODO: very unsafe, do not use unless you know what you are doing *)
         let dummy_advance (t : Value.t) ?(increase_epoch_count = false)
-            ~new_global_slot : Value.t =
+            ~new_global_slot_since_genesis : Value.t =
           let new_epoch_count =
             if increase_epoch_count then Length.succ t.epoch_count
             else t.epoch_count
           in
-          let global_slot_since_hard_fork_to_span global_slot =
-            Mina_numbers.Global_slot_since_hard_fork.to_uint32 global_slot
-            |> Mina_numbers.Global_slot_span.of_uint32
-          in
-          let global_slot_since_genesis =
-            Mina_numbers.Global_slot_since_genesis.(
-              add
-                ( sub t.global_slot_since_genesis
-                    (global_slot_since_hard_fork_to_span (curr_global_slot t))
-                |> Option.value_exn )
-                (global_slot_since_hard_fork_to_span new_global_slot))
+          let slot_diff =
+            Option.value_exn
+              (Mina_numbers.Global_slot_since_genesis.diff
+                 new_global_slot_since_genesis t.global_slot_since_genesis )
           in
           { t with
             epoch_count = new_epoch_count
-          ; curr_global_slot =
-              Global_slot.For_tests.of_global_slot t.curr_global_slot
-                new_global_slot
-          ; global_slot_since_genesis
+          ; curr_global_slot = Global_slot.add t.curr_global_slot slot_diff
+          ; global_slot_since_genesis = new_global_slot_since_genesis
           }
       end
 
