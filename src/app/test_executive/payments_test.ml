@@ -484,19 +484,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "check account balances.  snark-node-key1 should be greater than or \
          equal to the snark fee"
         (let%bind { total_balance = key_1_balance_actual; _ } =
-           Network.Node.must_get_account_data ~logger untimed_node_b
-             ~public_key:
+           let snark_node_key1_account_id =
+             Account_id.create
                ( snark_node_key1.keypair.public_key
                |> Signature_lib.Public_key.compress )
+               Token_id.default
+           in
+           Network.Node.must_get_account_data ~logger untimed_node_b
+             ~account_id:snark_node_key1_account_id
          in
          let%bind { total_balance = key_2_balance_actual; _ } =
-           Network.Node.must_get_account_data ~logger untimed_node_a
-             ~public_key:
+           let snark_node_key2_account_id =
+             Account_id.create
                ( snark_node_key2.keypair.public_key
                |> Signature_lib.Public_key.compress )
+               Token_id.default
+           in
+           Network.Node.must_get_account_data ~logger untimed_node_b
+             ~account_id:snark_node_key2_account_id
          in
          let key_1_balance_expected =
-           Currency.Amount.of_formatted_string config.snark_worker_fee
+           Currency.Amount.of_mina_string_exn config.snark_worker_fee
          in
          if
            Currency.Amount.( >= )
@@ -508,8 +516,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               snark-node-key1 balance: %s.  \n\
               snark-node-key2 balance: %s.  \n\
               snark-worker-fee: %s"
-             (Currency.Balance.to_formatted_string key_1_balance_actual)
-             (Currency.Balance.to_formatted_string key_2_balance_actual)
+             (Currency.Balance.to_mina_string key_1_balance_actual)
+             (Currency.Balance.to_mina_string key_2_balance_actual)
              config.snark_worker_fee ;
 
            Malleable_error.return () )
@@ -519,8 +527,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               snark-node-key1 balance: %s.  \n\
               snark-node-key2 balance: %s.  \n\
               snark-worker-fee: %s"
-             (Currency.Balance.to_formatted_string key_1_balance_actual)
-             (Currency.Balance.to_formatted_string key_2_balance_actual)
+             (Currency.Balance.to_mina_string key_1_balance_actual)
+             (Currency.Balance.to_mina_string key_2_balance_actual)
              config.snark_worker_fee )
     in
     let%bind () =
@@ -552,19 +560,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "check account balances.  snark-node-key2 should be greater than or \
          equal to the snark fee"
         (let%bind { total_balance = key_1_balance_actual; _ } =
-           Network.Node.must_get_account_data ~logger untimed_node_b
-             ~public_key:
+           let snark_node_key1_account_id =
+             Account_id.create
                ( snark_node_key1.keypair.public_key
                |> Signature_lib.Public_key.compress )
+               Token_id.default
+           in
+           Network.Node.must_get_account_data ~logger untimed_node_b
+             ~account_id:snark_node_key1_account_id
          in
          let%bind { total_balance = key_2_balance_actual; _ } =
-           Network.Node.must_get_account_data ~logger untimed_node_a
-             ~public_key:
-               ( snark_node_key2.keypair.public_key
+           let snark_node_key2_account_id =
+             Account_id.create
+               ( snark_node_key1.keypair.public_key
                |> Signature_lib.Public_key.compress )
+               Token_id.default
+           in
+           Network.Node.must_get_account_data ~logger untimed_node_a
+             ~account_id:snark_node_key2_account_id
          in
          let key_2_balance_expected =
-           Currency.Amount.of_formatted_string config.snark_worker_fee
+           Currency.Amount.of_mina_string_exn config.snark_worker_fee
          in
          if
            Currency.Amount.( >= )
@@ -576,8 +592,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               snark-node-key1 balance: %s.  \n\
               snark-node-key2 balance: %s.  \n\
               snark-worker-fee: %s"
-             (Currency.Balance.to_formatted_string key_1_balance_actual)
-             (Currency.Balance.to_formatted_string key_2_balance_actual)
+             (Currency.Balance.to_mina_string key_1_balance_actual)
+             (Currency.Balance.to_mina_string key_2_balance_actual)
              config.snark_worker_fee ;
 
            Malleable_error.return () )
@@ -587,8 +603,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               snark-node-key1 balance: %s.  \n\
               snark-node-key2 balance: %s.  \n\
               snark-worker-fee: %s"
-             (Currency.Balance.to_formatted_string key_1_balance_actual)
-             (Currency.Balance.to_formatted_string key_2_balance_actual)
+             (Currency.Balance.to_mina_string key_1_balance_actual)
+             (Currency.Balance.to_mina_string key_2_balance_actual)
              config.snark_worker_fee )
     in
     section_hard "running replayer"
