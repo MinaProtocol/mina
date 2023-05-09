@@ -230,7 +230,7 @@ module type Full = sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
+    [@@@with_top_version_tag]
 
     module V2 : sig
       type t =
