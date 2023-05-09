@@ -67,15 +67,20 @@ macro_rules! impl_oracles {
                 let oracles_result =
                     proof.oracles::<DefaultFqSponge<$curve_params, PlonkSpongeConstantsKimchi>, DefaultFrSponge<$F, PlonkSpongeConstantsKimchi>>(&index, &p_comm, &public_input)?;
 
-                let (mut sponge, combined_inner_product, p_eval, digest, oracles) = (
+                let (mut sponge, combined_inner_product, digest, oracles) = (
                     oracles_result.fq_sponge,
                     oracles_result.combined_inner_product,
-                    oracles_result.public_evals,
                     oracles_result.digest,
                     oracles_result.oracles,
                 );
 
                 sponge.absorb_fr(&[shift_scalar::<$G>(combined_inner_product)]);
+
+                let p_eval =  {
+                    let p = proof.evals.public;
+                    (p.zeta[0].into(), p.zeta_omega[0].into())
+                };
+
 
                 let opening_prechallenges = proof
                     .proof
@@ -86,7 +91,7 @@ macro_rules! impl_oracles {
 
                 Ok(CamlOracles {
                     o: oracles.into(),
-                    p_eval: (p_eval[0][0].into(), p_eval[1][0].into()),
+                    p_eval,
                     opening_prechallenges,
                     digest_before_evaluations: digest.into(),
                 })
