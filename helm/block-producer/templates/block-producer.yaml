@@ -286,10 +286,6 @@ spec:
           mountPath: /root/.mina-config
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
-        {{- if $.Values.persist_working_dir }}
-        - name: working-dir
-          mountPath: /root
-        {{- end }}
         {{- if $.Values.mina.uploadBlocksToGCloud }}
         - name: gcloud-keyfile
           mountPath: "/root/gcloud/"
@@ -300,10 +296,12 @@ spec:
         {{- end }}
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
       volumes:
+      - name: config-dir
       {{- if $.Values.persist_working_dir }}
-      - name: working-dir
         persistentVolumeClaim:
           claimName: pvc-{{ $config.name }}
+      {{- else}}
+        emptyDir: {}
       {{- end }}
       - name: private-keys
         secret:
@@ -346,8 +344,6 @@ spec:
             path: faucet-key.pub
       {{ end -}}
       - name: wallet-keys
-        emptyDir: {}
-      - name: config-dir
         emptyDir: {}
       - name: actual-libp2p
         emptyDir: {}

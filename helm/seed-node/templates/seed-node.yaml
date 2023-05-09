@@ -157,15 +157,15 @@ spec:
         - name: daemon-config
           mountPath: "/root/config/"
         {{- end }}
-        {{- if $.Values.persist_working_dir }}
-        - name: working-dir
-          mountPath: /root
-        {{- end }}
+        - name: config-dir
+          mountPath: /root/.mina-config/
       volumes:
+      - name: config-dir
       {{- if $.Values.persist_working_dir }}
-      - name: working-dir
         persistentVolumeClaim:
           claimName: pvc-{{ $config.name }}
+      {{- else}}
+        emptyDir: {}
       {{- end }}
       {{- if $.Values.mina.runtimeConfig }}
       - name: daemon-config

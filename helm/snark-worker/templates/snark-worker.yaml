@@ -44,14 +44,15 @@ spec:
           - name: "RAYON_NUM_THREADS"
             value: "4"
         imagePullPolicy: Always
-      {{- if $.Values.persist_working_dir }}
         volumeMounts:
-          - name: working-dir
-            mountPath: /root
+          - name: config-dir
+            mountPath: /root/.mina-config
       volumes:
-        - name: working-dir
-          persistentVolumeClaim:
-            claimName: pvc-{{ $.Values.workerName }}
-      {{ end }}
-      
+      - name: config-dir
+      {{- if $.Values.persist_working_dir }}
+        persistentVolumeClaim:
+          claimName: pvc-{{ $.Values.workerName }}
+      {{- else}}
+        emptyDir: {}
+      {{- end }} 
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}

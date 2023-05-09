@@ -129,10 +129,6 @@ spec:
         {{- end }}
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
-        {{ if $.Values.persist_working_dir }}
-        - name: working-dir
-          mountPath: /root
-        {{ end }}
 {{- end }}
       # Archive Process
       - name: archive
@@ -154,10 +150,8 @@ spec:
         - name: daemon-config
           mountPath: "/root/config/"
         {{- end }}
-        {{- if .Values.persist_working_dir }}
-        - name: working-dir
-          mountPath: /root
-        {{ end }}
+        - name: config-dir
+          mountPath: "/root/.mina-config/"
         ports:
         - name: archive-port
           protocol: TCP
@@ -171,8 +165,6 @@ spec:
 {{- include "healthcheck.archive.allChecks" . | indent 8 }}
 {{- include "nodeSelector.preemptible" .Values | indent 6 }}
       volumes:
-      - name: config-dir
-        emptyDir: {}
       {{- if .Values.mina.runtimeConfig }}
       - name: daemon-config
         configMap:
@@ -180,10 +172,12 @@ spec:
       {{- end }}
       - name: actual-libp2p
         emptyDir: {}
+      - name: config-dir
       {{- if .Values.persist_working_dir }}
-      - name: working-dir
         persistentVolumeClaim:
           claimName: pvc-{{ template "archive-node.fullname" . }}
+      {{- else}}
+        emptyDir: {}
       {{- end }}
 ---
 {{- if $.Values.persist_working_dir }}

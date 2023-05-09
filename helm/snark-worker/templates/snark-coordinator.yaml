@@ -123,10 +123,8 @@ spec:
         {{- end }}
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
-        {{ if $.Values.persist_working_dir }}
-        - name: working-dir
-          mountPath: /root
-        {{ end }}
+        - name: config-dir
+          mountPath: /root/.mina-config/
       volumes:
       {{- if $.Values.mina.runtimeConfig }}
       - name: daemon-config
@@ -135,10 +133,12 @@ spec:
       {{- end }}
       - name: actual-libp2p
         emptyDir: {}
-      {{ if $.Values.persist_working_dir }}
-      - name: working-dir
+      - name: config-dir
+      {{- if $.Values.persist_working_dir }}
         persistentVolumeClaim:
            claimName: pvc-{{ $.Values.coordinatorName }}
+      {{- else }} 
+        emptyDir: {}
       {{ end }}
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
 
