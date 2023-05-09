@@ -1254,19 +1254,27 @@ let%test_unit "group_add_full" =
 
             (* Add left_input to external checks *)
             Foreign_field.(
-              External_checks.append_multi_range_check external_checks
+              External_checks.append_bound_check external_checks
               @@ Element.Standard.to_limbs @@ Affine.x left_input) ;
             Foreign_field.(
-              External_checks.append_multi_range_check external_checks
+              External_checks.append_bound_check external_checks
               @@ Element.Standard.to_limbs @@ Affine.y left_input) ;
 
             (* Add right_input to external checks *)
             Foreign_field.(
-              External_checks.append_multi_range_check external_checks
+              External_checks.append_bound_check external_checks
               @@ Element.Standard.to_limbs @@ Affine.x right_input) ;
             Foreign_field.(
-              External_checks.append_multi_range_check external_checks
+              External_checks.append_bound_check external_checks
               @@ Element.Standard.to_limbs @@ Affine.y right_input) ;
+
+            (* Add result to external checks *)
+            Foreign_field.(
+              External_checks.append_bound_check external_checks
+              @@ Element.Standard.to_limbs @@ Affine.x result) ;
+            Foreign_field.(
+              External_checks.append_bound_check external_checks
+              @@ Element.Standard.to_limbs @@ Affine.y result) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -1281,7 +1289,7 @@ let%test_unit "group_add_full" =
              *    computed bound to the external_checks.multi-ranges, which
              *    are then constrainted in (2)
              *)
-            assert (Mina_stdlib.List.Length.equal external_checks.bounds 6) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.bounds 12) ;
             List.iter external_checks.bounds ~f:(fun product ->
                 let _remainder_bound =
                   Foreign_field.valid_element
@@ -1294,7 +1302,7 @@ let%test_unit "group_add_full" =
 
             (* 2) Add gates for external multi-range-checks *)
             assert (
-              Mina_stdlib.List.Length.equal external_checks.multi_ranges 13 ) ;
+              Mina_stdlib.List.Length.equal external_checks.multi_ranges 15 ) ;
             List.iter external_checks.multi_ranges ~f:(fun multi_range ->
                 let v0, v1, v2 = multi_range in
                 Range_check.multi (module Runner.Impl) v0 v1 v2 ;
