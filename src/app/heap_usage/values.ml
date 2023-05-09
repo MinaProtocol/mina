@@ -418,7 +418,7 @@ let protocol_state =
       "last_vrf_output": "q4zrn2ZlIeTV8_8XPb3PZu4eQusG0n5ieUNy5gyZAAA=",
       "total_currency": "1014488754000001000",
       "curr_global_slot": {
-        "slot_number": ["Since_genesis","2831"],
+        "slot_number": ["Since_hard_fork","2831"],
         "slots_per_epoch": "7140"
       },
       "global_slot_since_genesis": ["Since_genesis","2831"],
