@@ -111,6 +111,7 @@ macro_rules! impl_srs {
                 srs: $name,
                 domain_size: ocaml::Int,
                 evals: Vec<$CamlF>,
+                // TODO: num_chunks: usize,
             ) -> Result<CamlPolyComm<$CamlG>, ocaml::Error> {
                     let x_domain = EvaluationDomain::<$F>::new(domain_size as usize).ok_or_else(|| {
                         ocaml::Error::invalid_argument("CamlSRS::evaluations")
@@ -129,6 +130,7 @@ macro_rules! impl_srs {
             pub fn [<$name:snake _b_poly_commitment>](
                 srs: $name,
                 chals: Vec<$CamlF>,
+                // TODO: num_chunks: usize,
             ) -> Result<CamlPolyComm<$CamlG>, ocaml::Error> {
                 let chals: Vec<$F> = chals.into_iter().map(Into::into).collect();
                 let coeffs = b_poly_coefficients(&chals);

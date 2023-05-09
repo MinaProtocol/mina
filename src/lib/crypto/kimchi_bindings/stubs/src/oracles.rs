@@ -6,6 +6,7 @@ use kimchi::{
     prover::caml::{CamlProofWithPublic, CamlProverProof},
     verifier_index::VerifierIndex,
 };
+#[allow(unused_imports)]
 use mina_poseidon::{
     self,
     constants::PlonkSpongeConstantsKimchi,
