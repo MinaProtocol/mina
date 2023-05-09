@@ -320,7 +320,7 @@ struct
           public_input t.proof
       in
       let ((x_hat_1, _x_hat_2) as x_hat) =
-        assert false
+        failwith "FIXME for commitment_lengths.ml"
         (* O.(p_eval_1 o, p_eval_2 o) *)
       in
       let scalar_chal f =

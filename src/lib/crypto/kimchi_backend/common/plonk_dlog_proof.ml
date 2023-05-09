@@ -302,7 +302,6 @@ module Make (Inputs : Inputs_intf) = struct
       : 'f Kimchi_types.lookup_evaluations =
     { sorted; aggreg; table; runtime }
 
-  (* TODO: add public field  *)
   let eval_to_backend
       { Pickles_types.Plonk_types.Evals.w
       ; coefficients
