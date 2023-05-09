@@ -237,6 +237,7 @@ module Node = struct
         }
       }
     |}]
+
     (* TODO: temporary version *)
     module Send_test_zkapp = Generated_graphql_queries.Send_test_zkapp
     module Pooled_zkapp_commands =
@@ -322,7 +323,7 @@ module Node = struct
                    vestingIncrement
                    initialMinimumBalance
                  }
-          token
+          tokenId
           tokenSymbol
           verificationKey { verificationKey
                             hash
@@ -985,7 +986,7 @@ module Node = struct
       | None ->
           "<no last snark worker>"
       | Some last ->
-          last |> Account.Key.to_yojson |> Yojson.Safe.to_string
+          last |> Scalars.PublicKey.serialize |> Yojson.Basic.to_string
     in
     [%log info] "snark worker changed, lastSnarkWorker: %s" last_snark_worker
       ~metadata:[ ("lastSnarkWorker", `String last_snark_worker) ] ;

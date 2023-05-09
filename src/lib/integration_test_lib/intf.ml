@@ -128,6 +128,7 @@ module Engine = struct
         -> t
         -> new_snark_pub_key:Signature_lib.Public_key.Compressed.t
         -> unit Malleable_error.t
+
       (** Send a batch of zkApp transactions.
           Returned is a list of transaction id *)
       val send_zkapp_batch :
