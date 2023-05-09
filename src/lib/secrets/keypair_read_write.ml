@@ -47,7 +47,9 @@ struct
   let read ~(privkey_path : string) ~(password : Secret_file.password) :
       (Keypair.t, Privkey_error.t) Deferred.Result.t =
     let open Deferred.Result.Let_syntax in
-    let%bind pk_bytes = Secret_file.read ~path:privkey_path ~password in
+    let%bind pk_bytes =
+      Secret_file.read ~which ~path:privkey_path ~password ()
+    in
     let open Result.Let_syntax in
     Deferred.return
     @@ let%bind sk =

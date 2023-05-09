@@ -15,9 +15,11 @@ type password = Bytes.t Deferred.t Lazy.t
 [password] is only forced if the file has secure permissions.
 *)
 val read :
-     path:string
+     ?which:string
+  -> path:string
   -> password:password
-  -> (Bytes.t, Privkey_error.t) Deferred.Result.t
+  -> unit
+  -> (bytes, Privkey_error.t) Deferred.Result.t
 
 (** Write [contents] to [path], after wrapping it in a [Secret_box] with [password].
 
