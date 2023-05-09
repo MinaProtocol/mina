@@ -31,10 +31,18 @@ let get_nonce_exn (pk : Public_key.Compressed.t) :
   in
   nonce
 
-let update_body ?(update = Account_update.Update.noop) ~account amount =
+let update_body ?preconditions ?(update = Account_update.Update.noop) ~account amount =
   let open Monad_lib.State.Let_syntax in
   let open Account_update in
-  let%map nonce = get_nonce_exn account in
+  let%map default =
+    let%map nonce = get_nonce_exn account in
+    Account_update.Preconditions.
+    { network = Zkapp_precondition.Protocol_state.accept
+    ; account = Account_precondition.Nonce nonce
+    ; valid_while = Ignore
+    }
+  in
+  let update_preconditions = Option.value ~default preconditions in
   let account_update = update in
   Body.
     { dummy with
@@ -47,11 +55,7 @@ let update_body ?(update = Account_update.Update.noop) ~account amount =
     ; may_use_token = No
     ; authorization_kind = Signature
     ; use_full_commitment = true
-    ; preconditions =
-        { network = Zkapp_precondition.Protocol_state.accept
-        ; account = Account_precondition.Nonce nonce
-        ; valid_while = Ignore
-        }
+    ; preconditions = update_preconditions
     }
 
 let update ?(calls = []) body =
@@ -82,7 +86,7 @@ let gen_balance_split ?limit balance =
   generate ?limit [] (Balance.to_amount balance)
 
 module Simple_txn = struct
-  let make ~sender ~receiver amount =
+  let make ?preconditions ~sender ~receiver amount =
     object
       method sender : Public_key.Compressed.t = sender
 
@@ -93,11 +97,11 @@ module Simple_txn = struct
       method updates : (account_update list, nonces) Monad_lib.State.t =
         let open Monad_lib.State.Let_syntax in
         let%bind sender_decrease_body =
-          update_body ~account:sender
+          update_body ?preconditions ~account:sender
             Amount.Signed.(negate @@ of_unsigned amount)
         in
         let%map receiver_increase_body =
-          update_body ~account:receiver Amount.Signed.(of_unsigned amount)
+          update_body ?preconditions ~account:receiver Amount.Signed.(of_unsigned amount)
         in
         [ update
             Account_update.
