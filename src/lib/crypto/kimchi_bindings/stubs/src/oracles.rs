@@ -3,6 +3,7 @@ use ark_ff::One;
 use kimchi::circuits::scalars::{caml::CamlRandomOracles, RandomOracles};
 use kimchi::proof::ProverProof;
 use kimchi::{prover::caml::CamlProverProof, verifier_index::VerifierIndex};
+#[allow(unused_imports)]
 use mina_poseidon::{
     self,
     constants::PlonkSpongeConstantsKimchi,

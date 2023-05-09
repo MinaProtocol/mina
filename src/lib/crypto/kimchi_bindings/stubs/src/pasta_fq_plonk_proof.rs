@@ -174,6 +174,7 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq>
         zeta_omega: vec![Fq::one()],
     };
     let evals = ProofEvaluations {
+        public: eval(),
         w: array_init(|_| eval()),
         coefficients: array_init(|_| eval()),
         z: eval(),
