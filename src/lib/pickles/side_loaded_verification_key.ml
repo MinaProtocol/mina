@@ -223,15 +223,15 @@ module Stable = struct
                      ; shifted = None
                      }
                    in
-                   { sigma_comm = Array.map ~f:g (Vector.to_array c.sigma_comm)
+                   { sigma_comm = Array.map ~f:g (Vector.to_array c.sigma_comms)
                    ; coefficients_comm =
-                       Array.map ~f:g (Vector.to_array c.coefficients_comm)
-                   ; generic_comm = g c.generic_comm
-                   ; mul_comm = g c.mul_comm
-                   ; psm_comm = g c.psm_comm
-                   ; emul_comm = g c.emul_comm
-                   ; complete_add_comm = g c.complete_add_comm
-                   ; endomul_scalar_comm = g c.endomul_scalar_comm
+                       Array.map ~f:g (Vector.to_array c.coefficients_comms)
+                   ; generic_comm = g c.generic_comms
+                   ; mul_comm = g c.mul_comms
+                   ; psm_comm = g c.psm_comms
+                   ; emul_comm = g c.emul_comms
+                   ; complete_add_comm = g c.complete_add_comms
+                   ; endomul_scalar_comm = g c.endomul_scalar_comms
                    } )
               ; shifts = Common.tock_shifts ~log2_size
               ; lookup_index = None

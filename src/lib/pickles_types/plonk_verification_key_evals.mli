@@ -2,15 +2,15 @@
 
 module Stable : sig
   module V2 : sig
-    type 'comm t =
-      { sigma_comms : 'comm array Plonk_types.Permuts_vec.Stable.V1.t
-      ; coefficients_comms : 'comm array Plonk_types.Columns_vec.Stable.V1.t
-      ; generic_comms : 'comm array
-      ; psm_comms : 'comm array
-      ; complete_add_comms : 'comm array
-      ; mul_comms : 'comm array
-      ; emul_comms : 'comm array
-      ; endomul_scalar_comms : 'comm array
+    type 'comms t =
+      { sigma_comms : 'comms Plonk_types.Permuts_vec.Stable.V1.t
+      ; coefficients_comms : 'comms Plonk_types.Columns_vec.Stable.V1.t
+      ; generic_comms : 'comms
+      ; psm_comms : 'comms
+      ; complete_add_comms : 'comms
+      ; mul_comms : 'comms
+      ; emul_comms : 'comms
+      ; endomul_scalar_comms : 'comms
       }
 
     include Sigs.Full.S1 with type 'a t := 'a t
@@ -19,21 +19,20 @@ module Stable : sig
   module Latest = V2
 end
 
-type 'comm t = 'comm Stable.Latest.t =
-  { sigma_comms : 'comm array Plonk_types.Permuts_vec.t
-  ; coefficients_comms : 'comm array Plonk_types.Columns_vec.t
-  ; generic_comms : 'comm array
-  ; psm_comms : 'comm array
-  ; complete_add_comms : 'comm array
-  ; mul_comms : 'comm array
-  ; emul_comms : 'comm array
-  ; endomul_scalar_comms : 'comm array
+type 'comms t = 'comms Stable.Latest.t =
+  { sigma_comms : 'comms Plonk_types.Permuts_vec.t
+  ; coefficients_comms : 'comms Plonk_types.Columns_vec.t
+  ; generic_comms : 'comms
+  ; psm_comms : 'comms
+  ; complete_add_comms : 'comms
+  ; mul_comms : 'comms
+  ; emul_comms : 'comms
+  ; endomul_scalar_comms : 'comms
   }
 [@@deriving sexp, equal, compare, hash, yojson, hlist]
 
 val typ :
-     length:int
-  -> ('a, 'b, 'c) Snarky_backendless.Typ.t
+     ('a, 'b, 'c) Snarky_backendless.Typ.t
   -> ('a t, 'b t, 'c) Snarky_backendless.Typ.t
 
 (** [map t ~f] applies [f] to all elements of type ['a] within record [t] and
@@ -41,5 +40,25 @@ val typ :
     {!sigma_comms} and {!coefficients_comms}. *)
 val map : 'a t -> f:('a -> 'b) -> 'b t
 
-(** [map2] *)
 val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t
+
+val dummy : 'a -> 'a t
+
+module Chunked : sig
+  type nonrec 'a t = 'a array t
+
+  val typ :
+       length:int
+    -> ('a, 'b, 'c) Snarky_backendless.Typ.t
+    -> ('a t, 'b t, 'c) Snarky_backendless.Typ.t
+
+  val map : 'a t -> f:('a -> 'b) -> 'b t
+
+  val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t
+
+  val dummy : 'a -> 'a t
+end
+
+(** [chunk comms] convert a ['comm t] structure [comms] with single commitment
+    fields to a chunk-ready one.  *)
+val chunk : 'comm t -> 'comm Chunked.t

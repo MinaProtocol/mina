@@ -182,7 +182,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   (** does this convert a backend.verifier_index to a pickles_types.verifier_index? *)
   let vk_commitments (t : Inputs.Verifier_index.t) :
-      Inputs.Curve.Affine.t Pickles_types.Plonk_verification_key_evals.t =
+      Inputs.Curve.Affine.t Pickles_types.Plonk_verification_key_evals.Chunked.t
+      =
     let g c : Inputs.Curve.Affine.t =
       match Inputs.Poly_comm.of_backend_without_degree_bound c with
       | `Without_degree_bound x ->
@@ -190,17 +191,18 @@ module Make (Inputs : Inputs_intf) = struct
       | `With_degree_bound _ ->
           assert false
     in
-    { sigma_comm =
-        Pickles_types.Vector.init Pickles_types.Plonk_types.Permuts.n
-          ~f:(fun i -> g t.evals.sigma_comm.(i))
-    ; coefficients_comm =
-        Pickles_types.Vector.init Pickles_types.Plonk_types.Columns.n
-          ~f:(fun i -> g t.evals.coefficients_comm.(i))
-    ; generic_comm = g t.evals.generic_comm
-    ; psm_comm = g t.evals.psm_comm
-    ; complete_add_comm = g t.evals.complete_add_comm
-    ; mul_comm = g t.evals.mul_comm
-    ; emul_comm = g t.evals.emul_comm
-    ; endomul_scalar_comm = g t.evals.endomul_scalar_comm
+    let open Pickles_types in
+    { sigma_comms =
+        Vector.init Plonk_types.Permuts.n ~f:(fun i -> g t.evals.sigma_comm.(i))
+    ; coefficients_comms =
+        Vector.init Plonk_types.Columns.n ~f:(fun i ->
+            g t.evals.coefficients_comm.(i) )
+    ; generic_comms = g t.evals.generic_comm
+    ; psm_comms = g t.evals.psm_comm
+    ; complete_add_comms = g t.evals.complete_add_comm
+    ; mul_comms = g t.evals.mul_comm
+    ; emul_comms = g t.evals.emul_comm
+    ; endomul_scalar_comms = g t.evals.endomul_scalar_comm
     }
+    |> Plonk_verification_key_evals.chunk
 end

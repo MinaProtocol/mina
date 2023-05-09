@@ -14,7 +14,7 @@ module Stable : sig
   module V2 : sig
     type t =
       { commitments :
-          Backend.Tock.Curve.Affine.t
+          Backend.Tock.Curve.Affine.t array
           Pickles_types.Plonk_verification_key_evals.t
       ; index : Impls.Wrap.Verification_key.t
       ; data : Data.t
@@ -29,12 +29,14 @@ end
 
 type t = Stable.Latest.t =
   { commitments :
-      Backend.Tock.Curve.Affine.t Pickles_types.Plonk_verification_key_evals.t
+      Backend.Tock.Curve.Affine.t
+      Pickles_types.Plonk_verification_key_evals.Chunked.t
   ; index : Impls.Wrap.Verification_key.t
   ; data : Data.t
   }
 [@@deriving fields, to_yojson]
 
-val dummy_commitments : 'a -> 'a Pickles_types.Plonk_verification_key_evals.t
+val dummy_commitments :
+  'a -> 'a Pickles_types.Plonk_verification_key_evals.Chunked.t
 
 val dummy : Stable.Latest.t lazy_t

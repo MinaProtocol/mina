@@ -160,26 +160,26 @@ end
 
 let index_to_field_elements (k : 'a Plonk_verification_key_evals.t) ~g =
   let Plonk_verification_key_evals.
-        { sigma_comm
-        ; coefficients_comm
-        ; generic_comm
-        ; psm_comm
-        ; complete_add_comm
-        ; mul_comm
-        ; emul_comm
-        ; endomul_scalar_comm
+        { sigma_comms
+        ; coefficients_comms
+        ; generic_comms
+        ; psm_comms
+        ; complete_add_comms
+        ; mul_comms
+        ; emul_comms
+        ; endomul_scalar_comms
         } =
     k
   in
   List.map
-    ( Vector.to_list sigma_comm
-    @ Vector.to_list coefficients_comm
-    @ [ generic_comm
-      ; psm_comm
-      ; complete_add_comm
-      ; mul_comm
-      ; emul_comm
-      ; endomul_scalar_comm
+    ( Vector.to_list sigma_comms
+    @ Vector.to_list coefficients_comms
+    @ [ generic_comms
+      ; psm_comms
+      ; complete_add_comms
+      ; mul_comms
+      ; emul_comms
+      ; endomul_scalar_comms
       ] )
     ~f:g
   |> Array.concat

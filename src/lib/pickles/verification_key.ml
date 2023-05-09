@@ -110,7 +110,7 @@ module Repr = struct
     module V2 = struct
       type t =
         { commitments :
-            Backend.Tock.Curve.Affine.Stable.V1.t
+            Backend.Tock.Curve.Affine.Stable.V1.t array
             Plonk_verification_key_evals.Stable.V2.t
         ; data : Data.Stable.V1.t
         }
@@ -125,7 +125,8 @@ end
 module Stable = struct
   module V2 = struct
     type t =
-      { commitments : Backend.Tock.Curve.Affine.t Plonk_verification_key_evals.t
+      { commitments :
+          Backend.Tock.Curve.Affine.t array Plonk_verification_key_evals.t
       ; index :
           (Impls.Wrap.Verification_key.t
           [@to_yojson
@@ -160,21 +161,25 @@ module Stable = struct
                ; shifted = None
                }
              in
-             { sigma_comm = Array.map ~f:g (Vector.to_array c.sigma_comm)
+             let f = Array.map ~f:g in
+             { sigma_comm = Array.map ~f (Vector.to_array c.sigma_comms)
              ; coefficients_comm =
-                 Array.map ~f:g (Vector.to_array c.coefficients_comm)
-             ; generic_comm = g c.generic_comm
-             ; mul_comm = g c.mul_comm
-             ; psm_comm = g c.psm_comm
-             ; emul_comm = g c.emul_comm
-             ; complete_add_comm = g c.complete_add_comm
-             ; endomul_scalar_comm = g c.endomul_scalar_comm
+                 Array.map ~f (Vector.to_array c.coefficients_comms)
+             ; generic_comm = f c.generic_comms
+             ; mul_comm = f c.mul_comms
+             ; psm_comm = f c.psm_comms
+             ; emul_comm = f c.emul_comms
+             ; complete_add_comm = f c.complete_add_comms
+             ; endomul_scalar_comm = f c.endomul_scalar_comms
              } )
         ; shifts = Common.tock_shifts ~log2_size
         ; lookup_index = None
         }
       in
-      { commitments = c; data = d; index = t }
+      { commitments = Plonk_verification_key_evals.chunk c
+      ; data = d
+      ; index = t
+      }
 
     include
       Binable.Of_binable
@@ -192,22 +197,11 @@ end]
 
 let to_yojson = Stable.Latest.to_yojson
 
-let dummy_commitments g =
-  let open Plonk_types in
-  { Plonk_verification_key_evals.sigma_comm =
-      Vector.init Permuts.n ~f:(fun _ -> g)
-  ; coefficients_comm = Vector.init Columns.n ~f:(fun _ -> g)
-  ; generic_comm = g
-  ; psm_comm = g
-  ; complete_add_comm = g
-  ; mul_comm = g
-  ; emul_comm = g
-  ; endomul_scalar_comm = g
-  }
-
 let dummy =
   lazy
     (let rows = Domain.size (Common.wrap_domains ~proofs_verified:2).h in
      let g = Backend.Tock.Curve.(to_affine_exn one) in
-     { Repr.commitments = dummy_commitments g; data = { constraints = rows } }
+     { Repr.commitments = Plonk_verification_key_evals.Chunked.dummy g
+     ; data = { constraints = rows }
+     }
      |> Stable.Latest.of_repr (Kimchi_bindings.Protocol.SRS.Fq.create 1) )
