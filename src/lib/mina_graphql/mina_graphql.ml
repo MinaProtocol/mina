@@ -612,6 +612,13 @@ module Types = struct
               ~doc:"metadata for the log"
               ~typ:(non_null (list (non_null metadatum)))
               ~resolve:(fun _ (log : Itn_logger.t) -> log.metadata)
+          ; field "process"
+              ~args:Arg.[]
+              ~doc:
+                "if not the daemon, which process sent the log (prover or \
+                 verifier)"
+              ~typ:string
+              ~resolve:(fun _ (log : Itn_logger.t) -> log.process)
           ] )
   end
 
@@ -1819,7 +1826,15 @@ module Types = struct
             | Applied | Enqueued ->
                 None
             | Included_but_failed failures ->
-                List.concat failures |> List.hd )
+                let rec first_failure = function
+                  | (failure :: _) :: _ ->
+                      Some failure
+                  | [] :: others ->
+                      first_failure others
+                  | [] ->
+                      None
+                in
+                first_failure failures )
       ]
 
     let payment =
@@ -3170,6 +3185,100 @@ module Types = struct
                 ]
       end
 
+      module ZkappCommandsDetails = struct
+        type input =
+          { fee_payers : Signature_lib.Private_key.t list
+          ; num_zkapps_to_deploy : int
+          ; num_new_accounts : int
+          ; transactions_per_second : float
+          ; duration_in_minutes : int
+          ; memo_prefix : string
+          ; no_precondition : bool
+          ; min_balance_change : string
+          ; max_balance_change : string
+          ; init_balance : string
+          ; min_fee : string
+          ; max_fee : string
+          ; deployment_fee : string
+          ; account_queue_size : int
+          ; max_cost : bool
+          }
+
+        let arg_typ =
+          obj "ZkappCommandsDetails"
+            ~doc:"Keys and other information for scheduling zkapp commands"
+            ~coerce:(fun fee_payers num_zkapps_to_deploy num_new_accounts
+                         transactions_per_second duration_in_minutes memo_prefix
+                         no_precondition min_balance_change max_balance_change
+                         init_balance min_fee max_fee deployment_fee
+                         account_queue_size max_cost ->
+              Result.return
+                { fee_payers
+                ; num_zkapps_to_deploy
+                ; num_new_accounts
+                ; transactions_per_second
+                ; duration_in_minutes
+                ; memo_prefix
+                ; no_precondition
+                ; min_balance_change
+                ; max_balance_change
+                ; init_balance
+                ; min_fee
+                ; max_fee
+                ; deployment_fee
+                ; account_queue_size
+                ; max_cost
+                } )
+            ~split:(fun f (t : input) ->
+              f t.fee_payers t.num_zkapps_to_deploy t.num_new_accounts
+                t.transactions_per_second t.duration_in_minutes t.memo_prefix
+                t.no_precondition t.min_balance_change t.max_balance_change
+                t.init_balance t.min_fee t.max_fee t.deployment_fee
+                t.account_queue_size t.max_cost )
+            ~fields:
+              Arg.
+                [ arg "feePayers"
+                    ~typ:(non_null (list (non_null PrivateKey.arg_typ)))
+                    ~doc:
+                      "Private keys of fee payers (fee payers also function as \
+                       the account creators)"
+                ; arg "numZkappsToDeploy" ~typ:(non_null int)
+                    ~doc:
+                      "Number of zkApp accounts that we initially deploy for \
+                       the purpose of test"
+                ; arg "numNewAccounts" ~typ:(non_null int)
+                    ~doc:
+                      "Number of zkapp accounts that the scheduler generates \
+                       during the test"
+                ; arg "transactionsPerSecond" ~typ:(non_null float)
+                    ~doc:"Frequency of transactions"
+                ; arg "durationInMinutes" ~doc:"Length of scheduler run"
+                    ~typ:(non_null int)
+                ; arg "memoPrefix" ~doc:"Prefix of memo" ~typ:(non_null string)
+                ; arg "noPrecondition"
+                    ~doc:"Disable the precondition in account updates"
+                    ~typ:(non_null bool)
+                ; arg "minBalanceChange" ~doc:"Minimum balance change"
+                    ~typ:(non_null string)
+                ; arg "maxBalanceChange" ~doc:"Maximum balance change"
+                    ~typ:(non_null string)
+                ; arg "initBalance" ~typ:(non_null string)
+                    ~doc:
+                      "Initial balance for zkApp accounts that we initially \
+                       deploy for the purpose of test"
+                ; arg "minFee" ~doc:"Minimum fee" ~typ:(non_null string)
+                ; arg "maxFee" ~doc:"Maximum fee" ~typ:(non_null string)
+                ; arg "deploymentFee"
+                    ~doc:"Fee for the initial deployment of zkApp accounts"
+                    ~typ:(non_null string)
+                ; arg "accountQueueSize"
+                    ~doc:"The size of queue for recently used accounts"
+                    ~typ:(non_null int)
+                ; arg "maxCost" ~doc:"Generate max cost zkApp command"
+                    ~typ:(non_null bool)
+                ]
+      end
+
       module GatingUpdate = struct
         type input =
           { trusted_peers : Network_peer.Peer.t list
@@ -4448,15 +4557,458 @@ module Mutations = struct
                           let next_tm_next = Time.add tm_next wait_span in
                           go ((ndx + 1) mod num_senders) next_tm_next
                       in
+                      [%log info] "Starting payment scheduler with handle %s"
+                        (Uuid.to_string uuid) ;
                       let tm_next = Time.add tm_start wait_span in
                       don't_wait_for @@ go 0 tm_next ;
                       Ok (Uuid.to_string uuid) ) )
 
-    let stop_payments =
-      io_field "stopPayments"
+    let account_of_id id ledger =
+      Mina_ledger.Ledger.location_of_account ledger id
+      |> Option.value_exn
+      |> Mina_ledger.Ledger.get ledger
+      |> Option.value_exn
+
+    let account_of_kp (kp : Signature_lib.Keypair.t) ledger =
+      account_of_id (Account_id.of_public_key kp.public_key) ledger
+
+    let deploy_zkapps ~mina ~ledger ~deployment_fee ~max_cost ~init_balance
+        ~(fee_payer_array : Signature_lib.Keypair.t Array.t)
+        ~constraint_constants ~logger ~memo_prefix ~wait_span ~stop_signal
+        ~stop_time ~uuid keypairs =
+      let fee_payer_accounts =
+        Array.map fee_payer_array ~f:(fun key -> account_of_kp key ledger)
+      in
+      let fee_payer_nonces =
+        Array.map fee_payer_accounts ~f:(fun account -> ref account.nonce)
+      in
+      let ndx = ref 0 in
+      let num_fee_payers = Array.length fee_payer_array in
+      Deferred.List.iter keypairs ~f:(fun kp ->
+          if Time.(now () >= stop_time) then (
+            [%log info]
+              "Scheduled zkapp commands with handle %s has expired, stop \
+               deployment of zkapp accounts"
+              (Uuid.to_string uuid) ;
+            Uuid.Table.remove scheduler_tbl uuid ;
+            return () )
+          else if Ivar.is_full stop_signal then (
+            [%log info]
+              "Scheduled zkapp commands with handle %s received stop signal, \
+               stop deployment of zkapp accounts"
+              (Uuid.to_string uuid) ;
+            Uuid.Table.remove scheduler_tbl uuid ;
+            return () )
+          else
+            let fee_payer_keypair = fee_payer_array.(!ndx) in
+            let memo = sprintf "%s-%s" memo_prefix (Int.to_string !ndx) in
+            let spec =
+              { Transaction_snark.For_tests.Deploy_snapp_spec.sender =
+                  (fee_payer_keypair, !(fee_payer_nonces.(!ndx)))
+              ; fee = Currency.Fee.of_mina_string_exn deployment_fee
+              ; fee_payer = None
+              ; amount = Currency.Amount.of_mina_string_exn init_balance
+              ; zkapp_account_keypairs = [ kp ]
+              ; memo = Signed_command_memo.create_from_string_exn memo
+              ; new_zkapp_account = true
+              ; snapp_update = Account_update.Update.dummy
+              ; preconditions = None
+              ; authorization_kind = Account_update.Authorization_kind.Signature
+              }
+            in
+            let zkapp_command =
+              Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+                ~permissions:
+                  ( if max_cost then
+                    { Permissions.user_default with
+                      set_verification_key = Permissions.Auth_required.Proof
+                    ; edit_state = Permissions.Auth_required.Proof
+                    ; edit_action_state = Proof
+                    }
+                  else Permissions.user_default )
+                spec
+            in
+            let%bind () = after wait_span in
+            let rec go () =
+              match%bind send_zkapp_command mina zkapp_command with
+              | Ok _ ->
+                  fee_payer_nonces.(!ndx) :=
+                    Account.Nonce.succ !(fee_payer_nonces.(!ndx)) ;
+                  ndx := (!ndx + 1) mod num_fee_payers ;
+                  [%log info]
+                    "Successfully submitted zkApp command that creates a zkApp \
+                     account"
+                    ~metadata:
+                      [ ("zkapp_command", Zkapp_command.to_yojson zkapp_command)
+                      ] ;
+                  Deferred.unit
+              | Error err ->
+                  [%log info] "Failed to setup a zkApp account, try again"
+                    ~metadata:
+                      [ ("zkapp_command", Zkapp_command.to_yojson zkapp_command)
+                      ; ("error", `String err)
+                      ] ;
+                  let%bind () = after wait_span in
+                  go ()
+            in
+            go () )
+
+    let is_zkapp_deployed kp ledger =
+      match
+        Option.try_with (fun () ->
+            let account = account_of_kp kp ledger in
+            Option.is_some account.zkapp )
+      with
+      | Some true ->
+          true
+      | _ ->
+          false
+
+    let all_zkapps_deployed ~ledger (keypairs : Signature_lib.Keypair.t list) =
+      List.map keypairs ~f:(fun kp -> is_zkapp_deployed kp ledger)
+      |> List.for_all ~f:Fn.id
+
+    let rec wait_until_zkapps_deployed ?(deployed = false) ~mina ~ledger
+        ~deployment_fee ~max_cost ~init_balance
+        ~(fee_payer_array : Signature_lib.Keypair.t Array.t)
+        ~constraint_constants ~logger ~uuid ~stop_signal ~stop_time ~memo_prefix
+        ~wait_span (keypairs : Signature_lib.Keypair.t list) =
+      if Time.( >= ) (Time.now ()) stop_time then (
+        [%log info] "Scheduled zkApp commands with handle %s has expired"
+          (Uuid.to_string uuid) ;
+        Uuid.Table.remove scheduler_tbl uuid ;
+        return None )
+      else if Ivar.is_full stop_signal then (
+        [%log info] "Stopping scheduled zkApp commands with handle %s"
+          (Uuid.to_string uuid) ;
+        Uuid.Table.remove scheduler_tbl uuid ;
+        return None )
+      else if all_zkapps_deployed ~ledger keypairs then (
+        [%log info] "All zkApp accounts are deployed" ;
+        return (Some ledger) )
+      else
+        let%bind () =
+          if not deployed then (
+            [%log info] "Start deploying zkApp accounts" ;
+            deploy_zkapps ~mina ~ledger ~deployment_fee ~max_cost ~init_balance
+              ~fee_payer_array ~constraint_constants ~logger ~memo_prefix
+              ~wait_span ~stop_signal ~stop_time ~uuid keypairs )
+          else return ()
+        in
+        [%log debug] "The accounts were not in the best tip $ledger, try again"
+          ~metadata:
+            [ ( "ledger"
+              , `List (List.map (Ledger.to_list ledger) ~f:Account.to_yojson) )
+            ] ;
+        let%bind () =
+          Async.after
+            (Time.Span.of_ms
+               (Float.of_int constraint_constants.block_window_duration_ms) )
+        in
+        let ledger =
+          get_ledger_and_breadcrumb mina
+          |> Option.value_map ~default:ledger ~f:(fun (new_ledger, _) ->
+                 new_ledger )
+        in
+        wait_until_zkapps_deployed ~deployed:true ~mina ~ledger ~deployment_fee
+          ~max_cost ~init_balance ~fee_payer_array ~constraint_constants ~logger
+          ~uuid ~stop_signal ~stop_time ~memo_prefix ~wait_span keypairs
+
+    let schedule_zkapp_commands =
+      io_field "scheduleZkappCommands"
         ~args:
           Arg.
-            [ arg "handle" ~doc:"Payment scheduler handle"
+            [ arg "input" ~doc:"Zkapp commands details"
+                ~typ:(non_null Types.Input.Itn.ZkappCommandsDetails.arg_typ)
+            ]
+        ~typ:(non_null string)
+        ~resolve:(fun { ctx = with_seq_no, mina; _ } () input ->
+          if not with_seq_no then return @@ Error "Missing sequence information"
+          else
+            return
+            @@
+            match input with
+            | Error err ->
+                Error
+                  (sprintf "Invalid input to zkapp command scheduler: %s" err)
+            | Ok zkapp_command_details -> (
+                let logger = Mina_lib.top_level_logger mina in
+                [%log debug]
+                  ~metadata:
+                    [ ( "no_precondition"
+                      , `Bool zkapp_command_details.no_precondition )
+                    ]
+                  "Received request to start the zkapp command scheduler" ;
+                if List.is_empty zkapp_command_details.fee_payers then
+                  Error "Empty list of fee payers"
+                else
+                  let uuid = Uuid.create_random Random.State.default in
+                  let ivar = Ivar.create () in
+                  ( match Uuid.Table.add scheduler_tbl ~key:uuid ~data:ivar with
+                  | `Ok ->
+                      ()
+                  | `Duplicate ->
+                      failwith
+                        "Unexpected duplicate scheduled zkApp commands handle"
+                  ) ;
+                  let wait_span =
+                    1. /. zkapp_command_details.transactions_per_second
+                    |> Time.Span.of_sec
+                  in
+                  let duration_span =
+                    Time.Span.of_min
+                      (Float.of_int zkapp_command_details.duration_in_minutes)
+                  in
+                  let tm_start = Time.now () in
+                  let tm_end = Time.add tm_start duration_span in
+                  match get_ledger_and_breadcrumb mina with
+                  | None ->
+                      Error "Could not get best tip ledger"
+                  | Some (ledger, _best_tip) -> (
+                      [%log info] "Starting zkApp scheduler with handle %s"
+                        (Uuid.to_string uuid) ;
+                      let { Precomputed_values.constraint_constants; _ } =
+                        (Mina_lib.config mina).precomputed_values
+                      in
+                      let zkapp_account_keypairs =
+                        List.init zkapp_command_details.num_zkapps_to_deploy
+                          ~f:(fun _ -> Signature_lib.Keypair.create ())
+                      in
+                      let unused_keypairs =
+                        List.init (20 + zkapp_command_details.num_new_accounts)
+                          ~f:(fun _ -> Signature_lib.Keypair.create ())
+                      in
+                      let fee_payer_keypairs =
+                        List.map zkapp_command_details.fee_payers
+                          ~f:Signature_lib.Keypair.of_private_key_exn
+                      in
+                      let fee_payer_ids =
+                        List.map fee_payer_keypairs ~f:(fun kp ->
+                            Account_id.of_public_key kp.public_key )
+                      in
+                      let zkapp_account_ids =
+                        List.map zkapp_account_keypairs ~f:(fun kp ->
+                            Account_id.of_public_key kp.public_key )
+                      in
+                      let num_fee_payers = List.length fee_payer_keypairs in
+                      let fee_payer_array = Array.of_list fee_payer_keypairs in
+                      match
+                        Option.try_with (fun () ->
+                            Array.map fee_payer_array
+                              ~f:(fun fee_payer_keypair ->
+                                account_of_kp fee_payer_keypair ledger ) )
+                      with
+                      | None ->
+                          Error "fee payer not in the ledger"
+                      | Some _ ->
+                          let keymap =
+                            List.map
+                              ( zkapp_account_keypairs @ fee_payer_keypairs
+                              @ unused_keypairs )
+                              ~f:(fun { public_key; private_key } ->
+                                (Public_key.compress public_key, private_key) )
+                            |> Public_key.Compressed.Map.of_alist_exn
+                          in
+                          let `VK vk, `Prover prover =
+                            Transaction_snark.For_tests.create_trivial_snapp
+                              ~constraint_constants ()
+                          in
+                          let account_queue = Queue.create () in
+                          let insert_account_queue ~account_state_tbl id =
+                            let a =
+                              Account_id.Table.find_and_remove account_state_tbl
+                                id
+                            in
+                            Queue.enqueue account_queue (Option.value_exn a) ;
+                            if
+                              Queue.length account_queue
+                              > zkapp_command_details.account_queue_size
+                            then
+                              let a, role = Queue.dequeue_exn account_queue in
+                              Account_id.Table.add_exn account_state_tbl
+                                ~key:(Account.identifier a) ~data:(a, role)
+                            else ()
+                          in
+                          let rec go ~account_state_tbl ~ndx ~tm_next ~counter =
+                            if Time.( >= ) (Time.now ()) tm_end then (
+                              [%log info]
+                                "Scheduled zkApp commands with handle %s has \
+                                 expired"
+                                (Uuid.to_string uuid) ;
+                              Uuid.Table.remove scheduler_tbl uuid ;
+                              Deferred.unit )
+                            else if Ivar.is_full ivar then (
+                              [%log info]
+                                "Stopping scheduled zkApp commands with handle \
+                                 %s"
+                                (Uuid.to_string uuid) ;
+                              Uuid.Table.remove scheduler_tbl uuid ;
+                              Deferred.unit )
+                            else
+                              let fee_payer = fee_payer_array.(ndx) in
+                              let%bind () =
+                                match get_ledger_and_breadcrumb mina with
+                                | None ->
+                                    [%log info]
+                                      "Failed to fetch the best tip ledger, \
+                                       skip this round, we will try again at \
+                                       $time"
+                                      ~metadata:
+                                        [ ( "time"
+                                          , `String
+                                              (Time.to_string_fix_proto `Local
+                                                 tm_next ) )
+                                        ] ;
+                                    Deferred.unit
+                                | Some (ledger, _) -> (
+                                    let number_of_accounts_generated =
+                                      Account_id.Table.data account_state_tbl
+                                      @ Queue.to_list account_queue
+                                      |> List.filter ~f:(function
+                                           | _, `New_account ->
+                                               true
+                                           | _ ->
+                                               false )
+                                      |> List.length
+                                    in
+
+                                    let generate_new_accounts =
+                                      number_of_accounts_generated
+                                      < zkapp_command_details.num_new_accounts
+                                    in
+                                    let (fee_payer_account : Account.t), _ =
+                                      Account_id.Table.find_exn
+                                        account_state_tbl
+                                        (Account_id.of_public_key
+                                           fee_payer.public_key )
+                                    in
+                                    let memo =
+                                      Printf.sprintf "%s-%s-%s-%s"
+                                        zkapp_command_details.memo_prefix
+                                        (Int.to_string_hum ndx)
+                                        (Mina_numbers.Account_nonce.to_string
+                                           fee_payer_account.nonce )
+                                        (Int.to_string_hum counter)
+                                    in
+                                    let zkapp_command_with_dummy_auth =
+                                      Quickcheck.Generator.generate
+                                        ( if zkapp_command_details.max_cost then
+                                          Mina_generators
+                                          .Zkapp_command_generators
+                                          .gen_max_cost_zkapp_command_from
+                                            ~fee_payer_keypair:fee_payer
+                                            ~account_state_tbl ~vk
+                                            ~genesis_constants:
+                                              (Mina_lib.config mina)
+                                                .precomputed_values
+                                                .genesis_constants
+                                        else
+                                          Mina_generators
+                                          .Zkapp_command_generators
+                                          .gen_zkapp_command_from ~memo
+                                            ~no_account_precondition:
+                                              zkapp_command_details
+                                                .no_precondition
+                                            ~fee_range:
+                                              ( zkapp_command_details.min_fee
+                                              , zkapp_command_details.max_fee )
+                                            ~balance_change_range:
+                                              ( zkapp_command_details
+                                                  .min_balance_change
+                                              , zkapp_command_details
+                                                  .max_balance_change )
+                                            ~ignore_sequence_events_precond:true
+                                            ~no_token_accounts:true
+                                            ~limited:true
+                                            ~fee_payer_keypair:fee_payer ~keymap
+                                            ~account_state_tbl
+                                            ~generate_new_accounts ~ledger ~vk
+                                            () )
+                                        ~size:1
+                                        ~random:
+                                          (Splittable_random.State.create
+                                             Random.State.default )
+                                    in
+                                    let accounts =
+                                      Zkapp_command.accounts_referenced
+                                        zkapp_command_with_dummy_auth
+                                    in
+                                    List.iter accounts
+                                      ~f:
+                                        (insert_account_queue ~account_state_tbl) ;
+                                    let%bind zkapp_command =
+                                      Zkapp_command_builder
+                                      .replace_authorizations ~prover ~keymap
+                                        zkapp_command_with_dummy_auth
+                                    in
+                                    match%map
+                                      send_zkapp_command mina zkapp_command
+                                    with
+                                    | Ok _ ->
+                                        [%log info] "Send out zkApp $command"
+                                          ~metadata:
+                                            [ ( "command"
+                                              , Zkapp_command.to_yojson
+                                                  zkapp_command )
+                                            ]
+                                    | Error e ->
+                                        [%log info]
+                                          "Failed to send out zkApp $command, \
+                                           see $error"
+                                          ~metadata:
+                                            [ ( "command"
+                                              , Zkapp_command.to_yojson
+                                                  zkapp_command )
+                                            ; ("error", `String e)
+                                            ] )
+                              in
+                              let%bind () = Async_unix.at tm_next in
+                              let next_tm_next = Time.add tm_next wait_span in
+                              go ~account_state_tbl
+                                ~ndx:((ndx + 1) mod num_fee_payers)
+                                ~tm_next:next_tm_next ~counter:(counter + 1)
+                          in
+
+                          upon
+                            (wait_until_zkapps_deployed ~mina ~ledger
+                               ~deployment_fee:
+                                 zkapp_command_details.deployment_fee
+                               ~max_cost:zkapp_command_details.max_cost
+                               ~init_balance:zkapp_command_details.init_balance
+                               ~fee_payer_array ~constraint_constants
+                               zkapp_account_keypairs ~logger ~uuid
+                               ~stop_signal:ivar ~stop_time:tm_end
+                               ~memo_prefix:zkapp_command_details.memo_prefix
+                               ~wait_span ) (fun result ->
+                              match result with
+                              | None ->
+                                  ()
+                              | Some ledger ->
+                                  let account_state_tbl =
+                                    let get_account ids role =
+                                      List.map ids ~f:(fun id ->
+                                          (id, (account_of_id id ledger, role)) )
+                                    in
+
+                                    Account_id.Table.of_alist_exn
+                                      ( get_account fee_payer_ids `Fee_payer
+                                      @ get_account zkapp_account_ids
+                                          `Ordinary_participant )
+                                  in
+                                  let tm_next =
+                                    Time.add (Time.now ()) wait_span
+                                  in
+                                  don't_wait_for
+                                  @@ go ~account_state_tbl ~ndx:0 ~tm_next
+                                       ~counter:0 ) ;
+
+                          Ok (Uuid.to_string uuid) ) ) )
+
+    let stop_scheduled_transactions =
+      io_field "stopScheduledTransactions"
+        ~args:
+          Arg.
+            [ arg "handle" ~doc:"Transaction scheduler handle"
                 ~typ:(non_null string)
             ]
         ~typ:(non_null string)
@@ -4471,23 +5023,24 @@ module Mutations = struct
                   return
                   @@ Error
                        (sprintf
-                          "Could not find scheduled payments with handle %s"
+                          "Could not find scheduled transactions with handle %s"
                           handle )
               | Some ivar ->
                   [%log info]
-                    "Requesting stop of scheduled payments with handle %s"
+                    "Requesting stop of scheduled transactions with handle %s"
                     handle ;
                   Ivar.fill_if_empty ivar () ;
                   return
                   @@ Ok
                        (sprintf
-                          "Requesting stop of scheduled payments with handle %s"
+                          "Requesting stop of scheduled transactions with \
+                           handle %s"
                           handle )
             with _ ->
               return
               @@ Error
-                   (sprintf "Not a valid scheduled payments handle: %s" handle)
-          )
+                   (sprintf "Not a valid scheduled transactions handle: %s"
+                      handle ) )
 
     let update_gating =
       io_field "updateGating"
@@ -4574,7 +5127,12 @@ module Mutations = struct
             return @@ Ok s )
 
     let commands =
-      [ schedule_payments; stop_payments; update_gating; flush_internal_logs ]
+      [ schedule_payments
+      ; schedule_zkapp_commands
+      ; stop_scheduled_transactions
+      ; update_gating
+      ; flush_internal_logs
+      ]
   end
 end
 
