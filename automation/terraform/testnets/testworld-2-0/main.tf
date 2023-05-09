@@ -64,7 +64,7 @@ variable "fish_count" {
 
 module "node_configs" {
   providers      = { google.gke = google.google-us-central1 }
-  source         = "../../modules/o1-testnet"
+  source         = "../../modules/o1-testworld"
   cluster_name   = "coda-infra-central1"
   cluster_region = "us-central1"
   k8s_context    = "gke_o1labs-192920_us-central1_coda-infra-central1"
@@ -85,6 +85,7 @@ module "node_configs" {
   seed_zone      = "us-central1"
   seed_region    = "us-central1-b"
   seed_peers_url = "https://storage.googleapis.com/seed-lists/testworld-2-0_seeds.txt"
+  seed_key_pass  = "naughty blue worm"
 
   # archive configs
   archive_node_count  = 3
@@ -118,7 +119,7 @@ module "node_configs" {
   # snark worker configs
   snark_coordinators = [
     {
-      snark_worker_replicas        = 0
+      snark_worker_replicas        = 2
       snark_worker_fee             = "0.01"
       snark_worker_public_key      = "B62qmQsEHcsPUs5xdtHKjEmWqqhUPRSF2GNmdguqnNvpEZpKftPC69e"
       snark_coordinators_host_port = 10401
@@ -132,7 +133,7 @@ module "node_configs" {
 
   # block producer configs
   block_producer_starting_host_port = 10501
-  block_producer_key_pass           = "naughty blue worm"
+  # block_producer_key_pass           = ""
 
   whales = [
     for i in range(var.whale_count) : { duplicates = 1 }

@@ -62,7 +62,10 @@ spec:
           mountPath: /root/.mina-config
         env:
           - name: MINA_PRIVKEY_PASS
-            value: {{ $.Values.mina.privkeyPass | quote }}
+            valueFrom:
+                secretKeyRef:
+                        name: {{ $config.privkeyPass | quote }}
+                        key: keypass
       {{ if $config.libp2pSecret -}}
       - name: libp2p-perms
         image: {{ $.Values.mina.image | quote }}
