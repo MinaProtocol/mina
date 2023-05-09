@@ -37,6 +37,10 @@ spec:
         volumeMounts:
         - name: testnet
           mountPath: /testnet
+        readinessProbe:
+          httpGet:
+            path: /healthcheck
+            port: 80
       volumes:
       - name: testnet
         configMap:
