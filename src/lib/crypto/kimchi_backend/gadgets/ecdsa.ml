@@ -329,6 +329,7 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
   in
   (* Bounds 2: Left input bound check covered by (Bounds 1).
    *           Right input bound check value is gadget output so checked externally.
+   *           Result chained, so no bound check required.
    *)
   let expected_right_x =
     Foreign_field.sub
@@ -561,6 +562,16 @@ let%test_unit "group_add" =
                 unused_external_checks left_input right_input
                 foreign_field_modulus
             in
+
+            (* Check for expected quantity of external checks *)
+            assert (
+              Mina_stdlib.List.Length.equal unused_external_checks.bounds 6 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
+                3 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal
+                unused_external_checks.compact_multi_ranges 3 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -1057,6 +1068,16 @@ let%test_unit "group_add_chained" =
                   unused_external_checks input2 result1 foreign_field_modulus
             in
 
+            (* Check for expected quantity of external checks *)
+            assert (
+              Mina_stdlib.List.Length.equal unused_external_checks.bounds 12 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
+                6 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal
+                unused_external_checks.compact_multi_ranges 6 ) ;
+
             (* Check output matches expected result *)
             as_prover (fun () ->
                 assert (
@@ -1180,7 +1201,7 @@ let%test_unit "group_add_chained" =
     () )
 
 let%test_unit "group_add_full" =
-  if tests_enabled then
+  if tests_enabled then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -1359,4 +1380,4 @@ let%test_unit "group_add_full" =
         expected (* expected result *)
         secp256k1_modulus
     in
-    ()
+    () )
