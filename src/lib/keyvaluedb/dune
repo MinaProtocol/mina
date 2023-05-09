@@ -1,6 +1,6 @@
 (library
- (name rocksdb)
- (public_name rocksdb)
+ (name keyvaluedb)
+ (public_name keyvaluedb)
  (library_flags -linkall)
 (libraries
    ;; opam libraries
@@ -9,7 +9,6 @@
    base.caml
    core.uuid
    core_kernel
-   rocks
    core
    core_kernel.uuid
    sexplib0
@@ -19,8 +18,9 @@
    ;; local libraries
    file_system
    key_value_database
+   keyvaluedb_rust
 )
  (preprocess
   (pps ppx_version ppx_jane))
  (instrumentation (backend bisect_ppx))
- (synopsis "RocksDB Database module"))
+ (synopsis "Keyvaluedb Database module"))

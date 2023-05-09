@@ -33,7 +33,7 @@
    transition_frontier_extensions
    mina_base
    mina_transaction_logic
-   rocksdb
+   keyvaluedb
    mina_block
    mina_state
    genesis_constants

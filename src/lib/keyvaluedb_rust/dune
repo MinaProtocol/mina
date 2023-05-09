@@ -1,0 +1,23 @@
+(dirs :standard \ target)
+(rule
+ (targets libkeyvaluedb_rust.a libkeyvaluedb_rust.so)
+ (deps (source_tree .))
+ (action
+  (no-infer
+   (progn
+      (run sh -c "cargo build --release")
+    (run sh -c
+      "cp target/release/libkeyvaluedb_rust.so ./libkeyvaluedb_rust.so 2> /dev/null || \
+       cp target/release/libkeyvaluedb_rust.dylib ./libkeyvaluedb_rust.so")
+    (run cp target/release/libkeyvaluedb_rust.a ./libkeyvaluedb_rust.a)
+   ))))
+
+(library
+ (name keyvaluedb_rust)
+ (libraries
+    core_kernel
+    core
+ )
+ (public_name keyvaluedb_rust)
+ (c_library_flags -lpthread -lc -lm)
+ (foreign_archives keyvaluedb_rust))

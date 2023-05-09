@@ -110,7 +110,7 @@ module type Depth = sig
 end
 
 module type Key_value_database = sig
-  type t [@@deriving sexp]
+  type t
 
   type config
 

@@ -26,9 +26,6 @@ ARG RUST_NIGHTLY=2022-09-12
 # wasm-pack version
 ARG WASM_PACK_VERSION=v0.10.3
 
-# Rocksdb commit tag/branch to clone
-ARG ROCKSDB_VERSION=v5.18.4
-
 # --- OS package dependencies
 # Organized as two alphabetized lists, first libraries and then tools/other packages
 ENV DEBIAN_FRONTEND=noninteractive
@@ -109,21 +106,6 @@ USER root
 RUN curl -sL https://github.com/rustwasm/wasm-pack/releases/download/${WASM_PACK_VERSION}/wasm-pack-${WASM_PACK_VERSION}-x86_64-unknown-linux-musl.tar.gz \
   | tar --extract --gzip --strip-components=1 --directory=/usr/bin --file=-
 
-# --- RocksDB Installation of a given ROCKSDB_VERSION
-# These flags turn some errors into warnings for running with G++ 9 or higher
-# The build command below checks for the g++ major version and removes CXXFLAGS if its less than 9
-ENV CXXFLAGS '-Wno-error=deprecated-copy -Wno-error=pessimizing-move -Wno-error=class-memaccess'
-# This builds and installs just the rocksdb static lib for us, and cleans up after itself
-# Send error output to /dev/null as its noisy with compiler warnings
-RUN git clone https://github.com/facebook/rocksdb \
-  --depth 1 --shallow-submodules \
-  -b "${ROCKSDB_VERSION}" /rocksdb \
-  && test $(g++ -dumpversion | cut -c 1 -) -lt 9 \
-    && CXXFLAGS='' make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) 2>/dev/null \
-    || make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) 2>/dev/null \
-  && cp /rocksdb/librocksdb.a /usr/local/lib/librocksdb_coda.a \
-  && rm -rf /rocksdb \
-  && strip -S /usr/local/lib/librocksdb_coda.a
 # Clear CXXFLAGS afterwards to avoid affecting other code
 ENV CXXFLAGS=""
 

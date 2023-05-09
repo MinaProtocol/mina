@@ -205,19 +205,19 @@ module Error = struct
         sprintf "Raised %s" (Error.to_string_hum err)
 end
 
-module Rocks = Rocksdb.Serializable.GADT.Make (Schema)
+module Keyvaluedb = Keyvaluedb.Serializable.GADT.Make (Schema)
 
-type t = { directory : string; logger : Logger.t; db : Rocks.t }
+type t = { directory : string; logger : Logger.t; db : Keyvaluedb.t }
 
 let create ~logger ~directory =
   if not (Result.is_ok (Unix.access directory [ `Exists ])) then
     Unix.mkdir ~perm:0o766 directory ;
-  { directory; logger; db = Rocks.create directory }
+  { directory; logger; db = Keyvaluedb.create directory }
 
-let close t = Rocks.close t.db
+let close t = Keyvaluedb.close t.db
 
 open Schema
-open Rocks
+open Keyvaluedb
 
 let mem db ~key = Option.is_some (get db ~key)
 
@@ -359,6 +359,7 @@ let move_root t ~new_root ~garbage =
            *)
           Batch.remove batch ~key:(Transition node_hash) ;
           Batch.remove batch ~key:(Arcs node_hash) ) ) ;
+  Keyvaluedb.gc t.db ;
   old_root_hash
 
 let get_transition t hash =

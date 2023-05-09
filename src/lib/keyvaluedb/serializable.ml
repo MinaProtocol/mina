@@ -1,4 +1,5 @@
 open Core_kernel
+module Rust = Keyvaluedb_rust.Rust
 
 module Make (Key : Binable.S) (Value : Binable.S) :
   Key_value_database.Intf.S
@@ -75,6 +76,8 @@ module GADT = struct
 
     val close : t -> unit
 
+    val gc : t -> unit
+
     val get : t -> key:'a g -> 'a option
 
     val get_raw : t -> key:'a g -> Bigstring.t option
@@ -125,6 +128,8 @@ module GADT = struct
     let create directory = Database.create directory
 
     let close = Database.close
+
+    let gc = Database.gc
 
     module T = Make_Serializer (Database)
     include T

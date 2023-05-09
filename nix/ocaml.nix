@@ -165,8 +165,6 @@ let
           pkgs.fd
         ] ++ ocaml-libs;
 
-        # todo: slimmed rocksdb
-        MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
 
         # this is used to retrieve the path of the built static library
@@ -269,9 +267,9 @@ let
           mv _build/default/src/app/cli/src/mina.exe $out/bin/mina
         '';
       });
-        
+
       with-instrumentation = wrapMina self.with-instrumentation-dev { };
-      
+
       # Unit tests
       mina_tests = runMinaCheck {
         name = "tests";

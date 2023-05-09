@@ -17,7 +17,7 @@
    async_unix
    ;; local libraries
    mina_metrics
-   rocksdb
+   keyvaluedb
    pipe_lib
    logger
    key_value_database

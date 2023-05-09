@@ -478,7 +478,7 @@ module Make (Action : Action_intf) = Make0 (struct
 
   module Config = String
   module Db =
-    Rocksdb.Serializable.Make
+    Keyvaluedb.Serializable.Make
       (Network_peer.Peer.Stable.Latest)
       (Record.Stable.Latest)
   module Action = Action

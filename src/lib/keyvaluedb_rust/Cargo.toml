@@ -1,0 +1,17 @@
+[package]
+name = "keyvaluedb_rust"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["staticlib", "cdylib", "lib"]
+
+[dependencies]
+rand = {version = "0.8", features = [ "small_rng" ] }
+uuid = { version = "1", features = [ "v4" ] }
+libc = "0.2"
+crc32fast = "1"
+zstd = "0.12"
+ocaml-interop = { git = "https://github.com/sebastiencs/ocaml-interop.git", branch = "closure-values" }
