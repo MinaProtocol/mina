@@ -176,6 +176,13 @@ let cvar_field_to_bignum_bigint_as_prover (type f)
 let bignum_biguint_sqrt (x : Bignum_bigint.t) : Bignum_bigint.t =
   Bignum_bigint.of_zarith_bigint @@ Z.sqrt @@ Bignum_bigint.to_zarith_bigint x
 
+(* Compute the inverse of Bignum_bigint value x with modulus *)
+let bignum_bigint_inverse (x : Bignum_bigint.t) (modulus : Bignum_bigint.t) :
+    Bignum_bigint.t =
+  let x = Bignum_bigint.to_zarith_bigint x in
+  let modulus = Bignum_bigint.to_zarith_bigint modulus in
+  Bignum_bigint.of_zarith_bigint @@ Z.invert x modulus
+
 (* Field to hex *)
 let field_to_hex (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)

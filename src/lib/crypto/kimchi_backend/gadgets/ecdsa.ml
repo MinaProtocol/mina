@@ -116,7 +116,7 @@ let tuple9_of_array array =
   | _ ->
       assert false
 
-(* Helper to check if point is on secp256k1 curve *)
+(* Helper to check if point is on secp256k1 curve: y^2 = x^3 + 7 *)
 let secp256k1_is_on_curve (point : Bignum_bigint.t * Bignum_bigint.t)
     (foreign_field_modulus : Bignum_bigint.t) : bool =
   let x, y = point in
@@ -225,19 +225,13 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
         (* Compute slope and slope squared *)
         let slope =
           Bignum_bigint.(
-            (* Computes 2 = (Ry - Ly)/(Rx - Lx) *)
+            (* Computes s = (Ry - Ly)/(Rx - Lx) *)
             let delta_y = (right_y - left_y) % foreign_field_modulus in
             let delta_x = (right_x - left_x) % foreign_field_modulus in
 
             (* Compute delta_x inverse *)
             let delta_x_inv =
-              let delta_x = Bignum_bigint.to_zarith_bigint delta_x in
-              let foreign_field_modulus =
-                Bignum_bigint.to_zarith_bigint foreign_field_modulus
-              in
-
-              let delta_x_inv = Z.invert delta_x foreign_field_modulus in
-              Bignum_bigint.of_zarith_bigint delta_x_inv
+              Common.bignum_bigint_inverse delta_x foreign_field_modulus
             in
 
             delta_y * delta_x_inv % foreign_field_modulus)
@@ -442,6 +436,142 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* Return result point *)
   Affine.of_coordinates (result_x, result_y)
+
+(* Gadget for (partial) elliptic curve group doubling over foreign field
+ *
+ *   Given input point P, constrains that
+ *     s' = 3 * Px^2 / (2 * Py) mod f
+ *     x = s'^2 - 2 * Px mod f
+ *     y = s' * (Px - x) - Py mod f
+ *
+ *   where f is the foreign field modulus.
+ *   See p. 348 of "Introduction to Modern Cryptography" by Katz and Lindell
+ *
+ *   Preconditions and limitations:
+ *      Px is not O (the point at infinity)
+ *
+ *   Note: See group addition notes (above) about group properties supported by this implementation
+ *)
+let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
+    (_external_checks : f Foreign_field.External_checks.t) (point : f Affine.t)
+    (a : f) (* curve parameter *)
+    (foreign_field_modulus : f Foreign_field.standard_limbs) : f Affine.t =
+  let open Circuit in
+  (* TODO: Remove sanity checks if this API is not public facing *)
+  as_prover (fun () ->
+      (* Sanity check that point is not infinity *)
+      assert (
+        not
+          (Affine.equal_as_prover
+             (module Circuit)
+             point
+             (Affine.zero_as_prover (module Circuit)) ) ) ) ;
+
+  (* Unpack coordinates *)
+  let point_x, point_y = Affine.to_coordinates point in
+
+  (* Compute witness values *)
+  let ( _slope0
+      , _slope1
+      , _slope2
+      , _result_x0
+      , _result_x1
+      , _result_x2
+      , _result_y0
+      , _result_y1
+      , _result_y2 ) =
+    exists (Typ.array ~length:9 Field.typ) ~compute:(fun () ->
+        let point_x =
+          Foreign_field.Element.Standard.to_bignum_bigint_as_prover
+            (module Circuit)
+            point_x
+        in
+        let point_y =
+          Foreign_field.Element.Standard.to_bignum_bigint_as_prover
+            (module Circuit)
+            point_y
+        in
+        let a = Common.field_to_bignum_bigint (module Circuit) a in
+        let foreign_field_modulus =
+          Foreign_field.field_standard_limbs_to_bignum_bigint
+            (module Circuit)
+            foreign_field_modulus
+        in
+
+        (* Compute slope using 1st derivative of sqrt(x^3 + a * x + b)
+         * Note that when a = 0 (e.g. as in the case of secp256k1) we have
+         * one fewer constraint.
+         *)
+        let slope =
+          Bignum_bigint.(
+            (* Computes s' = (3 * Px^2  + a )/ 2 * Py *)
+            let numerator =
+              ( of_int 3
+                * pow point_x (of_int 2)
+                % foreign_field_modulus % foreign_field_modulus
+              + a )
+              % foreign_field_modulus
+            in
+            let denominator = of_int 2 * point_y % foreign_field_modulus in
+
+            (* Compute inverse of denominator *)
+            let denominator_inv =
+              Common.bignum_bigint_inverse denominator foreign_field_modulus
+            in
+            numerator * denominator_inv % foreign_field_modulus)
+        in
+
+        let slope_squared =
+          Bignum_bigint.((pow slope @@ of_int 2) % foreign_field_modulus)
+        in
+
+        (* Compute result's x-coodinate: x = s^2 - 2 * Px *)
+        let result_x =
+          Bignum_bigint.(
+            slope_squared
+            - of_int 2 * point_x % foreign_field_modulus % foreign_field_modulus)
+        in
+
+        (* Compute result's y-coodinate: y = s * (Px - x) - Py *)
+        let result_y =
+          Bignum_bigint.(
+            let x_diff = (point_x - result_x) % foreign_field_modulus in
+            let x_diff_s = slope * x_diff % foreign_field_modulus in
+            (x_diff_s - point_y) % foreign_field_modulus)
+        in
+
+        (* Convert from Bignums to field elements *)
+        let slope0, slope1, slope2 =
+          Foreign_field.bignum_bigint_to_field_standard_limbs
+            (module Circuit)
+            slope
+        in
+        let result_x0, result_x1, result_x2 =
+          Foreign_field.bignum_bigint_to_field_standard_limbs
+            (module Circuit)
+            result_x
+        in
+        let result_y0, result_y1, result_y2 =
+          Foreign_field.bignum_bigint_to_field_standard_limbs
+            (module Circuit)
+            result_y
+        in
+
+        (* Return and convert back to Cvars *)
+        [| slope0
+         ; slope1
+         ; slope2
+         ; result_x0
+         ; result_x1
+         ; result_x2
+         ; result_y0
+         ; result_y1
+         ; result_y2
+        |] )
+    |> tuple9_of_array
+  in
+
+  point
 
 (*********)
 (* Tests *)
