@@ -105,7 +105,6 @@ let dispatch_remote_log log =
           eprintf "Exception when sending internal log via RPC: %s"
             (Exn.to_string_mach exn) )
 
-
 (* Used to ensure that no more than one log message is on-flight at
    a time to guarantee sequential processing. *)
 let sequential_dispatcher_loop () =
@@ -134,7 +133,6 @@ let log ?process ~timestamp ~message ~metadata () =
         List.map metadata ~f:(fun (s, json) -> (s, Yojson.Safe.to_string json))
       in
       let remote_log = { timestamp; message; metadata; process } in
-      (* write the message to the pipe *)
       Async.Pipe.write_without_pushback sequential_log_writer_pipe remote_log
   | None ->
       (* daemon *)
@@ -167,3 +165,22 @@ let flush_queue end_log_counter =
   Queue.filter_inplace log_queue ~f:(fun t -> t.sequence_no > end_log_counter) ;
   let len' = Queue.length log_queue in
   len - len'
+
+(* Post-processing hook *)
+
+type message_postprocessor =
+     timestamp:Time.t
+  -> message:string
+  -> metadata:(string * Yojson.Safe.t) list
+  -> (Time.t * string * (string * Yojson.Safe.t) list) list
+
+let set_message_postprocessor, postprocess_message =
+  let message_postprocessor : message_postprocessor ref =
+    ref (fun ~timestamp ~message ~metadata ->
+        [ (timestamp, message, metadata) ] )
+  in
+  let set f = message_postprocessor := f in
+  let call ~timestamp ~message ~metadata =
+    !message_postprocessor ~timestamp ~message ~metadata
+  in
+  (set, call)

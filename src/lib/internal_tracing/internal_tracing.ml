@@ -73,33 +73,33 @@ let with_slot slot f = with_block (Some (Global_slot slot)) f
 let get_current_block_id () =
   Async_kernel.Async_kernel_scheduler.find_local current_block_id_key
 
-let handling_current_block_id_change' block_id =
+let handling_current_block_id_change' ~last_block_id block_id ~make =
   if Block_id.equal !last_block_id block_id then []
   else (
     last_block_id := block_id ;
-    [ `Assoc [ ("current_block", `String (Block_id.to_string block_id)) ] ] )
+    [ make block_id ] )
 
 (** If the current context has a different block from last time,
     record a block context change. It is important to call this when generating
     events that relate to a block to detect and record context switches
     made by the Async scheduler. *)
-let handling_current_block_id_change events =
+let handling_current_block_id_change ~last_block_id events ~make =
   let block_id = Option.value ~default:no_block @@ get_current_block_id () in
-  handling_current_block_id_change' block_id @ events
+  handling_current_block_id_change' ~last_block_id block_id ~make @ events
 
-let handling_current_call_id_change' call_id =
+let handling_current_call_id_change' ~last_call_id call_id ~make =
   if Int.equal !last_call_id call_id then []
   else (
     last_call_id := call_id ;
-    [ `Assoc [ ("current_call_id", `Int call_id) ] ] )
+    [ make call_id ] )
 
 (** If the current context has a different call ID from last time,
     record a call ID context change. It is important to call this when generating
     events that relate to different concurrent calls to detect and record
     context switches made by the Async scheduler. *)
-let handling_current_call_id_change events =
+let handling_current_call_id_change ~last_call_id events ~make =
   let call_id = Internal_tracing_context_call.get () in
-  handling_current_call_id_change' call_id @ events
+  handling_current_call_id_change' ~last_call_id ~make call_id @ events
 
 module For_logger = struct
   module Json_lines_rotate_transport = struct
@@ -151,9 +151,22 @@ module For_logger = struct
           Option.value ~default:`Null (String.Map.find metadata "state_hash")
         in
         `Assoc [ ("produced_block_state_hash", state_hash) ]
+
+      let current_block_id block_id =
+        `Assoc [ ("current_block", `String (Block_id.to_string block_id)) ]
+
+      let current_call_id call_id = `Assoc [ ("current_call_id", `Int call_id) ]
     end
 
     let process () msg =
+      let handling_current_block_id_change =
+        handling_current_block_id_change ~last_block_id
+          ~make:Event.current_block_id
+      in
+      let handling_current_call_id_change =
+        handling_current_call_id_change ~last_call_id
+          ~make:Event.current_call_id
+      in
       let { Logger.Message.level; message; metadata; timestamp; _ } = msg in
       if is_enabled () && Logger.Level.equal level Logger.Level.Internal then
         let json_lines : Yojson.Safe.t list =
@@ -200,6 +213,32 @@ module For_logger = struct
     Logger.Transport.create (module Json_lines_rotate_transport) state
 
   let processor = Logger.Processor.create (module Processor) ()
+
+  let last_block_id = ref no_block
+
+  let last_call_id = ref 0
+
+  (* Used by ITN logging handler. Unlike the above, this produces raw messages
+     instead of JSON output *)
+  let post_process_message ~timestamp ~message ~metadata =
+    let handling_current_block_id_change =
+      handling_current_block_id_change ~last_block_id ~make:(fun block_id ->
+          ( timestamp
+          , "@current_block_id"
+          , [ ("current_block_id", `String (Block_id.to_string block_id)) ] ) )
+    in
+    let handling_current_call_id_change =
+      handling_current_call_id_change ~last_call_id ~make:(fun call_id ->
+          (timestamp, "@current_call_id", [ ("current_call_id", `Int call_id) ]) )
+    in
+    if is_enabled () then
+      let log_messages : (Time.t * string * (string * Yojson.Safe.t) list) list
+          =
+        handling_current_call_id_change
+        @@ handling_current_block_id_change [ (timestamp, message, metadata) ]
+      in
+      log_messages
+    else []
 end
 
 module Context_logger = Internal_tracing_context_logger
