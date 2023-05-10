@@ -207,8 +207,11 @@ module Block_produced = struct
     let%bind block_height =
       find int breadcrumb_consensus_state [ "blockchain_length" ]
     in
-    let%bind global_slot =
-      find int breadcrumb_consensus_state [ "curr_global_slot"; "slot_number" ]
+    let%bind global_slot_since_hard_fork =
+      find (list string) breadcrumb_consensus_state [ "slot_number" ]
+    in
+    let global_slot =
+      List.nth_exn global_slot_since_hard_fork 1 |> Int.of_string
     in
     let%map epoch = find int breadcrumb_consensus_state [ "epoch_count" ] in
     { block_height; global_slot; epoch; snarked_ledger_generated; state_hash }
