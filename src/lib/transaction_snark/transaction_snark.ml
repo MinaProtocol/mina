@@ -2236,6 +2236,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         Account_id.Checked.create payload.common.fee_payer_pk fee_token
       in
       let%bind () =
+        [%with_label_ "Fee-payer and soure must be equal"] (fun () ->
+            Account_id.Checked.equal fee_payer source >>= Boolean.Assert.is_true )
+      in
+      let%bind () =
         [%with_label_ "Check slot validity"] (fun () ->
             Global_slot.Checked.(
               current_global_slot <= payload.common.valid_until)
