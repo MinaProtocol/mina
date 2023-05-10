@@ -105,6 +105,17 @@ let dispatch_remote_log log =
           eprintf "Exception when sending internal log via RPC: %s"
             (Exn.to_string_mach exn) )
 
+
+(* Used to ensure that no more than one log message is on-flight at
+   a time to guarantee sequential processing. *)
+let sequential_dispatcher_loop () =
+  let open Async in
+  let pipe_r, pipe_w = Pipe.create () in
+  don't_wait_for (Pipe.iter pipe_r ~f:dispatch_remote_log) ;
+  pipe_w
+
+let sequential_log_writer_pipe = sequential_dispatcher_loop ()
+
 (* this function can be called:
    (1) by the logging process (daemon, verifier, or prover) from the logger in Logger, or
    (2) by the daemon when it receives a log via RPC from the verifier or prover
@@ -123,7 +134,8 @@ let log ?process ~timestamp ~message ~metadata () =
         List.map metadata ~f:(fun (s, json) -> (s, Yojson.Safe.to_string json))
       in
       let remote_log = { timestamp; message; metadata; process } in
-      Async.don't_wait_for (dispatch_remote_log remote_log)
+      (* write the message to the pipe *)
+      Async.Pipe.write_without_pushback sequential_log_writer_pipe remote_log
   | None ->
       (* daemon *)
       (* convert JSON to Basic.t in queue, so we don't have to in GraphQL response *)
