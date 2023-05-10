@@ -65,7 +65,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Some
           { node_name = "snark-node"
           ; account_name = "snark-node-key1"
-          ; worker_nodes = 8
+          ; worker_nodes = 4
           }
     ; snark_worker_fee = "0.0001"
     ; num_archive_nodes = 1
