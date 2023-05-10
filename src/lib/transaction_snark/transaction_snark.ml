@@ -2236,6 +2236,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         Account_id.Checked.create payload.common.fee_payer_pk fee_token
       in
       let%bind () =
+        [%with_label_ "Fee-payer and soure must be equal"] (fun () ->
+            Account_id.Checked.equal fee_payer source >>= Boolean.Assert.is_true )
+      in
+      let%bind () =
         [%with_label_ "Check slot validity"] (fun () ->
             Global_slot.Checked.(
               current_global_slot <= payload.common.valid_until)
@@ -4200,6 +4204,13 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; authorization = Signature.dummy
         }
       in
+      let sender_is_the_same_as_fee_payer =
+        match fee_payer_opt with
+        | Some (fee_payer, _) ->
+            Signature_lib.Keypair.equal fee_payer sender
+        | None ->
+            true
+      in
       let preconditions' =
         Option.value preconditions
           ~default:
@@ -4208,9 +4219,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ~f:(fun { network; _ } -> network)
                   ~default:Zkapp_precondition.Protocol_state.accept
             ; account =
-                ( if Option.is_none fee_payer_opt then
-                  Nonce (Account.Nonce.succ sender_nonce)
-                else Nonce sender_nonce )
+                ( if sender_is_the_same_as_fee_payer then
+                  Account_update.Account_precondition.Accept
+                else Nonce (Account.Nonce.succ sender_nonce) )
             ; valid_while =
                 Option.value_map preconditions
                   ~f:(fun { valid_while; _ } -> valid_while)
@@ -4230,13 +4241,15 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; update = Account_update.Update.noop
           ; token_id = Token_id.default
           ; balance_change
-          ; increment_nonce = false
+          ; increment_nonce =
+              (if sender_is_the_same_as_fee_payer then false else true)
           ; events = []
           ; actions = []
           ; call_data = Field.zero
           ; call_depth = 0
           ; preconditions = preconditions'
-          ; use_full_commitment = true
+          ; use_full_commitment =
+              (if sender_is_the_same_as_fee_payer then true else false)
           ; implicit_account_creation_fee = false
           ; may_use_token = No
           ; authorization_kind = Signature
@@ -4478,8 +4491,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
     end
 
-    let deploy_snapp ?(no_auth = false) ?(default_permissions = false)
-        ~constraint_constants (spec : Deploy_snapp_spec.t) =
+    let deploy_snapp ?(no_auth = false) ?permissions ~constraint_constants
+        (spec : Deploy_snapp_spec.t) =
       let `VK vk, `Prover _trivial_prover =
         create_trivial_snapp ~constraint_constants ()
       in
@@ -4497,14 +4510,13 @@ module Make_str (A : Wire_types.Concrete) = struct
           { update with
             verification_key = Zkapp_basic.Set_or_keep.Set vk
           ; permissions =
-              ( if default_permissions then
-                Zkapp_basic.Set_or_keep.Set Permissions.user_default
-              else
-                Zkapp_basic.Set_or_keep.Set
-                  { Permissions.user_default with
-                    edit_state = Permissions.Auth_required.Proof
-                  ; edit_action_state = Proof
-                  } )
+              Zkapp_basic.Set_or_keep.Set
+                (Option.value permissions
+                   ~default:
+                     { Permissions.user_default with
+                       edit_state = Permissions.Auth_required.Proof
+                     ; edit_action_state = Proof
+                     } )
           }
       in
       let ( `Zkapp_command { Zkapp_command.fee_payer; account_updates; memo }

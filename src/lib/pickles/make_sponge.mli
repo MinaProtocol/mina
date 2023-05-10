@@ -88,15 +88,15 @@ module Make (Field : Kimchi_backend.Field.S) :
 
 module Test
     (Impl : Snarky_backendless.Snark_intf.Run)
-    (S_constant : Sponge.Intf.Sponge
-                    with module Field := Impl.Field.Constant
-                     and module State := Sponge.State
-                     and type input := Impl.field
-                     and type digest := Impl.field)
-    (S_checked : Sponge.Intf.Sponge
-                   with module Field := Impl.Field
-                    and module State := Sponge.State
-                    and type input := Impl.Field.t
-                    and type digest := Impl.Field.t) : sig
+    (_ : Sponge.Intf.Sponge
+           with module Field := Impl.Field.Constant
+            and module State := Sponge.State
+            and type input := Impl.field
+            and type digest := Impl.field)
+    (_ : Sponge.Intf.Sponge
+           with module Field := Impl.Field
+            and module State := Sponge.State
+            and type input := Impl.Field.t
+            and type digest := Impl.Field.t) : sig
   val test : Impl.Field.Constant.t Sponge.Params.t -> unit
 end
