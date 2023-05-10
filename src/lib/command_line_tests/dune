@@ -1,7 +1,5 @@
-(library
- (name command_line_tests)
- (public_name command_line_tests)
- (inline_tests (deps ../../app/cli/src/mina.exe))
+(tests
+ (names command_line_tests)
  (libraries
    ;; opam libraries
    async_kernel
@@ -11,6 +9,7 @@
    core
    async_unix
    stdio
+   alcotest
    ;; mina libraries
    init
  )
