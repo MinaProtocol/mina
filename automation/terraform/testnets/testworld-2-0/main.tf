@@ -118,7 +118,7 @@ module "node_configs" {
   # snark worker configs
   snark_coordinators = [
     {
-      snark_worker_replicas        = 0
+      snark_worker_replicas        = 2
       snark_worker_fee             = "0.01"
       snark_worker_public_key      = "B62qmQsEHcsPUs5xdtHKjEmWqqhUPRSF2GNmdguqnNvpEZpKftPC69e"
       snark_coordinators_host_port = 10401
