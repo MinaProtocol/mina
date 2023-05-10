@@ -9,25 +9,16 @@ module Snark_intf = Snarky_backendless.Snark_intf
 let keccak_dim = 5
 
 (* value `l` in Keccak, ranges from 0 to 6 (7 possible values) *)
-let keccak_length = 6
+let keccak_ell = 6
 
 (* width of the lane of the state, meaning the length of each word in bits (64) *)
-let keccak_word = Int.pow 2 keccak_length
+let keccak_word = Int.pow 2 keccak_ell
 
 (* length of the state in bits, meaning the 5x5 matrix of words in bits (1600) *)
 let keccak_state_length = Int.pow 2 keccak_word
 
 (* number of rounds of the Keccak permutation function depending on the value `l` (24) *)
-let keccak_rounds = 12 + (2 * keccak_length)
-
-(* Length of hash output *)
-let keccak_eth_output = 256
-
-(* Capacity in Keccak256 *)
-let keccak_eth_capacity = 512
-
-(* Bitrate in Keccak256 (1088) *)
-let keccak_eth_bitrate = keccak_state_length - keccak_eth_capacity
+let keccak_rounds = 12 + (2 * keccak_ell)
 
 (* Creates the 5x5 table of rotation offset for Keccak modulo 64
    * | x \ y |  0 |  1 |  2 |  3 |  4 |
@@ -65,7 +56,6 @@ let check_bytes_to_word (type f)
 (* Internal struct for Keccak State *)
 
 module State = struct
-  module Cvar = Snarky_backendless.Cvar
 
   type 'a matrix = 'a array array
 
@@ -185,17 +175,43 @@ end
 
 (* Pads a message M as:
    * M || pad[x](|M|)
-   * Padding rule 10*1.
+   * Padding rule 0x06 ..0*..1.
    * The padded message vector will start with the message vector
-   * followed by the 10*1 rule to fulfil a length that is a multiple of bitrate (in bytes)
+   * followed by the 0*1 rule to fulfil a length that is a multiple of rate (in bytes)
 *)
-let pad (type f)
+let pad_nist (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (message : Circuit.Field.t list) (bitrate : int) : Circuit.Field.t list =
+    (message : Circuit.Field.t list) (rate : int) : Circuit.Field.t list =
   let open Circuit in
   (* Find out desired length of the padding in bytes *)
-  (* If message is already bitrate bits, need to pad full bitrate again *)
-  let extra_bytes = (bitrate / 8) - (List.length message mod bitrate) in
+  (* If message is already rate bits, need to pad full rate again *)
+  let extra_bytes = (rate / 8) - (List.length message mod rate) in
+  (* 0x06 0x00 ... 0x00 0x80 or 0x86 *)
+  let last_field = Common.two_pow (module Circuit) 7 in
+  let last = Field.constant @@ Common.two_pow (module Circuit) 7 in
+  (* Create the padding vector *)
+  let pad = Array.create ~len:extra_bytes Field.zero in
+  pad.(0) <- Field.of_int 6 ;
+  pad.(extra_bytes - 1) <- Field.add pad.(extra_bytes - 1) last ;
+  Field.Assert.equal (Field.constant last_field) last ;
+  (* Cast the padding array to a list *)
+  let pad = Array.to_list pad in
+  (* Return the padded message *)
+  message @ pad
+
+(* Pads a message M as:
+   * M || pad[x](|M|)
+   * Padding rule 10*1.
+   * The padded message vector will start with the message vector
+   * followed by the 10*1 rule to fulfil a length that is a multiple of rate (in bytes)
+*)
+let pad_101 (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (message : Circuit.Field.t list) (rate : int) : Circuit.Field.t list =
+  let open Circuit in
+  (* Find out desired length of the padding in bytes *)
+  (* If message is already rate bits, need to pad full rate again *)
+  let extra_bytes = (rate / 8) - (List.length message mod rate) in
   (* 0x01 0x00 ... 0x00 0x80 or 0x81 *)
   let last_field = Common.two_pow (module Circuit) 7 in
   let last = Field.constant @@ Common.two_pow (module Circuit) 7 in
@@ -407,18 +423,18 @@ let permutation (type f)
   done ;
   state
 
-(* Absorb padded message into a keccak state with given bitrate and capacity *)
+(* Absorb padded message into a keccak state with given rate and capacity *)
 let absorb (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (padded_message : Circuit.Field.t list) ~(bitrate : int) ~(capacity : int) :
+    (padded_message : Circuit.Field.t list) ~(capacity : int) ~(rate : int) :
     Circuit.Field.t State.matrix =
   let open Circuit in
   let root_state = State.zeros (module Circuit) in
   let state = root_state in
 
-  (* split into blocks of bitrate bits *)
-  (* for each block of bitrate bits in the padded message -> this is bitrate/8 bytes *)
-  let chunks = List.chunks_of padded_message ~length:(bitrate / 8) in
+  (* split into blocks of rate bits *)
+  (* for each block of rate bits in the padded message -> this is rate/8 bytes *)
+  let chunks = List.chunks_of padded_message ~length:(rate / 8) in
   (* (capacity / 8) zero bytes *)
   let zeros = Array.to_list @@ Array.create ~len:(capacity / 8) Field.zero in
   for i = 0 to List.length chunks do
@@ -439,7 +455,7 @@ let absorb (type f)
 (* Squeeze state until it has a desired length in bits *)
 let squeeze (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (state : Circuit.Field.t State.matrix) ~(bitrate : int) ~(bitlength : int) :
+    (state : Circuit.Field.t State.matrix) ~(length : int) ~(rate : int) :
     Circuit.Field.t list =
   let copy (bytestring : Circuit.Field.t list)
       (output_array : Circuit.Field.t array) ~(start : int) ~(length : int) :
@@ -452,10 +468,10 @@ let squeeze (type f)
 
   let open Circuit in
   (* bytes per squeeze *)
-  let bytes_per_squeeze = bitrate / 8 in
+  let bytes_per_squeeze = rate / 8 in
   (* number of squeezes *)
-  let squeezes = (bitlength / bitrate) + 1 in
-  (* multiple of bitrate that is larger than output_length, in bytes *)
+  let squeezes = (length / rate) + 1 in
+  (* multiple of rate that is larger than output_length, in bytes *)
   let output_length = squeezes * bytes_per_squeeze in
   (* array with sufficient space to store the output *)
   let output_array = Array.create ~len:output_length Field.zero in
@@ -479,7 +495,7 @@ let squeeze (type f)
   done ;
   (* Obtain the hash selecting the first bitlength/8 bytes of the output array *)
   let hashed =
-    Array.to_list @@ Array.sub output_array ~pos:0 ~len:(bitlength / 8)
+    Array.to_list @@ Array.sub output_array ~pos:0 ~len:(length / 8)
   in
 
   hashed
@@ -489,36 +505,67 @@ let squeeze (type f)
  *)
 let sponge (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (padded_message : Circuit.Field.t list) ~(bitrate : int) ~(capacity : int)
-    ~(bitlength : int) : Circuit.Field.t list =
-  (* check that the padded message is a multiple of bitrate *)
-  assert (List.length padded_message * 8 mod bitrate = 0) ;
+    (padded_message : Circuit.Field.t list) ~(length : int) ~(capacity : int) ~(rate : int) 
+     : Circuit.Field.t list =
+  (* check that the padded message is a multiple of rate *)
+  assert (List.length padded_message * 8 mod rate = 0) ;
 
   (* absorb *)
-  let state = absorb (module Circuit) padded_message ~bitrate ~capacity in
+  let state = absorb (module Circuit) padded_message ~capacity ~rate in
 
   (* squeeze *)
-  let hashed = squeeze (module Circuit) state ~bitrate ~bitlength in
+  let hashed = squeeze (module Circuit) state ~length ~rate in
   hashed
 
 (*
 * Keccak hash function with input message passed as list of 1byte Cvars.
 * The message will be parsed as follows:
 * - the first byte of the message will be the least significant byte of the first word of the state (A[0][0])
-* - the 10*1 pad will take place after the message, until reaching the bit length BITRATE.
+* - the 10*1 pad will take place after the message, until reaching the bit length rate.
 * - then, {0} pad will take place to finish the 1600 bits of the state.
 *)
 let hash (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (message : Circuit.Field.t list) (bitrate : int) (capacity : int)
-    (bitlength : int) : Circuit.Field.t list =
-  assert (bitrate > 0) ;
+    (message : Circuit.Field.t list) ~(length : int) ~(capacity : int) (nist: bool)
+    : Circuit.Field.t list =
   assert (capacity > 0) ;
-  assert (bitlength > 0) ;
-  assert (bitrate + capacity = keccak_state_length) ;
-  assert (bitrate mod 8 = 0) ;
-  assert (bitlength mod 8 = 0) ;
-
-  let padded = pad (module Circuit) message bitrate in
-  let hash = sponge (module Circuit) padded ~bitrate ~capacity ~bitlength in
+  assert (length > 0) ;
+  assert (length mod 8 = 0) ;
+  let rate = keccak_state_length - capacity in
+  let padded = match nist with 
+    | true -> pad_nist (module Circuit) message rate
+    | false -> pad_101 (module Circuit) message rate in
+  let hash = sponge (module Circuit) padded ~length ~capacity ~rate in
   hash
+
+(* Gadget for SHA-3 hash function with output length of 224 bits *)
+let sha3_224 (type f)
+(module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+(message : Circuit.Field.t list) : Circuit.Field.t list =
+hash (module Circuit) message ~length:224 ~capacity:448 true
+
+
+(* Gadget for SHA-3 hash function with output length of 256 bits *)
+let sha3_256 (type f)
+(module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+(message : Circuit.Field.t list) : Circuit.Field.t list =
+hash (module Circuit) message ~length:256 ~capacity:512 true
+
+(* Gadget for SHA-3 hash function with output length of 384 bits *)
+let sha3_384 (type f)
+(module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+(message : Circuit.Field.t list) : Circuit.Field.t list =
+hash (module Circuit) message ~length:384 ~capacity:768 true
+
+
+(* Gadget for SHA-3 hash function with output length of 512 bits *)
+let sha3_512 (type f)
+(module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+(message : Circuit.Field.t list) : Circuit.Field.t list =
+hash (module Circuit) message ~length:512 ~capacity:1024 true
+
+(* Gadget for Keccak hash function for the parameters used in Ethereum *)
+let ethereum_hash (type f) 
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (message : Circuit.Field.t list) : Circuit.Field.t list =
+  hash (module Circuit) message ~length:256 ~capacity:512 false
