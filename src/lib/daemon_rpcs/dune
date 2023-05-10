@@ -25,6 +25,7 @@
    transition_frontier
    block_time
    mina_numbers
+   itn_logger
    cli_lib
    transaction_inclusion_status
    consensus
