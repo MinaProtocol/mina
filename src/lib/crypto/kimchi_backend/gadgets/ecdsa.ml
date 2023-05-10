@@ -116,14 +116,24 @@ let tuple9_of_array array =
   | _ ->
       assert false
 
-(* Helper to check if point is on secp256k1 curve: y^2 = x^3 + 7 *)
-let secp256k1_is_on_curve (point : Bignum_bigint.t * Bignum_bigint.t)
+(* Helper to check if point is on elliptic curve curve: y^2 = x^3 + a * x + b *)
+let is_on_curve (point : Bignum_bigint.t * Bignum_bigint.t)
+    (a : Bignum_bigint.t) (* curve parameter a *)
+    (b : Bignum_bigint.t) (* curve parameter b *)
     (foreign_field_modulus : Bignum_bigint.t) : bool =
   let x, y = point in
   Bignum_bigint.(
     pow y (of_int 2) % foreign_field_modulus
-    = (pow x (of_int 3) % foreign_field_modulus)
-      + (of_int 7 % foreign_field_modulus))
+    = ( (pow x (of_int 3) % foreign_field_modulus)
+      + (a * x % foreign_field_modulus)
+      + b )
+      % foreign_field_modulus)
+
+(* Helper to check if point is on secp256k1 curve: y^2 = x^3 + 7 *)
+let secp256k1_is_on_curve (point : Bignum_bigint.t * Bignum_bigint.t)
+    (foreign_field_modulus : Bignum_bigint.t) : bool =
+  is_on_curve point (Bignum_bigint.of_int 0) (Bignum_bigint.of_int 7)
+    foreign_field_modulus
 
 (* Gadget for (partial) elliptic curve group addition over foreign field
  *
@@ -289,7 +299,7 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
     |> tuple9_of_array
   in
 
-  (* Convert slope into foreign field element *)
+  (* Convert slope and result into foreign field elements *)
   let slope =
     Foreign_field.Element.Standard.of_limbs (slope0, slope1, slope2)
   in
@@ -302,6 +312,7 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* C1: Constrain computation of slope squared *)
   let slope_squared =
+    (* s * s = s^2 *)
     Foreign_field.mul
       (module Circuit)
       external_checks slope slope foreign_field_modulus
@@ -317,6 +328,7 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
    *     with s^2 - x - Lx = Rx
    *)
   let slope_squared_minus_x =
+    (* s^2 - x = sΔx *)
     Foreign_field.sub
       (module Circuit)
       ~full:false slope_squared result_x foreign_field_modulus
@@ -326,6 +338,7 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
    *           Result chained, so no bound check required.
    *)
   let expected_right_x =
+    (* sΔx - Lx = Rx *)
     Foreign_field.sub
       (module Circuit)
       ~full:false slope_squared_minus_x left_x foreign_field_modulus
@@ -339,6 +352,7 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
     expected_right_x right_x ;
   (* C3: Continue the chain to length 4 by computing (Rx - x) * s (used later) *)
   let right_delta =
+    (* Rx - x = RxΔ *)
     Foreign_field.sub
       (module Circuit)
       ~full:false expected_right_x result_x foreign_field_modulus
@@ -350,6 +364,7 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
   Foreign_field.External_checks.append_bound_check external_checks
   @@ Foreign_field.Element.Standard.to_limbs right_delta ;
   let right_delta_s =
+    (* RxΔ * s = RxΔs *)
     Foreign_field.mul
       (module Circuit)
       external_checks right_delta slope foreign_field_modulus
@@ -364,6 +379,7 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
    *     with (Rx - Lx) * s + Ly = Ry
    *)
   let delta_x =
+    (* Rx - Lx = Δx *)
     Foreign_field.sub
       (module Circuit)
       ~full:false right_x left_x foreign_field_modulus
@@ -374,6 +390,7 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
   Foreign_field.External_checks.append_bound_check external_checks
   @@ Foreign_field.Element.Standard.to_limbs delta_x ;
   let delta_x_s =
+    (* Δx * s = Δxs *)
     Foreign_field.mul
       (module Circuit)
       external_checks delta_x slope foreign_field_modulus
@@ -384,6 +401,7 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
    *)
   (* Finish constraining slope in new chain (above mul ended chain) *)
   let expected_right_y =
+    (* Δxs + Ly = Ry *)
     Foreign_field.add
       (module Circuit)
       ~full:false delta_x_s left_y foreign_field_modulus
@@ -399,6 +417,7 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
    *     with Ry + y = (Rx - x) * s
    *)
   let expected_right_delta_s =
+    (* Ry + y = RxΔs *)
     Foreign_field.add ~full:false
       (module Circuit)
       expected_right_y result_y foreign_field_modulus
@@ -453,8 +472,8 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
  *   Note: See group addition notes (above) about group properties supported by this implementation
  *)
 let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (_external_checks : f Foreign_field.External_checks.t) (point : f Affine.t)
-    (a : f) (* curve parameter *)
+    (external_checks : f Foreign_field.External_checks.t) (point : f Affine.t)
+    (a : f) (* curve parameter a *)
     (foreign_field_modulus : f Foreign_field.standard_limbs) : f Affine.t =
   let open Circuit in
   (* TODO: Remove sanity checks if this API is not public facing *)
@@ -471,15 +490,15 @@ let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
   let point_x, point_y = Affine.to_coordinates point in
 
   (* Compute witness values *)
-  let ( _slope0
-      , _slope1
-      , _slope2
-      , _result_x0
-      , _result_x1
-      , _result_x2
-      , _result_y0
-      , _result_y1
-      , _result_y2 ) =
+  let ( slope0
+      , slope1
+      , slope2
+      , result_x0
+      , result_x1
+      , result_x2
+      , result_y0
+      , result_y1
+      , result_y2 ) =
     exists (Typ.array ~length:9 Field.typ) ~compute:(fun () ->
         let point_x =
           Foreign_field.Element.Standard.to_bignum_bigint_as_prover
@@ -500,7 +519,7 @@ let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
 
         (* Compute slope using 1st derivative of sqrt(x^3 + a * x + b)
          * Note that when a = 0 (e.g. as in the case of secp256k1) we have
-         * one fewer constraint.
+         * one fewer constraint (below).
          *)
         let slope =
           Bignum_bigint.(
@@ -571,7 +590,215 @@ let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
     |> tuple9_of_array
   in
 
-  point
+  (* Convert slope and result into foreign field elements *)
+  let slope =
+    Foreign_field.Element.Standard.of_limbs (slope0, slope1, slope2)
+  in
+  let result_x =
+    Foreign_field.Element.Standard.of_limbs (result_x0, result_x1, result_x2)
+  in
+  let result_y =
+    Foreign_field.Element.Standard.of_limbs (result_y0, result_y1, result_y2)
+  in
+
+  (* C1: Constrain computation of slope squared *)
+  let slope_squared =
+    (* s * s  = s^2 *)
+    Foreign_field.mul
+      (module Circuit)
+      external_checks slope slope foreign_field_modulus
+  in
+  (* Bounds 1: Multiplication left input (slope) and right input (slope)
+   *           bound checks with single bound check.
+   *           Result bound check already tracked by external_checks.
+   *)
+  Foreign_field.External_checks.append_bound_check external_checks
+    (slope0, slope1, slope2) ;
+
+  (* C2: Constrain result x-coordinate computation: x = s^2 - 2 * Px with length 2 chain
+   *     with s^2 - x = 2 * Px
+   *)
+  let point_x2 =
+    (* s^2 - x = 2Px *)
+    Foreign_field.sub
+      (module Circuit)
+      ~full:false slope_squared result_x foreign_field_modulus
+  in
+  (* Bounds 2: Left input bound check covered by (Bounds 1).
+   *           Right input bound check value is gadget output so checked externally.
+   *           Result chained, so no bound check required.
+   *)
+  let expected_point_x =
+    (* 2Px - Px = Px *)
+    Foreign_field.sub
+      (module Circuit)
+      ~full:false point_x2 point_x foreign_field_modulus
+  in
+  (* Bounds 3: Left input bound check is chained.
+   *           Right input bound check value is gadget input so checked externally.
+   *           Result chained, so no bound check required.
+   *)
+  (* Copy expected_point_x to point_x *)
+  Foreign_field.Element.Standard.assert_equal
+    (module Circuit)
+    expected_point_x point_x ;
+  (* C3: Continue the chain to length 4 by computing (Px - x) * s (used later) *)
+  let delta_x =
+    (* Px - x = Δx *)
+    Foreign_field.sub
+      (module Circuit)
+      ~full:false expected_point_x result_x foreign_field_modulus
+  in
+  (* Bounds 4: Left input bound check is chained.
+   *           Right input bound check value is gadget output so checked externally.
+   *           Addition chain result (delta_x) bound check added below.
+   *)
+  Foreign_field.External_checks.append_bound_check external_checks
+  @@ Foreign_field.Element.Standard.to_limbs delta_x ;
+  let delta_xs =
+    (* Δx * s = Δxs *)
+    Foreign_field.mul
+      (module Circuit)
+      external_checks delta_x slope foreign_field_modulus
+  in
+
+  (* Bounds 5: Multiplication result bound checks for left input (delta_x)
+   *           and right input (slope) already covered by (Bounds 4) and (Bounds 1).
+   *           Result bound check already tracked by external_checks.
+   *)
+
+  (* C4: Constrain rest of y = s' * (Px - x) - Py and part of slope computation
+   *     s = (3 * Px^2 + a)/(2 * Py) in length 3 chain
+   *)
+  let expected_point_y =
+    (* Δxs - y = Py *)
+    Foreign_field.sub
+      (module Circuit)
+      ~full:false delta_xs result_y foreign_field_modulus
+  in
+  (* Bounds 6: Left input checked by (Bound 5).
+   *           Right input is gadget output so checked externally.
+   *           Addition result chained.
+   *)
+  (* Copy expected_point_y to point_y *)
+  Foreign_field.Element.Standard.assert_equal
+    (module Circuit)
+    expected_point_y point_y ;
+  let point_y2 =
+    (* Py + Py = 2Py *)
+    Foreign_field.add
+      (module Circuit)
+      ~full:false point_y point_y foreign_field_modulus
+  in
+  (* Bounds 7: Left input is gadget output so checked externally.
+   *           Right input is gadget output so checked externally.
+   *           Addition result chained.
+   *)
+  let point_y2s =
+    (* 2Py * s = 2Pys *)
+    Foreign_field.mul
+      (module Circuit)
+      external_checks point_y2 slope foreign_field_modulus
+  in
+  (* Bounds 8: Left input (point_y2) bound check added below.
+   *           Right input (slope) already checked by (Bound 1).
+   *           Result bound check already tracked by external_checks.
+   *)
+  Foreign_field.External_checks.append_bound_check external_checks
+  @@ Foreign_field.Element.Standard.to_limbs point_y2 ;
+
+  (* C5: Constrain rest slope computation s = (3 * Px^2 + a)/(2 * Py) *)
+  let point_x3 =
+    (* 2Px + Px = 3Px *)
+    Foreign_field.add
+      (module Circuit)
+      ~full:false point_x2 point_x foreign_field_modulus
+  in
+  (* Bounds 9: Left input (point_x2) bound check added below. (TODO: double check this is necessary)
+   *           Right input is gadget input so checked externally.
+   *           Result chained.
+   *)
+  Foreign_field.External_checks.append_bound_check external_checks
+  @@ Foreign_field.Element.Standard.to_limbs point_x2 ;
+  let point_x3_squared =
+    (* 3Px * Px = 3Px^2 *)
+    Foreign_field.mul
+      (module Circuit)
+      external_checks point_x3 point_x foreign_field_modulus
+  in
+
+  (* Bounds 10: Left input (point_x3) bound check added below.
+   *             Right input is gadget input so checked externally.
+   *             Result bound check already tracked by external_checks.
+   *)
+
+  (* Check if the elliptic curve a parameter requires more constraints
+   * to be added in order to add final a (e.g. 3Px^2 + a where a != 0).
+   *)
+  ( if Field.Constant.(equal a zero) then
+    (* Copy point_x3_squared to point_y2s *)
+    Foreign_field.Element.Standard.assert_equal
+      (module Circuit)
+      point_x3_squared point_y2s
+  else
+    (* Add curve constant a *)
+    let a =
+      let a0, a1, a2 =
+        exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
+            let a = Common.field_to_bignum_bigint (module Circuit) a in
+            let a0, a1, a2 =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Circuit)
+                a
+            in
+            [| a0; a1; a2 |] )
+        |> Common.tuple3_of_array
+      in
+      Foreign_field.Element.Standard.of_limbs (a0, a1, a2)
+    in
+    (* C6: Constrain rest slope computation s = (3 * Px^2 + a)/(2 * Py) *)
+    let point_x3_squared_plus_a =
+      (* 3Px^2 + a = 3Px^2a *)
+      Foreign_field.add
+        (module Circuit)
+        ~full:false point_x3_squared a foreign_field_modulus
+      (* Bounds 11: Left input (point_x3_squared) already tracked by (Bounds 10).
+       *            Right input is public constant. (TODO: check this)
+       *            Result bound check tracked below.
+       *)
+    in
+    Foreign_field.External_checks.append_bound_check external_checks
+    @@ Foreign_field.Element.Standard.to_limbs point_x3_squared_plus_a ;
+
+    (* Final Zero gate with result *)
+    let ( point_x3_squared_plus_a0
+        , point_x3_squared_plus_a1
+        , point_x3_squared_plus_a2 ) =
+      Foreign_field.Element.Standard.to_limbs point_x3_squared_plus_a
+    in
+    with_label "group_add_final_zero_gate" (fun () ->
+        assert_
+          { annotation = Some __LOC__
+          ; basic =
+              Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+                (Raw
+                   { kind = Zero
+                   ; values =
+                       [| point_x3_squared_plus_a0
+                        ; point_x3_squared_plus_a1
+                        ; point_x3_squared_plus_a2
+                       |]
+                   ; coeffs = [||]
+                   } )
+          } ) ;
+
+    (* Copy point_x3_squared to point_y2s *)
+    Foreign_field.Element.Standard.assert_equal
+      (module Circuit)
+      point_x3_squared_plus_a point_y2s ) ;
+
+  (* Return result point *)
+  Affine.of_coordinates (result_x, result_y)
 
 (*********)
 (* Tests *)
