@@ -1,35 +1,33 @@
 open Core_kernel
 
-open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
-
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
 (* DEFINITIONS OF CONSTANTS FOR KECCAK *)
 
 (* Length of the square matrix side of Keccak states *)
-let dim = 5
+let keccak_dim = 5
 
 (* value `l` in Keccak, ranges from 0 to 6 (7 possible values) *)
-let length = 6
+let keccak_length = 6
 
 (* width of the lane of the state, meaning the length of each word in bits (64) *)
-let word = Int.pow 2 length
+let keccak_word = Int.pow 2 keccak_length
 
 (* length of the state in bits, meaning the 5x5 matrix of words in bits (1600) *)
-let state = Int.pow 2 word
+let keccak_state_length = Int.pow 2 keccak_word
 
 (* number of rounds of the Keccak permutation function depending on the value `l` (24) *)
-let rounds = 12 + (2 * length)
+let keccak_rounds = 12 + (2 * keccak_length)
 
 (* Length of hash output *)
-let eth_output = 256
+let keccak_eth_output = 256
 
 (* Capacity in Keccak256 *)
-let eth_capacity = 512
+let keccak_eth_capacity = 512
 
 (* Bitrate in Keccak256 (1088) *)
-let eth_bitrate = state - eth_capacity
+let keccak_eth_bitrate = keccak_state_length - keccak_eth_capacity
 
 (* Creates the 5x5 table of rotation offset for Keccak modulo 64
    * | x \ y |  0 |  1 |  2 |  3 |  4 |
@@ -76,21 +74,34 @@ module State = struct
       (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f) :
       Circuit.Field.t matrix =
     let open Circuit in
-    let state = Array.make_matrix ~dimx:dim ~dimy:dim Field.zero in
+    let state =
+      Array.make_matrix ~dimx:keccak_dim ~dimy:keccak_dim Field.zero
+    in
     state
 
-  (* Converts a list of bytes to a matrix of Field elements *)
+  (* Updates the cells of a state with new values *)
+  let update (type f)
+      (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+      ~(prev : Circuit.Field.t matrix) ~(next : Circuit.Field.t matrix) =
+    for y = 0 to keccak_dim do
+      for x = 0 to keccak_dim do
+        prev.(x).(y) <- next.(x).(y)
+      done
+    done
 
+  (* Converts a list of bytes to a matrix of Field elements *)
   let of_bytes (type f)
       (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
       (bytestring : Circuit.Field.t list) : Circuit.Field.t matrix =
     let open Circuit in
     assert (List.length bytestring = 200) ;
-    let state = Array.make_matrix ~dimx:dim ~dimy:dim Field.zero in
-    for y = 0 to dim do
-      for x = 0 to dim do
-        for z = 0 to word / 8 do
-          let index = (8 * ((dim * y) + x)) + z in
+    let state =
+      Array.make_matrix ~dimx:keccak_dim ~dimy:keccak_dim Field.zero
+    in
+    for y = 0 to keccak_dim do
+      for x = 0 to keccak_dim do
+        for z = 0 to keccak_word / 8 do
+          let index = (8 * ((keccak_dim * y) + x)) + z in
           (* Field element containing value 2^(8*z) *)
           let shift_field =
             Common.bignum_bigint_to_field
@@ -111,12 +122,13 @@ module State = struct
       (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
       (state : Circuit.Field.t matrix) : Circuit.Field.t list =
     let open Circuit in
-    assert (Array.length state = dim && Array.length state.(0) = dim) ;
+    assert (
+      Array.length state = keccak_dim && Array.length state.(0) = keccak_dim ) ;
     let bytestring = Array.create ~len:200 Field.zero in
-    let bytes_per_word = word / 8 in
-    for y = 0 to dim do
-      for x = 0 to dim do
-        let base_index = bytes_per_word * ((dim * y) + x) in
+    let bytes_per_word = keccak_word / 8 in
+    for y = 0 to keccak_dim do
+      for x = 0 to keccak_dim do
+        let base_index = bytes_per_word * ((keccak_dim * y) + x) in
         for z = 0 to bytes_per_word do
           let index = base_index + z in
           let byte =
@@ -153,11 +165,15 @@ module State = struct
       (input1 : Circuit.Field.t matrix) (input2 : Circuit.Field.t matrix) :
       Circuit.Field.t matrix =
     let open Circuit in
-    assert (Array.length input1 = dim && Array.length input1.(0) = dim) ;
-    assert (Array.length input2 = dim && Array.length input2.(0) = dim) ;
-    let output = Array.make_matrix ~dimx:dim ~dimy:dim Field.zero in
-    for y = 0 to dim do
-      for x = 0 to dim do
+    assert (
+      Array.length input1 = keccak_dim && Array.length input1.(0) = keccak_dim ) ;
+    assert (
+      Array.length input2 = keccak_dim && Array.length input2.(0) = keccak_dim ) ;
+    let output =
+      Array.make_matrix ~dimx:keccak_dim ~dimy:keccak_dim Field.zero
+    in
+    for y = 0 to keccak_dim do
+      for x = 0 to keccak_dim do
         output.(x).(y) <-
           Bitwise.bxor64 (module Circuit) input1.(x).(y) input2.(x).(y)
       done
@@ -211,7 +227,7 @@ let theta (type f)
   let state_e = State.zeros (module Circuit) in
   (* XOR the elements of each row together *)
   (* for all x in {0..4}: C[x] = A[x,0] xor A[x,1] xor A[x,2] xor A[x,3] xor A[x,4] *)
-  for x = 0 to dim do
+  for x = 0 to keccak_dim do
     state_c.(x) <-
       Bitwise.(
         bxor64
@@ -226,7 +242,7 @@ let theta (type f)
           state_a.(x).(4))
   done ;
   (* for all x in {0..4}: D[x] = C[x-1] xor ROT(C[x+1], 1) *)
-  for x = 0 to dim do
+  for x = 0 to keccak_dim do
     state_d.(x) <-
       Bitwise.(
         bxor64
@@ -234,7 +250,7 @@ let theta (type f)
           state_c.((x - 1) mod 5)
           (rot64 (module Circuit) state_c.((x + 1) mod 5) 1 Left)) ;
     (* for all x in {0..4} and y in {0..4}: E[x,y] = A[x,y] xor D[x] *)
-    for y = 0 to dim do
+    for y = 0 to keccak_dim do
       state_e.(x).(y) <-
         Bitwise.(bxor64 (module Circuit) state_a.(x).(y) state_d.(x))
     done
@@ -272,9 +288,9 @@ let pi_rho (type f)
   let state_e = state in
   let state_b = State.zeros (module Circuit) in
   (* for all x in {0..4} and y in {0..4}: B[y,2x+3y] = ROT(E[x,y], r[x,y]) *)
-  for x = 0 to dim do
-    for y = 0 to dim do
-      state_b.(y).(((2 * x) + (3 * y)) mod dim) <-
+  for x = 0 to keccak_dim do
+    for y = 0 to keccak_dim do
+      state_b.(y).(((2 * x) + (3 * y)) mod keccak_dim) <-
         Bitwise.rot64 (module Circuit) state_e.(x).(y) rot_table.(x).(y) Left
     done
   done ;
@@ -296,8 +312,8 @@ let chi (type f)
   let state_b = state in
   let state_f = State.zeros (module Circuit) in
   (* for all x in {0..4} and y in {0..4}: F[x,y] = B[x,y] xor ((not B[x+1,y]) and B[x+2,y]) *)
-  for x = 0 to dim do
-    for y = 0 to dim do
+  for x = 0 to keccak_dim do
+    for y = 0 to keccak_dim do
       state_f.(x).(y) <-
         Bitwise.(
           bxor64
@@ -380,26 +396,110 @@ let round (type f)
 
   state_d
 
-(* Keccak sponge function for 1600 bits of state width
-   * Need to split the message into blocks of 1088 bits
-*)
-let sponge (type f)
+(* Keccak permutation function with a constant number of rounds *)
+let permutation (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (padded_message : Circuit.Field.t list) (bitrate : int) (capacity : int)
-    (output_length : int) : Circuit.Field.t list =
-  (* check that the padded message is a multiple of bitrate *)
-  assert (List.length padded_message * 8 mod bitrate = 0) ;
+    (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix =
+  for i = 0 to keccak_rounds do
+    let state_i = round (module Circuit) state i in
+    (* Update state for next step *)
+    State.update (module Circuit) ~prev:state ~next:state_i
+  done ;
+  state
 
-  (* absorb *)
+(* Absorb padded message into a keccak state with given bitrate and capacity *)
+let absorb (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (padded_message : Circuit.Field.t list) ~(bitrate : int) ~(capacity : int) :
+    Circuit.Field.t State.matrix =
+  let open Circuit in
   let root_state = State.zeros (module Circuit) in
   let state = root_state in
 
   (* split into blocks of bitrate bits *)
   (* for each block of bitrate bits in the padded message -> this is bitrate/8 bytes *)
+  let chunks = List.chunks_of padded_message ~length:(bitrate / 8) in
+  (* (capacity / 8) zero bytes *)
+  let zeros = Array.to_list @@ Array.create ~len:(capacity / 8) Field.zero in
+  for i = 0 to List.length chunks do
+    let block = List.nth_exn chunks i in
+    (* pad the block with 0s to up to 1600 bits *)
+    let padded_block = block @ zeros in
+    (* padded with zeros each block until they are 1600 bit long *)
+    assert (List.length padded_block * 8 = keccak_state_length) ;
+    let block_state = State.of_bytes (module Circuit) padded_block in
+    (* xor the state with the padded block *)
+    let state_xor = State.xor (module Circuit) state block_state in
+    (* apply the permutation function to the xored state *)
+    let state_perm = permutation (module Circuit) state_xor in
+    State.update (module Circuit) ~prev:state ~next:state_perm
+  done ;
+  state
 
-  
-  
-  padded_message
+(* Squeeze state until it has a desired length in bits *)
+let squeeze (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (state : Circuit.Field.t State.matrix) ~(bitrate : int) ~(bitlength : int) :
+    Circuit.Field.t list =
+  let copy (bytestring : Circuit.Field.t list)
+      (output_array : Circuit.Field.t array) ~(start : int) ~(length : int) :
+      unit =
+    for i = 0 to length - 1 do
+      output_array.(start + i) <- List.nth_exn bytestring i
+    done ;
+    ()
+  in
+
+  let open Circuit in
+  (* bytes per squeeze *)
+  let bytes_per_squeeze = bitrate / 8 in
+  (* number of squeezes *)
+  let squeezes = (bitlength / bitrate) + 1 in
+  (* multiple of bitrate that is larger than output_length, in bytes *)
+  let output_length = squeezes * bytes_per_squeeze in
+  (* array with sufficient space to store the output *)
+  let output_array = Array.create ~len:output_length Field.zero in
+
+  (* first state to be squeezed *)
+  let bytestring = State.as_prover_to_bytes (module Circuit) state in
+  let output_bytes = List.take bytestring bytes_per_squeeze in
+  copy output_bytes output_array ~start:0 ~length:bytes_per_squeeze ;
+
+  (* for the rest of squeezes *)
+  for i = 1 to squeezes do
+    (* apply the permutation function to the state *)
+    let new_state = permutation (module Circuit) state in
+    State.update (module Circuit) ~prev:state ~next:new_state ;
+    (* append the output of the permutation function to the output *)
+    let bytestring_i = State.as_prover_to_bytes (module Circuit) state in
+    let output_bytes_i = List.take bytestring_i bytes_per_squeeze in
+    copy output_bytes_i output_array ~start:(bytes_per_squeeze * i)
+      ~length:bytes_per_squeeze ;
+    ()
+  done ;
+  (* Obtain the hash selecting the first bitlength/8 bytes of the output array *)
+  let hashed =
+    Array.to_list @@ Array.sub output_array ~pos:0 ~len:(bitlength / 8)
+  in
+
+  hashed
+
+(* Keccak sponge function for 1600 bits of state width
+ * Need to split the message into blocks of 1088 bits. 
+ *)
+let sponge (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (padded_message : Circuit.Field.t list) ~(bitrate : int) ~(capacity : int)
+    ~(bitlength : int) : Circuit.Field.t list =
+  (* check that the padded message is a multiple of bitrate *)
+  assert (List.length padded_message * 8 mod bitrate = 0) ;
+
+  (* absorb *)
+  let state = absorb (module Circuit) padded_message ~bitrate ~capacity in
+
+  (* squeeze *)
+  let hashed = squeeze (module Circuit) state ~bitrate ~bitlength in
+  hashed
 
 (*
 * Keccak hash function with input message passed as list of 1byte Cvars.
@@ -411,15 +511,14 @@ let sponge (type f)
 let hash (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (message : Circuit.Field.t list) (bitrate : int) (capacity : int)
-    (output_length : int) : Circuit.Field.t list =
+    (bitlength : int) : Circuit.Field.t list =
   assert (bitrate > 0) ;
   assert (capacity > 0) ;
-  assert (output_length > 0) ;
-  assert (bitrate + capacity = state) ;
+  assert (bitlength > 0) ;
+  assert (bitrate + capacity = keccak_state_length) ;
   assert (bitrate mod 8 = 0) ;
-  assert (output_length mod 8 = 0) ;
+  assert (bitlength mod 8 = 0) ;
 
-  (*TODO: replace with output of keccak*)
   let padded = pad (module Circuit) message bitrate in
-  let hash = sponge (module Circuit) padded bitrate capacity output_length in
+  let hash = sponge (module Circuit) padded ~bitrate ~capacity ~bitlength in
   hash
