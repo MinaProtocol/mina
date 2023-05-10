@@ -102,6 +102,13 @@ let setup_daemon logger =
            permitted to send signed requests to the incentivized testnet \
            GraphQL server"
     else Command.Param.return None
+  and itn_max_logs =
+    if Mina_compile_config.itn_features then
+      flag "--itn-max-logs" ~aliases:[ "itn-max-logs" ] (optional int)
+        ~doc:
+          "NN Maximum number of logs to store to be made available via GraphQL \
+           for incentivized testnet"
+    else Command.Param.return None
   and demo_mode =
     flag "--demo-mode" ~aliases:[ "demo-mode" ] no_arg
       ~doc:
@@ -218,8 +225,7 @@ let setup_daemon logger =
         (sprintf
            "FEE Amount a worker wants to get compensated for generating a \
             snark proof (default: %d)"
-           (Currency.Fee.to_nanomina_int
-              Mina_compile_config.default_snark_worker_fee ) )
+           (Currency.Fee.to_nanomina_int Currency.Fee.default_snark_worker_fee) )
       (optional txn_fee)
   and work_reassignment_wait =
     flag "--work-reassignment-wait"
@@ -813,8 +819,7 @@ let setup_daemon logger =
               |> Option.map ~f:Currency.Fee.of_nanomina_int_exn
             in
             or_from_config json_to_currency_fee_option "snark-worker-fee"
-              ~default:Mina_compile_config.default_snark_worker_fee
-              snark_work_fee
+              ~default:Currency.Fee.default_snark_worker_fee snark_work_fee
           in
           let node_status_url =
             maybe_from_config YJ.Util.to_string_option "node-status-url"
@@ -1307,6 +1312,11 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                   "Cannot provide both uptime submitter public key and uptime \
                    submitter keyfile"
           in
+          if Mina_compile_config.itn_features then
+            (* set queue bound directly in Itn_logger
+               adding bound to Mina_lib config introduces cycle
+            *)
+            Option.iter itn_max_logs ~f:Itn_logger.set_queue_bound ;
           let start_time = Time.now () in
           let%map mina =
             Mina_lib.create ~wallets
