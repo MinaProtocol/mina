@@ -587,7 +587,7 @@ let parse_puppeteer_event (message : Puppeteer_message.t) =
            "the events emitting from the puppeteer script are either not \
             formatted correctly, or are trying to emit an event_type which is \
             not actually recognized by the integration test framework.  this \
-            should not happen and is a programmer error" )
+            should not happen and is a programmer error a b" )
 
 let dispatch_exn : type a b c. a t -> a -> b t -> (b -> c) -> c =
  fun t1 e t2 h ->
