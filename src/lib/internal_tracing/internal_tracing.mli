@@ -147,6 +147,12 @@ module For_logger : sig
 
   (** Processor for the "internal" log level used to record checkpoints *)
   val processor : Logger.Processor.t
+
+  val post_process_message :
+       timestamp:Core.Time.t
+    -> message:string
+    -> metadata:(string * Yojson.Safe.t) list
+    -> (Core.Time.t * string * (string * Yojson.Safe.t) list) list
 end
 
 module Context_logger : module type of Internal_tracing_context_logger
