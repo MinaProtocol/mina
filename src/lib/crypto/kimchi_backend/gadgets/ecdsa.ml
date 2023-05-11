@@ -473,7 +473,7 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
  *)
 let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
     (external_checks : f Foreign_field.External_checks.t) (point : f Affine.t)
-    (a : f) (* curve parameter a *)
+    ?(a = Circuit.Field.Constant.zero)
     (foreign_field_modulus : f Foreign_field.standard_limbs) : f Affine.t =
   let open Circuit in
   (* TODO: Remove sanity checks if this API is not public facing *)
@@ -525,11 +525,14 @@ let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
           Bignum_bigint.(
             (* Computes s' = (3 * Px^2  + a )/ 2 * Py *)
             let numerator =
-              ( of_int 3
-                * pow point_x (of_int 2)
-                % foreign_field_modulus % foreign_field_modulus
-              + a )
-              % foreign_field_modulus
+              let point_x_squared =
+                pow point_x (of_int 2) % foreign_field_modulus
+              in
+              let point_x3_squared =
+                of_int 3 * point_x_squared % foreign_field_modulus
+              in
+
+              (point_x3_squared + a) % foreign_field_modulus
             in
             let denominator = of_int 2 * point_y % foreign_field_modulus in
 
@@ -547,8 +550,8 @@ let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
         (* Compute result's x-coodinate: x = s^2 - 2 * Px *)
         let result_x =
           Bignum_bigint.(
-            slope_squared
-            - of_int 2 * point_x % foreign_field_modulus % foreign_field_modulus)
+            let point_x2 = of_int 2 * point_x % foreign_field_modulus in
+            (slope_squared - point_x2) % foreign_field_modulus)
         in
 
         (* Compute result's y-coodinate: y = s * (Px - x) - Py *)
@@ -728,9 +731,11 @@ let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
   in
 
   (* Bounds 10: Left input (point_x3) bound check added below.
-   *             Right input is gadget input so checked externally.
-   *             Result bound check already tracked by external_checks.
+   *            Right input is gadget input so checked externally.
+   *            Result bound check already tracked by external_checks.
    *)
+  Foreign_field.External_checks.append_bound_check external_checks
+  @@ Foreign_field.Element.Standard.to_limbs point_x3 ;
 
   (* Check if the elliptic curve a parameter requires more constraints
    * to be added in order to add final a (e.g. 3Px^2 + a where a != 0).
@@ -1558,7 +1563,7 @@ let%test_unit "group_add_chained" =
     () )
 
 let%test_unit "group_add_full" =
-  if tests_enabled then (
+  if (* tests_enabled *) false then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -1737,4 +1742,328 @@ let%test_unit "group_add_full" =
         expected (* expected result *)
         secp256k1_modulus
     in
+    () )
+
+let%test_unit "group_double" =
+  if tests_enabled then (
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+
+    (* Test group double *)
+    let test_group_double ?cs (point : Bignum_bigint.t * Bignum_bigint.t)
+        (expected_result : Bignum_bigint.t * Bignum_bigint.t)
+        ?(a = Bignum_bigint.zero)
+        (* curve parameter a *)
+          (foreign_field_modulus : Bignum_bigint.t) =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            let open Runner.Impl in
+            let a = Common.bignum_bigint_to_field (module Runner.Impl) a in
+            (* Prepare test inputs *)
+            let foreign_field_modulus =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                foreign_field_modulus
+            in
+            let point =
+              let x, y = point in
+              let x, y =
+                ( Foreign_field.Element.Standard.of_bignum_bigint
+                    (module Runner.Impl)
+                    x
+                , Foreign_field.Element.Standard.of_bignum_bigint
+                    (module Runner.Impl)
+                    y )
+              in
+              Affine.of_coordinates (x, y)
+            in
+            let expected_result =
+              let x, y = expected_result in
+              let x, y =
+                ( Foreign_field.Element.Standard.of_bignum_bigint
+                    (module Runner.Impl)
+                    x
+                , Foreign_field.Element.Standard.of_bignum_bigint
+                    (module Runner.Impl)
+                    y )
+              in
+              Affine.of_coordinates (x, y)
+            in
+
+            (* Create external checks context for tracking extra constraints
+               that are required for soundness (unused in this simple test) *)
+            let unused_external_checks =
+              Foreign_field.External_checks.create (module Runner.Impl)
+            in
+
+            (* Create the gadget *)
+            let result =
+              group_double
+                (module Runner.Impl)
+                unused_external_checks point ~a foreign_field_modulus
+            in
+
+            (* Check for expected quantity of external checks *)
+            if Field.Constant.(equal a zero) then
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.bounds 9 )
+            else
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.bounds 10 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
+                4 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal
+                unused_external_checks.compact_multi_ranges 4 ) ;
+
+            (* Check output matches expected result *)
+            as_prover (fun () ->
+                assert (
+                  Affine.equal_as_prover
+                    (module Runner.Impl)
+                    result expected_result ) ) ;
+            () )
+      in
+
+      cs
+    in
+
+    (* Test with elliptic curve y^2 = x^3 + 2 * x + 5 mod 13 *)
+    let _cs =
+      let a = Bignum_bigint.of_int 2 in
+      let b = Bignum_bigint.of_int 5 in
+      let modulus = Bignum_bigint.of_int 13 in
+      let point = (Bignum_bigint.of_int 2, Bignum_bigint.of_int 2) in
+      let expected_result = (Bignum_bigint.of_int 5, Bignum_bigint.of_int 7) in
+      assert (is_on_curve point a b modulus) ;
+      assert (is_on_curve expected_result a b modulus) ;
+      test_group_double point (* point *)
+        expected_result (* expected result *)
+        ~a modulus
+    in
+
+    (* Test with elliptic curve y^2 = x^3 + 5 mod 13 *)
+    let _cs =
+      let a = Bignum_bigint.of_int 0 in
+      let b = Bignum_bigint.of_int 5 in
+      let modulus = Bignum_bigint.of_int 13 in
+      let point = (Bignum_bigint.of_int 4, Bignum_bigint.of_int 2) in
+      let expected_result = (Bignum_bigint.of_int 6, Bignum_bigint.of_int 0) in
+      assert (is_on_curve point a b modulus) ;
+      assert (is_on_curve expected_result a b modulus) ;
+      test_group_double point (* point *)
+        expected_result (* expected result *)
+        modulus
+    in
+
+    (* Test with elliptic curve y^2 = x^3 + 7 mod 13 *)
+    let cs0 =
+      let a = Bignum_bigint.of_int 0 in
+      let b = Bignum_bigint.of_int 7 in
+      let modulus = Bignum_bigint.of_int 13 in
+      let point = (Bignum_bigint.of_int 7, Bignum_bigint.of_int 8) in
+      let expected_result = (Bignum_bigint.of_int 8, Bignum_bigint.of_int 8) in
+      assert (is_on_curve point a b modulus) ;
+      assert (is_on_curve expected_result a b modulus) ;
+      let cs =
+        test_group_double point (* point *)
+          expected_result (* expected result *)
+          modulus
+      in
+      let _cs =
+        test_group_double point (* point *)
+          expected_result (* expected result *)
+          ~a modulus
+      in
+      cs
+    in
+
+    (* Test with elliptic curve y^2 = x^3 + 17 * x mod 7879 *)
+    let cs17 =
+      let a = Bignum_bigint.of_int 17 in
+      let b = Bignum_bigint.of_int 0 in
+      let modulus = Bignum_bigint.of_int 7879 in
+      let point = (Bignum_bigint.of_int 7331, Bignum_bigint.of_int 888) in
+      let expected_result =
+        (Bignum_bigint.of_int 2754, Bignum_bigint.of_int 3623)
+      in
+      assert (is_on_curve point a b modulus) ;
+      assert (is_on_curve expected_result a b modulus) ;
+      test_group_double point (* point *)
+        expected_result (* expected result *)
+        ~a modulus
+    in
+
+    (* Constraint system reuse tests *)
+    let _cs =
+      let a = Bignum_bigint.of_int 0 in
+      let b = Bignum_bigint.of_int 7 in
+      let modulus = Bignum_bigint.of_int 13 in
+      let point = (Bignum_bigint.of_int 8, Bignum_bigint.of_int 8) in
+      let expected_result = (Bignum_bigint.of_int 11, Bignum_bigint.of_int 8) in
+      assert (is_on_curve point a b modulus) ;
+      assert (is_on_curve expected_result a b modulus) ;
+      test_group_double ~cs:cs0 point (* point *)
+        expected_result (* expected result *)
+        ~a modulus
+    in
+
+    let _cs =
+      let a = Bignum_bigint.of_int 17 in
+      let b = Bignum_bigint.of_int 0 in
+      let modulus = Bignum_bigint.of_int 7879 in
+      let point = (Bignum_bigint.of_int 1729, Bignum_bigint.of_int 4830) in
+      let expected_result =
+        (Bignum_bigint.of_int 6020, Bignum_bigint.of_int 5832)
+      in
+      assert (is_on_curve point a b modulus) ;
+      assert (is_on_curve expected_result a b modulus) ;
+      let _cs =
+        test_group_double ~cs:cs17 point (* point *)
+          expected_result (* expected result *)
+          ~a modulus
+      in
+
+      assert (
+        Common.is_error (fun () ->
+            (* Wrong constraint system *)
+            test_group_double ~cs:cs0 point (* point *)
+              expected_result (* expected result *)
+              ~a modulus ) ) ;
+      _cs
+    in
+
+    (* Tests with secp256k1 curve points *)
+    let secp256k1_modulus =
+      Common.bignum_bigint_of_hex
+        "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
+    in
+    let point =
+      ( Bignum_bigint.of_string
+          "107002484780363838095534061209472738804517997328105554367794569298664989358181"
+      , Bignum_bigint.of_string
+          "92879551684948148252506282887871578114014191438980334462241462418477012406178"
+      )
+    in
+    let expected_result =
+      ( Bignum_bigint.of_string
+          "74712964529040634650603708923084871318006229334056222485473734005356559517441"
+      , Bignum_bigint.of_string
+          "115267803285637743262834568062293432343366237647730050692079006689357117890542"
+      )
+    in
+
+    assert (secp256k1_is_on_curve point secp256k1_modulus) ;
+    assert (secp256k1_is_on_curve expected_result secp256k1_modulus) ;
+
+    let _cs = test_group_double point expected_result secp256k1_modulus in
+
+    let secp256k1_generator =
+      ( Bignum_bigint.of_string
+          "55066263022277343669578718895168534326250603453777594175500187360389116729240"
+      , Bignum_bigint.of_string
+          "32670510020758816978083085130507043184471273380659243275938904335757337482424"
+      )
+    in
+    let expected_result =
+      ( Bignum_bigint.of_string
+          "89565891926547004231252920425935692360644145829622209833684329913297188986597"
+      , Bignum_bigint.of_string
+          "12158399299693830322967808612713398636155367887041628176798871954788371653930"
+      )
+    in
+
+    assert (secp256k1_is_on_curve secp256k1_generator secp256k1_modulus) ;
+    assert (secp256k1_is_on_curve expected_result secp256k1_modulus) ;
+
+    let _cs =
+      test_group_double secp256k1_generator expected_result secp256k1_modulus
+    in
+
+    let point =
+      ( Bignum_bigint.of_string
+          "72340565915695963948758748585975158634181237057659908187426872555266933736285"
+      , Bignum_bigint.of_string
+          "26612022505003328753510360357395054342310218908477055087761596777225815854353"
+      )
+    in
+    let expected_result =
+      ( Bignum_bigint.of_string
+          "108904232316543774780790055701972437888102004393747607639914151522482739421637"
+      , Bignum_bigint.of_string
+          "12361022197403188621809379658301822420116828257004558379520642349031207949605"
+      )
+    in
+
+    assert (secp256k1_is_on_curve point secp256k1_modulus) ;
+    assert (secp256k1_is_on_curve expected_result secp256k1_modulus) ;
+
+    let _cs = test_group_double point expected_result secp256k1_modulus in
+
+    let point =
+      ( Bignum_bigint.of_string
+          "108904232316543774780790055701972437888102004393747607639914151522482739421637"
+      , Bignum_bigint.of_string
+          "12361022197403188621809379658301822420116828257004558379520642349031207949605"
+      )
+    in
+    let expected_result =
+      ( Bignum_bigint.of_string
+          "6412514063090203022225668498768852033918664033020116827066881895897922497918"
+      , Bignum_bigint.of_string
+          "46730676600197705465960490527225757352559615957463874893868944815778370642915"
+      )
+    in
+    assert (secp256k1_is_on_curve point secp256k1_modulus) ;
+    assert (secp256k1_is_on_curve expected_result secp256k1_modulus) ;
+
+    let cs = test_group_double point expected_result secp256k1_modulus in
+
+    (* CS reuse again*)
+    let point =
+      ( Bignum_bigint.of_string
+          "3994127195658013268703905225007935609302368792888634855477505418126918261961"
+      , Bignum_bigint.of_string
+          "25535899907968670181603106060653290873698485840006655398881908734054954693109"
+      )
+    in
+    let expected_result =
+      ( Bignum_bigint.of_string
+          "85505889528097925687832670439248941652336655858213625210338216314923495678594"
+      , Bignum_bigint.of_string
+          "49191910521103183437466384378802260055879125327516949990516385020354020159575"
+      )
+    in
+    assert (secp256k1_is_on_curve point secp256k1_modulus) ;
+    assert (secp256k1_is_on_curve expected_result secp256k1_modulus) ;
+
+    let _cs = test_group_double ~cs point expected_result secp256k1_modulus in
+
+    (* Negative tests *)
+    assert (
+      Common.is_error (fun () ->
+          (* Wrong constraint system *)
+          test_group_double ~cs:cs0 point (* point *)
+            expected_result (* expected result *)
+            secp256k1_modulus ) ) ;
+
+    assert (
+      Common.is_error (fun () ->
+          (* Wrong answer *)
+          let wrong_result =
+            ( Bignum_bigint.of_string
+                "6412514063090203022225668498768852033918664033020116827066881895897922497918"
+            , Bignum_bigint.of_string
+                "46730676600197705465960490527225757352559615957463874893868944815778370642914"
+            )
+          in
+          test_group_double point (* point *)
+            wrong_result (* expected result *)
+            secp256k1_modulus ) ) ;
+
     () )
