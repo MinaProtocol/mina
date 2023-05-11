@@ -24,9 +24,9 @@ in {
     '';
   };
   snarky_js = nix-npm-buildPackage.buildNpmPackage {
-    src = ../src/lib/snarky_js_bindings/snarkyjs;
+    src = ../src/lib/snarkyjs;
     preBuild = ''
-      BINDINGS_PATH=./src/node_bindings
+      BINDINGS_PATH=./src/bindings/compiled/node_bindings
       mkdir -p "$BINDINGS_PATH"
       cp ${plonk_wasm}/nodejs/plonk_wasm* "$BINDINGS_PATH"
       cp ${ocamlPackages_mina.mina_client_sdk}/share/snarkyjs_bindings/snarky_js_node*.js "$BINDINGS_PATH"
@@ -41,23 +41,6 @@ in {
       sed -i 's/return \[0,Exn,t\]/return joo_global_object.Error(t.c)/' "$BINDINGS_PATH"/snarky_js_node.bc.js
     '';
     npmBuild = "npm run build";
-    # TODO: add snarky-run
-    # TODO
-    # checkPhase = "node ${./src/lib/snarky_js_bindings/tests/run-tests.mjs}"
-  };
-
-  mina-signer = final.nix-npm-buildPackage.buildNpmPackage {
-    src = ../frontend/mina-signer;
-    preBuild = ''
-      cp ${ocamlPackages_mina.mina_client_sdk}/share/client_sdk/client_sdk.bc.js src
-      cp src/client_sdk.{bc,min}.js
-      chmod 0666 src/client_sdk.bc.js
-      cp ${plonk_wasm}/nodejs/plonk_wasm{.js,_bg.wasm} src
-      chmod 0666 src/plonk_wasm{.js,_bg.wasm}
-    '';
-    npmBuild = "npm run build";
-    doCheck = true;
-    checkPhase = "npm test";
   };
 
   # Jobs/Release/LeaderboardArtifact
@@ -99,4 +82,3 @@ in {
     '';
   };
 }
-

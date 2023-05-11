@@ -384,10 +384,7 @@ module Dsl = struct
       -> t
 
     val ledger_proofs_emitted_since_genesis :
-         soft_timeout:Network_time_span.t
-      -> hard_timeout:Network_time_span.t
-      -> num_proofs:int
-      -> t
+      test_config:Test_config.t -> num_proofs:int -> t
 
     val zkapp_to_be_included_in_frontier :
       has_failures:bool -> zkapp_command:Mina_base.Zkapp_command.t -> t
