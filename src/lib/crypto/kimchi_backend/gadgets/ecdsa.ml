@@ -797,7 +797,7 @@ let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
                    } )
           } ) ;
 
-    (* Copy point_x3_squared to point_y2s *)
+    (* Copy point_x3_squared_plus_a to point_y2s *)
     Foreign_field.Element.Standard.assert_equal
       (module Circuit)
       point_x3_squared_plus_a point_y2s ) ;
@@ -1929,6 +1929,7 @@ let%test_unit "group_double" =
           ~a modulus
       in
 
+      (* Negative test *)
       assert (
         Common.is_error (fun () ->
             (* Wrong constraint system *)
