@@ -131,7 +131,7 @@ client_sdk_test_sigs_nonconsensus: ocaml_checks
 snarkyjs: ocaml_checks
 	$(info Starting Build)
 	(ulimit -s 65532) && (ulimit -n 10240 || true) \
-	&& bash ./src/lib/snarkyjs/src/snarkyjs-bindings/scripts/build-snarkyjs-node.sh
+	&& bash ./src/lib/snarkyjs/src/bindings/scripts/build-snarkyjs-node.sh
 	$(info Build complete)
 
 rosetta_lib_encodings: ocaml_checks
