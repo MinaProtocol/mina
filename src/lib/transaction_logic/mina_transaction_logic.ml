@@ -963,17 +963,26 @@ module Make (L : Ledger_intf.S) :
               ~error:Transaction_status.Failure.Update_not_permitted_balance
           in
           let%bind fee_payer_account =
-            let%bind timing =
-              validate_timing ~txn_amount:amount
-                ~txn_global_slot:current_global_slot ~account:fee_payer_account
-              |> Result.map_error ~f:timing_error_to_user_command_status
+            let res =
+              let%bind timing =
+                validate_timing ~txn_amount:amount
+                  ~txn_global_slot:current_global_slot ~account:fee_payer_account
+                |> Result.map_error ~f:timing_error_to_user_command_status
+              in
+              let%map balance =
+                Result.map_error (sub_amount fee_payer_account.balance amount)
+                  ~f:(fun _ ->
+                    Transaction_status.Failure.Source_insufficient_balance )
+              in
+              { fee_payer_account with balance; timing }
             in
-            let%map balance =
-              Result.map_error (sub_amount fee_payer_account.balance amount)
-                ~f:(fun _ ->
-                  Transaction_status.Failure.Source_insufficient_balance )
-            in
-            { fee_payer_account with balance; timing }
+            match res with
+            | Ok x -> Ok x
+            | Error failure ->
+                 raise
+                    (Reject
+                       (Error.createf "%s"
+                          (Transaction_status.Failure.describe failure) ) )
           in
           (* Charge the account creation fee. *)
           let%bind receiver_amount =

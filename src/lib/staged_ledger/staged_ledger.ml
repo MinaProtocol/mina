@@ -4042,122 +4042,63 @@ let%test_module "staged ledger tests" =
               supercharge_coinbase_test ~self:locked_self
                 ~delegator:locked_delegator ~block_count f_expected_balance sl ) )
 
-    let%test_unit "Blocks having commands with insufficient funds are accepted \
-                   (with correct status)" =
-      let logger = Logger.create () in
-      let g =
-        let open Quickcheck.Generator.Let_syntax in
-        let%map ledger_init_state = Ledger.gen_initial_ledger_state
-        and global_slot = Quickcheck.Generator.small_positive_int in
-        let command (kp : Keypair.t) (balance : Currency.Amount.t)
-            (nonce : Account.Nonce.t) (receiver_pk : Public_key.Compressed.t)
-            (validity : [ `Valid | `Invalid ]) =
-          let amount, fee =
-            match validity with
-            | `Valid ->
-                ( Option.value_exn
-                    Amount.(
-                      balance
-                      - Currency.(Amount.of_fee Fee.minimum_user_command_fee))
-                , Currency.Fee.minimum_user_command_fee )
-            | `Invalid ->
-                (balance, Currency.Fee.minimum_user_command_fee)
-          in
-          let fee_payer_pk = Public_key.compress kp.public_key in
-          let body =
-            Signed_command_payload.Body.Payment { receiver_pk; amount }
-          in
-          let payload =
-            Signed_command.Payload.create ~fee ~fee_payer_pk ~nonce
-              ~memo:Signed_command_memo.dummy ~valid_until:None ~body
-          in
-          User_command.Signed_command (Signed_command.sign kp payload)
-        in
-        let signed_command =
-          let kp, balance, nonce, _ = ledger_init_state.(0) in
-          let receiver, _, _, _ = ledger_init_state.(2) in
-          command kp balance nonce
-            (Public_key.compress receiver.public_key)
-            `Valid
-        in
-        let invalid_command =
-          let kp, balance, nonce, _ = ledger_init_state.(1) in
-          let receiver, _, _, _ = ledger_init_state.(2) in
-          command kp balance nonce
-            (Public_key.compress receiver.public_key)
-            `Invalid
-        in
-        (ledger_init_state, signed_command, invalid_command, global_slot)
+    let command_insufficient_funds =
+      let open Quickcheck.Generator.Let_syntax in
+      let%map ledger_init_state = Ledger.gen_initial_ledger_state
+      and global_slot = Quickcheck.Generator.small_positive_int in
+      let kp, balance, nonce, _ = ledger_init_state.(0) in
+      let receiver_pk =
+        Quickcheck.random_value ~seed:(`Deterministic "receiver_pk")
+          Public_key.Compressed.gen
       in
-      Quickcheck.test g ~trials:1
-        ~f:(fun (ledger_init_state, valid_command, invalid_command, global_slot)
-           ->
+      let insufficient_account_creation_fee =
+        Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
+        / 2
+        |> Currency.Amount.of_nanomina_int_exn
+      in
+      let source_pk = Public_key.compress kp.public_key in
+      let body =
+        Signed_command_payload.Body.Payment
+          Payment_payload.Poly.
+            { receiver_pk; amount = insufficient_account_creation_fee }
+      in
+      let fee = Currency.Amount.to_fee balance in
+      let payload =
+        Signed_command.Payload.create ~fee ~fee_payer_pk:source_pk ~nonce
+          ~memo:Signed_command_memo.dummy ~valid_until:None ~body
+      in
+      let signed_command =
+        User_command.Signed_command (Signed_command.sign kp payload)
+      in
+      (ledger_init_state, signed_command, global_slot)
+
+    let%test_unit "Commands with Insufficient funds are not included" =
+      let logger = Logger.null () in
+      Quickcheck.test command_insufficient_funds ~trials:1
+        ~f:(fun (ledger_init_state, invalid_command, global_slot) ->
           async_with_ledgers ledger_init_state
             (fun ~snarked_ledger:_ sl _test_mask ->
               let global_slot = Mina_numbers.Global_slot.of_int global_slot in
-              let current_state, current_state_view =
-                dummy_state_and_view ~global_slot ()
-              in
-              let state_and_body_hash =
-                let state_hashes =
-                  Mina_state.Protocol_state.hashes current_state
-                in
-                ( state_hashes.state_hash
-                , state_hashes.state_body_hash |> Option.value_exn )
-              in
+              let current_state_view = dummy_state_view ~global_slot () in
               let diff_result =
                 Sl.create_diff ~constraint_constants ~global_slot !sl ~logger
                   ~current_state_view
-                  ~transactions_by_fee:(Sequence.of_list [ valid_command ])
+                  ~transactions_by_fee:(Sequence.of_list [ invalid_command ])
                   ~get_completed_work:(stmt_to_work_zero_fee ~prover:self_pk)
                   ~coinbase_receiver ~supercharge_coinbase:false
               in
-              match diff_result with
-              | Error e ->
-                  Error.raise (Pre_diff_info.Error.to_error e)
-              | Ok (diff, _invalid_txns) -> (
+              ( match diff_result with
+              | Ok (diff, _invalid_txns) ->
                   assert (
-                    List.length
+                    List.is_empty
                       (Staged_ledger_diff.With_valid_signatures_and_proofs
-                       .commands diff )
-                    = 1 ) ;
-                  let f, s = diff.diff in
-                  [%log info] "Diff %s"
-                    ( Staged_ledger_diff.With_valid_signatures_and_proofs
-                      .to_yojson diff
-                    |> Yojson.Safe.to_string ) ;
-                  let failed_command =
-                    With_status.
-                      { data = invalid_command
-                      ; status =
-                          Transaction_status.Failed
-                            Transaction_status.Failure.(
-                              Collection.of_single_failure
-                                Source_insufficient_balance)
-                      }
-                  in
-                  (*Replace the valid command with an invalid command)*)
-                  let diff =
-                    { Staged_ledger_diff.With_valid_signatures_and_proofs.diff =
-                        ({ f with commands = [ failed_command ] }, s)
-                    }
-                  in
-                  let%map res =
-                    Sl.apply ~constraint_constants ~global_slot !sl
-                      (Staged_ledger_diff.forget diff)
-                      ~logger ~verifier ~current_state_view ~state_and_body_hash
-                      ~coinbase_receiver ~supercharge_coinbase:false
-                  in
-                  match res with
-                  | Ok _x ->
-                      ()
-                  | Error e ->
-                      failwithf "Unexpected staged ledger apply error: %s"
-                        (Staged_ledger_error.to_string e)
-                        () ) ) )
+                       .commands diff ) )
+              | Error e ->
+                  Error.raise (Pre_diff_info.Error.to_error e) ) ;
+              Deferred.unit ) )
 
-    let%test_unit "Blocks having commands with insufficient fee to create new \
-                   account are accepted (with correct status)" =
+    let%test_unit "Blocks having commands with insufficient funds are rejected"
+        =
       let logger = Logger.create () in
       let g =
         let open Quickcheck.Generator.Let_syntax in
@@ -4186,7 +4127,7 @@ let%test_module "staged ledger tests" =
                     constraint_constants.account_creation_fee
                   / 2
                   |> Currency.Amount.of_nanomina_int_exn
-                , Currency.Fee.minimum_user_command_fee )
+                , Currency.Amount.to_fee balance )
           in
           let fee_payer_pk = Public_key.compress kp.public_key in
           let body =
@@ -4271,11 +4212,13 @@ let%test_module "staged ledger tests" =
                   in
                   match res with
                   | Ok _x ->
-                      ()
-                  | Error e ->
-                      failwithf "Unexpected staged ledger apply error: %s"
-                        (Staged_ledger_error.to_string e)
-                        () ) ) )
+                      assert false
+                  (*TODO: check transaction logic errors here. Verified that the error is here is [The source account has an insufficient balance]*)
+                  | Error (Staged_ledger_error.Unexpected _ as e) ->
+                      [%log info] "Error %s" (Staged_ledger_error.to_string e) ;
+                      assert true
+                  | Error _ ->
+                      assert false ) ) )
 
     let%test_unit "Mismatched verification keys in zkApp accounts and \
                    transactions" =
