@@ -27,8 +27,6 @@ type Command struct {
 	Params RawParams
 }
 
-type Scenario = []Command
-
 type NodeAddress string
 
 type NodeEntry struct {
@@ -48,10 +46,12 @@ type Config struct {
 	NodeData         map[NodeAddress]NodeEntry
 	SlotDurationMs   int
 	GenesisTimestamp time.Time
+	ControlExec      string
 }
 
 type OutputF = func(name string, value any, multiple bool, sensitive bool)
 
 type Action interface {
 	Run(config Config, params json.RawMessage, output OutputF) error
+	Name() string
 }

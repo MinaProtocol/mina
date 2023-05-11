@@ -19,20 +19,28 @@ import (
 
 var actions map[string]lib.Action
 
+func addAction(actions map[string]lib.Action, action lib.Action) {
+	actions[action.Name()] = action
+}
+
 func init() {
-	actions = map[string]lib.Action{
-		"discovery":      lib.DiscoverParticipantsAction{},
-		"payments":       lib.PaymentsAction{},
-		"load-keys":      lib.KeyloaderAction{},
-		"stop":           lib.StopAction{},
-		"wait":           lib.WaitAction{},
-		"fund-keys":      lib.FundAction{},
-		"zkapp-txs":      lib.ZkappCommandsAction{},
-		"slots-won":      lib.SlotsWonAction{},
-		"reset-gating":   lib.ResetGatingAction{},
-		"isolate":        lib.IsolateAction{},
-		"allocate-slots": lib.AllocateSlotsAction{},
-	}
+	actions = map[string]lib.Action{}
+	addAction(actions, lib.DiscoveryAction{})
+	addAction(actions, lib.PaymentsAction{})
+	addAction(actions, lib.KeyloaderAction{})
+	addAction(actions, lib.StopAction{})
+	addAction(actions, lib.WaitAction{})
+	addAction(actions, lib.FundAction{})
+	addAction(actions, lib.ZkappCommandsAction{})
+	addAction(actions, lib.SlotsWonAction{})
+	addAction(actions, lib.ResetGatingAction{})
+	addAction(actions, lib.IsolateAction{})
+	addAction(actions, lib.AllocateSlotsAction{})
+	addAction(actions, lib.RestartAction{})
+	addAction(actions, lib.JoinAction{})
+	addAction(actions, lib.SampleAction{})
+	addAction(actions, lib.ExceptAction{})
+
 }
 
 type AppConfig struct {

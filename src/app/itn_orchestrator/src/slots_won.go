@@ -45,4 +45,6 @@ func (SlotsWonAction) Run(config Config, rawParams json.RawMessage, output Outpu
 	})
 }
 
+func (SlotsWonAction) Name() string { return "slots-won" }
+
 var _ Action = SlotsWonAction{}

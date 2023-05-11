@@ -4,16 +4,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"itn_json_types"
+	"math"
 )
 
-type PaymentParams struct {
+type PaymentSubParams struct {
 	ExperimentName         string
-	Tps                    float64
+	Tps, MinTps            float64
 	DurationInMinutes      int
 	FeeMax, FeeMin, Amount uint64
 	Receiver               itn_json_types.MinaPublicKey
-	Senders                []itn_json_types.MinaPrivateKey
-	Nodes                  []NodeAddress
+}
+
+type PaymentParams struct {
+	PaymentSubParams
+	Senders []itn_json_types.MinaPrivateKey
+	Nodes   []NodeAddress
 }
 
 type ScheduledPaymentsReceipt struct {
@@ -21,12 +26,23 @@ type ScheduledPaymentsReceipt struct {
 	Handle  string      `json:"handle"`
 }
 
+func PaymentKeygenRequirements(gap int, params PaymentSubParams) (int, uint64) {
+	maxParticipants := int(math.Ceil(params.Tps / params.MinTps))
+	txCost := params.FeeMax + params.Amount
+	tpsGap := uint64(math.Round(params.Tps * float64(gap)))
+	totalTxs := uint64(math.Ceil(float64(params.DurationInMinutes) * 60 * params.Tps))
+	balance := 3 * txCost * totalTxs
+	keys := maxParticipants + int(tpsGap)*2
+	return keys, balance
+}
+
 func SchedulePayments(config Config, params PaymentParams, output func(ScheduledPaymentsReceipt)) error {
-	sendersPerNode := len(params.Senders) / len(params.Nodes)
-	for nodeIx, nodeAddress := range params.Nodes {
+	tps, nodes := selectNodes(params.Tps, params.MinTps, params.Nodes)
+	sendersPerNode := len(params.Senders) / len(nodes)
+	for nodeIx, nodeAddress := range nodes {
 		paymentInput := PaymentsDetails{
 			DurationInMinutes:     params.DurationInMinutes,
-			TransactionsPerSecond: params.Tps,
+			TransactionsPerSecond: tps,
 			Memo:                  fmt.Sprintf("%s-%d", params.ExperimentName, nodeIx),
 			FeeMax:                params.FeeMax,
 			FeeMin:                params.FeeMin,
@@ -60,7 +76,10 @@ func (PaymentsAction) Run(config Config, rawParams json.RawMessage, output Outpu
 	}
 	return SchedulePayments(config, params, func(receipt ScheduledPaymentsReceipt) {
 		output("receipt", receipt, true, false)
+		output("participant", receipt.Address, true, false)
 	})
 }
+
+func (PaymentsAction) Name() string { return "payments" }
 
 var _ Action = PaymentsAction{}

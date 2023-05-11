@@ -31,4 +31,6 @@ func (StopAction) Run(config Config, rawParams json.RawMessage, output OutputF) 
 	return StopTransactions(config, params)
 }
 
+func (StopAction) Name() string { return "stop" }
+
 var _ Action = StopAction{}

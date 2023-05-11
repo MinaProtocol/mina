@@ -13,7 +13,7 @@ type FundParams struct {
 	Prefix      string
 	Num         int
 	Privkey     string
-	PasswordEnv string `json:"password-env,omitempty"`
+	PasswordEnv string `json:",omitempty"`
 }
 
 type FundAction struct{}
@@ -44,5 +44,7 @@ func (FundAction) Run(config Config, rawParams json.RawMessage, output OutputF) 
 	cmd.Env = []string{"MINA_PRIVKEY_PASS=" + password}
 	return cmd.Run()
 }
+
+func (FundAction) Name() string { return "fund-keys" }
 
 var _ Action = FundAction{}

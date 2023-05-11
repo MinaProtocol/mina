@@ -61,6 +61,8 @@ func (IsolateAction) Run(config Config, rawParams json.RawMessage, output Output
 	return Isolate(config, params)
 }
 
+func (IsolateAction) Name() string { return "isolate" }
+
 var _ Action = IsolateAction{}
 
 type ResetGatingParams struct {
@@ -145,5 +147,7 @@ func (ResetGatingAction) Run(config Config, rawParams json.RawMessage, output Ou
 	}
 	return ResetGating(config, params)
 }
+
+func (ResetGatingAction) Name() string { return "reset-gating" }
 
 var _ Action = ResetGatingAction{}
