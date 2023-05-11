@@ -1,8 +1,10 @@
 (** Generic (polymorphic instance of [challenge_polynomial]) *)
 val challenge_polynomial :
-     (module Pickles_types.Shifted_value.Field_intf with type t = 'a)
-  -> 'a array
-  -> ('a -> 'a) Core_kernel.Staged.t
+     one:'a
+  -> add:('a -> 'b -> 'b)
+  -> mul:('b -> 'b -> 'b)
+  -> 'b array
+  -> ('b -> 'b) Core_kernel.Staged.t
 
 type 'a index' = 'a Pickles_types.Plonk_verification_key_evals.t
 

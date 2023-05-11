@@ -371,7 +371,7 @@ val wrap_main_dummy_override :
         -> unit )
 
 module Make_adversarial_test : functor
-  (_ : sig
+  (M : sig
      val tweak_statement :
           ( Import.Challenge.Constant.t
           , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t

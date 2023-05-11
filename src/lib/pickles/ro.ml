@@ -1,5 +1,6 @@
 open Core_kernel
 open Backend
+open Pickles_types
 open Import
 
 let bits_random_oracle =

@@ -1,43 +1,26 @@
 (library
  (name composition_types)
  (public_name pickles.composition_types)
- ; Deactivated warnings
- ; 40: name-out-scope (activate later)
- ;
- ; 41: ambiguous name (too many of them for now, activate later)
- ;
- ; 42: disambiguated-name (rely on type disambiguation ,not too bad but closer
- ; module openings may both solve the warning *and* help the reader)
- ;
- ; 44: open-shadow-identifier (operation overloading is common in the codebase)
- ;
- ; Warning 70 (no interface) is activated but not considered as an error since
- ; we use the `_intf` module naming pattern (see
- ; https://www.craigfe.io/posts/the-intf-trick for a rationale)
- (flags
-  (:standard
-    -w +a-40..42-44
-    -warn-error +a-70)
-  -open Core_kernel)
+ (flags -warn-error -27)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx ))
  (libraries
    ;; opam libraries
-  sexplib0
-  bin_prot.shape
-  core_kernel
-  base.caml
-  ;; local libraries
-  mina_wire_types
-  kimchi_backend.pasta
-  kimchi_backend.pasta.basic
-  snarky.backendless
-  pickles_types
-  pickles.limb_vector
-  kimchi_backend
-  pickles_base
-  pickles.backend
-  kimchi_backend.common
-  ppx_version.runtime
-  )
+   sexplib0
+   bin_prot.shape
+   core_kernel
+   base.caml
+   ;; local libraries
+   mina_wire_types
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   snarky.backendless
+   pickles_types
+   pickles.limb_vector
+   kimchi_backend
+   pickles_base
+   pickles.backend
+   kimchi_backend.common
+   ppx_version.runtime
  )
+)

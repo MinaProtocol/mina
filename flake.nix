@@ -290,7 +290,7 @@
             mina mina_tests mina-ocaml-format test_executive;
           inherit (pkgs)
             libp2p_helper kimchi_bindings_stubs snarky_js leaderboard
-            mina-signer validation trace-tool zkapp-cli;
+            validation trace-tool zkapp-cli;
           inherit (dockerImages)
             mina-image-slim mina-image-full mina-archive-image-full;
           mina-deb = debianPackages.mina;

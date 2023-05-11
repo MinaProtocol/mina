@@ -66,8 +66,6 @@ module Vk : sig
   type t = (Impls.Wrap.Verification_key.t[@sexp.opaque]) [@@deriving sexp]
 end
 
-[@@@warning "-32"]
-
 [%%versioned:
 module Stable : sig
   module V2 : sig
