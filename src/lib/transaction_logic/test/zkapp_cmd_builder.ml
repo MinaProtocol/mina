@@ -31,16 +31,17 @@ let get_nonce_exn (pk : Public_key.Compressed.t) :
   in
   nonce
 
-let update_body ?preconditions ?(update = Account_update.Update.noop) ~account amount =
+let update_body ?preconditions ?(update = Account_update.Update.noop) ~account
+    amount =
   let open Monad_lib.State.Let_syntax in
   let open Account_update in
   let%map default =
     let%map nonce = get_nonce_exn account in
     Account_update.Preconditions.
-    { network = Zkapp_precondition.Protocol_state.accept
-    ; account = Account_precondition.Nonce nonce
-    ; valid_while = Ignore
-    }
+      { network = Zkapp_precondition.Protocol_state.accept
+      ; account = Account_precondition.Nonce nonce
+      ; valid_while = Ignore
+      }
   in
   let update_preconditions = Option.value ~default preconditions in
   let account_update = update in
@@ -101,7 +102,8 @@ module Simple_txn = struct
             Amount.Signed.(negate @@ of_unsigned amount)
         in
         let%map receiver_increase_body =
-          update_body ?preconditions ~account:receiver Amount.Signed.(of_unsigned amount)
+          update_body ?preconditions ~account:receiver
+            Amount.Signed.(of_unsigned amount)
         in
         [ update
             Account_update.
@@ -157,7 +159,7 @@ module Simple_txn = struct
 end
 
 module Single = struct
-  let make ~account amount =
+  let make ?preconditions ~account amount =
     object
       method account : Public_key.Compressed.t = account
 
@@ -166,13 +168,13 @@ module Single = struct
       method updates =
         let open Monad_lib.State.Let_syntax in
         let open Account_update in
-        let%map body = update_body ~account amount in
+        let%map body = update_body ?preconditions ~account amount in
         [ update { body; authorization = dummy_auth } ]
     end
 end
 
 module Alter_account = struct
-  let make ~account ?(amount = Amount.Signed.zero) state_update =
+  let make ?preconditions ~account ?(amount = Amount.Signed.zero) state_update =
     object
       method account : Public_key.Compressed.t = account
 
@@ -183,7 +185,9 @@ module Alter_account = struct
       method updates =
         let open Monad_lib.State.Let_syntax in
         let open Account_update in
-        let%map body = update_body ~update:state_update ~account amount in
+        let%map body =
+          update_body ?preconditions ~update:state_update ~account amount
+        in
         [ update { body; authorization = dummy_auth } ]
     end
 end
