@@ -30,7 +30,7 @@ in Pipeline.build Pipeline.Config::{
     TestExecutive.execute "payment" dependsOn,
     TestExecutive.execute "delegation" dependsOn,
     TestExecutive.execute "gossip-consis" dependsOn,
-    TestExecutive.execute "opt-block-prod" dependsOn,
+    TestExecutive.execute "block-prod-prio" dependsOn,
     TestExecutive.execute "medium-bootstrap" dependsOn,
     TestExecutive.execute "archive-node" dependsOn
 
