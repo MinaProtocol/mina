@@ -949,8 +949,37 @@ module Make (L : Ledger_intf.S) :
           , Transaction_applied.Signed_command_applied.Body.Stake_delegation
               { previous_delegate } )
       | Payment { amount; _ } ->
+          let%bind fee_payer_account =
+            let ret =
+              let%bind balance =
+                Result.map_error (sub_amount fee_payer_account.balance amount)
+                  ~f:(fun _ ->
+                    Transaction_status.Failure.Source_insufficient_balance )
+              in
+              let%map timing =
+                validate_timing ~txn_amount:amount
+                  ~txn_global_slot:current_global_slot
+                  ~account:fee_payer_account
+                |> Result.map_error ~f:timing_error_to_user_command_status
+              in
+              { fee_payer_account with balance; timing }
+            in
+            (* Don't accept transactions with insufficient balance from the fee-payer.
+               TODO: eliminate this condition and accept transaction with failed status
+            *)
+            match ret with
+            | Ok x ->
+                Ok x
+            | Error failure ->
+                raise
+                  (Reject
+                     (Error.createf "%s"
+                        (Transaction_status.Failure.describe failure) ) )
+          in
           let receiver_location, receiver_account =
-            get_with_location ledger receiver |> ok_or_reject
+            if Account_id.equal fee_payer receiver then
+              (fee_payer_location, fee_payer_account)
+            else get_with_location ledger receiver |> ok_or_reject
           in
           let%bind () =
             Result.ok_if_true
@@ -961,19 +990,6 @@ module Make (L : Ledger_intf.S) :
             Result.ok_if_true
               (Account.has_permission_to_receive receiver_account)
               ~error:Transaction_status.Failure.Update_not_permitted_balance
-          in
-          let%bind fee_payer_account =
-            let%bind timing =
-              validate_timing ~txn_amount:amount
-                ~txn_global_slot:current_global_slot ~account:fee_payer_account
-              |> Result.map_error ~f:timing_error_to_user_command_status
-            in
-            let%map balance =
-              Result.map_error (sub_amount fee_payer_account.balance amount)
-                ~f:(fun _ ->
-                  Transaction_status.Failure.Source_insufficient_balance )
-            in
-            { fee_payer_account with balance; timing }
           in
           (* Charge the account creation fee. *)
           let%bind receiver_amount =
@@ -997,9 +1013,16 @@ module Make (L : Ledger_intf.S) :
             | `New ->
                 [ receiver ]
           in
-          ( [ (receiver_location, receiver_account)
-            ; (fee_payer_location, fee_payer_account)
-            ]
+          let updated_accounts =
+            if Account_id.equal fee_payer receiver then
+              (* [receiver_account] at this point has all the updates*)
+              [ (receiver_location, receiver_account) ]
+            else
+              [ (receiver_location, receiver_account)
+              ; (fee_payer_location, fee_payer_account)
+              ]
+          in
+          ( updated_accounts
           , Transaction_applied.Signed_command_applied.Body.Payment
               { new_accounts } )
     in

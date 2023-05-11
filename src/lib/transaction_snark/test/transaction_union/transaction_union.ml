@@ -616,7 +616,8 @@ let%test_module "Transaction union tests" =
         (Balance.of_nanomina_int_exn balance)
 
     let test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
-        ~fee_payer_pk ~fee_token ?memo ?valid_until ?nonce body =
+        ~fee_payer_pk ~fee_token ?memo ?valid_until ?nonce ?expected_failure
+        body =
       let memo =
         match memo with
         | Some memo ->
@@ -654,7 +655,8 @@ let%test_module "Transaction union tests" =
       in
       let signer = Signature_lib.Keypair.of_private_key_exn signer in
       let user_command = Signed_command.sign signer payload in
-      U.test_transaction_union ledger (Command (Signed_command user_command)) ;
+      U.test_transaction_union ?expected_failure ledger
+        (Command (Signed_command user_command)) ;
       let fee_payer = Signed_command.Payload.fee_payer payload in
       let receiver = Signed_command.Payload.receiver payload in
       let fee_payer_account = get_account fee_payer in
@@ -926,6 +928,73 @@ let%test_module "Transaction union tests" =
                 Balance.equal fee_payer_account.balance
                   expected_fee_payer_balance ) ;
               assert (Option.is_some receiver_account) ) )
+
+    let%test_unit "Payment to and from same key" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = U.Wallet.random_wallets ~n:2 () in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let receiver_pk = wallets.(0).account.public_key in
+              let token_id = Token_id.default in
+              let accounts =
+                [| create_account fee_payer_pk token_id 50_000_000_000 |]
+              in
+              let fee = Fee.of_nanomina_int_exn 1_000_000_000 in
+              let amount = Amount.of_nanomina_int_exn 4_000_000_000 in
+              let ( `Fee_payer_account fee_payer_account
+                  , `Receiver_account _receiver_account ) =
+                test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
+                  ~fee_payer_pk ~fee_token:token_id
+                  (Payment { receiver_pk; amount })
+              in
+              let fee_payer_account = Option.value_exn fee_payer_account in
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ) )
+
+    let%test_unit "Payment with source balance insufficient- untimed" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = U.Wallet.random_wallets ~n:2 () in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let receiver_pk = wallets.(1).account.public_key in
+              let token_id = Token_id.default in
+              let accounts =
+                [| create_account fee_payer_pk token_id 5_000_000_000 |]
+              in
+              let fee = Fee.of_nanomina_int_exn 1_000_000_000 in
+              let amount = Amount.of_nanomina_int_exn 5_000_000_000 in
+              ignore @@ test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
+                  ~fee_payer_pk ~fee_token:token_id
+                  ~expected_failure:
+                    [Transaction_status.Failure.Source_insufficient_balance]
+                  (Payment { receiver_pk; amount })))
+              
+
+    let%test_unit "Payment with insufficient account creation fee- untimed" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              let wallets = U.Wallet.random_wallets ~n:2 () in
+              let signer = wallets.(0).private_key in
+              let fee_payer_pk = wallets.(0).account.public_key in
+              let receiver_pk = wallets.(1).account.public_key in
+              let token_id = Token_id.default in
+              let accounts =
+                [| create_account fee_payer_pk token_id 5_000_000_000 |]
+              in
+              let fee = Fee.of_nanomina_int_exn 1_000_000_000 in
+              let amount = Amount.of_nanomina_int_exn 1 in
+              ignore @@ test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
+                  ~fee_payer_pk ~fee_token:token_id
+                  ~expected_failure:
+                    [Transaction_status.Failure
+                    .Amount_insufficient_to_create_account]
+                  (Payment { receiver_pk; amount })))
 
     let%test_unit "timed account - transactions" =
       Test_util.with_randomness 123456789 (fun () ->
