@@ -54,9 +54,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let%bind.Deferred result =
         let%bind.Deferred process =
           Async_unix.Process.create_exn
-            ~prog:"./src/lib/snarkyjs/tests/integration/node"
+            ~prog:"./src/lib/snarky_js_bindings/test_module/node"
             ~args:
-              [ "src/lib/snarkyjs/tests/integration/simple-zkapp.js"
+              [ "src/lib/snarky_js_bindings/test_module/simple-zkapp.js"
               ; Signature_lib.Private_key.to_base58_check fee_payer_key
               ; graphql_uri
               ]

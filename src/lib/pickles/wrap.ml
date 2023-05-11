@@ -2,7 +2,10 @@ module SC = Scalar_challenge
 module P = Proof
 open Pickles_types
 open Hlist
+open Tuple_lib
 open Common
+open Core_kernel
+open Async_kernel
 open Import
 open Types
 open Backend
@@ -10,7 +13,8 @@ open Backend
 (* This contains the "wrap" prover *)
 
 let challenge_polynomial =
-  Wrap_verifier.challenge_polynomial (module Backend.Tick.Field)
+  let open Backend.Tick.Field in
+  Wrap_verifier.challenge_polynomial ~add ~mul ~one
 
 module Type1 =
   Plonk_checks.Make
@@ -21,7 +25,7 @@ module Type1 =
       let index_terms = Plonk_checks.Scalars.Tick.index_terms
     end)
 
-let _vector_of_list (type a t)
+let vector_of_list (type a t)
     (module V : Snarky_intf.Vector.S with type elt = a and type t = t)
     (xs : a list) : t =
   let r = V.create () in
@@ -205,6 +209,8 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
   let plonk =
     let module Field = struct
       include Tick.Field
+
+      type nonrec bool = bool
     end in
     Type1.derive_plonk
       (module Field)
@@ -252,7 +258,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
                   N1
               | S (S Z) ->
                   N2
-              | S _ ->
+              | _ ->
                   assert false )
           ; domain_log2 =
               Branch_data.Domain_log2.of_int_exn
@@ -265,7 +271,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
           ; beta = chal plonk0.beta
           ; gamma = chal plonk0.gamma
           ; lookup =
-              Opt.map plonk.lookup ~f:(fun _ ->
+              Opt.map plonk.lookup ~f:(fun l ->
                   { Composition_types.Wrap.Proof_state.Deferred_values.Plonk
                     .In_circuit
                     .Lookup
@@ -646,7 +652,7 @@ let wrap
       Req ) :
       (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t )
     ~dlog_plonk_index wrap_main ~(typ : _ Impls.Step.Typ.t) ~step_vk
-    ~actual_wrap_domains ~step_plonk_indices:_ ~feature_flags
+    ~actual_wrap_domains ~step_plonk_indices ~feature_flags
     ~actual_feature_flags ?tweak_statement pk
     ({ statement = prev_statement; prev_evals; proof; index = which_index } :
       ( _
@@ -776,7 +782,7 @@ let wrap
     | _ ->
         Snarky_backendless.Request.unhandled
   in
-
+  let module O = Tick.Oracles in
   let public_input =
     tick_public_input_of_statement ~max_proofs_verified
       prev_statement_with_hashes ~feature_flags

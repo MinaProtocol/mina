@@ -14,27 +14,22 @@ let rec absorb :
     -> unit =
  fun ~absorb_field ~absorb_scalar ~g1_to_field_elements ~mask_g1_opt ty t ->
   match ty with
-  | Type.PC ->
+  | PC ->
       List.iter ~f:absorb_field (g1_to_field_elements t)
-  | Type.Field ->
+  | Field ->
       absorb_field t
-  | Type.Scalar ->
+  | Scalar ->
       absorb_scalar t
-  | Type.Without_degree_bound ->
+  | Without_degree_bound ->
       Array.iter
         ~f:(Fn.compose (List.iter ~f:absorb_field) g1_to_field_elements)
         t
-  | Type.With_degree_bound ->
-      let Pickles_types.Plonk_types.Poly_comm.With_degree_bound.
-            { unshifted; shifted } =
-        t
-      in
-      let absorb x =
-        absorb ~absorb_field ~absorb_scalar ~g1_to_field_elements ~mask_g1_opt
-          Type.PC (mask_g1_opt x)
-      in
-      Array.iter unshifted ~f:absorb ;
-      absorb shifted
+  | With_degree_bound ->
+      Array.iter t.unshifted ~f:(fun t ->
+          absorb ~absorb_field ~absorb_scalar ~g1_to_field_elements ~mask_g1_opt
+            PC (mask_g1_opt t) ) ;
+      absorb ~absorb_field ~absorb_scalar ~g1_to_field_elements ~mask_g1_opt PC
+        (mask_g1_opt t.shifted)
   | ty1 :: ty2 ->
       let absorb t =
         absorb t ~absorb_field ~absorb_scalar ~g1_to_field_elements ~mask_g1_opt
@@ -56,14 +51,14 @@ let ones_vector :
   let rec go :
       type m. Boolean.var -> int -> m Nat.t -> (Boolean.var, m) Vector.t =
    fun value i m ->
-    match[@warning "-45"] m with
-    | Pickles_types.Nat.Z ->
-        Pickles_types.Vector.[]
-    | Pickles_types.Nat.S m ->
+    match m with
+    | Z ->
+        []
+    | S m ->
         let value =
           Boolean.(value && not (Field.equal first_zero (Field.of_int i)))
         in
-        Pickles_types.Vector.(value :: go value (i + 1) m)
+        value :: go value (i + 1) m
   in
   go Boolean.true_ 0 n
 

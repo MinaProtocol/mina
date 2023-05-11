@@ -156,9 +156,6 @@ val length : ('a, 'n) t -> 'n Nat.t
 val append :
   ('a, 'n) vec -> ('a, 'm) vec -> ('n, 'm, 'n_m) Nat.Adds.t -> ('a, 'n_m) vec
 
-(** [singleton x] is [x] *)
-val singleton : 'a -> ('a, Nat.z Nat.s) t
-
 val unsingleton : ('a, Nat.z Nat.s) t -> 'a
 
 val trim : 'a 'n 'm. ('a, 'm) vec -> ('n, 'm) Nat.Lte.t -> ('a, 'n) vec
