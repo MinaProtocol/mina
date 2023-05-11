@@ -966,7 +966,8 @@ module Make (L : Ledger_intf.S) :
             let res =
               let%bind timing =
                 validate_timing ~txn_amount:amount
-                  ~txn_global_slot:current_global_slot ~account:fee_payer_account
+                  ~txn_global_slot:current_global_slot
+                  ~account:fee_payer_account
                 |> Result.map_error ~f:timing_error_to_user_command_status
               in
               let%map balance =
@@ -977,12 +978,13 @@ module Make (L : Ledger_intf.S) :
               { fee_payer_account with balance; timing }
             in
             match res with
-            | Ok x -> Ok x
+            | Ok x ->
+                Ok x
             | Error failure ->
-                 raise
-                    (Reject
-                       (Error.createf "%s"
-                          (Transaction_status.Failure.describe failure) ) )
+                raise
+                  (Reject
+                     (Error.createf "%s"
+                        (Transaction_status.Failure.describe failure) ) )
           in
           (* Charge the account creation fee. *)
           let%bind receiver_amount =
