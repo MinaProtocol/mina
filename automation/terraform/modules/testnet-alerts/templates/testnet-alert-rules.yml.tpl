@@ -151,8 +151,8 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/LowMinWindowDensity-Runbook-7908635be4754b44a862d9bec8edc239"
 
   - alert: LowFillRate
-    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_slot_fill_rate ${rule_filter}) < 0.75 * 0.75
-    for: ${alert_evaluation_duration}
+    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_slot_fill_rate ${rule_filter}) < 0.75 * 0.6
+    for: 1h
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
