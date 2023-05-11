@@ -44,11 +44,10 @@ Pipeline.build
     spec = 
       let unitDirtyWhen = [
         S.strictlyStart (S.contains "src/lib"),
-        S.strictlyStart (S.contains "src/nonconsensus"),
+        S.strictlyStart (S.contains "src/test"),
         S.strictly (S.contains "Makefile"),
-        S.exactly "buildkite/src/Jobs/Test/DaemonUnitTest" "dhall",
-        S.exactly "scripts/link-coredumps" "sh",
-        S.exactly "buildkite/scripts/unit-test" "sh"
+        S.exactly "buildkite/src/Jobs/Test/SingleNodeTest" "dhall",
+        S.exactly "buildkite/scripts/single-node-tests" "sh"
       ]
 
       in
@@ -59,6 +58,6 @@ Pipeline.build
         name = "SingleNodeTest"
       },
     steps = [
-      buildTestCmd "dev" "src/lib/command_line_tests/command_line_tests.exe" Size.XLarge
+      buildTestCmd "dev" "src/test/command_line_tests/command_line_tests.exe" Size.XLarge
     ]
   }
