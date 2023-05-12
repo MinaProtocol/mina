@@ -2,7 +2,7 @@ open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
-let tests_enabled = true
+let group_tests_enabled = true
 
 let two_to_4limb = Bignum_bigint.(Common.two_to_3limb * Common.two_to_limb)
 
@@ -770,22 +770,31 @@ let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* Bounds 10: Left input (point_x3) bound check added below.
    *            Right input is gadget input so checked externally.
-   *            Result bound check already tracked by external_checks,
-   *            sub since it is equal to point_y2s (that is already
-   *            bounds checked) we can remove it. <---- TODO Optimization
+   *            Result bound check already tracked by mul's
+   *            external_checks.
    *)
-  Foreign_field.External_checks.append_bound_check external_checks
-  @@ Foreign_field.Element.Standard.to_limbs point_x3 ;
 
   (* Check if the elliptic curve a parameter requires more constraints
    * to be added in order to add final a (e.g. 3Px^2 + a where a != 0).
    *)
-  ( if Foreign_field.field_standard_limbs_is_zero (module Circuit) a then
+  if Foreign_field.field_standard_limbs_is_zero (module Circuit) a then (
+    (* Optimisation (saves 6 rows): Drop point_x3_squared bound check since
+     * it's equal to point_y2s and covered by (Bounds 8) *)
+    Foreign_field.External_checks.drop_bound_check external_checks ;
+
+    (* Add point_x3 bound check (Bounds 10) *)
+    Foreign_field.External_checks.append_bound_check external_checks
+    @@ Foreign_field.Element.Standard.to_limbs point_x3 ;
+
     (* Copy point_x3_squared to point_y2s *)
     Foreign_field.Element.Standard.assert_equal
       (module Circuit)
-      point_x3_squared point_y2s
-  else
+      point_x3_squared point_y2s )
+  else (
+    (* Add point_x3 bound check (Bounds 10) *)
+    Foreign_field.External_checks.append_bound_check external_checks
+    @@ Foreign_field.Element.Standard.to_limbs point_x3 ;
+
     (* Add curve constant a *)
     let a =
       let a0, a1, a2 =
@@ -803,12 +812,11 @@ let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
         (module Circuit)
         ~full:false point_x3_squared a foreign_field_modulus
       (* Bounds 11: Left input (point_x3_squared) already tracked by (Bounds 10).
-       *            Right input is public constant. (TODO: check this)
-       *            Result bound check tracked below.
+       *            Right input is public constant.
+       *            Result bound check already covered by (Bound 8) since
+       *            point_x3_squared_plus_a = point_y2s.
        *)
     in
-    Foreign_field.External_checks.append_bound_check external_checks
-    @@ Foreign_field.Element.Standard.to_limbs point_x3_squared_plus_a ;
 
     (* Final Zero gate with result *)
     let ( point_x3_squared_plus_a0
@@ -845,7 +853,7 @@ let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
 (*********)
 
 let%test_unit "ecdsa affine helpers " =
-  if (* tests_enabled *) false then
+  if group_tests_enabled then
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -887,7 +895,7 @@ let%test_unit "ecdsa affine helpers " =
     ()
 
 let%test_unit "group_add" =
-  if (* tests_enabled *) false then (
+  if group_tests_enabled then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -1259,7 +1267,7 @@ let%test_unit "group_add" =
     () )
 
 let%test_unit "group_add_chained" =
-  if (* tests_enabled *) false then (
+  if group_tests_enabled then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -1460,7 +1468,7 @@ let%test_unit "group_add_chained" =
     () )
 
 let%test_unit "group_add_full" =
-  if (* tests_enabled *) false then (
+  if group_tests_enabled then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -1620,7 +1628,7 @@ let%test_unit "group_add_full" =
     () )
 
 let%test_unit "group_double" =
-  if (* tests_enabled *) false then (
+  if group_tests_enabled then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -1674,10 +1682,10 @@ let%test_unit "group_double" =
             if Foreign_field.field_standard_limbs_is_zero (module Runner.Impl) a
             then
               assert (
-                Mina_stdlib.List.Length.equal unused_external_checks.bounds 9 )
+                Mina_stdlib.List.Length.equal unused_external_checks.bounds 8 )
             else
               assert (
-                Mina_stdlib.List.Length.equal unused_external_checks.bounds 10 ) ;
+                Mina_stdlib.List.Length.equal unused_external_checks.bounds 9 ) ;
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
                 4 ) ;
@@ -1930,7 +1938,7 @@ let%test_unit "group_double" =
     () )
 
 let%test_unit "group_double_chained" =
-  if (* tests_enabled *) false then (
+  if group_tests_enabled then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -1989,10 +1997,10 @@ let%test_unit "group_double_chained" =
             if Foreign_field.field_standard_limbs_is_zero (module Runner.Impl) a
             then
               assert (
-                Mina_stdlib.List.Length.equal unused_external_checks.bounds 18 )
+                Mina_stdlib.List.Length.equal unused_external_checks.bounds 16 )
             else
               assert (
-                Mina_stdlib.List.Length.equal unused_external_checks.bounds 20 ) ;
+                Mina_stdlib.List.Length.equal unused_external_checks.bounds 18 ) ;
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
                 8 ) ;
@@ -2049,7 +2057,7 @@ let%test_unit "group_double_chained" =
     () )
 
 let%test_unit "group_double_full" =
-  if tests_enabled (* false *) then (
+  if group_tests_enabled then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -2132,8 +2140,8 @@ let%test_unit "group_double_full" =
              *    are then constrainted in (2)
              *)
             if Foreign_field.field_standard_limbs_is_zero (module Runner.Impl) a
-            then assert (Mina_stdlib.List.Length.equal external_checks.bounds 13)
-            else assert (Mina_stdlib.List.Length.equal external_checks.bounds 14) ;
+            then assert (Mina_stdlib.List.Length.equal external_checks.bounds 12)
+            else assert (Mina_stdlib.List.Length.equal external_checks.bounds 13) ;
             List.iter external_checks.bounds ~f:(fun value ->
                 let _bound =
                   Foreign_field.valid_element
@@ -2146,7 +2154,7 @@ let%test_unit "group_double_full" =
 
             (* 2) Add gates for external multi-range-checks *)
             assert (
-              Mina_stdlib.List.Length.equal external_checks.multi_ranges 17 ) ;
+              Mina_stdlib.List.Length.equal external_checks.multi_ranges 16 ) ;
             List.iter external_checks.multi_ranges ~f:(fun multi_range ->
                 let v0, v1, v2 = multi_range in
                 Range_check.multi (module Runner.Impl) v0 v1 v2 ;
@@ -2211,7 +2219,7 @@ let%test_unit "group_double_full" =
     () )
 
 let%test_unit "group_ops_mixed" =
-  if (* tests_enabled *) false then (
+  if group_tests_enabled then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -2282,10 +2290,10 @@ let%test_unit "group_ops_mixed" =
             if Foreign_field.field_standard_limbs_is_zero (module Runner.Impl) a
             then
               assert (
-                Mina_stdlib.List.Length.equal unused_external_checks.bounds 15 )
+                Mina_stdlib.List.Length.equal unused_external_checks.bounds 14 )
             else
               assert (
-                Mina_stdlib.List.Length.equal unused_external_checks.bounds 16 ) ;
+                Mina_stdlib.List.Length.equal unused_external_checks.bounds 15 ) ;
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
                 7 ) ;
@@ -2353,7 +2361,7 @@ let%test_unit "group_ops_mixed" =
     () )
 
 let%test_unit "group_properties" =
-  if (* tests_enabled *) false then (
+  if group_tests_enabled then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =

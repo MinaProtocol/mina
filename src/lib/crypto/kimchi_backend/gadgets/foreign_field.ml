@@ -362,6 +362,7 @@ module External_checks = struct
     { multi_ranges = []; compact_multi_ranges = []; bounds = [] }
 
   (* Track a multi-range-check *)
+  (* TODO: improve names of these from append_ to add_, push_ or insert_ *)
   let append_multi_range_check (external_checks : 'field t)
       (x : 'field Cvar.t standard_limbs) =
     external_checks.multi_ranges <- x :: external_checks.multi_ranges
@@ -376,6 +377,11 @@ module External_checks = struct
   let append_bound_check (external_checks : 'field t)
       (x : 'field Cvar.t standard_limbs) =
     external_checks.bounds <- x :: external_checks.bounds
+
+  (* Drop last appended bound check *)
+  let drop_bound_check (external_checks : 'field t) =
+    external_checks.bounds <-
+      (match external_checks.bounds with [] -> [] | _ :: tl -> tl)
 end
 
 (* Common auxiliary functions for foreign field gadgets *)
