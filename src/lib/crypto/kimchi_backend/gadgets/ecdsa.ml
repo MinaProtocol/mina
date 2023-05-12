@@ -908,40 +908,13 @@ let%test_unit "group_add" =
                 foreign_field_modulus
             in
             let left_input =
-              let x, y = left_input in
-              let x, y =
-                ( Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    x
-                , Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    y )
-              in
-              Affine.of_coordinates (x, y)
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) left_input
             in
             let right_input =
-              let x, y = right_input in
-              let x, y =
-                ( Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    x
-                , Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    y )
-              in
-              Affine.of_coordinates (x, y)
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) right_input
             in
             let expected_result =
-              let x, y = expected_result in
-              let x, y =
-                ( Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    x
-                , Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    y )
-              in
-              Affine.of_coordinates (x, y)
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) expected_result
             in
 
             (* Create external checks context for tracking extra constraints
@@ -1303,52 +1276,16 @@ let%test_unit "group_add_chained" =
                 foreign_field_modulus
             in
             let left_input =
-              let x, y = left_input in
-              let x, y =
-                ( Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    x
-                , Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    y )
-              in
-              Affine.of_coordinates (x, y)
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) left_input
             in
             let right_input =
-              let x, y = right_input in
-              let x, y =
-                ( Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    x
-                , Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    y )
-              in
-              Affine.of_coordinates (x, y)
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) right_input
             in
             let input2 =
-              let x, y = input2 in
-              let x, y =
-                ( Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    x
-                , Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    y )
-              in
-              Affine.of_coordinates (x, y)
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) input2
             in
             let expected_result =
-              let x, y = expected_result in
-              let x, y =
-                ( Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    x
-                , Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    y )
-              in
-              Affine.of_coordinates (x, y)
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) expected_result
             in
 
             (* Create external checks context for tracking extra constraints
@@ -1532,40 +1469,13 @@ let%test_unit "group_add_full" =
                 foreign_field_modulus
             in
             let left_input =
-              let x, y = left_input in
-              let x, y =
-                ( Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    x
-                , Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    y )
-              in
-              Affine.of_coordinates (x, y)
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) left_input
             in
             let right_input =
-              let x, y = right_input in
-              let x, y =
-                ( Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    x
-                , Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    y )
-              in
-              Affine.of_coordinates (x, y)
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) right_input
             in
             let expected_result =
-              let x, y = expected_result in
-              let x, y =
-                ( Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    x
-                , Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    y )
-              in
-              Affine.of_coordinates (x, y)
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) expected_result
             in
 
             (* Create external checks context for tracking extra constraints
@@ -1712,28 +1622,10 @@ let%test_unit "group_double" =
                 foreign_field_modulus
             in
             let point =
-              let x, y = point in
-              let x, y =
-                ( Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    x
-                , Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    y )
-              in
-              Affine.of_coordinates (x, y)
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) point
             in
             let expected_result =
-              let x, y = expected_result in
-              let x, y =
-                ( Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    x
-                , Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    y )
-              in
-              Affine.of_coordinates (x, y)
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) expected_result
             in
 
             (* Create external checks context for tracking extra constraints
@@ -2034,28 +1926,10 @@ let%test_unit "group_double_chained" =
                 foreign_field_modulus
             in
             let point =
-              let x, y = point in
-              let x, y =
-                ( Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    x
-                , Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    y )
-              in
-              Affine.of_coordinates (x, y)
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) point
             in
             let expected_result =
-              let x, y = expected_result in
-              let x, y =
-                ( Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    x
-                , Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    y )
-              in
-              Affine.of_coordinates (x, y)
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) expected_result
             in
 
             (* Create external checks context for tracking extra constraints
@@ -2165,40 +2039,13 @@ let%test_unit "group_ops_mixed" =
                 foreign_field_modulus
             in
             let left_input =
-              let x, y = left_input in
-              let x, y =
-                ( Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    x
-                , Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    y )
-              in
-              Affine.of_coordinates (x, y)
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) left_input
             in
             let right_input =
-              let x, y = right_input in
-              let x, y =
-                ( Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    x
-                , Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    y )
-              in
-              Affine.of_coordinates (x, y)
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) right_input
             in
             let expected_result =
-              let x, y = expected_result in
-              let x, y =
-                ( Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    x
-                , Foreign_field.Element.Standard.of_bignum_bigint
-                    (module Runner.Impl)
-                    y )
-              in
-              Affine.of_coordinates (x, y)
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) expected_result
             in
 
             (* Create external checks context for tracking extra constraints
