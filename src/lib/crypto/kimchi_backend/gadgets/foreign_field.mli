@@ -31,6 +31,11 @@ val field_standard_limbs_to_bignum_bigint :
   -> 'field standard_limbs
   -> Bignum_bigint.t
 
+val field_standard_limbs_is_zero :
+     (module Snark_intf.Run with type field = 'field)
+  -> 'field standard_limbs
+  -> bool
+
 (** Foreign field element base type - not used directly *)
 module type Element_intf = sig
   type 'field t

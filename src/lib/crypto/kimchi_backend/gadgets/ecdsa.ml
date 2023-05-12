@@ -506,7 +506,10 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
  *)
 let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
     (external_checks : f Foreign_field.External_checks.t) (point : f Affine.t)
-    ?(a = Circuit.Field.Constant.zero)
+    ?(a =
+      ( Circuit.Field.Constant.zero
+      , Circuit.Field.Constant.zero
+      , Circuit.Field.Constant.zero ))
     (foreign_field_modulus : f Foreign_field.standard_limbs) : f Affine.t =
   let open Circuit in
   (* TODO: Remove sanity checks if this API is not public facing *)
@@ -543,7 +546,9 @@ let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
             (module Circuit)
             point_y
         in
-        let a = Common.field_to_bignum_bigint (module Circuit) a in
+        let a =
+          Foreign_field.field_standard_limbs_to_bignum_bigint (module Circuit) a
+        in
         let foreign_field_modulus =
           Foreign_field.field_standard_limbs_to_bignum_bigint
             (module Circuit)
@@ -775,7 +780,7 @@ let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
   (* Check if the elliptic curve a parameter requires more constraints
    * to be added in order to add final a (e.g. 3Px^2 + a where a != 0).
    *)
-  ( if Field.Constant.(equal a zero) then
+  ( if Foreign_field.field_standard_limbs_is_zero (module Circuit) a then
     (* Copy point_x3_squared to point_y2s *)
     Foreign_field.Element.Standard.assert_equal
       (module Circuit)
@@ -785,12 +790,7 @@ let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
     let a =
       let a0, a1, a2 =
         exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
-            let a = Common.field_to_bignum_bigint (module Circuit) a in
-            let a0, a1, a2 =
-              Foreign_field.bignum_bigint_to_field_standard_limbs
-                (module Circuit)
-                a
-            in
+            let a0, a1, a2 = a in
             [| a0; a1; a2 |] )
         |> Common.tuple3_of_array
       in
@@ -1637,8 +1637,12 @@ let%test_unit "group_double" =
       let cs, _proof_keypair, _proof =
         Runner.generate_and_verify_proof ?cs (fun () ->
             let open Runner.Impl in
-            let a = Common.bignum_bigint_to_field (module Runner.Impl) a in
             (* Prepare test inputs *)
+            let a =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                a
+            in
             let foreign_field_modulus =
               Foreign_field.bignum_bigint_to_field_standard_limbs
                 (module Runner.Impl)
@@ -1667,7 +1671,8 @@ let%test_unit "group_double" =
             in
 
             (* Check for expected quantity of external checks *)
-            if Field.Constant.(equal a zero) then
+            if Foreign_field.field_standard_limbs_is_zero (module Runner.Impl) a
+            then
               assert (
                 Mina_stdlib.List.Length.equal unused_external_checks.bounds 9 )
             else
@@ -1943,8 +1948,12 @@ let%test_unit "group_double_chained" =
       let cs, _proof_keypair, _proof =
         Runner.generate_and_verify_proof ?cs (fun () ->
             let open Runner.Impl in
-            let a = Common.bignum_bigint_to_field (module Runner.Impl) a in
             (* Prepare test inputs *)
+            let a =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                a
+            in
             let foreign_field_modulus =
               Foreign_field.bignum_bigint_to_field_standard_limbs
                 (module Runner.Impl)
@@ -1977,7 +1986,8 @@ let%test_unit "group_double_chained" =
             in
 
             (* Check for expected quantity of external checks *)
-            if Field.Constant.(equal a zero) then
+            if Foreign_field.field_standard_limbs_is_zero (module Runner.Impl) a
+            then
               assert (
                 Mina_stdlib.List.Length.equal unused_external_checks.bounds 18 )
             else
@@ -2056,8 +2066,12 @@ let%test_unit "group_double_full" =
       let cs, _proof_keypair, _proof =
         Runner.generate_and_verify_proof ?cs (fun () ->
             let open Runner.Impl in
-            let a = Common.bignum_bigint_to_field (module Runner.Impl) a in
             (* Prepare test inputs *)
+            let a =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                a
+            in
             let foreign_field_modulus =
               Foreign_field.bignum_bigint_to_field_standard_limbs
                 (module Runner.Impl)
@@ -2117,8 +2131,8 @@ let%test_unit "group_double_full" =
              *    computed bound to the external_checks.multi-ranges, which
              *    are then constrainted in (2)
              *)
-            if Field.Constant.(equal a zero) then
-              assert (Mina_stdlib.List.Length.equal external_checks.bounds 13)
+            if Foreign_field.field_standard_limbs_is_zero (module Runner.Impl) a
+            then assert (Mina_stdlib.List.Length.equal external_checks.bounds 13)
             else assert (Mina_stdlib.List.Length.equal external_checks.bounds 14) ;
             List.iter external_checks.bounds ~f:(fun value ->
                 let _bound =
@@ -2216,8 +2230,12 @@ let%test_unit "group_ops_mixed" =
       let cs, _proof_keypair, _proof =
         Runner.generate_and_verify_proof ?cs (fun () ->
             let open Runner.Impl in
-            let a = Common.bignum_bigint_to_field (module Runner.Impl) a in
             (* Prepare test inputs *)
+            let a =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                a
+            in
             let foreign_field_modulus =
               Foreign_field.bignum_bigint_to_field_standard_limbs
                 (module Runner.Impl)
@@ -2261,7 +2279,8 @@ let%test_unit "group_ops_mixed" =
             in
 
             (* Check for expected quantity of external checks *)
-            if Field.Constant.(equal a zero) then
+            if Foreign_field.field_standard_limbs_is_zero (module Runner.Impl) a
+            then
               assert (
                 Mina_stdlib.List.Length.equal unused_external_checks.bounds 15 )
             else
@@ -2354,7 +2373,11 @@ let%test_unit "group_properties" =
         Runner.generate_and_verify_proof ?cs (fun () ->
             let open Runner.Impl in
             (* Prepare test inputs *)
-            let a = Common.bignum_bigint_to_field (module Runner.Impl) a in
+            let a =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                a
+            in
             let foreign_field_modulus =
               Foreign_field.bignum_bigint_to_field_standard_limbs
                 (module Runner.Impl)

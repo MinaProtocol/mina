@@ -118,6 +118,13 @@ let field_standard_limbs_to_bignum_bigint (type f)
   in
   Bignum_bigint.(l0 + (Common.two_to_limb * l1) + (two_to_2limb * l2))
 
+(* Check if field standard_limbs is zero *)
+let field_standard_limbs_is_zero (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (field_limbs : f standard_limbs) : bool =
+  let l0, l1, l2 = field_limbs in
+  Circuit.Field.Constant.(equal l0 zero && equal l1 zero && equal l2 zero)
+
 (* Foreign field element interface *)
 (* TODO: It would be better if this were created with functor that
  *       takes are arguments the native field and the foreign field modulus.
