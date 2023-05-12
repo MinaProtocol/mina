@@ -30,7 +30,7 @@ spec:
         command:
         - bash
         - -c
-        - mina advanced generate-libp2p-keypair --privkey-path /root/libp2p-keys/key && /bin/chmod -R 0700 /root/libp2p-keys/
+        - mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key && /bin/chmod -R 0700 /root/libp2p-keys/
         volumeMounts:
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
@@ -74,7 +74,7 @@ spec:
           {{- if .Values.mina.seedPeersURL }}
           "-peer-list-url", {{ .Values.mina.seedPeersURL | quote }},
           {{- end -}}
-          "-discovery-keypair", "/root/libp2p-keys/key",
+          "-libp2p-keypair", "/root/libp2p-keys/key",
           "-config-directory", "/root/.mina-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",

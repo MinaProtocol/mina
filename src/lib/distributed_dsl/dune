@@ -20,6 +20,6 @@
    inline_test_quiet_logs
  )
  (preprocess
-  (pps ppx_coda ppx_version ppx_jane ppx_compare ppx_deriving.enum ppx_deriving_yojson))
+  (pps ppx_mina ppx_version ppx_jane ppx_compare ppx_deriving.enum ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))
  (synopsis "Distributed DSL"))

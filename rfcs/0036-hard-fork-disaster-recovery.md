@@ -79,7 +79,7 @@ is run, the daemon saves the following data:
 
 - the SNARKed ledger corresponding to the root
 
-  this is an instance of `Mina_base.Ledger.Any_ledger.witness`, retrievable
+  this is an instance of `Mina_ledger.Ledger.Any_ledger.witness`, retrievable
   via
 
   ```ocaml

@@ -59,6 +59,7 @@ struct GatingConfig {
   trustedIps @2 :List(Text);
   trustedPeerIds @3 :List(PeerId);
   isolate @4 :Bool;
+  cleanAddedPeers @5 :Bool;
 }
 
 struct TopicLevel {
@@ -80,7 +81,7 @@ struct Libp2pConfig {
   gatingConfig @11 :GatingConfig;
   maxConnections @12 :UInt32;
   validationQueueSize @13 :UInt32;
-  minaPeerExchange @14 :Bool;
+  peerProtectionRatio @14 :Float32;
   minConnections @15 :UInt32;
   knownPrivateIpNets @16 :List(Text);
   topicConfig @17 :List(TopicLevel);
@@ -335,6 +336,10 @@ struct Libp2pHelperInterface {
     ids @0 :List(RootBlockId);
   }
 
+  struct HeartbeatPeer {
+    id @0 :PeerId;
+  }
+
   struct DownloadResource {
     tag @0 :UInt8;
     ids @1 :List(RootBlockId);
@@ -417,6 +422,7 @@ struct Libp2pHelperInterface {
       addResource @2 :Libp2pHelperInterface.AddResource;
       deleteResource @3 :Libp2pHelperInterface.DeleteResource;
       downloadResource @4 :Libp2pHelperInterface.DownloadResource;
+      heartbeatPeer @5 :Libp2pHelperInterface.HeartbeatPeer;
     }
   }
 
