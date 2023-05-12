@@ -765,7 +765,9 @@ let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* Bounds 10: Left input (point_x3) bound check added below.
    *            Right input is gadget input so checked externally.
-   *            Result bound check already tracked by external_checks.
+   *            Result bound check already tracked by external_checks,
+   *            sub since it is equal to point_y2s (that is already
+   *            bounds checked) we can remove it. <---- TODO Optimization
    *)
   Foreign_field.External_checks.append_bound_check external_checks
   @@ Foreign_field.Element.Standard.to_limbs point_x3 ;
@@ -1540,19 +1542,22 @@ let%test_unit "group_add_full" =
                     (module Runner.Impl)
                     result expected_result ) ) ;
 
-            (* Perform external checks *)
+            (*
+             * Perform external checks
+             *)
+
             (* 1) Add gates for external bound additions.
              *    Note: internally this also adds multi-range-checks for the
              *    computed bound to the external_checks.multi-ranges, which
              *    are then constrainted in (2)
              *)
             assert (Mina_stdlib.List.Length.equal external_checks.bounds 12) ;
-            List.iter external_checks.bounds ~f:(fun product ->
-                let _remainder_bound =
+            List.iter external_checks.bounds ~f:(fun value ->
+                let _bound =
                   Foreign_field.valid_element
                     (module Runner.Impl)
                     external_checks
-                    (Foreign_field.Element.Standard.of_limbs product)
+                    (Foreign_field.Element.Standard.of_limbs value)
                     foreign_field_modulus
                 in
                 () ) ;
@@ -2031,6 +2036,164 @@ let%test_unit "group_double_chained" =
     let _cs =
       test_group_double_chained point expected_result secp256k1_modulus
     in
+    () )
+
+let%test_unit "group_double_full" =
+  if tests_enabled (* false *) then (
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+
+    (* Test group double (full circuit with external checks) *)
+    let test_group_double_full ?cs (point : Bignum_bigint.t * Bignum_bigint.t)
+        (expected_result : Bignum_bigint.t * Bignum_bigint.t)
+        ?(a = Bignum_bigint.zero)
+        (* curve parameter a *)
+          (foreign_field_modulus : Bignum_bigint.t) =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            let open Runner.Impl in
+            let a = Common.bignum_bigint_to_field (module Runner.Impl) a in
+            (* Prepare test inputs *)
+            let foreign_field_modulus =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                foreign_field_modulus
+            in
+            let point =
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) point
+            in
+            let expected_result =
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                expected_result
+            in
+
+            (* Create external checks context for tracking extra constraints
+               that are required for soundness *)
+            let external_checks =
+              Foreign_field.External_checks.create (module Runner.Impl)
+            in
+
+            (* P + P = D *)
+            let result =
+              group_double
+                (module Runner.Impl)
+                external_checks point ~a foreign_field_modulus
+            in
+
+            (* Add input point to external checks *)
+            Foreign_field.(
+              External_checks.append_bound_check external_checks
+              @@ Element.Standard.to_limbs @@ Affine.x point) ;
+            Foreign_field.(
+              External_checks.append_bound_check external_checks
+              @@ Element.Standard.to_limbs @@ Affine.y point) ;
+
+            (* Add result to external checks *)
+            Foreign_field.(
+              External_checks.append_bound_check external_checks
+              @@ Element.Standard.to_limbs @@ Affine.x result) ;
+            Foreign_field.(
+              External_checks.append_bound_check external_checks
+              @@ Element.Standard.to_limbs @@ Affine.y result) ;
+
+            (* Check output matches expected result *)
+            as_prover (fun () ->
+                assert (
+                  Affine.equal_as_prover
+                    (module Runner.Impl)
+                    result expected_result ) ) ;
+
+            (*
+             * Perform external checks
+             *)
+
+            (* 1) Add gates for external bound additions.
+             *    Note: internally this also adds multi-range-checks for the
+             *    computed bound to the external_checks.multi-ranges, which
+             *    are then constrainted in (2)
+             *)
+            if Field.Constant.(equal a zero) then
+              assert (Mina_stdlib.List.Length.equal external_checks.bounds 13)
+            else assert (Mina_stdlib.List.Length.equal external_checks.bounds 14) ;
+            List.iter external_checks.bounds ~f:(fun value ->
+                let _bound =
+                  Foreign_field.valid_element
+                    (module Runner.Impl)
+                    external_checks
+                    (Foreign_field.Element.Standard.of_limbs value)
+                    foreign_field_modulus
+                in
+                () ) ;
+
+            (* 2) Add gates for external multi-range-checks *)
+            assert (
+              Mina_stdlib.List.Length.equal external_checks.multi_ranges 17 ) ;
+            List.iter external_checks.multi_ranges ~f:(fun multi_range ->
+                let v0, v1, v2 = multi_range in
+                Range_check.multi (module Runner.Impl) v0 v1 v2 ;
+                () ) ;
+
+            (* 3) Add gates for external compact-multi-range-checks *)
+            assert (
+              Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges
+                4 ) ;
+            List.iter external_checks.compact_multi_ranges
+              ~f:(fun compact_multi_range ->
+                let v01, v2 = compact_multi_range in
+                Range_check.compact_multi (module Runner.Impl) v01 v2 ;
+                () ) ;
+
+            () )
+      in
+
+      cs
+    in
+
+    let point =
+      ( Bignum_bigint.of_string
+          "422320656143453469357911138554881092132771509739438645920469442837105323580"
+      , Bignum_bigint.of_string
+          "99573693339481125202377937570343422789783140695684047090890158240546390265715"
+      )
+    in
+    let expected_result =
+      ( Bignum_bigint.of_string
+          "111592986473580724183094323045895279290564238712238558254671818420787861656338"
+      , Bignum_bigint.of_string
+          "21999887286188040786039896471521925680577344653927821650184541049020329991940"
+      )
+    in
+
+    assert (secp256k1_is_on_curve point) ;
+    assert (secp256k1_is_on_curve expected_result) ;
+
+    let _cs = test_group_double_full point expected_result secp256k1_modulus in
+
+    let point =
+      ( Bignum_bigint.of_string
+          "35572202113406269203741773940276421270986156279943921117631530910348880407195"
+      , Bignum_bigint.of_string
+          "77949858788528057664678921426007070786227653051729292366956150514299227362888"
+      )
+    in
+    let expected_result =
+      ( Bignum_bigint.of_string
+          "77054343462981168852324254689119448477035493875004605555517034503407691682302"
+      , Bignum_bigint.of_string
+          "71816304404296379298724767646016383731405297016881176644824032740912066853658"
+      )
+    in
+
+    assert (secp256k1_is_on_curve point) ;
+    assert (secp256k1_is_on_curve expected_result) ;
+
+    let _cs = test_group_double_full point expected_result secp256k1_modulus in
+
     () )
 
 let%test_unit "group_ops_mixed" =
