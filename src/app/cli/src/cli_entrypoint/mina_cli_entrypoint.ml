@@ -947,14 +947,13 @@ let setup_daemon logger =
                   "You cannot provide both `block-producer-key` and \
                    `block_production_pubkey`"
             | None, None -> (
-                match Sys.getenv "MINA_BY_PRIVKEY" with
-                | Some _ ->
-                    let%map kp =
-                      Secrets.Keypair.Terminal_stdin.read_exn
-                        ~should_prompt_user:false
-                        ~which:"block producer keypair" ""
+                match Sys.getenv "MINA_BP_PRIVKEY" with
+                | Some base58_privkey ->
+                    let kp =
+                      Private_key.of_base58_check_exn base58_privkey
+                      |> Keypair.of_private_key_exn
                     in
-                    Some kp
+                    return (Some kp)
                 | None ->
                     return None )
             | Some sk_file, _ ->

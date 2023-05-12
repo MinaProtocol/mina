@@ -84,75 +84,56 @@ let write ~path ~mkdir ~(password : Bytes.t Deferred.t Lazy.t) ~plaintext =
   let%bind () = lift (Unix.chmod path ~perm:0o600) in
   lift (Writer.close privkey_f)
 
-let decrypt_secret_box ~contents ~source ~(password : Bytes.t Deferred.t Lazy.t)
-    =
+let read ~path ~(password : Bytes.t Deferred.t Lazy.t) =
+  let to_corrupt_privkey =
+    Deferred.Result.map_error ~f:(fun e -> `Corrupted_privkey e)
+  in
+  let handle_open ~mkdir ~f p = handle_open ~mkdir ~f p in
   let open Deferred.Result.Let_syntax in
+  let read_all r =
+    lift (Pipe.to_list (Reader.lines r))
+    >>| fun ss -> String.concat ~sep:"\n" ss
+  in
+  let%bind privkey_file = handle_open ~mkdir:false ~f:Reader.open_file path in
+  let%bind st = handle_open ~mkdir:false ~f:Unix.stat path in
+  let file_error =
+    if st.perm land 0o077 <> 0 then
+      Some
+        (sprintf
+           "insecure permissions on `%s`. They should be 0600, they are %o\n\
+            Hint: chmod 600 %s\n"
+           path (st.perm land 0o777) path )
+    else None
+  in
+  let dn = Filename.dirname path in
+  let%bind st = handle_open ~mkdir:false ~f:Unix.stat dn in
+  let dir_error =
+    if st.perm land 0o777 <> 0o700 then
+      Some
+        (sprintf
+           "insecure permissions on `%s`. They should be 0700, they are %o\n\
+            Hint: chmod 700 %s\n"
+           dn (st.perm land 0o777) dn )
+    else None
+  in
+  let%bind () =
+    match (file_error, dir_error) with
+    | Some e1, Some e2 ->
+        Deferred.Or_error.error_string (e1 ^ e2) |> to_corrupt_privkey
+    | Some e1, None | None, Some e1 ->
+        Deferred.Or_error.error_string e1 |> to_corrupt_privkey
+    | None, None ->
+        Deferred.Result.return ()
+  in
+  let%bind file_contents = read_all privkey_file |> to_corrupt_privkey in
   let%bind sb =
-    match Secret_box.of_yojson (Yojson.Safe.from_string contents) with
+    match Secret_box.of_yojson (Yojson.Safe.from_string file_contents) with
     | Ok sb ->
         return sb
     | Error e ->
         Deferred.return
           (Privkey_error.corrupted_privkey
-             (Error.createf "couldn't parse %s: %s" source e) )
+             (Error.createf "couldn't parse %s: %s" path e) )
   in
   let%bind password = lift (Lazy.force password) in
   Deferred.return (Secret_box.decrypt ~password sb)
-
-let read ?(which = "") ~path ~(password : Bytes.t Deferred.t Lazy.t) () =
-  match path with
-  | "" -> (
-      let env = "MINA_BP_PRIVKEY" in
-      match Sys.getenv env with
-      | Some contents ->
-          decrypt_secret_box ~contents ~source:env ~password
-      | None ->
-          Deferred.return
-          @@ Error
-               (Privkey_error.raise ~which (`Environment_variable_not_set env))
-      )
-  | _ ->
-      let to_corrupt_privkey =
-        Deferred.Result.map_error ~f:(fun e -> `Corrupted_privkey e)
-      in
-      let handle_open ~mkdir ~f p = handle_open ~mkdir ~f p in
-      let open Deferred.Result.Let_syntax in
-      let read_all r =
-        lift (Pipe.to_list (Reader.lines r))
-        >>| fun ss -> String.concat ~sep:"\n" ss
-      in
-      let%bind privkey_file =
-        handle_open ~mkdir:false ~f:Reader.open_file path
-      in
-      let%bind st = handle_open ~mkdir:false ~f:Unix.stat path in
-      let file_error =
-        if st.perm land 0o077 <> 0 then
-          Some
-            (sprintf
-               "insecure permissions on `%s`. They should be 0600, they are %o\n\
-                Hint: chmod 600 %s\n"
-               path (st.perm land 0o777) path )
-        else None
-      in
-      let dn = Filename.dirname path in
-      let%bind st = handle_open ~mkdir:false ~f:Unix.stat dn in
-      let dir_error =
-        if st.perm land 0o777 <> 0o700 then
-          Some
-            (sprintf
-               "insecure permissions on `%s`. They should be 0700, they are %o\n\
-                Hint: chmod 700 %s\n"
-               dn (st.perm land 0o777) dn )
-        else None
-      in
-      let%bind () =
-        match (file_error, dir_error) with
-        | Some e1, Some e2 ->
-            Deferred.Or_error.error_string (e1 ^ e2) |> to_corrupt_privkey
-        | Some e1, None | None, Some e1 ->
-            Deferred.Or_error.error_string e1 |> to_corrupt_privkey
-        | None, None ->
-            Deferred.Result.return ()
-      in
-      let%bind contents = read_all privkey_file |> to_corrupt_privkey in
-      decrypt_secret_box ~contents ~source:path ~password

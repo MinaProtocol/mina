@@ -5,8 +5,7 @@ type t =
   | `Incorrect_password_or_corrupted_privkey
   | `Cannot_open_file of string * Unix.Error.t
   | `Parent_directory_does_not_exist of string
-  | `Password_not_in_environment of string list
-  | `Environment_variable_not_set of string ]
+  | `Password_not_in_environment of string list ]
 
 let to_string : t -> string = function
   | `Corrupted_privkey e ->
@@ -27,8 +26,6 @@ let to_string : t -> string = function
         "No password was specified in any of the following environment \
          variables: %s"
         (String.concat env_vars ~sep:", ")
-  | `Environment_variable_not_set env_var ->
-      sprintf "Environment variable %s is not set" env_var
 
 let raise ~which t =
   let where = sprintf "loading %s" which in

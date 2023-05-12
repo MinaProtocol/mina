@@ -33,7 +33,7 @@ module T = struct
   let read ~(privkey_path : string) ~(password : Secret_file.password) :
       (t, Privkey_error.t) Deferred.Result.t =
     let open Deferred.Result.Let_syntax in
-    let%bind bytes = Secret_file.read ~path:privkey_path ~password () in
+    let%bind bytes = Secret_file.read ~path:privkey_path ~password in
     Deferred.return
     @@
     match Mina_net2.Keypair.of_string (Bytes.to_string bytes) with
