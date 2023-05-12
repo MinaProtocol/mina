@@ -537,7 +537,7 @@ let setup_daemon logger =
                ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate ) ;
         (* Consumer for `[%log internal]` logging used for internal tracing *)
         Itn_logger.set_message_postprocessor
-          Internal_tracing.For_logger.post_process_message ;
+          Internal_tracing.For_itn_logger.post_process_message ;
         Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
           ~processor:Internal_tracing.For_logger.processor
           ~transport:

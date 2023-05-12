@@ -147,7 +147,9 @@ module For_logger : sig
 
   (** Processor for the "internal" log level used to record checkpoints *)
   val processor : Logger.Processor.t
+end
 
+module For_itn_logger : sig
   val post_process_message :
        timestamp:Core.Time.t
     -> message:string
