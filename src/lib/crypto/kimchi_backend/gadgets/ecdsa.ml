@@ -908,13 +908,19 @@ let%test_unit "group_add" =
                 foreign_field_modulus
             in
             let left_input =
-              Affine.of_bignum_bigint_coordinates (module Runner.Impl) left_input
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                left_input
             in
             let right_input =
-              Affine.of_bignum_bigint_coordinates (module Runner.Impl) right_input
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                right_input
             in
             let expected_result =
-              Affine.of_bignum_bigint_coordinates (module Runner.Impl) expected_result
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                expected_result
             in
 
             (* Create external checks context for tracking extra constraints
@@ -1276,16 +1282,22 @@ let%test_unit "group_add_chained" =
                 foreign_field_modulus
             in
             let left_input =
-              Affine.of_bignum_bigint_coordinates (module Runner.Impl) left_input
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                left_input
             in
             let right_input =
-              Affine.of_bignum_bigint_coordinates (module Runner.Impl) right_input
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                right_input
             in
             let input2 =
               Affine.of_bignum_bigint_coordinates (module Runner.Impl) input2
             in
             let expected_result =
-              Affine.of_bignum_bigint_coordinates (module Runner.Impl) expected_result
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                expected_result
             in
 
             (* Create external checks context for tracking extra constraints
@@ -1469,13 +1481,19 @@ let%test_unit "group_add_full" =
                 foreign_field_modulus
             in
             let left_input =
-              Affine.of_bignum_bigint_coordinates (module Runner.Impl) left_input
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                left_input
             in
             let right_input =
-              Affine.of_bignum_bigint_coordinates (module Runner.Impl) right_input
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                right_input
             in
             let expected_result =
-              Affine.of_bignum_bigint_coordinates (module Runner.Impl) expected_result
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                expected_result
             in
 
             (* Create external checks context for tracking extra constraints
@@ -1625,7 +1643,9 @@ let%test_unit "group_double" =
               Affine.of_bignum_bigint_coordinates (module Runner.Impl) point
             in
             let expected_result =
-              Affine.of_bignum_bigint_coordinates (module Runner.Impl) expected_result
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                expected_result
             in
 
             (* Create external checks context for tracking extra constraints
@@ -1929,7 +1949,9 @@ let%test_unit "group_double_chained" =
               Affine.of_bignum_bigint_coordinates (module Runner.Impl) point
             in
             let expected_result =
-              Affine.of_bignum_bigint_coordinates (module Runner.Impl) expected_result
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                expected_result
             in
 
             (* Create external checks context for tracking extra constraints
@@ -2039,13 +2061,19 @@ let%test_unit "group_ops_mixed" =
                 foreign_field_modulus
             in
             let left_input =
-              Affine.of_bignum_bigint_coordinates (module Runner.Impl) left_input
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                left_input
             in
             let right_input =
-              Affine.of_bignum_bigint_coordinates (module Runner.Impl) right_input
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                right_input
             in
             let expected_result =
-              Affine.of_bignum_bigint_coordinates (module Runner.Impl) expected_result
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                expected_result
             in
 
             (* Create external checks context for tracking extra constraints
@@ -2143,7 +2171,7 @@ let%test_unit "group_ops_mixed" =
     () )
 
 let%test_unit "group_properties" =
-  if tests_enabled (* false *) then (
+  if (* tests_enabled *) false then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
