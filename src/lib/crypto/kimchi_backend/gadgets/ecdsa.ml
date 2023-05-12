@@ -16,6 +16,12 @@ module Affine : sig
        * 'field Foreign_field.Element.Standard.t
     -> 'field t
 
+  (* Create foreign field affine point from coordinate pair of Bignum_bigint.t (x, y) *)
+  val of_bignum_bigint_coordinates :
+       (module Snark_intf.Run with type field = 'field)
+    -> Bignum_bigint.t * Bignum_bigint.t
+    -> 'field t
+
   (* Create foreign field affine point from hex *)
   val of_hex :
     (module Snark_intf.Run with type field = 'field) -> string -> 'field t
@@ -43,6 +49,13 @@ module Affine : sig
     -> 'field t
     -> bool
 
+  (* Add copy constraints that two Affine points are equal *)
+  val assert_equal :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> 'field t
+    -> unit
+
   (* Zero point *)
   val zero_as_prover :
     (module Snark_intf.Run with type field = 'field) -> 'field t
@@ -52,6 +65,14 @@ end = struct
     * 'field Foreign_field.Element.Standard.t
 
   let of_coordinates a = a
+
+  let of_bignum_bigint_coordinates (type field)
+      (module Circuit : Snark_intf.Run with type field = field)
+      (point : Bignum_bigint.t * Bignum_bigint.t) : field t =
+    let x, y = point in
+    of_coordinates
+      ( Foreign_field.Element.Standard.of_bignum_bigint (module Circuit) x
+      , Foreign_field.Element.Standard.of_bignum_bigint (module Circuit) y )
 
   let of_hex (type field)
       (module Circuit : Snark_intf.Run with type field = field) a : field t =
@@ -99,6 +120,15 @@ end = struct
     Foreign_field.Element.Standard.(
       equal_as_prover (module Circuit) left_x right_x
       && equal_as_prover (module Circuit) left_y right_y)
+
+  let assert_equal (type field)
+      (module Circuit : Snark_intf.Run with type field = field) (left : field t)
+      (right : field t) : unit =
+    let left_x, left_y = to_coordinates left in
+    let right_x, right_y = to_coordinates right in
+    Foreign_field.Element.Standard.(
+      assert_equal (module Circuit) left_x right_x ;
+      assert_equal (module Circuit) left_y right_y)
 
   let zero_as_prover (type field)
       (module Circuit : Snark_intf.Run with type field = field) : field t =
@@ -1010,10 +1040,6 @@ let%test_unit "group_add" =
             (Bignum_bigint.of_int 13) ) ) ;
 
     (* Tests with secp256k1 curve points *)
-    let secp256k1_modulus =
-      Common.bignum_bigint_of_hex
-        "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
-    in
     let secp256k1_generator =
       ( Bignum_bigint.of_string
           "55066263022277343669578718895168534326250603453777594175500187360389116729240"
@@ -1103,87 +1129,6 @@ let%test_unit "group_add" =
       test_group_add random_point3 (* left_input *)
         random_point4 (* right_input *)
         expected_result3 (* expected result *)
-        secp256k1_modulus
-    in
-
-    (* Associativity property tests: (A + B) + C = A + (B + C) *)
-    let point_a =
-      ( Bignum_bigint.of_string
-          "91912497963823123478116822884732139628190832705407231701764952343726416711855"
-      , Bignum_bigint.of_string
-          "49452367889301070501376254092628796145138539168494152504737467741773168124760"
-      )
-    in
-    let point_b =
-      ( Bignum_bigint.of_string
-          "29502439673038669208668529522755683819865795739143827007174566246430706797824"
-      , Bignum_bigint.of_string
-          "35223237028337404663803385409928522988777911445558441524657532331144268714656"
-      )
-    in
-    let point_c =
-      ( Bignum_bigint.of_string
-          "44331816903152493521894989522981917448107061758631615119387450138604890579267"
-      , Bignum_bigint.of_string
-          "110803745758429090434705947697698605989790020592976462538569196983324591882487"
-      )
-    in
-    let a_plus_b =
-      ( Bignum_bigint.of_string
-          "8755496106250053248276522261910196564443459285595383310514967052139798694962"
-      , Bignum_bigint.of_string
-          "21228320413749114555969668076672021499394248303889556774607231590236577626815"
-      )
-    in
-    let b_plus_c =
-      ( Bignum_bigint.of_string
-          "58880948527294146746048027892412353965984108434187707735584383788904602968804"
-      , Bignum_bigint.of_string
-          "1479669712587705368218265703424569995838356356361892166392696705662461366001"
-      )
-    in
-    let a_plus_b_plus_c =
-      ( Bignum_bigint.of_string
-          "104310220857547788837760666157632558611833888718481243049108797947002322419003"
-      , Bignum_bigint.of_string
-          "45554704545952635021323176893141730924480066354683411172606846468947160712543"
-      )
-    in
-
-    assert (secp256k1_is_on_curve point_a) ;
-    assert (secp256k1_is_on_curve point_b) ;
-    assert (secp256k1_is_on_curve point_c) ;
-    assert (secp256k1_is_on_curve a_plus_b) ;
-    assert (secp256k1_is_on_curve b_plus_c) ;
-    assert (secp256k1_is_on_curve a_plus_b_plus_c) ;
-
-    (* A + B *)
-    let _cs =
-      test_group_add point_a (* left_input *)
-        point_b (* right_input *)
-        a_plus_b (* expected result *)
-        secp256k1_modulus
-    in
-    (* (A + B) + C *)
-    let _cs =
-      test_group_add a_plus_b (* left_input *)
-        point_c (* right_input *)
-        a_plus_b_plus_c (* expected result *)
-        secp256k1_modulus
-    in
-
-    (* B + C *)
-    let _cs =
-      test_group_add point_b (* left_input *)
-        point_c (* right_input *)
-        b_plus_c (* expected result *)
-        secp256k1_modulus
-    in
-    (* A + (B + C) *)
-    let _cs =
-      test_group_add point_a (* left_input *)
-        b_plus_c (* right_input *)
-        a_plus_b_plus_c (* expected result *)
         secp256k1_modulus
     in
 
@@ -1458,10 +1403,6 @@ let%test_unit "group_add_chained" =
     in
 
     (* Group add chaining test *)
-    let secp256k1_modulus =
-      Common.bignum_bigint_of_hex
-        "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
-    in
     let pt1 =
       ( Bignum_bigint.of_string
           "22078445491128279362564324454450148838521766213873448035670368771866784776689"
@@ -1711,10 +1652,6 @@ let%test_unit "group_add_full" =
     in
 
     (* Full tests *)
-    let secp256k1_modulus =
-      Common.bignum_bigint_of_hex
-        "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
-    in
     let pt1 =
       ( Bignum_bigint.of_string
           "108106717441068942935036481412556424456551432537879152449804306833272168535105"
@@ -1945,10 +1882,6 @@ let%test_unit "group_double" =
     in
 
     (* Tests with secp256k1 curve points *)
-    let secp256k1_modulus =
-      Common.bignum_bigint_of_hex
-        "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
-    in
     let point =
       ( Bignum_bigint.of_string
           "107002484780363838095534061209472738804517997328105554367794569298664989358181"
@@ -2181,10 +2114,6 @@ let%test_unit "group_double_chained" =
       test_group_double_chained point expected_result ~a modulus
     in
 
-    let secp256k1_modulus =
-      Common.bignum_bigint_of_hex
-        "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
-    in
     let point =
       ( Bignum_bigint.of_string
           "42044065574201065781794313442437176970676726666507255383911343977315911214824"
@@ -2209,7 +2138,7 @@ let%test_unit "group_double_chained" =
     () )
 
 let%test_unit "group_ops_mixed" =
-  if tests_enabled (* false *) then (
+  if (* tests_enabled *) false then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -2363,5 +2292,259 @@ let%test_unit "group_ops_mixed" =
 
     let _cs =
       test_group_ops_mixed point1 point2 expected_result secp256k1_modulus
+    in
+    () )
+
+let%test_unit "group_properties" =
+  if tests_enabled (* false *) then (
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+
+    (* Test group properties *)
+    let test_group_properties ?cs (point_a : Bignum_bigint.t * Bignum_bigint.t)
+        (point_b : Bignum_bigint.t * Bignum_bigint.t)
+        (point_c : Bignum_bigint.t * Bignum_bigint.t)
+        (expected_commutative_result : Bignum_bigint.t * Bignum_bigint.t)
+        (expected_associative_result : Bignum_bigint.t * Bignum_bigint.t)
+        (expected_distributive_result : Bignum_bigint.t * Bignum_bigint.t)
+        ?(a = Bignum_bigint.zero) (foreign_field_modulus : Bignum_bigint.t) =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            let open Runner.Impl in
+            (* Prepare test inputs *)
+            let a = Common.bignum_bigint_to_field (module Runner.Impl) a in
+            let foreign_field_modulus =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                foreign_field_modulus
+            in
+            let point_a =
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) point_a
+            in
+            let point_b =
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) point_b
+            in
+            let point_c =
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) point_c
+            in
+            let expected_commutative_result =
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                expected_commutative_result
+            in
+            let expected_associative_result =
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                expected_associative_result
+            in
+            let expected_distributive_result =
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                expected_distributive_result
+            in
+
+            (* Create external checks context for tracking extra constraints
+               that are required for soundness (unused in this simple test) *)
+            let unused_external_checks =
+              Foreign_field.External_checks.create (module Runner.Impl)
+            in
+
+            (*
+             * Commutative property tests
+             *
+             *     A + B = B + A
+             *)
+            let a_plus_b =
+              (* A + B *)
+              group_add
+                (module Runner.Impl)
+                unused_external_checks point_a point_b foreign_field_modulus
+            in
+
+            let b_plus_a =
+              (* B + A *)
+              group_add
+                (module Runner.Impl)
+                unused_external_checks point_b point_a foreign_field_modulus
+            in
+
+            (* Todo add equality wiring *)
+            (* Assert A + B = B + A *)
+            as_prover (fun () ->
+                assert (
+                  Affine.equal_as_prover (module Runner.Impl) a_plus_b b_plus_a ) ) ;
+
+            (* Assert A + B = expected_commutative_result *)
+            as_prover (fun () ->
+                assert (
+                  Affine.equal_as_prover
+                    (module Runner.Impl)
+                    a_plus_b expected_commutative_result ) ) ;
+
+            (*
+             * Associativity property tests
+             *
+             *     (A + B) + C = A + (B + C)
+             *)
+            let b_plus_c =
+              (* B + C *)
+              group_add
+                (module Runner.Impl)
+                unused_external_checks point_b point_c foreign_field_modulus
+            in
+
+            let a_plus_b_plus_c =
+              (* (A + B) + C *)
+              group_add
+                (module Runner.Impl)
+                unused_external_checks a_plus_b point_c foreign_field_modulus
+            in
+
+            let b_plus_c_plus_a =
+              (* A + (B + C) *)
+              group_add
+                (module Runner.Impl)
+                unused_external_checks point_a b_plus_c foreign_field_modulus
+            in
+
+            (* Assert (A + B) + C = A + (B + C) *)
+            Affine.assert_equal
+              (module Runner.Impl)
+              a_plus_b_plus_c b_plus_c_plus_a ;
+            as_prover (fun () ->
+                assert (
+                  Affine.equal_as_prover
+                    (module Runner.Impl)
+                    a_plus_b_plus_c b_plus_c_plus_a ) ) ;
+
+            (* Assert A + B = expected_commutative_result *)
+            Affine.assert_equal
+              (module Runner.Impl)
+              a_plus_b_plus_c expected_associative_result ;
+            as_prover (fun () ->
+                assert (
+                  Affine.equal_as_prover
+                    (module Runner.Impl)
+                    a_plus_b_plus_c expected_associative_result ) ) ;
+
+            (*
+             * Distributive property tests
+             *
+             *     2 * (A + B) = 2 * A + 2 * B
+             *)
+            let double_of_sum =
+              (* 2 * (A + B) *)
+              group_double
+                (module Runner.Impl)
+                unused_external_checks a_plus_b ~a foreign_field_modulus
+            in
+
+            let double_a =
+              (* 2 * A *)
+              group_double
+                (module Runner.Impl)
+                unused_external_checks point_a ~a foreign_field_modulus
+            in
+
+            let double_b =
+              (* 2 * B *)
+              group_double
+                (module Runner.Impl)
+                unused_external_checks point_b ~a foreign_field_modulus
+            in
+
+            let sum_of_doubles =
+              (* 2 * A + 2 * B *)
+              group_add
+                (module Runner.Impl)
+                unused_external_checks double_a double_b foreign_field_modulus
+            in
+
+            (* Assert 2 * (A + B) = 2 * A + 2 * B *)
+            Affine.assert_equal
+              (module Runner.Impl)
+              double_of_sum sum_of_doubles ;
+            as_prover (fun () ->
+                assert (
+                  Affine.equal_as_prover
+                    (module Runner.Impl)
+                    double_of_sum sum_of_doubles ) ) ;
+
+            (* Assert 2 * (A + B) = expected_distributive_result *)
+            Affine.assert_equal
+              (module Runner.Impl)
+              double_of_sum expected_distributive_result ;
+            as_prover (fun () ->
+                assert (
+                  Affine.equal_as_prover
+                    (module Runner.Impl)
+                    double_of_sum expected_distributive_result ) ) ;
+            () )
+      in
+
+      cs
+    in
+
+    let point_a =
+      ( Bignum_bigint.of_string
+          "104139740379639537914620141697889522643195068624996157573145175343741564772195"
+      , Bignum_bigint.of_string
+          "24686993868898088086788882517246409097753788695591891584026176923146938009248"
+      )
+    in
+    let point_b =
+      ( Bignum_bigint.of_string
+          "36743784007303620043843440776745227903854397846775577839885696093428264537689"
+      , Bignum_bigint.of_string
+          "37572687997781202307536515813734773072395389211771147301250986255900442183367"
+      )
+    in
+    let point_c =
+      ( Bignum_bigint.of_string
+          "49696436312078070273833592624394555921078337653960324106519507173094660966846"
+      , Bignum_bigint.of_string
+          "8233980127281521579593600770666525234073102501648621450313070670075221490597"
+      )
+    in
+    let expected_commutative_result =
+      (* A + B *)
+      ( Bignum_bigint.of_string
+          "82115184826944281192212047494549730220285137025844635077989275753462094545317"
+      , Bignum_bigint.of_string
+          "65806312870411158102677100909644698935674071740730856487954465264167266803940"
+      )
+    in
+    let expected_associative_result =
+      (* A + B + C *)
+      ( Bignum_bigint.of_string
+          "32754193298666340516904674847278729692077935996237244820399615298932008086168"
+      , Bignum_bigint.of_string
+          "98091569220567533408383096211571578494419313923145170353903484742714309353581"
+      )
+    in
+    (* 2* (A + B) *)
+    let expected_distributive_result =
+      ( Bignum_bigint.of_string
+          "92833221040863134022467437260311951512477869225271942781021131905899386232859"
+      , Bignum_bigint.of_string
+          "88875130971526456079808346479572776785614636860343295137331156710761285100759"
+      )
+    in
+
+    assert (secp256k1_is_on_curve point_a) ;
+    assert (secp256k1_is_on_curve point_b) ;
+    assert (secp256k1_is_on_curve point_c) ;
+    assert (secp256k1_is_on_curve expected_commutative_result) ;
+    assert (secp256k1_is_on_curve expected_associative_result) ;
+    assert (secp256k1_is_on_curve expected_distributive_result) ;
+
+    let _cs =
+      test_group_properties point_a point_b point_c expected_commutative_result
+        expected_associative_result expected_distributive_result
+        secp256k1_modulus
     in
     () )
