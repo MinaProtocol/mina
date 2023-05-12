@@ -1,6 +1,5 @@
-{{ if .httpSnarkWorkCoordinator }}
-{{ range until ($.Values.snarkWorkersConfig.count | int) }}
-{{ $name := printf "%s%03d" $.Values.snarkWorkersConfig.namePrefix (add . 1) }}
+{{ range until ($.Values.httpCoordinatedSnarkersConfig.count | int) }}
+{{ $name := printf "%s%03d" $.Values.httpCoordinatedSnarkersConfig.namePrefix (add . 1) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -193,5 +192,4 @@ spec:
 {{ include "sideCar.logs.service" (dict "name" $name "logs" $.Values.logs) }}
 {{ include "sideCar.internalTrace.service" (dict "name" $name "internalTrace" $.Values.internalTrace) }}
 ---
-{{ end }}
 {{ end }}

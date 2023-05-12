@@ -27,7 +27,7 @@ spec:
             - name: SEED_NODE_COUNT
               value: {{ len .Values.seedConfigs | quote }}
             - name: SNARKER_NODE_COUNT
-              value: {{ .Values.snarkWorkersConfig.count | quote }}
+              value: {{ .Values.minaSnarkCoordinatorsConfig | len | quote }}
             - name: TRANSACTION_GENERATOR_NODE_COUNT
               value: "0"
             - name: PRODUCER_NODE_COUNT
