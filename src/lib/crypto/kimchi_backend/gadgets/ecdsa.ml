@@ -2489,6 +2489,7 @@ let%test_unit "group_properties" =
       cs
     in
 
+    (* Test with secp256k1 curve *)
     let point_a =
       ( Bignum_bigint.of_string
           "104139740379639537914620141697889522643195068624996157573145175343741564772195"
@@ -2547,4 +2548,228 @@ let%test_unit "group_properties" =
         expected_associative_result expected_distributive_result
         secp256k1_modulus
     in
+
+    (*
+     * Test with NIST P-224 curve
+     *     y^2 = x^3 -3 * x + 18958286285566608000408668544493926415504680968679321075787234672564
+     *)
+    let p224_modulus =
+      Bignum_bigint.of_string
+        "0xffffffffffffffffffffffffffffffff000000000000000000000001"
+    in
+    let a_param =
+      (* - 3 *)
+      Bignum_bigint.of_string
+        "0xfffffffffffffffffffffffffffffffefffffffffffffffffffffffe"
+      (* Note: p224 a_param < vesta_modulus *)
+    in
+    let b_param =
+      (* 18958286285566608000408668544493926415504680968679321075787234672564 *)
+      Bignum_bigint.of_string
+        "0xb4050a850c04b3abf54132565044b0b7d7bfd8ba270b39432355ffb4"
+    in
+
+    let point_a =
+      ( Bignum_bigint.of_string
+          "20564182195513988720077877094445678909500371329094056390559170498601"
+      , Bignum_bigint.of_string
+          "2677931089606376366731934050370502738338362171950142296573730478996"
+      )
+    in
+    let point_b =
+      ( Bignum_bigint.of_string
+          "15331822097908430690332647239357533892026967275700588538504771910797"
+      , Bignum_bigint.of_string
+          "4049755097518382314285232898392449281690500011901831745754040069555"
+      )
+    in
+    let point_c =
+      ( Bignum_bigint.of_string
+          "25082387259758106010480779115787834869202362152205819097823199674591"
+      , Bignum_bigint.of_string
+          "5836788343546154757468239805956174785568118741436223437725908467573"
+      )
+    in
+    let expected_commutative_result =
+      (* A + B *)
+      ( Bignum_bigint.of_string
+          "7995206472745921825893910722935139765985673196416788824369950333191"
+      , Bignum_bigint.of_string
+          "8265737252928447574971649463676620963677557474048291412774437728538"
+      )
+    in
+    let expected_associative_result =
+      (* A + B + C *)
+      ( Bignum_bigint.of_string
+          "3257699169520051230744895047894307554057883749899622226174209882724"
+      , Bignum_bigint.of_string
+          "7231957109409135332430424812410043083405298563323557216003172539215"
+      )
+    in
+    (* 2 * (A + B) *)
+    let expected_distributive_result =
+      ( Bignum_bigint.of_string
+          "12648120179660537445264809843313333879121180184951710403373354501995"
+      , Bignum_bigint.of_string
+          "130351274476047354152272911484022089680853927680837325730785745821"
+      )
+    in
+    assert (is_on_curve point_a a_param b_param p224_modulus) ;
+    assert (is_on_curve point_b a_param b_param p224_modulus) ;
+    assert (is_on_curve point_c a_param b_param p224_modulus) ;
+    assert (is_on_curve expected_commutative_result a_param b_param p224_modulus) ;
+    assert (is_on_curve expected_associative_result a_param b_param p224_modulus) ;
+    assert (
+      is_on_curve expected_distributive_result a_param b_param p224_modulus ) ;
+
+    let _cs =
+      test_group_properties point_a point_b point_c expected_commutative_result
+        expected_associative_result expected_distributive_result ~a:a_param
+        p224_modulus
+    in
+
+    (*
+     * Test with bn254 curve
+     *     y^2 = x^3 + 0 * x + 2
+     *)
+    let bn254_modulus =
+      Bignum_bigint.of_string
+        "16798108731015832284940804142231733909889187121439069848933715426072753864723"
+    in
+    let a_param = Bignum_bigint.of_int 0 in
+    let b_param = Bignum_bigint.of_int 2 in
+
+    let point_a =
+      ( Bignum_bigint.of_string
+          "7489139758950854827551487063927077939563321761044181276420624792983052878185"
+      , Bignum_bigint.of_string
+          "2141496180075348025061594016907544139242551437114964865155737156269728330559"
+      )
+    in
+    let point_b =
+      ( Bignum_bigint.of_string
+          "9956514278304933003335636627606783773825106169180128855351756770342193930117"
+      , Bignum_bigint.of_string
+          "1762095167736644705377345502398082775379271270251951679097189107067141702434"
+      )
+    in
+    let point_c =
+      ( Bignum_bigint.of_string
+          "15979993511612396332695593711346186397534040520881664680241489873512193259980"
+      , Bignum_bigint.of_string
+          "10163302455117602785156120251106605625181898385895334763785764107729313787391"
+      )
+    in
+    let expected_commutative_result =
+      (* A + B *)
+      ( Bignum_bigint.of_string
+          "13759678784866515747881317697821131633872329198354290325517257690138811932261"
+      , Bignum_bigint.of_string
+          "4040037229868341675068324615541961445935091050207890024311587166409180676332"
+      )
+    in
+    let expected_associative_result =
+      (* A + B + C *)
+      ( Bignum_bigint.of_string
+          "16098676871974911854784905872738346730775870232298829667865365025475731380192"
+      , Bignum_bigint.of_string
+          "12574401007382321193248731381385712204251317924015127170657534965607164101869"
+      )
+    in
+    (* 2 * (A + B) *)
+    let expected_distributive_result =
+      ( Bignum_bigint.of_string
+          "9395314037281443688092936149000099903064729021023078772338895863158377429106"
+      , Bignum_bigint.of_string
+          "14218226539011623427628171089944499674924086623747284955166459983416867234215"
+      )
+    in
+    assert (is_on_curve point_a a_param b_param bn254_modulus) ;
+    assert (is_on_curve point_b a_param b_param bn254_modulus) ;
+    assert (is_on_curve point_c a_param b_param bn254_modulus) ;
+    assert (
+      is_on_curve expected_commutative_result a_param b_param bn254_modulus ) ;
+    assert (
+      is_on_curve expected_associative_result a_param b_param bn254_modulus ) ;
+    assert (
+      is_on_curve expected_distributive_result a_param b_param bn254_modulus ) ;
+
+    let _cs =
+      test_group_properties point_a point_b point_c expected_commutative_result
+        expected_associative_result expected_distributive_result ~a:a_param
+        bn254_modulus
+    in
+
+    (*
+     * Test with (Pasta) Pallas curve (on Vesta native)
+     *     y^2 = x^3 + 5
+     *)
+    let pallas_modulus =
+      Bignum_bigint.of_string
+        "28948022309329048855892746252171976963363056481941560715954676764349967630337"
+    in
+    let a_param = Bignum_bigint.of_int 0 in
+    let b_param = Bignum_bigint.of_int 5 in
+
+    let point_a =
+      ( Bignum_bigint.of_string
+          "3687554385661875988153708668118568350801595287403286241588941623974773451174"
+      , Bignum_bigint.of_string
+          "4125300560830971348224390975663473429075828688503632065713036496032796088150"
+      )
+    in
+    let point_b =
+      ( Bignum_bigint.of_string
+          "13150688393980970390008393861087383374732464068960495642594966124646063172404"
+      , Bignum_bigint.of_string
+          "2084472543720136255281934655991399553143524556330848293815942786297013884533"
+      )
+    in
+    let point_c =
+      ( Bignum_bigint.of_string
+          "26740989696982304482414554371640280045791606641637898228291292575942109454805"
+      , Bignum_bigint.of_string
+          "14906024627800344780747375705291059367428823794643427263104879621768813059138"
+      )
+    in
+    let expected_commutative_result =
+      (* A + B *)
+      ( Bignum_bigint.of_string
+          "11878681988771676869370724830611253729756170947285460876552168044614948225457"
+      , Bignum_bigint.of_string
+          "14497133356854845193720136968564933709713968802446650329644811738138289288792"
+      )
+    in
+    let expected_associative_result =
+      (* A + B + C *)
+      ( Bignum_bigint.of_string
+          "8988194870545558903676114324437227470798902472195505563098874771184576333284"
+      , Bignum_bigint.of_string
+          "2715074574400479059415686517976976756653616385004805753779147804207672517454"
+      )
+    in
+    (* 2 * (A + B) *)
+    let expected_distributive_result =
+      ( Bignum_bigint.of_string
+          "5858337972845412034234591451268195730728808894992644330419904703508222498795"
+      , Bignum_bigint.of_string
+          "7758708768756582293117808728373210197717986974150537098853332332749930840785"
+      )
+    in
+    assert (is_on_curve point_a a_param b_param pallas_modulus) ;
+    assert (is_on_curve point_b a_param b_param pallas_modulus) ;
+    assert (is_on_curve point_c a_param b_param pallas_modulus) ;
+    assert (
+      is_on_curve expected_commutative_result a_param b_param pallas_modulus ) ;
+    assert (
+      is_on_curve expected_associative_result a_param b_param pallas_modulus ) ;
+    assert (
+      is_on_curve expected_distributive_result a_param b_param pallas_modulus ) ;
+
+    let _cs =
+      test_group_properties point_a point_b point_c expected_commutative_result
+        expected_associative_result expected_distributive_result ~a:a_param
+        pallas_modulus
+    in
+
     () )
