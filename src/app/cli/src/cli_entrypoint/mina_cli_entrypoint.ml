@@ -1797,29 +1797,24 @@ let mina_commands logger =
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
   ]
 
-[%%if integration_tests]
-
-module type Integration_test = sig
-  val name : string
-
-  val command : Async.Command.t
-end
-
-let mina_commands logger =
-  let open Tests in
-  let group =
-    List.map
-      ~f:(fun (module T) -> (T.name, T.command))
-      ( [ (* (module Coda_shared_state_test)
-             ; (module Coda_transitive_peers_test) *)
-          (module Coda_change_snark_worker_test)
-        ]
-        : (module Integration_test) list )
+let print_version_help coda_exe version =
+  (* mimic Jane Street command help *)
+  let lines =
+    [ "print version information"
+    ; ""
+    ; sprintf "  %s %s" (Filename.basename coda_exe) version
+    ; ""
+    ; "=== flags ==="
+    ; ""
+    ; "  [-help]  print this help text and exit"
+    ; "           (alias: -?)"
+    ]
   in
-  mina_commands logger
-  @ [ ("integration-tests", Command.group ~summary:"Integration tests" group) ]
+  List.iter lines ~f:(Core.printf "%s\n%!")
 
-[%%endif]
+let print_version_info () =
+  Core.printf "Commit %s on branch %s\n" Mina_version.commit_id
+    Mina_version.branch
 
 let () =
   Random.self_init () ;
