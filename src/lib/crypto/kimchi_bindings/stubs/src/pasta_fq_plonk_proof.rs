@@ -8,7 +8,10 @@ use ark_ec::AffineCurve;
 use ark_ff::One;
 use array_init::array_init;
 use groupmap::GroupMap;
-use kimchi::prover_index::ProverIndex;
+use kimchi::{
+    circuits::lookup::runtime_tables::{caml::CamlRuntimeTable, RuntimeTable},
+    prover_index::ProverIndex,
+};
 use kimchi::{circuits::polynomial::COLUMNS, verifier::batch_verify};
 use kimchi::{
     proof::{
@@ -31,6 +34,7 @@ use std::convert::TryInto;
 pub fn caml_pasta_fq_plonk_proof_create(
     index: CamlPastaFqPlonkIndexPtr<'static>,
     witness: Vec<CamlFqVector>,
+    runtime_tables: Vec<CamlRuntimeTable<CamlFq>>,
     prev_challenges: Vec<CamlFq>,
     prev_sgs: Vec<CamlGPallas>,
 ) -> Result<CamlProverProof<CamlGPallas, CamlFq>, ocaml::Error> {
@@ -67,6 +71,8 @@ pub fn caml_pasta_fq_plonk_proof_create(
         .expect("the witness should be a column of 15 vectors");
     let index: &ProverIndex<Pallas> = &index.as_ref().0;
 
+    let runtime_tables: Vec<RuntimeTable<Fq>> = runtime_tables.into_iter().map(Into::into).collect();
+
     // public input
     let public_input = witness[0][0..index.cs.public].to_vec();
 
@@ -81,7 +87,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
         let proof = ProverProof::create_recursive::<
             DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>,
             DefaultFrSponge<Fq, PlonkSpongeConstantsKimchi>,
-        >(&group_map, witness, &[], index, prev, None)
+        >(&group_map, witness, &runtime_tables, index, prev, None)
         .map_err(|e| ocaml::Error::Error(e.into()))?;
         Ok((proof, public_input).into())
     })
