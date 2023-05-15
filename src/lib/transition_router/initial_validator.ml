@@ -259,6 +259,8 @@ let run ~logger ~trust_system ~verifier ~transition_reader
             |> Protocol_state.hashes )
               .state_hash
           in
+          Internal_tracing.Context_call.with_call_id ~tag:"initial_validation"
+          @@ fun () ->
           Internal_tracing.with_state_hash state_hash
           @@ fun () ->
           [%log internal] "Initial_validation" ;

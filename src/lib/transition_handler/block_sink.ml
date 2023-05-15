@@ -61,6 +61,8 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
           state |> header |> Header.protocol_state |> Protocol_state.hashes)
           .state_hash
       in
+      Internal_tracing.Context_call.with_call_id ~tag:"block_received"
+      @@ fun () ->
       Internal_tracing.with_state_hash state_hash
       @@ fun () ->
       [%log internal] "@block_metadata"
