@@ -73,7 +73,7 @@ let with_slot slot f = with_block (Some (Global_slot slot)) f
 let get_current_block_id () =
   Async_kernel.Async_kernel_scheduler.find_local current_block_id_key
 
-let handling_current_block_id_change' ~last_block_id block_id ~make =
+let handling_current_block_id_change' ~last_block_id ~make block_id =
   if Block_id.equal !last_block_id block_id then []
   else (
     last_block_id := block_id ;
@@ -83,23 +83,23 @@ let handling_current_block_id_change' ~last_block_id block_id ~make =
     record a block context change. It is important to call this when generating
     events that relate to a block to detect and record context switches
     made by the Async scheduler. *)
-let handling_current_block_id_change ~last_block_id events ~make =
+let handling_current_block_id_change ~last_block_id ~make events =
   let block_id = Option.value ~default:no_block @@ get_current_block_id () in
   handling_current_block_id_change' ~last_block_id block_id ~make @ events
 
-let handling_current_call_id_change' ~last_call_id call_id ~make =
+let handling_current_call_id_change' ~last_call_id ~make ~tag call_id =
   if Int.equal !last_call_id call_id then []
   else (
     last_call_id := call_id ;
-    [ make call_id ] )
+    [ make tag call_id ] )
 
 (** If the current context has a different call ID from last time,
     record a call ID context change. It is important to call this when generating
     events that relate to different concurrent calls to detect and record
     context switches made by the Async scheduler. *)
-let handling_current_call_id_change ~last_call_id events ~make =
-  let call_id = Internal_tracing_context_call.get () in
-  handling_current_call_id_change' ~last_call_id ~make call_id @ events
+let handling_current_call_id_change ~last_call_id ~make events =
+  let call_id, tag = Internal_tracing_context_call.get () in
+  handling_current_call_id_change' ~last_call_id ~make ~tag call_id @ events
 
 module For_logger = struct
   module Json_lines_rotate_transport = struct
@@ -155,7 +155,11 @@ module For_logger = struct
       let current_block block_id =
         `Assoc [ ("current_block", `String (Block_id.to_string block_id)) ]
 
-      let current_call_id call_id = `Assoc [ ("current_call_id", `Int call_id) ]
+      let current_call_id tag call_id =
+        `Assoc
+          [ ("current_call_id", `Int call_id)
+          ; ("current_call_tag", `String tag)
+          ]
     end
 
     let process () msg =
@@ -232,8 +236,12 @@ module For_itn_logger = struct
           , [ ("current_block", `String (Block_id.to_string block_id)) ] ) )
     in
     let handling_current_call_id_change =
-      handling_current_call_id_change ~last_call_id ~make:(fun call_id ->
-          (timestamp, "@control", [ ("current_call_id", `Int call_id) ]) )
+      handling_current_call_id_change ~last_call_id ~make:(fun tag call_id ->
+          ( timestamp
+          , "@control"
+          , [ ("current_call_id", `Int call_id)
+            ; ("current_call_tag", `String tag)
+            ] ) )
     in
     if is_enabled () then
       let log_messages : (Time.t * string * (string * Yojson.Safe.t) list) list
