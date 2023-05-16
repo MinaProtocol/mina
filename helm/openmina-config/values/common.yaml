@@ -1,6 +1,6 @@
 testnetName: testnet
 mina:
-  image: tizoc/mina-daemon:5462a59380
+  image: tizoc/mina-daemon:openmina-tracing-fix-test
   snarkCoordinatorImage: binier/mina-snark-worker-rs:latest
   privkeyPass:
   exposeGraphql: true
@@ -24,12 +24,12 @@ healthcheck:
 
 plainNodesConfig:
   # the number of plain nodes
-  count: 8
+  count: 4
   namePrefix: node
 
 snarkWorkersConfig:
   # the number of snark workers
-  count: 96
+  count: 8
   namePrefix: snarker
 
 seedConfigs:
@@ -83,7 +83,7 @@ logs:
 
 internalTrace:
   enable: true
-  image: openmina/mina-internal-trace-consumer:2794c20
+  image: openmina/mina-internal-trace-consumer:c889bfe
 
 aggregator:
   image: openmina/mina-aggregator:60795c47
