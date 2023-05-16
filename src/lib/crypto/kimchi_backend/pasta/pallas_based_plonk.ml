@@ -232,7 +232,7 @@ module Proving_key = struct
   type t = Keypair.t
 
   include
-    Core_kernel.Binable.Of_binable
+    Core_kernel.Binable.Of_binable_with_uuid
       (Core_kernel.Unit)
       (struct
         type nonrec t = t
@@ -240,6 +240,8 @@ module Proving_key = struct
         let to_binable _ = ()
 
         let of_binable () = failwith "TODO"
+
+        let caller_identity = Bin_prot.Shape.Uuid.of_string "TODO"
       end)
 
   let is_initialized _ = `Yes
