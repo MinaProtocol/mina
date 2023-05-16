@@ -64,80 +64,111 @@ module Keypair = Dlog_plonk_based_keypair.Make (struct
   module Constraint_system = R1CS_constraint_system
 end)
 
-module Proof = Plonk_dlog_proof.Make (struct
-  let id = "pasta_vesta"
+module Proof = struct
+  module Challenge_polynomial = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( Curve.Affine.Stable.V1.t
+          , Field.Stable.V1.t )
+          Plonk_dlog_proof.Challenge_polynomial.Stable.V1.t
+        [@@deriving sexp, compare, yojson]
 
-  module Scalar_field = Field
-  module Base_field = Fq
+        let to_latest = Fn.id
+      end
+    end]
 
-  module Backend = struct
-    type t =
-      ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
-      , Pasta_bindings.Fp.t )
-      Kimchi_types.prover_proof
+    type ('g, 'fq) t_ = ('g, 'fq) Plonk_dlog_proof.Challenge_polynomial.t =
+      { challenges : 'fq array; commitment : 'g }
 
-    include Kimchi_bindings.Protocol.Proof.Fp
+    type ty = (Curve.Affine.t, Field.t) Plonk_dlog_proof.Challenge_polynomial.t
 
-    let batch_verify vks ts =
-      Promise.run_in_thread (fun () -> batch_verify vks ts)
+    let challenges { Plonk_dlog_proof.Challenge_polynomial.challenges; _ } =
+      challenges
 
-    let create_aux ~f:create (pk : Keypair.t) primary auxiliary prev_chals
-        prev_comms =
-      (* external values contains [1, primary..., auxiliary ] *)
-      let external_values i =
-        let open Field.Vector in
-        if i < length primary then get primary i
-        else get auxiliary (i - length primary)
-      in
-
-      (* compute witness *)
-      let computed_witness =
-        R1CS_constraint_system.compute_witness pk.cs external_values
-      in
-      let num_rows = Array.length computed_witness.(0) in
-
-      (* convert to Rust vector *)
-      let witness_cols =
-        Array.init Kimchi_backend_common.Constants.columns ~f:(fun col ->
-            let witness = Field.Vector.create () in
-            for row = 0 to num_rows - 1 do
-              Field.Vector.emplace_back witness computed_witness.(col).(row)
-            done ;
-            witness )
-      in
-      create pk.index witness_cols prev_chals prev_comms
-
-    let create_async (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
-      create_aux pk primary auxiliary prev_chals prev_comms
-        ~f:(fun pk auxiliary_input prev_challenges prev_sgs ->
-          Promise.run_in_thread (fun () ->
-              create pk auxiliary_input prev_challenges prev_sgs ) )
-
-    let create_and_verify_async (pk : Keypair.t) primary auxiliary prev_chals
-        prev_comms =
-      create_aux pk primary auxiliary prev_chals prev_comms
-        ~f:(fun pk auxiliary_input prev_challenges prev_sgs ->
-          Promise.run_in_thread (fun () ->
-              create_and_verify pk auxiliary_input prev_challenges prev_sgs ) )
-
-    let create (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
-      create_aux pk primary auxiliary prev_chals prev_comms ~f:create
+    let commitment { Plonk_dlog_proof.Challenge_polynomial.commitment; _ } =
+      commitment
   end
 
-  module Verifier_index = Kimchi_bindings.Protocol.VerifierIndex.Fp
-  module Index = Keypair
+  include Plonk_dlog_proof.Make (struct
+    let id = "pasta_vesta"
 
-  module Evaluations_backend = struct
-    type t = Scalar_field.t Kimchi_types.proof_evaluations
-  end
+    module Scalar_field = Field
+    module Base_field = Fq
+    module Challenge_polynomial = Challenge_polynomial
 
-  module Opening_proof_backend = struct
-    type t = (Curve.Affine.Backend.t, Scalar_field.t) Kimchi_types.opening_proof
-  end
+    module Backend = struct
+      type t =
+        ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
+        , Pasta_bindings.Fp.t )
+        Kimchi_types.prover_proof
 
-  module Poly_comm = Fp_poly_comm
-  module Curve = Curve
-end)
+      include Kimchi_bindings.Protocol.Proof.Fp
+
+      let batch_verify vks ts =
+        Promise.run_in_thread (fun () -> batch_verify vks ts)
+
+      let create_aux ~f:create (pk : Keypair.t) primary auxiliary prev_chals
+          prev_comms =
+        (* external values contains [1, primary..., auxiliary ] *)
+        let external_values i =
+          let open Field.Vector in
+          if i < length primary then get primary i
+          else get auxiliary (i - length primary)
+        in
+
+        (* compute witness *)
+        let computed_witness =
+          R1CS_constraint_system.compute_witness pk.cs external_values
+        in
+        let num_rows = Array.length computed_witness.(0) in
+
+        (* convert to Rust vector *)
+        let witness_cols =
+          Array.init Kimchi_backend_common.Constants.columns ~f:(fun col ->
+              let witness = Field.Vector.create () in
+              for row = 0 to num_rows - 1 do
+                Field.Vector.emplace_back witness computed_witness.(col).(row)
+              done ;
+              witness )
+        in
+        create pk.index witness_cols prev_chals prev_comms
+
+      let create_async (pk : Keypair.t) primary auxiliary prev_chals prev_comms
+          =
+        create_aux pk primary auxiliary prev_chals prev_comms
+          ~f:(fun pk auxiliary_input prev_challenges prev_sgs ->
+            Promise.run_in_thread (fun () ->
+                create pk auxiliary_input prev_challenges prev_sgs ) )
+
+      let create_and_verify_async (pk : Keypair.t) primary auxiliary prev_chals
+          prev_comms =
+        create_aux pk primary auxiliary prev_chals prev_comms
+          ~f:(fun pk auxiliary_input prev_challenges prev_sgs ->
+            Promise.run_in_thread (fun () ->
+                create_and_verify pk auxiliary_input prev_challenges prev_sgs ) )
+
+      let create (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
+        create_aux pk primary auxiliary prev_chals prev_comms ~f:create
+    end
+
+    module Verifier_index = Kimchi_bindings.Protocol.VerifierIndex.Fp
+    module Index = Keypair
+
+    module Evaluations_backend = struct
+      type t = Scalar_field.t Kimchi_types.proof_evaluations
+    end
+
+    module Opening_proof_backend = struct
+      type t =
+        (Curve.Affine.Backend.t, Scalar_field.t) Kimchi_types.opening_proof
+    end
+
+    module Poly_comm = Fp_poly_comm
+    module Curve = Curve
+  end)
+end
 
 module Proving_key = struct
   type t = Keypair.t

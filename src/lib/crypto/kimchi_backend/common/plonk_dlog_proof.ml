@@ -14,6 +14,18 @@ let tuple6_to_vec (w0, w1, w2, w3, w4, w5) = Vector.[ w0; w1; w2; w3; w4; w5 ]
 
 let tuple6_of_vec Vector.[ w0; w1; w2; w3; w4; w5 ] = (w0, w1, w2, w3, w4, w5)
 
+module Challenge_polynomial = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('g, 'fq) t = { challenges : 'fq array; commitment : 'g }
+      [@@deriving version, bin_io, sexp, compare, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+end
+
 module type Stable_v1 = sig
   module Stable : sig
     module V1 : sig
@@ -57,6 +69,17 @@ module type Inputs_intf = sig
       val to_backend :
         (Base_field.t * Base_field.t) Pickles_types.Or_infinity.t -> Backend.t
     end
+  end
+
+  module Challenge_polynomial : sig
+    type t = (Curve.Affine.t, Scalar_field.t) Challenge_polynomial.t
+
+    type ('g, 'fq) t_ = ('g, 'fq) Challenge_polynomial.t =
+      { challenges : 'fq array; commitment : 'g }
+
+    val challenges : t -> Scalar_field.t array
+
+    val commitment : t -> Curve.Affine.t
   end
 
   module Poly_comm : sig
@@ -122,17 +145,8 @@ module type Inputs_intf = sig
   end
 end
 
-module Challenge_polynomial = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type ('g, 'fq) t = { challenges : 'fq array; commitment : 'g }
-      [@@deriving version, bin_io, sexp, compare, yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
-end
+(* Alias to leave the module type definitions reachable after open Inputs below *)
+module CP = Challenge_polynomial
 
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
@@ -140,23 +154,23 @@ module Make (Inputs : Inputs_intf) = struct
   module Fq = Scalar_field
   module G = Curve
 
-  module Challenge_polynomial = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          ( G.Affine.Stable.V1.t
-          , Fq.Stable.V1.t )
-          Challenge_polynomial.Stable.V1.t
-        [@@deriving sexp, compare, yojson]
+  (* module Challenge_polynomial = struct
+       [%%versioned
+       module Stable = struct
+         module V1 = struct
+           type t =
+             ( G.Affine.Stable.V1.t
+             , Fq.Stable.V1.t )
+             Challenge_polynomial.Stable.V1.t
+           [@@deriving sexp, compare, yojson]
 
-        let to_latest = Fn.id
-      end
-    end]
+           let to_latest = Fn.id
+         end
+       end]
 
-    type ('g, 'fq) t_ = ('g, 'fq) Challenge_polynomial.t =
-      { challenges : 'fq array; commitment : 'g }
-  end
+       type ('g, 'fq) t_ = ('g, 'fq) Challenge_polynomial.t =
+         { challenges : 'fq array; commitment : 'g }
+     end *)
 
   type message = Challenge_polynomial.t list
 
@@ -316,7 +330,7 @@ module Make (Inputs : Inputs_intf) = struct
       (v : t) =
     Array.init (V.length v) ~f:(V.get v)
 
-  let to_backend' (chal_polys : Challenge_polynomial.t list) primary_input
+  let to_backend' (chal_polys : message) primary_input
       ({ messages = { w_comm; z_comm; t_comm; lookup }
        ; openings =
            { proof = { lr; z_1; z_2; delta; challenge_polynomial_commitment }
@@ -354,7 +368,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; public = primary_input
     ; prev_challenges =
         Array.of_list_map chal_polys
-          ~f:(fun { Challenge_polynomial.commitment = x, y; challenges } ->
+          ~f:(fun { CP.commitment = x, y; challenges } ->
             { Kimchi_types.chals = challenges
             ; comm =
                 { Kimchi_types.shifted = None
@@ -371,13 +385,10 @@ module Make (Inputs : Inputs_intf) = struct
       match (message : message option) with Some s -> s | None -> []
     in
     let challenges =
-      List.map chal_polys ~f:(fun { Challenge_polynomial.challenges; _ } ->
-          challenges )
-      |> Array.concat
+      List.map chal_polys ~f:Challenge_polynomial.challenges |> Array.concat
     in
     let commitments =
-      Array.of_list_map chal_polys
-        ~f:(fun { Challenge_polynomial.commitment; _ } ->
+      Array.of_list_map chal_polys ~f:(fun { CP.commitment; _ } ->
           G.Affine.to_backend (Finite commitment) )
     in
     let res = Backend.create pk primary auxiliary challenges commitments in
@@ -388,13 +399,10 @@ module Make (Inputs : Inputs_intf) = struct
       match (message : message option) with Some s -> s | None -> []
     in
     let challenges =
-      List.map chal_polys ~f:(fun { Challenge_polynomial.challenges; _ } ->
-          challenges )
-      |> Array.concat
+      List.map chal_polys ~f:Challenge_polynomial.challenges |> Array.concat
     in
     let commitments =
-      Array.of_list_map chal_polys
-        ~f:(fun { Challenge_polynomial.commitment; _ } ->
+      Array.of_list_map chal_polys ~f:(fun { CP.commitment; _ } ->
           G.Affine.to_backend (Finite commitment) )
     in
     let%map.Promise res =
@@ -403,17 +411,12 @@ module Make (Inputs : Inputs_intf) = struct
     of_backend res
 
   let create_and_verify_async ?message pk ~primary ~auxiliary =
-    let chal_polys =
-      match (message : message option) with Some s -> s | None -> []
-    in
+    let chal_polys = match message with Some s -> s | None -> [] in
     let challenges =
-      List.map chal_polys ~f:(fun { Challenge_polynomial.challenges; _ } ->
-          challenges )
-      |> Array.concat
+      List.map chal_polys ~f:Challenge_polynomial.challenges |> Array.concat
     in
     let commitments =
-      Array.of_list_map chal_polys
-        ~f:(fun { Challenge_polynomial.commitment; _ } ->
+      Array.of_list_map chal_polys ~f:(fun { CP.commitment; _ } ->
           G.Affine.to_backend (Finite commitment) )
     in
     let%map.Promise res =
