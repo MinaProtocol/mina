@@ -41,8 +41,6 @@ end
 module type Inputs_intf = sig
   open Intf
 
-  val id : string
-
   module Scalar_field : sig
     include Stable_v1
 
@@ -71,9 +69,25 @@ module type Inputs_intf = sig
     end
   end
 
+  type t =
+    ( Curve.Affine.t
+    , Scalar_field.t
+    , Scalar_field.t array )
+    Pickles_types.Plonk_types.Proof.t
+
+  val create :
+       messages:Curve.Affine.t Pickles_types.Plonk_types.Messages.Stable.V2.t
+    -> openings:
+         ( Curve.Affine.t
+         , Scalar_field.t
+         , Scalar_field.t array )
+         Pickles_types.Plonk_types.Openings.Stable.V2.t
+    -> t
+
   module Challenge_polynomial : sig
     type t = (Curve.Affine.t, Scalar_field.t) Challenge_polynomial.t
 
+    (* TODO: Worth removing? *)
     type ('g, 'fq) t_ = ('g, 'fq) Challenge_polynomial.t =
       { challenges : 'fq array; commitment : 'g }
 
@@ -154,78 +168,9 @@ module Make (Inputs : Inputs_intf) = struct
   module Fq = Scalar_field
   module G = Curve
 
-  (* module Challenge_polynomial = struct
-       [%%versioned
-       module Stable = struct
-         module V1 = struct
-           type t =
-             ( G.Affine.Stable.V1.t
-             , Fq.Stable.V1.t )
-             Challenge_polynomial.Stable.V1.t
-           [@@deriving sexp, compare, yojson]
-
-           let to_latest = Fn.id
-         end
-       end]
-
-       type ('g, 'fq) t_ = ('g, 'fq) Challenge_polynomial.t =
-         { challenges : 'fq array; commitment : 'g }
-     end *)
-
-  type message = Challenge_polynomial.t list
+  type message = Inputs.Challenge_polynomial.t list
 
   let hash_fold_array f s x = hash_fold_list f s (Array.to_list x)
-
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      module T = struct
-        type t =
-          ( G.Affine.Stable.V1.t
-          , Fq.Stable.V1.t
-          , Fq.Stable.V1.t array )
-          Pickles_types.Plonk_types.Proof.Stable.V2.t
-        [@@deriving compare, sexp, yojson, hash, equal]
-
-        let id = "plong_dlog_proof_" ^ Inputs.id
-
-        type 'a creator =
-             messages:G.Affine.t Pickles_types.Plonk_types.Messages.Stable.V2.t
-          -> openings:
-               ( G.Affine.t
-               , Fq.t
-               , Fq.t array )
-               Pickles_types.Plonk_types.Openings.Stable.V2.t
-          -> 'a
-
-        let map_creator c ~f ~messages ~openings = f (c ~messages ~openings)
-
-        let create ~messages ~openings =
-          let open Pickles_types.Plonk_types.Proof in
-          { messages; openings }
-      end
-
-      include T
-
-      include (
-        Allocation_functor.Make.Full
-          (T) :
-            Allocation_functor.Intf.Output.Full_intf
-              with type t := t
-               and type 'a creator := 'a creator )
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  include (
-    Stable.Latest :
-      sig
-        type t [@@deriving compare, sexp, yojson, hash, equal, bin_io]
-      end
-      with type t := t )
-
-  [%%define_locally Stable.Latest.(create)]
 
   let g t f = G.Affine.of_backend (f t)
 

@@ -6,12 +6,13 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
+  (pps ppx_version ppx_mina ppx_jane ppx_deriving_yojson ppx_deriving.std))
  (libraries
-  ;; opam libraries
+   ;; opam libraries
   ppx_inline_test.config
   sexplib0
   core_kernel
+  allocation_functor
   bin_prot.shape
   base.caml
   ;; local libraries

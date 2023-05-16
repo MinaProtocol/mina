@@ -92,12 +92,69 @@ module Proof = struct
       commitment
   end
 
-  include Plonk_dlog_proof.Make (struct
+  module T = struct
     let id = "pasta_pallas"
 
+    let hash_fold_array f s x = hash_fold_list f s (Array.to_list x)
+
+    [%%versioned
+    module Stable = struct
+      module V2 = struct
+        module T = struct
+          type t =
+            ( Curve.Affine.Stable.V1.t
+            , Field.Stable.V1.t
+            , Field.Stable.V1.t array )
+            Pickles_types.Plonk_types.Proof.Stable.V2.t
+          [@@deriving compare, sexp, yojson, hash, equal]
+
+          let id = "plong_dlog_proof_" ^ id
+
+          type 'a creator =
+               messages:
+                 Curve.Affine.t Pickles_types.Plonk_types.Messages.Stable.V2.t
+            -> openings:
+                 ( Curve.Affine.t
+                 , Field.t
+                 , Field.t array )
+                 Pickles_types.Plonk_types.Openings.Stable.V2.t
+            -> 'a
+
+          let map_creator c ~f ~messages ~openings = f (c ~messages ~openings)
+
+          let create ~messages ~openings =
+            let open Pickles_types.Plonk_types.Proof in
+            { messages; openings }
+        end
+
+        include T
+
+        include (
+          Allocation_functor.Make.Full
+            (T) :
+              Allocation_functor.Intf.Output.Full_intf
+                with type t := t
+                 and type 'a creator := 'a creator )
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    include (
+      Stable.Latest :
+        sig
+          type t [@@deriving compare, sexp, yojson, hash, equal, bin_io]
+        end
+        with type t := t )
+
+    let create = Stable.Latest.create
+  end
+
+  include Plonk_dlog_proof.Make (struct
     module Scalar_field = Field
     module Base_field = Fp
     module Challenge_polynomial = Challenge_polynomial
+    include T
 
     module Backend = struct
       type t =
@@ -167,6 +224,8 @@ module Proof = struct
     module Poly_comm = Fq_poly_comm
     module Curve = Curve
   end)
+
+  include T
 end
 
 module Proving_key = struct
