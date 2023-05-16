@@ -91,7 +91,7 @@ module "berkeley" {
   mina_agent_image            = "codaprotocol/coda-user-agent:0.1.8"
   mina_bots_image             = "codaprotocol/coda-bots:0.0.13-beta-1"
   mina_points_image           = "codaprotocol/coda-points-hack:32b.4"
-  watchdog_image              = "gcr.io/o1labs-192920/watchdog:0.4.3"
+  watchdog_image              = "gcr.io/o1labs-192920/watchdog:0.4.13"
   use_embedded_runtime_config = true
 
   archive_node_count            = 3
