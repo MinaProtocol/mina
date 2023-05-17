@@ -35,19 +35,9 @@ let%test_module "Update account permissions" =
 
     let `VK vk, `Prover prover = Lazy.force U.trivial_zkapp
 
-    let%test_unit "update verification key can not be set to be proof or \
-                   impossible" =
-      let gen =
-        let open Quickcheck.Generator.Let_syntax in
-        let%bind ledger = U.gen_snapp_ledger in
-        let%map auth =
-          Quickcheck.Generator.of_list
-            [ Permissions.Auth_required.Proof; Impossible ]
-        in
-        (ledger, auth)
-      in
-      Quickcheck.test ~trials:1 gen
-        ~f:(fun (({ init_ledger; specs }, new_kp), auth) ->
+    let test_vk_update_permission ~auth =
+      Quickcheck.test ~trials:1 U.gen_snapp_ledger
+        ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
                   Mina_transaction_logic.For_tests.Init_ledger.init
@@ -90,4 +80,10 @@ let%test_module "Update account permissions" =
                         .Permission_for_update_vk_can_not_be_proof_or_impossible
                       , U.Pass_2 )
                     ledger [ zkapp_command ] ) ) )
+
+    let%test_unit "update verification key can not be set to be proof" =
+      test_vk_update_permission ~auth:Permissions.Auth_required.Proof
+
+    let%test_unit "update verification key can not be set to be impossible" =
+      test_vk_update_permission ~auth:Permissions.Auth_required.Impossible
   end )
