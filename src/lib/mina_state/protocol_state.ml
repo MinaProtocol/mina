@@ -164,7 +164,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           Blockchain_state.snarked_ledger_hash t.blockchain_state
       ; blockchain_length = C.blockchain_length_var cs
       ; min_window_density = C.min_window_density_var cs
-      ; last_vrf_output = ()
       ; total_currency = C.total_currency_var cs
       ; global_slot_since_genesis = C.global_slot_since_genesis_var cs
       ; staking_epoch_data = C.staking_epoch_data_var cs
@@ -185,7 +184,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           Blockchain_state.snarked_ledger_hash t.blockchain_state
       ; blockchain_length = C.blockchain_length cs
       ; min_window_density = C.min_window_density cs
-      ; last_vrf_output = ()
       ; total_currency = C.total_currency cs
       ; global_slot_since_genesis = C.global_slot_since_genesis cs
       ; staking_epoch_data = C.staking_epoch_data cs
