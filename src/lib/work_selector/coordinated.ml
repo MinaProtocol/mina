@@ -26,10 +26,12 @@ struct
     let statement = Snark_work_lib.Work.Single.Spec.statement spec in
     (* TODO: take into account all pass hashes here  *)
     let source =
-      Mina_base.Frozen_ledger_hash.to_base58_check statement.source.first_pass_ledger
+      Mina_base.Frozen_ledger_hash.to_base58_check
+        statement.source.first_pass_ledger
     in
     let target =
-      Mina_base.Frozen_ledger_hash.to_base58_check statement.target.second_pass_ledger
+      Mina_base.Frozen_ledger_hash.to_base58_check
+        statement.target.second_pass_ledger
     in
     source ^ ":" ^ target
 
