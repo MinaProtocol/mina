@@ -353,8 +353,8 @@ module Network_config = struct
         ; aws_route53_zone_id
         ; cpu_request = 6
         ; mem_request = "12Gi"
-        ; worker_cpu_request = 4
-        ; worker_mem_request = "6Gi"
+        ; worker_cpu_request = 6
+        ; worker_mem_request = "8Gi"
         }
     }
 
@@ -706,7 +706,15 @@ module Network_manager = struct
       "Writing out the genesis keys (in case you want to use them manually) to \
        testnet dir %s"
       testnet_dir ;
-    (* TODO: write out the keypair files into the file system *)
+    let kps_base_path = String.concat [ testnet_dir; "/genesis_keys" ] in
+    let%bind () = Unix.mkdir kps_base_path in
+    let%bind () =
+      Core.String.Map.iter network_config.genesis_keypairs ~f:(fun kp ->
+          Network_keypair.to_yojson kp
+          |> Yojson.Safe.to_file
+               (String.concat [ kps_base_path; "/"; kp.keypair_name; ".json" ]) )
+      |> Deferred.return
+    in
     [%log info] "Initializing terraform" ;
     let open Malleable_error.Let_syntax in
     let%bind (_ : string) = run_cmd_or_hard_error t "terraform" [ "init" ] in
