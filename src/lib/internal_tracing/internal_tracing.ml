@@ -176,8 +176,8 @@ module For_logger = struct
         let json_lines : Yojson.Safe.t list =
           match message with
           | "@metadata" ->
-              handling_current_call_id_change
-              @@ handling_current_block_id_change
+              handling_current_block_id_change
+              @@ handling_current_call_id_change
                    [ Event.checkpoint_metadata metadata ]
           | "@block_metadata" ->
               handling_current_block_id_change [ Event.block_metadata metadata ]
@@ -198,8 +198,8 @@ module For_logger = struct
                 if String.Map.is_empty metadata then []
                 else [ Event.checkpoint_metadata metadata ]
               in
-              handling_current_call_id_change
-              @@ handling_current_block_id_change
+              handling_current_block_id_change
+              @@ handling_current_call_id_change
                    (checkpoint_event_json :: metadata_event_json)
         in
         Some
@@ -251,8 +251,8 @@ module For_itn_logger = struct
         let metadata = String.Map.of_alist_reduce ~f:(fun a _b -> a) metadata in
         match message with
         | "@metadata" ->
-            handling_current_call_id_change
-            @@ handling_current_block_id_change
+            handling_current_block_id_change
+            @@ handling_current_call_id_change
                  [ (timestamp, "@control", assoc @@ checkpoint_metadata metadata)
                  ]
         | "@block_metadata" ->
@@ -283,8 +283,8 @@ module For_itn_logger = struct
                 [ (timestamp, "@control", assoc @@ checkpoint_metadata metadata)
                 ]
             in
-            handling_current_call_id_change
-            @@ handling_current_block_id_change
+            handling_current_block_id_change
+            @@ handling_current_call_id_change
                  ((timestamp, checkpoint, []) :: metadata_event)
       in
       log_messages
