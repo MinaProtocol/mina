@@ -470,7 +470,7 @@ let update_permissions =
          Param.flag "--set-delegate" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
        and set_verification_key =
-         Param.flag "--set-verification-key" ~doc:"Proof|Signature|Either|None"
+         Param.flag "--set-verification-key" ~doc:"Signature|Either|None"
            Param.(required string)
        and set_zkapp_uri =
          Param.flag "--set-zkapp-uri" ~doc:"Proof|Signature|Either|None"
