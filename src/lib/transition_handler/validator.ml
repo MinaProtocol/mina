@@ -94,6 +94,9 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
           let transition_hash =
             State_hash.With_state_hashes.state_hash transition_with_hash
           in
+          Internal_tracing.Context_call.with_call_id
+            ~tag:"transition_handler_validator"
+          @@ fun () ->
           Internal_tracing.with_state_hash transition_hash
           @@ fun () ->
           let transition = With_hash.data transition_with_hash in
