@@ -435,8 +435,6 @@ let get_parent_state_view ~pool block_id =
       parent_block.min_window_density |> Unsigned.UInt32.of_int64
       |> Mina_numbers.Length.of_uint32
     in
-    (* TODO : this will change *)
-    let last_vrf_output = () in
     let total_currency =
       Currency.Amount.of_string parent_block.total_currency
     in
@@ -490,7 +488,6 @@ let get_parent_state_view ~pool block_id =
       { Zkapp_precondition.Protocol_state.Poly.snarked_ledger_hash
       ; blockchain_length
       ; min_window_density
-      ; last_vrf_output
       ; total_currency
       ; global_slot_since_genesis
       ; staking_epoch_data
