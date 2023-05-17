@@ -2,7 +2,8 @@ final: prev:
 let
   inherit (final)
     pkgs stdenv writeScript nix-npm-buildPackage ocamlPackages_mina plonk_wasm;
-in {
+in
+{
   client_sdk = nix-npm-buildPackage.buildYarnPackage {
     name = "client_sdk";
     src = ../frontend/client_sdk;
@@ -26,7 +27,7 @@ in {
   snarky_js = nix-npm-buildPackage.buildNpmPackage {
     src = ../src/lib/snarkyjs;
     preBuild = ''
-      BINDINGS_PATH=./src/bindings/compiled/node_bindings
+      BINDINGS_PATH=./src/snarkyjs-bindings/compiled/node_bindings
       mkdir -p "$BINDINGS_PATH"
       cp ${plonk_wasm}/nodejs/plonk_wasm* "$BINDINGS_PATH"
       cp ${ocamlPackages_mina.mina_client_sdk}/share/snarkyjs_bindings/snarky_js_node*.js "$BINDINGS_PATH"
