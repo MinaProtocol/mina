@@ -381,15 +381,21 @@ let setup_daemon logger =
          dummy proofs (none)"
   and plugins = plugin_flag
   and precomputed_blocks_path =
-    flag "--precomputed-blocks-file"
-      ~aliases:[ "precomputed-blocks-file" ]
+    flag "--precomputed-blocks-path"
+      ~aliases:[ "precomputed-blocks-path" ]
       (optional string)
-      ~doc:"PATH Path to write precomputed blocks to, for replay or archiving"
+      ~doc:
+        "PATH Path to write precomputed blocks to, for replay or archiving. If \
+         PATH is a directory, precomputed blocks will be logged to individual \
+         files within this directory. Otherwise, they will be appended to the \
+         same file."
   and log_precomputed_blocks =
     flag "--log-precomputed-blocks"
       ~aliases:[ "log-precomputed-blocks" ]
       (optional_with_default false bool)
-      ~doc:"true|false Include precomputed blocks in the log (default: false)"
+      ~doc:
+        "true|false Include precomputed blocks in the log (default: false). \
+         See also --precomputed-block-path for additional functionality."
   and block_reward_threshold =
     flag "--minimum-block-reward" ~aliases:[ "minimum-block-reward" ]
       ~doc:
