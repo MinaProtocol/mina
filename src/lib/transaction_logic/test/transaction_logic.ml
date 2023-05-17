@@ -215,6 +215,60 @@ let%test_module "Test transaction logic." =
                           false ) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
+    let%test_unit "Delegate cannot be set on account with non-default token." =
+      Quickcheck.test ~trials
+        (let open Quickcheck in
+        let open Generator.Let_syntax in
+        let%bind token_owner, token_id = Test_account.gen_custom_token in
+        let%bind delegator = Test_account.gen in
+        let%bind delegate = Test_account.gen in
+        let txn =
+          ( Txn_tree.make ~account:token_owner.pk
+              ~children:
+                [ ( Alter_account.make ~account:delegator.pk ~token_id
+                      { Account_update.Update.noop with
+                        delegate = Set delegate.pk
+                      }
+                    :> transaction )
+                ]
+              Account_update.Update.noop
+            :> transaction )
+        in
+        let%bind fee =
+          Fee.(gen_incl zero (balance_to_fee token_owner.balance))
+        in
+        let%map global_slot = Global_slot.gen in
+        ( global_slot
+        , token_owner.pk
+        , fee
+        , Test_account.
+            [ token_owner
+            ; set_token_id token_id delegator
+            ; set_token_id token_id delegate
+            ]
+        , [ txn ] ))
+        ~f:(fun (global_slot, fee_payer, fee, accounts, txns) ->
+          [%test_pred: Zk_cmd_result.t Or_error.t]
+            (Predicates.pure ~f:(fun (txn, ledger) ->
+                 let delegator = List.hd_exn accounts in
+                 Transaction_status.equal txn.command.status
+                   (Failed
+                      [ []
+                      ; [ Cancelled ]
+                      ; [ Update_not_permitted_delegate
+                        ; Cannot_pay_creation_fee_in_token
+                        ]
+                      ] )
+                 (* Verify that delegate remains unchanged. *)
+                 && Predicates.verify_account_updates delegator ~txn ~ledger
+                      ~f:(fun _ -> function
+                      | Some orig, Some updt ->
+                          Option.equal Public_key.Compressed.equal orig.delegate
+                            updt.delegate
+                      | _ ->
+                          false ) ) )
+            (run_zkapp_cmd ~global_slot ~fee_payer ~fee ~accounts txns) )
+
     (* It is assumed here that the account is indeed a zkApp account. Presumably
        it's being checked elsewhere. If there's no zkApp associated with the
        account, this update succeeds, but does nothing. For the moment we're ignoring

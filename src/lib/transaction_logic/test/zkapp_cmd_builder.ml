@@ -31,8 +31,9 @@ let get_nonce_exn (pk : Public_key.Compressed.t) :
   in
   nonce
 
-let update_body ?preconditions ?(update = Account_update.Update.noop) ~account
-    amount =
+let update_body ?preconditions ?(update = Account_update.Update.noop) ~token_id
+    ~account amount =
+  let tok = token_id in
   let open Monad_lib.State.Let_syntax in
   let open Account_update in
   let%map default =
@@ -49,11 +50,12 @@ let update_body ?preconditions ?(update = Account_update.Update.noop) ~account
     { dummy with
       public_key = account
     ; update = account_update
-    ; token_id = Token_id.default
+    ; token_id = tok
     ; balance_change = amount
     ; increment_nonce = true
     ; implicit_account_creation_fee = true
-    ; may_use_token = No
+    ; may_use_token =
+        (if Token_id.(equal default tok) then No else Parents_own_token)
     ; authorization_kind = Signature
     ; use_full_commitment = true
     ; preconditions = update_preconditions
@@ -87,7 +89,8 @@ let gen_balance_split ?limit balance =
   generate ?limit [] (Balance.to_amount balance)
 
 module Simple_txn = struct
-  let make ?preconditions ~sender ~receiver amount =
+  let make ?preconditions ?(token_id = Token_id.default) ~sender ~receiver
+      amount =
     object
       method sender : Public_key.Compressed.t = sender
 
@@ -95,14 +98,16 @@ module Simple_txn = struct
 
       method amount : Amount.t = amount
 
+      method token_id : Token_id.t = token_id
+
       method updates : (account_update list, nonces) Monad_lib.State.t =
         let open Monad_lib.State.Let_syntax in
         let%bind sender_decrease_body =
-          update_body ?preconditions ~account:sender
+          update_body ?preconditions ~token_id ~account:sender
             Amount.Signed.(negate @@ of_unsigned amount)
         in
         let%map receiver_increase_body =
-          update_body ?preconditions ~account:receiver
+          update_body ?preconditions ~token_id ~account:receiver
             Amount.Signed.(of_unsigned amount)
         in
         [ update
@@ -159,48 +164,58 @@ module Simple_txn = struct
 end
 
 module Single = struct
-  let make ?preconditions ~account amount =
-    object
+  let make ?preconditions ?(token_id = Token_id.default) ~account amount =
+    object (self)
       method account : Public_key.Compressed.t = account
 
       method amount : Amount.Signed.t = amount
 
+      method token_id : Token_id.t = token_id
+
       method updates =
         let open Monad_lib.State.Let_syntax in
         let open Account_update in
-        let%map body = update_body ?preconditions ~account amount in
+        let token_id = self#token_id in
+        let%map body = update_body ?preconditions ~token_id ~account amount in
         [ update { body; authorization = dummy_auth } ]
     end
 end
 
 module Alter_account = struct
-  let make ?preconditions ~account ?(amount = Amount.Signed.zero) state_update =
-    object
+  let make ?preconditions ~account ?(token_id = Token_id.default)
+      ?(amount = Amount.Signed.zero) state_update =
+    object (self)
       method account : Public_key.Compressed.t = account
 
       method amount : Amount.Signed.t = amount
 
       method update : Account_update.Update.t = state_update
 
+      method token_id : Token_id.t = token_id
+
       method updates =
         let open Monad_lib.State.Let_syntax in
         let open Account_update in
+        let token_id = self#token_id in
         let%map body =
-          update_body ?preconditions ~update:state_update ~account amount
+          update_body ?preconditions ~token_id ~update:state_update ~account
+            amount
         in
         [ update { body; authorization = dummy_auth } ]
     end
 end
 
 module Txn_tree = struct
-  let make ~account ?(amount = Amount.Signed.zero) ?(children = []) state_update
-      =
-    object
+  let make ~account ?(token_id = Token_id.default)
+      ?(amount = Amount.Signed.zero) ?(children = []) state_update =
+    object (self)
       method account : Public_key.Compressed.t = account
 
       method amount : Amount.Signed.t = amount
 
       method update : Account_update.Update.t = state_update
+
+      method token_id : Token_id.t = token_id
 
       method children : transaction list = children
 
@@ -208,7 +223,10 @@ module Txn_tree = struct
         let open Monad_lib.State.Let_syntax in
         let open Account_update in
         let module State_ext = Monad_lib.Make_ext2 (Monad_lib.State) in
-        let%bind body = update_body ~update:state_update ~account amount in
+        let token_id = self#token_id in
+        let%bind body =
+          update_body ~update:state_update ~token_id ~account amount
+        in
         let%map calls =
           State_ext.concat_map_m children ~f:(fun c -> c#updates)
         in
