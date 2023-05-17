@@ -140,7 +140,7 @@ if [ -z "$NODE_PORT" ]; then
 fi
 
 if [ -z "$IMAGE" ]; then
-    IMAGE=$($KUBECTL get deployment/frontend --output=jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)
+    IMAGE=$($KUBECTL get deployment/frontend --output=jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null) || true
 fi
 
 COMMON_VALUES="$(values frontend)"
