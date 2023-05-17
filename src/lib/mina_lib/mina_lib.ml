@@ -105,7 +105,7 @@ type t =
   ; subscriptions : Coda_subscriptions.t
   ; sync_status : Sync_status.t Mina_incremental.Status.Observer.t
   ; precomputed_block_writer :
-      ([ `Path of string ] option * [ `Log ] option) ref
+      ([ `Path of string | `Path_dir of string ] option * [ `Log ] option) ref
   ; block_production_status :
       [ `Producing | `Producing_in_ms of float | `Free ] ref
   ; in_memory_reverse_structured_log_messages_for_integration_test :
@@ -1986,10 +1986,16 @@ let create ?wallets (config : Config.t) =
               Archive_client.run ~logger:config.logger
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
                 archive_process_port ) ;
+          (* To log precomputed blocks to individual files, set both
+             --precomputed-blocks-path DIR and --log-precomputed-blocks true *)
           let precomputed_block_writer =
             ref
               ( Option.map config.precomputed_blocks_path ~f:(fun path ->
-                    `Path path )
+                    match Core.Unix.(stat path).st_kind with
+                    | S_DIR ->
+                        `Path_dir path
+                    | _ ->
+                        `Path path )
               , if config.log_precomputed_blocks then Some `Log else None )
           in
           let subscriptions =
@@ -1999,6 +2005,7 @@ let create ?wallets (config : Config.t) =
               ~is_storing_all:config.is_archive_rocksdb
               ~upload_blocks_to_gcloud:config.upload_blocks_to_gcloud
               ~time_controller:config.time_controller ~precomputed_block_writer
+              ~log_precomputed_blocks:config.log_precomputed_blocks
           in
           let open Mina_incremental.Status in
           let transition_frontier_incr =
