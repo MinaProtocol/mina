@@ -27,6 +27,8 @@ module Auth_required : sig
 
   val of_string : string -> t
 
+  val is_proof_or_impossible : t -> bool
+
   [%%ifdef consensus_mechanism]
 
   module Checked : sig

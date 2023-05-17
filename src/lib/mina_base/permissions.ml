@@ -112,6 +112,12 @@ module Auth_required = struct
     | _ ->
         failwith "auth_required_of_string: unknown variant"
 
+  let is_proof_or_impossible = function
+    | Proof | Impossible ->
+        true
+    | _ ->
+        false
+
   (* The encoding is chosen so that it is easy to write this function
 
       let spec_eval t ~signature_verifies =

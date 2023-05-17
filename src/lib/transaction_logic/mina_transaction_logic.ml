@@ -1335,12 +1335,8 @@ module Make (L : Ledger_intf.S) :
         in
         Permissions.Auth_required.check perm tag
 
-      let is_proof_or_impossible perm =
-        match perm with
-        | Permissions.Auth_required.Proof | Impossible ->
-            true
-        | _ ->
-            false
+      let is_proof_or_impossible =
+        Permissions.Auth_required.is_proof_or_impossible
     end
 
     module Global_slot = struct

@@ -433,8 +433,8 @@ module Failure = struct
         "The authentication for an account didn't allow the requested update \
          to its voted-for state hash"
     | Permission_for_update_vk_can_not_be_proof_or_impossible ->
-        "User can not set the permission of update verification key to be \
-         Proof or Impossible"
+        "The permission to set verification key cannot be proof-only or \
+         impossible. It can be Signature, Either, or None"
     | Zkapp_command_replay_check_failed ->
         "Check to avoid replays failed. The account update must increment \
          nonce or use full commitment if the authorization is a signature"
