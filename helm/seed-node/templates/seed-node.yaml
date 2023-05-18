@@ -96,6 +96,11 @@ spec:
           {{- if $.Values.internalTrace.enable}}
           "-internal-tracing",
           {{- end -}}
+          {{- if $.Values.itn.enable }}
+          "-itn-keys", {{ $.Values.itn.keys }},
+          "-itn-graphql-port", "$(MINA_ITN_GRAPHQL_PORT)",
+          # TODO: uptime service
+          {{- end }}
           {{- if $.Values.mina.exposeGraphql }}
           "-insecure-rest-server",
           {{- end -}}
@@ -160,6 +165,8 @@ spec:
         - name: MINA_LIBP2P_PASS
           value: {{ $config.libp2pSecretPassword | quote }}
         # {{- end }}
+        - name: MINA_ITN_GRAPHQL_PORT
+          value: {{ $.Values.itn.itnGraphqlPort | quote }}
         {{ if $.Values.mina.optimized }}
         - name: MINA_SKIP_REDUNDANT_SNARK_VERIFICATIONS
           value: "1"
@@ -294,4 +301,20 @@ spec:
 {{ include "sideCar.logs.service" (dict "name" $config.name "logs" $.Values.logs) }}
 {{ include "sideCar.internalTrace.service" (dict "name" $config.name "internalTrace" $.Values.internalTrace) }}
 ---
+{{- if $.Values.itn.enable }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $config.name }}-itn-graphql
+spec:
+  type: ClusterIP
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ $config.name }}
+  ports:
+  - name: http-graphql
+    protocol: TCP
+    port: 80
+    targetPort: {{ $.Values.mina.ports.graphql }}
+{{- end }}
 {{ end }}

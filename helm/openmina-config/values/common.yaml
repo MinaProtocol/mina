@@ -24,7 +24,7 @@ healthcheck:
 
 plainNodesConfig:
   # the number of plain nodes
-  count: 4
+  count: 2
   namePrefix: node
 
 snarkWorkersConfig:
@@ -45,14 +45,14 @@ blockProducerConfigs:
     # see resources/key-01
     keypairName: prod1-privkey-secret
     isolated: false
-  - name: prod02
-    # see resources/key-01
-    keypairName: prod1-privkey-secret
-    isolated: false
-  - name: prod03
-    # see resources/key-01
-    keypairName: prod1-privkey-secret
-    isolated: false
+  # - name: prod02
+  #   # see resources/key-01
+  #   keypairName: prod1-privkey-secret
+  #   isolated: false
+  # - name: prod03
+  #   # see resources/key-01
+  #   keypairName: prod1-privkey-secret
+  #   isolated: false
   - name: prod2
     # see resources/key-02
     keypairName: prod2-privkey-secret
@@ -92,6 +92,11 @@ aggregator:
 ciFrontend:
   image: directcuteo/mina-ci-frontend:reports35
   nodePort: 31356
+
+itn:
+  enable: true
+  keys: "AwwggBsAe7ICWzZ1Smw9rfBB3/KG4SzrE1ZpTDKdhEc="
+  itnGraphqlPort: 9000
 
 nodeSelector:
   preemptible: false

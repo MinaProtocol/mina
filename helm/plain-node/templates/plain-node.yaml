@@ -74,6 +74,11 @@ spec:
           {{- if $.Values.internalTrace.enable}}
           "-internal-tracing",
           {{- end -}}
+          {{- if $.Values.itn.enable }}
+          "-itn-keys", {{ $.Values.itn.keys }},
+          "-itn-graphql-port", "$(MINA_ITN_GRAPHQL_PORT)",
+          # TODO: uptime service
+          {{- end }}
           {{- if $.Values.mina.exposeGraphql }}
           "-insecure-rest-server",
           {{- end -}}
@@ -135,6 +140,8 @@ spec:
         - name: MINA_PARTIAL_STATEMENT_HASH
           value: "1"
         {{ end -}}
+        - name: MINA_ITN_GRAPHQL_PORT
+          value: {{ $.Values.itn.itnGraphqlPort | quote }}
         {{ include "sideCar.bpfDebugger.envVar" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 8 }}
         ports:
         - name: client-port
@@ -214,7 +221,23 @@ spec:
     port: 80
     targetPort: {{ $.Values.mina.ports.graphql }}
 {{- end }}
-
+---
+{{- if $.Values.itn.enable }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-itn-graphql
+spec:
+  type: ClusterIP
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ $name }}
+  ports:
+  - name: http-graphql
+    protocol: TCP
+    port: 80
+    targetPort: {{ $.Values.mina.ports.graphql }}
+{{- end }}
 {{ include "sideCar.resources.service" (dict "name" $name "resources" $.Values.resources) }}
 {{ include "sideCar.bpfDebugger.service" (dict "name" $name "bpfDebugger" $.Values.bpfDebugger) }}
 {{ include "sideCar.logs.service" (dict "name" $name "logs" $.Values.logs) }}

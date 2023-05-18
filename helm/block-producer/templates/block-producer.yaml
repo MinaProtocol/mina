@@ -253,6 +253,11 @@ spec:
           {{- if $.Values.internalTrace.enable}}
           "-internal-tracing",
           {{- end -}}
+          {{- if $.Values.itn.enable }}
+          "-itn-keys", {{ $.Values.itn.keys }},
+          "-itn-graphql-port", "$(MINA_ITN_GRAPHQL_PORT)",
+          # TODO: uptime service
+          {{- end }}
           {{- if $.Values.mina.exposeGraphql }}
           "-insecure-rest-server",
           {{- end -}}
@@ -310,6 +315,8 @@ spec:
         - name: MINA_SKIP_SIGCHECK
           value: "y"
         {{- end }}
+        - name: MINA_ITN_GRAPHQL_PORT
+          value: {{ $.Values.itn.itnGraphqlPort | quote }}
         {{ include "sideCar.bpfDebugger.envVar" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 8 }}
         ports:
         - name: client-port
@@ -438,6 +445,23 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ $config.name }}-graphql
+spec:
+  type: ClusterIP
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ $config.name }}
+  ports:
+  - name: http-graphql
+    protocol: TCP
+    port: 80
+    targetPort: {{ $.Values.mina.ports.graphql }}
+{{- end }}
+---
+{{- if $.Values.itn.enable }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $config.name }}-itn-graphql
 spec:
   type: ClusterIP
   publishNotReadyAddresses: true
