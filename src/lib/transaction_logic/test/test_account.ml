@@ -25,7 +25,7 @@ let make ?zkapp ?nonce ?(token_id = Token_id.default) ?(balance = Balance.zero)
 
 let non_empty { balance; _ } = Balance.(balance > zero)
 
-let account_id { pk; _ } = Account_id.create pk Token_id.default
+let account_id { pk; token_id; _ } = Account_id.create pk token_id
 
 let set_token_id token_id account = { account with token_id }
 
@@ -70,8 +70,7 @@ let gen_custom_token =
   let token_id = Account_id.derive_token_id ~owner:(account_id owner) in
   (owner, token_id)
 
-let with_token_id gen_account =
+let with_token_id ?(gen = gen) token_id =
   let open Quickcheck.Generator.Let_syntax in
-  let%bind account = gen_account in
-  let%map token_id = Token_id.gen in
+  let%map account = gen in
   { account with token_id }
