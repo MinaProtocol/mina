@@ -2085,12 +2085,20 @@ let create ?wallets (config : Config.t) =
              --precomputed-blocks-path DIR and --log-precomputed-blocks true *)
           let precomputed_block_writer =
             ref
-              ( Option.map config.precomputed_blocks_path ~f:(fun path ->
-                    match Core.Unix.(stat path).st_kind with
-                    | S_DIR ->
-                        `Path_dir path
-                    | _ ->
-                        `Path path )
+              ( ( try
+                    Option.map config.precomputed_blocks_path ~f:(fun path ->
+                        match Core.Unix.(lstat path).st_kind with
+                        | S_DIR ->
+                            `Path_dir path
+                        | S_REG ->
+                            `Path path
+                        | _ ->
+                            [%log' error config.logger]
+                              ~metadata:[ ("path", `String path) ]
+                              "$path is not a regular Unix file or directory. \
+                               Local precomputed block logging disabled." ;
+                            failwith "No precomputed block logging" )
+                  with _ -> None )
               , if config.log_precomputed_blocks then Some `Log else None )
           in
           let subscriptions =
