@@ -98,6 +98,15 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
               Pipe.write_without_pushback writer { With_hash.data; hash } ) )
       ~if_not_found:ignore
   in
+  let network =
+    match Core.Sys.getenv "NETWORK_NAME" with
+    | Some network ->
+        Some network
+    | _ ->
+        [%log warn]
+          "NETWORK_NAME environment variable not set. Default to 'berkeley'" ;
+        Some "berkeley"
+  in
   let gcloud_keyfile =
     match Core.Sys.getenv "GCLOUD_KEYFILE" with
     | Some keyfile ->
@@ -175,16 +184,6 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                    ( if upload_blocks_to_gcloud then
                      let json =
                        Yojson.Safe.to_string (Lazy.force precomputed_block)
-                     in
-                     let network =
-                       match Core.Sys.getenv "NETWORK_NAME" with
-                       | Some network ->
-                           Some network
-                       | _ ->
-                           [%log warn]
-                             "NETWORK_NAME environment variable not set. Must \
-                              be set to use upload_blocks_to_gcloud" ;
-                           None
                      in
                      let bucket =
                        match Core.Sys.getenv "GCLOUD_BLOCK_UPLOAD_BUCKET" with
@@ -282,16 +281,6 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                                  Out_channel.output_lines out_channel [ json ] )
                          | `Path_dir path -> (
                              (* log precomputed blocks to individual files in the directory *)
-                             let network =
-                               match Core.Sys.getenv "NETWORK_NAME" with
-                               | Some network ->
-                                   Some network
-                               | _ ->
-                                   [%log warn]
-                                     "NETWORK_NAME environment variable not \
-                                      set. Default to 'mainnet'" ;
-                                   Some "mainnet"
-                             in
                              match network with
                              | Some network ->
                                  let hash_string =
