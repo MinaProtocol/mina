@@ -296,10 +296,6 @@ spec:
     port: 80
     targetPort: {{ $.Values.mina.ports.graphql }}
 {{- end }}
-{{ include "sideCar.resources.service" (dict "name" $config.name "resources" $.Values.resources) }}
-{{ include "sideCar.bpfDebugger.service" (dict "name" $config.name "bpfDebugger" $.Values.bpfDebugger) }}
-{{ include "sideCar.logs.service" (dict "name" $config.name "logs" $.Values.logs) }}
-{{ include "sideCar.internalTrace.service" (dict "name" $config.name "internalTrace" $.Values.internalTrace) }}
 ---
 {{- if $.Values.itn.enable }}
 apiVersion: v1
@@ -315,6 +311,11 @@ spec:
   - name: http-graphql
     protocol: TCP
     port: 80
-    targetPort: {{ $.Values.mina.ports.graphql }}
+    targetPort: {{ $.Values.itn.itnGraphqlPort }}
 {{- end }}
+{{ include "sideCar.resources.service" (dict "name" $config.name "resources" $.Values.resources) }}
+{{ include "sideCar.bpfDebugger.service" (dict "name" $config.name "bpfDebugger" $.Values.bpfDebugger) }}
+{{ include "sideCar.logs.service" (dict "name" $config.name "logs" $.Values.logs) }}
+{{ include "sideCar.internalTrace.service" (dict "name" $config.name "internalTrace" $.Values.internalTrace) }}
+---
 {{ end }}

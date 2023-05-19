@@ -236,7 +236,7 @@ spec:
   - name: http-graphql
     protocol: TCP
     port: 80
-    targetPort: {{ $.Values.mina.ports.graphql }}
+    targetPort: {{ $.Values.itn.itnGraphqlPort }}
 {{- end }}
 {{ include "sideCar.resources.service" (dict "name" $name "resources" $.Values.resources) }}
 {{ include "sideCar.bpfDebugger.service" (dict "name" $name "bpfDebugger" $.Values.bpfDebugger) }}

@@ -95,7 +95,7 @@ ciFrontend:
 
 itn:
   enable: true
-  keys: "AwwggBsAe7ICWzZ1Smw9rfBB3/KG4SzrE1ZpTDKdhEc="
+  keys: "j1JO0mYKxC+1lRmnRAd020XmG0LeBtrD6+STxrIzKhw="
   itnGraphqlPort: 9000
 
 nodeSelector:
