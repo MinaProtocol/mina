@@ -98,14 +98,20 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
               Pipe.write_without_pushback writer { With_hash.data; hash } ) )
       ~if_not_found:ignore
   in
+  let dump_precomputed_blocks =
+    Option.is_some (fst !precomputed_block_writer)
+  in
   let network =
     match Core.Sys.getenv "NETWORK_NAME" with
     | Some network ->
-        Some network
+        if upload_blocks_to_gcloud || dump_precomputed_blocks then
+          [%log info] "NETWORK_NAME environment variable set to %s" network ;
+        network
     | _ ->
-        [%log warn]
-          "NETWORK_NAME environment variable not set. Default to 'berkeley'" ;
-        Some "berkeley"
+        if upload_blocks_to_gcloud || dump_precomputed_blocks then
+          [%log warn]
+            "NETWORK_NAME environment variable not set. Default to 'berkeley'" ;
+        "berkeley"
   in
   let gcloud_keyfile =
     match Core.Sys.getenv "GCLOUD_KEYFILE" with
@@ -118,6 +124,20 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
           [%log warn]
             "GCLOUD_KEYFILE environment variable not set. Must be set to use \
              upload_blocks_to_gcloud" ;
+        None
+  in
+  let gcloud_bucket =
+    match Core.Sys.getenv "GCLOUD_BLOCK_UPLOAD_BUCKET" with
+    | Some bucket ->
+        if upload_blocks_to_gcloud then
+          [%log info]
+            "GCLOUD_BLOCK_UPLOAD_BUCKET environment variable set to %s" bucket ;
+        Some bucket
+    | _ ->
+        if upload_blocks_to_gcloud then
+          [%log warn]
+            "GCLOUD_BLOCK_UPLOAD_BUCKET environment variable not set. Must be \
+             set to use upload_blocks_to_gcloud" ;
         None
   in
   Option.iter (fst !precomputed_block_writer) ~f:(fun path ->
@@ -140,7 +160,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
           let new_block = Mina_block.Validated.forget new_block_validated in
           let new_block_no_hash = With_hash.data new_block in
           let hash = State_hash.With_state_hashes.state_hash new_block in
-          (let path, _log = !precomputed_block_writer in
+          (let path, log = !precomputed_block_writer in
            match Broadcast_pipe.Reader.peek transition_frontier with
            | None ->
                [%log warn]
@@ -185,19 +205,8 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                      let json =
                        Yojson.Safe.to_string (Lazy.force precomputed_block)
                      in
-                     let bucket =
-                       match Core.Sys.getenv "GCLOUD_BLOCK_UPLOAD_BUCKET" with
-                       | Some bucket ->
-                           Some bucket
-                       | _ ->
-                           [%log warn]
-                             "GCLOUD_BLOCK_UPLOAD_BUCKET environment variable \
-                              not set. Must be set to use \
-                              upload_blocks_to_gcloud" ;
-                           None
-                     in
-                     match (gcloud_keyfile, network, bucket) with
-                     | Some _, Some network, Some bucket ->
+                     match (gcloud_keyfile, gcloud_bucket) with
+                     | Some _, Some bucket ->
                          let hash_string = State_hash.to_base58_check hash in
                          [%log info]
                            ~metadata:
@@ -269,61 +278,51 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                          () ) ;
                    (* Log precomputed blocks locally *)
                    Option.iter path ~f:(fun path ->
-                       if log_precomputed_blocks then
-                         let json =
-                           Yojson.Safe.to_string (Lazy.force precomputed_block)
-                         in
-                         match path with
-                         | `Path path ->
-                             (* original logging functionality, appends to single file *)
-                             Out_channel.with_file ~append:true path
-                               ~f:(fun out_channel ->
-                                 Out_channel.output_lines out_channel [ json ] )
-                         | `Path_dir path -> (
-                             (* log precomputed blocks to individual files in the directory *)
-                             match network with
-                             | Some network ->
-                                 let hash_string =
-                                   State_hash.to_base58_check hash
-                                 in
-                                 let height =
-                                   Mina_block.blockchain_length
-                                     new_block_no_hash
-                                   |> Mina_numbers.Length.to_string
-                                 in
-                                 let name =
-                                   sprintf "%s-%s-%s.json" network height
-                                     hash_string
-                                 in
-                                 let fpath =
-                                   Core.Filename.(
-                                     parts path @ [ name ] |> of_parts)
-                                 in
-                                 Out_channel.with_file ~append:false fpath
-                                   ~f:(fun out_channel ->
-                                     Out_channel.output_lines out_channel
-                                       [ json ] ) ;
-                                 [%log info]
-                                   ~metadata:
-                                     [ ("block", `String name)
-                                     ; ("path", `String path)
-                                     ; ( "time"
-                                       , `String
-                                           Time.(
-                                             now ()
-                                             |> to_string_iso8601_basic
-                                                  ~zone:Zone.utc) )
-                                     ]
-                                   "Logged precomputed $block to $path at $time"
-                             | None ->
-                                 () )
-                       else
-                         [%log info]
-                           ~metadata:
-                             [ ( "state_hash"
-                               , `String (State_hash.to_base58_check hash) )
-                             ]
-                           "Saw block with state hash $state_hash" ) ) ) ;
+                       let json =
+                         Yojson.Safe.to_string (Lazy.force precomputed_block)
+                       in
+                       match path with
+                       | `Path path ->
+                           (* original logging functionality, appends to single file *)
+                           Out_channel.with_file ~append:true path
+                             ~f:(fun out_channel ->
+                               Out_channel.output_lines out_channel [ json ] )
+                       | `Path_dir path ->
+                           (* log precomputed blocks to individual files in the directory *)
+                           let hash_string = State_hash.to_base58_check hash in
+                           let height =
+                             Mina_block.blockchain_length new_block_no_hash
+                             |> Mina_numbers.Length.to_string
+                           in
+                           let name =
+                             sprintf "%s-%s-%s.json" network height hash_string
+                           in
+                           let fpath =
+                             Core.Filename.(parts path @ [ name ] |> of_parts)
+                           in
+                           Out_channel.with_file ~append:false fpath
+                             ~f:(fun out_channel ->
+                               Out_channel.output_lines out_channel [ json ] ) ;
+                           [%log info]
+                             ~metadata:
+                               [ ("block", `String name)
+                               ; ("path", `String path)
+                               ]
+                             "Logged precomputed $block to $path" ) ;
+                   if log_precomputed_blocks then
+                     [%log info] "Saw block with state hash $state_hash"
+                       ~metadata:
+                         (let state_hash_data =
+                            [ ( "state_hash"
+                              , `String (State_hash.to_base58_check hash) )
+                            ]
+                          in
+                          if is_some log then
+                            state_hash_data
+                            @ [ ( "precomputed_block"
+                                , Lazy.force precomputed_block )
+                              ]
+                          else state_hash_data ) ) ) ;
           match
             Filtered_external_transition.validate_transactions
               ~constraint_constants new_block_no_hash
