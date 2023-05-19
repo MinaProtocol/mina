@@ -386,16 +386,14 @@ let setup_daemon logger =
       (optional string)
       ~doc:
         "PATH Path to write precomputed blocks to, for replay or archiving. If \
-         PATH is a directory, precomputed blocks will be logged to individual \
-         files within this directory. Otherwise, they will be appended to the \
-         same file."
+         path is a directory, precomputed blocks will be logged to individual \
+         files within this directory. If path is a file, they will be appended \
+         to this file. Otherwise, precomputed blocks will not be dumped."
   and log_precomputed_blocks =
     flag "--log-precomputed-blocks"
       ~aliases:[ "log-precomputed-blocks" ]
       (optional_with_default false bool)
-      ~doc:
-        "true|false Include precomputed blocks in the log (default: false). \
-         See also --precomputed-block-path for additional functionality."
+      ~doc:"true|false Include precomputed blocks in the log (default: false)"
   and block_reward_threshold =
     flag "--minimum-block-reward" ~aliases:[ "minimum-block-reward" ]
       ~doc:

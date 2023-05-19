@@ -2084,22 +2084,30 @@ let create ?wallets (config : Config.t) =
           (* To log precomputed blocks to individual files, set both
              --precomputed-blocks-path DIR and --log-precomputed-blocks true *)
           let precomputed_block_writer =
-            ref
-              ( ( try
-                    Option.map config.precomputed_blocks_path ~f:(fun path ->
-                        match Core.Unix.(lstat path).st_kind with
-                        | S_DIR ->
-                            `Path_dir path
-                        | S_REG ->
-                            `Path path
-                        | _ ->
-                            [%log' error config.logger]
-                              ~metadata:[ ("path", `String path) ]
-                              "$path is not a regular Unix file or directory. \
-                               Local precomputed block logging disabled." ;
-                            failwith "No precomputed block logging" )
-                  with _ -> None )
-              , if config.log_precomputed_blocks then Some `Log else None )
+            let block_path_opt =
+              try
+                Option.map config.precomputed_blocks_path ~f:(fun path ->
+                    match Core.Unix.(lstat path).st_kind with
+                    | S_DIR ->
+                        `Path_dir path
+                    | S_REG ->
+                        `Path path
+                    | _ ->
+                        [%log' error config.logger]
+                          ~metadata:[ ("path", `String path) ]
+                          "$path is not a regular Unix file or directory. \
+                           Local precomputed block logging disabled." ;
+                        failwith "No precomputed block logging" )
+              with _ -> None
+            in
+            let log_opt =
+              match block_path_opt with
+              | None ->
+                  if config.log_precomputed_blocks then Some `Log else None
+              | _ ->
+                  None
+            in
+            ref (block_path_opt, log_opt)
           in
           let subscriptions =
             Mina_subscriptions.create ~logger:config.logger
