@@ -68,7 +68,7 @@ let signature =
       signature_for_mainnet
   | Testnet ->
       signature_for_testnet
-  | Other_of_string ->
+  | Other_network ->
       signature_for_other
 
 let signature_for_mainnet_legacy = salt_legacy signature_mainnet
@@ -83,7 +83,7 @@ let signature_legacy =
       signature_for_mainnet_legacy
   | Testnet ->
       signature_for_testnet_legacy
-  | Other_of_string ->
+  | Other_network ->
       signature_for_other_legacy
 
 let vrf_output = salt vrf_output
