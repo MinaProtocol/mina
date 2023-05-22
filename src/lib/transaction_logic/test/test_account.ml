@@ -25,6 +25,8 @@ let make ?zkapp ?nonce ?(token_id = Token_id.default) ?(balance = Balance.zero)
 
 let non_empty { balance; _ } = Balance.(balance > zero)
 
+let public_key { pk; _ } = pk
+
 let account_id { pk; token_id; _ } = Account_id.create pk token_id
 
 let set_token_id token_id account = { account with token_id }
