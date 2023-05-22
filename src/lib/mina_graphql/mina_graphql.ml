@@ -2765,6 +2765,8 @@ module Types = struct
 
       let to_ ~doc = arg "to" ~typ:(non_null PublicKey.arg_typ) ~doc
 
+      let fee_payer ~doc = arg "feePayer" ~typ:PublicKey.arg_typ ~doc
+
       let token ~doc = arg "token" ~typ:(non_null TokenId.arg_typ) ~doc
 
       let token_opt ~doc = arg "token" ~typ:TokenId.arg_typ ~doc
@@ -2823,6 +2825,7 @@ module Types = struct
       type input =
         { from : (Epoch_seed.t, bool) Public_key.Compressed.Poly.t
         ; to_ : Account.key
+        ; fee_payer : (Epoch_seed.t, bool) Public_key.Compressed.Poly.t option
         ; amount : Currency.Amount.t
         ; fee : Currency.Fee.t
         ; valid_until : UInt32.input option
@@ -2834,16 +2837,17 @@ module Types = struct
       let arg_typ =
         let open Fields in
         obj "SendPaymentInput"
-          ~coerce:(fun from to_ amount fee valid_until memo nonce ->
-            (from, to_, amount, fee, valid_until, memo, nonce) )
+          ~coerce:(fun from to_ fee_payer amount fee valid_until memo nonce ->
+            (from, to_, fee_payer, amount, fee, valid_until, memo, nonce) )
           ~split:(fun f (x : input) ->
-            f x.from x.to_
+            f x.from x.to_ x.fee_payer
               (Currency.Amount.to_uint64 x.amount)
               (Currency.Fee.to_uint64 x.fee)
               x.valid_until x.memo x.nonce )
           ~fields:
             [ from ~doc:"Public key of sender of payment"
             ; to_ ~doc:"Public key of recipient of payment"
+            ; fee_payer ~doc:"Public key of fee payer"
             ; amount ~doc:"Amount of MINA to send to receiver"
             ; fee ~doc:"Fee amount in order to send payment"
             ; valid_until
@@ -3987,7 +3991,7 @@ module Mutations = struct
           ; Types.Input.Fields.signature
           ]
       ~resolve:(fun { ctx = mina; _ } ()
-                    (from, to_, amount, fee, valid_until, memo, nonce_opt)
+                    (from, to_, fee_payer, amount, fee, valid_until, memo, nonce_opt)
                     signature ->
         let body =
           Signed_command_payload.Body.Payment
@@ -3996,14 +4000,15 @@ module Mutations = struct
             ; amount = Amount.of_uint64 amount
             }
         in
+        let signer = Option.value ~default:from fee_payer in
         match signature with
         | None ->
-            send_unsigned_user_command ~mina ~nonce_opt ~signer:from ~memo ~fee
-              ~fee_payer_pk:from ~valid_until ~body
+            send_unsigned_user_command ~mina ~nonce_opt ~signer ~memo ~fee
+              ~fee_payer_pk:signer ~valid_until ~body
             |> Deferred.Result.map ~f:Types.User_command.mk_user_command
         | Some signature ->
-            send_signed_user_command ~mina ~nonce_opt ~signer:from ~memo ~fee
-              ~fee_payer_pk:from ~valid_until ~body ~signature
+            send_signed_user_command ~mina ~nonce_opt ~signer ~memo ~fee
+              ~fee_payer_pk:signer ~valid_until ~body ~signature
             |> Deferred.Result.map ~f:Types.User_command.mk_user_command )
 
   let make_zkapp_endpoint ~name ~doc ~f =
@@ -5751,7 +5756,7 @@ module Queries = struct
           ; Types.Input.Fields.signature
           ]
       ~resolve:(fun { ctx = mina; _ } ()
-                    (from, to_, amount, fee, valid_until, memo, nonce_opt)
+                    (from, to_, fee_payer, amount, fee, valid_until, memo, nonce_opt)
                     signature ->
         let open Deferred.Result.Let_syntax in
         let body =
@@ -5768,9 +5773,11 @@ module Queries = struct
           | None ->
               Deferred.Result.fail "Signature field is missing"
         in
+        let fee_payer_pk = Option.value ~default:from fee_payer
+        in
         let%bind user_command_input =
           Mutations.make_signed_user_command ~nonce_opt ~signer:from ~memo ~fee
-            ~fee_payer_pk:from ~valid_until ~body ~signature
+            ~fee_payer_pk ~valid_until ~body ~signature
         in
         let%map user_command, _ =
           User_command_input.to_user_command
