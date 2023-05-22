@@ -1,3 +1,3 @@
-type t = Testnet | Mainnet | Other_of_string
+type t = Testnet | Mainnet | Other_network
 
 let t = Testnet
