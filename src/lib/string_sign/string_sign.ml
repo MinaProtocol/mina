@@ -94,15 +94,38 @@ let%test_module "Sign_string tests" =
       let signature = sign ~signature_kind keypair.private_key s in
       verify ~signature_kind signature keypair.public_key s
 
-    let%test "Sign with testnet, fail to verify with mainnet" =
+    let%test "Sign, verify with other networks" =
+      let s = "Sky is blue" in
+      let signature_kind = Mina_signature_kind.Other_network in
+      let signature =
+        sign ~signature_kind:Other_network keypair.private_key s
+      in
+      verify ~signature_kind signature keypair.public_key s
+
+    let%test "Sign with testnet, fail to verify with mainnet or other networks"
+        =
       let open Mina_signature_kind in
       let s = "Some pills make you larger" in
       let signature = sign ~signature_kind:Testnet keypair.private_key s in
-      not (verify ~signature_kind:Mainnet signature keypair.public_key s)
+      (not (verify ~signature_kind:Mainnet signature keypair.public_key s))
+      && not
+           (verify ~signature_kind:Other_network signature keypair.public_key s)
 
     let%test "Sign with mainnet, fail to verify with testnet" =
       let open Mina_signature_kind in
       let s = "Watson, come here, I need you" in
       let signature = sign ~signature_kind:Mainnet keypair.private_key s in
-      not (verify ~signature_kind:Testnet signature keypair.public_key s)
+      (not (verify ~signature_kind:Testnet signature keypair.public_key s))
+      && not
+           (verify ~signature_kind:Other_network signature keypair.public_key s)
+
+    let%test "Sign with other networks, fail to verify with mainnet or testnet"
+        =
+      let open Mina_signature_kind in
+      let s = "Roses are red" in
+      let signature =
+        sign ~signature_kind:Other_network keypair.private_key s
+      in
+      (not (verify ~signature_kind:Mainnet signature keypair.public_key s))
+      && not (verify ~signature_kind:Testnet signature keypair.public_key s)
   end )

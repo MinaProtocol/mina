@@ -229,7 +229,7 @@ module Make
     let derive =
       let open Mina_signature_kind in
       match signature_kind with
-      | None ->
+      | None | Some Other_network ->
           Message.derive
       | Some Mainnet ->
           Message.derive_for_mainnet
@@ -243,7 +243,7 @@ module Make
     let hash =
       let open Mina_signature_kind in
       match signature_kind with
-      | None ->
+      | None | Some Other_network ->
           Message.hash
       | Some Mainnet ->
           Message.hash_for_mainnet
@@ -259,7 +259,7 @@ module Make
     let hash =
       let open Mina_signature_kind in
       match signature_kind with
-      | None ->
+      | None | Some Other_network ->
           Message.hash
       | Some Mainnet ->
           Message.hash_for_mainnet
@@ -437,7 +437,7 @@ module Make
     let derive =
       let open Mina_signature_kind in
       match signature_kind with
-      | None ->
+      | None | Some Other_network ->
           Message.derive
       | Some Mainnet ->
           Message.derive_for_mainnet
@@ -453,7 +453,7 @@ module Make
     let hash =
       let open Mina_signature_kind in
       match signature_kind with
-      | None ->
+      | None | Some Other_network ->
           Message.hash
       | Some Mainnet ->
           Message.hash_for_mainnet
@@ -469,7 +469,7 @@ module Make
     let hash =
       let open Mina_signature_kind in
       match signature_kind with
-      | None ->
+      | None | Some Other_network ->
           Message.hash
       | Some Mainnet ->
           Message.hash_for_mainnet
@@ -494,12 +494,16 @@ module Message = struct
 
   let network_id_testnet = Char.of_int_exn 0
 
+  let network_id_other = Char.of_int_exn 2
+
   let network_id =
     match Mina_signature_kind.t with
     | Mainnet ->
         network_id_mainnet
     | Testnet ->
         network_id_testnet
+    | Other_network ->
+        network_id_other
 
   module Legacy = struct
     open Tick

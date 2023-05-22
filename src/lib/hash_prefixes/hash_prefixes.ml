@@ -48,6 +48,8 @@ let signature_testnet = create "CodaSignature"
 
 let signature_mainnet = create "MinaSignatureMainnet"
 
+let signature_other = create "OtherSiganture"
+
 let receipt_chain_user_command = create "MinaReceiptUC"
 
 (* leaving this one with "Coda", to preserve the existing hashes *)
