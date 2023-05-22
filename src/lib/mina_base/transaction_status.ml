@@ -38,6 +38,7 @@ module Failure = struct
         | Zkapp_command_replay_check_failed
         | Fee_payer_nonce_must_increase
         | Fee_payer_must_be_signed
+        | Source_must_be_signed
         | Account_balance_precondition_unsatisfied
         | Account_nonce_precondition_unsatisfied
         | Account_receipt_chain_hash_precondition_unsatisfied
@@ -121,6 +122,7 @@ module Failure = struct
       ~update_not_permitted_voting_for:add
       ~zkapp_command_replay_check_failed:add ~fee_payer_nonce_must_increase:add
       ~fee_payer_must_be_signed:add
+      ~source_must_be_signed:add
       ~account_balance_precondition_unsatisfied:add
       ~account_nonce_precondition_unsatisfied:add
       ~account_receipt_chain_hash_precondition_unsatisfied:add
@@ -199,7 +201,9 @@ module Failure = struct
     | Fee_payer_nonce_must_increase ->
         "Fee_payer_nonce_must_increase"
     | Fee_payer_must_be_signed ->
-        "Fee_payer_must_be_signed"
+       "Fee_payer_must_be_signed"
+    | Source_must_be_signed ->
+       "Source_must_be_signed"
     | Account_balance_precondition_unsatisfied ->
         "Account_balance_precondition_unsatisfied"
     | Account_nonce_precondition_unsatisfied ->
@@ -432,7 +436,9 @@ module Failure = struct
     | Fee_payer_nonce_must_increase ->
         "Fee payer account update must increment its nonce"
     | Fee_payer_must_be_signed ->
-        "Fee payer account update must have a valid signature"
+       "Fee payer account update must have a valid signature"
+    | Source_must_be_signed ->
+        "A user command must be signed by the source"
     | Account_balance_precondition_unsatisfied ->
         "The account update's account balance precondition was unsatisfied"
     | Account_nonce_precondition_unsatisfied ->
