@@ -32,6 +32,7 @@ module Failure = struct
       | Zkapp_command_replay_check_failed
       | Fee_payer_nonce_must_increase
       | Fee_payer_must_be_signed
+      | Source_must_be_signed
       | Account_balance_precondition_unsatisfied
       | Account_nonce_precondition_unsatisfied
       | Account_receipt_chain_hash_precondition_unsatisfied

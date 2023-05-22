@@ -904,6 +904,15 @@ module Make (L : Ledger_intf.S) :
       (* Compute the necessary changes to apply the command, failing if any of
          the conditions are not met.
       *)
+      let%bind () =
+        if
+          Public_key.Compressed.equal
+            (Account_id.public_key source)
+            signer_pk
+        then return ()
+        else
+          Error Transaction_status.Failure.Source_must_be_signed
+      in
       match payload.body with
       | Stake_delegation _ ->
           let receiver_location, _receiver_account =
