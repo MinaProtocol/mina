@@ -627,7 +627,7 @@ struct
           { Transaction_snark_work.fee; proofs = proof; prover } )
 
   (* This causes a snark pool to never be GC'd. This is fine as it should live as long as the daemon lives. *)
-  let store_periodically (t : Resource_pool.t) =
+  let _store_periodically (t : Resource_pool.t) =
     Clock.every' (Time.Span.of_min 3.) (fun () ->
         let before = Time.now () in
         let%map () =
@@ -677,7 +677,7 @@ struct
             ~time_controller ~frontier_broadcast_pipe ~log_gossip_heard
             ~on_remote_push
     in
-    store_periodically (resource_pool pool) ;
+    (* store_periodically (resource_pool pool) ; *)
     (pool, r_sink, l_sink)
 end
 
