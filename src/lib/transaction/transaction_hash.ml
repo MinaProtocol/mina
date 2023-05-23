@@ -236,16 +236,16 @@ let%test_module "Transaction hashes" =
       in
       (* the V1 signed command is converted to a V2 signed command, then hashed *)
       let expected_hash =
-        "5JvD87Ag3GuTCJhDsWUXDbJ7vTWWVuCnAhNjnnZ78h1mjxrhdS61"
+        "5JuHPnnSmETfMxfC7goshhwdPuUAkTzmxg2uZzLjb3iTWBBn2Wy6"
       in
       run_test ~transaction_id ~expected_hash
 
     let%test "signed command v2 hash from transaction id" =
       let transaction_id =
-        "Av0BlDV3VklWpVXVRQr7cidImXn8E9nqCAxPjuyUNZ2pu3pJJxkBAP//IgAgpNU5narWobUpPXWnrzjilYnd9C6DVcafO/ZLc3vdrMgAVklWpVXVRQr7cidImXn8E9nqCAxPjuyUNZ2pu3pJJxkBFeE3d36c7ThjtioG6XUJjkISr2jfgpa99wHwhZ6neSQB/rQkVklWpVXVRQr7cidImXn8E9nqCAxPjuyUNZ2pu3pJJxkBAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+        "Av1AQg8AlEnpua7SqyAM80vJIW10/Kqnp2FHOMTCii86qa8rSjkAAAD//yIAIPVBcM7g/nXBMy303a594bnQ7OwX4fuaocUqCTbkFglTAJRJ6bmu0qsgDPNLySFtdPyqp6dhRzjEwoovOqmvK0o5AJHytSF/cBVhs1+FGudG82jtzzfsfYhiXF4bDJUQz28kAf4bDZRJ6bmu0qsgDPNLySFtdPyqp6dhRzjEwoovOqmvK0o5AAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
       in
       let expected_hash =
-        "5JuhZ8sR6gQZQCUMpZJpacn9XrXTksSj6zRWHQQXZtZzjiQZ5dNb"
+        "5JuEJtMCq4yK3LnK2uv6FPVdjhYP7r4AKzr73VwQGnyRkRhL9pQL"
       in
       run_test ~transaction_id ~expected_hash
 

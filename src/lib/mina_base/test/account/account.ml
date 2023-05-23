@@ -39,7 +39,7 @@ let%test_module "Test account's timing." =
                   ; vesting_period
                   ; vesting_increment
                   } ->
-                  let global_slot = Global_slot.max_value in
+                  let global_slot = Global_slot_since_genesis.max_value in
                   Option.some
                   @@ Account.min_balance_at_slot ~global_slot ~cliff_time
                        ~cliff_amount ~vesting_period ~vesting_increment
@@ -54,9 +54,13 @@ let%test_module "Test account's timing." =
         (let open Quickcheck.Generator.Let_syntax in
         let%bind timing = gen_timing in
         let max_global_slot =
-          Global_slot.(sub timing.cliff_time (of_int 1)) |> Option.value_exn
+          Global_slot_since_genesis.(
+            sub timing.cliff_time (Global_slot_span.of_int 1))
+          |> Option.value_exn
         in
-        let%map global_slot = Global_slot.(gen_incl zero max_global_slot) in
+        let%map global_slot =
+          Global_slot_since_genesis.(gen_incl zero max_global_slot)
+        in
         (timing, global_slot))
         ~f:(fun (timing, global_slot) ->
           [%test_eq: Balance.t] timing.initial_minimum_balance
@@ -75,8 +79,8 @@ let%test_module "Test account's timing." =
       Quickcheck.test
         (let open Quickcheck.Generator.Let_syntax in
         let%bind timing = gen_timing in
-        let%bind slot1 = Global_slot.gen in
-        let%map slot2 = Global_slot.(gen_incl slot1 max_value) in
+        let%bind slot1 = Global_slot_since_genesis.gen in
+        let%map slot2 = Global_slot_since_genesis.(gen_incl slot1 max_value) in
         (timing, slot1, slot2))
         ~f:(fun (timing, slot1, slot2) ->
           [%test_pred: Balance.t * Balance.t]
@@ -91,7 +95,9 @@ let%test_module "Test account's timing." =
           [%test_eq: Balance.t] Balance.zero
             (min_balance_at_slot timing_rec ~global_slot:vesting_final_slot) ;
           let one_slot_prior =
-            Global_slot.(sub vesting_final_slot (of_int 1)) |> Option.value_exn
+            Global_slot_since_genesis.(
+              sub vesting_final_slot (Global_slot_span.of_int 1))
+            |> Option.value_exn
           in
           [%test_pred: Balance.t]
             Balance.(( < ) zero)
@@ -111,17 +117,17 @@ let%test_module "Test account's timing." =
         let vesting_end = Account.timing_final_vesting_slot timing in
         (* Global_slot addition may overflow, so we need to make sure it won't happen. *)
         let max_slot =
-          let open Global_slot in
+          let open Global_slot_since_genesis in
           sub max_value timing_rec.vesting_period
           |> Option.value_map ~default:vesting_end ~f:(min vesting_end)
         in
         let%map global_slot =
-          Global_slot.gen_incl timing_rec.cliff_time max_slot
+          Global_slot_since_genesis.gen_incl timing_rec.cliff_time max_slot
         in
         (timing, timing_rec, global_slot))
         ~f:(fun (timing, timing_rec, global_slot) ->
           let vesting_period_later =
-            Global_slot.add global_slot timing_rec.vesting_period
+            Global_slot_since_genesis.add global_slot timing_rec.vesting_period
           in
           let min_bal_at_slot = min_balance_at_slot timing_rec ~global_slot in
           let min_bal_later =
@@ -137,11 +143,12 @@ let%test_module "Test account's timing." =
         (let open Quickcheck.Generator.Let_syntax in
         let%bind timing = gen_timing in
         let max_slot =
-          Global_slot.(sub timing.cliff_time (of_int 1))
-          |> Option.value ~default:Global_slot.zero
+          Global_slot_since_genesis.(
+            sub timing.cliff_time (Global_slot_span.of_int 1))
+          |> Option.value ~default:Global_slot_since_genesis.zero
         in
-        let%bind slot1 = Global_slot.(gen_incl zero max_slot) in
-        let%map slot2 = Global_slot.gen_incl slot1 max_slot in
+        let%bind slot1 = Global_slot_since_genesis.(gen_incl zero max_slot) in
+        let%map slot2 = Global_slot_since_genesis.gen_incl slot1 max_slot in
         (timing, slot1, slot2))
         ~f:(fun (timing, start_slot, end_slot) ->
           [%test_eq: Balance.t] Balance.zero
@@ -155,8 +162,10 @@ let%test_module "Test account's timing." =
         let vesting_end =
           Account.timing_final_vesting_slot (Account.Timing.of_record timing)
         in
-        let%bind slot1 = Global_slot.(gen_incl vesting_end max_value) in
-        let%map slot2 = Global_slot.(gen_incl slot1 max_value) in
+        let%bind slot1 =
+          Global_slot_since_genesis.(gen_incl vesting_end max_value)
+        in
+        let%map slot2 = Global_slot_since_genesis.(gen_incl slot1 max_value) in
         (timing, slot1, slot2))
         ~f:(fun (timing, start_slot, end_slot) ->
           [%test_eq: Balance.t] Balance.zero
@@ -166,8 +175,8 @@ let%test_module "Test account's timing." =
       Quickcheck.test
         (let open Quickcheck.Generator.Let_syntax in
         let%bind timing = gen_timing in
-        let%bind slot1 = Global_slot.gen in
-        let%map slot2 = Global_slot.(gen_incl zero slot1) in
+        let%bind slot1 = Global_slot_since_genesis.gen in
+        let%map slot2 = Global_slot_since_genesis.(gen_incl zero slot1) in
         (timing, slot1, slot2))
         ~f:(fun (timing, start_slot, end_slot) ->
           [%test_eq: Balance.t] Balance.zero
@@ -181,16 +190,19 @@ let%test_module "Test account's timing." =
         let%bind timing =
           Account.gen_timing_at_least_one_vesting_period Balance.max_int
         in
-        let min_slot = Global_slot.(add timing.cliff_time (of_int 1)) in
+        let min_slot =
+          Global_slot_since_genesis.(
+            add timing.cliff_time (Global_slot_span.of_int 1))
+        in
         let max_slot =
-          let open Global_slot in
+          let open Global_slot_since_genesis in
           sub
             Account.(timing_final_vesting_slot @@ Timing.of_record timing)
-            (of_int 1)
+            (Global_slot_span.of_int 1)
           |> Option.value ~default:zero
         in
-        let%bind slot1 = Global_slot.gen_incl min_slot max_slot in
-        let%map slot2 = Global_slot.gen_incl slot1 max_slot in
+        let%bind slot1 = Global_slot_since_genesis.gen_incl min_slot max_slot in
+        let%map slot2 = Global_slot_since_genesis.gen_incl slot1 max_slot in
         (timing, slot1, slot2))
         ~f:(fun (timing, start_slot, end_slot) ->
           let open UInt64 in
@@ -205,7 +217,7 @@ let%test_module "Test account's timing." =
       Quickcheck.test
         (let open Quickcheck.Generator.Let_syntax in
         let%bind account = Account.gen in
-        let%map global_slot = Global_slot.gen in
+        let%map global_slot = Global_slot_since_genesis.gen in
         (account, global_slot))
         ~f:(fun (account, global_slot) ->
           [%test_eq: Balance.t] account.balance
@@ -215,7 +227,7 @@ let%test_module "Test account's timing." =
       Quickcheck.test
         (let open Quickcheck.Generator.Let_syntax in
         let%bind account = Account.gen_timed in
-        let%map global_slot = Global_slot.gen in
+        let%map global_slot = Global_slot_since_genesis.gen in
         (account, global_slot))
         ~f:(fun (account, global_slot) ->
           let minimum_balance =
@@ -230,7 +242,10 @@ let%test_module "Test account's timing." =
             Account.(liquid_balance_at_slot account ~global_slot) )
 
     let%test_unit "Minimum balance checked equal to unchecked." =
-      let global_slot_var gs = Global_slot.(Checked.constant @@ to_uint32 gs) in
+      let global_slot_since_genesis_var gs =
+        Global_slot_since_genesis.Checked.constant gs
+      in
+      let global_slot_span_var span = Global_slot_span.Checked.constant span in
       Quickcheck.test
         (let open Quickcheck.Generator.Let_syntax in
         let%bind timing = gen_timing in
@@ -242,12 +257,14 @@ let%test_module "Test account's timing." =
           let open UInt64.Infix in
           Amount.(to_uint64 max_int)
           / Amount.to_uint64 timing.vesting_increment
-          * UInt64.of_uint32 (Global_slot.to_uint32 timing.vesting_period)
+          * UInt64.of_uint32 (Global_slot_span.to_uint32 timing.vesting_period)
           |> UInt64.to_uint32
-          |> UInt32.add (Global_slot.to_uint32 timing.cliff_time)
-          |> Global_slot.of_uint32
+          |> UInt32.add (Global_slot_since_genesis.to_uint32 timing.cliff_time)
+          |> Global_slot_since_genesis.of_uint32
         in
-        let%map global_slot = Global_slot.(gen_incl zero max_slot) in
+        let%map global_slot =
+          Global_slot_since_genesis.(gen_incl zero max_slot)
+        in
         (timing, global_slot))
         ~f:(fun (timing, global_slot) ->
           let min_balance = min_balance_at_slot timing ~global_slot in
@@ -256,10 +273,10 @@ let%test_module "Test account's timing." =
               ~initial_minimum_balance:
                 Balance.(var_of_t timing.initial_minimum_balance)
               ~cliff_amount:Amount.(var_of_t timing.cliff_amount)
-              ~cliff_time:(global_slot_var timing.cliff_time)
+              ~cliff_time:(global_slot_since_genesis_var timing.cliff_time)
               ~vesting_increment:Amount.(var_of_t timing.vesting_increment)
-              ~vesting_period:(global_slot_var timing.vesting_period)
-              ~global_slot:(global_slot_var global_slot)
+              ~vesting_period:(global_slot_span_var timing.vesting_period)
+              ~global_slot:(global_slot_since_genesis_var global_slot)
             |> Snarky_backendless.(
                  Checked_runner.Simple.map ~f:(As_prover0.read Balance.typ))
             |> Snark_params.Tick.run_and_check

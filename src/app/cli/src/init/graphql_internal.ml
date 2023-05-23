@@ -9,7 +9,7 @@
  * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
  * sell copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
  *
@@ -244,10 +244,6 @@ struct
           respond_string ~status:`Precondition_failed
             ~body:"Invalid sequence number" ()
         in
-        (* let missing_sequence_info () =
-             respond_string ~status:`Precondition_failed
-               ~body:"Missing sequence information" ()
-           in *)
         match auth_keys with
         | None ->
             respond false

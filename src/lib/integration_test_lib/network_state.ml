@@ -84,7 +84,11 @@ module Make
     ignore
       ( Event_router.on event_router Event_type.Block_produced
           ~f:(fun node block_produced ->
-            [%log debug] "Updating network state with block produced event" ;
+            [%log debug] "Updating network state with block produced event"
+              ~metadata:
+                [ ( "snark_ledger_generated"
+                  , `Bool block_produced.snarked_ledger_generated )
+                ] ;
             update ~f:(fun state ->
                 [%log debug] "handling block production from $node"
                   ~metadata:[ ("node", `String (Node.id node)) ] ;

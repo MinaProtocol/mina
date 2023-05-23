@@ -10,7 +10,7 @@ module Types = struct
 
     module Data : sig
       module Consensus_state : sig
-        module Value : V1S0
+        module Value : V2S0
       end
     end
   end
@@ -91,13 +91,13 @@ module type Concrete = sig
       end
 
       module Value : sig
-        module V1 : sig
+        module V2 : sig
           type t =
             ( Mina_numbers.Length.V1.t
             , Consensus_vrf.Output.Truncated.V1.t
             , Currency.Amount.V1.t
             , Consensus_global_slot.V1.t
-            , Mina_numbers.Global_slot.V1.t
+            , Mina_numbers.Global_slot_since_genesis.V1.t
             , Epoch_data.Staking_value_versioned.Value.V1.t
             , Epoch_data.Next_value_versioned.Value.V1.t
             , bool
@@ -184,13 +184,13 @@ module M = struct
       end
 
       module Value = struct
-        module V1 = struct
+        module V2 = struct
           type t =
             ( Mina_numbers.Length.V1.t
             , Consensus_vrf.Output.Truncated.V1.t
             , Currency.Amount.V1.t
             , Consensus_global_slot.V1.t
-            , Mina_numbers.Global_slot.V1.t
+            , Mina_numbers.Global_slot_since_genesis.V1.t
             , Epoch_data.Staking_value_versioned.Value.V1.t
             , Epoch_data.Next_value_versioned.Value.V1.t
             , bool

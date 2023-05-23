@@ -88,11 +88,15 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       let to_latest ({ payload; signer; signature } : t) : Latest.t =
         let payload : Signed_command_payload.t =
+          let valid_until =
+            Global_slot_legacy.to_uint32 payload.common.valid_until
+            |> Global_slot_since_genesis.of_uint32
+          in
           let common : Signed_command_payload.Common.t =
             { fee = payload.common.fee
             ; fee_payer_pk = payload.common.fee_payer_pk
             ; nonce = payload.common.nonce
-            ; valid_until = payload.common.valid_until
+            ; valid_until
             ; memo = payload.common.memo
             }
           in

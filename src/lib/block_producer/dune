@@ -10,6 +10,7 @@
    core_kernel
    core
    async
+   integers
    ;; local libraries
    mina_wire_types
    mina_metrics

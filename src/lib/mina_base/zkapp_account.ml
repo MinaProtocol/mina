@@ -225,7 +225,7 @@ module Stable = struct
       , Verification_key_wire.Stable.V1.t option
       , Mina_numbers.Zkapp_version.Stable.V1.t
       , F.Stable.V1.t
-      , Mina_numbers.Global_slot.Stable.V1.t
+      , Mina_numbers.Global_slot_since_genesis.Stable.V1.t
       , bool
       , Zkapp_uri.Stable.V1.t )
       Poly.Stable.V2.t
@@ -240,7 +240,7 @@ type t =
   , Verification_key_wire.t option
   , Mina_numbers.Zkapp_version.t
   , F.t
-  , Mina_numbers.Global_slot.t
+  , Mina_numbers.Global_slot_since_genesis.t
   , bool
   , Zkapp_uri.t )
   Poly.t
@@ -259,7 +259,7 @@ module Checked = struct
       Flagged_option.t
     , Mina_numbers.Zkapp_version.Checked.t
     , Pickles.Impls.Step.Field.t
-    , Mina_numbers.Global_slot.Checked.t
+    , Mina_numbers.Global_slot_since_genesis.Checked.t
     , Boolean.var
     , string Data_as_hash.t )
     Poly.t
@@ -277,7 +277,8 @@ module Checked = struct
       ~verification_key:(f field)
       ~zkapp_version:(f Mina_numbers.Zkapp_version.Checked.to_input)
       ~action_state:(f app_state)
-      ~last_action_slot:(f Mina_numbers.Global_slot.Checked.to_input)
+      ~last_action_slot:
+        (f Mina_numbers.Global_slot_since_genesis.Checked.to_input)
       ~proved_state:
         (f (fun (b : Boolean.var) ->
              Random_oracle.Input.Chunked.packed ((b :> Field.Var.t), 1) ) )
@@ -352,7 +353,7 @@ let typ : (Checked.t, t) Typ.t =
              (Option.map ~f:(With_hash.map ~f:(fun x -> Option.value_exn x)))
     ; Mina_numbers.Zkapp_version.typ
     ; Pickles_types.Vector.typ Field.typ Pickles_types.Nat.N5.n
-    ; Mina_numbers.Global_slot.typ
+    ; Mina_numbers.Global_slot_since_genesis.typ
     ; Boolean.typ
     ; Data_as_hash.typ ~hash:hash_zkapp_uri
     ]
@@ -377,7 +378,7 @@ let to_input (t : t) : _ Random_oracle.Input.Chunked.t =
             (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash) ) )
     ~zkapp_version:(f Mina_numbers.Zkapp_version.to_input)
     ~action_state:(f app_state)
-    ~last_action_slot:(f Mina_numbers.Global_slot.to_input)
+    ~last_action_slot:(f Mina_numbers.Global_slot_since_genesis.to_input)
     ~proved_state:
       (f (fun b -> Random_oracle.Input.Chunked.packed (field_of_bool b, 1)))
     ~zkapp_uri:(f zkapp_uri_to_input)
@@ -393,7 +394,7 @@ let default : _ Poly.t =
   ; action_state =
       (let empty = Actions.empty_state_element in
        [ empty; empty; empty; empty; empty ] )
-  ; last_action_slot = Mina_numbers.Global_slot.zero
+  ; last_action_slot = Mina_numbers.Global_slot_since_genesis.zero
   ; proved_state = false
   ; zkapp_uri = ""
   }
@@ -425,8 +426,8 @@ let deriver obj =
        ~verification_key:
          !.(option ~js_type:Or_undefined (verification_key_with_hash @@ o ()))
        ~zkapp_version:!.uint32 ~action_state:!.action_state_deriver
-       ~last_action_slot:!.global_slot ~proved_state:!.bool ~zkapp_uri:!.string
-       obj
+       ~last_action_slot:!.global_slot_since_genesis
+       ~proved_state:!.bool ~zkapp_uri:!.string obj
 
 let gen_uri =
   let open Quickcheck in
@@ -446,14 +447,14 @@ let gen : t Quickcheck.Generator.t =
   in
   let%bind zkapp_version = Mina_numbers.Zkapp_version.gen in
   let%bind seq_state = Generator.list_with_length 5 Field.gen in
-  let%bind last_sequence_slot = Mina_numbers.Global_slot.gen in
+  let%bind last_sequence_slot = Mina_numbers.Global_slot_since_genesis.gen in
   let%map zkapp_uri = gen_uri in
   let five = Pickles_types.Nat.(S (S (S (S (S Z))))) in
   { app_state
   ; verification_key = None
   ; zkapp_version
   ; action_state = Pickles_types.(Vector.of_list_and_length_exn seq_state five)
-  ; last_action_slot = Mina_numbers.Global_slot.zero
+  ; last_action_slot = Mina_numbers.Global_slot_since_genesis.zero
   ; proved_state = false
   ; zkapp_uri
   }

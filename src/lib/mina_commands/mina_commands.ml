@@ -390,7 +390,7 @@ let get_status ~flag t =
       Consensus.Data.Consensus_state.consensus_time consensus_state
     in
     let global_slot_since_genesis =
-      Mina_numbers.Global_slot.to_int
+      Mina_numbers.Global_slot_since_genesis.to_int
       @@ Consensus.Data.Consensus_state.global_slot_since_genesis
            consensus_state
     in

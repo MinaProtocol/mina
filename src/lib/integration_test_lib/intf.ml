@@ -84,7 +84,7 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> nonce:Mina_numbers.Account_nonce.t
         -> memo:string
-        -> valid_until:Mina_numbers.Global_slot.t
+        -> valid_until:Mina_numbers.Global_slot_since_genesis.t
         -> raw_signature:string
         -> signed_command_result Deferred.Or_error.t
 
@@ -97,7 +97,7 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> nonce:Mina_numbers.Account_nonce.t
         -> memo:string
-        -> valid_until:Mina_numbers.Global_slot.t
+        -> valid_until:Mina_numbers.Global_slot_since_genesis.t
         -> raw_signature:string
         -> signed_command_result Malleable_error.t
 

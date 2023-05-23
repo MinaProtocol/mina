@@ -307,7 +307,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       { Poly.init; curr }
 
     let push (t : t) (state_body_hash : State_body_hash.t)
-        (global_slot : Mina_numbers.Global_slot.t) : t =
+        (global_slot : Mina_numbers.Global_slot_since_genesis.t) : t =
       (* this is the same computation for combining state hashes and state body hashes as
          `Protocol_state.hash_abstract', not available here because it would create
          a module dependency cycle
@@ -317,7 +317,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Random_oracle.hash ~init:Hash_prefix.protocol_state
             [| (t.curr :> Field.t)
              ; (state_body_hash :> Field.t)
-             ; Mina_numbers.Global_slot.to_field global_slot
+             ; Mina_numbers.Global_slot_since_genesis.to_field global_slot
             |]
           |> Stack_hash.of_hash
       }
@@ -330,13 +330,14 @@ module Make_str (A : Wire_types.Concrete) = struct
       type t = var
 
       let push (t : t) (state_body_hash : State_body_hash.var)
-          (global_slot : Mina_numbers.Global_slot.Checked.var) =
+          (global_slot : Mina_numbers.Global_slot_since_genesis.Checked.var) =
         make_checked (fun () ->
             let curr =
               Random_oracle.Checked.hash ~init:Hash_prefix.protocol_state
                 [| Stack_hash.var_to_hash_packed t.curr
                  ; State_body_hash.var_to_hash_packed state_body_hash
-                 ; Mina_numbers.Global_slot.Checked.to_field global_slot
+                 ; Mina_numbers.Global_slot_since_genesis.Checked.to_field
+                     global_slot
                 |]
               |> Stack_hash.var_of_hash_packed
             in
@@ -682,7 +683,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         { t with data }
 
       let push_state (state_body_hash : State_body_hash.t)
-          (global_slot : Mina_numbers.Global_slot.t) (t : t) =
+          (global_slot : Mina_numbers.Global_slot_since_genesis.t) (t : t) =
         { t with state = State_stack.push t.state state_body_hash global_slot }
 
       let if_ (cond : Tick0.Boolean.var) ~(then_ : var) ~(else_ : var) :
@@ -704,7 +705,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           { t with data }
 
         let push_state (state_body_hash : State_body_hash.var)
-            (global_slot : Mina_numbers.Global_slot.Checked.var) (t : t) =
+            (global_slot : Mina_numbers.Global_slot_since_genesis.Checked.var)
+            (t : t) =
           let%map state =
             State_stack.Checked.push t.state state_body_hash global_slot
           in
@@ -1332,7 +1334,7 @@ module Make_str (A : Wire_types.Concrete) = struct
          depth:int
       -> t
       -> State_body_hash.t
-      -> Mina_numbers.Global_slot.t
+      -> Mina_numbers.Global_slot_since_genesis.t
       -> is_new_stack:bool
       -> t Or_error.t
   end
@@ -1407,7 +1409,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     test ~trials:20
       (Generator.tuple3
          (Coinbase.Gen.gen ~constraint_constants)
-         State_body_hash.gen Mina_numbers.Global_slot.gen )
+         State_body_hash.gen Mina_numbers.Global_slot_since_genesis.gen )
       ~f:(fun ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
               , state_body_hash
               , global_slot ) ->
@@ -1440,7 +1442,8 @@ module Make_str (A : Wire_types.Concrete) = struct
               State_body_hash.var_of_t state_body_hash
             in
             let global_slot_var =
-              Mina_numbers.Global_slot.Checked.constant global_slot
+              Mina_numbers.Global_slot_since_genesis.Checked.constant
+                global_slot
             in
             let%map result =
               handle
@@ -1470,7 +1473,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     test ~trials:20
       (Generator.tuple3
          (Coinbase.Gen.gen ~constraint_constants)
-         State_body_hash.gen Mina_numbers.Global_slot.gen )
+         State_body_hash.gen Mina_numbers.Global_slot_since_genesis.gen )
       ~f:(fun ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
               , state_body_hash
               , global_slot ) ->
@@ -1505,7 +1508,8 @@ module Make_str (A : Wire_types.Concrete) = struct
               State_body_hash.var_of_t state_body_hash
             in
             let global_slot_var =
-              Mina_numbers.Global_slot.Checked.constant global_slot
+              Mina_numbers.Global_slot_since_genesis.Checked.constant
+                global_slot
             in
             let%map result =
               handle
@@ -1644,7 +1648,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           (list
              (Generator.tuple3
                 (Coinbase.Gen.gen ~constraint_constants)
-                State_body_hash.gen Mina_numbers.Global_slot.gen ) ))
+                State_body_hash.gen Mina_numbers.Global_slot_since_genesis.gen ) ))
     in
     test ~trials:100 coinbase_lists_gen ~f:add_remove_check
 end
