@@ -161,7 +161,8 @@ module For_logger = struct
           :: Internal_tracing_context_call.Call_tag.to_metadata tag )
     end
 
-    let process () msg =
+    let expand_log_message ~last_block_id ~last_call_id ~timestamp ~message
+        ~metadata =
       let handling_current_block_id_change =
         handling_current_block_id_change ~last_block_id
           ~make:Event.current_block
@@ -170,36 +171,41 @@ module For_logger = struct
         handling_current_call_id_change ~last_call_id
           ~make:Event.current_call_id
       in
+      let json_lines : Yojson.Safe.t list =
+        match message with
+        | "@metadata" ->
+            handling_current_block_id_change
+            @@ handling_current_call_id_change
+                 [ Event.checkpoint_metadata metadata ]
+        | "@block_metadata" ->
+            handling_current_block_id_change [ Event.block_metadata metadata ]
+        | "@internal_tracing_enabled" ->
+            [ Event.internal_tracing_enabled timestamp ]
+        | "@internal_tracing_disabled" ->
+            [ Event.internal_tracing_disabled timestamp ]
+        | "@mina_node_metadata" ->
+            [ Event.mina_node_metadata metadata ]
+        | "@produced_block_state_hash" ->
+            handling_current_block_id_change
+              [ Event.produced_block_state_hash metadata ]
+        | checkpoint ->
+            let checkpoint_event_json = Event.checkpoint checkpoint timestamp in
+            let metadata_event_json =
+              if String.Map.is_empty metadata then []
+              else [ Event.checkpoint_metadata metadata ]
+            in
+            handling_current_block_id_change
+            @@ handling_current_call_id_change
+                 (checkpoint_event_json :: metadata_event_json)
+      in
+      json_lines
+
+    let process () msg =
       let { Logger.Message.level; message; metadata; timestamp; _ } = msg in
       if is_enabled () && Logger.Level.equal level Logger.Level.Internal then
-        let json_lines : Yojson.Safe.t list =
-          match message with
-          | "@metadata" ->
-              handling_current_block_id_change
-              @@ handling_current_call_id_change
-                   [ Event.checkpoint_metadata metadata ]
-          | "@block_metadata" ->
-              handling_current_block_id_change [ Event.block_metadata metadata ]
-          | "@internal_tracing_enabled" ->
-              [ Event.internal_tracing_enabled timestamp ]
-          | "@internal_tracing_disabled" ->
-              [ Event.internal_tracing_disabled timestamp ]
-          | "@mina_node_metadata" ->
-              [ Event.mina_node_metadata metadata ]
-          | "@produced_block_state_hash" ->
-              handling_current_block_id_change
-                [ Event.produced_block_state_hash metadata ]
-          | checkpoint ->
-              let checkpoint_event_json =
-                Event.checkpoint checkpoint timestamp
-              in
-              let metadata_event_json =
-                if String.Map.is_empty metadata then []
-                else [ Event.checkpoint_metadata metadata ]
-              in
-              handling_current_block_id_change
-              @@ handling_current_call_id_change
-                   (checkpoint_event_json :: metadata_event_json)
+        let json_lines =
+          expand_log_message ~last_block_id ~last_call_id ~timestamp ~message
+            ~metadata
         in
         Some
           ( String.concat ~sep:"\n"
@@ -228,62 +234,21 @@ module For_itn_logger = struct
 
      IMPORTANT: this must replicate the same logic as [For_logger.Processor.process] *)
   let post_process_message ~timestamp ~message ~metadata =
-    let handling_current_block_id_change =
-      handling_current_block_id_change ~last_block_id ~make:(fun block_id ->
-          ( timestamp
-          , "@control"
-          , [ ("current_block", `String (Block_id.to_string block_id)) ] ) )
-    in
-    let handling_current_call_id_change =
-      handling_current_call_id_change ~last_call_id ~make:(fun tag call_id ->
-          ( timestamp
-          , "@control"
-          , ("current_call_id", `Int call_id)
-            :: Internal_tracing_context_call.Call_tag.to_metadata tag ) )
-    in
+    let metadata = String.Map.of_alist_reduce ~f:(fun a _b -> a) metadata in
     if is_enabled () then
+      let json_lines =
+        For_logger.Processor.expand_log_message ~last_block_id ~last_call_id
+          ~timestamp ~message ~metadata
+      in
       let log_messages : (Time.t * string * (string * Yojson.Safe.t) list) list
           =
-        let open For_logger.Processor.Event in
-        let assoc = Yojson.Safe.Util.to_assoc in
-        let metadata = String.Map.of_alist_reduce ~f:(fun a _b -> a) metadata in
-        match message with
-        | "@metadata" ->
-            handling_current_block_id_change
-            @@ handling_current_call_id_change
-                 [ (timestamp, "@control", assoc @@ checkpoint_metadata metadata)
-                 ]
-        | "@block_metadata" ->
-            handling_current_block_id_change
-              [ (timestamp, "@control", assoc @@ block_metadata metadata) ]
-        | "@internal_tracing_enabled" ->
-            [ ( timestamp
-              , "@control"
-              , assoc @@ internal_tracing_enabled timestamp )
-            ]
-        | "@internal_tracing_disabled" ->
-            [ ( timestamp
-              , "@control"
-              , assoc @@ internal_tracing_disabled timestamp )
-            ]
-        | "@mina_node_metadata" ->
-            [ (timestamp, "@control", assoc @@ mina_node_metadata metadata) ]
-        | "@produced_block_state_hash" ->
-            handling_current_block_id_change
-              [ ( timestamp
-                , "@control"
-                , assoc @@ produced_block_state_hash metadata )
-              ]
-        | checkpoint ->
-            let metadata_event =
-              if String.Map.is_empty metadata then []
-              else
-                [ (timestamp, "@control", assoc @@ checkpoint_metadata metadata)
-                ]
-            in
-            handling_current_block_id_change
-            @@ handling_current_call_id_change
-                 ((timestamp, checkpoint, []) :: metadata_event)
+        List.filter_map json_lines ~f:(function
+          | `List [ `String checkpoint; _ ] ->
+              Some (timestamp, checkpoint, [])
+          | `Assoc assoc ->
+              Some (timestamp, "@control", assoc)
+          | _ ->
+              None )
       in
       log_messages
     else []
