@@ -178,7 +178,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; zkapp_account_keypairs = zkapp_keypairs
         ; memo
         ; new_zkapp_account = true
-        ; snapp_update = Account_update.Update.dummy
+        ; snapp_update =
+            { Account_update.Update.dummy with
+              timing =
+                Set
+                  { initial_minimum_balance = Currency.Balance.zero
+                  ; cliff_time = Mina_numbers.Global_slot.zero
+                  ; cliff_amount = Currency.Amount.zero
+                  ; vesting_period =
+                      Mina_numbers.Global_slot.zero (* SHOULD FAIL *)
+                  ; vesting_increment = Currency.Amount.zero
+                  }
+            }
         ; preconditions = None
         ; authorization_kind = Signature
         }
