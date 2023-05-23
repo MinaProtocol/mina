@@ -157,9 +157,8 @@ module For_logger = struct
 
       let current_call_id tag call_id =
         `Assoc
-          [ ("current_call_id", `Int call_id)
-          ; ("current_call_tag", `String tag)
-          ]
+          ( ("current_call_id", `Int call_id)
+          :: Internal_tracing_context_call.Call_tag.to_metadata tag )
     end
 
     let process () msg =
@@ -239,9 +238,8 @@ module For_itn_logger = struct
       handling_current_call_id_change ~last_call_id ~make:(fun tag call_id ->
           ( timestamp
           , "@control"
-          , [ ("current_call_id", `Int call_id)
-            ; ("current_call_tag", `String tag)
-            ] ) )
+          , ("current_call_id", `Int call_id)
+            :: Internal_tracing_context_call.Call_tag.to_metadata tag ) )
     in
     if is_enabled () then
       let log_messages : (Time.t * string * (string * Yojson.Safe.t) list) list

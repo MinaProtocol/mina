@@ -105,7 +105,7 @@ let dispatch_remote_log log =
           eprintf "Exception when sending internal log via RPC: %s"
             (Exn.to_string_mach exn) )
 
-(* Used to ensure that no more than one log message is on-flight at
+(* Used to ensure that no more than one log message is in-flight at
    a time to guarantee sequential processing. *)
 let sequential_dispatcher_loop () =
   let open Async in
