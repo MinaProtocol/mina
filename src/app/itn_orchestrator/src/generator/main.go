@@ -44,7 +44,7 @@ func sampleStopRatio(minRatio, maxRatio float64) float64 {
 
 type Params struct {
 	BaseTps, StressTps, SenderRatio, ZkappRatio, RedeployRatio, MinStopRatio, MaxStopRatio float64
-	RoundDurationMin, Rounds, StopsPerRound, Gap                                           int
+	RoundDurationMin, PauseMin, Rounds, StopsPerRound, Gap                                 int
 	SendFromNonBpsOnly, StopOnlyBps                                                        bool
 	ExperimentName, PasswordEnv, FundKeyPrefix                                             string
 	Privkeys                                                                               []string
@@ -52,8 +52,9 @@ type Params struct {
 }
 
 type Command struct {
-	Action string
-	Params any
+	Action  string
+	Params  any
+	comment string
 }
 
 type GeneratedRound struct {
@@ -92,7 +93,7 @@ type ZkappRefParams struct {
 }
 
 func zkapps(feePayersRef int, nodesRef int, nodesName string, params lib.ZkappSubParams) Command {
-	return Command{Action: lib.SampleAction{}.Name(), Params: ZkappRefParams{
+	return Command{Action: lib.ZkappCommandsAction{}.Name(), Params: ZkappRefParams{
 		ZkappSubParams: params,
 		FeePayers:      lib.LocalComplexValue(feePayersRef, "key"),
 		Nodes:          lib.LocalComplexValue(nodesRef, nodesName),
@@ -101,14 +102,14 @@ func zkapps(feePayersRef int, nodesRef int, nodesName string, params lib.ZkappSu
 
 type PaymentRefParams struct {
 	lib.PaymentSubParams
-	FeePayers lib.ComplexValue
-	Nodes     lib.ComplexValue
+	Senders lib.ComplexValue
+	Nodes   lib.ComplexValue
 }
 
 func payments(feePayersRef int, nodesRef int, nodesName string, params lib.PaymentSubParams) Command {
-	return Command{Action: lib.SampleAction{}.Name(), Params: PaymentRefParams{
+	return Command{Action: lib.PaymentsAction{}.Name(), Params: PaymentRefParams{
 		PaymentSubParams: params,
-		FeePayers:        lib.LocalComplexValue(feePayersRef, "key"),
+		Senders:          lib.LocalComplexValue(feePayersRef, "key"),
 		Nodes:            lib.LocalComplexValue(nodesRef, nodesName),
 	}}
 }
@@ -129,6 +130,35 @@ func restart(nodesRef int, nodesName string, clean bool) Command {
 		Nodes: lib.LocalComplexValue(nodesRef, nodesName),
 		Clean: clean,
 	}}
+}
+
+type JoinRefParams struct {
+	Group1 lib.ComplexValue
+	Group2 lib.ComplexValue
+}
+
+func join(g1Ref int, g1Name string, g2Ref int, g2Name string) Command {
+	return Command{Action: lib.JoinAction{}.Name(), Params: JoinRefParams{
+		Group1: lib.LocalComplexValue(g1Ref, g1Name),
+		Group2: lib.LocalComplexValue(g2Ref, g2Name),
+	}}
+}
+
+type ExceptRefParams struct {
+	Group  lib.ComplexValue
+	Except lib.ComplexValue
+}
+
+func except(groupRef int, groupName string, exceptRef int, exceptName string) Command {
+	return Command{Action: lib.ExceptAction{}.Name(), Params: ExceptRefParams{
+		Group:  lib.LocalComplexValue(groupRef, groupName),
+		Except: lib.LocalComplexValue(exceptRef, exceptName),
+	}}
+}
+
+func withComment(comment string, cmd Command) Command {
+	cmd.comment = comment
+	return cmd
 }
 
 func (p *Params) Generate(round int) GeneratedRound {
@@ -162,48 +192,58 @@ func (p *Params) Generate(round int) GeneratedRound {
 	}
 	paymentKeysNum, paymentAmount := lib.PaymentKeygenRequirements(p.Gap, paymentParams)
 	cmds := []Command{}
-	cmds = append(cmds, discovery(lib.DiscoveryParams{
+	roundStartMin := round * (p.RoundDurationMin + p.PauseMin)
+	cmds = append(cmds, withComment(fmt.Sprintf("Starting round %d, %d min since start", round, roundStartMin), discovery(lib.DiscoveryParams{
 		OffsetMin:        15,
 		NoBlockProducers: p.SendFromNonBpsOnly,
-	}))
+	})))
 	cmds = append(cmds, sample(-1, "participant", []float64{p.SenderRatio}))
 	cmds = append(cmds, loadKeys(lib.KeyloaderParams{Dir: zkappsKeysDir}))
 	cmds = append(cmds, loadKeys(lib.KeyloaderParams{Dir: paymentsKeysDir}))
 	cmds = append(cmds, zkapps(-2, -3, "group1", zkappParams))
 	cmds = append(cmds, payments(-2, -4, "group1", paymentParams))
+	cmds = append(cmds, join(-1, "participant", -2, "participant"))
 	stopWaits := make([]int, p.StopsPerRound)
 	for i := 0; i < p.StopsPerRound; i++ {
 		stopWaits[i] = rand.Intn(60 * p.RoundDurationMin)
 	}
 	sort.Ints(stopWaits)
 	for i := p.StopsPerRound - 1; i > 0; i-- {
-		stopWaits[i] = stopWaits[i] - stopWaits[i-1]
+		stopWaits[i] -= stopWaits[i-1]
 	}
 	stopRatio := sampleStopRatio(p.MinStopRatio, p.MaxStopRatio)
-	for _, waitSec := range stopWaits {
-		cmds = append(cmds, wait(waitSec))
+	elapsed := 0
+	for i, waitSec := range stopWaits {
+		cmds = append(cmds, withComment(fmt.Sprintf("Running round %d, %d min %d sec since start, waiting for %d sec", round, roundStartMin+elapsed/60, elapsed%60, waitSec), wait(waitSec)))
 		cmds = append(cmds, discovery(lib.DiscoveryParams{
 			OffsetMin:          15,
 			OnlyBlockProducers: p.StopOnlyBps,
 		}))
-		cmds = append(cmds, sample(-1, "participant", []float64{p.RedeployRatio * stopRatio, (1 - p.RedeployRatio) * stopRatio}))
+		cmds = append(cmds, except(-1, "participant", -3-i*6, "group"))
+		cmds = append(cmds, sample(-1, "group", []float64{p.RedeployRatio * stopRatio, (1 - p.RedeployRatio) * stopRatio}))
 		cmds = append(cmds, restart(-1, "group1", true))
 		cmds = append(cmds, restart(-2, "group2", false))
+		elapsed += waitSec
+	}
+	if round < p.Rounds-1 {
+		cmds = append(cmds,
+			withComment(fmt.Sprintf("Waiting for remainder of round %d and pause, %d min %d sec since start", round, roundStartMin+elapsed/60, elapsed%60),
+				wait((p.RoundDurationMin+p.PauseMin)*60-elapsed)))
 	}
 	return GeneratedRound{
 		Commands: cmds,
 		FundCommands: []Command{
 			fund(lib.FundParams{
 				PasswordEnv: p.PasswordEnv,
-				Privkey:     p.Privkeys[0], /*TODO use multiple*/
-				Prefix:      zkappsKeysDir + "/key-",
+				Privkeys:    p.Privkeys,
+				Prefix:      zkappsKeysDir + "/key",
 				Amount:      zkappAmount,
 				Fee:         1e9,
 				Num:         zkappKeysNum,
 			}),
 			fund(lib.FundParams{
 				PasswordEnv: p.PasswordEnv,
-				Privkey:     p.Privkeys[0], /*TODO use multiple*/
+				Privkeys:    p.Privkeys,
 				Prefix:      paymentsKeysDir + "/key-",
 				Amount:      paymentAmount,
 				Fee:         1e9,
@@ -234,6 +274,7 @@ func main() {
 	flag.BoolVar(&p.SendFromNonBpsOnly, "send-from-non-bps", false, "send only from non block producers")
 	flag.BoolVar(&p.StopOnlyBps, "stop-only-bps", false, "stop only block producers")
 	flag.IntVar(&p.RoundDurationMin, "round-duration", 30, "duration of a round, minutes")
+	flag.IntVar(&p.PauseMin, "pause", 15, "duration of a pause between rounds, minutes")
 	flag.IntVar(&p.Rounds, "rounds", 4, "number of rounds to run experiment")
 	flag.IntVar(&p.StopsPerRound, "round-stops", 2, "number of stops to perform within round")
 	flag.IntVar(&p.Gap, "gap", 180, "gap between related transactions, seconds")
@@ -248,10 +289,6 @@ func main() {
 	flag.StringVar(&p.PasswordEnv, "password-env", "", "Name of environment variable to read privkey password from")
 	flag.StringVar((*string)(&p.PaymentReceiver), "payment-receiver", "", "Mina PK receiving payments")
 	flag.Parse()
-	if p.PaymentReceiver == "" {
-		fmt.Fprintln(os.Stderr, "Payment receiver not specified")
-		os.Exit(2)
-	}
 	p.Privkeys = strings.Split(privkeys, ",")
 	switch mode {
 	case "stop-ratio-distribution":
@@ -270,24 +307,33 @@ func main() {
 	default:
 		os.Exit(1)
 	}
+	if p.PaymentReceiver == "" {
+		fmt.Fprintln(os.Stderr, "Payment receiver not specified")
+		os.Exit(2)
+	}
 	encoder := json.NewEncoder(os.Stdout)
+	_ = encoder.Encode("Funding keys for the experiment")
+	writeCommand := func(cmd Command) {
+		if cmd.comment != "" {
+			if err := encoder.Encode(cmd.comment); err != nil {
+				fmt.Fprintf(os.Stderr, "Error writing comment: %v\n", err)
+				os.Exit(3)
+			}
+		}
+		if err := encoder.Encode(cmd); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing command: %v\n", err)
+			os.Exit(3)
+		}
+	}
 	cmds := []Command{}
 	for r := 0; r < p.Rounds; r++ {
 		round := p.Generate(r)
 		cmds = append(cmds, round.Commands...)
 		for _, cmd := range round.FundCommands {
-			err := encoder.Encode(cmd)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error writing fund command: %v\n", err)
-				os.Exit(3)
-			}
+			writeCommand(cmd)
 		}
 	}
 	for _, cmd := range cmds {
-		err := encoder.Encode(cmd)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error writing command: %v\n", err)
-			os.Exit(3)
-		}
+		writeCommand(cmd)
 	}
 }

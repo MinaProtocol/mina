@@ -52,6 +52,7 @@ type AppConfig struct {
 	MinaExec         string `json:",omitempty"`
 	SlotDurationMs   int
 	GenesisTimestamp itn_json_types.Time
+	ControlExec      string `json:",omitempty"`
 }
 
 func loadAppConfig() (res AppConfig) {
@@ -74,6 +75,23 @@ func loadAppConfig() (res AppConfig) {
 		return
 	}
 	return
+}
+
+type CommandOrComment struct {
+	command *lib.Command
+	comment string
+}
+
+func (v *CommandOrComment) UnmarshalJSON(data []byte) error {
+	if err := json.Unmarshal(data, &v.comment); err == nil {
+		return nil
+	}
+	cmd := lib.Command{}
+	if err := json.Unmarshal(data, &cmd); err != nil {
+		return err
+	}
+	v.command = &cmd
+	return nil
 }
 
 func main() {
@@ -106,6 +124,7 @@ func main() {
 		NodeData:         nodeData,
 		SlotDurationMs:   appConfig.SlotDurationMs,
 		GenesisTimestamp: time.Time(appConfig.GenesisTimestamp),
+		ControlExec:      appConfig.ControlExec,
 	}
 	if config.MinaExec == "" {
 		config.MinaExec = "mina"
@@ -117,15 +136,21 @@ func main() {
 		OutputCache: outCache,
 	}
 	inDecoder := json.NewDecoder(os.Stdin)
-	for step := 0; ; step++ {
-		var cmd lib.Command
-		if err := inDecoder.Decode(&cmd); err != nil {
+	step := 0
+	for {
+		var commandOrComment CommandOrComment
+		if err := inDecoder.Decode(&commandOrComment); err != nil {
 			if err != io.EOF {
 				log.Errorf("Error decoding command for step %d: %v", step, err)
 				os.Exit(5)
 			}
 			break
 		}
+		if commandOrComment.command == nil {
+			fmt.Fprintln(os.Stderr, commandOrComment.comment)
+			continue
+		}
+		cmd := *commandOrComment.command
 		params, err := lib.ResolveParams(rconfig, step, cmd.Params)
 		if err != nil {
 			log.Errorf("Error resolving params for step %d: %v", step, err)
@@ -175,5 +200,6 @@ func main() {
 			os.Exit(9)
 			return
 		}
+		step++
 	}
 }
