@@ -874,14 +874,6 @@ module Make (L : Ledger_intf.S) :
     in
     (* Fee-payer information *)
     let fee_payer = Signed_command.fee_payer user_command in
-    let%bind () =
-      Result.ok_if_true
-        (Public_key.Compressed.equal signer_pk
-           (Account_id.public_key fee_payer) )
-        ~error:
-          (Error.of_string
-             "signer public key does not match fee payer public key" )
-    in
     let%bind fee_payer_location, fee_payer_account =
       pay_fee ~user_command ~signer_pk ~ledger ~current_global_slot
     in

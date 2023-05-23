@@ -969,12 +969,12 @@ let%test_module "Transaction union tests" =
               in
               let fee = Fee.of_nanomina_int_exn 1_000_000_000 in
               let amount = Amount.of_nanomina_int_exn 5_000_000_000 in
-              ignore @@ test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
-                  ~fee_payer_pk ~fee_token:token_id
-                  ~expected_failure:
-                    [Transaction_status.Failure.Source_insufficient_balance]
-                  (Payment { receiver_pk; amount })))
-              
+              ignore
+              @@ test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
+                   ~fee_payer_pk ~fee_token:token_id
+                   ~expected_failure:
+                     [ Transaction_status.Failure.Source_insufficient_balance ]
+                   (Payment { receiver_pk; amount }) ) )
 
     let%test_unit "Payment with insufficient account creation fee- untimed" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -989,12 +989,14 @@ let%test_module "Transaction union tests" =
               in
               let fee = Fee.of_nanomina_int_exn 1_000_000_000 in
               let amount = Amount.of_nanomina_int_exn 1 in
-              ignore @@ test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
-                  ~fee_payer_pk ~fee_token:token_id
-                  ~expected_failure:
-                    [Transaction_status.Failure
-                    .Amount_insufficient_to_create_account]
-                  (Payment { receiver_pk; amount })))
+              ignore
+              @@ test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
+                   ~fee_payer_pk ~fee_token:token_id
+                   ~expected_failure:
+                     [ Transaction_status.Failure
+                       .Amount_insufficient_to_create_account
+                     ]
+                   (Payment { receiver_pk; amount }) ) )
 
     let%test_unit "timed account - transactions" =
       Test_util.with_randomness 123456789 (fun () ->
