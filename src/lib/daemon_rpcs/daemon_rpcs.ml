@@ -313,3 +313,77 @@ module Get_object_lifetime_statistics = struct
     Rpc.Rpc.create ~name:"Get_object_lifetime_statistics" ~version:0 ~bin_query
       ~bin_response
 end
+
+(* Precomputed block writer *)
+
+module Set_dump_dir = struct
+  type query = string * string option [@@deriving bin_io_unversioned]
+
+  type response = unit [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Set_dump_dir" ~version:0 ~bin_query ~bin_response
+end
+
+module Set_dump_file = struct
+  type query = string [@@deriving bin_io_unversioned]
+
+  type response = unit [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Set_dump_file" ~version:0 ~bin_query ~bin_response
+end
+
+module Start_logging = struct
+  type query = unit [@@deriving bin_io_unversioned]
+
+  type response = unit [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Start_logging" ~version:0 ~bin_query ~bin_response
+end
+
+module Set_uploading = struct
+  type query = string * string * string option [@@deriving bin_io_unversioned]
+
+  type response = unit [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Set_uploading" ~version:0 ~bin_query ~bin_response
+end
+
+module Stop_appending = struct
+  type query = unit [@@deriving bin_io_unversioned]
+
+  type response = unit [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Stop_appending" ~version:0 ~bin_query ~bin_response
+end
+
+module Stop_dumping = struct
+  type query = unit [@@deriving bin_io_unversioned]
+
+  type response = unit [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Stop_dumping" ~version:0 ~bin_query ~bin_response
+end
+
+module Stop_logging = struct
+  type query = unit [@@deriving bin_io_unversioned]
+
+  type response = unit [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Stop_logging" ~version:0 ~bin_query ~bin_response
+end
+
+module Stop_uploading = struct
+  type query = unit [@@deriving bin_io_unversioned]
+
+  type response = unit [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Stop_uploading" ~version:0 ~bin_query ~bin_response
+end

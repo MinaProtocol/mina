@@ -193,6 +193,32 @@ module Status = struct
     [@@deriving to_yojson, bin_io_unversioned, fields]
   end
 
+  module Precomputed_block_writer = struct
+    module Dumping = struct
+      type t = { dir : string; network : string }
+      [@@deriving to_yojson, bin_io_unversioned, fields]
+    end
+  
+    module Uploading = struct
+      type t =
+        { bucket : string
+        ; keyfile : string
+        ; network : string
+        }
+      [@@deriving to_yojson, bin_io_unversioned, fields]
+    end
+    
+    type t =
+      { mutable appending : string option
+      ; mutable dumping : Dumping.t option
+      ; mutable logging : bool
+      ; mutable uploading : Uploading.t option
+      }
+    [@@deriving to_yojson, bin_io_unversioned, fields]
+
+    let uploading t = t.uploading
+  end
+
   module Make_entries (FieldT : sig
     type 'a t
 
@@ -427,6 +453,35 @@ module Status = struct
         |> digest_entries ~title:""
       in
       map_entry "Metrics" ~f:render
+
+    let precomputed_block_writer =
+      let render conf =
+        let fmt_field name op field = [ (name, op (Field.get field conf)) ] in
+        let open Printf in
+        let open Precomputed_block_writer in
+        let dumping =
+          let open Dumping in
+          fmt_field "dump_dir" (function
+            | Some dump -> sprintf "{ network: %s, dir: %s }" dump.network dump.dir
+            | None -> "...not dumping" )
+        in
+        let appending = fmt_field "appending" (function
+            | Some path -> path
+            | None -> "...not appending")
+        in
+        let logging = fmt_field "logging" Bool.to_string in
+        let uploading =
+          let open Uploading in
+          fmt_field "uploading" (function
+            | Some upload -> sprintf "{ network: %s, bucket: %s }" upload.network upload.bucket
+            | None -> "...not uploading")
+        in
+        Fields.to_list ~appending ~dumping ~logging ~uploading
+        |> List.concat
+        |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
+        |> digest_entries ~title:""
+      in
+      option_entry "Precomputed block writing" ~f:render
   end
 
   type t =
@@ -460,6 +515,7 @@ module Status = struct
     ; consensus_configuration : Consensus.Configuration.Stable.Latest.t
     ; addrs_and_ports : Node_addrs_and_ports.Display.Stable.Latest.t
     ; metrics : Metrics.t
+    ; precomputed_block_writer : Precomputed_block_writer.t option
     }
   [@@deriving to_yojson, bin_io_unversioned, fields]
 
@@ -477,7 +533,7 @@ module Status = struct
       ~coinbase_receiver ~histograms ~consensus_time_best_tip
       ~global_slot_since_genesis_best_tip ~consensus_time_now
       ~consensus_mechanism ~consensus_configuration ~next_block_production
-      ~snark_work_fee ~addrs_and_ports ~catchup_status ~metrics
+      ~snark_work_fee ~addrs_and_ports ~catchup_status ~metrics ~precomputed_block_writer
     |> List.filter_map ~f:Fn.id
 
   let to_text (t : t) =
