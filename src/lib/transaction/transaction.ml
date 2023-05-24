@@ -143,3 +143,10 @@ let valid_size ~genesis_constants (t : t) =
       User_command.valid_size ~genesis_constants cmd
   | Fee_transfer _ | Coinbase _ ->
       Ok ()
+
+let check_well_formedness ~genesis_constants (t : t) =
+  match t with
+  | Command cmd ->
+      User_command.check_well_formedness ~genesis_constants cmd
+  | Fee_transfer _ | Coinbase _ ->
+      Ok ()
