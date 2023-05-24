@@ -94,14 +94,16 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta> {
             },
         };
 
-        // TODO dummy_lookup_value ?
-        // TODO: num_chunks
-        let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true, 1);
+        let max_poly_size = index.max_poly_size as usize;
 
-        let zk_rows = 3;
+        let zk_rows = 3; // zk_rows set to default value
+
+        let (linearization, powers_of_alpha) =
+            expr_linearization(Some(&feature_flags), true, zk_rows as usize);
+
         VerifierIndex::<Vesta> {
             domain,
-            max_poly_size: index.max_poly_size as usize,
+            max_poly_size,
             zk_rows,
             public: index.public as usize,
             prev_challenges: index.prev_challenges as usize,

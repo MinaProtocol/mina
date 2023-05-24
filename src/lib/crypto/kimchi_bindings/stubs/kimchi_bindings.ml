@@ -114,12 +114,14 @@ module Protocol = struct
            t
         -> int
         -> Pasta_bindings.Fp.t array
+        -> int
         -> Pasta_bindings.Fq.t Kimchi_types.or_infinity Kimchi_types.poly_comm
         = "caml_fp_srs_commit_evaluations"
 
       external b_poly_commitment :
            t
         -> Pasta_bindings.Fp.t array
+        -> int
         -> Pasta_bindings.Fq.t Kimchi_types.or_infinity Kimchi_types.poly_comm
         = "caml_fp_srs_b_poly_commitment"
 
@@ -163,12 +165,14 @@ module Protocol = struct
            t
         -> int
         -> Pasta_bindings.Fq.t array
+        -> int
         -> Pasta_bindings.Fp.t Kimchi_types.or_infinity Kimchi_types.poly_comm
         = "caml_fq_srs_commit_evaluations"
 
       external b_poly_commitment :
            t
         -> Pasta_bindings.Fq.t array
+        -> int
         -> Pasta_bindings.Fp.t Kimchi_types.or_infinity Kimchi_types.poly_comm
         = "caml_fq_srs_b_poly_commitment"
 
