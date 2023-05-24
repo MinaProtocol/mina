@@ -39,52 +39,87 @@ func ZkappKeygenRequirements(params ZkappSubParams) (int, uint64) {
 	return keys, balance
 }
 
-func SendZkappCommands(config Config, params ZkappCommandParams, output func(ScheduledZkappCommandsReceipt)) error {
-	tps, nodes := selectNodes(params.Tps, params.MinTps, params.Nodes)
-	zkappsToDeploy, accountQueueSize := params.ZkappsToDeploy, params.AccountQueueSize
-	feePayersPerNode := len(params.FeePayers) / len(nodes)
+func scheduleZkappCommandsDo(config Config, params ZkappCommandParams, nodeAddress NodeAddress, batchIx int, tps float64, zkappsToDeploy, accountQueueSize int, feePayers []itn_json_types.MinaPrivateKey) (string, error) {
+	paymentInput := ZkappCommandsDetails{
+		MemoPrefix:            fmt.Sprintf("%s-%d", params.ExperimentName, batchIx),
+		DurationInMinutes:     params.DurationInMinutes,
+		TransactionsPerSecond: tps,
+		NumZkappsToDeploy:     zkappsToDeploy,
+		NumNewAccounts:        params.NewAccounts,
+		FeePayers:             feePayers,
+		NoPrecondition:        params.NoPrecondition,
+		MinBalanceChange:      formatMina(params.MinBalanceChange),
+		MaxBalanceChange:      formatMina(params.MaxBalanceChange),
+		InitBalance:           formatMina(1e10 * uint64(params.NewAccounts+1)),
+		MinFee:                formatMina(params.MinFee),
+		MaxFee:                formatMina(params.MaxFee),
+		DeploymentFee:         formatMina(params.DeploymentFee),
+		AccountQueueSize:      accountQueueSize,
+		MaxCost:               params.MaxCost,
+	}
+	handle, err := ScheduleZkappCommands(config, nodeAddress, paymentInput)
+	if err == nil {
+		config.Log.Infof("scheduled zkapp batch %d with tps %f for %s: %s", batchIx, tps, nodeAddress, handle)
+	}
+	return handle, nil
+}
+
+func zkappParams(params ZkappCommandParams, tps float64) (zkappsToDeploy int, accountQueueSize int) {
+	zkappsToDeploy, accountQueueSize = params.ZkappsToDeploy, params.AccountQueueSize
 	if zkappsToDeploy == 0 {
-		if params.Gap == 0 {
-			return errors.New("either zkappsToDeploy or gap parameters should be specified")
-		}
-		gap := params.Gap
-		tpsGap := int(math.Round(tps * float64(gap)))
+		tpsGap := int(math.Round(tps * float64(params.Gap)))
 		zkappsToDeploy, accountQueueSize = tpsGap*4, tpsGap*3
 	}
-	initBalance := 1e10 * uint64(params.NewAccounts+1)
+	return
+}
+
+func SendZkappCommands(config Config, params ZkappCommandParams, output func(ScheduledZkappCommandsReceipt)) error {
+	if params.ZkappsToDeploy == 0 && params.Gap == 0 {
+		return errors.New("either zkappsToDeploy or gap parameters should be specified")
+	}
+	tps, nodes := selectNodes(params.Tps, params.MinTps, params.Nodes)
+	feePayersPerNode := len(params.FeePayers) / len(nodes)
+	zkappsToDeploy, accountQueueSize := zkappParams(params, tps)
+	successfulNodes := make([]NodeAddress, 0, len(nodes))
+	remTps := params.Tps
+	remFeePayers := params.FeePayers
+	var err error
 	for nodeIx, nodeAddress := range nodes {
-		paymentInput := ZkappCommandsDetails{
-			MemoPrefix:            params.ExperimentName,
-			DurationInMinutes:     params.DurationInMinutes,
-			TransactionsPerSecond: tps,
-			NumZkappsToDeploy:     zkappsToDeploy,
-			NumNewAccounts:        params.NewAccounts,
-			FeePayers:             params.FeePayers[nodeIx*feePayersPerNode : (nodeIx+1)*feePayersPerNode],
-			NoPrecondition:        params.NoPrecondition,
-			MinBalanceChange:      formatMina(params.MinBalanceChange),
-			MaxBalanceChange:      formatMina(params.MaxBalanceChange),
-			InitBalance:           formatMina(initBalance),
-			MinFee:                formatMina(params.MinFee),
-			MaxFee:                formatMina(params.MaxFee),
-			DeploymentFee:         formatMina(params.DeploymentFee),
-			AccountQueueSize:      accountQueueSize,
-			MaxCost:               params.MaxCost,
-		}
-		client, err := config.GetGqlClient(config.Ctx, nodeAddress)
+		feePayers := remFeePayers[:feePayersPerNode]
+		var handle string
+		handle, err = scheduleZkappCommandsDo(config, params, nodeAddress, len(successfulNodes), tps, zkappsToDeploy, accountQueueSize, feePayers)
 		if err != nil {
-			return fmt.Errorf("error allocating client for %s: %v", nodeAddress, err)
+			config.Log.Warnf("error scheduling zkapp txs for %s: %v", nodeAddress, err)
+			n := len(nodes) - nodeIx - 1
+			tps = remTps / float64(n)
+			feePayersPerNode = len(remFeePayers) / n
+			zkappsToDeploy, accountQueueSize = zkappParams(params, tps)
+			continue
 		}
-		handle, err := ScheduleZkappCommands(config.Ctx, client, paymentInput)
-		if err != nil {
-			return fmt.Errorf("error scheduling payments to %s: %v", nodeAddress, err)
-		}
+		successfulNodes = append(successfulNodes, nodeAddress)
+		remFeePayers = remFeePayers[feePayersPerNode:]
+		remTps -= tps
 		output(ScheduledZkappCommandsReceipt{
 			Address: nodeAddress,
 			Handle:  handle,
 		})
-		config.Log.Infof("scheduled payments for %s: %s", nodeAddress, handle)
 	}
-	return nil
+	if err != nil {
+		// last schedule payment request didn't work well
+		for _, nodeAddress := range successfulNodes {
+			handle, err2 := scheduleZkappCommandsDo(config, params, nodeAddress, len(successfulNodes), tps, zkappsToDeploy, accountQueueSize, remFeePayers)
+			if err2 != nil {
+				config.Log.Warnf("error scheduling second batch of zkapp txs for %s: %v", nodeAddress, err2)
+				continue
+			}
+			output(ScheduledZkappCommandsReceipt{
+				Address: nodeAddress,
+				Handle:  handle,
+			})
+			return nil
+		}
+	}
+	return err
 }
 
 type ZkappCommandsAction struct{}

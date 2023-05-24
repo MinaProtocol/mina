@@ -117,7 +117,7 @@ func main() {
 	config := lib.Config{
 		Ctx:              ctx,
 		UptimeBucket:     client.Bucket(appConfig.UptimeBucket),
-		GetGqlClient:     lib.GetGqlClient(ed25519.PrivateKey(appConfig.Key), nodeData),
+		Sk:               ed25519.PrivateKey(appConfig.Key),
 		Log:              log,
 		Daemon:           appConfig.Daemon,
 		MinaExec:         appConfig.MinaExec,

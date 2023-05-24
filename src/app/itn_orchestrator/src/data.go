@@ -2,6 +2,7 @@ package itn_orchestrator
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"time"
 
@@ -34,12 +35,13 @@ type NodeEntry struct {
 	Libp2pPort      uint16
 	PeerId          string
 	IsBlockProducer bool
+	LastStatusCode  *int
 }
 
 type Config struct {
 	Ctx              context.Context
 	UptimeBucket     *storage.BucketHandle
-	GetGqlClient     GetGqlClientF
+	Sk               ed25519.PrivateKey
 	Log              logging.StandardLogger
 	Daemon           string
 	MinaExec         string

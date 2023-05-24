@@ -67,7 +67,7 @@ func DiscoverParticipants(config Config, params DiscoveryParams, output func(Nod
 		if _, has := cache[addr]; has {
 			continue
 		}
-		_, err = config.GetGqlClient(ctx, addr)
+		_, _, err = GetGqlClient(config, addr)
 		if err != nil {
 			log.Errorf("Error on auth for %s: %v", addr, err)
 			continue

@@ -2,7 +2,6 @@ package itn_orchestrator
 
 import (
 	"encoding/json"
-	"fmt"
 )
 
 type SlotsWonParams struct {
@@ -16,14 +15,10 @@ type SlotsWonOutput struct {
 
 func SlotsWon(config Config, params SlotsWonParams, output func(SlotsWonOutput)) error {
 	for _, address := range params.Participants {
-		client, err := config.GetGqlClient(config.Ctx, address)
-		if err != nil {
-			return fmt.Errorf("failed to create a client for %s: %v", address, err)
-		}
-		if config.NodeData[address].IsBlockProducer {
-			resp, err := SlotsWonGql(config.Ctx, client)
+		resp, slotsQueried, err := SlotsWonGql(config, address)
+		if slotsQueried {
 			if err != nil {
-				return fmt.Errorf("failed to get slots for %s: %v", address, err)
+				return err
 			}
 			output(SlotsWonOutput{SlotsWon: resp, Address: address})
 		} else {

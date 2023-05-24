@@ -36,35 +36,66 @@ func PaymentKeygenRequirements(gap int, params PaymentSubParams) (int, uint64) {
 	return keys, balance
 }
 
+func schedulePaymentsDo(config Config, params PaymentParams, nodeAddress NodeAddress, batchIx int, tps float64, feePayers []itn_json_types.MinaPrivateKey) (string, error) {
+	paymentInput := PaymentsDetails{
+		DurationInMinutes:     params.DurationInMinutes,
+		TransactionsPerSecond: tps,
+		Memo:                  fmt.Sprintf("%s-%d", params.ExperimentName, batchIx),
+		FeeMax:                params.FeeMax,
+		FeeMin:                params.FeeMin,
+		Amount:                params.Amount,
+		Receiver:              params.Receiver,
+		Senders:               feePayers,
+	}
+	handle, err := SchedulePaymentsGql(config, nodeAddress, paymentInput)
+	if err == nil {
+		config.Log.Infof("scheduled payment batch %d with tps %f for %s: %s", batchIx, tps, nodeAddress, handle)
+	}
+	return handle, err
+}
+
 func SchedulePayments(config Config, params PaymentParams, output func(ScheduledPaymentsReceipt)) error {
 	tps, nodes := selectNodes(params.Tps, params.MinTps, params.Nodes)
-	sendersPerNode := len(params.Senders) / len(nodes)
+	feePayersPerNode := len(params.Senders) / len(nodes)
+	successfulNodes := make([]NodeAddress, 0, len(nodes))
+	remTps := params.Tps
+	remFeePayers := params.Senders
+	var err error
 	for nodeIx, nodeAddress := range nodes {
-		paymentInput := PaymentsDetails{
-			DurationInMinutes:     params.DurationInMinutes,
-			TransactionsPerSecond: tps,
-			Memo:                  fmt.Sprintf("%s-%d", params.ExperimentName, nodeIx),
-			FeeMax:                params.FeeMax,
-			FeeMin:                params.FeeMin,
-			Amount:                params.Amount,
-			Receiver:              params.Receiver,
-			Senders:               params.Senders[nodeIx*sendersPerNode : (nodeIx+1)*sendersPerNode],
-		}
-		client, err := config.GetGqlClient(config.Ctx, nodeAddress)
+		feePayers := remFeePayers[:feePayersPerNode]
+		var handle string
+		handle, err = schedulePaymentsDo(config, params, nodeAddress, len(successfulNodes), tps, feePayers)
 		if err != nil {
-			return fmt.Errorf("error allocating client for %s: %v", nodeAddress, err)
+			config.Log.Warnf("error scheduling payments for %s: %v", nodeAddress, err)
+			n := len(nodes) - nodeIx - 1
+			tps = remTps / float64(n)
+			feePayersPerNode = len(remFeePayers) / n
+			continue
 		}
-		handle, err := SchedulePaymentsGql(config.Ctx, client, paymentInput)
-		if err != nil {
-			return fmt.Errorf("error scheduling payments to %s: %v", nodeAddress, err)
-		}
+		successfulNodes = append(successfulNodes, nodeAddress)
+		remFeePayers = remFeePayers[feePayersPerNode:]
+		remTps -= tps
 		output(ScheduledPaymentsReceipt{
 			Address: nodeAddress,
 			Handle:  handle,
 		})
-		config.Log.Infof("scheduled payments for %s: %s", nodeAddress, handle)
 	}
-	return nil
+	if err != nil {
+		// last schedule payment request didn't work well
+		for _, nodeAddress := range successfulNodes {
+			handle, err2 := schedulePaymentsDo(config, params, nodeAddress, len(successfulNodes), tps, remFeePayers)
+			if err2 != nil {
+				config.Log.Warnf("error scheduling second batch of payments for %s: %v", nodeAddress, err2)
+				continue
+			}
+			output(ScheduledPaymentsReceipt{
+				Address: nodeAddress,
+				Handle:  handle,
+			})
+			return nil
+		}
+	}
+	return err
 }
 
 type PaymentsAction struct{}
