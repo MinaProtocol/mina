@@ -460,6 +460,30 @@ module Types = struct
                ~transaction_pool_diff_broadcasted:nn_int
                ~transactions_added_to_pool:nn_int ~transaction_pool_size:nn_int )
 
+    let precomputed_block_dumping : (_, Daemon_rpcs.Types.Status.Precomputed_block_writer.Dumping.t option) typ =
+      obj "PrecomputedBlockDumping" ~fields:(fun _ ->
+        let open Reflection.Shorthand in
+        let open Daemon_rpcs.Types.Status.Precomputed_block_writer in
+        List.rev
+        @@ Dumping.Fields.fold ~init:[] ~dir:nn_string ~network:nn_string )
+
+    let precomputed_block_uploading : (_, Daemon_rpcs.Types.Status.Precomputed_block_writer.Uploading.t option) typ =
+      obj "PrecomputedBlockDumping" ~fields:(fun _ ->
+        let open Reflection.Shorthand in
+        let open Daemon_rpcs.Types.Status.Precomputed_block_writer in
+        List.rev
+        @@ Uploading.Fields.fold ~init:[] ~bucket:nn_string ~keyfile:nn_string ~network:nn_string )
+
+    let precomputed_block_writer : (_, Daemon_rpcs.Types.Status.Precomputed_block_writer.t option) typ =
+      obj "PrecomputedBlockWriter" ~fields:(fun _ ->
+          let open Reflection.Shorthand in
+          let open Daemon_rpcs.Types.Status.Precomputed_block_writer in
+          List.rev
+          @@ Fields.fold ~init:[]
+               ~appending:string ~logging:nn_bool
+               ~dumping:(id ~typ:precomputed_block_dumping)
+               ~uploading:(id ~typ:precomputed_block_uploading) )
+
     let t : (_, Daemon_rpcs.Types.Status.t option) typ =
       obj "DaemonStatus" ~fields:(fun _ ->
           let open Reflection.Shorthand in
@@ -487,7 +511,8 @@ module Types = struct
                  (id ~typ:(non_null consensus_configuration))
                ~highest_block_length_received:nn_int
                ~highest_unvalidated_block_length_received:nn_int
-               ~metrics:(id ~typ:(non_null metrics)) )
+               ~metrics:(id ~typ:(non_null metrics))
+               ~precomputed_block_writer:(id ~typ:precomputed_block_writer) )
   end
 
   let fee_transfer =
