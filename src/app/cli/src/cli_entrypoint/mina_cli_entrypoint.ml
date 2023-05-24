@@ -380,20 +380,23 @@ let setup_daemon logger =
          with full proving (full), snark-testing with dummy proofs (check), or \
          dummy proofs (none)"
   and plugins = plugin_flag
-  and precomputed_blocks_path =
-    flag "--precomputed-blocks-path"
-      ~aliases:[ "precomputed-blocks-path" ]
-      (optional string)
-      ~doc:
-        "PATH Path to write precomputed blocks to, for replay or archiving. If \
-         path is a directory, precomputed blocks will be logged to individual \
-         files within this directory. If path is a file, they will be appended \
-         to this file. Otherwise, precomputed blocks will not be dumped."
   and log_precomputed_blocks =
     flag "--log-precomputed-blocks"
       ~aliases:[ "log-precomputed-blocks" ]
       (optional_with_default false bool)
       ~doc:"true|false Include precomputed blocks in the log (default: false)"
+  and precomputed_blocks_file =
+    flag "--precomputed-blocks-file"
+      ~aliases:[ "precomputed-blocks-file" ]
+      (optional string)
+      ~doc:
+        "PATH File to append precomputed blocks to, for replay or archiving."
+  and precomputed_blocks_dir =
+    flag "--precomputed-blocks-dir"
+      ~aliases:[ "precomputed-blocks-dir" ]
+      (optional string)
+      ~doc:
+        "PATH Directory to dump precomputed blocks to."
   and block_reward_threshold =
     flag "--minimum-block-reward" ~aliases:[ "minimum-block-reward" ]
       ~doc:
@@ -1321,10 +1324,12 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~consensus_local_state ~is_archive_rocksdb
                  ~work_reassignment_wait ~archive_process_location
                  ~log_block_creation ~precomputed_values ~start_time
-                 ?precomputed_blocks_path ~log_precomputed_blocks
+                 ?precomputed_blocks_file ?precomputed_blocks_dir
+                 ~log_precomputed_blocks
                  ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
                  ~uptime_submitter_keypair ~stop_time ~node_status_url
-                 ~graphql_control_port:itn_graphql_port () )
+                 ~graphql_control_port:itn_graphql_port ()
+                 ~precomputed_block_writer:Mina_lib.empty )
           in
           { mina
           ; client_trustlist
