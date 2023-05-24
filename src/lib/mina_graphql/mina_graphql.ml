@@ -1732,7 +1732,6 @@ module Types = struct
             |> Account.Nonce.to_int )
       ; field_no_status "source" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account that the command is sent from"
-          ~deprecated:(Deprecated (Some "use fee payer field instead"))
           ~resolve:(fun { ctx = mina; _ } cmd ->
             AccountObj.get_best_ledger_account mina
               (Signed_command.fee_payer cmd.With_hash.data) )
@@ -1743,6 +1742,7 @@ module Types = struct
               (Signed_command.receiver cmd.With_hash.data) )
       ; field_no_status "feePayer" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account that pays the fees for the command"
+          ~deprecated:(Deprecated (Some "use source field instead"))
           ~resolve:(fun { ctx = mina; _ } cmd ->
             AccountObj.get_best_ledger_account mina
               (Signed_command.fee_payer cmd.With_hash.data) )
@@ -1845,9 +1845,7 @@ module Types = struct
     let stake_delegation =
       obj "UserCommandDelegation" ~fields:(fun _ ->
           field_no_status "delegator" ~typ:(non_null AccountObj.account)
-            ~args:[]
-            ~deprecated:(Deprecated (Some "use fee payer field instead"))
-            ~resolve:(fun { ctx = mina; _ } cmd ->
+            ~args:[] ~resolve:(fun { ctx = mina; _ } cmd ->
               AccountObj.get_best_ledger_account mina
                 (Signed_command.fee_payer cmd.With_hash.data) )
           :: field_no_status "delegatee" ~typ:(non_null AccountObj.account)
