@@ -12,13 +12,8 @@ module Snark_worker_config = struct
     }
 end
 
-module Precomputed_block_writer = Daemon_rpcs.Types.Status.Precomputed_block_writer
-(* type precomputed_block_writer = Daemon_rpcs.Types.Status.Precomputed_block_writer.t =
-  { appending : string option
-  ; dumping : Dumping.t option
-  ; logging : bool
-  ; uploading : Uploading.t option
-  } *)
+module Precomputed_block_writer =
+  Daemon_rpcs.Types.Status.Precomputed_block_writer
 
 (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
 type t =

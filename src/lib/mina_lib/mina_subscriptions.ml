@@ -98,18 +98,29 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
               Pipe.write_without_pushback writer { With_hash.data; hash } ) )
       ~if_not_found:ignore
   in
-  Option.iter (Daemon_rpcs.Types.Status.Precomputed_block_writer.uploading precomputed_block_writer) ~f:(fun { keyfile; _ } ->
+  let module Precomputed_block_writer =
+    Daemon_rpcs.Types.Status.Precomputed_block_writer
+  in
+  Option.iter (Precomputed_block_writer.uploading precomputed_block_writer)
+    ~f:(fun { keyfile; _ } ->
       ignore
         ( Core.Sys.command
-            (sprintf "gcloud auth activate-service-account --key-file=%s" keyfile)
+            (sprintf "gcloud auth activate-service-account --key-file=%s"
+               keyfile )
           : int ) ) ;
   O1trace.background_thread "process_new_block_subscriptions" (fun () ->
       Strict_pipe.Reader.iter new_blocks ~f:(fun new_block_validated ->
           let new_block = Mina_block.Validated.forget new_block_validated in
           let new_block_no_hash = With_hash.data new_block in
           let hash = State_hash.With_state_hashes.state_hash new_block in
-          (let { Daemon_rpcs.Types.Status.Precomputed_block_writer.appending; dumping; logging; uploading } = precomputed_block_writer in
-            match Broadcast_pipe.Reader.peek transition_frontier with
+          (let { Precomputed_block_writer.appending
+               ; dumping
+               ; logging
+               ; uploading
+               } =
+             precomputed_block_writer
+           in
+           match Broadcast_pipe.Reader.peek transition_frontier with
            | None ->
                [%log warn]
                  "Transition frontier not available when creating precomputed \
@@ -149,130 +160,132 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                         Mina_block.Precomputed.to_yojson precomputed_block )
                    in
                    (* Upload precomputed blocks to gcloud *)
-                   (* TODO Option.iter uploading ~f:... *)
                    Option.iter uploading ~f:(fun info ->
-                     let json =
-                       Yojson.Safe.to_string (Lazy.force precomputed_block)
-                     in
-                     let hash_string = State_hash.to_base58_check hash in
-                         let height =
-                           Mina_block.blockchain_length new_block_no_hash
-                           |> Mina_numbers.Length.to_string
-                         in
-                         [%log info]
-                           ~metadata:
-                             [ ("hash", `String hash_string)
-                             ; ("bucket", `String info.bucket)
-                             ; ("height", `String height)
-                             ]
-                           "Uploading precomputed block with $height and $hash to gcloud \
-                            $bucket" ;
-                         let name =
-                           sprintf "%s-%s-%s.json" info.network height hash_string
-                         in
-                         (* TODO: Use a pipe to queue this if these are building up *)
-                         don't_wait_for
-                           ( Mina_metrics.(
-                               Gauge.inc_one
-                                 Block_latency.Upload_to_gcloud
-                                 .upload_to_gcloud_blocks) ;
-                             let tmp_file =
-                               Core.Filename.temp_file ~in_dir:"/tmp"
-                                 "upload_block_file" ""
-                             in
-                             let f = Stdlib.open_out tmp_file in
-                             fprintf f "%s" json ;
-                             Stdlib.close_out f ;
-                             let command =
-                               Printf.sprintf "gsutil cp -n %s gs://%s/%s"
-                                 tmp_file info.bucket name
-                             in
-                             let%map output =
-                               (* This double-wrapping of [try_with]s is protection
-                                  against both immediate exceptions in process setup
-                                  and exceptions in the 'deferred' part of setup.
-                                  We also attach 'tags' to the errors below, so that we
-                                  we have information about which of these different
-                                  kinds of exception were seen, if any.
-                               *)
-                               Deferred.Or_error.try_with_join ~here:[%here]
-                                 (fun () ->
-                                   Or_error.try_with (fun () ->
-                                       Async.Process.run () ~prog:"bash"
-                                         ~args:[ "-c"; command ]
-                                       |> Deferred.Result.map_error
-                                            ~f:(Error.tag ~tag:__LOC__) )
-                                   |> Result.map_error
-                                        ~f:(Error.tag ~tag:__LOC__)
-                                   |> Deferred.return |> Deferred.Or_error.join )
-                             in
-                             ( match output with
-                             | Ok _result ->
-                                 ()
-                             | Error e ->
-                                 [%log warn]
-                                   ~metadata:
-                                     [ ("error", Error_json.error_to_yojson e)
-                                     ; ("command", `String command)
-                                     ]
-                                   "Uploading block to gcloud with command \
-                                    $command failed: $error" ) ;
-                             Sys.remove tmp_file ;
-                             Mina_metrics.(
-                               Gauge.dec_one
-                                 Block_latency.Upload_to_gcloud
-                                 .upload_to_gcloud_blocks) ) ) ;
+                       let json =
+                         Yojson.Safe.to_string (Lazy.force precomputed_block)
+                       in
+                       let hash_string = State_hash.to_base58_check hash in
+                       let height =
+                         Mina_block.blockchain_length new_block_no_hash
+                         |> Mina_numbers.Length.to_string
+                       in
+                       [%log info]
+                         ~metadata:
+                           [ ("hash", `String hash_string)
+                           ; ("bucket", `String info.bucket)
+                           ; ("height", `String height)
+                           ]
+                         "Uploading precomputed block with $height and $hash \
+                          to gcloud $bucket" ;
+                       let name =
+                         sprintf "%s-%s-%s.json" info.network height hash_string
+                       in
+                       (* TODO: Use a pipe to queue this if these are building up *)
+                       don't_wait_for
+                         ( Mina_metrics.(
+                             Gauge.inc_one
+                               Block_latency.Upload_to_gcloud
+                               .upload_to_gcloud_blocks) ;
+                           let tmp_file =
+                             Core.Filename.temp_file ~in_dir:"/tmp"
+                               "upload_block_file" ""
+                           in
+                           let f = Stdlib.open_out tmp_file in
+                           fprintf f "%s" json ;
+                           Stdlib.close_out f ;
+                           let command =
+                             Printf.sprintf "gsutil cp -n %s gs://%s/%s"
+                               tmp_file info.bucket name
+                           in
+                           let%map output =
+                             (* This double-wrapping of [try_with]s is protection
+                                against both immediate exceptions in process setup
+                                and exceptions in the 'deferred' part of setup.
+                                We also attach 'tags' to the errors below, so that we
+                                we have information about which of these different
+                                kinds of exception were seen, if any.
+                             *)
+                             Deferred.Or_error.try_with_join ~here:[%here]
+                               (fun () ->
+                                 Or_error.try_with (fun () ->
+                                     Async.Process.run () ~prog:"bash"
+                                       ~args:[ "-c"; command ]
+                                     |> Deferred.Result.map_error
+                                          ~f:(Error.tag ~tag:__LOC__) )
+                                 |> Result.map_error ~f:(Error.tag ~tag:__LOC__)
+                                 |> Deferred.return |> Deferred.Or_error.join )
+                           in
+                           ( match output with
+                           | Ok _result ->
+                               ()
+                           | Error e ->
+                               [%log warn]
+                                 ~metadata:
+                                   [ ("error", Error_json.error_to_yojson e)
+                                   ; ("command", `String command)
+                                   ]
+                                 "Uploading block to gcloud with command \
+                                  $command failed: $error" ) ;
+                           Sys.remove tmp_file ;
+                           Mina_metrics.(
+                             Gauge.dec_one
+                               Block_latency.Upload_to_gcloud
+                               .upload_to_gcloud_blocks) ) ) ;
                    (* original logging functionality, appends to single file *)
                    Option.iter appending ~f:(fun path ->
-                      let json =
-                        Yojson.Safe.to_string (Lazy.force precomputed_block)
-                      in
-                      Out_channel.with_file ~append:true path
-                        ~f:(fun out_channel ->
-                          Out_channel.output_lines out_channel [ json ] ) ) ;
+                       let json =
+                         Yojson.Safe.to_string (Lazy.force precomputed_block)
+                       in
+                       Out_channel.with_file ~append:true path
+                         ~f:(fun out_channel ->
+                           Out_channel.output_lines out_channel [ json ] ) ) ;
                    (* dump precomputed blocks to local directory *)
                    Option.iter dumping ~f:(fun { dir; network } ->
-                        let json =
-                          Yojson.Safe.to_string (Lazy.force precomputed_block)
-                        in
-                        (* log precomputed blocks to individual files in the directory *)
-                            let hash_string = State_hash.to_base58_check hash in
-                            let height =
-                              Mina_block.blockchain_length new_block_no_hash
-                              |> Mina_numbers.Length.to_string
-                            in
-                            let name =
-                              sprintf "%s-%s-%s.json" network height hash_string
-                            in
-                            let path =
-                              Core.Filename.(parts dir @ [ name ] |> of_parts)
-                            in
-                            Out_channel.with_file ~append:false path
-                              ~f:(fun out_channel ->
-                                Out_channel.output_lines out_channel [ json ] ) ;
-                            Mina_metrics.(
-                               Counter.inc_one
-                                 Block_latency.Precomputed_block_dump.count ;
-                               Counter.inc
-                                 Block_latency.Precomputed_block_dump.bytes_written
-                                 (Float.of_int Bytes.(of_string json |> length) ) ) ;
-                            [%log info]
-                              ~metadata:
-                                [ ("height", `String height)
-                                ; ("hash", `String hash_string)
-                                ; ("dir", `String dir)
-                                ]
-                              "Logged precomputed block with $height and $hash to $dir" ) ;
+                       let json =
+                         Yojson.Safe.to_string (Lazy.force precomputed_block)
+                       in
+                       (* log precomputed blocks to individual files in the directory *)
+                       let hash_string = State_hash.to_base58_check hash in
+                       let height =
+                         Mina_block.blockchain_length new_block_no_hash
+                         |> Mina_numbers.Length.to_string
+                       in
+                       let name =
+                         sprintf "%s-%s-%s.json" network height hash_string
+                       in
+                       let path =
+                         Core.Filename.(parts dir @ [ name ] |> of_parts)
+                       in
+                       Out_channel.with_file ~append:false path
+                         ~f:(fun out_channel ->
+                           Out_channel.output_lines out_channel [ json ] ) ;
+                       Mina_metrics.(
+                         Counter.inc_one
+                           Block_latency.Precomputed_block_dump.count ;
+                         Counter.inc
+                           Block_latency.Precomputed_block_dump.bytes_written
+                           (Float.of_int Bytes.(of_string json |> length))) ;
+                       [%log info]
+                         ~metadata:
+                           [ ("height", `String height)
+                           ; ("hash", `String hash_string)
+                           ; ("dir", `String dir)
+                           ]
+                         "Logged precomputed block with $height and $hash to \
+                          $dir" ) ;
                    if logging then
                      [%log info] "Saw block with state hash $state_hash"
                        ~metadata:
-                         [ ( "state_hash", `String (State_hash.to_base58_check hash) )
-                         ; ( "precomputed_block", Lazy.force precomputed_block )
+                         [ ( "state_hash"
+                           , `String (State_hash.to_base58_check hash) )
+                         ; ("precomputed_block", Lazy.force precomputed_block)
                          ] ;
                    if is_none appending && is_none dumping && not logging then
                      [%log info] "Saw block with state hash $state_hash"
                        ~metadata:
-                         [ ( "state_hash", `String (State_hash.to_base58_check hash) ) ] ) ) ;
+                         [ ( "state_hash"
+                           , `String (State_hash.to_base58_check hash) )
+                         ] ) ) ;
           match
             Filtered_external_transition.validate_transactions
               ~constraint_constants new_block_no_hash

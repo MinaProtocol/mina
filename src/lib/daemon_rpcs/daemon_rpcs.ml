@@ -343,15 +343,6 @@ module Start_logging = struct
     Rpc.Rpc.create ~name:"Start_logging" ~version:0 ~bin_query ~bin_response
 end
 
-module Set_uploading = struct
-  type query = string * string * string option [@@deriving bin_io_unversioned]
-
-  type response = unit [@@deriving bin_io_unversioned]
-
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Set_uploading" ~version:0 ~bin_query ~bin_response
-end
-
 module Stop_appending = struct
   type query = unit [@@deriving bin_io_unversioned]
 
@@ -377,13 +368,4 @@ module Stop_logging = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Stop_logging" ~version:0 ~bin_query ~bin_response
-end
-
-module Stop_uploading = struct
-  type query = unit [@@deriving bin_io_unversioned]
-
-  type response = unit [@@deriving bin_io_unversioned]
-
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Stop_uploading" ~version:0 ~bin_query ~bin_response
 end

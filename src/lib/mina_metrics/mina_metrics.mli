@@ -482,7 +482,7 @@ module Block_latency : sig
 
   module Precomputed_block_dump : sig
     val count : Counter.t
-  
+
     val bytes_written : Counter.t
   end
 
