@@ -68,6 +68,7 @@ module Verifier_index_json = struct
         ('fr, 'sRS, 'polyComm) Kimchi_types.VerifierIndex.verifier_index =
     { domain : 'fr domain
     ; max_poly_size : int
+    ; zk_rows : int
     ; public : int
     ; prev_challenges : int
     ; srs : 'sRS
@@ -149,6 +150,7 @@ module Stable = struct
             ; group_gen = Backend.Tock.Field.domain_generator ~log2_size
             }
         ; max_poly_size = 1 lsl Nat.to_int Rounds.Wrap.n
+        ; zk_rows = Common.default_zk_rows
         ; public
         ; prev_challenges = 2 (* Due to Wrap_hack *)
         ; srs

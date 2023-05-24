@@ -30,6 +30,7 @@ impl From<VerifierIndex<Pallas>> for CamlPastaFqPlonkVerifierIndex {
                 group_gen: CamlFq(vi.domain.group_gen),
             },
             max_poly_size: vi.max_poly_size as isize,
+            zk_rows: vi.zk_rows as isize,
             public: vi.public as isize,
             prev_challenges: vi.prev_challenges as isize,
             srs: CamlFqSrs(vi.srs.get().expect("have an srs").clone()),
@@ -96,7 +97,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas> {
 
         let max_poly_size = index.max_poly_size as usize;
 
-        let zk_rows = 3; // zk_rows set to default value
+        let zk_rows = index.zk_rows as u64;
 
         let (linearization, powers_of_alpha) =
             expr_linearization(Some(&feature_flags), true, zk_rows as usize);
@@ -241,6 +242,7 @@ pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierInd
             group_gen: Fq::one().into(),
         },
         max_poly_size: 0,
+        zk_rows: 0,
         public: 0,
         prev_challenges: 0,
         srs: CamlFqSrs::new(SRS::create(0)),

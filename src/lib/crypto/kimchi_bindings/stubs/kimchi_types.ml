@@ -218,6 +218,7 @@ module VerifierIndex = struct
   type nonrec ('fr, 'srs, 'poly_comm) verifier_index =
     { domain : 'fr domain
     ; max_poly_size : int
+    ; zk_rows : int
     ; public : int
     ; prev_challenges : int
     ; srs : 'srs

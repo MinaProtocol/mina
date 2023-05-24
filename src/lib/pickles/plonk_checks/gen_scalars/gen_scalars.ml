@@ -145,10 +145,10 @@ module Tick : S = struct
         a Env.t) =
 |ocaml}
 
-external fp_linearization : unit -> string * (string * string) array
+external fp_linearization : int -> string * (string * string) array
   = "fp_linearization_strings"
 
-let fp_constant_term, fp_index_terms = fp_linearization ()
+let fp_constant_term, fp_index_terms = fp_linearization 1
 
 let () = output_string fp_constant_term
 
@@ -232,10 +232,10 @@ module Tock : S = struct
         a Env.t) =
 |ocaml}
 
-external fq_linearization : unit -> string * (string * string) array
+external fq_linearization : int -> string * (string * string) array
   = "fq_linearization_strings"
 
-let fq_constant_term, fq_index_terms = fq_linearization ()
+let fq_constant_term, fq_index_terms = fq_linearization 1
 
 let () = output_string fq_constant_term
 

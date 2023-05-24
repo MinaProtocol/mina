@@ -1,7 +1,7 @@
 open Core_kernel
 open Import
 
-let zk_rows = 3
+let zk_rows = Common.default_zk_rows
 
 let rough_domains =
   let d = Domain.Pow_2_roots_of_unity 20 in
