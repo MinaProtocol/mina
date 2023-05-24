@@ -546,7 +546,7 @@ module Tick : S = struct
                       "0x0000000000000000000000000000000000000000000000000000000000000001"
                   ) )
             + alpha_pow 26
-              * ( unnormalized_lagrange_basis (-2)
+              * ( unnormalized_lagrange_basis (-4)
                 * ( cell (var (LookupAggreg, Curr))
                   - field
                       "0x0000000000000000000000000000000000000000000000000000000000000001"
@@ -555,7 +555,7 @@ module Tick : S = struct
               * if_feature
                   ( LookupsPerRow 1
                   , (fun () ->
-                      unnormalized_lagrange_basis (-2)
+                      unnormalized_lagrange_basis (-4)
                       * ( cell (var (LookupSorted 0, Curr))
                         - cell (var (LookupSorted 1, Curr)) ) )
                   , fun () ->
@@ -577,7 +577,7 @@ module Tick : S = struct
               * if_feature
                   ( LookupsPerRow 3
                   , (fun () ->
-                      unnormalized_lagrange_basis (-2)
+                      unnormalized_lagrange_basis (-4)
                       * ( cell (var (LookupSorted 2, Curr))
                         - cell (var (LookupSorted 3, Curr)) ) )
                   , fun () ->
@@ -4366,7 +4366,7 @@ module Tock : S = struct
                       "0x0000000000000000000000000000000000000000000000000000000000000001"
                   ) )
             + alpha_pow 26
-              * ( unnormalized_lagrange_basis (-2)
+              * ( unnormalized_lagrange_basis (-4)
                 * ( cell (var (LookupAggreg, Curr))
                   - field
                       "0x0000000000000000000000000000000000000000000000000000000000000001"
@@ -4375,7 +4375,7 @@ module Tock : S = struct
               * if_feature
                   ( LookupsPerRow 1
                   , (fun () ->
-                      unnormalized_lagrange_basis (-2)
+                      unnormalized_lagrange_basis (-4)
                       * ( cell (var (LookupSorted 0, Curr))
                         - cell (var (LookupSorted 1, Curr)) ) )
                   , fun () ->
@@ -4397,7 +4397,7 @@ module Tock : S = struct
               * if_feature
                   ( LookupsPerRow 3
                   , (fun () ->
-                      unnormalized_lagrange_basis (-2)
+                      unnormalized_lagrange_basis (-4)
                       * ( cell (var (LookupSorted 2, Curr))
                         - cell (var (LookupSorted 3, Curr)) ) )
                   , fun () ->
