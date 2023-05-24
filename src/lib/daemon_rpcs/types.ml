@@ -462,11 +462,7 @@ module Status = struct
         let open Precomputed_block_writer in
         let dumping =
           let open Dumping in
-          fmt_field_opt "dir" (function
-            | Some dump ->
-                Some dump.dir
-            | _ ->
-                None )
+          fmt_field_opt "dir" (function Some dump -> Some dump.dir | _ -> None)
         in
         let appending = fmt_field_opt "file" Fn.id in
         let logging =

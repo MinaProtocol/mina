@@ -222,25 +222,39 @@ val verifier : t -> Verifier.t
 
 val genesis_ledger : t -> Mina_ledger.Ledger.t Lazy.t
 
-(** Precomputed block writer *)
-val appending : t -> string option
+module Precomputed_blocks : sig
+  module Initial : sig
+    val network :
+         logger:Logger.t
+      -> upload_blocks_to_gcloud:bool
+      -> precomputed_blocks_dir:string option
+      -> precomputed_blocks_file:string option
+      -> string
 
-val dumping : t -> Precomputed_block_writer.Dumping.t option
+    val gcloud_bucket : string option
 
-val logging : t -> bool
+    val gcloud_keyfile : string option
+  end
 
-val uploading : t -> Precomputed_block_writer.Uploading.t option
+  val appending : t -> string option
 
-val start_logging : t -> unit
+  val dumping : t -> Precomputed_block_writer.Dumping.t option
 
-val stop_appending : t -> unit
+  val logging : t -> bool
 
-val stop_dumping : t -> unit
+  val uploading : t -> Precomputed_block_writer.Uploading.t option
 
-val stop_logging : t -> unit
+  val start_logging : t -> unit
 
-val set_dump_dir : ?network:string -> path:string -> t -> unit
+  val stop_appending : t -> unit
 
-val set_dump_file : path:string -> t -> unit
+  val stop_dumping : t -> unit
 
-val empty : Precomputed_block_writer.t
+  val stop_logging : t -> unit
+
+  val set_dump_dir : ?network:string -> path:string -> t -> unit
+
+  val set_dump_file : path:string -> t -> unit
+
+  val empty : Precomputed_block_writer.t
+end

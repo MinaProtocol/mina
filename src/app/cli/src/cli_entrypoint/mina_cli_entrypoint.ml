@@ -1293,6 +1293,72 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                   "Cannot provide both uptime submitter public key and uptime \
                    submitter keyfile"
           in
+          let precomputed_block_writer =
+            let open Option in
+            let open Mina_lib in
+            let appending =
+              iter precomputed_blocks_file ~f:(fun file ->
+                  [%log' info logger]
+                    ~metadata:[ ("path", `String file) ]
+                    "Precomputed blocks will be appended to the same file $path" ) ;
+              precomputed_blocks_file
+            in
+            let dumping =
+              map precomputed_blocks_dir ~f:(fun dir ->
+                  [%log' info logger]
+                    ~metadata:[ ("path", `String dir) ]
+                    "Precomputed blocks will be dumped to individual files in \
+                     $path" ;
+                  { Precomputed_block_writer.Dumping.dir
+                  ; network =
+                      Precomputed_blocks.Initial.network ~logger
+                        ~upload_blocks_to_gcloud ~precomputed_blocks_dir
+                        ~precomputed_blocks_file
+                  } )
+            in
+            let logging =
+              if log_precomputed_blocks then
+                [%log' info logger] "Precomputed blocks will be logged" ;
+              log_precomputed_blocks
+            in
+            let uploading =
+              if upload_blocks_to_gcloud then (
+                let open Precomputed_blocks.Initial in
+                match (gcloud_bucket, gcloud_keyfile) with
+                | Some bucket, Some keyfile ->
+                    [%log' info logger]
+                      ~metadata:
+                        [ ("bucket", `String bucket)
+                        ; ("keyfile", `String keyfile)
+                        ]
+                      "GCLOUD_KEYFILE environment variable set to $keyfile\n\
+                       GCLOUD_BLOCK_UPLOAD_BUCKET environment variable set to \
+                       $bucket" ;
+                    Some
+                      { Precomputed_block_writer.Uploading.bucket
+                      ; keyfile
+                      ; network =
+                          network ~logger ~upload_blocks_to_gcloud
+                            ~precomputed_blocks_dir ~precomputed_blocks_file
+                      }
+                | bucket, keyfile ->
+                    if is_none bucket then
+                      [%log' warn logger]
+                        "GCLOUD_BLOCK_UPLOAD_BUCKET environment variable not \
+                         set. Must be set in order to upload blocks to gcloud" ;
+                    if is_none keyfile then
+                      [%log' warn logger]
+                        "GCLOUD_KEYFILE environment variable not set. Must be \
+                         set in order to upload blocks to gcloud" ;
+                    None )
+              else None
+            in
+            { Mina_lib.Precomputed_block_writer.appending
+            ; dumping
+            ; logging
+            ; uploading
+            }
+          in
           let start_time = Time.now () in
           let%map mina =
             Mina_lib.create ~wallets
@@ -1326,7 +1392,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~block_reward_threshold ~uptime_url ~uptime_submitter_keypair
                  ~stop_time ~node_status_url
                  ~graphql_control_port:itn_graphql_port ()
-                 ~precomputed_block_writer:Mina_lib.empty )
+                 ~precomputed_block_writer )
           in
           { mina
           ; client_trustlist

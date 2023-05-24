@@ -5,6 +5,7 @@ open Async
 open Signature_lib
 open Mina_numbers
 open Mina_base
+module Precomputed_blocks = Mina_lib.Precomputed_blocks
 
 (** For status *)
 let txn_count = ref 0
@@ -46,19 +47,6 @@ let get_balance t (addr : Account_id.t) =
   let open Participating_state.Option.Let_syntax in
   let%map account = get_account t addr in
   account.Account.Poly.balance
-
-(* precomputed block writer *)
-let set_dump_dir ?network ~path t = Mina_lib.set_dump_dir ?network ~path t
-
-let set_dump_file ~path t = Mina_lib.set_dump_file ~path t
-
-let start_logging t = Mina_lib.start_logging t
-
-let stop_appending t = Mina_lib.stop_appending t
-
-let stop_dumping t = Mina_lib.stop_dumping t
-
-let stop_logging t = Mina_lib.stop_logging t
 
 let get_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let config = Mina_lib.config t in
@@ -466,7 +454,7 @@ let get_status ~flag t =
       }
   in
   let precomputed_block_writer =
-    let open Mina_lib in
+    let open Precomputed_blocks in
     if
       is_some (appending t)
       || logging t
