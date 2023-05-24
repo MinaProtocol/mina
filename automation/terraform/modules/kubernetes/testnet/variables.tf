@@ -33,7 +33,7 @@ variable "use_local_charts" {
 
 variable "healthcheck_enabled" {
   type    = bool
-  default = true
+  default = false
 }
 
 variable "deploy_watchdog" {
@@ -213,14 +213,14 @@ variable "block_producer_configs" {
 variable "seed_configs" {
   type = list(
     object({
-      name               = string,
-      class              = string,
-      libp2p_secret      = string,
-      external_port      = number,
-      external_ip        = string,
+      name          = string,
+      class         = string,
+      libp2p_secret = string,
+      external_port = number,
+      external_ip   = string,
       # private_key_secret = string,
-      enableArchive      = bool,
-      archiveAddress     = string
+      enableArchive  = bool,
+      archiveAddress = string
     })
   )
   default = []
@@ -320,23 +320,23 @@ variable "make_report_accounts" {
 variable "archive_configs" {
   type = list(
     object({
-      name                    = string
-      image                   = string
-      serverPort              = string
-      externalPort            = string
-      enableLocalDaemon       = bool
-      enablePostgresDB        = bool
+      name              = string
+      image             = string
+      serverPort        = string
+      externalPort      = string
+      enableLocalDaemon = bool
+      enablePostgresDB  = bool
 
-      postgresHost            = string
-      postgresPort            = string
-      remoteSchemaFile        = string
-      remoteSchemaAuxFiles        = list(string)
+      postgresHost         = string
+      postgresPort         = string
+      remoteSchemaFile     = string
+      remoteSchemaAuxFiles = list(string)
 
       persistenceEnabled      = bool
       persistenceSize         = string
       persistenceStorageClass = string
       persistenceAccessModes  = list(string)
-      spotAllowed     = string
+      spotAllowed             = string
     })
   )
   default = []

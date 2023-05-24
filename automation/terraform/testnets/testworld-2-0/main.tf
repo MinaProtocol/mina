@@ -50,12 +50,12 @@ provider "google" {
 
 variable "whale_count" {
   type    = number
-  default = 0
+  default = 10
 }
 
 variable "fish_count" {
   type    = number
-  default = 3
+  default = 2
 }
 
 #######################################
@@ -73,8 +73,8 @@ module "node_configs" {
   artifact_path               = abspath(path.module)
   use_embedded_runtime_config = true
 
-  mina_image         = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup2-fix-track3-genesis-ledger-9a9bacb-focal-berkeley"
-  mina_archive_image = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup2-fix-track3-genesis-ledger-9a9bacb-focal"
+  mina_image         = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup2-fix-track3-genesis-ledger-4f7e50a-focal-berkeley"
+  mina_archive_image = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup2-fix-track3-genesis-ledger-4f7e50a-focal"
   mina_agent_image   = "codaprotocol/coda-user-agent:0.1.8"
   mina_bots_image    = "codaprotocol/coda-bots:0.0.13-beta-1"
   mina_points_image  = "codaprotocol/coda-points-hack:32b.4"
@@ -118,7 +118,7 @@ module "node_configs" {
   # snark worker configs
   snark_coordinators = [
     {
-      snark_worker_replicas        = 2
+      snark_worker_replicas        = 4
       snark_worker_fee             = "0.01"
       snark_worker_public_key      = "B62qmQsEHcsPUs5xdtHKjEmWqqhUPRSF2GNmdguqnNvpEZpKftPC69e"
       snark_coordinators_host_port = 10401
