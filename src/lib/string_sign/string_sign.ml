@@ -111,7 +111,7 @@ let%test_module "Sign_string tests" =
       && not
            (verify ~signature_kind:Other_network signature keypair.public_key s)
 
-    let%test "Sign with mainnet, fail to verify with testnet" =
+    let%test "Sign with mainnet, fail to verify with testnet or other network" =
       let open Mina_signature_kind in
       let s = "Watson, come here, I need you" in
       let signature = sign ~signature_kind:Mainnet keypair.private_key s in
