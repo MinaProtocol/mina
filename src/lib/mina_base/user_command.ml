@@ -326,7 +326,26 @@ let check_verifiable (t : Verifiable.t) : Valid.t Or_error.t =
   | Zkapp_command p ->
       Ok (Zkapp_command (Zkapp_command.Valid.of_verifiable p))
 
+let zero_vesting_msg = "Timing update with zero vesting period"
+
+let check_zero_vesting_period (t : t) : unit Or_error.t =
+  match t with
+  | Signed_command _ ->
+      Ok ()
+  | Zkapp_command p ->
+      let has_zero_vesting_period =
+        Zkapp_command.Call_forest.exists p.account_updates ~f:(fun p ->
+            match p.body.update.timing with
+            | Keep ->
+                false
+            | Set { vesting_period; _ } ->
+                Mina_numbers.Global_slot.(equal zero) vesting_period )
+      in
+      if has_zero_vesting_period then Error (Error.of_string zero_vesting_msg)
+      else Ok ()
+
 let check ~status ~find_vk (t : t) : Valid.t Or_error.t =
+  let%bind.Or_error () = check_zero_vesting_period t in
   to_verifiable ~status ~find_vk t |> Or_error.bind ~f:check_verifiable
 
 let forget_check (t : Valid.t) : t =
