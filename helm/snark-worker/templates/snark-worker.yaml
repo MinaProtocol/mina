@@ -1,5 +1,6 @@
 {{ range until ($.Values.snarkWorkersConfig.count | int) }}
 {{ $name := printf "%s%03d" $.Values.snarkWorkersConfig.namePrefix (add . 1) }}
+{{ $itn_port := add $.Values.snarkWorkersConfig.itnGraphqlPort . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -26,6 +27,20 @@ spec:
     spec:
       {{ include "sideCar.podAttrs" (dict "resources" $.Values.resources "bpfDebugger" $.Values.bpfDebugger) | nindent 6 }}
       initContainers:
+      {{ if $.Values.itn.enable }}
+      - name: fix-uptime-key-perms
+        image: busybox
+        command:
+        - sh
+        - -c
+        - /bin/cp /umptime-keys/key /root/uptime-keys/key && /bin/chmod 0700 /root/uptime-keys/
+        volumeMounts:
+        - name: uptime-keys
+          mountPath: /umptime-keys/
+          readOnly: true
+        - name: actual-uptime-keys
+          mountPath: /root/uptime-keys/
+      {{- end }}
       - name: libp2p-perms
         image: {{ $.Values.mina.image | quote }}
         command:
@@ -76,7 +91,8 @@ spec:
           {{- if $.Values.itn.enable }}
           "-itn-keys", {{ $.Values.itn.keys }},
           "-itn-graphql-port", "$(MINA_ITN_GRAPHQL_PORT)",
-          # TODO: uptime service
+          "-uptime-submitter-key", "/root/uptime-keys/key",
+          "-uptime-url", "http://116.202.128.230:6000/v1/submit",
           {{- end }}
           {{- if $.Values.mina.exposeGraphql }}
           "-insecure-rest-server",
@@ -140,7 +156,9 @@ spec:
           value: "1"
         {{ end -}}
         - name: MINA_ITN_GRAPHQL_PORT
-          value: {{ $.Values.itn.itnGraphqlPort | quote }}
+          value: {{ $itn_port | quote }}
+        - name: UPTIME_PRIVKEY_PASS
+          value:
         {{ include "sideCar.bpfDebugger.envVar" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 8 }}
         - name: MINA_SNARK_COORDINATOR_URL
           value: http://snarker-http-coordinator
@@ -174,6 +192,10 @@ spec:
         - name: {{ template "sideCar.logs.minaLogsVolumeName" }}
           mountPath: "/root/.mina-config"
         {{- end }}
+        {{- if $.Values.itn.enable }}
+        - name: actual-uptime-keys
+          mountPath: /root/uptime-keys/
+        {{- end }}
       volumes:
       {{- if $.Values.mina.runtimeConfig }}
       - name: daemon-config
@@ -191,6 +213,19 @@ spec:
           items:
           - key: "unset-k8s-env.sh"
             path: "unset-k8s-env.sh"
+      {{- if $.Values.itn.enable }}
+      - name: uptime-keys
+        secret:
+          secretName: {{ $name }}-uptime-key-secret
+          defaultMode: 256
+          items:
+          - key: key
+            path: key
+          - key: pub
+            path: key.pub
+      - name: actual-uptime-keys
+        emptyDir: {}
+      {{- end}}
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
 ---
 {{- if $.Values.itn.enable }}
@@ -199,15 +234,16 @@ kind: Service
 metadata:
   name: {{ $name }}-itn-graphql
 spec:
-  type: ClusterIP
+  type: NodePort
   publishNotReadyAddresses: true
   selector:
     app: {{ $name }}
   ports:
   - name: http-graphql
     protocol: TCP
-    port: 80
-    targetPort: {{ $.Values.itn.itnGraphqlPort }}
+    port: {{ $itn_port }}
+    targetPort: {{ $itn_port }}
+    nodePort: {{ $itn_port }}
 {{- end }}
 ---
 {{ include "sideCar.resources.service" (dict "name" $name "resources" $.Values.resources) }}

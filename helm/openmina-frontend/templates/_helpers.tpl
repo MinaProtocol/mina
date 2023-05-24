@@ -40,11 +40,6 @@ http {
         location /{{ $node.name }}/graphql {
            proxy_pass http://{{ $node.name }}-graphql.{{ $node.namespace }}.svc.cluster.local/graphql;
         }
-        location /{{ $node.name }}/itn-graphql/graphql {
-           proxy_pass http://{{ $node.name }}-itn-graphql.{{ $node.namespace }}.svc.cluster.local/graphql;
-           proxy_set_header Authorization $http_authorization;
-           proxy_pass_header Authorization;
-        }
         location /{{ $node.name }}/internal-trace/graphql {
            proxy_pass http://{{ $node.name }}-internal-trace-graphql.{{ $node.namespace }}.svc.cluster.local/graphql;
         }

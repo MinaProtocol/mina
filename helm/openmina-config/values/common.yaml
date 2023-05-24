@@ -26,25 +26,30 @@ plainNodesConfig:
   # the number of plain nodes
   count: 2
   namePrefix: node
+  itnGraphqlPort: 31520
 
 snarkWorkersConfig:
   # the number of snark workers
-  count: 8
+  count: 2
   namePrefix: snarker
+  itnGraphqlPort: 31550
 
 seedConfigs:
   - name: seed1
     # see resources/seed1
     libp2pSecret: seed1-libp2p-secret
+    itnGraphqlPort: 31502
   - name: seed2
     # see resources/seed2
     libp2pSecret: seed2-libp2p-secret
+    itnGraphqlPort: 31503
 
 blockProducerConfigs:
-  - name: prod01
+  - name: prod1
     # see resources/key-01
     keypairName: prod1-privkey-secret
     isolated: false
+    itnGraphqlPort: 31510
   # - name: prod02
   #   # see resources/key-01
   #   keypairName: prod1-privkey-secret
@@ -57,10 +62,11 @@ blockProducerConfigs:
     # see resources/key-02
     keypairName: prod2-privkey-secret
     isolated: false
-  - name: prod3
-    # see resources/key-03
-    keypairName: prod3-privkey-secret
-    isolated: false
+    itnGraphqlPort: 31511
+  # - name: prod3
+  #   # see resources/key-03
+  #   keypairName: prod3-privkey-secret
+  #   isolated: false
 
 resources:
   enable: true

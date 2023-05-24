@@ -26,6 +26,20 @@ spec:
     spec:
       {{ include "sideCar.podAttrs" (dict "resources" $.Values.resources "bpfDebugger" $.Values.bpfDebugger) | nindent 6 }}
       initContainers:
+      {{ if $.Values.itn.enable }}
+      - name: fix-uptime-key-perms
+        image: busybox
+        command:
+        - sh
+        - -c
+        - /bin/cp /umptime-keys/key /root/uptime-keys/key && /bin/chmod 0700 /root/uptime-keys/
+        volumeMounts:
+        - name: uptime-keys
+          mountPath: /umptime-keys/
+          readOnly: true
+        - name: actual-uptime-keys
+          mountPath: /root/uptime-keys/
+      {{- end }}
       - name: fix-perms
         image: busybox
         command:
@@ -256,7 +270,8 @@ spec:
           {{- if $.Values.itn.enable }}
           "-itn-keys", {{ $.Values.itn.keys }},
           "-itn-graphql-port", "$(MINA_ITN_GRAPHQL_PORT)",
-          # TODO: uptime service
+          "-uptime-submitter-key", "/root/uptime-keys/key",
+          "-uptime-url", "http://116.202.128.230:6000/v1/submit",
           {{- end }}
           {{- if $.Values.mina.exposeGraphql }}
           "-insecure-rest-server",
@@ -316,7 +331,9 @@ spec:
           value: "y"
         {{- end }}
         - name: MINA_ITN_GRAPHQL_PORT
-          value: {{ $.Values.itn.itnGraphqlPort | quote }}
+          value: {{ $config.itnGraphqlPort | quote }}
+        - name: UPTIME_PRIVKEY_PASS
+          value:
         {{ include "sideCar.bpfDebugger.envVar" (dict "bpfDebugger" $.Values.bpfDebugger) | nindent 8 }}
         ports:
         - name: client-port
@@ -352,6 +369,10 @@ spec:
         {{- end }}
         - name: scripts
           mountPath: "/scripts"
+        {{- if $.Values.itn.enable }}
+        - name: actual-uptime-keys
+          mountPath: /root/uptime-keys/
+        {{- end }}
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
       volumes:
       - name: private-keys
@@ -422,6 +443,19 @@ spec:
           items:
           - key: "unset-k8s-env.sh"
             path: "unset-k8s-env.sh"
+      {{- if $.Values.itn.enable }}
+      - name: uptime-keys
+        secret:
+          secretName: {{ $config.name }}-uptime-key-secret
+          defaultMode: 256
+          items:
+          - key: key
+            path: key
+          - key: pub
+            path: key.pub
+      - name: actual-uptime-keys
+        emptyDir: {}
+      {{- end}}
 ---
 apiVersion: v1
 kind: Service
@@ -463,15 +497,16 @@ kind: Service
 metadata:
   name: {{ $config.name }}-itn-graphql
 spec:
-  type: ClusterIP
+  type: NodePort
   publishNotReadyAddresses: true
   selector:
     app: {{ $config.name }}
   ports:
   - name: http-graphql
     protocol: TCP
-    port: 80
-    targetPort: {{ $.Values.itn.itnGraphqlPort }}
+    port: {{ $config.itnGraphqlPort }}
+    targetPort: {{ $config.itnGraphqlPort }}
+    nodePort: {{ $config.itnGraphqlPort }}
 {{- end }}
 {{ include "sideCar.resources.service" (dict "name" $config.name "resources" $.Values.resources) }}
 {{ include "sideCar.bpfDebugger.service" (dict "name" $config.name "bpfDebugger" $.Values.bpfDebugger) }}
