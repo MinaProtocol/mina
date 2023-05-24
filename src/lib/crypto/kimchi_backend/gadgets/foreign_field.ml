@@ -171,6 +171,10 @@ module type Element_intf = sig
     -> 'field t
     -> Bignum_bigint.t
 
+  (* Convert foreign field affine point to string *)
+  val to_string_as_prover :
+    (module Snark_intf.Run with type field = 'field) -> 'field t -> string
+
   (* Compare if two foreign field elements are equal *)
   val equal_as_prover :
        (module Snark_intf.Run with type field = 'field)
@@ -184,6 +188,14 @@ module type Element_intf = sig
     -> 'field t
     -> 'field t
     -> unit
+
+  (* Add conditional constraints to select foreign field element *)
+  val if_ :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field Cvar.t Snark_intf.Boolean0.t
+    -> 'field t
+    -> 'field t
+    -> 'field t
 end
 
 (* Foreign field element structures *)
@@ -249,6 +261,11 @@ end = struct
       let l0, l1, l2 = to_bignum_bigint_limbs_as_prover (module Circuit) x in
       Bignum_bigint.(l0 + (Common.two_to_limb * l1) + (two_to_2limb * l2))
 
+    let to_string_as_prover (type field)
+        (module Circuit : Snark_intf.Run with type field = field) a : string =
+      sprintf "%s" @@ Bignum_bigint.to_string
+      @@ to_bignum_bigint_as_prover (module Circuit) a
+
     let equal_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field)
         (left : field t) (right : field t) : bool =
@@ -279,6 +296,18 @@ end = struct
         field_standard_limbs_to_bignum_bigint (module Circuit) modulus
       in
       Bignum_bigint.(to_bignum_bigint_as_prover (module Circuit) x < modulus)
+
+    let if_ (type field)
+        (module Circuit : Snark_intf.Run with type field = field)
+        (b : Circuit.Boolean.var) (then_ : field t) (else_ : field t) : field t
+        =
+      let open Circuit in
+      let then0, then1, then2 = to_limbs then_ in
+      let else0, else1, else2 = to_limbs else_ in
+      of_limbs
+        ( Field.if_ b ~then_:then0 ~else_:else0
+        , Field.if_ b ~then_:then1 ~else_:else1
+        , Field.if_ b ~then_:then2 ~else_:else2 )
   end
 
   (* Compact limbs foreign field element *)
@@ -326,6 +355,11 @@ end = struct
       let l01, l2 = to_bignum_bigint_limbs_as_prover (module Circuit) x in
       Bignum_bigint.(l01 + (two_to_2limb * l2))
 
+    let to_string_as_prover (type field)
+        (module Circuit : Snark_intf.Run with type field = field) a : string =
+      sprintf "%s" @@ Bignum_bigint.to_string
+      @@ to_bignum_bigint_as_prover (module Circuit) a
+
     let equal_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field)
         (left : field t) (right : field t) : bool =
@@ -342,6 +376,17 @@ end = struct
       let right01, right2 = to_limbs right in
       Field.Assert.equal left01 right01 ;
       Field.Assert.equal left2 right2
+
+    let if_ (type field)
+        (module Circuit : Snark_intf.Run with type field = field)
+        (b : Circuit.Boolean.var) (then_ : field t) (else_ : field t) : field t
+        =
+      let open Circuit in
+      let then01, then2 = to_limbs then_ in
+      let else01, else2 = to_limbs else_ in
+      of_limbs
+        ( Field.if_ b ~then_:then01 ~else_:else01
+        , Field.if_ b ~then_:then2 ~else_:else2 )
   end
 end
 

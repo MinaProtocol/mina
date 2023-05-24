@@ -77,6 +77,10 @@ module type Element_intf = sig
     -> 'field t
     -> Bignum_bigint.t
 
+  (* Convert foreign field affine point to string *)
+  val to_string_as_prover :
+    (module Snark_intf.Run with type field = 'field) -> 'field t -> string
+
   (** Compare if two foreign field elements are equal *)
   val equal_as_prover :
        (module Snark_intf.Run with type field = 'field)
@@ -90,6 +94,14 @@ module type Element_intf = sig
     -> 'field t
     -> 'field t
     -> unit
+
+  (* Add conditional constraints to select foreign field element *)
+  val if_ :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field Cvar.t Snark_intf.Boolean0.t
+    -> 'field t
+    -> 'field t
+    -> 'field t
 end
 
 module Element : sig
