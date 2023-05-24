@@ -8,6 +8,7 @@ module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
 module Subscriptions = Mina_subscriptions
+module Precomputed_block_writer = Config.Precomputed_block_writer
 
 type t
 
@@ -220,3 +221,38 @@ val runtime_config : t -> Runtime_config.t
 val verifier : t -> Verifier.t
 
 val genesis_ledger : t -> Mina_ledger.Ledger.t Lazy.t
+
+(** Precomputed block writer *)
+val appending : t -> string option
+
+val dumping : t -> Precomputed_block_writer.Dumping.t option
+
+val logging : t -> bool
+
+val uploading : t -> Precomputed_block_writer.Uploading.t option
+
+val start_logging : t -> unit
+
+val stop_appending : t -> unit
+
+val stop_dumping : t -> unit
+
+val stop_logging : t -> unit
+
+val stop_uploading : t -> unit
+
+val set_dump_dir : ?network:string -> path:string -> t -> unit
+
+val set_dump_file : path:string -> t -> unit
+
+val set_uploading : ?network:string -> bucket:string -> keyfile:string -> t -> unit
+
+val empty : Precomputed_block_writer.t
+
+val mk_appending : path:string -> Precomputed_block_writer.t
+
+val mk_dumping : network:string -> path:string -> Precomputed_block_writer.t
+
+val mk_logging : unit -> Precomputed_block_writer.t
+
+val mk_uploading : network:string -> bucket:string -> keyfile:string -> Precomputed_block_writer.t

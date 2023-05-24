@@ -14,6 +14,7 @@ module Conf_dir = Conf_dir
 module Subscriptions = Mina_subscriptions
 module Snark_worker_lib = Snark_worker
 module Timeout = Timeout_lib.Core_time
+module Precomputed_block_writer = Config.Precomputed_block_writer
 
 let daemon_start_time = Time_ns.now ()
 
@@ -113,8 +114,7 @@ type t =
       Daemon_rpcs.Types.Status.Next_producer_timing.t option
   ; subscriptions : Mina_subscriptions.t
   ; sync_status : Sync_status.t Mina_incremental.Status.Observer.t
-  ; precomputed_block_writer :
-      ([ `Path of string | `Path_dir of string ] option * [ `Log ] option) ref
+  ; precomputed_block_writer : Precomputed_block_writer.t
   ; block_production_status :
       [ `Producing | `Producing_in_ms of float | `Free ] ref
   }
@@ -136,6 +136,161 @@ let client_port t =
     t.config.gossip_net_params.addrs_and_ports
   in
   client_port
+
+(* precomputed_block_writer *)
+let init_network (config : Config.t) =
+  let need_network =
+    config.upload_blocks_to_gcloud || is_some config.precomputed_blocks_file || is_some config.precomputed_blocks_dir
+  in
+  match Core.Sys.getenv "NETWORK_NAME" with
+  | Some network ->
+      if need_network then
+        [%log' info config.logger]
+          "NETWORK_NAME environment variable set to %s" network ;
+      network
+  | _ ->
+      if need_network then
+        [%log' warn config.logger]
+          "NETWORK_NAME environment variable not set. Default to 'berkeley'" ;
+      "berkeley"
+
+let gcloud_keyfile = Core.Sys.getenv "GCLOUD_KEYFILE"
+let gcloud_bucket = Core.Sys.getenv "GCLOUD_BLOCK_UPLOAD_BUCKET"
+
+let check_path path =
+  try
+    match Core.Unix.(lstat path).st_kind with
+    | S_REG -> Some (`File path)
+    | S_DIR -> Some (`Dir path)
+    | _ -> failwith "irregular path"
+  with _ -> None
+
+let appending t = t.precomputed_block_writer.appending
+
+let dumping t = t.precomputed_block_writer.dumping
+
+let logging t = t.precomputed_block_writer.logging
+
+let uploading t = t.precomputed_block_writer.uploading
+
+let set_dump_dir ?network ~path t =
+  let dir_opt =
+    match check_path path with
+    | Some (`Dir dir) -> Some dir
+    | _ ->
+        [%log' error t.config.logger] "Invalid dump directory" ;
+        None
+  in
+  let network =
+    match network with
+    | Some network -> network
+    | None -> init_network t.config
+  in
+  Option.iter dir_opt ~f:(fun dir ->
+      [%log' info t.config.logger]
+        ~metadata:
+          [ ("dir", `String dir)
+          ; ("network", `String network)
+          ]
+        "Set $network precomputed block dumping to $dir" ;
+      t.precomputed_block_writer.dumping <- Some {
+          Precomputed_block_writer.Dumping.network = network;
+          dir
+        } )
+
+let set_dump_file ~path t =
+  let file_opt =
+    match check_path path with
+    | Some (`File file) -> Some file
+    | _ ->
+        [%log' error t.config.logger] "Invalid dump file" ;
+        None
+  in
+  Option.iter file_opt ~f:(fun file ->
+      [%log' info t.config.logger]
+        ~metadata:[ ("file", `String file) ]
+        "Set precomputed block appending to $file" ;
+      t.precomputed_block_writer.appending <- Some file )
+
+let start_logging t =
+  [%log' info t.config.logger] "Precomputed block logging started" ;
+  t.precomputed_block_writer.logging <- true
+
+let set_uploading ?network ~bucket ~keyfile t =
+  let net =
+      let open Precomputed_block_writer.Uploading in
+      Option.map t.precomputed_block_writer.uploading ~f:(fun up -> up.network)
+    in
+  match network, net with
+  | Some network, _ | _, Some network ->
+      [%log' info t.config.logger]
+        ~metadata:
+          [ ("network", `String network)
+          ; ("bucket", `String bucket)
+          ; ("keyfile", `String keyfile)
+          ]
+        "Gcloud uploading $network precomputed blocks to $bucket with $keyfile" ;
+      t.precomputed_block_writer.uploading <- Some { network; bucket; keyfile }
+  | _ ->
+      [%log' error t.config.logger] "Attempted to set uploading without network"
+
+let stop_appending t =
+  t.precomputed_block_writer.appending <- None
+
+let stop_dumping t =
+  t.precomputed_block_writer.dumping <- None
+
+let stop_logging t =
+  t.precomputed_block_writer.logging <- false
+
+let stop_uploading t =
+  t.precomputed_block_writer.uploading <- None
+
+(* TODO *)
+let empty : Precomputed_block_writer.t =
+  { appending = None
+  ; dumping = None
+  ; logging = false
+  ; uploading = None
+  }
+
+let mk_appending ~path =
+  let open Precomputed_block_writer in
+  match check_path path with
+  | Some (`File path) ->
+      { appending = Some path
+      ; dumping = None
+      ; logging = false
+      ; uploading = None
+      }
+  | _ -> empty
+
+let mk_dumping ~network ~path =
+  let open Precomputed_block_writer in
+  match check_path path with
+  | Some (`Dir path) ->
+      { appending = None
+      ; dumping = Some { Dumping.dir = path; network }
+      ; logging = false
+      ; uploading = None
+      }
+  | _ -> empty
+
+let mk_logging () =
+  let open Precomputed_block_writer in
+  { appending = None
+  ; dumping = None
+  ; logging = true
+  ; uploading = None
+  }
+
+let mk_uploading ~network ~bucket ~keyfile =
+  let open Precomputed_block_writer in
+  { appending = None
+  ; dumping = None
+  ; logging = false
+  ; uploading = Some { Uploading.network; bucket; keyfile }
+  }
 
 (* Get the most recently set public keys  *)
 let block_production_pubkeys t : Public_key.Compressed.Set.t =
@@ -1392,6 +1547,52 @@ let send_resource_pool_diff_or_wait ~rl ~diff_score ~max_per_15_seconds diff =
   able_to_send_or_wait ()
 
 let create ?wallets (config : Config.t) =
+  let _precomputed_block_writer_setup =
+    let open Option in
+    (* appending *)
+    iter config.precomputed_blocks_file ~f:(fun file ->
+      [%log' info config.logger]
+        ~metadata:[ ("path", `String file) ]
+        "Precomputed blocks will be appended to the same file $path" ) ;
+    config.precomputed_block_writer.appending <- config.precomputed_blocks_file ;
+    (* logging *)
+    (if config.log_precomputed_blocks then
+      [%log' info config.logger] "Precomputed blocks will be logged") ;
+    config.precomputed_block_writer.logging <- config.log_precomputed_blocks ;
+    (* local dumping *)
+    match config.precomputed_blocks_dir with
+    | Some dir ->
+        [%log' info config.logger]
+          ~metadata:[ ("path", `String dir) ]
+          "Precomputed blocks will be dumped to individual files in $path" ;
+        config.precomputed_block_writer.dumping <- Some { dir; network = init_network config }
+    | None ->
+        config.precomputed_block_writer.dumping <- None ;
+    (* uploading *)
+    if config.upload_blocks_to_gcloud then
+      match gcloud_bucket, gcloud_keyfile with
+      | Some bucket, Some keyfile ->
+          [%log' info config.logger]
+            ~metadata:
+              [ ("bucket", `String bucket)
+              ; ("keyfile", `String keyfile)
+              ]
+            "GCLOUD_KEYFILE environment variable set to $keyfile\n\
+             GCLOUD_BLOCK_UPLOAD_BUCKET environment variable set to $bucket" ;
+          config.precomputed_block_writer.uploading <- Some { bucket; keyfile; network = init_network config }
+      | bucket, keyfile ->
+          if is_none bucket then
+            [%log' warn config.logger]
+              "GCLOUD_BLOCK_UPLOAD_BUCKET environment variable not set. Must be \
+               set in order to upload blocks to gcloud" ;
+          if is_none keyfile then
+            [%log' warn config.logger]
+              "GCLOUD_KEYFILE environment variable not set. Must be set in \
+               order to upload blocks to gcloud" ;
+          config.precomputed_block_writer.uploading <- None
+    else
+      config.precomputed_block_writer.uploading <- None
+  in
   let module Context = (val context config) in
   let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
@@ -2081,42 +2282,13 @@ let create ?wallets (config : Config.t) =
                 ~precomputed_values:config.precomputed_values
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
                 archive_process_port ) ;
-          (* To log precomputed blocks to individual files, set both
-             --precomputed-blocks-path DIR and --log-precomputed-blocks true *)
-          let precomputed_block_writer =
-            let block_path_opt =
-              try
-                Option.map config.precomputed_blocks_path ~f:(fun path ->
-                    match Core.Unix.(lstat path).st_kind with
-                    | S_DIR ->
-                        `Path_dir path
-                    | S_REG ->
-                        `Path path
-                    | _ ->
-                        [%log' error config.logger]
-                          ~metadata:[ ("path", `String path) ]
-                          "$path is not a regular Unix file or directory. \
-                           Local precomputed block logging disabled." ;
-                        failwith "No precomputed block logging" )
-              with _ -> None
-            in
-            let log_opt =
-              match block_path_opt with
-              | None ->
-                  if config.log_precomputed_blocks then Some `Log else None
-              | _ ->
-                  None
-            in
-            ref (block_path_opt, log_opt)
-          in
           let subscriptions =
             Mina_subscriptions.create ~logger:config.logger
               ~constraint_constants ~new_blocks ~wallets
               ~transition_frontier:frontier_broadcast_pipe_r
               ~is_storing_all:config.is_archive_rocksdb
-              ~upload_blocks_to_gcloud:config.upload_blocks_to_gcloud
-              ~time_controller:config.time_controller ~precomputed_block_writer
-              ~log_precomputed_blocks:config.log_precomputed_blocks
+              ~time_controller:config.time_controller
+              ~precomputed_block_writer:config.precomputed_block_writer
           in
           let open Mina_incremental.Status in
           let transition_frontier_incr =
@@ -2177,7 +2349,7 @@ let create ?wallets (config : Config.t) =
             ; snark_job_state = snark_jobs_state
             ; subscriptions
             ; sync_status
-            ; precomputed_block_writer
+            ; precomputed_block_writer = config.precomputed_block_writer
             ; block_production_status = ref `Free
             } ) )
 
