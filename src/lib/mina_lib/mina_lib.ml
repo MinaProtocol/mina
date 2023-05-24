@@ -217,11 +217,17 @@ let start_logging t =
   [%log' info t.config.logger] "Precomputed block logging started" ;
   t.precomputed_block_writer.logging <- true
 
-let stop_appending t = t.precomputed_block_writer.appending <- None
+let stop_appending t =
+  [%log' info t.config.logger] "Precomputed block appending stopped" ;
+  t.precomputed_block_writer.appending <- None
 
-let stop_dumping t = t.precomputed_block_writer.dumping <- None
+let stop_dumping t =
+  [%log' info t.config.logger] "Precomputed block dumping stopped" ;
+  t.precomputed_block_writer.dumping <- None
 
-let stop_logging t = t.precomputed_block_writer.logging <- false
+let stop_logging t =
+  [%log' info t.config.logger] "Precomputed block logging stopped" ;
+  t.precomputed_block_writer.logging <- false
 
 let empty : Precomputed_block_writer.t =
   { appending = None; dumping = None; logging = false; uploading = None }
