@@ -253,6 +253,161 @@ let reset_trust_status =
              printf "Failed to reset trust status %s\n" (Error.to_string_hum e) )
     )
 
+(* precomputed block writer *)
+let set_precomputed_dump_dir =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  let path_flag =
+    flag "--path" ~aliases:[ "path" ]
+      ~doc:"PATH Set precomputed block dump directory"
+      (required string)
+  in
+  let network_flag =
+    flag "--network" ~aliases:[ "network" ]
+      ~doc:"NETWORK Network name for precomputed block dumping"
+      (optional string)
+  in
+  Command.async ~summary:"Set precomputed block dump directory"
+    (Cli_lib.Background_daemon.rpc_init
+      (Args.zip2 path_flag network_flag)
+      ~f:(fun port (path, network_opt) ->
+         let%map res = Daemon_rpcs.Client.dispatch Set_dump_dir.rpc (path, network_opt) port in
+         match res with
+         | Ok _ -> (
+            match network_opt with
+            | Some network ->
+                printf "Precomputed block dump dir set to %s with network %s\n" path network
+            | None ->
+                printf "Precomputed block dump dir set to %s\n" path )
+         | Error e ->
+              printf "Failed to set dump dir with path %s\n" (Error.to_string_hum e) ) )
+
+let set_precomputed_dump_file =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  let path_flag =
+    flag "--path" ~aliases:[ "path" ]
+      ~doc:"PATH Precomputed block dump file path for replaying"
+      (required string)
+  in
+  Command.async ~summary:"Set precomputed block dump file for replaying"
+    (Cli_lib.Background_daemon.rpc_init path_flag ~f:(fun port path ->
+         let%map res = Daemon_rpcs.Client.dispatch Set_dump_file.rpc path port in
+         match res with
+         | Ok _ ->
+              printf "Precomputed block will now be dumped to %s\n" path
+         | Error e ->
+              printf "Failed to set dump path %s\n" (Error.to_string_hum e) ) )
+
+let start_logging =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"Start logging precomputed block"
+    (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
+         let%map res = Daemon_rpcs.Client.dispatch Start_logging.rpc () port in
+         match res with
+         | Ok _ ->
+              print_endline "Precomputed blocks will now be logged"
+         | Error e ->
+              printf "Failed to set precomputed block logging %s\n" (Error.to_string_hum e) ) )
+
+let set_precomputed_uploading =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  let bucket_flag =
+    flag "--bucket" ~aliases:[ "bucket" ]
+      ~doc:"BUCKET Gcloud bucket"
+      (required string)
+  in
+  let keyfile_flag =
+    flag "--keyfile" ~aliases:[ "keyfile" ]
+      ~doc:"KEYFILE Gcloud keyfile"
+      (required string)
+  in
+  let network_flag =
+    flag "--network" ~aliases:[ "network" ]
+      ~doc:"NETWORK Network name for precomputed block uploading"
+      (optional string)
+  in
+  Command.async ~summary:"Set precomputed block gcloud uploading"
+    (Cli_lib.Background_daemon.rpc_init
+      (Args.zip3 bucket_flag keyfile_flag network_flag)
+      ~f:(fun port (bucket, keyfile, network_opt) ->
+         let%map res = Daemon_rpcs.Client.dispatch Set_uploading.rpc (bucket, keyfile, network_opt) port in
+         match res with
+         | Ok _ ->
+              (match network_opt with
+               | Some network ->
+                  printf
+                    !"Precomputed blocks will now be uploaded to gcloud\n\
+                     - bucket:  %s\n
+                     - network: %s\n
+                     - keyfile: %s\n"
+                     bucket network keyfile
+              | None ->
+                  printf
+                    "Precomputed blocks will be uploaded to gcloud\n\
+                     - bucket:  %s\n\
+                     - keyfile: %s\n"
+                     bucket keyfile )
+         | Error e ->
+              printf "Failed to set dump path %s\n" (Error.to_string_hum e) ) )
+let stop_appending =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"Stop appending precomputed blocks to a single file"
+    (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
+         let%map res = Daemon_rpcs.Client.dispatch Stop_appending.rpc () port in
+         match res with
+         | Ok _ ->
+              print_endline "Precomputed block appending deactivated"
+         | Error e ->
+              printf "Failed to deactivate block appending %s\n" (Error.to_string_hum e) ) )
+
+let stop_dumping =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"Stop dumping precomputed blocks"
+    (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
+         let%map res = Daemon_rpcs.Client.dispatch Stop_dumping.rpc () port in
+         match res with
+         | Ok _ ->
+              print_endline "Precomputed block writing deactivated"
+         | Error e ->
+              printf "Failed to deactivate block dumping %s\n" (Error.to_string_hum e) ) )
+
+let stop_logging =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"Stop logging precomputed blocks"
+    (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
+         let%map res = Daemon_rpcs.Client.dispatch Stop_logging.rpc () port in
+         match res with
+         | Ok _ ->
+              print_endline "Precomputed block logging deactivated"
+         | Error e ->
+              printf "Failed to deactivate block logging %s\n" (Error.to_string_hum e) ) )
+
+let stop_uploading =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"Stop uploading precomputed blocks to gcloud"
+    (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
+         let%map res = Daemon_rpcs.Client.dispatch Stop_uploading.rpc () port in
+         match res with
+         | Ok _ ->
+              print_endline "Precomputed block uploading deactivated"
+         | Error e ->
+              printf "Failed to deactivate block uploading %s\n" (Error.to_string_hum e) ) )
+
 let get_public_keys =
   let open Daemon_rpcs in
   let open Command.Param in
@@ -2239,6 +2394,14 @@ let client =
     ; ("export-local-logs", Export_logs.export_locally)
     ; ("stop-daemon", stop_daemon)
     ; ("status", status)
+    ; ("set-precomputed-file", set_precomputed_dump_file)
+    ; ("set-precomputed-dir", set_precomputed_dump_dir)
+    ; ("set-precomputed-uploading", set_precomputed_uploading)
+    ; ("set-precomputed-logging", start_logging)
+    ; ("deactivate-precomputed-appending", stop_appending)
+    ; ("deactivate-precomputed-dumping", stop_dumping)
+    ; ("deactivate-precomputed-logging", stop_logging)
+    ; ("deactivate-precomputed-uploading", stop_uploading)
     ]
 
 let client_trustlist_group =
