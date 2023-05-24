@@ -1310,6 +1310,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                     "Precomputed blocks will be dumped to individual files in \
                      $path" ;
                   { Precomputed_block_writer.Dumping.dir
+                  ; number = 0
                   ; network =
                       Precomputed_blocks.Initial.network ~logger
                         ~upload_blocks_to_gcloud ~precomputed_blocks_dir
@@ -1337,6 +1338,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                     Some
                       { Precomputed_block_writer.Uploading.bucket
                       ; keyfile
+                      ; number = 0
                       ; network =
                           network ~logger ~upload_blocks_to_gcloud
                             ~precomputed_blocks_dir ~precomputed_blocks_file

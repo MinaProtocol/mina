@@ -201,12 +201,16 @@ module Precomputed_blocks = struct
       | None ->
           Initial.get_network t.config.logger false
     in
+    let number =
+      Option.value_map t.precomputed_block_writer.dumping ~default:0
+        ~f:(fun dump -> dump.number)
+    in
     Option.iter dir_opt ~f:(fun dir ->
         [%log' info t.config.logger]
           ~metadata:[ ("dir", `String dir); ("network", `String network) ]
           "Set $network precomputed block dumping to $dir" ;
         t.precomputed_block_writer.dumping <-
-          Some { Precomputed_block_writer.Dumping.network; dir } )
+          Some { Precomputed_block_writer.Dumping.dir; network; number } )
 
   let set_dump_file ~path t =
     let file_opt =

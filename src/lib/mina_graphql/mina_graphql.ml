@@ -468,7 +468,8 @@ module Types = struct
           let open Reflection.Shorthand in
           let open Daemon_rpcs.Types.Status.Precomputed_block_writer in
           List.rev
-          @@ Dumping.Fields.fold ~init:[] ~dir:nn_string ~network:nn_string )
+          @@ Dumping.Fields.fold ~init:[] ~dir:nn_string ~network:nn_string
+               ~number:nn_int )
 
     let precomputed_block_uploading :
         ( _
@@ -480,7 +481,7 @@ module Types = struct
           let open Daemon_rpcs.Types.Status.Precomputed_block_writer in
           List.rev
           @@ Uploading.Fields.fold ~init:[] ~bucket:nn_string ~keyfile:nn_string
-               ~network:nn_string )
+               ~network:nn_string ~number:nn_int )
 
     let precomputed_block_writer :
         (_, Daemon_rpcs.Types.Status.Precomputed_block_writer.t option) typ =

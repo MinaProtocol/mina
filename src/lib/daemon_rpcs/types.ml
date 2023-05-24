@@ -195,13 +195,22 @@ module Status = struct
 
   module Precomputed_block_writer = struct
     module Dumping = struct
-      type t = { dir : string; network : string }
+      type t = { dir : string; network : string; mutable number : int }
       [@@deriving to_yojson, bin_io_unversioned, fields]
+
+      let inc_one t = t.number <- t.number + 1
     end
 
     module Uploading = struct
-      type t = { bucket : string; keyfile : string; network : string }
+      type t =
+        { bucket : string
+        ; keyfile : string
+        ; network : string
+        ; mutable number : int
+        }
       [@@deriving to_yojson, bin_io_unversioned, fields]
+
+      let inc_one t = t.number <- t.number + 1
     end
 
     type t =
@@ -462,7 +471,11 @@ module Status = struct
         let open Precomputed_block_writer in
         let dumping =
           let open Dumping in
-          fmt_field_opt "dir" (function Some dump -> Some dump.dir | _ -> None)
+          fmt_field_opt "dir" (function
+            | Some dump ->
+                Some (sprintf "{ path: %s, quantity: %d }" dump.dir dump.number)
+            | _ ->
+                None )
         in
         let appending = fmt_field_opt "file" Fn.id in
         let logging =
@@ -473,8 +486,8 @@ module Status = struct
           fmt_field_opt "upload" (function
             | Some upload ->
                 Some
-                  (sprintf "{ network: %s, bucket: %s }" upload.network
-                     upload.bucket )
+                  (sprintf "{ bucket: %s, quantity: %d }" upload.bucket
+                     upload.number )
             | _ ->
                 None )
         in

@@ -160,7 +160,8 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                         Mina_block.Precomputed.to_yojson precomputed_block )
                    in
                    (* Upload precomputed blocks to gcloud *)
-                   Option.iter uploading ~f:(fun info ->
+                   Option.iter uploading
+                     ~f:(fun ({ bucket; network; _ } as t) ->
                        let json =
                          Yojson.Safe.to_string (Lazy.force precomputed_block)
                        in
@@ -172,13 +173,13 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                        [%log info]
                          ~metadata:
                            [ ("hash", `String hash_string)
-                           ; ("bucket", `String info.bucket)
+                           ; ("bucket", `String bucket)
                            ; ("height", `String height)
                            ]
-                         "Uploading precomputed block with $height and $hash \
-                          to gcloud $bucket" ;
+                         "Uploading precomputed block with height $height and \
+                          $hash to gcloud $bucket" ;
                        let name =
-                         sprintf "%s-%s-%s.json" info.network height hash_string
+                         sprintf "%s-%s-%s.json" network height hash_string
                        in
                        (* TODO: Use a pipe to queue this if these are building up *)
                        don't_wait_for
@@ -195,7 +196,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                            Stdlib.close_out f ;
                            let command =
                              Printf.sprintf "gsutil cp -n %s gs://%s/%s"
-                               tmp_file info.bucket name
+                               tmp_file bucket name
                            in
                            let%map output =
                              (* This double-wrapping of [try_with]s is protection
@@ -217,7 +218,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                            in
                            ( match output with
                            | Ok _result ->
-                               ()
+                               Precomputed_block_writer.Uploading.inc_one t
                            | Error e ->
                                [%log warn]
                                  ~metadata:
@@ -240,7 +241,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                          ~f:(fun out_channel ->
                            Out_channel.output_lines out_channel [ json ] ) ) ;
                    (* dump precomputed blocks to local directory *)
-                   Option.iter dumping ~f:(fun { dir; network } ->
+                   Option.iter dumping ~f:(fun ({ dir; network; _ } as t) ->
                        let json =
                          Yojson.Safe.to_string (Lazy.force precomputed_block)
                        in
@@ -256,6 +257,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                        let path =
                          Core.Filename.(parts dir @ [ name ] |> of_parts)
                        in
+                       Precomputed_block_writer.Dumping.inc_one t ;
                        Out_channel.with_file ~append:false path
                          ~f:(fun out_channel ->
                            Out_channel.output_lines out_channel [ json ] ) ;
