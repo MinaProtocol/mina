@@ -256,10 +256,14 @@ locals {
         apt-get update --yes && apt-get install --yes lsb-core apt-transport-https curl jq
 
         export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)"
-        echo "deb http://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-        curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
-        apt-get update -y && apt-get install kubectl -y
-        cp --update --verbose $(which kubectl) "$${CI_SHARED_BIN}/kubectl"
+        echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+  && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - \
+  && apt-get update --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends google-cloud-sdk kubectl google-cloud-sdk-gke-gcloud-auth-plugin \
+  && rm -rf /var/lib/apt/lists/*
+
+        export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+
 
         # Install helm
         curl https://baltocdn.com/helm/signing.asc | apt-key add -
