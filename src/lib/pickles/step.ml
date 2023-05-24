@@ -381,7 +381,9 @@ struct
         (prechals, b)
       in
       let challenge_polynomial_commitment =
-        if not must_verify then Ipa.Wrap.compute_sg new_bulletproof_challenges
+        if not must_verify then
+          let num_chunks = 1 (* FIXME: num_chunks *) in
+          Ipa.Wrap.compute_sg ~num_chunks new_bulletproof_challenges
         else t.proof.openings.proof.challenge_polynomial_commitment
       in
       let witness : _ Per_proof_witness.Constant.No_app_state.t =

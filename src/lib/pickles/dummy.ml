@@ -36,7 +36,10 @@ module Ipa = struct
           Ipa.Wrap.compute_challenge prechallenge )
 
     let sg =
-      lazy (time "dummy wrap sg" (fun () -> Ipa.Wrap.compute_sg challenges))
+      lazy
+        (time "dummy wrap sg" (fun () ->
+             (* num chunks can be 1 since it's a dummy value *)
+             Ipa.Wrap.compute_sg ~num_chunks:1 challenges ) )
   end
 
   module Step = struct
@@ -50,6 +53,9 @@ module Ipa = struct
           Ipa.Step.compute_challenge prechallenge )
 
     let sg =
-      lazy (time "dummy wrap sg" (fun () -> Ipa.Step.compute_sg challenges))
+      lazy
+        (time "dummy wrap sg" (fun () ->
+             (* num chunks can be 1 since it's a dummy value *)
+             Ipa.Step.compute_sg ~num_chunks:1 challenges ) )
   end
 end

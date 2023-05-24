@@ -108,7 +108,7 @@ module Ipa : sig
     , 'a )
     Pickles_types.Vector.t
 
-  type ('a, 'b) compute_sg := 'a challenge -> 'b * 'b
+  type ('a, 'b) compute_sg := num_chunks:int -> 'a challenge -> 'b * 'b
 
   module Wrap : sig
     val compute_challenge :

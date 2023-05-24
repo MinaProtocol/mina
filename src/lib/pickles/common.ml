@@ -160,9 +160,8 @@ module Ipa = struct
 
     let compute_challenges cs = compute_challenges field ~endo_to_field cs
 
-    let compute_sg chals =
+    let compute_sg ~num_chunks chals =
       let comm =
-        let num_chunks = 1 (* FIXME: num_chunks *) in
         Kimchi_bindings.Protocol.SRS.Fq.b_poly_commitment
           (Backend.Tock.Keypair.load_urs ())
           (Pickles_types.Vector.to_array (compute_challenges chals))
@@ -182,9 +181,8 @@ module Ipa = struct
 
     let compute_challenges cs = compute_challenges field ~endo_to_field cs
 
-    let compute_sg chals =
+    let compute_sg ~num_chunks chals =
       let comm =
-        let num_chunks = 1 (* FIXME: num_chunks *) in
         Kimchi_bindings.Protocol.SRS.Fp.b_poly_commitment
           (Backend.Tick.Keypair.load_urs ())
           (Pickles_types.Vector.to_array (compute_challenges chals))
