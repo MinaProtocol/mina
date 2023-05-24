@@ -320,6 +320,22 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return
             ( Mina_commands.get_public_keys mina
             |> Participating_state.active_error ) )
+    ; implement Daemon_rpcs.Set_dump_dir.rpc (fun () (path, network) ->
+        return (Mina_commands.set_dump_dir ?network ~path mina ) )
+    ; implement Daemon_rpcs.Set_dump_file.rpc (fun () path ->
+        return (Mina_commands.set_dump_file mina ~path) )
+    ; implement Daemon_rpcs.Start_logging.rpc (fun () () ->
+        return (Mina_commands.start_logging mina) )
+    ; implement Daemon_rpcs.Set_uploading.rpc (fun () (bucket, keyfile, network) ->
+        return (Mina_commands.set_uploading ?network ~bucket ~keyfile mina) )
+    ; implement Daemon_rpcs.Stop_appending.rpc (fun () () ->
+        return (Mina_commands.stop_appending mina) )
+    ; implement Daemon_rpcs.Stop_dumping.rpc (fun () () ->
+        return (Mina_commands.stop_dumping mina) )
+    ; implement Daemon_rpcs.Stop_logging.rpc (fun () () ->
+        return (Mina_commands.stop_logging mina) )
+    ; implement Daemon_rpcs.Stop_uploading.rpc (fun () () ->
+        return (Mina_commands.stop_uploading mina) )
     ; implement Daemon_rpcs.Get_nonce.rpc (fun () aid ->
           return
             ( Mina_commands.get_nonce mina aid

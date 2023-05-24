@@ -47,6 +47,23 @@ let get_balance t (addr : Account_id.t) =
   let%map account = get_account t addr in
   account.Account.Poly.balance
 
+(* precomputed block writer *)
+let set_dump_dir ?network ~path t = Mina_lib.set_dump_dir ?network ~path t
+
+let set_dump_file ~path t = Mina_lib.set_dump_file ~path t
+
+let start_logging t = Mina_lib.start_logging t
+
+let set_uploading ?network ~bucket ~keyfile t = Mina_lib.set_uploading ?network ~bucket ~keyfile t
+
+let stop_appending t = Mina_lib.stop_appending t
+
+let stop_dumping t = Mina_lib.stop_dumping t
+
+let stop_logging t = Mina_lib.stop_logging t
+
+let stop_uploading t = Mina_lib.stop_uploading t
+
 let get_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let config = Mina_lib.config t in
   let trust_system = config.trust_system in
@@ -452,6 +469,18 @@ let get_status ~flag t =
           @@ Counter.value Transaction_pool.transactions_added_to_pool
       }
   in
+  (* TODO *)
+  let precomputed_block_writer =
+    let open Mina_lib in
+    if is_some (appending t) || logging t || is_some (dumping t) || is_some (uploading t) then
+      Some
+        { Daemon_rpcs.Types.Status.Precomputed_block_writer.appending = appending t
+        ; dumping = dumping t
+        ; logging = logging t
+        ; uploading = uploading t
+        }
+    else None
+  in
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
   ; catchup_status
@@ -485,6 +514,7 @@ let get_status ~flag t =
   ; consensus_configuration
   ; addrs_and_ports
   ; metrics
+  ; precomputed_block_writer
   }
 
 let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
