@@ -180,6 +180,12 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	ps, blockHash := makePaths(submittedAt, &req)
 
+	remoteAddr := r.Header.Get("X-Forwarded-For")
+	if remoteAddr == "" {
+		// If there is no X-Forwarded-For header, use the remote address
+		remoteAddr = r.RemoteAddr
+	}
+
 	meta := MetaToBeSaved{
 		CreatedAt:          req.Data.CreatedAt.Format(time.RFC3339),
 		PeerId:             req.Data.PeerId,
