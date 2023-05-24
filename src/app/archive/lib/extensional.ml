@@ -13,7 +13,7 @@ open Signature_lib
 module User_command = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       (* for `command_type` and `status`, a string is enough
          in any case, there aren't existing string conversions for the
          original OCaml types
@@ -50,7 +50,7 @@ end
 module Internal_command = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       (* for `command_type`, a string is enough
          no existing string conversion for the original OCaml type
       *)
@@ -125,8 +125,8 @@ module Block = struct
         ; global_slot_since_genesis :
             Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         ; timestamp : Block_time.Stable.V1.t
-        ; user_cmds : User_command.Stable.V1.t list
-        ; internal_cmds : Internal_command.Stable.V1.t list
+        ; user_cmds : User_command.Stable.V2.t list
+        ; internal_cmds : Internal_command.Stable.V2.t list
         ; zkapp_cmds : Zkapp_command.Stable.V1.t list
         ; protocol_version : Protocol_version.Stable.V1.t
         ; proposed_protocol_version : Protocol_version.Stable.V1.t option
