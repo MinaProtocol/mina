@@ -21,8 +21,8 @@ const TEST_WHITELIST_SPREADSHEET_ID = "1NODwwcVxLNnCI4XnIrGdGBSjointN4MZ8QZ7wqgt
 const TEST_CLOUD_BUCKET_NAME = "georgeee-uptime-itn-test-1"
 
 // Incentivized testnet
-const ITN_WHITELIST_SPREADSHEET_ID = "13ljZysTrRINd-pBz70SnSPBJ817fGJ0ETOcjHMppXow"
-const ITN_CLOUD_BUCKET_NAME = "georgeee-uptime-itn-test-2"
+const ITN_WHITELIST_SPREADSHEET_ID = "1lv0EoMjdRk31XJZxQr-4PaswPLWw3BFsRqWHWf26HJI"
+const ITN_CLOUD_BUCKET_NAME = "uptime-itn-test"
 
 func CloudBucketName() string {
 	if os.Getenv("TEST") == "" {
