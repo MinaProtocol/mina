@@ -389,14 +389,11 @@ let setup_daemon logger =
     flag "--precomputed-blocks-file"
       ~aliases:[ "precomputed-blocks-file" ]
       (optional string)
-      ~doc:
-        "PATH File to append precomputed blocks to, for replay or archiving."
+      ~doc:"PATH File to append precomputed blocks to, for replay or archiving."
   and precomputed_blocks_dir =
     flag "--precomputed-blocks-dir"
       ~aliases:[ "precomputed-blocks-dir" ]
-      (optional string)
-      ~doc:
-        "PATH Directory to dump precomputed blocks to."
+      (optional string) ~doc:"PATH Directory to dump precomputed blocks to."
   and block_reward_threshold =
     flag "--minimum-block-reward" ~aliases:[ "minimum-block-reward" ]
       ~doc:
@@ -1325,9 +1322,9 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~work_reassignment_wait ~archive_process_location
                  ~log_block_creation ~precomputed_values ~start_time
                  ?precomputed_blocks_file ?precomputed_blocks_dir
-                 ~log_precomputed_blocks
-                 ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-                 ~uptime_submitter_keypair ~stop_time ~node_status_url
+                 ~log_precomputed_blocks ~upload_blocks_to_gcloud
+                 ~block_reward_threshold ~uptime_url ~uptime_submitter_keypair
+                 ~stop_time ~node_status_url
                  ~graphql_control_port:itn_graphql_port ()
                  ~precomputed_block_writer:Mina_lib.empty )
           in
@@ -1442,8 +1439,8 @@ let replay_blocks logger =
                    In_channel.close blocks_file ;
                    None )
          in
-         let%bind coda = setup_daemon () in
-         let%bind () = Mina_lib.start_with_precomputed_blocks coda blocks in
+         let%bind mina = setup_daemon () in
+         let%bind () = Mina_lib.start_with_precomputed_blocks mina blocks in
          [%log info]
            "Daemon is ready, replayed precomputed blocks. Clients can now \
             connect" ;

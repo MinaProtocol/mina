@@ -1448,10 +1448,11 @@ module Block_latency = struct
     let count : Counter.t =
       let help = "Number of precomputed blocks written to disk" in
       Counter.v "precomputed_block_dump_count" ~help ~namespace ~subsystem
-    
+
     let bytes_written : Counter.t =
       let help = "Number of precomputed block bytes written to disk" in
-      Counter.v "precomputed_block_dump_bytes_written" ~help ~namespace ~subsystem
+      Counter.v "precomputed_block_dump_bytes_written" ~help ~namespace
+        ~subsystem
   end
 
   module Latency_time_spec = struct

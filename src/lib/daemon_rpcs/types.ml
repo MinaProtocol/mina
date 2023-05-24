@@ -198,16 +198,12 @@ module Status = struct
       type t = { dir : string; network : string }
       [@@deriving to_yojson, bin_io_unversioned, fields]
     end
-  
+
     module Uploading = struct
-      type t =
-        { bucket : string
-        ; keyfile : string
-        ; network : string
-        }
+      type t = { bucket : string; keyfile : string; network : string }
       [@@deriving to_yojson, bin_io_unversioned, fields]
     end
-    
+
     type t =
       { mutable appending : string option
       ; mutable dumping : Dumping.t option
@@ -456,32 +452,42 @@ module Status = struct
 
     let precomputed_block_writer =
       let render conf =
-        let fmt_field name op field = [ (name, op (Field.get field conf)) ] in
+        let fmt_field_opt name op field =
+          Option.value_map
+            (op @@ Field.get field conf)
+            ~default:[]
+            ~f:(fun res -> [ (name, res) ])
+        in
         let open Printf in
         let open Precomputed_block_writer in
         let dumping =
           let open Dumping in
-          fmt_field "dump_dir" (function
-            | Some dump -> sprintf "{ network: %s, dir: %s }" dump.network dump.dir
-            | None -> "...not dumping" )
+          fmt_field_opt "dir" (function
+            | Some dump ->
+                Some dump.dir
+            | _ ->
+                None )
         in
-        let appending = fmt_field "appending" (function
-            | Some path -> path
-            | None -> "...not appending")
+        let appending = fmt_field_opt "file" Fn.id in
+        let logging =
+          fmt_field_opt "log" (fun b -> if b then Some "true" else None)
         in
-        let logging = fmt_field "logging" Bool.to_string in
         let uploading =
           let open Uploading in
-          fmt_field "uploading" (function
-            | Some upload -> sprintf "{ network: %s, bucket: %s }" upload.network upload.bucket
-            | None -> "...not uploading")
+          fmt_field_opt "upload" (function
+            | Some upload ->
+                Some
+                  (sprintf "{ network: %s, bucket: %s }" upload.network
+                     upload.bucket )
+            | _ ->
+                None )
         in
         Fields.to_list ~appending ~dumping ~logging ~uploading
         |> List.concat
         |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
         |> digest_entries ~title:""
       in
-      option_entry "Precomputed block writing" ~f:render
+      option_entry "Precomputed block writer" ~f:render
   end
 
   type t =
@@ -533,7 +539,8 @@ module Status = struct
       ~coinbase_receiver ~histograms ~consensus_time_best_tip
       ~global_slot_since_genesis_best_tip ~consensus_time_now
       ~consensus_mechanism ~consensus_configuration ~next_block_production
-      ~snark_work_fee ~addrs_and_ports ~catchup_status ~metrics ~precomputed_block_writer
+      ~snark_work_fee ~addrs_and_ports ~catchup_status ~metrics
+      ~precomputed_block_writer
     |> List.filter_map ~f:Fn.id
 
   let to_text (t : t) =

@@ -239,20 +239,8 @@ val stop_dumping : t -> unit
 
 val stop_logging : t -> unit
 
-val stop_uploading : t -> unit
-
 val set_dump_dir : ?network:string -> path:string -> t -> unit
 
 val set_dump_file : path:string -> t -> unit
 
-val set_uploading : ?network:string -> bucket:string -> keyfile:string -> t -> unit
-
 val empty : Precomputed_block_writer.t
-
-val mk_appending : path:string -> Precomputed_block_writer.t
-
-val mk_dumping : network:string -> path:string -> Precomputed_block_writer.t
-
-val mk_logging : unit -> Precomputed_block_writer.t
-
-val mk_uploading : network:string -> bucket:string -> keyfile:string -> Precomputed_block_writer.t
