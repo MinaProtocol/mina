@@ -76,6 +76,7 @@
    pickles
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
+   daemon_rpcs
  )
 
  (preprocessor_deps ../../../../config.mlh)
