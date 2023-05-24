@@ -110,40 +110,35 @@ module Ipa : sig
 
   type ('a, 'b) compute_sg := num_chunks:int -> 'a challenge -> 'b * 'b
 
+  type tick := Backend.Tick.Field.t (* Fp *)
+
+  type tock := Backend.Tock.Field.t (* Fq *)
+
   module Wrap : sig
     val compute_challenge :
-         Import.Challenge.Constant.t Import.Scalar_challenge.t
-      -> Backend.Tock.Field.t
+      Import.Challenge.Constant.t Import.Scalar_challenge.t -> tock
 
     val endo_to_field :
-         Import.Challenge.Constant.t Import.Scalar_challenge.t
-      -> Backend.Tock.Field.t
+      Import.Challenge.Constant.t Import.Scalar_challenge.t -> tock
 
-    val compute_challenges :
-      'a challenge -> (Backend.Tock.Field.t, 'a) Pickles_types.Vector.t
+    val compute_challenges : 'a challenge -> (tock, 'a) Pickles_types.Vector.t
 
-    val compute_sg : ('a, Pasta_bindings.Fp.t) compute_sg
+    val compute_sg : ('a, tick) compute_sg
   end
 
   module Step : sig
     val compute_challenge :
-         Import.Challenge.Constant.t Import.Scalar_challenge.t
-      -> Backend.Tick.Field.t
+      Import.Challenge.Constant.t Import.Scalar_challenge.t -> tick
 
     val endo_to_field :
-         Import.Challenge.Constant.t Import.Scalar_challenge.t
-      -> Backend.Tick.Field.t
+      Import.Challenge.Constant.t Import.Scalar_challenge.t -> tick
 
-    val compute_challenges :
-      'a challenge -> (Backend.Tick.Field.t, 'a) Pickles_types.Vector.t
+    val compute_challenges : 'a challenge -> (tick, 'a) Pickles_types.Vector.t
 
-    val compute_sg : ('a, Pasta_bindings.Fq.t) compute_sg
+    val compute_sg : ('a, tock) compute_sg
 
     val accumulator_check :
-         ( (Pasta_bindings.Fq.t * Pasta_bindings.Fq.t)
-         * (Pasta_bindings.Fp.t, 'a) Pickles_types.Vector.t )
-         list
-      -> bool Promise.t
+      ((tock * tock) * (tick, 'a) Pickles_types.Vector.t) list -> bool Promise.t
   end
 end
 
