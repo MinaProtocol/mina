@@ -382,21 +382,15 @@ let valid_size ~genesis_constants = function
 let has_zero_vesting_period = function
   | Signed_command _ ->
       false
-  | Zkapp_command (p : Zkapp_command.t) ->
-      Zkapp_command.Call_forest.exists p.account_updates ~f:(fun p ->
-          match p.body.update.timing with
-          | Keep ->
-              false
-          | Set { vesting_period; _ } ->
-              Mina_numbers.Global_slot.(equal zero) vesting_period )
+  | Zkapp_command p ->
+      Zkapp_command.has_zero_vesting_period p
 
 module Well_formedness_error = struct
   (* syntactically-evident errors such that a user command can never succeed *)
   type t =
     | Insufficient_fee
     | Zero_vesting_period
-    | Zkapp_too_big of
-        (Error.t[@to_yojson fun err -> `String (Error.to_string_hum err)])
+    | Zkapp_too_big of (Error.t[@to_yojson Error_json.error_to_yojson])
   [@@deriving compare, to_yojson]
 
   let to_string = function
