@@ -12,6 +12,14 @@ module Snark_worker_config = struct
     }
 end
 
+module Precomputed_block_writer = Daemon_rpcs.Types.Status.Precomputed_block_writer
+(* type precomputed_block_writer = Daemon_rpcs.Types.Status.Precomputed_block_writer.t =
+  { appending : string option
+  ; dumping : Dumping.t option
+  ; logging : bool
+  ; uploading : Uploading.t option
+  } *)
+
 (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
 type t =
   { conf_dir : string
@@ -51,7 +59,8 @@ type t =
   ; log_block_creation : bool [@default false]
   ; precomputed_values : Precomputed_values.t
   ; start_time : Time.t
-  ; precomputed_blocks_path : string option
+  ; precomputed_blocks_file : string option
+  ; precomputed_blocks_dir : string option
   ; log_precomputed_blocks : bool
   ; upload_blocks_to_gcloud : bool
   ; block_reward_threshold : Currency.Amount.t option [@default None]
@@ -60,5 +69,6 @@ type t =
   ; uptime_submitter_keypair : Keypair.t option [@default None]
   ; stop_time : int
   ; graphql_control_port : int option [@default None]
+  ; precomputed_block_writer : Precomputed_block_writer.t
   }
 [@@deriving make]
