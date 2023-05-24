@@ -50,12 +50,12 @@ provider "google" {
 
 variable "whale_count" {
   type    = number
-  default = 10
+  default = 9
 }
 
 variable "fish_count" {
   type    = number
-  default = 2
+  default = 3
 }
 
 #######################################
@@ -118,7 +118,7 @@ module "node_configs" {
   # snark worker configs
   snark_coordinators = [
     {
-      snark_worker_replicas        = 4
+      snark_worker_replicas        = 3
       snark_worker_fee             = "0.01"
       snark_worker_public_key      = "B62qmQsEHcsPUs5xdtHKjEmWqqhUPRSF2GNmdguqnNvpEZpKftPC69e"
       snark_coordinators_host_port = 10401
