@@ -13,6 +13,7 @@ resource "kubernetes_ingress_v1" "testnet_graphql_ingress" {
     annotations = {
       "kubernetes.io/ingress.class" = "nginx"
       "nginx.org/mergeable-ingress-type" = "minion"
+      "nginx.ingress.kubernetes.io/use-regex" = "true"
       "nginx.ingress.kubernetes.io/rewrite-target" = "/$2"
     }
   }
@@ -39,6 +40,7 @@ resource "kubernetes_ingress_v1" "testnet_graphql_ingress" {
             }
 
             path = "/${path.value}(/|$)(.*)"
+            path_type = "Prefix"
           }
         }
       }
