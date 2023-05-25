@@ -24,7 +24,9 @@ in Pipeline.build Pipeline.Config::{
         S.strictlyStart (S.contains "src"),
         S.strictlyStart (S.contains "dockerfiles"),
         S.strictlyStart (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest"),
-        S.strictlyStart (S.contains "buildkite/src/Jobs/Command/TestExecutive")
+        S.strictlyStart (S.contains "buildkite/src/Jobs/Command/TestExecutive"),
+        S.strictlyStart (S.contains "automation/terraform/modules/o1-integration"),
+        S.strictlyStart (S.contains "automation/terraform/modules/kubernetes/testnet")
     ],
     path = "Test",
     name = "TestnetIntegrationTests"
