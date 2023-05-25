@@ -172,10 +172,8 @@ let bignum_bigint_unpack ?(remove_trailing = false) (bignum : Bignum_bigint.t) :
       match lst with
       | [] ->
           []
-      | true :: tl ->
-          true :: tl
-      | false :: tl ->
-          remove_leading_false_rec tl
+      | hd :: tl ->
+          if hd then hd :: tl else remove_leading_false_rec tl
     in
     List.rev @@ remove_leading_false_rec rev
   in
