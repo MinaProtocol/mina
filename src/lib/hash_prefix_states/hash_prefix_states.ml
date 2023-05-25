@@ -60,31 +60,32 @@ let signature_for_mainnet = salt signature_mainnet
 
 let signature_for_testnet = salt signature_testnet
 
-let signature_for_other = salt signature_other
+let signature_for_other chain_name = salt @@ signature_other chain_name
 
-let signature =
-  match Mina_signature_kind.t with
+let signature ?(signature_kind = Mina_signature_kind.t) =
+  match signature_kind with
   | Mainnet ->
       signature_for_mainnet
   | Testnet ->
       signature_for_testnet
-  | Other_network ->
-      signature_for_other
+  | Other_network chain_name ->
+      signature_for_other chain_name
 
 let signature_for_mainnet_legacy = salt_legacy signature_mainnet
 
 let signature_for_testnet_legacy = salt_legacy signature_testnet
 
-let signature_for_other_legacy = salt_legacy signature_other
+let signature_for_other_legacy chain_name =
+  salt_legacy @@ signature_other chain_name
 
-let signature_legacy =
-  match Mina_signature_kind.t with
+let signature_legacy ?(signature_kind = Mina_signature_kind.t) =
+  match signature_kind with
   | Mainnet ->
       signature_for_mainnet_legacy
   | Testnet ->
       signature_for_testnet_legacy
-  | Other_network ->
-      signature_for_other_legacy
+  | Other_network chain_name ->
+      signature_for_other_legacy chain_name
 
 let vrf_output = salt vrf_output
 

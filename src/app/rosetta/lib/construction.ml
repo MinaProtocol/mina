@@ -682,7 +682,7 @@ module Parse = struct
               else if String.equal network_identifier.network "testnet" then
                 Testnet
               else
-                Other_network
+                Other_network network_identifier.network
             in
             Option.is_some @@
               Signed_command.create_with_signature_checked ~signature_kind
