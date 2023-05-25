@@ -1,6 +1,6 @@
 [%%import "/src/config.mlh"]
 
-type t = Testnet | Mainnet | Other_network
+type t = Testnet | Mainnet | Other_network of string
 
 [%%if network = "mainnet"]
 
@@ -12,6 +12,8 @@ let t = Testnet
 
 [%%else]
 
-let t = Other_network
+[%%inject "network", chain_name]
+
+let t = Other_network chain_name
 
 [%%endif]
