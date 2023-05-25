@@ -47,15 +47,15 @@ let signed_command ?(valid_until = Global_slot.max_value) ?signer ~sender
   Command
     (User_command.Signed_command
        Signed_command.Poly.{ payload; signer; signature = Signature.dummy } )
-      
+
 let balance_to_fee b = Balance.to_amount b |> Amount.to_fee
 
 let setup =
   let open Quickcheck.Generator.Let_syntax in
   let%bind global_slot = Global_slot.gen in
   (* Sender must pay at least 1 nanomina of fee and at least 1 nanomina of transfer. *)
-  let%bind sender = Test_account.gen_constrained_balance ()
-                      ~min:Balance.(of_nanomina_int_exn 2)
+  let%bind sender =
+    Test_account.gen_constrained_balance () ~min:Balance.(of_nanomina_int_exn 2)
   in
   (* Amount cannot drain whole sender's balance, because we want a non-zero fee. *)
   let max_amount =
@@ -65,12 +65,11 @@ let setup =
   let%bind amount = Amount.gen_incl Amount.one max_amount in
   (* Receiver's balance must be able to pay the fee and also to accept the amount. *)
   let max_recv_balance =
-    Balance.(sub_amount max_int amount)
-    |> Option.value ~default:Balance.zero
+    Balance.(sub_amount max_int amount) |> Option.value ~default:Balance.zero
   in
-  let%bind receiver = Test_account.gen_constrained_balance ()
-                        ~max:max_recv_balance
-                        ~min:Balance.(of_nanomina_int_exn 1)
+  let%bind receiver =
+    Test_account.gen_constrained_balance () ~max:max_recv_balance
+      ~min:Balance.(of_nanomina_int_exn 1)
   in
   (* We don't decide, who pays the fee yet, so both parties must be able to do so. *)
   let max_sender_fee =
@@ -82,9 +81,8 @@ let setup =
   (global_slot, sender, receiver, amount, fee)
 
 let simple_payment () =
-  Quickcheck.test setup
-    ~f:(fun (global_slot, sender, receiver, amount, fee) ->
-      let accounts = [ sender; receiver] in
+  Quickcheck.test setup ~f:(fun (global_slot, sender, receiver, amount, fee) ->
+      let accounts = [ sender; receiver ] in
       let txn = signed_command ~fee ~sender ~receiver amount in
       let txn_state_view = protocol_state ~global_slot accounts in
       let ledger =
@@ -95,8 +93,7 @@ let simple_payment () =
            ~txn_state_view ledger [ txn ] ) )
 
 let simple_payment_signer_different_from_fee_payer () =
-  Quickcheck.test setup
-    ~f:(fun (global_slot, sender, receiver, amount, fee) ->
+  Quickcheck.test setup ~f:(fun (global_slot, sender, receiver, amount, fee) ->
       let accounts = [ sender; receiver ] in
       let txn = signed_command ~signer:receiver ~fee ~sender ~receiver amount in
       let txn_state_view = protocol_state ~global_slot accounts in
@@ -108,4 +105,3 @@ let simple_payment_signer_different_from_fee_payer () =
           "Cannot pay fees from a public key that did not sign the transaction"
         (Transaction_logic.apply_transactions ~constraint_constants ~global_slot
            ~txn_state_view ledger [ txn ] ) )
-

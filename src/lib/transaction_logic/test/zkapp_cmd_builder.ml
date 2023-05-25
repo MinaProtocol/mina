@@ -221,20 +221,21 @@ end
 
 let mk_updates (t : transaction) = t#updates
 
-let fee_payer_body (account, amount) =
+let fee_payer_body ?valid_until (account, amount) =
+  let vu = valid_until in
   let open Monad_lib in
   let open State.Let_syntax in
   let open Account_update.Body.Fee_payer in
   let%map nonce = get_nonce_exn account in
-  { public_key = account; fee = amount; valid_until = None; nonce }
+  { public_key = account; fee = amount; valid_until = vu; nonce }
 
-let build_zkapp_cmd ~fee transactions :
+let build_zkapp_cmd ?valid_until ~fee transactions :
     ( Zkapp_command.t
     , Account_nonce.t Public_key.Compressed.Map.t )
     Monad_lib.State.t =
   let open Monad_lib in
   let open State.Let_syntax in
-  let%bind body = fee_payer_body fee in
+  let%bind body = fee_payer_body ?valid_until fee in
   let%map updates = State.concat_map_m ~f:mk_updates transactions in
   Zkapp_command.
     { fee_payer = { body; authorization = Signature.dummy }
@@ -242,5 +243,7 @@ let build_zkapp_cmd ~fee transactions :
     ; memo = Signed_command_memo.dummy
     }
 
-let zkapp_cmd ~noncemap ~fee transactions =
-  Monad_lib.State.eval_state (build_zkapp_cmd ~fee transactions) noncemap
+let zkapp_cmd ?valid_until ~noncemap ~fee transactions =
+  Monad_lib.State.eval_state
+    (build_zkapp_cmd ?valid_until ~fee transactions)
+    noncemap
