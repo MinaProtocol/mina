@@ -16,7 +16,7 @@ use kimchi::{
     },
     verifier::Context,
 };
-use kimchi::{prover::caml::CamlProverProof, verifier_index::VerifierIndex};
+use kimchi::{prover::caml::CamlProofWithPublic, verifier_index::VerifierIndex};
 use mina_curves::pasta::{Fp, Fq, Pallas, PallasParameters};
 use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi,
@@ -33,7 +33,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
     witness: Vec<CamlFqVector>,
     prev_challenges: Vec<CamlFq>,
     prev_sgs: Vec<CamlGPallas>,
-) -> Result<CamlProverProof<CamlGPallas, CamlFq>, ocaml::Error> {
+) -> Result<CamlProofWithPublic<CamlGPallas, CamlFq>, ocaml::Error> {
     {
         let ptr: &mut poly_commitment::srs::SRS<Pallas> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
@@ -91,7 +91,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_verify(
     index: CamlPastaFqPlonkVerifierIndex,
-    proof: CamlProverProof<CamlGPallas, CamlFq>,
+    proof: CamlProofWithPublic<CamlGPallas, CamlFq>,
 ) -> bool {
     let group_map = <Pallas as CommitmentCurve>::Map::setup();
 
@@ -115,7 +115,7 @@ pub fn caml_pasta_fq_plonk_proof_verify(
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_batch_verify(
     indexes: Vec<CamlPastaFqPlonkVerifierIndex>,
-    proofs: Vec<CamlProverProof<CamlGPallas, CamlFq>>,
+    proofs: Vec<CamlProofWithPublic<CamlGPallas, CamlFq>>,
 ) -> bool {
     let ts: Vec<_> = indexes
         .into_iter()
@@ -146,7 +146,7 @@ pub fn caml_pasta_fq_plonk_proof_batch_verify(
 
 #[ocaml_gen::func]
 #[ocaml::func]
-pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq> {
+pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProofWithPublic<CamlGPallas, CamlFq> {
     fn comm() -> PolyComm<Pallas> {
         let g = Pallas::prime_subgroup_generator();
         PolyComm {
@@ -174,6 +174,7 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq>
         zeta_omega: vec![Fq::one()],
     };
     let evals = ProofEvaluations {
+        public: Some(eval()),
         w: array_init(|_| eval()),
         coefficients: array_init(|_| eval()),
         z: eval(),
@@ -203,7 +204,7 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq>
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_deep_copy(
-    x: CamlProverProof<CamlGPallas, CamlFq>,
-) -> CamlProverProof<CamlGPallas, CamlFq> {
+    x: CamlProofWithPublic<CamlGPallas, CamlFq>,
+) -> CamlProofWithPublic<CamlGPallas, CamlFq> {
     x
 }

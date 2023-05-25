@@ -480,7 +480,7 @@ let%test_module "gate finalization" =
          * Pasta_bindings.Fp.t list
          * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
            , Pasta_bindings.Fp.t )
-           Kimchi_types.prover_proof
+           Kimchi_types.proof_with_public
 
     module type SETUP = sig
       val example : example
@@ -505,14 +505,14 @@ let%test_module "gate finalization" =
          snarky proof *)
       let vk = Kimchi_bindings.Protocol.VerifierIndex.Fp.create index
 
-      let proof = Backend.Tick.Proof.of_backend proof
+      let proof = Backend.Tick.Proof.of_backend_with_public_evals proof
 
       let test_feature_flags_configs =
         generate_test_feature_flag_configs S.actual_feature_flags
 
       let runtest feature_flags =
         run_recursive_proof_test S.actual_feature_flags feature_flags
-          public_input vk proof
+          public_input vk proof.proof
 
       let%test "true -> yes" = runtest test_feature_flags_configs.true_is_yes
 
@@ -918,7 +918,7 @@ let wrap
           } )
   in
   [%log internal] "Pickles_wrap_proof_done" ;
-  ( { proof = next_proof
+  ( { proof = next_proof.proof
     ; statement =
         Types.Wrap.Statement.to_minimal next_statement
           ~to_option:Opt.to_option_unsafe

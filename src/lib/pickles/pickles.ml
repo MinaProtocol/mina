@@ -1786,7 +1786,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                 }
                             } )
                     in
-                    ( { proof = next_proof
+                    ( { proof = next_proof.proof
                       ; statement =
                           Types.Wrap.Statement.to_minimal
                             ~to_option:Plonk_types.Opt.to_option next_statement

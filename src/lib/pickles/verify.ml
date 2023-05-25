@@ -358,7 +358,10 @@ let verify_heterogenous (ts : Instance.t list) =
                t.statement.proof_state.messages_for_next_wrap_proof
                  .old_bulletproof_challenges )
         in
-        (key.index, t.proof, input, Some message) )
+        ( key.index
+        , { proof = t.proof; public_evals = None }
+        , input
+        , Some message ) )
   in
   [%log internal] "Compute_batch_verify_inputs_done" ;
   [%log internal] "Dlog_check_batch_verify" ;
