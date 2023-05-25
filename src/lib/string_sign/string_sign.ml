@@ -107,12 +107,10 @@ let%test_module "Sign_string tests" =
       let open Mina_signature_kind in
       let s = "Some pills make you larger" in
       let signature = sign ~signature_kind:Testnet keypair.private_key s in
-      not (verify ~signature_kind:Mainnet signature keypair.public_key s)
-    (*
+      (not (verify ~signature_kind:Mainnet signature keypair.public_key s))
       && not
            (verify ~signature_kind:(Other_network "Foo") signature
               keypair.public_key s )
-      *)
 
     let%test "Sign with mainnet, fail to verify with testnet or other network" =
       let open Mina_signature_kind in
