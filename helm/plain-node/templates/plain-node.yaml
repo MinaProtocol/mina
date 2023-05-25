@@ -104,7 +104,7 @@ spec:
         volumeMounts:
         {{- if $.Values.mina.uploadBlocksToGCloud }}
         - name: gcloud-keyfile
-          mountPath: "/root/gcloud/"
+          mountPath: "/gcloud/"
         {{- end }}
         {{- if $.Values.mina.runtimeConfig }}
         - name: daemon-config
