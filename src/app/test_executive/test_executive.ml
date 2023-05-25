@@ -63,9 +63,8 @@ let tests : test list =
   ; ("zkapps-nonce", (module Zkapps_nonce_test.Make : Intf.Test.Functor_intf))
   ; ( "verification-key"
     , (module Verification_key_update.Make : Intf.Test.Functor_intf) )
-  ; ( "opt-block-prod"
+  ; ( "block-prod-prio"
     , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
-  ; ("snark", (module Snark_test.Make : Intf.Test.Functor_intf))
   ; ("snarkyjs", (module Snarkyjs.Make : Intf.Test.Functor_intf))
   ; ("block-reward", (module Block_reward_test.Make : Intf.Test.Functor_intf))
   ]
