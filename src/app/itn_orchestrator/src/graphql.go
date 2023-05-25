@@ -26,16 +26,16 @@ type Authenticator struct {
 
 func (doer *DoerWithStatus) Do(req *http.Request) (*http.Response, error) {
 	resp, err := doer.Doer.Do(req)
-	if err != nil {
+	if err == nil {
 		doer.LastStatusCode = resp.StatusCode
 	}
 	return resp, err
 }
 
 type SequentialAuthenticator struct {
-	Authenticator
-	uuid  string
-	seqno uint16
+	authenticator *Authenticator
+	uuid          string
+	seqno         uint16
 }
 
 func NewAuthenticator(sk ed25519.PrivateKey, doer graphql.Doer) *Authenticator {
@@ -47,7 +47,7 @@ func NewAuthenticator(sk ed25519.PrivateKey, doer graphql.Doer) *Authenticator {
 
 func NewSequentialAuthenticator(uuid string, seqno uint16, authenticator *Authenticator) *SequentialAuthenticator {
 	return &SequentialAuthenticator{
-		Authenticator: *authenticator,
+		authenticator: authenticator,
 		uuid:          uuid,
 		seqno:         seqno,
 	}
@@ -85,11 +85,11 @@ func (client *SequentialAuthenticator) Do(req *http.Request) (*http.Response, er
 	binary.BigEndian.PutUint16(msg, client.seqno)
 	copy(msg[2:], uuid)
 	copy(msg[2+len(uuid):], body)
-	sig := ed25519.Sign(client.sk, msg)
+	sig := ed25519.Sign(client.authenticator.sk, msg)
 	sigStr := base64.StdEncoding.EncodeToString(sig)
 	header := strings.Join([]string{
 		"Signature",
-		client.pkStr,
+		client.authenticator.pkStr,
 		sigStr,
 		"; Sequencing",
 		client.uuid,
@@ -97,7 +97,7 @@ func (client *SequentialAuthenticator) Do(req *http.Request) (*http.Response, er
 	}, " ")
 	req.Header.Set("Authorization", header)
 	client.seqno++
-	return client.doer.Do(req)
+	return client.authenticator.doer.Do(req)
 }
 
 var _ graphql.Doer = (*SequentialAuthenticator)(nil)
@@ -134,7 +134,8 @@ func wrapGqlRequest(config Config, nodeAddress NodeAddress, perform func(client 
 	if err != nil && *lastCode == 412 {
 		config.Log.Infof("received sequencing error code (412), retrying request to %s, error: %v", nodeAddress, err)
 		delete(config.NodeData, nodeAddress)
-		client, _, err := GetGqlClient(config, nodeAddress)
+		var client graphql.Client
+		client, _, err = GetGqlClient(config, nodeAddress)
 		if err != nil {
 			return "", fmt.Errorf("failed to create a replacement client for %s: %v", nodeAddress, err)
 		}

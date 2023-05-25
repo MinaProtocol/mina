@@ -68,8 +68,10 @@ func SchedulePayments(config Config, params PaymentParams, output func(Scheduled
 		if err != nil {
 			config.Log.Warnf("error scheduling payments for %s: %v", nodeAddress, err)
 			n := len(nodes) - nodeIx - 1
-			tps = remTps / float64(n)
-			feePayersPerNode = len(remFeePayers) / n
+			if n > 0 {
+				tps = remTps / float64(n)
+				feePayersPerNode = len(remFeePayers) / n
+			}
 			continue
 		}
 		successfulNodes = append(successfulNodes, nodeAddress)

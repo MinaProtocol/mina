@@ -91,9 +91,11 @@ func SendZkappCommands(config Config, params ZkappCommandParams, output func(Sch
 		if err != nil {
 			config.Log.Warnf("error scheduling zkapp txs for %s: %v", nodeAddress, err)
 			n := len(nodes) - nodeIx - 1
-			tps = remTps / float64(n)
-			feePayersPerNode = len(remFeePayers) / n
-			zkappsToDeploy, accountQueueSize = zkappParams(params, tps)
+			if n > 0 {
+				tps = remTps / float64(n)
+				feePayersPerNode = len(remFeePayers) / n
+				zkappsToDeploy, accountQueueSize = zkappParams(params, tps)
+			}
 			continue
 		}
 		successfulNodes = append(successfulNodes, nodeAddress)
