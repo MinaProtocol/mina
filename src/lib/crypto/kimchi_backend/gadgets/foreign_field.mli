@@ -81,6 +81,12 @@ module type Element_intf = sig
   val to_string_as_prover :
     (module Snark_intf.Run with type field = 'field) -> 'field t -> string
 
+  (* Constrain zero check computation with boolean output *)
+  val is_zero :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> 'field Cvar.t Snark_intf.Boolean0.t
+
   (** Compare if two foreign field elements are equal *)
   val equal_as_prover :
        (module Snark_intf.Run with type field = 'field)

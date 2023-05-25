@@ -175,6 +175,12 @@ module type Element_intf = sig
   val to_string_as_prover :
     (module Snark_intf.Run with type field = 'field) -> 'field t -> string
 
+  (* Constrain zero check computation with boolean output *)
+  val is_zero :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> 'field Cvar.t Snark_intf.Boolean0.t
+
   (* Compare if two foreign field elements are equal *)
   val equal_as_prover :
        (module Snark_intf.Run with type field = 'field)
@@ -265,6 +271,16 @@ end = struct
         (module Circuit : Snark_intf.Run with type field = field) a : string =
       sprintf "%s" @@ Bignum_bigint.to_string
       @@ to_bignum_bigint_as_prover (module Circuit) a
+
+    let is_zero (type field)
+        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
+        : Circuit.Boolean.var =
+      let open Circuit in
+      let x0, x1, x2 = to_limbs x in
+      let x0_is_zero = Field.(equal x0 zero) in
+      let x1_is_zero = Field.(equal x1 zero) in
+      let x2_is_zero = Field.(equal x2 zero) in
+      Boolean.(x0_is_zero && x1_is_zero && x2_is_zero)
 
     let equal_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field)
@@ -359,6 +375,15 @@ end = struct
         (module Circuit : Snark_intf.Run with type field = field) a : string =
       sprintf "%s" @@ Bignum_bigint.to_string
       @@ to_bignum_bigint_as_prover (module Circuit) a
+
+    let is_zero (type field)
+        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
+        : Circuit.Boolean.var =
+      let open Circuit in
+      let x01, x2 = to_limbs x in
+      let x01_is_zero = Field.(equal x01 zero) in
+      let x2_is_zero = Field.(equal x2 zero) in
+      Boolean.(x01_is_zero && x2_is_zero)
 
     let equal_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field)

@@ -239,12 +239,12 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
       assert (
         not (Affine.equal_as_prover (module Circuit) left_input right_input) ) ;
       (* Sanity check that both points are not infinity *)
-      assert (
-        not
-          (Affine.equal_as_prover
-             (module Circuit)
-             left_input
-             (Affine.as_prover_zero (module Circuit)) ) ) ;
+      (* assert (
+         not
+           (Affine.equal_as_prover
+              (module Circuit)
+              left_input
+              (Affine.as_prover_zero (module Circuit)) ) ) ; *)
       assert (
         not
           (Affine.equal_as_prover
@@ -337,6 +337,15 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
             let x_diff_s = slope * x_diff % foreign_field_modulus in
             (x_diff_s - right_y) % foreign_field_modulus)
         in
+
+        (* printf "slope = %s\n" @@ Bignum_bigint.to_string slope ;
+           printf "slope^2 = %s\n" @@ Bignum_bigint.to_string slope_squared ;
+           printf "x = %s\n" @@ Bignum_bigint.to_string result_x ;
+           printf "y = %s\n" @@ Bignum_bigint.to_string result_y ;
+           printf "Lx = %s\n" @@ Bignum_bigint.to_string left_x ;
+           printf "Rx = %s\n" @@ Bignum_bigint.to_string right_x ;
+           printf "Ly = %s\n" @@ Bignum_bigint.to_string left_y ;
+           printf "Ry = %s\n" @@ Bignum_bigint.to_string right_y ; *)
 
         (* Convert from Bignums to field elements *)
         let slope0, slope1, slope2 =
@@ -524,7 +533,11 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
     expected_right_delta_s right_delta_s ;
 
   (* Return result point *)
-  Affine.of_coordinates (result_x, result_y)
+  Affine.if_
+    (module Circuit)
+    (Foreign_field.Element.Standard.is_zero (module Circuit) left_x)
+    (Affine.of_coordinates (right_x, right_y))
+    (Affine.of_coordinates (result_x, result_y))
 
 (* Gadget for (partial) elliptic curve group doubling over foreign field
  *
@@ -896,7 +909,7 @@ let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
  *   Preconditions and limitations:
  *      P is not O (the point at infinity)
  *      s is not zero
- *      Length of s must equal the bit-length of the group order n
+ *      Length of s must equal the bit-length of the group order n  (TODO: REMOVE THIS requirement)
  *)
 let ec_scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     (external_checks : f Foreign_field.External_checks.t)
@@ -907,42 +920,36 @@ let ec_scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
       , Circuit.Field.Constant.zero
       , Circuit.Field.Constant.zero ))
     (foreign_field_modulus : f Foreign_field.standard_limbs) : f Affine.t =
-  let open Circuit in
-  (* Array.iter scalar ~f:(fun bit ->
-      as_prover (fun () ->
-          let bit = Common.cvar_bool_to_bool_as_prover (module Circuit) bit in
-          printf "Bit = %b\n" @@ bit ) ;
-      () ) ; *)
-
   (* Double-and-add algorithm
    *   Only used for signature verification, so simple algorithm suffices.
+   *
+   *     A = O; B = P
+   *     for i in 0..n
+   *         if si == 1
+   *             A = group_add(A, B)
+   *         B = group_double(B)
+   *     return A
    *)
-
-  (* Workaround cannot add group-zero: start with initial point = 2 * point *)
-  let init_point =
-    group_double (module Circuit) external_checks point ~a foreign_field_modulus
-  in
-
-  let result =
-    Array.foldi scalar
-      ~init:(init_point, point)
-        (* Workaround: cannot add group-zero *)
-        (* ~init:(Affine.as_prover_zero (module Circuit), point) *)
-      ~f:(fun i (result, base) bit ->
-        as_prover (fun () ->
+  let acc, _base =
+    Array.foldi scalar (* ~init:(init_point, point) *)
+      ~init:(Affine.as_prover_zero (module Circuit), point) (* (acc, base) *)
+      ~f:(fun i (acc, base) bit ->
+        (* let open Circuit in
+           as_prover (fun () ->
+            printf "----\n" ;
             printf "i       = %d\n" i ;
-            printf "result  = %s\n"
-            @@ Affine.to_string_as_prover (module Circuit) result ;
+            printf "acc     = %s\n"
+            @@ Affine.to_string_as_prover (module Circuit) acc ;
             printf "base    = %s\n"
             @@ Affine.to_string_as_prover (module Circuit) base ;
             printf "bit     = %b\n"
-            @@ Common.cvar_bool_to_bool_as_prover (module Circuit) bit ) ;
+            @@ Common.cvar_bool_to_bool_as_prover (module Circuit) bit ) ; *)
 
-        (* Add: sum = result + base *)
+        (* Add: sum = acc + base *)
         let sum =
           group_add
             (module Circuit)
-            external_checks result base foreign_field_modulus
+            external_checks acc base foreign_field_modulus
         in
 
         (* Group double: double_base = base + base *)
@@ -959,46 +966,15 @@ let ec_scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
         in
 
         (* Group add conditionally *)
-        let result = Affine.if_ (module Circuit) bit sum result in
+        let acc = Affine.if_ (module Circuit) bit sum acc in
 
-        as_prover (fun () ->
-            printf "result' = %s\n"
-            @@ Affine.to_string_as_prover (module Circuit) result ) ;
-
-        (result, double_base) )
+        (* as_prover (fun () ->
+            printf "acc'    = %s\n"
+            @@ Affine.to_string_as_prover (module Circuit) acc ) ; *)
+        (acc, double_base) )
   in
 
-  let result = fst result in
-
-  (* Workaround cannot add group-zero: result = result - init_point *)
-  let neg_init_point =
-    (* Negate init_point *)
-    let init_point_x, init_point_y = Affine.to_coordinates init_point in
-    let neg_init_point_y =
-      (* neg_init_point_y = 0 - init_point_y *)
-      Foreign_field.sub
-        (module Circuit)
-        ~full:false
-        (Foreign_field.Element.Standard.of_bignum_bigint
-           (module Circuit)
-           Bignum_bigint.zero )
-        init_point_y foreign_field_modulus
-    in
-    Affine.of_coordinates (init_point_x, neg_init_point_y)
-  in
-
-  let result =
-    (* result = result + neg_init_point *)
-    group_add
-      (module Circuit)
-      external_checks result neg_init_point foreign_field_modulus
-  in
-
-  as_prover (fun () ->
-    printf "RESULT  = %s\n"
-    @@ Affine.to_string_as_prover (module Circuit) result ) ;
-
-  result
+  acc
 
 (***************)
 (* Group tests *)
@@ -2985,7 +2961,7 @@ let%test_unit "group_properties" =
 (********************)
 
 let%test_unit "scalar_mul" =
-  if scalar_mul_tests_enabled then
+  if scalar_mul_tests_enabled then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -2993,7 +2969,7 @@ let%test_unit "scalar_mul" =
     in
 
     (* Test elliptic curve scalar multiplication *)
-    let test_scalar_mul ?cs (scalar : Bignum_bigint.t array)
+    let test_scalar_mul ?cs (scalar : Bignum_bigint.t)
         (point : Bignum_bigint.t * Bignum_bigint.t)
         (expected_result : Bignum_bigint.t * Bignum_bigint.t)
         ?(a = Bignum_bigint.zero) (foreign_field_modulus : Bignum_bigint.t) =
@@ -3012,10 +2988,13 @@ let%test_unit "scalar_mul" =
                 (module Runner.Impl)
                 foreign_field_modulus
             in
-            let scalar =
-              Array.map scalar ~f:(fun scalar ->
-                  exists Boolean.typ ~compute:(fun () ->
-                      if Bignum_bigint.(equal scalar zero) then false else true ) )
+            let scalar_bits =
+              (* Removing trailing zeros helps make the test faster *)
+              let scalar_bits =
+                Common.bignum_bigint_unpack ~remove_trailing:true scalar
+              in
+              Array.map scalar_bits ~f:(fun bit ->
+                  exists Boolean.typ ~compute:(fun () -> bit) )
             in
             let point =
               Affine.of_bignum_bigint_coordinates (module Runner.Impl) point
@@ -3036,8 +3015,13 @@ let%test_unit "scalar_mul" =
             let result =
               ec_scalar_mul
                 (module Runner.Impl)
-                unused_external_checks scalar point ~a foreign_field_modulus
+                unused_external_checks scalar_bits point ~a
+                foreign_field_modulus
             in
+
+            as_prover (fun () ->
+                printf "RESULT  = %s\n"
+                @@ Affine.to_string_as_prover (module Runner.Impl) result ) ;
 
             (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
             let fake =
@@ -3059,8 +3043,112 @@ let%test_unit "scalar_mul" =
       cs
     in
 
-    (* Tests for random points *)
-    let scalar = Bignum_bigint.[| one; zero; zero; zero |] in
+    (* Test group add *)
+    let test_group_add ?cs (left_input : Bignum_bigint.t * Bignum_bigint.t)
+        (right_input : Bignum_bigint.t * Bignum_bigint.t)
+        (expected_result : Bignum_bigint.t * Bignum_bigint.t)
+        (foreign_field_modulus : Bignum_bigint.t) =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            let open Runner.Impl in
+            (* Prepare test inputs *)
+            let foreign_field_modulus =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                foreign_field_modulus
+            in
+            let left_input =
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                left_input
+            in
+            let right_input =
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                right_input
+            in
+            let expected_result =
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                expected_result
+            in
+
+            (* Create external checks context for tracking extra constraints
+               that are required for soundness (unused in this simple test) *)
+            let unused_external_checks =
+              Foreign_field.External_checks.create (module Runner.Impl)
+            in
+
+            (* L + R = S *)
+            let result =
+              group_add
+                (module Runner.Impl)
+                unused_external_checks left_input right_input
+                foreign_field_modulus
+            in
+
+            (* Check for expected quantity of external checks *)
+            assert (
+              Mina_stdlib.List.Length.equal unused_external_checks.bounds 6 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
+                3 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal
+                unused_external_checks.compact_multi_ranges 3 ) ;
+
+            (* Check output matches expected result *)
+            as_prover (fun () ->
+                assert (
+                  Affine.equal_as_prover
+                    (module Runner.Impl)
+                    result expected_result ) ) ;
+            () )
+      in
+
+      cs
+    in
+
+    let zero_pt = (Bignum_bigint.zero, Bignum_bigint.zero) in
+    let pt2 =
+      ( Bignum_bigint.of_string
+          "14155322613096941824503892607495280579903778637099750589312382650686697414735"
+      , Bignum_bigint.of_string
+          "6513771125762614571725090849784101711151222857564970563886992272283710338112"
+      )
+    in
+    let expected_pt =
+      ( Bignum_bigint.of_string
+          "14155322613096941824503892607495280579903778637099750589312382650686697414735"
+      , Bignum_bigint.of_string
+          "6513771125762614571725090849784101711151222857564970563886992272283710338112"
+      )
+    in
+
+    assert (secp256k1_is_on_curve pt2) ;
+    assert (secp256k1_is_on_curve expected_pt) ;
+
+    let _cs =
+      test_group_add zero_pt (* left_input *)
+        pt2 (* right_input *)
+        expected_pt (* expected result *)
+        secp256k1_modulus
+    in
+
+    (* Multiply by 1 *)
+    let scalar = Bignum_bigint.of_int 1 in
+    let point =
+      ( Bignum_bigint.of_string
+          "67973637023329354644729732876692436096994797487488454090437075702698953132769"
+      , Bignum_bigint.of_string
+          "108096131279561713744990959402407452508030289249215221172372441421932322041359"
+      )
+    in
+    let _cs = test_scalar_mul scalar point point secp256k1_modulus in
+
+    (* Multiply by 6 *)
+    let scalar = Bignum_bigint.of_int 6 in
     let point =
       ( Bignum_bigint.of_string
           "67973637023329354644729732876692436096994797487488454090437075702698953132769"
@@ -3070,10 +3158,67 @@ let%test_unit "scalar_mul" =
     in
     let expected_result =
       ( Bignum_bigint.of_string
-          "67973637023329354644729732876692436096994797487488454090437075702698953132769"
+          "37941877700581055232085743160302884615963229784754572200220248617732513837044"
       , Bignum_bigint.of_string
-          "108096131279561713744990959402407452508030289249215221172372441421932322041359"
+          "103619381845871132282285745641400810486981078987965768860988615362483475376768"
       )
     in
     let _cs = test_scalar_mul scalar point expected_result secp256k1_modulus in
-    ()
+
+    (* Multiply by 391 (9-bits) *)
+    let scalar = Bignum_bigint.of_int 391 in
+    let point =
+      ( Bignum_bigint.of_string
+          "54895644447597143434988379138583445778456903839185254067441861567562618370751"
+      , Bignum_bigint.of_string
+          "104240867874630534073764110268869655023740253909668464291682942589488282068874"
+      )
+    in
+    let expected_result =
+      ( Bignum_bigint.of_string
+          "92358528850649079329920393962087666882076668287684124835881344341719861256355"
+      , Bignum_bigint.of_string
+          "27671880807027823848003850001152132266698242755975705342674616617508656063465"
+      )
+    in
+    let _cs = test_scalar_mul scalar point expected_result secp256k1_modulus in
+
+    (* Multiply by 56081 (16-bits) = 0b1000 1000 1101 1011 *)
+    let scalar = Bignum_bigint.of_int 56081 in
+    let point =
+      ( Bignum_bigint.of_string
+          "49950185608981313523985721024498375953313579282523275566585584189656370223502"
+      , Bignum_bigint.of_string
+          "63146279987886420302806526994276928563454160280333237123111833753346399349172"
+      )
+    in
+    let expected_result =
+      ( Bignum_bigint.of_string
+          "108851670764886172021315090022738025632501895048831561535857748171372817371035"
+      , Bignum_bigint.of_string
+          "39836887958851910836029687008284321008437801650048469660046898576758470452396"
+      )
+    in
+    let _cs = test_scalar_mul scalar point expected_result secp256k1_modulus in
+
+    (* Multiply by full-size secp256k1 scalar (256-bits) *)
+    let scalar =
+      Bignum_bigint.of_string
+        "99539640504241691246180604816121958450675059637016987953058113537095650715171"
+    in
+    let point =
+      ( Bignum_bigint.of_string
+          "68328903637429126750778604407754814031272668830649072423942370967409226150426"
+      , Bignum_bigint.of_string
+          "115181214446139478209347980655067703553667234783111668132659797097404834370543"
+      )
+    in
+    let expected_result =
+      ( Bignum_bigint.of_string
+          "39225021357252528375135552880830100632566425214595783585248505195330577648905"
+      , Bignum_bigint.of_string
+          "29440534631649867975583896121458013539074827830686556074829823458426851891598"
+      )
+    in
+    let _cs = test_scalar_mul scalar point expected_result secp256k1_modulus in
+    () )

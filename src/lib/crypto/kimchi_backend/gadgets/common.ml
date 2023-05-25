@@ -53,6 +53,12 @@ let cvar_field_to_field_as_prover (type f)
     (field_element : Circuit.Field.t) : f =
   Circuit.As_prover.read Circuit.Field.typ field_element
 
+(* Convert cvar boolean element (i.e. Boolean.t) to field *)
+let cvar_bool_to_bool_as_prover (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (bool : Circuit.Boolean.var) : bool =
+  Circuit.As_prover.read Circuit.Boolean.typ bool
+
 (* Combines bits of two cvars with a given boolean function and returns the resulting field element *)
 let cvar_field_bits_combine_as_prover (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -155,6 +161,37 @@ let bignum_bigint_div_rem (numerator : Bignum_bigint.t)
   let quotient = Bignum_bigint.(numerator / denominator) in
   let remainder = Bignum_bigint.(numerator - (denominator * quotient)) in
   (quotient, remainder)
+
+(* Bignum_bigint to bool array *)
+let bignum_bigint_unpack ?(remove_trailing = false) (bignum : Bignum_bigint.t) :
+    bool array =
+  (* Helper to remove trailing false *)
+  let remove_trailing_false (lst : bool list) =
+    let rev = List.rev lst in
+    let rec remove_leading_false_rec lst =
+      match lst with
+      | [] ->
+          []
+      | true :: tl ->
+          true :: tl
+      | false :: tl ->
+          remove_leading_false_rec tl
+    in
+    List.rev @@ remove_leading_false_rec rev
+  in
+
+  (* Convert biguint to bitstring *)
+  let bitstr = Z.to_bits @@ Bignum_bigint.to_zarith_bigint bignum in
+  (* Convert bitstring to list of bool *)
+  let bits =
+    List.init
+      (8 * String.length bitstr)
+      ~f:(fun i ->
+        let c = Char.to_int bitstr.[i / 8] in
+        let j = i mod 8 in
+        if Int.((c lsr j) land 1 = 1) then true else false )
+  in
+  Array.of_list @@ if remove_trailing then remove_trailing_false bits else bits
 
 (* Bignum_bigint to hex *)
 let bignum_bigint_to_hex (bignum : Bignum_bigint.t) : string =
