@@ -7,7 +7,7 @@
 terraform {
   required_version = ">= 0.14.0"
   backend "s3" {
-    key     = "terraform-itn3-testnetv2.tfstate"
+    key     = "terraform-itn3-testnetv3.tfstate"
     encrypt = true
     region  = "us-west-2"
     bucket  = "o1labs-terraform-state"
@@ -50,7 +50,7 @@ provider "google" {
 
 variable "whale_count" {
   type    = number
-  default = 9
+  default = 6
 }
 
 variable "fish_count" {
