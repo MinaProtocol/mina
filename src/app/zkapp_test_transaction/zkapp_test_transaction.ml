@@ -431,11 +431,11 @@ let update_token_symbol =
 
 let update_permissions =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-      ~permissions ~current_auth () =
+      ~snapp_update ~current_auth () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-        ~permissions ~current_auth
+      update_snapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+        ~snapp_update ~current_auth
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -515,12 +515,80 @@ let update_permissions =
            ; set_timing = Util.auth_of_string set_timing
            }
        in
+       let snapp_update = { Account_update.Update.dummy with permissions } in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~permissions
+         ~snapp_update
+         ~current_auth:(Util.auth_of_string current_auth) ))
+
+
+let update_timings =
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+      ~snapp_update ~current_auth () =
+    let open Deferred.Let_syntax in
+    let%map zkapp_command =
+      update_snapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+        ~snapp_update ~current_auth
+    in
+    Util.print_snapp_transaction ~debug zkapp_command ;
+    ()
+  in
+  Command.(
+    let open Let_syntax in
+    Command.async
+      ~summary:
+        "Generate a zkApp transaction that updates the timings of a zkApp \
+         account"
+      (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
+       and zkapp_keyfile =
+         Param.flag "--zkapp-account-key"
+           ~doc:"KEYFILE Private key file of the zkApp account to be updated"
+           Param.(required string)
+       and initial_minimum_balance =
+         Param.flag "--initial-minimum-balance" ~doc:"initial minimum balance as int"
+           Param.(required int)
+       and cliff_time =
+         Param.flag "--cliff-time" ~doc:"cliff time in int"
+           Param.(required int)
+       and cliff_amount =
+         Param.flag "--cliff-amount" ~doc:"cliff amount in int"
+           Param.(required int)
+       and vesting_period =
+         Param.flag "--vesting-period" ~doc:"vesting period in int"
+           Param.(required int)
+       and vesting_increment =
+         Param.flag "--vesting-increment" ~doc:"vesting increment in int"
+           Param.(required int)
+       and current_auth =
+         Param.flag "--current-auth"
+           ~doc:
+             "Proof|Signature|Either|None Current authorization in the account \
+              to change permissions"
+           Param.(required string)
+       in
+       let fee = Option.value ~default:Flags.default_fee fee in
+       let timing =
+        Zkapp_basic.Set_or_keep.Set
+          ( { initial_minimum_balance =
+                Currency.Balance.of_mina_int_exn initial_minimum_balance
+            ; cliff_time = Mina_numbers.Global_slot.of_int cliff_time
+            ; cliff_amount = Currency.Amount.of_mina_int_exn cliff_amount
+            ; vesting_period = Mina_numbers.Global_slot.of_int vesting_period
+            ; vesting_increment = Currency.Amount.of_mina_int_exn vesting_increment
+            }
+            : Account_update.Update.Timing_info.value )
+      in
+      let snapp_update = { Account_update.Update.dummy with timing } 
+      in
+       if Currency.Fee.(fee < Flags.min_fee) then
+         failwith
+           (sprintf "Fee must at least be %s"
+              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
+       create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+         ~snapp_update
          ~current_auth:(Util.auth_of_string current_auth) ))
 
 let test_zkapp_with_genesis_ledger =
@@ -558,6 +626,7 @@ let txn_commands =
   ; ("update-sequence-state", update_action_state)
   ; ("update-token-symbol", update_token_symbol)
   ; ("update-permissions", update_permissions)
+  ; ("update-timings", update_timings)
   ; ("test-zkapp-with-genesis-ledger", test_zkapp_with_genesis_ledger)
   ]
 
