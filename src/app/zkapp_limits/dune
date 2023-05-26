@@ -1,0 +1,15 @@
+(executable
+ (package zkapp_limits)
+ (name zkapp_limits)
+ (public_name zkapp_limits)
+ (libraries
+   ;; opam libraries
+   base
+   base.caml
+   core_kernel
+   ;; local libraries
+   mina_base
+   genesis_constants
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_mina ppx_custom_printf ppx_let ppx_hash ppx_compare ppx_sexp_conv)))

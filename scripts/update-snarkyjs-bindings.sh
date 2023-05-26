@@ -1,1 +1,1 @@
-./src/lib/snarkyjs/src/snarkyjs-bindings/scripts/update-snarkyjs-bindings.sh
+./src/lib/snarkyjs/src/bindings/scripts/update-snarkyjs-bindings.sh

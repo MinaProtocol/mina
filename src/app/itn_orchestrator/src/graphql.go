@@ -5,21 +5,13 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
-
 	"github.com/Khan/genqlient/graphql"
 )
-
-func Auth(ctx context.Context, client graphql.Client) (string, uint16, error) {
-	resp, err := auth(ctx, client)
-	if err != nil {
-		return "", 0, err
-	}
-	return resp.Auth.ServerUuid, resp.Auth.SignerSequenceNumber, nil
-}
 
 type Authenticator struct {
 	sk    ed25519.PrivateKey
@@ -97,7 +89,33 @@ func (client *SequentialAuthenticator) Do(req *http.Request) (*http.Response, er
 
 var _ graphql.Doer = (*SequentialAuthenticator)(nil)
 
-func SchedulePayments(ctx context.Context, client graphql.Client, input PaymentsDetails) (string, error) {
+type GetGqlClientF = func(context.Context, NodeAddress) (graphql.Client, error)
+
+func GetGqlClient(sk ed25519.PrivateKey, nodes map[NodeAddress]NodeEntry) GetGqlClientF {
+	authenticator := NewAuthenticator(sk, http.DefaultClient)
+	return func(ctx context.Context, addr NodeAddress) (graphql.Client, error) {
+		if entry, has := nodes[addr]; has {
+			return entry.Client, nil
+		}
+		url := "http://" + string(addr) + "/graphql"
+		authClient := graphql.NewClient(url, authenticator)
+		resp, err := auth(ctx, authClient)
+		if err != nil {
+			return nil, fmt.Errorf("failed to authorize client %s: %v", addr, err)
+		}
+		seqAuthenticator := NewSequentialAuthenticator(resp.Auth.ServerUuid, resp.Auth.SignerSequenceNumber, authenticator)
+		client := graphql.NewClient(url, seqAuthenticator)
+		nodes[addr] = NodeEntry{
+			Client:          client,
+			Libp2pPort:      resp.Auth.Libp2pPort,
+			PeerId:          resp.Auth.PeerId,
+			IsBlockProducer: resp.Auth.IsBlockProducer,
+		}
+		return client, nil
+	}
+}
+
+func SchedulePaymentsGql(ctx context.Context, client graphql.Client, input PaymentsDetails) (string, error) {
 	resp, err := schedulePayments(ctx, client, input)
 	if err != nil {
 		return "", err
@@ -105,10 +123,34 @@ func SchedulePayments(ctx context.Context, client graphql.Client, input Payments
 	return resp.SchedulePayments, nil
 }
 
-func StopPayments(ctx context.Context, client graphql.Client, handle string) (string, error) {
-	resp, err := stopPayments(ctx, client, handle)
+func StopTransactionsGql(ctx context.Context, client graphql.Client, handle string) (string, error) {
+	resp, err := stopScheduledTransactions(ctx, client, handle)
 	if err != nil {
 		return "", err
 	}
-	return resp.StopPayments, nil
+	return resp.StopScheduledTransactions, nil
+}
+
+func ScheduleZkappCommands(ctx context.Context, client graphql.Client, input ZkappCommandsDetails) (string, error) {
+	resp, err := scheduleZkappCommands(ctx, client, input)
+	if err != nil {
+		return "", err
+	}
+	return resp.ScheduleZkappCommands, nil
+}
+
+func SlotsWonGql(ctx context.Context, client graphql.Client) ([]int, error) {
+	resp, err := slotsWon(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+	return resp.SlotsWon, nil
+}
+
+func UpdateGatingGql(ctx context.Context, client graphql.Client, input GatingUpdate) (string, error) {
+	resp, err := updateGating(ctx, client, input)
+	if err != nil {
+		return "", err
+	}
+	return resp.UpdateGating, nil
 }

@@ -363,10 +363,19 @@ let add_tags_to_metadata metadata tags =
 let log t ~level ~module_ ~location ?tags ?(metadata = []) ?event_id fmt =
   let metadata = add_tags_to_metadata metadata tags in
   let f message =
-    raw t
-    @@ make_message t ~level ~module_ ~location ~metadata ~message ~event_id
-         ~skip_merge_global_metadata:(Level.equal level Level.Internal)
+    let message' =
+      make_message t ~level ~module_ ~location ~metadata ~message ~event_id
+        ~skip_merge_global_metadata:(Level.equal level Level.Internal)
+    in
+    raw t message' ;
+    match level with
+    | Internal ->
+        if Mina_compile_config.itn_features then
+          Itn_logger.log ~timestamp:message'.timestamp ~message ~metadata
+    | _ ->
+        ()
   in
+
   ksprintf f fmt
 
 type 'a log_function =

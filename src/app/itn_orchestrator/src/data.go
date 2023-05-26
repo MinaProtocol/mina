@@ -3,8 +3,10 @@ package itn_orchestrator
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/Khan/genqlient/graphql"
 	logging "github.com/ipfs/go-log/v2"
 )
 
@@ -27,13 +29,25 @@ type Command struct {
 
 type Scenario = []Command
 
+type NodeAddress string
+
+type NodeEntry struct {
+	Client          graphql.Client
+	Libp2pPort      uint16
+	PeerId          string
+	IsBlockProducer bool
+}
+
 type Config struct {
-	Ctx          context.Context
-	UptimeBucket *storage.BucketHandle
-	GetGqlClient GetGqlClientF
-	Log          logging.StandardLogger
-	Daemon       string
-	MinaExec     string
+	Ctx              context.Context
+	UptimeBucket     *storage.BucketHandle
+	GetGqlClient     GetGqlClientF
+	Log              logging.StandardLogger
+	Daemon           string
+	MinaExec         string
+	NodeData         map[NodeAddress]NodeEntry
+	SlotDurationMs   int
+	GenesisTimestamp time.Time
 }
 
 type OutputF = func(name string, value any, multiple bool, sensitive bool)

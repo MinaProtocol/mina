@@ -30,6 +30,7 @@
    pasta_bindings
    pickles
    pickles.backend
+   pickles_types
    random_oracle
    sgn
    sgn_type

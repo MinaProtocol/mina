@@ -1217,15 +1217,19 @@ module Make (Inputs : Inputs_intf) = struct
         (a, inclusion_proof)
     in
     (* delegate to public key if new account using default token *)
-    let self_delegate =
-      let account_update_token_id = Account_update.token_id account_update in
-      Bool.(
-        account_is_new
-        &&& Token_id.equal account_update_token_id Token_id.default)
-    in
     let a =
+      let self_delegate =
+        let account_update_token_id = Account_update.token_id account_update in
+        Bool.(
+          account_is_new
+          &&& Token_id.equal account_update_token_id Token_id.default)
+      in
+      (* in-SNARK, a new account has the empty public key here
+         in that case, use the public key from the account update, not the account
+      *)
       Account.set_delegate
-        (Public_key.if_ self_delegate ~then_:(Account.public_key a)
+        (Public_key.if_ self_delegate
+           ~then_:(Account_update.public_key account_update)
            ~else_:(Account.delegate a) )
         a
     in
@@ -1628,18 +1632,10 @@ module Make (Inputs : Inputs_intf) = struct
     (* Update delegate. *)
     let a, local_state =
       let delegate = Account_update.Update.delegate account_update in
-      let base_delegate =
-        let should_set_new_account_delegate =
-          (* Only accounts for the default token may delegate. *)
-          Bool.(account_is_new &&& account_update_token_is_default)
-        in
-        (* New accounts should have the delegate equal to the public key of the
-           account.
-        *)
-        Public_key.if_ should_set_new_account_delegate
-          ~then_:(Account_update.public_key account_update)
-          ~else_:(Account.delegate a)
-      in
+      (* for new accounts using the default token, we've already
+         set the delegate to the public key
+      *)
+      let base_delegate = Account.delegate a in
       let has_permission =
         Controller.check ~proof_verifies ~signature_verifies
           (Account.Permissions.set_delegate a)

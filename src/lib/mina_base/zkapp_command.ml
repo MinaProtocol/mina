@@ -1945,6 +1945,17 @@ module Update_group = Make_update_group (struct
         failwith "zkapp_segment_of_controls: Unsupported combination"
 end)
 
+let zkapp_cost ~proof_segments ~signed_single_segments ~signed_pair_segments
+    ~(genesis_constants : Genesis_constants.t) () =
+  (*10.26*np + 10.08*n2 + 9.14*n1 < 69.45*)
+  let proof_cost = genesis_constants.zkapp_proof_update_cost in
+  let signed_pair_cost = genesis_constants.zkapp_signed_pair_update_cost in
+  let signed_single_cost = genesis_constants.zkapp_signed_single_update_cost in
+  Float.(
+    (proof_cost * of_int proof_segments)
+    + (signed_pair_cost * of_int signed_pair_segments)
+    + (signed_single_cost * of_int signed_single_segments))
+
 (* Zkapp_command transactions are filtered using this predicate
    - when adding to the transaction pool
    - in incoming blocks
@@ -1975,7 +1986,7 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
       ( [ ((), (), ()) ]
       :: [ ((), (), ()) :: List.map all_updates ~f:(fun _ -> ((), (), ())) ] )
   in
-  let proof_segments, signed_singles, signed_pairs =
+  let proof_segments, signed_single_segments, signed_pair_segments =
     List.fold ~init:(0, 0, 0) groups
       ~f:(fun (proof_segments, signed_singles, signed_pairs) { spec; _ } ->
         match spec with
@@ -1986,18 +1997,13 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
         | Signed_pair ->
             (proof_segments, signed_singles, signed_pairs + 1) )
   in
-  let proof_cost = genesis_constants.zkapp_proof_update_cost in
-  let signed_pair_cost = genesis_constants.zkapp_signed_pair_update_cost in
-  let signed_single_cost = genesis_constants.zkapp_signed_single_update_cost in
   let cost_limit = genesis_constants.zkapp_transaction_cost_limit in
   let max_event_elements = genesis_constants.max_event_elements in
   let max_action_elements = genesis_constants.max_action_elements in
-  (*10.26*np + 10.08*n2 + 9.14*n1 < 69.45*)
   let zkapp_cost_within_limit =
     Float.(
-      (proof_cost * of_int proof_segments)
-      + (signed_pair_cost * of_int signed_pairs)
-      + (signed_single_cost * of_int signed_singles)
+      zkapp_cost ~proof_segments ~signed_single_segments ~signed_pair_segments
+        ~genesis_constants ()
       < cost_limit)
   in
   let valid_event_elements = num_event_elements <= max_event_elements in

@@ -41,6 +41,32 @@ let zkapp_command =
   in
   List.hd_exn zkapp_commands
 
+let zkapp_proof =
+  List.fold_until
+    (Mina_base.Zkapp_command.all_account_updates_list zkapp_command)
+    ~init:None
+    ~f:(fun _acc a ->
+      match a.Mina_base.Account_update.authorization with
+      | Proof proof ->
+          Stop (Some proof)
+      | _ ->
+          Continue None )
+    ~finish:Fn.id
+  |> Option.value_exn
+
+let dummy_proof =
+  Pickles.Proof.dummy Pickles_types.Nat.N2.n Pickles_types.Nat.N2.n
+    Pickles_types.Nat.N2.n ~domain_log2:16
+
+let dummy_vk = Mina_base.Side_loaded_verification_key.dummy
+
+let verification_key =
+  let `VK vk, `Prover _ =
+    Transaction_snark.For_tests.create_trivial_snapp
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled ()
+  in
+  With_hash.data vk
+
 let applied = Mina_base.Transaction_status.Applied
 
 let mk_scan_state_base_node

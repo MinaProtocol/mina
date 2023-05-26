@@ -10,4 +10,7 @@ orchestrator: src/graphql_generated.go $(shell find src/ -type f)
 clean:
 	rm -f orchestrator src/graphql_generated.go
 
-.PHONY: clean tidy
+test:
+	cd src && go test
+
+.PHONY: clean tidy test

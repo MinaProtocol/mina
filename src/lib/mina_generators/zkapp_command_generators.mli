@@ -23,6 +23,8 @@ val max_token_updates : int
 
 val gen_account_precondition_from_account :
      ?failure:failure
+  -> ?ignore_sequence_events_precond:bool
+  -> ?no_account_precondition:bool
   -> ?is_nonce_precondition:bool
   -> first_use_of_account:bool
   -> Account.t
@@ -45,6 +47,14 @@ val gen_protocol_state_precondition :
   *)
 val gen_zkapp_command_from :
      ?global_slot:Mina_numbers.Global_slot.t
+  -> ?memo:string
+  -> ?no_account_precondition:bool
+  -> ?fee_range:string * string
+  -> ?balance_change_range:string * string
+  -> ?ignore_sequence_events_precond:bool
+  -> ?no_token_accounts:bool
+  -> ?limited:bool
+  -> ?generate_new_accounts:bool
   -> ?failure:failure
   -> ?max_account_updates:int
   -> ?max_token_updates:int

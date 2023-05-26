@@ -33,8 +33,8 @@ let test_ledger accounts =
   let%map () =
     R.iter_m accounts ~f:(fun a ->
         let acc_id = account_id a in
-        let account = Account.initialize acc_id in
+        let account : Account.t = Account.initialize acc_id in
         Ledger.create_new_account ledger acc_id
-          { account with balance = a.balance; nonce = a.nonce } )
+          { account with balance = a.balance; nonce = a.nonce; zkapp = a.zkapp } )
   in
   ledger

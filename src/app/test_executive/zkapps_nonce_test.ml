@@ -54,9 +54,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let num_proofs = 2
 
-  let blocks_for_first_proof_exn =
-    Test_config.blocks_for_first_ledger_proof_exn config
-
   let padding_payments () =
     let needed_for_padding =
       Test_config.transactions_needed_for_ledger_proofs config ~num_proofs
@@ -363,18 +360,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in *)
     let%bind () =
       (*wait for blocks required to produce 2 proofs given 0.75 slot fill rate + some buffer*)
-      let soft_timeout =
-        Network_time_span.Slots
-          (Test_config.slots_of_blocks (blocks_for_first_proof_exn + 6))
-      in
-      let hard_timeout =
-        Network_time_span.Slots
-          (Test_config.slots_of_blocks (blocks_for_first_proof_exn + 12))
-      in
       section_hard "Wait for proof to be emitted"
         ( wait_for t
-        @@ Wait_condition.ledger_proofs_emitted_since_genesis ~soft_timeout
-             ~hard_timeout ~num_proofs )
+        @@ Wait_condition.ledger_proofs_emitted_since_genesis
+             ~test_config:config ~num_proofs )
     in
     Event_router.cancel (event_router t) snark_work_event_subscription () ;
     Event_router.cancel (event_router t) snark_work_failure_subscription () ;

@@ -21,7 +21,7 @@ type ScheduledPaymentsReceipt struct {
 	Handle  string      `json:"handle"`
 }
 
-func SendPayments(config Config, params PaymentParams, output func(ScheduledPaymentsReceipt)) error {
+func SchedulePayments(config Config, params PaymentParams, output func(ScheduledPaymentsReceipt)) error {
 	sendersPerNode := len(params.Senders) / len(params.Nodes)
 	for nodeIx, nodeAddress := range params.Nodes {
 		paymentInput := PaymentsDetails{
@@ -38,7 +38,7 @@ func SendPayments(config Config, params PaymentParams, output func(ScheduledPaym
 		if err != nil {
 			return fmt.Errorf("error allocating client for %s: %v", nodeAddress, err)
 		}
-		handle, err := SchedulePayments(config.Ctx, client, paymentInput)
+		handle, err := SchedulePaymentsGql(config.Ctx, client, paymentInput)
 		if err != nil {
 			return fmt.Errorf("error scheduling payments to %s: %v", nodeAddress, err)
 		}
@@ -58,7 +58,7 @@ func (PaymentsAction) Run(config Config, rawParams json.RawMessage, output Outpu
 	if err := json.Unmarshal(rawParams, &params); err != nil {
 		return err
 	}
-	return SendPayments(config, params, func(receipt ScheduledPaymentsReceipt) {
+	return SchedulePayments(config, params, func(receipt ScheduledPaymentsReceipt) {
 		output("receipt", receipt, true, false)
 	})
 }

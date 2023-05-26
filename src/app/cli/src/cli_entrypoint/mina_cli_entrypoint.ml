@@ -102,6 +102,13 @@ let setup_daemon logger =
            permitted to send signed requests to the incentivized testnet \
            GraphQL server"
     else Command.Param.return None
+  and itn_max_logs =
+    if Mina_compile_config.itn_features then
+      flag "--itn-max-logs" ~aliases:[ "itn-max-logs" ] (optional int)
+        ~doc:
+          "NN Maximum number of logs to store to be made available via GraphQL \
+           for incentivized testnet"
+    else Command.Param.return None
   and demo_mode =
     flag "--demo-mode" ~aliases:[ "demo-mode" ] no_arg
       ~doc:
@@ -218,8 +225,7 @@ let setup_daemon logger =
         (sprintf
            "FEE Amount a worker wants to get compensated for generating a \
             snark proof (default: %d)"
-           (Currency.Fee.to_nanomina_int
-              Mina_compile_config.default_snark_worker_fee ) )
+           (Currency.Fee.to_nanomina_int Currency.Fee.default_snark_worker_fee) )
       (optional txn_fee)
   and work_reassignment_wait =
     flag "--work-reassignment-wait"
@@ -813,8 +819,7 @@ let setup_daemon logger =
               |> Option.map ~f:Currency.Fee.of_nanomina_int_exn
             in
             or_from_config json_to_currency_fee_option "snark-worker-fee"
-              ~default:Mina_compile_config.default_snark_worker_fee
-              snark_work_fee
+              ~default:Currency.Fee.default_snark_worker_fee snark_work_fee
           in
           let node_status_url =
             maybe_from_config YJ.Util.to_string_option "node-status-url"
@@ -1307,6 +1312,11 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                   "Cannot provide both uptime submitter public key and uptime \
                    submitter keyfile"
           in
+          if Mina_compile_config.itn_features then
+            (* set queue bound directly in Itn_logger
+               adding bound to Mina_lib config introduces cycle
+            *)
+            Option.iter itn_max_logs ~f:Itn_logger.set_queue_bound ;
           let start_time = Time.now () in
           let%map mina =
             Mina_lib.create ~wallets
@@ -1787,29 +1797,24 @@ let mina_commands logger =
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
   ]
 
-[%%if integration_tests]
-
-module type Integration_test = sig
-  val name : string
-
-  val command : Async.Command.t
-end
-
-let mina_commands logger =
-  let open Tests in
-  let group =
-    List.map
-      ~f:(fun (module T) -> (T.name, T.command))
-      ( [ (* (module Coda_shared_state_test)
-             ; (module Coda_transitive_peers_test) *)
-          (module Coda_change_snark_worker_test)
-        ]
-        : (module Integration_test) list )
+let print_version_help coda_exe version =
+  (* mimic Jane Street command help *)
+  let lines =
+    [ "print version information"
+    ; ""
+    ; sprintf "  %s %s" (Filename.basename coda_exe) version
+    ; ""
+    ; "=== flags ==="
+    ; ""
+    ; "  [-help]  print this help text and exit"
+    ; "           (alias: -?)"
+    ]
   in
-  mina_commands logger
-  @ [ ("integration-tests", Command.group ~summary:"Integration tests" group) ]
+  List.iter lines ~f:(Core.printf "%s\n%!")
 
-[%%endif]
+let print_version_info () =
+  Core.printf "Commit %s on branch %s\n" Mina_version.commit_id
+    Mina_version.branch
 
 let () =
   Random.self_init () ;

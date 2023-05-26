@@ -606,7 +606,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~trust_system ~get_completed_work ~transaction_resource_pool
     ~time_controller ~consensus_local_state ~coinbase_receiver ~frontier_reader
     ~transition_writer ~set_next_producer_timing ~log_block_creation
-    ~block_reward_threshold ~block_produced_bvar =
+    ~block_reward_threshold ~block_produced_bvar ~vrf_evaluation_state =
   let open Context in
   O1trace.sync_thread "produce_blocks" (fun () ->
       let genesis_breadcrumb =
@@ -994,7 +994,6 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
       in
       let production_supervisor = Singleton_supervisor.create ~task:produce in
       let scheduler = Singleton_scheduler.create time_controller in
-      let vrf_evaluation_state = Vrf_evaluation_state.create () in
       let rec check_next_block_timing slot i () =
         O1trace.sync_thread "check_next_block_timing" (fun () ->
             (* Begin checking for the ability to produce a block *)
