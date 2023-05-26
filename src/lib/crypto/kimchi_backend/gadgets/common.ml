@@ -162,6 +162,10 @@ let bignum_bigint_div_rem (numerator : Bignum_bigint.t)
   let remainder = Bignum_bigint.(numerator - (denominator * quotient)) in
   (quotient, remainder)
 
+(* Bignum_bigint to bytes *)
+let bignum_bigint_unpack_bytes (bignum : Bignum_bigint.t) : string =
+  Z.to_bits @@ Bignum_bigint.to_zarith_bigint bignum
+
 (* Bignum_bigint to bool array *)
 let bignum_bigint_unpack ?(remove_trailing = false) (bignum : Bignum_bigint.t) :
     bool array =
@@ -195,6 +199,10 @@ let bignum_bigint_unpack ?(remove_trailing = false) (bignum : Bignum_bigint.t) :
 let bignum_bigint_to_hex (bignum : Bignum_bigint.t) : string =
   Z.format "%x" @@ Bignum_bigint.to_zarith_bigint bignum
 
+(* Create Bignum_bigint.t from binary string *)
+let bignum_bigint_of_bin (bin : string) : Bignum_bigint.t =
+  Bignum_bigint.of_zarith_bigint @@ Z.of_bits bin
+
 (* Bignum_bigint.t of hex *)
 let bignum_bigint_of_hex (hex : string) : Bignum_bigint.t =
   Bignum_bigint.of_zarith_bigint @@ Z.of_string_base 16 hex
@@ -206,6 +214,83 @@ let cvar_field_to_bignum_bigint_as_prover (type f)
   let open Circuit in
   field_to_bignum_bigint (module Circuit)
   @@ As_prover.read Field.typ field_element
+
+(* Compute modular square root using Tonelli-Shanks algorithm
+ *   See https://en.wikipedia.org/wiki/Tonelli%E2%80%93Shanks_algorithm
+ *)
+let bignum_bigint_sqrt_mod (x : Bignum_bigint.t) (modulus : Bignum_bigint.t) :
+    Bignum_bigint.t =
+  let open Z in
+  let x = Bignum_bigint.to_zarith_bigint x in
+  let modulus = Bignum_bigint.to_zarith_bigint modulus in
+
+  (* Useful helpers and shorthands *)
+  let two = of_int 2 in
+  let mod_minus_1 = modulus - one in
+  let pow_mod base exp = powm base exp modulus in
+
+  (* Euler's criterion *)
+  let legendre x = pow_mod x (mod_minus_1 / two) in
+
+  if not (equal (legendre x) one) then
+    (* t = 0: x is quadratic residue iff x^{(modulus - 1)/2} == 1 *)
+    Bignum_bigint.zero
+  else
+    (* Solve: modulus - 1 = Q * 2^S for S *)
+    let s = of_int @@ trailing_zeros mod_minus_1 in
+    if equal s one then
+      (* Q = (modulus - 1)/2 and r = x^{(Q + 1)/2} *)
+      Bignum_bigint.of_zarith_bigint
+      @@ pow_mod x (((mod_minus_1 / two) + one) / two)
+    else
+      (* Solve: modulus - 1 = Q * 2^S for Q by shifting away zeros *)
+      let q = mod_minus_1 asr to_int s in
+
+      (* Search for z in Z/pZ which is a quadratic non-residue *)
+      let z =
+        let rec find_non_square z =
+          if equal (legendre z) mod_minus_1 then z
+          else find_non_square @@ (z + one)
+        in
+        find_non_square two
+      in
+
+      (* Solving loop *)
+      let rec loop m c t r =
+        if equal t one then r
+        else
+          (* Use repeated squaring to find the least 0 < i < M s.t. t^{2^i} = 1 *)
+          let rec find_least_i n i =
+            if equal n one || geq i m then i
+            else find_least_i (n * n mod modulus) (i + one)
+          in
+          let i = find_least_i t zero in
+
+          (* b <- c^{2^{M - i}} *)
+          let b = pow_mod c (pow_mod two (m - i - one)) in
+          (* M <- i *)
+          let m = i in
+          (* c <- b^2 *)
+          let c = b * b mod modulus in
+          (* t <- tb^2 *)
+          let t = t * c in
+          (* R <- Rb *)
+          let r = r * b in
+
+          (* Recurse *)
+          loop m c t r
+      in
+
+      (* M <- S *)
+      let m = s in
+      (* c <- Z^Q *)
+      let c = pow_mod z q in
+      (* t <- x^Q *)
+      let t = pow_mod x ((q + one) / two) in
+      (* R <- n^{(Q + 1)/2} *)
+      let r = pow_mod x q in
+
+      Bignum_bigint.of_zarith_bigint @@ loop m c t r
 
 (* Compute square root of Bignum_bigint value x *)
 let bignum_biguint_sqrt (x : Bignum_bigint.t) : Bignum_bigint.t =

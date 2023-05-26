@@ -176,8 +176,10 @@ let tuple9_of_array array =
   | _ ->
       assert false
 
+type bignum_point = Bignum_bigint.t * Bignum_bigint.t
+
 (* Helper to check if point is on elliptic curve curve: y^2 = x^3 + a * x + b *)
-let is_on_curve (point : Bignum_bigint.t * Bignum_bigint.t)
+let is_on_curve (point : bignum_point)
     (a : Bignum_bigint.t) (* curve parameter a *)
     (b : Bignum_bigint.t) (* curve parameter b *)
     (foreign_field_modulus : Bignum_bigint.t) : bool =
@@ -200,10 +202,13 @@ let secp256k1_generator =
       "32670510020758816978083085130507043184471273380659243275938904335757337482424"
   )
 
+let secp256k1_a = Bignum_bigint.of_int 0
+
+let secp256k1_b = Bignum_bigint.of_int 7
+
 (* Helper to check if point is on secp256k1 curve: y^2 = x^3 + 7 *)
 let secp256k1_is_on_curve (point : Bignum_bigint.t * Bignum_bigint.t) : bool =
-  is_on_curve point (Bignum_bigint.of_int 0) (Bignum_bigint.of_int 7)
-    secp256k1_modulus
+  is_on_curve point secp256k1_a secp256k1_b secp256k1_modulus
 
 (* Gadget for (partial) elliptic curve group addition over foreign field
  *
@@ -893,6 +898,64 @@ let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* Return result point *)
   Affine.of_coordinates (result_x, result_y)
+
+(* Select initial EC scalar mul accumulator value ia using trustworthy nothing-up-my-sleeve deterministic algorithm
+ *
+ *   Simple hash-to-curve algorithm
+ *
+ *   Trustlessly select an elliptic curve point for which noone knows the discrete logarithm!
+ *)
+let ec_get_ai_point (a : Bignum_bigint.t) (* curve parameter a *)
+    (b : Bignum_bigint.t) (* curve parameter b *)
+    (gen : bignum_point) (* Elliptic curve generator point *)
+    (foreign_field_modulus : Bignum_bigint.t) : bignum_point * bignum_point =
+  (* Hash generator point to get candidate x-coordinate *)
+  let open Digestif.SHA256 in
+  let ctx = init () in
+
+  assert (is_on_curve gen a b foreign_field_modulus) ;
+
+  (* Hash to point function *)
+  let hash_to_point ctx (point : bignum_point ref) =
+    (* Hash curve point *)
+    let x, y = !point in
+    let ctx = feed_string ctx @@ Common.bignum_bigint_unpack_bytes x in
+    let ctx = feed_string ctx @@ Common.bignum_bigint_unpack_bytes y in
+    let bytes = get ctx |> to_raw_string in
+
+    (* Initialize x-coordinate from hash output *)
+    let x =
+      Bignum_bigint.(Common.bignum_bigint_of_bin bytes % foreign_field_modulus)
+    in
+
+    (* Compute y-coordinate: y = sqrt(x^3 + a * x + b) *)
+    let x3 = Bignum_bigint.(pow x (of_int 3) % foreign_field_modulus) in
+    let ax = Bignum_bigint.(a * x % foreign_field_modulus) in
+    let x3ax = Bignum_bigint.((x3 + ax) % foreign_field_modulus) in
+    let y2 = Bignum_bigint.((x3ax + b) % foreign_field_modulus) in
+    let y = Common.bignum_bigint_sqrt_mod y2 foreign_field_modulus in
+
+    (* Return possibly valid curve point *)
+    (x, y)
+  in
+
+  (* Deterministically search for valid curve point *)
+  let candidate_point = ref (hash_to_point ctx (ref gen)) in
+  while not (is_on_curve !candidate_point a b foreign_field_modulus) do
+    candidate_point := hash_to_point ctx candidate_point
+  done ;
+
+  (* We have a valid curve point! *)
+  let point = !candidate_point in
+
+  (* Compute negated point (i.e. with other y-root) *)
+  let neg_point =
+    let x, y = point in
+    let neg_y = Bignum_bigint.(neg y % foreign_field_modulus) in
+    (x, neg_y)
+  in
+
+  (point, neg_point)
 
 (* Gadget for elliptic curve scalar multiplication over foreign field
  *
@@ -2997,10 +3060,8 @@ let%test_unit "group_properties" =
 (* Scalar mul tests *)
 (********************)
 
-type bignum_point = Bignum_bigint.t * Bignum_bigint.t
-
 let%test_unit "scalar_mul" =
-  if scalar_mul_tests_enabled then
+  if scalar_mul_tests_enabled then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -3084,20 +3145,73 @@ let%test_unit "scalar_mul" =
       cs
     in
 
-    (* Random initial accumulator point and its negation *)
-    let ia =
-      Bignum_bigint.
-        ( ( of_string
-              "53225897340046515129217142841757882509614391470754847726520045320014049520438"
-          , of_string
-              "61270977549317982406456606202085494058878229397549988970941688201238451264950"
-          )
-        , ( of_string
-              "53225897340046515129217142841757882509614391470754847726520045320014049520438"
-          , of_string
-              "54521111687998213017114378806602413794391755268090575068515895806670383406713"
-          ) )
+    (* Test initial accumulator (ia) point generation algorithm *)
+    let pointX =
+      ( Bignum_bigint.of_string
+          "67973637023329354644729732876692436096994797487488454090437075702698953132769"
+      , Bignum_bigint.of_string
+          "108096131279561713744990959402407452508030289249215221172372441421932322041359"
+      )
     in
+    let ia = ec_get_ai_point secp256k1_a secp256k1_b pointX secp256k1_modulus in
+    assert (
+      Bignum_bigint.(
+        equal
+          (fst (fst ia))
+          (Bignum_bigint.of_string
+             "77808213848094917079255757522755861813805484598820680171349097575367307923684" )) ) ;
+    assert (
+      Bignum_bigint.(
+        equal
+          (snd (fst ia))
+          (Bignum_bigint.of_string
+             "53863434441850287308371409267019602514253829996603354269738630468061457326859" )) ) ;
+    assert (
+      Bignum_bigint.(
+        equal
+          (fst (snd ia))
+          (Bignum_bigint.of_string
+             "77808213848094917079255757522755861813805484598820680171349097575367307923684" )) ) ;
+    assert (
+      Bignum_bigint.(
+        equal
+          (snd (snd ia))
+          (Bignum_bigint.of_string
+             "61928654795465908115199575741668305339016154669037209769718953539847377344804" )) ) ;
+
+    (* Get EC scalar mul initial accumulator point *)
+    let ia =
+      ec_get_ai_point secp256k1_a secp256k1_b secp256k1_generator
+        secp256k1_modulus
+    in
+    assert (
+      Bignum_bigint.(
+        equal
+          (fst (fst ia))
+          (Bignum_bigint.of_string
+             "73748207725492941843355928046090697797026070566443284126849221438943867210749" )) ) ;
+    assert (
+      Bignum_bigint.(
+        equal
+          (snd (fst ia))
+          (Bignum_bigint.of_string
+             "71805440039692371678177852429904809925653495989672587996663750265844216498843" )) ) ;
+    assert (
+      Bignum_bigint.(
+        equal
+          (fst (snd ia))
+          (Bignum_bigint.of_string
+             "73748207725492941843355928046090697797026070566443284126849221438943867210749" )) ) ;
+    assert (
+      Bignum_bigint.(
+        equal
+          (snd (snd ia))
+          (Bignum_bigint.of_string
+             "43986649197623823745393132578783097927616488675967976042793833742064618172820" )) ) ;
+
+    (*
+     * EC scalar multiplication tests
+     *)
 
     (* Multiply by 1 *)
     let scalar = Bignum_bigint.of_int 1 in
@@ -3215,4 +3329,21 @@ let%test_unit "scalar_mul" =
     let _cs =
       test_scalar_mul scalar point expected_result ia secp256k1_modulus
     in
-    ()
+
+    (* Compute secp256k1 pub key from secret key *)
+    let scalar =
+      Bignum_bigint.of_string
+        "88112557240431687619949876834386306142823675858092281192015740375511510392207"
+    in
+    let expected_pubkey =
+      ( Bignum_bigint.of_string
+          "50567548908598322015490923046917426159132337313161362096244889522774999144344"
+      , Bignum_bigint.of_string
+          "35561449820918632865961375836489131575522128704654117756369029278244987778295"
+      )
+    in
+    let _cs =
+      test_scalar_mul scalar secp256k1_generator expected_pubkey ia
+        secp256k1_modulus
+    in
+    () )
