@@ -33,7 +33,8 @@ end
 type connection_gating =
   { banned_peers : Peer.t list; trusted_peers : Peer.t list; isolate : bool }
 
-let gating_config_to_helper_format (config : connection_gating) =
+let gating_config_to_helper_format ?(clean_added_peers = false)
+    (config : connection_gating) =
   let trusted_ips =
     List.map ~f:(fun p -> Unix.Inet_addr.to_string p.host) config.trusted_peers
   in
@@ -56,8 +57,8 @@ let gating_config_to_helper_format (config : connection_gating) =
       ~f:(fun p -> Libp2p_ipc.create_peer_id p.peer_id)
       config.trusted_peers
   in
-  Libp2p_ipc.create_gating_config ~banned_ips ~banned_peers ~trusted_ips
-    ~trusted_peers ~isolate:config.isolate
+  Libp2p_ipc.create_gating_config ~clean_added_peers ~banned_ips ~banned_peers
+    ~trusted_ips ~trusted_peers ~isolate:config.isolate
 
 module For_tests = struct
   module Helper = Libp2p_helper
@@ -332,12 +333,13 @@ let begin_advertising t =
   |> Libp2p_helper.do_rpc t.helper (module Libp2p_ipc.Rpcs.BeginAdvertising)
   |> Deferred.Or_error.ignore_m
 
-let set_connection_gating_config t config =
+let set_connection_gating_config t ?clean_added_peers config =
   match%map
     Libp2p_helper.do_rpc t.helper
       (module Libp2p_ipc.Rpcs.SetGatingConfig)
       (Libp2p_ipc.Rpcs.SetGatingConfig.create_request
-         ~gating_config:(gating_config_to_helper_format config) )
+         ~gating_config:
+           (gating_config_to_helper_format ?clean_added_peers config) )
   with
   | Ok _ ->
       t.connection_gating <- config ;

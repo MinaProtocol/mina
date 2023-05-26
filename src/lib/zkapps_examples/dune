@@ -1,5 +1,6 @@
 (library
  (name zkapps_examples)
+ (public_name zkapps_examples)
  (libraries
    ;; opam libraries
    base
@@ -20,6 +21,7 @@
    pickles.backend
    pickles_types
    random_oracle
+   random_oracle_input
    snarky.backendless
    snark_params
    sgn

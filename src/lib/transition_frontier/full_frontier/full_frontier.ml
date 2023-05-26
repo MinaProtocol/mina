@@ -505,6 +505,15 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
             (Staged_ledger.scan_state
                (Breadcrumb.staged_ledger new_root_node.breadcrumb) )
           : unit Or_error.t ) ;
+      (*Check that the new snarked ledger is as expected*)
+      let new_snarked_ledger_hash = Ledger.merkle_root mt in
+      let expected_snarked_ledger_hash =
+        Breadcrumb.protocol_state new_root_node.breadcrumb
+        |> Protocol_state.blockchain_state
+        |> Blockchain_state.snarked_ledger_hash
+      in
+      assert (
+        Ledger_hash.equal new_snarked_ledger_hash expected_snarked_ledger_hash ) ;
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)
@@ -622,8 +631,10 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       let new_root_protocol_states =
         Root_data.Limited.protocol_states new_root
       in
+      [%log' internal t.logger] "Move_frontier_root" ;
       move_root t ~new_root_hash ~new_root_protocol_states ~garbage
         ~enable_epoch_ledger_sync ;
+      [%log' internal t.logger] "Move_frontier_root_done" ;
       (old_root_hash, Some new_root_hash)
 
 module Metrics = struct
@@ -949,7 +960,8 @@ module For_tests = struct
     Async.Thread_safe.block_on_async_exn (fun () ->
         Verifier.create ~logger ~proof_level ~constraint_constants
           ~conf_dir:None
-          ~pids:(Child_processes.Termination.create_pid_table ()) )
+          ~pids:(Child_processes.Termination.create_pid_table ())
+          () )
 
   module Genesis_ledger = (val precomputed_values.genesis_ledger)
 

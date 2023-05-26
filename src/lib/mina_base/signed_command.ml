@@ -130,7 +130,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let nonce = Fn.compose Payload.nonce payload
 
   (* for filtering *)
-  let minimum_fee = Mina_compile_config.minimum_user_command_fee
+  let minimum_fee = Currency.Fee.minimum_user_command_fee
 
   let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
 
@@ -196,9 +196,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~key_gen
         ?(nonce = Account_nonce.zero) ~fee_range create_body =
       let open Quickcheck.Generator.Let_syntax in
-      let min_fee =
-        Fee.to_nanomina_int Mina_compile_config.minimum_user_command_fee
-      in
+      let min_fee = Fee.to_nanomina_int Currency.Fee.minimum_user_command_fee in
       let max_fee = min_fee + fee_range in
       let%bind (signer : Signature_keypair.t), (receiver : Signature_keypair.t)
           =

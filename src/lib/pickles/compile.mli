@@ -324,3 +324,124 @@ val compile_with_wrap_main_override_promise :
          * ('max_proofs_verified, 'max_proofs_verified) Proof.t )
          Promise.t )
        H3_2.T(Prover).t
+
+val wrap_main_dummy_override :
+     Import.Domains.t
+  -> ( 'max_proofs_verified
+     , 'branches
+     , 'max_local_max_proofs_verifieds )
+     Full_signature.t
+  -> ('prev_varss, 'branches) Hlist.Length.t
+  -> ( Wrap_main_inputs.Inner_curve.Constant.t Wrap_verifier.index'
+     , 'branches )
+     Vector.t
+     Lazy.t
+  -> (int, 'branches) Pickles_types.Vector.t
+  -> (Import.Domains.t, 'branches) Pickles_types.Vector.t
+  -> (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
+  -> ('max_proofs_verified, 'max_local_max_proofs_verifieds) Requests.Wrap.t
+     * (   ( ( Impls.Wrap.Field.t
+             , Wrap_verifier.Challenge.t Kimchi_types.scalar_challenge
+             , Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
+             , ( Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
+               , Impls.Wrap.Boolean.var )
+               Plonk_types.Opt.t
+             , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
+                 Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+                 .In_circuit
+                 .Lookup
+                 .t
+               , Impls.Wrap.Boolean.var )
+               Pickles_types__Plonk_types.Opt.t
+             , Impls.Wrap.Boolean.var )
+             Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
+             .t
+           , Wrap_verifier.Challenge.t Kimchi_types.scalar_challenge
+           , Wrap_verifier.Other_field.Packed.t
+             Pickles_types__Shifted_value.Type1.t
+           , Impls.Wrap.Field.t
+           , Impls.Wrap.Field.t
+           , Impls.Wrap.Field.t
+           , ( Impls.Wrap.Field.t Import.Scalar_challenge.t
+               Import.Types.Bulletproof_challenge.t
+             , Backend.Tick.Rounds.n )
+             Vector.T.t
+           , Impls.Wrap.Field.t )
+           Composition_types.Wrap.Statement.t
+        -> unit )
+
+module Make_adversarial_test : functor
+  (_ : sig
+     val tweak_statement :
+          ( Import.Challenge.Constant.t
+          , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
+          , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+          , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+            , bool )
+            Import.Types.Opt.t
+          , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
+              Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+              .In_circuit
+              .Lookup
+              .t
+            , bool )
+            Import.Types.Opt.t
+          , bool
+          , 'max_proofs_verified
+            Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
+          , (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.vec
+          , ( 'b
+            , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
+              , 'actual_proofs_verified )
+              Pickles_types.Vector.t
+            , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
+                  Import.Bulletproof_challenge.t
+                , 'e )
+                Pickles_types.Vector.t
+              , 'actual_proofs_verified )
+              Pickles_types.Vector.t )
+            Proof.Base.Messages_for_next_proof_over_same_field.Step.t
+          , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
+            Import.Types.Bulletproof_challenge.t
+            Import.Types.Step_bp_vec.t
+          , Import.Types.Branch_data.t )
+          Import.Types.Wrap.Statement.In_circuit.t
+       -> ( Import.Challenge.Constant.t
+          , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
+          , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+          , ( Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
+            , bool )
+            Import.Types.Opt.t
+          , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
+              Composition_types.Wrap.Proof_state.Deferred_values.Plonk
+              .In_circuit
+              .Lookup
+              .t
+            , bool )
+            Import.Types.Opt.t
+          , bool
+          , 'max_proofs_verified
+            Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
+          , ( Limb_vector.Constant.Hex64.t
+            , Composition_types.Digest.Limbs.n )
+            Pickles_types.Vector.vec
+          , ( 'b
+            , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.t
+              , 'actual_proofs_verified )
+              Pickles_types.Vector.t
+            , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t
+                  Import.Bulletproof_challenge.t
+                , 'e )
+                Pickles_types.Vector.t
+              , 'actual_proofs_verified )
+              Pickles_types.Vector.t )
+            Proof.Base.Messages_for_next_proof_over_same_field.Step.t
+          , Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
+            Import.Types.Bulletproof_challenge.t
+            Import.Types.Step_bp_vec.t
+          , Import.Types.Branch_data.t )
+          Import.Types.Wrap.Statement.In_circuit.t
+
+     val check_verifier_error : Error.t -> unit
+   end)
+  -> sig end

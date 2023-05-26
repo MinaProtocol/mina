@@ -43,8 +43,7 @@ module Prove_receipt = struct
   type t = Receipt.Chain_hash.t * User_command.t list [@@deriving yojson]
 
   let to_text proof =
-    sprintf
-      !"Merkle List of transactions:\n%s"
+    sprintf "Merkle List of transactions:\n%s"
       (to_yojson proof |> Yojson.Safe.pretty_to_string)
 end
 

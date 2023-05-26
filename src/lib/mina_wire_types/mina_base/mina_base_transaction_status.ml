@@ -23,7 +23,7 @@ module Failure = struct
       | Update_not_permitted_delegate
       | Update_not_permitted_app_state
       | Update_not_permitted_verification_key
-      | Update_not_permitted_sequence_state
+      | Update_not_permitted_action_state
       | Update_not_permitted_zkapp_uri
       | Update_not_permitted_token_symbol
       | Update_not_permitted_permissions
@@ -36,7 +36,7 @@ module Failure = struct
       | Account_nonce_precondition_unsatisfied
       | Account_receipt_chain_hash_precondition_unsatisfied
       | Account_delegate_precondition_unsatisfied
-      | Account_sequence_state_precondition_unsatisfied
+      | Account_action_state_precondition_unsatisfied
       | Account_app_state_precondition_unsatisfied of int
       | Account_proved_state_precondition_unsatisfied
       | Account_is_new_precondition_unsatisfied

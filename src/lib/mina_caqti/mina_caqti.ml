@@ -9,6 +9,9 @@ type _ Caqti_type.field +=
   | Array_nullable_int : int option array Caqti_type.field
 
 type _ Caqti_type.field +=
+  | Array_nullable_int64 : int64 option array Caqti_type.field
+
+type _ Caqti_type.field +=
   | Array_nullable_string : string option array Caqti_type.field
 
 module Type_spec = struct
@@ -106,6 +109,22 @@ let () =
   in
   define_coding Array_nullable_int { get_coding }
 
+(* register coding for nullable int64 arrays *)
+let () =
+  let open Caqti_type.Field in
+  let rep = Caqti_type.String in
+  let encode, decode =
+    make_coding ~elem_to_string:Int64.to_string ~elem_of_string:Int64.of_string
+  in
+  let get_coding : type a. _ -> a t -> a coding =
+   fun _ -> function
+    | Array_nullable_int64 ->
+        Coding { rep; encode; decode }
+    | _ ->
+        assert false
+  in
+  define_coding Array_nullable_int64 { get_coding }
+
 (* register coding for nullable string arrays *)
 let () =
   let open Caqti_type.Field in
@@ -138,6 +157,23 @@ let array_int_typ : int array Caqti_type.t =
     >>| Array.of_list
   in
   Caqti_type.custom array_nullable_int_typ ~encode ~decode
+
+(* this type may require type annotations in queries, eg.
+   `SELECT id FROM zkapp_states WHERE element_ids = ?::bigint[]`
+*)
+let array_nullable_int64_typ : int64 option array Caqti_type.t =
+  Caqti_type.field Array_nullable_int64
+
+let array_int64_typ : int64 array Caqti_type.t =
+  let open Result.Let_syntax in
+  let encode xs = return @@ Array.map ~f:Option.some xs in
+  let decode xs =
+    Option.all (Array.to_list xs)
+    |> Result.of_option
+         ~error:"Failed to decode int64 array, encountered NULL value"
+    >>| Array.of_list
+  in
+  Caqti_type.custom array_nullable_int64_typ ~encode ~decode
 
 (* this type may require type annotations in queries, e.g.
    `SELECT id FROM zkapp_states WHERE element_ids = ?::string[]`

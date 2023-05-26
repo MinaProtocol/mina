@@ -4,7 +4,7 @@ open Signature_lib
 let validate_int16 x =
   let max_port = 1 lsl 16 in
   if 0 <= x && x < max_port then Ok x
-  else Or_error.errorf !"Port not between 0 and %d" max_port
+  else Or_error.errorf "Port not between 0 and %d" max_port
 
 let int16 =
   Command.Arg_type.map Command.Param.int

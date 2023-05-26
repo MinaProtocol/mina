@@ -35,16 +35,16 @@ cd "${SCRIPTPATH}/../_build"
 SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata"
 case "${MINA_DEB_CODENAME}" in
   bookworm|jammy)
-    DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8"
+    DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
     ;;
   bullseye|focal)
-    DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8"
+    DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
     ;;
   buster)
-    DAEMON_DEPS=", libffi6, libjemalloc2, libpq-dev, libprocps7"
+    DAEMON_DEPS=", libffi6, libjemalloc2, libpq-dev, libprocps7, mina-logproc"
     ;;
   stretch|bionic)
-    DAEMON_DEPS=", libffi6, libjemalloc1, libpq-dev, libprocps6"
+    DAEMON_DEPS=", libffi6, libjemalloc1, libpq-dev, libprocps6, mina-logproc"
     ;;
   *)
     echo "Unknown Debian codename provided: ${MINA_DEB_CODENAME}"; exit 1
@@ -190,6 +190,49 @@ then
 
 fi # only builds on mainnet-like branches
 ##################################### END GENERATE KEYPAIR PACKAGE #######################################
+
+
+##################################### LOGPROC PACKAGE #######################################
+
+mkdir -p "${BUILDDIR}/DEBIAN"
+cat << EOF > "${BUILDDIR}/DEBIAN/control"
+
+Package: mina-logproc
+Version: ${MINA_DEB_VERSION}
+License: Apache-2.0
+Vendor: none
+Architecture: amd64
+Maintainer: o(1)Labs <build@o1labs.org>
+Installed-Size:
+Depends: ${SHARED_DEPS}
+Section: base
+Priority: optional
+Homepage: https://minaprotocol.com/
+Description: Utility for processing mina-daemon log output
+ Utility for processing mina-daemon log output
+ Built from ${GITHASH} by ${BUILD_URL}
+EOF
+
+echo "------------------------------------------------------------"
+echo "Control File:"
+cat "${BUILDDIR}/DEBIAN/control"
+
+# Binaries
+rm -rf "${BUILDDIR}/usr/local/bin"
+mkdir -p "${BUILDDIR}/usr/local/bin"
+cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
+
+# echo contents of deb
+echo "------------------------------------------------------------"
+echo "Deb Contents:"
+find "${BUILDDIR}"
+
+# Build the package
+echo "------------------------------------------------------------"
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-logproc_${MINA_DEB_VERSION}.deb
+ls -lh mina*.deb
+
+##################################### END LOGPROC PACKAGE #######################################
 
 ##################################### MAINNET PACKAGE #######################################
 if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches

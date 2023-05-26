@@ -112,7 +112,7 @@ module Json_layout = struct
           ; set_permissions : Auth_required.t [@default None]
           ; set_verification_key : Auth_required.t [@default None]
           ; set_zkapp_uri : Auth_required.t [@default None]
-          ; edit_sequence_state : Auth_required.t [@default None]
+          ; edit_action_state : Auth_required.t [@default None]
           ; set_token_symbol : Auth_required.t [@default None]
           ; increment_nonce : Auth_required.t [@default None]
           ; set_voting_for : Auth_required.t [@default None]
@@ -179,8 +179,8 @@ module Json_layout = struct
           { app_state : Field.t list
           ; verification_key : Verification_key.t option [@default None]
           ; zkapp_version : Zkapp_version.t
-          ; sequence_state : Field.t list
-          ; last_sequence_slot : int
+          ; action_state : Field.t list
+          ; last_action_slot : int
           ; proved_state : bool
           ; zkapp_uri : string
           }
@@ -631,6 +631,8 @@ module Proof_keys = struct
         (Json_layout.Proof_keys.Transaction_capacity.of_yojson json)
 
     let small : t = Log_2 2
+
+    let medium : t = Log_2 3
   end
 
   type t =

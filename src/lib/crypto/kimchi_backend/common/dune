@@ -39,6 +39,8 @@
   allocation_functor
   snarky.intf
   promise
+  logger
+  internal_tracing.context_logger
   ppx_version.runtime))
 
 (rule

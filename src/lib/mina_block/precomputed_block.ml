@@ -56,6 +56,8 @@ module T = struct
     ; staged_ledger_diff : Staged_ledger_diff.t
     ; delta_transition_chain_proof :
         Frozen_ledger_hash.t * Frozen_ledger_hash.t list
+    ; protocol_version : Protocol_version.t
+    ; proposed_protocol_version : Protocol_version.t option [@default None]
     ; accounts_accessed : (int * Account.t) list
     ; accounts_created : (Account_id.t * Currency.Fee.t) list
     ; tokens_used : (Token_id.t * Account_id.t option) list
@@ -80,6 +82,8 @@ module Stable = struct
             (* TODO: Delete this or find out why it is here. *)
       ; delta_transition_chain_proof :
           Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
+      ; protocol_version : Protocol_version.Stable.V1.t
+      ; proposed_protocol_version : Protocol_version.Stable.V1.t option
       ; accounts_accessed : (int * Account.Stable.V2.t) list
       ; accounts_created :
           (Account_id.Stable.V2.t * Currency.Fee.Stable.V1.t) list
@@ -127,6 +131,8 @@ let of_block ~logger
               None ) )
   in
   let header = Block.header block in
+  let protocol_version = Header.current_protocol_version header in
+  let proposed_protocol_version = Header.proposed_protocol_version_opt header in
   let accounts_accessed_time = Time.now () in
   [%log debug]
     "Precomputed block for $state_hash: accounts-accessed took $time ms"
@@ -174,6 +180,8 @@ let of_block ~logger
   ; staged_ledger_diff =
       Staged_ledger_diff.Body.staged_ledger_diff (Block.body block)
   ; delta_transition_chain_proof = Header.delta_block_chain_proof header
+  ; protocol_version
+  ; proposed_protocol_version
   ; accounts_accessed
   ; accounts_created
   ; tokens_used

@@ -206,7 +206,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
           ~data:kp.private_key )
   in
   let balances =
-    let min_cmd_fee = Mina_compile_config.minimum_user_command_fee in
+    let min_cmd_fee = Currency.Fee.minimum_user_command_fee in
     let min_balance =
       Currency.Fee.to_nanomina_int min_cmd_fee
       |> Int.( + ) 1_000_000_000_000_000
@@ -239,7 +239,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
       ; set_permissions = Either
       ; set_verification_key = Either
       ; set_zkapp_uri = Either
-      ; edit_sequence_state = Either
+      ; edit_action_state = Either
       ; set_token_symbol = Either
       ; increment_nonce = Either
       ; set_voting_for = Either

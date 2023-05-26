@@ -193,6 +193,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       in
       let diff =
         O1trace.sync_thread "create_staged_ledger_diff" (fun () ->
+            [%log internal] "Create_staged_ledger_diff" ;
             (* TODO: handle transaction inclusion failures here *)
             let diff_result =
               Staged_ledger.create_diff ~constraint_constants ~global_slot
@@ -209,6 +210,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               |> Result.map_error ~f:(fun err ->
                      Staged_ledger.Staged_ledger_error.Pre_diff err )
             in
+            [%log internal] "Create_staged_ledger_diff_done" ;
             match (diff_result, block_reward_threshold) with
             | Ok diff, Some threshold ->
                 let net_return =
@@ -232,6 +234,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
             | _ ->
                 diff_result )
       in
+      [%log internal] "Apply_staged_ledger_diff" ;
       match%map
         let%bind.Deferred.Result diff = return diff in
         Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
@@ -280,6 +283,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                   ] ) ;
           None)
   in
+  [%log internal] "Apply_staged_ledger_diff_done" ;
   match res with
   | None ->
       Interruptible.return None
@@ -377,6 +381,8 @@ module Precomputed = struct
     ; staged_ledger_diff : Staged_ledger_diff.t
     ; delta_transition_chain_proof :
         Frozen_ledger_hash.t * Frozen_ledger_hash.t list
+    ; protocol_version : Protocol_version.t
+    ; proposed_protocol_version : Protocol_version.t option
     ; accounts_accessed : (int * Account.t) list
     ; accounts_created : (Account_id.t * Currency.Fee.t) list
     ; tokens_used : (Token_id.t * Account_id.t option) list
@@ -600,7 +606,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~trust_system ~get_completed_work ~transaction_resource_pool
     ~time_controller ~consensus_local_state ~coinbase_receiver ~frontier_reader
     ~transition_writer ~set_next_producer_timing ~log_block_creation
-    ~block_reward_threshold ~block_produced_bvar =
+    ~block_reward_threshold ~block_produced_bvar ~vrf_evaluation_state =
   let open Context in
   O1trace.sync_thread "produce_blocks" (fun () ->
       let genesis_breadcrumb =
@@ -648,6 +654,12 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
         | None ->
             log_bootstrap_mode () ; Interruptible.return ()
         | Some frontier -> (
+            let global_slot =
+              Consensus.Data.Block_data.global_slot_since_genesis block_data
+            in
+            Internal_tracing.with_slot global_slot
+            @@ fun () ->
+            [%log internal] "Begin_block_production" ;
             let open Transition_frontier.Extensions in
             let transition_registry =
               get_extension
@@ -710,6 +722,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                   ( Header.protocol_state_proof
                   @@ Mina_block.header (With_hash.data previous_transition) )
             in
+            [%log internal] "Get_transactions_from_pool" ;
             let transactions =
               Network_pool.Transaction_pool.Resource_pool.transactions
                 transaction_resource_pool
@@ -719,6 +732,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
             let%bind () =
               Interruptible.lift (Deferred.return ()) (Ivar.read ivar)
             in
+            [%log internal] "Generate_next_state" ;
             let%bind next_state_opt =
               generate_next_state ~constraint_constants ~scheduled_time
                 ~block_data ~previous_protocol_state ~time_controller
@@ -726,12 +740,18 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                 ~transactions ~get_completed_work ~logger ~log_block_creation
                 ~winner_pk:winner_pubkey ~block_reward_threshold
             in
+            [%log internal] "Generate_next_state_done" ;
             match next_state_opt with
             | None ->
                 Interruptible.return ()
             | Some
                 (protocol_state, internal_transition, pending_coinbase_witness)
               ->
+                let diff =
+                  Internal_transition.staged_ledger_diff internal_transition
+                in
+                let commands = Staged_ledger_diff.commands diff in
+                let transactions_count = List.length commands in
                 let protocol_state_hashes =
                   Protocol_state.hashes protocol_state
                 in
@@ -740,6 +760,16 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                   ; data = Protocol_state.consensus_state protocol_state
                   }
                 in
+                [%log internal] "@produced_block_state_hash"
+                  ~metadata:
+                    [ ( "state_hash"
+                      , `String
+                          (Mina_base.State_hash.to_base58_check
+                             protocol_state_hashes.state_hash ) )
+                    ] ;
+                Internal_tracing.with_state_hash
+                  protocol_state_hashes.state_hash
+                @@ fun () ->
                 Debug_assert.debug_assert (fun () ->
                     [%test_result: [ `Take | `Keep ]]
                       (Consensus.Hooks.select
@@ -769,6 +799,10 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                   (let open Deferred.Let_syntax in
                   let emit_breadcrumb () =
                     let open Deferred.Result.Let_syntax in
+                    [%log internal]
+                      ~metadata:
+                        [ ("transactions_count", `Int transactions_count) ]
+                      "Produce_state_transition_proof" ;
                     let%bind protocol_state_proof =
                       time ~logger ~time_controller
                         "Protocol_state_proof proving time(ms)" (fun () ->
@@ -791,6 +825,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                     let previous_state_hash =
                       (Protocol_state.hashes previous_protocol_state).state_hash
                     in
+                    [%log internal] "Produce_chain_transition_proof" ;
                     let delta_block_chain_proof =
                       Transition_chain_prover.prove
                         ~length:
@@ -798,6 +833,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                         ~frontier previous_state_hash
                       |> Option.value_exn
                     in
+                    [%log internal] "Produce_validated_transition" ;
                     let%bind transition =
                       let open Result.Let_syntax in
                       Validation.wrap
@@ -855,6 +891,13 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                              | `Prover_error _ ) as err ->
                                err )
                     in
+                    [%log internal] "@block_metadata"
+                      ~metadata:
+                        [ ( "blockchain_length"
+                          , Mina_numbers.Length.to_yojson
+                            @@ Mina_block.blockchain_length
+                            @@ Breadcrumb.block breadcrumb )
+                        ] ;
                     [%str_log info]
                       ~metadata:
                         [ ("breadcrumb", Breadcrumb.to_yojson breadcrumb) ]
@@ -870,6 +913,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                           Span.to_ms
                           @@ diff (now ())
                           @@ Block_time.to_time_exn scheduled_time)) ;
+                    [%log internal] "Send_breadcrumb_to_transition_frontier" ;
                     let%bind.Async.Deferred () =
                       Strict_pipe.Writer.write transition_writer breadcrumb
                     in
@@ -879,6 +923,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                         )
                       ]
                     in
+                    [%log internal] "Wait_for_confirmation" ;
                     [%log debug] ~metadata
                       "Waiting for block $state_hash to be inserted into \
                        frontier" ;
@@ -905,6 +950,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                       ]
                     >>= function
                     | `Transition_accepted ->
+                        [%log internal] "Transition_accepted" ;
                         [%log info] ~metadata
                           "Generated transition $state_hash was accepted into \
                            transition frontier" ;
@@ -913,6 +959,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                         (* FIXME #3167: this should be fatal, and more
                            importantly, shouldn't happen.
                         *)
+                        [%log internal] "Transition_accept_timeout" ;
                         let msg : (_, unit, string, unit) format4 =
                           "Timed out waiting for generated transition \
                            $state_hash to enter transition frontier. \
@@ -947,7 +994,6 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
       in
       let production_supervisor = Singleton_supervisor.create ~task:produce in
       let scheduler = Singleton_scheduler.create time_controller in
-      let vrf_evaluation_state = Vrf_evaluation_state.create () in
       let rec check_next_block_timing slot i () =
         O1trace.sync_thread "check_next_block_timing" (fun () ->
             (* Begin checking for the ability to produce a block *)
@@ -1228,6 +1274,8 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
       ; protocol_state_proof
       ; staged_ledger_diff
       ; delta_transition_chain_proof = delta_block_chain_proof
+      ; protocol_version = _
+      ; proposed_protocol_version = _
       ; accounts_accessed = _
       ; accounts_created = _
       ; tokens_used = _

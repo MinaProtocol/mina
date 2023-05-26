@@ -123,8 +123,7 @@ module type Signed_intf = sig
 
   val gen : t Quickcheck.Generator.t
 
-  val create :
-    magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) Signed_poly.t
+  val create : magnitude:magnitude -> sgn:Sgn.t -> t
 
   val sgn : t -> Sgn.t
 
@@ -320,6 +319,12 @@ module type Full = sig
 
     include Codable.S with type t := t
 
+    val minimum_user_command_fee : t
+
+    val default_transaction_fee : t
+
+    val default_snark_worker_fee : t
+
     (* TODO: Get rid of signed fee, use signed amount *)
     [%%ifdef consensus_mechanism]
 
@@ -418,6 +423,8 @@ module type Full = sig
 
       val to_fee : var -> Fee.var
 
+      val to_field : var -> Field.Var.t
+
       module Unsafe : sig
         val of_field : Field.Var.t -> t
       end
@@ -483,6 +490,8 @@ module type Full = sig
 
       val sub_or_zero : var -> var -> var Checked.t
 
+      val sub_amount_or_zero : var -> Amount.var -> var Checked.t
+
       val ( + ) : var -> Amount.var -> var Checked.t
 
       val ( - ) : var -> Amount.var -> var Checked.t
@@ -500,6 +509,8 @@ module type Full = sig
       val ( >= ) : var -> var -> Boolean.var Checked.t
 
       val if_ : Boolean.var -> then_:var -> else_:var -> var Checked.t
+
+      val to_field : var -> Field.Var.t
 
       module Unsafe : sig
         val of_field : Field.Var.t -> var

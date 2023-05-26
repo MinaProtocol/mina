@@ -14,6 +14,10 @@ let main () =
   let open Values in
   print_heap_usage "Account.t (w/ zkapp)" account ;
   print_heap_usage "Zkapp_command.t" zkapp_command ;
+  print_heap_usage "Pickles.Side_loaded.Proof.t" zkapp_proof ;
+  print_heap_usage "Mina_base.Side_loaded_verification_key.t" verification_key ;
+  print_heap_usage "Dummy Pickles.Side_loaded.Proof.t" dummy_proof ;
+  print_heap_usage "Dummy Mina_base.Side_loaded_verification_key.t" dummy_vk ;
   print_heap_usage "Ledger.Db.path.t" merkle_path ;
   print_heap_usage "Protocol_state.t" protocol_state ;
   print_heap_usage "Pending_coinbase.t" pending_coinbase ;
@@ -23,6 +27,7 @@ let main () =
   print_heap_usage "Parallel_scan.Base.t (payment)" scan_state_base_node_payment ;
   print_heap_usage "Parallel_scan.Base.t (zkApp)" scan_state_base_node_zkapp ;
   print_heap_usage "Parallel_scan.Merge.t" scan_state_merge_node ;
+  print_heap_usage "Transaction_snark.Statement.t" transaction_snark_statement ;
   Deferred.unit
 
 let () =

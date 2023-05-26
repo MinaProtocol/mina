@@ -286,7 +286,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
     let connection_gating t = Deferred.return !(t.connection_gating)
 
-    let set_connection_gating t config =
+    let set_connection_gating ?clean_added_peers:_ t config =
       t.connection_gating := config ;
       Deferred.return config
   end

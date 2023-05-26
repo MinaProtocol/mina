@@ -2,10 +2,7 @@ module SC = Scalar_challenge
 module P = Proof
 open Pickles_types
 open Hlist
-open Tuple_lib
 open Common
-open Core_kernel
-open Async_kernel
 open Import
 open Types
 open Backend
@@ -13,8 +10,7 @@ open Backend
 (* This contains the "wrap" prover *)
 
 let challenge_polynomial =
-  let open Backend.Tick.Field in
-  Wrap_verifier.challenge_polynomial ~add ~mul ~one
+  Wrap_verifier.challenge_polynomial (module Backend.Tick.Field)
 
 module Type1 =
   Plonk_checks.Make
@@ -25,7 +21,7 @@ module Type1 =
       let index_terms = Plonk_checks.Scalars.Tick.index_terms
     end)
 
-let vector_of_list (type a t)
+let _vector_of_list (type a t)
     (module V : Snarky_intf.Vector.S with type elt = a and type t = t)
     (xs : a list) : t =
   let r = V.create () in
@@ -209,8 +205,6 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
   let plonk =
     let module Field = struct
       include Tick.Field
-
-      type nonrec bool = bool
     end in
     Type1.derive_plonk
       (module Field)
@@ -258,7 +252,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
                   N1
               | S (S Z) ->
                   N2
-              | _ ->
+              | S _ ->
                   assert false )
           ; domain_log2 =
               Branch_data.Domain_log2.of_int_exn
@@ -271,7 +265,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
           ; beta = chal plonk0.beta
           ; gamma = chal plonk0.gamma
           ; lookup =
-              Opt.map plonk.lookup ~f:(fun l ->
+              Opt.map plonk.lookup ~f:(fun _ ->
                   { Composition_types.Wrap.Proof_state.Deferred_values.Plonk
                     .In_circuit
                     .Lookup
@@ -652,7 +646,7 @@ let wrap
       Req ) :
       (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t )
     ~dlog_plonk_index wrap_main ~(typ : _ Impls.Step.Typ.t) ~step_vk
-    ~actual_wrap_domains ~step_plonk_indices ~feature_flags
+    ~actual_wrap_domains ~step_plonk_indices:_ ~feature_flags
     ~actual_feature_flags ?tweak_statement pk
     ({ statement = prev_statement; prev_evals; proof; index = which_index } :
       ( _
@@ -665,6 +659,8 @@ let wrap
         , max_proofs_verified )
         Vector.t )
       P.Base.Step.t ) =
+  let logger = Internal_tracing_context_logger.get () in
+  [%log internal] "Pickles_wrap_proof" ;
   let messages_for_next_wrap_proof =
     let module M =
       H1.Map
@@ -780,7 +776,7 @@ let wrap
     | _ ->
         Snarky_backendless.Request.unhandled
   in
-  let module O = Tick.Oracles in
+
   let public_input =
     tick_public_input_of_statement ~max_proofs_verified
       prev_statement_with_hashes ~feature_flags
@@ -814,10 +810,12 @@ let wrap
          (M.f messages_for_next_wrap_proof) )
       lte
   in
+  [%log internal] "Wrap_compute_deferred_values" ;
   let { deferred_values; x_hat_evals; sponge_digest_before_evaluations } =
     deferred_values ~sgs ~prev_challenges ~step_vk ~public_input ~proof
       ~actual_proofs_verified ~feature_flags ~actual_feature_flags
   in
+  [%log internal] "Wrap_compute_deferred_values_done" ;
   let next_statement : _ Types.Wrap.Statement.In_circuit.t =
     let messages_for_next_wrap_proof :
         _ P.Base.Messages_for_next_proof_over_same_field.Wrap.t =
@@ -872,10 +870,16 @@ let wrap
   let%map.Promise next_proof =
     let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
     Common.time "wrap proof" (fun () ->
+        [%log internal] "Wrap_generate_witness_conv" ;
         Impls.Wrap.generate_witness_conv
           ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs; public_inputs } () ->
-            Backend.Tock.Proof.create_async ~primary:public_inputs
-              ~auxiliary:auxiliary_inputs pk ~message:next_accumulator )
+            [%log internal] "Backend_tock_proof_create_async" ;
+            let%map.Promise proof =
+              Backend.Tock.Proof.create_async ~primary:public_inputs
+                ~auxiliary:auxiliary_inputs pk ~message:next_accumulator
+            in
+            [%log internal] "Backend_tock_proof_create_async_done" ;
+            proof )
           ~input_typ:input
           ~return_typ:(Snarky_backendless.Typ.unit ())
           (fun x () : unit ->
@@ -913,6 +917,7 @@ let wrap
               }
           } )
   in
+  [%log internal] "Pickles_wrap_proof_done" ;
   ( { proof = next_proof
     ; statement =
         Types.Wrap.Statement.to_minimal next_statement

@@ -330,8 +330,7 @@ end = struct
         sprintf
           "The minimum fee on transactions is %s . Please increase your fee to \
            at least this amount."
-          (Currency.Fee.to_mina_string
-             Mina_compile_config.minimum_user_command_fee )
+          (Currency.Fee.to_mina_string Currency.Fee.minimum_user_command_fee)
     | `Transaction_submit_invalid_signature ->
         "An invalid signature is attached to this transaction"
     | `Transaction_submit_insufficient_balance ->

@@ -12,7 +12,9 @@
    base.caml
    base.base_internalhash_types
    ;; local libraries
+   itn_logger
    interpolator_lib
+   mina_compile_config
    ppx_version.runtime
  )
  (preprocess

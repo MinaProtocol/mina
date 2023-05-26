@@ -308,7 +308,7 @@ module Transaction_pool = struct
     create ~compare_init:compare_envelope ~logger (fun (ds : input list) ->
         O1trace.thread "dispatching_transaction_pool_batcher_verification"
           (fun () ->
-            [%log info]
+            [%log debug]
               "Dispatching $num_proofs transaction pool proofs to verifier"
               ~metadata:[ ("num_proofs", `Int (List.length ds)) ] ;
             let open Deferred.Or_error.Let_syntax in
@@ -442,7 +442,7 @@ module Snark_pool = struct
            (Sys.getenv_opt "MAX_VERIFIER_BATCH_SIZE") )
       ~compare_init:compare_envelope ~logger
       (fun ps0 ->
-        [%log info] "Dispatching $num_proofs snark pool proofs to verifier"
+        [%log debug] "Dispatching $num_proofs snark pool proofs to verifier"
           ~metadata:[ ("num_proofs", `Int (List.length ps0)) ] ;
         let ps =
           List.concat_map ps0 ~f:(function
@@ -500,7 +500,8 @@ module Snark_pool = struct
         Async.Thread_safe.block_on_async_exn (fun () ->
             Verifier.create ~logger ~proof_level ~constraint_constants
               ~conf_dir:None
-              ~pids:(Child_processes.Termination.create_pid_table ()) )
+              ~pids:(Child_processes.Termination.create_pid_table ())
+              () )
 
       let gen_proofs =
         let open Quickcheck.Generator.Let_syntax in

@@ -2,9 +2,6 @@
 
 set -eo pipefail
 
-# execute pre-processing steps like zexe-standardize.sh if set
-if [ -n "${PREPROCESSOR}" ]; then echo "--- Executing preprocessor" && ${PREPROCESSOR}; fi
-
 eval $(opam config env)
 export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
 export GO=/usr/lib/go/bin/go
@@ -44,3 +41,6 @@ make deb
 
 echo "--- Upload debs to amazon s3 repo"
 make publish_debs
+
+echo "--- Git diff after build is complete:"
+git diff --exit-code

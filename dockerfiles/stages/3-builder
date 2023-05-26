@@ -43,8 +43,9 @@ WORKDIR $HOME/${MINA_DIR}
 
 # --- Build all major tagets required for packaging and the packages themselves
 RUN echo "--- Build all major tagets required for packaging from Commit SHA: ${MINA_COMMIT_SHA1}" \
+   && mkdir ${HOME}/app \
    && make libp2p_helper \
-   && ./scripts/zexe-standardize.sh \
+   && mv src/app/libp2p_helper/result/bin/libp2p_helper ${HOME}/app/libp2p_helper \
    && eval $(opam config env) \
    && dune build --profile=${DUNE_PROFILE} \
     src/app/logproc/logproc.exe \

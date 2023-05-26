@@ -181,7 +181,15 @@ variable "seed_starting_host_port" {
 
 variable "snark_coordinators" {
   description = "configurations for not just the snark coordinators but also the snark workers they coordinate"
-  type    = list(any)
+  type    = list(    
+    object({
+
+      snark_coordinator_name = string,
+      snark_worker_replicas = number
+      snark_worker_fee      = number
+      snark_worker_public_key = string
+      snark_coordinators_host_port = number
+    }))
   default = []
 }
 

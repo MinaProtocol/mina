@@ -50,7 +50,7 @@ module Accounts = struct
             ; set_permissions
             ; set_verification_key
             ; set_zkapp_uri
-            ; edit_sequence_state
+            ; edit_action_state
             ; set_token_symbol
             ; increment_nonce
             ; set_voting_for
@@ -77,7 +77,7 @@ module Accounts = struct
             ; set_permissions = auth_required set_permissions
             ; set_verification_key = auth_required set_verification_key
             ; set_zkapp_uri = auth_required set_zkapp_uri
-            ; edit_sequence_state = auth_required edit_sequence_state
+            ; edit_action_state = auth_required edit_action_state
             ; set_token_symbol = auth_required set_token_symbol
             ; increment_nonce = auth_required increment_nonce
             ; set_voting_for = auth_required set_voting_for
@@ -105,8 +105,8 @@ module Accounts = struct
             { app_state
             ; verification_key
             ; zkapp_version
-            ; sequence_state
-            ; last_sequence_slot
+            ; action_state
+            ; last_action_slot
             ; proved_state
             ; zkapp_uri
             } ->
@@ -134,29 +134,27 @@ module Accounts = struct
               Option.map verification_key
                 ~f:(With_hash.of_data ~hash_data:Zkapp_account.digest_vk)
             in
-            let%map sequence_state =
+            let%map action_state =
               if
                 Mina_stdlib.List.Length.Compare.(
-                  sequence_state
-                  = Pickles_types.Nat.to_int Pickles_types.Nat.N5.n)
-              then Ok (Pickles_types.Vector.Vector_5.of_list_exn sequence_state)
+                  action_state = Pickles_types.Nat.to_int Pickles_types.Nat.N5.n)
+              then Ok (Pickles_types.Vector.Vector_5.of_list_exn action_state)
               else
                 Or_error.errorf
-                  !"zkApp account sequence_state has invalid length %{sexp: \
+                  !"zkApp account action_state has invalid length %{sexp: \
                     Runtime_config.Accounts.Single.t} length: %d"
-                  t
-                  (List.length sequence_state)
+                  t (List.length action_state)
             in
 
-            let last_sequence_slot =
-              Mina_numbers.Global_slot.of_int last_sequence_slot
+            let last_action_slot =
+              Mina_numbers.Global_slot.of_int last_action_slot
             in
             Some
               { Zkapp_account.verification_key
               ; app_state
               ; zkapp_version
-              ; sequence_state
-              ; last_sequence_slot
+              ; action_state
+              ; last_action_slot
               ; proved_state
               ; zkapp_uri
               }
@@ -222,7 +220,7 @@ module Accounts = struct
             ; set_permissions
             ; set_verification_key
             ; set_zkapp_uri
-            ; edit_sequence_state
+            ; edit_action_state
             ; set_token_symbol
             ; increment_nonce
             ; set_voting_for
@@ -240,7 +238,7 @@ module Accounts = struct
           ; set_permissions = auth_required set_permissions
           ; set_verification_key = auth_required set_verification_key
           ; set_zkapp_uri = auth_required set_zkapp_uri
-          ; edit_sequence_state = auth_required edit_sequence_state
+          ; edit_action_state = auth_required edit_action_state
           ; set_token_symbol = auth_required set_token_symbol
           ; increment_nonce = auth_required increment_nonce
           ; set_voting_for = auth_required set_voting_for
@@ -253,8 +251,8 @@ module Accounts = struct
                { app_state
                ; verification_key
                ; zkapp_version
-               ; sequence_state
-               ; last_sequence_slot
+               ; action_state
+               ; last_action_slot
                ; proved_state
                ; zkapp_uri
                }
@@ -263,15 +261,15 @@ module Accounts = struct
             let verification_key =
               Option.map verification_key ~f:With_hash.data
             in
-            let sequence_state = Pickles_types.Vector.to_list sequence_state in
-            let last_sequence_slot =
-              Mina_numbers.Global_slot.to_int last_sequence_slot
+            let action_state = Pickles_types.Vector.to_list action_state in
+            let last_action_slot =
+              Mina_numbers.Global_slot.to_int last_action_slot
             in
             { Runtime_config.Accounts.Single.Zkapp_account.app_state
             ; verification_key
             ; zkapp_version
-            ; sequence_state
-            ; last_sequence_slot
+            ; action_state
+            ; last_action_slot
             ; proved_state
             ; zkapp_uri
             } )
@@ -682,8 +680,8 @@ let%test_module "Runtime config" =
                                   "zkapp": { "app_state": [ "14", "0", "0", "0", "0", "0", "0", "0" ],
                                              "verification_key": null,
                                              "zkapp_version": "0",
-                                             "sequence_state": [ "0", "0", "0", "0", "0" ],
-                                             "last_sequence_slot": 0,
+                                             "action_state": [ "0", "0", "0", "0", "0" ],
+                                             "last_action_slot": 0,
                                              "proved_state": false,
                                              "zkapp_uri": "http://zkapps_r_us.com"
                                            }

@@ -534,7 +534,11 @@ module type S = sig
 
       val min_window_density : Value.t -> Length.t
 
+      val sub_window_densities : Value.t -> Length.t list
+
       val block_stake_winner : Value.t -> Public_key.Compressed.t
+
+      val last_vrf_output : Value.t -> string
 
       val block_creator : Value.t -> Public_key.Compressed.t
 

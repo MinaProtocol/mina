@@ -6,6 +6,8 @@ module T = struct
 
   type view = Diff.Full.With_mutant.t list
 
+  let name = "identity"
+
   let create ~logger:_ _ = ((), [])
 
   let handle_diffs () _ diffs_with_mutants : view option =

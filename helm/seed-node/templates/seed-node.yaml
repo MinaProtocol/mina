@@ -37,6 +37,9 @@ spec:
           mountPath: /libp2p-keys
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
+        env:
+        - name: MINA_LIBP2P_PASS
+          value: {{ $config.libp2pSecretPassword | quote }}
       {{- else -}}
       - name: libp2p-perms
         image: {{ $.Values.mina.image | quote }}
@@ -49,7 +52,7 @@ spec:
           mountPath: /root/libp2p-keys
         env:
           - name: MINA_LIBP2P_PASS
-            value: {{ $.Values.mina.privkeyPass | quote }}
+            value: {{ $config.libp2pSecretPassword | quote }}
       {{- end }}
       containers:
       - name: mina
@@ -121,9 +124,11 @@ spec:
         - name: GCLOUD_BLOCK_UPLOAD_BUCKET
           value: "mina_network_block_data"
         - name: DAEMON_EXTERNAL_PORT
-          value: {{ default $.Values.mina.ports.p2p $config.externalPort | quote }}
+          value: {{ $.Values.mina.ports.p2p | quote }}
+        # {{- if $config.libp2pSecret }}
         - name: MINA_LIBP2P_PASS
-          value: {{ $.Values.mina.privkeyPass | quote }}
+          value: {{ $config.libp2pSecretPassword | quote }}
+        # {{- end }}
         ports:
         - name: client-port
           protocol: TCP
@@ -136,8 +141,8 @@ spec:
           containerPort: {{ $.Values.mina.ports.metrics }}
         - name: external-port
           protocol: TCP
-          containerPort: {{ default $.Values.mina.ports.p2p $config.externalPort }}
-          hostPort: {{ default $.Values.mina.ports.external $config.externalPort }}
+          containerPort: {{ $.Values.mina.ports.p2p }}
+          hostPort: {{ $.Values.mina.ports.p2p }}
 {{$data := dict "name" $config.name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.seed.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
@@ -212,7 +217,7 @@ spec:
     app: {{ $config.name }}
   ports:
   - name: tcp-p2p
-    port: {{ default $.Values.mina.ports.p2p $config.externalPort }}
+    port: {{ $.Values.mina.ports.p2p }}
     targetPort: external-port
 ---
 {{- if $.Values.mina.exposeGraphql }}

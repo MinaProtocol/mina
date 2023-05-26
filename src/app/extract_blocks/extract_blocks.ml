@@ -47,6 +47,10 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   let open Deferred.Let_syntax in
   let%bind creator = pk_of_id block.creator_id in
   let%bind block_winner = pk_of_id block.block_winner_id in
+  let last_vrf_output =
+    (* keep hex encoding *)
+    block.last_vrf_output
+  in
   let%bind snarked_ledger_hash_str =
     query_db ~f:(fun db ->
         Processor.Snarked_ledger_hash.find_by_id db block.snarked_ledger_hash_id )
@@ -72,6 +76,12 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     block.min_window_density |> Unsigned.UInt32.of_int64
     |> Mina_numbers.Length.of_uint32
   in
+  let sub_window_densities =
+    block.sub_window_densities
+    |> Array.map ~f:(fun length ->
+           Unsigned.UInt32.of_int64 length |> Mina_numbers.Length.of_uint32 )
+    |> Array.to_list
+  in
   let total_currency = Currency.Amount.of_string block.total_currency in
   let ledger_hash = Ledger_hash.of_base58_check_exn block.ledger_hash in
   let height = Unsigned.UInt32.of_int64 block.height in
@@ -83,16 +93,33 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   in
   let timestamp = Block_time.of_string_exn block.timestamp in
   let chain_status = Chain_status.of_string block.chain_status in
+  let%bind protocol_version =
+    let%map { major; minor; patch } =
+      query_db ~f:(fun db ->
+          Processor.Protocol_versions.load db block.protocol_version_id )
+    in
+    Protocol_version.create_exn ~major ~minor ~patch
+  in
+  let%bind proposed_protocol_version =
+    Option.value_map block.proposed_protocol_version_id ~default:(return None)
+      ~f:(fun id ->
+        let%map { major; minor; patch } =
+          query_db ~f:(fun db -> Processor.Protocol_versions.load db id)
+        in
+        Some (Protocol_version.create_exn ~major ~minor ~patch) )
+  in
   (* commands, accounts_accessed, accounts_created, tokens_used to be filled in later *)
   return
     { Extensional.Block.state_hash
     ; parent_hash
     ; creator
     ; block_winner
+    ; last_vrf_output
     ; snarked_ledger_hash
     ; staking_epoch_data
     ; next_epoch_data
     ; min_window_density
+    ; sub_window_densities
     ; total_currency
     ; ledger_hash
     ; height
@@ -102,6 +129,8 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     ; user_cmds = []
     ; internal_cmds = []
     ; zkapp_cmds = []
+    ; proposed_protocol_version
+    ; protocol_version
     ; chain_status
     ; accounts_accessed = []
     ; accounts_created = []

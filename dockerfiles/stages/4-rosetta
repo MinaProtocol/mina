@@ -2,7 +2,7 @@
 # The "rosetta" Stage
 # - sets up the final container with built binaries and a running postgresql archive node setup
 #################################################################################################
-# Supports debian:stretch-slim, debian:buster-slim, and ubuntu:focal
+# Supports debian:buster-slim, debian:bullseye-slim, and ubuntu:focal
 ARG image=ubuntu:focal
 FROM ${image} AS rosetta
 ARG deb_codename=focal

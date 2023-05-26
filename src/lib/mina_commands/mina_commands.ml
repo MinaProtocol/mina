@@ -97,15 +97,11 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
             , `List (List.map ~f:User_command.to_yojson valid_commands) )
           ; ( "invalid_commands"
             , `List
-                (List.map
-                   ~f:
-                     (Fn.compose
-                        Network_pool.Transaction_pool.Resource_pool.Diff
-                        .Diff_error
-                        .to_yojson snd )
-                   invalid_commands ) )
+                (List.map invalid_commands ~f:(fun (_cmd, diff_err) ->
+                     Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+                     .to_yojson diff_err ) ) )
           ]
-        "Invalid result from scheduling a user command" ;
+        "Invalid result when scheduling a user command" ;
       Error (Error.of_string "Internal error while scheduling a user command")
   | Error e ->
       Error e
@@ -119,26 +115,21 @@ let setup_and_submit_user_commands t user_command_list =
       [ ("mina_command", `String "scheduling a batch of user transactions") ] ;
   Mina_lib.add_transactions t user_command_list
 
-let setup_and_submit_snapp_command t (zkapp_command : Zkapp_command.t) =
+let setup_and_submit_zkapp_commands t (zkapp_commands : Zkapp_command.t list) =
   let open Participating_state.Let_syntax in
   (* hack to get types to work out *)
   let%map () = return () in
   let open Deferred.Let_syntax in
-  let%map result = Mina_lib.add_zkapp_transactions t [ zkapp_command ] in
-  txn_count := !txn_count + 1 ;
+  let%map result = Mina_lib.add_zkapp_transactions t zkapp_commands in
+  let num_zkapps = List.length zkapp_commands in
+  txn_count := !txn_count + num_zkapps ;
   match result with
-  | Ok (_, [], [ failed_txn ]) ->
-      Error
-        (Error.of_string
-           (sprintf !"%s"
-              ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
-                .to_yojson (snd failed_txn)
-              |> Yojson.Safe.to_string ) ) )
-  | Ok (`Broadcasted, [ User_command.Zkapp_command txn ], []) ->
+  | Ok (`Broadcasted, commands, []) ->
+      let zkapp_jsons = List.map commands ~f:User_command.to_yojson in
       [%log' info (Mina_lib.top_level_logger t)]
-        ~metadata:[ ("zkapp_command", Zkapp_command.to_yojson txn) ]
-        "Scheduled zkApp $zkapp_command" ;
-      Ok txn
+        ~metadata:[ ("zkapp_commands", `List zkapp_jsons) ]
+        "Scheduled %d zkApps" num_zkapps ;
+      Ok zkapp_commands
   | Ok (decision, valid_commands, invalid_commands) ->
       [%log' info (Mina_lib.top_level_logger t)]
         ~metadata:
@@ -149,22 +140,36 @@ let setup_and_submit_snapp_command t (zkapp_command : Zkapp_command.t) =
                     "broadcasted"
                 | `Not_broadcasted ->
                     "not_broadcasted" ) )
-          ; ( "valid_snapp_commands"
+          ; ( "valid_zkapp_commands"
             , `List (List.map ~f:User_command.to_yojson valid_commands) )
           ; ( "invalid_zkapp_commands"
             , `List
-                (List.map
-                   ~f:
-                     (Fn.compose
-                        Network_pool.Transaction_pool.Resource_pool.Diff
-                        .Diff_error
-                        .to_yojson snd )
-                   invalid_commands ) )
+                (List.map invalid_commands ~f:(fun (_cmd, diff_err) ->
+                     Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+                     .to_yojson diff_err ) ) )
           ]
-        "Invalid result from scheduling a zkApp command" ;
-      Error (Error.of_string "Internal error while scheduling a zkApp command")
+        "Invalid results when scheduling zkApp commands" ;
+      let err_str =
+        List.map invalid_commands ~f:(fun (_cmd, diff_error) ->
+            Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+            .to_yojson diff_error
+            |> Yojson.Safe.to_string )
+        |> String.concat ~sep:"; "
+      in
+      Error (Error.of_string err_str)
   | Error e ->
       Error e
+
+let setup_and_submit_zkapp_command t (zkapp_command : Zkapp_command.t) =
+  let res = setup_and_submit_zkapp_commands t [ zkapp_command ] in
+  let%map.Participating_state res' = res in
+  match%map.Deferred res' with
+  | Ok [ zkapp ] ->
+      Ok zkapp
+  | Ok ([] | _ :: _) ->
+      failwith "Expected exactly one zkApp"
+  | Error err ->
+      Error err
 
 module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
   type proof_elem = User_command.t

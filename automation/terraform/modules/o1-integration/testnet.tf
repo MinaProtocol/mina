@@ -23,11 +23,13 @@ module "kubernetes_testnet" {
   log_level             = "Trace"
   log_snark_work_gossip = true
 
-  additional_peers = [local.seed_peer.multiaddr]
+  #make sure everyone has the seed peer's multiaddress
+  additional_peers = ["/dns4/seed.${var.testnet_name}/tcp/${local.seed_external_port}/p2p/12D3KooWCoGWacXE4FRwAX8VqhnWVKhz5TTEecWEuGmiNrDt2XLf"]
   runtime_config   = var.runtime_config
 
   seed_zone   = "us-west1-a"
   seed_region = "us-west1"
+  seed_external_port = local.seed_external_port
   seed_configs = [local.seed_config]
 
   archive_configs = local.archive_node_configs
@@ -37,23 +39,27 @@ module "kubernetes_testnet" {
 
   archive_node_count   = var.archive_node_count
 
-  snark_coordinators = var.snark_worker_replicas <= 0 ? [] : [
+  snark_coordinators = var.snark_coordinator_config == null ? [] :[ 
     {
-      snark_worker_replicas = var.snark_worker_replicas
+      snark_coordinator_name = var.snark_coordinator_config.name
+      snark_worker_replicas = var.snark_coordinator_config.worker_nodes
       snark_worker_fee      = var.snark_worker_fee
-      snark_worker_public_key = var.snark_worker_public_key
+      snark_worker_public_key = var.snark_coordinator_config.public_key
       snark_coordinators_host_port = local.snark_worker_host_port
     }
   ]
 
-  block_producer_key_pass = "naughty blue worm"
+  # block_producer_key_pass = "naughty blue worm"
   block_producer_configs  = [
     for index, config in var.block_producer_configs : {
       name                   = config.name
-      id                     = config.id
+      # id                     = config.id
       class                  = "test",
       external_port          = local.block_producer_starting_host_port + index
-      private_key_secret     = config.keypair_secret
+      keypair_name     = config.keypair.keypair_name
+      # private_key     = config.keypair.private_key
+      # public_key     = config.keypair.public_key
+      privkey_password     = config.keypair.privkey_password
       libp2p_secret          = config.libp2p_secret
       isolated               = false
       enable_gossip_flooding = false

@@ -653,3 +653,29 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
       assert expect_snark_failure
   | Ok _ ->
       assert (not expect_snark_failure)
+
+let test_zkapp_command ?expected_failure ?(memo = Signed_command_memo.empty)
+    ?(fee = Currency.Fee.(of_nanomina_int_exn 100)) ~fee_payer_pk ~signers
+    ~initialize_ledger ~finalize_ledger zkapp_command =
+  let fee_payer : Account_update.Fee_payer.t =
+    { body =
+        { Account_update.Body.Fee_payer.dummy with
+          public_key = fee_payer_pk
+        ; fee
+        }
+    ; authorization = Signature.dummy
+    }
+  in
+  let zkapp_command : Zkapp_command.t =
+    Array.fold signers
+      ~init:
+        ({ fee_payer; account_updates = zkapp_command; memo } : Zkapp_command.t)
+      ~f:(fun zkapp_command (pk_compressed, sk) ->
+        Zkapps_examples.insert_signatures pk_compressed sk zkapp_command )
+  in
+  Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+      let aux = initialize_ledger ledger in
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          check_zkapp_command_with_merges_exn ?expected_failure ledger
+            [ zkapp_command ] ) ;
+      finalize_ledger aux ledger )

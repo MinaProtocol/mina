@@ -80,6 +80,7 @@ val create_gating_config :
   -> trusted_ips:string list
   -> trusted_peers:Builder.PeerId.t list
   -> isolate:bool
+  -> clean_added_peers:bool
   -> gating_config
 
 val create_rpc_request :

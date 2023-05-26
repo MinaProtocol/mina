@@ -260,14 +260,20 @@ module Instance = struct
         ~f:Result.return
     in
     let apply_diff diff =
+      [%log internal] "Apply_full_frontier_diffs" ;
       let (`New_root_and_diffs_with_mutants (_, diffs_with_mutants)) =
         Full_frontier.apply_diffs frontier [ diff ] ~has_long_catchup_job:false
           ~enable_epoch_ledger_sync:
             ( if ignore_consensus_local_state then `Disabled
             else `Enabled root_ledger )
       in
-      Extensions.notify extensions ~frontier ~diffs_with_mutants
-      |> Deferred.map ~f:Result.return
+      [%log internal] "Apply_full_frontier_diffs_done" ;
+      [%log internal] "Notify_frontier_extensions" ;
+      let%map.Deferred result =
+        Extensions.notify extensions ~logger ~frontier ~diffs_with_mutants
+      in
+      [%log internal] "Notify_frontier_extensions_done" ;
+      Result.return result
     in
     (* crawl through persistent frontier and load transitions into in memory frontier *)
     let%bind () =
@@ -284,6 +290,21 @@ module Instance = struct
                    Error (`Fatal_error (Invalid_genesis_state_hash transition))
                    |> Deferred.return
              in
+             let state_hash =
+               ( With_hash.hash
+               @@ Mina_block.Validation.block_with_hash transition )
+                 .state_hash
+             in
+             Internal_tracing.with_state_hash state_hash
+             @@ fun () ->
+             [%log internal] "@block_metadata"
+               ~metadata:
+                 [ ( "blockchain_length"
+                   , Mina_numbers.Length.to_yojson
+                     @@ Mina_block.(
+                          blockchain_length (Validation.block transition)) )
+                 ] ;
+             [%log internal] "Loaded_transition_from_storage" ;
              (* we're loading transitions from persistent storage,
                 don't assign a timestamp
              *)
@@ -296,6 +317,7 @@ module Instance = struct
                  ~sender:None ~transition_receipt_time ()
              in
              let%map () = apply_diff Diff.(E (New_node (Full breadcrumb))) in
+             [%log internal] "Breadcrumb_integrated" ;
              breadcrumb ) )
         ~f:
           (Result.map_error ~f:(function

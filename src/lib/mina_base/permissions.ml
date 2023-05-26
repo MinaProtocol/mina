@@ -352,7 +352,7 @@ module Poly = struct
         ; set_permissions : 'controller
         ; set_verification_key : 'controller
         ; set_zkapp_uri : 'controller
-        ; edit_sequence_state : 'controller
+        ; edit_action_state : 'controller
         ; set_token_symbol : 'controller
         ; increment_nonce : 'controller
         ; set_voting_for : 'controller
@@ -368,7 +368,7 @@ module Poly = struct
       ~send:(f controller) ~set_delegate:(f controller)
       ~set_permissions:(f controller) ~set_verification_key:(f controller)
       ~receive:(f controller) ~set_zkapp_uri:(f controller)
-      ~edit_sequence_state:(f controller) ~set_token_symbol:(f controller)
+      ~edit_action_state:(f controller) ~set_token_symbol:(f controller)
       ~increment_nonce:(f controller) ~set_voting_for:(f controller)
       ~set_timing:(f controller) ~access:(f controller)
     |> List.rev
@@ -404,7 +404,7 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
   let%bind set_permissions = auth_required_gen in
   let%bind set_verification_key = auth_required_gen in
   let%bind set_zkapp_uri = auth_required_gen in
-  let%bind edit_sequence_state = auth_required_gen in
+  let%bind edit_action_state = auth_required_gen in
   let%bind set_token_symbol = auth_required_gen in
   let%bind increment_nonce = auth_required_gen in
   let%bind set_voting_for = auth_required_gen in
@@ -423,7 +423,7 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
     ; set_permissions
     ; set_verification_key
     ; set_zkapp_uri
-    ; edit_sequence_state
+    ; edit_action_state
     ; set_token_symbol
     ; increment_nonce
     ; set_voting_for
@@ -447,7 +447,7 @@ module Checked = struct
     let c = g Auth_required.Checked.if_ in
     Poly.Fields.map ~edit_state:c ~send:c ~receive:c ~set_delegate:c
       ~set_permissions:c ~set_verification_key:c ~set_zkapp_uri:c
-      ~edit_sequence_state:c ~set_token_symbol:c ~increment_nonce:c
+      ~edit_action_state:c ~set_token_symbol:c ~increment_nonce:c
       ~set_voting_for:c ~set_timing:c ~access:c
 
   let constant (t : Stable.Latest.t) : t =
@@ -455,7 +455,7 @@ module Checked = struct
     let a f = Auth_required.Checked.constant (get f t) in
     Poly.Fields.map ~edit_state:a ~send:a ~receive:a ~set_delegate:a
       ~set_permissions:a ~set_verification_key:a ~set_zkapp_uri:a
-      ~edit_sequence_state:a ~set_token_symbol:a ~increment_nonce:a
+      ~edit_action_state:a ~set_token_symbol:a ~increment_nonce:a
       ~set_voting_for:a ~set_timing:a ~access:a
 end
 
@@ -491,7 +491,7 @@ let user_default : t =
   ; set_permissions = Signature
   ; set_verification_key = Signature
   ; set_zkapp_uri = Signature
-  ; edit_sequence_state = Signature
+  ; edit_action_state = Signature
   ; set_token_symbol = Signature
   ; increment_nonce = Signature
   ; set_voting_for = Signature
@@ -508,7 +508,7 @@ let empty : t =
   ; set_permissions = None
   ; set_verification_key = None
   ; set_zkapp_uri = None
-  ; edit_sequence_state = None
+  ; edit_action_state = None
   ; set_token_symbol = None
   ; increment_nonce = None
   ; set_voting_for = None
@@ -528,7 +528,7 @@ let deriver obj =
   Poly.Fields.make_creator obj ~edit_state:!.auth_required ~send:!.auth_required
     ~receive:!.auth_required ~set_delegate:!.auth_required
     ~set_permissions:!.auth_required ~set_verification_key:!.auth_required
-    ~set_zkapp_uri:!.auth_required ~edit_sequence_state:!.auth_required
+    ~set_zkapp_uri:!.auth_required ~edit_action_state:!.auth_required
     ~set_token_symbol:!.auth_required ~increment_nonce:!.auth_required
     ~set_voting_for:!.auth_required ~set_timing:!.auth_required
     ~access:!.auth_required
@@ -555,7 +555,7 @@ let%test_unit "json value" =
         setPermissions: "Signature",
         setVerificationKey: "Signature",
         setZkappUri: "Signature",
-        editSequenceState: "Signature",
+        editActionState: "Signature",
         setTokenSymbol: "Signature",
         incrementNonce: "Signature",
         setVotingFor: "Signature",

@@ -4,17 +4,15 @@ let ContainerImages = ./ContainerImages.dhall
 let S = ../Lib/SelectFiles.dhall
 let D = S.PathPattern
 
-let DebVersion = < Bookworm | Bullseye | Buster | Stretch | Jammy | Focal | Bionic >
+let DebVersion = < Bookworm | Bullseye | Buster | Jammy | Focal >
 
 let capitalName = \(debVersion : DebVersion) ->
   merge {
     Bookworm = "Bookworm"
     , Bullseye = "Bullseye"
     , Buster = "Buster"
-    , Stretch = "Stretch"
     , Jammy = "Jammy"
     , Focal = "Focal"
-    , Bionic = "Bionic"
   } debVersion
 
 let lowerName = \(debVersion : DebVersion) ->
@@ -22,38 +20,30 @@ let lowerName = \(debVersion : DebVersion) ->
     Bookworm = "bookworm"
     , Bullseye = "bullseye"
     , Buster = "buster"
-    , Stretch = "stretch"
     , Jammy = "jammy"
     , Focal = "focal"
-    , Bionic = "bionic"
   } debVersion
 
---- Bionic and Stretch are so similar that they share a toolchain runner
---- Same with Bullseye and Focal
+--- Bullseye and Focal are so similar that they share a toolchain runner
 --- Same with Bookworm and Jammy
 let toolchainRunner = \(debVersion : DebVersion) ->
   merge {
     Bookworm = RunInToolchain.runInToolchainBookworm
     , Bullseye = RunInToolchain.runInToolchainBullseye
     , Buster = RunInToolchain.runInToolchainBuster
-    , Stretch = RunInToolchain.runInToolchainStretch
     , Jammy = RunInToolchain.runInToolchainBookworm
     , Focal = RunInToolchain.runInToolchainBullseye
-    , Bionic = RunInToolchain.runInToolchainStretch
   } debVersion
 
---- Bionic and Stretch are so similar that they share a toolchain image
---- Same with Bullseye and Focal
+--- Bullseye and Focal are so similar that they share a toolchain image
 --- Same with Bookworm and Jammy
 let toolchainImage = \(debVersion : DebVersion) ->
   merge { 
     Bookworm = ContainerImages.minaToolchainBookworm
     , Bullseye = ContainerImages.minaToolchainBullseye
     , Buster = ContainerImages.minaToolchainBuster
-    , Stretch = ContainerImages.minaToolchainStretch
     , Jammy = ContainerImages.minaToolchainBookworm
     , Focal = ContainerImages.minaToolchainBullseye
-    , Bionic = ContainerImages.minaToolchainStretch
   } debVersion
 
 let dependsOn = \(debVersion : DebVersion) ->
@@ -61,10 +51,8 @@ let dependsOn = \(debVersion : DebVersion) ->
     Bookworm = [{ name = "MinaArtifactBookworm", key = "builder-bookworm" }]
     , Bullseye = [{ name = "MinaArtifactBullseye", key = "builder-bullseye" }]
     , Buster = [{ name = "MinaArtifactBuster", key = "builder-buster" }]
-    , Stretch = [{ name = "MinaArtifactStretch", key = "builder-stretch" }]
     , Jammy = [{ name = "MinaArtifactJammy", key = "builder-jammy" }]
     , Focal = [{ name = "MinaArtifactFocal", key = "builder-focal" }]
-    , Bionic = [{ name = "MinaArtifactBionic", key = "builder-bionic" }]
   } debVersion
 
 -- Most debian builds are only used for public releases
@@ -105,10 +93,8 @@ let dirtyWhen = \(debVersion : DebVersion) ->
     Bookworm = zeroDirtyWhen
     , Bullseye = bullseyeDirtyWhen
     , Buster = zeroDirtyWhen
-    , Stretch = zeroDirtyWhen
     , Jammy = zeroDirtyWhen
     , Focal = zeroDirtyWhen
-    , Bionic = zeroDirtyWhen
   } debVersion
 
 in

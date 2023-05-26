@@ -983,11 +983,25 @@ module Account_precondition = struct
         | Full of Zkapp_precondition.Account.Stable.V2.t
         | Nonce of Account.Nonce.Stable.V1.t
         | Accept
-      [@@deriving sexp, equal, yojson, hash, compare]
+      [@@deriving sexp, yojson, hash, compare]
 
       let to_latest = Fn.id
+
+      let to_full = function
+        | Full s ->
+            s
+        | Nonce n ->
+            { Zkapp_precondition.Account.accept with
+              nonce = Check { lower = n; upper = n }
+            }
+        | Accept ->
+            Zkapp_precondition.Account.accept
+
+      let equal p q = Zkapp_precondition.Account.equal (to_full p) (to_full q)
     end
   end]
+
+  [%%define_locally Stable.Latest.(to_full, equal)]
 
   let gen : t Quickcheck.Generator.t =
     Quickcheck.Generator.variant3 Zkapp_precondition.Account.gen
@@ -999,16 +1013,6 @@ module Account_precondition = struct
              Nonce x
          | `C () ->
              Accept )
-
-  let to_full = function
-    | Full s ->
-        s
-    | Nonce n ->
-        { Zkapp_precondition.Account.accept with
-          nonce = Check { lower = n; upper = n }
-        }
-    | Accept ->
-        Zkapp_precondition.Account.accept
 
   let of_full (p : Zkapp_precondition.Account.t) =
     let module A = Zkapp_precondition.Account in
@@ -1048,11 +1052,31 @@ module Account_precondition = struct
     [%test_eq: t] account_precondition
       (account_precondition |> Fd.to_json full |> Fd.of_json full)
 
+  let%test "json roundtrip Full with ignore" =
+    let account_precondition = Full Zkapp_precondition.Account.accept in
+    let module Fd = Fields_derivers_zkapps.Derivers in
+    let full = deriver (Fd.o ()) in
+    equal account_precondition
+      (account_precondition |> Fd.to_json full |> Fd.of_json full)
+
   let%test_unit "json roundtrip nonce" =
     let account_precondition : t = Nonce (Account_nonce.of_int 928472) in
     let module Fd = Fields_derivers_zkapps.Derivers in
     let full = deriver (Fd.o ()) in
     [%test_eq: t] account_precondition
+      (account_precondition |> Fd.to_json full |> Fd.of_json full)
+
+  let%test "json roundtrip Full with nonce" =
+    let n = Account_nonce.of_int 4321 in
+    let account_precondition : t =
+      Full
+        { Zkapp_precondition.Account.accept with
+          nonce = Check { lower = n; upper = n }
+        }
+    in
+    let module Fd = Fields_derivers_zkapps.Derivers in
+    let full = deriver (Fd.o ()) in
+    equal account_precondition
       (account_precondition |> Fd.to_json full |> Fd.of_json full)
 
   let%test_unit "json roundtrip full" =
@@ -1080,7 +1104,7 @@ module Account_precondition = struct
           nonce: {lower: "34928", upper: "34928"},
           receiptChainHash: null, delegate: null,
           state: [null,null,null,null,null,null,null,null],
-          sequenceState: null, provedState: null, isNew: null
+          actionState: null, provedState: null, isNew: null
         }|json}
       |> Yojson.Safe.from_string |> Yojson.Safe.to_string )
 
@@ -1740,6 +1764,36 @@ module Body = struct
     ; may_use_token
     ; authorization_kind
     }
+
+  let gen_with_events_and_actions =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map public_key = Public_key.Compressed.gen
+    and token_id = Token_id.gen
+    and update = Update.gen ()
+    and balance_change = Currency.Amount.Signed.gen
+    and increment_nonce = Quickcheck.Generator.bool
+    and events = return [ [| Field.zero |]; [| Field.zero |] ]
+    and actions = return [ [| Field.zero |]; [| Field.zero |] ]
+    and call_data = Field.gen
+    and preconditions = Preconditions.gen
+    and use_full_commitment = Quickcheck.Generator.bool
+    and implicit_account_creation_fee = Quickcheck.Generator.bool
+    and may_use_token = May_use_token.gen
+    and authorization_kind = Authorization_kind.gen in
+    { public_key
+    ; token_id
+    ; update
+    ; balance_change
+    ; increment_nonce
+    ; events
+    ; actions
+    ; call_data
+    ; preconditions
+    ; use_full_commitment
+    ; implicit_account_creation_fee
+    ; may_use_token
+    ; authorization_kind
+    }
 end
 
 module T = struct
@@ -1804,6 +1858,12 @@ module T = struct
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
     let%map body = Body.gen and authorization = Control.gen_with_dummies in
+    { body; authorization }
+
+  let gen_with_events_and_actions : t Quickcheck.Generator.t =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map body = Body.gen_with_events_and_actions
+    and authorization = Control.gen_with_dummies in
     { body; authorization }
 
   let quickcheck_generator : t Quickcheck.Generator.t = gen

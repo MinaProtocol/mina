@@ -190,7 +190,7 @@ let update_of_id pool update_id =
                   ; set_permissions
                   ; set_verification_key
                   ; set_zkapp_uri
-                  ; edit_sequence_state
+                  ; edit_action_state
                   ; set_token_symbol
                   ; increment_nonce
                   ; set_voting_for
@@ -208,7 +208,7 @@ let update_of_id pool update_id =
               ; set_permissions
               ; set_verification_key
               ; set_zkapp_uri
-              ; edit_sequence_state
+              ; edit_action_state
               ; set_token_symbol
               ; increment_nonce
               ; set_voting_for
@@ -486,7 +486,7 @@ let get_account_update_body ~pool body_id =
                  ; receipt_chain_hash
                  ; delegate_id
                  ; state_id
-                 ; sequence_state_id
+                 ; action_state_id
                  ; proved_state
                  ; is_new
                  } =
@@ -572,16 +572,16 @@ let get_account_update_body ~pool body_id =
           in
           List.map fields ~f:Or_ignore.of_option |> Zkapp_state.V.of_list_exn
         in
-        let%bind sequence_state =
-          let%map sequence_state_opt =
-            Option.value_map sequence_state_id ~default:(return None)
+        let%bind action_state =
+          let%map action_state_opt =
+            Option.value_map action_state_id ~default:(return None)
               ~f:(fun id ->
                 let%map field_str =
                   query_db ~f:(fun db -> Processor.Zkapp_field.load db id)
                 in
                 Some (Zkapp_basic.F.of_string field_str) )
           in
-          Or_ignore.of_option sequence_state_opt
+          Or_ignore.of_option action_state_opt
         in
         let proved_state = Or_ignore.of_option proved_state in
         let is_new = Or_ignore.of_option is_new in
@@ -592,7 +592,7 @@ let get_account_update_body ~pool body_id =
              ; receipt_chain_hash
              ; delegate
              ; state
-             ; sequence_state
+             ; action_state
              ; proved_state
              ; is_new
              } )
@@ -754,7 +754,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
             ; set_permissions
             ; set_verification_key
             ; set_zkapp_uri
-            ; edit_sequence_state
+            ; edit_action_state
             ; set_token_symbol
             ; increment_nonce
             ; set_voting_for
@@ -770,7 +770,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
       ; set_permissions
       ; set_verification_key
       ; set_zkapp_uri
-      ; edit_sequence_state
+      ; edit_action_state
       ; set_token_symbol
       ; increment_nonce
       ; set_voting_for
@@ -788,8 +788,8 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
            { app_state_id
            ; verification_key_id
            ; zkapp_version
-           ; sequence_state_id
-           ; last_sequence_slot
+           ; action_state_id
+           ; last_action_slot
            ; proved_state
            ; zkapp_uri_id
            }
@@ -856,10 +856,10 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
         in
         let%bind { element0; element1; element2; element3; element4 } =
           query_db ~f:(fun db ->
-              Processor.Zkapp_sequence_states.load db sequence_state_id )
+              Processor.Zkapp_action_states.load db action_state_id )
         in
         let elements = [ element0; element1; element2; element3; element4 ] in
-        let%bind sequence_state =
+        let%bind action_state =
           let%map field_strs =
             Deferred.List.map elements ~f:(fun id ->
                 query_db ~f:(fun db -> Processor.Zkapp_field.load db id) )
@@ -867,8 +867,8 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
           let fields = List.map field_strs ~f:Zkapp_basic.F.of_string in
           Pickles_types.Vector.Vector_5.of_list_exn fields
         in
-        let last_sequence_slot =
-          last_sequence_slot |> Unsigned.UInt32.of_int64
+        let last_action_slot =
+          last_action_slot |> Unsigned.UInt32.of_int64
           |> Mina_numbers.Global_slot.of_uint32
         in
         let%map zkapp_uri =
@@ -878,8 +878,8 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
           ( { app_state
             ; verification_key
             ; zkapp_version
-            ; sequence_state
-            ; last_sequence_slot
+            ; action_state
+            ; last_action_slot
             ; proved_state
             ; zkapp_uri
             }

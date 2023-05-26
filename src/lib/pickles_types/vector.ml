@@ -12,6 +12,8 @@ end
 
 include T
 
+let singleton a = [ a ]
+
 let unsingleton (type a) ([ x ] : (a, z s) t) : a = x
 
 let rec iter : type a n. (a, n) t -> f:(a -> unit) -> unit =

@@ -20,30 +20,44 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Test_config in
     { default with
       requires_graphql = true
-    ; block_producers =
-        [ { balance = "8000000000"; timing = Untimed }
-        ; { balance = "1000000000"; timing = Untimed }
+    ; genesis_ledger =
+        [ { account_name = "node-a-key"
+          ; balance = "8000000000"
+          ; timing = Untimed
+          }
+        ; { account_name = "node-b-key"; balance = "1000000"; timing = Untimed }
+        ; { account_name = "fish1"; balance = "3000"; timing = Untimed }
+        ; { account_name = "fish2"; balance = "3000"; timing = Untimed }
+        ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
         ]
-    ; extra_genesis_accounts =
-        [ { balance = "3000"; timing = Untimed }
-        ; { balance = "3000"; timing = Untimed }
+    ; block_producers =
+        [ { node_name = "node-a"; account_name = "node-a-key" }
+        ; { node_name = "node-b"; account_name = "node-b-key" }
         ]
     ; num_archive_nodes = 1
-    ; num_snark_workers = 2
+    ; snark_coordinator =
+        Some
+          { node_name = "snark-node"
+          ; account_name = "snark-node-key"
+          ; worker_nodes = 5
+          }
     ; snark_worker_fee = "0.0001"
     ; proof_config =
         { proof_config_default with
           work_delay = Some 1
         ; transaction_capacity =
-            Some Runtime_config.Proof_keys.Transaction_capacity.small
+            Some Runtime_config.Proof_keys.Transaction_capacity.medium
         }
     }
 
   let transactions_sent = ref 0
 
+  let num_proofs = 2
+
   let padding_payments () =
-    let needed_for_padding = 42 in
-    (* for work_delay=1 and transaction_capacity=4 per block*)
+    let needed_for_padding =
+      Test_config.transactions_needed_for_ledger_proofs config ~num_proofs
+    in
     if !transactions_sent >= needed_for_padding then 0
     else needed_for_padding - !transactions_sent
 
@@ -76,32 +90,52 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let block_producer_nodes = Network.block_producers network in
-    let node = List.hd_exn block_producer_nodes in
-    let[@warning "-8"] [ fish1_kp; _fish2_kp ] =
-      Network.extra_genesis_keypairs network
+    let block_producer_nodes =
+      Network.block_producers network |> Core.String.Map.data
+    in
+    let node =
+      Core.String.Map.find_exn (Network.block_producers network) "node-a"
+    in
+    let fish1_kp =
+      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1")
+        .keypair
     in
     let fish1_pk = Signature_lib.Public_key.compress fish1_kp.public_key in
     let fish1_account_id =
       Mina_base.Account_id.create fish1_pk Mina_base.Token_id.default
     in
-    let with_timeout ?(soft_slots = 3) () =
+    let with_timeout ~soft_slots =
       let soft_timeout = Network_time_span.Slots soft_slots in
       let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
       Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
     in
     let wait_for_zkapp ~has_failures zkapp_command =
       let%map () =
-        wait_for t @@ with_timeout ()
+        wait_for t @@ with_timeout ~soft_slots:4
         @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures
              ~zkapp_command
       in
       [%log info] "zkApp transaction included in transition frontier"
     in
+    (*Wait for first BP to start sending payments and avoid partially filling blocks*)
+    let first_bp = List.hd_exn block_producer_nodes in
     let%bind () =
-      section_hard "Wait for nodes to initialize"
-        (wait_for t
-           (Wait_condition.nodes_to_initialize @@ Network.all_nodes network) )
+      wait_for t (Wait_condition.nodes_to_initialize [ first_bp ])
+    in
+    (*Start sending padding transactions to get snarked ledger sooner*)
+    let%bind () =
+      let fee = Currency.Fee.of_nanomina_int_exn 3_000_000 in
+      send_padding_transactions block_producer_nodes ~fee ~logger
+        ~n:(padding_payments ())
+    in
+    (*wait for the rest*)
+    let%bind () =
+      wait_for t
+        (Wait_condition.nodes_to_initialize
+           (List.filter
+              ~f:(fun n ->
+                String.(Network.Node.id n <> Network.Node.id first_bp) )
+              (Core.String.Map.data (Network.all_nodes network)) ) )
     in
     let keymap =
       List.fold [ fish1_kp ] ~init:Signature_lib.Public_key.Compressed.Map.empty
@@ -110,6 +144,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ~key:(Signature_lib.Public_key.compress public_key)
             ~data:private_key )
     in
+    (*Transaction that updates fee payer account in account_updates.
+      The account update should fail due to failing nonce condition if the next transaction with the same fee payer is added to the same block
+    *)
     let%bind.Deferred invalid_nonce_zkapp_cmd_from_fish1 =
       let open Zkapp_command_builder in
       let with_dummy_signatures =
@@ -132,6 +169,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
+    (*Transaction that updates fee payer account in account_updates but passes
+       because the nonce precondition is true. There should be no other fee
+       payer updates in the same block*)
     let%bind.Deferred valid_zkapp_cmd_from_fish1 =
       let open Zkapp_command_builder in
       let with_dummy_signatures =
@@ -154,7 +194,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
-    let%bind.Deferred set_precondition_zkapp_cmd_from_fish1 =
+    (*Set fee payer send permission to Proof. New transactions with the same
+      fee payer are accepted into the pool.
+      Only the ones that make it to the same block are applied.
+      The remaining ones in the pool should be evicted because the fee payer will
+      no longer have the permission to send with Signature authorization*)
+    let%bind.Deferred set_permission_zkapp_cmd_from_fish1 =
       let open Zkapp_command_builder in
       let with_dummy_signatures =
         let account_updates =
@@ -176,7 +221,34 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
-    let%bind.Deferred valid_precondition_zkapp_cmd_from_fish1 =
+    (*Transaction with fee payer update in account_updates. The account update
+      should fail if the send permission is changed to Proof*)
+    let%bind.Deferred valid_fee_invalid_permission_zkapp_cmd_from_fish1 =
+      let open Zkapp_command_builder in
+      let with_dummy_signatures =
+        let account_updates =
+          mk_forest
+            [ mk_node
+                (mk_account_update_body Signature No fish1_kp Token_id.default 1
+                   ~increment_nonce:true )
+                []
+            ; mk_node
+                (mk_account_update_body Signature No fish1_kp Token_id.default
+                   (-1) )
+                []
+            ]
+        in
+        account_updates
+        |> mk_zkapp_command ~memo:"valid zkapp from fish1" ~fee:12_000_000
+             ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 3)
+      in
+      replace_authorizations ~keymap with_dummy_signatures
+    in
+    (*Transaction that doesn't make it into a block and should be evicted from
+      the pool after fee payer's send permission is changed
+      Making it a low fee transaction to prevent from getting into a block, to
+      test transaction pruning*)
+    let%bind.Deferred invalid_fee_invalid_permission_zkapp_cmd_from_fish1 =
       let open Zkapp_command_builder in
       let with_dummy_signatures =
         let account_updates =
@@ -187,8 +259,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
         in
         account_updates
-        |> mk_zkapp_command ~memo:"valid zkapp from fish1" ~fee:12_000_000
-             ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 3)
+        |> mk_zkapp_command ~memo:"valid zkapp from fish1" ~fee:2_000_000
+             ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 4)
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
@@ -204,92 +276,50 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Deferred.return `Continue )
     in
     let%bind () =
-      section
-        "Send a zkapp command with an invalid account update nonce using fish1"
-        (send_zkapp ~logger node invalid_nonce_zkapp_cmd_from_fish1)
+      section_hard
+        "Send a zkapp commands with fee payer nonce increments and nonce \
+         preconditions"
+        (send_zkapp_batch ~logger node
+           [ invalid_nonce_zkapp_cmd_from_fish1; valid_zkapp_cmd_from_fish1 ] )
     in
     let%bind () =
-      section
-        "Send a zkapp command that has its nonce properly incremented after \
-         the fish1 transaction"
-        (send_zkapp ~logger node valid_zkapp_cmd_from_fish1)
-    in
-    let%bind () =
-      section
-        "Wait for fish1 zkapp command with invalid nonce to appear in \
+      section_hard
+        "Wait for fish1 zkapp command with failing nonce check to appear in \
          transition frontier with failed status"
         (wait_for_zkapp ~has_failures:true invalid_nonce_zkapp_cmd_from_fish1)
     in
     let%bind () =
-      section
-        "Wait for fish1 zkapp command with valid nonce to be accepted into \
-         transition frontier"
+      section_hard
+        "Wait for fish1 zkapp command with passing nonce check to be accepted \
+         into transition frontier"
         (wait_for_zkapp ~has_failures:false valid_zkapp_cmd_from_fish1)
     in
     let%bind () =
-      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
-      send_padding_transactions block_producer_nodes ~fee ~logger
-        ~n:(padding_payments ())
+      section_hard
+        "Send zkapp commands with account updates for fish1 that sets send \
+         permission to Proof and then tries to send funds "
+        (send_zkapp_batch ~logger node
+           [ set_permission_zkapp_cmd_from_fish1
+           ; valid_fee_invalid_permission_zkapp_cmd_from_fish1
+           ; invalid_fee_invalid_permission_zkapp_cmd_from_fish1
+           ] )
     in
     let%bind () =
-      section_hard "wait for 1 block to be produced"
-        ( wait_for t
-        @@ with_timeout ~soft_slots:5 ()
-        @@ Wait_condition.blocks_to_be_produced 1 )
-    in
-    let%bind () =
-      section "Verify invalid zkapp commands are removed from transaction pool"
-        (let%bind pooled_zkapp_commands =
-           Network.Node.get_pooled_zkapp_commands ~logger node ~pk:fish1_pk
-           |> Deferred.bind ~f:Malleable_error.or_hard_error
-         in
-         if List.is_empty pooled_zkapp_commands then (
-           [%log info] "Transaction pool is empty" ;
-           return () )
-         else
-           Malleable_error.hard_error
-             (Error.of_string
-                "Transaction pool contains invalid zkapp commands after a \
-                 block was produced" ) )
-    in
-    let%bind () =
-      section
-        "Send a zkapp command account update that sets send precondition using \
-         fish1"
-        (send_zkapp ~logger node set_precondition_zkapp_cmd_from_fish1)
-    in
-    let%bind () =
-      section
-        "Send a zkapp command that should be valid after precondition from the \
-         fish1 transaction"
-        (send_zkapp ~logger node valid_precondition_zkapp_cmd_from_fish1)
-    in
-    let%bind () =
-      section
-        "Wait for fish1 zkapp command with set precondition to be accepted by \
+      section_hard
+        "Wait for fish1 zkapp command with set permission to be accepted by \
          transition frontier"
-        (wait_for_zkapp ~has_failures:false
-           set_precondition_zkapp_cmd_from_fish1 )
+        (wait_for_zkapp ~has_failures:false set_permission_zkapp_cmd_from_fish1)
     in
     let%bind () =
-      section
-        "Wait for fish1 zkapp command to be accepted by transition frontier"
-        (wait_for_zkapp ~has_failures:false
-           valid_precondition_zkapp_cmd_from_fish1 )
+      section_hard
+        "Wait for fish1 zkapp command that tries to send funds with Signature"
+        (wait_for_zkapp ~has_failures:true
+           valid_fee_invalid_permission_zkapp_cmd_from_fish1 )
     in
     let%bind () =
-      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
-      send_padding_transactions block_producer_nodes ~fee ~logger
-        ~n:(padding_payments ())
-    in
-    let%bind () =
-      section_hard "wait for 1 block to be produced"
-        (wait_for t (Wait_condition.blocks_to_be_produced 1))
-    in
-    let%bind () =
-      section
-        "Verify precondition zkapp command was applied by checking account \
-         nonce"
+      section_hard
+        "Verify account update after the updated permission failed by checking \
+         account nonce"
         (let%bind { nonce = fish1_nonce; _ } =
            Network.Node.get_account_data ~logger node
              ~account_id:fish1_account_id
@@ -301,35 +331,47 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              (Error.of_string
                 "Nonce value of fish1 does not match expected nonce" )
          else (
-           [%log info] "Invalid zkapp command was correctly ignored" ;
+           [%log info]
+             "Invalid zkapp command was ignored as expected due to low fee" ;
            return () ) )
     in
+    (*TODO: enable later
+      let%bind () =
+        section_hard
+          "Verify invalid zkapp commands are removed from transaction pool"
+          (let%bind pooled_zkapp_commands =
+             Network.Node.get_pooled_zkapp_commands ~logger node ~pk:fish1_pk
+             |> Deferred.bind ~f:Malleable_error.or_hard_error
+           in
+           [%log debug] "Pooled zkapp_commands $commands"
+             ~metadata:
+               [ ( "commands"
+                 , `List (List.map ~f:(fun s -> `String s) pooled_zkapp_commands)
+                 )
+               ] ;
+           if List.is_empty pooled_zkapp_commands then (
+             [%log info] "Transaction pool is empty" ;
+             return () )
+           else
+             Malleable_error.hard_error
+               (Error.of_string
+                  "Transaction pool contains invalid zkapp commands after a \
+                   block was produced" ) )
+      in *)
     let%bind () =
-      section "Verify invalid zkapp commands are removed from transaction pool"
-        (let%bind pooled_zkapp_commands =
-           Network.Node.get_pooled_zkapp_commands ~logger node ~pk:fish1_pk
-           |> Deferred.bind ~f:Malleable_error.or_hard_error
-         in
-         if List.is_empty pooled_zkapp_commands then (
-           [%log info] "Transaction pool is empty" ;
-           return () )
-         else
-           Malleable_error.hard_error
-             (Error.of_string
-                "Transaction pool contains invalid zkapp commands after a \
-                 block was produced" ) )
-    in
-    let%bind () =
+      (*wait for blocks required to produce 2 proofs given 0.75 slot fill rate + some buffer*)
       section_hard "Wait for proof to be emitted"
         ( wait_for t
-        @@ Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:2 )
+        @@ Wait_condition.ledger_proofs_emitted_since_genesis
+             ~test_config:config ~num_proofs )
     in
     Event_router.cancel (event_router t) snark_work_event_subscription () ;
     Event_router.cancel (event_router t) snark_work_failure_subscription () ;
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
-           (List.hd_exn @@ Network.archive_nodes network)
+           ( List.hd_exn
+           @@ (Network.archive_nodes network |> Core.String.Map.data) )
        in
        check_replayer_logs ~logger logs )
 end

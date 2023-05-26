@@ -895,7 +895,7 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
   let rec apply_txns_first_pass ?(acc = []) ~k txns =
     match txns with
     | [] ->
-        k (List.rev acc)
+        k (`First_pass_ledger_hash (Ledger.merkle_root ledger)) (List.rev acc)
     | txn :: txns' ->
         let transaction, state_hash, block_global_slot =
           extract_txn_and_global_slot txn
@@ -1032,23 +1032,46 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
     | Partially_applied partially_applied_txns ->
         apply_txns_second_pass partially_applied_txns ~k
   in
-  let rec apply_txns previous_incomplete
-      (ordered_txns : _ Transactions_ordered.Poly.t list) =
+  let rec apply_txns (previous_incomplete : Previous_incomplete_txns.t)
+      (ordered_txns : _ Transactions_ordered.Poly.t list)
+      ~first_pass_ledger_hash =
+    let previous_incomplete =
+      (*filter out any non-zkapp transactions for second pass application*)
+      match previous_incomplete with
+      | Previous_incomplete_txns.Unapplied txns ->
+          Previous_incomplete_txns.Unapplied
+            (List.filter txns ~f:(fun txn ->
+                 match
+                   (Ledger.Transaction_applied.transaction
+                      txn.transaction_with_info )
+                     .data
+                 with
+                 | Command (Zkapp_command _) ->
+                     true
+                 | _ ->
+                     false ) )
+      | Partially_applied txns ->
+          Partially_applied
+            (List.filter txns ~f:(fun (_, t) ->
+                 match t with Zkapp_command _ -> true | _ -> false ) )
+    in
     match ordered_txns with
     | [] ->
         apply_previous_incomplete_txns previous_incomplete ~k:(fun () ->
-            Ok (`Complete (Ledger.merkle_root ledger)) )
+            Ok (`Complete first_pass_ledger_hash) )
     | [ txns_per_block ] when stop_at_first_pass ->
         (*Last block; don't apply second pass. This is for snarked ledgers which are first pass ledgers*)
         apply_txns_first_pass txns_per_block.first_pass
-          ~k:(fun _partially_applied_txns ->
-            (*Apply second pass of previous tree's transactions, if any*)
-            apply_previous_incomplete_txns previous_incomplete ~k:(fun () ->
-                apply_txns (Unapplied []) [] ) )
+          ~k:(fun first_pass_ledger_hash _partially_applied_txns ->
+            (*Skip previous_incomplete: If there are previous_incomplete txns
+              then there’d be at least two sets of txns_per_block and the
+              previous_incomplete txns will be applied when processing the first
+              set. The subsequent sets shouldn’t have any previous-incomplete.*)
+            apply_txns (Unapplied []) [] ~first_pass_ledger_hash )
     | txns_per_block :: ordered_txns' ->
         (*Apply first pass of a blocks transactions either new or continued from previous tree*)
         apply_txns_first_pass txns_per_block.first_pass
-          ~k:(fun partially_applied_txns ->
+          ~k:(fun first_pass_ledger_hash partially_applied_txns ->
             (*Apply second pass of previous tree's transactions, if any*)
             apply_previous_incomplete_txns previous_incomplete ~k:(fun () ->
                 let continue_previous_tree's_txns =
@@ -1070,11 +1093,12 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
                 in
                 if do_second_pass then
                   apply_txns_second_pass partially_applied_txns ~k:(fun () ->
-                      apply_txns (Unapplied []) ordered_txns' )
+                      apply_txns (Unapplied []) ordered_txns'
+                        ~first_pass_ledger_hash )
                 else
                   (*Transactions not completed in this tree, so second pass after first pass of remaining transactions for the same block in the next tree*)
                   apply_txns (Partially_applied partially_applied_txns)
-                    ordered_txns' ) )
+                    ordered_txns' ~first_pass_ledger_hash ) )
   in
   let previous_incomplete =
     Option.value_map (List.hd ordered_txns)
@@ -1082,7 +1106,12 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
       ~f:(fun (first_block : Transactions_ordered.t) ->
         Unapplied first_block.previous_incomplete )
   in
-  apply_txns previous_incomplete ordered_txns
+  (*Assuming this function is called on snarked ledger and snarked ledger is the
+    first pass ledger*)
+  let first_pass_ledger_hash =
+    `First_pass_ledger_hash (Ledger.merkle_root ledger)
+  in
+  apply_txns previous_incomplete ordered_txns ~first_pass_ledger_hash
 
 let apply_ordered_txns_sync ?stop_at_first_pass ordered_txns ~ledger
     ~get_protocol_state ~apply_first_pass ~apply_second_pass
@@ -1307,7 +1336,7 @@ let all_work_pairs t
 
 let update_metrics t = Parallel_scan.update_metrics t.scan_state
 
-let fill_work_and_enqueue_transactions t transactions work =
+let fill_work_and_enqueue_transactions t ~logger transactions work =
   let open Or_error.Let_syntax in
   let fill_in_transaction_snark_work tree (works : Transaction_snark_work.t list)
       : (Ledger_proof.t * Sok_message.t) list Or_error.t =
@@ -1334,6 +1363,13 @@ let fill_work_and_enqueue_transactions t transactions work =
     Parallel_scan.update t.scan_state ~completed_jobs:work_list
       ~data:transactions
   in
+  [%log internal] "@metadata"
+    ~metadata:
+      [ ("scan_state_added_works", `Int (List.length work))
+      ; ("total_proofs", `Int (total_proofs work))
+      ; ("merge_jobs_created", `Int (List.length work_list))
+      ; ("emitted_proof", `Bool (Option.is_some proof_opt))
+      ] ;
   let%map result_opt, scan_state' =
     Option.value_map
       ~default:

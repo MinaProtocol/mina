@@ -30,7 +30,7 @@ let of_yojson = function
   | _ ->
       Error "Transaction_hash.of_yojson: Expected a string"
 
-let hash_signed_command, hash_zkapp_command =
+let hash_signed_command, hash_zkapp_command, hash_coinbase, hash_fee_transfer =
   let mk_hasher (type a) (module M : Bin_prot.Binable.S with type t = a)
       (cmd : a) =
     cmd |> Binable.to_string (module M) |> digest_string
@@ -66,7 +66,12 @@ let hash_signed_command, hash_zkapp_command =
     in
     zkapp_cmd_hasher cmd_dummy_signatures_and_proofs
   in
-  (hash_signed_command, hash_zkapp_command)
+  (* no signatures to replace for internal commands *)
+  let hash_coinbase = mk_hasher (module Mina_base.Coinbase.Stable.Latest) in
+  let hash_fee_transfer =
+    mk_hasher (module Fee_transfer.Single.Stable.Latest)
+  in
+  (hash_signed_command, hash_zkapp_command, hash_coinbase, hash_fee_transfer)
 
 [%%ifdef consensus_mechanism]
 
@@ -85,12 +90,6 @@ let hash_signed_command_v1 (cmd_v1 : Signed_command.t_v1) =
   hash_signed_command cmd
 
 let hash_zkapp_command_v1 = hash_zkapp_command
-
-let hash_fee_transfer fee_transfer =
-  fee_transfer |> Fee_transfer.Single.to_base58_check |> digest_string
-
-let hash_coinbase coinbase =
-  coinbase |> Coinbase.to_base58_check |> digest_string
 
 let hash_of_transaction_id (transaction_id : string) : t Or_error.t =
   (* A transaction id might be:

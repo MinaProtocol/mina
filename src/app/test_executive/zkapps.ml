@@ -20,16 +20,30 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Test_config in
     { default with
       requires_graphql = true
-    ; block_producers =
-        [ { balance = "8000000000"; timing = Untimed }
-        ; { balance = "1000000000"; timing = Untimed }
+    ; genesis_ledger =
+        [ { account_name = "node-a-key"
+          ; balance = "8000000000"
+          ; timing = Untimed
+          }
+        ; { account_name = "node-b-key"
+          ; balance = "1000000000"
+          ; timing = Untimed
+          }
+        ; { account_name = "fish1"; balance = "3000"; timing = Untimed }
+        ; { account_name = "fish2"; balance = "3000"; timing = Untimed }
+        ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
         ]
-    ; extra_genesis_accounts =
-        [ { balance = "3000"; timing = Untimed }
-        ; { balance = "3000"; timing = Untimed }
+    ; block_producers =
+        [ { node_name = "node-a"; account_name = "node-a-key" }
+        ; { node_name = "node-b"; account_name = "node-b-key" }
         ]
     ; num_archive_nodes = 1
-    ; num_snark_workers = 2
+    ; snark_coordinator =
+        Some
+          { node_name = "snark-node"
+          ; account_name = "snark-node-key"
+          ; worker_nodes = 2
+          }
     ; snark_worker_fee = "0.0001"
     ; proof_config =
         { proof_config_default with
@@ -115,17 +129,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let block_producer_nodes = Network.block_producers network in
+    let block_producer_nodes =
+      Network.block_producers network |> Core.String.Map.data
+    in
     (* TODO: capture snark worker processes' failures *)
     let%bind () =
       section_hard "Wait for nodes to initialize"
         (wait_for t
-           (Wait_condition.nodes_to_initialize @@ Network.all_nodes network) )
+           ( Wait_condition.nodes_to_initialize
+           @@ (Network.all_nodes network |> Core.String.Map.data) ) )
     in
-    let node = List.hd_exn block_producer_nodes in
+    let node =
+      Core.String.Map.find_exn (Network.block_producers network) "node-a"
+    in
     let constraint_constants = Network.constraint_constants network in
-    let[@warning "-8"] [ fish1_kp; fish2_kp ] =
-      Network.extra_genesis_keypairs network
+    let fish1_kp =
+      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1")
+        .keypair
+    in
+    let fish2_kp =
+      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish2")
+        .keypair
     in
     let num_zkapp_accounts = 3 in
     let zkapp_keypairs =
@@ -174,7 +198,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let new_permissions : Permissions.t =
         { Permissions.user_default with
           edit_state = Permissions.Auth_required.Proof
-        ; edit_sequence_state = Proof
+        ; edit_action_state = Proof
         ; set_delegate = Proof
         ; set_verification_key = Proof
         ; set_permissions = Proof
@@ -430,7 +454,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ]
             ]
           |> mk_zkapp_command ~memo:"mint token" ~fee:12_000_000 ~fee_payer_pk
-               ~fee_payer_nonce:(Account.Nonce.of_int 2)
+               ~fee_payer_nonce:(Account.Nonce.of_int 1)
         in
         replace_authorizations ~keymap with_dummy_signatures
       in
@@ -453,7 +477,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ]
             ]
           |> mk_zkapp_command ~memo:"zkapp to mint token2" ~fee:11_500_000
-               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 3)
+               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 2)
         in
         replace_authorizations ~keymap with_dummy_signatures
       in
@@ -485,7 +509,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ]
             ]
           |> mk_zkapp_command ~memo:"zkapp for tokens transfer" ~fee:11_000_000
-               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 4)
+               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 3)
         in
         replace_authorizations ~keymap with_dummy_signatures
       in
@@ -522,7 +546,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
           |> mk_zkapp_command ~memo:"zkapp for tokens transfer 2"
                ~fee:10_000_000 ~fee_payer_pk
-               ~fee_payer_nonce:(Account.Nonce.of_int 5)
+               ~fee_payer_nonce:(Account.Nonce.of_int 4)
         in
         replace_authorizations ~keymap with_dummy_signatures
       in
@@ -821,14 +845,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "Wait for proof to be emitted"
         (wait_for t
-           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
+           (Wait_condition.ledger_proofs_emitted_since_genesis
+              ~test_config:config ~num_proofs:1 ) )
     in
     Event_router.cancel (event_router t) snark_work_event_subscription () ;
     Event_router.cancel (event_router t) snark_work_failure_subscription () ;
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
-           (List.hd_exn @@ Network.archive_nodes network)
+           (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
        in
        check_replayer_logs ~logger logs )
 end

@@ -8,6 +8,17 @@ open Mina_transaction
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
 
+  (* Call [f] [n] times in sequence *)
+  let repeat_seq ~n ~f =
+    let open Malleable_error.Let_syntax in
+    let rec go n =
+      if n = 0 then return ()
+      else
+        let%bind () = f () in
+        go (n - 1)
+    in
+    go n
+
   let send_payments ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee ~node
       n =
     let open Malleable_error.Let_syntax in
@@ -15,13 +26,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       if n = 0 then return hashlist
       else
         let%bind hash =
-          let%map { hash; _ } =
+          let%map { hash; nonce; _ } =
             Engine.Network.Node.must_send_payment ~logger ~sender_pub_key
               ~receiver_pub_key ~amount ~fee node
           in
-          [%log info] "gossip_consistency test: payment #%d sent with hash %s."
+          [%log info]
+            "sending multiple payments: payment #%d sent with hash of %s and \
+             nonce of %d."
             n
-            (Transaction_hash.to_base58_check hash) ;
+            (Transaction_hash.to_base58_check hash)
+            (Unsigned.UInt32.to_int nonce) ;
           hash
         in
         go (n - 1) (List.append hashlist [ hash ])
@@ -42,7 +56,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  ~txn_hash:hash ~node_included_in:`Any_node )
           in
           [%log info]
-            "gossip_consistency test: payment #%d with hash %s successfully \
+            "wait for multiple payments: payment #%d with hash %s successfully \
              included in frontier."
             n
             (Transaction_hash.to_base58_check hash) ;
@@ -187,29 +201,39 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Inputs.Engine
 
-  let send_zkapp ~logger node zkapp_command =
-    [%log info] "Sending zkApp"
-      ~metadata:
-        [ ("zkapp_command", Mina_base.Zkapp_command.to_yojson zkapp_command)
-        ; ( "memo"
-          , `String
-              (Mina_base.Signed_command_memo.to_string_hum zkapp_command.memo)
-          )
-        ] ;
-    match%bind.Deferred Network.Node.send_zkapp ~logger node ~zkapp_command with
-    | Ok _zkapp_id ->
-        [%log info] "ZkApp transaction sent" ;
+  let send_zkapp_batch ~logger node zkapp_commands =
+    List.iter zkapp_commands ~f:(fun zkapp_command ->
+        [%log info] "Sending zkApp"
+          ~metadata:
+            [ ("zkapp_command", Mina_base.Zkapp_command.to_yojson zkapp_command)
+            ; ( "memo"
+              , `String
+                  (Mina_base.Signed_command_memo.to_string_hum
+                     zkapp_command.memo ) )
+            ] ) ;
+    match%bind.Deferred
+      Network.Node.send_zkapp_batch ~logger node ~zkapp_commands
+    with
+    | Ok _zkapp_ids ->
+        [%log info] "ZkApp transactions sent" ;
         Malleable_error.return ()
     | Error err ->
         let err_str = Error.to_string_mach err in
-        [%log error] "Error sending zkApp"
+        [%log error] "Error sending zkApp transactions"
           ~metadata:[ ("error", `String err_str) ] ;
-        Malleable_error.hard_error_format "Error sending zkApp: %s" err_str
+        Malleable_error.hard_error_format "Error sending zkApp transactions: %s"
+          err_str
+
+  let send_zkapp ~logger node zkapp_command =
+    send_zkapp_batch ~logger node [ zkapp_command ]
 
   let send_invalid_zkapp ~logger node zkapp_command substring =
     [%log info] "Sending zkApp, expected to fail" ;
-    match%bind.Deferred Network.Node.send_zkapp ~logger node ~zkapp_command with
-    | Ok _zkapp_id ->
+    match%bind.Deferred
+      Network.Node.send_zkapp_batch ~logger node
+        ~zkapp_commands:[ zkapp_command ]
+    with
+    | Ok _zkapp_ids ->
         [%log error] "ZkApp transaction succeeded, expected error \"%s\""
           substring ;
         Malleable_error.hard_error_format

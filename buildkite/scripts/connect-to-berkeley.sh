@@ -17,6 +17,13 @@ mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key
 # Set permissions on the keypair so the daemon doesn't complain
 chmod -R 0700 /root/libp2p-keys/
 
+mkdir -p /root/libp2p-keys/
+# Pre-generated random password for this quick test
+export MINA_LIBP2P_PASS=eithohShieshichoh8uaJ5iefo1reiRudaekohG7AeCeib4XuneDet2uGhu7lahf
+mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key
+# Set permissions on the keypair so the daemon doesn't complain
+chmod -R 0700 /root/libp2p-keys/
+
 # Restart in the background
 mina daemon \
   --peer-list-url "https://storage.googleapis.com/seed-lists/berkeley_seeds.txt" \

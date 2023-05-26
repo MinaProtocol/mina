@@ -1,28 +1,45 @@
 (library
-  (name transaction_logic_tests)
+ (name transaction_logic_tests)
  (libraries
    ;; opam libraries
-   ppx_inline_test.config
-   core
+   async_kernel
+   async_unix
    base
+   base.base_internalhash_types
+   core
    core_kernel
-   base64
    integers
+   ppx_inline_test.config
    sexplib0
    yojson
    ;; local libraries
    currency
+   data_hash_lib
+   genesis_constants
+   kimchi_backend_common
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    mina_base
+   mina_base_import
    mina_transaction
    mina_transaction_logic
    mina_numbers
+   mina_ledger
    mina_wire_types
+   monad_lib
+   pasta_bindings
+   pickles
+   pickles.backend
+   pickles_types
    random_oracle
    sgn
    sgn_type
+   signature_lib
+   snark_params
+   zkapp_command_builder
    )
-  (library_flags -linkall)
-  (inline_tests)
-  (preprocess
-    (pps ppx_snarky ppx_version ppx_jane ppx_sexp_conv ppx_inline_test ppx_assert))
-  (instrumentation (backend bisect_ppx)))
+(library_flags -linkall)
+(inline_tests)
+(preprocess
+ (pps ppx_snarky ppx_version ppx_jane ppx_sexp_conv ppx_inline_test ppx_assert))
+(instrumentation (backend bisect_ppx)))

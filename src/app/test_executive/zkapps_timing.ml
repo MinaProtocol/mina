@@ -19,13 +19,26 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Test_config in
     { default with
       requires_graphql = true
+    ; genesis_ledger =
+        [ { account_name = "node-a-key"
+          ; balance = "8000000000"
+          ; timing = Untimed
+          }
+        ; { account_name = "node-b-key"
+          ; balance = "1000000000"
+          ; timing = Untimed
+          }
+        ; { account_name = "node-c-key"
+          ; balance = "1000000000"
+          ; timing = Untimed
+          }
+        ]
     ; block_producers =
-        [ { balance = "8000000000"; timing = Untimed }
-        ; { balance = "1000000000"; timing = Untimed }
-        ; { balance = "1000000000"; timing = Untimed }
+        [ { node_name = "node-a"; account_name = "node-a-key" }
+        ; { node_name = "node-b"; account_name = "node-b-key" }
+        ; { node_name = "node-c"; account_name = "node-c-key" }
         ]
     ; num_archive_nodes = 1
-    ; num_snark_workers = 0
     }
 
   let run network t =
@@ -33,10 +46,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let logger = Logger.create () in
     let all_nodes = Network.all_nodes network in
     let%bind () =
-      Malleable_error.List.iter all_nodes
-        ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize)
+      wait_for t
+        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
     in
-    let block_producer_nodes = Network.block_producers network in
+    let block_producer_nodes =
+      Network.block_producers network |> Core.String.Map.data
+    in
     let node = List.hd_exn block_producer_nodes in
     let constraint_constants =
       Genesis_constants.Constraint_constants.compiled
@@ -106,7 +121,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let open Mina_base in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.of_mina_int_exn 10 in
-      let nonce = Account.Nonce.of_int 2 in
+      let nonce = Account.Nonce.of_int 1 in
       let memo =
         Signed_command_memo.create_from_string_exn
           "zkApp, 2nd account with timing"
@@ -152,7 +167,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let open Mina_base in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.of_mina_int_exn 100 in
-      let nonce = Account.Nonce.of_int 4 in
+      let nonce = Account.Nonce.of_int 2 in
       let memo =
         Signed_command_memo.create_from_string_exn
           "zkApp, 3rd account with timing"
@@ -229,7 +244,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let open Mina_base in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.of_mina_int_exn 7 in
-      let nonce = Account.Nonce.of_int 2 in
+      let nonce = Account.Nonce.of_int 1 in
       let memo =
         Signed_command_memo.create_from_string_exn
           "Invalid transfer, timed account"
@@ -260,7 +275,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let open Mina_base in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.zero in
-      let nonce = Account.Nonce.of_int 6 in
+      let nonce = Account.Nonce.of_int 3 in
       let memo =
         Signed_command_memo.create_from_string_exn
           "zkApp, invalid update timing"
@@ -632,7 +647,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
-           (List.hd_exn @@ Network.archive_nodes network)
+           (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
        in
        check_replayer_logs ~logger logs )
 end

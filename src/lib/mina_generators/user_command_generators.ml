@@ -61,7 +61,7 @@ let zkapp_command_with_ledger ?num_keypairs ?max_account_updates
         vk
   in
   let%bind balances =
-    let min_cmd_fee = Mina_compile_config.minimum_user_command_fee in
+    let min_cmd_fee = Currency.Fee.minimum_user_command_fee in
     let min_balance =
       Currency.Fee.to_nanomina_int min_cmd_fee
       |> Int.( + ) 100_000_000_000_000_000
@@ -93,7 +93,7 @@ let zkapp_command_with_ledger ?num_keypairs ?max_account_updates
       ; set_permissions = Either
       ; set_verification_key = Either
       ; set_zkapp_uri = Either
-      ; edit_sequence_state = Either
+      ; edit_action_state = Either
       ; set_token_symbol = Either
       ; increment_nonce = Either
       ; set_voting_for = Either

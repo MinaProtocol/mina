@@ -3,7 +3,16 @@ open Core_kernel
 let max_log_line_length = 1 lsl 20
 
 module Level = struct
-  type t = Spam | Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
+  type t =
+    | Internal
+    | Spam
+    | Trace
+    | Debug
+    | Info
+    | Warn
+    | Error
+    | Faulty_peer
+    | Fatal
   [@@deriving sexp, equal, compare, show { with_path = false }, enumerate]
 
   let of_string str =
@@ -24,7 +33,7 @@ module Time = struct
   let of_yojson json =
     json |> Yojson.Safe.Util.to_string |> fun s -> Ok (Time.of_string s)
 
-  let pretty_to_string timestamp =
+  let pp ppf timestamp =
     (* This used to be
        [Core.Time.format timestamp "%Y-%m-%d %H:%M:%S UTC"
         ~zone:Time.Zone.utc]
@@ -35,14 +44,11 @@ module Time = struct
     let zone = Time.Zone.utc in
     let date, time = Time.to_date_ofday ~zone timestamp in
     let time_parts = Time.Ofday.to_parts time in
-    let fmt_2_chars () i =
-      let s = string_of_int i in
-      if Int.(i < 10) then "0" ^ s else s
-    in
-    Stdlib.Format.sprintf "%i-%a-%a %a:%a:%a UTC" (Date.year date) fmt_2_chars
+    Format.fprintf ppf "%i-%02d-%02d %02d:%02d:%02d UTC" (Date.year date)
       (Date.month date |> Month.to_int)
-      fmt_2_chars (Date.day date) fmt_2_chars time_parts.hr fmt_2_chars
-      time_parts.min fmt_2_chars time_parts.sec
+      (Date.day date) time_parts.hr time_parts.min time_parts.sec
+
+  let pretty_to_string timestamp = Format.asprintf "%a" pp timestamp
 
   let pretty_to_string_ref = ref pretty_to_string
 
@@ -144,6 +150,8 @@ module Processor = struct
 
   type t = T : (module S with type t = 't) * 't -> t
 
+  let create m t = T (m, t)
+
   module Raw = struct
     type t = Level.t
 
@@ -185,14 +193,15 @@ module Processor = struct
                   err ) ;
             None
         | Ok (str, extra) ->
-            let formatted_extra =
-              extra
-              |> List.map ~f:(fun (k, v) -> "\n\t" ^ k ^ ": " ^ v)
-              |> String.concat ~sep:""
+            let msg =
+              (* The previously existing \t has been changed to 2 spaces. *)
+              Format.asprintf "@[<v 2>%a [%a] %s@,%a@]" Time.pp msg.timestamp
+                Level.pp msg.level str
+                (Format.pp_print_list ~pp_sep:Format.pp_print_cut
+                   (fun ppf (k, v) -> Format.fprintf ppf "%s: %s" k v) )
+                extra
             in
-            let time = Time.pretty_to_string msg.timestamp in
-            Some
-              (time ^ " [" ^ Level.show msg.level ^ "] " ^ str ^ formatted_extra)
+            Some msg
   end
 
   let raw ?(log_level = Level.Spam) () = T ((module Raw), Raw.create ~log_level)
@@ -300,7 +309,7 @@ let extend t metadata =
 let change_id { null; metadata; id = _ } ~id = { null; metadata; id }
 
 let make_message (t : t) ~level ~module_ ~location ~metadata ~message ~event_id
-    =
+    ~skip_merge_global_metadata =
   let global_metadata' =
     let m = !global_metadata in
     let key_cmp (k1, _) (k2, _) = String.compare k1 k2 in
@@ -316,9 +325,12 @@ let make_message (t : t) ~level ~module_ ~location ~metadata ~message ~event_id
   ; source = Some (Source.create ~module_ ~location)
   ; message
   ; metadata =
-      Metadata.extend
-        (Metadata.merge (Metadata.of_alist_exn global_metadata') t.metadata)
-        metadata
+      ( if skip_merge_global_metadata then
+        Metadata.extend Metadata.empty metadata
+      else
+        Metadata.extend
+          (Metadata.merge (Metadata.of_alist_exn global_metadata') t.metadata)
+          metadata )
   ; event_id
   }
 
@@ -351,9 +363,19 @@ let add_tags_to_metadata metadata tags =
 let log t ~level ~module_ ~location ?tags ?(metadata = []) ?event_id fmt =
   let metadata = add_tags_to_metadata metadata tags in
   let f message =
-    raw t
-    @@ make_message t ~level ~module_ ~location ~metadata ~message ~event_id
+    let message' =
+      make_message t ~level ~module_ ~location ~metadata ~message ~event_id
+        ~skip_merge_global_metadata:(Level.equal level Level.Internal)
+    in
+    raw t message' ;
+    match level with
+    | Internal ->
+        if Mina_compile_config.itn_features then
+          Itn_logger.log ~timestamp:message'.timestamp ~message ~metadata
+    | _ ->
+        ()
   in
+
   ksprintf f fmt
 
 type 'a log_function =
@@ -367,6 +389,8 @@ type 'a log_function =
   -> 'a
 
 let trace = log ~level:Trace
+
+let internal = log ~level:Internal
 
 let debug = log ~level:Debug
 
@@ -401,6 +425,7 @@ module Structured = struct
     let metadata = add_tags_to_metadata (str_metadata @ metadata) tags in
     raw t
     @@ make_message t ~level ~module_ ~location ~metadata ~message ~event_id
+         ~skip_merge_global_metadata:(Level.equal level Level.Internal)
 
   let trace = log ~level:Trace
 

@@ -19,26 +19,30 @@ end
 
 let validate_transition ~context:(module Context : CONTEXT) ~frontier
     ~unprocessed_transition_cache enveloped_transition =
-  let module Context = struct
-    include Context
-
-    let logger =
-      Logger.extend logger
-        [ ("selection_context", `String "Transition_handler.Validator") ]
-  end in
+  let logger = Context.logger in
   let open Result.Let_syntax in
   let transition =
     Envelope.Incoming.data enveloped_transition
     |> Mina_block.Validation.block_with_hash
   in
   let transition_hash = State_hash.With_state_hashes.state_hash transition in
+  [%log internal] "Validate_transition" ;
   let root_breadcrumb = Transition_frontier.root frontier in
+  let blockchain_length =
+    Envelope.Incoming.data enveloped_transition
+    |> Mina_block.Validation.block |> Mina_block.blockchain_length
+  in
+  [%log internal] "@block_metadata"
+    ~metadata:
+      [ ("blockchain_length", Mina_numbers.Length.to_yojson blockchain_length) ] ;
+  [%log internal] "Check_transition_not_in_frontier" ;
   let%bind () =
     Option.fold
       (Transition_frontier.find frontier transition_hash)
       ~init:Result.(Ok ())
       ~f:(fun _ _ -> Result.Error (`In_frontier transition_hash))
   in
+  [%log internal] "Check_transition_not_in_process" ;
   let%bind () =
     Option.fold
       (Unprocessed_transition_cache.final_state unprocessed_transition_cache
@@ -46,6 +50,14 @@ let validate_transition ~context:(module Context : CONTEXT) ~frontier
       ~init:Result.(Ok ())
       ~f:(fun _ final_state -> Result.Error (`In_process final_state))
   in
+  [%log internal] "Check_transition_can_be_connected" ;
+  let module Context = struct
+    include Context
+
+    let logger =
+      Logger.extend logger
+        [ ("selection_context", `String "Transition_handler.Validator") ]
+  end in
   let%map () =
     Result.ok_if_true
       (Consensus.Hooks.equal_select_status `Take
@@ -57,6 +69,7 @@ let validate_transition ~context:(module Context : CONTEXT) ~frontier
             ~candidate:(With_hash.map ~f:Mina_block.consensus_state transition) ) )
       ~error:`Disconnected
   in
+  [%log internal] "Register_transition_for_processing" ;
   (* we expect this to be Ok since we just checked the cache *)
   Unprocessed_transition_cache.register_exn unprocessed_transition_cache
     enveloped_transition
@@ -81,6 +94,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
           let transition_hash =
             State_hash.With_state_hashes.state_hash transition_with_hash
           in
+          Internal_tracing.with_state_hash transition_hash
+          @@ fun () ->
           let transition = With_hash.data transition_with_hash in
           let sender = Envelope.Incoming.sender transition_env in
           match
@@ -108,9 +123,12 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
                 (Core_kernel.Time.diff
                    Block_time.(now time_controller |> to_time_exn)
                    transition_time ) ;
+              [%log internal] "Validate_transition_done" ;
               Writer.write valid_transition_writer
                 (`Block cached_transition, `Valid_cb vc)
           | Error (`In_frontier _) | Error (`In_process _) ->
+              [%log internal] "Failure"
+                ~metadata:[ ("reason", `String "In_frontier or In_process") ] ;
               Trust_system.record_envelope_sender trust_system logger sender
                 ( Trust_system.Actions.Sent_old_gossip
                 , Some
@@ -119,6 +137,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
                       ; ("transition", Mina_block.to_yojson transition)
                       ] ) )
           | Error `Disconnected ->
+              [%log internal] "Failure"
+                ~metadata:[ ("reason", `String "Disconnected") ] ;
               Mina_metrics.(Counter.inc_one Rejected_blocks.worse_than_root) ;
               [%log error]
                 ~metadata:

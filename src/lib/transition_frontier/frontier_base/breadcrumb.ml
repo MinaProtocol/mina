@@ -65,10 +65,42 @@ T.
 
 include Allocation_functor.Make.Sexp (T)
 
+let compute_block_trace_metadata transition_with_validation =
+  (* No need to compute anything if internal tracing is disabled, will be dropped anyway *)
+  if not @@ Internal_tracing.is_enabled () then []
+  else
+    let header =
+      Mina_block.header
+      @@ Mina_block.Validation.block transition_with_validation
+    in
+    let ps = Mina_block.Header.protocol_state header in
+    let cs = Mina_state.Protocol_state.consensus_state ps in
+    let open Consensus.Data.Consensus_state in
+    [ ( "global_slot"
+      , Mina_numbers.Global_slot.to_yojson @@ global_slot_since_genesis cs )
+    ; ("slot", Unsigned_extended.UInt32.to_yojson @@ curr_slot cs)
+    ; ( "previous_state_hash"
+      , State_hash.to_yojson @@ Mina_state.Protocol_state.previous_state_hash ps
+      )
+    ; ("creator", Account.key_to_yojson @@ block_creator cs)
+    ; ("winner", Account.key_to_yojson @@ block_stake_winner cs)
+    ; ("coinbase_receiver", Account.key_to_yojson @@ coinbase_receiver cs)
+    ]
+
 let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
     ~trust_system ~parent
     ~transition:(transition_with_validation : Mina_block.almost_valid_block)
     ~sender ~transition_receipt_time () =
+  let state_hash =
+    ( With_hash.hash
+    @@ Mina_block.Validation.block_with_hash transition_with_validation )
+      .state_hash
+  in
+  Internal_tracing.with_state_hash state_hash
+  @@ fun () ->
+  [%log internal] "Build_breadcrumb" ;
+  let metadata = compute_block_trace_metadata transition_with_validation in
+  [%log internal] "@block_metadata" ~metadata ;
   O1trace.thread "build_breadcrumb" (fun () ->
       let open Deferred.Let_syntax in
       match%bind
@@ -84,6 +116,7 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
           ( `Just_emitted_a_proof just_emitted_a_proof
           , `Block_with_validation fully_valid_block
           , `Staged_ledger transitioned_staged_ledger ) ->
+          [%log internal] "Create_breadcrumb" ;
           Deferred.Result.return
             (create
                ~validated_transition:

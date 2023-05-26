@@ -474,18 +474,20 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       type magnitude = Unsigned.t [@@deriving sexp, compare]
 
-      let create ~magnitude ~sgn = { magnitude; sgn }
+      let create ~magnitude ~sgn =
+        { magnitude
+        ; sgn = (if Unsigned.(equal magnitude zero) then Sgn.Pos else sgn)
+        }
 
       let sgn { sgn; _ } = sgn
 
       let magnitude { magnitude; _ } = magnitude
 
-      let zero : t = create ~magnitude:zero ~sgn:Sgn.Pos
+      let zero : t = { magnitude = zero; sgn = Sgn.Pos }
 
       let gen =
         Quickcheck.Generator.map2 gen Sgn.gen ~f:(fun magnitude sgn ->
-            if Unsigned.(equal zero magnitude) then zero
-            else create ~magnitude ~sgn )
+            create ~magnitude ~sgn )
 
       let sgn_to_bool = function Sgn.Pos -> true | Neg -> false
 
@@ -950,6 +952,15 @@ module Make_str (A : Wire_types.Concrete) = struct
     end]
 
     let (_ : (Signed.t, (t, Sgn.t) Signed_poly.t) Type_equal.t) = Type_equal.T
+
+    let minimum_user_command_fee =
+      of_mina_string_exn Mina_compile_config.minimum_user_command_fee_string
+
+    let default_transaction_fee =
+      of_mina_string_exn Mina_compile_config.default_transaction_fee_string
+
+    let default_snark_worker_fee =
+      of_mina_string_exn Mina_compile_config.default_snark_worker_fee_string
   end
 
   module Amount = struct
@@ -1032,6 +1043,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
           val to_fee : var -> Fee.var
 
+          val to_field : var -> Field.Var.t
+
           module Unsafe : sig
             val of_field : Field.Var.t -> t
           end
@@ -1100,6 +1113,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
         let to_fee (t : var) : Fee.var = t
 
+        let to_field = Fn.id
+
         module Unsafe = struct
           let of_field : Field.Var.t -> var = Fn.id
         end
@@ -1159,6 +1174,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     module Checked = struct
       include Amount.Checked
 
+      let to_field = Fn.id
+
       module Unsafe = struct
         let of_field (x : Field.Var.t) : var = x
       end
@@ -1170,6 +1187,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       let add_amount = add
 
       let sub_amount = sub
+
+      let sub_amount_or_zero = sub_or_zero
 
       let add_amount_flagged = add_flagged
 

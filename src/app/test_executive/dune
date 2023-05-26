@@ -53,6 +53,9 @@
    sgn
    zkapp_command_builder
    network_pool
+   zkapps_examples
+   cache_dir
+   snarky.backendless
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_jane ppx_deriving_yojson ppx_mina ppx_version)))

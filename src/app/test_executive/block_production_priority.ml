@@ -17,22 +17,49 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let num_extra_keys = 1000
 
-  let num_sender_nodes = 4
+  (* let num_sender_nodes = 4 *)
 
   let config =
     let open Test_config in
     { default with
       requires_graphql = true
+    ; genesis_ledger =
+        [ { Test_Account.account_name = "receiver-key"
+          ; balance = "9999999"
+          ; timing = Untimed
+          }
+        ; { account_name = "empty-bp-key"; balance = "0"; timing = Untimed }
+        ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
+        ]
+        @ List.init num_extra_keys ~f:(fun i ->
+              let i_str = Int.to_string i in
+              { Test_Account.account_name =
+                  String.concat [ "sender-account"; i_str ]
+              ; balance = "10000"
+              ; timing = Untimed
+              } )
     ; block_producers =
-        { Wallet.balance = "9999999"; timing = Untimed }
-        :: List.init (num_sender_nodes + 1)
-             ~f:(const { Wallet.balance = "0"; timing = Untimed })
-    ; num_snark_workers = 25
-    ; extra_genesis_accounts =
-        List.init num_extra_keys ~f:(fun _ ->
-            { Wallet.balance = "1000"; timing = Untimed } )
+        [ { node_name = "receiver"; account_name = "receiver-key" }
+        ; { node_name = "empty_node-1"; account_name = "empty-bp-key" }
+        ; { node_name = "empty_node-2"; account_name = "empty-bp-key" }
+        ; { node_name = "empty_node-3"; account_name = "empty-bp-key" }
+        ; { node_name = "empty_node-4"; account_name = "empty-bp-key" }
+        ; { node_name = "observer"; account_name = "empty-bp-key" }
+        ]
+    ; snark_coordinator =
+        Some
+          { node_name = "snark-node"
+          ; account_name = "snark-node-key"
+          ; worker_nodes = 4
+          }
     ; txpool_max_size = 10_000_000
     ; snark_worker_fee = "0.0001"
+    ; proof_config =
+        { proof_config_default with
+          work_delay = Some 1
+        ; transaction_capacity =
+            Some Runtime_config.Proof_keys.Transaction_capacity.small
+        }
     }
 
   let fee = Currency.Fee.of_nanomina_int_exn 10_000_000
@@ -48,32 +75,49 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    (* Receiver receives transactions and produces blocks,
-       senders send transactions and retrieve blocks, observer is shutdown
-       at the start and is launched at the end to run the catchup. *)
-    let%bind receiver, observer, senders =
-      match Network.block_producers network with
-      | receiver :: observer :: rs ->
-          return (receiver, observer, rs)
-      | _ ->
-          Malleable_error.hard_error_string "no block producer / observer"
+    let receiver =
+      Core.String.Map.find_exn (Network.block_producers network) "receiver"
+    in
+    let observer =
+      Core.String.Map.find_exn (Network.block_producers network) "observer"
     in
     let%bind receiver_pub_key = pub_key_of_node receiver in
+    let empty_bps =
+      Core.String.Map.remove
+        (Core.String.Map.remove (Network.block_producers network) "receiver")
+        "observer"
+      |> Core.String.Map.data
+    in
+    let rec map_remove_keys map ~(keys : string list) =
+      match keys with
+      | [] ->
+          map
+      | hd :: tl ->
+          map_remove_keys (Core.String.Map.remove map hd) ~keys:tl
+    in
+    let sender_kps =
+      map_remove_keys
+        (Network.genesis_keypairs network)
+        ~keys:[ "receiver-key"; "empty-bp-key"; "snark-node-key" ]
+      |> Core.String.Map.data
+    in
+    let sender_priv_keys =
+      List.map sender_kps ~f:(fun kp -> kp.keypair.private_key)
+    in
     let pk_to_string = Signature_lib.Public_key.Compressed.to_base58_check in
     [%log info] "receiver: %s" (pk_to_string receiver_pub_key) ;
     let%bind () =
-      Malleable_error.List.iter senders ~f:(fun s ->
-          let%map pk = pub_key_of_node s in
-          [%log info] "sender: %s" (pk_to_string pk) )
+      Malleable_error.List.iter sender_kps ~f:(fun s ->
+          let pk = s.keypair.public_key |> Signature_lib.Public_key.compress in
+          return ([%log info] "sender: %s" (pk_to_string pk)) )
     in
     let window_ms =
       (Network.constraint_constants network).block_window_duration_ms
     in
+    let all_nodes = Network.all_nodes network in
     let%bind () =
-      section_hard "wait for nodes to initialize"
-        (Malleable_error.List.iter
-           (Network.all_nodes network)
-           ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize) )
+      wait_for t
+        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
     in
     let%bind () =
       section_hard "wait for 3 blocks to be produced (warm-up)"
@@ -92,26 +136,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section_hard "spawn transaction sending"
-        (let num_senders = List.length senders in
-         let sender_keys =
-           List.map ~f:snd
-           @@ Fn.flip List.take num_extra_keys
-           @@ List.drop
-                (Array.to_list @@ Lazy.force @@ Key_gen.Sample_keypairs.keypairs)
-                (num_senders + 2)
-         in
-         let num_sender_keys = List.length sender_keys in
-         let keys_per_sender = num_sender_keys / num_senders in
-         let%bind () =
-           Malleable_error.ok_if_true ~error_type:`Hard
-             ~error:(Error.of_string "not enough sender keys")
-             (keys_per_sender > 0)
-         in
-         let num_payments = num_slots * window_ms / tx_delay_ms in
+        (let num_payments = num_slots * window_ms / tx_delay_ms in
          let repeat_count = Unsigned.UInt32.of_int num_payments in
          let repeat_delay_ms = Unsigned.UInt32.of_int tx_delay_ms in
-         [%log info] "will now send %d payments" num_payments ;
-         Malleable_error.List.fold ~init:sender_keys senders
+         let num_sender_keys = List.length sender_priv_keys in
+         let keys_per_sender = num_sender_keys / List.length empty_bps in
+         [%log info]
+           "will now send %d payments from as many accounts.  %d nodes will \
+            send %d payments each from distinct keys"
+           num_payments (List.length empty_bps) keys_per_sender ;
+         Malleable_error.List.fold ~init:sender_priv_keys empty_bps
            ~f:(fun keys node ->
              let keys0, rest = List.split_n keys keys_per_sender in
              Network.Node.must_send_test_payments ~repeat_count ~repeat_delay_ms
@@ -184,7 +218,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "retrieve metrics of tx sender nodes"
         (* We omit the result because we just want to query senders to see some useful
             output in test logs *)
-        (Malleable_error.List.iter senders
+        (Malleable_error.List.iter empty_bps
            ~f:
              (Fn.compose Malleable_error.soften_error
                 (Fn.compose Malleable_error.ignore_m get_metrics) ) )

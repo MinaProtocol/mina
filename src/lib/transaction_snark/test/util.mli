@@ -154,3 +154,19 @@ val test_transaction_union :
   -> Ledger.t
   -> Mina_transaction.Transaction.Valid.t
   -> unit
+
+val test_zkapp_command :
+     ?expected_failure:Transaction_status.Failure.t * pass_number
+  -> ?memo:Signed_command_memo.t
+  -> ?fee:Currency.Fee.t
+  -> fee_payer_pk:Account.key
+  -> signers:
+       (Signature_lib.Public_key.Compressed.t * Signature_lib.Private_key.t)
+       array
+  -> initialize_ledger:(Ledger.t -> 'c)
+  -> finalize_ledger:('c -> Ledger.t -> 'd)
+  -> ( Account_update.t
+     , Zkapp_command.Digest.Account_update.t
+     , Zkapp_command.Digest.Forest.t )
+     Zkapp_command.Call_forest.t
+  -> 'd

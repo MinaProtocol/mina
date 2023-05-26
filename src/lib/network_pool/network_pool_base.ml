@@ -84,6 +84,8 @@ end)
       (struct
         include Resource_pool.Diff
 
+        let label = Resource_pool.label
+
         type pool = Resource_pool.t
       end)
       (Broadcast_callback)
@@ -92,6 +94,8 @@ end)
     Pool_sink.Local_sink
       (struct
         include Resource_pool.Diff
+
+        let label = Resource_pool.label
 
         type pool = Resource_pool.t
       end)

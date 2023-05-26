@@ -280,6 +280,15 @@
           "description": null,
           "fields": [
             {
+              "name": "cleanAddedPeers",
+              "description":
+                "If true, resets added peers to an empty list (including seeds)",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "isolate",
               "description":
                 "If true, no connections will be allowed unless they are from a trusted peer",
@@ -347,6 +356,13 @@
             }
           ],
           "inputFields": [
+            {
+              "name": "cleanAddedPeers",
+              "description":
+                "If true, resets added peers to an empty list (including seeds)",
+              "type": { "kind": "SCALAR", "name": "Boolean", "ofType": null },
+              "defaultValue": null
+            },
             {
               "name": "isolate",
               "description":
@@ -1060,7 +1076,7 @@
               "deprecationReason": null
             },
             {
-              "name": "editSequenceState",
+              "name": "editActionState",
               "description": null,
               "args": [],
               "type": {
@@ -1254,7 +1270,7 @@
               "defaultValue": null
             },
             {
-              "name": "editSequenceState",
+              "name": "editActionState",
               "description": null,
               "type": {
                 "kind": "NON_NULL",
@@ -2436,7 +2452,7 @@
               "deprecationReason": null
             },
             {
-              "name": "sequenceState",
+              "name": "actionState",
               "description": null,
               "args": [],
               "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
@@ -2516,7 +2532,7 @@
               "defaultValue": null
             },
             {
-              "name": "sequenceState",
+              "name": "actionState",
               "description": null,
               "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
               "defaultValue": null
@@ -5005,18 +5021,27 @@
             },
             {
               "name": "internalSendZkapp",
-              "description": "Send a zkApp (for internal testing purposes)",
+              "description":
+                "Send zkApp transactions (for internal testing purposes)",
               "args": [
                 {
-                  "name": "zkappCommand",
+                  "name": "zkappCommands",
                   "description": null,
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,
                     "ofType": {
-                      "kind": "SCALAR",
-                      "name": "SendTestZkappInput",
-                      "ofType": null
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "SendTestZkappInput",
+                          "ofType": null
+                        }
+                      }
                     }
                   },
                   "defaultValue": null
@@ -5026,9 +5051,17 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "OBJECT",
-                  "name": "SendZkappPayload",
-                  "ofType": null
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "SendZkappPayload",
+                      "ofType": null
+                    }
+                  }
                 }
               },
               "isDeprecated": false,
@@ -7132,7 +7165,7 @@
               "deprecationReason": null
             },
             {
-              "name": "sequenceState",
+              "name": "actionState",
               "description": null,
               "args": [],
               "type": { "kind": "SCALAR", "name": "Field", "ofType": null },
@@ -7846,7 +7879,7 @@
               "deprecationReason": null
             },
             {
-              "name": "editSequenceState",
+              "name": "editActionState",
               "description": null,
               "args": [],
               "type": {
@@ -11058,8 +11091,8 @@
         },
         {
           "kind": "SCALAR",
-          "name": "SequenceEvent",
-          "description": "sequence event",
+          "name": "Action",
+          "description": "action",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -11306,9 +11339,9 @@
               "deprecationReason": null
             },
             {
-              "name": "editSequenceState",
+              "name": "editActionState",
               "description":
-                "Authorization required to edit the sequence state",
+                "Authorization required to edit the action state",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -11982,8 +12015,8 @@
               "deprecationReason": null
             },
             {
-              "name": "sequenceEvents",
-              "description": "Sequence events associated with this account",
+              "name": "actionState",
+              "description": "Action state associated with this account",
               "args": [],
               "type": {
                 "kind": "LIST",
@@ -11993,7 +12026,7 @@
                   "name": null,
                   "ofType": {
                     "kind": "SCALAR",
-                    "name": "SequenceEvent",
+                    "name": "Action",
                     "ofType": null
                   }
                 }

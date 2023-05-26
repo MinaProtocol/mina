@@ -12,7 +12,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   module Stable = struct
     module V1 = struct
       type t = A.V1.t = { major : int; minor : int; patch : int }
-      [@@deriving compare, sexp, yojson, fields]
+      [@@deriving compare, equal, sexp, yojson, fields]
 
       let to_latest = Fn.id
     end

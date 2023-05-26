@@ -65,4 +65,5 @@
    kimchi_backend.pasta.basic
    o1trace
    mina_net2
+   internal_tracing
 ))

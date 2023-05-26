@@ -15,22 +15,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let initial_fee_payer_balance = Currency.Balance.of_mina_string_exn "8000000"
-
-  let zkapp_target_balance = Currency.Balance.of_mina_string_exn "10"
-
   let config =
     let open Test_config in
-    let open Test_config.Wallet in
     { default with
       requires_graphql = true
-    ; block_producers =
-        [ { balance = Currency.Balance.to_mina_string initial_fee_payer_balance
-          ; timing = Untimed
-          }
+    ; genesis_ledger =
+        [ { account_name = "node-key"; balance = "8000000"; timing = Untimed }
+        ; { account_name = "extra-key"; balance = "10"; timing = Untimed }
         ]
-    ; extra_genesis_accounts = [ { balance = "10"; timing = Untimed } ]
-    ; num_snark_workers = 0
+    ; block_producers = [ { node_name = "node"; account_name = "node-key" } ]
     }
 
   let check_and_print_stout_stderr ~logger process =
@@ -48,9 +41,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-
-    let block_producer_nodes = Network.block_producers network in
-    let node = List.hd_exn block_producer_nodes in
+    let node =
+      Core.String.Map.find_exn (Network.block_producers network) "node"
+    in
     let%bind fee_payer_key = priv_key_of_node node in
     let graphql_uri = Network.Node.graphql_uri node in
 
@@ -61,9 +54,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let%bind.Deferred result =
         let%bind.Deferred process =
           Async_unix.Process.create_exn
-            ~prog:"./src/lib/snarky_js_bindings/test_module/node"
+            ~prog:"./src/lib/snarkyjs/tests/integration/node"
             ~args:
-              [ "src/lib/snarky_js_bindings/test_module/simple-zkapp.js"
+              [ "src/lib/snarkyjs/tests/integration/simple-zkapp.js"
               ; Signature_lib.Private_key.to_base58_check fee_payer_key
               ; graphql_uri
               ]

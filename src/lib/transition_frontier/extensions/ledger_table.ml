@@ -18,6 +18,8 @@ module T = struct
 
   type view = unit
 
+  let name = "ledger_table"
+
   let add_entry t ~ledger_hash ~ledger =
     (* add ledger, increment ref count *)
     ignore
