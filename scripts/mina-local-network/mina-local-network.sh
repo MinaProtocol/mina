@@ -12,7 +12,7 @@ trap "killall background" EXIT
 MINA_EXE=_build/default/src/app/cli/src/mina.exe
 ARCHIVE_EXE=_build/default/src/app/archive/archive.exe
 LOGPROC_EXE=_build/default/src/app/logproc/logproc.exe
-ZKAPP_EXE=_build/default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe 
+ZKAPP_EXE=_build/default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe
 
 export MINA_PRIVKEY_PASS='naughty blue worm'
 export MINA_LIBP2P_PASS="${MINA_PRIVKEY_PASS}"
@@ -33,8 +33,9 @@ SNARK_WORKERS_COUNT=1
 ZKAPP_TRANSACTIONS=false
 RESET=false
 UPDATE_GENESIS_TIMESTAMP=false
+PROOF_LEVEL="full"
 
-SNARK_WORKER_FEE=0.01
+SNARK_WORKER_FEE=0.001
 TRANSACTION_FREQUENCY=10 # in seconds
 
 SEED_START_PORT=3000
@@ -109,12 +110,14 @@ help() {
   echo "                                         |   Default: ${PG_DB}"
   echo "-vt  |--value-transfer-txns              | Whether to execute periodic value transfer transactions (presence of argument)"
   echo "                                         |   Default: ${VALUE_TRANSFERS}"
-  echo "-zt |--zkapp-transactions                | Whether to execute periodic zkapp transactions (presence of argument)"
+  echo "-zt  |--zkapp-transactions               | Whether to execute periodic zkapp transactions (presence of argument)"
   echo "                                         |   Default: ${ZKAPP_TRANSACTIONS}"
   echo "-tf  |--transactions-frequency <#>       | Frequency of periodic transactions execution (in seconds)"
   echo "                                         |   Default: ${TRANSACTION_FREQUENCY}"
   echo "-sf  |--snark-worker-fee <#>             | SNARK Worker fee"
   echo "                                         |   Default: ${SNARK_WORKER_FEE}"
+  echo "-pl  |--proof-level <proof-level>        | Proof level (currently consumed by SNARK Workers only)"
+  echo "                                         |   Default: ${PROOF_LEVEL}"
   echo "-r   |--reset                            | Whether to reset the Mina Local Network storage file-system (presence of argument)"
   echo "                                         |   Default: ${RESET}"
   echo "-u   |--update-genesis-timestamp         | Whether to update the Genesis Ledger timestamp (presence of argument)"
@@ -124,6 +127,9 @@ help() {
   printf "\n"
   echo "Available logging levels:"
   echo "  Spam, Trace, Debug, Info, Warn, Error, Faulty_peer, Fatal"
+  printf "\n"
+  echo "Available proof levels:"
+  echo "  full, check, none"
   printf "\n"
 
   exit
@@ -171,7 +177,6 @@ exec-daemon() {
 exec-worker-daemon() {
   COORDINATOR_PORT=${1}
   shift
-  PROOF_LEVEL="full"
   SHUTDOWN_ON_DISCONNECT="false"
   COORDINATOR_HOST_AND_PORT="localhost:${COORDINATOR_PORT}"
 
@@ -179,7 +184,7 @@ exec-worker-daemon() {
     -proof-level ${PROOF_LEVEL} \
     -shutdown-on-disconnect ${SHUTDOWN_ON_DISCONNECT} \
     -daemon-address ${COORDINATOR_HOST_AND_PORT} \
-  $@
+    $@
 }
 
 # Executes the Archive node
@@ -301,6 +306,10 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   -sf | --snark-worker-fee)
     SNARK_WORKER_FEE="${2}"
+    shift
+    ;;
+  -pl | --proof-level)
+    PROOF_LEVEL="${2}"
     shift
     ;;
   -r | --reset) RESET=true ;;
@@ -669,14 +678,14 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   KEY_FILE=${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0
   PUB_KEY=$(cat ${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0.pub)
   REST_SERVER="http://127.0.0.1:$((${FISH_START_PORT} + 1))/graphql"
-  
+
   echo "Waiting for Node (${REST_SERVER}) to be up to start sending value transfer transactions..."
   printf "\n"
 
   until ${MINA_EXE} client status -daemon-port ${FISH_START_PORT} &>/dev/null; do
     sleep 1
   done
-  
+
   SYNCED=0
 
   echo "Waiting for Node (${REST_SERVER})'s transition frontier to be up"
