@@ -1734,7 +1734,7 @@ module Types = struct
           ~args:[] ~doc:"Account that the command is sent from"
           ~resolve:(fun { ctx = mina; _ } cmd ->
             AccountObj.get_best_ledger_account mina
-              (Signed_command.source cmd.With_hash.data) )
+              (Signed_command.fee_payer cmd.With_hash.data) )
       ; field_no_status "receiver" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account that the command applies to"
           ~resolve:(fun { ctx = mina; _ } cmd ->
@@ -1742,6 +1742,7 @@ module Types = struct
               (Signed_command.receiver cmd.With_hash.data) )
       ; field_no_status "feePayer" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account that pays the fees for the command"
+          ~deprecated:(Deprecated (Some "use source field instead"))
           ~resolve:(fun { ctx = mina; _ } cmd ->
             AccountObj.get_best_ledger_account mina
               (Signed_command.fee_payer cmd.With_hash.data) )
@@ -1846,7 +1847,7 @@ module Types = struct
           field_no_status "delegator" ~typ:(non_null AccountObj.account)
             ~args:[] ~resolve:(fun { ctx = mina; _ } cmd ->
               AccountObj.get_best_ledger_account mina
-                (Signed_command.source cmd.With_hash.data) )
+                (Signed_command.fee_payer cmd.With_hash.data) )
           :: field_no_status "delegatee" ~typ:(non_null AccountObj.account)
                ~args:[] ~resolve:(fun { ctx = mina; _ } cmd ->
                  AccountObj.get_best_ledger_account mina
@@ -3976,7 +3977,7 @@ module Mutations = struct
                     (from, to_, fee, valid_until, memo, nonce_opt) signature ->
         let body =
           Signed_command_payload.Body.Stake_delegation
-            (Set_delegate { delegator = from; new_delegate = to_ })
+            (Set_delegate { new_delegate = to_ })
         in
         match signature with
         | None ->
@@ -4002,10 +4003,7 @@ module Mutations = struct
                     signature ->
         let body =
           Signed_command_payload.Body.Payment
-            { source_pk = from
-            ; receiver_pk = to_
-            ; amount = Amount.of_uint64 amount
-            }
+            { receiver_pk = to_; amount = Amount.of_uint64 amount }
         in
         match signature with
         | None ->
@@ -4079,7 +4077,7 @@ module Mutations = struct
           in
           let body =
             Signed_command_payload.Body.Payment
-              { source_pk; receiver_pk; amount = Amount.of_uint64 amount }
+              { receiver_pk; amount = Amount.of_uint64 amount }
           in
           let memo = "" in
           let kp =
@@ -4499,10 +4497,7 @@ module Mutations = struct
                           in
                           let body =
                             Signed_command_payload.Body.Payment
-                              { source_pk
-                              ; receiver_pk
-                              ; amount = payment_details.amount
-                              }
+                              { receiver_pk; amount = payment_details.amount }
                           in
                           let valid_until = None in
                           let nonce = nonces.(ndx) in
@@ -5807,10 +5802,7 @@ module Queries = struct
         let open Deferred.Result.Let_syntax in
         let body =
           Signed_command_payload.Body.Payment
-            { source_pk = from
-            ; receiver_pk = to_
-            ; amount = Amount.of_uint64 amount
-            }
+            { receiver_pk = to_; amount = Amount.of_uint64 amount }
         in
         let%bind signature =
           match signature with
