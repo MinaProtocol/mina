@@ -38,27 +38,36 @@ module Node = struct
     }
 
   type t =
-    { app_id : string; pod_id : string; pod_info : pod_info; config : config }
+    { app_id : string
+    ; pod_ids : string list
+    ; pod_info : pod_info
+    ; config : config
+    }
 
-  let id { pod_id; _ } = pod_id
+  let id { pod_ids; _ } = List.hd_exn pod_ids
 
   let network_keypair { pod_info = { network_keypair; _ }; _ } = network_keypair
 
   let base_kube_args t = [ "--cluster"; t.cluster; "--namespace"; t.namespace ]
 
-  let get_logs_in_container ?container_id { pod_id; config; pod_info; _ } =
+  let get_logs_in_container ?container_id { pod_ids; config; pod_info; _ } =
     let container_id =
       Option.value container_id ~default:pod_info.primary_container_id
     in
     let%bind cwd = Unix.getcwd () in
     Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code:13 cwd "kubectl"
-      (base_kube_args config @ [ "logs"; "-c"; container_id; pod_id ])
+      ( base_kube_args config
+      @ [ "logs"; "-c"; container_id; List.hd_exn pod_ids ] )
 
   let run_in_container ?(exit_code = 10) ?container_id ?override_with_pod_id
       ~cmd t =
     let { config; pod_info; _ } = t in
     let pod_id =
-      match override_with_pod_id with Some pid -> pid | None -> t.pod_id
+      match override_with_pod_id with
+      | Some pid ->
+          pid
+      | None ->
+          List.hd_exn t.pod_ids
     in
     let container_id =
       Option.value container_id ~default:pod_info.primary_container_id
@@ -70,7 +79,7 @@ module Node = struct
       @ cmd )
 
   let cp_string_to_container_file ?container_id ~str ~dest t =
-    let { pod_id; config; pod_info; _ } = t in
+    let { pod_ids; config; pod_info; _ } = t in
     let container_id =
       Option.value container_id ~default:pod_info.primary_container_id
     in
@@ -81,7 +90,9 @@ module Node = struct
     Out_channel.output_string oc str ;
     Out_channel.close oc ;
     let%bind cwd = Unix.getcwd () in
-    let dest_file = sprintf "%s/%s:%s" config.namespace pod_id dest in
+    let dest_file =
+      sprintf "%s/%s:%s" config.namespace (List.hd_exn pod_ids) dest
+    in
     Integration_test_lib.Util.run_cmd_or_error cwd "kubectl"
       (base_kube_args config @ [ "cp"; "-c"; container_id; tmp_file; dest_file ])
 
@@ -102,7 +113,7 @@ module Node = struct
   let logger_metadata node =
     [ ("namespace", `String node.config.namespace)
     ; ("app_id", `String node.app_id)
-    ; ("pod_id", `String node.pod_id)
+    ; ("pod_id", `String (List.hd_exn node.pod_ids))
     ]
 
   module Scalars = Graphql_lib.Scalars
@@ -200,6 +211,16 @@ module Node = struct
               nonce
               hash
             }
+          }
+      }
+    |}]
+
+    module Set_snark_worker =
+    [%graphql
+    {|
+      mutation ($input: SetSnarkWorkerInput! ) @encoders(module: "Encoders"){
+        setSnarkWorker(input:$input){
+          lastSnarkWorker
           }
       }
     |}]
@@ -515,6 +536,10 @@ module Node = struct
         ] ;
     res
 
+  let must_send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee =
+    send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
+
   let send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
       ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature =
     [%log info] "Sending a payment with raw signature"
@@ -563,10 +588,6 @@ module Node = struct
       ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let must_send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee =
-    send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee
-    |> Deferred.bind ~f:Malleable_error.or_hard_error
-
   let send_test_payments ~repeat_count ~repeat_delay_ms ~logger t ~senders
       ~receiver_pub_key ~amount ~fee =
     [%log info] "Sending a series of test payments"
@@ -591,6 +612,36 @@ module Node = struct
       ~receiver_pub_key ~amount ~fee =
     send_test_payments ~repeat_count ~repeat_delay_ms ~logger t ~senders
       ~receiver_pub_key ~amount ~fee
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+  let set_snark_worker ~logger t ~new_snark_pub_key =
+    [%log info] "Changing snark worker key" ~metadata:(logger_metadata t) ;
+    let open Deferred.Or_error.Let_syntax in
+    let set_snark_worker_graphql () =
+      let input = Some new_snark_pub_key in
+      let set_snark_worker_obj =
+        Graphql.Set_snark_worker.(make @@ makeVariables ~input ())
+      in
+      exec_graphql_request ~logger ~node:t
+        ~query_name:"set_snark_worker_graphql" set_snark_worker_obj
+    in
+    let%map result_obj = set_snark_worker_graphql () in
+    let returned_last_snark_worker_opt =
+      result_obj.setSnarkWorker.lastSnarkWorker
+    in
+    let last_snark_worker =
+      match returned_last_snark_worker_opt with
+      | None ->
+          "<no last snark worker>"
+      | Some last ->
+          last |> Account.Key.to_yojson |> Yojson.Safe.to_string
+    in
+    [%log info] "snark worker changed, lastSnarkWorker: %s" last_snark_worker
+      ~metadata:[ ("lastSnarkWorker", `String last_snark_worker) ] ;
+    ()
+
+  let must_set_snark_worker ~logger t ~new_snark_pub_key =
+    set_snark_worker ~logger t ~new_snark_pub_key
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let dump_archive_data ~logger (t : t) ~data_file =
@@ -635,7 +686,7 @@ module Node = struct
 
   let run_replayer ~logger (t : t) =
     [%log info] "Running replayer on archived data (node: %s, container: %s)"
-      t.pod_id mina_archive_container_id ;
+      (List.hd_exn t.pod_ids) mina_archive_container_id ;
     let open Malleable_error.Let_syntax in
     let%bind accounts =
       run_in_container t
@@ -666,8 +717,8 @@ module Node = struct
 
   let dump_mina_logs ~logger (t : t) ~log_file =
     let open Malleable_error.Let_syntax in
-    [%log info] "Dumping container logs from (node: %s, container: %s)" t.pod_id
-      t.pod_info.primary_container_id ;
+    [%log info] "Dumping container logs from (node: %s, container: %s)"
+      (List.hd_exn t.pod_ids) t.pod_info.primary_container_id ;
     let%map logs = get_logs_in_container t in
     [%log info] "Dumping container log to file %s" log_file ;
     Out_channel.with_file log_file ~f:(fun out_ch ->
@@ -677,7 +728,7 @@ module Node = struct
     let open Malleable_error.Let_syntax in
     [%log info]
       "Dumping precomputed blocks from logs for (node: %s, container: %s)"
-      t.pod_id t.pod_info.primary_container_id ;
+      (List.hd_exn t.pod_ids) t.pod_info.primary_container_id ;
     let%bind logs = get_logs_in_container t in
     (* kubectl logs may include non-log output, like "Using password from environment variable" *)
     let log_lines =
@@ -789,7 +840,7 @@ module Node = struct
 end
 
 module Workload_to_deploy = struct
-  type t = { workload_id : string; pod_info : Node.pod_info list }
+  type t = { workload_id : string; pod_info : Node.pod_info }
 
   let construct_workload workload_id pod_info : t = { workload_id; pod_info }
 
@@ -821,28 +872,24 @@ module Workload_to_deploy = struct
       |> List.filter ~f:(Fn.compose not String.is_empty)
       |> List.map ~f:(String.substr_replace_first ~pattern:"pod/" ~with_:"")
     in
-    if Stdlib.List.compare_lengths t.pod_info pod_ids <> 0 then
-      failwithf
-        "Unexpected number of replicas in kubernetes deployment for workload \
-         %s: expected %d, got %d"
-        t.workload_id (List.length t.pod_info) (List.length pod_ids) () ;
-    List.zip_exn t.pod_info pod_ids
-    |> List.map ~f:(fun (pod_info, pod_id) ->
-           { Node.app_id; pod_id; pod_info; config } )
+    (* we have a strict 1 workload to 1 pod setup, except the snark workers. *)
+    (* elsewhere in the code I'm simply using List.hd_exn which is not ideal but enabled by the fact that in all relevant cases, there's only going to be 1 pod id in pod_ids *)
+    (* TODO fix this^ and have a more elegant solution *)
+    let pod_info = t.pod_info in
+    { Node.app_id; pod_ids; pod_info; config }
 end
 
 type t =
   { namespace : string
   ; constants : Test_config.constants
-  ; seeds : Node.t list
-  ; block_producers : Node.t list
-  ; snark_coordinators : Node.t list
-  ; snark_workers : Node.t list
-  ; archive_nodes : Node.t list
-  ; testnet_log_filter : string (* ; keypairs : Signature_lib.Keypair.t list *)
-  ; block_producer_keypairs : Signature_lib.Keypair.t list
-  ; extra_genesis_keypairs : Signature_lib.Keypair.t list
-  ; nodes_by_pod_id : Node.t String.Map.t
+  ; seeds : Node.t Core.String.Map.t
+  ; block_producers : Node.t Core.String.Map.t
+  ; snark_coordinators : Node.t Core.String.Map.t
+  ; snark_workers : Node.t Core.String.Map.t
+  ; archive_nodes : Node.t Core.String.Map.t
+        (* ; nodes_by_pod_id : Node.t Core.String.Map.t *)
+  ; testnet_log_filter : string
+  ; genesis_keypairs : Network_keypair.t Core.String.Map.t
   }
 
 let constants { constants; _ } = constants
@@ -863,48 +910,59 @@ let archive_nodes { archive_nodes; _ } = archive_nodes
 
 (* all_nodes returns all *actual* mina nodes; note that a snark_worker is a pod within the network but not technically a mina node, therefore not included here.  snark coordinators on the other hand ARE mina nodes *)
 let all_nodes { seeds; block_producers; snark_coordinators; archive_nodes; _ } =
-  List.concat [ seeds; block_producers; snark_coordinators; archive_nodes ]
+  List.concat
+    [ Core.String.Map.to_alist seeds
+    ; Core.String.Map.to_alist block_producers
+    ; Core.String.Map.to_alist snark_coordinators
+    ; Core.String.Map.to_alist archive_nodes
+    ]
+  |> Core.String.Map.of_alist_exn
 
 (* all_pods returns everything in the network.  remember that snark_workers will never initialize and will never sync, and aren't supposed to *)
-let all_pods
-    { seeds
-    ; block_producers
-    ; snark_coordinators
-    ; snark_workers
-    ; archive_nodes
-    ; _
-    } =
+(* TODO snark workers and snark coordinators have the same key name, but different workload ids*)
+let all_pods t =
   List.concat
-    [ seeds; block_producers; snark_coordinators; snark_workers; archive_nodes ]
+    [ Core.String.Map.to_alist t.seeds
+    ; Core.String.Map.to_alist t.block_producers
+    ; Core.String.Map.to_alist t.snark_coordinators
+    ; Core.String.Map.to_alist t.snark_workers
+    ; Core.String.Map.to_alist t.archive_nodes
+    ]
+  |> Core.String.Map.of_alist_exn
 
 (* all_non_seed_pods returns everything in the network except seed nodes *)
-let all_non_seed_pods
-    { block_producers; snark_coordinators; snark_workers; archive_nodes; _ } =
+let all_non_seed_pods t =
   List.concat
-    [ block_producers; snark_coordinators; snark_workers; archive_nodes ]
+    [ Core.String.Map.to_alist t.block_producers
+    ; Core.String.Map.to_alist t.snark_coordinators
+    ; Core.String.Map.to_alist t.snark_workers
+    ; Core.String.Map.to_alist t.archive_nodes
+    ]
+  |> Core.String.Map.of_alist_exn
 
-let all_keypairs { block_producer_keypairs; extra_genesis_keypairs; _ } =
-  block_producer_keypairs @ extra_genesis_keypairs
+let genesis_keypairs { genesis_keypairs; _ } = genesis_keypairs
 
-let block_producer_keypairs { block_producer_keypairs; _ } =
-  block_producer_keypairs
+let lookup_node_by_pod_id t id =
+  let pods = all_pods t |> Core.Map.to_alist in
+  List.fold pods ~init:None ~f:(fun acc (node_name, node) ->
+      match acc with
+      | Some acc ->
+          Some acc
+      | None ->
+          if String.equal id (List.hd_exn node.pod_ids) then
+            Some (node_name, node)
+          else None )
 
-let extra_genesis_keypairs { extra_genesis_keypairs; _ } =
-  extra_genesis_keypairs
-
-let lookup_node_by_pod_id t = Map.find t.nodes_by_pod_id
-
-let all_pod_ids t = Map.keys t.nodes_by_pod_id
+let all_pod_ids t =
+  let pods = all_pods t |> Core.Map.to_alist in
+  List.fold pods ~init:[] ~f:(fun acc (_, node) ->
+      List.cons (List.hd_exn node.pod_ids) acc )
 
 let initialize_infra ~logger network =
   let open Malleable_error.Let_syntax in
-  let poll_interval = Time.Span.of_sec 30.0 in
-  let max_polls = 60 (* poll_interval * max_polls = 30 mins *) in
-  let all_pods_set =
-    all_pods network
-    |> List.map ~f:(fun { pod_id; _ } -> pod_id)
-    |> String.Set.of_list
-  in
+  let poll_interval = Time.Span.of_sec 15.0 in
+  let max_polls = 40 (* 10 mins *) in
+  let all_pods_set = all_pod_ids network |> String.Set.of_list in
   let kube_get_pods () =
     Integration_test_lib.Util.run_cmd_or_error_timeout ~timeout_seconds:60 "/"
       "kubectl"

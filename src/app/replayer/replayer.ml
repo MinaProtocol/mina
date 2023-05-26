@@ -43,7 +43,6 @@ module type Get_command_ids = sig
   val run :
        Caqti_async.connection
     -> state_hash:string
-    -> start_slot:int64
     -> (int list, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t
 end
 
@@ -243,9 +242,11 @@ let epoch_data_of_id ~logger pool epoch_data_id =
       failwithf "Error retrieving epoch data for epoch data id %d, error: %s"
         epoch_data_id (Caqti_error.show msg) ()
 
-let process_block_infos_of_state_hash ~logger pool state_hash ~f =
+let process_block_infos_of_state_hash ~logger pool ~state_hash ~start_slot ~f =
   match%bind
-    Caqti_async.Pool.use (fun db -> Sql.Block_info.run db state_hash) pool
+    Caqti_async.Pool.use
+      (fun db -> Sql.Block_info.run db ~state_hash ~start_slot)
+      pool
   with
   | Ok block_infos ->
       f block_infos
@@ -987,8 +988,24 @@ let unquoted_string_of_yojson json =
   let s = Yojson.Safe.to_string json in
   String.sub s ~pos:1 ~len:(String.length s - 2)
 
+let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis =
+  (* start replaying at the slot after the one we've just finished with *)
+  let start_slot_since_genesis = Int64.succ last_global_slot_since_genesis in
+  let replayer_checkpoint =
+    create_replayer_checkpoint ~ledger ~start_slot_since_genesis
+    |> input_to_yojson |> Yojson.Safe.pretty_to_string
+  in
+  let checkpoint_file =
+    sprintf "replayer-checkpoint-%Ld.json" start_slot_since_genesis
+  in
+  [%log info] "Writing checkpoint file"
+    ~metadata:[ ("checkpoint_file", `String checkpoint_file) ] ;
+  return
+  @@ Out_channel.with_file checkpoint_file ~f:(fun oc ->
+         Out_channel.output_string oc replayer_checkpoint )
+
 let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
-    ~continue_on_error () =
+    ~checkpoint_interval ~continue_on_error () =
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -1055,10 +1072,19 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
               max_slot ;
             try_slot ~logger pool max_slot
       in
-      [%log info] "Loading block information using target state hash" ;
-      let%bind block_ids =
-        process_block_infos_of_state_hash ~logger pool target_state_hash
-          ~f:(fun block_infos ->
+      [%log info]
+        "Loading block information using target state hash and start slot" ;
+      (* oldest block id is the id of the block with the earliest slot *)
+      let%bind block_ids, oldest_block_id =
+        process_block_infos_of_state_hash ~logger pool
+          ~state_hash:target_state_hash
+          ~start_slot:input.start_slot_since_genesis ~f:(fun block_infos ->
+            let ({ id = oldest_block_id; _ } : Sql.Block_info.t) =
+              Option.value_exn
+                (List.min_elt block_infos ~compare:(fun bi1 bi2 ->
+                     Int64.compare bi1.global_slot_since_genesis
+                       bi2.global_slot_since_genesis ) )
+            in
             let ids = List.map block_infos ~f:(fun { id; _ } -> id) in
             (* build mapping from global slots to state and ledger hashes *)
             List.iter block_infos
@@ -1069,27 +1095,33 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                   ~data:
                     ( State_hash.of_base58_check_exn state_hash
                     , Ledger_hash.of_base58_check_exn ledger_hash ) ) ;
-            return (Int.Set.of_list ids) )
+            return (Int.Set.of_list ids, oldest_block_id) )
       in
-      (* check that genesis block is in chain to target hash
-         assumption: genesis block occupies global slot 0
-      *)
-      if Int64.Table.mem global_slot_hashes_tbl Int64.zero then
+      if Int64.equal input.start_slot_since_genesis 0L then
+        (* check that genesis block is in chain to target hash
+           assumption: genesis block occupies global slot 0
+
+           if nonzero start slot, can't assume there's a block at that slot
+        *)
+        if Int64.Table.mem global_slot_hashes_tbl Int64.zero then
+          [%log info]
+            "Block chain leading to target state hash includes genesis block, \
+             length = %d"
+            (Int.Set.length block_ids)
+        else (
+          [%log fatal]
+            "Block chain leading to target state hash does not include genesis \
+             block" ;
+          Core_kernel.exit 1 )
+      else
         [%log info]
-          "Block chain leading to target state hash includes genesis block, \
+          "Block chain from non-genesis start slot to target state hash has \
            length = %d"
-          (Int.Set.length block_ids)
-      else (
-        [%log fatal]
-          "Block chain leading to target state hash does not include genesis \
-           block" ;
-        Core_kernel.exit 1 ) ;
+          (Int.Set.length block_ids) ;
       let get_command_ids (module Command_ids : Get_command_ids) name =
         match%bind
           Caqti_async.Pool.use
-            (fun db ->
-              Command_ids.run db ~state_hash:target_state_hash
-                ~start_slot:input.start_slot_since_genesis )
+            (fun db -> Command_ids.run db ~state_hash:target_state_hash)
             pool
         with
         | Ok ids ->
@@ -1116,12 +1148,12 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             let open Deferred.Let_syntax in
             match%map
               Caqti_async.Pool.use
-                (fun db -> Sql.Internal_command.run db id)
+                (fun db ->
+                  Sql.Internal_command.run db
+                    ~start_slot:input.start_slot_since_genesis
+                    ~internal_cmd_id:id )
                 pool
             with
-            | Ok [] ->
-                failwithf "Could not find any internal commands with id: %d" id
-                  ()
             | Ok internal_cmds ->
                 internal_cmds
             | Error msg ->
@@ -1151,11 +1183,14 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                   -1
               | "fee_transfer_via_coinbase", "coinbase" ->
                   1
-              | _ ->
-                  failwith
+              | s1, s2 ->
+                  failwithf
                     "Two internal commands have the same global slot since \
                      genesis %Ld, sequence no %d, and secondary sequence no \
-                     %d, but are not a coinbase and fee transfer via coinbase"
+                     %d, but are not a coinbase and fee transfer via coinbase \
+                     (%s and %s)"
+                    ic1.global_slot_since_genesis ic1.sequence_no
+                    ic1.secondary_sequence_no s1 s2 ()
             else cmp )
       in
       (* populate cache of fee transfer via coinbase items *)
@@ -1242,13 +1277,24 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
              $state_hash at global slot since genesis %Ld"
             curr_global_slot_since_genesis
         in
-        let log_on_slot_change curr_global_slot_since_genesis =
+        let checkpoint_interval_i64 =
+          Option.map checkpoint_interval ~f:Int64.of_int
+        in
+        let write_checkpoint_file curr_global_slot_since_genesis =
+          Option.iter checkpoint_interval_i64 ~f:(fun interval ->
+              if Int64.(last_global_slot_since_genesis % interval = 0L) then
+                Async.don't_wait_for
+                  (write_replayer_checkpoint ~logger ~ledger
+                     ~last_global_slot_since_genesis ) )
+        in
+        let run_actions_on_slot_change curr_global_slot_since_genesis =
           if
             Int64.( > ) curr_global_slot_since_genesis
               last_global_slot_since_genesis
           then (
             log_ledger_hash_after_last_slot () ;
-            log_state_hash_on_next_slot curr_global_slot_since_genesis )
+            log_state_hash_on_next_slot curr_global_slot_since_genesis ;
+            write_checkpoint_file curr_global_slot_since_genesis )
         in
         let combine_or_run_internal_cmds (ic : Sql.Internal_command.t)
             (ics : Sql.Internal_command.t list) =
@@ -1262,7 +1308,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
               (* combining situation 2
                  two fee transfer commands with same global slot since genesis, sequence number
               *)
-              log_on_slot_change ic.global_slot_since_genesis ;
+              run_actions_on_slot_change ic.global_slot_since_genesis ;
               let%bind () =
                 apply_combined_fee_transfer ~logger ~pool ~ledger ~set_nonces
                   ~repair_nonces ~continue_on_error ic ic2
@@ -1272,7 +1318,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                 ~last_block_id:ic.block_id ~staking_epoch_ledger
                 ~next_epoch_ledger
           | _ ->
-              log_on_slot_change ic.global_slot_since_genesis ;
+              run_actions_on_slot_change ic.global_slot_since_genesis ;
               let%bind () =
                 run_internal_command ~logger ~pool ~ledger ~set_nonces
                   ~repair_nonces ~continue_on_error ic
@@ -1298,7 +1344,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
               , next_epoch_ledger
               , next_seed )
         | [], uc :: ucs ->
-            log_on_slot_change uc.global_slot_since_genesis ;
+            run_actions_on_slot_change uc.global_slot_since_genesis ;
             let%bind () =
               run_user_command ~logger ~pool ~ledger ~set_nonces ~repair_nonces
                 ~continue_on_error uc
@@ -1308,7 +1354,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
               ~last_block_id:uc.block_id ~staking_epoch_ledger
               ~next_epoch_ledger
         | ic :: _, uc :: ucs when cmp_ic_uc ic uc > 0 ->
-            log_on_slot_change uc.global_slot_since_genesis ;
+            run_actions_on_slot_change uc.global_slot_since_genesis ;
             let%bind () =
               run_user_command ~logger ~pool ~ledger ~set_nonces ~repair_nonces
                 ~continue_on_error uc
@@ -1327,24 +1373,12 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                slot since_genesis %Ld and sequence number %d"
               ic.global_slot_since_genesis ic.sequence_no ()
       in
-      let%bind unparented_ids =
-        query_db pool
-          ~f:(fun db -> Sql.Block.get_unparented db ())
-          ~item:"unparented ids"
-      in
-      let genesis_block_id =
-        match List.filter unparented_ids ~f:(Int.Set.mem block_ids) with
-        | [ id ] ->
-            id
-        | _ ->
-            failwith "Expected only the genesis block to have an unparented id"
-      in
       let%bind start_slot_since_genesis =
         let%map slot_opt =
           query_db pool
             ~f:(fun db ->
               Sql.Block.get_next_slot db input.start_slot_since_genesis )
-            ~item:"Next slot"
+            ~item:"Start slot"
         in
         match slot_opt with
         | Some slot ->
@@ -1367,6 +1401,16 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             ; ( "available_start_slot"
               , `String (Int64.to_string start_slot_since_genesis) )
             ] ;
+      let%bind last_block_id =
+        if Int64.equal input.start_slot_since_genesis 0L then
+          query_db pool
+            ~f:(fun db -> Sql.Block.genesis_block_id db)
+            ~item:"Genesis block id"
+        else
+          query_db pool
+            ~f:(fun db -> Sql.Block.parent_block_id db oldest_block_id)
+            ~item:"Parent block id"
+      in
       [%log info] "At start global slot %Ld, ledger hash"
         start_slot_since_genesis
         ~metadata:[ ("ledger_hash", json_ledger_hash_of_ledger ledger) ] ;
@@ -1377,27 +1421,13 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                , next_seed ) =
         apply_commands sorted_internal_cmds sorted_user_cmds
           ~last_global_slot_since_genesis:start_slot_since_genesis
-          ~last_block_id:genesis_block_id ~staking_epoch_ledger:ledger
+          ~last_block_id:oldest_block_id ~staking_epoch_ledger:ledger
           ~next_epoch_ledger:ledger
       in
       match input.target_epoch_ledgers_state_hash with
       | None ->
-          (* start replaying at the slot after the one we've just finished with *)
-          let start_slot_since_genesis =
-            Int64.succ last_global_slot_since_genesis
-          in
-          let replayer_checkpoint =
-            create_replayer_checkpoint ~ledger ~start_slot_since_genesis
-            |> input_to_yojson |> Yojson.Safe.pretty_to_string
-          in
-          let checkpoint_file =
-            sprintf "replayer-checkpoint-%Ld.json" start_slot_since_genesis
-          in
-          [%log info] "Writing checkpoint file"
-            ~metadata:[ ("checkpoint_file", `String checkpoint_file) ] ;
-          return
-          @@ Out_channel.with_file checkpoint_file ~f:(fun oc ->
-                 Out_channel.output_string oc replayer_checkpoint )
+          write_replayer_checkpoint ~logger ~ledger
+            ~last_global_slot_since_genesis
       | Some target_epoch_ledgers_state_hash -> (
           match output_file_opt with
           | None ->
@@ -1451,6 +1481,10 @@ let () =
          and continue_on_error =
            Param.flag "--continue-on-error"
              ~doc:"Continue processing after errors" Param.no_arg
+         and checkpoint_interval =
+           Param.flag "--checkpoint-interval"
+             ~doc:"NN Write checkpoint file every NN slots"
+             Param.(optional int)
          in
          main ~input_file ~output_file_opt ~archive_uri ~set_nonces
-           ~repair_nonces ~continue_on_error )))
+           ~repair_nonces ~checkpoint_interval ~continue_on_error )))

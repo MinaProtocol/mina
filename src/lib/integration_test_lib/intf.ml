@@ -113,6 +113,18 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> signed_command_result Malleable_error.t
 
+      val set_snark_worker :
+           logger:Logger.t
+        -> t
+        -> new_snark_pub_key:Signature_lib.Public_key.Compressed.t
+        -> unit Deferred.Or_error.t
+
+      val must_set_snark_worker :
+           logger:Logger.t
+        -> t
+        -> new_snark_pub_key:Signature_lib.Public_key.Compressed.t
+        -> unit Malleable_error.t
+
       val must_send_test_payments :
            repeat_count:Unsigned.uint32
         -> repeat_delay_ms:Unsigned.uint32
@@ -182,23 +194,19 @@ module Engine = struct
 
     val genesis_constants : t -> Genesis_constants.t
 
-    val seeds : t -> Node.t list
+    val seeds : t -> Node.t Core.String.Map.t
 
-    val all_non_seed_pods : t -> Node.t list
+    val all_non_seed_pods : t -> Node.t Core.String.Map.t
 
-    val block_producers : t -> Node.t list
+    val block_producers : t -> Node.t Core.String.Map.t
 
-    val snark_coordinators : t -> Node.t list
+    val snark_coordinators : t -> Node.t Core.String.Map.t
 
-    val archive_nodes : t -> Node.t list
+    val archive_nodes : t -> Node.t Core.String.Map.t
 
-    val all_nodes : t -> Node.t list
+    val all_nodes : t -> Node.t Core.String.Map.t
 
-    val all_keypairs : t -> Signature_lib.Keypair.t list
-
-    val block_producer_keypairs : t -> Signature_lib.Keypair.t list
-
-    val extra_genesis_keypairs : t -> Signature_lib.Keypair.t list
+    val genesis_keypairs : t -> Network_keypair.t Core.String.Map.t
 
     val initialize_infra : logger:Logger.t -> t -> unit Malleable_error.t
   end
@@ -351,7 +359,8 @@ module Dsl = struct
       -> node_included_in:[ `Any_node | `Node of Engine.Network.Node.t ]
       -> t
 
-    val ledger_proofs_emitted_since_genesis : num_proofs:int -> t
+    val ledger_proofs_emitted_since_genesis :
+      test_config:Test_config.t -> num_proofs:int -> t
   end
 
   module type S = sig

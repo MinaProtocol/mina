@@ -19,10 +19,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   (* TODO: refactor all currency values to decimal represenation *)
   (* TODO: test account creation fee *)
-  (* TODO: test snark work *)
   let config =
     let open Test_config in
-    let open Test_config.Wallet in
     let make_timing ~min_balance ~cliff_time ~cliff_amount ~vesting_period
         ~vesting_increment : Mina_base.Account_timing.t =
       let open Currency in
@@ -36,24 +34,41 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     { default with
       requires_graphql = true
-    ; block_producers =
-        [ { balance = "400000"; timing = Untimed } (* 400_000_000_000_000 *)
-        ; { balance = "300000"; timing = Untimed } (* 300_000_000_000_000 *)
-        ; { balance = "30000"
+    ; genesis_ledger =
+        [ { account_name = "untimed-node-a-key"
+          ; balance = "400000"
+          ; timing = Untimed (* 400_000_000_000_000 *)
+          }
+        ; { account_name = "untimed-node-b-key"
+          ; balance = "300000"
+          ; timing = Untimed (* 300_000_000_000_000 *)
+          }
+        ; { account_name = "timed-node-c-key"
+          ; balance = "30000"
           ; timing =
               make_timing ~min_balance:10_000_000_000_000 ~cliff_time:8
                 ~cliff_amount:0 ~vesting_period:4
                 ~vesting_increment:5_000_000_000_000
+              (* 30_000_000_000_000 mina is the total.  initially, the balance will be 10k mina.  after 8 global slots, the cliff is hit, although the cliff amount is 0.  4 slots after that, 5_000_000_000_000 mina will vest, and 4 slots after that another 5_000_000_000_000 will vest, and then twice again, for a total of 30k mina all fully liquid and unlocked at the end of the schedule*)
           }
-          (* 30_000_000_000_000 mina is the total.  initially, the balance will be 10k mina.  after 8 global slots, the cliff is hit, although the cliff amount is 0.  4 slots after that, 5_000_000_000_000 mina will vest, and 4 slots after that another 5_000_000_000_000 will vest, and then twice again, for a total of 30k mina all fully liquid and unlocked at the end of the schedule*)
+        ; { account_name = "snark-node-key1"; balance = "0"; timing = Untimed }
+        ; { account_name = "snark-node-key2"; balance = "0"; timing = Untimed }
+        ; { account_name = "fish1"; balance = "100"; timing = Untimed }
+        ; { account_name = "fish2"; balance = "100"; timing = Untimed }
         ]
-    ; extra_genesis_accounts =
-        [ { balance = "1000"; timing = Untimed }
-        ; { balance = "1000"; timing = Untimed }
+    ; block_producers =
+        [ { node_name = "untimed-node-a"; account_name = "untimed-node-a-key" }
+        ; { node_name = "untimed-node-b"; account_name = "untimed-node-b-key" }
+        ; { node_name = "timed-node-c"; account_name = "timed-node-c-key" }
         ]
-    ; num_archive_nodes = 1
-    ; num_snark_workers = 4
+    ; snark_coordinator =
+        Some
+          { node_name = "snark-node"
+          ; account_name = "snark-node-key1"
+          ; worker_nodes = 4
+          }
     ; snark_worker_fee = "0.0001"
+    ; num_archive_nodes = 1
     ; proof_config =
         { proof_config_default with
           work_delay = Some 1
@@ -62,50 +77,70 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
     }
 
-  (* Call [f] [n] times in sequence *)
-  let repeat_seq ~n ~f =
-    let open Malleable_error.Let_syntax in
-    let rec go n =
-      if n = 0 then return ()
-      else
-        let%bind () = f () in
-        go (n - 1)
-    in
-    go n
-
   let run network t =
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_nodes = Network.all_nodes network in
-    let%bind () = wait_for t (Wait_condition.nodes_to_initialize all_nodes) in
-    let[@warning "-8"] [ untimed_node_a; untimed_node_b; timed_node_c ] =
-      Network.block_producers network
+    let%bind () =
+      wait_for t
+        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
+    in
+    let untimed_node_a =
+      Core.String.Map.find_exn
+        (Network.block_producers network)
+        "untimed-node-a"
+    in
+    let untimed_node_b =
+      Core.String.Map.find_exn
+        (Network.block_producers network)
+        "untimed-node-b"
+    in
+    let timed_node_c =
+      Core.String.Map.find_exn (Network.block_producers network) "timed-node-c"
+    in
+    let fish1 =
+      Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1"
+    in
+    let fish2 =
+      Core.String.Map.find_exn (Network.genesis_keypairs network) "fish2"
     in
     [%log info] "extra genesis keypairs: %s"
-      (List.to_string (Network.extra_genesis_keypairs network)
+      (List.to_string [ fish1.keypair; fish2.keypair ]
          ~f:(fun { Signature_lib.Keypair.public_key; _ } ->
            public_key |> Signature_lib.Public_key.to_bigstring
            |> Bigstring.to_string ) ) ;
-    let[@warning "-8"] [ fish1; fish2 ] =
-      Network.extra_genesis_keypairs network
+    let snark_coordinator =
+      Core.String.Map.find_exn (Network.all_nodes network) "snark-node"
     in
+    let snark_node_key1 =
+      Core.String.Map.find_exn
+        (Network.genesis_keypairs network)
+        "snark-node-key1"
+    in
+    let snark_node_key2 =
+      Core.String.Map.find_exn
+        (Network.genesis_keypairs network)
+        "snark-node-key2"
+    in
+    [%log info] "snark node keypairs: %s"
+      (List.to_string [ snark_node_key1.keypair; snark_node_key2.keypair ]
+         ~f:(fun { Signature_lib.Keypair.public_key; _ } ->
+           public_key |> Signature_lib.Public_key.to_yojson
+           |> Yojson.Safe.to_string ) ) ;
     (* create a signed txn which we'll use to make a successfull txn, and then a replay attack *)
     let amount = Currency.Amount.of_formatted_string "10" in
     let fee = Currency.Fee.of_formatted_string "1" in
     let test_constants = Engine.Network.constraint_constants network in
     let receiver_pub_key =
-      fish1.public_key |> Signature_lib.Public_key.compress
+      fish1.keypair.public_key |> Signature_lib.Public_key.compress
     in
-    let sender_kp = fish2 in
     let sender_pub_key =
-      sender_kp.public_key |> Signature_lib.Public_key.compress
+      fish2.keypair.public_key |> Signature_lib.Public_key.compress
     in
     (* hardcoded copy of extra_genesis_accounts[0] and extra_genesis_accounts[1], update here if they change *)
-    let receiver_original_balance =
-      Currency.Amount.of_formatted_string "1000"
-    in
-    let sender_original_balance = Currency.Amount.of_formatted_string "1000" in
+    let receiver_original_balance = Currency.Amount.of_formatted_string "100" in
+    let sender_original_balance = Currency.Amount.of_formatted_string "100" in
     let txn_body =
       Signed_command_payload.Body.Payment
         { source_pk = sender_pub_key
@@ -124,7 +159,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~fee_payer_pk:sender_pub_key ~valid_until:None
         ~memo:(Signed_command_memo.create_from_string_exn "")
         ~body:txn_body ~signer:sender_pub_key
-        ~sign_choice:(User_command_input.Sign_choice.Keypair sender_kp) ()
+        ~sign_choice:(User_command_input.Sign_choice.Keypair fish2.keypair) ()
     in
     [%log info] "user_command_input: $user_command"
       ~metadata:
@@ -151,7 +186,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     (* setup complete *)
     let%bind () =
-      section "send a single payment between 2 untimed accounts"
+      section "send a single signed payment between 2 fish accounts"
         (let%bind { hash; _ } =
            Network.Node.must_send_payment_with_raw_sig untimed_node_b ~logger
              ~sender_pub_key:
@@ -399,11 +434,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind receiver_pub_key = pub_key_of_node receiver in
          let sender = untimed_node_b in
          let%bind sender_pub_key = pub_key_of_node sender in
-         let%bind () =
+         let%bind _ =
            (*
             To fill up a `small` transaction capacity with work delay of 1,
             there needs to be 12 total txns sent.
-
             Calculation is as follows:
             Max number trees in the scan state is
               `(transaction_capacity_log+1) * (work_delay+1)`
@@ -412,21 +446,131 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Per block there can be 2 transactions included (other two slots would be for a coinbase and fee transfers).
             In the initial state of the network, the scan state waits till all the trees are filled before emitting a proof from the first tree.
             Hence, 6*2 = 12 transactions untill we get the first snarked ledger.
-
             2 successful txn are sent in the prior course of this test,
             so spamming out at least 10 more here will trigger a ledger proof to be emitted *)
-           repeat_seq ~n:10 ~f:(fun () ->
-               Network.Node.must_send_payment ~logger sender ~sender_pub_key
-                 ~receiver_pub_key ~amount:Currency.Amount.one ~fee
-               >>| ignore )
+           send_payments ~logger ~sender_pub_key ~receiver_pub_key
+             ~amount:Currency.Amount.one ~fee ~node:sender 10
          in
          wait_for t
-           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
+           (Wait_condition.ledger_proofs_emitted_since_genesis
+              ~test_config:config ~num_proofs:1 ) )
+    in
+    let%bind () =
+      section_hard
+        "check account balances.  snark-node-key1 should be greater than or \
+         equal to the snark fee"
+        (let%bind { total_balance = key_1_balance_actual; _ } =
+           Network.Node.must_get_account_data ~logger untimed_node_b
+             ~public_key:
+               ( snark_node_key1.keypair.public_key
+               |> Signature_lib.Public_key.compress )
+         in
+         let%bind { total_balance = key_2_balance_actual; _ } =
+           Network.Node.must_get_account_data ~logger untimed_node_a
+             ~public_key:
+               ( snark_node_key2.keypair.public_key
+               |> Signature_lib.Public_key.compress )
+         in
+         let key_1_balance_expected =
+           Currency.Amount.of_formatted_string config.snark_worker_fee
+         in
+         if
+           Currency.Amount.( >= )
+             (Currency.Balance.to_amount key_1_balance_actual)
+             key_1_balance_expected
+         then (
+           [%log info]
+             "balance check successful.  \n\
+              snark-node-key1 balance: %s.  \n\
+              snark-node-key2 balance: %s.  \n\
+              snark-worker-fee: %s"
+             (Currency.Balance.to_formatted_string key_1_balance_actual)
+             (Currency.Balance.to_formatted_string key_2_balance_actual)
+             config.snark_worker_fee ;
+
+           Malleable_error.return () )
+         else
+           Malleable_error.soft_error_format ~value:()
+             "Error with balance of snark-node-key1.  \n\
+              snark-node-key1 balance: %s.  \n\
+              snark-node-key2 balance: %s.  \n\
+              snark-worker-fee: %s"
+             (Currency.Balance.to_formatted_string key_1_balance_actual)
+             (Currency.Balance.to_formatted_string key_2_balance_actual)
+             config.snark_worker_fee )
+    in
+    let%bind () =
+      section_hard
+        "change snark worker key from snark-node-key1 to snark-node-key2"
+        (Network.Node.must_set_snark_worker ~logger snark_coordinator
+           ~new_snark_pub_key:
+             ( snark_node_key2.keypair.public_key
+             |> Signature_lib.Public_key.compress ) )
+    in
+    let%bind () =
+      section_hard
+        "send out a bunch of txns to fill up the snark ledger, then wait for \
+         proofs to be emitted"
+        (let receiver = untimed_node_b in
+         let%bind receiver_pub_key = pub_key_of_node receiver in
+         let sender = untimed_node_a in
+         let%bind sender_pub_key = pub_key_of_node sender in
+         let%bind _ =
+           send_payments ~logger ~sender_pub_key ~receiver_pub_key
+             ~amount:Currency.Amount.one ~fee ~node:sender 12
+         in
+         wait_for t
+           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:2
+              ~test_config:config ) )
+    in
+    let%bind () =
+      section_hard
+        "check account balances.  snark-node-key2 should be greater than or \
+         equal to the snark fee"
+        (let%bind { total_balance = key_1_balance_actual; _ } =
+           Network.Node.must_get_account_data ~logger untimed_node_b
+             ~public_key:
+               ( snark_node_key1.keypair.public_key
+               |> Signature_lib.Public_key.compress )
+         in
+         let%bind { total_balance = key_2_balance_actual; _ } =
+           Network.Node.must_get_account_data ~logger untimed_node_a
+             ~public_key:
+               ( snark_node_key2.keypair.public_key
+               |> Signature_lib.Public_key.compress )
+         in
+         let key_2_balance_expected =
+           Currency.Amount.of_formatted_string config.snark_worker_fee
+         in
+         if
+           Currency.Amount.( >= )
+             (Currency.Balance.to_amount key_2_balance_actual)
+             key_2_balance_expected
+         then (
+           [%log info]
+             "balance check successful.  \n\
+              snark-node-key1 balance: %s.  \n\
+              snark-node-key2 balance: %s.  \n\
+              snark-worker-fee: %s"
+             (Currency.Balance.to_formatted_string key_1_balance_actual)
+             (Currency.Balance.to_formatted_string key_2_balance_actual)
+             config.snark_worker_fee ;
+
+           Malleable_error.return () )
+         else
+           Malleable_error.soft_error_format ~value:()
+             "Error with balance of snark-node-key2.  \n\
+              snark-node-key1 balance: %s.  \n\
+              snark-node-key2 balance: %s.  \n\
+              snark-worker-fee: %s"
+             (Currency.Balance.to_formatted_string key_1_balance_actual)
+             (Currency.Balance.to_formatted_string key_2_balance_actual)
+             config.snark_worker_fee )
     in
     section_hard "running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
-           (List.hd_exn @@ Network.archive_nodes network)
+           (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
        in
        check_replayer_logs ~logger logs )
 end

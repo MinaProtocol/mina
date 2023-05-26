@@ -265,7 +265,7 @@ let parse_event_from_log_entry ~logger ~network log_entry =
   let%bind pod_id =
     find string log_entry [ "resource"; "labels"; "pod_name" ]
   in
-  let%bind node =
+  let%bind _, node =
     Kubernetes_network.lookup_node_by_pod_id network pod_id
     |> Option.value_map ~f:Or_error.return
          ~default:

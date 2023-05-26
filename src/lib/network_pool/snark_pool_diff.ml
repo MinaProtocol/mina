@@ -34,6 +34,8 @@ module Make
 
   type rejected = Rejected.t [@@deriving sexp, yojson]
 
+  let label = Pool.label
+
   let reject_overloaded_diff _ = ()
 
   type compact =

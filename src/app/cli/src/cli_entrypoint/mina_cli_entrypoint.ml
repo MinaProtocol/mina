@@ -976,39 +976,45 @@ let setup_daemon logger =
             | None, None ->
                 client_trustlist
           in
+          let get_monitor_infos monitor =
+            let rec get_monitors accum monitor =
+              match Async_kernel.Monitor.parent monitor with
+              | None ->
+                  List.rev accum
+              | Some parent ->
+                  get_monitors (parent :: accum) parent
+            in
+            let monitors = get_monitors [ monitor ] monitor in
+            List.map monitors ~f:(fun monitor ->
+                match Async_kernel.Monitor.sexp_of_t monitor with
+                | Sexp.List sexps ->
+                    `List (List.map ~f:Error_json.sexp_record_to_yojson sexps)
+                | Sexp.Atom _ ->
+                    failwith "Expeted a sexp list" )
+          in
           Stream.iter
             (Async_kernel.Async_kernel_scheduler.long_cycles_with_context
                ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest) )
             ~f:(fun (span, context) ->
               let secs = Time_ns.Span.to_sec span in
-              let rec get_monitors accum monitor =
-                match Async_kernel.Monitor.parent monitor with
-                | None ->
-                    List.rev accum
-                | Some parent ->
-                    get_monitors (parent :: accum) parent
-              in
-              let monitors = get_monitors [ context.monitor ] context.monitor in
-              let monitor_infos =
-                List.map monitors ~f:(fun monitor ->
-                    Async_kernel.Monitor.sexp_of_t monitor
-                    |> Error_json.sexp_to_yojson )
-              in
+              let monitor_infos = get_monitor_infos context.monitor in
               [%log debug]
                 ~metadata:
                   [ ("long_async_cycle", `Float secs)
                   ; ("monitors", `List monitor_infos)
                   ]
-                "Long async cycle, $long_async_cycle seconds" ;
+                "Long async cycle, $long_async_cycle seconds, $monitors" ;
               Mina_metrics.(
                 Runtime.Long_async_histogram.observe Runtime.long_async_cycle
                   secs) ) ;
           Stream.iter Async_kernel.Async_kernel_scheduler.long_jobs_with_context
             ~f:(fun (context, span) ->
               let secs = Time_ns.Span.to_sec span in
+              let monitor_infos = get_monitor_infos context.monitor in
               [%log debug]
                 ~metadata:
                   [ ("long_async_job", `Float secs)
+                  ; ("monitors", `List monitor_infos)
                   ; ( "most_recent_2_backtrace"
                     , `String
                         (String.concat ~sep:"␤"
@@ -1683,30 +1689,6 @@ let mina_commands logger =
   ; (Parallel.worker_command_name, Parallel.worker_command)
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
   ]
-
-[%%if integration_tests]
-
-module type Integration_test = sig
-  val name : string
-
-  val command : Async.Command.t
-end
-
-let mina_commands logger =
-  let open Tests in
-  let group =
-    List.map
-      ~f:(fun (module T) -> (T.name, T.command))
-      ( [ (* (module Coda_shared_state_test)
-             ; (module Coda_transitive_peers_test) *)
-          (module Coda_change_snark_worker_test)
-        ]
-        : (module Integration_test) list )
-  in
-  mina_commands logger
-  @ [ ("integration-tests", Command.group ~summary:"Integration tests" group) ]
-
-[%%endif]
 
 let print_version_help coda_exe version =
   (* mimic Jane Street command help *)

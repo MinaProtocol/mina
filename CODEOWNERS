@@ -1,4 +1,4 @@
-/CODEOWNERS @nholland94 @bkase @imeckler
+/CODEOWNERS @nholland94 @bkase @aneesharaines
 /buildkite @MinaProtocol/infra-eng-reviewers
 /frontend/ @MinaProtocol/product-eng-reviewers
 /dockerfiles/ @MinaProtocol/infra-eng-reviewers
@@ -6,13 +6,15 @@
 /Makefile @MinaProtocol/infra-eng-reviewers
 /src/config/dev.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
 /src/config/testnet_postake_medium_curves.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
-/CODE_OF_CONDUCT.md @imeckler @bkase
+/src/config/mainnet.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
+/src/config/devnet.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
+/CODE_OF_CONDUCT.md @aneesharaines
 /CONTRIBUTING.md @MinaProtocol/product-eng-reviewers
-/LICENSE @imeckler
+/LICENSE @aneesharaines
 /README.md @MinaProtocol/product-eng-reviewers
 /README-dev.md @MinaProtocol/protocol-eng-reviewers
 
-/src/external/ @bkase @psteckler @imeckler @mrmr1993
+/src/external/ @bkase @psteckler @aneesharaines @mrmr1993
 
 /src/app/archive @MinaProtocol/protocol-eng-reviewers
 /src/app/cli/src/tests @MinaProtocol/protocol-eng-reviewers

@@ -60,7 +60,7 @@ spec:
           mountPath: /root/.mina-config
         env:
           - name: MINA_PRIVKEY_PASS
-            value: {{ $.Values.mina.privkeyPass | quote }}
+            value: {{ $config.privateKeyPW | quote }}
       {{ if $config.libp2pSecret -}}
       - name: libp2p-perms
         image: {{ $.Values.mina.image | quote }}
@@ -112,10 +112,10 @@ spec:
           - name: CODA_PUBLIC_KEY
             valueFrom:
               secretKeyRef:
-                name: {{ $config.privateKeySecret }}
+                name: {{ $config.keypairName }}
                 key: pub
           - name: MINA_PRIVKEY_PASS
-            value: {{ $.Values.mina.privkeyPass | quote }}
+            value: {{ $config.privateKeyPW | quote }}
           - name: PYTHONUNBUFFERED
             value: "1"
         ports:
@@ -142,14 +142,14 @@ spec:
                 name: echo-service-key
                 key: pub
           - name: ECHO_PASSWORD
-            value: {{ $.Values.mina.privkeyPass | quote }}
+            value: {{ $config.privateKeyPW | quote }}
           - name: FAUCET_PUBLICKEY
             valueFrom:
               secretKeyRef:
                 name: faucet-service-key
                 key: pub
           - name: FAUCET_PASSWORD
-            value: {{ $.Values.mina.privkeyPass | quote }}
+            value: {{ $config.privateKeyPW | quote }}
           - name: DISCORD_API_KEY
             valueFrom:
               secretKeyRef:
@@ -243,10 +243,10 @@ spec:
         - name: GCLOUD_BLOCK_UPLOAD_BUCKET
           value: "mina_network_block_data"
         - name: MINA_PRIVKEY_PASS
-          value: {{ $.Values.mina.privkeyPass | quote }}
+          value: {{ $config.privateKeyPW | quote }}
         {{- if $config.libp2pSecret }}
         - name: MINA_LIBP2P_PASS
-          value: {{ $.Values.mina.privkeyPass | quote }}
+          value: {{ $config.privateKeyPW | quote }}
         {{- end }}
         - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
@@ -288,7 +288,7 @@ spec:
       volumes:
       - name: private-keys
         secret:
-          secretName: {{ $config.privateKeySecret }}
+          secretName: {{ $config.keypairName }}
           defaultMode: 256
           items:
           - key: key

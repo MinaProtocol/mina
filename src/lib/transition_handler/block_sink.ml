@@ -64,8 +64,11 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
             in
             Mina_metrics.Block_latency.(
               Validation_acceptance_time.update processing_time_span)
-        | _ ->
-            () ) ;
+        | Some _ ->
+            ()
+        | None ->
+            [%log error] "Validation timed out on $block"
+              ~metadata:[ ("block", Mina_block.to_yojson state) ] ) ;
       Perf_histograms.add_span ~name:"external_transition_latency"
         (Core.Time.abs_diff
            Block_time.(now time_controller |> to_time)

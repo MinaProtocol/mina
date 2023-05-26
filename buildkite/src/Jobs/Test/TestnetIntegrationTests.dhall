@@ -18,7 +18,9 @@ in Pipeline.build Pipeline.Config::{
         S.strictlyStart (S.contains "src"),
         S.strictlyStart (S.contains "dockerfiles"),
         S.strictlyStart (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest"),
-        S.strictlyStart (S.contains "buildkite/src/Jobs/Command/TestExecutive")
+        S.strictlyStart (S.contains "buildkite/src/Jobs/Command/TestExecutive"),
+        S.strictlyStart (S.contains "automation/terraform/modules/o1-integration"),
+        S.strictlyStart (S.contains "automation/terraform/modules/kubernetes/testnet")
     ],
     path = "Test",
     name = "TestnetIntegrationTests"
@@ -30,7 +32,7 @@ in Pipeline.build Pipeline.Config::{
     TestExecutive.execute "payment" dependsOn,
     TestExecutive.execute "delegation" dependsOn,
     TestExecutive.execute "gossip-consis" dependsOn,
-    TestExecutive.execute "opt-block-prod" dependsOn,
+    TestExecutive.execute "block-prod-prio" dependsOn,
     TestExecutive.execute "medium-bootstrap" dependsOn,
     TestExecutive.execute "archive-node" dependsOn
 

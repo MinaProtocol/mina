@@ -59,7 +59,7 @@ let tests : test list =
   ; ("archive-node", (module Archive_node_test.Make : Intf.Test.Functor_intf))
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
   ; ("medium-bootstrap", (module Medium_bootstrap.Make : Intf.Test.Functor_intf))
-  ; ( "opt-block-prod"
+  ; ( "block-prod-prio"
     , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
   ]
 
@@ -360,8 +360,12 @@ let main inputs =
           [%log info] "%s started" (Engine.Network.Node.id node) ;
           Malleable_error.return res
         in
-        let seed_nodes = network |> Engine.Network.seeds in
-        let non_seed_pods = network |> Engine.Network.all_non_seed_pods in
+        let seed_nodes =
+          network |> Engine.Network.seeds |> Core.String.Map.data
+        in
+        let non_seed_pods =
+          network |> Engine.Network.all_non_seed_pods |> Core.String.Map.data
+        in
         (* TODO: parallelize (requires accumlative hard errors) *)
         let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
         let%bind () =

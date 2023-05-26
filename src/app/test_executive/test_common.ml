@@ -8,6 +8,17 @@ open Mina_base
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
 
+  (* Call [f] [n] times in sequence *)
+  let repeat_seq ~n ~f =
+    let open Malleable_error.Let_syntax in
+    let rec go n =
+      if n = 0 then return ()
+      else
+        let%bind () = f () in
+        go (n - 1)
+    in
+    go n
+
   let send_payments ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee ~node
       n =
     let open Malleable_error.Let_syntax in
@@ -15,13 +26,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       if n = 0 then return hashlist
       else
         let%bind hash =
-          let%map { hash; _ } =
+          let%map { hash; nonce; _ } =
             Engine.Network.Node.must_send_payment ~logger ~sender_pub_key
               ~receiver_pub_key ~amount ~fee node
           in
-          [%log info] "gossip_consistency test: payment #%d sent with hash %s."
+          [%log info]
+            "sending multiple payments: payment #%d sent with hash of %s and \
+             nonce of %d."
             n
-            (Transaction_hash.to_base58_check hash) ;
+            (Transaction_hash.to_base58_check hash)
+            (Unsigned.UInt32.to_int nonce) ;
           hash
         in
         go (n - 1) (List.append hashlist [ hash ])
@@ -42,7 +56,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  ~txn_hash:hash ~node_included_in:`Any_node )
           in
           [%log info]
-            "gossip_consistency test: payment #%d with hash %s successfully \
+            "wait for multiple payments: payment #%d with hash %s successfully \
              included in frontier."
             n
             (Transaction_hash.to_base58_check hash) ;

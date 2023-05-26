@@ -271,7 +271,7 @@ module Transaction_pool = struct
   let create verifier : t =
     let logger = Logger.create () in
     create ~compare_init:compare_envelope ~logger (fun (ds : input list) ->
-        [%log info]
+        [%log debug]
           "Dispatching $num_proofs transaction pool proofs to verifier"
           ~metadata:[ ("num_proofs", `Int (List.length ds)) ] ;
         let open Deferred.Or_error.Let_syntax in
@@ -367,7 +367,7 @@ module Snark_pool = struct
            (Sys.getenv_opt "MAX_VERIFIER_BATCH_SIZE") )
       ~compare_init:compare_envelope ~logger
       (fun ps0 ->
-        [%log info] "Dispatching $num_proofs snark pool proofs to verifier"
+        [%log debug] "Dispatching $num_proofs snark pool proofs to verifier"
           ~metadata:[ ("num_proofs", `Int (List.length ps0)) ] ;
         let ps =
           List.concat_map ps0 ~f:(function

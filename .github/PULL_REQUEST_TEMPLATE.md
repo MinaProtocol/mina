@@ -7,6 +7,8 @@ Explain how you tested your changes here.
 
 Checklist:
 
+- [ ] Dependency versions are unchanged
+  - Notify Velocity team if dependencies must change in CI
 - [ ] Document code purpose, how to use it
   - Mention expected invariants, implicit constraints
 - [ ] Tests were added for the new behavior
@@ -16,5 +18,4 @@ Checklist:
 - [ ] Serialized types are in stable-versioned modules
 - [ ] Does this close issues? List them:
 
-Closes #0000
 Closes #0000

@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ tpl .Values.seed.fullname . }}
+  name: "seed-service"
 spec:
   type: ClusterIP
   # We want all pods to have their addresses published for the sake of the
@@ -10,9 +10,9 @@ spec:
   # have to be able to talk to each other in order to become ready.
   publishNotReadyAddresses: true
   selector:
-    app: {{ tpl .Values.seed.fullname . }}
+    app: "seed-service"
   ports:
   - name: tcp-p2p
-    port: {{ .Values.mina.ports.p2p }}
+    port: {{ $.Values.mina.ports.p2p }}
     targetPort: external-port
 ---
