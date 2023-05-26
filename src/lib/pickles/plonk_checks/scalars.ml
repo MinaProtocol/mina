@@ -89,7 +89,7 @@ module Env = struct
     ; endo_coefficient : 'a
     ; mds : int * int -> 'a
     ; srs_length_log2 : int
-    ; vanishes_on_last_4_rows : 'a
+    ; vanishes_on_zero_knowledge_and_previous_rows : 'a
     ; joint_combiner : 'a
     ; beta : 'a
     ; gamma : 'a
@@ -123,7 +123,7 @@ module Tick : S = struct
        ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows
+       ; vanishes_on_zero_knowledge_and_previous_rows
        ; joint_combiner = _
        ; beta
        ; gamma
@@ -316,7 +316,7 @@ module Tick : S = struct
         ( LookupTables
         , (fun () ->
             alpha_pow 24
-            * ( vanishes_on_last_4_rows
+            * ( vanishes_on_zero_knowledge_and_previous_rows
               * ( cell (var (LookupAggreg, Next))
                   * ( if_feature
                         ( LookupsPerRow 0
@@ -628,7 +628,7 @@ module Tick : S = struct
        ; mds = _
        ; endo_coefficient
        ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows
+       ; vanishes_on_zero_knowledge_and_previous_rows
        ; joint_combiner
        ; beta
        ; gamma
@@ -643,7 +643,7 @@ module Tick : S = struct
                ( LookupTables
                , (fun () ->
                    alpha_pow 24
-                   * ( vanishes_on_last_4_rows
+                   * ( vanishes_on_zero_knowledge_and_previous_rows
                      * ( field
                            "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                        * ( cell (var (LookupAggreg, Curr))
@@ -802,7 +802,7 @@ module Tick : S = struct
                ( LookupTables
                , (fun () ->
                    alpha_pow 24
-                   * ( vanishes_on_last_4_rows
+                   * ( vanishes_on_zero_knowledge_and_previous_rows
                      * ( field
                            "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                        * ( cell (var (LookupAggreg, Curr))
@@ -1004,7 +1004,7 @@ module Tick : S = struct
                ( LookupTables
                , (fun () ->
                    alpha_pow 24
-                   * ( vanishes_on_last_4_rows
+                   * ( vanishes_on_zero_knowledge_and_previous_rows
                      * ( field
                            "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                        * ( cell (var (LookupAggreg, Curr))
@@ -1207,7 +1207,7 @@ module Tick : S = struct
                ( LookupTables
                , (fun () ->
                    alpha_pow 24
-                   * ( vanishes_on_last_4_rows
+                   * ( vanishes_on_zero_knowledge_and_previous_rows
                      * ( field
                            "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                        * ( cell (var (LookupAggreg, Curr))
@@ -3943,7 +3943,7 @@ module Tock : S = struct
        ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
        ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows
+       ; vanishes_on_zero_knowledge_and_previous_rows
        ; joint_combiner = _
        ; beta
        ; gamma
@@ -4136,7 +4136,7 @@ module Tock : S = struct
         ( LookupTables
         , (fun () ->
             alpha_pow 24
-            * ( vanishes_on_last_4_rows
+            * ( vanishes_on_zero_knowledge_and_previous_rows
               * ( cell (var (LookupAggreg, Next))
                   * ( if_feature
                         ( LookupsPerRow 0
@@ -4448,7 +4448,7 @@ module Tock : S = struct
        ; mds = _
        ; endo_coefficient
        ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows
+       ; vanishes_on_zero_knowledge_and_previous_rows
        ; joint_combiner
        ; beta
        ; gamma
@@ -4463,7 +4463,7 @@ module Tock : S = struct
                ( LookupTables
                , (fun () ->
                    alpha_pow 24
-                   * ( vanishes_on_last_4_rows
+                   * ( vanishes_on_zero_knowledge_and_previous_rows
                      * ( field
                            "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                        * ( cell (var (LookupAggreg, Curr))
@@ -4622,7 +4622,7 @@ module Tock : S = struct
                ( LookupTables
                , (fun () ->
                    alpha_pow 24
-                   * ( vanishes_on_last_4_rows
+                   * ( vanishes_on_zero_knowledge_and_previous_rows
                      * ( field
                            "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                        * ( cell (var (LookupAggreg, Curr))
@@ -4824,7 +4824,7 @@ module Tock : S = struct
                ( LookupTables
                , (fun () ->
                    alpha_pow 24
-                   * ( vanishes_on_last_4_rows
+                   * ( vanishes_on_zero_knowledge_and_previous_rows
                      * ( field
                            "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                        * ( cell (var (LookupAggreg, Curr))
@@ -5027,7 +5027,7 @@ module Tock : S = struct
                ( LookupTables
                , (fun () ->
                    alpha_pow 24
-                   * ( vanishes_on_last_4_rows
+                   * ( vanishes_on_zero_knowledge_and_previous_rows
                      * ( field
                            "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                        * ( cell (var (LookupAggreg, Curr))
