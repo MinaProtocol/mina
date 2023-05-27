@@ -258,7 +258,7 @@ let kanikoBuild
               , name = "gcr.io/kaniko-project/executor:latest"
               , args = Some
                   (   [ "--dockerfile=Dockerfile"
-                      , "--context=dir://${context}"
+                      , "--context-sub-path=${context}"
                       , "--destination=${image}"
                       , "--skip-unused-stages"
                       , "--use-new-run"
@@ -272,6 +272,7 @@ let kanikoBuild
                       , "--cache-run-layers=true"
                       , "--cache-repo=gcr.io/o1labs-192920/cache"
                       , "--cache-ttl=336h"
+                      , "--compressed-caching=false"
                       ]
                     # mkArgs image desc serviceDesc
                   )
