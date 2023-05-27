@@ -150,8 +150,7 @@ val revalidate :
      t
   -> logger:Logger.t
   -> [ `Entire_pool | `Subset of Account_id.Set.t ]
-  -> (Account_id.t -> Account_nonce.t * Currency.Amount.t)
-     (** Lookup an account in the new ledger *)
+  -> (Account_id.t -> Account.t) (** Lookup an account in the new ledger *)
   -> t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
 
 (** Get the global slot since genesis according to the pool's time controller. *)
