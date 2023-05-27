@@ -218,6 +218,18 @@ spawn-archive-node() {
   exec-archive-node $@ &>${FOLDER}/log.txt &
 }
 
+# Resets genesis ledger
+reset-genesis-ledger() {
+  GENESIS_LEDGER_FOLDER=${1}
+  DAEMON_CONFIG=${2}
+  echo 'Resetting Genesis Ledger...'
+  printf "\n"
+
+  jq "{genesis: {genesis_state_timestamp:\"$(date +"%Y-%m-%dT%H:%M:%S%z")\"}, ledger:.}" \
+    <${GENESIS_LEDGER_FOLDER}/genesis_ledger.json \
+    >${DAEMON_CONFIG}
+}
+
 # ================================================
 # Parse inputs from arguments
 
@@ -492,17 +504,24 @@ fi
 SNARK_COORDINATOR_PUBKEY=$(cat ${LEDGER_FOLDER}/snark_coordinator_keys/snark_coordinator_account.pub)
 
 # ================================================
-# Update the Genesis State Timestamp
+# Update the Genesis State Timestamp or Reset the Genesis Ledger
 
 CONFIG=${LEDGER_FOLDER}/daemon.json
 
-if ${RESET} || ${UPDATE_GENESIS_TIMESTAMP}; then
-  echo 'Updating Genesis State timestamp...'
-  printf "\n"
+if ${RESET}; then
+  reset-genesis-ledger ${LEDGER_FOLDER} ${CONFIG}
+fi
 
-  jq "{genesis: {genesis_state_timestamp:\"$(date +"%Y-%m-%dT%H:%M:%S%z")\"}, ledger:.}" \
-    <${LEDGER_FOLDER}/genesis_ledger.json \
-    >${CONFIG}
+if ${UPDATE_GENESIS_TIMESTAMP}; then
+  if test -f "${CONFIG}"; then
+    echo 'Updating Genesis State timestamp...'
+    printf "\n"
+
+    tmp=$(mktemp)
+    jq ".genesis.genesis_state_timestamp=\"$(date +"%Y-%m-%dT%H:%M:%S%z")\"" ${CONFIG} >"$tmp" && mv -f "$tmp" ${CONFIG}
+  else
+    reset-genesis-ledger ${LEDGER_FOLDER} ${CONFIG}
+  fi
 fi
 
 # ================================================
