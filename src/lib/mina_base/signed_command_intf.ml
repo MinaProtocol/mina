@@ -102,10 +102,6 @@ module type S = sig
 
   val token : t -> Token_id.t
 
-  val source_pk : t -> Public_key.Compressed.t
-
-  val source : t -> Account_id.t
-
   val receiver_pk : t -> Public_key.Compressed.t
 
   val receiver : t -> Account_id.t
@@ -234,7 +230,7 @@ module type Full = sig
 
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
+    [@@@with_top_version_tag]
 
     module V2 : sig
       type t =
