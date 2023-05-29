@@ -446,11 +446,11 @@ end
 open Snark_params
 
 module Message = struct
-  let network_id_mainnet = Char.of_int_exn 1
+  let network_id_mainnet = String.of_char @@ Char.of_int_exn 1
 
-  let network_id_testnet = Char.of_int_exn 0
+  let network_id_testnet = String.of_char @@ Char.of_int_exn 0
 
-  let network_id_other = Char.of_int_exn 2
+  let network_id_other chain_name = chain_name
 
   let network_id =
     match Mina_signature_kind.t with
@@ -458,8 +458,8 @@ module Message = struct
         network_id_mainnet
     | Testnet ->
         network_id_testnet
-    | Other_network _ ->
-        network_id_other
+    | Other_network chain_name ->
+        network_id_other chain_name
 
   module Legacy = struct
     open Tick
@@ -473,8 +473,7 @@ module Message = struct
           { field_elements = [| x; y |]
           ; bitstrings =
               [| Tock.Field.unpack private_key
-               ; Fold_lib.Fold.(
-                   to_list (string_bits (String.of_char network_id)))
+               ; Fold_lib.Fold.(to_list (string_bits network_id))
               |]
           }
       in
@@ -492,8 +491,8 @@ module Message = struct
               network_id_mainnet
           | Testnet ->
               network_id_testnet
-          | Other_network _ ->
-              network_id_other )
+          | Other_network chain_name ->
+              network_id_other chain_name )
 
     let derive_for_mainnet = make_derive ~network_id:network_id_mainnet
 
@@ -548,9 +547,7 @@ module Message = struct
     let make_derive ~network_id t ~private_key ~public_key =
       let input =
         let x, y = Tick.Inner_curve.to_affine_exn public_key in
-        let id =
-          Fold_lib.Fold.(to_list (string_bits (String.of_char network_id)))
-        in
+        let id = Fold_lib.Fold.(to_list (string_bits network_id)) in
         Random_oracle.Input.Chunked.append t
           { field_elements =
               [| x; y; Field.project (Tock.Field.unpack private_key) |]
@@ -572,8 +569,8 @@ module Message = struct
               network_id_mainnet
           | Testnet ->
               network_id_testnet
-          | Other_network _ ->
-              network_id_other )
+          | Other_network chain_name ->
+              network_id_other chain_name )
 
     let derive_for_mainnet = make_derive ~network_id:network_id_mainnet
 
