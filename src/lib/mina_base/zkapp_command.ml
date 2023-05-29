@@ -2046,6 +2046,14 @@ let has_zero_vesting_period t =
       | Set { vesting_period; _ } ->
           Mina_numbers.Global_slot.(equal zero) vesting_period )
 
+let update_vk_is_proof_or_impossible t =
+  Call_forest.exists t.account_updates ~f:(fun p ->
+      match p.body.update.permissions with
+      | Keep ->
+          false
+      | Set { set_verification_key; _ } ->
+          Permissions.Auth_required.is_proof_or_impossible set_verification_key )
+
 let get_transaction_commitments (zkapp_command : t) =
   let memo_hash = Signed_command_memo.hash zkapp_command.memo in
   let fee_payer_hash =

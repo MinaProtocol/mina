@@ -385,12 +385,19 @@ let has_zero_vesting_period = function
   | Zkapp_command p ->
       Zkapp_command.has_zero_vesting_period p
 
+let update_vk_is_proof_or_impossible = function
+  | Signed_command _ ->
+      false
+  | Zkapp_command p ->
+      Zkapp_command.update_vk_is_proof_or_impossible p
+
 module Well_formedness_error = struct
   (* syntactically-evident errors such that a user command can never succeed *)
   type t =
     | Insufficient_fee
     | Zero_vesting_period
     | Zkapp_too_big of (Error.t[@to_yojson Error_json.error_to_yojson])
+    | Permission_for_update_vk_can_not_be_proof_or_impossible
   [@@deriving compare, to_yojson]
 
   let to_string = function
@@ -400,6 +407,9 @@ module Well_formedness_error = struct
         "Zero vesting period"
     | Zkapp_too_big err ->
         sprintf "Zkapp too big (%s)" (Error.to_string_hum err)
+    | Permission_for_update_vk_can_not_be_proof_or_impossible ->
+        "The permission to set verification key cannot be proof-only or \
+         impossible. It can be Signature, Either, or None"
 end
 
 let check_well_formedness ~genesis_constants t :
@@ -408,6 +418,8 @@ let check_well_formedness ~genesis_constants t :
     let open Well_formedness_error in
     [ (has_insufficient_fee, Insufficient_fee)
     ; (has_zero_vesting_period, Zero_vesting_period)
+    ; ( update_vk_is_proof_or_impossible
+      , Permission_for_update_vk_can_not_be_proof_or_impossible )
     ]
   in
   let errs0 =
