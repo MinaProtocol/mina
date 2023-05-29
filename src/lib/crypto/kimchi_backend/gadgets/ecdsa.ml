@@ -4,9 +4,11 @@ module Snark_intf = Snarky_backendless.Snark_intf
 
 let group_tests_enabled = false
 
-let scalar_mul_tests_enabled = true
+let group_scalar_mul_tests = true
 
 let two_to_4limb = Bignum_bigint.(Common.two_to_3limb * Common.two_to_limb)
+
+type bignum_point = Bignum_bigint.t * Bignum_bigint.t
 
 (* Affine representation of an elliptic curve point over a foreign field *)
 module Affine : sig
@@ -20,9 +22,7 @@ module Affine : sig
 
   (* Create foreign field affine point from coordinate pair of Bignum_bigint.t (x, y) *)
   val of_bignum_bigint_coordinates :
-       (module Snark_intf.Run with type field = 'field)
-    -> Bignum_bigint.t * Bignum_bigint.t
-    -> 'field t
+    (module Snark_intf.Run with type field = 'field) -> bignum_point -> 'field t
 
   (* Create foreign field affine point from hex *)
   val of_hex :
@@ -82,7 +82,7 @@ end = struct
 
   let of_bignum_bigint_coordinates (type field)
       (module Circuit : Snark_intf.Run with type field = field)
-      (point : Bignum_bigint.t * Bignum_bigint.t) : field t =
+      (point : bignum_point) : field t =
     let x, y = point in
     of_coordinates
       ( Foreign_field.Element.Standard.of_bignum_bigint (module Circuit) x
@@ -176,8 +176,6 @@ let tuple9_of_array array =
   | _ ->
       assert false
 
-type bignum_point = Bignum_bigint.t * Bignum_bigint.t
-
 (* Helper to check if point is on elliptic curve curve: y^2 = x^3 + a * x + b *)
 let is_on_curve (point : bignum_point)
     (a : Bignum_bigint.t) (* curve parameter a *)
@@ -192,8 +190,12 @@ let is_on_curve (point : bignum_point)
       % foreign_field_modulus)
 
 let secp256k1_modulus =
-  Common.bignum_bigint_of_hex
-    "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
+  Bignum_bigint.of_string
+    "115792089237316195423570985008687907853269984665640564039457584007908834671663"
+
+let secp256k1_order =
+  Bignum_bigint.of_string
+    "115792089237316195423570985008687907852837564279074904382605163141518161494337"
 
 let secp256k1_generator =
   ( Bignum_bigint.of_string
@@ -206,8 +208,20 @@ let secp256k1_a = Bignum_bigint.of_int 0
 
 let secp256k1_b = Bignum_bigint.of_int 7
 
+let secp256k1_ia =
+  ( ( Bignum_bigint.of_string
+        "73748207725492941843355928046090697797026070566443284126849221438943867210749"
+    , Bignum_bigint.of_string
+        "71805440039692371678177852429904809925653495989672587996663750265844216498843"
+    )
+  , ( Bignum_bigint.of_string
+        "73748207725492941843355928046090697797026070566443284126849221438943867210749"
+    , Bignum_bigint.of_string
+        "43986649197623823745393132578783097927616488675967976042793833742064618172820"
+    ) )
+
 (* Helper to check if point is on secp256k1 curve: y^2 = x^3 + 7 *)
-let secp256k1_is_on_curve (point : Bignum_bigint.t * Bignum_bigint.t) : bool =
+let secp256k1_is_on_curve (point : bignum_point) : bool =
   is_on_curve point secp256k1_a secp256k1_b secp256k1_modulus
 
 (* Gadget for (partial) elliptic curve group addition over foreign field
@@ -342,15 +356,6 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
             let x_diff_s = slope * x_diff % foreign_field_modulus in
             (x_diff_s - right_y) % foreign_field_modulus)
         in
-
-        (* printf "slope = %s\n" @@ Bignum_bigint.to_string slope ;
-           printf "slope^2 = %s\n" @@ Bignum_bigint.to_string slope_squared ;
-           printf "x = %s\n" @@ Bignum_bigint.to_string result_x ;
-           printf "y = %s\n" @@ Bignum_bigint.to_string result_y ;
-           printf "Lx = %s\n" @@ Bignum_bigint.to_string left_x ;
-           printf "Rx = %s\n" @@ Bignum_bigint.to_string right_x ;
-           printf "Ly = %s\n" @@ Bignum_bigint.to_string left_y ;
-           printf "Ry = %s\n" @@ Bignum_bigint.to_string right_y ; *)
 
         (* Convert from Bignums to field elements *)
         let slope0, slope1, slope2 =
@@ -899,13 +904,36 @@ let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
   (* Return result point *)
   Affine.of_coordinates (result_x, result_y)
 
+(* Gadget for elliptic curve group negation *)
+let group_negate (type f) (module Circuit : Snark_intf.Run with type field = f)
+    (point : f Affine.t) (foreign_field_modulus : f Foreign_field.standard_limbs)
+    : f Affine.t =
+  let x, y = Affine.to_coordinates point in
+  (* Zero constant foreign field elemtn *)
+  let zero =
+    Foreign_field.Element.Standard.of_bignum_bigint
+      (module Circuit)
+      Bignum_bigint.zero
+  in
+  (* C1: Constrain computation of the negated point *)
+  let neg_y =
+    (* neg_y = 0 - y *)
+    Foreign_field.sub (module Circuit) ~full:false zero y foreign_field_modulus
+  in
+
+  (* Bounds 1: Left input is public constant
+   *           Right input parameter (checked externally)
+   *           Result bound is part of output checked externally
+   *)
+  Affine.of_coordinates (x, neg_y)
+
 (* Select initial EC scalar mul accumulator value ia using trustworthy nothing-up-my-sleeve deterministic algorithm
  *
  *   Simple hash-to-curve algorithm
  *
  *   Trustlessly select an elliptic curve point for which noone knows the discrete logarithm!
  *)
-let ec_get_ai_point (a : Bignum_bigint.t) (* curve parameter a *)
+let group_get_ia_point (a : Bignum_bigint.t) (* curve parameter a *)
     (b : Bignum_bigint.t) (* curve parameter b *)
     (gen : bignum_point) (* Elliptic curve generator point *)
     (foreign_field_modulus : Bignum_bigint.t) : bignum_point * bignum_point =
@@ -915,8 +943,8 @@ let ec_get_ai_point (a : Bignum_bigint.t) (* curve parameter a *)
 
   assert (is_on_curve gen a b foreign_field_modulus) ;
 
-  (* Hash to point function *)
-  let hash_to_point ctx (point : bignum_point ref) =
+  (* Hash to (possible) elliptic curve point function *)
+  let hash_to_curve_point ctx (point : bignum_point ref) =
     (* Hash curve point *)
     let x, y = !point in
     let ctx = feed_string ctx @@ Common.bignum_bigint_unpack_bytes x in
@@ -940,9 +968,9 @@ let ec_get_ai_point (a : Bignum_bigint.t) (* curve parameter a *)
   in
 
   (* Deterministically search for valid curve point *)
-  let candidate_point = ref (hash_to_point ctx (ref gen)) in
+  let candidate_point = ref (hash_to_curve_point ctx (ref gen)) in
   while not (is_on_curve !candidate_point a b foreign_field_modulus) do
-    candidate_point := hash_to_point ctx candidate_point
+    candidate_point := hash_to_curve_point ctx candidate_point
   done ;
 
   (* We have a valid curve point! *)
@@ -957,7 +985,195 @@ let ec_get_ai_point (a : Bignum_bigint.t) (* curve parameter a *)
 
   (point, neg_point)
 
-(* Gadget for elliptic curve scalar multiplication over foreign field
+(* Gadget to constrain a point in on the elliptic curve specified by
+ *   y^2 = x^3 + ax + b
+ * where a, b are the curve parameters and foreign_field_modulus is
+ * the base field modulus
+ *)
+let group_is_on_curve (type f)
+    (module Circuit : Snark_intf.Run with type field = f)
+    (external_checks : f Foreign_field.External_checks.t) (point : f Affine.t)
+    ?(a =
+      ( Circuit.Field.Constant.zero
+      , Circuit.Field.Constant.zero
+      , Circuit.Field.Constant.zero ))
+    ?(b =
+      ( Circuit.Field.Constant.zero
+      , Circuit.Field.Constant.zero
+      , Circuit.Field.Constant.zero ))
+    (foreign_field_modulus : f Foreign_field.standard_limbs) =
+  let open Circuit in
+  let x, y = Affine.to_coordinates point in
+
+  (* C1: x^2 = x * x *)
+  let x_squared =
+    Foreign_field.mul (module Circuit) external_checks x x foreign_field_modulus
+  in
+
+  (* Bounds 1: Left and right inputs are gadget input so checked externally
+   *           Result bound check already tracked by external_checks
+   *)
+
+  (* C2: Optionally constrain addition of curve parameter a *)
+  let x_squared_a =
+    if not (Foreign_field.field_standard_limbs_is_zero (module Circuit) a) then (
+      (* x^2 + a *)
+      let a =
+        let a0, a1, a2 =
+          exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
+              let a0, a1, a2 = a in
+              [| a0; a1; a2 |] )
+          |> Common.tuple3_of_array
+        in
+        Foreign_field.Element.Standard.of_limbs (a0, a1, a2)
+      in
+      let x_squared_a =
+        Foreign_field.add
+          (module Circuit)
+          ~full:false x_squared a foreign_field_modulus
+      in
+      (* Bounds 2: Left input already checked by (Bounds 1)
+       *           Right input public parameter (no check necessary)
+       *           Result bound check below
+       *)
+      (* Add x_squared_a bound check *)
+      Foreign_field.External_checks.append_bound_check external_checks
+      @@ Foreign_field.Element.Standard.to_limbs x_squared_a ;
+      x_squared_a )
+    else x_squared
+  in
+
+  (* C3: x^3 + ax = (x^2 + a) * x *)
+  let x_cubed_ax =
+    Foreign_field.mul
+      (module Circuit)
+      external_checks x_squared_a x foreign_field_modulus
+  in
+
+  (* Bounds 3: Left input already checked by (Bounds 2) or (Bounds 1)
+   *           Right input is gadget input so checked externally
+   *           Result bound check already tracked by external_checks
+   *)
+
+  (* C4: Optionally constrain addition of curve parameter b *)
+  let x_cubed_ax_b =
+    if not (Foreign_field.field_standard_limbs_is_zero (module Circuit) b) then (
+      (* (x^2 + a) * x + b *)
+      let b =
+        let b0, b1, b2 =
+          exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
+              let b0, b1, b2 = b in
+              [| b0; b1; b2 |] )
+          |> Common.tuple3_of_array
+        in
+        Foreign_field.Element.Standard.of_limbs (b0, b1, b2)
+      in
+      let x_cubed_ax_b =
+        Foreign_field.add
+          (module Circuit)
+          ~full:false x_cubed_ax b foreign_field_modulus
+      in
+
+      (* Bounds 4: Left input already checked by (Bounds 3)
+       *           Right input public parameter (no check necessary)
+       *           Result bound check below
+       *)
+
+      (* Add x_cubed_ax_b bound check *)
+      Foreign_field.External_checks.append_bound_check external_checks
+      @@ Foreign_field.Element.Standard.to_limbs x_cubed_ax_b ;
+
+      (* Zero gate with result x_cubed_ax_b *)
+      let x_cubed_ax_b0, x_cubed_ax_b1, x_cubed_ax_b2 =
+        Foreign_field.Element.Standard.to_limbs x_cubed_ax_b
+      in
+      with_label "group_is_on_curve_x_cubed_ax_b" (fun () ->
+          assert_
+            { annotation = Some __LOC__
+            ; basic =
+                Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+                  (Raw
+                     { kind = Zero
+                     ; values =
+                         [| x_cubed_ax_b0; x_cubed_ax_b1; x_cubed_ax_b2 |]
+                     ; coeffs = [||]
+                     } )
+            } ) ;
+
+      x_cubed_ax_b )
+    else x_cubed_ax
+  in
+
+  (* C5: y^2 = y * y *)
+  let y_squared =
+    Foreign_field.mul (module Circuit) external_checks y y foreign_field_modulus
+  in
+
+  (* Bounds 5: Left and right inputs are gadget input so checked externally
+   *           Result bound check already tracked by external_checks
+   *)
+
+  (* Copy y_squared to x_cubed_ax_b *)
+  Foreign_field.Element.Standard.assert_equal
+    (module Circuit)
+    y_squared x_cubed_ax_b ;
+  ()
+
+(* Gadget to constrain that initial accumulator point is on elliptic curve and the computation of its negation *)
+let group_check_ia (type f)
+    (module Circuit : Snark_intf.Run with type field = f)
+    (external_checks : f Foreign_field.External_checks.t)
+    (ai : f Affine.t * f Affine.t)
+    ?(a =
+      ( Circuit.Field.Constant.zero
+      , Circuit.Field.Constant.zero
+      , Circuit.Field.Constant.zero ))
+    ?(b =
+      ( Circuit.Field.Constant.zero
+      , Circuit.Field.Constant.zero
+      , Circuit.Field.Constant.zero ))
+    (foreign_field_modulus : f Foreign_field.standard_limbs) =
+  let open Circuit in
+  let init_acc, expected_neg_init_acc = ai in
+  (* C1: Check that initial accumulator point is on curve *)
+  group_is_on_curve
+    (module Circuit)
+    external_checks init_acc ~a ~b foreign_field_modulus ;
+
+  (* C2: Constrain computation of the negated initial accumulator point *)
+  let neg_init_acc =
+    group_negate (module Circuit) init_acc foreign_field_modulus
+  in
+
+  (* Bounds 1: Input is public constant
+   *           Result is part of input (checked externally)
+   *)
+  let _, neg_init_y = Affine.to_coordinates neg_init_acc in
+
+  (* Zero gate with result neg_init_y *)
+  let neg_init_y0, neg_init_y1, neg_init_y2 =
+    Foreign_field.Element.Standard.to_limbs neg_init_y
+  in
+  with_label "group_check_ia_neg_init_y" (fun () ->
+      assert_
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (Raw
+                 { kind = Zero
+                 ; values = [| neg_init_y0; neg_init_y1; neg_init_y2 |]
+                 ; coeffs = [||]
+                 } )
+        } ) ;
+
+  (* C3: Copy computed_neg_init_acc to neg_init_acc *)
+  Affine.assert_equal (module Circuit) neg_init_acc expected_neg_init_acc ;
+
+  (* P is on curve <=> -P is on curve, thus we do not need to check
+   * neg_init_acc is on curve *)
+  ()
+
+(* Gadget for elliptic curve group scalar multiplication over foreign field
  *
  *   Given input point P and scalar field element s, computes and constrains that
  *     Q = s0 * P + ... + sz * 2^z * P
@@ -980,7 +1196,8 @@ let ec_get_ai_point (a : Bignum_bigint.t) (* curve parameter a *)
  *      ia point is randomly selected and constrained to be on the curve
  *      ia negated point computation is constrained
  *)
-let ec_scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
+let group_scalar_mul (type f)
+    (module Circuit : Snark_intf.Run with type field = f)
     (external_checks : f Foreign_field.External_checks.t)
     (scalar : Circuit.Boolean.var array) (point : f Affine.t)
     (ia : f Affine.t * f Affine.t) ?(doubles : f Affine.t array option)
@@ -1033,7 +1250,7 @@ let ec_scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
    *     negative, which we cannot add to itself.  Therefore, in total there are
    *     2z points that we do not want to select as our initial point nor compute
    *     as an intermediate A point during scaling.  The probability we select or
-   *     compute one of these points is ~ 2z^2/n, where n is the order of the
+   *     compute one of these points is approx 2z^2/n, where n is the order of the
    *     elliptic curve group.
    *
    *     The probability of selecting a bad point is negligible for our applications
@@ -1080,7 +1297,7 @@ let ec_scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
 (* Group tests *)
 (***************)
 
-let%test_unit "ecdsa affine helpers " =
+let%test_unit "affine" =
   if group_tests_enabled then
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
@@ -1131,9 +1348,8 @@ let%test_unit "group_add" =
     in
 
     (* Test group add *)
-    let test_group_add ?cs (left_input : Bignum_bigint.t * Bignum_bigint.t)
-        (right_input : Bignum_bigint.t * Bignum_bigint.t)
-        (expected_result : Bignum_bigint.t * Bignum_bigint.t)
+    let test_group_add ?cs (left_input : bignum_point)
+        (right_input : bignum_point) (expected_result : bignum_point)
         (foreign_field_modulus : Bignum_bigint.t) =
       (* Generate and verify proof *)
       let cs, _proof_keypair, _proof =
@@ -1496,10 +1712,8 @@ let%test_unit "group_add_chained" =
 
     (* Test chained group add *)
     let test_group_add_chained ?cs ?(chain_left = true)
-        (left_input : Bignum_bigint.t * Bignum_bigint.t)
-        (right_input : Bignum_bigint.t * Bignum_bigint.t)
-        (input2 : Bignum_bigint.t * Bignum_bigint.t)
-        (expected_result : Bignum_bigint.t * Bignum_bigint.t)
+        (left_input : bignum_point) (right_input : bignum_point)
+        (input2 : bignum_point) (expected_result : bignum_point)
         (foreign_field_modulus : Bignum_bigint.t) =
       (* Generate and verify proof *)
       let cs, _proof_keypair, _proof =
@@ -1696,9 +1910,8 @@ let%test_unit "group_add_full" =
     in
 
     (* Test full group add (with bounds cehcks) *)
-    let test_group_add_full ?cs (left_input : Bignum_bigint.t * Bignum_bigint.t)
-        (right_input : Bignum_bigint.t * Bignum_bigint.t)
-        (expected_result : Bignum_bigint.t * Bignum_bigint.t)
+    let test_group_add_full ?cs (left_input : bignum_point)
+        (right_input : bignum_point) (expected_result : bignum_point)
         (foreign_field_modulus : Bignum_bigint.t) =
       (* Generate and verify proof *)
       let cs, _proof_keypair, _proof =
@@ -1856,9 +2069,8 @@ let%test_unit "group_double" =
     in
 
     (* Test group double *)
-    let test_group_double ?cs (point : Bignum_bigint.t * Bignum_bigint.t)
-        (expected_result : Bignum_bigint.t * Bignum_bigint.t)
-        ?(a = Bignum_bigint.zero)
+    let test_group_double ?cs (point : bignum_point)
+        (expected_result : bignum_point) ?(a = Bignum_bigint.zero)
         (* curve parameter a *)
           (foreign_field_modulus : Bignum_bigint.t) =
       (* Generate and verify proof *)
@@ -2159,10 +2371,8 @@ let%test_unit "group_double_chained" =
     in
 
     (* Test group double chaining *)
-    let test_group_double_chained ?cs
-        (point : Bignum_bigint.t * Bignum_bigint.t)
-        (expected_result : Bignum_bigint.t * Bignum_bigint.t)
-        ?(a = Bignum_bigint.zero)
+    let test_group_double_chained ?cs (point : bignum_point)
+        (expected_result : bignum_point) ?(a = Bignum_bigint.zero)
         (* curve parameter a *)
           (foreign_field_modulus : Bignum_bigint.t) =
       (* Generate and verify proof *)
@@ -2278,9 +2488,8 @@ let%test_unit "group_double_full" =
     in
 
     (* Test group double (full circuit with external checks) *)
-    let test_group_double_full ?cs (point : Bignum_bigint.t * Bignum_bigint.t)
-        (expected_result : Bignum_bigint.t * Bignum_bigint.t)
-        ?(a = Bignum_bigint.zero)
+    let test_group_double_full ?cs (point : bignum_point)
+        (expected_result : bignum_point) ?(a = Bignum_bigint.zero)
         (* curve parameter a *)
           (foreign_field_modulus : Bignum_bigint.t) =
       (* Generate and verify proof *)
@@ -2440,10 +2649,8 @@ let%test_unit "group_ops_mixed" =
     in
 
     (* Test mix of group operations (e.g. things are wired correctly *)
-    let test_group_ops_mixed ?cs
-        (left_input : Bignum_bigint.t * Bignum_bigint.t)
-        (right_input : Bignum_bigint.t * Bignum_bigint.t)
-        (expected_result : Bignum_bigint.t * Bignum_bigint.t)
+    let test_group_ops_mixed ?cs (left_input : bignum_point)
+        (right_input : bignum_point) (expected_result : bignum_point)
         ?(a = Bignum_bigint.zero)
         (* curve parameter a *)
           (foreign_field_modulus : Bignum_bigint.t) =
@@ -2582,13 +2789,12 @@ let%test_unit "group_properties" =
     in
 
     (* Test group properties *)
-    let test_group_properties ?cs (point_a : Bignum_bigint.t * Bignum_bigint.t)
-        (point_b : Bignum_bigint.t * Bignum_bigint.t)
-        (point_c : Bignum_bigint.t * Bignum_bigint.t)
-        (expected_commutative_result : Bignum_bigint.t * Bignum_bigint.t)
-        (expected_associative_result : Bignum_bigint.t * Bignum_bigint.t)
-        (expected_distributive_result : Bignum_bigint.t * Bignum_bigint.t)
-        ?(a = Bignum_bigint.zero) (foreign_field_modulus : Bignum_bigint.t) =
+    let test_group_properties ?cs (point_a : bignum_point)
+        (point_b : bignum_point) (point_c : bignum_point)
+        (expected_commutative_result : bignum_point)
+        (expected_associative_result : bignum_point)
+        (expected_distributive_result : bignum_point) ?(a = Bignum_bigint.zero)
+        (foreign_field_modulus : Bignum_bigint.t) =
       (* Generate and verify proof *)
       let cs, _proof_keypair, _proof =
         Runner.generate_and_verify_proof ?cs (fun () ->
@@ -3056,12 +3262,339 @@ let%test_unit "group_properties" =
 
     () )
 
-(********************)
-(* Scalar mul tests *)
-(********************)
+(*******************************)
+(* Scalar multiplication tests *)
+(*******************************)
 
-let%test_unit "scalar_mul" =
-  if scalar_mul_tests_enabled then (
+let%test_unit "group_is_on_curve" =
+  if (* group_scalar_mul_tests *) false then (
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+
+    (* Test group_is_on_curve *)
+    let test_group_is_on_curve ?cs (point : bignum_point)
+        ?(a = Bignum_bigint.zero) ?(b = Bignum_bigint.zero)
+        (foreign_field_modulus : Bignum_bigint.t) =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            (* Prepare test inputs *)
+            let a =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                a
+            in
+            let b =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                b
+            in
+            let foreign_field_modulus =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                foreign_field_modulus
+            in
+            let point =
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) point
+            in
+
+            (* Create external checks context for tracking extra constraints
+               that are required for soundness (unused in this simple test) *)
+            let unused_external_checks =
+              Foreign_field.External_checks.create (module Runner.Impl)
+            in
+
+            (* Check point is on elliptic curve *)
+            group_is_on_curve
+              (module Runner.Impl)
+              unused_external_checks point ~a ~b foreign_field_modulus ;
+
+            (* Check for expected quantity of external checks *)
+            let bounds_checks_count = ref 3 in
+            if
+              not
+                (Foreign_field.field_standard_limbs_is_zero
+                   (module Runner.Impl)
+                   a )
+            then bounds_checks_count := !bounds_checks_count + 1 ;
+            if
+              not
+                (Foreign_field.field_standard_limbs_is_zero
+                   (module Runner.Impl)
+                   b )
+            then bounds_checks_count := !bounds_checks_count + 1 ;
+            assert (
+              Mina_stdlib.List.Length.equal unused_external_checks.bounds
+                !bounds_checks_count ) ;
+            assert (
+              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
+                3 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal
+                unused_external_checks.compact_multi_ranges 3 ) ;
+            () )
+      in
+
+      cs
+    in
+
+    (* Positive tests *)
+    let _cs =
+      test_group_is_on_curve secp256k1_generator ~a:secp256k1_a ~b:secp256k1_b
+        secp256k1_modulus
+    in
+
+    let good_pt =
+      ( Bignum_bigint.of_string
+          "18950551679048287927361677965259288422489066940346827203675447914841748996155"
+      , Bignum_bigint.of_string
+          "47337572658241658062145739798014345835092764795141449413289521900680935648400"
+      )
+    in
+    let _cs =
+      test_group_is_on_curve good_pt ~a:secp256k1_a ~b:secp256k1_b
+        secp256k1_modulus
+    in
+    let neg_good_pt =
+      let x, y = good_pt in
+      (x, Bignum_bigint.((zero - y) % secp256k1_modulus))
+    in
+    let _cs =
+      test_group_is_on_curve neg_good_pt ~a:secp256k1_a ~b:secp256k1_b
+        secp256k1_modulus
+    in
+
+    (* Test with y^2 = x^3 -3 * x + 18958286285566608000408668544493926415504680968679321075787234672564 *)
+    let c0_modulus =
+      Bignum_bigint.of_string
+        "0xffffffffffffffffffffffffffffffff000000000000000000000001"
+    in
+    let c0_a_param =
+      (* -3 *)
+      Bignum_bigint.of_string
+        "0xfffffffffffffffffffffffffffffffefffffffffffffffffffffffe"
+    in
+    let c0_b_param =
+      Bignum_bigint.of_string
+        "18958286285566608000408668544493926415504680968679321075787234672564"
+    in
+
+    let point =
+      ( Bignum_bigint.of_string
+          "20564182195513988720077877094445678909500371329094056390559170498601"
+      , Bignum_bigint.of_string
+          "2677931089606376366731934050370502738338362171950142296573730478996"
+      )
+    in
+    let _cs =
+      test_group_is_on_curve point ~a:c0_a_param ~b:c0_b_param c0_modulus
+    in
+
+    (* Test with elliptic curve y^2 = x^3 + 17 * x mod 7879 *)
+    let c1_a_param = Bignum_bigint.of_int 17 in
+    let c1_b_param = Bignum_bigint.of_int 0 in
+    let c1_modulus = Bignum_bigint.of_int 7879 in
+    let _cs =
+      let point = (Bignum_bigint.of_int 7331, Bignum_bigint.of_int 888) in
+      test_group_is_on_curve point ~a:c1_a_param ~b:c1_b_param c1_modulus
+    in
+
+    (* Negative tests *)
+    assert (
+      Common.is_error (fun () ->
+          let bad_pt =
+            ( Bignum_bigint.of_string
+                "67973637023329354644729732876692436096994797487488454090437075702698953132769"
+            , Bignum_bigint.of_string
+                "208096131279561713744990959402407452508030289249215221172372441421932322041350"
+            )
+          in
+          test_group_is_on_curve bad_pt ~a:secp256k1_a ~b:secp256k1_b
+            secp256k1_modulus ) ) ;
+
+    assert (
+      Common.is_error (fun () ->
+          let bad_pt = (Bignum_bigint.zero, Bignum_bigint.one) in
+          test_group_is_on_curve bad_pt ~a:secp256k1_a ~b:secp256k1_b
+            secp256k1_modulus ) ) ;
+    assert (
+      Common.is_error (fun () ->
+          let bad_pt = (Bignum_bigint.one, Bignum_bigint.one) in
+          test_group_is_on_curve bad_pt ~a:c0_a_param ~b:c0_b_param c0_modulus ) ) ;
+    assert (
+      Common.is_error (fun () ->
+          let bad_pt = (Bignum_bigint.of_int 2, Bignum_bigint.of_int 77) in
+          test_group_is_on_curve bad_pt ~a:c1_a_param ~b:c1_b_param c1_modulus ) ) ;
+
+    () )
+
+let%test_unit "group_check_ia" =
+  if (* group_scalar_mul_tests *) false then (
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+
+    (* Test group_check_ia *)
+    let test_group_check_ia ?cs (ai : bignum_point * bignum_point)
+        ?(a = Bignum_bigint.zero) ?(b = Bignum_bigint.zero)
+        (foreign_field_modulus : Bignum_bigint.t) =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            (* Prepare test inputs *)
+            let a =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                a
+            in
+            let b =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                b
+            in
+            let foreign_field_modulus =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                foreign_field_modulus
+            in
+            let ai =
+              let init_acc, neg_init_acc = ai in
+              ( Affine.of_bignum_bigint_coordinates (module Runner.Impl) init_acc
+              , Affine.of_bignum_bigint_coordinates
+                  (module Runner.Impl)
+                  neg_init_acc )
+            in
+
+            (* Create external checks context for tracking extra constraints
+               that are required for soundness (unused in this simple test) *)
+            let unused_external_checks =
+              Foreign_field.External_checks.create (module Runner.Impl)
+            in
+
+            (* Check initial accumulator values *)
+            group_check_ia
+              (module Runner.Impl)
+              unused_external_checks ai ~a ~b foreign_field_modulus ;
+
+            (* Check for expected quantity of external checks *)
+            let bounds_checks_count = ref 3 in
+            if
+              not
+                (Foreign_field.field_standard_limbs_is_zero
+                   (module Runner.Impl)
+                   a )
+            then bounds_checks_count := !bounds_checks_count + 1 ;
+            if
+              not
+                (Foreign_field.field_standard_limbs_is_zero
+                   (module Runner.Impl)
+                   b )
+            then bounds_checks_count := !bounds_checks_count + 1 ;
+            assert (
+              Mina_stdlib.List.Length.equal unused_external_checks.bounds
+                !bounds_checks_count ) ;
+            assert (
+              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
+                3 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal
+                unused_external_checks.compact_multi_ranges 3 ) ;
+            () )
+      in
+
+      cs
+    in
+
+    (* Positive tests *)
+    let secp_ia =
+      group_get_ia_point secp256k1_a secp256k1_b secp256k1_generator
+        secp256k1_modulus
+    in
+    let init_acc, neg_init_acc = secp_ia in
+    (* Check secp256k1 initial accumulator(ia) point is correctly computed *)
+    assert (
+      Bignum_bigint.(
+        equal (fst init_acc) (fst @@ fst secp256k1_ia)
+        && equal (snd init_acc) (snd @@ fst secp256k1_ia)
+        && equal (fst neg_init_acc) (fst @@ snd secp256k1_ia)
+        && equal (snd neg_init_acc) (snd @@ snd secp256k1_ia)) ) ;
+    (* Check constraining of ia *)
+    let _cs =
+      test_group_check_ia secp_ia ~a:secp256k1_a ~b:secp256k1_b
+        secp256k1_modulus
+    in
+    let some_pt =
+      ( Bignum_bigint.of_string
+          "87932290535379810167112156366296444069940380144846532129360940996760542053602"
+      , Bignum_bigint.of_string
+          "33187319066909761709627516324935765453892876757028686788996843601006577450383"
+      )
+    in
+    (* Check computation and constraining of another ia *)
+    let another_ia =
+      group_get_ia_point secp256k1_a secp256k1_b some_pt secp256k1_modulus
+    in
+    let cs =
+      test_group_check_ia another_ia ~a:secp256k1_a ~b:secp256k1_b
+        secp256k1_modulus
+    in
+    (* Constraint system reuse *)
+    let some_pt2 =
+      ( Bignum_bigint.of_string
+          "33321203307284859285457570648264200146777100201560799373305582914511875834316"
+      , Bignum_bigint.of_string
+          "7129423920069223884043324693587298420542722670070397102650821528843979421489"
+      )
+    in
+    let another_ia2 =
+      group_get_ia_point secp256k1_a secp256k1_b some_pt2 secp256k1_modulus
+    in
+    let _cs =
+      test_group_check_ia ~cs another_ia2 ~a:secp256k1_a ~b:secp256k1_b
+        secp256k1_modulus
+    in
+
+    (* Negative tests *)
+    assert (
+      Common.is_error (fun () ->
+          (* Bad negated ia *)
+          let neg_init_acc = snd secp_ia in
+          let bad_neg =
+            (fst neg_init_acc, Bignum_bigint.(snd neg_init_acc + one))
+          in
+          let bad_ia = (fst secp_ia, bad_neg) in
+          test_group_check_ia bad_ia ~a:secp256k1_a ~b:secp256k1_b
+            secp256k1_modulus ) ) ;
+
+    assert (
+      Common.is_error (fun () ->
+          (* init_acc is not on curve, but negative is good *)
+          let bad_pt =
+            ( Bignum_bigint.of_string
+                "73748207725492941843355928046090697797026070566443284126849221438943867210748"
+            , Bignum_bigint.of_string
+                "71805440039692371678177852429904809925653495989672587996663750265844216498843"
+            )
+          in
+          assert (
+            not (is_on_curve bad_pt secp256k1_a secp256k1_b secp256k1_modulus) ) ;
+          let neg_bad_pt =
+            let x, y = bad_pt in
+            (x, Bignum_bigint.((zero - y) % secp256k1_modulus))
+          in
+          let bad_ia = (bad_pt, neg_bad_pt) in
+          test_group_check_ia bad_ia ~a:secp256k1_a ~b:secp256k1_b
+            secp256k1_modulus ) ) ;
+
+    () )
+
+let%test_unit "group_scalar_mul" =
+  if (* group_scalar_mul_tests *) false then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -3069,9 +3602,10 @@ let%test_unit "scalar_mul" =
     in
 
     (* Test elliptic curve scalar multiplication *)
-    let test_scalar_mul ?cs (scalar : Bignum_bigint.t) (point : bignum_point)
-        (expected_result : bignum_point) (ia : bignum_point * bignum_point)
-        ?(a = Bignum_bigint.zero) (foreign_field_modulus : Bignum_bigint.t) =
+    let test_group_scalar_mul ?cs (scalar : Bignum_bigint.t)
+        (point : bignum_point) (expected_result : bignum_point)
+        (ia : bignum_point * bignum_point) ?(a = Bignum_bigint.zero)
+        (foreign_field_modulus : Bignum_bigint.t) =
       (* Generate and verify proof *)
       let cs, _proof_keypair, _proof =
         Runner.generate_and_verify_proof ?cs (fun () ->
@@ -3119,17 +3653,11 @@ let%test_unit "scalar_mul" =
 
             (* Q = sP *)
             let result =
-              ec_scalar_mul
+              group_scalar_mul
                 (module Runner.Impl)
                 unused_external_checks scalar_bits point ia ~a
                 foreign_field_modulus
             in
-
-            (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
-            let fake =
-              exists Field.typ ~compute:(fun () -> Field.Constant.zero)
-            in
-            Boolean.Assert.is_true (Field.equal fake Field.zero) ;
 
             (* Check for expected quantity of external checks *)
 
@@ -3153,7 +3681,9 @@ let%test_unit "scalar_mul" =
           "108096131279561713744990959402407452508030289249215221172372441421932322041359"
       )
     in
-    let ia = ec_get_ai_point secp256k1_a secp256k1_b pointX secp256k1_modulus in
+    let ia =
+      group_get_ia_point secp256k1_a secp256k1_b pointX secp256k1_modulus
+    in
     assert (
       Bignum_bigint.(
         equal
@@ -3181,7 +3711,7 @@ let%test_unit "scalar_mul" =
 
     (* Get EC scalar mul initial accumulator point *)
     let ia =
-      ec_get_ai_point secp256k1_a secp256k1_b secp256k1_generator
+      group_get_ia_point secp256k1_a secp256k1_b secp256k1_generator
         secp256k1_modulus
     in
     assert (
@@ -3222,7 +3752,7 @@ let%test_unit "scalar_mul" =
           "108096131279561713744990959402407452508030289249215221172372441421932322041359"
       )
     in
-    let _cs = test_scalar_mul scalar point point ia secp256k1_modulus in
+    let _cs = test_group_scalar_mul scalar point point ia secp256k1_modulus in
 
     (* Multiply by 6 *)
     let scalar = Bignum_bigint.of_int 6 in
@@ -3241,7 +3771,7 @@ let%test_unit "scalar_mul" =
       )
     in
     let _cs =
-      test_scalar_mul scalar point expected_result ia secp256k1_modulus
+      test_group_scalar_mul scalar point expected_result ia secp256k1_modulus
     in
 
     (* Multiply by 391 (9-bits) *)
@@ -3261,7 +3791,7 @@ let%test_unit "scalar_mul" =
       )
     in
     let _cs =
-      test_scalar_mul scalar point expected_result ia secp256k1_modulus
+      test_group_scalar_mul scalar point expected_result ia secp256k1_modulus
     in
 
     (* Multiply by 56081 (16-bits) = 0b1000 1000 1101 1011 *)
@@ -3281,7 +3811,7 @@ let%test_unit "scalar_mul" =
       )
     in
     let _cs =
-      test_scalar_mul scalar point expected_result ia secp256k1_modulus
+      test_group_scalar_mul scalar point expected_result ia secp256k1_modulus
     in
 
     (* Multiply by full-size secp256k1 scalar (256-bits) *)
@@ -3304,7 +3834,7 @@ let%test_unit "scalar_mul" =
       )
     in
     let _cs =
-      test_scalar_mul scalar point expected_result ia secp256k1_modulus
+      test_group_scalar_mul scalar point expected_result ia secp256k1_modulus
     in
 
     (* Multiply by another full-size secp256k1 scalar (256-bits) *)
@@ -3327,7 +3857,7 @@ let%test_unit "scalar_mul" =
       )
     in
     let _cs =
-      test_scalar_mul scalar point expected_result ia secp256k1_modulus
+      test_group_scalar_mul scalar point expected_result ia secp256k1_modulus
     in
 
     (* Compute secp256k1 pub key from secret key *)
@@ -3342,8 +3872,432 @@ let%test_unit "scalar_mul" =
           "35561449820918632865961375836489131575522128704654117756369029278244987778295"
       )
     in
-    let _cs =
-      test_scalar_mul scalar secp256k1_generator expected_pubkey ia
+    let cs =
+      test_group_scalar_mul scalar secp256k1_generator expected_pubkey ia
         secp256k1_modulus
+    in
+    (* Constraint system reuse *)
+    let scalar =
+      Bignum_bigint.of_string
+        "93102346685989503200550820820601664115283772668359982393657391253613200462560"
+    in
+    let pt =
+      ( Bignum_bigint.of_string
+          "80241667548591023836188751980970358333134768792886000377475093272122544843235"
+      , Bignum_bigint.of_string
+          "102689901017063159731231921183137353356646798093847528339410885787356562759036"
+      )
+    in
+    let expected_pt =
+      ( Bignum_bigint.of_string
+          "64386647670032720196082497276861206017517306207097800786232350268707480253408"
+      , Bignum_bigint.of_string
+          "61006610021997184131721512813438552408464895711704942585895904572625072596197"
+      )
+    in
+    let _cs =
+      test_group_scalar_mul ~cs scalar pt expected_pt ia secp256k1_modulus
+    in
+    () )
+
+let%test_unit "group_scalar_mul_properties" =
+  if (* group_scalar_mul_tests *) true then (
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+
+    (* Test elliptic curve scalar multiplication properties *)
+    let test_group_scalar_mul_properties ?cs (a_scalar : Bignum_bigint.t)
+        (b_scalar : Bignum_bigint.t) (point : bignum_point)
+        (a_expected_result : bignum_point) (b_expected_result : bignum_point)
+        (a_plus_b_expected : bignum_point) (a_times_b_expected : bignum_point)
+        (negation_expected : bignum_point) (ia : bignum_point * bignum_point)
+        (scalar_modulus : Bignum_bigint.t) ?(a = Bignum_bigint.zero)
+        (foreign_field_modulus : Bignum_bigint.t) =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            let open Runner.Impl in
+            (* Prepare test inputs *)
+            let ia =
+              let init_acc, neg_init_acc = ia in
+              ( Affine.of_bignum_bigint_coordinates (module Runner.Impl) init_acc
+              , Affine.of_bignum_bigint_coordinates
+                  (module Runner.Impl)
+                  neg_init_acc )
+            in
+            let a =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                a
+            in
+            let foreign_field_modulus =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                foreign_field_modulus
+            in
+            let a_scalar_bits =
+              (* Removing trailing zeros helps make the test faster *)
+              let a_scalar_bits =
+                Common.bignum_bigint_unpack ~remove_trailing:true a_scalar
+              in
+              Array.map a_scalar_bits ~f:(fun bit ->
+                  exists Boolean.typ ~compute:(fun () -> bit) )
+            in
+            let b_scalar_bits =
+              (* Removing trailing zeros helps make the test faster *)
+              let b_scalar_bits =
+                Common.bignum_bigint_unpack ~remove_trailing:true b_scalar
+              in
+              Array.map b_scalar_bits ~f:(fun bit ->
+                  exists Boolean.typ ~compute:(fun () -> bit) )
+            in
+            let c_scalar_bits =
+              (* Removing trailing zeros helps make the test faster *)
+              let c_scalar =
+                Bignum_bigint.((a_scalar + b_scalar) % scalar_modulus)
+              in
+              let c_scalar_bits =
+                Common.bignum_bigint_unpack ~remove_trailing:true c_scalar
+              in
+              Array.map c_scalar_bits ~f:(fun bit ->
+                  exists Boolean.typ ~compute:(fun () -> bit) )
+            in
+            let point =
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) point
+            in
+            let a_expected_result =
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                a_expected_result
+            in
+            let b_expected_result =
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                b_expected_result
+            in
+            let a_plus_b_expected =
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                a_plus_b_expected
+            in
+            let a_times_b_expected =
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                a_times_b_expected
+            in
+            let negation_expected =
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                negation_expected
+            in
+
+            (* Create external checks context for tracking extra constraints
+               that are required for soundness (unused in this simple test) *)
+            let unused_external_checks =
+              Foreign_field.External_checks.create (module Runner.Impl)
+            in
+
+            (*
+             * Check distributive property with adding scalars: aP + bP = (a + b)P
+             *)
+
+            (* A = aP *)
+            let a_result =
+              group_scalar_mul
+                (module Runner.Impl)
+                unused_external_checks a_scalar_bits point ia ~a
+                foreign_field_modulus
+            in
+
+            (* B = bP *)
+            let b_result =
+              group_scalar_mul
+                (module Runner.Impl)
+                unused_external_checks b_scalar_bits point ia ~a
+                foreign_field_modulus
+            in
+
+            (* C = (a + b)P *)
+            let a_plus_b_result =
+              group_scalar_mul
+                (module Runner.Impl)
+                unused_external_checks c_scalar_bits point ia ~a
+                foreign_field_modulus
+            in
+
+            (* A + B *)
+            let a_result_plus_b_result =
+              group_add
+                (module Runner.Impl)
+                unused_external_checks a_result b_result foreign_field_modulus
+            in
+
+            (* Assert aP = expected A *)
+            Affine.assert_equal (module Runner.Impl) a_result a_expected_result ;
+            (* Assert bP = expected B *)
+            Affine.assert_equal (module Runner.Impl) b_result b_expected_result ;
+            (* Assert (a + b)P = expected *)
+            Affine.assert_equal
+              (module Runner.Impl)
+              a_plus_b_result a_plus_b_expected ;
+            (* Assert A + B = (a + b)P = cP *)
+            Affine.assert_equal
+              (module Runner.Impl)
+              a_result_plus_b_result a_plus_b_result ;
+
+            (*
+             * Check distributive property with multiplying scalars: [a]bP = [b]aP = [a*b]P
+             *)
+
+            (* [a]bP *)
+            let a_b_result =
+              group_scalar_mul
+                (module Runner.Impl)
+                unused_external_checks a_scalar_bits b_result ia ~a
+                foreign_field_modulus
+            in
+
+            (* [b]aP *)
+            let b_a_result =
+              group_scalar_mul
+                (module Runner.Impl)
+                unused_external_checks b_scalar_bits a_result ia ~a
+                foreign_field_modulus
+            in
+
+            (* Compute a*b as foreign field multiplication in scalar field *)
+            let ab_scalar_bits =
+              let ab_scalar =
+                Bignum_bigint.(a_scalar * b_scalar % scalar_modulus)
+              in
+              let ab_scalar_bits =
+                Common.bignum_bigint_unpack ~remove_trailing:true ab_scalar
+              in
+              Array.map ab_scalar_bits ~f:(fun bit ->
+                  exists Boolean.typ ~compute:(fun () -> bit) )
+            in
+
+            (* (a * b)P *)
+            let ab_result =
+              group_scalar_mul
+                (module Runner.Impl)
+                unused_external_checks ab_scalar_bits point ia ~a
+                foreign_field_modulus
+            in
+
+            (* Assert [a]bP = [b]aP *)
+            Affine.assert_equal (module Runner.Impl) a_b_result b_a_result ;
+            (* Assert [b]aP = (a * b)P *)
+            Affine.assert_equal (module Runner.Impl) b_a_result ab_result ;
+            (* Assert (a * b)P = expected *)
+            Affine.assert_equal
+              (module Runner.Impl)
+              ab_result a_times_b_expected ;
+
+            (*
+             * Check scaling computes with negation: [-s]P = -(sP)
+             *)
+
+            (* Compute -a_scalar witness *)
+            let minus_a_scalar_bits =
+              let minus_a_scalar = Bignum_bigint.(-a_scalar % scalar_modulus) in
+              let minus_a_scalar_bits =
+                Common.bignum_bigint_unpack ~remove_trailing:true minus_a_scalar
+              in
+              Array.map minus_a_scalar_bits ~f:(fun bit ->
+                  exists Boolean.typ ~compute:(fun () -> bit) )
+            in
+
+            (* [-s]P *)
+            let minus_a_result =
+              group_scalar_mul
+                (module Runner.Impl)
+                unused_external_checks minus_a_scalar_bits point ia ~a
+                foreign_field_modulus
+            in
+
+            (* -(sP) *)
+            let negated_a_result =
+              group_negate (module Runner.Impl) a_result foreign_field_modulus
+            in
+
+            (* Need to write negated y-coordinate to row in order to assert_equal on it *)
+            let neg_init_y0, neg_init_y1, neg_init_y2 =
+              Foreign_field.Element.Standard.to_limbs
+              @@ Affine.y negated_a_result
+            in
+            with_label "negation_property_check" (fun () ->
+                assert_
+                  { annotation = Some __LOC__
+                  ; basic =
+                      Kimchi_backend_common.Plonk_constraint_system
+                      .Plonk_constraint
+                      .T
+                        (Raw
+                           { kind = Zero
+                           ; values =
+                               [| neg_init_y0; neg_init_y1; neg_init_y2 |]
+                           ; coeffs = [||]
+                           } )
+                  } ) ;
+
+            (* Assert [-s]P = -(sP) *)
+            Affine.assert_equal
+              (module Runner.Impl)
+              minus_a_result negated_a_result ;
+            (* Assert -(sP) = expected *)
+            Affine.assert_equal
+              (module Runner.Impl)
+              negated_a_result negation_expected ;
+
+            () )
+      in
+
+      cs
+    in
+
+    (* Get EC scalar mul initial accumulator point *)
+    let ia =
+      group_get_ia_point secp256k1_a secp256k1_b secp256k1_generator
+        secp256k1_modulus
+    in
+
+    (*
+     * EC scalar multiplication properties tests
+     *)
+
+    (* Tests with generator *)
+    let a_scalar =
+      Bignum_bigint.of_string
+        "79401928295407367700174300280555320402843131478792245979539416476579739380993"
+    in
+    (* aG *)
+    let a_expected =
+      ( Bignum_bigint.of_string
+          "17125835931983334217694156357722716412757965999176597307946554943053675538785"
+      , Bignum_bigint.of_string
+          "46388026915780724534166509048612278793220290073988306084942872130687658791661"
+      )
+    in
+    let b_scalar =
+      Bignum_bigint.of_string
+        "89091288558408807474211262098870527285408764120538440460973310880924228023627"
+    in
+    (* bG *)
+    let b_expected =
+      ( Bignum_bigint.of_string
+          "79327061200655101960260174492040176163202074463842535225851740487556039447898"
+      , Bignum_bigint.of_string
+          "17719907321698144940791372349744661269763063699265755816142522447977929876765"
+      )
+    in
+    (* (a + b)G *)
+    let a_plus_b_expected =
+      ( Bignum_bigint.of_string
+          "81040990384669475923010997008987195868838198748766130146528604954229008315134"
+      , Bignum_bigint.of_string
+          "34561268318835956667566052477444512933985042899902969559255322703897774718063"
+      )
+    in
+    (* (a * b)G *)
+    let a_times_b_expected =
+      ( Bignum_bigint.of_string
+          "81456477659851325370442471400511783773782655276230587738882014172211964156628"
+      , Bignum_bigint.of_string
+          "95026373302104994624825470484745116441888023752189438912144935562310761663097"
+      )
+    in
+    (* [-a]G *)
+    let negation_expected =
+      ( Bignum_bigint.of_string
+          "17125835931983334217694156357722716412757965999176597307946554943053675538785"
+      , Bignum_bigint.of_string
+          "69404062321535470889404475960075629060049694591652257954514711877221175880002"
+      )
+    in
+
+    assert (secp256k1_is_on_curve a_expected) ;
+    assert (secp256k1_is_on_curve b_expected) ;
+    assert (secp256k1_is_on_curve a_plus_b_expected) ;
+    assert (secp256k1_is_on_curve a_times_b_expected) ;
+    assert (secp256k1_is_on_curve negation_expected) ;
+
+    let _cs =
+      test_group_scalar_mul_properties a_scalar b_scalar secp256k1_generator
+        a_expected b_expected a_plus_b_expected a_times_b_expected
+        negation_expected ia secp256k1_order secp256k1_modulus
+    in
+
+    (* Tests with another curve point *)
+    let point =
+      ( Bignum_bigint.of_string
+          "33774054739397672981116348681092907963399779523481500939771509974082662984990"
+      , Bignum_bigint.of_string
+          "60414776605185041994402340927179985824709402511452021592188768672640080416757"
+      )
+    in
+    let a_scalar =
+      Bignum_bigint.of_string
+        "101698197574283114939368343806106834988902354006673798485060078476846328099457"
+    in
+    (* aP *)
+    let a_expected =
+      ( Bignum_bigint.of_string
+          "75195284589272297831705973079897644085806639251981864022525558637369799002975"
+      , Bignum_bigint.of_string
+          "21318219854954928210493202207122232794689530644716510309784081397689563830643"
+      )
+    in
+    let b_scalar =
+      Bignum_bigint.of_string
+        "29906750163917842454712060592346612426879165698013462577595179415632189050569"
+    in
+    (* bP *)
+    let b_expected =
+      ( Bignum_bigint.of_string
+          "31338730031552911193929716320599408654845663804319033450328019997834721773857"
+      , Bignum_bigint.of_string
+          "19509931248131549366806268091016515808560677012657535095393179462073374184004"
+      )
+    in
+    (* (a + b)P *)
+    let a_plus_b_expected =
+      ( Bignum_bigint.of_string
+          "3785015531479612950834562670482118046158085046729801327010146109899305257240"
+      , Bignum_bigint.of_string
+          "67252551234352942899384104854542424500400416990163373189382133933498016564076"
+      )
+    in
+    (* (a * b)P *)
+    let a_times_b_expected =
+      ( Bignum_bigint.of_string
+          "104796198157638974641325627725056289938393733264860209068332598339943619687138"
+      , Bignum_bigint.of_string
+          "62474612839119693016992187953610680368302121786246432257338185158014628586401"
+      )
+    in
+    (* [-a]P *)
+    let negation_expected =
+      ( Bignum_bigint.of_string
+          "75195284589272297831705973079897644085806639251981864022525558637369799002975"
+      , Bignum_bigint.of_string
+          "94473869382361267213077782801565675058580454020924053729673502610219270841020"
+      )
+    in
+
+    assert (secp256k1_is_on_curve point) ;
+    assert (secp256k1_is_on_curve a_expected) ;
+    assert (secp256k1_is_on_curve b_expected) ;
+    assert (secp256k1_is_on_curve a_plus_b_expected) ;
+    assert (secp256k1_is_on_curve a_times_b_expected) ;
+    assert (secp256k1_is_on_curve negation_expected) ;
+
+    let _cs =
+      test_group_scalar_mul_properties a_scalar b_scalar point a_expected
+        b_expected a_plus_b_expected a_times_b_expected negation_expected ia
+        secp256k1_order secp256k1_modulus
     in
     () )
