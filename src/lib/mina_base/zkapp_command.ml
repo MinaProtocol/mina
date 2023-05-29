@@ -2038,6 +2038,14 @@ let valid_size ~(genesis_constants : Genesis_constants.t) (t : t) :
     in
     Error (Error.of_string err_msg)
 
+let has_zero_vesting_period t =
+  Call_forest.exists t.account_updates ~f:(fun p ->
+      match p.body.update.timing with
+      | Keep ->
+          false
+      | Set { vesting_period; _ } ->
+          Mina_numbers.Global_slot.(equal zero) vesting_period )
+
 let get_transaction_commitments (zkapp_command : t) =
   let memo_hash = Signed_command_memo.hash zkapp_command.memo in
   let fee_payer_hash =
