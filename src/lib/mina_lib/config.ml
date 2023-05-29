@@ -51,7 +51,8 @@ type t =
   ; log_block_creation : bool [@default false]
   ; precomputed_values : Precomputed_values.t
   ; start_time : Time.t
-  ; precomputed_blocks_path : string option
+  ; precomputed_blocks_file : string option
+  ; precomputed_blocks_dir : string option
   ; log_precomputed_blocks : bool
   ; upload_blocks_to_gcloud : bool
   ; block_reward_threshold : Currency.Amount.t option [@default None]
