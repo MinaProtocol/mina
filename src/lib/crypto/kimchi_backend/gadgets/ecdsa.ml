@@ -1191,10 +1191,12 @@ let group_check_ia (type f)
  *
  *   Preconditions and limitations:
  *      P is not O (the point at infinity)
+ *      P's coordinates are bounds checked
  *      s is not zero
  *      z > 0
  *      ia point is randomly selected and constrained to be on the curve
  *      ia negated point computation is constrained
+ *      ia coordinates are bounds checked
  *)
 let group_scalar_mul (type f)
     (module Circuit : Snark_intf.Run with type field = f)
@@ -1268,14 +1270,36 @@ let group_scalar_mul (type f)
             (module Circuit)
             external_checks acc base foreign_field_modulus
         in
+        (* Bounds 1:
+         *   Left input is previous result, so already checked.
+         *   Right input is checked by previous doubling check.
+         *   Initial acc and base are gadget inputs and checked externally.
+         *   Result bounds check below.
+         *)
+        Foreign_field.External_checks.append_bound_check external_checks
+        @@ Foreign_field.Element.Standard.to_limbs @@ Affine.x sum ;
+        Foreign_field.External_checks.append_bound_check external_checks
+        @@ Foreign_field.Element.Standard.to_limbs @@ Affine.y sum ;
 
         (* Group double: double_base = base + base *)
         let double_base =
           match doubles with
           | None ->
-              group_double
-                (module Circuit)
-                external_checks base ~a foreign_field_modulus
+              let double_base =
+                group_double
+                  (module Circuit)
+                  external_checks base ~a foreign_field_modulus
+              in
+              (* Bounds 2:
+               *   Input is previous result, so already checked.
+               *   Initial base is gadget inputs and checked externally.
+               *   Result bounds check below.
+               *)
+              Foreign_field.External_checks.append_bound_check external_checks
+              @@ Foreign_field.Element.Standard.to_limbs @@ Affine.x double_base ;
+              Foreign_field.External_checks.append_bound_check external_checks
+              @@ Foreign_field.Element.Standard.to_limbs @@ Affine.y double_base ;
+              double_base
           | Some doubles ->
               (* When the base point is public (e.g. the secp256k1 generator)
                * they could be a precomputed public parameter *)
@@ -3267,7 +3291,7 @@ let%test_unit "group_properties" =
 (*******************************)
 
 let%test_unit "group_is_on_curve" =
-  if (* group_scalar_mul_tests *) false then (
+  if (* group_scalar_mul_tests *) true then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -3432,7 +3456,7 @@ let%test_unit "group_is_on_curve" =
     () )
 
 let%test_unit "group_check_ia" =
-  if (* group_scalar_mul_tests *) false then (
+  if (* group_scalar_mul_tests *) true then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -3594,7 +3618,7 @@ let%test_unit "group_check_ia" =
     () )
 
 let%test_unit "group_scalar_mul" =
-  if (* group_scalar_mul_tests *) false then (
+  if (* group_scalar_mul_tests *) true then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
