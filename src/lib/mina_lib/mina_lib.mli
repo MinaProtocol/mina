@@ -9,6 +9,7 @@ module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
 module Subscriptions = Coda_subscriptions
+module Precomputed_block_writer = Subscriptions.Precomputed_block_writer
 
 type t
 
