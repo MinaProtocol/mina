@@ -367,7 +367,6 @@ let protocol_state_precondition_of_id pool id =
   ( { snarked_ledger_hash
     ; blockchain_length
     ; min_window_density
-    ; last_vrf_output = ()
     ; total_currency
     ; global_slot_since_genesis
     ; staking_epoch_data
