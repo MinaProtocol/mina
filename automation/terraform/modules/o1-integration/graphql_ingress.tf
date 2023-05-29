@@ -1,4 +1,4 @@
-resource "kubernetes_ingress" "testnet_graphql_ingress" {
+resource "kubernetes_ingress_v1" "testnet_graphql_ingress" {
   count = var.deploy_graphql_ingress ? 1 : 0
   depends_on = [
     module.kubernetes_testnet.testnet_namespace,
@@ -13,6 +13,7 @@ resource "kubernetes_ingress" "testnet_graphql_ingress" {
     annotations = {
       "kubernetes.io/ingress.class" = "nginx"
       "nginx.org/mergeable-ingress-type" = "minion"
+      "nginx.ingress.kubernetes.io/use-regex" = "true"
       "nginx.ingress.kubernetes.io/rewrite-target" = "/$2"
     }
   }
@@ -30,11 +31,16 @@ resource "kubernetes_ingress" "testnet_graphql_ingress" {
 
           content {
             backend {
-              service_name = "${path.value}-graphql"
-              service_port = 80
+              service {
+                name = "${path.value}-graphql"
+                port {
+                  number = 80
+                }
+              }
             }
 
             path = "/${path.value}(/|$)(.*)"
+            path_type = "Prefix"
           }
         }
       }
