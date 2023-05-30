@@ -4076,10 +4076,7 @@ let%test_module "staged ledger tests" =
       let body =
         Signed_command_payload.Body.Payment
           Payment_payload.Poly.
-            { source_pk
-            ; receiver_pk
-            ; amount = insufficient_account_creation_fee
-            }
+            { receiver_pk; amount = insufficient_account_creation_fee }
       in
       let fee = Currency.Amount.to_fee balance in
       let payload =
@@ -4150,14 +4147,14 @@ let%test_module "staged ledger tests" =
                   |> Currency.Amount.of_nanomina_int_exn
                 , Currency.Amount.to_fee balance )
           in
-          let source_pk = Public_key.compress kp.public_key in
+          let fee_payer_pk = Public_key.compress kp.public_key in
           let body =
             Signed_command_payload.Body.Payment
               Payment_payload.Poly.
-                { source_pk; receiver_pk; amount = account_creation_fee }
+                { receiver_pk; amount = account_creation_fee }
           in
           let payload =
-            Signed_command.Payload.create ~fee ~fee_payer_pk:source_pk ~nonce
+            Signed_command.Payload.create ~fee ~fee_payer_pk ~nonce
               ~memo:Signed_command_memo.dummy ~valid_until:None ~body
           in
           User_command.Signed_command (Signed_command.sign kp payload)

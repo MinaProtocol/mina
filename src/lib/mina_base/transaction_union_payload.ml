@@ -28,17 +28,17 @@ module Body = struct
     (Tag.t, Public_key.Compressed.t, Token_id.t, Currency.Amount.t, bool) t_
   [@@deriving sexp]
 
-  let of_user_command_payload_body = function
-    | Signed_command_payload.Body.Payment { source_pk; receiver_pk; amount } ->
+  let of_user_command_payload_body ~fee_payer_pk = function
+    | Signed_command_payload.Body.Payment { receiver_pk; amount } ->
         { tag = Tag.Payment
-        ; source_pk
+        ; source_pk = fee_payer_pk
         ; receiver_pk
         ; token_id = Token_id.default
         ; amount
         }
-    | Stake_delegation (Set_delegate { delegator; new_delegate }) ->
+    | Stake_delegation (Set_delegate { new_delegate }) ->
         { tag = Tag.Stake_delegation
-        ; source_pk = delegator
+        ; source_pk = fee_payer_pk
         ; receiver_pk = new_delegate
         ; token_id = Token_id.default
         ; amount = Currency.Amount.zero
@@ -235,7 +235,7 @@ let of_user_command_payload
       ; valid_until
       ; memo
       }
-  ; body = Body.of_user_command_payload_body body
+  ; body = Body.of_user_command_payload_body ~fee_payer_pk body
   }
 
 let gen =

@@ -271,11 +271,10 @@ let cache_fee_transfer_via_coinbase pool (internal_cmd : Sql.Internal_command.t)
 
 module User_command_helpers = struct
   let body_of_sql_user_cmd pool
-      ({ typ; source_id; receiver_id; amount; global_slot_since_genesis; _ } :
+      ({ typ; source_id = _; receiver_id; amount; global_slot_since_genesis; _ } :
         Sql.User_command.t ) : Signed_command_payload.Body.t Deferred.t =
     let open Signed_command_payload.Body in
     let open Deferred.Let_syntax in
-    let%bind source_pk = Load_data.pk_of_id pool source_id in
     let%map receiver_pk = Load_data.pk_of_id pool receiver_id in
     let amount =
       Option.map amount
@@ -288,11 +287,10 @@ module User_command_helpers = struct
           failwithf "Payment at global slot since genesis %Ld has NULL amount"
             global_slot_since_genesis () ;
         let amount = Option.value_exn amount in
-        Payment Payment_payload.Poly.{ source_pk; receiver_pk; amount }
+        Payment Payment_payload.Poly.{ receiver_pk; amount }
     | "delegation" ->
         Stake_delegation
-          (Stake_delegation.Set_delegate
-             { delegator = source_pk; new_delegate = receiver_pk } )
+          (Stake_delegation.Set_delegate { new_delegate = receiver_pk })
     | _ ->
         failwithf "Invalid user command type: %s" typ ()
 end
@@ -436,8 +434,6 @@ let get_parent_state_view ~pool block_id =
       parent_block.min_window_density |> Unsigned.UInt32.of_int64
       |> Mina_numbers.Length.of_uint32
     in
-    (* TODO : this will change *)
-    let last_vrf_output = () in
     let total_currency =
       Currency.Amount.of_string parent_block.total_currency
     in
@@ -491,7 +487,6 @@ let get_parent_state_view ~pool block_id =
       { Zkapp_precondition.Protocol_state.Poly.snarked_ledger_hash
       ; blockchain_length
       ; min_window_density
-      ; last_vrf_output
       ; total_currency
       ; global_slot_since_genesis
       ; staking_epoch_data

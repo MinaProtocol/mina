@@ -188,7 +188,7 @@ module Body = struct
     module V2 = struct
       type t = Mina_wire_types.Mina_base.Signed_command_payload.Body.V2.t =
         | Payment of Payment_payload.Stable.V2.t
-        | Stake_delegation of Stake_delegation.Stable.V1.t
+        | Stake_delegation of Stake_delegation.Stable.V2.t
       [@@deriving sexp, compare, equal, sexp, hash, yojson]
 
       let to_latest = Fn.id
@@ -211,27 +211,11 @@ module Body = struct
 
   module Tag = Transaction_union_tag
 
-  let gen ?source_pk max_amount =
+  let gen max_amount =
     let open Quickcheck.Generator in
-    let stake_delegation_gen =
-      match source_pk with
-      | Some source_pk ->
-          Stake_delegation.gen_with_delegator source_pk
-      | None ->
-          Stake_delegation.gen
-    in
     map
-      (variant2
-         (Payment_payload.gen ?source_pk max_amount)
-         stake_delegation_gen )
+      (variant2 (Payment_payload.gen max_amount) Stake_delegation.gen)
       ~f:(function `A p -> Payment p | `B d -> Stake_delegation d)
-
-  let source_pk (t : t) =
-    match t with
-    | Payment payload ->
-        payload.source_pk
-    | Stake_delegation payload ->
-        Stake_delegation.source_pk payload
 
   let receiver_pk (t : t) =
     match t with
@@ -241,13 +225,6 @@ module Body = struct
         Stake_delegation.receiver_pk payload
 
   let token (_ : t) = Token_id.default
-
-  let source t =
-    match t with
-    | Payment payload ->
-        Account_id.create payload.source_pk (token t)
-    | Stake_delegation payload ->
-        Stake_delegation.source payload
 
   let receiver t =
     match t with
@@ -332,10 +309,6 @@ let memo (t : t) = t.common.memo
 
 let body (t : t) = t.body
 
-let source_pk (t : t) = Body.source_pk t.body
-
-let source (t : t) = Body.source t.body
-
 let receiver_pk (t : t) = Body.receiver_pk t.body
 
 let receiver (t : t) = Body.receiver t.body
@@ -358,13 +331,11 @@ let account_access_statuses (t : t) (status : Transaction_status.t) =
   match status with
   | Applied ->
       List.map
-        [ fee_payer t; source t; receiver t ]
+        [ fee_payer t; receiver t ]
         ~f:(fun acct_id -> (acct_id, `Accessed))
   | Failed _ ->
       (fee_payer t, `Accessed)
-      :: List.map
-           [ source t; receiver t ]
-           ~f:(fun acct_id -> (acct_id, `Not_accessed))
+      :: List.map [ receiver t ] ~f:(fun acct_id -> (acct_id, `Not_accessed))
 
 let dummy : t =
   { common =
@@ -384,7 +355,7 @@ let gen =
     Currency.Amount.(sub max_int (of_fee common.fee))
     |> Option.value_exn ?here:None ?error:None ?message:None
   in
-  let%map body = Body.gen ~source_pk:common.fee_payer_pk max_amount in
+  let%map body = Body.gen max_amount in
   Poly.{ common; body }
 
 (** This module defines a weight for each payload component *)

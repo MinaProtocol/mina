@@ -137,7 +137,6 @@ let%test_module "Protocol state precondition tests" =
           Check protocol_state.snarked_ledger_hash
       ; blockchain_length = Check (interval protocol_state.blockchain_length)
       ; min_window_density = Check (interval protocol_state.min_window_density)
-      ; last_vrf_output = ()
       ; total_currency = Check (interval protocol_state.total_currency)
       ; global_slot_since_genesis =
           Check (interval protocol_state.global_slot_since_genesis)

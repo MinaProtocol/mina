@@ -283,7 +283,7 @@ module type Full = sig
 
     val deploy_snapp :
          ?no_auth:bool
-      -> ?default_permissions:bool
+      -> ?permissions:Permissions.t
       -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Deploy_snapp_spec.t
       -> Zkapp_command.t

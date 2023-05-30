@@ -47,10 +47,6 @@ module Body : sig
   val receiver_pk : t -> Signature_lib.Public_key.Compressed.t
 
   val receiver : t -> Account_id.t
-
-  val source_pk : t -> Signature_lib.Public_key.Compressed.t
-
-  val source : t -> Account_id.t
 end
 
 module Common : sig
@@ -209,10 +205,6 @@ val body : t -> Body.t
 val receiver_pk : t -> Public_key.Compressed.t
 
 val receiver : t -> Account_id.t
-
-val source_pk : t -> Public_key.Compressed.t
-
-val source : t -> Account_id.t
 
 val token : t -> Token_id.t
 

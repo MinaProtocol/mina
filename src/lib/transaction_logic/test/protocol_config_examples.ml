@@ -22,7 +22,6 @@ let protocol_state : Zkapp_precondition.Protocol_state.View.t =
     { snarked_ledger_hash = Frozen_ledger_hash.empty_hash
     ; blockchain_length = Length.of_int 119
     ; min_window_density = Length.of_int 10
-    ; last_vrf_output = ()
     ; total_currency = Amount.of_mina_int_exn 10
     ; global_slot_since_genesis = Global_slot_since_genesis.of_int 120
     ; staking_epoch_data = epoch_data

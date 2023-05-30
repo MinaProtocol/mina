@@ -2248,6 +2248,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         Account_id.Checked.create payload.common.fee_payer_pk fee_token
       in
       let%bind () =
+        [%with_label_ "Fee payer and source must be equal"] (fun () ->
+            Account_id.Checked.equal fee_payer source >>= Boolean.Assert.is_true )
+      in
+      let%bind () =
         [%with_label_ "Check slot validity"] (fun () ->
             Global_slot_since_genesis.Checked.(
               current_global_slot <= payload.common.valid_until)
@@ -2415,6 +2419,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                   Account.Checked.has_permission
                     ~signature_verifies:is_user_command ~to_:`Access account
                 in
+                let permitted_to_increment_nonce =
+                  Account.Checked.has_permission ~to_:`Increment_nonce account
+                in
                 let permitted_to_send =
                   Account.Checked.has_permission ~to_:`Send account
                 in
@@ -2425,6 +2432,15 @@ module Make_str (A : Wire_types.Concrete) = struct
                   [%with_label_
                     "Fee payer access should be permitted for all commands"]
                     (fun () -> Boolean.Assert.is_true permitted_to_access)
+                in
+                let%bind () =
+                  [%with_label_
+                    "Fee payer increment nonce should be permitted for all \
+                     commands"] (fun () ->
+                      Boolean.Assert.any
+                        [ Boolean.not is_user_command
+                        ; permitted_to_increment_nonce
+                        ] )
                 in
                 let%bind () =
                   [%with_label_
@@ -4487,8 +4503,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
     end
 
-    let deploy_snapp ?(no_auth = false) ?(default_permissions = false)
-        ~constraint_constants (spec : Deploy_snapp_spec.t) =
+    let deploy_snapp ?(no_auth = false) ?permissions ~constraint_constants
+        (spec : Deploy_snapp_spec.t) =
       let `VK vk, `Prover _trivial_prover =
         create_trivial_snapp ~constraint_constants ()
       in
@@ -4506,14 +4522,13 @@ module Make_str (A : Wire_types.Concrete) = struct
           { update with
             verification_key = Zkapp_basic.Set_or_keep.Set vk
           ; permissions =
-              ( if default_permissions then
-                Zkapp_basic.Set_or_keep.Set Permissions.user_default
-              else
-                Zkapp_basic.Set_or_keep.Set
-                  { Permissions.user_default with
-                    edit_state = Permissions.Auth_required.Proof
-                  ; edit_action_state = Proof
-                  } )
+              Zkapp_basic.Set_or_keep.Set
+                (Option.value permissions
+                   ~default:
+                     { Permissions.user_default with
+                       edit_state = Permissions.Auth_required.Proof
+                     ; edit_action_state = Proof
+                     } )
           }
       in
       let ( `Zkapp_command { Zkapp_command.fee_payer; account_updates; memo }
