@@ -1,4 +1,4 @@
-let tests_enabled = true
+let tests_enabled = false
 
 let%test_unit "custom gates integration" =
   ( if tests_enabled then

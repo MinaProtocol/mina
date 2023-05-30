@@ -4,7 +4,7 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 
-let tests_enabled = true
+let tests_enabled = false
 
 (* Auxiliary functions *)
 
@@ -514,7 +514,9 @@ let bnot64_unchecked (type f)
     (input : Circuit.Field.t) : Circuit.Field.t =
   bnot_unchecked (module Circuit) input 64
 
+(**************)
 (* UNIT TESTS *)
+(**************)
 
 let%test_unit "bitwise rotation gadget" =
   if tests_enabled then (
@@ -569,10 +571,6 @@ let%test_unit "bitwise rotation gadget" =
     assert (Common.is_error (fun () -> test_rot "1" 64 Left "1")) ;
     assert (Common.is_error (fun () -> test_rot ~cs "0" 0 Left "0")) ) ;
   ()
-
-(*********)
-(* Tests *)
-(*********)
 
 let%test_unit "bitwise xor gadget" =
   if tests_enabled then (

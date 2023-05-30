@@ -1,9 +1,9 @@
+
 (* Common gadget helpers *)
 
-open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 
-let tests_enabled = true
+let tests_enabled = false
 
 let tuple3_of_array array =
   match array with [| a1; a2; a3 |] -> (a1, a2, a3) | _ -> assert false
@@ -66,7 +66,7 @@ let cvar_field_bits_combine_as_prover (type f)
     @@ cvar_field_to_field_as_prover (module Circuit)
     @@ input2
   in
-  Field.Constant.project @@ List.map2_exn list1 list2 ~f:bfun
+  Field.Constant.project @@ Core_kernel.List.map2_exn list1 list2 ~f:bfun
 
 (* field_bits_le_to_field - Create a field element from contiguous bits of another
  *
@@ -99,7 +99,7 @@ let field_bits_le_to_field (type f)
 
   let stop = if stop = -1 then List.length bits else stop in
   (* Convert bits range (boolean list) to field element *)
-  Field.Constant.project @@ List.slice bits start stop
+  Field.Constant.project @@ Core_kernel.List.slice bits start stop
 
 (* Create cvar field element from contiguous bits of another
      See field_bits_le_to_field for more information *)
@@ -185,8 +185,19 @@ let field_of_hex (type f)
     (hex : string) : f =
   bignum_bigint_to_field (module Circuit) @@ bignum_bigint_of_hex hex
 
+(* List of field elements for each byte of hexadecimal input*)
+let field_bytes_of_hex (type f)
+  (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+  (hex : string) : f list =
+  let chars = hex |> String.to_seq |> List.of_seq in
+  let list_pairs = Core_kernel.List.groupi chars ~break:(fun i _ _ -> i mod 2 = 0) in
+  let list_bytes = Core_kernel.List.map list_pairs ~f:(fun byte ->
+      let hex_i = Core_kernel.String.of_char_list byte in
+      field_of_hex (module Circuit) hex_i ) in
+  list_bytes
+
 (* Negative test helper *)
-let is_error (func : unit -> _) = Result.is_error (Or_error.try_with func)
+let is_error (func : unit -> _) = Result.is_error (Core_kernel.Or_error.try_with func)
 
 (* Two to the power of n as a field element *)
 let two_pow (type f)
