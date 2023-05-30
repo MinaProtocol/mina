@@ -397,7 +397,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind.Deferred zkapp_command_update_vk_impossible =
       Transaction_snark.For_tests.update_states ~constraint_constants
-        (make_update_vk_spec ~auth:Permissions.Auth_required.Impossible ~nonce:3)
+        (make_update_vk_spec ~auth:Permissions.Auth_required.Impossible ~nonce:2)
     in
     let%bind.Deferred zkapp_command_nonexistent_fee_payer =
       let new_kp = Signature_lib.Keypair.create () in
@@ -799,25 +799,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard
         "Send a zkApp transaction that set the permission for updating vk to \
          be Proof"
-        (send_zkapp ~logger node zkapp_command_update_vk_proof)
-    in
-    let%bind () =
-      section_hard
-        "Wait for zkApp transaction that set the permission for updating vk to \
-         Proof to fail in a block"
-        (wait_for_zkapp zkapp_command_update_vk_proof ~has_failures:true)
+        (send_invalid_zkapp ~logger node zkapp_command_update_vk_proof
+           "Permission_for_update_vk_can_not_be_proof_or_impossible" )
     in
     let%bind () =
       section_hard
         "Send a zkApp transaction that set the permission for updating vk to \
          be Impossible"
-        (send_zkapp ~logger node zkapp_command_update_vk_impossible)
-    in
-    let%bind () =
-      section_hard
-        "Wait for zkapp transaction that set the permission for updating vk to \
-         Impossible to fail in a block"
-        (wait_for_zkapp zkapp_command_update_vk_impossible ~has_failures:true)
+        (send_invalid_zkapp ~logger node zkapp_command_update_vk_impossible
+           "Permission_for_update_vk_can_not_be_proof_or_impossible" )
     in
     let%bind () =
       section_hard
