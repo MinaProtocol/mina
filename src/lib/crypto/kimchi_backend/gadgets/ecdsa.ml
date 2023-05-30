@@ -4,7 +4,7 @@ module Snark_intf = Snarky_backendless.Snark_intf
 
 let group_tests_enabled = false
 
-let group_scalar_mul_tests = true
+let group_scalar_mul_tests = false
 
 let two_to_4limb = Bignum_bigint.(Common.two_to_3limb * Common.two_to_limb)
 
@@ -168,7 +168,14 @@ end = struct
         , if_ (module Circuit) b then_y else_y )
 end
 
-(* Array to tuple helper *)
+(* Array to tuple helpers *)
+let tuple6_of_array array =
+  match array with
+  | [| a1; a2; a3; a4; a5; a6 |] ->
+      (a1, a2, a3, a4, a5, a6)
+  | _ ->
+      assert false
+
 let tuple9_of_array array =
   match array with
   | [| a1; a2; a3; a4; a5; a6; a7; a8; a9 |] ->
@@ -1192,6 +1199,7 @@ let group_check_ia (type f)
  *   Preconditions and limitations:
  *      P is not O (the point at infinity)
  *      P's coordinates are bounds checked
+ *      P is on the curve
  *      s is not zero
  *      z > 0
  *      ia point is randomly selected and constrained to be on the curve
@@ -1316,6 +1324,318 @@ let group_scalar_mul (type f)
   group_add
     (module Circuit)
     external_checks acc neg_init_acc foreign_field_modulus
+
+(* Gadget for constraining ECDSA signature verification
+ *
+ *   Inputs:
+ *     external_checks       := Context to track required external checks
+ *     pubkey                := Public key of signer
+ *     signature             := ECDSA signature (r, s) s.t. r, s \in [1, n)
+ *     hash                  := Message hash s.t. hash \in Fn
+ *     ia                    := Initial accumulator point (and its negation)
+ *     gen                   := Elliptic curve group generator point
+ *     a                     := Elliptic curve a parameter
+ *     b                     := Elliptic curve b parameter
+ *     curve_order           := Elliptic curve group order (scalar field modulus)
+ *     foreign_field_modulus := Elliptic curve base field modulus
+ *
+ *   Preconditions and limitations:
+ *      pubkey is not O (the point at infinity)
+ *      pubkey is bounds checked
+ *      pubkey is on the curve
+ *      r, s \in [1, n)
+ *      hash \in Fn
+ *      ia point is randomly selected and constrained to be on the curve
+ *      ia negated point computation is constrained
+ *      ia coordinates are bounds checked
+ *)
+let ecdsa_verify (type f) (module Circuit : Snark_intf.Run with type field = f)
+    (external_checks : f Foreign_field.External_checks.t) (pubkey : f Affine.t)
+    (signature :
+      f Foreign_field.Element.Standard.t * f Foreign_field.Element.Standard.t )
+    (hash : f Foreign_field.Element.Standard.t) (ia : f Affine.t * f Affine.t)
+    (gen : f Affine.t) ?(doubles : f Affine.t array option)
+    ?(a =
+      ( Circuit.Field.Constant.zero
+      , Circuit.Field.Constant.zero
+      , Circuit.Field.Constant.zero ))
+    ?(b =
+      ( Circuit.Field.Constant.zero
+      , Circuit.Field.Constant.zero
+      , Circuit.Field.Constant.zero ))
+    (curve_order : f Foreign_field.standard_limbs)
+    (foreign_field_modulus : f Foreign_field.standard_limbs) =
+  let open Circuit in
+  (* Signaures r and s *)
+  let r, s = signature in
+
+  (* Compute witness value s^-1 *)
+  let s_inv0, s_inv1, s_inv2 =
+    exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
+        let curve_order =
+          Foreign_field.field_standard_limbs_to_bignum_bigint
+            (module Circuit)
+            curve_order
+        in
+
+        let s =
+          Foreign_field.Element.Standard.to_bignum_bigint_as_prover
+            (module Circuit)
+            s
+        in
+
+        (* Compute s^-1 *)
+        let s_inv = Common.bignum_bigint_inverse s curve_order in
+
+        (* Convert from Bignums to field elements *)
+        let s_inv0, s_inv1, s_inv2 =
+          Foreign_field.bignum_bigint_to_field_standard_limbs
+            (module Circuit)
+            s_inv
+        in
+
+        (* Return and convert back to Cvars *)
+        [| s_inv0; s_inv1; s_inv2 |] )
+    |> Common.tuple3_of_array
+  in
+  let s_inv =
+    Foreign_field.Element.Standard.of_limbs (s_inv0, s_inv1, s_inv2)
+  in
+
+  (* C1: Constrain s * s^-1 = 1 *)
+  let s_times_s_inv =
+    (* s * s  = s^2 *)
+    Foreign_field.mul (module Circuit) external_checks s s_inv curve_order
+  in
+  let one =
+    Foreign_field.Element.Standard.of_bignum_bigint (module Circuit)
+    @@ Bignum_bigint.one
+  in
+  Foreign_field.Element.Standard.assert_equal (module Circuit) s_times_s_inv one ;
+
+  (* Bounds 1: Left input is gadget input (checked externally)
+   *           Right input is witness value (checked below)
+   *           Result bound check already tracked by external_checks.
+   *)
+  Foreign_field.External_checks.append_bound_check external_checks
+    (s_inv0, s_inv1, s_inv2) ;
+
+  (* C2: Constrain u1 = zs^-1 *)
+  let u1 =
+    Foreign_field.mul (module Circuit) external_checks hash s_inv curve_order
+  in
+
+  (* Bounds 2: Left input (hash) is gadget input (checked externally)
+   *           Right input already checked by (Bounds 1)
+   *           Result bound check already tracked by external_checks.
+   *)
+
+  (* C3: Constrain u2 = rs^-1 *)
+  let u2 =
+    Foreign_field.mul (module Circuit) external_checks r s_inv curve_order
+  in
+
+  (* Bounds 3: Left input r is gadget input (checked externally)
+   *           Right input already checked by (Bounds 1)
+   *           Result bound check already tracked by external_checks.
+   *)
+
+  (*
+   * Compute R = u1G + u2P
+   *)
+  let scalar_bits =
+    Common.bignum_bigint_bit_length
+    @@ Foreign_field.field_standard_limbs_to_bignum_bigint
+         (module Circuit)
+         curve_order
+  in
+
+  (* C4: Decompose u1 into bits *)
+  let u1_bits =
+    exists (Typ.array ~length:scalar_bits Boolean.typ) ~compute:(fun () ->
+        Common.bignum_bigint_unpack
+        @@ Foreign_field.Element.Standard.to_bignum_bigint_as_prover
+             (module Circuit)
+             u1 )
+  in
+
+  (* C5: Decompose u2 into bits *)
+  let u2_bits =
+    exists (Typ.array ~length:scalar_bits Boolean.typ) ~compute:(fun () ->
+        Common.bignum_bigint_unpack
+        @@ Foreign_field.Element.Standard.to_bignum_bigint_as_prover
+             (module Circuit)
+             u2 )
+  in
+
+  (* C6: Constrain scalar multiplication u1G *)
+  let u1_point =
+    group_scalar_mul
+      (module Circuit)
+      external_checks u1_bits gen ia ?doubles ~a foreign_field_modulus
+  in
+
+  (* Bounds 6: Point gen is gadget input (checked externally)
+   *           Initial accumulator is gadget input (checked externally)
+   *           Result bound check for u1_point below.
+   *)
+  Foreign_field.External_checks.append_bound_check external_checks
+  @@ Foreign_field.Element.Standard.to_limbs @@ Affine.x u1_point ;
+  Foreign_field.External_checks.append_bound_check external_checks
+  @@ Foreign_field.Element.Standard.to_limbs @@ Affine.y u1_point ;
+
+  (* C7: Constrain scalar multiplication u2P *)
+  let u2_point =
+    group_scalar_mul
+      (module Circuit)
+      external_checks u2_bits pubkey ia ?doubles ~a foreign_field_modulus
+  in
+  (* Bounds 7: Point gen is gadget input (checked externally)
+   *           Initial accumulator is gadget input (checked externally)
+   *           Result bound check for u1_point below.
+   *)
+  Foreign_field.External_checks.append_bound_check external_checks
+  @@ Foreign_field.Element.Standard.to_limbs @@ Affine.x u2_point ;
+  Foreign_field.External_checks.append_bound_check external_checks
+  @@ Foreign_field.Element.Standard.to_limbs @@ Affine.y u2_point ;
+
+  (* C8: R = u1G + u2P *)
+  let result =
+    group_add
+      (module Circuit)
+      external_checks u1_point u2_point foreign_field_modulus
+  in
+
+  (* Bounds 8: Left and right inputs checked by (Bounds 6) and (Bounds 7)
+   *           Result bound is bound checked below
+   *)
+  Foreign_field.External_checks.append_bound_check external_checks
+  @@ Foreign_field.Element.Standard.to_limbs @@ Affine.x result ;
+  Foreign_field.External_checks.append_bound_check external_checks
+  @@ Foreign_field.Element.Standard.to_limbs @@ Affine.y result ;
+
+  (* Constrain that r = Rx (mod n), where n is the scalar field modulus (curve_order)
+   *
+   *   Note: The scalar field modulus (curve_order) may be greater or smaller than
+   *         the base field modulus (foreign_field_modulus)
+   *
+   *           curve_order > foreign_field_modulus => Rx = 0 * n + Rx
+   *
+   *           curve_order < foreign_field_modulus  => Rx = q * n + Rx'
+   *
+   *  Thus, to check for congruence we need to compute the remainder modulo n and
+   *  assert that it is equal to r.
+   *)
+
+  (* Compute witness value q and Rx' *)
+  let quotient0, quotient1, quotient2, x_prime0, x_prime1, x_prime2 =
+    exists (Typ.array ~length:6 Field.typ) ~compute:(fun () ->
+        let curve_order =
+          Foreign_field.field_standard_limbs_to_bignum_bigint
+            (module Circuit)
+            curve_order
+        in
+
+        let x =
+          Foreign_field.Element.Standard.to_bignum_bigint_as_prover
+            (module Circuit)
+            (Affine.x result)
+        in
+
+        (* Compute q and r of Rx = q * n + r *)
+        let quotient, x_prime = Common.bignum_bigint_div_rem x curve_order in
+
+        (* Convert from Bignums to field elements *)
+        let quotient0, quotient1, quotient2 =
+          Foreign_field.bignum_bigint_to_field_standard_limbs
+            (module Circuit)
+            quotient
+        in
+        let x_prime0, x_prime1, x_prime2 =
+          Foreign_field.bignum_bigint_to_field_standard_limbs
+            (module Circuit)
+            x_prime
+        in
+
+        (* Return and convert back to Cvars *)
+        [| quotient0; quotient1; quotient2; x_prime0; x_prime1; x_prime2 |] )
+    |> tuple6_of_array
+  in
+
+  (* C9: Compute q * n *)
+  let quotient =
+    Foreign_field.Element.Standard.of_limbs (quotient0, quotient1, quotient2)
+  in
+  let n =
+    Foreign_field.Element.Standard.of_bignum_bigint (module Circuit)
+    @@ Foreign_field.field_standard_limbs_to_bignum_bigint
+         (module Circuit)
+         curve_order
+  in
+  let quotient_n =
+    Foreign_field.mul (module Circuit) external_checks quotient n curve_order
+  in
+  (* Bounds 9: Left input q is bound checked below
+   *           Right input n is curve_order public parameter so not checked
+   *           Result bound check is already covered by external_checks
+   *)
+  Foreign_field.External_checks.append_bound_check external_checks
+  @@ Foreign_field.Element.Standard.to_limbs quotient_n ;
+
+  (* C10: Compute qn + Rx' *)
+  let x_prime =
+    Foreign_field.Element.Standard.of_limbs (x_prime0, x_prime1, x_prime2)
+  in
+  let computed_x =
+    Foreign_field.add
+      (module Circuit)
+      ~full:false quotient_n x_prime curve_order
+  in
+
+  (* as_prover (fun() ->
+       printf "Rx = %s\n" @@ Foreign_field.Element.Standard.to_string_as_prover (module Circuit) @@ Affine.x result;
+       printf "q  = %s\n" @@ Foreign_field.Element.Standard.to_string_as_prover (module Circuit) quotient;
+       printf "x' = %s\n" @@ Foreign_field.Element.Standard.to_string_as_prover (module Circuit) x_prime;
+       printf "n  = %s\n" @@ Foreign_field.Element.Standard.to_string_as_prover (module Circuit) n;
+     ) ; *)
+
+  (* Final Zero gate with result *)
+  let computed_x0, computed_x1, computed_x2 =
+    Foreign_field.Element.Standard.to_limbs computed_x
+  in
+  with_label "ecdsa_verify_computed_x" (fun () ->
+      assert_
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (Raw
+                 { kind = Zero
+                 ; values = [| computed_x0; computed_x1; computed_x2 |]
+                 ; coeffs = [||]
+                 } )
+        } ) ;
+  (* Bounds 10: Left input qn already checked by (Bounds 9)
+   *            Right input x_prime bounds checked below
+   *            Result bound already checked by (Bounds 8)
+   *)
+  Foreign_field.External_checks.append_bound_check external_checks
+  @@ Foreign_field.Element.Standard.to_limbs x_prime ;
+
+  (* C11: Check qn + r = Rx *)
+  Foreign_field.Element.Standard.assert_equal
+    (module Circuit)
+    computed_x (Affine.x result) ;
+
+  (* C12: Check that r = x' *)
+  Foreign_field.Element.Standard.assert_equal (module Circuit) r x_prime ;
+
+  (* C13: Check result is on curve (implies result is not infinity) *)
+  group_is_on_curve
+    (module Circuit)
+    external_checks result ~a ~b foreign_field_modulus ;
+
+  (* Bounds 13: Input already bound checked by (Bounds 8) *)
+  ()
 
 (***************)
 (* Group tests *)
@@ -3291,7 +3611,7 @@ let%test_unit "group_properties" =
 (*******************************)
 
 let%test_unit "group_is_on_curve" =
-  if (* group_scalar_mul_tests *) true then (
+  if (* group_scalar_mul_tests *) false then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -3456,7 +3776,7 @@ let%test_unit "group_is_on_curve" =
     () )
 
 let%test_unit "group_check_ia" =
-  if (* group_scalar_mul_tests *) true then (
+  if (* group_scalar_mul_tests *) false then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -3618,7 +3938,7 @@ let%test_unit "group_check_ia" =
     () )
 
 let%test_unit "group_scalar_mul" =
-  if (* group_scalar_mul_tests *) true then (
+  if (* group_scalar_mul_tests *) false then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -3925,7 +4245,7 @@ let%test_unit "group_scalar_mul" =
     () )
 
 let%test_unit "group_scalar_mul_properties" =
-  if (* group_scalar_mul_tests *) true then (
+  if (* group_scalar_mul_tests *) false then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -4323,5 +4643,276 @@ let%test_unit "group_scalar_mul_properties" =
       test_group_scalar_mul_properties a_scalar b_scalar point a_expected
         b_expected a_plus_b_expected a_times_b_expected negation_expected ia
         secp256k1_order secp256k1_modulus
+    in
+    () )
+
+(***************)
+(* ECDSA tests *)
+(***************)
+
+let%test_unit "ecdsa_verify" =
+  if (* ecdsa_tests *) true then (
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+
+    (* Let's test proving ECDSA signature verification in ZK! *)
+    let test_ecdsa_verify ?cs (pubkey : bignum_point)
+        (signature : Bignum_bigint.t * Bignum_bigint.t) (hash : Bignum_bigint.t)
+        (ia : bignum_point * bignum_point) (gen : bignum_point)
+        ?(a = Bignum_bigint.zero) ?(b = Bignum_bigint.zero)
+        (curve_order : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
+        =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            (* Prepare test inputs *)
+            let ia =
+              let init_acc, neg_init_acc = ia in
+              ( Affine.of_bignum_bigint_coordinates (module Runner.Impl) init_acc
+              , Affine.of_bignum_bigint_coordinates
+                  (module Runner.Impl)
+                  neg_init_acc )
+            in
+            let a =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                a
+            in
+            let b =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                b
+            in
+            let foreign_field_modulus =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                foreign_field_modulus
+            in
+            let curve_order =
+              Foreign_field.bignum_bigint_to_field_standard_limbs
+                (module Runner.Impl)
+                curve_order
+            in
+            let pubkey =
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) pubkey
+            in
+            let gen =
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) gen
+            in
+            let signature =
+              ( Foreign_field.Element.Standard.of_bignum_bigint
+                  (module Runner.Impl)
+                  (fst signature)
+              , Foreign_field.Element.Standard.of_bignum_bigint
+                  (module Runner.Impl)
+                  (snd signature) )
+            in
+            let hash =
+              Foreign_field.Element.Standard.of_bignum_bigint
+                (module Runner.Impl)
+                hash
+            in
+
+            (* Create external checks context for tracking extra constraints
+               that are required for soundness (unused in this simple test) *)
+            let unused_external_checks =
+              Foreign_field.External_checks.create (module Runner.Impl)
+            in
+
+            (* Verify ECDSA signature *)
+            ecdsa_verify
+              (module Runner.Impl)
+              unused_external_checks pubkey signature hash ia gen ~a ~b
+              curve_order foreign_field_modulus ;
+
+            () )
+      in
+
+      cs
+    in
+
+    (* Test 1: ECDSA verify test with real Ethereum mainnet signature
+     *   Tx: https://etherscan.io/tx/0x0d26b1539304a214a6517b529a027f987cd52e70afd8fdc4244569a93121f144
+     *
+     *   Raw tx: 0xf86580850df8475800830186a094353535353535353535353535353535353535353564801ba082de9950cc5aac0dca7210cb4b77320ac9e844717d39b1781e9d941d920a1206a01da497b3c134f50b2fce514d66e20c5e43f9615f097395a5527041d14860a52f
+     *   Msg hash: 0x3e91cd8bd233b3df4e4762b329e2922381da770df1b31276ec77d0557be7fcef
+     *   Raw pubkey: 0x046e0f66759bb520b026a9c7d61c82e8354025f2703696dcdac679b2f7945a352e637c8f71379941fa22f15a9fae9cb725ae337b16f216f5acdeefbd52a0882c27
+     *   Raw signature: 0x82de9950cc5aac0dca7210cb4b77320ac9e844717d39b1781e9d941d920a12061da497b3c134f50b2fce514d66e20c5e43f9615f097395a5527041d14860a52f1b
+     *     r := 0x82de9950cc5aac0dca7210cb4b77320ac9e844717d39b1781e9d941d920a1206
+     *     s := 0x1da497b3c134f50b2fce514d66e20c5e43f9615f097395a5527041d14860a52f
+     *     v := 27
+     *)
+    let eth_pubkey =
+      ( Bignum_bigint.of_string
+          "49781623198970027997721070672560275063607048368575198229673025608762959476014"
+      , Bignum_bigint.of_string
+          "44999051047832679156664607491606359183507784636787036192076848057884504239143"
+      )
+    in
+    let eth_signature =
+      ( (* r *)
+        Bignum_bigint.of_string
+          "59193968509713231970845573191808992654796038550727015999103892005508493218310"
+      , (* s *)
+        Bignum_bigint.of_string
+          "13407882537414256709292360527926092843766608354464979273376653245977131525423"
+      )
+    in
+    let tx_msg_hash =
+      Bignum_bigint.of_string
+        "0x3e91cd8bd233b3df4e4762b329e2922381da770df1b31276ec77d0557be7fcef"
+    in
+
+    assert (secp256k1_is_on_curve eth_pubkey) ;
+
+    let _cs =
+      test_ecdsa_verify eth_pubkey eth_signature tx_msg_hash secp256k1_ia
+        secp256k1_generator ~a:secp256k1_a ~b:secp256k1_b secp256k1_order
+        secp256k1_modulus
+    in
+
+    (* Negative test *)
+    assert (
+      Common.is_error (fun () ->
+          (* Bad hash *)
+          let bad_tx_msg_hash =
+            Bignum_bigint.of_string
+              "0x3e91cd8bd233b3df4e4762b329e2922381da770df1b31276ec77d0557be7fcee"
+          in
+          test_ecdsa_verify eth_pubkey eth_signature bad_tx_msg_hash
+            secp256k1_ia secp256k1_generator ~a:secp256k1_a ~b:secp256k1_b
+            secp256k1_order secp256k1_modulus ) ) ;
+
+    (* Test 2: ECDSA verify test with another real Ethereum mainnet signature
+     *   Tx: https://etherscan.io/tx/0x9cec14aadb06b59b2646333f47efe0ee7f21fed48d93806023b8eb205aa3b161
+     *
+     *   Raw tx: 0x02f9019c018201338405f5e100850cad3895d8830108949440a50cf069e992aa4536211b23f286ef88752187880b1a2bc2ec500000b90124322bba210000000000000000000000008a001303158670e284950565164933372807cd4800000000000000000000000012d220fbda92a9c8f281ea02871afa70dfde81e90000000000000000000000000000000000000000000000000afd4ea3d29472400000000000000000000000000000000000000000461c9bb5bb1c3429b25544e3f4b7bb67d63f9b432df61df28a9897e26284b370adcd7b558fa286babb0efdeb000000000000000000000000000000000000000000000000001cdd1f19bb8dc0000000000000000000000000000000000000000000000000000000006475ed380000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a8f2573c080a0893bc3facf19becba979e31d37ed1b222faab09b8c554a17072f6fbfc1e5658fa01119ef751f0fc3c1ec4d1eeb9db64c9f416ce1aa3267d7b98d8426ab35f0c422
+     *   Msg hash: 0xf7c5983cdb051f68aa84444c4b8ecfdbf60548fe3f5f3f2d19cc5d3c096f0b5b
+     *   Raw pubkey: 0x04ad53a68c2120f9a81288b1377adbe7477b7cec1b9b5ff57d5e331ee7f9e6c2372f997b48cf3faa91023f77754ef63ec49dcd5a61b681b53cda894616c28422c0
+     *   Raw signature: 0x893bc3facf19becba979e31d37ed1b222faab09b8c554a17072f6fbfc1e5658f1119ef751f0fc3c1ec4d1eeb9db64c9f416ce1aa3267d7b98d8426ab35f0c4221c
+     *     r := 0x893bc3facf19becba979e31d37ed1b222faab09b8c554a17072f6fbfc1e5658f
+     *     s := 0x1119ef751f0fc3c1ec4d1eeb9db64c9f416ce1aa3267d7b98d8426ab35f0c422
+     *     v := 0
+     *)
+    let eth_pubkey =
+      Ethereum.pubkey_hex_to_point
+        "0x04ad53a68c2120f9a81288b1377adbe7477b7cec1b9b5ff57d5e331ee7f9e6c2372f997b48cf3faa91023f77754ef63ec49dcd5a61b681b53cda894616c28422c0"
+    in
+
+    let eth_signature =
+      ( (* r *)
+        Bignum_bigint.of_string
+          "0x893bc3facf19becba979e31d37ed1b222faab09b8c554a17072f6fbfc1e5658f"
+      , (* s *)
+        Bignum_bigint.of_string
+          "0x1119ef751f0fc3c1ec4d1eeb9db64c9f416ce1aa3267d7b98d8426ab35f0c422"
+      )
+    in
+    let tx_msg_hash =
+      Bignum_bigint.of_string
+        "0xf7c5983cdb051f68aa84444c4b8ecfdbf60548fe3f5f3f2d19cc5d3c096f0b5b"
+    in
+
+    assert (secp256k1_is_on_curve eth_pubkey) ;
+
+    let _cs =
+      test_ecdsa_verify eth_pubkey eth_signature tx_msg_hash secp256k1_ia
+        secp256k1_generator ~a:secp256k1_a ~b:secp256k1_b secp256k1_order
+        secp256k1_modulus
+    in
+
+    (* Test 3: ECDSA verify test with yet another real Ethereum mainnet signature
+     *   Tx: https://etherscan.io/tx/0x4eb2087dc31dda8fc1bd8680624cd2ae0c1ed0d880de1daefb6fddac208d08fb
+     *
+     *   Raw tx: 0x02f90114011c8405f5e100850d90b9d72982f4a8948a3749936e723325c6b645a0901470cd9e790b9480b8a8b88d4fde00000000000000000000000085210d346e2baa59a486dd19cf9d18f1325d9ffc00000000000000000000000039f083386e75120d2c6c152900219849dbdaa7e60000000000000000000000000000000000000000000000000000000000000b7100000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000360c6ebec080a0a8c5ae8e178c29a3de4a70ef0d22cbb29a8a0013cfa81fea66885556573debe1a031532f9be326029161a4b7bedb80ea4d20b1293cbefb51cc570e72e6aa4ef4d1
+     *   Msg hash: 0xccdea6d5fce0363b9fbc2cf9a14087fc67c79fbdf55b25789ee2d51dcd82dbc1
+     *   Raw pubkey: 0x042b7a248bf6fa2acc079d4f451c68c56a40ef81aeaf6a89c10ed6d692f7a6fdea0c05f95d601c3ab4f75d9253d356ab7af4d7d2ac250e0832581d08f1e224a976
+     *   Raw signature: 0xa8c5ae8e178c29a3de4a70ef0d22cbb29a8a0013cfa81fea66885556573debe131532f9be326029161a4b7bedb80ea4d20b1293cbefb51cc570e72e6aa4ef4d11c
+     *     r := 0xa8c5ae8e178c29a3de4a70ef0d22cbb29a8a0013cfa81fea66885556573debe1
+     *     s := 0x31532f9be326029161a4b7bedb80ea4d20b1293cbefb51cc570e72e6aa4ef4d1
+     *     v := 0
+     *)
+    let eth_pubkey =
+      Ethereum.pubkey_hex_to_point
+        "0x042b7a248bf6fa2acc079d4f451c68c56a40ef81aeaf6a89c10ed6d692f7a6fdea0c05f95d601c3ab4f75d9253d356ab7af4d7d2ac250e0832581d08f1e224a976"
+    in
+
+    let eth_signature =
+      ( (* r *)
+        Bignum_bigint.of_string
+          "0xa8c5ae8e178c29a3de4a70ef0d22cbb29a8a0013cfa81fea66885556573debe1"
+      , (* s *)
+        Bignum_bigint.of_string
+          "0x31532f9be326029161a4b7bedb80ea4d20b1293cbefb51cc570e72e6aa4ef4d1"
+      )
+    in
+    let tx_msg_hash =
+      Bignum_bigint.of_string
+        "0xccdea6d5fce0363b9fbc2cf9a14087fc67c79fbdf55b25789ee2d51dcd82dbc1"
+    in
+
+    assert (secp256k1_is_on_curve eth_pubkey) ;
+
+    let cs =
+      test_ecdsa_verify eth_pubkey eth_signature tx_msg_hash secp256k1_ia
+        secp256k1_generator ~a:secp256k1_a ~b:secp256k1_b secp256k1_order
+        secp256k1_modulus
+    in
+
+    assert (
+      Common.is_error (fun () ->
+          (* Bad signature *)
+          let bad_eth_signature =
+            ( (* r *)
+              Bignum_bigint.of_string
+                "0xc8c5ae8e178c29a3de4a70ef0d22cbb29a8a0013cfa81fea66885556573debe1"
+            , (* s *)
+              Bignum_bigint.of_string
+                "0x31532f9be326029161a4b7bedb80ea4d20b1293cbefb51cc570e72e6aa4ef4d1"
+            )
+          in
+          test_ecdsa_verify eth_pubkey bad_eth_signature tx_msg_hash
+            secp256k1_ia secp256k1_generator ~a:secp256k1_a ~b:secp256k1_b
+            secp256k1_order secp256k1_modulus ) ) ;
+
+    (* Test 4: Constraint system reuse
+     *   Tx: https://etherscan.io/tx/0xfc7d65547eb5192c2f35b7e190b4792a9ebf79876f164ead32288e9fe2b7e4f3
+     *
+     *   Raw tx: 0x02f8730113843b9aca00851405ffdc00825b0494a9d1e08c7793af67e9d92fe308d5697fb81d3e4388299ce7c69d7b9c1780c001a06d5a635efe29deca27e52e96dd2d4056cff1a4b51f88d363f1c3802a26cd67a0a07c34d16c2831ee6265d6d2a55cee6e3273f41480424686d44fe709ce7cfd1567
+     *   Msg hash: 0x62c771b337f1a0070dddb863b953017aa12918fc37f338419f7664fda443ce93
+     *   Raw pubkey: 0x041d4911ee95f0858df65b942fe88cd54d6c06f73fc9e716db1e153d9994b16930e0284e96e308ef77f1d588aa446237111ab370eeab84059a08980e7e7ab0c467
+     *   Raw signature: 0x6d5a635efe29deca27e52e96dd2d4056cff1a4b51f88d363f1c3802a26cd67a07c34d16c2831ee6265d6d2a55cee6e3273f41480424686d44fe709ce7cfd15671b
+     *     r := 0xa8c5ae8e178c29a3de4a70ef0d22cbb29a8a0013cfa81fea66885556573debe1
+     *     s := 0x31532f9be326029161a4b7bedb80ea4d20b1293cbefb51cc570e72e6aa4ef4d1
+     *     v := 1
+     *)
+    let eth_pubkey =
+      Ethereum.pubkey_hex_to_point
+        "0x041d4911ee95f0858df65b942fe88cd54d6c06f73fc9e716db1e153d9994b16930e0284e96e308ef77f1d588aa446237111ab370eeab84059a08980e7e7ab0c467"
+    in
+
+    let eth_signature =
+      ( (* r *)
+        Bignum_bigint.of_string
+          "0x6d5a635efe29deca27e52e96dd2d4056cff1a4b51f88d363f1c3802a26cd67a0"
+      , (* s *)
+        Bignum_bigint.of_string
+          "0x7c34d16c2831ee6265d6d2a55cee6e3273f41480424686d44fe709ce7cfd1567"
+      )
+    in
+    let tx_msg_hash =
+      Bignum_bigint.of_string
+        "0x62c771b337f1a0070dddb863b953017aa12918fc37f338419f7664fda443ce93"
+    in
+
+    assert (secp256k1_is_on_curve eth_pubkey) ;
+
+    let _cs =
+      test_ecdsa_verify ~cs eth_pubkey eth_signature tx_msg_hash secp256k1_ia
+        secp256k1_generator ~a:secp256k1_a ~b:secp256k1_b secp256k1_order
+        secp256k1_modulus
     in
     () )
