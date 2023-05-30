@@ -848,9 +848,10 @@ let%test_module "account timing check" =
                 Timed
                   { initial_minimum_balance =
                       Currency.Balance.of_mina_int_exn 10_000
-                  ; cliff_time = Mina_numbers.Global_slot.of_int 10_000
+                  ; cliff_time =
+                      Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.of_mina_int_exn 9_995
-                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -875,7 +876,7 @@ let%test_module "account timing check" =
                 ledger_init_state ;
               (* slot before cliff, insufficient fund to pay fee *)
               apply_user_commands_at_slot ledger
-                (Mina_numbers.Global_slot.of_int 9_000)
+                (Mina_numbers.Global_slot_since_genesis.of_int 9_000)
                 ~expected_rejection:true
                 [ Mina_transaction.Transaction.Command
                     (Signed_command user_command)
@@ -892,9 +893,10 @@ let%test_module "account timing check" =
                 Timed
                   { initial_minimum_balance =
                       Currency.Balance.of_mina_int_exn 10_000
-                  ; cliff_time = Mina_numbers.Global_slot.of_int 10_000
+                  ; cliff_time =
+                      Mina_numbers.Global_slot_since_genesis.of_int 10_000
                   ; cliff_amount = Currency.Amount.of_mina_int_exn 9_995
-                  ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                  ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                   ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                   }
               in
@@ -918,7 +920,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               apply_user_commands_at_slot ledger
-                (Mina_numbers.Global_slot.of_int 10_000)
+                (Mina_numbers.Global_slot_since_genesis.of_int 10_000)
                 ~expected_rejection:true
                 [ Mina_transaction.Transaction.Command
                     (Signed_command user_command)
@@ -938,9 +940,10 @@ let%test_module "account timing check" =
                   Timed
                     { initial_minimum_balance =
                         Currency.Balance.of_mina_int_exn 10_000
-                    ; cliff_time = Mina_numbers.Global_slot.of_int 10_000
+                    ; cliff_time =
+                        Mina_numbers.Global_slot_since_genesis.of_int 10_000
                     ; cliff_amount = Currency.Amount.of_mina_int_exn 9_995
-                    ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                    ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                     ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                     }
                 else Untimed
@@ -968,7 +971,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               apply_user_commands_at_slot ledger
-                (Mina_numbers.Global_slot.of_int 11_000)
+                (Mina_numbers.Global_slot_since_genesis.of_int 11_000)
                 [ Mina_transaction.Transaction.Command
                     (Signed_command user_command)
                 ] ) )
@@ -987,9 +990,10 @@ let%test_module "account timing check" =
                   Timed
                     { initial_minimum_balance =
                         Currency.Balance.of_mina_int_exn 10_000
-                    ; cliff_time = Mina_numbers.Global_slot.of_int 10_000
+                    ; cliff_time =
+                        Mina_numbers.Global_slot_since_genesis.of_int 10_000
                     ; cliff_amount = Currency.Amount.of_mina_int_exn 9_995
-                    ; vesting_period = Mina_numbers.Global_slot.of_int 1
+                    ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                     ; vesting_increment = Currency.Amount.of_nanomina_int_exn 10
                     }
                 else Untimed
