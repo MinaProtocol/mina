@@ -29,7 +29,6 @@ module Failure = struct
       | Update_not_permitted_permissions
       | Update_not_permitted_nonce
       | Update_not_permitted_voting_for
-      | Permission_for_update_vk_can_not_be_proof_or_impossible
       | Zkapp_command_replay_check_failed
       | Fee_payer_nonce_must_increase
       | Fee_payer_must_be_signed

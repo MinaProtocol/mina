@@ -1440,10 +1440,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                   fun ~proof_verifies:_ ~signature_verifies perm ->
                     Permissions.Auth_required.Checked.eval_no_proof
                       ~signature_verifies perm
-
-            let is_proof_or_impossible perm_checked =
-              Permissions.Auth_required.Checked.is_proof_or_impossible
-                perm_checked
           end
 
           module Ledger = struct

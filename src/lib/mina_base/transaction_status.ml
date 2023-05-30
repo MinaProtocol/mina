@@ -35,7 +35,6 @@ module Failure = struct
         | Update_not_permitted_permissions
         | Update_not_permitted_nonce
         | Update_not_permitted_voting_for
-        | Permission_for_update_vk_can_not_be_proof_or_impossible
         | Zkapp_command_replay_check_failed
         | Fee_payer_nonce_must_increase
         | Fee_payer_must_be_signed
@@ -120,7 +119,6 @@ module Failure = struct
       ~update_not_permitted_token_symbol:add
       ~update_not_permitted_permissions:add ~update_not_permitted_nonce:add
       ~update_not_permitted_voting_for:add
-      ~permission_for_update_vk_can_not_be_proof_or_impossible:add
       ~zkapp_command_replay_check_failed:add ~fee_payer_nonce_must_increase:add
       ~fee_payer_must_be_signed:add
       ~account_balance_precondition_unsatisfied:add
@@ -196,8 +194,6 @@ module Failure = struct
         "Update_not_permitted_nonce"
     | Update_not_permitted_voting_for ->
         "Update_not_permitted_voting_for"
-    | Permission_for_update_vk_can_not_be_proof_or_impossible ->
-        "Permission_for_update_vk_can_not_be_proof_or_impossible"
     | Zkapp_command_replay_check_failed ->
         "Zkapp_command_replay_check_failed"
     | Fee_payer_nonce_must_increase ->
@@ -290,8 +286,6 @@ module Failure = struct
         Ok Update_not_permitted_nonce
     | "Update_not_permitted_voting_for" ->
         Ok Update_not_permitted_voting_for
-    | "Permission_for_update_vk_can_not_be_proof_or_impossible" ->
-        Ok Permission_for_update_vk_can_not_be_proof_or_impossible
     | "Zkapp_command_replay_check_failed" ->
         Ok Zkapp_command_replay_check_failed
     | "Fee_payer_nonce_must_increase" ->
@@ -432,9 +426,6 @@ module Failure = struct
     | Update_not_permitted_voting_for ->
         "The authentication for an account didn't allow the requested update \
          to its voted-for state hash"
-    | Permission_for_update_vk_can_not_be_proof_or_impossible ->
-        "The permission to set verification key cannot be proof-only or \
-         impossible. It can be Signature, Either, or None"
     | Zkapp_command_replay_check_failed ->
         "Check to avoid replays failed. The account update must increment \
          nonce or use full commitment if the authorization is a signature"

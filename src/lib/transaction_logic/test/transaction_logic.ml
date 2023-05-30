@@ -505,37 +505,6 @@ let%test_module "Test transaction logic." =
                       ] ) ) )
             (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
-    let test_vk_update_permission ~auth =
-      Quickcheck.test ~trials:1
-        (let open Quickcheck in
-        let open Generator.Let_syntax in
-        let%bind account = Test_account.gen_with_zkapp in
-        let perm =
-          { Permissions.user_default with set_verification_key = auth }
-        in
-        let txn =
-          Alter_account.make ~account:account.pk
-            { Account_update.Update.noop with permissions = Set perm }
-        in
-        let%map fee = Fee.(gen_incl zero (balance_to_fee account.balance)) in
-        (account.pk, fee, [ account ], [ (txn :> transaction) ]))
-        ~f:(fun (fee_payer, fee, accounts, txns) ->
-          [%test_pred: Zk_cmd_result.t Or_error.t]
-            (Predicates.pure ~f:(fun (txn, _ledger) ->
-                 Transaction_status.equal txn.command.status
-                   (Failed
-                      [ []
-                      ; [ Permission_for_update_vk_can_not_be_proof_or_impossible
-                        ]
-                      ] ) ) )
-            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
-
-    let%test_unit "Update_verification_key can not be set to be proof" =
-      test_vk_update_permission ~auth:Permissions.Auth_required.Proof
-
-    let%test_unit "Update_verification_key can not be set to be impossible" =
-      test_vk_update_permission ~auth:Permissions.Auth_required.Impossible
-
     let%test_unit "All updates must succeed or none is applied." =
       (* But the fee is still paid. *)
       Quickcheck.test ~trials
