@@ -1,6 +1,6 @@
 (library
  (name zkapp_command_test)
- (modules fee_related transaction_commitments valid_size)
+ (modules fee_related transaction_commitments valid_size invalid_update_vk_permission)
  (inline_tests)
  (library_flags -linkall)
  (flags -w -22)
