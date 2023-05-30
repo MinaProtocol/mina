@@ -1366,6 +1366,15 @@ module Block = struct
                 (module Conn)
                 ~public_keys ~parent_id
         in
+        let global_slot_since_hard_fork =
+          Consensus.Data.Consensus_state.curr_global_slot consensus_state
+          |> Unsigned.UInt32.to_int64
+        in
+        let chain_status =
+          if Int64.equal global_slot_since_hard_fork 0L then
+            Chain_status.(to_string Canonical)
+          else Chain_status.(to_string Pending)
+        in
         let%bind block_id =
           Conn.find
             (Caqti_request.find typ Caqti_type.int
@@ -1392,9 +1401,7 @@ module Block = struct
                 |> Blockchain_state.staged_ledger_hash
                 |> Staged_ledger_hash.ledger_hash |> Ledger_hash.to_base58_check
             ; height
-            ; global_slot_since_hard_fork =
-                Consensus.Data.Consensus_state.curr_global_slot consensus_state
-                |> Unsigned.UInt32.to_int64
+            ; global_slot_since_hard_fork
             ; global_slot_since_genesis =
                 consensus_state
                 |> Consensus.Data.Consensus_state.global_slot_since_genesis
@@ -1402,8 +1409,7 @@ module Block = struct
             ; timestamp =
                 Protocol_state.blockchain_state protocol_state
                 |> Blockchain_state.timestamp |> Block_time.to_int64
-                (* we don't yet know the chain status for a block we're adding *)
-            ; chain_status = Chain_status.(to_string Pending)
+            ; chain_status
             }
         in
         let account_creation_fee_of_fees_and_balance ?additional_fee fee balance
@@ -2282,6 +2288,38 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
       let add_accounts () =
         Caqti_async.Pool.use
           (fun (module Conn : CONNECTION) ->
+            (* blocks depend on having the protocol version set, which the daemon does on startup;
+               the actual value doesn't affect the block state hash, which is how we
+               identify a block in the archive db
+
+               here, we just set the protocol version to a dummy value *)
+            Protocol_version.(set_current zero) ;
+            let proof_level = Genesis_constants.Proof_level.compiled in
+            let constraint_constants =
+              Genesis_constants.Constraint_constants.compiled
+            in
+            let%bind precomputed_values =
+              match%map
+                Genesis_ledger_helper.init_from_config_file ~logger
+                  ~proof_level:(Some proof_level) runtime_config
+              with
+              | Ok (precomputed_values, _) ->
+                  precomputed_values
+              | Error err ->
+                  failwithf "Could not get precomputed values, error: %s"
+                    (Error.to_string_hum err) ()
+            in
+            let genesis_block =
+              let With_hash.{ data = block; hash = the_hashes }, _ =
+                Mina_block.genesis ~precomputed_values
+              in
+              With_hash.{ data = block; hash = the_hashes.state_hash }
+            in
+            let%bind _ =
+              Block.add_if_doesn't_exist
+                (module Conn)
+                ~constraint_constants genesis_block
+            in
             let open Deferred.Result.Let_syntax in
             let%bind () = Conn.start () in
             let rec go accounts =

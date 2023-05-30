@@ -113,6 +113,18 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> signed_command_result Malleable_error.t
 
+      val set_snark_worker :
+           logger:Logger.t
+        -> t
+        -> new_snark_pub_key:Signature_lib.Public_key.Compressed.t
+        -> unit Deferred.Or_error.t
+
+      val must_set_snark_worker :
+           logger:Logger.t
+        -> t
+        -> new_snark_pub_key:Signature_lib.Public_key.Compressed.t
+        -> unit Malleable_error.t
+
       val must_send_test_payments :
            repeat_count:Unsigned.uint32
         -> repeat_delay_ms:Unsigned.uint32
@@ -347,7 +359,8 @@ module Dsl = struct
       -> node_included_in:[ `Any_node | `Node of Engine.Network.Node.t ]
       -> t
 
-    val ledger_proofs_emitted_since_genesis : num_proofs:int -> t
+    val ledger_proofs_emitted_since_genesis :
+      test_config:Test_config.t -> num_proofs:int -> t
   end
 
   module type S = sig

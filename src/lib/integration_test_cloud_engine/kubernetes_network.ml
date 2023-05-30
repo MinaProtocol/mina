@@ -215,6 +215,16 @@ module Node = struct
       }
     |}]
 
+    module Set_snark_worker =
+    [%graphql
+    {|
+      mutation ($input: SetSnarkWorkerInput! ) @encoders(module: "Encoders"){
+        setSnarkWorker(input:$input){
+          lastSnarkWorker
+          }
+      }
+    |}]
+
     module Get_account_data =
     [%graphql
     {|
@@ -526,6 +536,10 @@ module Node = struct
         ] ;
     res
 
+  let must_send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee =
+    send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
+
   let send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
       ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature =
     [%log info] "Sending a payment with raw signature"
@@ -574,10 +588,6 @@ module Node = struct
       ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let must_send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee =
-    send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee
-    |> Deferred.bind ~f:Malleable_error.or_hard_error
-
   let send_test_payments ~repeat_count ~repeat_delay_ms ~logger t ~senders
       ~receiver_pub_key ~amount ~fee =
     [%log info] "Sending a series of test payments"
@@ -602,6 +612,36 @@ module Node = struct
       ~receiver_pub_key ~amount ~fee =
     send_test_payments ~repeat_count ~repeat_delay_ms ~logger t ~senders
       ~receiver_pub_key ~amount ~fee
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+  let set_snark_worker ~logger t ~new_snark_pub_key =
+    [%log info] "Changing snark worker key" ~metadata:(logger_metadata t) ;
+    let open Deferred.Or_error.Let_syntax in
+    let set_snark_worker_graphql () =
+      let input = Some new_snark_pub_key in
+      let set_snark_worker_obj =
+        Graphql.Set_snark_worker.(make @@ makeVariables ~input ())
+      in
+      exec_graphql_request ~logger ~node:t
+        ~query_name:"set_snark_worker_graphql" set_snark_worker_obj
+    in
+    let%map result_obj = set_snark_worker_graphql () in
+    let returned_last_snark_worker_opt =
+      result_obj.setSnarkWorker.lastSnarkWorker
+    in
+    let last_snark_worker =
+      match returned_last_snark_worker_opt with
+      | None ->
+          "<no last snark worker>"
+      | Some last ->
+          last |> Account.Key.to_yojson |> Yojson.Safe.to_string
+    in
+    [%log info] "snark worker changed, lastSnarkWorker: %s" last_snark_worker
+      ~metadata:[ ("lastSnarkWorker", `String last_snark_worker) ] ;
+    ()
+
+  let must_set_snark_worker ~logger t ~new_snark_pub_key =
+    set_snark_worker ~logger t ~new_snark_pub_key
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let dump_archive_data ~logger (t : t) ~data_file =

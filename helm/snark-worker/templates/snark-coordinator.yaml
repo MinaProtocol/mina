@@ -62,6 +62,9 @@ spec:
           {{- if $.Values.mina.enableArchive }}
           "-archive-address", {{ $.Values.mina.archiveAddress }}
           {{- end -}}
+          {{- if $.Values.mina.exposeGraphql }}
+          "-insecure-rest-server",
+          {{- end -}}
         ]
         env:
         - name: "RAYON_NUM_THREADS"
