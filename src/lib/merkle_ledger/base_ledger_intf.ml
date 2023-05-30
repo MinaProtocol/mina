@@ -44,10 +44,10 @@ module type S = sig
        and type t := t
 
   (** list of accounts in the ledger *)
-  val to_list : t -> account list
+  val to_list : t -> account list Async.Deferred.t
 
   (** iterate over all indexes and accounts *)
-  val iteri : t -> f:(index -> account -> unit) -> unit
+  val iteri : t -> f:(index -> account -> unit) -> unit Async.Deferred.t
 
   (** fold over accounts in the ledger, passing the Merkle address *)
   val foldi :
@@ -71,10 +71,10 @@ module type S = sig
     -> init:'accum
     -> f:('accum -> account -> ('accum, 'stop) Base.Continue_or_stop.t)
     -> finish:('accum -> 'stop)
-    -> 'stop
+    -> 'stop Async.Deferred.t
 
   (** set of account ids associated with accounts *)
-  val accounts : t -> account_id_set
+  val accounts : t -> account_id_set Async.Deferred.t
 
   (** Get the public key that owns a token. *)
   val token_owner : t -> token_id -> key option
