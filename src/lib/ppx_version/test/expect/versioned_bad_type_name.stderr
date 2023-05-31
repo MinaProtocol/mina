@@ -1,0 +1,11 @@
+Raised at file "parsing/location.ml", line 514, characters 16-61
+Called from file "src/versioned_module.ml", line 213, characters 8-23
+Called from file "src/versioned_module.ml", line 441, characters 4-50
+Called from file "src/versioned_module.ml", line 487, characters 14-62
+Called from file "list.ml", line 117, characters 24-34
+Called from file "src/list0.ml" (inlined), line 22, characters 40-81
+Called from file "src/versioned_module.ml", line 480, characters 4-1009
+Called from file "src/versioned_module.ml", line 581, characters 6-66
+
+File "test/versioned_bad_type_name.ml", line 7, characters 8-39:
+Error: Expected a single public type t.

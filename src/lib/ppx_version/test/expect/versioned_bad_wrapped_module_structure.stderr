@@ -1,0 +1,2 @@
+File "test/versioned_bad_wrapped_module_structure.ml", line 5, characters 36-43:
+Error: Ppxlib.Deriving: generator 'version' doesn't accept argument 'wrapped'

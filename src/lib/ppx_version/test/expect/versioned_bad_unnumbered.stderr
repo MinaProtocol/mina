@@ -1,0 +1,2 @@
+File "test/versioned_bad_unnumbered.ml", line 4, characters 38-48:
+Error: Ppxlib.Deriving: generator 'version' doesn't accept argument 'unnumbered'

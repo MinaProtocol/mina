@@ -1,0 +1,2 @@
+File "test/versioned_bad_arrow_type.ml", line 8, characters 15-28:
+Error: ppx_bin_shape: unsupported type: int -> string

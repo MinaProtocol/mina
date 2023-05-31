@@ -1,0 +1,6 @@
+Raised at file "parsing/location.ml", line 514, characters 16-61
+Called from file "src/versioned_util.ml", line 10, characters 57-62
+Called from file "src/versioned_module.ml", line 579, characters 18-69
+
+File "test/versioned_module_bad_stable_name.ml", line 4, characters 22-25:
+Error: Expected a module named Stable, but got a module named Bad.

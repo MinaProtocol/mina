@@ -1,0 +1,2 @@
+File "test/versioned_bad_option.ml", line 9, characters 17-26:
+Error: "optin" is neither an OCaml type constructor nor a versioned type

@@ -1,0 +1,2 @@
+File "test/versioned_bad_module_structure.ml", line 6, characters 8-35:
+Error: Versioned type, not a label or variant, must have manifest (right-hand side)

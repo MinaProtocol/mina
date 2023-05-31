@@ -1,0 +1,2 @@
+File "test/versioned_bad_version_name.ml", line 7, characters 10-37:
+Error: Versioning module name must be Vn, for a positive number n, which cannot begin with 0, got: "V01"

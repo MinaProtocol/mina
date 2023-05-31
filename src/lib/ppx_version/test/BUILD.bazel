@@ -1,0 +1,276 @@
+load(
+    "@obazl_rules_ocaml//ocaml:rules.bzl",
+    # "ocaml_executable",
+    # "ocaml_module",
+    "ppx_executable",
+    "ppx_expect_test",
+)
+
+################################################################
+test_suite(
+    name = "test",
+    tests = [
+        ":bad_version_syntax_bin_io_in_functor",
+        ":bad_version_syntax_extension",
+        ":bad_version_syntax_missing_versioned",
+        ":bad_version_syntax_multiple_errors",
+        # ":bad_version_syntax_version_in_functor.ml",
+        ":bad_versioned_in_functor",
+        ":bad_versioned_in_nested_functor",
+
+        ":good_version_syntax",
+
+        ":versioned_bad_arrow_type",
+        ":versioned_bad_contained_types",
+        ":versioned_bad_module_name",
+        ":versioned_bad_module_structure",
+        ":versioned_bad_option",
+        ":versioned_bad_type_name",
+        ":versioned_bad_unnumbered",
+        ":versioned_bad_version_name",
+        ":versioned_bad_wrapped_module_structure",
+        ":versioned_module_bad_missing_to_latest",
+        ":versioned_module_bad_missing_type",
+        ":versioned_module_bad_stable_name",
+        ":versioned_module_bad_version_name",
+        ":versioned_module_bad_version_order",
+
+        ":versioned_module_good",
+        ":versioned_sig_good_ml",
+        ":versioned_sig_good_mli",
+        ":versioned_good",
+    ]
+)
+
+################################################################
+ppx_expect_test(
+    name    = "good_version_syntax",
+    src     = "good_version_syntax.ml",
+    expect  = {"expect/good_version_syntax.ml": "stdout"},
+    ppx     = ":ppx",
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "versioned_good",
+    src     = "versioned_good.ml",
+    expect  = {"expect/versioned_good.ml": "stdout"},
+    ppx     = ":ppx",
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "bad_version_syntax_bin_io_in_functor",
+    src     = "bad_version_syntax_bin_io_in_functor.ml",
+    expect  = {"expect/bad_version_syntax_bin_io_in_functor.ml": "stdout"},
+    ppx     = ":ppx",
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "bad_version_syntax_extension",
+    src     = "bad_version_syntax_extension.ml",
+    expect  = {"expect/bad_version_syntax_extension.ml": "stdout"},
+    ppx     = ":ppx",
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "versioned_module_good",
+    src     = "versioned_module_good.ml",
+    expect  = {"expect/versioned_module_good.ml": "stdout"},
+    ppx     = ":ppx",
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "versioned_sig_good_mli",
+    src     = "versioned_sig_good.mli",
+    expect  = {"expect/versioned_sig_good.mli": "stdout"},
+    ppx     = ":ppx",
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "versioned_sig_good_ml",
+    src     = "versioned_sig_good.ml",
+    expect  = {"expect/versioned_sig_good.ml": "stdout"},
+    ppx     = ":ppx",
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "bad_version_syntax_missing_versioned",
+    src     = "bad_version_syntax_missing_versioned.ml",
+    expect  = {"expect/bad_version_syntax_missing_versioned.ml": "stdout"},
+    ppx     = ":ppx",
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "bad_versioned_in_functor",
+    src     = "bad_versioned_in_functor.ml",
+    expect  = {"expect/bad_versioned_in_functor.ml": "stdout"},
+    ppx     = ":ppx",
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "bad_versioned_in_nested_functor",
+    src     = "bad_versioned_in_nested_functor.ml",
+    expect  = {"expect/bad_versioned_in_nested_functor.ml": "stdout"},
+    ppx     = ":ppx",
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "bad_version_syntax_multiple_errors",
+    src     = "bad_version_syntax_multiple_errors.ml",
+    expect  = {"expect/bad_version_syntax_multiple_errors.ml": "stdout"},
+    ppx     = ":ppx",
+    deps_opam = ["core_kernel"],
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "versioned_bad_module_name",
+    src     = "versioned_bad_module_name.ml",
+    ppx     = ":ppx",
+    expect  = {"expect/versioned_bad_module_name.stderr": "stderr"},
+    deps_opam = ["core_kernel"],
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "versioned_bad_module_structure",
+    src     = "versioned_bad_module_structure.ml",
+    ppx     = ":ppx",
+    expect  = {"expect/versioned_bad_module_structure.stderr": "stderr"},
+    deps_opam = ["core_kernel"],
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "versioned_bad_version_name",
+    src     = "versioned_bad_version_name.ml",
+    ppx     = ":ppx",
+    expect  = {"expect/versioned_bad_version_name.stderr": "stderr"},
+    deps_opam = ["core_kernel"],
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "versioned_bad_wrapped_module_structure",
+    src     = "versioned_bad_wrapped_module_structure.ml",
+    ppx     = ":ppx",
+    expect  = {"expect/versioned_bad_wrapped_module_structure.stderr": "stderr"},
+    deps_opam = ["core_kernel"],
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "versioned_bad_type_name",
+    src     = "versioned_bad_type_name.ml",
+    expect  = {"expect/versioned_bad_type_name.stderr": "stderr"},
+    ppx     = ":ppx",
+    deps_opam = ["core_kernel"],
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "versioned_bad_unnumbered",
+    src     = "versioned_bad_unnumbered.ml",
+    ppx     = ":ppx",
+    expect  = {"expect/versioned_bad_unnumbered.stderr": "stderr"},
+    deps_opam = ["core_kernel"],
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "versioned_bad_option",
+    src     = "versioned_bad_option.ml",
+    ppx     = ":ppx",
+    expect  = {"expect/versioned_bad_option.stderr": "stderr"},
+    deps_opam = ["core_kernel"],
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "versioned_bad_contained_types",
+    src     = "versioned_bad_contained_types.ml",
+    expect  = {"expect/versioned_bad_contained_types.ml": "stdout"},
+    ppx     = ":ppx",
+    deps_opam = ["core_kernel"],
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "versioned_bad_arrow_type",
+    src     = "versioned_bad_arrow_type.ml",
+    ppx     = ":ppx",
+    expect  = {"expect/versioned_bad_arrow_type.stderr": "stderr"},
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "versioned_module_bad_stable_name",
+    src     = "versioned_module_bad_stable_name.ml",
+    expect  = {"expect/versioned_module_bad_stable_name.stderr": "stderr"},
+    ppx     = ":ppx",
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "versioned_module_bad_version_name",
+    src     = "versioned_module_bad_version_name.ml",
+    expect  = {"expect/versioned_module_bad_version_name.stderr": "stderr"},
+    ppx     = ":ppx",
+    deps_opam = ["core_kernel"],
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "versioned_module_bad_missing_type",
+    src     = "versioned_module_bad_missing_type.ml",
+    expect  = {"expect/versioned_module_bad_missing_type.stderr": "stderr"},
+    ppx     = ":ppx",
+    deps_opam = ["core_kernel"],
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "versioned_module_bad_version_order",
+    src     = "versioned_module_bad_version_order.ml",
+    expect  = {"expect/versioned_module_bad_version_order.stderr": "stderr"},
+    ppx     = ":ppx",
+    deps_opam = ["core_kernel"],
+    timeout = "short"
+)
+
+ppx_expect_test(
+    name    = "versioned_module_bad_missing_to_latest",
+    expect  = {"expect/versioned_module_bad_missing_to_latest.ml": "stdout"},
+    src     = "versioned_module_bad_missing_to_latest.ml",
+    ppx     = ":ppx",
+    deps_opam = ["core_kernel"],
+    timeout = "short"
+)
+
+###############
+ppx_executable(
+    name = "ppx",
+    main = "//bzl/ppx/exe:ppxlib_driver",
+    deps = [
+        "//src:ppx_version"
+    ],
+    deps_opam = [
+        "core_kernel",
+        "ppxlib",
+        "ppx_jane",
+        "ppx_deriving_yojson",
+    ],
+    deps_adjunct_opam = [
+        "ppx_deriving_yojson.runtime",
+    ],
+    visibility = ["//visibility:public"],
+)
