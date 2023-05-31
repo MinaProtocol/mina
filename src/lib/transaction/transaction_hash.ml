@@ -246,16 +246,16 @@ let%test_module "Transaction hashes" =
         "BD421DxjdoLimeUh4RA4FEvHdDn6bfxyMVWiWUwbYzQkqhNUv8B5M4gCSREpu9mVueBYoHYWkwB8BMf6iS2jjV8FffvPGkuNeczBfY7YRwLuUGBRCQJ3ktFBrNuu4abqgkYhXmcS2xyzoSGxHbXkJRAokTwjQ9HP6TLSeXz9qa92nJaTeccMnkoZBmEitsZWWnTCMqDc6rhN4Z9UMpg4wzdPMwNJvLRuJBD14Dd5pR84KBoY9rrnv66rHPc4m2hH9QSEt4aEJC76BQ446pHN9ZLmyhrk28f5xZdBmYxp3hV13fJEJ3Gv1XqJMBqFxRhzCVGoKDbLAaNRb5F1u1WxTzJu5n4cMMDEYydGEpNirY2PKQqHkR8gEqjXRTkpZzP8G19qT"
       in
       let expected_hash =
-        "5JuHPnnSmETfMxfC7goshhwdPuUAkTzmxg2uZzLjb3iTWBBn2Wy6"
+        "5JuV53FPXad1QLC46z7wsou9JjjYP87qaUeryscZqLUMmLSg8j2n"
       in
       run_test ~transaction_id ~expected_hash
 
     let%test "signed command v2 hash from transaction id" =
       let transaction_id =
-        "Av1AQg8AlEnpua7SqyAM80vJIW10/Kqnp2FHOMTCii86qa8rSjkAAAD//yIAIPVBcM7g/nXBMy303a594bnQ7OwX4fuaocUqCTbkFglTAJRJ6bmu0qsgDPNLySFtdPyqp6dhRzjEwoovOqmvK0o5AJHytSF/cBVhs1+FGudG82jtzzfsfYhiXF4bDJUQz28kAf4bDZRJ6bmu0qsgDPNLySFtdPyqp6dhRzjEwoovOqmvK0o5AAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+        "Av0IlDV3VklWpVXVRQr7cidImXn8E9nqCAxPjuyUNZ2pu3pJJxkBAAD//yIAIKTVOZ2q1qG1KT11p6844pWJ3fQug1XGnzv2S3N73azIABXhN3d+nO04Y7YqBul1CY5CEq9o34KWvfcB8IWep3kkAf60JFZJVqVV1UUK+3InSJl5/BPZ6ggMT47slDWdqbt6SScZAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
       in
       let expected_hash =
-        "5JuEJtMCq4yK3LnK2uv6FPVdjhYP7r4AKzr73VwQGnyRkRhL9pQL"
+        "5JvBt4173K3t7gQSpFoMGtbtZuYWPSg29cWad5pnnRd9BnAowoqY"
       in
       run_test ~transaction_id ~expected_hash
 
