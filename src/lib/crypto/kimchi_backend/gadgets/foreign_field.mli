@@ -293,6 +293,7 @@ val result_row :
 val mul :
      (module Snark_intf.Run with type field = 'f)
   -> 'f External_checks.t (* external_checks *)
+  -> ?bound_check_result:bool
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)

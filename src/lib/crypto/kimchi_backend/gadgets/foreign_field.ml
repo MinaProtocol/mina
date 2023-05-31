@@ -1075,8 +1075,8 @@ let compute_bound_witness_carry (type f)
 
 (* Foreign field multiplication gadget definition *)
 let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (external_checks : f External_checks.t) (left_input : f Element.Standard.t)
-    (right_input : f Element.Standard.t)
+    (external_checks : f External_checks.t) ?(bound_check_result = true)
+    (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
     (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
   let open Circuit in
   (* Check foreign field modulus < max allowed *)
@@ -1251,8 +1251,9 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     (carry1_lo, product1_lo, product1_hi_0) ;
   External_checks.append_compact_multi_range_check external_checks
     (quotient_bound01, quotient_bound2) ;
-  External_checks.append_bound_check external_checks
-    (remainder0, remainder1, remainder2) ;
+  if bound_check_result then
+    External_checks.append_bound_check external_checks
+      (remainder0, remainder1, remainder2) ;
 
   let left_input0, left_input1, left_input2 =
     Element.Standard.to_limbs left_input
