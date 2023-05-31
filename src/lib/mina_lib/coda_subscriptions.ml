@@ -15,11 +15,7 @@ module Optional_public_key = struct
 end
 
 module Precomputed_block_writer = struct
-  type t =
-    { file : string option
-    ; dir : string option
-    ; log : bool
-    }
+  type t = { file : string option; dir : string option; log : bool }
   [@@deriving fields]
 end
 
@@ -108,7 +104,8 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
       ~if_not_found:ignore
   in
   let dump_precomputed_blocks =
-    is_some (!precomputed_block_writer : Precomputed_block_writer.t).dir in
+    is_some (!precomputed_block_writer : Precomputed_block_writer.t).dir
+  in
   let network =
     match Core.Sys.getenv "NETWORK_NAME" with
     | Some network ->
@@ -145,14 +142,14 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
         if upload_blocks_to_gcloud then
           [%log warn]
             "GCLOUD_BLOCK_UPLOAD_BUCKET environment variable not set. Must be \
-            set to use upload_blocks_to_gcloud" ;
+             set to use upload_blocks_to_gcloud" ;
         None
   in
-  Option.iter (!precomputed_block_writer).file ~f:(fun path ->
+  Option.iter !precomputed_block_writer.file ~f:(fun path ->
       [%log info]
         ~metadata:[ ("path", `String path) ]
         "Precomputed blocks will be logged to the same file $path" ) ;
-  Option.iter (!precomputed_block_writer).dir ~f:(fun path ->
+  Option.iter !precomputed_block_writer.dir ~f:(fun path ->
       [%log info]
         ~metadata:[ ("path", `String path) ]
         "Precomputed blocks will be logged to individual files in $path" ) ;
@@ -169,7 +166,9 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
             Mina_block.Validated.forget new_block
             |> State_hash.With_state_hashes.state_hash
           in
-          (let Precomputed_block_writer.{ file; dir; log } = !precomputed_block_writer in
+          (let Precomputed_block_writer.{ file; dir; log } =
+             !precomputed_block_writer
+           in
            let precomputed_block =
              lazy
                (let scheduled_time = Block_time.now time_controller in
@@ -187,9 +186,9 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
              | Some _, Some bucket ->
                  let hash_string = State_hash.to_base58_check hash in
                  let height =
-                  Mina_block.Validated.forget new_block
-                  |> With_hash.data |> Mina_block.blockchain_length
-                  |> Mina_numbers.Length.to_string
+                   Mina_block.Validated.forget new_block
+                   |> With_hash.data |> Mina_block.blockchain_length
+                   |> Mina_numbers.Length.to_string
                  in
                  let name =
                    sprintf "%s-%s-%s.json" network height hash_string
@@ -257,44 +256,36 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                let json =
                  Yojson.Safe.to_string (Lazy.force precomputed_block)
                in
-                (* original functionality, appends to single file *)
-                Out_channel.with_file ~append:true path
-                  ~f:(fun out_channel ->
-                    Out_channel.output_lines out_channel [ json ] ) ) ;
+               (* original functionality, appends to single file *)
+               Out_channel.with_file ~append:true path ~f:(fun out_channel ->
+                   Out_channel.output_lines out_channel [ json ] ) ) ;
            Option.iter dir ~f:(fun path ->
                (* write precomputed blocks to individual files in the directory *)
-                let json =
-                  Yojson.Safe.to_string (Lazy.force precomputed_block)
+               let json =
+                 Yojson.Safe.to_string (Lazy.force precomputed_block)
+               in
+               let hash_string = State_hash.to_base58_check hash in
+               let height =
+                 Mina_block.Validated.forget new_block
+                 |> With_hash.data |> Mina_block.blockchain_length
+                 |> Mina_numbers.Length.to_string
+               in
+               let name = sprintf "%s-%s-%s.json" network height hash_string in
+               let fpath = Core.Filename.(parts path @ [ name ] |> of_parts) in
+               Out_channel.with_file ~append:false fpath ~f:(fun out_channel ->
+                   Out_channel.output_lines out_channel [ json ] ) ;
+               [%log info]
+                 ~metadata:[ ("block", `String name); ("path", `String path) ]
+                 "Logged precomputed $block to $path" ) ;
+           [%log info] "Saw block with state hash $state_hash"
+             ~metadata:
+               (let state_hash_data =
+                  [ ("state_hash", `String (State_hash.to_base58_check hash)) ]
                 in
-                let hash_string = State_hash.to_base58_check hash in
-                let height =
-                  Mina_block.Validated.forget new_block
-                  |> With_hash.data |> Mina_block.blockchain_length
-                  |> Mina_numbers.Length.to_string
-                in
-                let name =
-                  sprintf "%s-%s-%s.json" network height hash_string
-                in
-                let fpath =
-                  Core.Filename.(parts path @ [ name ] |> of_parts)
-                in
-                Out_channel.with_file ~append:false fpath
-                  ~f:(fun out_channel ->
-                    Out_channel.output_lines out_channel [ json ] ) ;
-                [%log info]
-                  ~metadata:
-                    [ ("block", `String name); ("path", `String path) ]
-                  "Logged precomputed $block to $path" ) ;
-             [%log info] "Saw block with state hash $state_hash"
-               ~metadata:
-                 (let state_hash_data =
-                    [ ("state_hash", `String (State_hash.to_base58_check hash))
-                    ]
-                  in
-                  if log then
-                    state_hash_data
-                    @ [ ("precomputed_block", Lazy.force precomputed_block) ]
-                  else state_hash_data ) ) ;
+                if log then
+                  state_hash_data
+                  @ [ ("precomputed_block", Lazy.force precomputed_block) ]
+                else state_hash_data ) ) ;
           let new_block_no_hash =
             Mina_block.Validated.forget new_block |> With_hash.data
           in

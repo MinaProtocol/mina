@@ -1308,10 +1308,10 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~consensus_local_state ~is_archive_rocksdb
                  ~work_reassignment_wait ~archive_process_location
                  ~log_block_creation ~precomputed_values ~start_time
-                 ?precomputed_blocks_file ?precomputed_blocks_dir ~log_precomputed_blocks
-                 ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-                 ~uptime_submitter_keypair ~stop_time ~node_status_url
-                 ~node_status_type () )
+                 ?precomputed_blocks_file ?precomputed_blocks_dir
+                 ~log_precomputed_blocks ~upload_blocks_to_gcloud
+                 ~block_reward_threshold ~uptime_url ~uptime_submitter_keypair
+                 ~stop_time ~node_status_url () )
           in
           { Coda_initialization.coda
           ; client_trustlist

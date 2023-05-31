@@ -1997,8 +1997,8 @@ let create ?wallets (config : Config.t) =
                     | _ ->
                         [%log' error config.logger]
                           ~metadata:[ ("path", `String path) ]
-                          "$path is not a regular Unix file. \
-                           Local precomputed block appending disabled." ;
+                          "$path is not a regular Unix file. Local precomputed \
+                           block appending disabled." ;
                         failwith "No precomputed block appending" )
               with _ -> None
             in
@@ -2011,12 +2011,16 @@ let create ?wallets (config : Config.t) =
                     | _ ->
                         [%log' error config.logger]
                           ~metadata:[ ("path", `String path) ]
-                          "$path is not a regular Unix directory. \
-                           Local precomputed block dumping disabled." ;
+                          "$path is not a regular Unix directory. Local \
+                           precomputed block dumping disabled." ;
                         failwith "No precomputed block dumping" )
               with _ -> None
             in
-            ref { Precomputed_block_writer.file; dir; log = config.log_precomputed_blocks }
+            ref
+              { Precomputed_block_writer.file
+              ; dir
+              ; log = config.log_precomputed_blocks
+              }
           in
           let subscriptions =
             Coda_subscriptions.create ~logger:config.logger
