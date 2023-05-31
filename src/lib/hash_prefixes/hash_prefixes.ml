@@ -48,7 +48,7 @@ let signature_testnet = create "CodaSignature"
 
 let signature_mainnet = create "MinaSignatureMainnet"
 
-let signature_other chain_name = create (chain_name ^ "Siganture")
+let signature_other chain_name = create (chain_name ^ "Signature")
 
 let receipt_chain_user_command = create "MinaReceiptUC"
 
