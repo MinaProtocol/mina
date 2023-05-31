@@ -1722,6 +1722,11 @@ module Make (Inputs : Inputs_intf) = struct
         Local_state.add_check local_state Update_not_permitted_permissions
           Bool.(Set_or_keep.is_keep permissions ||| has_permission)
       in
+      let permissions =
+        Set_or_keep.set_or_keep ~if_:Account.Permissions.if_ permissions
+          (Account.permissions a)
+      in
+      let a = Account.set_permissions permissions a in
       (a, local_state)
     in
     (* Initialize account's pk, in case it is new. *)
