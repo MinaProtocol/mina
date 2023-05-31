@@ -1,53 +1,52 @@
 (* versioned_types.ml -- static enforcement of versioned types via ppx *)
 
 (* If the dune profile defines "print_versioned_types" to be true, this deriver
-   prints a representation of each versioned type to stdout. The driver "print_versioned_types"
-   can be used to print the types from a particular OCaml source file. This facility is
-   meant to be used in CI to detect changes to versioned types.
+    prints a representation of each versioned type to stdout. The driver "print_versioned_types"
+    can be used to print the types from a particular OCaml source file. This facility is
+    meant to be used in CI to detect changes to versioned types.
 
-   Otherwise, we use this deriver as follows:
+    Otherwise, we use this deriver as follows:
 
-   1) check that versioned type always in valid module hierarchy
-   2) versioned types depend only on other versioned types or OCaml built-in types
+    1) check that versioned type always in valid module hierarchy
+    2) versioned types depend only on other versioned types or OCaml built-in types
 
-  to use, add coda_ppx to the dune pps list, and annotate a type declaration with
-  either
+   to use, add coda_ppx to the dune pps list, and annotate a type declaration with
+   either
 
-    [@@deriving version]
+     [@@deriving version]
 
-  or
+   or
 
-    [@@deriving version { option }]
+     [@@deriving version { option }]
 
-  where option is one of "rpc", "asserted", or "binable".
+   where option is one of "rpc", "asserted", or "binable".
 
-  Without options (the common case), the type must be named "t", and its definition
-  occurs in the module hierarchy "Stable.Vn" or "Stable.Vn.T", where n is a positive integer.
+   Without options (the common case), the type must be named "t", and its definition
+   occurs in the module hierarchy "Stable.Vn" or "Stable.Vn.T", where n is a positive integer.
 
-  The "asserted" option asserts that the type is versioned, to allow compilation
-  to proceed. The types referred to in the type are not checked for versioning
-  with this option.
+   The "asserted" option asserts that the type is versioned, to allow compilation
+   to proceed. The types referred to in the type are not checked for versioning
+   with this option.
 
-  The "binable" option is a synonym for "asserted". It assumes that the type
-  will be serialized using a "Binable.Of_..." or "Make_binable" functors, which relies
-  on the serialization of some other type.
+   The "binable" option is a synonym for "asserted". It assumes that the type
+   will be serialized using a "Binable.Of_..." or "Make_binable" functors, which relies
+   on the serialization of some other type.
 
-  If "rpc" is true, again, the type must be named "query", "response", or "msg",
-  and the type definition occurs in the hierarchy "Vn.T".
+   If "rpc" is true, again, the type must be named "query", "response", or "msg",
+   and the type definition occurs in the hierarchy "Vn.T".
 
-  All these options are available for types within structures.
+   All these options are available for types within structures.
 
-  Within signatures, the declaration
+   Within signatures, the declaration
 
-    val __versioned__ : unit
+     val __versioned__ : unit
 
-  is generated. If the "numbered" option is given, then
+   is generated. If the "numbered" option is given, then
 
-    val version : int
+     val version : int
 
-  is also generated. This option should be needed only by the internal versioning
-  machinery, and not in ordinary code. No other options are available within signatures.
-
+   is also generated. This option should be needed only by the internal versioning
+   machinery, and not in ordinary code. No other options are available within signatures.
 *)
 
 open Core_kernel
@@ -69,7 +68,8 @@ let module_path_list path = List.drop (String.split path ~on:'.') 2
 module Printing = struct
   let contains_deriving_bin_io (attrs : attributes) =
     let derivers =
-      Ast_pattern.(attribute ~name:(string "deriving") ~payload:(single_expr_payload __))
+      Ast_pattern.(
+        attribute ~name:(string "deriving") ~payload:(single_expr_payload __))
     in
     match
       List.find_map attrs ~f:(fun attr ->
@@ -81,7 +81,7 @@ module Printing = struct
           | Pexp_tuple derivers ->
               derivers
           | _ ->
-              [derivers]
+              [ derivers ]
         in
         let bin_io_pattern =
           Ast_pattern.(pexp_ident (lident (string "bin_io")))
@@ -98,7 +98,10 @@ module Printing = struct
       let loc = Location.none
     end) in
     let open E in
-    {attr_name={txt= "deriving"; loc}; attr_payload=PStr [%str bin_io]; attr_loc=Location.none}
+    { attr_name = { txt = "deriving"; loc }
+    ; attr_payload = PStr [%str bin_io]
+    ; attr_loc = Location.none
+    }
 
   (* remove internal attributes, on core type in manifest and in records or variants in kind *)
   let type_decl_remove_internal_attributes type_decl =
@@ -106,35 +109,40 @@ module Printing = struct
       match type_decl.ptype_kind with
       | Ptype_variant ctors ->
           Ptype_variant
-            (List.map ctors ~f:(fun ctor -> {ctor with pcd_attributes= []}))
+            (List.map ctors ~f:(fun ctor -> { ctor with pcd_attributes = [] }))
       | Ptype_record labels ->
           Ptype_record
-            (List.map labels ~f:(fun label -> {label with pld_attributes= []}))
+            (List.map labels ~f:(fun label ->
+                 { label with pld_attributes = [] } ) )
       | kind ->
           kind
     in
     let removed_in_manifest =
       Option.map type_decl.ptype_manifest ~f:(fun core_type ->
-          {core_type with ptyp_attributes= []} )
+          { core_type with ptyp_attributes = [] } )
     in
     { type_decl with
-      ptype_manifest= removed_in_manifest
-    ; ptype_kind= removed_in_kind }
+      ptype_manifest = removed_in_manifest
+    ; ptype_kind = removed_in_kind
+    }
 
   (* filter attributes from types, except for bin_io, don't care about changes to others *)
   let filter_type_decls_attrs type_decl =
     (* retain only `deriving bin_io` in deriving list *)
     let ptype_attributes =
-      if contains_deriving_bin_io type_decl.ptype_attributes then [just_bin_io]
+      if contains_deriving_bin_io type_decl.ptype_attributes then
+        [ just_bin_io ]
       else []
     in
     let type_decl_no_attrs = type_decl_remove_internal_attributes type_decl in
-    {type_decl_no_attrs with ptype_attributes}
+    { type_decl_no_attrs with ptype_attributes }
 
   (* convert type_decls to structure item so we can print it *)
   let type_decls_to_stri type_decls =
     (* type derivers only work with recursive types *)
-    {pstr_desc= Pstr_type (Ast.Recursive, type_decls); pstr_loc= Location.none}
+    { pstr_desc = Pstr_type (Ast.Recursive, type_decls)
+    ; pstr_loc = Location.none
+    }
 
   (* prints path_to_type:type_definition *)
   let print_type ~loc:_ ~path (_rec_flag, type_decls) _rpc _asserted _binable =
@@ -143,7 +151,7 @@ module Printing = struct
     List.iteri module_path ~f:(fun i s ->
         printf "%s" s ;
         if i < path_len - 1 then printf "." ) ;
-    printf ".%s" (List.hd_exn type_decls).ptype_name.txt;
+    printf ".%s" (List.hd_exn type_decls).ptype_name.txt ;
     printf ":%!" ;
     let type_decls_filtered_attrs =
       List.map type_decls ~f:filter_type_decls_attrs
@@ -166,7 +174,7 @@ module Deriving = struct
 
   let validate_rpc_type_decl inner3_modules type_decl =
     match List.take inner3_modules 2 with
-    | ["T"; module_version] ->
+    | [ "T"; module_version ] ->
         validate_module_version module_version type_decl.ptype_loc
     | _ ->
         Location.raise_errorf ~loc:type_decl.ptype_loc
@@ -175,7 +183,7 @@ module Deriving = struct
 
   let validate_plain_type_decl inner3_modules type_decl =
     match inner3_modules with
-    | ["T"; module_version; "Stable"] | module_version :: "Stable" :: _ ->
+    | [ "T"; module_version; "Stable" ] | module_version :: "Stable" :: _ ->
         validate_module_version module_version type_decl.ptype_loc
     | _ ->
         Location.raise_errorf ~loc:type_decl.ptype_loc
@@ -190,7 +198,7 @@ module Deriving = struct
     let loc = type_decl.ptype_name.loc in
     match generation_kind with
     | Rpc ->
-        let rpc_valid_names = ["query"; "response"; "msg"] in
+        let rpc_valid_names = [ "query"; "response"; "msg" ] in
         if
           List.find rpc_valid_names ~f:(fun ty -> String.equal ty name)
           |> Option.is_none
@@ -211,14 +219,14 @@ module Deriving = struct
 
   let module_name_from_plain_path inner3_modules =
     match inner3_modules with
-    | ["T"; module_version; "Stable"] | module_version :: "Stable" :: _ ->
+    | [ "T"; module_version; "Stable" ] | module_version :: "Stable" :: _ ->
         module_version
     | _ ->
         failwith "module_name_from_plain_path: unexpected module path"
 
   let module_name_from_rpc_path inner3_modules =
     match List.take inner3_modules 2 with
-    | ["T"; module_version] ->
+    | [ "T"; module_version ] ->
         module_version
     | _ ->
         failwith "module_name_from_rpc_path: unexpected module path"
@@ -253,11 +261,12 @@ module Deriving = struct
     ; "char"
     ; "string"
     ; "bool"
-    ; "unit" ]
+    ; "unit"
+    ]
 
-  let ocaml_builtin_type_constructors = ["list"; "array"; "option"; "ref"]
+  let ocaml_builtin_type_constructors = [ "list"; "array"; "option"; "ref" ]
 
-  let jane_street_type_constructors = ["sexp_opaque"]
+  let jane_street_type_constructors = [ "sexp_opaque" ]
 
   let is_version_module vn =
     let len = String.length vn in
@@ -277,7 +286,7 @@ module Deriving = struct
     | vn :: "Stable" :: _ ->
         is_version_module vn
     | vn :: label :: "Stable" :: "Time" :: _
-      when List.mem ["Span"; "With_utc_sexp"] label ~equal:String.equal ->
+      when List.mem [ "Span"; "With_utc_sexp" ] label ~equal:String.equal ->
         (* special cases, maybe improper module structure *)
         is_version_module vn
     | _ ->
@@ -317,74 +326,76 @@ module Deriving = struct
 
   let rec generate_core_type_version_decls type_name core_type =
     match core_type.ptyp_desc with
-    | Ptyp_constr ({txt; _}, core_types) -> (
-      match txt with
-      | Lident id ->
-          (* type t = id *)
-          if String.equal id type_name (* recursion *) then []
-          else if
-            List.is_empty core_types
-            && List.mem ocaml_builtin_types id ~equal:String.equal
-          then (* no versioning to worry about *)
-            []
-          else if
-            List.mem ocaml_builtin_type_constructors id ~equal:String.equal
-            || List.mem jane_street_type_constructors id ~equal:String.equal
-          then
-            match core_types with
-            | [_] ->
-                generate_version_lets_for_core_types type_name core_types
-            | _ ->
-                Location.raise_errorf ~loc:core_type.ptyp_loc
-                  "Type constructor \"%s\" expects one type argument, got %d"
-                  id (List.length core_types)
-          else
-            Location.raise_errorf ~loc:core_type.ptyp_loc
-              "\"%s\" is neither an OCaml type constructor nor a versioned type"
-              id
-      | Ldot (prefix, "t") ->
-          (* type t = A.B.t
-             if prefix not trustlisted, generate: let _ = A.B.__versioned__
-             disallow Stable.Latest.t
-          *)
-          if is_stable_latest prefix then
-            Location.raise_errorf ~loc:core_type.ptyp_loc
-              "Cannot use type of the form Stable.Latest.t within a versioned \
-               type" ;
-          let core_type_decls =
-            generate_version_lets_for_core_types type_name core_types
-          in
-          if trustlisted_prefix prefix ~loc:core_type.ptyp_loc then
-            core_type_decls
-          else
-            let loc = core_type.ptyp_loc in
-            let pexp_loc = loc in
-            let new_prefix =
-              (* allow types within stable-versioned modules generated
-                 by Hashable.Make_binable, like M.Stable.Vn.Table.t;
-                 generate "let _ = M.Stable.Vn.__versioned__"
-              *)
-              match prefix with
-              | Ldot ((Ldot (_, vn) as longident), label)
-                when is_version_module vn
-                     && List.mem
-                          ["Table"; "Hash_set"; "Hash_queue"]
-                          label ~equal:String.equal ->
-                  longident
+    | Ptyp_constr ({ txt; _ }, core_types) -> (
+        match txt with
+        | Lident id ->
+            (* type t = id *)
+            if String.equal id type_name (* recursion *) then []
+            else if
+              List.is_empty core_types
+              && List.mem ocaml_builtin_types id ~equal:String.equal
+            then (* no versioning to worry about *)
+              []
+            else if
+              List.mem ocaml_builtin_type_constructors id ~equal:String.equal
+              || List.mem jane_street_type_constructors id ~equal:String.equal
+            then
+              match core_types with
+              | [ _ ] ->
+                  generate_version_lets_for_core_types type_name core_types
               | _ ->
-                  prefix
+                  Location.raise_errorf ~loc:core_type.ptyp_loc
+                    "Type constructor \"%s\" expects one type argument, got %d"
+                    id (List.length core_types)
+            else
+              Location.raise_errorf ~loc:core_type.ptyp_loc
+                "\"%s\" is neither an OCaml type constructor nor a versioned \
+                 type"
+                id
+        | Ldot (prefix, "t") ->
+            (* type t = A.B.t
+               if prefix not trustlisted, generate: let _ = A.B.__versioned__
+               disallow Stable.Latest.t
+            *)
+            if is_stable_latest prefix then
+              Location.raise_errorf ~loc:core_type.ptyp_loc
+                "Cannot use type of the form Stable.Latest.t within a \
+                 versioned type" ;
+            let core_type_decls =
+              generate_version_lets_for_core_types type_name core_types
             in
-            let versioned_ident =
-              { pexp_desc=
-                  Pexp_ident {txt= Ldot (new_prefix, "__versioned__"); loc}
-              ; pexp_loc
-              ; pexp_loc_stack=[]
-              ; pexp_attributes= [] }
-            in
-            [%str let __ = [%e versioned_ident]] @ core_type_decls
-      | _ ->
-          Location.raise_errorf ~loc:core_type.ptyp_loc
-            "Unrecognized type constructor for versioned type" )
+            if trustlisted_prefix prefix ~loc:core_type.ptyp_loc then
+              core_type_decls
+            else
+              let loc = core_type.ptyp_loc in
+              let pexp_loc = loc in
+              let new_prefix =
+                (* allow types within stable-versioned modules generated
+                   by Hashable.Make_binable, like M.Stable.Vn.Table.t;
+                   generate "let _ = M.Stable.Vn.__versioned__"
+                *)
+                match prefix with
+                | Ldot ((Ldot (_, vn) as longident), label)
+                  when is_version_module vn
+                       && List.mem
+                            [ "Table"; "Hash_set"; "Hash_queue" ]
+                            label ~equal:String.equal ->
+                    longident
+                | _ ->
+                    prefix
+              in
+              let versioned_ident =
+                { pexp_desc =
+                    Pexp_ident { txt = Ldot (new_prefix, "__versioned__"); loc }
+                ; pexp_loc
+                ; pexp_loc_stack = []
+                ; pexp_attributes = []
+                }
+              in
+              [%str let __ = [%e versioned_ident]] @ core_type_decls
+        | _ ->
+            Location.raise_errorf ~loc:core_type.ptyp_loc
+              "Unrecognized type constructor for versioned type" )
     | Ptyp_tuple core_types ->
         (* type t = t1 * t2 * t3 *)
         generate_version_lets_for_core_types type_name core_types
@@ -443,7 +454,7 @@ module Deriving = struct
 
   let generate_constraint_type_decls type_name cstrs =
     let gen_for_constraint (ty1, ty2, _loc) =
-      List.concat_map [ty1; ty2]
+      List.concat_map [ ty1; ty2 ]
         ~f:(generate_core_type_version_decls type_name)
     in
     List.concat_map cstrs ~f:gen_for_constraint
@@ -457,13 +468,13 @@ module Deriving = struct
     let main_type_version_decls =
       match type_decl.ptype_kind with
       | Ptype_abstract -> (
-        match type_decl.ptype_manifest with
-        | Some manifest ->
-            generate_core_type_version_decls type_name manifest
-        | None ->
-            Location.raise_errorf ~loc:type_decl.ptype_loc
-              "Versioned type, not a label or variant, must have manifest \
-               (right-hand side)" )
+          match type_decl.ptype_manifest with
+          | Some manifest ->
+              generate_core_type_version_decls type_name manifest
+          | None ->
+              Location.raise_errorf ~loc:type_decl.ptype_loc
+                "Versioned type, not a label or variant, must have manifest \
+                 (right-hand side)" )
       | Ptype_variant ctor_decls ->
           List.fold ctor_decls ~init:[] ~f:(fun accum ctor_decl ->
               generate_constructor_decl_decls type_name ctor_decl @ accum )
@@ -481,12 +492,12 @@ module Deriving = struct
     end) in
     let open E in
     let versioned_current = [%stri let __versioned__ = ()] in
-    if asserted then [versioned_current]
+    if asserted then [ versioned_current ]
     else
       match generation_kind with
       | Rpc ->
           (* check whether contained types are versioned,
-           but don't assert versioned-ness of this type *)
+             but don't assert versioned-ness of this type *)
           generate_contained_type_version_decls type_decl
       | Plain ->
           (* check contained types, assert this type is versioned *)
@@ -497,17 +508,17 @@ module Deriving = struct
     let type_decl2 = List.hd_exn (List.rev type_decls) in
     ( if not (Int.equal (List.length type_decls) 1) then
       let loc =
-        { loc_start= type_decl1.ptype_loc.loc_start
-        ; loc_end= type_decl2.ptype_loc.loc_end
-        ; loc_ghost= true }
+        { loc_start = type_decl1.ptype_loc.loc_start
+        ; loc_end = type_decl2.ptype_loc.loc_end
+        ; loc_ghost = true
+        }
       in
       Location.raise_errorf ~loc
-        "Versioned type must be just one type \"t\", not a sequence of types"
-    ) ;
+        "Versioned type must be just one type \"t\", not a sequence of types" ) ;
     type_decl1
 
-  let generate_let_bindings_for_type_decl_str ~loc ~path
-      (_rec_flag, type_decls) rpc asserted binable =
+  let generate_let_bindings_for_type_decl_str ~loc ~path (_rec_flag, type_decls)
+      rpc asserted binable =
     (* binable is synonym for asserted,
        in the sense that we don't require the type to be versioned
     *)
@@ -536,16 +547,16 @@ module Deriving = struct
       *)
       match generation_kind with
       | Rpc when String.equal type_name "query" ->
-        versioned_decls
+          versioned_decls
       | _ ->
-        generate_version_number_decl inner3_modules loc generation_kind
-        @ versioned_decls )
+          generate_version_number_decl inner3_modules loc generation_kind
+          @ versioned_decls )
 
   let generate_val_decls_for_type_decl ~loc type_decl =
     match type_decl.ptype_kind with
     (* the structure of the type doesn't affect what we generate for signatures *)
     | Ptype_abstract | Ptype_variant _ | Ptype_record _ ->
-        [[%sigi: val __versioned__ : unit]]
+        [ [%sigi: val __versioned__ : unit] ]
     | Ptype_open ->
         (* but the type can't be open, else it might vary over time *)
         Location.raise_errorf ~loc
@@ -570,7 +581,7 @@ let str_type_decl :
   in
   let deriver ~loc ~path (rec_flag, type_decls) rpc asserted binable =
     (choose_deriver ~printing:Printing.print_type
-       ~deriving:Deriving.generate_let_bindings_for_type_decl_str)
+       ~deriving:Deriving.generate_let_bindings_for_type_decl_str )
       ~loc ~path (rec_flag, type_decls) rpc asserted binable
   in
   Ppxlib.Deriving.Generator.make args deriver
@@ -579,7 +590,7 @@ let sig_type_decl :
     (signature, rec_flag * type_declaration list) Ppxlib.Deriving.Generator.t =
   let deriver ~loc ~path (rec_flag, type_decls) =
     (choose_deriver ~printing:Printing.gen_empty_sig
-       ~deriving:Deriving.generate_val_decls_for_type_decl_sig)
+       ~deriving:Deriving.generate_val_decls_for_type_decl_sig )
       ~loc ~path (rec_flag, type_decls)
   in
   Ppxlib.Deriving.Generator.make_noarg deriver

@@ -20,9 +20,9 @@ let bin_io_gens :
     (   ctxt:Expansion_context.Deriver.t
      -> rec_flag * type_declaration list
      -> (string * expression) list
-     -> structure_item list)
+     -> structure_item list )
     list =
-  List.map ["bin_shape"; "bin_read"; "bin_write"; "bin_type_class"]
+  List.map [ "bin_shape"; "bin_read"; "bin_write"; "bin_type_class" ]
     ~f:(fun name ->
       let deriver = Option.value_exn (Ppx_derivers.lookup name) in
       (* deriver is an instance of Ppxlib.Deriving.Deriver.deriver
@@ -72,7 +72,7 @@ let bin_io_gens :
 
 let validate_type_decl inner2_modules type_decl =
   match inner2_modules with
-  | [module_version; "Stable"] ->
+  | [ module_version; "Stable" ] ->
       let inside_stable_versioned =
         try
           validate_module_version module_version type_decl.ptype_loc ;
@@ -101,7 +101,8 @@ let rewrite_to_bin_io ~loc ~path (_rec_flag, type_decls) =
   let ctxt =
     let derived_item_loc = loc in
     (* TODO: is inline:false what we want? *)
-    Expansion_context.Deriver.make ~derived_item_loc ~base:ctxt_base () ~inline:false
+    Expansion_context.Deriver.make ~derived_item_loc ~base:ctxt_base ()
+      ~inline:false
   in
   List.concat_map bin_io_gens ~f:(fun gen ->
       gen ~ctxt (Nonrecursive, type_decls) [] )

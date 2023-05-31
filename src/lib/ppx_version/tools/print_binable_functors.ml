@@ -4,7 +4,6 @@
 
    within a versioned type, these should not change
    and they should always appear within a versioned type
-
 *)
 
 open Core_kernel
@@ -14,7 +13,7 @@ open Versioned_util
 
 let name = "print_binable_functors"
 
-type accumulator = {module_path: string list}
+type accumulator = { module_path : string list }
 
 let is_included_binable_functor_app (inc_decl : include_declaration) =
   let of_binable_pattern =
@@ -53,13 +52,13 @@ let is_included_binable_functor_app (inc_decl : include_declaration) =
         (pmod_ident
            (ldot
               (ldot (lident (string "Bin_prot")) (string "Utils"))
-              (string "Make_binable")))
+              (string "Make_binable") ) )
         __)
   in
   let make_binable =
     Option.is_some
-      (parse_opt make_binable_pattern Location.none inc_decl.pincl_mod
-         (fun _ -> Some ()))
+      (parse_opt make_binable_pattern Location.none inc_decl.pincl_mod (fun _ ->
+           Some () ) )
   in
   of_binable || make_binable
 
@@ -79,14 +78,14 @@ let traverse_ast =
 
     method! structure_item stri acc =
       match stri.pstr_desc with
-      | Pstr_module {pmb_name = {txt = Some name; _}; pmb_expr; _} ->
+      | Pstr_module { pmb_name = { txt = Some name; _ }; pmb_expr; _ } ->
           ignore
             (self#module_expr pmb_expr
-               {module_path= name :: acc.module_path}) ;
+               { module_path = name :: acc.module_path } ) ;
           acc
       | Pstr_extension ((name, _payload), _attrs)
         when List.mem
-               ["test"; "test_unit"; "test_module"]
+               [ "test"; "test_unit"; "test_module" ]
                name.txt ~equal:String.equal ->
           (* don't print functors in test code *)
           acc
@@ -98,7 +97,7 @@ let traverse_ast =
   end
 
 let preprocess_impl str =
-  ignore (traverse_ast#structure str {module_path= []}) ;
+  ignore (traverse_ast#structure str { module_path = [] }) ;
   str
 
 let () =

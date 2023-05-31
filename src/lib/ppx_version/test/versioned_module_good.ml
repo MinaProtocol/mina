@@ -42,7 +42,7 @@ let () =
      failure.
   *)
   ( try
-      ignore (M1.Stable.V2.bin_read_t buf ~pos_ref:(ref 0) : int );
+      ignore (M1.Stable.V2.bin_read_t buf ~pos_ref:(ref 0) : int) ;
       assert false
     with Failure _ -> () ) ;
   (* Test that [bin_read_to_latest_opt] finds and uses the right
@@ -59,15 +59,15 @@ module M2 = struct
   [%%versioned
   module Stable = struct
     module V3 = struct
-      type 'a t = {a: 'a; b: int} [@@deriving equal]
+      type 'a t = { a : 'a; b : int } [@@deriving equal]
     end
 
     module V2 = struct
-      type 'a t = {b: M1.Stable.V3.t; a: 'a}
+      type 'a t = { b : M1.Stable.V3.t; a : 'a }
     end
 
     module V1 = struct
-      type t = {a: M1.Stable.V1.t}
+      type t = { a : M1.Stable.V1.t }
     end
   end]
 end
@@ -77,19 +77,19 @@ module M3 = struct
   [%%versioned
   module Stable = struct
     module V3 = struct
-      type t = {a: bool; b: int}
+      type t = { a : bool; b : int }
 
       let to_latest = Fn.id
     end
 
     module V2 = struct
-      type 'a t = {b: M1.Stable.V3.t; a: 'a}
+      type 'a t = { b : M1.Stable.V3.t; a : 'a }
     end
 
     module V1 = struct
-      type t = {a: M1.Stable.V1.t}
+      type t = { a : M1.Stable.V1.t }
 
-      let to_latest {a} = {V3.a; b= (if a then 1 else 0)}
+      let to_latest { a } = { V3.a; b = (if a then 1 else 0) }
     end
   end]
 end
@@ -101,10 +101,10 @@ let () =
   (* Choose a value that could deserialise to [M2.Stable.V3.t] and [V2.t] if
      not for the versioning checks.
   *)
-  let x : M1.Stable.V3.t M2.Stable.V3.t = {M2.a= 15; b= 15} in
+  let x : M1.Stable.V3.t M2.Stable.V3.t = { M2.a = 15; b = 15 } in
   let buf = Bigstring.create 20 in
   (* Test writing given version. *)
-  ignore (M2.Stable.V3.bin_write_t M1.Stable.V3.bin_write_t buf ~pos:0 x : int);
+  ignore (M2.Stable.V3.bin_write_t M1.Stable.V3.bin_write_t buf ~pos:0 x : int) ;
   (* Test that reads are compatible with [With_version]. *)
   let y : M1.Stable.V3.t M2.Stable.V3.With_version.t =
     M2.Stable.V3.With_version.bin_read_t M1.Stable.V3.bin_read_t buf
@@ -124,7 +124,9 @@ let () =
      [M1.Stable.V3.t M2.Stable.V3.t = {a: M1.Stable.V3.t; b: int}]
   *)
   try
-    ignore (M2.Stable.V3.bin_read_t bin_read_int buf ~pos_ref:(ref 0) : int M2.Stable.V3.t) ;
+    ignore
+      ( M2.Stable.V3.bin_read_t bin_read_int buf ~pos_ref:(ref 0)
+        : int M2.Stable.V3.t ) ;
     assert false
   with Assert_failure _ -> ()
 
@@ -133,7 +135,7 @@ module M4 = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = {a: bool; b: int} [@@deriving sexp, equal]
+      type t = { a : bool; b : int } [@@deriving sexp, equal]
 
       let to_latest = Fn.id
     end
@@ -169,7 +171,7 @@ module M6 = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Bool.t [@@deriving version {asserted}]
+      type t = Bool.t [@@deriving version { asserted }]
 
       let to_latest = Fn.id
     end
@@ -189,7 +191,7 @@ end
 
 (* Test that types applied to parameters are properly versioned. *)
 let () =
-  let x : M7.Stable.V1.t = {a= 15; b= 20} in
+  let x : M7.Stable.V1.t = { a = 15; b = 20 } in
   let buf = Bigstring.create 20 in
   (* Test writing given version. *)
   ignore (M7.Stable.V1.bin_write_t buf ~pos:0 x : int) ;
@@ -216,7 +218,7 @@ module M8 = struct
 
       let things = 3
 
-      let _ : int * int * int = (some, other, things)
+      let (_ : int * int * int) = (some, other, things)
 
       let to_latest = Fn.id
 
@@ -237,16 +239,16 @@ module M8 = struct
       include (
         F
           (X) :
-          sig
-            type y = t
-          end )
+            sig
+              type y = t
+            end )
     end
   end]
 
   module X = struct
     open Stable.V1
 
-    let _ : int * int * int = (some, other, things)
+    let (_ : int * int * int) = (some, other, things)
 
     module X = X
 

@@ -3,7 +3,7 @@ open Core_kernel
 (* deriving bin_io in nested functor body *)
 
 module Functor (X : sig end) (Y : sig
-                          val _y : int
+  val _y : int
 end) =
 struct
   [%%versioned

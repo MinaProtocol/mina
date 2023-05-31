@@ -45,7 +45,8 @@ module M4 = struct
   module Stable = struct
     module V1 = struct
       (* record of versioned types *)
-      type t = {one: M0.Stable.V1.t; two: M1.Stable.V1.t} [@@deriving yojson]
+      type t = { one : M0.Stable.V1.t; two : M1.Stable.V1.t }
+      [@@deriving yojson]
 
       let to_latest = Fn.id
     end
@@ -66,13 +67,13 @@ module M5 = struct
   [%%versioned
   module Stable = struct
     module V5 = struct
-      type t = Stable.V1.t array array [@sexp.opaque] [@@deriving sexp]
+      type t = (Stable.V1.t array array[@sexp.opaque]) [@@deriving sexp]
 
       let to_latest = Fn.id
     end
 
     module V4 = struct
-      type t = Stable.V1.t option [@sexp.opaque] [@@deriving sexp]
+      type t = (Stable.V1.t option[@sexp.opaque]) [@@deriving sexp]
 
       let to_latest _ = [||]
     end

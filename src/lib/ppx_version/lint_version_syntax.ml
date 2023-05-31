@@ -22,30 +22,44 @@ let errors_as_warnings_ref = ref false
 
 let make_deriving_validator ~pred err_msg type_decl =
   let derivers =
-    Ast_pattern.(attribute ~name:(string "deriving") ~payload:(single_expr_payload __))
+    Ast_pattern.(
+      attribute ~name:(string "deriving") ~payload:(single_expr_payload __))
   in
-  match List.find_map type_decl.ptype_attributes
-            ~f:(fun attr -> parse_opt derivers Location.none attr (fun l -> Some l)) with
-    | Some derivers ->
+  match
+    List.find_map type_decl.ptype_attributes ~f:(fun attr ->
+        parse_opt derivers Location.none attr (fun l -> Some l) )
+  with
+  | Some derivers ->
       let derivers_loc = derivers.pexp_loc in
       let derivers =
-        match derivers.pexp_desc with Pexp_tuple derivers -> derivers | _ -> [derivers]
+        match derivers.pexp_desc with
+        | Pexp_tuple derivers ->
+            derivers
+        | _ ->
+            [ derivers ]
       in
-      let make_lident_pattern nm = Ast_pattern.(pexp_ident (lident (string nm))) in
+      let make_lident_pattern nm =
+        Ast_pattern.(pexp_ident (lident (string nm)))
+      in
       let version_pattern = make_lident_pattern "version" in
-      let version_with_arg_pattern = Ast_pattern.(pexp_apply (make_lident_pattern "version") __) in
+      let version_with_arg_pattern =
+        Ast_pattern.(pexp_apply (make_lident_pattern "version") __)
+      in
       let bin_io_pattern = make_lident_pattern "bin_io" in
-      let make_find_pattern handler pat = List.exists derivers ~f:(fun deriver ->
-          Option.is_some @@ parse_opt pat Location.none deriver handler)
+      let make_find_pattern handler pat =
+        List.exists derivers ~f:(fun deriver ->
+            Option.is_some @@ parse_opt pat Location.none deriver handler )
       in
       let find_pattern = make_find_pattern (Some ()) in
       let find_with_arg_pattern = make_find_pattern (fun _ -> Some ()) in
       let has_bin_io = find_pattern bin_io_pattern in
-      let has_version = find_pattern version_pattern
-                        || find_with_arg_pattern version_with_arg_pattern
+      let has_version =
+        find_pattern version_pattern
+        || find_with_arg_pattern version_with_arg_pattern
       in
-      if pred has_bin_io has_version then [(derivers_loc, err_msg)] else []
-    | None -> []
+      if pred has_bin_io has_version then [ (derivers_loc, err_msg) ] else []
+  | None ->
+      []
 
 let validate_neither_bin_io_nor_version =
   make_deriving_validator
@@ -66,7 +80,7 @@ let is_version_module vn =
 
 let is_versioned_module_inc_decl inc_decl =
   match inc_decl.pincl_mod.pmod_desc with
-  | Pmod_ident {txt= Ldot (Lident "Stable", name); _}
+  | Pmod_ident { txt = Ldot (Lident "Stable", name); _ }
     when is_version_module name ->
       true
   | _ ->
@@ -78,15 +92,16 @@ let versioned_in_functor_error loc =
 let include_stable_latest_error loc = (loc, "Cannot include Stable.Latest")
 
 type accumulator =
-  { in_functor: bool
-  ; in_include: bool
-  ; in_versioned_ext: bool
-  ; module_path: string list
-  ; errors: (Location.t * string) list }
+  { in_functor : bool
+  ; in_include : bool
+  ; in_versioned_ext : bool
+  ; module_path : string list
+  ; errors : (Location.t * string) list
+  }
 
-let acc_with_errors acc errors = {acc with errors}
+let acc_with_errors acc errors = { acc with errors }
 
-let acc_with_accum_errors acc errors = {acc with errors= acc.errors @ errors}
+let acc_with_accum_errors acc errors = { acc with errors = acc.errors @ errors }
 
 let is_longident_with_id id = function
   | Lident s when String.equal id s ->
@@ -107,7 +122,7 @@ let is_stable_prefix = is_longident_with_id "Stable"
 
 let is_stable_latest_inc_decl inc_decl =
   match inc_decl.pincl_mod.pmod_desc with
-  | Pmod_ident {txt= Ldot (Lident "Stable", "Latest"); _} ->
+  | Pmod_ident { txt = Ldot (Lident "Stable", "Latest"); _ } ->
       true
   | _ ->
       false
@@ -116,7 +131,7 @@ let is_jane_street_prefix prefix =
   match Longident.flatten_exn prefix with
   (* N.B.: Uuid is in core_kernel library, but not in Core_kernel module *)
   | core :: _
-    when List.mem ["Core_kernel"; "Core"; "Uuid"] core ~equal:String.equal ->
+    when List.mem [ "Core_kernel"; "Core"; "Uuid" ] core ~equal:String.equal ->
       true
   | _ ->
       false
@@ -169,7 +184,7 @@ let rec core_types_misuses core_types =
 and get_core_type_versioned_type_misuses core_type =
   match core_type.ptyp_desc with
   | Ptyp_arrow (_label, core_type1, core_type2) ->
-      core_types_misuses [core_type1; core_type2]
+      core_types_misuses [ core_type1; core_type2 ]
   | Ptyp_tuple core_types ->
       core_types_misuses core_types
   | Ptyp_constr (lident, core_types) ->
@@ -201,7 +216,7 @@ and get_core_type_versioned_type_misuses core_type =
         | Rtag (_label, _b, core_types) ->
             core_types
         | Rinherit core_type ->
-            [core_type]
+            [ core_type ]
       in
       let core_types = List.concat_map row_fields ~f:core_types_of_row_field in
       core_types_misuses core_types
@@ -248,7 +263,8 @@ let get_versioned_type_misuses type_decl =
     List.map type_decl.ptype_params ~f:(fun (ty, _variance) -> ty)
   in
   let cstr_types =
-    List.concat_map type_decl.ptype_cstrs ~f:(fun (ty1, ty2, _loc) -> [ty1; ty2])
+    List.concat_map type_decl.ptype_cstrs ~f:(fun (ty1, ty2, _loc) ->
+        [ ty1; ty2 ] )
   in
   let kind_types = types_of_type_kind type_decl.ptype_kind in
   let manifest_types = Option.to_list type_decl.ptype_manifest in
@@ -281,15 +297,15 @@ let lint_ast =
           let errs = get_core_type_versioned_type_misuses core_type in
           acc_with_accum_errors acc errs
       | Pexp_pack mod_expr -> (
-        (* misuses like (module Foo.Stable.V1) *)
-        match mod_expr.pmod_desc with
-        | Pmod_ident id
-          when (not acc.in_versioned_ext) && is_versioned_module_lident id.txt
-          ->
-            let err = (id.loc, "Versioned module cannot be packaged") in
-            acc_with_accum_errors acc [err]
-        | _ ->
-            acc )
+          (* misuses like (module Foo.Stable.V1) *)
+          match mod_expr.pmod_desc with
+          | Pmod_ident id
+            when (not acc.in_versioned_ext) && is_versioned_module_lident id.txt
+            ->
+              let err = (id.loc, "Versioned module cannot be packaged") in
+              acc_with_accum_errors acc [ err ]
+          | _ ->
+              acc )
       | _ ->
           super#expression expr acc
 
@@ -298,32 +314,39 @@ let lint_ast =
         match expr.pmod_desc with
         (* don't match special case of functor with () argument *)
         | Pmod_functor (Named _, body) ->
-            self#module_expr body {acc with in_functor= true}
+            self#module_expr body { acc with in_functor = true }
         | Pmod_apply
-            ( { pmod_desc=
+            ( { pmod_desc =
                   Pmod_apply
-                    ( { pmod_desc=
+                    ( { pmod_desc =
                           Pmod_ident
-                            {txt= Ldot (Lident "Binable", of_binable); _}
-                      ; _ }
-                    , {pmod_desc= Pmod_ident {txt= arg; _}; _} )
+                            { txt = Ldot (Lident "Binable", of_binable); _ }
+                      ; _
+                      }
+                    , { pmod_desc = Pmod_ident { txt = arg; _ }; _ } )
               ; pmod_loc
-              ; _ }
+              ; _
+              }
             , _ )
           when List.mem
-              [ "Of_binable"; "Of_binable_without_uuid"
-              ; "Of_binable1"; "Of_binable1_without_uuid"
-              ; "Of_binable2"; "Of_binable2_without_uuid"
-              ; "Of_binable3"; "Of_binable3_without_uuid"
-              ]
-              of_binable ~equal:String.equal ->
+                 [ "Of_binable"
+                 ; "Of_binable_without_uuid"
+                 ; "Of_binable1"
+                 ; "Of_binable1_without_uuid"
+                 ; "Of_binable2"
+                 ; "Of_binable2_without_uuid"
+                 ; "Of_binable3"
+                 ; "Of_binable3_without_uuid"
+                 ]
+                 of_binable ~equal:String.equal ->
             let include_errors =
               if acc.in_include then []
               else
                 [ ( pmod_loc
                   , sprintf
                       "Binable.%s application must be an argument to an include"
-                      of_binable ) ]
+                      of_binable )
+                ]
             in
             let path_errors =
               if in_stable_versioned_module acc.module_path then []
@@ -331,53 +354,59 @@ let lint_ast =
                 [ ( pmod_loc
                   , sprintf
                       "Binable.%s applied outside of stable-versioned module"
-                      of_binable ) ]
+                      of_binable )
+                ]
             in
             let arg_errors =
               if is_versioned_module_ident arg then []
               else
                 [ ( pmod_loc
                   , sprintf
-                      "First argument to Binable.%s must be a \
-                       stable-versioned module"
-                      of_binable ) ]
+                      "First argument to Binable.%s must be a stable-versioned \
+                       module"
+                      of_binable )
+                ]
             in
-            acc_with_accum_errors acc
-              (include_errors @ path_errors @ arg_errors)
+            acc_with_accum_errors acc (include_errors @ path_errors @ arg_errors)
         | Pmod_apply
-            ( { pmod_desc=
+            ( { pmod_desc =
                   Pmod_apply
-                    ( { pmod_desc=
+                    ( { pmod_desc =
                           Pmod_ident
-                            {txt= Ldot (Lident "Binable", of_binable); _}
-                      ; _ }
+                            { txt = Ldot (Lident "Binable", of_binable); _ }
+                      ; _
+                      }
                     , _ )
               ; pmod_loc
-              ; _ }
+              ; _
+              }
             , _ )
           when List.mem
-              [ "Of_binable_with_uuid"
-              ; "Of_binable1_with_uuid"
-              ; "Of_binable2_with_uuid"
-              ; "Of_binable3_with_uuid"
-              ; "Of_stringable_with_uuid"
-              ; "Of_sexpable_with_uuid"
-              ]
-              of_binable ~equal:String.equal ->
+                 [ "Of_binable_with_uuid"
+                 ; "Of_binable1_with_uuid"
+                 ; "Of_binable2_with_uuid"
+                 ; "Of_binable3_with_uuid"
+                 ; "Of_stringable_with_uuid"
+                 ; "Of_sexpable_with_uuid"
+                 ]
+                 of_binable ~equal:String.equal ->
             let errors =
               [ ( pmod_loc
                 , sprintf
-                    "Binable.%s application not allowed, serialization may be unstable"
-                    of_binable ) ]
+                    "Binable.%s application not allowed, serialization may be \
+                     unstable"
+                    of_binable )
+              ]
             in
             acc_with_accum_errors acc errors
         | Pmod_apply
-            ( { pmod_desc= Pmod_ident {txt= Ldot (Lident "Binable", ftor); _}
+            ( { pmod_desc = Pmod_ident { txt = Ldot (Lident "Binable", ftor); _ }
               ; pmod_loc
-              ; _ }
+              ; _
+              }
             , _ )
           when List.mem
-                 ["Of_sexpable"; "Of_stringable"]
+                 [ "Of_sexpable"; "Of_stringable" ]
                  ftor ~equal:String.equal ->
             let include_errors =
               if acc.in_include then []
@@ -385,7 +414,8 @@ let lint_ast =
                 [ ( pmod_loc
                   , sprintf
                       "Binable.%s application must be an argument to an include"
-                      ftor ) ]
+                      ftor )
+                ]
             in
             let path_errors =
               if in_stable_versioned_module acc.module_path then []
@@ -393,31 +423,36 @@ let lint_ast =
                 [ ( pmod_loc
                   , sprintf
                       "Binable.%s applied outside of stable-versioned module"
-                      ftor ) ]
+                      ftor )
+                ]
             in
             acc_with_accum_errors acc (include_errors @ path_errors)
         | Pmod_apply
-            ( { pmod_desc=
+            ( { pmod_desc =
                   Pmod_ident
-                    { txt=
+                    { txt =
                         Ldot (Ldot (Lident "Bin_prot", "Utils"), "Make_binable")
-                    ; _ }
+                    ; _
+                    }
               ; pmod_loc
-              ; _ }
+              ; _
+              }
             , _ ) ->
             let include_errors =
               if acc.in_include then []
               else
                 [ ( pmod_loc
                   , "Bin_prot.Utils.Make_binable application must be an \
-                     argument to an include" ) ]
+                     argument to an include" )
+                ]
             in
             let path_errors =
               if in_stable_versioned_module acc.module_path then []
               else
                 [ ( pmod_loc
                   , "Bin_prot.Utils.Make_binable applied outside of \
-                     stable-versioned module" ) ]
+                     stable-versioned module" )
+                ]
             in
             acc_with_accum_errors acc (include_errors @ path_errors)
         | _ ->
@@ -427,10 +462,10 @@ let lint_ast =
 
     method! structure_item str acc =
       match str.pstr_desc with
-      | Pstr_module {pmb_name = {txt = Some name; _}; pmb_expr; _} ->
+      | Pstr_module { pmb_name = { txt = Some name; _ }; pmb_expr; _ } ->
           let acc' =
             self#module_expr pmb_expr
-              {acc with module_path= name :: acc.module_path}
+              { acc with module_path = name :: acc.module_path }
           in
           acc_with_errors acc acc'.errors
       | Pstr_type (rec_flag, type_decls) ->
@@ -442,14 +477,15 @@ let lint_ast =
               , "Versioned type must be in %%versioned extension" )
             in
             (* don't enforce %%versioned requirement for query, response types *)
-            if String.equal ty_name "t" then [err] else []
+            if String.equal ty_name "t" then [ err ] else []
           in
           let deriving_errors_fun =
             match rec_flag with
-            | Nonrecursive -> no_errors_fun
+            | Nonrecursive ->
+                no_errors_fun
             | Recursive ->
-              if acc.in_functor then validate_neither_bin_io_nor_version
-              else validate_version_if_bin_io
+                if acc.in_functor then validate_neither_bin_io_nor_version
+                else validate_version_if_bin_io
           in
           let versioned_type_misuse_errors_fun =
             if not @@ in_versioned_type_module acc.module_path then
@@ -470,31 +506,31 @@ let lint_ast =
         when acc.in_functor
              && String.length name.txt >= 9
              && String.equal (String.sub name.txt ~pos:0 ~len:9) "versioned" ->
-          acc_with_accum_errors acc [versioned_in_functor_error name.loc]
-      | Pstr_extension ((name, PStr [stri]), _attrs)
+          acc_with_accum_errors acc [ versioned_in_functor_error name.loc ]
+      | Pstr_extension ((name, PStr [ stri ]), _attrs)
         when String.length name.txt >= 9
              && String.equal (String.sub name.txt ~pos:0 ~len:9) "versioned" ->
           let acc' =
-            self#structure_item stri {acc with in_versioned_ext= true}
+            self#structure_item stri { acc with in_versioned_ext = true }
           in
-          {acc' with in_versioned_ext= false}
+          { acc' with in_versioned_ext = false }
       | Pstr_extension ((name, _payload), _attrs)
         when List.mem
-               ["test"; "test_unit"; "test_module"]
+               [ "test"; "test_unit"; "test_module" ]
                name.txt ~equal:String.equal ->
           (* don't check for errors in test code *)
           acc
       | Pstr_include inc_decl when is_stable_latest_inc_decl inc_decl ->
-          acc_with_errors acc [include_stable_latest_error str.pstr_loc]
+          acc_with_errors acc [ include_stable_latest_error str.pstr_loc ]
       | Pstr_include inc_decl when is_versioned_module_inc_decl inc_decl ->
-          acc_with_errors acc [include_versioned_module_error str.pstr_loc]
+          acc_with_errors acc [ include_versioned_module_error str.pstr_loc ]
       | Pstr_include inc_decl when is_stable_latest_inc_decl inc_decl ->
-          acc_with_errors acc [include_stable_latest_error str.pstr_loc]
+          acc_with_errors acc [ include_stable_latest_error str.pstr_loc ]
       | Pstr_include inc_decl ->
           let acc' =
-            self#module_expr inc_decl.pincl_mod {acc with in_include= true}
+            self#module_expr inc_decl.pincl_mod { acc with in_include = true }
           in
-          {acc' with in_include= false}
+          { acc' with in_include = false }
       | _ ->
           let acc' = super#structure_item str acc in
           acc_with_errors acc acc'.errors
@@ -503,15 +539,16 @@ let lint_ast =
 let lint_impl str =
   let acc =
     lint_ast#structure str
-      { in_functor= false
-      ; in_include= false
-      ; in_versioned_ext= false
-      ; module_path= []
-      ; errors= [] }
+      { in_functor = false
+      ; in_include = false
+      ; in_versioned_ext = false
+      ; module_path = []
+      ; errors = []
+      }
   in
   if !errors_as_warnings_ref then (
     (* we can't print Lint_error.t's, so collect the same information
-     in a way we can print, that is, a list of location, string pairs *)
+       in a way we can print, that is, a list of location, string pairs *)
     List.iter acc.errors ~f:(fun (loc, msg) ->
         eprintf "File \"%s\", line %d, characters %d-%d:\n%!"
           loc.loc_start.pos_fname loc.loc_start.pos_lnum

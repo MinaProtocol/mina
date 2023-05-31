@@ -22,10 +22,9 @@ let check_modname ~loc name : string =
 let diff_formatter =
   let out_funs = Format.(pp_get_formatter_out_functions std_formatter ()) in
   let out_funs' =
-    {
-      out_funs with
-      out_newline = (fun () -> out_funs.out_spaces 1);
-      out_indent = (fun _ -> ());
+    { out_funs with
+      out_newline = (fun () -> out_funs.out_spaces 1)
+    ; out_indent = (fun _ -> ())
     }
   in
   Format.formatter_of_out_functions out_funs'
@@ -43,7 +42,7 @@ let validate_module_version module_version loc =
           Location.raise_errorf ~loc
             "Versioning module name must be Vn, for some positive number n, \
              got: \"%s\""
-            module_version);
+            module_version ) ;
     (* invariant: 0th char is digit *)
     if Int.equal (Char.get_digit_exn numeric_part.[0]) 0 then
       Location.raise_errorf ~loc
@@ -62,7 +61,7 @@ let version_of_versioned_module_name name =
          https://ocaml.janestreet.com/ocaml-core/latest/doc/core_kernel/index.html
 
        add to this list as needed; but more items slows things down
- *)
+*)
 let jane_street_library_modules = [ "Uuid" ]
 
 let jane_street_modules =
