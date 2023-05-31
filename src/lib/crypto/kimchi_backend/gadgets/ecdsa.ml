@@ -1156,7 +1156,7 @@ let group_check_ia (type f)
 let group_scalar_mul (type f)
     (module Circuit : Snark_intf.Run with type field = f)
     (external_checks : f Foreign_field.External_checks.t)
-    (scalar : Circuit.Boolean.var array) (point : f Affine.t)
+    (scalar : Circuit.Boolean.var list) (point : f Affine.t)
     (ia : f Affine.t * f Affine.t) ?(doubles : f Affine.t array option)
     ?(a =
       ( Circuit.Field.Constant.zero
@@ -1217,7 +1217,7 @@ let group_scalar_mul (type f)
    *)
   let init_acc, neg_init_acc = ia in
   let acc, _base =
-    Array.foldi scalar ~init:(init_acc, point) (* (acc, base) *)
+    List.foldi scalar ~init:(init_acc, point) (* (acc, base) *)
       ~f:(fun i (acc, base) bit ->
         (* Add: sum = acc + base *)
         let sum =
@@ -1302,7 +1302,7 @@ let group_check_subgroup (type f)
    *)
   let n_minus_one_bits =
     (* TODO: This should be public curve parameter constants and not constrained here *)
-    exists (Typ.array ~length:scalar_bit_length Boolean.typ) ~compute:(fun () ->
+    exists (Typ.list ~length:scalar_bit_length Boolean.typ) ~compute:(fun () ->
         Common.bignum_bigint_unpack Bignum_bigint.(curve_order_bigint - one) )
   in
 
@@ -1488,20 +1488,16 @@ let ecdsa_verify (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* C3: Decompose u1 into bits *)
   let u1_bits =
-    exists (Typ.array ~length:scalar_bit_length Boolean.typ) ~compute:(fun () ->
-        Common.bignum_bigint_unpack
-        @@ Foreign_field.Element.Standard.to_bignum_bigint_as_prover
-             (module Circuit)
-             u1 )
+    Foreign_field.Element.Standard.unpack
+      (module Circuit)
+      u1 ~length:scalar_bit_length
   in
 
   (* C4: Decompose u2 into bits *)
   let u2_bits =
-    exists (Typ.array ~length:scalar_bit_length Boolean.typ) ~compute:(fun () ->
-        Common.bignum_bigint_unpack
-        @@ Foreign_field.Element.Standard.to_bignum_bigint_as_prover
-             (module Circuit)
-             u2 )
+    Foreign_field.Element.Standard.unpack
+      (module Circuit)
+      u2 ~length:scalar_bit_length
   in
 
   (* C5: Constrain scalar multiplication u1G *)
@@ -4017,7 +4013,7 @@ let%test_unit "group_scalar_mul" =
               let scalar_bits =
                 Common.bignum_bigint_unpack ~remove_trailing:true scalar
               in
-              Array.map scalar_bits ~f:(fun bit ->
+              List.map scalar_bits ~f:(fun bit ->
                   exists Boolean.typ ~compute:(fun () -> bit) )
             in
             let point =
@@ -4327,7 +4323,7 @@ let%test_unit "group_scalar_mul_properties" =
               let a_scalar_bits =
                 Common.bignum_bigint_unpack ~remove_trailing:true a_scalar
               in
-              Array.map a_scalar_bits ~f:(fun bit ->
+              List.map a_scalar_bits ~f:(fun bit ->
                   exists Boolean.typ ~compute:(fun () -> bit) )
             in
             let b_scalar_bits =
@@ -4335,7 +4331,7 @@ let%test_unit "group_scalar_mul_properties" =
               let b_scalar_bits =
                 Common.bignum_bigint_unpack ~remove_trailing:true b_scalar
               in
-              Array.map b_scalar_bits ~f:(fun bit ->
+              List.map b_scalar_bits ~f:(fun bit ->
                   exists Boolean.typ ~compute:(fun () -> bit) )
             in
             let c_scalar_bits =
@@ -4346,7 +4342,7 @@ let%test_unit "group_scalar_mul_properties" =
               let c_scalar_bits =
                 Common.bignum_bigint_unpack ~remove_trailing:true c_scalar
               in
-              Array.map c_scalar_bits ~f:(fun bit ->
+              List.map c_scalar_bits ~f:(fun bit ->
                   exists Boolean.typ ~compute:(fun () -> bit) )
             in
             let point =
@@ -4460,7 +4456,7 @@ let%test_unit "group_scalar_mul_properties" =
               let ab_scalar_bits =
                 Common.bignum_bigint_unpack ~remove_trailing:true ab_scalar
               in
-              Array.map ab_scalar_bits ~f:(fun bit ->
+              List.map ab_scalar_bits ~f:(fun bit ->
                   exists Boolean.typ ~compute:(fun () -> bit) )
             in
 
@@ -4491,7 +4487,7 @@ let%test_unit "group_scalar_mul_properties" =
               let minus_a_scalar_bits =
                 Common.bignum_bigint_unpack ~remove_trailing:true minus_a_scalar
               in
-              Array.map minus_a_scalar_bits ~f:(fun bit ->
+              List.map minus_a_scalar_bits ~f:(fun bit ->
                   exists Boolean.typ ~compute:(fun () -> bit) )
             in
 

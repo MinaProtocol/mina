@@ -202,6 +202,13 @@ module type Element_intf = sig
     -> 'field t
     -> 'field t
     -> 'field t
+
+  (* Decompose and constrain foreign field element into list of boolean cvars *)
+  val unpack :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> length:int
+    -> 'field Cvar.t Snark_intf.Boolean0.t list
 end
 
 (* Foreign field element structures *)
@@ -324,6 +331,15 @@ end = struct
         ( Field.if_ b ~then_:then0 ~else_:else0
         , Field.if_ b ~then_:then1 ~else_:else1
         , Field.if_ b ~then_:then2 ~else_:else2 )
+
+    let unpack (type field)
+        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
+        ~(length : int) : Circuit.Boolean.var list =
+      let open Circuit in
+      let l0, l1, l2 = to_limbs x in
+      Field.unpack l0 ~length:Common.limb_bits
+      @ Field.unpack l1 ~length:Common.limb_bits
+      @ Field.unpack l2 ~length:(length - (2 * Common.limb_bits))
   end
 
   (* Compact limbs foreign field element *)
@@ -412,6 +428,14 @@ end = struct
       of_limbs
         ( Field.if_ b ~then_:then01 ~else_:else01
         , Field.if_ b ~then_:then2 ~else_:else2 )
+
+    let unpack (type field)
+        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
+        ~(length : int) : Circuit.Boolean.var list =
+      let open Circuit in
+      let l01, l2 = to_limbs x in
+      Field.unpack l01 ~length:(2 * Common.limb_bits)
+      @ Field.unpack l2 ~length:(length - (2 * Common.limb_bits))
   end
 end
 

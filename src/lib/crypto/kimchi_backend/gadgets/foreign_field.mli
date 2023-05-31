@@ -108,6 +108,13 @@ module type Element_intf = sig
     -> 'field t
     -> 'field t
     -> 'field t
+
+  (* Decompose and constrain foreign field element into list of boolean cvars *)
+  val unpack :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> length:int
+    -> 'field Cvar.t Snark_intf.Boolean0.t list
 end
 
 module Element : sig
@@ -262,7 +269,7 @@ val sub :
   -> 'f Element.Standard.t
 (* result *)
 
-(* Gadget for creating and addition or subtraction result row (Zero gate with result) *)
+(* Gadget for creating an addition or subtraction result row (Zero gate with result) *)
 val result_row :
      (module Snark_intf.Run with type field = 'f)
   -> ?label:string
