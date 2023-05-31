@@ -456,6 +456,23 @@ end
 
 (* Common auxiliary functions for foreign field gadgets *)
 
+(* TODO: Implement hash function output (e.g. keccak) to ecdsa input integration code *)
+(* Gadget to constrain conversion of bytes array into foreign field element *)
+let _bytes_to_foreign_field_element (type f)
+    (module Circuit : Snark_intf.Run with type field = f) _bytes
+    (_foreign_field_modulus : f standard_limbs) =
+  (* C1: Check bit length of bytes = bit length of foreign field modulus *)
+  (* C2: Constrain bytes into standard foreign field element limbs => foreign field element z *)
+  (* C3: Reduce z modulo foreign_field_modulus
+   *
+   *   Constrain z' = z + 0 modulo foreign_field_modulus using foreign field addition gate
+   *
+   *   Note: this is sufficient because z cannot be double the size due to bit length constraint
+   *)
+  (* C4: Range check z' *)
+  (* return z' *)
+  ()
+
 (* Check that the foreign modulus is less than the maximum allowed *)
 let check_modulus (type f) (module Circuit : Snark_intf.Run with type field = f)
     (foreign_field_modulus : f standard_limbs) =

@@ -1498,9 +1498,6 @@ let ecdsa_verify (type f) (module Circuit : Snark_intf.Run with type field = f)
   Foreign_field.External_checks.append_bound_check external_checks
     (s_inv0, s_inv1, s_inv2) ;
 
-  (* || Check modular reduction of z/hash *)
-  (*    Addition method should be sufficient (same number of bits so can't be double size) *)
-
   (* C2: Constrain u1 = zs^-1 *)
   let u1 =
     Foreign_field.mul (module Circuit) external_checks hash s_inv curve_order
@@ -1689,7 +1686,9 @@ let ecdsa_verify (type f) (module Circuit : Snark_intf.Run with type field = f)
       ~full:false quotient_times_n x_prime curve_order
   in
   (* Addition chain final result row *)
-  Foreign_field.result_row (module Circuit) ~label:"ecdsa_verify_computed_x" computed_x ;
+  Foreign_field.result_row
+    (module Circuit)
+    ~label:"ecdsa_verify_computed_x" computed_x ;
 
   (* Bounds 11: Left input qn is chained input, so not checked
    *            Right input x_prime bounds checked below
