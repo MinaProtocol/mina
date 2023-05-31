@@ -8808,8 +8808,8 @@
                   "ofType": null
                 }
               },
-              "isDeprecated": false,
-              "deprecationReason": null
+              "isDeprecated": true,
+              "deprecationReason": "use source field instead"
             },
             {
               "name": "validUntil",
@@ -9192,8 +9192,8 @@
                   "ofType": null
                 }
               },
-              "isDeprecated": false,
-              "deprecationReason": null
+              "isDeprecated": true,
+              "deprecationReason": "use source field instead"
             },
             {
               "name": "validUntil",

@@ -601,6 +601,8 @@ module Checked = struct
               Boolean.false_
           | `Set_delegate ->
               Boolean.true_
+          | `Increment_nonce ->
+              Boolean.true_
           | `Access ->
               failwith
                 "Account.Checked.has_permission: signature_verifies argument \
@@ -616,6 +618,9 @@ module Checked = struct
     | `Set_delegate ->
         Permissions.Auth_required.Checked.eval_no_proof
           account.permissions.set_delegate ~signature_verifies
+    | `Increment_nonce ->
+        Permissions.Auth_required.Checked.eval_no_proof
+          account.permissions.increment_nonce ~signature_verifies
     | `Access ->
         Permissions.Auth_required.Checked.eval_no_proof
           account.permissions.access ~signature_verifies
@@ -851,6 +856,29 @@ let has_permission ~control ~to_ (account : t) =
       Permissions.Auth_required.check account.permissions.receive control
   | `Set_delegate ->
       Permissions.Auth_required.check account.permissions.set_delegate control
+  | `Increment_nonce ->
+      Permissions.Auth_required.check account.permissions.increment_nonce
+        control
+
+(** [true] iff account has permissions set that enable them to transfer Mina (assuming the command is signed) *)
+let has_permission_to_send account =
+  has_permission ~control:Control.Tag.Signature ~to_:`Access account
+  && has_permission ~control:Control.Tag.Signature ~to_:`Send account
+
+(** [true] iff account has permissions set that enable them to receive Mina *)
+let has_permission_to_receive account =
+  has_permission ~control:Control.Tag.None_given ~to_:`Access account
+  && has_permission ~control:Control.Tag.None_given ~to_:`Receive account
+
+(** [true] iff account has permissions set that enable them to set their delegate (assuming the command is signed) *)
+let has_permission_to_set_delegate account =
+  has_permission ~control:Control.Tag.Signature ~to_:`Access account
+  && has_permission ~control:Control.Tag.Signature ~to_:`Set_delegate account
+
+(** [true] iff account has permissions set that enable them to increment their nonce (assuming the command is signed) *)
+let has_permission_to_increment_nonce account =
+  has_permission ~control:Control.Tag.Signature ~to_:`Access account
+  && has_permission ~control:Control.Tag.Signature ~to_:`Increment_nonce account
 
 let liquid_balance_at_slot ~global_slot (account : t) =
   match account.timing with

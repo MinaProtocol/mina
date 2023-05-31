@@ -646,16 +646,14 @@ module Parse = struct
                             which)
                        (`Json_parse (Some (Core_kernel.Error.to_string_hum e))))
             in
-            let%bind source_pk = parse_pk ~which:"source" payment.from in
+            let%bind fee_payer_pk = parse_pk ~which:"source" payment.from in
             let%bind receiver_pk = parse_pk ~which:"receiver" payment.to_ in
             let body =
               Signed_command_payload.Body.Payment
-                { source_pk
-                ; receiver_pk
+                { receiver_pk
                 ; amount = Mina_currency.Amount.of_uint64 payment.amount
                 }
             in
-            let fee_payer_pk = source_pk in
             let fee = Mina_currency.Fee.of_uint64 payment.fee in
             let signer = fee_payer_pk in
             let valid_until =

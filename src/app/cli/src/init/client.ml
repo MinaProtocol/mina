@@ -483,7 +483,7 @@ let batch_send_payments =
           in
           User_command_input.create ~signer:signer_pk ~fee
             ~fee_payer_pk:signer_pk ~memo:Signed_command_memo.empty ~valid_until
-            ~body:(Payment { source_pk = signer_pk; receiver_pk; amount })
+            ~body:(Payment { receiver_pk; amount })
             ~sign_choice:(User_command_input.Sign_choice.Keypair keypair) () )
     in
     Daemon_rpcs.Client.dispatch_with_message Daemon_rpcs.Send_user_commands.rpc

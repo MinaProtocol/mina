@@ -104,9 +104,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; memo = Signed_command_memo.empty
         }
       in
-      let payment_payload =
-        { Payment_payload.Poly.source_pk = sender_pk; receiver_pk; amount }
-      in
+      let payment_payload = { Payment_payload.Poly.receiver_pk; amount } in
       let body = Signed_command_payload.Body.Payment payment_payload in
       { Signed_command_payload.Poly.common; body }
     in
