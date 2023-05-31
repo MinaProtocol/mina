@@ -1,7 +1,11 @@
 (executable
  (name print_versioned_types)
  (modules print_versioned_types)
- (libraries ppx_version
+ (libraries 
+            core_kernel
+            ppxlib
+            ppxlib.astlib
+            ppx_version
             ; every deriver we might encounter
             ppx_bin_prot
             lens.ppx_deriving
@@ -19,7 +23,12 @@
 (executable
  (name print_binable_functors)
  (modules print_binable_functors)
- (libraries ppx_version
+ (libraries 
+            base
+            core_kernel
+            ppxlib
+            ppxlib.astlib
+            ppx_version
             ; every deriver we might encounter
             ppx_bin_prot
             lens.ppx_deriving
