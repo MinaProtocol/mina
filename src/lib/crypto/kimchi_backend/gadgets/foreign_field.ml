@@ -660,6 +660,23 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
   (* Return the result *)
   (Element.Standard.of_limbs (result0, result1, result2), sign, field_overflow)
 
+(* Gadget for creating an addition or subtraction result row (Zero gate with result) *)
+let result_row (type f) (module Circuit : Snark_intf.Run with type field = f)
+    ?(label = "result_zero_row") (result : f Element.Standard.t) =
+  let open Circuit in
+  let result0, result1, result2 = Element.Standard.to_limbs result in
+  with_label label (fun () ->
+      assert_
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (Raw
+                 { kind = Zero
+                 ; values = [| result0; result1; result2 |]
+                 ; coeffs = [||]
+                 } )
+        } )
+
 (* Gadget to check the supplied value is a valid foreign field element for the
  * supplied foreign field modulus
  *
@@ -707,8 +724,8 @@ let valid_element (type f) (module Circuit : Snark_intf.Run with type field = f)
   let bound, sign, ovf =
     sum_setup (module Circuit) value offset Add foreign_field_modulus
   in
-
-  let bound0, bound1, bound2 = Element.Standard.to_limbs bound in
+  (* Result row *)
+  result_row (module Circuit) ~label:"final_add_zero_gate" bound ;
 
   (* Sanity check *)
   as_prover (fun () ->
@@ -716,20 +733,6 @@ let valid_element (type f) (module Circuit : Snark_intf.Run with type field = f)
       let ovf = Common.cvar_field_to_field_as_prover (module Circuit) ovf in
       assert (Field.Constant.(equal sign one)) ;
       assert (Field.Constant.(equal ovf one)) ) ;
-
-  (* Final Zero gate*)
-  with_label "final_add_zero_gate" (fun () ->
-      (* Set up FFAdd gate *)
-      assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (Raw
-                 { kind = Zero
-                 ; values = [| bound0; bound1; bound2 |]
-                 ; coeffs = [||]
-                 } )
-        } ) ;
 
   (* Set up copy constraints with overflow with the overflow check*)
   Field.Assert.equal ovf Field.one ;
@@ -740,10 +743,10 @@ let valid_element (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* Add external check for multi range check *)
   External_checks.append_multi_range_check external_checks
-    (bound0, bound1, bound2) ;
+  @@ Element.Standard.to_limbs bound ;
 
   (* Return the bound value *)
-  Element.Standard.of_limbs (bound0, bound1, bound2)
+  bound
 
 (* FOREIGN FIELD ADDITION CHAIN GADGET *)
 
@@ -904,22 +907,6 @@ let sub (type f) (module Circuit : Snark_intf.Run with type field = f)
           left_input right_input Sub foreign_field_modulus
       in
       result
-
-let result_row (type f) (module Circuit : Snark_intf.Run with type field = f)
-    ?(label = "result_zero_row") (result : f Element.Standard.t) =
-  let open Circuit in
-  let result0, result1, result2 = Element.Standard.to_limbs result in
-  with_label label (fun () ->
-      assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (Raw
-                 { kind = Zero
-                 ; values = [| result0; result1; result2 |]
-                 ; coeffs = [||]
-                 } )
-        } )
 
 (* FOREIGN FIELD MULTIPLICATION *)
 

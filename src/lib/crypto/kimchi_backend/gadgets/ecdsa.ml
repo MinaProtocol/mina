@@ -518,32 +518,15 @@ let group_add (type f) (module Circuit : Snark_intf.Run with type field = f)
       (module Circuit)
       expected_right_y result_y foreign_field_modulus
   in
+  (* Result row *)
+  Foreign_field.result_row
+    (module Circuit)
+    ~label:"group_add_expected_right_delta_s" expected_right_delta_s ;
   (* Bounds 9: Addition chain result (expected_right_delta_s) bound check already
    *           covered by (Bounds 5).
    *           Left input bound check is chained.
    *           Right input bound check value is gadget output so checked externally.
    *)
-  let expected_right_delta_s0, expected_right_delta_s1, expected_right_delta_s2
-      =
-    Foreign_field.Element.Standard.to_limbs expected_right_delta_s
-  in
-
-  (* Final Zero gate with result *)
-  with_label "group_add_final_zero_gate" (fun () ->
-      assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (Raw
-                 { kind = Zero
-                 ; values =
-                     [| expected_right_delta_s0
-                      ; expected_right_delta_s1
-                      ; expected_right_delta_s2
-                     |]
-                 ; coeffs = [||]
-                 } )
-        } ) ;
   (* Copy expected_right_delta_s to right_delta_s *)
   Foreign_field.Element.Standard.assert_equal
     (module Circuit)
@@ -1072,6 +1055,10 @@ let group_is_on_curve (type f)
           (module Circuit)
           ~full:false x_cubed_ax b foreign_field_modulus
       in
+      (* Result row *)
+      Foreign_field.result_row
+        (module Circuit)
+        ~label:"group_is_on_curve_x_cubed_ax_b" x_cubed_ax_b ;
 
       (* Bounds 4: Left input already checked by (Bounds 3)
        *           Right input public parameter (no check necessary)
@@ -1081,23 +1068,6 @@ let group_is_on_curve (type f)
       (* Add x_cubed_ax_b bound check *)
       Foreign_field.External_checks.append_bound_check external_checks
       @@ Foreign_field.Element.Standard.to_limbs x_cubed_ax_b ;
-
-      (* Zero gate with result x_cubed_ax_b *)
-      let x_cubed_ax_b0, x_cubed_ax_b1, x_cubed_ax_b2 =
-        Foreign_field.Element.Standard.to_limbs x_cubed_ax_b
-      in
-      with_label "group_is_on_curve_x_cubed_ax_b" (fun () ->
-          assert_
-            { annotation = Some __LOC__
-            ; basic =
-                Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-                  (Raw
-                     { kind = Zero
-                     ; values =
-                         [| x_cubed_ax_b0; x_cubed_ax_b1; x_cubed_ax_b2 |]
-                     ; coeffs = [||]
-                     } )
-            } ) ;
 
       x_cubed_ax_b )
     else x_cubed_ax
@@ -1132,7 +1102,6 @@ let group_check_ia (type f)
       , Circuit.Field.Constant.zero
       , Circuit.Field.Constant.zero ))
     (foreign_field_modulus : f Foreign_field.standard_limbs) =
-  let open Circuit in
   let init_acc, expected_neg_init_acc = ai in
   (* C1: Check that initial accumulator point is on curve *)
   group_is_on_curve
@@ -1143,27 +1112,13 @@ let group_check_ia (type f)
   let neg_init_acc =
     group_negate (module Circuit) init_acc foreign_field_modulus
   in
+  (* Result row *)
+  Foreign_field.result_row (module Circuit) ~label:"group_check_ia_neg_init_y"
+  @@ Affine.y neg_init_acc ;
 
   (* Bounds 1: Input is public constant
    *           Result is part of input (checked externally)
    *)
-  let _, neg_init_y = Affine.to_coordinates neg_init_acc in
-
-  (* Zero gate with result neg_init_y *)
-  let neg_init_y0, neg_init_y1, neg_init_y2 =
-    Foreign_field.Element.Standard.to_limbs neg_init_y
-  in
-  with_label "group_check_ia_neg_init_y" (fun () ->
-      assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (Raw
-                 { kind = Zero
-                 ; values = [| neg_init_y0; neg_init_y1; neg_init_y2 |]
-                 ; coeffs = [||]
-                 } )
-        } ) ;
 
   (* C3: Copy computed_neg_init_acc to neg_init_acc *)
   Affine.assert_equal (module Circuit) neg_init_acc expected_neg_init_acc ;
@@ -4552,26 +4507,11 @@ let%test_unit "group_scalar_mul_properties" =
             let negated_a_result =
               group_negate (module Runner.Impl) a_result foreign_field_modulus
             in
-
-            (* Need to write negated y-coordinate to row in order to assert_equal on it *)
-            let neg_init_y0, neg_init_y1, neg_init_y2 =
-              Foreign_field.Element.Standard.to_limbs
-              @@ Affine.y negated_a_result
-            in
-            with_label "negation_property_check" (fun () ->
-                assert_
-                  { annotation = Some __LOC__
-                  ; basic =
-                      Kimchi_backend_common.Plonk_constraint_system
-                      .Plonk_constraint
-                      .T
-                        (Raw
-                           { kind = Zero
-                           ; values =
-                               [| neg_init_y0; neg_init_y1; neg_init_y2 |]
-                           ; coeffs = [||]
-                           } )
-                  } ) ;
+            (* Result row: need to write negated y-coordinate to row in order to assert_equal on it *)
+            Foreign_field.result_row
+              (module Runner.Impl)
+              ~label:"negation_property_check"
+            @@ Affine.y negated_a_result ;
 
             (* Assert [-s]P = -(sP) *)
             Affine.assert_equal
