@@ -23,6 +23,9 @@ spec:
         - send
         - --remote=http://{{ include "server-name" . }}/
         - --count={{ .Values.count }}
+        {{- if $.Values.continuous }}
+        - --continuous
+        {{- end }}
         resources:
           requests:
             {{ if $.Values.cpu }}
