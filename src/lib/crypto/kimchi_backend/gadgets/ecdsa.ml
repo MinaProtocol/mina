@@ -1354,7 +1354,7 @@ let group_check_subgroup (type f)
    *     (n - 1)P = -P
    *)
   let n_minus_one_bits =
-    (* TODO: This should be public curve parameter constants *)
+    (* TODO: This should be public curve parameter constants and not constrained here *)
     exists (Typ.array ~length:scalar_bit_length Boolean.typ) ~compute:(fun () ->
         Common.bignum_bigint_unpack Bignum_bigint.(curve_order_bigint - one) )
   in
@@ -1377,6 +1377,7 @@ let group_check_subgroup (type f)
 
   (* C2: Compute -P *)
   let minus_point = group_negate (module Circuit) point foreign_field_modulus in
+  (* Result row *)
   Foreign_field.result_row (module Circuit) ~label:"minus_point_y"
   @@ Affine.y minus_point ;
   (* Bounds 2: Input is gadget input (checked externally)
@@ -1384,12 +1385,6 @@ let group_check_subgroup (type f)
    *)
   Foreign_field.External_checks.append_bound_check external_checks
   @@ Foreign_field.Element.Standard.to_limbs @@ Affine.y minus_point ;
-
-  as_prover (fun () ->
-      printf "n_minus_one_point = %s\n"
-      @@ Affine.to_string_as_prover (module Circuit) n_minus_one_point ;
-      printf "minus_point       = %s\n"
-      @@ Affine.to_string_as_prover (module Circuit) minus_point ) ;
 
   (* C3: Assert (n - 1)P = -P *)
   Affine.assert_equal (module Circuit) n_minus_one_point minus_point
@@ -1594,7 +1589,7 @@ let ecdsa_verify (type f) (module Circuit : Snark_intf.Run with type field = f)
   Foreign_field.External_checks.append_bound_check external_checks
   @@ Foreign_field.Element.Standard.to_limbs @@ Affine.y result ;
 
-  (* Constrain that r = Rx (mod n), where n is the scalar field modulus (curve_order)
+  (* Constrain that r = Rx (mod n), where n is the scalar field modulus
    *
    *   Note: The scalar field modulus (curve_order) may be greater or smaller than
    *         the base field modulus (foreign_field_modulus)
@@ -1603,11 +1598,18 @@ let ecdsa_verify (type f) (module Circuit : Snark_intf.Run with type field = f)
    *
    *           curve_order < foreign_field_modulus  => Rx = q * n + Rx'
    *
-   *  Thus, to check for congruence we need to compute the remainder modulo n and
-   *  assert that it is equal to r.
+   *  Thus, to check for congruence we need to compute the modular reduction of Rx and
+   *  assert that it equals r.
    *
-   *  !!! n is public, so don't need range check and everything else on limbs should works.
-   *  Someone could use very small base field modulus... sooo we do mull approach
+   *  Since we may want to target applications where the scalar field is much smaller
+   *  than the base field, so we cannot make any assumptions about the ratio between
+   *  these moduli, so we will constrain Rx = q * n + Rx' using the foreign field
+   *  multiplication gadget, rather than just constraining Rx + 0 with our foreign
+   *  field addition gadget.
+   *
+   *  As we are reducing Rx modulo n, we are performing foreign field arithmetic modulo n.
+   *  However, the multiplicand n above is not a valid foreign field element in [0, n - 1].
+   *  To be safe we must constrain Rx = q * (n - 1) + q + Rx  modulo n.
    *)
 
   (* Compute witness value q and Rx' *)
@@ -1645,79 +1647,71 @@ let ecdsa_verify (type f) (module Circuit : Snark_intf.Run with type field = f)
     |> tuple6_of_array
   in
 
-  (* C9: Compute q * n *)
+  (* C9: Constrain q * (n - 1) *)
   let quotient =
     Foreign_field.Element.Standard.of_limbs (quotient0, quotient1, quotient2)
   in
-  let n =
+  let n_minus_one =
     Foreign_field.Element.Standard.of_bignum_bigint (module Circuit)
-    @@ Foreign_field.field_standard_limbs_to_bignum_bigint
-         (module Circuit)
-         curve_order
+    @@ Bignum_bigint.(curve_order_bigint - one)
   in
-  let quotient_n =
-    Foreign_field.mul (module Circuit) external_checks quotient n curve_order
+  let quotient_product =
+    Foreign_field.mul
+      (module Circuit)
+      external_checks quotient n_minus_one curve_order
   in
   (* Bounds 9: Left input q is bound checked below
-   *           Right input n is curve_order public parameter so not checked
+   *           Right input (n - 1) is a public parameter so not checked
    *           Result bound check is already covered by external_checks
    *)
   Foreign_field.External_checks.append_bound_check external_checks
-  @@ Foreign_field.Element.Standard.to_limbs quotient_n ;
+  @@ Foreign_field.Element.Standard.to_limbs quotient ;
 
-  (* C10: Compute qn + Rx' *)
+  (* C10: Compute qn = q * (n - 1) + q *)
+  let quotient_times_n =
+    Foreign_field.add
+      (module Circuit)
+      ~full:false quotient_product quotient curve_order
+  in
+
+  (* Bounds 10: Left input q * (n - 1) is covered by (Bounds 9)
+   *            Right input q is covered by (Bounds 9)
+   *            Result is chained into subsequent addition (no check necessary)
+   *)
+
+  (* C11: Compute Rx = qn + Rx' *)
   let x_prime =
     Foreign_field.Element.Standard.of_limbs (x_prime0, x_prime1, x_prime2)
   in
   let computed_x =
     Foreign_field.add
       (module Circuit)
-      ~full:false quotient_n x_prime curve_order
+      ~full:false quotient_times_n x_prime curve_order
   in
+  (* Addition chain final result row *)
+  Foreign_field.result_row (module Circuit) ~label:"ecdsa_verify_computed_x" computed_x ;
 
-  (* as_prover (fun() ->
-       printf "Rx = %s\n" @@ Foreign_field.Element.Standard.to_string_as_prover (module Circuit) @@ Affine.x result;
-       printf "q  = %s\n" @@ Foreign_field.Element.Standard.to_string_as_prover (module Circuit) quotient;
-       printf "x' = %s\n" @@ Foreign_field.Element.Standard.to_string_as_prover (module Circuit) x_prime;
-       printf "n  = %s\n" @@ Foreign_field.Element.Standard.to_string_as_prover (module Circuit) n;
-     ) ; *)
-
-  (* Final Zero gate with result *)
-  let computed_x0, computed_x1, computed_x2 =
-    Foreign_field.Element.Standard.to_limbs computed_x
-  in
-  with_label "ecdsa_verify_computed_x" (fun () ->
-      assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (Raw
-                 { kind = Zero
-                 ; values = [| computed_x0; computed_x1; computed_x2 |]
-                 ; coeffs = [||]
-                 } )
-        } ) ;
-  (* Bounds 10: Left input qn already checked by (Bounds 9)
+  (* Bounds 11: Left input qn is chained input, so not checked
    *            Right input x_prime bounds checked below
    *            Result bound already checked by (Bounds 8)
    *)
   Foreign_field.External_checks.append_bound_check external_checks
   @@ Foreign_field.Element.Standard.to_limbs x_prime ;
 
-  (* C11: Check qn + r = Rx *)
+  (* C12: Check qn + r = Rx *)
   Foreign_field.Element.Standard.assert_equal
     (module Circuit)
     computed_x (Affine.x result) ;
 
-  (* C12: Check that r = x' *)
+  (* C13: Check that r = x' *)
   Foreign_field.Element.Standard.assert_equal (module Circuit) r x_prime ;
 
-  (* C13: Check result is on curve (implies result is not infinity) *)
+  (* C14: Check result is on curve (also implies result is not infinity) *)
   group_is_on_curve
     (module Circuit)
     external_checks result ~a ~b foreign_field_modulus ;
 
-  (* Bounds 13: Input already bound checked by (Bounds 8) *)
+  (* Bounds 14: Input already bound checked by (Bounds 8) *)
   ()
 
 (***************)
@@ -4808,7 +4802,8 @@ let%test_unit "ecdsa_verify" =
             (* Subgroup check for pubkey *)
             group_check_subgroup
               (module Runner.Impl)
-              unused_external_checks pubkey ia ~a curve_order foreign_field_modulus ;
+              unused_external_checks pubkey ia ~a curve_order
+              foreign_field_modulus ;
 
             (* Verify ECDSA signature *)
             ecdsa_verify
