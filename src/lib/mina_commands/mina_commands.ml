@@ -16,22 +16,25 @@ let get_account t (addr : Account_id.t) =
   let%bind loc = Mina_ledger.Ledger.location_of_account ledger addr in
   Mina_ledger.Ledger.get ledger loc
 
-let get_accounts t =
-  let open Participating_state.Let_syntax in
-  let%map ledger = Mina_lib.best_ledger t in
-  Mina_ledger.Ledger.to_list ledger
+let get_accounts t : Account.t list Participating_state.t Deferred.t =
+  match Mina_lib.best_ledger t with
+  | `Active ledger ->
+      let%map accts = Mina_ledger.Ledger.to_list ledger in
+      `Active accts
+  | `Bootstrapping ->
+      Deferred.return `Bootstrapping
 
 let string_of_public_key =
   Fn.compose Public_key.Compressed.to_base58_check Account.public_key
 
-let get_public_keys t =
-  let open Participating_state.Let_syntax in
-  let%map account = get_accounts t in
-  List.map account ~f:string_of_public_key
+let get_public_keys t : string list Participating_state.t Deferred.t =
+  let%map.Deferred accounts_pstate = get_accounts t in
+  let%map.Participating_state accounts = accounts_pstate in
+  List.map accounts ~f:string_of_public_key
 
 let get_keys_with_details t =
-  let open Participating_state.Let_syntax in
-  let%map accounts = get_accounts t in
+  let%map.Deferred accounts_pstate = get_accounts t in
+  let%map.Participating_state accounts = accounts_pstate in
   List.map accounts ~f:(fun account ->
       ( string_of_public_key account
       , account.Account.Poly.balance |> Currency.Balance.to_nanomina_int

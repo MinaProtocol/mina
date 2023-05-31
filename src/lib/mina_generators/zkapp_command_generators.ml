@@ -1112,7 +1112,11 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
   in
   let fee_payer_acct_id = Account_id.create fee_payer_pk Token_id.default in
-  let ledger_accounts = Ledger.to_list ledger in
+  let ledger_accounts =
+    (* Ledger.to_list is in Deferred.t, avoid here *)
+    let num_accounts = Ledger.num_accounts ledger in
+    List.init num_accounts ~f:(fun i -> Ledger.get_at_index_exn ledger i)
+  in
   (* table of public keys to accounts, updated when generating each account_update
 
      a Map would be more principled, but threading that map through the code
@@ -1141,14 +1145,16 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
           "gen_zkapp_command_from: public key %s is in ledger, but not keymap"
           (Signature_lib.Public_key.Compressed.to_base58_check pk)
           () ) ;
+
   (* table of public keys not in the ledger, to be used for new zkapp_command
      we have the corresponding private keys, so we can create signatures for those new zkapp_command
   *)
   let ledger_account_list =
+    let ledger_account_ids =
+      List.map ledger_accounts ~f:Account.identifier |> Account_id.Set.of_list
+    in
     Account_id.Set.union_list
-      [ Ledger.accounts ledger
-      ; Account_id.Set.of_hashtbl_keys account_state_tbl
-      ]
+      [ ledger_account_ids; Account_id.Set.of_hashtbl_keys account_state_tbl ]
     |> Account_id.Set.to_list
   in
   let ledger_pk_list =
@@ -1564,7 +1570,11 @@ let gen_list_of_zkapp_command_from ?global_slot ?failure ?max_account_updates
     match account_state_tbl with
     | None ->
         let tbl = Account_id.Table.create () in
-        let accounts = Ledger.to_list ledger in
+        let accounts =
+          (* `Ledger.to_list` would introduce Deferred.t *)
+          let num_accounts = Ledger.num_accounts ledger in
+          List.init num_accounts ~f:(fun i -> Ledger.get_at_index_exn ledger i)
+        in
         List.iter accounts ~f:(fun acct ->
             let acct_id = Account.identifier acct in
             Account_id.Table.update tbl acct_id ~f:(function
