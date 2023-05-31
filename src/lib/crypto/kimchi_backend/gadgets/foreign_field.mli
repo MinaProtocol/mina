@@ -264,6 +264,13 @@ val sub :
   -> 'f Element.Standard.t
 (* result *)
 
+(* Gadget for creating and addition or subtraction result row (Zero gate with result) *)
+val result_row :
+     (module Snark_intf.Run with type field = 'f)
+  -> ?label:string
+  -> 'f Element.Standard.t
+  -> unit
+
 (** Gadget for foreign field multiplication
  *
  *   Constrains that

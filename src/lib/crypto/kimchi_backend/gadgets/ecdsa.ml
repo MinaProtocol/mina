@@ -1325,6 +1325,75 @@ let group_scalar_mul (type f)
     (module Circuit)
     external_checks acc neg_init_acc foreign_field_modulus
 
+(* Gadget to check point is in the subgroup
+ *   nP = O
+ * where n is the elliptic curve group order and O is the point at infinity
+ *)
+let group_check_subgroup (type f)
+    (module Circuit : Snark_intf.Run with type field = f)
+    (external_checks : f Foreign_field.External_checks.t) (point : f Affine.t)
+    (ia : f Affine.t * f Affine.t) ?(doubles : f Affine.t array option)
+    ?(a =
+      ( Circuit.Field.Constant.zero
+      , Circuit.Field.Constant.zero
+      , Circuit.Field.Constant.zero ))
+    (curve_order : f Foreign_field.standard_limbs)
+    (foreign_field_modulus : f Foreign_field.standard_limbs) =
+  let open Circuit in
+  (* Useful helpers (TODO: Move to curve_params) *)
+  let curve_order_bigint =
+    Foreign_field.field_standard_limbs_to_bignum_bigint
+      (module Circuit)
+      curve_order
+  in
+  let scalar_bit_length = Common.bignum_bigint_bit_length curve_order_bigint in
+
+  (* Subgroup check: nP = O
+   *   We don't support identity element, so instead we check
+   *     ((n - 1) + 1)P = O
+   *     (n - 1)P = -P
+   *)
+  let n_minus_one_bits =
+    (* TODO: This should be public curve parameter constants *)
+    exists (Typ.array ~length:scalar_bit_length Boolean.typ) ~compute:(fun () ->
+        Common.bignum_bigint_unpack Bignum_bigint.(curve_order_bigint - one) )
+  in
+
+  (* C1: Compute (n - 1)P *)
+  let n_minus_one_point =
+    group_scalar_mul
+      (module Circuit)
+      external_checks n_minus_one_bits point ia ?doubles ~a
+      foreign_field_modulus
+  in
+  (* Bounds 1: Left input is public constant (no bounds check required)
+   *           Right input is gadget input (checked externally)
+   *           Result bound check below
+   *)
+  Foreign_field.External_checks.append_bound_check external_checks
+  @@ Foreign_field.Element.Standard.to_limbs @@ Affine.x n_minus_one_point ;
+  Foreign_field.External_checks.append_bound_check external_checks
+  @@ Foreign_field.Element.Standard.to_limbs @@ Affine.y n_minus_one_point ;
+
+  (* C2: Compute -P *)
+  let minus_point = group_negate (module Circuit) point foreign_field_modulus in
+  Foreign_field.result_row (module Circuit) ~label:"minus_point_y"
+  @@ Affine.y minus_point ;
+  (* Bounds 2: Input is gadget input (checked externally)
+   *           Result bound check below
+   *)
+  Foreign_field.External_checks.append_bound_check external_checks
+  @@ Foreign_field.Element.Standard.to_limbs @@ Affine.y minus_point ;
+
+  as_prover (fun () ->
+      printf "n_minus_one_point = %s\n"
+      @@ Affine.to_string_as_prover (module Circuit) n_minus_one_point ;
+      printf "minus_point       = %s\n"
+      @@ Affine.to_string_as_prover (module Circuit) minus_point ) ;
+
+  (* C3: Assert (n - 1)P = -P *)
+  Affine.assert_equal (module Circuit) n_minus_one_point minus_point
+
 (* Gadget for constraining ECDSA signature verification
  *
  *   Inputs:
@@ -1339,12 +1408,18 @@ let group_scalar_mul (type f)
  *     curve_order           := Elliptic curve group order (scalar field modulus)
  *     foreign_field_modulus := Elliptic curve base field modulus
  *
- *   Preconditions and limitations:
- *      pubkey is not O (the point at infinity)
- *      pubkey is bounds checked
- *      pubkey is on the curve
+ *   Preconditions:
+ *      pubkey is on the curve and not O   (use group_is_on_curve gadget)
+ *      pubkey is in the subgroup (nP = O) (use group_check_subgroup gadget)
+ *      pubkey is bounds checked           (use multi-range-check gadgets)
  *      r, s \in [1, n)
- *      hash \in Fn
+ *      hash \in Fn                        (use bytes_to_foreign_field_element gadget)
+ *
+ *   Public parameters
+ *      gen is the correct elliptic curve group generator point
+ *      a, b are correct elliptic curve parameters
+ *      curve_order is the correct elliptic curve group order
+ *      foreign_field_modulus is the correct elliptic curve base field modulus
  *      ia point is randomly selected and constrained to be on the curve
  *      ia negated point computation is constrained
  *      ia coordinates are bounds checked
@@ -1368,6 +1443,14 @@ let ecdsa_verify (type f) (module Circuit : Snark_intf.Run with type field = f)
   let open Circuit in
   (* Signaures r and s *)
   let r, s = signature in
+
+  (* Useful helpers *)
+  let curve_order_bigint =
+    Foreign_field.field_standard_limbs_to_bignum_bigint
+      (module Circuit)
+      curve_order
+  in
+  let scalar_bit_length = Common.bignum_bigint_bit_length curve_order_bigint in
 
   (* Compute witness value s^-1 *)
   let s_inv0, s_inv1, s_inv2 =
@@ -1420,6 +1503,9 @@ let ecdsa_verify (type f) (module Circuit : Snark_intf.Run with type field = f)
   Foreign_field.External_checks.append_bound_check external_checks
     (s_inv0, s_inv1, s_inv2) ;
 
+  (* || Check modular reduction of z/hash *)
+  (*    Addition method should be sufficient (same number of bits so can't be double size) *)
+
   (* C2: Constrain u1 = zs^-1 *)
   let u1 =
     Foreign_field.mul (module Circuit) external_checks hash s_inv curve_order
@@ -1443,16 +1529,10 @@ let ecdsa_verify (type f) (module Circuit : Snark_intf.Run with type field = f)
   (*
    * Compute R = u1G + u2P
    *)
-  let scalar_bits =
-    Common.bignum_bigint_bit_length
-    @@ Foreign_field.field_standard_limbs_to_bignum_bigint
-         (module Circuit)
-         curve_order
-  in
 
   (* C4: Decompose u1 into bits *)
   let u1_bits =
-    exists (Typ.array ~length:scalar_bits Boolean.typ) ~compute:(fun () ->
+    exists (Typ.array ~length:scalar_bit_length Boolean.typ) ~compute:(fun () ->
         Common.bignum_bigint_unpack
         @@ Foreign_field.Element.Standard.to_bignum_bigint_as_prover
              (module Circuit)
@@ -1461,7 +1541,7 @@ let ecdsa_verify (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* C5: Decompose u2 into bits *)
   let u2_bits =
-    exists (Typ.array ~length:scalar_bits Boolean.typ) ~compute:(fun () ->
+    exists (Typ.array ~length:scalar_bit_length Boolean.typ) ~compute:(fun () ->
         Common.bignum_bigint_unpack
         @@ Foreign_field.Element.Standard.to_bignum_bigint_as_prover
              (module Circuit)
@@ -1525,6 +1605,9 @@ let ecdsa_verify (type f) (module Circuit : Snark_intf.Run with type field = f)
    *
    *  Thus, to check for congruence we need to compute the remainder modulo n and
    *  assert that it is equal to r.
+   *
+   *  !!! n is public, so don't need range check and everything else on limbs should works.
+   *  Someone could use very small base field modulus... sooo we do mull approach
    *)
 
   (* Compute witness value q and Rx' *)
@@ -4721,6 +4804,11 @@ let%test_unit "ecdsa_verify" =
             let unused_external_checks =
               Foreign_field.External_checks.create (module Runner.Impl)
             in
+
+            (* Subgroup check for pubkey *)
+            group_check_subgroup
+              (module Runner.Impl)
+              unused_external_checks pubkey ia ~a curve_order foreign_field_modulus ;
 
             (* Verify ECDSA signature *)
             ecdsa_verify

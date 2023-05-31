@@ -893,6 +893,22 @@ let sub (type f) (module Circuit : Snark_intf.Run with type field = f)
       in
       result
 
+let result_row (type f) (module Circuit : Snark_intf.Run with type field = f)
+    ?(label = "result_zero_row") (result : f Element.Standard.t) =
+  let open Circuit in
+  let result0, result1, result2 = Element.Standard.to_limbs result in
+  with_label label (fun () ->
+      assert_
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (Raw
+                 { kind = Zero
+                 ; values = [| result0; result1; result2 |]
+                 ; coeffs = [||]
+                 } )
+        } )
+
 (* FOREIGN FIELD MULTIPLICATION *)
 
 (* Compute non-zero intermediate products
