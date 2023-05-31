@@ -47,7 +47,7 @@ module type S = sig
   val to_list : t -> account list Async.Deferred.t
 
   (** iterate over all indexes and accounts *)
-  val iteri : t -> f:(index -> account -> unit) -> unit Async.Deferred.t
+  val iteri : t -> f:(index -> account -> unit) -> unit
 
   (** fold over accounts in the ledger, passing the Merkle address *)
   val foldi :

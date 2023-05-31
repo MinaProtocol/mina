@@ -116,7 +116,7 @@ end = struct
   let set_next_available_token _t _tid =
     failwith "set_next_available_token: null ledgers cannot be mutated"
 
-  let iteri _t ~f:_ = Async.Deferred.unit
+  let iteri _t ~f:_ = ()
 
   let fold_until _t ~init ~f:_ ~finish = Async.Deferred.return @@ finish init
 

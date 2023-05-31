@@ -651,8 +651,10 @@ module Make (Inputs : Inputs_intf.S) = struct
       List.map accts ~f:Account.identifier |> Account_id.Set.of_list
 
     let iteri t ~f =
-      let%map.Async.Deferred accts = to_list t in
-      List.iteri accts ~f
+      assert_is_attached t ;
+      let num_accounts = num_accounts t in
+      Sequence.range ~stop:`exclusive 0 num_accounts
+      |> Sequence.iter ~f:(fun i -> f i (get_at_index_exn t i))
 
     let foldi_with_ignored_accounts t ignored_accounts ~init ~f =
       assert_is_attached t ;

@@ -636,8 +636,12 @@ module Make (Inputs : Inputs_intf) :
         Ok (`Existed, location)
 
   let iteri t ~f =
-    let%map.Async.Deferred accts = to_list t in
-    List.iteri accts ~f
+    match Account_location.last_location_address t with
+    | None ->
+        ()
+    | Some last_addr ->
+        Sequence.range ~stop:`inclusive 0 (Addr.to_int last_addr)
+        |> Sequence.iter ~f:(fun i -> f i (get_at_index_exn t i))
 
   (* TODO : if key-value store supports iteration mechanism, like RocksDB,
      maybe use that here, instead of loading all accounts into memory See Issue
