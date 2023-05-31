@@ -800,14 +800,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "Send a zkApp transaction that set the permission for updating vk to \
          be Proof"
         (send_invalid_zkapp ~logger node zkapp_command_update_vk_proof
-           "Permission_for_update_vk_can_not_be_proof_or_impossible" )
+           "The permission to set verification key cannot be proof-only or \
+            impossible. It can be Signature, Either, or None" )
     in
     let%bind () =
       section_hard
         "Send a zkApp transaction that set the permission for updating vk to \
          be Impossible"
         (send_invalid_zkapp ~logger node zkapp_command_update_vk_impossible
-           "Permission_for_update_vk_can_not_be_proof_or_impossible" )
+           "The permission to set verification key cannot be proof-only or \
+            impossible. It can be Signature, Either, or None" )
     in
     let%bind () =
       section_hard
