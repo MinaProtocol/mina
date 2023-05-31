@@ -447,11 +447,6 @@ module External_checks = struct
   let append_bound_check (external_checks : 'field t)
       (x : 'field Cvar.t standard_limbs) =
     external_checks.bounds <- x :: external_checks.bounds
-
-  (* Drop last appended bound check *)
-  let drop_bound_check (external_checks : 'field t) =
-    external_checks.bounds <-
-      (match external_checks.bounds with [] -> [] | _ :: tl -> tl)
 end
 
 (* Common auxiliary functions for foreign field gadgets *)

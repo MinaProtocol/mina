@@ -2,9 +2,9 @@ open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
-let group_tests_enabled = false
+let group_tests_enabled = true
 
-let group_scalar_mul_tests = false
+let group_scalar_mul_tests = true
 
 let two_to_4limb = Bignum_bigint.(Common.two_to_3limb * Common.two_to_limb)
 
@@ -824,28 +824,26 @@ let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
    *)
   Foreign_field.External_checks.append_bound_check external_checks
   @@ Foreign_field.Element.Standard.to_limbs point_x2 ;
-  let point_x3_squared =
-    (* 3Px * Px = 3Px^2 *)
-    Foreign_field.mul
-      (module Circuit)
-      external_checks point_x3 point_x foreign_field_modulus
-  in
-
-  (* Bounds 10: Left input (point_x3) bound check added below.
-   *            Right input is gadget input so checked externally.
-   *            Result bound check already tracked by mul's
-   *            external_checks.
-   *)
 
   (* Check if the elliptic curve a parameter requires more constraints
    * to be added in order to add final a (e.g. 3Px^2 + a where a != 0).
    *)
-  if Foreign_field.field_standard_limbs_is_zero (module Circuit) a then (
-    (* Optimisation (saves 6 rows): Drop point_x3_squared bound check since
-     * it's equal to point_y2s and covered by (Bounds 8) *)
-    Foreign_field.External_checks.drop_bound_check external_checks ;
+  ( if Foreign_field.field_standard_limbs_is_zero (module Circuit) a then (
+    let point_x3_squared =
+      (* 3Px * Px = 3Px^2 *)
+      Foreign_field.mul
+        (module Circuit)
+        external_checks ~bound_check_result:false point_x3 point_x
+        foreign_field_modulus
+    in
 
-    (* Add point_x3 bound check (Bounds 10) *)
+    (* Bounds 10a: Left input (point_x3) bound check added below.
+     *             Right input is gadget input so checked externally.
+     *             Result bound check already covered by (Bounds 8) since
+     *             point_x3_squared is equal to point_y2s.
+     *)
+
+    (* Add point_x3 bound check (Bounds 101) *)
     Foreign_field.External_checks.append_bound_check external_checks
     @@ Foreign_field.Element.Standard.to_limbs point_x3 ;
 
@@ -853,8 +851,20 @@ let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
     Foreign_field.Element.Standard.assert_equal
       (module Circuit)
       point_x3_squared point_y2s )
-  else (
-    (* Add point_x3 bound check (Bounds 10) *)
+  else
+    let point_x3_squared =
+      (* 3Px * Px = 3Px^2 *)
+      Foreign_field.mul
+        (module Circuit)
+        external_checks point_x3 point_x foreign_field_modulus
+    in
+
+    (* Bounds 10b: Left input (point_x3) bound check added below.
+     *             Right input is gadget input so checked externally.
+     *             Result bound check already covered by external_checks.
+     *)
+
+    (* Add point_x3 bound check (Bounds 10b) *)
     Foreign_field.External_checks.append_bound_check external_checks
     @@ Foreign_field.Element.Standard.to_limbs point_x3 ;
 
@@ -874,34 +884,16 @@ let group_double (type f) (module Circuit : Snark_intf.Run with type field = f)
       Foreign_field.add
         (module Circuit)
         ~full:false point_x3_squared a foreign_field_modulus
-      (* Bounds 11: Left input (point_x3_squared) already tracked by (Bounds 10).
+      (* Bounds 11: Left input (point_x3_squared) already tracked by (Bounds 10b).
        *            Right input is public constant.
        *            Result bound check already covered by (Bound 8) since
        *            point_x3_squared_plus_a = point_y2s.
        *)
     in
-
-    (* Final Zero gate with result *)
-    let ( point_x3_squared_plus_a0
-        , point_x3_squared_plus_a1
-        , point_x3_squared_plus_a2 ) =
-      Foreign_field.Element.Standard.to_limbs point_x3_squared_plus_a
-    in
-    with_label "group_add_final_zero_gate" (fun () ->
-        assert_
-          { annotation = Some __LOC__
-          ; basic =
-              Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-                (Raw
-                   { kind = Zero
-                   ; values =
-                       [| point_x3_squared_plus_a0
-                        ; point_x3_squared_plus_a1
-                        ; point_x3_squared_plus_a2
-                       |]
-                   ; coeffs = [||]
-                   } )
-          } ) ;
+    (* Result row *)
+    Foreign_field.result_row
+      (module Circuit)
+      ~label:"group_double_point_x3_squared_plus_a" point_x3_squared_plus_a ;
 
     (* Copy point_x3_squared_plus_a to point_y2s *)
     Foreign_field.Element.Standard.assert_equal
@@ -3704,7 +3696,7 @@ let%test_unit "group_properties" =
 (*******************************)
 
 let%test_unit "group_is_on_curve" =
-  if (* group_scalar_mul_tests *) false then (
+  if group_scalar_mul_tests then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -3869,7 +3861,7 @@ let%test_unit "group_is_on_curve" =
     () )
 
 let%test_unit "group_check_ia" =
-  if (* group_scalar_mul_tests *) false then (
+  if group_scalar_mul_tests then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -4031,7 +4023,7 @@ let%test_unit "group_check_ia" =
     () )
 
 let%test_unit "group_scalar_mul" =
-  if (* group_scalar_mul_tests *) false then (
+  if group_scalar_mul_tests then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -4338,7 +4330,7 @@ let%test_unit "group_scalar_mul" =
     () )
 
 let%test_unit "group_scalar_mul_properties" =
-  if (* group_scalar_mul_tests *) false then (
+  if group_scalar_mul_tests then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =

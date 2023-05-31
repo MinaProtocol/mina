@@ -139,8 +139,6 @@ module External_checks : sig
     'field t -> 'field Cvar.t compact_limbs -> unit
 
   val append_bound_check : 'field t -> 'field Cvar.t standard_limbs -> unit
-
-  val drop_bound_check : 'field t -> unit
 end
 
 (* Type of operation *)
