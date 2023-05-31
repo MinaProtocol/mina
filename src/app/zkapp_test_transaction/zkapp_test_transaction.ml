@@ -524,7 +524,6 @@ let update_permissions =
          ~snapp_update
          ~current_auth:(Util.auth_of_string current_auth) ))
 
-
 let update_timings =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
       ~snapp_update ~current_auth () =
@@ -548,11 +547,11 @@ let update_timings =
            ~doc:"KEYFILE Private key file of the zkApp account to be updated"
            Param.(required string)
        and initial_minimum_balance =
-         Param.flag "--initial-minimum-balance" ~doc:"initial minimum balance as int"
+         Param.flag "--initial-minimum-balance"
+           ~doc:"initial minimum balance as int"
            Param.(required int)
        and cliff_time =
-         Param.flag "--cliff-time" ~doc:"cliff time in int"
-           Param.(required int)
+         Param.flag "--cliff-time" ~doc:"cliff time in int" Param.(required int)
        and cliff_amount =
          Param.flag "--cliff-amount" ~doc:"cliff amount in int"
            Param.(required int)
@@ -571,18 +570,18 @@ let update_timings =
        in
        let fee = Option.value ~default:Flags.default_fee fee in
        let timing =
-        Zkapp_basic.Set_or_keep.Set
-          ( { initial_minimum_balance =
-                Currency.Balance.of_mina_int_exn initial_minimum_balance
-            ; cliff_time = Mina_numbers.Global_slot.of_int cliff_time
-            ; cliff_amount = Currency.Amount.of_mina_int_exn cliff_amount
-            ; vesting_period = Mina_numbers.Global_slot.of_int vesting_period
-            ; vesting_increment = Currency.Amount.of_mina_int_exn vesting_increment
-            }
-            : Account_update.Update.Timing_info.value )
-      in
-      let snapp_update = { Account_update.Update.dummy with timing } 
-      in
+         Zkapp_basic.Set_or_keep.Set
+           ( { initial_minimum_balance =
+                 Currency.Balance.of_mina_int_exn initial_minimum_balance
+             ; cliff_time = Mina_numbers.Global_slot.of_int cliff_time
+             ; cliff_amount = Currency.Amount.of_mina_int_exn cliff_amount
+             ; vesting_period = Mina_numbers.Global_slot.of_int vesting_period
+             ; vesting_increment =
+                 Currency.Amount.of_mina_int_exn vesting_increment
+             }
+             : Account_update.Update.Timing_info.value )
+       in
+       let snapp_update = { Account_update.Update.dummy with timing } in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"

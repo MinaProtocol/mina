@@ -764,7 +764,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
       let fee_payer_nonce++
       let sender_nonce++
 
-      QUERY=$(${ZKAPP_EXE} update-timings --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $fee_payer_nonce --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --initial-minimum-balance 1 --cliff-time 0 --cliff-amount 0 --vesting-period 0 --vesting-increment 0 --fee 5 --current-auth Signature | sed 1,5d)
+      QUERY=$(${ZKAPP_EXE} update-state --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $fee_payer_nonce --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --zkapp-state $state --fee 5 | sed 1,5d)
       python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
       let fee_payer_nonce++
       let state++
