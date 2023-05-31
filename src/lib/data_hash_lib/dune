@@ -27,6 +27,7 @@
    random_oracle
    base58_check
    snarky.intf
+   ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess
