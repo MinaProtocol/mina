@@ -36,6 +36,7 @@ module CliTests = struct
       ()
     in
     Async.Thread_safe.block_on_async_exn (fun () -> TestRunner.run test_case)
+
 end
 
 let () =

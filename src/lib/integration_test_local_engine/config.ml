@@ -1,5 +1,4 @@
 open Core
-open Async
 
 let config_dir = "mina_spun_test"
 
@@ -35,14 +34,7 @@ module ConfigDirs = struct
     let genesis = Filename.temp_dir ~in_dir:root_path genesis_dir "" in
     let libp2p_keypair = Filename.temp_dir ~in_dir:root_path p2p_dir "" in
     { root_path; conf; genesis; libp2p_keypair }
-
-  let generate_keys t =
-    let open Deferred.Let_syntax in
-    let%map () =
-      Init.Client.generate_libp2p_keypair_do (libp2p_keypair_folder t) ()
-    in
-    ()
-
+  
   let dirs t = [ t.conf; t.genesis; t.libp2p_keypair ]
 
   let mina_log t = t.conf ^/ "mina.log"
@@ -50,7 +42,12 @@ end
 
 module Config = struct
   type t =
-    { port : int; dirs : ConfigDirs.t; mina_exe : string; clean_up : bool }
+    { port : int
+    ; dirs : ConfigDirs.t
+    ; mina_exe : string
+    ; clean_up : bool 
+
+  }
 
   let create port dirs mina_exe clean_up = { port; dirs; mina_exe; clean_up }
 

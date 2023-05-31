@@ -12,6 +12,8 @@
    alcotest
    ;; mina libraries
    init
+   integration_test_lib
+   integration_test_local_engine
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_compare))

@@ -1,7 +1,5 @@
 (library
- (public_name integration_test_cloud_engine)
- (name integration_test_cloud_engine)
- (inline_tests)
+ (name integration_test_local_engine)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                ppx_mina ppx_version ppx_let ppx_inline_test ppx_pipebang
@@ -25,6 +23,7 @@
    integers
    re2
    ;; local libraries
+   init
    key_gen
    integration_test_lib
    graphql_lib
@@ -49,4 +48,5 @@
    kimchi_backend.pasta.basic
    with_hash
    data_hash_lib
+
 ))
