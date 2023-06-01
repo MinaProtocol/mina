@@ -105,7 +105,7 @@ module Env = struct
     ; joint_combiner : 'a
     ; beta : 'a
     ; gamma : 'a
-    ; unnormalized_lagrange_basis : int -> 'a
+    ; unnormalized_lagrange_basis : bool * int -> 'a
     ; if_feature : Kimchi_types.feature_flag * (unit -> 'a) * (unit -> 'a) -> 'a
     }
 end

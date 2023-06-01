@@ -365,7 +365,12 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
   ; beta
   ; gamma
   ; unnormalized_lagrange_basis =
-      (fun i ->
+      (fun (use_zk_rows, i) ->
+        let zk_rows = 3 in
+        let i =
+          let open Int in
+          if use_zk_rows then -zk_rows + i else i
+        in
         let w_to_i =
           match i with
           | 0 ->
