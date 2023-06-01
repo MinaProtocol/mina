@@ -319,9 +319,7 @@ module For_tests = struct
         let payload : Signed_command.Payload.t =
           Signed_command.Payload.create ~fee:Fee.zero ~fee_payer_pk:sender_pk
             ~nonce ~valid_until:None ~memo:Signed_command_memo.dummy
-            ~body:
-              (Payment
-                 { source_pk = sender_pk; receiver_pk; amount = send_amount } )
+            ~body:(Payment { receiver_pk; amount = send_amount })
         in
         Signed_command.sign sender_keypair payload )
 

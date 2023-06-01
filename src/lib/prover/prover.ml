@@ -54,6 +54,8 @@ module Worker_state = struct
     val verify : Protocol_state.Value.t -> Proof.t -> unit Or_error.t Deferred.t
 
     val toggle_internal_tracing : bool -> unit
+
+    val set_itn_logger_data : daemon_port:int -> unit
   end
 
   (* bin_io required by rpc_parallel *)
@@ -155,6 +157,9 @@ module Worker_state = struct
                  don't_wait_for
                  @@ Internal_tracing.toggle ~logger
                       (if enabled then `Enabled else `Disabled)
+
+               let set_itn_logger_data ~daemon_port =
+                 Itn_logger.set_data ~process_kind:"prover" ~daemon_port
              end : S )
          | Check ->
              ( module struct
@@ -191,6 +196,8 @@ module Worker_state = struct
                let verify _state _proof = Deferred.return (Ok ())
 
                let toggle_internal_tracing _ = ()
+
+               let set_itn_logger_data ~daemon_port:_ = ()
              end : S )
          | None ->
              ( module struct
@@ -207,6 +214,8 @@ module Worker_state = struct
                let verify _ _ = Deferred.return (Ok ())
 
                let toggle_internal_tracing _ = ()
+
+               let set_itn_logger_data ~daemon_port:_ = ()
              end : S )
        in
        Memory_stats.log_memory_stats logger ~process:"prover" ;
@@ -258,6 +267,12 @@ module Functions = struct
         let (module M) = Worker_state.get w in
         M.toggle_internal_tracing enabled ;
         Deferred.unit )
+
+  let set_itn_logger_data =
+    create bin_int bin_unit (fun w daemon_port ->
+        let (module M) = Worker_state.get w in
+        M.set_itn_logger_data ~daemon_port ;
+        Deferred.unit )
 end
 
 module Worker = struct
@@ -270,6 +285,7 @@ module Worker = struct
           ('w, Extend_blockchain_input.t, Blockchain.t Or_error.t) F.t
       ; verify_blockchain : ('w, Blockchain.t, unit Or_error.t) F.t
       ; toggle_internal_tracing : ('w, bool, unit) F.t
+      ; set_itn_logger_data : ('w, int, unit) F.t
       }
 
     module Worker_state = Worker_state
@@ -297,6 +313,7 @@ module Worker = struct
         ; extend_blockchain = f extend_blockchain
         ; verify_blockchain = f verify_blockchain
         ; toggle_internal_tracing = f toggle_internal_tracing
+        ; set_itn_logger_data = f set_itn_logger_data
         }
 
       let init_worker_state
@@ -536,3 +553,7 @@ let create_genesis_block t (genesis_inputs : Genesis_proof.Inputs.t) =
 let toggle_internal_tracing { connection; _ } enabled =
   Worker.Connection.run connection ~f:Worker.functions.toggle_internal_tracing
     ~arg:enabled
+
+let set_itn_logger_data { connection; _ } ~daemon_port =
+  Worker.Connection.run connection ~f:Worker.functions.set_itn_logger_data
+    ~arg:daemon_port

@@ -81,6 +81,8 @@ module type S = sig
 
   val public_key : t -> Public_key.Compressed.t
 
+  val of_public_key : Public_key.t -> t
+
   val token_id : t -> Digest.t
 
   val to_input : t -> Snark_params.Tick.Field.t Random_oracle.Input.Chunked.t

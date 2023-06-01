@@ -335,29 +335,28 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              "Invalid zkapp command was ignored as expected due to low fee" ;
            return () ) )
     in
-    (*TODO: enable later
-      let%bind () =
-        section_hard
-          "Verify invalid zkapp commands are removed from transaction pool"
-          (let%bind pooled_zkapp_commands =
-             Network.Node.get_pooled_zkapp_commands ~logger node ~pk:fish1_pk
-             |> Deferred.bind ~f:Malleable_error.or_hard_error
-           in
-           [%log debug] "Pooled zkapp_commands $commands"
-             ~metadata:
-               [ ( "commands"
-                 , `List (List.map ~f:(fun s -> `String s) pooled_zkapp_commands)
-                 )
-               ] ;
-           if List.is_empty pooled_zkapp_commands then (
-             [%log info] "Transaction pool is empty" ;
-             return () )
-           else
-             Malleable_error.hard_error
-               (Error.of_string
-                  "Transaction pool contains invalid zkapp commands after a \
-                   block was produced" ) )
-      in *)
+    let%bind () =
+      section_hard
+        "Verify invalid zkapp commands are removed from transaction pool"
+        (let%bind pooled_zkapp_commands =
+           Network.Node.get_pooled_zkapp_commands ~logger node ~pk:fish1_pk
+           |> Deferred.bind ~f:Malleable_error.or_hard_error
+         in
+         [%log debug] "Pooled zkapp_commands $commands"
+           ~metadata:
+             [ ( "commands"
+               , `List (List.map ~f:(fun s -> `String s) pooled_zkapp_commands)
+               )
+             ] ;
+         if List.is_empty pooled_zkapp_commands then (
+           [%log info] "Transaction pool is empty" ;
+           return () )
+         else
+           Malleable_error.hard_error
+             (Error.of_string
+                "Transaction pool contains invalid zkapp commands after a \
+                 block was produced" ) )
+    in
     let%bind () =
       (*wait for blocks required to produce 2 proofs given 0.75 slot fill rate + some buffer*)
       section_hard "Wait for proof to be emitted"

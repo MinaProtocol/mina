@@ -413,6 +413,13 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Daemon_rpcs.Get_object_lifetime_statistics.rpc (fun () () ->
           return
             (Yojson.Safe.pretty_to_string @@ Allocation_functor.Table.dump ()) )
+    ; implement Daemon_rpcs.Submit_internal_log.rpc
+        (fun () { timestamp; message; metadata; process } ->
+          let metadata =
+            List.map metadata ~f:(fun (s, value) ->
+                (s, Yojson.Safe.from_string value) )
+          in
+          return @@ Itn_logger.log ~process ~timestamp ~message ~metadata () )
     ]
   in
   let log_snark_work_metrics (work : Snark_worker.Work.Result.t) =
