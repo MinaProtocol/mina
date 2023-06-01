@@ -15,18 +15,18 @@ const DELEGATION_WHITELIST_COLUMN = "E"
 
 // Production
 const PROD_WHITELIST_SPREADSHEET_ID = "1k-0kseheD5ruSCyxK1RQUIhEA09TJ999Gyw9unT0ZDY"
-const PROD_CLOUD_BUCKET_NAME = "foundation-delegation-uptime"
+const PROD_CLOUD_BUCKET_NAME = "itn-uptime"
 
 const TEST_WHITELIST_SPREADSHEET_ID = "130pLQL40WE8WjYinzS4RxuLqixk98aGBrMQW6kdbs10"
 const TEST_CLOUD_BUCKET_NAME = "georgeee-uptime-itn-test-1"
 
 // Incentivized testnet
-const ITN_WHITELIST_SPREADSHEET_ID = "13ljZysTrRINd-pBz70SnSPBJ817fGJ0ETOcjHMppXow"
-const ITN_CLOUD_BUCKET_NAME = "georgeee-uptime-itn-test-1"
+const ITN_WHITELIST_SPREADSHEET_ID = "1k-0kseheD5ruSCyxK1RQUIhEA09TJ999Gyw9unT0ZDY"
+const ITN_CLOUD_BUCKET_NAME = "itn-uptime"
 
 func CloudBucketName() string {
 	if os.Getenv("TEST") == "" {
-		if os.Getenv("NETWORK") == "ITN" {
+		if os.Getenv("NETWORK") == "itn" {
 			return ITN_CLOUD_BUCKET_NAME
 		}
 		return PROD_CLOUD_BUCKET_NAME
@@ -37,7 +37,7 @@ func CloudBucketName() string {
 
 func WhitelistSpreadsheetId() string {
 	if os.Getenv("TEST") == "" {
-		if os.Getenv("NETWORK") == "ITN" {
+		if os.Getenv("NETWORK") == "itn" {
 			return ITN_WHITELIST_SPREADSHEET_ID
 		}
 		return PROD_WHITELIST_SPREADSHEET_ID
