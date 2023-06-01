@@ -219,6 +219,7 @@ let setup_daemon logger =
   and log_json = Flag.Log.json
   and log_level = Flag.Log.level
   and file_log_level = Flag.Log.file_log_level
+  and file_log_rotations = Flag.Log.file_log_rotations
   and snark_work_fee =
     flag "--snark-worker-fee" ~aliases:[ "snark-worker-fee" ]
       ~doc:
@@ -508,13 +509,12 @@ let setup_daemon logger =
         Stdout_log.setup log_json log_level ;
         (* 512MB logrotate max size = 1GB max filesystem usage *)
         let logrotate_max_size = 1024 * 1024 * 10 in
-        let logrotate_num_rotate = 50 in
         Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
           ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina.log" ~max_size:logrotate_max_size
-               ~num_rotate:logrotate_num_rotate ) ;
+               ~num_rotate:file_log_rotations ) ;
         let best_tip_diff_log_size = 1024 * 1024 * 5 in
         Logger.Consumer_registry.register ~id:Logger.Logger_id.best_tip_diff
           ~processor:(Logger.Processor.raw ())
@@ -534,7 +534,7 @@ let setup_daemon logger =
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-oversized-logs.log"
-               ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate ) ;
+               ~max_size:logrotate_max_size ~num_rotate:file_log_rotations ) ;
         (* Consumer for `[%log internal]` logging used for internal tracing *)
         Itn_logger.set_message_postprocessor
           Internal_tracing.For_itn_logger.post_process_message ;
