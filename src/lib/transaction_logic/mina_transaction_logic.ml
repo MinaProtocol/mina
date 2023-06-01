@@ -724,13 +724,6 @@ module Make (L : Ledger_intf.S) :
 
   let check b = ksprintf (fun s -> if b then Ok () else Or_error.error_string s)
 
-  let validate_nonces txn_nonce account_nonce =
-    check
-      (Account.Nonce.equal account_nonce txn_nonce)
-      !"Nonce in account %{sexp: Account.Nonce.t} different from nonce in \
-        transaction %{sexp: Account.Nonce.t}"
-      account_nonce txn_nonce
-
   let validate_time ~valid_until ~current_global_slot =
     check
       Global_slot.(current_global_slot <= valid_until)
@@ -788,113 +781,27 @@ module Make (L : Ledger_intf.S) :
     | Error _ ->
         Result.fail (failure Overflow)
 
-  (* Helper function for [apply_user_command_unchecked] *)
-  let pay_fee' ~command ~nonce ~fee_payer ~fee ~ledger ~current_global_slot =
-    let open Or_error.Let_syntax in
-    (* Fee-payer information *)
-    let%bind location, account = get_with_location ledger fee_payer in
-    let%bind () =
-      match location with
-      | `Existing _ ->
-          return ()
-      | `New ->
-          Or_error.errorf "The fee-payer account does not exist"
-    in
-    let fee = Amount.of_fee fee in
-    let%bind balance = sub_amount account.balance fee in
-    let%bind () = validate_nonces nonce account.nonce in
-    let%map timing =
-      validate_timing ~txn_amount:fee ~txn_global_slot:current_global_slot
-        ~account
-    in
-    ( location
-    , { account with
-        balance
-      ; nonce = Account.Nonce.succ account.nonce
-      ; receipt_chain_hash =
-          Receipt.Chain_hash.cons_signed_command_payload command
-            account.receipt_chain_hash
-      ; timing
-      } )
-
-  (* Helper function for [apply_user_command_unchecked] *)
-  let pay_fee ~user_command ~signer_pk ~ledger ~current_global_slot =
-    let open Or_error.Let_syntax in
-    (* Fee-payer information *)
-    let nonce = Signed_command.nonce user_command in
-    let fee_payer = Signed_command.fee_payer user_command in
-    let%bind () =
-      let fee_token = Signed_command.fee_token user_command in
-      let%bind () =
-        (* TODO: Enable multi-sig. *)
-        if
-          Public_key.Compressed.equal
-            (Account_id.public_key fee_payer)
-            signer_pk
-        then return ()
-        else
-          Or_error.errorf
-            "Cannot pay fees from a public key that did not sign the \
-             transaction"
-      in
-      let%map () =
-        (* TODO: Remove this check and update the transaction snark once we have
-           an exchange rate mechanism. See issue #4447.
-        *)
-        if Token_id.equal fee_token Token_id.default then return ()
-        else
-          Or_error.errorf
-            "Cannot create transactions with fee_token different from the \
-             default"
-      in
-      ()
-    in
-    let%map loc, account' =
-      pay_fee' ~command:(Signed_command_payload user_command.payload) ~nonce
-        ~fee_payer
-        ~fee:(Signed_command.fee user_command)
-        ~ledger ~current_global_slot
-    in
-    (loc, account')
-
   (* someday: It would probably be better if we didn't modify the receipt chain hash
      in the case that the sender is equal to the receiver, but it complicates the SNARK, so
      we don't for now. *)
   let apply_user_command_unchecked
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~txn_global_slot ledger
-      ({ payload; signer; signature = _ } as user_command : Signed_command.t) =
+      ({ payload; signer = _; signature = _ } as user_command : Signed_command.t) =
     let open Or_error.Let_syntax in
-    let signer_pk = Public_key.compress signer in
     let current_global_slot = txn_global_slot in
     let%bind () =
       validate_time
         ~valid_until:(Signed_command.valid_until user_command)
         ~current_global_slot
     in
-    (* Fee-payer information *)
-    let fee_payer = Signed_command.fee_payer user_command in
-    let%bind fee_payer_location, fee_payer_account =
-      pay_fee ~user_command ~signer_pk ~ledger ~current_global_slot
-    in
-    let%bind () =
-      if Account.has_permission_to_send fee_payer_account then Ok ()
-      else
-        Or_error.error_string
-          Transaction_status.Failure.(describe Update_not_permitted_balance)
-    in
-    let%bind () =
-      if Account.has_permission_to_increment_nonce fee_payer_account then Ok ()
-      else
-        Or_error.error_string
-          Transaction_status.Failure.(describe Update_not_permitted_nonce)
-    in
-    (* Charge the fee. This must happen, whether or not the command itself
-       succeeds, to ensure that the network is compensated for processing this
-       command.
-    *)
-    let%bind () =
-      set_with_location ledger fee_payer_location fee_payer_account
+    (* Fee payment *)
+    let%bind `FP_halted (fee_payer_location, fee_payer_account) = Fee_payment.(
+      init_with_signed_command ~ledger_ops:(module L) ~ledger
+        ~global_slot:txn_global_slot user_command
+      >>= find_account
+      >>= validate_payment
+      >>| apply )
     in
     let receiver = Signed_command.receiver user_command in
     let exception Reject of Error.t in
@@ -937,7 +844,7 @@ module Make (L : Ledger_intf.S) :
             ; timing
             }
           in
-          ( [ (fee_payer_location, fee_payer_account) ]
+          ( [ (`Existing fee_payer_location, fee_payer_account) ]
           , Transaction_applied.Signed_command_applied.Body.Stake_delegation
               { previous_delegate } )
       | Payment { amount; _ } ->
@@ -968,9 +875,12 @@ module Make (L : Ledger_intf.S) :
                      (Error.createf "%s"
                         (Transaction_status.Failure.describe failure) ) )
           in
+          let fee_payer = Signed_command.fee_payer user_command in
           let receiver_location, receiver_account =
             if Account_id.equal fee_payer receiver then
-              (fee_payer_location, fee_payer_account)
+              (* We wouldn't have come to this point if fee payer's account
+                 didn't exist. *)
+              (`Existing fee_payer_location, fee_payer_account)
             else get_with_location ledger receiver |> ok_or_reject
           in
           let%bind () =
@@ -1011,7 +921,7 @@ module Make (L : Ledger_intf.S) :
               [ (receiver_location, receiver_account) ]
             else
               [ (receiver_location, receiver_account)
-              ; (fee_payer_location, fee_payer_account)
+              ; (`Existing fee_payer_location, fee_payer_account)
               ]
           in
           ( updated_accounts
