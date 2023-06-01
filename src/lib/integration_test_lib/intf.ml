@@ -151,6 +151,11 @@ module Engine = struct
         -> public_key:Signature_lib.Public_key.Compressed.t
         -> account_data Malleable_error.t
 
+      val get_logs :
+           logger:Logger.t
+        -> t
+        -> Yojson.Safe.t list Async_kernel.Deferred.Or_error.t
+
       val get_peer_id :
            logger:Logger.t
         -> t

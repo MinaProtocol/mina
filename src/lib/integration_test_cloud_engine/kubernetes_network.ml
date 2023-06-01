@@ -283,6 +283,15 @@ module Node = struct
         }
       }
     |}]
+
+    (* this is a stub, the actual graphql endpoint hasn't been written yet *)
+    (* module Query_latest_logs =
+       [%graphql
+       {|
+         query {
+           newloglines
+         }
+       |}] *)
   end
 
   (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
@@ -643,6 +652,26 @@ module Node = struct
   let must_set_snark_worker ~logger t ~new_snark_pub_key =
     set_snark_worker ~logger t ~new_snark_pub_key
     |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+  (* TODO: this is a complete stub of course, since the actual graphql endpoint it would hit doesn't exist yet *)
+  let get_logs ~logger t =
+    [%log info] "Getting logs of node" ~metadata:(logger_metadata t) ;
+    Deferred.Or_error.return
+      [ Yojson.Safe.from_string ""; Yojson.Safe.from_string "" ]
+  (* let open Deferred.Or_error.Let_syntax in
+     [%log info] "Getting logs of node"
+       ~metadata:(logger_metadata t) ;
+     let query_obj = Graphql.Query_latest_logs.(make @@ makeVariables ()) in
+     let%bind query_result_obj =
+       exec_graphql_request ~logger ~node:t ~query_name:"query_logs" query_obj
+     in
+     [%log info] "get_logs, finished exec_graphql_request" ;
+     let new_loglines = query_result_obj.newloglines |> Array.to_list in
+     return new_loglines *)
+
+  (* let must_get_logs ~logger t =
+     get_logs ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
+  *)
 
   let dump_archive_data ~logger (t : t) ~data_file =
     (* this function won't work if `t` doesn't happen to be an archive node *)
