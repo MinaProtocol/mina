@@ -251,7 +251,6 @@ module Account_update_under_construction = struct
                   { snarked_ledger_hash = Ignore
                   ; blockchain_length = Ignore
                   ; min_window_density = Ignore
-                  ; last_vrf_output = ()
                   ; total_currency = Ignore
                   ; global_slot_since_genesis = Ignore
                   ; staking_epoch_data =
