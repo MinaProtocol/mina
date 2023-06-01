@@ -62,7 +62,7 @@ blockProducerConfigs:
     # see resources/key-02
     keypairName: prod2-privkey-secret
     isolated: false
-    itnGraphqlPort: 31511
+    itnGraphqlPort: 31512
   # - name: prod3
   #   # see resources/key-03
   #   keypairName: prod3-privkey-secret
