@@ -23,7 +23,7 @@ let protocol_state : Zkapp_precondition.Protocol_state.View.t =
     ; blockchain_length = Length.of_int 119
     ; min_window_density = Length.of_int 10
     ; total_currency = Amount.of_mina_int_exn 10
-    ; global_slot_since_genesis = Global_slot.of_int 120
+    ; global_slot_since_genesis = Global_slot_since_genesis.of_int 120
     ; staking_epoch_data = epoch_data
     ; next_epoch_data = epoch_data
     }

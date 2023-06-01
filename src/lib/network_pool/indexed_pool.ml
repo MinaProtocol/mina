@@ -14,7 +14,7 @@ let replace_fee : Currency.Fee.t = Currency.Fee.of_nanomina_int_exn 1
    * Iff a command is at the head of its sender's queue it is also in
      applicable_by_fee.
    * Sequences in all_by_sender are ordered by nonce and "dense".
-   * Only commands with an expiration <> Global_slot.max_value is added to transactions_with_expiration.
+   * Only commands with an expiration <> Global_slot_since_genesis.max_value is added to transactions_with_expiration.
    * There are no empty sets or sequences.
    * Fee indices are correct.
    * Total currency required is correct.
@@ -53,7 +53,8 @@ type t =
       Transaction_hash.User_command_with_valid_signature.t
       Transaction_hash.Map.t
   ; transactions_with_expiration :
-      Transaction_hash.User_command_with_valid_signature.Set.t Global_slot.Map.t
+      Transaction_hash.User_command_with_valid_signature.Set.t
+      Global_slot_since_genesis.Map.t
         (*Only transactions that have an expiry*)
   ; size : int
   ; config : Config.t
@@ -80,8 +81,9 @@ module Command_error = struct
     | Overflow
     | Bad_token
     | Expired of
-        [ `Valid_until of Mina_numbers.Global_slot.t ]
-        * [ `Global_slot_since_genesis of Mina_numbers.Global_slot.t ]
+        [ `Valid_until of Mina_numbers.Global_slot_since_genesis.t ]
+        * [ `Global_slot_since_genesis of
+            Mina_numbers.Global_slot_since_genesis.t ]
     | Unwanted_fee_token of Token_id.t
   [@@deriving sexp, to_yojson]
 
@@ -281,7 +283,7 @@ let empty ~constraint_constants ~consensus_constants ~time_controller : t =
   ; all_by_sender = Account_id.Map.empty
   ; all_by_fee = Currency.Fee_rate.Map.empty
   ; all_by_hash = Transaction_hash.Map.empty
-  ; transactions_with_expiration = Global_slot.Map.empty
+  ; transactions_with_expiration = Global_slot_since_genesis.Map.empty
   ; size = 0
   ; config = { constraint_constants; consensus_constants; time_controller }
   }
@@ -327,14 +329,23 @@ let global_slot_since_genesis conf =
   in
   match conf.constraint_constants.fork with
   | Some { previous_global_slot; _ } ->
-      Mina_numbers.Global_slot.(add previous_global_slot current_slot)
+      let slot_span =
+        Mina_numbers.Global_slot_since_hard_fork.to_uint32 current_slot
+        |> Mina_numbers.Global_slot_span.of_uint32
+      in
+      Mina_numbers.Global_slot_since_genesis.(
+        add previous_global_slot slot_span)
   | None ->
-      current_slot
+      (* we're in the genesis "hard fork", so consider current slot as
+         since-genesis
+      *)
+      Mina_numbers.Global_slot_since_hard_fork.to_uint32 current_slot
+      |> Mina_numbers.Global_slot_since_genesis.of_uint32
 
 let check_expiry t (cmd : User_command.t) =
   let global_slot_since_genesis = global_slot_since_genesis t in
   let valid_until = User_command.valid_until cmd in
-  if Global_slot.(valid_until < global_slot_since_genesis) then
+  if Global_slot_since_genesis.(valid_until < global_slot_since_genesis) then
     Error
       (Command_error.Expired
          ( `Valid_until valid_until
@@ -347,7 +358,7 @@ let update_expiration_map expiration_map cmd op =
     Transaction_hash.User_command_with_valid_signature.command cmd
   in
   let expiry = User_command.valid_until user_cmd in
-  if Global_slot.(expiry <> max_value) then
+  if Global_slot_since_genesis.(expiry <> max_value) then
     match op with
     | `Add ->
         Map_set.insert
@@ -1431,8 +1442,9 @@ let%test_module _ =
                       ) ->
                     failwithf
                       !"Expired user command. Current global slot is \
-                        %{sexp:Mina_numbers.Global_slot.t} but user command is \
-                        only valid until %{sexp:Mina_numbers.Global_slot.t}"
+                        %{sexp:Mina_numbers.Global_slot_since_genesis.t} but \
+                        user command is only valid until \
+                        %{sexp:Mina_numbers.Global_slot_since_genesis.t}"
                       global_slot_since_genesis valid_until () )
           in
           go cmds )
@@ -1707,7 +1719,7 @@ let%test_module _ =
         compile_time_genesis.data |> Mina_state.Protocol_state.body
       in
       { (Mina_state.Protocol_state.Body.view state_body) with
-        global_slot_since_genesis = Mina_numbers.Global_slot.zero
+        global_slot_since_genesis = Mina_numbers.Global_slot_since_genesis.zero
       }
 
     let add_to_pool ~nonce ~balance pool cmd =
@@ -1747,7 +1759,8 @@ let%test_module _ =
           in
           ignore
             ( Mina_ledger.Ledger.apply_user_command ~constraint_constants
-                ~txn_global_slot:Mina_numbers.Global_slot.zero ledger v
+                ~txn_global_slot:Mina_numbers.Global_slot_since_genesis.zero
+                ledger v
               |> Or_error.ok_exn
               : Mina_transaction_logic.Transaction_applied
                 .Signed_command_applied

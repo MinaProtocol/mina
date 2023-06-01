@@ -294,7 +294,7 @@ let valid_until (t : t) =
       | Some valid_until ->
           valid_until
       | None ->
-          Mina_numbers.Global_slot.max_value )
+          Mina_numbers.Global_slot_since_genesis.max_value )
 
 module Valid = struct
   type t_ = t

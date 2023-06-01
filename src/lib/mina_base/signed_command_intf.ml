@@ -112,7 +112,7 @@ module type S = sig
 
   val memo : t -> Signed_command_memo.t
 
-  val valid_until : t -> Global_slot.t
+  val valid_until : t -> Global_slot_since_genesis.t
 
   (* for filtering *)
   val minimum_fee : Currency.Fee.t
