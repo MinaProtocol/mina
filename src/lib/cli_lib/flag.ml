@@ -324,6 +324,16 @@ module Log = struct
     in
     flag "--file-log-level" ~aliases:[ "file-log-level" ] ~doc
       (optional_with_default Logger.Level.Trace log_level)
+
+  let file_log_rotations =
+    let open Command.Param in
+    flag "--file-log-rotations"
+      ~doc:
+        (Printf.sprintf
+           "Number of file log rotations before overwriting old logs (default: \
+            %d)"
+           Default.file_log_rotations )
+      (optional_with_default Default.file_log_rotations int)
 end
 
 type signed_command_common =
