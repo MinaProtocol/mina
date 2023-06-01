@@ -2044,7 +2044,7 @@ let has_zero_vesting_period t =
       | Keep ->
           false
       | Set { vesting_period; _ } ->
-          Mina_numbers.Global_slot.(equal zero) vesting_period )
+          Mina_numbers.Global_slot_span.(equal zero) vesting_period )
 
 let get_transaction_commitments (zkapp_command : t) =
   let memo_hash = Signed_command_memo.hash zkapp_command.memo in
