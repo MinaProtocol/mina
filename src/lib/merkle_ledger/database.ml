@@ -615,6 +615,10 @@ module Make (Inputs : Inputs_intf) :
     Async.Deferred.List.init ~how:`Parallel num_accounts ~f:(fun i ->
         Async.Deferred.return @@ get_at_index_exn mdb i )
 
+  let to_list_sequential mdb =
+    let num_accounts = num_accounts mdb in
+    List.init num_accounts ~f:(fun i -> get_at_index_exn mdb i)
+
   let accounts mdb =
     let%map.Async.Deferred accts = to_list mdb in
     List.map accts ~f:Account.identifier |> Account_id.Set.of_list

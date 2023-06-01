@@ -154,7 +154,13 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let self_set_location t account_id location =
       assert_is_attached t ;
-      Account_id.Table.set t.location_tbl ~key:account_id ~data:location
+      Account_id.Table.set t.location_tbl ~key:account_id ~data:location ;
+      match t.current_location with
+      | None ->
+          t.current_location <- Some location
+      | Some loc ->
+          if Location.( > ) location loc then
+            t.current_location <- Some location
 
     (* don't rely on a particular implementation *)
     let self_find_account t location =
@@ -643,6 +649,11 @@ module Make (Inputs : Inputs_intf.S) = struct
       let num_accounts = num_accounts t in
       Async.Deferred.List.init ~how:`Parallel num_accounts ~f:(fun i ->
           Async.Deferred.return @@ get_at_index_exn t i )
+
+    let to_list_sequential t =
+      assert_is_attached t ;
+      let num_accounts = num_accounts t in
+      List.init num_accounts ~f:(fun i -> get_at_index_exn t i)
 
     (* keys from this mask and all ancestors *)
     let accounts t =

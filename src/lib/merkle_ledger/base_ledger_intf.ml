@@ -46,6 +46,9 @@ module type S = sig
   (** list of accounts in the ledger *)
   val to_list : t -> account list Async.Deferred.t
 
+  (** list of accounts via slower sequential mechanism *)
+  val to_list_sequential : t -> account list
+
   (** iterate over all indexes and accounts *)
   val iteri : t -> f:(index -> account -> unit) -> unit
 

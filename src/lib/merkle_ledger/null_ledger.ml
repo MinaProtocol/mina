@@ -126,6 +126,8 @@ end = struct
 
   let to_list _t = Async.Deferred.return []
 
+  let to_list_sequential _t = []
+
   let make_space_for _t _tot = ()
 
   let get_all_accounts_rooted_at_exn t addr =

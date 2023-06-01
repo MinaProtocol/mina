@@ -31,6 +31,10 @@ let%test_module "test functor on in memory databases" =
     module Make (Test : Test_intf) = struct
       module MT = Test.MT
 
+      let account_default_token_gen =
+        let%map.Quickcheck.Generator account = Account.gen in
+        { account with token_id = Token_id.default }
+
       let%test_unit "getting a non existing account returns None" =
         Test.with_instance (fun mdb ->
             Quickcheck.test
@@ -50,13 +54,13 @@ let%test_module "test functor on in memory databases" =
 
       let%test "add and retrieve an account" =
         Test.with_instance (fun mdb ->
-            let account = Quickcheck.random_value Account.gen in
+            let account = Quickcheck.random_value account_default_token_gen in
             let location = create_new_account_exn mdb account in
             Account.equal (Option.value_exn (MT.get mdb location)) account )
 
       let%test "accounts are atomic" =
         Test.with_instance (fun mdb ->
-            let account = Quickcheck.random_value Account.gen in
+            let account = Quickcheck.random_value account_default_token_gen in
             let location = create_new_account_exn mdb account in
             MT.set mdb location account ;
             let location' =
@@ -85,7 +89,7 @@ let%test_module "test functor on in memory databases" =
               let open Quickcheck.Let_syntax in
               let%bind num_initial_accounts = Int.gen_incl 0 n in
               let%map accounts =
-                list_with_length num_initial_accounts Account.gen
+                list_with_length num_initial_accounts account_default_token_gen
               in
               dedup_accounts accounts
             in
@@ -132,7 +136,8 @@ let%test_module "test functor on in memory databases" =
               let open Quickcheck.Let_syntax in
               let max_height = Int.min (MT.depth mdb) 5 in
               let%bind num_accounts = Int.gen_incl 0 (1 lsl max_height) in
-              Quickcheck.Generator.list_with_length num_accounts Account.gen
+              Quickcheck.Generator.list_with_length num_accounts
+                account_default_token_gen
             in
             let accounts = Quickcheck.random_value accounts_gen in
             Sequence.of_list accounts
@@ -150,7 +155,7 @@ let%test_module "test functor on in memory databases" =
       let%test_unit "set_inner_hash_at_addr_exn(address,hash); \
                      get_inner_hash_at_addr_exn(address) = hash" =
         let random_hash =
-          Hash.hash_account @@ Quickcheck.random_value Account.gen
+          Hash.hash_account @@ Quickcheck.random_value account_default_token_gen
         in
         Test.with_instance (fun mdb ->
             Quickcheck.test
@@ -165,7 +170,8 @@ let%test_module "test functor on in memory databases" =
       let random_accounts max_height =
         let num_accounts = 1 lsl max_height in
         Quickcheck.random_value
-          (Quickcheck.Generator.list_with_length num_accounts Account.gen)
+          (Quickcheck.Generator.list_with_length num_accounts
+             account_default_token_gen )
 
       let populate_db mdb max_height =
         random_accounts max_height
@@ -223,7 +229,7 @@ let%test_module "test functor on in memory databases" =
                 let accounts =
                   Quickcheck.random_value
                     (Quickcheck.Generator.list_with_length num_accounts
-                       Account.gen )
+                       account_default_token_gen )
                 in
                 if not @@ List.is_empty accounts then
                   let addresses =
@@ -316,7 +322,7 @@ let%test_module "test functor on in memory databases" =
                 let accounts =
                   Quickcheck.random_value
                     (Quickcheck.Generator.list_with_length num_accounts
-                       Account.gen )
+                       account_default_token_gen )
                 in
                 MT.set_all_accounts_rooted_at_exn mdb address accounts ;
                 let result =
@@ -363,7 +369,9 @@ let%test_module "test functor on in memory databases" =
         Test.with_instance (fun mdb ->
             let max_height = Int.min (MT.depth mdb) 5 in
             test_subtree_range mdb max_height ~f:(fun index ->
-                let account = Quickcheck.random_value Account.gen in
+                let account =
+                  Quickcheck.random_value account_default_token_gen
+                in
                 MT.set_at_index_exn mdb index account ;
                 let result = MT.get_at_index_exn mdb index in
                 assert (Account.equal account result) ) )
@@ -404,7 +412,8 @@ let%test_module "test functor on in memory databases" =
             let accounts = random_accounts max_height |> dedup_accounts in
             List.iter accounts ~f:(fun account ->
                 ignore (create_new_account_exn mdb account : Test.Location.t) ) ;
-            [%test_result: Account.t list] accounts ~expect:(MT.to_list mdb) )
+            let expect = MT.to_list_sequential mdb in
+            [%test_result: Account.t list] accounts ~expect )
 
       let%test_unit "Add 2^d accounts (for testing, d is small)" =
         if Test.depth <= 8 then
@@ -474,39 +483,41 @@ let%test_module "test functor on in memory databases" =
             assert (Int.equal retrieved_total total) )
 
       let%test_unit "fold_until over account balances" =
-        Test.with_instance (fun mdb ->
-            let num_accounts = 5 in
-            let some_num = 3 in
-            let account_ids = Account_id.gen_accounts num_accounts in
-            let some_account_ids = List.take account_ids some_num in
-            let last_account_id = List.hd_exn (List.rev some_account_ids) in
-            let balances =
-              Quickcheck.random_value
-                (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
-            in
-            let some_balances = List.take balances some_num in
-            let total =
-              List.fold some_balances ~init:0 ~f:(fun accum balance ->
-                  Balance.to_int balance + accum )
-            in
-            let accounts =
-              List.map2_exn account_ids balances ~f:Account.create
-            in
-            List.iter accounts ~f:(fun account ->
-                ignore @@ create_new_account_exn mdb account ) ;
-            (* stop folding on last_account_id, sum of balances in accounts should be same as some_balances *)
-            let retrieved_total =
-              MT.fold_until mdb ~init:0
-                ~f:(fun total account ->
-                  let current_balance = Account.balance account in
-                  let current_account_id = Account.identifier account in
-                  let new_total = Balance.to_int current_balance + total in
-                  if Account_id.equal current_account_id last_account_id then
-                    Stop new_total
-                  else Continue new_total )
-                ~finish:(fun total -> total)
-            in
-            assert (Int.equal retrieved_total total) )
+        Async_unix.Thread_safe.block_on_async_exn (fun () ->
+            Test.with_instance (fun mdb ->
+                let num_accounts = 5 in
+                let some_num = 3 in
+                let account_ids = Account_id.gen_accounts num_accounts in
+                let some_account_ids = List.take account_ids some_num in
+                let last_account_id = List.hd_exn (List.rev some_account_ids) in
+                let balances =
+                  Quickcheck.random_value
+                    (Quickcheck.Generator.list_with_length num_accounts
+                       Balance.gen )
+                in
+                let some_balances = List.take balances some_num in
+                let total =
+                  List.fold some_balances ~init:0 ~f:(fun accum balance ->
+                      Balance.to_int balance + accum )
+                in
+                let accounts =
+                  List.map2_exn account_ids balances ~f:Account.create
+                in
+                List.iter accounts ~f:(fun account ->
+                    ignore @@ create_new_account_exn mdb account ) ;
+                (* stop folding on last_account_id, sum of balances in accounts should be same as some_balances *)
+                let%map.Async.Deferred retrieved_total =
+                  MT.fold_until mdb ~init:0
+                    ~f:(fun total account ->
+                      let current_balance = Account.balance account in
+                      let current_account_id = Account.identifier account in
+                      let new_total = Balance.to_int current_balance + total in
+                      if Account_id.equal current_account_id last_account_id
+                      then Stop new_total
+                      else Continue new_total )
+                    ~finish:(fun total -> total)
+                in
+                assert (Int.equal retrieved_total total) ) )
     end
 
     module Make_db (Depth : sig
