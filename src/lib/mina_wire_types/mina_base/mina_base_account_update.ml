@@ -16,9 +16,9 @@ module Update = struct
     module V1 = struct
       type t =
         { initial_minimum_balance : Currency.Balance.V1.t
-        ; cliff_time : Mina_numbers.Global_slot.V1.t
+        ; cliff_time : Mina_numbers.Global_slot_since_genesis.V1.t
         ; cliff_amount : Currency.Amount.V1.t
-        ; vesting_period : Mina_numbers.Global_slot.V1.t
+        ; vesting_period : Mina_numbers.Global_slot_span.V1.t
         ; vesting_increment : Currency.Amount.V1.t
         }
     end
@@ -72,7 +72,7 @@ module Body = struct
       type t =
         { public_key : Public_key.Compressed.V1.t
         ; fee : Currency.Fee.V1.t
-        ; valid_until : Mina_numbers.Global_slot.V1.t option
+        ; valid_until : Mina_numbers.Global_slot_since_genesis.V1.t option
         ; nonce : Mina_numbers.Account_nonce.V1.t
         }
     end

@@ -249,7 +249,14 @@ module Types = struct
 
     let block_time = BlockTime.typ ()
 
-    let global_slot = GlobalSlot.typ ()
+    let global_slot_since_genesis = GlobalSlotSinceGenesis.typ ()
+
+    (* type annotation required because we're not using this yet *)
+    let global_slot_since_hard_fork :
+        (Mina_lib.t, GlobalSlotSinceHardFork.t option) typ =
+      GlobalSlotSinceHardFork.typ ()
+
+    let global_slot_span = GlobalSlotSpan.typ ()
 
     let length = Length.typ ()
 
@@ -314,7 +321,8 @@ module Types = struct
         ; field "slot" ~typ:(non_null uint32)
             ~args:Arg.[]
             ~resolve:(fun _ global_slot -> C.slot global_slot)
-        ; field "globalSlot" ~typ:(non_null global_slot)
+        ; field "globalSlot"
+            ~typ:(non_null global_slot_since_hard_fork)
             ~args:Arg.[]
             ~resolve:(fun _ (global_slot : Consensus.Data.Consensus_time.t) ->
               C.to_global_slot global_slot )
@@ -346,7 +354,7 @@ module Types = struct
             ~resolve:(fun _ (time, _) -> time)
         ; field "globalSlotSinceGenesis"
             ~args:Arg.[]
-            ~typ:(non_null global_slot)
+            ~typ:(non_null global_slot_since_genesis)
             ~resolve:(fun _ (_, slot) -> slot)
         ] )
 
@@ -378,7 +386,7 @@ module Types = struct
               | Produce_now info ->
                   [ of_time ~consensus_constants info.time ] )
         ; field "globalSlotSinceGenesis"
-            ~typ:(non_null @@ list @@ non_null global_slot)
+            ~typ:(non_null @@ list @@ non_null global_slot_since_genesis)
             ~doc:"Next block production global-slot-since-genesis "
             ~args:Arg.[]
             ~resolve:(fun _
@@ -659,7 +667,7 @@ module Types = struct
                   None
               | Timed timing_info ->
                   Some timing_info.initial_minimum_balance )
-        ; field "cliffTime" ~typ:global_slot
+        ; field "cliffTime" ~typ:global_slot_since_genesis
             ~doc:"The cliff time for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -677,7 +685,7 @@ module Types = struct
                   None
               | Timed timing_info ->
                   Some timing_info.cliff_amount )
-        ; field "vestingPeriod" ~typ:global_slot
+        ; field "vestingPeriod" ~typ:global_slot_span
             ~doc:"The vesting period for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -1658,7 +1666,9 @@ module Types = struct
           ; abstract_field "feePayer"
               ~typ:(non_null AccountObj.account)
               ~args:[] ~doc:"Account that pays the fees for the command"
-          ; abstract_field "validUntil" ~typ:(non_null global_slot) ~args:[]
+          ; abstract_field "validUntil"
+              ~typ:(non_null global_slot_since_genesis)
+              ~args:[]
               ~doc:
                 "The global slot number after which this transaction cannot be \
                  applied"
@@ -1746,7 +1756,8 @@ module Types = struct
           ~resolve:(fun { ctx = mina; _ } cmd ->
             AccountObj.get_best_ledger_account mina
               (Signed_command.fee_payer cmd.With_hash.data) )
-      ; field_no_status "validUntil" ~typ:(non_null global_slot) ~args:[]
+      ; field_no_status "validUntil" ~typ:(non_null global_slot_since_genesis)
+          ~args:[]
           ~doc:
             "The global slot number after which this transaction cannot be \
              applied" ~resolve:(fun _ cmd ->
@@ -2683,7 +2694,8 @@ module Types = struct
       let arg_typ =
         obj "VrfMessageInput" ~doc:"The inputs to a vrf evaluation"
           ~coerce:(fun global_slot epoch_seed delegator_index ->
-            { Consensus_vrf.Layout.Message.global_slot
+            { Consensus_vrf.Layout.Message.global_slot =
+                Mina_numbers.Global_slot_since_hard_fork.of_uint32 global_slot
             ; epoch_seed = Mina_base.Epoch_seed.of_base58_check_exn epoch_seed
             ; delegator_index
             } )
@@ -2696,7 +2708,8 @@ module Types = struct
                 ~typ:(non_null int)
             ]
           ~split:(fun f (t : input) ->
-            f t.global_slot
+            f
+              (Mina_numbers.Global_slot_since_hard_fork.to_uint32 t.global_slot)
               (Mina_base.Epoch_seed.to_base58_check t.epoch_seed)
               t.delegator_index )
     end
@@ -3331,7 +3344,8 @@ module Types = struct
   let vrf_message : ('context, Consensus_vrf.Layout.Message.t option) typ =
     let open Consensus_vrf.Layout.Message in
     obj "VrfMessage" ~doc:"The inputs to a vrf evaluation" ~fields:(fun _ ->
-        [ field "globalSlot" ~typ:(non_null global_slot)
+        [ field "globalSlot"
+            ~typ:(non_null global_slot_since_hard_fork)
             ~args:Arg.[]
             ~resolve:(fun _ { global_slot; _ } -> global_slot)
         ; field "epochSeed" ~typ:(non_null epoch_seed)
@@ -3842,7 +3856,8 @@ module Mutations = struct
                   Ledger.apply_zkapp_command_unchecked ~constraint_constants
                     ~global_slot:
                       ( Transition_frontier.Breadcrumb.consensus_state breadcrumb
-                      |> Consensus.Data.Consensus_state.curr_global_slot )
+                      |> Consensus.Data.Consensus_state
+                         .global_slot_since_genesis )
                     ~state_view ledger zkapp_command
                 in
                 (* rearrange data to match result type of `send_zkapp_command` *)
@@ -3886,7 +3901,7 @@ module Mutations = struct
     let open Result.Let_syntax in
     (* TODO: We should put a more sensible default here. *)
     let valid_until =
-      Option.map ~f:Mina_numbers.Global_slot.of_uint32 valid_until
+      Option.map ~f:Mina_numbers.Global_slot_since_genesis.of_uint32 valid_until
     in
     let%bind fee =
       result_of_exn Currency.Fee.of_uint64 fee
@@ -5987,7 +6002,8 @@ module Queries = struct
               in
               List.map (Queue.to_list vrf_state.queue)
                 ~f:(fun { global_slot; _ } ->
-                  Unsigned.UInt32.to_int global_slot ) )
+                  Mina_numbers.Global_slot_since_hard_fork.to_int global_slot )
+          )
 
     let internal_logs =
       io_field "internalLogs"

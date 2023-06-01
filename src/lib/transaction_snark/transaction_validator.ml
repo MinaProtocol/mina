@@ -60,9 +60,9 @@ let%test_unit "invalid transactions do not dirty the ledger" =
       (Account.create_timed sender_id
          (Balance.of_nanomina_int_exn 20)
          ~initial_minimum_balance:(Balance.of_nanomina_int_exn 20)
-         ~cliff_time:(Global_slot.of_int 1)
+         ~cliff_time:Global_slot_since_genesis.one
          ~cliff_amount:(Amount.of_nanomina_int_exn 10)
-         ~vesting_period:(Global_slot.of_int 1)
+         ~vesting_period:Global_slot_span.one
          ~vesting_increment:(Amount.of_nanomina_int_exn 1) )
   in
   let receiver_pk =
@@ -79,8 +79,8 @@ let%test_unit "invalid transactions do not dirty the ledger" =
     let payload =
       Signed_command_payload.create
         ~fee:(Fee.of_nanomina_int_exn 1)
-        ~fee_payer_pk:sender_pk ~nonce:(Account_nonce.of_int 0)
-        ~valid_until:None ~memo:Signed_command_memo.dummy
+        ~fee_payer_pk:sender_pk ~nonce:Account_nonce.zero ~valid_until:None
+        ~memo:Signed_command_memo.dummy
         ~body:(Signed_command_payload.Body.Payment payment)
     in
     Option.value_exn
@@ -92,7 +92,7 @@ let%test_unit "invalid transactions do not dirty the ledger" =
   Ledger.create_new_account_exn ledger receiver_id receiver_account ;
   ( match
       apply_user_command ~constraint_constants
-        ~txn_global_slot:(Global_slot.of_int 1) ledger invalid_command
+        ~txn_global_slot:Global_slot_since_genesis.one ledger invalid_command
     with
   | Ok _ ->
       failwith "successfully applied an invalid transaction"
@@ -110,4 +110,4 @@ let%test_unit "invalid transactions do not dirty the ledger" =
          (Ledger.location_of_account ledger sender_id)
          ~f:(Ledger.get ledger) )
   in
-  assert (Account_nonce.equal account_after_apply.nonce (Account_nonce.of_int 0))
+  assert (Account_nonce.equal account_after_apply.nonce Account_nonce.zero)

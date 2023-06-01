@@ -113,7 +113,7 @@ let%test_module "Transaction union tests" =
       in
       let pending_coinbase_stack_target =
         U.pending_coinbase_stack_target transaction U.genesis_state_body_hash
-          Mina_numbers.Global_slot.zero pending_coinbase_init
+          Mina_numbers.Global_slot_since_genesis.zero pending_coinbase_init
       in
       let txn_in_block =
         { Transaction_protocol_state.Poly.transaction
@@ -1013,11 +1013,13 @@ let%test_module "Transaction union tests" =
           in
           let balance = Balance.of_mina_int_exn 100_000 in
           let initial_minimum_balance = Balance.of_mina_int_exn 80_000 in
-          let cliff_time = Mina_numbers.Global_slot.of_int 1000 in
+          let cliff_time = Mina_numbers.Global_slot_since_genesis.of_int 1000 in
           let cliff_amount = Amount.of_nanomina_int_exn 10_000 in
-          let vesting_period = Mina_numbers.Global_slot.of_int 10 in
+          let vesting_period = Mina_numbers.Global_slot_span.of_int 10 in
           let vesting_increment = Amount.of_nanomina_int_exn 1 in
-          let txn_global_slot = Mina_numbers.Global_slot.of_int 1002 in
+          let txn_global_slot =
+            Mina_numbers.Global_slot_since_genesis.of_int 1002
+          in
           let sender =
             { sender with
               account =
@@ -1956,9 +1958,9 @@ let%test_module "Transaction union tests" =
             let account_id = Account_id.create pk Token_id.default in
             let balance = Balance.of_mina_int_exn 100_000 in
             let initial_minimum_balance = Balance.of_mina_int_exn 80 in
-            let cliff_time = Mina_numbers.Global_slot.of_int 2 in
+            let cliff_time = Mina_numbers.Global_slot_since_genesis.of_int 2 in
             let cliff_amount = Amount.of_mina_int_exn 5 in
-            let vesting_period = Mina_numbers.Global_slot.of_int 2 in
+            let vesting_period = Mina_numbers.Global_slot_span.of_int 2 in
             let vesting_increment = Amount.of_mina_int_exn 40 in
             Or_error.ok_exn
             @@ Account.create_timed account_id balance ~initial_minimum_balance
@@ -2007,7 +2009,9 @@ let%test_module "Transaction union tests" =
                   Ledger.create_new_account_exn ledger (Account.identifier acc)
                     acc ) ;
               (* well over the vesting period, the timing field shouldn't change*)
-              let txn_global_slot = Mina_numbers.Global_slot.of_int 100 in
+              let txn_global_slot =
+                Mina_numbers.Global_slot_since_genesis.of_int 100
+              in
               List.iter transactions ~f:(fun txn ->
                   U.test_transaction_union ~txn_global_slot ledger txn ) ) )
   end )

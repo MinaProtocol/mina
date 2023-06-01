@@ -389,7 +389,8 @@ let user_command_to_transaction ~logger ~pool ~ledger (cmd : Sql.User_command.t)
   let memo = Signed_command_memo.of_base58_check_exn cmd.memo in
   let valid_until =
     Option.map cmd.valid_until ~f:(fun slot ->
-        Mina_numbers.Global_slot.of_uint32 @@ Unsigned.UInt32.of_int64 slot )
+        Mina_numbers.Global_slot_since_genesis.of_uint32
+        @@ Unsigned.UInt32.of_int64 slot )
   in
   let payload =
     Signed_command_payload.create
@@ -438,7 +439,7 @@ let get_parent_state_view ~pool block_id =
     in
     let global_slot_since_genesis =
       parent_block.global_slot_since_genesis |> Unsigned.UInt32.of_int64
-      |> Mina_numbers.Global_slot.of_uint32
+      |> Mina_numbers.Global_slot_since_genesis.of_uint32
     in
     let epoch_data_of_raw_epoch_data (raw_epoch_data : Processor.Epoch_data.t) :
         Mina_base.Epoch_data.Value.t Deferred.t =
@@ -1058,7 +1059,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                     match
                       Ledger.apply_transaction_first_pass ~constraint_constants
                         ~global_slot:
-                          (Mina_numbers.Global_slot.of_uint32
+                          (Mina_numbers.Global_slot_since_genesis.of_uint32
                              (Unsigned.UInt32.of_int64
                                 last_global_slot_since_genesis ) )
                         ~txn_state_view ledger txn
