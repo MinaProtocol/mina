@@ -67,30 +67,30 @@ minaSnarkCoordinatorsConfig:
   publicKey: B62qoGg77bjwPm3kncsjnBChAbeipbotqUCpcGe8FGPbLAJegj6K7od
   workSelectionAlgorithm: seq
   workers: 20
-# - name: snarker002
-#   publicKey: B62qos2NxSras7juEwPVnkoV23YTFvWawyko8pgcf8S5nccTFCzVpdy
-#   workSelectionAlgorithm: rand
-#   workers: 20
-# - name: snarker003
-#   publicKey: B62qjW2AZJBc3H17pMvz73JLRLxSdFHjymkzMTTA9sv3bVKSm63B5FQ
-#   workSelectionAlgorithm: rand
-#   workers: 20
-# - name: snarker004
-#   publicKey: B62qrsEWVgwRMJatJzQCrepPisMF4QcB2PPBbu9pbodZRvxWM7ochkx
-#   workSelectionAlgorithm: rand
-#   workers: 10
-# - name: snarker005
-#   publicKey: B62qk8YAtjoJy4EvHeZsjLHX6GRkJTi6cBcksa4i3YKuqzMAfRpW5wD
-#   workSelectionAlgorithm: rand
-#   workers: 10
-# - name: snarker006
-#   publicKey: B62qmrqiRDgVjJgrEFvSUdANT5wYiZZvLLMk3Kt6tJ6ZYvnbJ7tAccf
-#   workSelectionAlgorithm: rand
-#   workers: 10
-# - name: snarker007
-#   publicKey: B62qqPz9DfFwDNJP4e2GPpb5aQ7gibaXAwcsLAyQhTb14gExwXCJypD
-#   workSelectionAlgorithm: rand
-#   workers: 10
+- name: snarker002
+  publicKey: B62qos2NxSras7juEwPVnkoV23YTFvWawyko8pgcf8S5nccTFCzVpdy
+  workSelectionAlgorithm: rand
+  workers: 20
+- name: snarker003
+  publicKey: B62qjW2AZJBc3H17pMvz73JLRLxSdFHjymkzMTTA9sv3bVKSm63B5FQ
+  workSelectionAlgorithm: rand
+  workers: 20
+- name: snarker004
+  publicKey: B62qrsEWVgwRMJatJzQCrepPisMF4QcB2PPBbu9pbodZRvxWM7ochkx
+  workSelectionAlgorithm: rand
+  workers: 10
+- name: snarker005
+  publicKey: B62qk8YAtjoJy4EvHeZsjLHX6GRkJTi6cBcksa4i3YKuqzMAfRpW5wD
+  workSelectionAlgorithm: rand
+  workers: 10
+- name: snarker006
+  publicKey: B62qmrqiRDgVjJgrEFvSUdANT5wYiZZvLLMk3Kt6tJ6ZYvnbJ7tAccf
+  workSelectionAlgorithm: rand
+  workers: 10
+- name: snarker007
+  publicKey: B62qqPz9DfFwDNJP4e2GPpb5aQ7gibaXAwcsLAyQhTb14gExwXCJypD
+  workSelectionAlgorithm: rand
+  workers: 10
 
 resources:
   enable: true
