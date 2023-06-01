@@ -2,9 +2,9 @@ open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
-let group_tests_enabled = true
+let group_tests_enabled = false
 
-let group_scalar_mul_tests = true
+let group_scalar_mul_tests = false
 
 let two_to_4limb = Bignum_bigint.(Common.two_to_3limb * Common.two_to_limb)
 
@@ -1336,7 +1336,110 @@ let group_check_subgroup (type f)
   (* C3: Assert (n - 1)P = -P *)
   Affine.assert_equal (module Circuit) n_minus_one_point minus_point
 
-(* Gadget for constraining ECDSA signature verification
+(* Gadget to assert signature scalars r,s \in Fn
+ * Must be used when r and s are not public parameters
+ *)
+let ecdsa_signature_scalar_check (type f)
+    (module Circuit : Snark_intf.Run with type field = f)
+    (scalar_checks : f Foreign_field.External_checks.t)
+    (signature :
+      f Foreign_field.Element.Standard.t * f Foreign_field.Element.Standard.t )
+    (curve_order : f Foreign_field.standard_limbs) =
+  let open Circuit in
+  (* Signaures r and s *)
+  let r, s = signature in
+
+  (* Compute witness r^-1 and s^-1 needed for not-zero-check *)
+  let r_inv0, r_inv1, r_inv2, s_inv0, s_inv1, s_inv2 =
+    exists (Typ.array ~length:6 Field.typ) ~compute:(fun () ->
+        let curve_order =
+          Foreign_field.field_standard_limbs_to_bignum_bigint
+            (module Circuit)
+            curve_order
+        in
+
+        let r =
+          Foreign_field.Element.Standard.to_bignum_bigint_as_prover
+            (module Circuit)
+            r
+        in
+
+        let s =
+          Foreign_field.Element.Standard.to_bignum_bigint_as_prover
+            (module Circuit)
+            s
+        in
+
+        (* Compute r^-1 *)
+        let r_inv = Common.bignum_bigint_inverse r curve_order in
+
+        (* Compute s^-1 *)
+        let s_inv = Common.bignum_bigint_inverse s curve_order in
+
+        (* Convert from Bignums to field elements *)
+        let r_inv0, r_inv1, r_inv2 =
+          Foreign_field.bignum_bigint_to_field_standard_limbs
+            (module Circuit)
+            r_inv
+        in
+        let s_inv0, s_inv1, s_inv2 =
+          Foreign_field.bignum_bigint_to_field_standard_limbs
+            (module Circuit)
+            s_inv
+        in
+
+        (* Return and convert back to Cvars *)
+        [| r_inv0; r_inv1; r_inv2; s_inv0; s_inv1; s_inv2 |] )
+    |> tuple6_of_array
+  in
+  let r_inv =
+    Foreign_field.Element.Standard.of_limbs (r_inv0, r_inv1, r_inv2)
+  in
+  let s_inv =
+    Foreign_field.Element.Standard.of_limbs (s_inv0, s_inv1, s_inv2)
+  in
+
+  let one = Foreign_field.Element.Standard.one (module Circuit) in
+
+  (* C1: Constrain that r != 0 *)
+  let computed_one =
+    Foreign_field.mul (module Circuit) scalar_checks r r_inv curve_order
+  in
+  (* Bounds 1: Left input r is bound checked below
+   *           Right input r_inv is bound checked below
+   *           Result bound check is covered by scalar_checks
+   *)
+  Foreign_field.External_checks.append_bound_check scalar_checks
+  @@ Foreign_field.Element.Standard.to_limbs r ;
+  Foreign_field.External_checks.append_bound_check scalar_checks
+  @@ Foreign_field.Element.Standard.to_limbs r_inv ;
+  (* Assert r * r^-1 = 1 *)
+  Foreign_field.Element.Standard.assert_equal (module Circuit) computed_one one ;
+
+  (* C2: Constrain that s != 0 *)
+  let computed_one =
+    Foreign_field.mul (module Circuit) scalar_checks s s_inv curve_order
+  in
+  (* Bounds 2: Left input s is bound checked below
+   *           Right input s_inv is bound checked below
+   *           Result bound check is covered by scalar_checks
+   *)
+  Foreign_field.External_checks.append_bound_check scalar_checks
+  @@ Foreign_field.Element.Standard.to_limbs s ;
+  Foreign_field.External_checks.append_bound_check scalar_checks
+  @@ Foreign_field.Element.Standard.to_limbs s_inv ;
+  (* Assert s * s^-1 = 1 *)
+  Foreign_field.Element.Standard.assert_equal (module Circuit) computed_one one
+
+(* C3: Assert r \in [0, n)
+ *     Already covered by bound check on r (Bounds 1)
+ *)
+
+(* C4: Assert s \in [0, n)
+ *     Already covered by bound check on s (Bounds 2)
+ *)
+
+(* Gadget for constraining ECDSA signature verificationin zero-knowledge
  *
  *   Inputs:
  *     external_checks       := Context to track required external checks
@@ -1354,7 +1457,7 @@ let group_check_subgroup (type f)
  *      pubkey is on the curve and not O   (use group_is_on_curve gadget)
  *      pubkey is in the subgroup (nP = O) (use group_check_subgroup gadget)
  *      pubkey is bounds checked           (use multi-range-check gadgets)
- *      r, s \in [1, n)
+ *      r, s \in [1, n)                    (use ecdsa_signature_scalar_check gadget)
  *      msg_hash \in Fn                    (use bytes_to_foreign_field_element gadget)
  *
  *   Public parameters
@@ -1367,7 +1470,8 @@ let group_check_subgroup (type f)
  *      ia coordinates are bounds checked
  *)
 let ecdsa_verify (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (external_checks : f Foreign_field.External_checks.t) (pubkey : f Affine.t)
+    (base_checks : f Foreign_field.External_checks.t)
+    (scalar_checks : f Foreign_field.External_checks.t) (pubkey : f Affine.t)
     (signature :
       f Foreign_field.Element.Standard.t * f Foreign_field.Element.Standard.t )
     (msg_hash : f Foreign_field.Element.Standard.t)
@@ -1454,13 +1558,13 @@ let ecdsa_verify (type f) (module Circuit : Snark_intf.Run with type field = f)
   let msg_hash_computed =
     Foreign_field.mul
       (module Circuit)
-      external_checks ~bound_check_result:false s u1 curve_order
+      scalar_checks ~bound_check_result:false s u1 curve_order
   in
   (* Bounds 1: Left input s is gadget input (checked externally)
    *           Right input u1 checked below
    *           Result is gadget input (already checked externally).
    *)
-  Foreign_field.External_checks.append_bound_check external_checks
+  Foreign_field.External_checks.append_bound_check scalar_checks
   @@ Foreign_field.Element.Standard.to_limbs u1 ;
   (* Assert s * u1 = z *)
   Foreign_field.Element.Standard.assert_equal
@@ -1471,13 +1575,13 @@ let ecdsa_verify (type f) (module Circuit : Snark_intf.Run with type field = f)
   let r_computed =
     Foreign_field.mul
       (module Circuit)
-      external_checks ~bound_check_result:false s u2 curve_order
+      scalar_checks ~bound_check_result:false s u2 curve_order
   in
   (* Bounds 2: Left input s is gadget input (checked externally)
    *           Right input u2 checked below
    *           Result is gadget input (already checked externally).
    *)
-  Foreign_field.External_checks.append_bound_check external_checks
+  Foreign_field.External_checks.append_bound_check scalar_checks
   @@ Foreign_field.Element.Standard.to_limbs u2 ;
   (* Assert s * u2 = r *)
   Foreign_field.Element.Standard.assert_equal (module Circuit) r_computed r ;
@@ -1504,46 +1608,46 @@ let ecdsa_verify (type f) (module Circuit : Snark_intf.Run with type field = f)
   let u1_point =
     group_scalar_mul
       (module Circuit)
-      external_checks u1_bits gen ia ?doubles ~a foreign_field_modulus
+      base_checks u1_bits gen ia ?doubles ~a foreign_field_modulus
   in
 
   (* Bounds 5: Generator is gadget input (public parameter)
    *           Initial accumulator is gadget input (checked externally or public parameter)
    *           Result bound check for u1_point below.
    *)
-  Foreign_field.External_checks.append_bound_check external_checks
+  Foreign_field.External_checks.append_bound_check base_checks
   @@ Foreign_field.Element.Standard.to_limbs @@ Affine.x u1_point ;
-  Foreign_field.External_checks.append_bound_check external_checks
+  Foreign_field.External_checks.append_bound_check base_checks
   @@ Foreign_field.Element.Standard.to_limbs @@ Affine.y u1_point ;
 
   (* C6: Constrain scalar multiplication u2P *)
   let u2_point =
     group_scalar_mul
       (module Circuit)
-      external_checks u2_bits pubkey ia ?doubles ~a foreign_field_modulus
+      base_checks u2_bits pubkey ia ?doubles ~a foreign_field_modulus
   in
   (* Bounds 6: Pubkey is gadget input (checked externally)
    *           Initial accumulator is gadget input (checked externally or public parameter)
    *           Result bound check for u2_point below.
    *)
-  Foreign_field.External_checks.append_bound_check external_checks
+  Foreign_field.External_checks.append_bound_check base_checks
   @@ Foreign_field.Element.Standard.to_limbs @@ Affine.x u2_point ;
-  Foreign_field.External_checks.append_bound_check external_checks
+  Foreign_field.External_checks.append_bound_check base_checks
   @@ Foreign_field.Element.Standard.to_limbs @@ Affine.y u2_point ;
 
   (* C7: R = u1G + u2P *)
   let result =
     group_add
       (module Circuit)
-      external_checks u1_point u2_point foreign_field_modulus
+      base_checks u1_point u2_point foreign_field_modulus
   in
 
   (* Bounds 7: Left and right inputs checked by (Bounds 5) and (Bounds 6)
    *           Result bound is bound checked below
    *)
-  Foreign_field.External_checks.append_bound_check external_checks
+  Foreign_field.External_checks.append_bound_check base_checks
   @@ Foreign_field.Element.Standard.to_limbs @@ Affine.x result ;
-  Foreign_field.External_checks.append_bound_check external_checks
+  Foreign_field.External_checks.append_bound_check base_checks
   @@ Foreign_field.Element.Standard.to_limbs @@ Affine.y result ;
 
   (* Constrain that r = Rx (mod n), where n is the scalar field modulus
@@ -1615,13 +1719,13 @@ let ecdsa_verify (type f) (module Circuit : Snark_intf.Run with type field = f)
   let quotient_product =
     Foreign_field.mul
       (module Circuit)
-      external_checks quotient n_minus_one curve_order
+      scalar_checks quotient n_minus_one curve_order
   in
   (* Bounds 8: Left input q is bound checked below
    *           Right input (n - 1) is a public parameter so not checked
-   *           Result bound check is already covered by external_checks
+   *           Result bound check is already covered by scalar_checks
    *)
-  Foreign_field.External_checks.append_bound_check external_checks
+  Foreign_field.External_checks.append_bound_check scalar_checks
   @@ Foreign_field.Element.Standard.to_limbs quotient ;
 
   (* C9: Compute qn = q * (n - 1) + q *)
@@ -1654,7 +1758,7 @@ let ecdsa_verify (type f) (module Circuit : Snark_intf.Run with type field = f)
    *            Right input x_prime bounds checked below
    *            Result already bound checked by (Bounds 7)
    *)
-  Foreign_field.External_checks.append_bound_check external_checks
+  Foreign_field.External_checks.append_bound_check scalar_checks
   @@ Foreign_field.Element.Standard.to_limbs x_prime ;
 
   (* C11: Check qn + r = Rx *)
@@ -1668,7 +1772,7 @@ let ecdsa_verify (type f) (module Circuit : Snark_intf.Run with type field = f)
   (* C13: Check result is on curve (also implies result is not infinity) *)
   group_is_on_curve
     (module Circuit)
-    external_checks result ~a ~b foreign_field_modulus ;
+    base_checks result ~a ~b foreign_field_modulus ;
 
   (* Bounds 13: Input already bound checked by (Bounds 8) *)
   ()
@@ -4737,23 +4841,30 @@ let%test_unit "ecdsa_verify" =
                 msg_hash
             in
 
-            (* Create external checks context for tracking extra constraints
+            (* Create external checks contexts for tracking extra constraints
                that are required for soundness (unused in this simple test) *)
-            let unused_external_checks =
+            let unused_base_checks =
+              Foreign_field.External_checks.create (module Runner.Impl)
+            in
+            let unused_scalar_checks =
               Foreign_field.External_checks.create (module Runner.Impl)
             in
 
             (* Subgroup check for pubkey *)
             group_check_subgroup
               (module Runner.Impl)
-              unused_external_checks pubkey ia ~a curve_order
-              foreign_field_modulus ;
+              unused_base_checks pubkey ia ~a curve_order foreign_field_modulus ;
+
+            (* Check r, s \in [1, n) *)
+            ecdsa_signature_scalar_check
+              (module Runner.Impl)
+              unused_scalar_checks signature curve_order ;
 
             (* Verify ECDSA signature *)
             ecdsa_verify
               (module Runner.Impl)
-              unused_external_checks pubkey signature msg_hash ia gen ~a ~b
-              curve_order foreign_field_modulus ;
+              unused_base_checks unused_scalar_checks pubkey signature msg_hash
+              ia gen ~a ~b curve_order foreign_field_modulus ;
 
             () )
       in

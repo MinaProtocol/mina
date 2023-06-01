@@ -153,6 +153,9 @@ module type Element_intf = sig
   (* Map foreign field element's Cvar limbs into some other limbs with the mapping function func *)
   val map : 'field t -> ('field Cvar.t -> 'g) -> 'g limbs_type
 
+  (* One constant *)
+  val one : (module Snark_intf.Run with type field = 'field) -> 'field t
+
   (* Convert foreign field element into field limbs *)
   val to_field_limbs_as_prover :
        (module Snark_intf.Run with type field = 'field)
@@ -268,6 +271,10 @@ end = struct
         : Bignum_bigint.t limbs_type =
       map x (Common.cvar_field_to_bignum_bigint_as_prover (module Circuit))
 
+    let one (type field)
+        (module Circuit : Snark_intf.Run with type field = field) : field t =
+      of_bignum_bigint (module Circuit) Bignum_bigint.one
+
     let to_bignum_bigint_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         : Bignum_bigint.t =
@@ -370,6 +377,10 @@ end = struct
     let map (x : 'field t) (func : 'field Cvar.t -> 'g) : 'g limbs_type =
       let l0, l1 = to_limbs x in
       (func l0, func l1)
+
+    let one (type field)
+        (module Circuit : Snark_intf.Run with type field = field) : field t =
+      of_bignum_bigint (module Circuit) Bignum_bigint.one
 
     let to_field_limbs_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)

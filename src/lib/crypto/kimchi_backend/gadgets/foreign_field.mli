@@ -59,6 +59,9 @@ module type Element_intf = sig
   (** Map foreign field element's Cvar limbs into some other limbs with the mapping function func *)
   val map : 'field t -> ('field Cvar.t -> 'g) -> 'g limbs_type
 
+  (** One constant *)
+  val one : (module Snark_intf.Run with type field = 'field) -> 'field t
+
   (** Convert foreign field element into field limbs *)
   val to_field_limbs_as_prover :
        (module Snark_intf.Run with type field = 'field)
@@ -77,11 +80,11 @@ module type Element_intf = sig
     -> 'field t
     -> Bignum_bigint.t
 
-  (* Convert foreign field affine point to string *)
+  (** Convert foreign field affine point to string *)
   val to_string_as_prover :
     (module Snark_intf.Run with type field = 'field) -> 'field t -> string
 
-  (* Constrain zero check computation with boolean output *)
+  (** Constrain zero check computation with boolean output *)
   val is_zero :
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
@@ -94,14 +97,14 @@ module type Element_intf = sig
     -> 'field t
     -> bool
 
-  (* Add copy constraints that two foreign field elements are equal *)
+  (** Add copy constraints that two foreign field elements are equal *)
   val assert_equal :
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> 'field t
     -> unit
 
-  (* Add conditional constraints to select foreign field element *)
+  (** Add conditional constraints to select foreign field element *)
   val if_ :
        (module Snark_intf.Run with type field = 'field)
     -> 'field Cvar.t Snark_intf.Boolean0.t
@@ -109,7 +112,7 @@ module type Element_intf = sig
     -> 'field t
     -> 'field t
 
-  (* Decompose and constrain foreign field element into list of boolean cvars *)
+  (** Decompose and constrain foreign field element into list of boolean cvars *)
   val unpack :
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
