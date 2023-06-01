@@ -1734,7 +1734,7 @@ module Types = struct
           ~args:[] ~doc:"Account that the command is sent from"
           ~resolve:(fun { ctx = mina; _ } cmd ->
             AccountObj.get_best_ledger_account mina
-              (Signed_command.source cmd.With_hash.data) )
+              (Signed_command.fee_payer cmd.With_hash.data) )
       ; field_no_status "receiver" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account that the command applies to"
           ~resolve:(fun { ctx = mina; _ } cmd ->
@@ -1742,6 +1742,7 @@ module Types = struct
               (Signed_command.receiver cmd.With_hash.data) )
       ; field_no_status "feePayer" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account that pays the fees for the command"
+          ~deprecated:(Deprecated (Some "use source field instead"))
           ~resolve:(fun { ctx = mina; _ } cmd ->
             AccountObj.get_best_ledger_account mina
               (Signed_command.fee_payer cmd.With_hash.data) )
@@ -1846,7 +1847,7 @@ module Types = struct
           field_no_status "delegator" ~typ:(non_null AccountObj.account)
             ~args:[] ~resolve:(fun { ctx = mina; _ } cmd ->
               AccountObj.get_best_ledger_account mina
-                (Signed_command.source cmd.With_hash.data) )
+                (Signed_command.fee_payer cmd.With_hash.data) )
           :: field_no_status "delegatee" ~typ:(non_null AccountObj.account)
                ~args:[] ~resolve:(fun { ctx = mina; _ } cmd ->
                  AccountObj.get_best_ledger_account mina
@@ -3976,7 +3977,7 @@ module Mutations = struct
                     (from, to_, fee, valid_until, memo, nonce_opt) signature ->
         let body =
           Signed_command_payload.Body.Stake_delegation
-            (Set_delegate { delegator = from; new_delegate = to_ })
+            (Set_delegate { new_delegate = to_ })
         in
         match signature with
         | None ->
@@ -4002,10 +4003,7 @@ module Mutations = struct
                     signature ->
         let body =
           Signed_command_payload.Body.Payment
-            { source_pk = from
-            ; receiver_pk = to_
-            ; amount = Amount.of_uint64 amount
-            }
+            { receiver_pk = to_; amount = Amount.of_uint64 amount }
         in
         match signature with
         | None ->
@@ -4079,7 +4077,7 @@ module Mutations = struct
           in
           let body =
             Signed_command_payload.Body.Payment
-              { source_pk; receiver_pk; amount = Amount.of_uint64 amount }
+              { receiver_pk; amount = Amount.of_uint64 amount }
           in
           let memo = "" in
           let kp =
@@ -4499,10 +4497,7 @@ module Mutations = struct
                           in
                           let body =
                             Signed_command_payload.Body.Payment
-                              { source_pk
-                              ; receiver_pk
-                              ; amount = payment_details.amount
-                              }
+                              { receiver_pk; amount = payment_details.amount }
                           in
                           let valid_until = None in
                           let nonce = nonces.(ndx) in
@@ -4577,7 +4572,8 @@ module Mutations = struct
 
     let deploy_zkapps ~mina ~ledger ~deployment_fee ~max_cost ~init_balance
         ~(fee_payer_array : Signature_lib.Keypair.t Array.t)
-        ~constraint_constants ~logger ~memo_prefix keypairs =
+        ~constraint_constants ~logger ~memo_prefix ~wait_span ~stop_signal
+        ~stop_time ~uuid keypairs =
       let fee_payer_accounts =
         Array.map fee_payer_array ~f:(fun key -> account_of_kp key ledger)
       in
@@ -4587,55 +4583,73 @@ module Mutations = struct
       let ndx = ref 0 in
       let num_fee_payers = Array.length fee_payer_array in
       Deferred.List.iter keypairs ~f:(fun kp ->
-          let fee_payer_keypair = fee_payer_array.(!ndx) in
-          let memo = sprintf "%s-%s" memo_prefix (Int.to_string !ndx) in
-          let spec =
-            { Transaction_snark.For_tests.Deploy_snapp_spec.sender =
-                (fee_payer_keypair, !(fee_payer_nonces.(!ndx)))
-            ; fee = Currency.Fee.of_mina_string_exn deployment_fee
-            ; fee_payer = None
-            ; amount = Currency.Amount.of_mina_string_exn init_balance
-            ; zkapp_account_keypairs = [ kp ]
-            ; memo = Signed_command_memo.create_from_string_exn memo
-            ; new_zkapp_account = true
-            ; snapp_update = Account_update.Update.dummy
-            ; preconditions = None
-            ; authorization_kind = Account_update.Authorization_kind.Signature
-            }
-          in
-          let zkapp_command =
-            Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-              ~permissions:
-                ( if max_cost then
-                  { Permissions.user_default with
-                    set_verification_key = Permissions.Auth_required.Proof
-                  ; edit_state = Permissions.Auth_required.Proof
-                  ; edit_action_state = Proof
-                  }
-                else Permissions.user_default )
-              spec
-          in
-          let rec go () =
-            match%bind send_zkapp_command mina zkapp_command with
-            | Ok _ ->
-                fee_payer_nonces.(!ndx) :=
-                  Account.Nonce.succ !(fee_payer_nonces.(!ndx)) ;
-                ndx := (!ndx + 1) mod num_fee_payers ;
-                [%log info]
-                  "Successfully submitted zkApp command that creates a zkApp \
-                   account"
-                  ~metadata:
-                    [ ("zkapp_command", Zkapp_command.to_yojson zkapp_command) ] ;
-                Deferred.unit
-            | Error err ->
-                [%log info] "Failed to setup a zkApp account, try again"
-                  ~metadata:
-                    [ ("zkapp_command", Zkapp_command.to_yojson zkapp_command)
-                    ; ("error", `String err)
-                    ] ;
-                go ()
-          in
-          go () )
+          if Time.(now () >= stop_time) then (
+            [%log info]
+              "Scheduled zkapp commands with handle %s has expired, stop \
+               deployment of zkapp accounts"
+              (Uuid.to_string uuid) ;
+            Uuid.Table.remove scheduler_tbl uuid ;
+            return () )
+          else if Ivar.is_full stop_signal then (
+            [%log info]
+              "Scheduled zkapp commands with handle %s received stop signal, \
+               stop deployment of zkapp accounts"
+              (Uuid.to_string uuid) ;
+            Uuid.Table.remove scheduler_tbl uuid ;
+            return () )
+          else
+            let fee_payer_keypair = fee_payer_array.(!ndx) in
+            let memo = sprintf "%s-%s" memo_prefix (Int.to_string !ndx) in
+            let spec =
+              { Transaction_snark.For_tests.Deploy_snapp_spec.sender =
+                  (fee_payer_keypair, !(fee_payer_nonces.(!ndx)))
+              ; fee = Currency.Fee.of_mina_string_exn deployment_fee
+              ; fee_payer = None
+              ; amount = Currency.Amount.of_mina_string_exn init_balance
+              ; zkapp_account_keypairs = [ kp ]
+              ; memo = Signed_command_memo.create_from_string_exn memo
+              ; new_zkapp_account = true
+              ; snapp_update = Account_update.Update.dummy
+              ; preconditions = None
+              ; authorization_kind = Account_update.Authorization_kind.Signature
+              }
+            in
+            let zkapp_command =
+              Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+                ~permissions:
+                  ( if max_cost then
+                    { Permissions.user_default with
+                      set_verification_key = Permissions.Auth_required.Proof
+                    ; edit_state = Permissions.Auth_required.Proof
+                    ; edit_action_state = Proof
+                    }
+                  else Permissions.user_default )
+                spec
+            in
+            let%bind () = after wait_span in
+            let rec go () =
+              match%bind send_zkapp_command mina zkapp_command with
+              | Ok _ ->
+                  fee_payer_nonces.(!ndx) :=
+                    Account.Nonce.succ !(fee_payer_nonces.(!ndx)) ;
+                  ndx := (!ndx + 1) mod num_fee_payers ;
+                  [%log info]
+                    "Successfully submitted zkApp command that creates a zkApp \
+                     account"
+                    ~metadata:
+                      [ ("zkapp_command", Zkapp_command.to_yojson zkapp_command)
+                      ] ;
+                  Deferred.unit
+              | Error err ->
+                  [%log info] "Failed to setup a zkApp account, try again"
+                    ~metadata:
+                      [ ("zkapp_command", Zkapp_command.to_yojson zkapp_command)
+                      ; ("error", `String err)
+                      ] ;
+                  let%bind () = after wait_span in
+                  go ()
+            in
+            go () )
 
     let is_zkapp_deployed kp ledger =
       match
@@ -4656,7 +4670,7 @@ module Mutations = struct
         ~deployment_fee ~max_cost ~init_balance
         ~(fee_payer_array : Signature_lib.Keypair.t Array.t)
         ~constraint_constants ~logger ~uuid ~stop_signal ~stop_time ~memo_prefix
-        (keypairs : Signature_lib.Keypair.t list) =
+        ~wait_span (keypairs : Signature_lib.Keypair.t list) =
       if Time.( >= ) (Time.now ()) stop_time then (
         [%log info] "Scheduled zkApp commands with handle %s has expired"
           (Uuid.to_string uuid) ;
@@ -4676,7 +4690,7 @@ module Mutations = struct
             [%log info] "Start deploying zkApp accounts" ;
             deploy_zkapps ~mina ~ledger ~deployment_fee ~max_cost ~init_balance
               ~fee_payer_array ~constraint_constants ~logger ~memo_prefix
-              keypairs )
+              ~wait_span ~stop_signal ~stop_time ~uuid keypairs )
           else return ()
         in
         [%log debug] "The accounts were not in the best tip $ledger, try again"
@@ -4696,7 +4710,7 @@ module Mutations = struct
         in
         wait_until_zkapps_deployed ~deployed:true ~mina ~ledger ~deployment_fee
           ~max_cost ~init_balance ~fee_payer_array ~constraint_constants ~logger
-          ~uuid ~stop_signal ~stop_time ~memo_prefix keypairs
+          ~uuid ~stop_signal ~stop_time ~memo_prefix ~wait_span keypairs
 
     let schedule_zkapp_commands =
       io_field "scheduleZkappCommands"
@@ -4962,8 +4976,8 @@ module Mutations = struct
                                ~fee_payer_array ~constraint_constants
                                zkapp_account_keypairs ~logger ~uuid
                                ~stop_signal:ivar ~stop_time:tm_end
-                               ~memo_prefix:zkapp_command_details.memo_prefix )
-                            (fun result ->
+                               ~memo_prefix:zkapp_command_details.memo_prefix
+                               ~wait_span ) (fun result ->
                               match result with
                               | None ->
                                   ()
@@ -5788,10 +5802,7 @@ module Queries = struct
         let open Deferred.Result.Let_syntax in
         let body =
           Signed_command_payload.Body.Payment
-            { source_pk = from
-            ; receiver_pk = to_
-            ; amount = Amount.of_uint64 amount
-            }
+            { receiver_pk = to_; amount = Amount.of_uint64 amount }
         in
         let%bind signature =
           match signature with

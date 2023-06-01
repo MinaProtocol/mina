@@ -1820,8 +1820,7 @@ module User_command = struct
            (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
         id
 
-    type balance_public_key_ids =
-      { fee_payer_id : int; source_id : int; receiver_id : int }
+    type balance_public_key_ids = { fee_payer_id : int; receiver_id : int }
 
     let add_account_ids_if_don't_exist (module Conn : CONNECTION)
         (t : Signed_command.t) =
@@ -1830,15 +1829,11 @@ module User_command = struct
         let pk = Signed_command.fee_payer_pk t in
         Public_key.add_if_doesn't_exist (module Conn) pk
       in
-      let%bind source_id =
-        let pk = Signed_command.source_pk t in
-        Public_key.add_if_doesn't_exist (module Conn) pk
-      in
       let%map receiver_id =
         let pk = Signed_command.receiver_pk t in
         Public_key.add_if_doesn't_exist (module Conn) pk
       in
-      { fee_payer_id; source_id; receiver_id }
+      { fee_payer_id; receiver_id }
 
     let add_if_doesn't_exist ?(via = `Ident) (module Conn : CONNECTION)
         (t : Signed_command.t) =
@@ -1848,7 +1843,7 @@ module User_command = struct
       | Some user_command_id ->
           return user_command_id
       | None ->
-          let%bind { fee_payer_id; source_id; receiver_id } =
+          let%bind { fee_payer_id; receiver_id } =
             add_account_ids_if_don't_exist (module Conn) t
           in
           let valid_until =
@@ -1874,7 +1869,7 @@ module User_command = struct
                 | `Zkapp_command ->
                     "zkapp" )
             ; fee_payer_id
-            ; source_id
+            ; source_id = fee_payer_id
             ; receiver_id
             ; nonce = Signed_command.nonce t |> Unsigned.UInt32.to_int64
             ; amount =
