@@ -30,7 +30,7 @@ val init_stack : Pending_coinbase.Stack_versioned.t
 
 val pending_coinbase_state_stack :
      state_body_hash:State_hash.t
-  -> global_slot:Mina_numbers.Global_slot.t
+  -> global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> Transaction_snark.Pending_coinbase_stack_state.t
 
 val dummy_rule :
@@ -56,7 +56,7 @@ type pass_number = Pass_1 | Pass_2
 val check_zkapp_command_with_merges_exn :
      ?expected_failure:Mina_base.Transaction_status.Failure.t * pass_number
   -> ?ignore_outside_snark:bool
-  -> ?global_slot:Mina_numbers.Global_slot.t
+  -> ?global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> ?state_body:Transaction_protocol_state.Block_data.t
   -> Ledger.t
   -> Zkapp_command.t list
@@ -109,7 +109,7 @@ val permissions_from_update :
 val pending_coinbase_stack_target :
      Mina_transaction.Transaction.Valid.t
   -> State_hash.t
-  -> Mina_numbers.Global_slot.t
+  -> Mina_numbers.Global_slot_since_genesis.t
   -> Pending_coinbase.Stack.t
   -> Pending_coinbase.Stack.t
 
@@ -150,7 +150,7 @@ val check_balance : Account_id.t -> int -> Ledger.t -> unit
 
 val test_transaction_union :
      ?expected_failure:Transaction_status.Failure.t list
-  -> ?txn_global_slot:Mina_numbers.Global_slot.t
+  -> ?txn_global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> Ledger.t
   -> Mina_transaction.Transaction.Valid.t
   -> unit

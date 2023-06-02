@@ -1,7 +1,7 @@
 open Core
 open Mina_base
 open Snark_params
-module Global_slot = Mina_numbers.Global_slot
+module Global_slot = Mina_numbers.Global_slot_since_genesis
 open Currency
 
 let top_hash_logging_enabled = ref false

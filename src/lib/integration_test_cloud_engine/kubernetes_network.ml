@@ -645,7 +645,7 @@ module Node = struct
               let%bind cliff_time =
                 match tm with
                 | `String s ->
-                    return @@ Mina_numbers.Global_slot.of_string s
+                    return @@ Mina_numbers.Global_slot_since_genesis.of_string s
                 | _ ->
                     fail
                       (Error.of_string
@@ -654,7 +654,7 @@ module Node = struct
               let%bind vesting_period =
                 match period with
                 | `String s ->
-                    return @@ Mina_numbers.Global_slot.of_string s
+                    return @@ Mina_numbers.Global_slot_span.of_string s
                 | _ ->
                     fail
                       (Error.of_string
@@ -891,8 +891,8 @@ module Node = struct
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
-      ~amount ~fee ~nonce ~memo ~(valid_until : Mina_numbers.Global_slot.t)
-      ~raw_signature =
+      ~amount ~fee ~nonce ~memo
+      ~(valid_until : Mina_numbers.Global_slot_since_genesis.t) ~raw_signature =
     [%log info] "Sending a payment with raw signature"
       ~metadata:(logger_metadata t) ;
     let open Deferred.Or_error.Let_syntax in
@@ -901,7 +901,8 @@ module Node = struct
       let input =
         Mina_graphql.Types.Input.SendPaymentInput.make_input
           ~from:sender_pub_key ~to_:receiver_pub_key ~amount ~fee ~memo ~nonce
-          ~valid_until:(Mina_numbers.Global_slot.to_uint32 valid_until)
+          ~valid_until:
+            (Mina_numbers.Global_slot_since_genesis.to_uint32 valid_until)
           ()
       in
       let variables = makeVariables ~input ~rawSignature:raw_signature () in

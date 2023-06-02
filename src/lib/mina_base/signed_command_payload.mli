@@ -91,7 +91,7 @@ module Common : sig
         ( Currency.Fee.Stable.V1.t
         , Public_key.Compressed.Stable.V1.t
         , Mina_numbers.Account_nonce.Stable.V1.t
-        , Mina_numbers.Global_slot.Stable.V1.t
+        , Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         , Signed_command_memo.Stable.V1.t )
         Poly.Stable.V2.t
       [@@deriving compare, equal, sexp, hash, yojson]
@@ -103,7 +103,7 @@ module Common : sig
         , Public_key.Compressed.Stable.V1.t
         , Token_id.Stable.V1.t
         , Mina_numbers.Account_nonce.Stable.V1.t
-        , Mina_numbers.Global_slot.Stable.V1.t
+        , Mina_numbers.Global_slot_legacy.Stable.V1.t
         , Signed_command_memo.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving compare, equal, sexp, hash, yojson]
@@ -120,7 +120,7 @@ module Common : sig
     ( Currency.Fee.var
     , Public_key.Compressed.var
     , Mina_numbers.Account_nonce.Checked.t
-    , Mina_numbers.Global_slot.Checked.t
+    , Mina_numbers.Global_slot_since_genesis.Checked.t
     , Signed_command_memo.Checked.t )
     Poly.t
 
@@ -179,7 +179,7 @@ val create :
      fee:Currency.Fee.t
   -> fee_payer_pk:Public_key.Compressed.t
   -> nonce:Mina_numbers.Account_nonce.t
-  -> valid_until:Mina_numbers.Global_slot.t option
+  -> valid_until:Mina_numbers.Global_slot_since_genesis.t option
   -> memo:Signed_command_memo.t
   -> body:Body.t
   -> t
@@ -196,7 +196,7 @@ val fee_excess : t -> Fee_excess.t
 
 val nonce : t -> Mina_numbers.Account_nonce.t
 
-val valid_until : t -> Mina_numbers.Global_slot.t
+val valid_until : t -> Mina_numbers.Global_slot_since_genesis.t
 
 val memo : t -> Signed_command_memo.t
 
