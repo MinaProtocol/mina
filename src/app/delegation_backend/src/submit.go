@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/btcsuite/btcutil/base58"
 	logging "github.com/ipfs/go-log/v2"
 	"golang.org/x/crypto/blake2b"
 )
@@ -88,42 +86,9 @@ func MakePathsImpl(submittedAt string, blockHash string, submitter Pk) (res Path
 	res.Block = "blocks/" + blockHash + ".dat"
 	return
 }
-func makePaths(submittedAt time.Time, req *submitRequest) (Paths, string) {
-	blockHashBytes := blake2b.Sum256(req.Data.Block.data)
-	blockHash := base58.CheckEncode(blockHashBytes[:], BASE58CHECK_VERSION_BLOCK_HASH)
+func makePaths(submittedAt time.Time, blockHash string, submitter Pk) Paths {
 	submittedAtStr := submittedAt.UTC().Format(time.RFC3339)
-	return MakePathsImpl(submittedAtStr, blockHash, req.Submitter), blockHash
-}
-
-func makeSignPayload(req *submitRequestData) ([]byte, error) {
-	createdAtStr := req.CreatedAt.UTC().Format(time.RFC3339)
-	createdAtJson, err2 := json.Marshal(createdAtStr)
-	if err2 != nil {
-		return nil, err2
-	}
-	signPayload := new(BufferOrError)
-	signPayload.WriteString("{\"block\":")
-	signPayload.Write(req.Block.json)
-	signPayload.WriteString(",\"created_at\":")
-	signPayload.Write(createdAtJson)
-	signPayload.WriteString(",\"peer_id\":\"")
-	signPayload.WriteString(req.PeerId)
-	signPayload.WriteString("\"")
-	if req.SnarkWork != nil {
-		signPayload.WriteString(",\"snark_work\":")
-		signPayload.Write(req.SnarkWork.json)
-	}
-	if req.GraphqlControlPort != 0 {
-		signPayload.WriteString(",\"graphql_control_port\":")
-		signPayload.WriteString(fmt.Sprintf("%d", req.GraphqlControlPort))
-	}
-	if req.BuiltWithCommitSha != "" {
-		signPayload.WriteString(",\"built_with_commit_sha\":\"")
-		signPayload.WriteString(req.BuiltWithCommitSha)
-		signPayload.WriteString("\"")
-	}
-	signPayload.WriteString("}")
-	return signPayload.Buf.Bytes(), signPayload.Err
+	return MakePathsImpl(submittedAtStr, blockHash, submitter)
 }
 
 // TODO consider using pointers and doing `== nil` comparison
@@ -147,56 +112,70 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req submitRequest
-	if err := json.Unmarshal(body, &req); err != nil {
+	var reqV1 submitRequestV1
+	var reqV0 submitRequestV0
+	if err := json.Unmarshal(body, &reqV1); err == nil {
+		req = reqV1
+		h.app.Log.Debugf("Received /submit request with v1 payload")
+	} else if err := json.Unmarshal(body, &reqV0); err == nil {
+		req = reqV0
+		h.app.Log.Debugf("Received /submit request with v0 payload")
+	} else {
 		h.app.Log.Debugf("Error while unmarshaling JSON of /submit request's body: %v", err)
 		w.WriteHeader(400)
 		writeErrorResponse(h.app, &w, "Wrong payload")
 		return
 	}
-	if req.Data.Block == nil || req.Data.PeerId == "" || req.Data.CreatedAt == nilTime || req.Submitter == nilPk || req.Sig == nilSig {
+
+	if !req.CheckRequiredFields() {
 		h.app.Log.Debug("One of required fields wasn't provided")
 		w.WriteHeader(400)
 		writeErrorResponse(h.app, &w, "One of required fields wasn't provided")
 		return
 	}
 
+	submitter := req.GetSubmitter()
+	sig := req.GetSig()
+
 	wl := h.app.Whitelist.ReadWhitelist()
-	if (*wl)[req.Submitter] == nil {
+	if (*wl)[submitter] == nil {
 		w.WriteHeader(401)
 		writeErrorResponse(h.app, &w, "Submitter is not registered")
 		return
 	}
 
 	submittedAt := h.app.Now()
-	if req.Data.CreatedAt.Add(TIME_DIFF_DELTA).After(submittedAt) {
+	if req.GetCreatedAt().Add(TIME_DIFF_DELTA).After(submittedAt) {
 		h.app.Log.Debugf("Field created_at is a timestamp in future: %v", submittedAt)
 		w.WriteHeader(400)
 		writeErrorResponse(h.app, &w, "Field created_at is a timestamp in future")
 		return
 	}
 
-	payload, err := makeSignPayload(&req.Data)
+	payload, err := req.MakeSignPayload()
 	if err != nil {
 		h.app.Log.Errorf("Error while unmarshaling JSON of /submit request's body: %v", err)
 		w.WriteHeader(500)
 		writeErrorResponse(h.app, &w, "Unexpected server error")
 		return
 	}
+
 	hash := blake2b.Sum256(payload)
-	if !verifySig(&req.Submitter, &req.Sig, hash[:], NetworkId()) {
+	if !verifySig(&submitter, &sig, hash[:], NetworkId()) {
 		w.WriteHeader(401)
 		writeErrorResponse(h.app, &w, "Invalid signature")
 		return
 	}
 
-	passesAttemptLimit := h.app.SubmitCounter.RecordAttempt(req.Submitter)
+	passesAttemptLimit := h.app.SubmitCounter.RecordAttempt(submitter)
 	if !passesAttemptLimit {
 		w.WriteHeader(429)
 		writeErrorResponse(h.app, &w, "Too many requests per hour")
 		return
 	}
 
-	ps, blockHash := makePaths(submittedAt, &req)
+	blockHash := req.GetBlockDataHash()
+	ps := makePaths(submittedAt, blockHash, submitter)
 
 	remoteAddr := r.Header.Get("X-Forwarded-For")
 	if remoteAddr == "" {
@@ -204,18 +183,7 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		remoteAddr = r.RemoteAddr
 	}
 
-	meta := MetaToBeSaved{
-		CreatedAt:          req.Data.CreatedAt.Format(time.RFC3339),
-		PeerId:             req.Data.PeerId,
-		SnarkWork:          req.Data.SnarkWork,
-		RemoteAddr:         r.RemoteAddr,
-		BlockHash:          blockHash,
-		Submitter:          req.Submitter,
-		GraphqlControlPort: req.Data.GraphqlControlPort,
-		BuiltWithCommitSha: req.Data.BuiltWithCommitSha,
-	}
-
-	metaBytes, err1 := json.Marshal(meta)
+	metaBytes, err1 := req.MakeMetaToBeSaved(remoteAddr)
 	if err1 != nil {
 		h.app.Log.Errorf("Error while marshaling JSON for metaToBeSaved: %v", err)
 		w.WriteHeader(500)
@@ -225,7 +193,7 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	toSave := make(ObjectsToSave)
 	toSave[ps.Meta] = metaBytes
-	toSave[ps.Block] = req.Data.Block.data
+	toSave[ps.Block] = []byte(req.GetBlockData())
 	h.app.Save(toSave)
 
 	_, err2 := io.Copy(w, bytes.NewReader([]byte("{\"status\":\"ok\"}")))

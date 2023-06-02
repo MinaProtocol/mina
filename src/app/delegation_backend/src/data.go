@@ -127,26 +127,18 @@ func (boe *BufferOrError) Write(b []byte) {
 	}
 }
 
-type submitRequestData struct {
-	PeerId             string    `json:"peer_id"`
-	Block              *Base64   `json:"block"`
-	SnarkWork          *Base64   `json:"snark_work,omitempty"`
-	GraphqlControlPort uint16    `json:"graphql_control_port,omitempty"`
-	CreatedAt          time.Time `json:"created_at"`
-	BuiltWithCommitSha string    `json:"built_with_commit_sha,omitempty"`
+type submitRequestSubmitterSig struct {
+	Submitter Pk  `json:"submitter"`
+	Sig       Sig `json:"signature"`
 }
-type submitRequest struct {
-	Data      submitRequestData `json:"data"`
-	Submitter Pk                `json:"submitter"`
-	Sig       Sig               `json:"signature"`
-}
-type MetaToBeSaved struct {
-	CreatedAt          string  `json:"created_at"`
-	PeerId             string  `json:"peer_id"`
-	SnarkWork          *Base64 `json:"snark_work,omitempty"`
-	GraphqlControlPort uint16  `json:"graphql_control_port,omitempty"`
-	BuiltWithCommitSha string  `json:"built_with_commit_sha,omitempty"`
-	RemoteAddr         string  `json:"remote_addr"`
-	Submitter          Pk      `json:"submitter"`  // is base58check-encoded submitter's public key
-	BlockHash          string  `json:"block_hash"` // is base58check-encoded hash of a block
+
+type submitRequest interface {
+	GetSubmitter() Pk
+	GetSig() Sig
+	GetBlockDataHash() string
+	MakeSignPayload() ([]byte, error)
+	GetCreatedAt() time.Time
+	MakeMetaToBeSaved(string) ([]byte, error)
+	CheckRequiredFields() bool
+	GetBlockData() []byte
 }

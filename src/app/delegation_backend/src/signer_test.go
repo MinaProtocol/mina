@@ -2,8 +2,9 @@ package delegation_backend
 
 import (
 	"encoding/json"
-	"golang.org/x/crypto/blake2b"
 	"testing"
+
+	"golang.org/x/crypto/blake2b"
 )
 
 func testVerifySig(pkStr string, sigStr string, data []byte, t *testing.T) {
@@ -29,12 +30,14 @@ func testVerifyRequest(name string, t *testing.T) {
 		t.Log("failed decoding test file")
 		t.FailNow()
 	}
-	j, err := makeSignPayload(&req.Data)
+	j, err := req.MakeSignPayload()
 	if err != nil {
 		t.FailNow()
 	}
 	hash := blake2b.Sum256(j)
-	if !verifySig(&req.Submitter, &req.Sig, hash[:], 1) {
+	submitter := req.GetSubmitter()
+	sig := req.GetSig()
+	if !verifySig(&submitter, &sig, hash[:], 1) {
 		t.FailNow()
 	}
 }

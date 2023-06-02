@@ -31,18 +31,18 @@ func mkB64B(b []byte) *Base64 {
 }
 
 func TestSignPayloadGeneration(t *testing.T) {
-	req := new(submitRequestData)
-	req.PeerId = "MLF0jAGTpL84LLerLddNs5M10NCHM+BwNeMxK78+"
-	req.Block = mkB64("zLgvHQzxSh8MWlTjXK+cMA==")
-	req.CreatedAt, _ = time.Parse(time.RFC3339, "2021-07-01T19:21:33+03:00")
-	json, err := makeSignPayload(req)
+	req := new(submitRequestV1)
+	req.Data.PeerId = "MLF0jAGTpL84LLerLddNs5M10NCHM+BwNeMxK78+"
+	req.Data.Block = mkB64("zLgvHQzxSh8MWlTjXK+cMA==")
+	req.Data.CreatedAt, _ = time.Parse(time.RFC3339, "2021-07-01T19:21:33+03:00")
+	json, err := req.MakeSignPayload()
 	if err != nil || !bytes.Equal(json, []byte(TSPG_EXPECTED_1)) {
 		t.FailNow()
 	}
-	req.SnarkWork = mkB64("Bjtox/3Yu4cT5eVCQz/JQ+P3Ce1JmCIE7N6b1MAa")
-	req.GraphqlControlPort = 1234
-	req.BuiltWithCommitSha = "26f4f27810edd44b991e7942ffc49daebbf99a80"
-	json, err = makeSignPayload(req)
+	req.Data.SnarkWork = mkB64("Bjtox/3Yu4cT5eVCQz/JQ+P3Ce1JmCIE7N6b1MAa")
+	req.Data.GraphqlControlPort = 1234
+	req.Data.BuiltWithCommitSha = "26f4f27810edd44b991e7942ffc49daebbf99a80"
+	json, err = req.MakeSignPayload()
 	if err != nil || !bytes.Equal(json, []byte(TSPG_EXPECTED_2)) {
 		t.FailNow()
 	}
@@ -112,7 +112,7 @@ func TestNoLengthProvided(t *testing.T) {
 }
 
 func TestTooLarge(t *testing.T) {
-	var req submitRequest
+	var req submitRequestV1
 	if err := json.Unmarshal(readTestFile("req-no-snark", t), &req); err != nil {
 		t.Log("failed decoding test file")
 		t.FailNow()
@@ -145,7 +145,7 @@ func TestUnauthorized(t *testing.T) {
 
 func TestPkLimitExceeded(t *testing.T) {
 	body := readTestFile("req-with-snark", t)
-	var req submitRequest
+	var req submitRequestV1
 	if err := json.Unmarshal(body, &req); err != nil {
 		t.Log("failed decoding test file")
 		t.FailNow()
@@ -179,7 +179,7 @@ func TestSuccess(t *testing.T) {
 	testNames := []string{"req-no-snark", "req-with-snark"}
 	for _, f := range testNames {
 		body := readTestFile(f, t)
-		var req submitRequest
+		var req submitRequestV1
 		if err := json.Unmarshal(body, &req); err != nil {
 			t.Logf("failed decoding test file %s", f)
 			t.FailNow()
@@ -190,8 +190,9 @@ func TestSuccess(t *testing.T) {
 			t.Logf("Failed testing %s: %v", f, rep)
 			t.FailNow()
 		}
-		paths, bhStr := makePaths(tm.Now(), &req)
-		var meta MetaToBeSaved
+		bhStr := req.GetBlockDataHash()
+		paths := makePaths(tm.Now(), bhStr, req.GetSubmitter())
+		var meta MetaToBeSavedV1
 		meta.CreatedAt = req.Data.CreatedAt.Format(time.RFC3339)
 		meta.PeerId = req.Data.PeerId
 		meta.SnarkWork = req.Data.SnarkWork
@@ -210,7 +211,7 @@ func TestSuccess(t *testing.T) {
 
 func Test40x(t *testing.T) {
 	body := readTestFile("req-with-snark", t)
-	var req submitRequest
+	var req submitRequestV1
 	if err := json.Unmarshal(body, &req); err != nil {
 		t.Log("failed decoding test file")
 		t.FailNow()
