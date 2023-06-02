@@ -796,12 +796,15 @@ module Make (L : Ledger_intf.S) :
         ~current_global_slot
     in
     (* Fee payment *)
-    let%bind `FP_halted (fee_payer_location, fee_payer_account) = Fee_payment.(
+    let%bind `FP_halted (fee_payer_location, fee_payer_account) =
+      let open Fee_payment in
+      let open FSM in
       init_with_signed_command ~ledger_ops:(module L) ~ledger
         ~global_slot:txn_global_slot user_command
       >>= find_account
       >>= validate_payment
-      >>| apply )
+      >>| apply
+      |> FSM.to_result
     in
     let receiver = Signed_command.receiver user_command in
     let exception Reject of Error.t in

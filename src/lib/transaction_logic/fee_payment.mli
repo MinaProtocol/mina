@@ -1,4 +1,3 @@
-open Core_kernel
 open Mina_base
 
 type ('ledger, 'location) initial
@@ -10,15 +9,15 @@ val init_with_signed_command :
   ledger:'ledger ->
   global_slot:Mina_numbers.Global_slot.t ->
   Signed_command.t ->
-  [> `FP_initial of ('ledger, 'location) initial ] Or_error.t
+  [> `FP_initial of ('ledger, 'location) initial ] FSM.t
 
 val find_account :
   [< `FP_initial of ('ledger, 'location) initial ] ->
-  [> `FP_account_found of ('ledger, 'location) with_account ] Or_error.t
+  [> `FP_account_found of ('ledger, 'location) with_account ] FSM.t
 
 val validate_payment :
   [< `FP_account_found of ('ledger, 'location) with_account ] ->
-  [> `FP_account_updated of ('ledger, 'location) account_updated ] Or_error.t
+  [> `FP_account_updated of ('ledger, 'location) account_updated ] FSM.t
 
 val apply :
   [< `FP_account_updated of ('ledger, 'location) account_updated ] ->

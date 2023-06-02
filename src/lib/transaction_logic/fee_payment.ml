@@ -33,24 +33,21 @@ type ('ledger, 'location) account_updated =
   ; fee_payer : Account.t 
   }
 
-let fail_unless ~error condition =
-  if condition then Ok () else Or_error.error_string error
-
 let init_with_signed_command (type ledger loc)
     ~(ledger_ops : (module Ledger_intf.S with type t = ledger and type location = loc))
     ~(ledger : ledger) ~(global_slot : Global_slot.t) (cmd : Signed_command.t) :
-    [> `FP_initial of (ledger, loc) initial ] Or_error.t =
-  let open Or_error.Let_syntax in
+    [> `FP_initial of (ledger, loc) initial ] FSM.t =
+  let open FSM.Let_syntax in
   let signer_pk = Public_key.compress cmd.signer in
   let fee_payer_id = Signed_command.fee_payer cmd in
   let%bind () =
-    fail_unless ~error:"Fee-payer must sign the command"
+    FSM.fail_unless ~error:"Fee-payer must sign the command"
       (Public_key.Compressed.equal
          (Account_id.public_key fee_payer_id)
          signer_pk )
   in
   let%map () =
-    fail_unless ~error:"Fee-payer must be the fee-payer"
+    FSM.fail_unless ~error:"Fee-payer must be the fee-payer"
       (Token_id.equal (Signed_command.fee_token cmd) Token_id.default)
   in
   `FP_initial
@@ -64,7 +61,7 @@ let init_with_signed_command (type ledger loc)
     }
 
 let find_account (type ledger loc) (`FP_initial (state : (ledger, loc) initial)) :
-    [> `FP_account_found of (ledger, loc) with_account ] Or_error.t =
+    [> `FP_account_found of (ledger, loc) with_account ] FSM.t =
   let module L = (val state.common.ledger.ops : Ledger_intf.S with type t = ledger and type location = loc) in
   let a =
     let open Option.Let_syntax in
@@ -76,18 +73,18 @@ let find_account (type ledger loc) (`FP_initial (state : (ledger, loc) initial))
   in
   match a with
   | None ->
-      Or_error.error_string "Fee-payer account not found"
+      FSM.fail "Fee-payer account not found"
   | Some ((location : L.location), fee_payer) ->
-     Ok (`FP_account_found
+     FSM.return (`FP_account_found
            { common = state.common; fee_payer; location }
        )
 
 let validate_payment (type ledger loc)
     (`FP_account_found (state : (ledger, loc) with_account)) :
-    [> `FP_account_updated of (ledger, loc) account_updated ] Or_error.t =
-  let open Or_error.Let_syntax in
+    [> `FP_account_updated of (ledger, loc) account_updated ] FSM.t =
+  let open FSM.Let_syntax in
   let%bind () =
-    fail_unless
+    FSM.fail_unless
       ~error:
       "Nonce in account %{sexp: Account.Nonce.t} different from nonce in \
        transaction %{sexp: Account.Nonce.t}"
@@ -96,14 +93,14 @@ let validate_payment (type ledger loc)
   let%bind balance =
     Balance.sub_amount state.fee_payer.balance (Amount.of_fee state.common.fee)
     |> Option.value_map
-         ~default:(Or_error.error_string "Insufficient funds")
-         ~f:Or_error.return
+         ~default:(FSM.fail "Insufficient funds")
+         ~f:FSM.return
   in
   let fee_payer = { state.fee_payer with balance } in
   let%bind () =
     match fee_payer.timing with
     | Untimed ->
-       Ok ()
+       FSM.return ()
     | Timed
        { initial_minimum_balance
        ; cliff_time
@@ -124,14 +121,14 @@ let validate_payment (type ledger loc)
              balance of %{sexp: Balance.t}"
            state.common.fee state.common.global_slot min_balance
        in
-       fail_unless ~error (Balance.( >= ) fee_payer.balance min_balance)
+       FSM.fail_unless ~error (Balance.( >= ) fee_payer.balance min_balance)
   in
   let%bind () =
-    fail_unless ~error:"update not permitted – nonce"
+    FSM.fail_unless ~error:"update not permitted – nonce"
       (Account.has_permission_to_increment_nonce fee_payer)
   in
   let%map () =
-    fail_unless ~error:"update not permitted – balance"
+    FSM.fail_unless ~error:"update not permitted – balance"
       (Account.has_permission_to_send fee_payer)
   in
   `FP_account_updated { ledger = state.common.ledger
