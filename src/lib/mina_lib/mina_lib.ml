@@ -961,19 +961,27 @@ let add_full_transactions t user_commands =
     |> Deferred.don't_wait_for ;
     Ivar.read result_ivar
   in
-  let too_big_err =
+  let well_formed_errors =
     List.find_map user_commands ~f:(fun cmd ->
-        let size_validity =
-          User_command.valid_size
+        match
+          User_command.check_well_formedness
             ~genesis_constants:t.config.precomputed_values.genesis_constants cmd
-        in
-        match size_validity with Ok () -> None | Error err -> Some err )
+        with
+        | Ok () ->
+            None
+        | Error errs ->
+            Some errs )
   in
-  match too_big_err with
+  match well_formed_errors with
   | None ->
       add_all_txns ()
-  | Some err ->
-      Deferred.Result.fail err
+  | Some errs ->
+      let error =
+        Error.of_string
+          ( List.map errs ~f:User_command.Well_formedness_error.to_string
+          |> String.concat ~sep:"," )
+      in
+      Deferred.Result.fail error
 
 let add_zkapp_transactions t (zkapp_commands : Zkapp_command.t list) =
   let add_all_txns () =
@@ -984,20 +992,28 @@ let add_zkapp_transactions t (zkapp_commands : Zkapp_command.t list) =
     |> Deferred.don't_wait_for ;
     Ivar.read result_ivar
   in
-  let too_big_err =
-    List.find_map zkapp_commands ~f:(fun zkapp_command ->
-        let size_validity =
-          Zkapp_command.valid_size
+  let well_formed_errors =
+    List.find_map zkapp_commands ~f:(fun cmd ->
+        match
+          User_command.check_well_formedness
             ~genesis_constants:t.config.precomputed_values.genesis_constants
-            zkapp_command
-        in
-        match size_validity with Ok () -> None | Error err -> Some err )
+            (Zkapp_command cmd)
+        with
+        | Ok () ->
+            None
+        | Error errs ->
+            Some errs )
   in
-  match too_big_err with
+  match well_formed_errors with
   | None ->
       add_all_txns ()
-  | Some err ->
-      Deferred.Result.fail err
+  | Some errs ->
+      let error =
+        Error.of_string
+          ( List.map errs ~f:User_command.Well_formedness_error.to_string
+          |> String.concat ~sep:"," )
+      in
+      Deferred.Result.fail error
 
 let next_producer_timing t = t.next_producer_timing
 

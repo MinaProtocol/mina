@@ -1040,55 +1040,47 @@ struct
             ~error:"Recently seen"
         in
         let%bind () =
-          let cmds_with_insufficient_fees =
-            List.filter
-              (Envelope.Incoming.data diff)
-              ~f:User_command.has_insufficient_fee
-          in
-          List.iter cmds_with_insufficient_fees ~f:(fun cmd ->
-              [%log' debug t.logger]
-                "User command $cmd from $sender has insufficient fee."
-                ~metadata:
-                  [ ("cmd", User_command.to_yojson cmd)
-                  ; ( "sender"
-                    , Envelope.(Sender.to_yojson (Incoming.sender diff)) )
-                  ] ) ;
-          let too_big_cmds =
-            List.filter (Envelope.Incoming.data diff) ~f:(fun cmd ->
-                let size_validity =
-                  User_command.valid_size
-                    ~genesis_constants:t.config.genesis_constants cmd
-                in
-                match size_validity with
+          let well_formedness_errors =
+            List.fold (Envelope.Incoming.data diff) ~init:[]
+              ~f:(fun acc user_cmd ->
+                match
+                  User_command.check_well_formedness
+                    ~genesis_constants:t.config.genesis_constants user_cmd
+                with
                 | Ok () ->
-                    false
-                | Error err ->
-                    [%log' debug t.logger] "User command is too big"
+                    acc
+                | Error errs ->
+                    [%log' debug t.logger]
+                      "User command $cmd from $sender has one or more \
+                       well-formedness errors."
                       ~metadata:
-                        [ ("cmd", User_command.to_yojson cmd)
+                        [ ("cmd", User_command.to_yojson user_cmd)
                         ; ( "sender"
                           , Envelope.(Sender.to_yojson (Incoming.sender diff))
                           )
-                        ; ("size_violation", Error_json.error_to_yojson err)
+                        ; ( "errors"
+                          , `List
+                              (List.map errs
+                                 ~f:User_command.Well_formedness_error.to_yojson )
+                          )
                         ] ;
-                    true )
+                    errs @ acc )
           in
-          let sufficient_fees = List.is_empty cmds_with_insufficient_fees in
-          let valid_sizes = List.is_empty too_big_cmds in
-          match (sufficient_fees, valid_sizes) with
-          | true, true ->
+          match
+            List.dedup_and_sort well_formedness_errors
+              ~compare:User_command.Well_formedness_error.compare
+          with
+          | [] ->
               Deferred.Or_error.return ()
-          | false, true ->
+          | errs ->
+              let err_str =
+                List.map errs ~f:User_command.Well_formedness_error.to_string
+                |> String.concat ~sep:","
+              in
               Deferred.Or_error.fail
-              @@ Error.of_string "Some commands have an insufficient fee"
-          | true, false ->
-              Deferred.Or_error.fail
-              @@ Error.of_string "Some commands are too big"
-          | false, false ->
-              Deferred.Or_error.fail
-              @@ Error.of_string
-                   "Some commands have an insufficient fee, and some are too \
-                    big"
+              @@ Error.createf
+                   "Some commands have one or more well-formedness errors: %s "
+                   err_str
         in
         (* TODO: batch `to_verifiable` (#11705) *)
         let%bind ledger =
