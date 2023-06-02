@@ -1,12 +1,12 @@
 
-### Reducing the size of the Mina blockchain state by developing a new custom-built storage
+# Database, a Rust-based lightweight key value store for the Mina blockchain state
   
 
 To enhance the overall performance of a blockchain node, one of the primary areas to focus on is the storage that contains the blockchain state. Regular and ongoing access to this storage by the node is necessary for the validation of new blocks. By optimizing the speed of the storage module, we can greatly reduce the time it takes to apply new blocks and thus improve the overall performance of the node.
 
 In Mina, the blockchain state is stored in the format of a Merkle tree. For rapid reading and writing to the blockchain state, it is vital to create a high-performance Merkle tree storage system.
 
-### **How Mina stores blockchain state in its ledger**
+## **How Mina stores blockchain state in its ledger**
 
 In Mina, the current state of the network is kept in a data structure called the _ledger_. The ledger contains information about all the accounts in the network and their balances. Every time transactions from a block are applied, a new updated version of the ledger is produced.
 
@@ -55,7 +55,7 @@ The design of the Rust-based storage is based on information by performance-rela
 
 This employs techniques such as removing wasteful copying, delaying the application of actions until commit, optimizing space usage, and more.
 
-### Try it out yourself
+## Try it out yourself
 
 Use the instructions from the readme to build Mina with the new storage:
 
