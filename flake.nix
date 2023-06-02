@@ -299,10 +299,12 @@
 
         # Pure dev shell, from which you can build Mina yourself manually, or hack on it.
         devShell = ocamlPackages.mina-dev.overrideAttrs (oa: {
+          name = "mina";
           buildInputs = oa.buildInputs ++ devShellPackages;
           shellHook = ''
             ${oa.shellHook}
             unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
+            export NIX_SHELL=mina
           '';
         });
         devShells.default = self.devShell.${system};
@@ -317,12 +319,16 @@
             ${oa.shellHook}
             unset MINA_COMMIT_DATE MINA_COMMIT_SHA1 MINA_BRANCH
             # TODO: dead code doesn't allow us to have nice things
+            export NIX_SHELL=mina-with-lsp
           '';
         });
 
         devShells.operations = pkgs.mkShell {
           name = "mina-operations";
           packages = with pkgs; [ skopeo gzip google-cloud-sdk ];
+          shellHook=''
+            export NIX_SHELL=mina-operations
+          '';
         };
 
         # TODO: think about rust toolchain in the dev shell
@@ -330,6 +336,7 @@
           name = "mina-integration-tests";
           shellHook = ''
             export MINA_BRANCH=$()
+            export NIX_SHELL=mina-integration-tests
           '';
           buildInputs = [
             self.packages.${system}.test_executive
@@ -351,6 +358,9 @@
         devShells.rust-impure = ocamlPackages.mina-dev.overrideAttrs (oa: {
           name = "mina-rust-shell";
           buildInputs = oa.buildInputs ++ devShellPackages;
+          shellHook=''
+            export NIX_SHELL=mina-rust-shell
+          '';
           nativeBuildInputs = oa.nativeBuildInputs ++ [
             pkgs.rustup
             pkgs.libiconv # needed on macOS for one of the rust dep
@@ -361,6 +371,9 @@
         devShells.zkapp-impure = ocamlPackages.mina-dev.overrideAttrs (oa: {
           name = "mina-zkapp-shell";
           buildInputs = oa.buildInputs ++ devShellPackages;
+          shellHook=''
+            export NIX_SHELL=mina-zkapp-shell
+          '';
           nativeBuildInputs = oa.nativeBuildInputs ++ [
             pkgs.rustup
             pkgs.libiconv # needed on macOS for one of the rust dep
