@@ -1042,7 +1042,7 @@ module Node = struct
     let open Malleable_error.Let_syntax in
     let%bind accounts =
       run_in_container t
-        ~cmd:[ "jq"; "-c"; ".ledger.accounts"; "/config/daemon.json" ]
+        ~cmd:[ "jq"; "-c"; ".ledger.accounts"; "/root/config/daemon.json" ]
     in
     let replayer_input =
       sprintf

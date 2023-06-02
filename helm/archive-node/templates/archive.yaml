@@ -83,7 +83,7 @@ spec:
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-archive-address", "$(DAEMON_ARCHIVE_PORT)",
           {{- if .Values.mina.runtimeConfig }}
-          "-config-file", "/config/daemon.json",
+          "-config-file", "/root/config/daemon.json",
           {{- end -}}
           "-generate-genesis-proof", {{ .Values.mina.generateGenesisProof | quote }}
         ]
@@ -125,7 +125,7 @@ spec:
           mountPath: /root/.mina-config
         {{- if .Values.mina.runtimeConfig }}
         - name: daemon-config
-          mountPath: "/config/"
+          mountPath: "/root/config/"
         {{- end }}
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
@@ -139,17 +139,19 @@ spec:
           "-metrics-port", "{{ .Values.archive.ports.metrics }}",
           "-postgres-uri", "{{ tpl .Values.archive.postgresUri . }}",
           {{- if .Values.mina.runtimeConfig }}
-          "-config-file", "/config/daemon.json",
+          "-config-file", "/root/config/daemon.json",
           {{- end }}
           "-server-port", "{{ .Values.archive.ports.server }}"
         ]
         env:
         imagePullPolicy: Always
-        {{- if .Values.mina.runtimeConfig }}
         volumeMounts:
+        {{- if .Values.mina.runtimeConfig }}
         - name: daemon-config
-          mountPath: "/config/"
+          mountPath: "/root/config/"
         {{- end }}
+        - name: config-dir
+          mountPath: "/root/.mina-config/"
         ports:
         - name: archive-port
           protocol: TCP
@@ -163,8 +165,6 @@ spec:
 {{- include "healthcheck.archive.allChecks" . | indent 8 }}
 {{- include "nodeSelector.preemptible" .Values | indent 6 }}
       volumes:
-      - name: config-dir
-        emptyDir: {}
       {{- if .Values.mina.runtimeConfig }}
       - name: daemon-config
         configMap:
@@ -172,3 +172,25 @@ spec:
       {{- end }}
       - name: actual-libp2p
         emptyDir: {}
+      - name: config-dir
+      {{- if .Values.persist_working_dir }}
+        persistentVolumeClaim:
+          claimName: pvc-{{ template "archive-node.fullname" . }}
+      {{- else}}
+        emptyDir: {}
+      {{- end }}
+---
+{{- if $.Values.persist_working_dir }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-{{ template "archive-node.fullname" . }}
+spec:
+  accessModes:
+      - {{ $.Values.storage.accessMode | quote }}
+  resources:
+    requests:
+      storage: {{ $.Values.storage.size | quote }}
+  storageClassName: "{{ $.Values.storage.storageClass }}"
+---
+{{ end }}

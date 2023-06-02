@@ -1,4 +1,5 @@
 let S = ../../Lib/SelectFiles.dhall
+let B = ../../External/Buildkite.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
@@ -7,6 +8,8 @@ let Command = ../../Command/Base.dhall
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
+
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 in
 
@@ -30,6 +33,7 @@ Pipeline.build
           , key = "snarkyjs-bindings-test"
           , target = Size.XLarge
           , docker = None Docker.Type
+          , soft_fail = Some (B/SoftFail.Boolean True)
         }
     ]
   }

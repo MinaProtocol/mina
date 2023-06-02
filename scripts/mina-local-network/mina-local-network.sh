@@ -230,6 +230,23 @@ reset-genesis-ledger() {
     >${DAEMON_CONFIG}
 }
 
+recreate-schema() {
+  echo "Recreating database '${PG_DB}'..."
+  
+  psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT} -c "DROP DATABASE IF EXISTS ${PG_DB};"
+  
+  psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT} -c "CREATE DATABASE ${PG_DB};"
+  
+  # We need to change our working directory as script has relation to others subscripts 
+  # and calling them from local folder
+  cd ./src/app/archive 
+  psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT} ${PG_DB} < create_schema.sql
+  cd ../../../
+
+  echo "Schema '${PG_DB}' created successfully."
+  printf "\n"
+}
+
 # ================================================
 # Parse inputs from arguments
 
@@ -422,6 +439,9 @@ LEDGER_FOLDER="${HOME}/.mina-network/mina-local-network-${WHALES}-${FISH}-${NODE
 
 if ${RESET}; then
   rm -rf ${LEDGER_FOLDER}
+  if ${ARCHIVE}; then
+    recreate-schema
+  fi
 fi
 
 if [ ! -d "${LEDGER_FOLDER}" ]; then
