@@ -608,8 +608,8 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
   in
   zkapp_command
 
-let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-    ~permissions ~current_auth =
+let update_snapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~snapp_update
+    ~current_auth =
   let open Deferred.Let_syntax in
   let%bind keypair = Util.fee_payer_keypair_of_file keyfile in
   let%bind zkapp_keypair = Util.snapp_keypair_of_file zkapp_keyfile in
@@ -622,7 +622,7 @@ let update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     ; zkapp_account_keypairs = [ zkapp_keypair ]
     ; memo = Util.memo memo
     ; new_zkapp_account = false
-    ; snapp_update = { Account_update.Update.dummy with permissions }
+    ; snapp_update
     ; current_auth
     ; call_data = Snark_params.Tick.Field.zero
     ; events = []
