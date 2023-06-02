@@ -141,6 +141,12 @@ module type Element_intf = sig
   (* Create foreign field element from Cvar limbs *)
   val of_limbs : 'field Cvar.t limbs_type -> 'field t
 
+  (* Create foreign field element from field limbs *)
+  val of_field_limbs :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field limbs_type
+    -> 'field t
+
   (* Create foreign field element from Bignum_bigint.t *)
   val of_bignum_bigint :
        (module Snark_intf.Run with type field = 'field)
@@ -240,6 +246,18 @@ end = struct
     type 'field t = 'field Cvar.t standard_limbs
 
     let of_limbs x = x
+
+    let of_field_limbs (type field)
+        (module Circuit : Snark_intf.Run with type field = field)
+        (x : field limbs_type) : field t =
+      let open Circuit in
+      let x =
+        exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
+            let x0, x1, x2 = x in
+            [| x0; x1; x2 |] )
+        |> Common.tuple3_of_array
+      in
+      of_limbs x
 
     let of_bignum_bigint (type field)
         (module Circuit : Snark_intf.Run with type field = field) x : field t =
@@ -343,6 +361,9 @@ end = struct
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         ~(length : int) : Circuit.Boolean.var list =
       let open Circuit in
+      (* TODO: Performance improvement, we could use this trick from Halo paper
+       * https://github.com/MinaProtocol/mina/blob/43e2994b64b9d3e99055d644ac6279d39c22ced5/src/lib/pickles/scalar_challenge.ml#L12
+       *)
       let l0, l1, l2 = to_limbs x in
       Field.unpack l0 ~length:Common.limb_bits
       @ Field.unpack l1 ~length:Common.limb_bits
@@ -358,6 +379,15 @@ end = struct
     type 'field t = 'field Cvar.t compact_limbs
 
     let of_limbs x = x
+
+    let of_field_limbs (type field)
+        (module Circuit : Snark_intf.Run with type field = field)
+        (x : field limbs_type) : field t =
+      let open Circuit in
+      let x =
+        exists Typ.(Field.typ * Field.typ) ~compute:(fun () -> (fst x, snd x))
+      in
+      of_limbs x
 
     let of_bignum_bigint (type field)
         (module Circuit : Snark_intf.Run with type field = field) x : field t =
@@ -443,6 +473,9 @@ end = struct
     let unpack (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         ~(length : int) : Circuit.Boolean.var list =
+      (* TODO: Performance improvement, we could use this trick from Halo paper
+       * https://github.com/MinaProtocol/mina/blob/43e2994b64b9d3e99055d644ac6279d39c22ced5/src/lib/pickles/scalar_challenge.ml#L12
+       *)
       let open Circuit in
       let l01, l2 = to_limbs x in
       Field.unpack l01 ~length:(2 * Common.limb_bits)
@@ -504,12 +537,9 @@ let _bytes_to_foreign_field_element (type f)
   ()
 
 (* Check that the foreign modulus is less than the maximum allowed *)
-let check_modulus (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (foreign_field_modulus : f standard_limbs) =
-  (* Check foreign field modulus < max allowed *)
-  let foreign_field_modulus =
-    field_standard_limbs_to_bignum_bigint (module Circuit) foreign_field_modulus
-  in
+let check_modulus_bignum_bigint (type f)
+    (module Circuit : Snark_intf.Run with type field = f)
+    (foreign_field_modulus : Bignum_bigint.t) =
   (* Note that the maximum foreign field modulus possible for addition is much
    * larger than that supported by multiplication.
    *
@@ -525,6 +555,15 @@ let check_modulus (type f) (module Circuit : Snark_intf.Run with type field = f)
   assert (
     Bignum_bigint.(
       foreign_field_modulus < max_foreign_field_modulus (module Circuit)) )
+
+(* Check that the foreign modulus is less than the maximum allowed *)
+let check_modulus (type f) (module Circuit : Snark_intf.Run with type field = f)
+    (foreign_field_modulus : f standard_limbs) =
+  let foreign_field_modulus =
+    field_standard_limbs_to_bignum_bigint (module Circuit) foreign_field_modulus
+  in
+
+  check_modulus_bignum_bigint (module Circuit) foreign_field_modulus
 
 (* Represents two limbs as one single field element with twice as many bits *)
 let as_prover_compact_limb (type f)

@@ -36,6 +36,14 @@ val field_standard_limbs_is_zero :
   -> 'field standard_limbs
   -> bool
 
+val check_modulus :
+     (module Snark_intf.Run with type field = 'field)
+  -> 'field standard_limbs
+  -> unit
+
+val check_modulus_bignum_bigint :
+  (module Snark_intf.Run with type field = 'field) -> Bignum_bigint.t -> unit
+
 (** Foreign field element base type - not used directly *)
 module type Element_intf = sig
   type 'field t
@@ -46,6 +54,12 @@ module type Element_intf = sig
 
   (** Create foreign field element from Cvar limbs *)
   val of_limbs : 'field Cvar.t limbs_type -> 'field t
+
+  (** Create foreign field element from field limbs *)
+  val of_field_limbs :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field limbs_type
+    -> 'field t
 
   (** Create foreign field element from Bignum_bigint.t *)
   val of_bignum_bigint :

@@ -26,7 +26,8 @@ let two_to_3limb = Bignum_bigint.(pow two_to_limb (of_int 3))
 
 (* Length of bigint in bits *)
 let bignum_bigint_bit_length (bigint : Bignum_bigint.t) : int =
-  Z.log2up (Bignum_bigint.to_zarith_bigint bigint)
+  if Bignum_bigint.(equal bigint zero) then 1
+  else Z.log2up (Bignum_bigint.to_zarith_bigint bigint)
 
 (* Conventions used in this interface
  *     1. Functions prefixed with "as_prover_" only happen during proving
@@ -166,9 +167,9 @@ let bignum_bigint_div_rem (numerator : Bignum_bigint.t)
 let bignum_bigint_unpack_bytes (bignum : Bignum_bigint.t) : string =
   Z.to_bits @@ Bignum_bigint.to_zarith_bigint bignum
 
-(* Bignum_bigint to bool array *)
+(* Bignum_bigint to bool list *)
 let bignum_bigint_unpack ?(remove_trailing = false) (bignum : Bignum_bigint.t) :
-    bool array =
+    bool list =
   (* Helper to remove trailing false *)
   let remove_trailing_false (lst : bool list) =
     let rev = List.rev lst in
@@ -193,7 +194,57 @@ let bignum_bigint_unpack ?(remove_trailing = false) (bignum : Bignum_bigint.t) :
         let j = i mod 8 in
         if Int.((c lsr j) land 1 = 1) then true else false )
   in
-  Array.of_list @@ if remove_trailing then remove_trailing_false bits else bits
+  if remove_trailing then remove_trailing_false bits else bits
+
+(* Bignum_bigint to bool array *)
+let bignum_bigint_unpack_array ?(remove_trailing = false)
+    (bignum : Bignum_bigint.t) : bool array =
+  (* Helper to remove trailing false *)
+  let remove_trailing_false (lst : bool list) =
+    let rev = List.rev lst in
+    let rec remove_leading_false_rec lst =
+      match lst with
+      | [] ->
+          []
+      | hd :: tl ->
+          if hd then hd :: tl else remove_leading_false_rec tl
+    in
+    remove_leading_false_rec rev
+  in
+
+  (* Convert biguint to bitstring *)
+  let bitstr = Z.to_bits @@ Bignum_bigint.to_zarith_bigint bignum in
+  (* Convert bitstring to list of bool *)
+  let bits =
+    List.init
+      (8 * String.length bitstr)
+      ~f:(fun i ->
+        let c = Char.to_int bitstr.[i / 8] in
+        let j = i mod 8 in
+        if Int.((c lsr j) land 1 = 1) then true else false )
+  in
+  Array.of_list_rev
+  @@ if remove_trailing then remove_trailing_false bits else bits
+
+let prover_bignum_bigint_unpack_cvars (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    ?(remove_trailing = false) (bignum : Bignum_bigint.t) :
+    Circuit.Boolean.var list =
+  let open Circuit in
+  Array.to_list
+  @@ exists
+       (Typ.array ~length:(bignum_bigint_bit_length bignum) Boolean.typ)
+       ~compute:(fun () ->
+         List.to_array @@ bignum_bigint_unpack ~remove_trailing bignum )
+
+(* Bignum_bigint to Boolean.var list (without creating boolean constraints) *)
+let bignum_bigint_unpack_unconstrained_cvars (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    ?(remove_trailing = false) (bignum : Bignum_bigint.t) :
+    Circuit.Boolean.var list =
+  let open Circuit in
+  List.map (bignum_bigint_unpack ~remove_trailing bignum) ~f:(fun bool ->
+      if bool then Boolean.true_ else Boolean.false_ )
 
 (* Bignum_bigint to hex *)
 let bignum_bigint_to_hex (bignum : Bignum_bigint.t) : string =
@@ -226,7 +277,7 @@ let bignum_bigint_sqrt_mod (x : Bignum_bigint.t) (modulus : Bignum_bigint.t) :
 
   (* Useful helpers and shorthands *)
   let two = of_int 2 in
-  let mod_minus_1 = modulus - one in
+  let mod_minus_1 = pred modulus in
   let pow_mod base exp = powm base exp modulus in
 
   (* Euler's criterion *)
