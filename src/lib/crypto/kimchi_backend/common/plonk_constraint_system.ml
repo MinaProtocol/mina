@@ -30,8 +30,6 @@ end
 
 (** A gate interface, parameterized by a field. *)
 module type Gate_vector_intf = sig
-  open Unsigned
-
   type field
 
   type t
