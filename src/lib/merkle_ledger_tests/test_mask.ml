@@ -271,7 +271,7 @@ module Make (Test : Test_intf) = struct
           Mask.Attached.set attached_mask (Test.Location.Account loc0)
             dummy_account ;
           (* Make some accounts *)
-          let num_accounts = (1 lsl Test.depth) - 2 in
+          let num_accounts = (1 lsl Test.depth) - 1 in
           let gen_values gen =
             Quickcheck.random_value
               (Quickcheck.Generator.list_with_length num_accounts gen)

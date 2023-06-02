@@ -31,10 +31,6 @@ let%test_module "test functor on in memory databases" =
     module Make (Test : Test_intf) = struct
       module MT = Test.MT
 
-      let account_default_token_gen =
-        let%map.Quickcheck.Generator account = Account.gen in
-        { account with token_id = Token_id.default }
-
       let%test_unit "getting a non existing account returns None" =
         Test.with_instance (fun mdb ->
             Quickcheck.test
@@ -54,13 +50,13 @@ let%test_module "test functor on in memory databases" =
 
       let%test "add and retrieve an account" =
         Test.with_instance (fun mdb ->
-            let account = Quickcheck.random_value account_default_token_gen in
+            let account = Quickcheck.random_value Account.gen in
             let location = create_new_account_exn mdb account in
             Account.equal (Option.value_exn (MT.get mdb location)) account )
 
       let%test "accounts are atomic" =
         Test.with_instance (fun mdb ->
-            let account = Quickcheck.random_value account_default_token_gen in
+            let account = Quickcheck.random_value Account.gen in
             let location = create_new_account_exn mdb account in
             MT.set mdb location account ;
             let location' =
@@ -89,7 +85,7 @@ let%test_module "test functor on in memory databases" =
               let open Quickcheck.Let_syntax in
               let%bind num_initial_accounts = Int.gen_incl 0 n in
               let%map accounts =
-                list_with_length num_initial_accounts account_default_token_gen
+                list_with_length num_initial_accounts Account.gen
               in
               dedup_accounts accounts
             in
@@ -136,8 +132,7 @@ let%test_module "test functor on in memory databases" =
               let open Quickcheck.Let_syntax in
               let max_height = Int.min (MT.depth mdb) 5 in
               let%bind num_accounts = Int.gen_incl 0 (1 lsl max_height) in
-              Quickcheck.Generator.list_with_length num_accounts
-                account_default_token_gen
+              Quickcheck.Generator.list_with_length num_accounts Account.gen
             in
             let accounts = Quickcheck.random_value accounts_gen in
             Sequence.of_list accounts
@@ -155,7 +150,7 @@ let%test_module "test functor on in memory databases" =
       let%test_unit "set_inner_hash_at_addr_exn(address,hash); \
                      get_inner_hash_at_addr_exn(address) = hash" =
         let random_hash =
-          Hash.hash_account @@ Quickcheck.random_value account_default_token_gen
+          Hash.hash_account @@ Quickcheck.random_value Account.gen
         in
         Test.with_instance (fun mdb ->
             Quickcheck.test
@@ -170,8 +165,7 @@ let%test_module "test functor on in memory databases" =
       let random_accounts max_height =
         let num_accounts = 1 lsl max_height in
         Quickcheck.random_value
-          (Quickcheck.Generator.list_with_length num_accounts
-             account_default_token_gen )
+          (Quickcheck.Generator.list_with_length num_accounts Account.gen)
 
       let populate_db mdb max_height =
         random_accounts max_height
@@ -229,7 +223,7 @@ let%test_module "test functor on in memory databases" =
                 let accounts =
                   Quickcheck.random_value
                     (Quickcheck.Generator.list_with_length num_accounts
-                       account_default_token_gen )
+                       Account.gen )
                 in
                 if not @@ List.is_empty accounts then
                   let addresses =
@@ -322,7 +316,7 @@ let%test_module "test functor on in memory databases" =
                 let accounts =
                   Quickcheck.random_value
                     (Quickcheck.Generator.list_with_length num_accounts
-                       account_default_token_gen )
+                       Account.gen )
                 in
                 MT.set_all_accounts_rooted_at_exn mdb address accounts ;
                 let result =
@@ -369,9 +363,7 @@ let%test_module "test functor on in memory databases" =
         Test.with_instance (fun mdb ->
             let max_height = Int.min (MT.depth mdb) 5 in
             test_subtree_range mdb max_height ~f:(fun index ->
-                let account =
-                  Quickcheck.random_value account_default_token_gen
-                in
+                let account = Quickcheck.random_value Account.gen in
                 MT.set_at_index_exn mdb index account ;
                 let result = MT.get_at_index_exn mdb index in
                 assert (Account.equal account result) ) )

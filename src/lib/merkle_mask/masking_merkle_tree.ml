@@ -155,6 +155,9 @@ module Make (Inputs : Inputs_intf.S) = struct
     let self_set_location t account_id location =
       assert_is_attached t ;
       Account_id.Table.set t.location_tbl ~key:account_id ~data:location ;
+      (* if account is at a hitherto-unused location, that
+         becomes the current location
+      *)
       match t.current_location with
       | None ->
           t.current_location <- Some location
