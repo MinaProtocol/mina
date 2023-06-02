@@ -137,6 +137,11 @@ cargo doc --open
     export DUNE_PROFILE=devnet
     ```
 
+    To let the system know the location of the new storage library:
+    ```bash
+    export LD_LIBRARY_PATH=$(pwd)/_build/default/src/lib/keyvaluedb_rust
+    ```
+
 1. Build packages:
 
     ```bash
