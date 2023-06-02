@@ -4,29 +4,34 @@ open Mina_base
 open Mina_numbers
 open Signature_lib
 
+type ('ledger, 'location) ledger =
+  { t : 'ledger
+  ; ops : (module Ledger_intf.S with type t = 'ledger and type location = 'location)
+  }
 
-type 'ledger common =
-  { ledger : 'ledger
+type ('ledger, 'location) common =
+  { ledger : ('ledger, 'location) ledger
   ; fee : Fee.t
   ; nonce : Account.Nonce.t
   ; global_slot : Global_slot.t
   }
 
-type ('ledger, 'loc) initial =
-  { common : 'ledger common
-  ; ledger_ops : (module Ledger_intf.S with type t = 'ledger and type location = 'loc)
+type ('ledger, 'location) initial =
+  { common : ('ledger, 'location) common
   ; fee_payer_id : Account_id.t
   }
 
-type ('ledger, 'loc) with_account =
-  { common : 'ledger common
-  ; ledger_ops :
-      (module Ledger_intf.S with type t = 'ledger and type location = 'loc)
+type ('ledger, 'location) with_account =
+  { common : ('ledger, 'location) common
   ; fee_payer : Account.t
-  ; location : 'loc
+  ; location : 'location
   }
 
-type 'location halted = [ `FP_halted of 'location * Account.t ]
+type ('ledger, 'location) account_updated =
+  { ledger : ('ledger, 'location) ledger
+  ; location : 'location
+  ; fee_payer : Account.t 
+  }
 
 let fail_unless ~error condition =
   if condition then Ok () else Or_error.error_string error
@@ -34,7 +39,7 @@ let fail_unless ~error condition =
 let init_with_signed_command (type ledger loc)
     ~(ledger_ops : (module Ledger_intf.S with type t = ledger and type location = loc))
     ~(ledger : ledger) ~(global_slot : Global_slot.t) (cmd : Signed_command.t) :
-    [> `FP_find_account of (ledger, loc) initial ] Or_error.t =
+    [> `FP_initial of (ledger, loc) initial ] Or_error.t =
   let open Or_error.Let_syntax in
   let signer_pk = Public_key.compress cmd.signer in
   let fee_payer_id = Signed_command.fee_payer cmd in
@@ -48,39 +53,38 @@ let init_with_signed_command (type ledger loc)
     fail_unless ~error:"Fee-payer must be the fee-payer"
       (Token_id.equal (Signed_command.fee_token cmd) Token_id.default)
   in
-  `FP_find_account
+  `FP_initial
     { common =
-        { ledger
+        { ledger = { t = ledger; ops = ledger_ops }
         ; fee = Signed_command.fee cmd
         ; nonce = Signed_command.nonce cmd
         ; global_slot
         }
-    ; ledger_ops
     ; fee_payer_id
     }
 
-let find_account (type ledger loc) (`FP_find_account (state : (ledger, loc) initial)) :
-    [> `FP_validate_payment of (ledger, loc) with_account ] Or_error.t =
-  let module L = (val state.ledger_ops : Ledger_intf.S with type t = ledger and type location = loc) in
+let find_account (type ledger loc) (`FP_initial (state : (ledger, loc) initial)) :
+    [> `FP_account_found of (ledger, loc) with_account ] Or_error.t =
+  let module L = (val state.common.ledger.ops : Ledger_intf.S with type t = ledger and type location = loc) in
   let a =
     let open Option.Let_syntax in
     let%bind location =
-      L.location_of_account state.common.ledger state.fee_payer_id
+      L.location_of_account state.common.ledger.t state.fee_payer_id
     in
-    let%map account = L.get state.common.ledger location in
+    let%map account = L.get state.common.ledger.t location in
     (location, account)
   in
   match a with
   | None ->
       Or_error.error_string "Fee-payer account not found"
   | Some ((location : L.location), fee_payer) ->
-     Ok (`FP_validate_payment
-           { common = state.common; ledger_ops = (module L); fee_payer; location }
+     Ok (`FP_account_found
+           { common = state.common; fee_payer; location }
        )
 
 let validate_payment (type ledger loc)
-    (`FP_validate_payment (state : (ledger, loc) with_account)) :
-    [> `FP_apply of (ledger, loc) with_account ] Or_error.t =
+    (`FP_account_found (state : (ledger, loc) with_account)) :
+    [> `FP_account_updated of (ledger, loc) account_updated ] Or_error.t =
   let open Or_error.Let_syntax in
   let%bind () =
     fail_unless
@@ -130,12 +134,15 @@ let validate_payment (type ledger loc)
     fail_unless ~error:"update not permitted – balance"
       (Account.has_permission_to_send fee_payer)
   in
-  `FP_apply { state with fee_payer = fee_payer }
+  `FP_account_updated { ledger = state.common.ledger
+                    ; location = state.location
+                    ; fee_payer = fee_payer
+                    }
 
 let apply (type ledger loc)
-      (`FP_apply (state : (ledger, loc) with_account))
-    : loc halted =
-  let module L = (val state.ledger_ops) in
-  L.set state.common.ledger state.location state.fee_payer;
+      (`FP_account_updated (state : (ledger, loc) account_updated))
+    : [> `FP_halted of loc * Account.t ] =
+  let module L = (val state.ledger.ops) in
+  L.set state.ledger.t state.location state.fee_payer;
   `FP_halted (state.location, state.fee_payer)
 
