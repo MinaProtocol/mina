@@ -1,6 +1,37 @@
 # Database
 
-Rust implementation of a simple database
+
+
+Database is a custom-built lightweight Rust-based key-value store in the form of a single append-only file. Storage data is now saved into the file system, which grants us more control and oversight for C++, increasing the node’s security. The new database follows the same API as the previous `rocksdb` package, making it a drop-in replacement. 
+
+The database is a single append-only file, where each entry (key-value) are preceded by a header. Each entry in the Database has the following structure:
+
+
+![image](https://github.com/openmina/mina/assets/60480123/c4d6c384-e180-4825-b319-b51a172a8877)
+
+
+
+We are using compression on both keys and values with the library `zstd`. This provides the following advantages:
+
+
+
+* **Space Efficiency**: Compression significantly reduces the amount of storage space required for our data.
+* **Improved I/O Efficiency**: Data compression improves I/O efficiency by reducing the amount of data that needs to be read from or written to disk. Since disk I/O tends to be one of the slowest operations in a database system, anything that reduces I/O can have a significant impact on performance.
+* **Cache Utilization**: By compressing data, more of it can fit into the database's cache. This increases cache hit rates, meaning that the database can often serve data from fast memory, leading to better performance.
+* **Reduced Latency**: With smaller data sizes due to compression, the time taken for disk reads and writes is lowered. 
+
+The compression makes the biggest difference on the transition frontier:
+
+
+
+* With RocksDB, the frontier takes **245 MB** on disk.
+* With our Rust implementation, takes **140 MB**.
+
+Although we’ve replaced the storage, we still use the same format (`binprot`) for encoding the Merkle tree as well as the accounts. To validate data integrity, we use `crc32`.
+
+The design of the Rust-based storage is based on information by performance-related data. This includes a redesign and improvement upon the implementation of the on-disk ledger (and possibly other similar data stores) used by the Mina node software. 
+
+This employs techniques such as removing wasteful copying, delaying the application of actions until commit, optimizing space usage, and more. 
 
 ## Run tests:
 ```bash
