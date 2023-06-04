@@ -99,3 +99,6 @@ Cargo.lock
 .env
 .envrc
 .direnv/
+
+### Helm Chart Keyfiles ###
+helm/daemon/keys.yaml

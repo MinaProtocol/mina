@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -u
 # Set the prefix to the node name (like "seed" or "block-producer")
 # And set count as the number of keys of this type to generate (e.g. "./keygen.sh seed 6" produces 6 keys, "seed-1" through "seed-6")
