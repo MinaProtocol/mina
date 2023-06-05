@@ -4,7 +4,6 @@
 2. [How Mina stores blockchain state in its ledger](#How-Mina-stores-blockchain-state-in-its-ledger)
 3. [A custom-built key-value store for Mina](#A-custom-built-key-value-store-for-Mina)
 4. [Try it out yourself](#Try-it-out-yourself)
-5. [The Mina Fuzzer Front End](#The-Mina-Fuzzer-Front-End)
 
 
 
