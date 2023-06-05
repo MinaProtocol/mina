@@ -45,7 +45,7 @@ For these reasons, we’ve replaced RocksDB with _Database_, a custom-built Rust
 
 The database is a single append-only file, where each entry (key-value) are preceded by a header. Each entry in the Database has the following structure:
 
-![image](https://github.com/openmina/mina/assets/60480123/1d747927-5e6f-4c81-9a31-dc7371f9ae28)
+![image](https://github.com/openmina/mina/assets/60480123/4187dc36-58cf-474b-b374-01d07abe7a3a)
 
 
 We are using compression on both keys and values with the library `zstd`. This provides the following advantages:
