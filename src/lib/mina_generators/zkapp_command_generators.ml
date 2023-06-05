@@ -437,15 +437,20 @@ let gen_protocol_state_precondition
   let%bind global_slot_since_genesis =
     let open Mina_numbers in
     let%bind epsilon1 =
-      Global_slot.gen_incl (Global_slot.of_int 0) (Global_slot.of_int 10)
+      Global_slot_span.gen_incl
+        (Global_slot_span.of_int 0)
+        (Global_slot_span.of_int 10)
     in
     let%bind epsilon2 =
-      Global_slot.gen_incl (Global_slot.of_int 0) (Global_slot.of_int 10)
+      Global_slot_span.gen_incl
+        (Global_slot_span.of_int 0)
+        (Global_slot_span.of_int 10)
     in
     { lower =
-        Global_slot.sub psv.global_slot_since_genesis epsilon1
-        |> Option.value ~default:Global_slot.zero
-    ; upper = Global_slot.add psv.global_slot_since_genesis epsilon2
+        Global_slot_since_genesis.sub psv.global_slot_since_genesis epsilon1
+        |> Option.value ~default:Global_slot_since_genesis.zero
+    ; upper =
+        Global_slot_since_genesis.add psv.global_slot_since_genesis epsilon2
     }
     |> return |> Zkapp_basic.Or_ignore.gen
   in
@@ -546,16 +551,27 @@ let gen_invalid_protocol_state_precondition
   | Global_slot_since_genesis ->
       let open Mina_numbers in
       let%map global_slot_since_genesis =
-        let%map epsilon = Global_slot.(gen_incl (of_int 1) (of_int 10)) in
-        if lower || Global_slot.(psv.global_slot_since_genesis > epsilon) then
-          { lower = Global_slot.zero
+        let%map epsilon = Global_slot_span.(gen_incl (of_int 1) (of_int 10)) in
+        let increment =
+          Global_slot_span.to_uint32 epsilon
+          |> Global_slot_since_genesis.of_uint32
+        in
+        if
+          lower
+          || Global_slot_since_genesis.(
+               psv.global_slot_since_genesis > increment)
+        then
+          { lower = Global_slot_since_genesis.zero
           ; upper =
-              Global_slot.sub psv.global_slot_since_genesis epsilon
-              |> Option.value ~default:Global_slot.zero
+              Global_slot_since_genesis.sub psv.global_slot_since_genesis
+                epsilon
+              |> Option.value ~default:Global_slot_since_genesis.zero
           }
         else
-          { lower = Global_slot.add psv.global_slot_since_genesis epsilon
-          ; upper = Global_slot.max_value
+          { lower =
+              Global_slot_since_genesis.add psv.global_slot_since_genesis
+                epsilon
+          ; upper = Global_slot_since_genesis.max_value
           }
       in
       { protocol_state_precondition with
@@ -837,16 +853,20 @@ let gen_account_update_body_components (type a b c d) ?global_slot
     | Some global_slot ->
         let open Mina_numbers in
         let%bind epsilon1 =
-          Global_slot.gen_incl (Global_slot.of_int 0) (Global_slot.of_int 10)
+          Global_slot_span.gen_incl
+            (Global_slot_span.of_int 0)
+            (Global_slot_span.of_int 10)
         in
         let%bind epsilon2 =
-          Global_slot.gen_incl (Global_slot.of_int 0) (Global_slot.of_int 10)
+          Global_slot_span.gen_incl
+            (Global_slot_span.of_int 0)
+            (Global_slot_span.of_int 10)
         in
         Zkapp_precondition.Closed_interval.
           { lower =
-              Global_slot.sub global_slot epsilon1
-              |> Option.value ~default:Global_slot.zero
-          ; upper = Global_slot.add global_slot epsilon2
+              Global_slot_since_genesis.sub global_slot epsilon1
+              |> Option.value ~default:Global_slot_since_genesis.zero
+          ; upper = Global_slot_since_genesis.add global_slot epsilon2
           }
         |> return |> Zkapp_basic.Or_ignore.gen
   and may_use_token =

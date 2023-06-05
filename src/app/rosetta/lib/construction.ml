@@ -658,7 +658,7 @@ module Parse = struct
             let signer = fee_payer_pk in
             let valid_until =
               Option.map payment.valid_until
-                ~f:Mina_numbers.Global_slot.of_uint32
+                ~f:Mina_numbers.Global_slot_since_genesis.of_uint32
             in
             let nonce = payment.nonce in
             let%map memo =

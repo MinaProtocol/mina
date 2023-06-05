@@ -2044,7 +2044,7 @@ let has_zero_vesting_period t =
       | Keep ->
           false
       | Set { vesting_period; _ } ->
-          Mina_numbers.Global_slot.(equal zero) vesting_period )
+          Mina_numbers.Global_slot_span.(equal zero) vesting_period )
 
 let update_vk_is_proof_or_impossible t =
   Call_forest.exists t.account_updates ~f:(fun p ->

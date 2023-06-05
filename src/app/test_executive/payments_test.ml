@@ -26,9 +26,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let open Currency in
       Timed
         { initial_minimum_balance = Balance.of_nanomina_int_exn min_balance
-        ; cliff_time = Mina_numbers.Global_slot.of_int cliff_time
+        ; cliff_time = Mina_numbers.Global_slot_since_genesis.of_int cliff_time
         ; cliff_amount = Amount.of_nanomina_int_exn cliff_amount
-        ; vesting_period = Mina_numbers.Global_slot.of_int vesting_period
+        ; vesting_period = Mina_numbers.Global_slot_span.of_int vesting_period
         ; vesting_increment = Amount.of_nanomina_int_exn vesting_increment
         }
     in

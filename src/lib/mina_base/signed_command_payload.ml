@@ -7,7 +7,8 @@ open Snark_params.Tick
 open Signature_lib
 module Memo = Signed_command_memo
 module Account_nonce = Mina_numbers.Account_nonce
-module Global_slot = Mina_numbers.Global_slot
+module Global_slot_since_genesis = Mina_numbers.Global_slot_since_genesis
+module Global_slot_legacy = Mina_numbers.Global_slot_legacy
 
 (* This represents the random oracle input corresponding to the old form of the token
    ID, which was a 64-bit integer. The default token id was the number 1.
@@ -76,7 +77,7 @@ module Common = struct
         ( Currency.Fee.Stable.V1.t
         , Public_key.Compressed.Stable.V1.t
         , Account_nonce.Stable.V1.t
-        , Global_slot.Stable.V1.t
+        , Global_slot_since_genesis.Stable.V1.t
         , Memo.Stable.V1.t )
         Poly.Stable.V2.t
       [@@deriving compare, equal, sexp, hash, yojson]
@@ -92,7 +93,7 @@ module Common = struct
         , Public_key.Compressed.Stable.V1.t
         , Token_id.Stable.V1.t
         , Account_nonce.Stable.V1.t
-        , Global_slot.Stable.V1.t
+        , Global_slot_legacy.Stable.V1.t
         , Memo.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving compare, equal, sexp, hash, yojson]
@@ -108,7 +109,7 @@ module Common = struct
        ; Legacy_token_id.default
        ; Public_key.Compressed.to_input_legacy fee_payer_pk
        ; Account_nonce.to_input_legacy nonce
-       ; Global_slot.to_input_legacy valid_until
+       ; Global_slot_since_genesis.to_input_legacy valid_until
        ; bitstring (Memo.to_bits memo)
       |]
 
@@ -117,7 +118,7 @@ module Common = struct
     let%map fee = Currency.Fee.gen
     and fee_payer_pk = Public_key.Compressed.gen
     and nonce = Account_nonce.gen
-    and valid_until = Global_slot.gen
+    and valid_until = Global_slot_since_genesis.gen
     and memo =
       let%bind is_digest = Bool.quickcheck_generator in
       if is_digest then
@@ -136,7 +137,7 @@ module Common = struct
     ( Currency.Fee.var
     , Public_key.Compressed.var
     , Account_nonce.Checked.t
-    , Global_slot.Checked.t
+    , Global_slot_since_genesis.Checked.t
     , Memo.Checked.t )
     Poly.t
 
@@ -145,7 +146,7 @@ module Common = struct
       [ Currency.Fee.typ
       ; Public_key.Compressed.typ
       ; Account_nonce.typ
-      ; Global_slot.typ
+      ; Global_slot_since_genesis.typ
       ; Memo.typ
       ]
       ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
@@ -157,13 +158,14 @@ module Common = struct
       ; fee_payer_pk = Public_key.Compressed.var_of_t fee_payer_pk
       ; nonce = Account_nonce.Checked.constant nonce
       ; memo = Memo.Checked.constant memo
-      ; valid_until = Global_slot.Checked.constant valid_until
+      ; valid_until = Global_slot_since_genesis.Checked.constant valid_until
       }
 
     let to_input_legacy ({ fee; fee_payer_pk; nonce; valid_until; memo } : var)
         =
       let%map nonce = Account_nonce.Checked.to_input_legacy nonce
-      and valid_until = Global_slot.Checked.to_input_legacy valid_until
+      and valid_until =
+        Global_slot_since_genesis.Checked.to_input_legacy valid_until
       and fee = Currency.Fee.var_to_input_legacy fee in
       let fee_token = Legacy_token_id.default_checked in
       Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
@@ -284,7 +286,8 @@ let create ~fee ~fee_payer_pk ~nonce ~valid_until ~memo ~body : t =
       { fee
       ; fee_payer_pk
       ; nonce
-      ; valid_until = Option.value valid_until ~default:Global_slot.max_value
+      ; valid_until =
+          Option.value valid_until ~default:Global_slot_since_genesis.max_value
       ; memo
       }
   ; body
@@ -339,7 +342,7 @@ let dummy : t =
       { fee = Currency.Fee.zero
       ; fee_payer_pk = Public_key.Compressed.empty
       ; nonce = Account_nonce.zero
-      ; valid_until = Global_slot.max_value
+      ; valid_until = Global_slot_since_genesis.max_value
       ; memo = Memo.dummy
       }
   ; body = Payment Payment_payload.dummy

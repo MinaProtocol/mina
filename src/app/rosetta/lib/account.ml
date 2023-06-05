@@ -117,15 +117,14 @@ module Sql = struct
         (timing_info : Archive_lib.Processor.Timing_info.t)
         ~start_slot
         ~end_slot =
-    let open Unsigned in
     let cliff_time =
-      UInt32.of_int (Int.of_int64_exn timing_info.cliff_time)
+      Mina_numbers.Global_slot_since_genesis.of_int (Int.of_int64_exn timing_info.cliff_time)
     in
     let cliff_amount =
       MinaCurrency.Amount.of_string timing_info.cliff_amount
     in
     let vesting_period =
-      UInt32.of_int (Int.of_int64_exn timing_info.vesting_period)
+      Mina_numbers.Global_slot_span.of_int (Int.of_int64_exn timing_info.vesting_period)
     in
     let vesting_increment =
       MinaCurrency.Amount.of_string
@@ -161,7 +160,8 @@ module Sql = struct
          |> Errors.Lift.sql ~context:"Finding timing info"
        in
        let end_slot =
-         UInt32.of_int64 requested_block_global_slot_since_genesis
+         Mina_numbers.Global_slot_since_genesis.of_uint32
+           (Unsigned.UInt32.of_int64 requested_block_global_slot_since_genesis)
        in
        let%bind (liquid_balance, nonce) =
          match timing_info_opt with
@@ -178,7 +178,7 @@ module Sql = struct
             let incremental_balance_between_slots =
               compute_incremental_balance timing_info
                 ~start_slot:
-                (UInt32.of_int
+                  (Mina_numbers.Global_slot_since_genesis.of_int
                    (Int.of_int64_exn
                       last_relevant_command_global_slot_since_genesis))
                 ~end_slot
