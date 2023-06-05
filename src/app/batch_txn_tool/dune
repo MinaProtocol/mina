@@ -14,8 +14,8 @@
    async_unix
    ;; local libraries
    currency
+   logger
    mina_base.import
-   graphql_lib
    signature_lib
    mina_base
    secrets
@@ -23,11 +23,10 @@
    snark_params
    unsigned_extended
    mina_wire_types
+   integration_test_lib
  )
  (instrumentation (backend bisect_ppx))
- (preprocessor_deps ../../../graphql_schema.json)
  (preprocess (pps 
               ppx_version 
               ppx_let 
-              graphql_ppx -- %{read-lines:../../graphql-ppx-config.inc}
 )))

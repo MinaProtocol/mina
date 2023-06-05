@@ -45,7 +45,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Core.String.Map.find_exn (Network.block_producers network) "node"
     in
     let%bind fee_payer_key = priv_key_of_node node in
-    let graphql_uri = Network.Node.graphql_uri node in
+    let graphql_uri = Network.Node.graphql_uri node |> Uri.to_string in
 
     let%bind () =
       [%log info] "Waiting for nodes to be initialized" ;

@@ -3,6 +3,7 @@ open Async
 open Signature_lib
 open Txn_tool_graphql
 open Unsigned
+open Logger
 
 let gen_keys count =
   Quickcheck.random_value ~seed:`Nondeterministic
@@ -98,6 +99,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     ~(origin_sender_secret_key_pw_option : string option)
     ~returner_secret_key_path ~(returner_secret_key_pw_option : string option)
     ~graphql_target_node_option () =
+  let logger = Logger.create () in
   let open Deferred.Let_syntax in
   (* define the rate limiting function *)
   let limit_level =
@@ -195,14 +197,14 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   in
 
   (* helper function that uses graphql command to get the nonce of a node*)
-  let get_nonce pk =
+  let get_nonce pk ~logger =
     Format.printf
       "txn burst tool: using graphql to get the nonce of the account= %s, \
        using graphql target node= %s@."
       (pk_to_str pk) graphql_target_node ;
     let%bind nonce =
       let%bind querry_result =
-        get_account_data ~graphql_target_node ~public_key:pk
+        get_account_data ~graphql_target_node ~public_key:pk ~logger
       in
       match querry_result with
       | Ok n ->
@@ -218,7 +220,8 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   in
 
   (* helper function that sends a transaction*)
-  let do_txn ~(sender_kp : Keypair.t) ~(receiver_kp : Keypair.t) ~nonce =
+  let do_txn ~(sender_kp : Keypair.t) ~(receiver_kp : Keypair.t) ~nonce ~logger
+      =
     Format.printf
       "txn burst tool: sending txn from sender= %s (nonce=%d) to receiver= %s \
        with amount=%s and fee=%s@."
@@ -230,7 +233,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     let%bind res =
       send_signed_transaction ~sender_priv_key:sender_kp.private_key ~nonce
         ~receiver_pub_key:receiver_kp.public_key ~amount:initial_send_amount
-        ~fee:fee_amount ~graphql_target_node
+        ~fee:fee_amount ~graphql_target_node ~logger
     in
     let%bind () =
       match res with
@@ -248,22 +251,23 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
   let%bind () =
     (* in a previous version of the code there could be multiple returners, thus the iter.  keeping this structure in case we decide to change back later *)
     Deferred.List.iter [ returner_keypair ] ~f:(fun kp ->
-        let%bind origin_nonce = get_nonce origin_keypair.public_key in
+        let%bind origin_nonce = get_nonce origin_keypair.public_key ~logger in
         (* we could also get the origin nonce outside the iter and then just increment by 1 every iter *)
-        do_txn ~sender_kp:origin_keypair ~receiver_kp:kp ~nonce:origin_nonce )
+        do_txn ~sender_kp:origin_keypair ~receiver_kp:kp ~nonce:origin_nonce
+          ~logger )
   in
 
   (* and back again... *)
   let%bind () =
     Deferred.List.iter [ returner_keypair ] ~f:(fun kp ->
-        let%bind returner_nonce = get_nonce kp.public_key in
+        let%bind returner_nonce = get_nonce kp.public_key ~logger in
         let rec do_command n : unit Deferred.t =
           (* nce = returner_nonce + ( num_txn_per_acct - n ) *)
           let nce =
             UInt32.add returner_nonce (UInt32.of_int (num_txn_per_acct - n))
           in
           let%bind () =
-            do_txn ~sender_kp:kp ~receiver_kp:origin_keypair ~nonce:nce
+            do_txn ~sender_kp:kp ~receiver_kp:origin_keypair ~nonce:nce ~logger
           in
           if n > 1 then do_command (n - 1) else return ()
         in
