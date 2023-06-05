@@ -14,6 +14,7 @@ module Make
     -> 'd
     -> ('e, 'b) Hlist.Length.t
     -> num_step_chunks:int
+    -> num_wrap_chunks:int
     -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
     -> max_proofs_verified:(module Nat.Add.Intf with type n = 'a)
     -> Import.Domains.t
@@ -23,6 +24,7 @@ module Make
     -> 'd
     -> ('e, 'b) Hlist.Length.t
     -> num_step_chunks:int
+    -> num_wrap_chunks:int
     -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
     -> max_proofs_verified:(module Nat.Add.Intf with type n = 'a)
     -> Import.Domains.Stable.V2.t

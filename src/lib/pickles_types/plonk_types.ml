@@ -690,9 +690,9 @@ module All_evals = struct
 
   let typ (type f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-      lookup_config =
+      ~num_chunks lookup_config =
     let open Impl.Typ in
-    let single = array ~length:1 field in
+    let single = array ~length:num_chunks field in
     let evals =
       With_public_input.typ
         (module Impl)

@@ -40,9 +40,10 @@ end
 
 (** [evals] is a constant *)
 val evals :
-  ( Backend.Tock.Field.t
-  , Backend.Tock.Field.t array )
-  Pickles_types.Plonk_types.All_evals.t
+     num_wrap_chunks:int
+  -> ( Backend.Tock.Field.t
+     , Backend.Tock.Field.t array )
+     Pickles_types.Plonk_types.All_evals.t
 
 (** [evals_combined] is a constant *)
 val evals_combined :

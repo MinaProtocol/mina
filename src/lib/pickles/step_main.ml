@@ -192,6 +192,10 @@ let step_main :
     if Type_equal.Id.same self.id d.id then basic.feature_flags
     else Types_map.feature_flags d
   in
+  let num_step_chunks (d : _ Tag.t) =
+    if Type_equal.Id.same self.id d.id then basic.num_step_chunks
+    else Types_map.num_step_chunks d
+  in
   let num_wrap_chunks (d : _ Tag.t) =
     if Type_equal.Id.same self.id d.id then basic.num_wrap_chunks
     else Types_map.num_wrap_chunks d
@@ -202,16 +206,18 @@ let step_main :
            (pvars, pvals, ns1, ns2) H4.T(Tag).t
         -> (pvars, br) Length.t
         -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, br) Vector.t
-           * (int, br) Vector.t =
+           * (int * int, br) Vector.t =
      fun ds ld ->
       match[@warning "-4"] (ds, ld) with
       | [], Z ->
           ([], [])
       | d :: ds, S ld ->
           let feature_flags = feature_flags d in
+          let num_step_chunks = num_step_chunks d in
           let num_wrap_chunks = num_wrap_chunks d in
-          let feature_flagss, num_wrap_chunkss = go ds ld in
-          (feature_flags :: feature_flagss, num_wrap_chunks :: num_wrap_chunkss)
+          let feature_flagss, num_chunkss = go ds ld in
+          ( feature_flags :: feature_flagss
+          , (num_step_chunks, num_wrap_chunks) :: num_chunkss )
       | [], _ ->
           .
       | _ :: _, _ ->
@@ -229,11 +235,11 @@ let step_main :
         -> (ns1, br) Length.t
         -> (ns2, br) Length.t
         -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, br) Vector.t
-        -> (int, br) Vector.t
+        -> (int * int, br) Vector.t
         -> (pvars, pvals, ns1, ns2) H4.T(Typ_with_max_proofs_verified).t =
-     fun ds ns1 ns2 ld ln1 ln2 feature_flagss num_wrap_chunkss ->
+     fun ds ns1 ns2 ld ln1 ln2 feature_flagss num_chunkss ->
       match[@warning "-4"]
-        (ds, ns1, ns2, ld, ln1, ln2, feature_flagss, num_wrap_chunkss)
+        (ds, ns1, ns2, ld, ln1, ln2, feature_flagss, num_chunkss)
       with
       | [], [], [], Z, Z, Z, [], [] ->
           []
@@ -244,11 +250,12 @@ let step_main :
         , S ln1
         , S ln2
         , feature_flags :: feature_flagss
-        , num_wrap_chunks :: num_wrap_chunkss ) ->
+        , (num_step_chunks, num_wrap_chunks) :: num_chunkss ) ->
           let t =
-            Per_proof_witness.typ ~num_wrap_chunks Typ.unit n1 ~feature_flags
+            Per_proof_witness.typ ~num_step_chunks ~num_wrap_chunks Typ.unit n1
+              ~feature_flags
           in
-          t :: join ds ns1 ns2 ld ln1 ln2 feature_flagss num_wrap_chunkss
+          t :: join ds ns1 ns2 ld ln1 ln2 feature_flagss num_chunkss
       | [], _, _, _, _, _, _, _ ->
           .
       | _ :: _, _, _, _, _, _, _, _ ->

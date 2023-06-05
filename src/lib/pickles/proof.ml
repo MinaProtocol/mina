@@ -110,8 +110,9 @@ end
 
 type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) With_data.t
 
-let dummy (type w h r) ?(num_wrap_chunks = 1) (_w : w Nat.t) (h : h Nat.t)
-    (most_recent_width : r Nat.t) ~domain_log2 : (w, h) t =
+let dummy (type w h r) ?(num_step_chunks = 1) ?(num_wrap_chunks = 1)
+    (_w : w Nat.t) (h : h Nat.t) (most_recent_width : r Nat.t) ~domain_log2 :
+    (w, h) t =
   let open Ro in
   let g0 = Tock.Curve.(to_affine_exn one) in
   let g len = Array.create ~len g0 in
@@ -119,6 +120,7 @@ let dummy (type w h r) ?(num_wrap_chunks = 1) (_w : w Nat.t) (h : h Nat.t)
   let lengths =
     Commitment_lengths.create ~num_chunks:num_wrap_chunks ~of_int:Fn.id
   in
+  let dummy_evals = Dummy.evals ~num_wrap_chunks in
   T
     { statement =
         { proof_state =
@@ -186,14 +188,15 @@ let dummy (type w h r) ?(num_wrap_chunks = 1) (_w : w Nat.t) (h : h Nat.t)
                 ; delta = g0
                 ; challenge_polynomial_commitment = g0
                 }
-            ; evals = Dummy.evals.evals.evals
-            ; ft_eval1 = Dummy.evals.ft_eval1
+            ; evals = dummy_evals.evals.evals
+            ; ft_eval1 = dummy_evals.ft_eval1
             }
         }
     ; prev_evals =
         (let e =
-           Plonk_types.Evals.map (Evaluation_lengths.create ~of_int:Fn.id)
-             ~f:(fun n -> (tick_arr n, tick_arr n))
+           Plonk_types.Evals.map
+             (Evaluation_lengths.create ~num_chunks:num_step_chunks
+                ~of_int:Fn.id ) ~f:(fun n -> (tick_arr n, tick_arr n))
          in
          let ex =
            { Plonk_types.All_evals.With_public_input.public_input =

@@ -1,5 +1,5 @@
-let create ~of_int =
-  let one = of_int 1 in
+let create ~num_chunks ~of_int =
+  let one = of_int num_chunks in
   let open Pickles_types in
   let open Plonk_types in
   Evals.

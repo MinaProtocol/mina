@@ -462,7 +462,7 @@ struct
               (Auxiliary_value)
           in
           M.f full_signature prev_varss_n prev_varss_length ~max_proofs_verified
-            ~num_step_chunks ~feature_flags
+            ~num_step_chunks ~num_wrap_chunks ~feature_flags
       | Some override ->
           Common.wrap_domains
             ~proofs_verified:(Pickles_base.Proofs_verified.to_int override)
@@ -627,8 +627,8 @@ struct
       match override_wrap_main with
       | None ->
           let srs = Tick.Keypair.load_urs () in
-          Wrap_main.wrap_main ~num_step_chunks ~feature_flags ~srs
-            full_signature prev_varss_length step_vks proofs_verifieds
+          Wrap_main.wrap_main ~num_step_chunks ~num_wrap_chunks ~feature_flags
+            ~srs full_signature prev_varss_length step_vks proofs_verifieds
             step_domains max_proofs_verified
       | Some { wrap_main; tweak_statement = _ } ->
           (* Instead of creating a proof using the pickles wrap circuit, we

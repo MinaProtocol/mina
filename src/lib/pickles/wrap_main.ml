@@ -91,7 +91,7 @@ let lookup_config_for_pack =
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
 let wrap_main
     (type max_proofs_verified branches prev_varss max_local_max_proofs_verifieds)
-    ~feature_flags ~num_step_chunks
+    ~feature_flags ~num_step_chunks ~num_wrap_chunks
     (full_signature :
       ( max_proofs_verified
       , branches
@@ -263,7 +263,9 @@ let wrap_main
               let evals =
                 let ty =
                   let ty =
-                    Plonk_types.All_evals.typ (module Impl) feature_flags
+                    Plonk_types.All_evals.typ
+                      (module Impl)
+                      ~num_chunks:num_wrap_chunks feature_flags
                   in
                   Vector.typ ty Max_proofs_verified.n
                 in

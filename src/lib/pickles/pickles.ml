@@ -1147,7 +1147,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               Wrap_domains.Make (A) (A_value) (A) (A_value) (A) (A_value)
             in
             M.f full_signature prev_varss_n prev_varss_length ~feature_flags
-              ~num_step_chunks
+              ~num_step_chunks ~num_wrap_chunks
               ~max_proofs_verified:(module Max_proofs_verified)
           in
           let module Branch_data = struct

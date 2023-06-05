@@ -429,7 +429,9 @@ let%test_module "gate finalization" =
          for use in the circuit *)
       and evals =
         constant
-          (Plonk_types.All_evals.typ (module Impls.Step) feature_flags)
+          (Plonk_types.All_evals.typ ~num_chunks:1
+             (module Impls.Step)
+             feature_flags )
           { evals = { public_input = x_hat_evals; evals = proof.openings.evals }
           ; ft_eval1 = proof.openings.ft_eval1
           }

@@ -872,6 +872,14 @@ struct
       }
     in
     [%log internal] "Pickles_step_proof_done" ;
+    let dummy_evals =
+      (* TODO: This isn't really right, because we don't necessarily have
+         homogeneity any more if the num_wrap_chunks != 1. We only really need
+         this for proofs that will be side-loaded (e.g. zkApps) anyway, we
+         should make this padding opt-out-able.
+      *)
+      Dummy.evals ~num_wrap_chunks:1
+    in
     ( { Proof.Base.Step.proof = next_proof.proof
       ; statement = next_statement
       ; index = branch_data.index
@@ -884,7 +892,7 @@ struct
                    ; evals =
                        { With_public_input.evals = es; public_input = x_hat }
                    } ) )
-            lte Max_proofs_verified.n Dummy.evals
+            lte Max_proofs_verified.n dummy_evals
       }
     , Option.value_exn !return_value
     , Option.value_exn !auxiliary_value

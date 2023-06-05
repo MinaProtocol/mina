@@ -77,7 +77,8 @@ module type S = sig
     type ('max_width, 'mlmb) t
 
     val dummy :
-         ?num_wrap_chunks:int
+         ?num_step_chunks:int
+      -> ?num_wrap_chunks:int
       -> 'w Nat.t
       -> 'm Nat.t
       -> _ Nat.t
