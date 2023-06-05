@@ -6,7 +6,7 @@ Database is a custom-built lightweight Rust-based key-value store in the form of
 
 The database is a single append-only file, where each entry (key-value) are preceded by a header. Each entry in the Database has the following structure:
 
-![image](https://github.com/openmina/mina/assets/60480123/edbc5bad-4189-4a3e-b815-9302dcc91348)
+![image](https://github.com/openmina/mina/assets/60480123/1fb6b589-656d-4f00-ae8f-364bf8df63c2)
 
 
 We are using compression on both keys and values with the library `zstd`. This provides the following advantages:
