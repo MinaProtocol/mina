@@ -6,9 +6,7 @@ Database is a custom-built lightweight Rust-based key-value store in the form of
 
 The database is a single append-only file, where each entry (key-value) are preceded by a header. Each entry in the Database has the following structure:
 
-
-![image](https://github.com/openmina/mina/assets/60480123/c4d6c384-e180-4825-b319-b51a172a8877)
-
+![image](https://github.com/openmina/mina/assets/60480123/edbc5bad-4189-4a3e-b815-9302dcc91348)
 
 
 We are using compression on both keys and values with the library `zstd`. This provides the following advantages:
@@ -33,16 +31,6 @@ The design of the Rust-based storage is based on information by performance-rela
 
 This employs techniques such as removing wasteful copying, delaying the application of actions until commit, optimizing space usage, and more. 
 
-## Run tests:
-```bash
-cargo test --release
-```
-
-## Documentation:
-
-```bash
-cargo doc --open
-```
 
 # How to build Mina with the new storage implementation
 
@@ -317,3 +305,15 @@ MINA_LIBP2P_PASS=some-password
   --config-file genesis_ledgers/berkeley.json \
    --libp2p-keypair path/to/libp2pkey
 ```
+
+## Run tests:
+```bash
+cargo test --release
+```
+
+## Documentation:
+
+```bash
+cargo doc --open
+```
+
