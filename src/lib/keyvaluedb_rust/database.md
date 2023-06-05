@@ -1,13 +1,13 @@
 
+# Database, a Rust-based lightweight key value store for the Mina blockchain state
+
+
 ## Table of Contents
 1. [Introduction](#Introduction)
 2. [How Mina stores blockchain state in its ledger](#How-Mina-stores-blockchain-state-in-its-ledger)
 3. [A custom-built key-value store for Mina](#A-custom-built-key-value-store-for-Mina)
 4. [Try it out yourself](#Try-it-out-yourself)
 
-
-
-# Database, a Rust-based lightweight key value store for the Mina blockchain state
   
 ## Introduction
 
