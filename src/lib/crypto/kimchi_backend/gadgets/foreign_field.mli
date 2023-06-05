@@ -21,20 +21,15 @@ type 'field standard_limbs = 'field * 'field * 'field
 
 type 'field compact_limbs = 'field * 'field
 
-val bignum_bigint_to_field_standard_limbs :
+val bignum_bigint_to_field_const_standard_limbs :
      (module Snark_intf.Run with type field = 'field)
   -> Bignum_bigint.t
   -> 'field standard_limbs
 
-val field_standard_limbs_to_bignum_bigint :
+val field_const_standard_limbs_to_bignum_bigint :
      (module Snark_intf.Run with type field = 'field)
   -> 'field standard_limbs
   -> Bignum_bigint.t
-
-val field_standard_limbs_is_zero :
-     (module Snark_intf.Run with type field = 'field)
-  -> 'field standard_limbs
-  -> bool
 
 val check_modulus :
      (module Snark_intf.Run with type field = 'field)
@@ -63,6 +58,12 @@ module type Element_intf = sig
 
   (** Create foreign field element from Bignum_bigint.t *)
   val of_bignum_bigint :
+       (module Snark_intf.Run with type field = 'field)
+    -> Bignum_bigint.t
+    -> 'field t
+
+  (** Create constant foreign field element from Bignum_bigint.t *)
+  val const_of_bignum_bigint :
        (module Snark_intf.Run with type field = 'field)
     -> Bignum_bigint.t
     -> 'field t

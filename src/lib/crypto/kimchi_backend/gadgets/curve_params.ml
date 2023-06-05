@@ -124,32 +124,36 @@ let to_circuit_constants (type field)
   InCircuit.
     { bignum = curve
     ; modulus =
-        Foreign_field.bignum_bigint_to_field_standard_limbs
+        Foreign_field.bignum_bigint_to_field_const_standard_limbs
           (module Circuit)
           curve.modulus
     ; order =
-        Foreign_field.bignum_bigint_to_field_standard_limbs
+        Foreign_field.bignum_bigint_to_field_const_standard_limbs
           (module Circuit)
           curve.order
     ; order_bit_length
     ; order_minus_one =
-        Foreign_field.Element.Standard.of_bignum_bigint
+        Foreign_field.Element.Standard.const_of_bignum_bigint
           (module Circuit)
           order_minus_one
     ; order_minus_one_bits =
-        Common.bignum_bigint_unpack_unconstrained_cvars
+        Common.bignum_bigint_unpack_as_unchecked_consts
           (module Circuit)
           order_minus_one
     ; a =
-        Foreign_field.Element.Standard.of_bignum_bigint (module Circuit) curve.a
+        Foreign_field.Element.Standard.const_of_bignum_bigint
+          (module Circuit)
+          curve.a
     ; b =
-        Foreign_field.Element.Standard.of_bignum_bigint (module Circuit) curve.b
+        Foreign_field.Element.Standard.const_of_bignum_bigint
+          (module Circuit)
+          curve.b
     ; gen = Affine.of_bignum_bigint_coordinates (module Circuit) curve.gen
     ; doubles =
         ((* Precompute 2^i * curve.gen, 0 <= i < curve.order_bit_length *)
          let doubles =
            Array.init order_bit_length (fun _i ->
-               Affine.as_prover_zero (module Circuit) )
+               Affine.const_zero (module Circuit) )
          in
          let point = ref curve.gen in
          for i = 0 to order_bit_length - 1 do

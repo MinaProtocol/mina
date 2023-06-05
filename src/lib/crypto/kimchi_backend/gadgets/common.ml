@@ -24,10 +24,10 @@ let two_to_limb = Bignum_bigint.(pow (of_int 2) (of_int limb_bits))
 (* 2^3L *)
 let two_to_3limb = Bignum_bigint.(pow two_to_limb (of_int 3))
 
-(* Length of bigint in bits *)
+(* Length of Bignum_bigint.t in bits *)
 let bignum_bigint_bit_length (bigint : Bignum_bigint.t) : int =
   if Bignum_bigint.(equal bigint zero) then 1
-  else Z.log2up (Bignum_bigint.to_zarith_bigint bigint)
+  else Z.log2 (Bignum_bigint.to_zarith_bigint bigint) + 1
 
 (* Conventions used in this interface
  *     1. Functions prefixed with "as_prover_" only happen during proving
@@ -196,53 +196,51 @@ let bignum_bigint_unpack ?(remove_trailing = false) (bignum : Bignum_bigint.t) :
   in
   if remove_trailing then remove_trailing_false bits else bits
 
-(* Bignum_bigint to bool array *)
-let bignum_bigint_unpack_array ?(remove_trailing = false)
-    (bignum : Bignum_bigint.t) : bool array =
-  (* Helper to remove trailing false *)
-  let remove_trailing_false (lst : bool list) =
-    let rev = List.rev lst in
-    let rec remove_leading_false_rec lst =
-      match lst with
-      | [] ->
-          []
-      | hd :: tl ->
-          if hd then hd :: tl else remove_leading_false_rec tl
-    in
-    remove_leading_false_rec rev
-  in
+let bignum_bigint_unpack_as (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    ?(remove_trailing = false) (bignum : Bignum_bigint.t)
+    (typ : (Circuit.Boolean.var, bool) Circuit.Typ.t) : Circuit.Boolean.var list
+    =
+  let open Circuit in
+  (* printf "scalar = %s\n" @@ Bignum_bigint.to_string bignum ;
+     printf "length = %d\n" @@ bignum_bigint_bit_length bignum ; *)
+  exists
+    (Typ.list ~length:(bignum_bigint_bit_length bignum) typ)
+    ~compute:(fun () -> bignum_bigint_unpack ~remove_trailing bignum)
 
-  (* Convert biguint to bitstring *)
-  let bitstr = Z.to_bits @@ Bignum_bigint.to_zarith_bigint bignum in
-  (* Convert bitstring to list of bool *)
-  let bits =
-    List.init
-      (8 * String.length bitstr)
-      ~f:(fun i ->
-        let c = Char.to_int bitstr.[i / 8] in
-        let j = i mod 8 in
-        if Int.((c lsr j) land 1 = 1) then true else false )
-  in
-  Array.of_list_rev
-  @@ if remove_trailing then remove_trailing_false bits else bits
-
-let prover_bignum_bigint_unpack_cvars (type f)
+let bignum_bigint_unpack_as_vars (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     ?(remove_trailing = false) (bignum : Bignum_bigint.t) :
     Circuit.Boolean.var list =
-  let open Circuit in
-  Array.to_list
-  @@ exists
-       (Typ.array ~length:(bignum_bigint_bit_length bignum) Boolean.typ)
+  bignum_bigint_unpack_as
+    (module Circuit)
+    ~remove_trailing bignum Circuit.Boolean.typ
+(* let open Circuit in
+   exists
+        (Typ.list ~length:(bignum_bigint_bit_length bignum) Boolean.typ)
+        ~compute:(fun () ->
+          bignum_bigint_unpack ~remove_trailing bignum ) *)
+
+let bignum_bigint_unpack_as_unchecked_vars (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    ?(remove_trailing = false) (bignum : Bignum_bigint.t) :
+    Circuit.Boolean.var list =
+  bignum_bigint_unpack_as
+    (module Circuit)
+    ~remove_trailing bignum Circuit.Boolean.typ_unchecked
+(* let open Circuit in
+   exists
+       (Typ.list ~length:(bignum_bigint_bit_length bignum) Boolean.typ_unchecked)
        ~compute:(fun () ->
-         List.to_array @@ bignum_bigint_unpack ~remove_trailing bignum )
+         bignum_bigint_unpack ~remove_trailing bignum ) *)
 
-(* Bignum_bigint to Boolean.var list (without creating boolean constraints) *)
-let bignum_bigint_unpack_unconstrained_cvars (type f)
+(* Bignum_bigint to constatnts Boolean.var list (without creating boolean constraints) *)
+let bignum_bigint_unpack_as_unchecked_consts (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     ?(remove_trailing = false) (bignum : Bignum_bigint.t) :
     Circuit.Boolean.var list =
   let open Circuit in
+  (* TODO: Change to  Boolean.var_of_value bool   .... Boolean.var_of_t *)
   List.map (bignum_bigint_unpack ~remove_trailing bignum) ~f:(fun bool ->
       if bool then Boolean.true_ else Boolean.false_ )
 

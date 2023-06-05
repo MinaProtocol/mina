@@ -30,7 +30,7 @@ let signature_scalar_check (type f)
   let r_inv0, r_inv1, r_inv2, s_inv0, s_inv1, s_inv2 =
     exists (Typ.array ~length:6 Field.typ) ~compute:(fun () ->
         let curve_order =
-          Foreign_field.field_standard_limbs_to_bignum_bigint
+          Foreign_field.field_const_standard_limbs_to_bignum_bigint
             (module Circuit)
             curve.order
         in
@@ -55,12 +55,12 @@ let signature_scalar_check (type f)
 
         (* Convert from Bignums to field elements *)
         let r_inv0, r_inv1, r_inv2 =
-          Foreign_field.bignum_bigint_to_field_standard_limbs
+          Foreign_field.bignum_bigint_to_field_const_standard_limbs
             (module Circuit)
             r_inv
         in
         let s_inv0, s_inv1, s_inv2 =
-          Foreign_field.bignum_bigint_to_field_standard_limbs
+          Foreign_field.bignum_bigint_to_field_const_standard_limbs
             (module Circuit)
             s_inv
         in
@@ -160,7 +160,7 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
   let u1_0, u1_1, u1_2, u2_0, u2_1, u2_2 =
     exists (Typ.array ~length:6 Field.typ) ~compute:(fun () ->
         let curve_order =
-          Foreign_field.field_standard_limbs_to_bignum_bigint
+          Foreign_field.field_const_standard_limbs_to_bignum_bigint
             (module Circuit)
             curve.order
         in
@@ -194,12 +194,12 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
 
         (* Convert from Bignums to field elements *)
         let u1_0, u1_1, u1_2 =
-          Foreign_field.bignum_bigint_to_field_standard_limbs
+          Foreign_field.bignum_bigint_to_field_const_standard_limbs
             (module Circuit)
             u1
         in
         let u2_0, u2_1, u2_2 =
-          Foreign_field.bignum_bigint_to_field_standard_limbs
+          Foreign_field.bignum_bigint_to_field_const_standard_limbs
             (module Circuit)
             u2
         in
@@ -335,7 +335,7 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
   let quotient0, quotient1, quotient2, x_prime0, x_prime1, x_prime2 =
     exists (Typ.array ~length:6 Field.typ) ~compute:(fun () ->
         let curve_order =
-          Foreign_field.field_standard_limbs_to_bignum_bigint
+          Foreign_field.field_const_standard_limbs_to_bignum_bigint
             (module Circuit)
             curve.order
         in
@@ -351,12 +351,12 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
 
         (* Convert from Bignums to field elements *)
         let quotient0, quotient1, quotient2 =
-          Foreign_field.bignum_bigint_to_field_standard_limbs
+          Foreign_field.bignum_bigint_to_field_const_standard_limbs
             (module Circuit)
             quotient
         in
         let x_prime0, x_prime1, x_prime2 =
-          Foreign_field.bignum_bigint_to_field_standard_limbs
+          Foreign_field.bignum_bigint_to_field_const_standard_limbs
             (module Circuit)
             x_prime
         in

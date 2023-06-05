@@ -4,7 +4,7 @@ module Snark_intf = Snarky_backendless.Snark_intf
 
 (* Affine representation of an elliptic curve point over a foreign field *)
 
-let tests_enabled = false
+let tests_enabled = true
 
 type bignum_point = Bignum_bigint.t * Bignum_bigint.t
 
@@ -23,6 +23,15 @@ let of_bignum_bigint_coordinates (type field)
   of_coordinates
     ( Foreign_field.Element.Standard.of_bignum_bigint (module Circuit) x
     , Foreign_field.Element.Standard.of_bignum_bigint (module Circuit) y )
+
+let const_of_bignum_bigint_coordinates (type field)
+    (module Circuit : Snark_intf.Run with type field = field)
+    (point : bignum_point) : field t =
+  let x, y = point in
+  of_coordinates
+    ( Foreign_field.Element.Standard.const_of_bignum_bigint (module Circuit) x
+    , Foreign_field.Element.Standard.const_of_bignum_bigint (module Circuit) y
+    )
 
 let of_hex (type field)
     (module Circuit : Snark_intf.Run with type field = field) a : field t =
@@ -79,12 +88,12 @@ let assert_equal (type field)
     assert_equal (module Circuit) left_x right_x ;
     assert_equal (module Circuit) left_y right_y)
 
-let as_prover_zero (type field)
+let const_zero (type field)
     (module Circuit : Snark_intf.Run with type field = field) : field t =
   of_coordinates
     Foreign_field.Element.Standard.
-      ( of_bignum_bigint (module Circuit) Bignum_bigint.zero
-      , of_bignum_bigint (module Circuit) Bignum_bigint.zero )
+      ( const_of_bignum_bigint (module Circuit) Bignum_bigint.zero
+      , const_of_bignum_bigint (module Circuit) Bignum_bigint.zero )
 
 let if_ (type field) (module Circuit : Snark_intf.Run with type field = field)
     (b : Circuit.Boolean.var) (then_ : field t) (else_ : field t) : field t =

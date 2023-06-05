@@ -64,13 +64,13 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
           (Affine.equal_as_prover
              (module Circuit)
              left_input
-             (Affine.as_prover_zero (module Circuit)) ) ) ;
+             (Affine.const_zero (module Circuit)) ) ) ;
       assert (
         not
           (Affine.equal_as_prover
              (module Circuit)
              right_input
-             (Affine.as_prover_zero (module Circuit)) ) ) ) ;
+             (Affine.const_zero (module Circuit)) ) ) ) ;
 
   (* Unpack coordinates *)
   let left_x, left_y = Affine.to_coordinates left_input in
@@ -155,17 +155,17 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
 
         (* Convert from Bignums to field elements *)
         let slope0, slope1, slope2 =
-          Foreign_field.bignum_bigint_to_field_standard_limbs
+          Foreign_field.bignum_bigint_to_field_const_standard_limbs
             (module Circuit)
             slope
         in
         let result_x0, result_x1, result_x2 =
-          Foreign_field.bignum_bigint_to_field_standard_limbs
+          Foreign_field.bignum_bigint_to_field_const_standard_limbs
             (module Circuit)
             result_x
         in
         let result_y0, result_y1, result_y2 =
-          Foreign_field.bignum_bigint_to_field_standard_limbs
+          Foreign_field.bignum_bigint_to_field_const_standard_limbs
             (module Circuit)
             result_y
         in
@@ -347,7 +347,7 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
           (Affine.equal_as_prover
              (module Circuit)
              point
-             (Affine.as_prover_zero (module Circuit)) ) ) ) ;
+             (Affine.const_zero (module Circuit)) ) ) ) ;
 
   (* Unpack coordinates *)
   let point_x, point_y = Affine.to_coordinates point in
@@ -381,17 +381,17 @@ let double (type f) (module Circuit : Snark_intf.Run with type field = f)
 
         (* Convert from Bignums to field elements *)
         let slope0, slope1, slope2 =
-          Foreign_field.bignum_bigint_to_field_standard_limbs
+          Foreign_field.bignum_bigint_to_field_const_standard_limbs
             (module Circuit)
             slope
         in
         let result_x0, result_x1, result_x2 =
-          Foreign_field.bignum_bigint_to_field_standard_limbs
+          Foreign_field.bignum_bigint_to_field_const_standard_limbs
             (module Circuit)
             result_x
         in
         let result_y0, result_y1, result_y2 =
-          Foreign_field.bignum_bigint_to_field_standard_limbs
+          Foreign_field.bignum_bigint_to_field_const_standard_limbs
             (module Circuit)
             result_y
         in
@@ -3095,7 +3095,7 @@ let%test_unit "Ec_group.check_ia" =
     () )
 
 let%test_unit "Ec_group.scalar_mul" =
-  if scalar_mul_tests then (
+  if scalar_mul_tests then
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -3114,8 +3114,7 @@ let%test_unit "Ec_group.scalar_mul" =
               Curve_params.to_circuit_constants (module Runner.Impl) curve
             in
             let scalar_bits =
-              (* TODO: figure out how to do this as public input without constraining bits *)
-              Common.prover_bignum_bigint_unpack_cvars
+              Common.bignum_bigint_unpack_as_unchecked_vars
                 (module Runner.Impl)
                 ~remove_trailing:true scalar
             in
@@ -3168,22 +3167,45 @@ let%test_unit "Ec_group.scalar_mul" =
           "108096131279561713744990959402407452508030289249215221172372441421932322041359"
       )
     in
-    let _cs = test_scalar_mul Secp256k1.params scalar point in
+    let _cs = test_scalar_mul Secp256k1.params scalar point point in
 
-    (* Multiply by 6 *)
-    let scalar = Bignum_bigint.of_int 6 in
-    let point =
+    (* Multiply by 3 *)
+    let scalar = Bignum_bigint.of_int 3 in
+    let expected_result =
       ( Bignum_bigint.of_string
-          "67973637023329354644729732876692436096994797487488454090437075702698953132769"
+          "157187898623115017197196263696044455473966365375620096488909462468556488992"
       , Bignum_bigint.of_string
-          "108096131279561713744990959402407452508030289249215221172372441421932322041359"
+          "8815915990003770986701969284580631365087521759318521999314517238992555623924"
       )
     in
+    let _cs = test_scalar_mul Secp256k1.params scalar point expected_result in
+
+    let scalar = Bignum_bigint.of_int 5 in
+    let expected_result =
+      ( Bignum_bigint.of_string
+          "51167536897757234729699532493775077246692685149885509345450034909880529264629"
+      , Bignum_bigint.of_string
+          "44029933166959533883508578962900776387952087967919619281016528212534310213626"
+      )
+    in
+    let _cs = test_scalar_mul Secp256k1.params scalar point expected_result in
+
+    let scalar = Bignum_bigint.of_int 6 in
     let expected_result =
       ( Bignum_bigint.of_string
           "37941877700581055232085743160302884615963229784754572200220248617732513837044"
       , Bignum_bigint.of_string
           "103619381845871132282285745641400810486981078987965768860988615362483475376768"
+      )
+    in
+    let _cs = test_scalar_mul Secp256k1.params scalar point expected_result in
+
+    let scalar = Bignum_bigint.of_int 7 in
+    let expected_result =
+      ( Bignum_bigint.of_string
+          "98789585776319197684463328274590329296514884375780947918152956981890869725107"
+      , Bignum_bigint.of_string
+          "53439843286771287571705008292825119475125031375071120429905353259479677320421"
       )
     in
     let _cs = test_scalar_mul Secp256k1.params scalar point expected_result in
@@ -3298,7 +3320,7 @@ let%test_unit "Ec_group.scalar_mul" =
       test_scalar_mul ~cs Secp256k1.params scalar Secp256k1.params.gen
         expected_pt
     in
-    () )
+    ()
 
 let%test_unit "Ec_group.scalar_mul_properties" =
   if scalar_mul_tests then (
@@ -3324,12 +3346,12 @@ let%test_unit "Ec_group.scalar_mul_properties" =
               Curve_params.to_circuit_constants (module Runner.Impl) curve
             in
             let a_scalar_bits =
-              Common.prover_bignum_bigint_unpack_cvars
+              Common.bignum_bigint_unpack_as_unchecked_vars
                 (module Runner.Impl)
                 ~remove_trailing:true a_scalar
             in
             let b_scalar_bits =
-              Common.prover_bignum_bigint_unpack_cvars
+              Common.bignum_bigint_unpack_as_unchecked_vars
                 (module Runner.Impl)
                 ~remove_trailing:true b_scalar
             in
@@ -3337,9 +3359,9 @@ let%test_unit "Ec_group.scalar_mul_properties" =
               let c_scalar =
                 Bignum_bigint.((a_scalar + b_scalar) % curve.bignum.order)
               in
-              Common.prover_bignum_bigint_unpack_cvars
-                  (module Runner.Impl)
-                  ~remove_trailing:true c_scalar
+              Common.bignum_bigint_unpack_as_unchecked_vars
+                (module Runner.Impl)
+                ~remove_trailing:true c_scalar
             in
             let point =
               Affine.of_bignum_bigint_coordinates (module Runner.Impl) point
@@ -3444,9 +3466,9 @@ let%test_unit "Ec_group.scalar_mul_properties" =
               let ab_scalar =
                 Bignum_bigint.(a_scalar * b_scalar % curve.bignum.order)
               in
-              Common.prover_bignum_bigint_unpack_cvars
-              (module Runner.Impl)
-              ~remove_trailing:true ab_scalar
+              Common.bignum_bigint_unpack_as_unchecked_vars
+                (module Runner.Impl)
+                ~remove_trailing:true ab_scalar
             in
 
             (* (a * b)P *)
@@ -3474,9 +3496,9 @@ let%test_unit "Ec_group.scalar_mul_properties" =
               let minus_a_scalar =
                 Bignum_bigint.(-a_scalar % curve.bignum.order)
               in
-              Common.prover_bignum_bigint_unpack_cvars
-              (module Runner.Impl)
-              ~remove_trailing:true minus_a_scalar
+              Common.bignum_bigint_unpack_as_unchecked_vars
+                (module Runner.Impl)
+                ~remove_trailing:true minus_a_scalar
             in
 
             (* [-a]P *)
@@ -3645,3 +3667,90 @@ let%test_unit "Ec_group.scalar_mul_properties" =
         negation_expected
     in
     () )
+
+let%test_unit "Ec_group.scalar_mul_tiny" =
+  if scalar_mul_tests then
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+
+    (* Test elliptic curve scalar multiplication with tiny scalar *)
+    let test_scalar_mul_tiny ?cs (curve : Curve_params.t)
+        (scalar : Bignum_bigint.t) (point : Affine.bignum_point)
+        (expected_result : Affine.bignum_point) =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            let open Runner.Impl in
+            (* Prepare test public inputs *)
+            let curve =
+              Curve_params.to_circuit_constants (module Runner.Impl) curve
+            in
+            let scalar_bits =
+              Common.bignum_bigint_unpack_as_unchecked_vars
+                (module Runner.Impl)
+                ~remove_trailing:true scalar
+            in
+            let point =
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) point
+            in
+            let expected_result =
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                expected_result
+            in
+
+            (* Create external checks context for tracking extra constraints
+               that are required for soundness (unused in this simple test) *)
+            let unused_external_checks =
+              Foreign_field.External_checks.create (module Runner.Impl)
+            in
+
+            (* Q = sP *)
+            let result =
+              scalar_mul
+                (module Runner.Impl)
+                unused_external_checks curve scalar_bits point
+            in
+
+            (* Check for expected quantity of external checks *)
+
+            (* Check output matches expected result *)
+            as_prover (fun () ->
+                assert (
+                  Affine.equal_as_prover
+                    (module Runner.Impl)
+                    result expected_result ) ) ;
+            () )
+      in
+
+      cs
+    in
+
+    (*
+     * EC scalar multiplication tests
+     *)
+
+    (* Multiply by 1 *)
+    let scalar = Bignum_bigint.of_int 2 in
+    let point =
+      ( Bignum_bigint.of_string
+          "67973637023329354644729732876692436096994797487488454090437075702698953132769"
+      , Bignum_bigint.of_string
+          "108096131279561713744990959402407452508030289249215221172372441421932322041359"
+      )
+    in
+    let _expected_result =
+      ( Bignum_bigint.of_string
+          "55163261558395629959399018458747217735022097476453626220534976346508255440132"
+      , Bignum_bigint.of_string
+          "64084400259104016223244036381136865352477201840651425128383163030179956518101"
+      )
+    in
+    let _cs =
+      test_scalar_mul_tiny Secp256k1.params scalar point _expected_result
+    in
+
+    ()

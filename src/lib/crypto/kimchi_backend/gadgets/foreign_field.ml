@@ -76,7 +76,7 @@ let bignum_bigint_to_standard_limbs (bigint : Bignum_bigint.t) :
   (l0, l1, l2)
 
 (* Convert Bignum_bigint.t to field standard_limbs *)
-let bignum_bigint_to_field_standard_limbs (type f)
+let bignum_bigint_to_field_const_standard_limbs (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (bigint : Bignum_bigint.t) : f standard_limbs =
   let l0, l1, l2 = bignum_bigint_to_standard_limbs bigint in
@@ -91,7 +91,7 @@ let bignum_bigint_to_compact_limbs (bigint : Bignum_bigint.t) :
   (l01, l2)
 
 (* Convert Bignum_bigint.t to field compact_limbs *)
-let bignum_bigint_to_field_compact_limbs (type f)
+let bignum_bigint_to_field_const_compact_limbs (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (bigint : Bignum_bigint.t) : f compact_limbs =
   let l01, l2 = bignum_bigint_to_compact_limbs bigint in
@@ -99,7 +99,7 @@ let bignum_bigint_to_field_compact_limbs (type f)
   , Common.bignum_bigint_to_field (module Circuit) l2 )
 
 (* Convert field standard_limbs to Bignum_bigint.t standard_limbs *)
-let field_standard_limbs_to_bignum_bigint_standard_limbs (type f)
+let field_const_standard_limbs_to_bignum_bigint_standard_limbs (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (field_limbs : f standard_limbs) : Bignum_bigint.t standard_limbs =
   let l0, l1, l2 = field_limbs in
@@ -108,22 +108,15 @@ let field_standard_limbs_to_bignum_bigint_standard_limbs (type f)
   , Common.field_to_bignum_bigint (module Circuit) l2 )
 
 (* Convert field standard_limbs to Bignum_bigint.t *)
-let field_standard_limbs_to_bignum_bigint (type f)
+let field_const_standard_limbs_to_bignum_bigint (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (field_limbs : f standard_limbs) : Bignum_bigint.t =
   let l0, l1, l2 =
-    field_standard_limbs_to_bignum_bigint_standard_limbs
+    field_const_standard_limbs_to_bignum_bigint_standard_limbs
       (module Circuit)
       field_limbs
   in
   Bignum_bigint.(l0 + (Common.two_to_limb * l1) + (two_to_2limb * l2))
-
-(* Check if field standard_limbs is zero *)
-let field_standard_limbs_is_zero (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (field_limbs : f standard_limbs) : bool =
-  let l0, l1, l2 = field_limbs in
-  Circuit.Field.Constant.(equal l0 zero && equal l1 zero && equal l2 zero)
 
 (* Foreign field element interface *)
 (* TODO: It would be better if this were created with functor that
@@ -149,6 +142,12 @@ module type Element_intf = sig
 
   (* Create foreign field element from Bignum_bigint.t *)
   val of_bignum_bigint :
+       (module Snark_intf.Run with type field = 'field)
+    -> Bignum_bigint.t
+    -> 'field t
+
+  (* Create constant foreign field element from Bignum_bigint.t *)
+  val const_of_bignum_bigint :
        (module Snark_intf.Run with type field = 'field)
     -> Bignum_bigint.t
     -> 'field t
@@ -273,6 +272,17 @@ end = struct
       in
       of_limbs (limb_vars.(0), limb_vars.(1), limb_vars.(2))
 
+    let const_of_bignum_bigint (type field)
+        (module Circuit : Snark_intf.Run with type field = field) x : field t =
+      let open Circuit in
+      let l12, l0 = Common.(bignum_bigint_div_rem x two_to_limb) in
+      let l2, l1 = Common.(bignum_bigint_div_rem l12 two_to_limb) in
+      of_limbs
+        Field.
+          ( constant @@ Common.bignum_bigint_to_field (module Circuit) l0
+          , constant @@ Common.bignum_bigint_to_field (module Circuit) l1
+          , constant @@ Common.bignum_bigint_to_field (module Circuit) l2 )
+
     let to_limbs x = x
 
     let map (x : 'field t) (func : 'field Cvar.t -> 'g) : 'g limbs_type =
@@ -341,7 +351,7 @@ end = struct
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         (modulus : field standard_limbs) : bool =
       let modulus =
-        field_standard_limbs_to_bignum_bigint (module Circuit) modulus
+        field_const_standard_limbs_to_bignum_bigint (module Circuit) modulus
       in
       Bignum_bigint.(to_bignum_bigint_as_prover (module Circuit) x < modulus)
 
@@ -403,6 +413,15 @@ end = struct
       of_limbs (limb_vars.(0), limb_vars.(1))
 
     let to_limbs x = x
+
+    let const_of_bignum_bigint (type field)
+        (module Circuit : Snark_intf.Run with type field = field) x : field t =
+      let open Circuit in
+      let l2, l01 = Common.(bignum_bigint_div_rem x two_to_2limb) in
+      of_limbs
+        Field.
+          ( constant @@ Common.bignum_bigint_to_field (module Circuit) l01
+          , constant @@ Common.bignum_bigint_to_field (module Circuit) l2 )
 
     let map (x : 'field t) (func : 'field Cvar.t -> 'g) : 'g limbs_type =
       let l0, l1 = to_limbs x in
@@ -560,7 +579,9 @@ let check_modulus_bignum_bigint (type f)
 let check_modulus (type f) (module Circuit : Snark_intf.Run with type field = f)
     (foreign_field_modulus : f standard_limbs) =
   let foreign_field_modulus =
-    field_standard_limbs_to_bignum_bigint (module Circuit) foreign_field_modulus
+    field_const_standard_limbs_to_bignum_bigint
+      (module Circuit)
+      foreign_field_modulus
   in
 
   check_modulus_bignum_bigint (module Circuit) foreign_field_modulus
@@ -611,7 +632,7 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
     exists (Typ.array ~length:5 Field.typ) ~compute:(fun () ->
         (* Compute bigint version of the inputs *)
         let modulus =
-          field_standard_limbs_to_bignum_bigint
+          field_const_standard_limbs_to_bignum_bigint
             (module Circuit)
             foreign_field_modulus
         in
@@ -1149,7 +1170,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
         , neg_foreign_field_modulus1
         , neg_foreign_field_modulus2 ) ) =
     let foreign_field_modulus =
-      field_standard_limbs_to_bignum_bigint
+      field_const_standard_limbs_to_bignum_bigint
         (module Circuit)
         foreign_field_modulus
     in
@@ -1158,7 +1179,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
       Bignum_bigint.(binary_modulus - foreign_field_modulus)
     in
     ( neg_foreign_field_modulus
-    , bignum_bigint_to_field_standard_limbs
+    , bignum_bigint_to_field_const_standard_limbs
         (module Circuit)
         neg_foreign_field_modulus )
   in
@@ -1194,7 +1215,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
               right_input
           in
           let foreign_field_modulus =
-            field_standard_limbs_to_bignum_bigint
+            field_const_standard_limbs_to_bignum_bigint
               (module Circuit)
               foreign_field_modulus
           in
@@ -1211,10 +1232,12 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
         (* Compute the intermediate products *)
         let products =
           let quotient =
-            bignum_bigint_to_field_standard_limbs (module Circuit) quotient
+            bignum_bigint_to_field_const_standard_limbs
+              (module Circuit)
+              quotient
           in
           let neg_foreign_field_modulus =
-            bignum_bigint_to_field_standard_limbs
+            bignum_bigint_to_field_const_standard_limbs
               (module Circuit)
               neg_foreign_field_modulus
           in
@@ -1232,10 +1255,12 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
         (* Compute the intermediate sums *)
         let sums =
           let quotient =
-            bignum_bigint_to_field_standard_limbs (module Circuit) quotient
+            bignum_bigint_to_field_const_standard_limbs
+              (module Circuit)
+              quotient
           in
           let neg_foreign_field_modulus =
-            bignum_bigint_to_field_standard_limbs
+            bignum_bigint_to_field_const_standard_limbs
               (module Circuit)
               neg_foreign_field_modulus
           in
@@ -1274,13 +1299,15 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
 
         (* Compute the rest of the witness data *)
         let quotient0, quotient1, quotient2 =
-          bignum_bigint_to_field_standard_limbs (module Circuit) quotient
+          bignum_bigint_to_field_const_standard_limbs (module Circuit) quotient
         in
         let remainder0, remainder1, remainder2 =
-          bignum_bigint_to_field_standard_limbs (module Circuit) remainder
+          bignum_bigint_to_field_const_standard_limbs (module Circuit) remainder
         in
         let quotient_bound01, quotient_bound2 =
-          bignum_bigint_to_field_compact_limbs (module Circuit) quotient_bound
+          bignum_bigint_to_field_const_compact_limbs
+            (module Circuit)
+            quotient_bound
         in
 
         [| carry1_lo
@@ -1388,7 +1415,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
               Bignum_bigint.((left_input + right_input) % foreign_field_modulus)
             in
             let foreign_field_modulus =
-              bignum_bigint_to_field_standard_limbs
+              bignum_bigint_to_field_const_standard_limbs
                 (module Runner.Impl)
                 foreign_field_modulus
             in
@@ -1478,7 +1505,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
                 inputs
             in
             let foreign_field_modulus =
-              bignum_bigint_to_field_standard_limbs
+              bignum_bigint_to_field_const_standard_limbs
                 (module Runner.Impl)
                 foreign_field_modulus
             in
@@ -1524,7 +1551,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
               Bignum_bigint.(left_input * right_input % foreign_field_modulus)
             in
             let foreign_field_modulus =
-              bignum_bigint_to_field_standard_limbs
+              bignum_bigint_to_field_const_standard_limbs
                 (module Runner.Impl)
                 foreign_field_modulus
             in
@@ -1584,7 +1611,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
               Bignum_bigint.(left_input * right_input % foreign_field_modulus)
             in
             let foreign_field_modulus =
-              bignum_bigint_to_field_standard_limbs
+              bignum_bigint_to_field_const_standard_limbs
                 (module Runner.Impl)
                 foreign_field_modulus
             in
@@ -1709,7 +1736,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
                 (expected_add - right_input) % foreign_field_modulus)
             in
             let foreign_field_modulus =
-              bignum_bigint_to_field_standard_limbs
+              bignum_bigint_to_field_const_standard_limbs
                 (module Runner.Impl)
                 foreign_field_modulus
             in
