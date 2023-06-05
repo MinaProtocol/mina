@@ -1,6 +1,6 @@
 deployment:
   testnet: "mainnet"
-  name: "production"
+  name: "helm-example"
   image: gcr.io/o1labs-192920/mina-daemon:1.3.1.2-25388a0-bullseye-mainnet
   runtimeConfig:
   customEntrypoint:
@@ -18,31 +18,53 @@ deployment:
 nodes:
   - name: "seed-1"
     class: "seed"
-    role: "production"
+    role: "helm-example"
     replicas: 1
     fullname: "seed-1"
     exposeGraphql: false
     seedFlags: true
     logLevel: Info
     fileLogLevel: Error
-    maxConnections: 200
+    maxConnections: 75
     ports:
       client: "8301"
       graphql: "3085"
-      metrics: "10001"
-      p2p: "10801"
+      metrics: "9100"
+      p2p: "10000"
     archive:
       enabled: false
-      address: production-mainnet-archive:3086
+      address: archive-1:3086
     libp2pKeys:
       enabled: true
     minaKeys:
       enabled: false
       produceBlocks: true
+  - name: "block-producer-1"
+    class: "block-producer"
+    role: "helm-example"
+    replicas: 3
+    fullname: "block-producer-1"
+    seedFlags: false
+    logLevel: Debug
+    fileLogLevel: Error
+    maxConnections: 25
+    ports:
+      client: "8301"
+      graphql: "3085"
+      metrics: "9100"
+      p2p: "10001"
+    archive:
+      enabled: false
+      address: archive-2:3086
+    libp2pKeys:
+      enabled: true
+    minaKeys:
+      enabled: true
+      produceBlocks: true
 
 requests:
-  memory: "80.0Gi"
-  cpu: "24"
+  memory: "20.0Gi"
+  cpu: "8"
 
 healthcheck:
   enabled: true

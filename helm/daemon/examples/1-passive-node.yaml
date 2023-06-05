@@ -1,0 +1,56 @@
+deployment:
+  testnet: "mainnet"
+  name: "helm-example"
+  image: gcr.io/o1labs-192920/mina-daemon:1.3.1.2-25388a0-bullseye-mainnet
+  runtimeConfig:
+  customEntrypoint:
+    enabled: false
+    entrypoint: ""
+  peerListURL: "https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt"
+  seedPeers:
+    - /dns4/seed-1.mainnet.o1test.net/tcp/10000/p2p/12D3KooWCa1d7G3SkRxy846qTvdAFX69NnoYZ32orWVLqJcDVGHW
+    - /dns4/seed-2.mainnet.o1test.net/tcp/10001/p2p/12D3KooWK4NfthViCTyLgVQa1WvqDC1NccVxGruCXCZUt3GqvFvn
+    - /dns4/seed-3.mainnet.o1test.net/tcp/10002/p2p/12D3KooWNofeYVAJXA3WGg2qCDhs3GEe71kTmKpFQXRbZmCz1Vr7
+    - /dns4/seed-4.mainnet.o1test.net/tcp/10003/p2p/12D3KooWEdBiTUQqxp3jeuWaZkwiSNcFxC6d6Tdq7u2Lf2ZD2Q6X
+    - /dns4/seed-5.mainnet.o1test.net/tcp/10004/p2p/12D3KooWL1DJTigSwuKQRfQE3p7puFUqfbHjXbZJ9YBWtMNpr3GU
+    - /dns4/seed-6.mainnet.o1test.net/tcp/10005/p2p/12D3KooWHGx4u32n42ub7dJNxAcAhwiA1WDq1Zsjn3k7RsS11pE8
+
+# The goal of this passive node example is to show that this chart can be used
+#   without any static keys, persistence, or mina keypairs and still conntect to the network
+nodes:
+  - name: "passive-1"
+    class: "passive"
+    role: "helm-example"
+    replicas: 1
+    fullname: "passive-1"
+    seedFlags: false
+    logLevel: Info
+    fileLogLevel: Error
+    maxConnections: 25
+    ports:
+      client: "8301"
+      graphql: "3085"
+      metrics: "9100"
+      p2p: "10002"
+    # This passive example pairs well with the archive node chart to observe blocks on the networtk and archive them
+    archive:
+      enabled: false
+      address: archive-1:3086
+    # With libp2pKeys = false, the node generates a new keypair at random on each startup
+    libp2pKeys:
+      enabled: false
+    minaKeys:
+      enabled: false
+      produceBlocks: false
+
+# for this example we have lower the hardware requirements as passively
+#   listening is a less crucial role so more downtime would be acceptable
+requests:
+  memory: "16.0Gi"
+  cpu: "6"
+
+healthcheck:
+  enabled: true
+  failureThreshold: 60
+  periodSeconds: 5
+  initialDelaySeconds: 30

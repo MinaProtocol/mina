@@ -1,6 +1,6 @@
 deployment:
   testnet: "mainnet"
-  name: "production"
+  name: "helm-example"
   image: gcr.io/o1labs-192920/mina-daemon:1.3.1.2-25388a0-bullseye-mainnet
   runtimeConfig:
   customEntrypoint:
@@ -18,141 +18,71 @@ deployment:
 nodes:
   - name: "seed-1"
     class: "seed"
-    role: "production"
+    # role is the expected use of this node, for us just a helm example
+    # to query for nodes with this role: `kubectl get pods -l role=helm-example`
+    role: "helm-example"
     replicas: 1
     fullname: "seed-1"
     exposeGraphql: false
+    # seedFlags is a boolean that simply controls a set of flags for seed nodes
+    #  specifically --seed and --enable-peer-exchange true
     seedFlags: true
     logLevel: Info
     fileLogLevel: Error
-    maxConnections: 200
+    maxConnections: 75
     ports:
       client: "8301"
       graphql: "3085"
-      metrics: "10001"
-      p2p: "10801"
+      metrics: "9100"
+      p2p: "10000"
+    # the archive section allows configuring an archive node to talk to in the same namespace
+    # archive nodes are not supported by this chart, see helm/archive-node
     archive:
       enabled: false
-      address: production-mainnet-archive:3086
+      address: archive-1:3086
+    # libp2pKeys configures the static libp2p networking keypair so that other nodes can
+    #   consistently find this one on the network. Important for seeds but does not play nice
+    #   yet with "replicas > 1"
     libp2pKeys:
       enabled: true
+    # minaKeys configures a mina keypair, and weather to use it for producing blocks
     minaKeys:
       enabled: false
       produceBlocks: true
-  - name: "seed-2"
-    class: "seed"
-    role: "production"
-    replicas: 1
-    fullname: "seed-2"
-    seedFlags: true
-    logLevel: Info
-    fileLogLevel: Error
-    maxConnections: 200
-    ports:
-      client: "8301"
-      graphql: "3085"
-      metrics: "10001"
-      p2p: "10802"
-    archive:
-      enabled: false
-      address: production-mainnet-archive:3086
-    libp2pKeys:
-      enabled: true
-    minaKeys:
-      enabled: false
-      produceBlocks: true
-  - name: "seed-3"
-    class: "seed"
-    role: "production"
-    replicas: 1
-    fullname: "seed-3"
-    seedFlags: true
-    logLevel: Info
-    fileLogLevel: Error
-    maxConnections: 200
-    ports:
-      client: "8301"
-      graphql: "3085"
-      metrics: "10001"
-      p2p: "10803"
-    archive:
-      enabled: false
-      address: production-mainnet-archive:3086
-    libp2pKeys:
-      enabled: true
-    minaKeys:
-      enabled: false
-      produceBlocks: true
-  - name: "seed-4"
-    class: "seed"
-    role: "extra-logging"
-    replicas: 1
-    fullname: "seed-4"
-    seedFlags: true
+  - name: "block-producer-1"
+    class: "block-producer"
+    # role is the expected use of this node, for us just a helm example
+    # to query for nodes with this role: `kubectl get pods -l role=helm-example`
+    role: "helm-example"
+    replicas: 3
+    fullname: "block-producer-1"
+    seedFlags: false
     logLevel: Debug
-    fileLogLevel: Debug
-    maxConnections: 100
-    ports:
-      client: "8301"
-      graphql: "3085"
-      metrics: "10001"
-      p2p: "10804"
-    archive:
-      enabled: false
-      address: backup-mainnet-archive:3086
-    libp2pKeys:
-      enabled: true
-    minaKeys:
-      enabled: false
-      produceBlocks: true
-  - name: "seed-5"
-    class: "seed"
-    role: "backup"
-    replicas: 1
-    fullname: "seed-5"
-    seedFlags: true
-    logLevel: Info
     fileLogLevel: Error
-    maxConnections: 100
+    maxConnections: 25
     ports:
       client: "8301"
       graphql: "3085"
-      metrics: "10001"
-      p2p: "10805"
+      metrics: "9100"
+      p2p: "10001"
+    # the archive section allows configuring an archive node to talk to in the same namespace
+    # archive nodes are not supported by this chart, see helm/archive-node
     archive:
       enabled: false
-      address: backup-mainnet-archive:3086
+      address: archive-2:3086
+    # libp2pKeys configures the static libp2p networking keypair so that other nodes can
+    #   consistently find this one on the network. Important for seeds but does not play nice
+    #   yet with "replicas > 1"
     libp2pKeys:
-      enabled: true
+      enabled: false
+    # minaKeys configures a mina keypair, and weather to use it for producing blocks
     minaKeys:
-      enabled: false
-      produceBlocks: true
-  - name: "seed-6"
-    class: "seed"
-    role: "backup"
-    replicas: 1
-    fullname: "seed-6"
-    seedFlags: true
-    logLevel: Info
-    fileLogLevel: Error
-    maxConnections: 100
-    ports:
-      client: "8301"
-      graphql: "3085"
-      metrics: "10001"
-      p2p: "10806"
-    archive:
-      enabled: false
-      address: backup-mainnet-archive:3086
-    libp2pKeys:
       enabled: true
-    minaKeys:
-      enabled: false
       produceBlocks: true
 
 requests:
-  memory: "80.0Gi"
-  cpu: "24"
+  memory: "20.0Gi"
+  cpu: "8"
 
 healthcheck:
   enabled: true
