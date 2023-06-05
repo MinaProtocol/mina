@@ -22,7 +22,7 @@ let%test_module "transaction logic consistency" =
 
     let block_data = precomputed_values.protocol_state_with_hash.data
 
-    let current_slot = Global_slot.of_int 15
+    let current_slot = Global_slot_since_genesis.of_int 15
 
     let block_data =
       (* Tweak block data to have current slot. *)
@@ -188,8 +188,8 @@ let%test_module "transaction logic consistency" =
               ~initial_minimum_balance:
                 ( Balance.sub_amount balance moveable_amount
                 |> Option.value ~default:Balance.zero )
-              ~cliff_time:(Global_slot.of_int cliff_time)
-              ~vesting_period:(Global_slot.of_int vesting_period)
+              ~cliff_time:(Global_slot_since_genesis.of_int cliff_time)
+              ~vesting_period:(Global_slot_since_genesis.of_int vesting_period)
               ~cliff_amount ~vesting_increment
           |> Or_error.ok_exn )
       in
@@ -217,7 +217,7 @@ let%test_module "transaction logic consistency" =
           Account_nonce.gen_incl (Account_nonce.of_int 0)
             (Account_nonce.of_int 3)
         in
-        let%bind valid_until = Global_slot.gen in
+        let%bind valid_until = Global_slot_since_genesis.gen in
         let%bind memo_length =
           Int.gen_incl 0 Signed_command_memo.max_digestible_string_length
         in

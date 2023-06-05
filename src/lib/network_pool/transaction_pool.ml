@@ -475,9 +475,11 @@ struct
       | Expired
           ( `Valid_until valid_until
           , `Global_slot_since_genesis global_slot_since_genesis ) ->
-          [ ("valid_until", Mina_numbers.Global_slot.to_yojson valid_until)
+          [ ( "valid_until"
+            , Mina_numbers.Global_slot_since_genesis.to_yojson valid_until )
           ; ( "current_global_slot"
-            , Mina_numbers.Global_slot.to_yojson global_slot_since_genesis )
+            , Mina_numbers.Global_slot_since_genesis.to_yojson
+                global_slot_since_genesis )
           ]
 
     let indexed_pool_error_log_info e =
@@ -1038,55 +1040,47 @@ struct
             ~error:"Recently seen"
         in
         let%bind () =
-          let cmds_with_insufficient_fees =
-            List.filter
-              (Envelope.Incoming.data diff)
-              ~f:User_command.has_insufficient_fee
-          in
-          List.iter cmds_with_insufficient_fees ~f:(fun cmd ->
-              [%log' debug t.logger]
-                "User command $cmd from $sender has insufficient fee."
-                ~metadata:
-                  [ ("cmd", User_command.to_yojson cmd)
-                  ; ( "sender"
-                    , Envelope.(Sender.to_yojson (Incoming.sender diff)) )
-                  ] ) ;
-          let too_big_cmds =
-            List.filter (Envelope.Incoming.data diff) ~f:(fun cmd ->
-                let size_validity =
-                  User_command.valid_size
-                    ~genesis_constants:t.config.genesis_constants cmd
-                in
-                match size_validity with
+          let well_formedness_errors =
+            List.fold (Envelope.Incoming.data diff) ~init:[]
+              ~f:(fun acc user_cmd ->
+                match
+                  User_command.check_well_formedness
+                    ~genesis_constants:t.config.genesis_constants user_cmd
+                with
                 | Ok () ->
-                    false
-                | Error err ->
-                    [%log' debug t.logger] "User command is too big"
+                    acc
+                | Error errs ->
+                    [%log' debug t.logger]
+                      "User command $cmd from $sender has one or more \
+                       well-formedness errors."
                       ~metadata:
-                        [ ("cmd", User_command.to_yojson cmd)
+                        [ ("cmd", User_command.to_yojson user_cmd)
                         ; ( "sender"
                           , Envelope.(Sender.to_yojson (Incoming.sender diff))
                           )
-                        ; ("size_violation", Error_json.error_to_yojson err)
+                        ; ( "errors"
+                          , `List
+                              (List.map errs
+                                 ~f:User_command.Well_formedness_error.to_yojson )
+                          )
                         ] ;
-                    true )
+                    errs @ acc )
           in
-          let sufficient_fees = List.is_empty cmds_with_insufficient_fees in
-          let valid_sizes = List.is_empty too_big_cmds in
-          match (sufficient_fees, valid_sizes) with
-          | true, true ->
+          match
+            List.dedup_and_sort well_formedness_errors
+              ~compare:User_command.Well_formedness_error.compare
+          with
+          | [] ->
               Deferred.Or_error.return ()
-          | false, true ->
+          | errs ->
+              let err_str =
+                List.map errs ~f:User_command.Well_formedness_error.to_string
+                |> String.concat ~sep:","
+              in
               Deferred.Or_error.fail
-              @@ Error.of_string "Some commands have an insufficient fee"
-          | true, false ->
-              Deferred.Or_error.fail
-              @@ Error.of_string "Some commands are too big"
-          | false, false ->
-              Deferred.Or_error.fail
-              @@ Error.of_string
-                   "Some commands have an insufficient fee, and some are too \
-                    big"
+              @@ Error.createf
+                   "Some commands have one or more well-formedness errors: %s "
+                   err_str
         in
         (* TODO: batch `to_verifiable` (#11705) *)
         let%bind ledger =
@@ -1575,7 +1569,7 @@ let%test_module _ =
         compile_time_genesis.data |> Mina_state.Protocol_state.body
       in
       { (Mina_state.Protocol_state.Body.view state_body) with
-        global_slot_since_genesis = Mina_numbers.Global_slot.zero
+        global_slot_since_genesis = Mina_numbers.Global_slot_since_genesis.zero
       }
 
     module Mock_transition_frontier = struct
@@ -2084,7 +2078,8 @@ let%test_module _ =
               let applied =
                 Or_error.ok_exn
                 @@ Mina_ledger.Ledger.apply_user_command ~constraint_constants
-                     ~txn_global_slot:Mina_numbers.Global_slot.zero ledger valid
+                     ~txn_global_slot:
+                       Mina_numbers.Global_slot_since_genesis.zero ledger valid
               in
               match applied.body with
               | Failed ->
@@ -2219,9 +2214,12 @@ let%test_module _ =
 
     let current_global_slot () =
       let current_time = Block_time.now time_controller in
+      (* for testing, consider this slot to be a since-genesis slot *)
       Consensus.Data.Consensus_time.(
         of_time_exn ~constants:consensus_constants current_time
         |> to_global_slot)
+      |> Mina_numbers.Global_slot_since_hard_fork.to_uint32
+      |> Mina_numbers.Global_slot_since_genesis.of_uint32
 
     let mk_now_invalid_test t _cmds ~mk_command =
       let cmd1 =
@@ -2267,9 +2265,9 @@ let%test_module _ =
         at (Block_time.to_time_exn slot_end)
       in
       let curr_slot = current_global_slot () in
-      let slot_padding = Mina_numbers.Global_slot.of_int padding in
+      let slot_padding = Mina_numbers.Global_slot_span.of_int padding in
       let curr_slot_plus_padding =
-        Mina_numbers.Global_slot.add curr_slot slot_padding
+        Mina_numbers.Global_slot_since_genesis.add curr_slot slot_padding
       in
       let valid_command =
         mk_payment ~valid_until:curr_slot_plus_padding ~sender_idx:1
@@ -2317,10 +2315,12 @@ let%test_module _ =
           assert_pool_txs t [] ;
           let curr_slot = current_global_slot () in
           let curr_slot_plus_three =
-            Mina_numbers.Global_slot.(add curr_slot (of_int 3))
+            Mina_numbers.Global_slot_since_genesis.add curr_slot
+              (Mina_numbers.Global_slot_span.of_int 3)
           in
           let curr_slot_plus_seven =
-            Mina_numbers.Global_slot.(add curr_slot (of_int 7))
+            Mina_numbers.Global_slot_since_genesis.add curr_slot
+              (Mina_numbers.Global_slot_span.of_int 7)
           in
           let few_now =
             List.take independent_cmds (List.length independent_cmds / 2)
@@ -2395,10 +2395,12 @@ let%test_module _ =
           assert_pool_txs t [] ;
           let curr_slot = current_global_slot () in
           let curr_slot_plus_three =
-            Mina_numbers.Global_slot.(add curr_slot (of_int 3))
+            Mina_numbers.Global_slot_since_genesis.add curr_slot
+              (Mina_numbers.Global_slot_span.of_int 3)
           in
           let curr_slot_plus_seven =
-            Mina_numbers.Global_slot.(add curr_slot (of_int 7))
+            Mina_numbers.Global_slot_since_genesis.add curr_slot
+              (Mina_numbers.Global_slot_span.of_int 7)
           in
           let few_now =
             List.take independent_cmds (List.length independent_cmds / 2)

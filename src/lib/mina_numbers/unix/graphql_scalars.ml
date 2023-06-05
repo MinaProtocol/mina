@@ -2,13 +2,33 @@ open Graphql_basic_scalars.Utils
 open Graphql_basic_scalars.Testing
 
 module Make (Schema : Schema) = struct
-  module GlobalSlot =
+  module GlobalSlotSinceGenesis =
     Make_scalar_using_to_string
-      (Mina_numbers.Global_slot)
+      (Mina_numbers.Global_slot_since_genesis)
       (struct
         let name = "Globalslot"
 
-        let doc = "globalslot"
+        let doc = "global slot"
+      end)
+      (Schema)
+
+  module GlobalSlotSinceHardFork =
+    Make_scalar_using_to_string
+      (Mina_numbers.Global_slot_since_hard_fork)
+      (struct
+        let name = "GlobalSlotSinceHardFork"
+
+        let doc = "global slot since hard fork"
+      end)
+      (Schema)
+
+  module GlobalSlotSpan =
+    Make_scalar_using_to_string
+      (Mina_numbers.Global_slot_span)
+      (struct
+        let name = "GlobalSlotSpan"
+
+        let doc = "global slot span"
       end)
       (Schema)
 
@@ -39,8 +59,18 @@ let%test_module "Roundtrip tests" =
   ( module struct
     include Make (Test_schema)
 
-    let%test_module "GlobalSlot" =
-      (module Make_test (GlobalSlot) (Mina_numbers.Global_slot))
+    let%test_module "GlobalSlotSinceGenesis" =
+      ( module Make_test
+                 (GlobalSlotSinceGenesis)
+                 (Mina_numbers.Global_slot_since_genesis) )
+
+    let%test_module "GlobalSlotSinceHardFork" =
+      ( module Make_test
+                 (GlobalSlotSinceHardFork)
+                 (Mina_numbers.Global_slot_since_hard_fork) )
+
+    let%test_module "GlobalSlotSpan" =
+      (module Make_test (GlobalSlotSpan) (Mina_numbers.Global_slot_span))
 
     let%test_module "AccountNonce" =
       (module Make_test (AccountNonce) (Mina_numbers.Account_nonce))

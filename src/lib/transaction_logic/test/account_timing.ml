@@ -11,7 +11,7 @@ let init_min_bal a =
   Option.value ~default:Balance.zero @@ Account.initial_minimum_balance a
 
 let cliff_time a =
-  Option.value ~default:Global_slot.zero @@ Account.cliff_time a
+  Option.value ~default:Global_slot_since_genesis.zero @@ Account.cliff_time a
 
 (* These tests verify basic invariants of timed accounts' behaviour.
    This is done very simply by exercising the function which determines
@@ -27,7 +27,7 @@ let%test_module "Test account timing." =
         let%bind amount =
           Amount.(gen_incl zero (Balance.to_amount account.balance))
         in
-        let%map slot = Global_slot.gen in
+        let%map slot = Global_slot_since_genesis.gen in
         (account, amount, slot))
         ~f:(fun (account, txn_amount, txn_global_slot) ->
           [%test_eq: txn_result] (Ok Account.Timing.Poly.Untimed)
@@ -46,14 +46,15 @@ let%test_module "Test account timing." =
           |> Option.value ~default:Amount.max_int
         in
         let%bind amount = Amount.gen_incl min_amount Amount.max_int in
-        let%map slot = Global_slot.gen in
+        let%map slot = Global_slot_since_genesis.gen in
         (account, amount, slot))
         ~f:(fun (account, txn_amount, txn_global_slot) ->
           [%test_eq: txn_result]
             ( Or_error.errorf
                 !"For timed account, the requested transaction for amount \
-                  %{sexp: Amount.t} at global slot %{sexp: Global_slot.t}, the \
-                  balance %{sexp: Balance.t} is insufficient"
+                  %{sexp: Amount.t} at global slot %{sexp: \
+                  Global_slot_since_genesis.t}, the balance %{sexp: Balance.t} \
+                  is insufficient"
                 txn_amount txn_global_slot account.balance
             |> Result.map_error ~f:(Error.tag ~tag:nsf_tag) )
             (validate_timing ~account ~txn_amount ~txn_global_slot) )
@@ -68,8 +69,10 @@ let%test_module "Test account timing." =
           |> Option.value_map ~default:Amount.zero ~f:to_amount
         in
         let%bind amount = Amount.(gen_incl zero max_amount) in
-        let max_slot = Global_slot.(of_int (to_int (cliff_time account) - 1)) in
-        let%map slot = Global_slot.(gen_incl zero max_slot) in
+        let max_slot =
+          Global_slot_since_genesis.(of_int (to_int (cliff_time account) - 1))
+        in
+        let%map slot = Global_slot_since_genesis.(gen_incl zero max_slot) in
         (account, amount, slot))
         ~f:(fun (account, txn_amount, txn_global_slot) ->
           [%test_eq: txn_result]
@@ -87,11 +90,13 @@ let%test_module "Test account timing." =
         in
         let%bind amount = Amount.(gen_incl zero available_amount) in
         let final_slot =
-          Global_slot.(
-            sub (Account.timing_final_vesting_slot account.timing) (of_int 1))
-          |> Option.value ~default:Global_slot.zero
+          Global_slot_since_genesis.(
+            sub
+              (Account.timing_final_vesting_slot account.timing)
+              (Global_slot_span.of_int 1))
+          |> Option.value ~default:Global_slot_since_genesis.zero
         in
-        let%map slot = Global_slot.(gen_incl zero final_slot) in
+        let%map slot = Global_slot_since_genesis.(gen_incl zero final_slot) in
         (account, amount, slot))
         ~f:(fun (account, txn_amount, txn_global_slot) ->
           [%test_eq: txn_result] (Ok account.timing)
@@ -105,7 +110,9 @@ let%test_module "Test account timing." =
           Amount.(gen_incl zero (Balance.to_amount account.balance))
         in
         let final_slot = Account.timing_final_vesting_slot account.timing in
-        let%map slot = Global_slot.(gen_incl final_slot max_value) in
+        let%map slot =
+          Global_slot_since_genesis.(gen_incl final_slot max_value)
+        in
         (account, amount, slot))
         ~f:(fun (account, txn_amount, txn_global_slot) ->
           [%test_eq: txn_result]
@@ -127,7 +134,7 @@ let%test_module "Test account timing." =
           Amount.(gen_incl available_amount (Balance.to_amount account.balance))
         in
         let%map slot =
-          Global_slot.(
+          Global_slot_since_genesis.(
             gen_incl zero (of_int @@ (to_int (cliff_time account) - 1)))
         in
         (account, amount, slot))
@@ -135,9 +142,10 @@ let%test_module "Test account timing." =
           [%test_eq: txn_result]
             ( Or_error.errorf
                 !"For timed account, the requested transaction for amount \
-                  %{sexp: Amount.t} at global slot %{sexp: Global_slot.t}, \
-                  applying the transaction would put the balance below the \
-                  calculated minimum balance of %{sexp: Balance.t}"
+                  %{sexp: Amount.t} at global slot %{sexp: \
+                  Global_slot_since_genesis.t}, applying the transaction would \
+                  put the balance below the calculated minimum balance of \
+                  %{sexp: Balance.t}"
                 txn_amount txn_global_slot (init_min_bal account)
             |> Or_error.tag ~tag:min_balance_tag )
             (validate_timing ~account ~txn_amount ~txn_global_slot) )

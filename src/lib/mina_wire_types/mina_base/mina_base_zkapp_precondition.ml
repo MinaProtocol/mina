@@ -43,7 +43,7 @@ module Protocol_state = struct
     type t =
       ( Mina_base_ledger_hash.V1.t Mina_base_zkapp_basic.Or_ignore.V1.t
       , Mina_numbers.Length.V1.t Numeric.V1.t
-      , Mina_numbers.Global_slot.V1.t Numeric.V1.t
+      , Mina_numbers.Global_slot_since_genesis.V1.t Numeric.V1.t
       , Currency.Amount.V1.t Numeric.V1.t
       , Epoch_data.V1.t )
       Poly.V1.t
@@ -52,7 +52,7 @@ end
 
 module Valid_while = struct
   module V1 = struct
-    type t = Mina_numbers.Global_slot.V1.t Numeric.V1.t
+    type t = Mina_numbers.Global_slot_since_genesis.V1.t Numeric.V1.t
   end
 end
 
