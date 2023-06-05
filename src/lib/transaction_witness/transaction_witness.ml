@@ -40,7 +40,7 @@ module Zkapp_command_segment_witness = struct
             list
         ; state_body : Mina_state.Protocol_state.Body.Value.Stable.V2.t
         ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
-        ; block_global_slot : Mina_numbers.Global_slot.Stable.V1.t
+        ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         }
       [@@deriving sexp, yojson]
 
@@ -59,7 +59,7 @@ module Stable = struct
       ; protocol_state_body : Mina_state.Protocol_state.Body.Value.Stable.V2.t
       ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
       ; status : Mina_base.Transaction_status.Stable.V2.t
-      ; block_global_slot : Mina_numbers.Global_slot.Stable.V1.t
+      ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
       }
     [@@deriving sexp, yojson]
 

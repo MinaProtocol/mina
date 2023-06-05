@@ -50,7 +50,9 @@ let%test_module "Valid_while precondition tests" =
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
-                  let global_slot = Mina_numbers.Global_slot.of_int 5 in
+                  let global_slot =
+                    Mina_numbers.Global_slot_since_genesis.of_int 5
+                  in
                   Mina_transaction_logic.For_tests.Init_ledger.init
                     (module Mina_ledger.Ledger.Ledger_inner)
                     init_ledger ledger ;
@@ -72,7 +74,9 @@ let%test_module "Valid_while precondition tests" =
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
-                  let global_slot = Mina_numbers.Global_slot.of_int 5 in
+                  let global_slot =
+                    Mina_numbers.Global_slot_since_genesis.of_int 5
+                  in
                   Mina_transaction_logic.For_tests.Init_ledger.init
                     (module Mina_ledger.Ledger.Ledger_inner)
                     init_ledger ledger ;
@@ -89,8 +93,8 @@ let%test_module "Valid_while precondition tests" =
                   U.check_zkapp_command_with_merges_exn
                     ~expected_failure:
                       (Valid_while_precondition_unsatisfied, U.Pass_2)
-                    ~global_slot:Mina_numbers.Global_slot.zero ledger
-                    [ zkapp_command ] ) ) )
+                    ~global_slot:Mina_numbers.Global_slot_since_genesis.zero
+                    ledger [ zkapp_command ] ) ) )
   end )
 
 let%test_module "Protocol state precondition tests" =
@@ -237,7 +241,8 @@ let%test_module "Protocol state precondition tests" =
                   let amount = Amount.of_mina_int_exn 10 in
                   let spec = List.hd_exn specs in
                   let new_slot =
-                    Mina_numbers.Global_slot.succ psv.global_slot_since_genesis
+                    Mina_numbers.Global_slot_since_genesis.succ
+                      psv.global_slot_since_genesis
                   in
                   let invalid_network_precondition =
                     { network_precondition with
