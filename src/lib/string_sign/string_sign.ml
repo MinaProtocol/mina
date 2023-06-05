@@ -107,7 +107,8 @@ let%test_module "Sign_string tests" =
       let open Mina_signature_kind in
       let s = "Some pills make you larger" in
       let signature = sign ~signature_kind:Testnet keypair.private_key s in
-      (not (verify ~signature_kind:Mainnet signature keypair.public_key s))
+      verify ~signature_kind:Testnet signature keypair.public_key s
+      && (not (verify ~signature_kind:Mainnet signature keypair.public_key s))
       && not
            (verify ~signature_kind:(Other_network "Foo") signature
               keypair.public_key s )
@@ -116,7 +117,8 @@ let%test_module "Sign_string tests" =
       let open Mina_signature_kind in
       let s = "Watson, come here, I need you" in
       let signature = sign ~signature_kind:Mainnet keypair.private_key s in
-      (not (verify ~signature_kind:Testnet signature keypair.public_key s))
+      verify ~signature_kind:Mainnet signature keypair.public_key s
+      && (not (verify ~signature_kind:Testnet signature keypair.public_key s))
       && not
            (verify ~signature_kind:(Other_network "Foo") signature
               keypair.public_key s )
@@ -128,7 +130,9 @@ let%test_module "Sign_string tests" =
       let signature =
         sign ~signature_kind:(Other_network "Foo") keypair.private_key s
       in
-      (not (verify ~signature_kind:Mainnet signature keypair.public_key s))
+      verify ~signature_kind:(Other_network "Foo") signature keypair.public_key
+        s
+      && (not (verify ~signature_kind:Mainnet signature keypair.public_key s))
       && (not (verify ~signature_kind:Testnet signature keypair.public_key s))
       && not
            (verify ~signature_kind:(Other_network "Bar") signature
