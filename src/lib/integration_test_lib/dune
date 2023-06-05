@@ -3,7 +3,10 @@
  (name integration_test_lib)
  (inline_tests)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_base ppx_fields_conv ppx_mina ppx_version ppx_optcomp ppx_let ppx_inline_test ppx_custom_printf ppx_deriving.std ppx_sexp_conv ppx_compare ppx_assert lens.ppx_deriving ppx_pipebang))
+ (preprocessor_deps ../../graphql-ppx-config.inc ../../../graphql_schema.json)
+ (preprocess (pps ppx_base ppx_fields_conv ppx_mina ppx_version ppx_let ppx_inline_test ppx_custom_printf ppx_deriving.std ppx_sexp_conv ppx_compare ppx_assert lens.ppx_deriving ppx_pipebang
+              graphql_ppx -- %{read-lines:../../graphql-ppx-config.inc}) 
+ )
  (libraries
    ;; opam libraries
    result
@@ -15,6 +18,7 @@
    async
    core
    lens
+   uri
    core_kernel
    async_kernel
    ppx_inline_test.config
@@ -22,6 +26,7 @@
    stdio
    extlib
    sexp_diff_kernel
+   re2
    ;; local libraries
    key_gen
    visualization
@@ -35,6 +40,7 @@
    mina_runtime_config
    mina_base
    mina_lib
+   graphql_lib
    genesis_constants
    transition_router
    signature_lib
@@ -48,4 +54,8 @@
    integers
    transition_handler
    snark_worker
+   generated_graphql_queries
+   mina_graphql
+   with_hash
+   pickles
 ))

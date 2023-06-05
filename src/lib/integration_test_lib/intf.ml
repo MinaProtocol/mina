@@ -4,17 +4,6 @@ open Mina_base
 open Pipe_lib
 open Mina_transaction
 
-type metrics_t =
-  { block_production_delay : int list
-  ; transaction_pool_diff_received : int
-  ; transaction_pool_diff_broadcasted : int
-  ; transactions_added_to_pool : int
-  ; transaction_pool_size : int
-  }
-
-type best_chain_block =
-  { state_hash : string; command_transaction_count : int; creator_pk : string }
-
 (* TODO: malleable error -> or error *)
 
 module Engine = struct
@@ -49,13 +38,20 @@ module Engine = struct
 
       val stop : t -> unit Malleable_error.t
 
-      type signed_command_result =
-        { id : string
-        ; hash : Transaction_hash.t
-        ; nonce : Mina_numbers.Account_nonce.t
-        }
+      val dump_archive_data :
+        logger:Logger.t -> t -> data_file:string -> unit Malleable_error.t
 
-      val graphql_uri : t -> string
+      val run_replayer : logger:Logger.t -> t -> string Malleable_error.t
+
+      val dump_mina_logs :
+        logger:Logger.t -> t -> log_file:string -> unit Malleable_error.t
+
+      val dump_precomputed_blocks :
+        logger:Logger.t -> t -> unit Malleable_error.t
+
+      val graphql_uri : t -> Uri.t
+
+      val graphql_client : logger:Logger.t -> t -> Test_graphql.t
 
       val send_payment :
            logger:Logger.t
@@ -64,7 +60,7 @@ module Engine = struct
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
         -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t
-        -> signed_command_result Deferred.Or_error.t
+        -> Test_graphql.signed_command_result Deferred.Or_error.t
 
       val must_send_payment :
            logger:Logger.t
@@ -73,7 +69,7 @@ module Engine = struct
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
         -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t
-        -> signed_command_result Malleable_error.t
+        -> Test_graphql.signed_command_result Malleable_error.t
 
       val send_payment_with_raw_sig :
            logger:Logger.t
@@ -86,7 +82,7 @@ module Engine = struct
         -> memo:string
         -> valid_until:Mina_numbers.Global_slot.t
         -> raw_signature:string
-        -> signed_command_result Deferred.Or_error.t
+        -> Test_graphql.signed_command_result Deferred.Or_error.t
 
       val must_send_payment_with_raw_sig :
            logger:Logger.t
@@ -99,7 +95,7 @@ module Engine = struct
         -> memo:string
         -> valid_until:Mina_numbers.Global_slot.t
         -> raw_signature:string
-        -> signed_command_result Malleable_error.t
+        -> Test_graphql.signed_command_result Malleable_error.t
 
       val send_delegation :
            logger:Logger.t
@@ -107,7 +103,7 @@ module Engine = struct
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
         -> fee:Currency.Fee.t
-        -> signed_command_result Deferred.Or_error.t
+        -> Test_graphql.signed_command_result Deferred.Or_error.t
 
       val must_send_delegation :
            logger:Logger.t
@@ -115,7 +111,7 @@ module Engine = struct
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
         -> fee:Currency.Fee.t
-        -> signed_command_result Malleable_error.t
+        -> Test_graphql.signed_command_result Malleable_error.t
 
       val set_snark_worker :
            logger:Logger.t
@@ -148,24 +144,20 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> unit Malleable_error.t
 
-      type account_data =
-        { nonce : Mina_numbers.Account_nonce.t
-        ; total_balance : Currency.Balance.t
-        ; liquid_balance_opt : Currency.Balance.t option
-        ; locked_balance_opt : Currency.Balance.t option
-        }
+      val get_metrics :
+        logger:Logger.t -> t -> Test_graphql.metrics_t Deferred.Or_error.t
 
       val get_account_data :
            logger:Logger.t
         -> t
         -> account_id:Mina_base.Account_id.t
-        -> account_data Deferred.Or_error.t
+        -> Test_graphql.account_data Deferred.Or_error.t
 
       val must_get_account_data :
            logger:Logger.t
         -> t
         -> account_id:Mina_base.Account_id.t
-        -> account_data Malleable_error.t
+        -> Test_graphql.account_data Malleable_error.t
 
       val get_account_permissions :
            logger:Logger.t
@@ -198,26 +190,13 @@ module Engine = struct
            ?max_length:int
         -> logger:Logger.t
         -> t
-        -> best_chain_block list Deferred.Or_error.t
+        -> Test_graphql.best_chain_block list Deferred.Or_error.t
 
       val must_get_best_chain :
            ?max_length:int
         -> logger:Logger.t
         -> t
-        -> best_chain_block list Malleable_error.t
-
-      val dump_archive_data :
-        logger:Logger.t -> t -> data_file:string -> unit Malleable_error.t
-
-      val run_replayer : logger:Logger.t -> t -> string Malleable_error.t
-
-      val dump_mina_logs :
-        logger:Logger.t -> t -> log_file:string -> unit Malleable_error.t
-
-      val dump_precomputed_blocks :
-        logger:Logger.t -> t -> unit Malleable_error.t
-
-      val get_metrics : logger:Logger.t -> t -> metrics_t Deferred.Or_error.t
+        -> Test_graphql.best_chain_block list Malleable_error.t
     end
 
     type t
