@@ -93,7 +93,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Currency.Amount.of_fee constraint_constants.account_creation_fee
     in
     let memo = "" in
-    let valid_until = Mina_numbers.Global_slot.max_value in
+    let valid_until = Mina_numbers.Global_slot_since_genesis.max_value in
     let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
     let payload =
       let common =
@@ -726,7 +726,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "Send a zkapp with an insufficient fee"
         (send_invalid_zkapp ~logger node zkapp_command_insufficient_fee
-           "Some commands have an insufficient fee" )
+           "Insufficient fee" )
     in
     (* Won't be accepted until the previous transactions are applied *)
     let%bind () =

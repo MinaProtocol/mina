@@ -7,7 +7,7 @@ let print_heap_usage name v =
   let repr = Obj.repr v in
   (* reachable_words may be 0, so it doesn't include size *)
   let words = Obj.size repr + Obj.reachable_words repr in
-  Format.printf "Data of type %-36s uses %6d heap words = %8d bytes@." name
+  Format.printf "Data of type %-46s uses %6d heap words = %8d bytes@." name
     words (words * Sys.word_size)
 
 let main () =

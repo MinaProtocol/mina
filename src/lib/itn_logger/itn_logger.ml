@@ -105,6 +105,16 @@ let dispatch_remote_log log =
           eprintf "Exception when sending internal log via RPC: %s"
             (Exn.to_string_mach exn) )
 
+(* Used to ensure that no more than one log message is in-flight at
+   a time to guarantee sequential processing. *)
+let sequential_dispatcher_loop () =
+  let open Async in
+  let pipe_r, pipe_w = Pipe.create () in
+  don't_wait_for (Pipe.iter pipe_r ~f:dispatch_remote_log) ;
+  pipe_w
+
+let sequential_log_writer_pipe = sequential_dispatcher_loop ()
+
 (* this function can be called:
    (1) by the logging process (daemon, verifier, or prover) from the logger in Logger, or
    (2) by the daemon when it receives a log via RPC from the verifier or prover
@@ -123,7 +133,7 @@ let log ?process ~timestamp ~message ~metadata () =
         List.map metadata ~f:(fun (s, json) -> (s, Yojson.Safe.to_string json))
       in
       let remote_log = { timestamp; message; metadata; process } in
-      Async.don't_wait_for (dispatch_remote_log remote_log)
+      Async.Pipe.write_without_pushback sequential_log_writer_pipe remote_log
   | None ->
       (* daemon *)
       (* convert JSON to Basic.t in queue, so we don't have to in GraphQL response *)
@@ -155,3 +165,22 @@ let flush_queue end_log_counter =
   Queue.filter_inplace log_queue ~f:(fun t -> t.sequence_no > end_log_counter) ;
   let len' = Queue.length log_queue in
   len - len'
+
+(* Post-processing hook *)
+
+type message_postprocessor =
+     timestamp:Time.t
+  -> message:string
+  -> metadata:(string * Yojson.Safe.t) list
+  -> (Time.t * string * (string * Yojson.Safe.t) list) list
+
+let set_message_postprocessor, postprocess_message =
+  let message_postprocessor : message_postprocessor ref =
+    ref (fun ~timestamp ~message ~metadata ->
+        [ (timestamp, message, metadata) ] )
+  in
+  let set f = message_postprocessor := f in
+  let call ~timestamp ~message ~metadata =
+    !message_postprocessor ~timestamp ~message ~metadata
+  in
+  (set, call)

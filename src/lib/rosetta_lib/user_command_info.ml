@@ -180,7 +180,8 @@ module Partial = struct
       ~fee:(Fee_currency.of_uint64 t.fee)
       ~fee_payer_pk ~nonce ~body ~memo
       ~valid_until:
-        (Option.map ~f:Mina_numbers.Global_slot.of_uint32 t.valid_until)
+        (Option.map ~f:Mina_numbers.Global_slot_since_genesis.of_uint32
+           t.valid_until )
 end
 
 let forget (t : t) : Partial.t =
