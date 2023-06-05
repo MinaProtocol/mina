@@ -45,7 +45,7 @@ For these reasons, we’ve replaced RocksDB with _Database_, a custom-built Rust
 
 The database is a single append-only file, where each entry (key-value) are preceded by a header. Each entry in the Database has the following structure:
 
-![image](https://github.com/openmina/mina/assets/60480123/1295ac9f-d182-4933-ab7c-b1b81333f6b0)
+![image](https://github.com/openmina/mina/assets/60480123/1d747927-5e6f-4c81-9a31-dc7371f9ae28)
 
 
 We are using compression on both keys and values with the library `zstd`. This provides the following advantages:
@@ -73,7 +73,3 @@ Use the instructions from the readme to build Mina with the new storage:
 [mina/README.md at ledger-ondisk · openmina/mina ](https://github.com/openmina/mina/blob/ledger-ondisk/src/lib/keyvaluedb_rust/README.md "https://github.com/openmina/mina/blob/ledger-ondisk/src/lib/keyvaluedb_rust/README.md")[](https://github.com/openmina/mina/blob/ledger-ondisk/src/lib/keyvaluedb_rust/README.md)
 
   
-
-The development of the new Database storage module is the first step to improving the Mina ledger, and by removing the hard dependency on RocksDB, it brings us one step closer to developing storage support for the Mina [web node](https://openmina.com/web-node).
-
-We thank you for taking the time to read this article. If you have any comments, suggestions or questions, feel free to contact me directly by email. To read more about OpenMina and the Mina Web Node, subscribe to our [Medium](https://medium.com/openmina) or visit our [GitHub](https://github.com/openmina/openmina).
