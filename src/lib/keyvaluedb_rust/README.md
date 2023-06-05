@@ -32,7 +32,50 @@ The design of the Rust-based storage is based on information by performance-rela
 This employs techniques such as removing wasteful copying, delaying the application of actions until commit, optimizing space usage, and more. 
 
 
-# How to build Mina with the new storage implementation
+# How to run Mina with the new storage implementation and Docker
+
+These instructions for connecting to berkeleynet.
+
+Add this to a `.mina-env` file:
+
+```bash
+export MINA_PRIVKEY_PASS=""
+export MINA_LIBP2P_PASS=""
+PEER_LIST_URL=https://storage.googleapis.com/seed-lists/berkeley_seeds.txt
+```
+
+Create the `.mina-config` and `keys` directories:
+
+```bash
+mkdir .mina-config
+mkdir keys
+chmod 700 keys
+```
+
+Produce a libp2p keypair:
+
+```bash
+docker run -it --rm \
+  --mount "type=bind,source=$(pwd)/keys,dst=/keys" \
+  openmina/mina:rust-ondiskdb \
+  libp2p generate-keypair --privkey-path /keys/p2pkey
+```
+
+And finally launch the daemon:
+
+```bash
+docker run --name mina -d \
+  -p 8302:8302 --restart=always \
+  --mount "type=bind,source=$(pwd)/.mina-env,dst=/entrypoint.d/mina-env,readonly" \
+  --mount "type=bind,source=$(pwd)/keys,dst=/keys,readonly" \
+  --mount "type=bind,source=$(pwd)/.mina-config,dst=/root/.mina-config" \
+  openmina/mina:rust-ondiskdb \
+  daemon --libp2p-keypair /keys/p2pkey --config-file /var/lib/coda/berkeley.json
+```
+
+For more information see [here](https://docs.minaprotocol.com/node-operators/connecting-to-the-network#docker)
+
+# How to build Mina from scratch with the new storage implementation
 
 ## Install System Packages
 
