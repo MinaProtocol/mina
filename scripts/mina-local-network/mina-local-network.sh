@@ -33,8 +33,9 @@ SNARK_WORKERS_COUNT=1
 ZKAPP_TRANSACTIONS=false
 RESET=false
 UPDATE_GENESIS_TIMESTAMP=false
+PROOF_LEVEL="full"
 
-SNARK_WORKER_FEE=0.01
+SNARK_WORKER_FEE=0.001
 TRANSACTION_FREQUENCY=10 # in seconds
 
 SEED_START_PORT=3000
@@ -97,8 +98,6 @@ help() {
   echo "                                         |   Default: ${LOG_LEVEL}"
   echo "-fll |--file-log-level <level>           | File output logging level"
   echo "                                         |   Default: ${FILE_LOG_LEVEL}"
-  echo "-it |--internal-tracing                  | Whether to enable internal tracing (presence of argument)"
-  echo "                                         |   Default: ${INTERNAL_TRACING:-false}"
   echo "-ph  |--pg-host <host>                   | PostgreSQL host"
   echo "                                         |   Default: ${PG_HOST}"
   echo "-pp  |--pg-port <#>                      | PostgreSQL port"
@@ -111,12 +110,14 @@ help() {
   echo "                                         |   Default: ${PG_DB}"
   echo "-vt  |--value-transfer-txns              | Whether to execute periodic value transfer transactions (presence of argument)"
   echo "                                         |   Default: ${VALUE_TRANSFERS}"
-  echo "-zt |--zkapp-transactions                | Whether to execute periodic zkapp transactions (presence of argument)"
+  echo "-zt  |--zkapp-transactions               | Whether to execute periodic zkapp transactions (presence of argument)"
   echo "                                         |   Default: ${ZKAPP_TRANSACTIONS}"
   echo "-tf  |--transactions-frequency <#>       | Frequency of periodic transactions execution (in seconds)"
   echo "                                         |   Default: ${TRANSACTION_FREQUENCY}"
   echo "-sf  |--snark-worker-fee <#>             | SNARK Worker fee"
   echo "                                         |   Default: ${SNARK_WORKER_FEE}"
+  echo "-pl  |--proof-level <proof-level>        | Proof level (currently consumed by SNARK Workers only)"
+  echo "                                         |   Default: ${PROOF_LEVEL}"
   echo "-r   |--reset                            | Whether to reset the Mina Local Network storage file-system (presence of argument)"
   echo "                                         |   Default: ${RESET}"
   echo "-u   |--update-genesis-timestamp         | Whether to update the Genesis Ledger timestamp (presence of argument)"
@@ -126,6 +127,9 @@ help() {
   printf "\n"
   echo "Available logging levels:"
   echo "  Spam, Trace, Debug, Info, Warn, Error, Faulty_peer, Fatal"
+  printf "\n"
+  echo "Available proof levels:"
+  echo "  full, check, none"
   printf "\n"
 
   exit
@@ -166,7 +170,6 @@ exec-daemon() {
     -log-json \
     -log-level ${LOG_LEVEL} \
     -file-log-level ${FILE_LOG_LEVEL} \
-    ${INTERNAL_TRACING:+-internal-tracing} \
     $@
 }
 
@@ -174,7 +177,6 @@ exec-daemon() {
 exec-worker-daemon() {
   COORDINATOR_PORT=${1}
   shift
-  PROOF_LEVEL="full"
   SHUTDOWN_ON_DISCONNECT="false"
   COORDINATOR_HOST_AND_PORT="localhost:${COORDINATOR_PORT}"
 
@@ -182,7 +184,7 @@ exec-worker-daemon() {
     -proof-level ${PROOF_LEVEL} \
     -shutdown-on-disconnect ${SHUTDOWN_ON_DISCONNECT} \
     -daemon-address ${COORDINATOR_HOST_AND_PORT} \
-  $@
+    $@
 }
 
 # Executes the Archive node
@@ -216,35 +218,16 @@ spawn-archive-node() {
   exec-archive-node $@ &>${FOLDER}/log.txt &
 }
 
-# Checks connection to database. Give possible reason for lack of connectivity.
-# Function assumes that env have pg_isready command installed. This cli utility is installed along with postgres server
-check-db-connection() {
-  echo "Checking connection to archive database..."
+# Resets genesis ledger
+reset-genesis-ledger() {
+  GENESIS_LEDGER_FOLDER=${1}
+  DAEMON_CONFIG=${2}
+  echo 'Resetting Genesis Ledger...'
   printf "\n"
 
-  case `pg_isready -U ${PG_USER} -h ${PG_HOST} -p ${PG_PORT} -d ${PG_DB} &>/dev/null; echo $?` in
-    0)
-      echo "Connection to database successful!"
-      ;;
-    1)
-      echo "The database server is rejecting connections (for example during startup)"
-      exit 1
-      ;;
-    2)
-      echo "There was no response from the database server to the connection attempt"
-      exit 1
-      ;;
-    3)
-      echo "No attempt to contact the database server was made (for example due to invalid parameters)"
-      exit 1
-      ;;
-    *)
-      echo "Unknown issue when connecting to database"
-      exit 1
-      ;;
-  esac
-
-  printf "\n"
+  jq "{genesis: {genesis_state_timestamp:\"$(date +"%Y-%m-%dT%H:%M:%S%z")\"}, ledger:.}" \
+    <${GENESIS_LEDGER_FOLDER}/genesis_ledger.json \
+    >${DAEMON_CONFIG}
 }
 
 recreate-schema() {
@@ -324,7 +307,6 @@ while [[ "$#" -gt 0 ]]; do
     FILE_LOG_LEVEL="${2}"
     shift
     ;;
-  -it | --internal-tracing) INTERNAL_TRACING=true ;;
   -ph | --pg-host)
     PG_HOST="${2}"
     shift
@@ -353,6 +335,10 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   -sf | --snark-worker-fee)
     SNARK_WORKER_FEE="${2}"
+    shift
+    ;;
+  -pl | --proof-level)
+    PROOF_LEVEL="${2}"
     shift
     ;;
   -r | --reset) RESET=true ;;
@@ -397,10 +383,7 @@ if ${ARCHIVE}; then
   echo "================================"
   printf "\n"
 
-  check-db-connection
-
-  echo "================================"
-  printf "\n"
+  psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT}/${PG_DB} -c "SELECT * FROM user_commands;" &>/dev/null
 
   ARCHIVE_ADDRESS_CLI_ARG="-archive-address ${ARCHIVE_SERVER_PORT}"
 fi
@@ -541,17 +524,24 @@ fi
 SNARK_COORDINATOR_PUBKEY=$(cat ${LEDGER_FOLDER}/snark_coordinator_keys/snark_coordinator_account.pub)
 
 # ================================================
-# Update the Genesis State Timestamp
+# Update the Genesis State Timestamp or Reset the Genesis Ledger
 
 CONFIG=${LEDGER_FOLDER}/daemon.json
 
-if ${RESET} || ${UPDATE_GENESIS_TIMESTAMP}; then
-  echo 'Updating Genesis State timestamp...'
-  printf "\n"
+if ${RESET}; then
+  reset-genesis-ledger ${LEDGER_FOLDER} ${CONFIG}
+fi
 
-  jq "{genesis: {genesis_state_timestamp:\"$(date +"%Y-%m-%dT%H:%M:%S%z")\"}, ledger:.}" \
-    <${LEDGER_FOLDER}/genesis_ledger.json \
-    >${CONFIG}
+if ${UPDATE_GENESIS_TIMESTAMP}; then
+  if test -f "${CONFIG}"; then
+    echo 'Updating Genesis State timestamp...'
+    printf "\n"
+
+    tmp=$(mktemp)
+    jq ".genesis.genesis_state_timestamp=\"$(date +"%Y-%m-%dT%H:%M:%S%z")\"" ${CONFIG} >"$tmp" && mv -f "$tmp" ${CONFIG}
+  else
+    reset-genesis-ledger ${LEDGER_FOLDER} ${CONFIG}
+  fi
 fi
 
 # ================================================
