@@ -1,3 +1,10 @@
+(** This module provides a generic interface {{ Input_intf }} to represent
+    finite fields.
+
+    A functor {{ Make }} is provided to instantiate a concrete field
+    implementation.
+*)
+
 open Intf
 open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
