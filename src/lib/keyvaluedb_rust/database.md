@@ -1,12 +1,22 @@
 
+## Table of Contents
+1. [Introduction](#Introduction)
+2. [How Mina stores blockchain state in its ledger](#How-Mina-stores-blockchain-state-in-its-ledger)
+3. [A custom-built key-value store for Mina](#A-custom-built-key-value-store-for-Mina)
+4. [Try it out yourself](#Try-it-out-yourself)
+5. [The Mina Fuzzer Front End](#The-Mina-Fuzzer-Front-End)
+
+
+
 # Database, a Rust-based lightweight key value store for the Mina blockchain state
   
+## Introduction
 
 To enhance the overall performance of a blockchain node, one of the primary areas to focus on is the storage that contains the blockchain state. Regular and ongoing access to this storage by the node is necessary for the validation of new blocks. By optimizing the speed of the storage module, we can greatly reduce the time it takes to apply new blocks and thus improve the overall performance of the node.
 
 In Mina, the blockchain state is stored in the format of a Merkle tree. For rapid reading and writing to the blockchain state, it is vital to create a high-performance Merkle tree storage system.
 
-## **How Mina stores blockchain state in its ledger**
+## How Mina stores blockchain state in its ledger
 
 In Mina, the current state of the network is kept in a data structure called the _ledger_. The ledger contains information about all the accounts in the network and their balances. Every time transactions from a block are applied, a new updated version of the ledger is produced.
 
@@ -29,6 +39,8 @@ Additionally, RocksDB is used to store:
 While RocksDB is an excellent database, it was not suitable for our use case because it is intended for general purposes. RocksDB has many features that are not necessary in our use case — we only utilize it as a key-value store.
 
 While the RocksDB store has been useful thus far, we want to create a custom solution that maximizes the node’s efficiency and performance. We wanted to reduce its size on disk, and remove our dependency on RocksDB, which would allow us to build (compile from source code into an executable program) Mina faster.
+
+## A custom-built key-value store for Mina
 
 For these reasons, we’ve replaced RocksDB with _Database_, a custom-built Rust-based key-value store. Database is a lightweight, single append-only file, key-value store that has improved performance. Storage data is now saved into the file system, which grants us more control and oversight for C++, increasing the node’s security. The new database follows the same API as the previous `rocksdb` package, making it a drop-in replacement.
 
