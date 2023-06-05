@@ -192,18 +192,26 @@ let step_main :
     if Type_equal.Id.same self.id d.id then basic.feature_flags
     else Types_map.feature_flags d
   in
-  let feature_flags =
+  let num_wrap_chunks (d : _ Tag.t) =
+    if Type_equal.Id.same self.id d.id then basic.num_wrap_chunks
+    else Types_map.num_wrap_chunks d
+  in
+  let feature_flags, num_wrap_chunks =
     let rec go :
         type pvars pvals ns1 ns2 br.
            (pvars, pvals, ns1, ns2) H4.T(Tag).t
         -> (pvars, br) Length.t
-        -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, br) Vector.t =
+        -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, br) Vector.t
+           * (int, br) Vector.t =
      fun ds ld ->
       match[@warning "-4"] (ds, ld) with
       | [], Z ->
-          []
+          ([], [])
       | d :: ds, S ld ->
-          feature_flags d :: go ds ld
+          let feature_flags = feature_flags d in
+          let num_wrap_chunks = num_wrap_chunks d in
+          let feature_flagss, num_wrap_chunkss = go ds ld in
+          (feature_flags :: feature_flagss, num_wrap_chunks :: num_wrap_chunkss)
       | [], _ ->
           .
       | _ :: _, _ ->
@@ -221,10 +229,13 @@ let step_main :
         -> (ns1, br) Length.t
         -> (ns2, br) Length.t
         -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, br) Vector.t
+        -> (int, br) Vector.t
         -> (pvars, pvals, ns1, ns2) H4.T(Typ_with_max_proofs_verified).t =
-     fun ds ns1 ns2 ld ln1 ln2 feature_flagss ->
-      match[@warning "-4"] (ds, ns1, ns2, ld, ln1, ln2, feature_flagss) with
-      | [], [], [], Z, Z, Z, [] ->
+     fun ds ns1 ns2 ld ln1 ln2 feature_flagss num_wrap_chunkss ->
+      match[@warning "-4"]
+        (ds, ns1, ns2, ld, ln1, ln2, feature_flagss, num_wrap_chunkss)
+      with
+      | [], [], [], Z, Z, Z, [], [] ->
           []
       | ( _d :: ds
         , n1 :: ns1
@@ -232,16 +243,19 @@ let step_main :
         , S ld
         , S ln1
         , S ln2
-        , feature_flags :: feature_flagss ) ->
-          let t = Per_proof_witness.typ Typ.unit n1 ~feature_flags in
-          t :: join ds ns1 ns2 ld ln1 ln2 feature_flagss
-      | [], _, _, _, _, _, _ ->
+        , feature_flags :: feature_flagss
+        , num_wrap_chunks :: num_wrap_chunkss ) ->
+          let t =
+            Per_proof_witness.typ ~num_wrap_chunks Typ.unit n1 ~feature_flags
+          in
+          t :: join ds ns1 ns2 ld ln1 ln2 feature_flagss num_wrap_chunkss
+      | [], _, _, _, _, _, _, _ ->
           .
-      | _ :: _, _, _, _, _, _, _ ->
+      | _ :: _, _, _, _, _, _, _, _ ->
           .
     in
     join rule.prevs local_signature local_branches proofs_verified
-      local_signature_length local_branches_length feature_flags
+      local_signature_length local_branches_length feature_flags num_wrap_chunks
   in
   let module Prev_typ =
     H4.Typ (Impls.Step) (Typ_with_max_proofs_verified)
@@ -479,6 +493,8 @@ let step_main :
                     ; step_domains = `Known basic.step_domains
                     ; wrap_key = dlog_plonk_index
                     ; feature_flags = basic.feature_flags
+                    ; num_step_chunks = basic.num_step_chunks
+                    ; num_wrap_chunks = basic.num_wrap_chunks
                     }
                   in
                   let module M =

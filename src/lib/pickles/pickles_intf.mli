@@ -76,7 +76,13 @@ module type S = sig
   module Proof : sig
     type ('max_width, 'mlmb) t
 
-    val dummy : 'w Nat.t -> 'm Nat.t -> _ Nat.t -> domain_log2:int -> ('w, 'm) t
+    val dummy :
+         ?num_wrap_chunks:int
+      -> 'w Nat.t
+      -> 'm Nat.t
+      -> _ Nat.t
+      -> domain_log2:int
+      -> ('w, 'm) t
 
     module Make (W : Nat.Intf) (MLMB : Nat.Intf) : sig
       type nonrec t = (W.n, MLMB.n) t [@@deriving sexp, compare, yojson, hash]
@@ -334,6 +340,8 @@ module type S = sig
          name:string
       -> max_proofs_verified:(module Nat.Add.Intf with type n = 'n1)
       -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+      -> num_step_chunks:int
+      -> num_wrap_chunks:int
       -> typ:('var, 'value) Impls.Step.Typ.t
       -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
 
@@ -397,6 +405,8 @@ module type S = sig
              , 'auxiliary_var
              , 'auxiliary_value )
              H4_6.T(Inductive_rule).t )
+    -> ?num_step_chunks:int
+    -> ?num_wrap_chunks:int
     -> unit
     -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
        * Cache_handle.t
@@ -450,6 +460,8 @@ module type S = sig
              , 'auxiliary_var
              , 'auxiliary_value )
              H4_6.T(Inductive_rule).t )
+    -> ?num_step_chunks:int
+    -> ?num_wrap_chunks:int
     -> unit
     -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
        * Cache_handle.t

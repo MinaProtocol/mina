@@ -15,6 +15,8 @@ module Basic : sig
         Pickles_types.Plonk_verification_key_evals.t
     ; wrap_vk : Impls.Wrap.Verification_key.t
     ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; num_step_chunks : int
+    ; num_wrap_chunks : int
     }
 end
 
@@ -37,6 +39,8 @@ module Side_loaded : sig
       ; public_input : ('var, 'value) Impls.Step.Typ.t
       ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
       ; branches : 'n2 Pickles_types.Nat.t
+      ; num_step_chunks : int
+      ; num_wrap_chunks : int
       }
   end
 
@@ -59,6 +63,8 @@ module Compiled : sig
     ; wrap_domains : Import.Domains.t
     ; step_domains : (Import.Domains.t, 'branches) Pickles_types.Vector.t
     ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; num_step_chunks : int
+    ; num_wrap_chunks : int
     }
 
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
@@ -76,6 +82,8 @@ module Compiled : sig
     ; wrap_domains : Import.Domains.t
     ; step_domains : (Import.Domains.t, 'branches) Pickles_types.Vector.t
     ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; num_step_chunks : int
+    ; num_wrap_chunks : int
     }
 end
 
@@ -97,6 +105,8 @@ module For_step : sig
         [ `Known of (Import.Domains.t, 'branches) Pickles_types.Vector.t
         | `Side_loaded ]
     ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; num_step_chunks : int
+    ; num_wrap_chunks : int
     }
 
   val of_side_loaded : ('a, 'b, 'c, 'd) Side_loaded.t -> ('a, 'b, 'c, 'd) t
@@ -134,3 +144,7 @@ val add_exn :
 val set_ephemeral : _ Tag.t -> Side_loaded.Ephemeral.t -> unit
 
 val public_input : ('var, 'value, _, _) Tag.t -> ('var, 'value) Impls.Step.Typ.t
+
+val num_step_chunks : _ Tag.t -> int
+
+val num_wrap_chunks : _ Tag.t -> int

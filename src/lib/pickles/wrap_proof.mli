@@ -28,4 +28,4 @@ module Checked : sig
   [@@deriving hlist]
 end
 
-val typ : (Checked.t, Constant.t) Impls.Step.Typ.t
+val typ : num_wrap_chunks:int -> (Checked.t, Constant.t) Impls.Step.Typ.t

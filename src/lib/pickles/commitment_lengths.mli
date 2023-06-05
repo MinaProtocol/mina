@@ -2,7 +2,8 @@
 
 (** [create] *)
 val create :
-     of_int:(int -> 'a)
+     num_chunks:int
+  -> of_int:(int -> 'a)
   -> ( 'a Pickles_types.Plonk_types.Columns_vec.t
      , 'a
      , 'a )

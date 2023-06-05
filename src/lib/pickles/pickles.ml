@@ -223,12 +223,15 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
     let in_prover tag vk = Types_map.set_ephemeral tag { index = `In_prover vk }
 
-    let create ~name ~max_proofs_verified ~feature_flags ~typ =
+    let create ~name ~max_proofs_verified ~feature_flags ~num_step_chunks
+        ~num_wrap_chunks ~typ =
       Types_map.add_side_loaded ~name
         { max_proofs_verified
         ; public_input = typ
         ; branches = Verification_key.Max_branches.n
         ; feature_flags
+        ; num_step_chunks
+        ; num_wrap_chunks
         }
 
     module Proof = struct
@@ -289,19 +292,20 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let compile_promise ?self ?cache ?disk_keys ?return_early_digest_exception
       ?override_wrap_domain ~public_input ~auxiliary_typ ~branches
-      ~max_proofs_verified ~name ~constraint_constants ~choices () =
+      ~max_proofs_verified ~name ~constraint_constants ~choices
+      ?(num_step_chunks = 1) ?(num_wrap_chunks = 1) () =
     compile_with_wrap_main_override_promise ?self ?cache ?disk_keys
       ?return_early_digest_exception ?override_wrap_domain ~public_input
       ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
-      ~choices ()
+      ~choices ~num_step_chunks ~num_wrap_chunks ()
 
   let compile ?self ?cache ?disk_keys ?override_wrap_domain ~public_input
       ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
-      ~choices () =
+      ~choices ?num_step_chunks ?num_wrap_chunks () =
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?disk_keys ?override_wrap_domain
         ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
-        ~constraint_constants ~choices ()
+        ~constraint_constants ~choices ?num_step_chunks ?num_wrap_chunks ()
     in
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.
@@ -1136,11 +1140,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           let feature_flags = Plonk_types.Features.none in
           let actual_feature_flags = Plonk_types.Features.none_bool in
+          let num_step_chunks = 1 in
+          let num_wrap_chunks = 1 in
           let wrap_domains =
             let module M =
               Wrap_domains.Make (A) (A_value) (A) (A_value) (A) (A_value)
             in
             M.f full_signature prev_varss_n prev_varss_length ~feature_flags
+              ~num_step_chunks
               ~max_proofs_verified:(module Max_proofs_verified)
           in
           let module Branch_data = struct
@@ -1165,7 +1172,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
               ~actual_feature_flags ~max_proofs_verified:Max_proofs_verified.n
               ~branches:Branches.n ~self ~public_input:(Input typ)
               ~auxiliary_typ:typ A.to_field_elements A_value.to_field_elements
-              rule ~wrap_domains ~proofs_verifieds
+              rule ~wrap_domains ~proofs_verifieds ~num_step_chunks
+              ~num_wrap_chunks
           in
           let step_domains = Vector.singleton inner_step_data.domains in
           let step_keypair =
@@ -1833,6 +1841,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ; wrap_vk = Lazy.map wrap_vk ~f:Verification_key.index
             ; wrap_domains
             ; step_domains
+            ; num_step_chunks
+            ; num_wrap_chunks
             }
           in
           Types_map.add_exn self data ;
@@ -2225,6 +2235,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           Side_loaded.create ~name:"foo"
             ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
             ~feature_flags:Plonk_types.Features.none ~typ:Field.typ
+            ~num_step_chunks:1 ~num_wrap_chunks:1
 
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
@@ -2575,7 +2586,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let side_loaded_tag =
           Side_loaded.create ~name:"foo"
             ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
-            ~feature_flags:maybe_features ~typ:Field.typ
+            ~feature_flags:maybe_features ~num_step_chunks:1 ~num_wrap_chunks:1
+            ~typ:Field.typ
 
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->

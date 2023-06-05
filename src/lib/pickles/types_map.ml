@@ -19,6 +19,8 @@ module Basic = struct
     ; wrap_key : Tick.Inner_curve.Affine.t Plonk_verification_key_evals.t
     ; wrap_vk : Impls.Wrap.Verification_key.t
     ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; num_step_chunks : int
+    ; num_wrap_chunks : int
     }
 end
 
@@ -40,6 +42,8 @@ module Side_loaded = struct
       ; public_input : ('var, 'value) Impls.Step.Typ.t
       ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
       ; branches : 'n2 Nat.t
+      ; num_step_chunks : int
+      ; num_wrap_chunks : int
       }
   end
 
@@ -53,7 +57,13 @@ module Side_loaded = struct
 
   let to_basic
       { permanent =
-          { max_proofs_verified; public_input; branches; feature_flags }
+          { max_proofs_verified
+          ; public_input
+          ; branches
+          ; feature_flags
+          ; num_step_chunks
+          ; num_wrap_chunks
+          }
       ; ephemeral
       } =
     let wrap_key, wrap_vk =
@@ -72,6 +82,8 @@ module Side_loaded = struct
     ; wrap_domains = Common.wrap_domains ~proofs_verified
     ; wrap_key
     ; feature_flags
+    ; num_step_chunks
+    ; num_wrap_chunks
     }
 end
 
@@ -83,6 +95,8 @@ module Compiled = struct
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
     ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; num_step_chunks : int
+    ; num_wrap_chunks : int
     }
 
   (* This is the data associated to an inductive proof system with statement type
@@ -100,6 +114,8 @@ module Compiled = struct
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
     ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; num_step_chunks : int
+    ; num_wrap_chunks : int
     }
 
   type packed =
@@ -115,6 +131,8 @@ module Compiled = struct
       ; step_domains
       ; wrap_key
       ; feature_flags
+      ; num_step_chunks
+      ; num_wrap_chunks
       } =
     { Basic.max_proofs_verified
     ; wrap_domains
@@ -123,6 +141,8 @@ module Compiled = struct
     ; wrap_key = Lazy.force wrap_key
     ; wrap_vk = Lazy.force wrap_vk
     ; feature_flags
+    ; num_step_chunks
+    ; num_wrap_chunks
     }
 end
 
@@ -141,12 +161,20 @@ module For_step = struct
           Impls.Step.field Pickles_base.Proofs_verified.One_hot.Checked.t ]
     ; step_domains : [ `Known of (Domains.t, 'branches) Vector.t | `Side_loaded ]
     ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; num_step_chunks : int
+    ; num_wrap_chunks : int
     }
 
   let of_side_loaded (type a b c d)
       ({ ephemeral
        ; permanent =
-           { branches; max_proofs_verified; public_input; feature_flags }
+           { branches
+           ; max_proofs_verified
+           ; public_input
+           ; feature_flags
+           ; num_step_chunks
+           ; num_wrap_chunks
+           }
        } :
         (a, b, c, d) Side_loaded.t ) : (a, b, c, d) t =
     let index =
@@ -165,6 +193,8 @@ module For_step = struct
     ; wrap_domain = `Side_loaded index.actual_wrap_domain_size
     ; step_domains = `Side_loaded
     ; feature_flags
+    ; num_step_chunks
+    ; num_wrap_chunks
     }
 
   let of_compiled
@@ -177,6 +207,8 @@ module For_step = struct
        ; step_domains
        ; feature_flags
        ; wrap_vk = _
+       ; num_step_chunks
+       ; num_wrap_chunks
        } :
         _ Compiled.t ) =
     { branches
@@ -190,6 +222,8 @@ module For_step = struct
     ; wrap_domain = `Known wrap_domains.h
     ; step_domains = `Known step_domains
     ; feature_flags
+    ; num_step_chunks
+    ; num_wrap_chunks
     }
 end
 
@@ -258,6 +292,22 @@ let feature_flags :
       (lookup_compiled tag.id).feature_flags
   | Side_loaded ->
       (lookup_side_loaded tag.id).permanent.feature_flags
+
+let num_step_chunks : type var value. (var, value, _, _) Tag.t -> int =
+ fun tag ->
+  match tag.kind with
+  | Compiled ->
+      (lookup_compiled tag.id).num_step_chunks
+  | Side_loaded ->
+      (lookup_side_loaded tag.id).permanent.num_step_chunks
+
+let num_wrap_chunks : type var value. (var, value, _, _) Tag.t -> int =
+ fun tag ->
+  match tag.kind with
+  | Compiled ->
+      (lookup_compiled tag.id).num_wrap_chunks
+  | Side_loaded ->
+      (lookup_side_loaded tag.id).permanent.num_wrap_chunks
 
 let _value_to_field_elements :
     type a. (_, a, _, _) Tag.t -> a -> Backend.Tick.Field.t array =

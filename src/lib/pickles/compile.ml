@@ -369,6 +369,8 @@ struct
            , Ret_value.t )
            Inductive_rule.public_input
       -> auxiliary_typ:(Auxiliary_var.t, Auxiliary_value.t) Impls.Step.Typ.t
+      -> num_step_chunks:int
+      -> num_wrap_chunks:int
       -> choices:
            (   self:(var, value, max_proofs_verified, branches) Tag.t
             -> (prev_varss, prev_valuess, widthss, heightss) H4.T(IR).t )
@@ -388,7 +390,7 @@ struct
    fun ~self ~cache ?disk_keys ?(return_early_digest_exception = false)
        ?override_wrap_domain ?override_wrap_main ~branches:(module Branches)
        ~max_proofs_verified ~name ~constraint_constants ~public_input
-       ~auxiliary_typ ~choices () ->
+       ~auxiliary_typ ~num_step_chunks ~num_wrap_chunks ~choices () ->
     let snark_keys_header kind constraint_system_hash =
       { Snark_keys_header.header_version = Snark_keys_header.header_version
       ; kind
@@ -460,7 +462,7 @@ struct
               (Auxiliary_value)
           in
           M.f full_signature prev_varss_n prev_varss_length ~max_proofs_verified
-            ~feature_flags
+            ~num_step_chunks ~feature_flags
       | Some override ->
           Common.wrap_domains
             ~proofs_verified:(Pickles_base.Proofs_verified.to_int override)
@@ -515,7 +517,8 @@ struct
                       ~max_proofs_verified:Max_proofs_verified.n
                       ~branches:Branches.n ~self ~public_input ~auxiliary_typ
                       Arg_var.to_field_elements Arg_value.to_field_elements rule
-                      ~wrap_domains ~proofs_verifieds )
+                      ~wrap_domains ~proofs_verifieds ~num_step_chunks
+                      ~num_wrap_chunks )
               in
               Timer.clock __LOC__ ; incr i ; res
             in
@@ -624,9 +627,9 @@ struct
       match override_wrap_main with
       | None ->
           let srs = Tick.Keypair.load_urs () in
-          Wrap_main.wrap_main ~feature_flags ~srs full_signature
-            prev_varss_length step_vks proofs_verifieds step_domains
-            max_proofs_verified
+          Wrap_main.wrap_main ~num_step_chunks ~feature_flags ~srs
+            full_signature prev_varss_length step_vks proofs_verifieds
+            step_domains max_proofs_verified
       | Some { wrap_main; tweak_statement = _ } ->
           (* Instead of creating a proof using the pickles wrap circuit, we
              have been asked to create proof in an 'adversarial' way, where
@@ -817,6 +820,8 @@ struct
       ; wrap_domains
       ; step_domains
       ; feature_flags
+      ; num_step_chunks
+      ; num_wrap_chunks
       }
     in
     Timer.clock __LOC__ ;
@@ -853,12 +858,15 @@ module Side_loaded = struct
 
   let in_prover tag vk = Types_map.set_ephemeral tag { index = `In_prover vk }
 
-  let create ~name ~max_proofs_verified ~feature_flags ~typ =
+  let create ~name ~max_proofs_verified ~feature_flags ~num_step_chunks
+      ~num_wrap_chunks ~typ =
     Types_map.add_side_loaded ~name
       { max_proofs_verified
       ; public_input = typ
       ; branches = Verification_key.Max_branches.n
       ; feature_flags
+      ; num_step_chunks
+      ; num_wrap_chunks
       }
 
   module Proof = struct
@@ -933,6 +941,8 @@ let compile_with_wrap_main_override_promise :
          , ret_value )
          Inductive_rule.public_input
     -> auxiliary_typ:(auxiliary_var, auxiliary_value) Impls.Step.Typ.t
+    -> num_step_chunks:int
+    -> num_wrap_chunks:int
     -> branches:(module Nat.Intf with type n = branches)
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = max_proofs_verified)
@@ -971,7 +981,8 @@ let compile_with_wrap_main_override_promise :
  *)
  fun ?self ?(cache = []) ?disk_keys ?(return_early_digest_exception = false)
      ?override_wrap_domain ?override_wrap_main ~public_input ~auxiliary_typ
-     ~branches ~max_proofs_verified ~name ~constraint_constants ~choices () ->
+     ~num_step_chunks ~num_wrap_chunks ~branches ~max_proofs_verified ~name
+     ~constraint_constants ~choices () ->
   let self =
     match self with
     | None ->
@@ -1041,7 +1052,7 @@ let compile_with_wrap_main_override_promise :
       ?override_wrap_domain ?override_wrap_main ~branches ~max_proofs_verified
       ~name ~public_input ~auxiliary_typ ~constraint_constants
       ~choices:(fun ~self -> conv_irs (choices ~self))
-      ()
+      ~num_step_chunks ~num_wrap_chunks ()
   in
   let (module Max_proofs_verified) = max_proofs_verified in
   let T = Max_proofs_verified.eq in
@@ -1264,7 +1275,7 @@ struct
       ~public_input:(Input Typ.unit) ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N2)
-      ~name:"blockchain-snark"
+      ~name:"blockchain-snark" ~num_step_chunks:1 ~num_wrap_chunks:1
       ~constraint_constants:
         (* Dummy values *)
         { sub_windows_per_window = 0
@@ -1316,7 +1327,8 @@ struct
             ~public_input:(Input Typ.unit) ~auxiliary_typ:Typ.unit
             ~branches:(module Nat.N1)
             ~max_proofs_verified:(module Nat.N2)
-            ~name:"recurse-on-bad" ~constraint_constants
+            ~name:"recurse-on-bad" ~constraint_constants ~num_step_chunks:1
+            ~num_wrap_chunks:1
             ~choices:(fun ~self:_ ->
               [ { identifier = "main"
                 ; feature_flags = Plonk_types.Features.none_bool

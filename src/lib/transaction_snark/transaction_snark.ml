@@ -620,7 +620,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         (fun i ->
           let open Zkapp_statement in
           Pickles.Side_loaded.create ~typ ~name:(sprintf "zkapp_%d" i)
-            ~feature_flags
+            ~feature_flags ~num_step_chunks:1 ~num_wrap_chunks:1
             ~max_proofs_verified:
               (module Pickles.Side_loaded.Verification_key.Max_width) )
 

@@ -75,6 +75,7 @@ let create
     ~wrap_domains
     ~(feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
     ~(actual_feature_flags : bool Plonk_types.Features.t)
+    ~(num_step_chunks : int) ~(num_wrap_chunks : int)
     ~(max_proofs_verified : max_proofs_verified Nat.t)
     ~(proofs_verifieds : (int, branches) Vector.t) ~(branches : branches Nat.t)
     ~(public_input :
@@ -142,6 +143,8 @@ let create
         ; wrap_domains
         ; step_domains
         ; feature_flags
+        ; num_step_chunks
+        ; num_wrap_chunks
         }
       ~public_input ~auxiliary_typ ~self_branches:branches ~proofs_verified
       ~local_signature:widths ~local_signature_length ~local_branches:heights

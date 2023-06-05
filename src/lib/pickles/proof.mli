@@ -105,7 +105,8 @@ type ('s, 'mlmb, 'c) with_data =
 type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) with_data
 
 val dummy :
-     'w Pickles_types.Nat.t
+     ?num_wrap_chunks:int
+  -> 'w Pickles_types.Nat.t
   -> 'h Pickles_types.Nat.t
   -> 'r Pickles_types.Nat.t
   -> domain_log2:int

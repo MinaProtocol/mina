@@ -91,7 +91,7 @@ let lookup_config_for_pack =
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
 let wrap_main
     (type max_proofs_verified branches prev_varss max_local_max_proofs_verifieds)
-    ~feature_flags
+    ~feature_flags ~num_step_chunks
     (full_signature :
       ( max_proofs_verified
       , branches
@@ -418,7 +418,8 @@ let wrap_main
                      Inner_curve.typ ~bool:Boolean.typ feature_flags
                      ~dummy:Inner_curve.Params.one
                      ~commitment_lengths:
-                       (Commitment_lengths.create ~of_int:Fn.id) )
+                       (Commitment_lengths.create ~num_chunks:num_step_chunks
+                          ~of_int:Fn.id ) )
                   ~request:(fun () -> Req.Messages) )
           in
           let sponge = Wrap_verifier.Opt.create sponge_params in

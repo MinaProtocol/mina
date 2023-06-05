@@ -72,6 +72,8 @@ val create :
   -> wrap_domains:Import.Domains.t
   -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
   -> actual_feature_flags:bool Plonk_types.Features.t
+  -> num_step_chunks:int
+  -> num_wrap_chunks:int
   -> max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t
   -> proofs_verifieds:(int, 'branches) Pickles_types.Vector.t
   -> branches:'branches Pickles_types.Nat.t

@@ -30,7 +30,7 @@ end
 
 open Impls.Step
 
-let typ : (Checked.t, Constant.t) Typ.t =
+let typ ~num_wrap_chunks : (Checked.t, Constant.t) Typ.t =
   let shift = Shifted_value.Type2.Shift.create (module Tock.Field) in
   Typ.of_hlistable ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
     ~value_to_hlist:Constant.to_hlist ~value_of_hlist:Constant.of_hlist
@@ -38,7 +38,9 @@ let typ : (Checked.t, Constant.t) Typ.t =
         (module Impl)
         Inner_curve.typ Plonk_types.Features.none ~bool:Boolean.typ
         ~dummy:Inner_curve.Params.one
-        ~commitment_lengths:(Commitment_lengths.create ~of_int:(fun x -> x))
+        ~commitment_lengths:
+          (Commitment_lengths.create ~num_chunks:num_wrap_chunks
+             ~of_int:(fun x -> x) )
     ; Types.Step.Bulletproof.typ ~length:(Nat.to_int Tock.Rounds.n)
         ( Typ.transport Other_field.typ
             ~there:(fun x ->

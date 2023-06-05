@@ -118,6 +118,8 @@ module Side_loaded : sig
        name:string
     -> max_proofs_verified:(module Nat.Add.Intf with type n = 'n1)
     -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    -> num_step_chunks:int
+    -> num_wrap_chunks:int
     -> typ:('var, 'value) Impls.Step.Typ.t
     -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
 
@@ -292,6 +294,8 @@ val compile_with_wrap_main_override_promise :
        , 'ret_value )
        Inductive_rule.public_input
   -> auxiliary_typ:('auxiliary_var, 'auxiliary_value) Impls.Step.Typ.t
+  -> num_step_chunks:int
+  -> num_wrap_chunks:int
   -> branches:(module Nat.Intf with type n = 'branches)
   -> max_proofs_verified:(module Nat.Add.Intf with type n = 'max_proofs_verified)
   -> name:string

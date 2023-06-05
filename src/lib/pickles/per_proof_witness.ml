@@ -139,7 +139,7 @@ module Constant = struct
   end
 end
 
-let typ (type n avar aval) ~feature_flags
+let typ (type n avar aval) ~feature_flags ~num_wrap_chunks
     (statement : (avar, aval) Impls.Step.Typ.t) (max_proofs_verified : n Nat.t)
     =
   let module Sc = Scalar_challenge in
@@ -150,7 +150,7 @@ let typ (type n avar aval) ~feature_flags
     ~var_of_hlist:of_hlist ~value_to_hlist:Constant.to_hlist
     ~value_of_hlist:Constant.of_hlist
     [ statement
-    ; Wrap_proof.typ
+    ; Wrap_proof.typ ~num_wrap_chunks
     ; Types.Wrap.Proof_state.In_circuit.typ
         (module Impl)
         ~challenge:Challenge.typ ~scalar_challenge:Challenge.typ ~feature_flags
