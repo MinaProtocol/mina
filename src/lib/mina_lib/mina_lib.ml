@@ -2037,6 +2037,13 @@ let net { components = { net; _ }; _ } = net
 let runtime_config { config = { precomputed_values; _ }; _ } =
   Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values
 
-let start_filtered_log (_ : t) (_ : string) = ()
+let start_filtered_log (_ : t) (_ : string) =
+  (*Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
+    ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
+    ~transport:
+      (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+         ~log_filename:"mina.log" ~max_size:logrotate_max_size
+         ~num_rotate:logrotate_num_rotate ); *)
+  ()
 
 let get_filtered_log_entries (_ : t) (_ : int) = []

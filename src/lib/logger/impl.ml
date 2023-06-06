@@ -268,6 +268,16 @@ module Transport = struct
         , Dumb_logrotate.create ~directory ~log_filename ~max_size ~num_rotate
         )
   end
+
+  (*module Stdout = struct
+      type t = unit
+
+      let create () = ()
+
+      let transport () = Core.print_endline
+    end*)
+
+  let stdout () = T ((module Stdout), Stdout.create ())
 end
 
 module Consumer_registry = struct
