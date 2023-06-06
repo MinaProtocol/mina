@@ -108,6 +108,8 @@ type t =
       ([ `Path of string ] option * [ `Log ] option) ref
   ; block_production_status :
       [ `Producing | `Producing_in_ms of float | `Free ] ref
+  ; in_memory_reverse_structured_log_messages_for_integration_test :
+      (int * string list) ref
   }
 [@@deriving fields]
 
@@ -2030,6 +2032,8 @@ let create ?wallets (config : Config.t) =
             ; sync_status
             ; precomputed_block_writer
             ; block_production_status = ref `Free
+            ; in_memory_reverse_structured_log_messages_for_integration_test =
+                ref (0, [])
             } ) )
 
 let net { components = { net; _ }; _ } = net
@@ -2037,13 +2041,34 @@ let net { components = { net; _ }; _ } = net
 let runtime_config { config = { precomputed_values; _ }; _ } =
   Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values
 
-let start_filtered_log (_ : t) (_ : string) =
-  (*Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
-    ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
-    ~transport:
-      (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-         ~log_filename:"mina.log" ~max_size:logrotate_max_size
-         ~num_rotate:logrotate_num_rotate ); *)
-  ()
+let start_filtered_log
+    ({ in_memory_reverse_structured_log_messages_for_integration_test; _ } : t)
+    (_ : string) =
+  let handle str =
+    let idx, old_messages =
+      !in_memory_reverse_structured_log_messages_for_integration_test
+    in
+    in_memory_reverse_structured_log_messages_for_integration_test :=
+      (idx + 1, str :: old_messages)
+  in
+  let event_set = (* TODO *) Structured_log_events.Set.empty in
+  Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
+    ~processor:(Logger.Processor.raw_structured_log_events event_set)
+    ~transport:(Logger.Transport.raw handle)
 
-let get_filtered_log_entries (_ : t) (_ : int) = []
+let get_filtered_log_entries
+    ({ in_memory_reverse_structured_log_messages_for_integration_test; _ } : t)
+    (idx : int) =
+  let rec get_from_idx curr_idx rev_messages output =
+    if idx < curr_idx then
+      match rev_messages with
+      | [] ->
+          output
+      | msg :: rev_messages ->
+          get_from_idx (curr_idx - 1) rev_messages (msg :: output)
+    else output
+  in
+  let curr_idx, messages =
+    !in_memory_reverse_structured_log_messages_for_integration_test
+  in
+  get_from_idx curr_idx messages []
