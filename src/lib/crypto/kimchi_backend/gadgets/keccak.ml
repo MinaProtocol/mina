@@ -214,14 +214,11 @@ module State = struct
     as_prover (fun () ->
         for x = 0 to keccak_dim - 1 do
           for y = 0 to keccak_dim - 1 do
-            let elem =
+            let _elem =
               Common.cvar_field_to_bignum_bigint_as_prover
                 (module Circuit)
                 state.(x).(y)
             in
-            print_endline
-              ( "x = " ^ string_of_int x ^ ", y = " ^ string_of_int y ^ " : "
-              ^ (elem |> Common.bignum_bigint_to_hex) ) ;
             ()
           done
         done )
@@ -437,13 +434,9 @@ let round (type f)
     (state : Circuit.Field.t State.matrix) (round : int) :
     Circuit.Field.t State.matrix =
   let state_a = state in
-  print_endline ("THETA " ^ string_of_int round) ;
   let state_e = theta (module Circuit) state_a in
-  print_endline ("PI RHO " ^ string_of_int round) ;
   let state_b = pi_rho (module Circuit) state_e in
-  print_endline ("CHI " ^ string_of_int round) ;
   let state_f = chi (module Circuit) state_b in
-  print_endline ("IOTA " ^ string_of_int round) ;
   let state_d = iota (module Circuit) state_f round in
   state_d
 
@@ -452,7 +445,6 @@ let permutation (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix =
   for i = 0 to keccak_rounds - 1 do
-    print_endline ("ROUND " ^ string_of_int i) ;
     let state_i = round (module Circuit) state i in
     (* Update state for next step *)
     State.update (module Circuit) ~prev:state ~next:state_i
@@ -474,7 +466,6 @@ let absorb (type f)
   (* (capacity / 8) zero bytes *)
   let zeros = Array.to_list @@ Array.create ~len:(capacity / 8) Field.zero in
   for i = 0 to List.length chunks - 1 do
-    print_endline "absorb phase" ;
     let block = List.nth_exn chunks i in
     (* pad the block with 0s to up to 1600 bits *)
     let padded_block = block @ zeros in
@@ -495,7 +486,6 @@ let squeeze (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (state : Circuit.Field.t State.matrix) ~(length : int) ~(rate : int) :
     Circuit.Field.t list =
-  print_endline "squeeze phase" ;
   let copy (bytestring : Circuit.Field.t list)
       (output_array : Circuit.Field.t array) ~(start : int) ~(length : int) =
     for i = 0 to length - 1 do
@@ -548,28 +538,32 @@ let sponge (type f)
   let state = absorb (module Circuit) padded_message ~capacity ~rate in
   (* squeeze *)
   let hashed = squeeze (module Circuit) state ~length ~rate in
-  Circuit.as_prover (fun () ->
-      print_endline "hash" ;
-      for i = 0 to List.length hashed - 1 do
-        let elem =
-          Common.cvar_field_to_bignum_bigint_as_prover
-            (module Circuit)
-            (List.nth_exn hashed i)
-        in
-        print_endline (elem |> Common.bignum_bigint_to_hex) ;
-        ()
-      done ) ;
   hashed
 
-(* Check that a list of cvars are at most 8 bits each *)
+(* Checks in the circuit that a list of cvars are at most 8 bits each *)
 let check_bytes (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (input : Circuit.Field.t list) : unit =
+    (inputs : Circuit.Field.t list) : unit =
   let open Circuit in
-  for i = 0 to List.length input - 1 do
-    (* Could be optimized if we reused the last wire for half the check of the following byte *)
-    let byte = List.nth_exn input i in
-    let bits12 = Field.(of_int 16 * byte) in
+  (* Create a second list of shifted inputs with 4 more bits*)
+  let shifted =
+    Core_kernel.List.map ~f:(fun x -> Field.(of_int 16 * x)) inputs
+  in
+  (* We need to lookup that both the inputs and the shifted values are less than 12 bits *)
+  (* Altogether means that it was less than 8 bits *)
+  let lookups = inputs @ shifted in
+  (* Make sure that a multiple of 3 cvars is in the list *)
+  let lookups =
+    match List.length lookups % 3 with
+    | 2 ->
+        lookups @ [ Field.zero ] @ [ Field.zero ]
+    | 1 ->
+        lookups @ [ Field.zero ]
+    | _ ->
+        lookups
+  in
+  (* We can fit 3 12-bit lookups per row *)
+  for i = 0 to (List.length lookups / 3) - 1 do
     with_label "lookup_byte" (fun () ->
         assert_
           { annotation = Some __LOC__
@@ -577,11 +571,11 @@ let check_bytes (type f)
               Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
                 (Lookup
                    { w0 = Field.one
-                   ; w1 = byte
+                   ; w1 = List.nth_exn lookups (3 * i)
                    ; w2 = Field.zero
-                   ; w3 = bits12
+                   ; w3 = List.nth_exn lookups ((3 * i) + 1)
                    ; w4 = Field.zero
-                   ; w5 = Field.zero
+                   ; w5 = List.nth_exn lookups ((3 * i) + 2)
                    ; w6 = Field.zero
                    } )
           } ) ;
@@ -714,5 +708,9 @@ let%test_unit "keccak gadget" =
       test_keccak ~nist:true ~len:512 "30"
         "2d44da53f305ab94b6365837b9803627ab098c41a6013694f9b468bccb9c13e95b3900365eb58924de7158a54467e984efcfdabdbcc9af9a940d49c51455b04c"
     in
+    (* I am the owner of the NFT with id X on the Ethereum chain *)
+    let _cs = test_keccak ~nist:false ~len:256 "4920616d20746865206f776e6572206f6620746865204e465420776974682069642058206f6e2074686520457468657265756d20636861696e" "63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36" in
+
     () ) ;
+
   ()
