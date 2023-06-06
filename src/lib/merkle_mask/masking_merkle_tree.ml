@@ -762,6 +762,10 @@ module Make (Inputs : Inputs_intf.S) = struct
                      the current location
                   *)
                   set t location account ;
+                  (* apparently redundant, but the non-default token transaction
+                     SNARK tests fail without it
+                  *)
+                  self_set_location t account_id location ;
                   Ok (`Added, location) ) )
       | Some location ->
           Ok (`Existed, location)
