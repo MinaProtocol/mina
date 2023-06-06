@@ -2043,7 +2043,7 @@ let runtime_config { config = { precomputed_values; _ }; _ } =
 
 let start_filtered_log
     ({ in_memory_reverse_structured_log_messages_for_integration_test; _ } : t)
-    (_ : string) =
+    (structured_log_ids : string list) =
   let handle str =
     let idx, old_messages =
       !in_memory_reverse_structured_log_messages_for_integration_test
@@ -2051,7 +2051,10 @@ let start_filtered_log
     in_memory_reverse_structured_log_messages_for_integration_test :=
       (idx + 1, str :: old_messages)
   in
-  let event_set = (* TODO *) Structured_log_events.Set.empty in
+  let event_set =
+    Structured_log_events.Set.of_list
+    @@ List.map ~f:Structured_log_events.id_of_string structured_log_ids
+  in
   Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
     ~processor:(Logger.Processor.raw_structured_log_events event_set)
     ~transport:(Logger.Transport.raw handle)

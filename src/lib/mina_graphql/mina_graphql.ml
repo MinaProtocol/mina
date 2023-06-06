@@ -2868,10 +2868,10 @@ module Mutations = struct
 
   let start_filtered_log =
     field "startFilteredLog" ~doc:"TODO" ~typ:(non_null string)
-      ~args:Arg.[ arg "filter" ~typ:(non_null string) ]
+      ~args:Arg.[ arg "filter" ~typ:(non_null (list (non_null string))) ]
       ~resolve:(fun { ctx = t; _ } () filter ->
         Mina_lib.start_filtered_log t filter ;
-        filter )
+        "ok" )
 
   let create_account =
     io_field "createAccount"

@@ -287,7 +287,7 @@ module Node = struct
     module StartFilteredLog =
     [%graphql
     {|
-      mutation ($filter: String!) @encoders(module: "Encoders"){
+      mutation ($filter: [String!]!) @encoders(module: "Encoders"){
         startFilteredLog(filter: $filter)
       }
     |}]
