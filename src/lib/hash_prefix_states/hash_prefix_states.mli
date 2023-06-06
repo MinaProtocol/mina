@@ -2,17 +2,22 @@ open Snark_params
 open Tick
 open Random_oracle
 
-val signature : Field.t State.t
+val signature : ?signature_kind:Mina_signature_kind.t -> Field.t State.t
 
 val signature_for_mainnet : Field.t State.t
 
 val signature_for_testnet : Field.t State.t
 
-val signature_legacy : Field.t Legacy.State.t
+val signature_for_other : string -> Field.t State.t
+
+val signature_legacy :
+  ?signature_kind:Mina_signature_kind.t -> Field.t Legacy.State.t
 
 val signature_for_mainnet_legacy : Field.t Legacy.State.t
 
 val signature_for_testnet_legacy : Field.t Legacy.State.t
+
+val signature_for_other_legacy : string -> Field.t Legacy.State.t
 
 (** [merkle_tree depth] gives the hash prefix for the given node depth.
 
