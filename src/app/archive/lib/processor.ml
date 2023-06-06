@@ -3918,8 +3918,9 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
               ~depth:constraint_constants.ledger_depth padded_accounts
           in
           let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
-          let account_ids =
-            Mina_ledger.Ledger.accounts ledger |> Account_id.Set.to_list
+          let%bind account_ids =
+            let%map account_id_set = Mina_ledger.Ledger.accounts ledger in
+            Account_id.Set.to_list account_id_set
           in
           let genesis_block =
             let With_hash.{ data = block; hash = the_hash }, _ =
