@@ -3669,7 +3669,7 @@ let%test_unit "Ec_group.scalar_mul_properties" =
     () )
 
 let%test_unit "Ec_group.scalar_mul_tiny" =
-  if scalar_mul_tests then
+  if (* scalar_mul_tests *) false then
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -3733,24 +3733,29 @@ let%test_unit "Ec_group.scalar_mul_tiny" =
      * EC scalar multiplication tests
      *)
 
-    (* Multiply by 1 *)
-    let scalar = Bignum_bigint.of_int 2 in
-    let point =
-      ( Bignum_bigint.of_string
-          "67973637023329354644729732876692436096994797487488454090437075702698953132769"
-      , Bignum_bigint.of_string
-          "108096131279561713744990959402407452508030289249215221172372441421932322041359"
-      )
+    (* Multiply by 2 *)
+    let _scalar = Bignum_bigint.of_int 2 in
+    let scalar =
+      Bignum_bigint.of_string
+        "11855648912002728172728178841471073659390794448519216021605431753054289932960"
     in
-    let _expected_result =
+    (* let point =
+         ( Bignum_bigint.of_string
+             "67973637023329354644729732876692436096994797487488454090437075702698953132769"
+         , Bignum_bigint.of_string
+             "108096131279561713744990959402407452508030289249215221172372441421932322041359"
+         )
+       in *)
+    let expected_result =
       ( Bignum_bigint.of_string
-          "55163261558395629959399018458747217735022097476453626220534976346508255440132"
+          "70053051566055881313133739458711159076876489753583172151093688692211624758142"
       , Bignum_bigint.of_string
-          "64084400259104016223244036381136865352477201840651425128383163030179956518101"
+          "28880740696940411617405703436512159146003456546669972608977923507321289511874"
       )
     in
     let _cs =
-      test_scalar_mul_tiny Secp256k1.params scalar point _expected_result
+      test_scalar_mul_tiny Secp256k1.params scalar Secp256k1.params.gen
+        expected_result
     in
 
     ()

@@ -203,6 +203,12 @@ module type Element_intf = sig
     -> 'field t
     -> unit
 
+  (* Create and constrain foreign field element from Bignum_bigint.t *)
+  val checked_const_of_bignum_bigint :
+       (module Snark_intf.Run with type field = 'field)
+    -> Bignum_bigint.t
+    -> 'field t
+
   (* Add conditional constraints to select foreign field element *)
   val if_ :
        (module Snark_intf.Run with type field = 'field)
@@ -347,6 +353,13 @@ end = struct
       Field.Assert.equal left1 right1 ;
       Field.Assert.equal left2 right2
 
+    let checked_const_of_bignum_bigint (type field)
+        (module Circuit : Snark_intf.Run with type field = field) x : field t =
+      let const_x = const_of_bignum_bigint (module Circuit) x in
+      let var_x = of_bignum_bigint (module Circuit) x in
+      assert_equal (module Circuit) const_x var_x ;
+      const_x
+
     let fits_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         (modulus : field standard_limbs) : bool =
@@ -375,9 +388,12 @@ end = struct
        * https://github.com/MinaProtocol/mina/blob/43e2994b64b9d3e99055d644ac6279d39c22ced5/src/lib/pickles/scalar_challenge.ml#L12
        *)
       let l0, l1, l2 = to_limbs x in
-      Field.unpack l0 ~length:Common.limb_bits
-      @ Field.unpack l1 ~length:Common.limb_bits
-      @ Field.unpack l2 ~length:(length - (2 * Common.limb_bits))
+      fst
+      @@ List.fold [ l0; l1; l2 ] ~init:([], length)
+           ~f:(fun (lst, length) limb ->
+             let bits_to_copy = min length Common.limb_bits in
+             ( lst @ Field.unpack limb ~length:bits_to_copy
+             , length - bits_to_copy ) )
   end
 
   (* Compact limbs foreign field element *)
@@ -478,6 +494,13 @@ end = struct
       Field.Assert.equal left01 right01 ;
       Field.Assert.equal left2 right2
 
+    let checked_const_of_bignum_bigint (type field)
+        (module Circuit : Snark_intf.Run with type field = field) x : field t =
+      let const_x = const_of_bignum_bigint (module Circuit) x in
+      let var_x = of_bignum_bigint (module Circuit) x in
+      assert_equal (module Circuit) const_x var_x ;
+      const_x
+
     let if_ (type field)
         (module Circuit : Snark_intf.Run with type field = field)
         (b : Circuit.Boolean.var) (then_ : field t) (else_ : field t) : field t
@@ -497,8 +520,12 @@ end = struct
        *)
       let open Circuit in
       let l01, l2 = to_limbs x in
-      Field.unpack l01 ~length:(2 * Common.limb_bits)
-      @ Field.unpack l2 ~length:(length - (2 * Common.limb_bits))
+      fst
+      @@ List.foldi [ l01; l2 ] ~init:([], length)
+           ~f:(fun i (lst, length) limb ->
+             let bits_to_copy = min length ((2 - i) * Common.limb_bits) in
+             ( lst @ Field.unpack limb ~length:bits_to_copy
+             , length - bits_to_copy ) )
   end
 end
 

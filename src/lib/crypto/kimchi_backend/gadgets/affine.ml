@@ -88,6 +88,14 @@ let assert_equal (type field)
     assert_equal (module Circuit) left_x right_x ;
     assert_equal (module Circuit) left_y right_y)
 
+let checked_const_of_bignum_bigint_coordinates (type field)
+    (module Circuit : Snark_intf.Run with type field = field)
+    (point : bignum_point) : field t =
+  let const_point = const_of_bignum_bigint_coordinates (module Circuit) point in
+  let var_point = of_bignum_bigint_coordinates (module Circuit) point in
+  assert_equal (module Circuit) const_point var_point ;
+  const_point
+
 let const_zero (type field)
     (module Circuit : Snark_intf.Run with type field = field) : field t =
   of_coordinates

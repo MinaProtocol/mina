@@ -148,7 +148,8 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
     (base_checks : f Foreign_field.External_checks.t)
     (scalar_checks : f Foreign_field.External_checks.t)
     (curve : f Curve_params.InCircuit.t) (pubkey : f Affine.t)
-    ?(use_precomputed_gen_doubles = true) ?(doubles : f Affine.t array option)
+    ?(use_precomputed_gen_doubles = true) ?(scalar_mul_bit_length = 0)
+    ?(doubles : f Affine.t array option)
     (signature :
       f Foreign_field.Element.Standard.t * f Foreign_field.Element.Standard.t )
     (msg_hash : f Foreign_field.Element.Standard.t) =
@@ -159,12 +160,6 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
   (* Compute witness value u1 and u2 *)
   let u1_0, u1_1, u1_2, u2_0, u2_1, u2_2 =
     exists (Typ.array ~length:6 Field.typ) ~compute:(fun () ->
-        let curve_order =
-          Foreign_field.field_const_standard_limbs_to_bignum_bigint
-            (module Circuit)
-            curve.order
-        in
-
         let r =
           Foreign_field.Element.Standard.to_bignum_bigint_as_prover
             (module Circuit)
@@ -184,13 +179,13 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
         in
 
         (* Compute s^-1 *)
-        let s_inv = Common.bignum_bigint_inverse s curve_order in
+        let s_inv = Common.bignum_bigint_inverse s curve.bignum.order in
 
         (* Compute u1 = z * s^-1 *)
-        let u1 = Bignum_bigint.(msg_hash * s_inv % curve_order) in
+        let u1 = Bignum_bigint.(msg_hash * s_inv % curve.bignum.order) in
 
         (* Compute u2 = r * s^-1 *)
-        let u2 = Bignum_bigint.(r * s_inv % curve_order) in
+        let u2 = Bignum_bigint.(r * s_inv % curve.bignum.order) in
 
         (* Convert from Bignums to field elements *)
         let u1_0, u1_1, u1_2 =
@@ -247,18 +242,24 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
    * Compute R = u1G + u2P
    *)
 
+  (* Set optional alternative scalar_mul_bit_length *)
+  let scalar_bit_length =
+    if scalar_mul_bit_length > 0 then scalar_mul_bit_length
+    else curve.order_bit_length
+  in
+
   (* C3: Decompose u1 into bits *)
   let u1_bits =
     Foreign_field.Element.Standard.unpack
       (module Circuit)
-      u1 ~length:curve.order_bit_length
+      u1 ~length:scalar_bit_length
   in
 
   (* C4: Decompose u2 into bits *)
   let u2_bits =
     Foreign_field.Element.Standard.unpack
       (module Circuit)
-      u2 ~length:curve.order_bit_length
+      u2 ~length:scalar_bit_length
   in
 
   (* C5: Constrain scalar multiplication u1G *)
@@ -334,12 +335,6 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
   (* Compute witness value q and Rx' *)
   let quotient0, quotient1, quotient2, x_prime0, x_prime1, x_prime2 =
     exists (Typ.array ~length:6 Field.typ) ~compute:(fun () ->
-        let curve_order =
-          Foreign_field.field_const_standard_limbs_to_bignum_bigint
-            (module Circuit)
-            curve.order
-        in
-
         let x =
           Foreign_field.Element.Standard.to_bignum_bigint_as_prover
             (module Circuit)
@@ -347,7 +342,9 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
         in
 
         (* Compute q and r of Rx = q * n + r *)
-        let quotient, x_prime = Common.bignum_bigint_div_rem x curve_order in
+        let quotient, x_prime =
+          Common.bignum_bigint_div_rem x curve.bignum.order
+        in
 
         (* Convert from Bignums to field elements *)
         let quotient0, quotient1, quotient2 =
@@ -443,7 +440,8 @@ let%test_unit "Ecdsa.verify" =
 
     (* Let's test proving ECDSA signature verification in ZK! *)
     let test_verify ?cs ?(use_precomputed_gen_doubles = true)
-        (curve : Curve_params.t) (pubkey : Affine.bignum_point)
+        ?(scalar_mul_bit_length = 0) (curve : Curve_params.t)
+        (pubkey : Affine.bignum_point)
         (signature : Bignum_bigint.t * Bignum_bigint.t)
         (msg_hash : Bignum_bigint.t) =
       (* Generate and verify proof *)
@@ -451,7 +449,9 @@ let%test_unit "Ecdsa.verify" =
         Runner.generate_and_verify_proof ?cs (fun () ->
             (* Prepare test inputs *)
             let curve =
-              Curve_params.to_circuit_constants (module Runner.Impl) curve
+              Curve_params.to_circuit_constants
+                (module Runner.Impl)
+                curve ~use_precomputed_gen_doubles
             in
             let pubkey =
               Affine.of_bignum_bigint_coordinates (module Runner.Impl) pubkey
@@ -492,8 +492,9 @@ let%test_unit "Ecdsa.verify" =
             (* Verify ECDSA signature *)
             verify
               (module Runner.Impl)
-              ~use_precomputed_gen_doubles unused_base_checks
-              unused_scalar_checks curve pubkey signature msg_hash ;
+              ~use_precomputed_gen_doubles ~scalar_mul_bit_length
+              unused_base_checks unused_scalar_checks curve pubkey signature
+              msg_hash ;
 
             () )
       in
@@ -536,7 +537,8 @@ let%test_unit "Ecdsa.verify" =
     assert (Ec_group.is_on_curve_bignum_point Secp256k1.params eth_pubkey) ;
 
     let _cs =
-      test_verify Secp256k1.params eth_pubkey eth_signature tx_msg_hash
+      test_verify Secp256k1.params ~use_precomputed_gen_doubles:true eth_pubkey
+        eth_signature tx_msg_hash
     in
 
     (* Negative test *)
@@ -675,6 +677,110 @@ let%test_unit "Ecdsa.verify" =
     let _cs =
       test_verify ~use_precomputed_gen_doubles:false Secp256k1.params eth_pubkey
         eth_signature tx_msg_hash
+    in
+
+    () )
+
+let%test_unit "Ecdsa.verify_tiny" =
+  if tests_enabled then (
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+
+    (* Tiny circuit for manual checks *)
+    let test_verify_tiny ?cs ?(use_precomputed_gen_doubles = true)
+        ?(scalar_mul_bit_length = 0) (curve : Curve_params.t)
+        (pubkey : Affine.bignum_point)
+        (signature : Bignum_bigint.t * Bignum_bigint.t)
+        (msg_hash : Bignum_bigint.t) =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            (* Prepare test inputs *)
+            let curve =
+              Curve_params.to_circuit_constants
+                (module Runner.Impl)
+                curve ~use_precomputed_gen_doubles
+            in
+            let pubkey =
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) pubkey
+            in
+            let signature =
+              ( Foreign_field.Element.Standard.of_bignum_bigint
+                  (module Runner.Impl)
+                  (fst signature)
+              , Foreign_field.Element.Standard.of_bignum_bigint
+                  (module Runner.Impl)
+                  (snd signature) )
+            in
+            let msg_hash =
+              Foreign_field.Element.Standard.of_bignum_bigint
+                (module Runner.Impl)
+                msg_hash
+            in
+
+            (* Create external checks contexts for tracking extra constraints
+               that are required for soundness (unused in this simple test) *)
+            let unused_base_checks =
+              Foreign_field.External_checks.create (module Runner.Impl)
+            in
+            let unused_scalar_checks =
+              Foreign_field.External_checks.create (module Runner.Impl)
+            in
+
+            (* Omit pubkey subgroup check *)
+
+            (* Omit checking r, s \in [1, n) *)
+
+            (* Verify ECDSA signature *)
+            verify
+              (module Runner.Impl)
+              ~use_precomputed_gen_doubles ~scalar_mul_bit_length
+              unused_base_checks unused_scalar_checks curve pubkey signature
+              msg_hash ;
+
+            () )
+      in
+
+      cs
+    in
+
+    (* Tiny secp256k1 signature test: results in 2-bit u1 and u2 scalars
+     * Extracted with k = 1 -> secret key = 57896044618658097711785492504343953926418782139537452191302581570759080747168 *)
+    let pubkey =
+      ( Bignum_bigint.of_string
+          "86918276961810349294276103416548851884759982251107"
+      , Bignum_bigint.of_string
+          "28597260016173315074988046521176122746119865902901063272803125467328307387891"
+      )
+    in
+    let signature =
+      ( (* r = Gx *)
+        Bignum_bigint.of_string
+          "55066263022277343669578718895168534326250603453777594175500187360389116729240"
+      , (* s = r/2 *)
+        Bignum_bigint.of_string
+          "27533131511138671834789359447584267163125301726888797087750093680194558364620"
+      )
+    in
+    let msg_hash =
+      (* z = 2s *)
+      Bignum_bigint.of_string
+        "55066263022277343669578718895168534326250603453777594175500187360389116729240"
+    in
+
+    assert (Ec_group.is_on_curve_bignum_point Secp256k1.params pubkey) ;
+
+    let _cs =
+      test_verify_tiny Secp256k1.params ~scalar_mul_bit_length:2 pubkey
+        signature msg_hash
+    in
+
+    let _cs =
+      test_verify_tiny Secp256k1.params ~use_precomputed_gen_doubles:false
+        ~scalar_mul_bit_length:2 pubkey signature msg_hash
     in
 
     () )

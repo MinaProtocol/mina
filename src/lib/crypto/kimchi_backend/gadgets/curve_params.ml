@@ -113,7 +113,7 @@ let double_bignum_point (curve : t) (point : Affine.bignum_point) :
 
 let to_circuit_constants (type field)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = field)
-    (curve : t) : field InCircuit.t =
+    ?(use_precomputed_gen_doubles = true) (curve : t) : field InCircuit.t =
   (* Need to know native field size before we can check if it fits *)
   Foreign_field.check_modulus_bignum_bigint (module Circuit) curve.modulus ;
   Foreign_field.check_modulus_bignum_bigint (module Circuit) curve.order ;
@@ -133,7 +133,7 @@ let to_circuit_constants (type field)
           curve.order
     ; order_bit_length
     ; order_minus_one =
-        Foreign_field.Element.Standard.const_of_bignum_bigint
+        Foreign_field.Element.Standard.checked_const_of_bignum_bigint
           (module Circuit)
           order_minus_one
     ; order_minus_one_bits =
@@ -141,33 +141,42 @@ let to_circuit_constants (type field)
           (module Circuit)
           order_minus_one
     ; a =
-        Foreign_field.Element.Standard.const_of_bignum_bigint
+        Foreign_field.Element.Standard.checked_const_of_bignum_bigint
           (module Circuit)
           curve.a
     ; b =
-        Foreign_field.Element.Standard.const_of_bignum_bigint
+        Foreign_field.Element.Standard.checked_const_of_bignum_bigint
           (module Circuit)
           curve.b
-    ; gen = Affine.of_bignum_bigint_coordinates (module Circuit) curve.gen
+    ; gen =
+        Affine.checked_const_of_bignum_bigint_coordinates
+          (module Circuit)
+          curve.gen
     ; doubles =
-        ((* Precompute 2^i * curve.gen, 0 <= i < curve.order_bit_length *)
-         let doubles =
-           Array.init order_bit_length (fun _i ->
-               Affine.const_zero (module Circuit) )
-         in
-         let point = ref curve.gen in
-         for i = 0 to order_bit_length - 1 do
-           let _slope, double = double_bignum_point curve !point in
-           point := double ;
-           doubles.(i) <-
-             Affine.of_bignum_bigint_coordinates (module Circuit) !point
-         done ;
-         doubles )
+        ( if use_precomputed_gen_doubles then (
+          (* Precompute 2^i * curve.gen, 0 <= i < curve.order_bit_length *)
+          let doubles =
+            Array.init order_bit_length (fun _i ->
+                Affine.const_zero (module Circuit) )
+          in
+          let point = ref curve.gen in
+          for i = 0 to order_bit_length - 1 do
+            let _slope, double = double_bignum_point curve !point in
+            point := double ;
+            doubles.(i) <-
+              Affine.checked_const_of_bignum_bigint_coordinates
+                (module Circuit)
+                !point
+          done ;
+          doubles )
+        else [||] )
     ; ia =
         { acc =
-            Affine.of_bignum_bigint_coordinates (module Circuit) curve.ia.acc
+            Affine.checked_const_of_bignum_bigint_coordinates
+              (module Circuit)
+              curve.ia.acc
         ; neg_acc =
-            Affine.of_bignum_bigint_coordinates
+            Affine.checked_const_of_bignum_bigint_coordinates
               (module Circuit)
               curve.ia.neg_acc
         }
