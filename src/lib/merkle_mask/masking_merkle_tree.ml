@@ -4,7 +4,8 @@
 open Core
 
 (* builds a Merkle tree mask; it's a Merkle tree, with some additional
-   operations *)
+   operations
+*)
 module Make (Inputs : Inputs_intf.S) = struct
   open Inputs
 
@@ -151,7 +152,16 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let self_set_location t account_id location =
       assert_is_attached t ;
-      Account_id.Table.set t.location_tbl ~key:account_id ~data:location
+      Account_id.Table.set t.location_tbl ~key:account_id ~data:location ;
+      (* if account is at a hitherto-unused location, that
+         becomes the current location
+      *)
+      match t.current_location with
+      | None ->
+          t.current_location <- Some location
+      | Some loc ->
+          if Location.( > ) location loc then
+            t.current_location <- Some location
 
     (* don't rely on a particular implementation *)
     let self_find_account t location =
@@ -477,18 +487,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert_is_attached t ;
       set_all_accounts_rooted_at_exn t address accounts
 
-    (* keys from this mask and all ancestors *)
-    let accounts t =
-      assert_is_attached t ;
-      let mask_keys =
-        Location_binable.Table.data t.account_tbl
-        |> List.map ~f:Account.identifier
-        |> Account_id.Set.of_list
-      in
-      let parent_keys = Base.accounts (get_parent t) in
-      Account_id.Set.union parent_keys mask_keys
-
-    let token_owner (t : t) (tid : Token_id.t) : Account_id.t option =
+    let token_owner t tid =
       assert_is_attached t ;
       match Token_id.Table.find t.token_owners tid with
       | Some id ->
@@ -620,56 +619,26 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let to_list t =
       assert_is_attached t ;
-      accounts t |> Set.to_list
-      |> List.map ~f:(fun key ->
-             let location = location_of_account t key |> Option.value_exn in
-             match location with
-             | Account addr ->
-                 (Addr.to_int addr, get t location |> Option.value_exn)
-             | location ->
-                 raise (Location_is_not_account location) )
-      |> List.sort ~compare:(fun (addr1, _) (addr2, _) ->
-             Int.compare addr1 addr2 )
-      |> List.map ~f:(fun (_, account) -> account)
+      let num_accounts = num_accounts t in
+      Async.Deferred.List.init ~how:`Parallel num_accounts ~f:(fun i ->
+          Async.Deferred.return @@ get_at_index_exn t i )
+
+    let to_list_sequential t =
+      assert_is_attached t ;
+      let num_accounts = num_accounts t in
+      List.init num_accounts ~f:(fun i -> get_at_index_exn t i)
+
+    (* keys from this mask and all ancestors *)
+    let accounts t =
+      assert_is_attached t ;
+      let%map.Async.Deferred accts = to_list t in
+      List.map accts ~f:Account.identifier |> Account_id.Set.of_list
 
     let iteri t ~f =
-      let account_ids = accounts t |> Account_id.Set.to_list in
-      let idx_account_pairs_unsorted =
-        List.map account_ids ~f:(fun acct_id ->
-            let idx =
-              try index_of_account_exn t acct_id
-              with exn ->
-                failwith
-                  (sprintf
-                     !"iter: index_of_account_exn failed, mask uuid: %{sexp: \
-                       Uuid.t} account id: %{sexp: Account_id.t}, exception: \
-                       %s"
-                     (get_uuid t) acct_id (Exn.to_string exn) )
-            in
-            match location_of_account t acct_id with
-            | None ->
-                failwith
-                  (sprintf
-                     !"iter: location_of_account returned None, mask uuid: \
-                       %{sexp: Uuid.t} account id: %{sexp: Account_id.t}"
-                     (get_uuid t) acct_id )
-            | Some loc -> (
-                match get t loc with
-                | None ->
-                    failwith
-                      (sprintf
-                         !"iter: get returned None, mask uuid: %{sexp: Uuid.t} \
-                           account id: %{sexp: Account_id.t}"
-                         (get_uuid t) acct_id )
-                | Some acct ->
-                    (idx, acct) ) )
-      in
-      (* in case iteration order matters *)
-      let idx_account_pairs =
-        List.sort idx_account_pairs_unsorted
-          ~compare:(fun (idx1, _) (idx2, _) -> Int.compare idx1 idx2)
-      in
-      List.iter idx_account_pairs ~f:(fun (idx, acct) -> f idx acct)
+      assert_is_attached t ;
+      let num_accounts = num_accounts t in
+      Sequence.range ~stop:`exclusive 0 num_accounts
+      |> Sequence.iter ~f:(fun i -> f i (get_at_index_exn t i))
 
     let foldi_with_ignored_accounts t ignored_accounts ~init ~f =
       assert_is_attached t ;
@@ -759,9 +728,10 @@ module Make (Inputs : Inputs_intf.S) = struct
               | None ->
                   Or_error.error_string "Db_error.Out_of_leaves"
               | Some location ->
+                  (* `set` calls `self_set_location`, which updates
+                     the current location
+                  *)
                   set t location account ;
-                  self_set_location t account_id location ;
-                  t.current_location <- Some location ;
                   Ok (`Added, location) ) )
       | Some location ->
           Ok (`Existed, location)
