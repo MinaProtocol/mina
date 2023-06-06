@@ -194,19 +194,23 @@ struct
   let choose_key :
       type n.
          n One_hot_vector.t
-      -> (Inner_curve.t index', n) Vector.t
-      -> Inner_curve.t index' =
+      -> (Inner_curve.t array index', n) Vector.t
+      -> Inner_curve.t array index' =
     let open Tuple_lib in
-    let map = Plonk_verification_key_evals.map in
-    let map2 = Plonk_verification_key_evals.map2 in
+    let map ~f =
+      Plonk_verification_key_evals.map ~f:(Array.map ~f:(Double.map ~f))
+    in
+    let map2 ~f =
+      Plonk_verification_key_evals.map2 ~f:(Array.map2_exn ~f:(Double.map2 ~f))
+    in
     fun bs keys ->
       let open Field in
       Vector.map2
         (bs :> (Boolean.var, n) Vector.t)
         keys
-        ~f:(fun b key -> map key ~f:(fun g -> Double.map g ~f:(( * ) (b :> t))))
-      |> Vector.reduce_exn ~f:(map2 ~f:(Double.map2 ~f:( + )))
-      |> map ~f:(fun g -> Double.map ~f:(Util.seal (module Impl)) g)
+        ~f:(fun b key -> map key ~f:(( * ) (b :> t)))
+      |> Vector.reduce_exn ~f:(map2 ~f:( + ))
+      |> map ~f:(Util.seal (module Impl))
 
   (* TODO: Unify with the code in step_verifier *)
   let lagrange (type n)
@@ -532,8 +536,9 @@ struct
               let index_sponge = Sponge.create sponge_params in
               Array.iter
                 (Types.index_to_field_elements
-                   ~g:(fun (z : Inputs.Inner_curve.t) ->
-                     List.to_array (Inner_curve.to_field_elements z) )
+                   ~g:(fun (z : Inputs.Inner_curve.t array) ->
+                     Array.concat_map z ~f:(fun z ->
+                         List.to_array (Inner_curve.to_field_elements z) ) )
                    m )
                 ~f:(fun x -> Sponge.absorb index_sponge x) ;
               Sponge.squeeze_field index_sponge )
@@ -698,12 +703,10 @@ struct
                all but last sigma_comm
             *)
             Vector.append sg_old
-              ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
-                :: [| m.psm_comm |]
+              ( [| x_hat |] :: [| ft_comm |] :: z_comm :: m.generic_comm
+                :: m.psm_comm
                 :: Vector.append w_comm
-                     (Vector.append
-                        (Vector.map m.coefficients_comm ~f:(fun g -> [| g |]))
-                        (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
+                     (Vector.append m.coefficients_comm sigma_comm_init
                         (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
                      (snd
                         Plonk_types.(

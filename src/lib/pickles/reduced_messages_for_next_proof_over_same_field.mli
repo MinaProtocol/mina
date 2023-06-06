@@ -35,7 +35,7 @@ module Step : sig
   [@@deriving sexp, yojson, sexp, compare, hash, equal]
 
   val prepare :
-       dlog_plonk_index:'a Pickles_types.Plonk_verification_key_evals.t
+       dlog_plonk_index:'a array Pickles_types.Plonk_verification_key_evals.t
     -> ( 'b
        , 'c
        , ( ( Import.Challenge.Constant.t Import.Scalar_challenge.t

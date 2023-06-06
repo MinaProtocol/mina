@@ -124,7 +124,8 @@ end
 module Stable = struct
   module V2 = struct
     type t =
-      { commitments : Backend.Tock.Curve.Affine.t Plonk_verification_key_evals.t
+      { commitments :
+          Backend.Tock.Curve.Affine.t array Plonk_verification_key_evals.t
       ; index :
           (Impls.Wrap.Verification_key.t
           [@to_yojson
@@ -172,7 +173,10 @@ module Stable = struct
         ; lookup_index = None
         }
       in
-      { commitments = c; data = d; index = t }
+      { commitments = Plonk_verification_key_evals.map ~f:(fun x -> [| x |]) c
+      ; data = d
+      ; index = t
+      }
 
     include
       Binable.Of_binable
@@ -180,8 +184,11 @@ module Stable = struct
         (struct
           type nonrec t = t
 
-          let to_binable { commitments; data; index = _ } =
-            { Repr.commitments; data }
+          let to_binable { commitments = c; data; index = _ } =
+            { Repr.commitments =
+                Plonk_verification_key_evals.map ~f:(fun x -> x.(0)) c
+            ; data
+            }
 
           let of_binable r = of_repr (Backend.Tock.Keypair.load_urs ()) r
         end)

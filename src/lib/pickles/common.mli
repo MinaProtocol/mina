@@ -42,7 +42,7 @@ val ft_comm :
   -> scale:('a -> 'b -> 'a)
   -> endoscale:('a -> 'c -> 'a)
   -> negate:('a -> 'a)
-  -> verification_key:'a Pickles_types.Plonk_verification_key_evals.t
+  -> verification_key:'a array Pickles_types.Plonk_verification_key_evals.t
   -> alpha:'c
   -> plonk:
        ( 'd

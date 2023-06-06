@@ -357,7 +357,8 @@ let step_main :
         let dlog_plonk_index =
           exists
             ~request:(fun () -> Req.Wrap_index)
-            (Plonk_verification_key_evals.typ Inner_curve.typ)
+            (Plonk_verification_key_evals.typ
+               (Typ.array ~length:basic.num_wrap_chunks Inner_curve.typ) )
         and prevs =
           exists (Prev_typ.f prev_proof_typs) ~request:(fun () ->
               Req.Proof_with_datas )

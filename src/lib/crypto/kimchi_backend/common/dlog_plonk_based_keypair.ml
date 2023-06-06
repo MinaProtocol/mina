@@ -182,11 +182,11 @@ module Make (Inputs : Inputs_intf) = struct
 
   (** does this convert a backend.verifier_index to a pickles_types.verifier_index? *)
   let vk_commitments (t : Inputs.Verifier_index.t) :
-      Inputs.Curve.Affine.t Pickles_types.Plonk_verification_key_evals.t =
-    let g c : Inputs.Curve.Affine.t =
+      Inputs.Curve.Affine.t array Pickles_types.Plonk_verification_key_evals.t =
+    let g c : Inputs.Curve.Affine.t array =
       match Inputs.Poly_comm.of_backend_without_degree_bound c with
       | `Without_degree_bound x ->
-          x.(0)
+          x
       | `With_degree_bound _ ->
           assert false
     in

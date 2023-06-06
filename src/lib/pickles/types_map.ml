@@ -16,7 +16,7 @@ module Basic = struct
     ; public_input : ('var, 'value) Impls.Step.Typ.t
     ; branches : 'n2 Nat.t
     ; wrap_domains : Domains.t
-    ; wrap_key : Tick.Inner_curve.Affine.t Plonk_verification_key_evals.t
+    ; wrap_key : Tick.Inner_curve.Affine.t array Plonk_verification_key_evals.t
     ; wrap_vk : Impls.Wrap.Verification_key.t
     ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
     ; num_step_chunks : int
@@ -80,7 +80,7 @@ module Side_loaded = struct
     ; public_input
     ; branches
     ; wrap_domains = Common.wrap_domains ~proofs_verified
-    ; wrap_key
+    ; wrap_key = Plonk_verification_key_evals.map ~f:(fun x -> [| x |]) wrap_key
     ; feature_flags
     ; num_step_chunks
     ; num_wrap_chunks
@@ -109,7 +109,8 @@ module Compiled = struct
     ; proofs_verifieds : (int, 'branches) Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
-    ; wrap_key : Tick.Inner_curve.Affine.t Plonk_verification_key_evals.t Lazy.t
+    ; wrap_key :
+        Tick.Inner_curve.Affine.t array Plonk_verification_key_evals.t Lazy.t
     ; wrap_vk : Impls.Wrap.Verification_key.t Lazy.t
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
@@ -154,7 +155,7 @@ module For_step = struct
     ; proofs_verifieds :
         [ `Known of (Impls.Step.Field.t, 'branches) Vector.t | `Side_loaded ]
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
-    ; wrap_key : inner_curve_var Plonk_verification_key_evals.t
+    ; wrap_key : inner_curve_var array Plonk_verification_key_evals.t
     ; wrap_domain :
         [ `Known of Domain.t
         | `Side_loaded of
@@ -189,7 +190,8 @@ module For_step = struct
     ; max_proofs_verified
     ; public_input
     ; proofs_verifieds = `Side_loaded
-    ; wrap_key = index.wrap_index
+    ; wrap_key =
+        Plonk_verification_key_evals.map ~f:(fun x -> [| x |]) index.wrap_index
     ; wrap_domain = `Side_loaded index.actual_wrap_domain_size
     ; step_domains = `Side_loaded
     ; feature_flags
@@ -218,7 +220,7 @@ module For_step = struct
     ; public_input
     ; wrap_key =
         Plonk_verification_key_evals.map (Lazy.force wrap_key)
-          ~f:Step_main_inputs.Inner_curve.constant
+          ~f:(Array.map ~f:Step_main_inputs.Inner_curve.constant)
     ; wrap_domain = `Known wrap_domains.h
     ; step_domains = `Known step_domains
     ; feature_flags

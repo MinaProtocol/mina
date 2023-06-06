@@ -572,12 +572,10 @@ struct
           let without_degree_bound =
             Vector.append
               (Vector.map sg_old ~f:(fun g -> [| g |]))
-              ( [| x_hat |] :: [| ft_comm |] :: z_comm :: [| m.generic_comm |]
-              :: [| m.psm_comm |]
+              ( [| x_hat |] :: [| ft_comm |] :: z_comm :: m.generic_comm
+              :: m.psm_comm
               :: Vector.append w_comm
-                   (Vector.append
-                      (Vector.map m.coefficients_comm ~f:(fun g -> [| g |]))
-                      (Vector.map sigma_comm_init ~f:(fun g -> [| g |]))
+                   (Vector.append m.coefficients_comm sigma_comm_init
                       (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
                    (snd
                       Plonk_types.(
@@ -1081,8 +1079,9 @@ struct
     let sponge = Sponge.create sponge_params in
     Array.iter
       (Types.index_to_field_elements
-         ~g:(fun (z : Inputs.Inner_curve.t) ->
-           List.to_array (Inner_curve.to_field_elements z) )
+         ~g:(fun (z : Inputs.Inner_curve.t array) ->
+           Array.concat_map z ~f:(fun z ->
+               List.to_array (Inner_curve.to_field_elements z) ) )
          index )
       ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
     sponge

@@ -29,7 +29,7 @@ struct
       lazy
         (Vector.init num_choices ~f:(fun _ ->
              let g = Backend.Tock.Inner_curve.(to_affine_exn one) in
-             Verification_key.dummy_commitments g ) )
+             Verification_key.dummy_commitments [| g |] ) )
     in
     Timer.clock __LOC__ ;
     let srs = Backend.Tick.Keypair.load_urs () in

@@ -696,7 +696,7 @@ module Wrap = struct
       { app_state : 's
             (** The actual application-level state (e.g., for Mina, this is the protocol state which contains the
     merkle root of the ledger, state related to consensus, etc.) *)
-      ; dlog_plonk_index : 'g Plonk_verification_key_evals.t
+      ; dlog_plonk_index : 'g array Plonk_verification_key_evals.t
             (** The verification key corresponding to the wrap-circuit for this recursive proof system.
           It gets threaded through all the circuits so that the step circuits can verify proofs against
           it.
@@ -713,7 +713,7 @@ module Wrap = struct
         ; old_bulletproof_challenges
         } ~app_state:app_state_to_field_elements ~comm ~(g : g -> f list) =
       Array.concat
-        [ index_to_field_elements ~g:comm dlog_plonk_index
+        [ index_to_field_elements ~g:(Array.concat_map ~f:comm) dlog_plonk_index
         ; app_state_to_field_elements app_state
         ; Vector.map2 challenge_polynomial_commitments
             old_bulletproof_challenges ~f:(fun comm chals ->
@@ -762,10 +762,11 @@ module Wrap = struct
       ; old_bulletproof_challenges
       }
 
-    let typ comm g s chal proofs_verified =
+    let typ ~num_step_chunks comm g s chal proofs_verified =
       Snarky_backendless.Typ.of_hlistable
         [ s
-        ; Plonk_verification_key_evals.typ comm
+        ; Plonk_verification_key_evals.typ
+            (Snarky_backendless.Typ.array ~length:num_step_chunks comm)
         ; Vector.typ g proofs_verified
         ; chal
         ]

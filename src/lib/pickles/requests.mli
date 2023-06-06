@@ -31,7 +31,7 @@ module Step : sig
           Hlist.H3.T(Per_proof_witness.Constant.No_app_state).t
           Snarky_backendless.Request.t
       | Wrap_index :
-          Backend.Tock.Curve.Affine.t Plonk_verification_key_evals.t
+          Backend.Tock.Curve.Affine.t array Plonk_verification_key_evals.t
           Snarky_backendless.Request.t
       | App_state : statement Snarky_backendless.Request.t
       | Return_value : return_value -> unit Snarky_backendless.Request.t

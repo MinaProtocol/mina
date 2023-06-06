@@ -203,12 +203,15 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       let of_compiled tag : t =
         let d = Types_map.lookup_compiled tag.Tag.id in
+        assert (d.num_wrap_chunks = 1) ;
         let actual_wrap_domain_size =
           Common.actual_wrap_domain_size
             ~log_2_domain_size:(Lazy.force d.wrap_vk).domain.log_size_of_group
         in
         { wrap_vk = Some (Lazy.force d.wrap_vk)
-        ; wrap_index = Lazy.force d.wrap_key
+        ; wrap_index =
+            Plonk_verification_key_evals.map ~f:(fun x -> x.(0))
+            @@ Lazy.force d.wrap_key
         ; max_proofs_verified =
             Pickles_base.Proofs_verified.of_nat
               (Nat.Add.n d.max_proofs_verified)
@@ -260,7 +263,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
       with_return (fun { return } ->
           List.map ts ~f:(fun (vk, x, p) ->
               let vk : V.t =
-                { commitments = vk.wrap_index
+                { commitments =
+                    Plonk_verification_key_evals.map
+                      ~f:(fun x -> [| x |])
+                      vk.wrap_index
                 ; index =
                     ( match vk.wrap_vk with
                     | None ->

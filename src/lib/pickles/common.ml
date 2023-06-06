@@ -236,23 +236,24 @@ let ft_comm ~add:( + ) ~scale ~endoscale:_ ~negate
   let _, [ sigma_comm_last ] =
     Vector.split m.sigma_comm (snd (Plonk_types.Permuts_minus_1.add Nat.N1.n))
   in
-  let f_comm =
-    List.reduce_exn ~f:( + )
-      [ plonk.perm * sigma_comm_last
-      ; plonk.vbmul * m.mul_comm
-      ; plonk.complete_add * m.complete_add_comm
-      ; plonk.endomul * m.emul_comm
-      ; plonk.endomul_scalar * m.endomul_scalar_comm
-      ]
-  in
-  let chunked_t_comm =
-    let n = Array.length t_comm in
-    let res = ref t_comm.(n - 1) in
+  let reduce_comm comm =
+    let n = Array.length comm in
+    let res = ref comm.(n - 1) in
     for i = n - 2 downto 0 do
-      res := t_comm.(i) + scale !res plonk.zeta_to_srs_length
+      res := comm.(i) + scale !res plonk.zeta_to_srs_length
     done ;
     !res
   in
+  let f_comm =
+    List.reduce_exn ~f:( + )
+      [ plonk.perm * reduce_comm sigma_comm_last
+      ; plonk.vbmul * reduce_comm m.mul_comm
+      ; plonk.complete_add * reduce_comm m.complete_add_comm
+      ; plonk.endomul * reduce_comm m.emul_comm
+      ; plonk.endomul_scalar * reduce_comm m.endomul_scalar_comm
+      ]
+  in
+  let chunked_t_comm = reduce_comm t_comm in
   f_comm + chunked_t_comm
   + negate (scale chunked_t_comm plonk.zeta_to_domain_size)
 
