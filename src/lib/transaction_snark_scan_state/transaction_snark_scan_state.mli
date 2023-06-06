@@ -22,7 +22,7 @@ module Transaction_with_witness : sig
     ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
     ; first_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
     ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
-    ; block_global_slot : Mina_numbers.Global_slot.t
+    ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
     }
   [@@deriving sexp]
 end
@@ -100,7 +100,7 @@ val fill_work_and_enqueue_transactions :
   -> ( ( Ledger_proof.t
        * ( Transaction.t With_status.t
          * State_hash.t
-         * Mina_numbers.Global_slot.t )
+         * Mina_numbers.Global_slot_since_genesis.t )
          Transactions_ordered.Poly.t
          list )
        option
@@ -110,7 +110,9 @@ val fill_work_and_enqueue_transactions :
 val latest_ledger_proof :
      t
   -> ( Ledger_proof_with_sok_message.t
-     * (Transaction.t With_status.t * State_hash.t * Mina_numbers.Global_slot.t)
+     * ( Transaction.t With_status.t
+       * State_hash.t
+       * Mina_numbers.Global_slot_since_genesis.t )
        Transactions_ordered.Poly.t
        list )
      option
@@ -127,7 +129,7 @@ val get_snarked_ledger_sync :
   -> get_protocol_state:
        (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)
   -> apply_first_pass:
-       (   global_slot:Mina_numbers.Global_slot.t
+       (   global_slot:Mina_numbers.Global_slot_since_genesis.t
         -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
         -> Ledger.t
         -> Transaction.t
@@ -137,7 +139,7 @@ val get_snarked_ledger_sync :
         -> Ledger.Transaction_partially_applied.t
         -> Ledger.Transaction_applied.t Or_error.t )
   -> apply_first_pass_sparse_ledger:
-       (   global_slot:Mina_numbers.Global_slot.t
+       (   global_slot:Mina_numbers.Global_slot_since_genesis.t
         -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
         -> Mina_ledger.Sparse_ledger.t
         -> Mina_transaction.Transaction.t
@@ -152,7 +154,7 @@ val get_snarked_ledger_async :
   -> get_protocol_state:
        (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)
   -> apply_first_pass:
-       (   global_slot:Mina_numbers.Global_slot.t
+       (   global_slot:Mina_numbers.Global_slot_since_genesis.t
         -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
         -> Ledger.t
         -> Transaction.t
@@ -162,7 +164,7 @@ val get_snarked_ledger_async :
         -> Ledger.Transaction_partially_applied.t
         -> Ledger.Transaction_applied.t Or_error.t )
   -> apply_first_pass_sparse_ledger:
-       (   global_slot:Mina_numbers.Global_slot.t
+       (   global_slot:Mina_numbers.Global_slot_since_genesis.t
         -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
         -> Mina_ledger.Sparse_ledger.t
         -> Mina_transaction.Transaction.t
@@ -184,7 +186,7 @@ val get_staged_ledger_async :
   -> get_protocol_state:
        (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)
   -> apply_first_pass:
-       (   global_slot:Mina_numbers.Global_slot.t
+       (   global_slot:Mina_numbers.Global_slot_since_genesis.t
         -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
         -> Ledger.t
         -> Transaction.t
@@ -194,7 +196,7 @@ val get_staged_ledger_async :
         -> Ledger.Transaction_partially_applied.t
         -> Ledger.Transaction_applied.t Or_error.t )
   -> apply_first_pass_sparse_ledger:
-       (   global_slot:Mina_numbers.Global_slot.t
+       (   global_slot:Mina_numbers.Global_slot_since_genesis.t
         -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
         -> Mina_ledger.Sparse_ledger.t
         -> Mina_transaction.Transaction.t
@@ -216,7 +218,9 @@ val hash : t -> Staged_ledger_hash.Aux_hash.t
 (** All the transactions with hash of the parent block in which they were included in the order in which they were applied*)
 val staged_transactions_with_state_hash :
      t
-  -> (Transaction.t With_status.t * State_hash.t * Mina_numbers.Global_slot.t)
+  -> ( Transaction.t With_status.t
+     * State_hash.t
+     * Mina_numbers.Global_slot_since_genesis.t )
      Transactions_ordered.Poly.t
      list
 

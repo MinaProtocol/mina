@@ -180,6 +180,9 @@ module Get_status = struct
     Rpc.Rpc.create ~name:"Get_status" ~version:0 ~bin_query ~bin_response
 end
 
+(* ITN internal logs from prover and verifier *)
+module Submit_internal_log = Itn_logger.Submit_internal_log
+
 module Clear_hist_status = struct
   type query = [ `Performance | `None ] [@@deriving bin_io_unversioned]
 

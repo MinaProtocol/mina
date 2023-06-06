@@ -191,6 +191,7 @@ variable "seed_configs" {
       # private_key_secret = string,
       enableArchive      = bool,
       archiveAddress     = string
+      persist_working_dir = bool,
     })
   )
   default = []
@@ -225,11 +226,11 @@ variable "block_producer_configs" {
       run_with_bots          = bool,
       enableArchive          = bool,
       archiveAddress         = string
+      persist_working_dir    = bool,
     })
   )
   default = []
 }
-
 
 variable "plain_node_configs" {
   default = null
@@ -245,6 +246,7 @@ variable "snark_coordinators" {
       snark_worker_fee      = number
       snark_worker_public_key = string
       snark_coordinators_host_port = number
+      persist_working_dir = bool
     }))
   default = []
 }
@@ -347,7 +349,8 @@ variable "archive_configs" {
       persistenceSize         = string
       persistenceStorageClass = string
       persistenceAccessModes  = list(string)
-      spotAllowed     = string
+      spotAllowed             = string
+      persist_working_dir     = bool
     })
   )
   default = []
@@ -366,4 +369,10 @@ variable "upload_blocks_to_gcloud" {
 variable "zkapps_dashboard_key" {
   type    = string
   default = ""
+}
+
+
+variable "enable_working_dir_persitence" {
+  type    = bool
+  default = false
 }

@@ -70,6 +70,7 @@
    kimchi_backend
    hex
    snark_bits
+   error_json
    ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)

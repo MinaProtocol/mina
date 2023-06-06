@@ -4,7 +4,7 @@ open Mina_base
 open Mina_transaction
 open Mina_state
 open Snark_params
-module Global_slot = Mina_numbers.Global_slot
+module Global_slot_since_genesis = Mina_numbers.Global_slot_since_genesis
 open Currency
 open Pickles_types
 module Wire_types = Mina_wire_types.Transaction_snark
@@ -532,7 +532,9 @@ module Make_str (A : Wire_types.Concrete) = struct
               let%bind receiver_account, _path =
                 read (Typ.Internal.ref ()) receiver_account
               in
-              let%map txn_global_slot = read Global_slot.typ txn_global_slot in
+              let%map txn_global_slot =
+                read Mina_numbers.Global_slot_since_genesis.typ txn_global_slot
+              in
               compute_unchecked ~constraint_constants ~txn_global_slot
                 ~fee_payer_account ~source_account ~receiver_account txn)
     end
@@ -644,7 +646,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; fee_excess : Amount.Signed.var
           ; supply_increase : Amount.Signed.var
           ; protocol_state : Zkapp_precondition.Protocol_state.View.Checked.t
-          ; block_global_slot : Global_slot.Checked.var
+          ; block_global_slot :
+              Mina_numbers.Global_slot_since_genesis.Checked.var
           }
       end
 
@@ -764,14 +767,22 @@ module Make_str (A : Wire_types.Concrete) = struct
           let create = Account_id.Checked.create
         end
 
-        module Global_slot = struct
-          include Global_slot.Checked
+        module Global_slot_since_genesis = struct
+          include Mina_numbers.Global_slot_since_genesis.Checked
 
           let ( > ) x y = run_checked (x > y)
 
           let if_ b ~then_ ~else_ = run_checked (if_ b ~then_ ~else_)
 
           let equal x y = run_checked (equal x y)
+        end
+
+        module Global_slot_span = struct
+          include Mina_numbers.Global_slot_span.Checked
+
+          let ( > ) x y = run_checked (x > y)
+
+          let if_ b ~then_ ~else_ = run_checked (if_ b ~then_ ~else_)
         end
 
         module Nonce = struct
@@ -1827,7 +1838,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ~compute:(fun () -> !witness.state_body)
         in
         let block_global_slot =
-          exists Mina_numbers.Global_slot.typ ~compute:(fun () ->
+          exists Mina_numbers.Global_slot_since_genesis.typ ~compute:(fun () ->
               !witness.block_global_slot )
         in
         let pending_coinbase_stack_init =
@@ -2132,7 +2143,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       | State_body :
           Mina_state.Protocol_state.Body.Value.t Snarky_backendless.Request.t
       | Init_stack : Pending_coinbase.Stack.t Snarky_backendless.Request.t
-      | Global_slot : Mina_numbers.Global_slot.t Snarky_backendless.Request.t
+      | Global_slot :
+          Mina_numbers.Global_slot_since_genesis.t Snarky_backendless.Request.t
 
     let%snarkydef_ add_burned_tokens acc_burned_tokens amount
         ~is_coinbase_or_fee_transfer ~update_account =
@@ -2236,8 +2248,12 @@ module Make_str (A : Wire_types.Concrete) = struct
         Account_id.Checked.create payload.common.fee_payer_pk fee_token
       in
       let%bind () =
+        [%with_label_ "Fee payer and source must be equal"] (fun () ->
+            Account_id.Checked.equal fee_payer source >>= Boolean.Assert.is_true )
+      in
+      let%bind () =
         [%with_label_ "Check slot validity"] (fun () ->
-            Global_slot.Checked.(
+            Global_slot_since_genesis.Checked.(
               current_global_slot <= payload.common.valid_until)
             >>= Boolean.Assert.is_true )
       in
@@ -2403,6 +2419,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                   Account.Checked.has_permission
                     ~signature_verifies:is_user_command ~to_:`Access account
                 in
+                let permitted_to_increment_nonce =
+                  Account.Checked.has_permission ~to_:`Increment_nonce account
+                in
                 let permitted_to_send =
                   Account.Checked.has_permission ~to_:`Send account
                 in
@@ -2413,6 +2432,15 @@ module Make_str (A : Wire_types.Concrete) = struct
                   [%with_label_
                     "Fee payer access should be permitted for all commands"]
                     (fun () -> Boolean.Assert.is_true permitted_to_access)
+                in
+                let%bind () =
+                  [%with_label_
+                    "Fee payer increment nonce should be permitted for all \
+                     commands"] (fun () ->
+                      Boolean.Assert.any
+                        [ Boolean.not is_user_command
+                        ; permitted_to_increment_nonce
+                        ] )
                 in
                 let%bind () =
                   [%with_label_
@@ -3017,7 +3045,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~request:(As_prover.return State_body)
       in
       let%bind global_slot =
-        exists Mina_numbers.Global_slot.typ
+        exists Mina_numbers.Global_slot_since_genesis.typ
           ~request:(As_prover.return Global_slot)
       in
       let%bind fee_payment_root_after, fee_excess, supply_increase =
@@ -3088,7 +3116,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let transaction_union_handler handler (transaction : Transaction_union.t)
         (state_body : Mina_state.Protocol_state.Body.Value.t)
-        (global_slot : Mina_numbers.Global_slot.t)
+        (global_slot : Mina_numbers.Global_slot_since_genesis.t)
         (init_stack : Pending_coinbase.Stack.t) :
         Snarky_backendless.Request.request -> _ =
      fun (With { request; respond } as r) ->
@@ -4475,8 +4503,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
     end
 
-    let deploy_snapp ?(no_auth = false) ?(default_permissions = false)
-        ~constraint_constants (spec : Deploy_snapp_spec.t) =
+    let deploy_snapp ?(no_auth = false) ?permissions ~constraint_constants
+        (spec : Deploy_snapp_spec.t) =
       let `VK vk, `Prover _trivial_prover =
         create_trivial_snapp ~constraint_constants ()
       in
@@ -4494,14 +4522,13 @@ module Make_str (A : Wire_types.Concrete) = struct
           { update with
             verification_key = Zkapp_basic.Set_or_keep.Set vk
           ; permissions =
-              ( if default_permissions then
-                Zkapp_basic.Set_or_keep.Set Permissions.user_default
-              else
-                Zkapp_basic.Set_or_keep.Set
-                  { Permissions.user_default with
-                    edit_state = Permissions.Auth_required.Proof
-                  ; edit_action_state = Proof
-                  } )
+              Zkapp_basic.Set_or_keep.Set
+                (Option.value permissions
+                   ~default:
+                     { Permissions.user_default with
+                       edit_state = Permissions.Auth_required.Proof
+                     ; edit_action_state = Proof
+                     } )
           }
       in
       let ( `Zkapp_command { Zkapp_command.fee_payer; account_updates; memo }

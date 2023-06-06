@@ -249,7 +249,14 @@ module Types = struct
 
     let block_time = BlockTime.typ ()
 
-    let global_slot = GlobalSlot.typ ()
+    let global_slot_since_genesis = GlobalSlotSinceGenesis.typ ()
+
+    (* type annotation required because we're not using this yet *)
+    let global_slot_since_hard_fork :
+        (Mina_lib.t, GlobalSlotSinceHardFork.t option) typ =
+      GlobalSlotSinceHardFork.typ ()
+
+    let global_slot_span = GlobalSlotSpan.typ ()
 
     let length = Length.typ ()
 
@@ -314,7 +321,8 @@ module Types = struct
         ; field "slot" ~typ:(non_null uint32)
             ~args:Arg.[]
             ~resolve:(fun _ global_slot -> C.slot global_slot)
-        ; field "globalSlot" ~typ:(non_null global_slot)
+        ; field "globalSlot"
+            ~typ:(non_null global_slot_since_hard_fork)
             ~args:Arg.[]
             ~resolve:(fun _ (global_slot : Consensus.Data.Consensus_time.t) ->
               C.to_global_slot global_slot )
@@ -346,7 +354,7 @@ module Types = struct
             ~resolve:(fun _ (time, _) -> time)
         ; field "globalSlotSinceGenesis"
             ~args:Arg.[]
-            ~typ:(non_null global_slot)
+            ~typ:(non_null global_slot_since_genesis)
             ~resolve:(fun _ (_, slot) -> slot)
         ] )
 
@@ -378,7 +386,7 @@ module Types = struct
               | Produce_now info ->
                   [ of_time ~consensus_constants info.time ] )
         ; field "globalSlotSinceGenesis"
-            ~typ:(non_null @@ list @@ non_null global_slot)
+            ~typ:(non_null @@ list @@ non_null global_slot_since_genesis)
             ~doc:"Next block production global-slot-since-genesis "
             ~args:Arg.[]
             ~resolve:(fun _
@@ -612,6 +620,13 @@ module Types = struct
               ~doc:"metadata for the log"
               ~typ:(non_null (list (non_null metadatum)))
               ~resolve:(fun _ (log : Itn_logger.t) -> log.metadata)
+          ; field "process"
+              ~args:Arg.[]
+              ~doc:
+                "if not the daemon, which process sent the log (prover or \
+                 verifier)"
+              ~typ:string
+              ~resolve:(fun _ (log : Itn_logger.t) -> log.process)
           ] )
   end
 
@@ -652,7 +667,7 @@ module Types = struct
                   None
               | Timed timing_info ->
                   Some timing_info.initial_minimum_balance )
-        ; field "cliffTime" ~typ:global_slot
+        ; field "cliffTime" ~typ:global_slot_since_genesis
             ~doc:"The cliff time for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -670,7 +685,7 @@ module Types = struct
                   None
               | Timed timing_info ->
                   Some timing_info.cliff_amount )
-        ; field "vestingPeriod" ~typ:global_slot
+        ; field "vestingPeriod" ~typ:global_slot_span
             ~doc:"The vesting period for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
@@ -1651,7 +1666,9 @@ module Types = struct
           ; abstract_field "feePayer"
               ~typ:(non_null AccountObj.account)
               ~args:[] ~doc:"Account that pays the fees for the command"
-          ; abstract_field "validUntil" ~typ:(non_null global_slot) ~args:[]
+          ; abstract_field "validUntil"
+              ~typ:(non_null global_slot_since_genesis)
+              ~args:[]
               ~doc:
                 "The global slot number after which this transaction cannot be \
                  applied"
@@ -1727,7 +1744,7 @@ module Types = struct
           ~args:[] ~doc:"Account that the command is sent from"
           ~resolve:(fun { ctx = mina; _ } cmd ->
             AccountObj.get_best_ledger_account mina
-              (Signed_command.source cmd.With_hash.data) )
+              (Signed_command.fee_payer cmd.With_hash.data) )
       ; field_no_status "receiver" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account that the command applies to"
           ~resolve:(fun { ctx = mina; _ } cmd ->
@@ -1735,10 +1752,12 @@ module Types = struct
               (Signed_command.receiver cmd.With_hash.data) )
       ; field_no_status "feePayer" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account that pays the fees for the command"
+          ~deprecated:(Deprecated (Some "use source field instead"))
           ~resolve:(fun { ctx = mina; _ } cmd ->
             AccountObj.get_best_ledger_account mina
               (Signed_command.fee_payer cmd.With_hash.data) )
-      ; field_no_status "validUntil" ~typ:(non_null global_slot) ~args:[]
+      ; field_no_status "validUntil" ~typ:(non_null global_slot_since_genesis)
+          ~args:[]
           ~doc:
             "The global slot number after which this transaction cannot be \
              applied" ~resolve:(fun _ cmd ->
@@ -1839,7 +1858,7 @@ module Types = struct
           field_no_status "delegator" ~typ:(non_null AccountObj.account)
             ~args:[] ~resolve:(fun { ctx = mina; _ } cmd ->
               AccountObj.get_best_ledger_account mina
-                (Signed_command.source cmd.With_hash.data) )
+                (Signed_command.fee_payer cmd.With_hash.data) )
           :: field_no_status "delegatee" ~typ:(non_null AccountObj.account)
                ~args:[] ~resolve:(fun { ctx = mina; _ } cmd ->
                  AccountObj.get_best_ledger_account mina
@@ -2675,7 +2694,8 @@ module Types = struct
       let arg_typ =
         obj "VrfMessageInput" ~doc:"The inputs to a vrf evaluation"
           ~coerce:(fun global_slot epoch_seed delegator_index ->
-            { Consensus_vrf.Layout.Message.global_slot
+            { Consensus_vrf.Layout.Message.global_slot =
+                Mina_numbers.Global_slot_since_hard_fork.of_uint32 global_slot
             ; epoch_seed = Mina_base.Epoch_seed.of_base58_check_exn epoch_seed
             ; delegator_index
             } )
@@ -2688,7 +2708,8 @@ module Types = struct
                 ~typ:(non_null int)
             ]
           ~split:(fun f (t : input) ->
-            f t.global_slot
+            f
+              (Mina_numbers.Global_slot_since_hard_fork.to_uint32 t.global_slot)
               (Mina_base.Epoch_seed.to_base58_check t.epoch_seed)
               t.delegator_index )
     end
@@ -3191,6 +3212,7 @@ module Types = struct
           ; max_fee : string
           ; deployment_fee : string
           ; account_queue_size : int
+          ; max_cost : bool
           }
 
         let arg_typ =
@@ -3200,7 +3222,7 @@ module Types = struct
                          transactions_per_second duration_in_minutes memo_prefix
                          no_precondition min_balance_change max_balance_change
                          init_balance min_fee max_fee deployment_fee
-                         account_queue_size ->
+                         account_queue_size max_cost ->
               Result.return
                 { fee_payers
                 ; num_zkapps_to_deploy
@@ -3216,13 +3238,14 @@ module Types = struct
                 ; max_fee
                 ; deployment_fee
                 ; account_queue_size
+                ; max_cost
                 } )
             ~split:(fun f (t : input) ->
               f t.fee_payers t.num_zkapps_to_deploy t.num_new_accounts
                 t.transactions_per_second t.duration_in_minutes t.memo_prefix
                 t.no_precondition t.min_balance_change t.max_balance_change
                 t.init_balance t.min_fee t.max_fee t.deployment_fee
-                t.account_queue_size )
+                t.account_queue_size t.max_cost )
             ~fields:
               Arg.
                 [ arg "feePayers"
@@ -3262,6 +3285,8 @@ module Types = struct
                 ; arg "accountQueueSize"
                     ~doc:"The size of queue for recently used accounts"
                     ~typ:(non_null int)
+                ; arg "maxCost" ~doc:"Generate max cost zkApp command"
+                    ~typ:(non_null bool)
                 ]
       end
 
@@ -3319,7 +3344,8 @@ module Types = struct
   let vrf_message : ('context, Consensus_vrf.Layout.Message.t option) typ =
     let open Consensus_vrf.Layout.Message in
     obj "VrfMessage" ~doc:"The inputs to a vrf evaluation" ~fields:(fun _ ->
-        [ field "globalSlot" ~typ:(non_null global_slot)
+        [ field "globalSlot"
+            ~typ:(non_null global_slot_since_hard_fork)
             ~args:Arg.[]
             ~resolve:(fun _ { global_slot; _ } -> global_slot)
         ; field "epochSeed" ~typ:(non_null epoch_seed)
@@ -3773,7 +3799,7 @@ module Mutations = struct
           Transition_frontier.Breadcrumb.staged_ledger breadcrumb
           |> Staged_ledger.ledger
         in
-        let accounts = Ledger.to_list best_tip_ledger in
+        let%bind accounts = Ledger.to_list best_tip_ledger in
         let constraint_constants =
           Genesis_constants.Constraint_constants.compiled
         in
@@ -3830,7 +3856,8 @@ module Mutations = struct
                   Ledger.apply_zkapp_command_unchecked ~constraint_constants
                     ~global_slot:
                       ( Transition_frontier.Breadcrumb.consensus_state breadcrumb
-                      |> Consensus.Data.Consensus_state.curr_global_slot )
+                      |> Consensus.Data.Consensus_state
+                         .global_slot_since_genesis )
                     ~state_view ledger zkapp_command
                 in
                 (* rearrange data to match result type of `send_zkapp_command` *)
@@ -3874,7 +3901,7 @@ module Mutations = struct
     let open Result.Let_syntax in
     (* TODO: We should put a more sensible default here. *)
     let valid_until =
-      Option.map ~f:Mina_numbers.Global_slot.of_uint32 valid_until
+      Option.map ~f:Mina_numbers.Global_slot_since_genesis.of_uint32 valid_until
     in
     let%bind fee =
       result_of_exn Currency.Fee.of_uint64 fee
@@ -3965,7 +3992,7 @@ module Mutations = struct
                     (from, to_, fee, valid_until, memo, nonce_opt) signature ->
         let body =
           Signed_command_payload.Body.Stake_delegation
-            (Set_delegate { delegator = from; new_delegate = to_ })
+            (Set_delegate { new_delegate = to_ })
         in
         match signature with
         | None ->
@@ -3991,10 +4018,7 @@ module Mutations = struct
                     signature ->
         let body =
           Signed_command_payload.Body.Payment
-            { source_pk = from
-            ; receiver_pk = to_
-            ; amount = Amount.of_uint64 amount
-            }
+            { receiver_pk = to_; amount = Amount.of_uint64 amount }
         in
         match signature with
         | None ->
@@ -4068,7 +4092,7 @@ module Mutations = struct
           in
           let body =
             Signed_command_payload.Body.Payment
-              { source_pk; receiver_pk; amount = Amount.of_uint64 amount }
+              { receiver_pk; amount = Amount.of_uint64 amount }
           in
           let memo = "" in
           let kp =
@@ -4488,10 +4512,7 @@ module Mutations = struct
                           in
                           let body =
                             Signed_command_payload.Body.Payment
-                              { source_pk
-                              ; receiver_pk
-                              ; amount = payment_details.amount
-                              }
+                              { receiver_pk; amount = payment_details.amount }
                           in
                           let valid_until = None in
                           let nonce = nonces.(ndx) in
@@ -4561,17 +4582,13 @@ module Mutations = struct
       |> Mina_ledger.Ledger.get ledger
       |> Option.value_exn
 
-    let id_of_kp (kp : Signature_lib.Keypair.t) =
-      Account_id.create
-        (Signature_lib.Public_key.compress kp.public_key)
-        Token_id.default
-
     let account_of_kp (kp : Signature_lib.Keypair.t) ledger =
-      account_of_id (id_of_kp kp) ledger
+      account_of_id (Account_id.of_public_key kp.public_key) ledger
 
-    let deploy_zkapps ~mina ~ledger ~deployment_fee ~init_balance
+    let deploy_zkapps ~mina ~ledger ~deployment_fee ~max_cost ~init_balance
         ~(fee_payer_array : Signature_lib.Keypair.t Array.t)
-        ~constraint_constants ~logger ~memo_prefix keypairs =
+        ~constraint_constants ~logger ~memo_prefix ~wait_span ~stop_signal
+        ~stop_time ~uuid keypairs =
       let fee_payer_accounts =
         Array.map fee_payer_array ~f:(fun key -> account_of_kp key ledger)
       in
@@ -4581,47 +4598,73 @@ module Mutations = struct
       let ndx = ref 0 in
       let num_fee_payers = Array.length fee_payer_array in
       Deferred.List.iter keypairs ~f:(fun kp ->
-          let fee_payer_keypair = fee_payer_array.(!ndx) in
-          let memo = sprintf "%s-%s" memo_prefix (Int.to_string !ndx) in
-          let spec =
-            { Transaction_snark.For_tests.Deploy_snapp_spec.sender =
-                (fee_payer_keypair, !(fee_payer_nonces.(!ndx)))
-            ; fee = Currency.Fee.of_mina_string_exn deployment_fee
-            ; fee_payer = None
-            ; amount = Currency.Amount.of_mina_string_exn init_balance
-            ; zkapp_account_keypairs = [ kp ]
-            ; memo = Signed_command_memo.create_from_string_exn memo
-            ; new_zkapp_account = true
-            ; snapp_update = Account_update.Update.dummy
-            ; preconditions = None
-            ; authorization_kind = Account_update.Authorization_kind.Signature
-            }
-          in
-          let zkapp_command =
-            Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-              ~default_permissions:true spec
-          in
-          let rec go () =
-            match%bind send_zkapp_command mina zkapp_command with
-            | Ok _ ->
-                fee_payer_nonces.(!ndx) :=
-                  Account.Nonce.succ !(fee_payer_nonces.(!ndx)) ;
-                ndx := (!ndx + 1) mod num_fee_payers ;
-                [%log info]
-                  "Successfully submitted zkApp command that creates a zkApp \
-                   account"
-                  ~metadata:
-                    [ ("zkapp_command", Zkapp_command.to_yojson zkapp_command) ] ;
-                Deferred.unit
-            | Error err ->
-                [%log info] "Failed to setup a zkApp account, try again"
-                  ~metadata:
-                    [ ("zkapp_command", Zkapp_command.to_yojson zkapp_command)
-                    ; ("error", `String err)
-                    ] ;
-                go ()
-          in
-          go () )
+          if Time.(now () >= stop_time) then (
+            [%log info]
+              "Scheduled zkapp commands with handle %s has expired, stop \
+               deployment of zkapp accounts"
+              (Uuid.to_string uuid) ;
+            Uuid.Table.remove scheduler_tbl uuid ;
+            return () )
+          else if Ivar.is_full stop_signal then (
+            [%log info]
+              "Scheduled zkapp commands with handle %s received stop signal, \
+               stop deployment of zkapp accounts"
+              (Uuid.to_string uuid) ;
+            Uuid.Table.remove scheduler_tbl uuid ;
+            return () )
+          else
+            let fee_payer_keypair = fee_payer_array.(!ndx) in
+            let memo = sprintf "%s-%s" memo_prefix (Int.to_string !ndx) in
+            let spec =
+              { Transaction_snark.For_tests.Deploy_snapp_spec.sender =
+                  (fee_payer_keypair, !(fee_payer_nonces.(!ndx)))
+              ; fee = Currency.Fee.of_mina_string_exn deployment_fee
+              ; fee_payer = None
+              ; amount = Currency.Amount.of_mina_string_exn init_balance
+              ; zkapp_account_keypairs = [ kp ]
+              ; memo = Signed_command_memo.create_from_string_exn memo
+              ; new_zkapp_account = true
+              ; snapp_update = Account_update.Update.dummy
+              ; preconditions = None
+              ; authorization_kind = Account_update.Authorization_kind.Signature
+              }
+            in
+            let zkapp_command =
+              Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+                ~permissions:
+                  ( if max_cost then
+                    { Permissions.user_default with
+                      set_verification_key = Permissions.Auth_required.Proof
+                    ; edit_state = Permissions.Auth_required.Proof
+                    ; edit_action_state = Proof
+                    }
+                  else Permissions.user_default )
+                spec
+            in
+            let%bind () = after wait_span in
+            let rec go () =
+              match%bind send_zkapp_command mina zkapp_command with
+              | Ok _ ->
+                  fee_payer_nonces.(!ndx) :=
+                    Account.Nonce.succ !(fee_payer_nonces.(!ndx)) ;
+                  ndx := (!ndx + 1) mod num_fee_payers ;
+                  [%log info]
+                    "Successfully submitted zkApp command that creates a zkApp \
+                     account"
+                    ~metadata:
+                      [ ("zkapp_command", Zkapp_command.to_yojson zkapp_command)
+                      ] ;
+                  Deferred.unit
+              | Error err ->
+                  [%log info] "Failed to setup a zkApp account, try again"
+                    ~metadata:
+                      [ ("zkapp_command", Zkapp_command.to_yojson zkapp_command)
+                      ; ("error", `String err)
+                      ] ;
+                  let%bind () = after wait_span in
+                  go ()
+            in
+            go () )
 
     let is_zkapp_deployed kp ledger =
       match
@@ -4639,10 +4682,10 @@ module Mutations = struct
       |> List.for_all ~f:Fn.id
 
     let rec wait_until_zkapps_deployed ?(deployed = false) ~mina ~ledger
-        ~deployment_fee ~init_balance
+        ~deployment_fee ~max_cost ~init_balance
         ~(fee_payer_array : Signature_lib.Keypair.t Array.t)
         ~constraint_constants ~logger ~uuid ~stop_signal ~stop_time ~memo_prefix
-        (keypairs : Signature_lib.Keypair.t list) =
+        ~wait_span (keypairs : Signature_lib.Keypair.t list) =
       if Time.( >= ) (Time.now ()) stop_time then (
         [%log info] "Scheduled zkApp commands with handle %s has expired"
           (Uuid.to_string uuid) ;
@@ -4660,16 +4703,15 @@ module Mutations = struct
         let%bind () =
           if not deployed then (
             [%log info] "Start deploying zkApp accounts" ;
-            deploy_zkapps ~mina ~ledger ~deployment_fee ~init_balance
+            deploy_zkapps ~mina ~ledger ~deployment_fee ~max_cost ~init_balance
               ~fee_payer_array ~constraint_constants ~logger ~memo_prefix
-              keypairs )
+              ~wait_span ~stop_signal ~stop_time ~uuid keypairs )
           else return ()
         in
+        let%bind accounts = Ledger.to_list ledger in
         [%log debug] "The accounts were not in the best tip $ledger, try again"
           ~metadata:
-            [ ( "ledger"
-              , `List (List.map (Ledger.to_list ledger) ~f:Account.to_yojson) )
-            ] ;
+            [ ("ledger", `List (List.map accounts ~f:Account.to_yojson)) ] ;
         let%bind () =
           Async.after
             (Time.Span.of_ms
@@ -4681,8 +4723,8 @@ module Mutations = struct
                  new_ledger )
         in
         wait_until_zkapps_deployed ~deployed:true ~mina ~ledger ~deployment_fee
-          ~init_balance ~fee_payer_array ~constraint_constants ~logger ~uuid
-          ~stop_signal ~stop_time ~memo_prefix keypairs
+          ~max_cost ~init_balance ~fee_payer_array ~constraint_constants ~logger
+          ~uuid ~stop_signal ~stop_time ~memo_prefix ~wait_span keypairs
 
     let schedule_zkapp_commands =
       io_field "scheduleZkappCommands"
@@ -4753,10 +4795,12 @@ module Mutations = struct
                           ~f:Signature_lib.Keypair.of_private_key_exn
                       in
                       let fee_payer_ids =
-                        List.map fee_payer_keypairs ~f:id_of_kp
+                        List.map fee_payer_keypairs ~f:(fun kp ->
+                            Account_id.of_public_key kp.public_key )
                       in
                       let zkapp_account_ids =
-                        List.map zkapp_account_keypairs ~f:id_of_kp
+                        List.map zkapp_account_keypairs ~f:(fun kp ->
+                            Account_id.of_public_key kp.public_key )
                       in
                       let num_fee_payers = List.length fee_payer_keypairs in
                       let fee_payer_array = Array.of_list fee_payer_keypairs in
@@ -4846,7 +4890,9 @@ module Mutations = struct
                                     in
                                     let (fee_payer_account : Account.t), _ =
                                       Account_id.Table.find_exn
-                                        account_state_tbl (id_of_kp fee_payer)
+                                        account_state_tbl
+                                        (Account_id.of_public_key
+                                           fee_payer.public_key )
                                     in
                                     let memo =
                                       Printf.sprintf "%s-%s-%s-%s"
@@ -4858,25 +4904,38 @@ module Mutations = struct
                                     in
                                     let zkapp_command_with_dummy_auth =
                                       Quickcheck.Generator.generate
-                                        (Mina_generators
-                                         .Zkapp_command_generators
-                                         .gen_zkapp_command_from ~memo
-                                           ~no_account_precondition:
-                                             zkapp_command_details
-                                               .no_precondition
-                                           ~fee_range:
-                                             ( zkapp_command_details.min_fee
-                                             , zkapp_command_details.max_fee )
-                                           ~balance_change_range:
-                                             ( zkapp_command_details
-                                                 .min_balance_change
-                                             , zkapp_command_details
-                                                 .max_balance_change )
-                                           ~ignore_sequence_events_precond:true
-                                           ~no_token_accounts:true ~limited:true
-                                           ~fee_payer_keypair:fee_payer ~keymap
-                                           ~account_state_tbl
-                                           ~generate_new_accounts ~ledger ~vk () )
+                                        ( if zkapp_command_details.max_cost then
+                                          Mina_generators
+                                          .Zkapp_command_generators
+                                          .gen_max_cost_zkapp_command_from
+                                            ~fee_payer_keypair:fee_payer
+                                            ~account_state_tbl ~vk
+                                            ~genesis_constants:
+                                              (Mina_lib.config mina)
+                                                .precomputed_values
+                                                .genesis_constants
+                                        else
+                                          Mina_generators
+                                          .Zkapp_command_generators
+                                          .gen_zkapp_command_from ~memo
+                                            ~no_account_precondition:
+                                              zkapp_command_details
+                                                .no_precondition
+                                            ~fee_range:
+                                              ( zkapp_command_details.min_fee
+                                              , zkapp_command_details.max_fee )
+                                            ~balance_change_range:
+                                              ( zkapp_command_details
+                                                  .min_balance_change
+                                              , zkapp_command_details
+                                                  .max_balance_change )
+                                            ~ignore_sequence_events_precond:true
+                                            ~no_token_accounts:true
+                                            ~limited:true
+                                            ~fee_payer_keypair:fee_payer ~keymap
+                                            ~account_state_tbl
+                                            ~generate_new_accounts ~ledger ~vk
+                                            () )
                                         ~size:1
                                         ~random:
                                           (Splittable_random.State.create
@@ -4926,12 +4985,13 @@ module Mutations = struct
                             (wait_until_zkapps_deployed ~mina ~ledger
                                ~deployment_fee:
                                  zkapp_command_details.deployment_fee
+                               ~max_cost:zkapp_command_details.max_cost
                                ~init_balance:zkapp_command_details.init_balance
                                ~fee_payer_array ~constraint_constants
                                zkapp_account_keypairs ~logger ~uuid
                                ~stop_signal:ivar ~stop_time:tm_end
-                               ~memo_prefix:zkapp_command_details.memo_prefix )
-                            (fun result ->
+                               ~memo_prefix:zkapp_command_details.memo_prefix
+                               ~wait_span ) (fun result ->
                               match result with
                               | None ->
                                   ()
@@ -5390,7 +5450,7 @@ module Queries = struct
             [] )
 
   let token_accounts =
-    field "tokenAccounts" ~doc:"Find all accounts for a token ID"
+    io_field "tokenAccounts" ~doc:"Find all accounts for a token ID"
       ~typ:(non_null (list (non_null Types.AccountObj.account)))
       ~args:
         Arg.
@@ -5400,25 +5460,28 @@ module Queries = struct
       ~resolve:(fun { ctx = mina; _ } () token_id ->
         match get_ledger_and_breadcrumb mina with
         | Some (ledger, breadcrumb) ->
-            let accounts = Ledger.accounts ledger in
-            Account_id.Set.fold accounts ~init:[] ~f:(fun acct_objs acct_id ->
-                if Token_id.(Account_id.token_id acct_id <> token_id) then
-                  acct_objs
-                else
-                  (* account id in the ledger, lookup should always succeed *)
-                  let loc =
-                    Option.value_exn
-                    @@ Ledger.location_of_account ledger acct_id
-                  in
-                  let account = Option.value_exn @@ Ledger.get ledger loc in
-                  let partial_account =
-                    Types.AccountObj.Partial_account.of_full_account ~breadcrumb
-                      account
-                  in
-                  Types.AccountObj.lift mina account.public_key partial_account
-                  :: acct_objs )
+            let%map.Deferred accounts = Ledger.accounts ledger in
+            Ok
+              (Account_id.Set.fold accounts ~init:[]
+                 ~f:(fun acct_objs acct_id ->
+                   if Token_id.(Account_id.token_id acct_id <> token_id) then
+                     acct_objs
+                   else
+                     (* account id in the ledger, lookup should always succeed *)
+                     let loc =
+                       Option.value_exn
+                       @@ Ledger.location_of_account ledger acct_id
+                     in
+                     let account = Option.value_exn @@ Ledger.get ledger loc in
+                     let partial_account =
+                       Types.AccountObj.Partial_account.of_full_account
+                         ~breadcrumb account
+                     in
+                     Types.AccountObj.lift mina account.public_key
+                       partial_account
+                     :: acct_objs ) )
         | None ->
-            [] )
+            return (Ok []) )
 
   let token_owner =
     field "tokenOwner" ~doc:"Find the account that owns a given token"
@@ -5756,10 +5819,7 @@ module Queries = struct
         let open Deferred.Result.Let_syntax in
         let body =
           Signed_command_payload.Body.Payment
-            { source_pk = from
-            ; receiver_pk = to_
-            ; amount = Amount.of_uint64 amount
-            }
+            { receiver_pk = to_; amount = Amount.of_uint64 amount }
         in
         let%bind signature =
           match signature with
@@ -5944,7 +6004,8 @@ module Queries = struct
               in
               List.map (Queue.to_list vrf_state.queue)
                 ~f:(fun { global_slot; _ } ->
-                  Unsigned.UInt32.to_int global_slot ) )
+                  Mina_numbers.Global_slot_since_hard_fork.to_int global_slot )
+          )
 
     let internal_logs =
       io_field "internalLogs"

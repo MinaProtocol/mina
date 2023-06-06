@@ -1,7 +1,7 @@
 open Core
 open Mina_base
 open Snark_params
-module Global_slot = Mina_numbers.Global_slot
+module Global_slot = Mina_numbers.Global_slot_since_genesis
 open Currency
 
 let top_hash_logging_enabled = ref false
@@ -476,7 +476,13 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let all bs = Tick.(Run.run_checked (Boolean.all bs))
 
-    let ( || ) b1 b2 = Tick.(Run.run_checked Boolean.(b1 || b2))
+    let ( || ) b1 b2 =
+      (* The bisect preprocessor rewrites || and && into code that also tracks when/whether the branch was taken.
+         The generated code assumes that those functions accept a bool,
+         so we call the equivalent snarky functions ||| and &&&.
+         We kept the old || versions around to avoid breaking existing code,
+         so the compiler won't detect this outside of bisect compilation.*)
+      Tick.(Run.run_checked Boolean.(b1 ||| b2))
 
     let equal t t' = Tick.Run.run_checked (Frozen_ledger_hash.equal_var t t')
 

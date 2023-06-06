@@ -185,7 +185,7 @@ module type Full = sig
    *)
   val zkapp_command_witnesses_exn :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> global_slot:Mina_numbers.Global_slot.t
+    -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> state_body:Transaction_protocol_state.Block_data.t
     -> fee_excess:Currency.Amount.Signed.t
     -> ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
@@ -232,7 +232,8 @@ module type Full = sig
            , 'h
            , 'i
            , ( Tick.Boolean.var
-             , Mina_numbers.Global_slot.Checked.var
+             , Mina_numbers.Global_slot_since_genesis.Checked.var
+             , Mina_numbers.Global_slot_span.Checked.var
              , Currency.Balance.var
              , Currency.Amount.var )
              Account_timing.As_record.t
@@ -240,10 +241,11 @@ module type Full = sig
            , 'k )
            Account.Poly.t
       -> txn_amount:Currency.Amount.var option
-      -> txn_global_slot:Mina_numbers.Global_slot.Checked.var
+      -> txn_global_slot:Mina_numbers.Global_slot_since_genesis.Checked.var
       -> ( [> `Min_balance of Currency.Balance.var ]
          * ( Tick.Boolean.var
-           , Mina_numbers.Global_slot.Checked.var
+           , Mina_numbers.Global_slot_since_genesis.Checked.var
+           , Mina_numbers.Global_slot_span.Checked.var
            , Currency.Balance.var
            , Currency.Amount.var )
            Account_timing.As_record.t )
@@ -281,7 +283,7 @@ module type Full = sig
 
     val deploy_snapp :
          ?no_auth:bool
-      -> ?default_permissions:bool
+      -> ?permissions:Permissions.t
       -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Deploy_snapp_spec.t
       -> Zkapp_command.t
