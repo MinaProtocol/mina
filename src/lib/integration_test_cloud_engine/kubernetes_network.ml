@@ -284,14 +284,21 @@ module Node = struct
       }
     |}]
 
-    (* this is a stub, the actual graphql endpoint hasn't been written yet *)
-    (* module Query_latest_logs =
-       [%graphql
-       {|
-         query {
-           newloglines
-         }
-       |}] *)
+    module StartFilteredLog =
+    [%graphql
+    {|
+      mutation ($filter: String!) @encoders(module: "Encoders"){
+        startFilteredLog(filter: $filter)
+      }
+    |}]
+
+    module GetFilteredLogEntries =
+    [%graphql
+    {|
+      query ($offset: Int!) @encoders(module: "Encoders"){
+        getFilteredLogEntries(offset: $offset)
+      }
+    |}]
   end
 
   (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)

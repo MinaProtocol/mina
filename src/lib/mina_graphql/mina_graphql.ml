@@ -2866,6 +2866,13 @@ module Mutations = struct
         Arg.[ arg "input" ~typ:(non_null Types.Input.AddAccountInput.arg_typ) ]
       ~resolve:create_account_resolver
 
+  let start_filtered_log =
+    field "startFilteredLog" ~doc:"TODO" ~typ:(non_null string)
+      ~args:Arg.[ arg "filter" ~typ:(non_null string) ]
+      ~resolve:(fun { ctx = t; _ } () filter ->
+        Mina_lib.start_filtered_log t filter ;
+        filter )
+
   let create_account =
     io_field "createAccount"
       ~doc:
@@ -3610,6 +3617,7 @@ module Mutations = struct
 
   let commands =
     [ add_wallet
+    ; start_filtered_log
     ; create_account
     ; create_hd_account
     ; unlock_account
@@ -3776,6 +3784,13 @@ module Queries = struct
       ~args:Arg.[]
       ~doc:"The version of the node (git commit hash)"
       ~resolve:(fun _ _ -> Some Mina_version.commit_id)
+
+  let get_filtered_log_entries =
+    field "getFilteredLogEntries"
+      ~typ:(non_null (list (non_null string)))
+      ~args:Arg.[ arg "offset" ~typ:(non_null int) ]
+      ~doc:"TODO"
+      ~resolve:(fun { ctx = t; _ } () i -> Mina_lib.get_filtered_log_entries t i)
 
   let tracked_accounts_resolver { ctx = coda; _ } () =
     let wallets = Mina_lib.wallets coda in
@@ -4330,6 +4345,7 @@ module Queries = struct
     [ sync_status
     ; daemon_status
     ; version
+    ; get_filtered_log_entries
     ; owned_wallets (* deprecated *)
     ; tracked_accounts
     ; wallet (* deprecated *)
