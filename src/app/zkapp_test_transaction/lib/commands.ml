@@ -188,7 +188,8 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   printf "(ZkApp transaction graphQL input %s\n\n%!"
     (graphql_zkapp_command zkapp_command) ;
   printf "Updated accounts\n" ;
-  List.iter (Ledger.to_list ledger) ~f:(fun acc ->
+  let%bind accounts = Ledger.to_list ledger in
+  List.iter accounts ~f:(fun acc ->
       printf "Account: %s\n%!"
         ( Genesis_ledger_helper_lib.Accounts.Single.of_account acc None
         |> Runtime_config.Accounts.Single.to_yojson |> Yojson.Safe.to_string ) ) ;
