@@ -99,7 +99,7 @@ First of all you need to either:
   ```json
   {
     "genesis": {
-      "proof_level": "none",
+      "proof_level": "none", # After the fix of https://github.com/MinaProtocol/mina/issues/13289
       "k": 30,
       "slots_per_epoch": 720,
       "block_window_duration": 20000,
