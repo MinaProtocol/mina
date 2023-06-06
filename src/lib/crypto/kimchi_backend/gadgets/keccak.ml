@@ -2,6 +2,8 @@ open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
+open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
+
 let tests_enabled = true
 
 (* DEFINITIONS OF CONSTANTS FOR KECCAK *)
@@ -157,12 +159,15 @@ module State = struct
                     (module Circuit)
                     state.(x).(y)
                 in
-                print_endline ("x = " ^ string_of_int x ^ " y = " ^ string_of_int y ^ " : " ^ (Common.bignum_bigint_to_hex word));
                 let power_lo = 8 * z in
-                let offset_lo = Bignum_bigint.(pow (of_int 2) (of_int power_lo)) in
+                let offset_lo =
+                  Bignum_bigint.(pow (of_int 2) (of_int power_lo))
+                in
                 let two_pow_8 = Bignum_bigint.(pow (of_int 2) (of_int 8)) in
-                let byte = Bignum_bigint.(((word - (word % offset_lo ))/ offset_lo) % two_pow_8) in
-                print_endline ("z = " ^ string_of_int z ^ " : " ^ Common.bignum_bigint_to_hex byte);
+                let byte =
+                  Bignum_bigint.(
+                    (word - (word % offset_lo)) / offset_lo % two_pow_8)
+                in
                 Common.bignum_bigint_to_field (module Circuit) byte )
           in
           bytestring.(index) <- byte
@@ -203,18 +208,23 @@ module State = struct
     output
 
   let _print (type f)
-  (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-  (state : Circuit.Field.t matrix) =
-  let open Circuit in
-  as_prover (fun () ->
-    for x = 0 to keccak_dim - 1 do
-      for y = 0 to keccak_dim - 1 do
-        let elem = Common.cvar_field_to_bignum_bigint_as_prover (module Circuit) state.(x).(y) in
-        print_endline ("x = " ^ string_of_int x ^ ", y = " ^ string_of_int y ^ " : " ^ (elem |> Common.bignum_bigint_to_hex )) ;
-        ()
-      done
-    done) ;
-
+      (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+      (state : Circuit.Field.t matrix) =
+    let open Circuit in
+    as_prover (fun () ->
+        for x = 0 to keccak_dim - 1 do
+          for y = 0 to keccak_dim - 1 do
+            let elem =
+              Common.cvar_field_to_bignum_bigint_as_prover
+                (module Circuit)
+                state.(x).(y)
+            in
+            print_endline
+              ( "x = " ^ string_of_int x ^ ", y = " ^ string_of_int y ^ " : "
+              ^ (elem |> Common.bignum_bigint_to_hex) ) ;
+            ()
+          done
+        done )
 end
 
 (* KECCAK HASH FUNCTION IMPLEMENTATION *)
@@ -263,7 +273,7 @@ let pad_101 (type f)
   let extra_bytes = (rate / 8) - (List.length message mod rate) in
   (* 0x01 0x00 ... 0x00 0x80 or 0x81 *)
   let last_field = Common.two_pow (module Circuit) 7 in
-  let last = Field.constant @@ Common.two_pow (module Circuit) 7 in
+  let last = Field.constant @@ last_field in
   (* Create the padding vector *)
   let pad = Array.create ~len:extra_bytes Field.zero in
   pad.(0) <- Field.one ;
@@ -427,9 +437,13 @@ let round (type f)
     (state : Circuit.Field.t State.matrix) (round : int) :
     Circuit.Field.t State.matrix =
   let state_a = state in
+  print_endline ("THETA " ^ string_of_int round) ;
   let state_e = theta (module Circuit) state_a in
+  print_endline ("PI RHO " ^ string_of_int round) ;
   let state_b = pi_rho (module Circuit) state_e in
+  print_endline ("CHI " ^ string_of_int round) ;
   let state_f = chi (module Circuit) state_b in
+  print_endline ("IOTA " ^ string_of_int round) ;
   let state_d = iota (module Circuit) state_f round in
   state_d
 
@@ -460,7 +474,7 @@ let absorb (type f)
   (* (capacity / 8) zero bytes *)
   let zeros = Array.to_list @@ Array.create ~len:(capacity / 8) Field.zero in
   for i = 0 to List.length chunks - 1 do
-    print_endline "absorb phase";
+    print_endline "absorb phase" ;
     let block = List.nth_exn chunks i in
     (* pad the block with 0s to up to 1600 bits *)
     let padded_block = block @ zeros in
@@ -480,8 +494,8 @@ let absorb (type f)
 let squeeze (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (state : Circuit.Field.t State.matrix) ~(length : int) ~(rate : int) :
-    Circuit.Field.t array =
-  print_endline "squeeze phase";
+    Circuit.Field.t list =
+  print_endline "squeeze phase" ;
   let copy (bytestring : Circuit.Field.t list)
       (output_array : Circuit.Field.t array) ~(start : int) ~(length : int) =
     for i = 0 to length - 1 do
@@ -518,7 +532,7 @@ let squeeze (type f)
   (* Obtain the hash selecting the first bitlength/8 bytes of the output array *)
   let hashed = Array.sub output_array ~pos:0 ~len:(length / 8) in
 
-  hashed
+  Array.to_list hashed
 
 (* Keccak sponge function for 1600 bits of state width
  * Need to split the message into blocks of 1088 bits. 
@@ -526,7 +540,7 @@ let squeeze (type f)
 let sponge (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (padded_message : Circuit.Field.t list) ~(length : int) ~(capacity : int)
-    ~(rate : int) : Circuit.Field.t array =
+    ~(rate : int) : Circuit.Field.t list =
   (* check that the padded message is a multiple of rate *)
   assert (List.length padded_message * 8 mod rate = 0) ;
 
@@ -535,13 +549,45 @@ let sponge (type f)
   (* squeeze *)
   let hashed = squeeze (module Circuit) state ~length ~rate in
   Circuit.as_prover (fun () ->
-      print_endline "hash";
-      for i = 0 to Array.length hashed - 1 do
-        let elem = Common.cvar_field_to_bignum_bigint_as_prover (module Circuit) hashed.(i) in
+      print_endline "hash" ;
+      for i = 0 to List.length hashed - 1 do
+        let elem =
+          Common.cvar_field_to_bignum_bigint_as_prover
+            (module Circuit)
+            (List.nth_exn hashed i)
+        in
         print_endline (elem |> Common.bignum_bigint_to_hex) ;
         ()
-      done) ;
+      done ) ;
   hashed
+
+(* Check that a list of cvars are at most 8 bits each *)
+let check_bytes (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (input : Circuit.Field.t list) : unit =
+  let open Circuit in
+  for i = 0 to List.length input - 1 do
+    (* Could be optimized if we reused the last wire for half the check of the following byte *)
+    let byte = List.nth_exn input i in
+    let bits12 = Field.(of_int 16 * byte) in
+    with_label "lookup_byte" (fun () ->
+        assert_
+          { annotation = Some __LOC__
+          ; basic =
+              Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+                (Lookup
+                   { w0 = Field.one
+                   ; w1 = byte
+                   ; w2 = Field.zero
+                   ; w3 = bits12
+                   ; w4 = Field.zero
+                   ; w5 = Field.zero
+                   ; w6 = Field.zero
+                   } )
+          } ) ;
+    ()
+  done ;
+  ()
 
 (*
 * Keccak hash function with input message passed as list of 1byte Cvars.
@@ -553,10 +599,12 @@ let sponge (type f)
 let hash (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (message : Circuit.Field.t list) ~(length : int) ~(capacity : int)
-    (nist : bool) : Circuit.Field.t array =
+    (nist : bool) : Circuit.Field.t list =
   assert (capacity > 0) ;
   assert (length > 0) ;
   assert (length mod 8 = 0) ;
+  (* Check each cvar input is 8 bits at most *)
+  check_bytes (module Circuit) message ;
   let rate = keccak_state_length - capacity in
   let padded =
     match nist with
@@ -566,37 +614,34 @@ let hash (type f)
         pad_101 (module Circuit) message rate
   in
   let hash = sponge (module Circuit) padded ~length ~capacity ~rate in
+  check_bytes (module Circuit) hash ;
+  (* Check each cvar output is 8 bits at most *)
   hash
 
-(* Gadget for SHA-3 hash function with output length of 224 bits *)
-let sha3_224 (type f)
+(* Gagdet for NIST SHA-3 function for output lengths 224/256/384/512 *)
+let nist_sha3 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (message : Circuit.Field.t list) : Circuit.Field.t array =
-  hash (module Circuit) message ~length:224 ~capacity:448 true
-
-(* Gadget for SHA-3 hash function with output length of 256 bits *)
-let sha3_256 (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (message : Circuit.Field.t list) : Circuit.Field.t array =
-  hash (module Circuit) message ~length:256 ~capacity:512 true
-
-(* Gadget for SHA-3 hash function with output length of 384 bits *)
-let sha3_384 (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (message : Circuit.Field.t list) : Circuit.Field.t array =
-  hash (module Circuit) message ~length:384 ~capacity:768 true
-
-(* Gadget for SHA-3 hash function with output length of 512 bits *)
-let sha3_512 (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (message : Circuit.Field.t list) : Circuit.Field.t array =
-  hash (module Circuit) message ~length:512 ~capacity:1024 true
+    (len : int) (message : Circuit.Field.t list) : Circuit.Field.t array =
+  let hash =
+    match len with
+    | 224 ->
+        hash (module Circuit) message ~length:224 ~capacity:448 true
+    | 256 ->
+        hash (module Circuit) message ~length:256 ~capacity:512 true
+    | 384 ->
+        hash (module Circuit) message ~length:384 ~capacity:768 true
+    | 512 ->
+        hash (module Circuit) message ~length:512 ~capacity:1024 true
+    | _ ->
+        assert false
+  in
+  Array.of_list hash
 
 (* Gadget for Keccak hash function for the parameters used in Ethereum *)
-let ethereum_hash (type f)
+let eth_keccak (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (message : Circuit.Field.t list) : Circuit.Field.t array =
-  hash (module Circuit) message ~length:256 ~capacity:512 false
+  Array.of_list @@ hash (module Circuit) message ~length:256 ~capacity:512 false
 
 (* KECCAK GADGET TESTS *)
 
@@ -609,7 +654,7 @@ let%test_unit "keccak gadget" =
       try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
     in
 
-    let test_keccak ?cs message =
+    let test_keccak ?cs ~nist ~len message expected =
       let cs, _proof_keypair, _proof =
         Runner.generate_and_verify_proof ?cs (fun () ->
             let open Runner.Impl in
@@ -623,13 +668,51 @@ let%test_unit "keccak gadget" =
                      @@ Common.field_bytes_of_hex (module Runner.Impl) message
                      )
             in
-            let _hashed = ethereum_hash (module Runner.Impl) message in
+            let hashed =
+              match nist with
+              | true ->
+                  nist_sha3 (module Runner.Impl) len message
+              | false ->
+                  eth_keccak (module Runner.Impl) message
+            in
+
+            let expected =
+              Array.of_list
+              @@ Common.field_bytes_of_hex (module Runner.Impl) expected
+            in
+            (* Check expected hash output *)
+            as_prover (fun () ->
+                for i = 0 to Array.length hashed - 1 do
+                  let byte_hash =
+                    Common.cvar_field_to_bignum_bigint_as_prover
+                      (module Runner.Impl)
+                      hashed.(i)
+                  in
+                  let byte_exp =
+                    Common.field_to_bignum_bigint
+                      (module Runner.Impl)
+                      expected.(i)
+                  in
+                  assert (Bignum_bigint.(byte_hash = byte_exp))
+                done ;
+                () ) ;
             () )
       in
       cs
     in
 
     (* Positive tests *)
-    let _cs = test_keccak "30" in
+    let _cs =
+      test_keccak ~nist:false ~len:256 "30"
+        "044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116d"
+    in
+    let _cs =
+      test_keccak ~nist:true ~len:256 "30"
+        "f9e2eaaa42d9fe9e558a9b8ef1bf366f190aacaa83bad2641ee106e9041096e4"
+    in
+    let _cs =
+      test_keccak ~nist:true ~len:512 "30"
+        "2d44da53f305ab94b6365837b9803627ab098c41a6013694f9b468bccb9c13e95b3900365eb58924de7158a54467e984efcfdabdbcc9af9a940d49c51455b04c"
+    in
     () ) ;
   ()

@@ -168,6 +168,14 @@ module Plonk_constraint = struct
       | EC_endoscale of
           { state : 'v Endoscale_round.t array; xs : 'v; ys : 'v; n_acc : 'v }
       | EC_endoscalar of { state : 'v Endoscale_scalar_round.t array }
+      | Lookup of 
+          { w0: 'v 
+          ; w1: 'v 
+          ; w2: 'v 
+          ; w3: 'v 
+          ; w4: 'v 
+          ; w5: 'v 
+          ; w6: 'v}
       | RangeCheck0 of
           { v0 : 'v (* Value to constrain to 88-bits *)
           ; v0p0 : 'v (* MSBs *)
@@ -340,6 +348,8 @@ module Plonk_constraint = struct
             { state =
                 Array.map ~f:(fun x -> Endoscale_scalar_round.map ~f x) state
             }
+      | Lookup { w0; w1; w2; w3; w4; w5; w6} ->
+          Lookup { w0 = f w0; w1 = f w1; w2 = f w2; w3 = f w3; w4 = f w4; w5 = f w5; w6 = f w6}      
       | RangeCheck0
           { v0
           ; v0p0
@@ -1660,6 +1670,18 @@ end = struct
           ~f:
             (Fn.compose add_endoscale_scalar_round
                (Endoscale_scalar_round.map ~f:reduce_to_v) )
+    | Plonk_constraint.T (Lookup {w0; w1; w2; w3; w4; w5; w6}
+    ) -> let vars = 
+      [|
+        Some (reduce_to_v w0)
+        ; Some (reduce_to_v w1)
+        ; Some (reduce_to_v w2)
+        ; Some (reduce_to_v w3)
+        ; Some (reduce_to_v w4)
+        ; Some (reduce_to_v w5)
+        ; Some (reduce_to_v w6)
+      |] in
+      add_row sys vars Lookup [| |]
     | Plonk_constraint.T
         (RangeCheck0
           { v0
