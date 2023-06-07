@@ -404,7 +404,8 @@ let%test_module "test functor on in memory databases" =
             let accounts = random_accounts max_height |> dedup_accounts in
             List.iter accounts ~f:(fun account ->
                 ignore (create_new_account_exn mdb account : Test.Location.t) ) ;
-            [%test_result: Account.t list] accounts ~expect:(MT.to_list mdb) )
+            let expect = MT.to_list_sequential mdb in
+            [%test_result: Account.t list] accounts ~expect )
 
       let%test_unit "Add 2^d accounts (for testing, d is small)" =
         if Test.depth <= 8 then
@@ -475,41 +476,41 @@ let%test_module "test functor on in memory databases" =
             assert (Int.equal retrieved_total total) )
 
       let%test_unit "fold_until over account balances" =
-        Test.with_instance (fun mdb ->
-            let num_accounts = 5 in
-            let some_num = 3 in
-            let account_ids = Account_id.gen_accounts num_accounts in
-            let some_account_ids = List.take account_ids some_num in
-            let last_account_id = List.hd_exn (List.rev some_account_ids) in
-            let balances =
-              Quickcheck.random_value
-                (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
-            in
-            let some_balances = List.take balances some_num in
-            let total =
-              List.fold some_balances ~init:0 ~f:(fun accum balance ->
-                  Balance.to_nanomina_int balance + accum )
-            in
-            let accounts =
-              List.map2_exn account_ids balances ~f:Account.create
-            in
-            List.iter accounts ~f:(fun account ->
-                ignore @@ create_new_account_exn mdb account ) ;
-            (* stop folding on last_account_id, sum of balances in accounts should be same as some_balances *)
-            let retrieved_total =
-              MT.fold_until mdb ~init:0
-                ~f:(fun total account ->
-                  let current_balance = Account.balance account in
-                  let current_account_id = Account.identifier account in
-                  let new_total =
-                    Balance.to_nanomina_int current_balance + total
-                  in
-                  if Account_id.equal current_account_id last_account_id then
-                    Stop new_total
-                  else Continue new_total )
-                ~finish:(fun total -> total)
-            in
-            assert (Int.equal retrieved_total total) )
+        Async_unix.Thread_safe.block_on_async_exn (fun () ->
+            Test.with_instance (fun mdb ->
+                let num_accounts = 5 in
+                let some_num = 3 in
+                let account_ids = Account_id.gen_accounts num_accounts in
+                let some_account_ids = List.take account_ids some_num in
+                let last_account_id = List.hd_exn (List.rev some_account_ids) in
+                let balances =
+                  Quickcheck.random_value
+                    (Quickcheck.Generator.list_with_length num_accounts
+                       Balance.gen )
+                in
+                let some_balances = List.take balances some_num in
+                let total =
+                  List.fold some_balances ~init:0 ~f:(fun accum balance ->
+                      Balance.to_int balance + accum )
+                in
+                let accounts =
+                  List.map2_exn account_ids balances ~f:Account.create
+                in
+                List.iter accounts ~f:(fun account ->
+                    ignore @@ create_new_account_exn mdb account ) ;
+                (* stop folding on last_account_id, sum of balances in accounts should be same as some_balances *)
+                let%map.Async.Deferred retrieved_total =
+                  MT.fold_until mdb ~init:0
+                    ~f:(fun total account ->
+                      let current_balance = Account.balance account in
+                      let current_account_id = Account.identifier account in
+                      let new_total = Balance.to_int current_balance + total in
+                      if Account_id.equal current_account_id last_account_id
+                      then Stop new_total
+                      else Continue new_total )
+                    ~finish:(fun total -> total)
+                in
+                assert (Int.equal retrieved_total total) ) )
     end
 
     module Make_db (Depth : sig
