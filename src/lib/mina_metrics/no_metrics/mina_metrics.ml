@@ -492,6 +492,12 @@ module Block_latency = struct
     let upload_to_gcloud_blocks : Gauge.t = ()
   end
 
+  module Precomputed_block_dump = struct
+    let count : Counter.t = ()
+
+    let bytes_written : Counter.t = ()
+  end
+
   module Gossip_slots = struct
     let v : Gauge.t = ()
 

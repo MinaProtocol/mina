@@ -5,6 +5,7 @@ open Async
 open Signature_lib
 open Mina_numbers
 open Mina_base
+module Precomputed_blocks = Mina_lib.Precomputed_blocks
 
 (** For status *)
 let txn_count = ref 0
@@ -452,6 +453,23 @@ let get_status ~flag t =
           @@ Counter.value Transaction_pool.transactions_added_to_pool
       }
   in
+  let precomputed_block_writer =
+    let open Precomputed_blocks in
+    if
+      is_some (appending t)
+      || logging t
+      || is_some (dumping t)
+      || is_some (uploading t)
+    then
+      Some
+        { Daemon_rpcs.Types.Status.Precomputed_block_writer.appending =
+            appending t
+        ; dumping = dumping t
+        ; logging = logging t
+        ; uploading = uploading t
+        }
+    else None
+  in
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
   ; catchup_status
@@ -485,6 +503,7 @@ let get_status ~flag t =
   ; consensus_configuration
   ; addrs_and_ports
   ; metrics
+  ; precomputed_block_writer
   }
 
 let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t

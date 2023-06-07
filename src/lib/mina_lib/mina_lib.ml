@@ -14,6 +14,7 @@ module Conf_dir = Conf_dir
 module Subscriptions = Mina_subscriptions
 module Snark_worker_lib = Snark_worker
 module Timeout = Timeout_lib.Core_time
+module Precomputed_block_writer = Config.Precomputed_block_writer
 
 let daemon_start_time = Time_ns.now ()
 
@@ -113,8 +114,7 @@ type t =
       Daemon_rpcs.Types.Status.Next_producer_timing.t option
   ; subscriptions : Mina_subscriptions.t
   ; sync_status : Sync_status.t Mina_incremental.Status.Observer.t
-  ; precomputed_block_writer :
-      ([ `Path of string ] option * [ `Log ] option) ref
+  ; precomputed_block_writer : Precomputed_block_writer.t
   ; block_production_status :
       [ `Producing | `Producing_in_ms of float | `Free ] ref
   }
@@ -136,6 +136,116 @@ let client_port t =
     t.config.gossip_net_params.addrs_and_ports
   in
   client_port
+
+module Precomputed_blocks = struct
+  module Initial = struct
+    let get_network logger need_network =
+      match Core.Sys.getenv "NETWORK_NAME" with
+      | Some network ->
+          if need_network then
+            [%log' info logger] "NETWORK_NAME environment variable set to %s"
+              network ;
+          network
+      | _ ->
+          if need_network then
+            [%log' warn logger]
+              "NETWORK_NAME environment variable not set. Default to 'berkeley'" ;
+          "berkeley"
+
+    let network ~logger ~upload_blocks_to_gcloud ~precomputed_blocks_dir
+        ~precomputed_blocks_file =
+      let need_network =
+        upload_blocks_to_gcloud
+        || is_some precomputed_blocks_file
+        || is_some precomputed_blocks_dir
+      in
+      get_network logger need_network
+
+    let gcloud_keyfile = Core.Sys.getenv "GCLOUD_KEYFILE"
+
+    let gcloud_bucket = Core.Sys.getenv "GCLOUD_BLOCK_UPLOAD_BUCKET"
+  end
+
+  let check_path path =
+    try
+      match Core.Unix.(lstat path).st_kind with
+      | S_REG ->
+          Some (`File path)
+      | S_DIR ->
+          Some (`Dir path)
+      | _ ->
+          failwith "irregular path"
+    with _ -> None
+
+  let appending t = t.precomputed_block_writer.appending
+
+  let dumping t = t.precomputed_block_writer.dumping
+
+  let logging t = t.precomputed_block_writer.logging
+
+  let uploading t = t.precomputed_block_writer.uploading
+
+  let set_dump_dir ?network ~path t =
+    let dir_opt =
+      match check_path path with
+      | Some (`Dir dir) ->
+          Some dir
+      | _ ->
+          [%log' error t.config.logger] "Invalid dump directory" ;
+          None
+    in
+    let network =
+      match network with
+      | Some network ->
+          network
+      | None ->
+          Initial.get_network t.config.logger false
+    in
+    let number =
+      Option.value_map t.precomputed_block_writer.dumping ~default:0
+        ~f:(fun dump -> dump.number)
+    in
+    Option.iter dir_opt ~f:(fun dir ->
+        [%log' info t.config.logger]
+          ~metadata:[ ("dir", `String dir); ("network", `String network) ]
+          "Set $network precomputed block dumping to $dir" ;
+        t.precomputed_block_writer.dumping <-
+          Some { Precomputed_block_writer.Dumping.dir; network; number } )
+
+  let set_dump_file ~path t =
+    let file_opt =
+      match check_path path with
+      | Some (`File file) ->
+          Some file
+      | _ ->
+          [%log' error t.config.logger] "Invalid dump file" ;
+          None
+    in
+    Option.iter file_opt ~f:(fun file ->
+        [%log' info t.config.logger]
+          ~metadata:[ ("file", `String file) ]
+          "Set precomputed block appending to $file" ;
+        t.precomputed_block_writer.appending <- Some file )
+
+  let start_logging t =
+    [%log' info t.config.logger] "Precomputed block logging started" ;
+    t.precomputed_block_writer.logging <- true
+
+  let stop_appending t =
+    [%log' info t.config.logger] "Precomputed block appending stopped" ;
+    t.precomputed_block_writer.appending <- None
+
+  let stop_dumping t =
+    [%log' info t.config.logger] "Precomputed block dumping stopped" ;
+    t.precomputed_block_writer.dumping <- None
+
+  let stop_logging t =
+    [%log' info t.config.logger] "Precomputed block logging stopped" ;
+    t.precomputed_block_writer.logging <- false
+
+  let empty : Precomputed_block_writer.t =
+    { appending = None; dumping = None; logging = false; uploading = None }
+end
 
 (* Get the most recently set public keys  *)
 let block_production_pubkeys t : Public_key.Compressed.Set.t =
@@ -2081,19 +2191,13 @@ let create ?wallets (config : Config.t) =
                 ~precomputed_values:config.precomputed_values
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
                 archive_process_port ) ;
-          let precomputed_block_writer =
-            ref
-              ( Option.map config.precomputed_blocks_path ~f:(fun path ->
-                    `Path path )
-              , if config.log_precomputed_blocks then Some `Log else None )
-          in
           let subscriptions =
             Mina_subscriptions.create ~logger:config.logger
               ~constraint_constants ~new_blocks ~wallets
               ~transition_frontier:frontier_broadcast_pipe_r
               ~is_storing_all:config.is_archive_rocksdb
-              ~upload_blocks_to_gcloud:config.upload_blocks_to_gcloud
-              ~time_controller:config.time_controller ~precomputed_block_writer
+              ~time_controller:config.time_controller
+              ~precomputed_block_writer:config.precomputed_block_writer
           in
           let open Mina_incremental.Status in
           let transition_frontier_incr =
@@ -2154,7 +2258,7 @@ let create ?wallets (config : Config.t) =
             ; snark_job_state = snark_jobs_state
             ; subscriptions
             ; sync_status
-            ; precomputed_block_writer
+            ; precomputed_block_writer = config.precomputed_block_writer
             ; block_production_status = ref `Free
             } ) )
 

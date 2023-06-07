@@ -380,16 +380,20 @@ let setup_daemon logger =
          with full proving (full), snark-testing with dummy proofs (check), or \
          dummy proofs (none)"
   and plugins = plugin_flag
-  and precomputed_blocks_path =
-    flag "--precomputed-blocks-file"
-      ~aliases:[ "precomputed-blocks-file" ]
-      (optional string)
-      ~doc:"PATH Path to write precomputed blocks to, for replay or archiving"
   and log_precomputed_blocks =
     flag "--log-precomputed-blocks"
       ~aliases:[ "log-precomputed-blocks" ]
       (optional_with_default false bool)
       ~doc:"true|false Include precomputed blocks in the log (default: false)"
+  and precomputed_blocks_file =
+    flag "--precomputed-blocks-file"
+      ~aliases:[ "precomputed-blocks-file" ]
+      (optional string)
+      ~doc:"PATH File to append precomputed blocks to, for replay or archiving."
+  and precomputed_blocks_dir =
+    flag "--precomputed-blocks-dir"
+      ~aliases:[ "precomputed-blocks-dir" ]
+      (optional string) ~doc:"PATH Directory to dump precomputed blocks to."
   and block_reward_threshold =
     flag "--minimum-block-reward" ~aliases:[ "minimum-block-reward" ]
       ~doc:
@@ -1289,6 +1293,74 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                   "Cannot provide both uptime submitter public key and uptime \
                    submitter keyfile"
           in
+          let precomputed_block_writer =
+            let open Option in
+            let open Mina_lib in
+            let appending =
+              iter precomputed_blocks_file ~f:(fun file ->
+                  [%log' info logger]
+                    ~metadata:[ ("path", `String file) ]
+                    "Precomputed blocks will be appended to the same file $path" ) ;
+              precomputed_blocks_file
+            in
+            let dumping =
+              map precomputed_blocks_dir ~f:(fun dir ->
+                  [%log' info logger]
+                    ~metadata:[ ("path", `String dir) ]
+                    "Precomputed blocks will be dumped to individual files in \
+                     $path" ;
+                  { Precomputed_block_writer.Dumping.dir
+                  ; number = 0
+                  ; network =
+                      Precomputed_blocks.Initial.network ~logger
+                        ~upload_blocks_to_gcloud ~precomputed_blocks_dir
+                        ~precomputed_blocks_file
+                  } )
+            in
+            let logging =
+              if log_precomputed_blocks then
+                [%log' info logger] "Precomputed blocks will be logged" ;
+              log_precomputed_blocks
+            in
+            let uploading =
+              if upload_blocks_to_gcloud then (
+                let open Precomputed_blocks.Initial in
+                match (gcloud_bucket, gcloud_keyfile) with
+                | Some bucket, Some keyfile ->
+                    [%log' info logger]
+                      ~metadata:
+                        [ ("bucket", `String bucket)
+                        ; ("keyfile", `String keyfile)
+                        ]
+                      "GCLOUD_KEYFILE environment variable set to $keyfile\n\
+                       GCLOUD_BLOCK_UPLOAD_BUCKET environment variable set to \
+                       $bucket" ;
+                    Some
+                      { Precomputed_block_writer.Uploading.bucket
+                      ; keyfile
+                      ; number = 0
+                      ; network =
+                          network ~logger ~upload_blocks_to_gcloud
+                            ~precomputed_blocks_dir ~precomputed_blocks_file
+                      }
+                | bucket, keyfile ->
+                    if is_none bucket then
+                      [%log' warn logger]
+                        "GCLOUD_BLOCK_UPLOAD_BUCKET environment variable not \
+                         set. Must be set in order to upload blocks to gcloud" ;
+                    if is_none keyfile then
+                      [%log' warn logger]
+                        "GCLOUD_KEYFILE environment variable not set. Must be \
+                         set in order to upload blocks to gcloud" ;
+                    None )
+              else None
+            in
+            { Mina_lib.Precomputed_block_writer.appending
+            ; dumping
+            ; logging
+            ; uploading
+            }
+          in
           let start_time = Time.now () in
           let%map mina =
             Mina_lib.create ~wallets
@@ -1317,10 +1389,12 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~consensus_local_state ~is_archive_rocksdb
                  ~work_reassignment_wait ~archive_process_location
                  ~log_block_creation ~precomputed_values ~start_time
-                 ?precomputed_blocks_path ~log_precomputed_blocks
-                 ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-                 ~uptime_submitter_keypair ~stop_time ~node_status_url
-                 ~graphql_control_port:itn_graphql_port () )
+                 ?precomputed_blocks_file ?precomputed_blocks_dir
+                 ~log_precomputed_blocks ~upload_blocks_to_gcloud
+                 ~block_reward_threshold ~uptime_url ~uptime_submitter_keypair
+                 ~stop_time ~node_status_url
+                 ~graphql_control_port:itn_graphql_port ()
+                 ~precomputed_block_writer )
           in
           { mina
           ; client_trustlist
@@ -1433,8 +1507,8 @@ let replay_blocks logger =
                    In_channel.close blocks_file ;
                    None )
          in
-         let%bind coda = setup_daemon () in
-         let%bind () = Mina_lib.start_with_precomputed_blocks coda blocks in
+         let%bind mina = setup_daemon () in
+         let%bind () = Mina_lib.start_with_precomputed_blocks mina blocks in
          [%log info]
            "Daemon is ready, replayed precomputed blocks. Clients can now \
             connect" ;

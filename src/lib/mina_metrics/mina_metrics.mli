@@ -480,6 +480,12 @@ module Block_latency : sig
     val upload_to_gcloud_blocks : Gauge.t
   end
 
+  module Precomputed_block_dump : sig
+    val count : Counter.t
+
+    val bytes_written : Counter.t
+  end
+
   module Gossip_slots : sig
     val v : Gauge.t
 
