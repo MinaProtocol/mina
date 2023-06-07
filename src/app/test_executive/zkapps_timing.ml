@@ -212,6 +212,46 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       , timing_account_id
       , zkapp_keypair )
     in
+    let zkapp_command_with_zero_vesting_period =
+      let open Mina_base in
+      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      let amount = Currency.Amount.of_mina_int_exn 10 in
+      let nonce = Account.Nonce.of_int 3 in
+      let memo =
+        Signed_command_memo.create_from_string_exn
+          "zkApp create account bad timing"
+      in
+      let zkapp_keypair = Signature_lib.Keypair.create () in
+      let (zkapp_command_spec : Transaction_snark.For_tests.Deploy_snapp_spec.t)
+          =
+        { sender = (keypair, nonce)
+        ; fee
+        ; fee_payer = None
+        ; amount
+        ; zkapp_account_keypairs = [ zkapp_keypair ]
+        ; memo
+        ; new_zkapp_account = true
+        ; snapp_update =
+            (let timing =
+               Zkapp_basic.Set_or_keep.Set
+                 ( { initial_minimum_balance = Currency.Balance.of_mina_int_exn 5
+                   ; cliff_time =
+                       Mina_numbers.Global_slot_since_genesis.of_int 10000
+                   ; cliff_amount = Currency.Amount.of_nanomina_int_exn 10_000
+                   ; vesting_period = Mina_numbers.Global_slot_span.zero
+                   ; vesting_increment =
+                       Currency.Amount.of_nanomina_int_exn 1_000
+                   }
+                   : Account_update.Update.Timing_info.value )
+             in
+             { Account_update.Update.dummy with timing } )
+        ; preconditions = None
+        ; authorization_kind = Signature
+        }
+      in
+      Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+        zkapp_command_spec
+    in
     let%bind zkapp_command_transfer_from_timed_account =
       let open Mina_base in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
@@ -392,6 +432,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind { total_balance = before_balance; _ } =
       Network.Node.must_get_account_data ~logger node
         ~account_id:timing_account_id
+    in
+    let%bind () =
+      section "Send invalid zkApp with zero vesting period in timing"
+        (send_invalid_zkapp ~logger node zkapp_command_with_zero_vesting_period
+           "Zero vesting period" )
     in
     (* let%bind before_balance =
          get_account_balance ~logger node timing_account_id
