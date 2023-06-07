@@ -1,9 +1,8 @@
-
 (* Common gadget helpers *)
 
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 
-let tests_enabled = false
+let tests_enabled = true
 
 let tuple3_of_array array =
   match array with [| a1; a2; a3 |] -> (a1, a2, a3) | _ -> assert false
@@ -187,17 +186,31 @@ let field_of_hex (type f)
 
 (* List of field elements for each byte of hexadecimal input*)
 let field_bytes_of_hex (type f)
-  (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-  (hex : string) : f list =
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (hex : string) : f list =
   let chars = hex |> String.to_seq |> List.of_seq in
-  let list_pairs = Core_kernel.List.groupi chars ~break:(fun i _ _ -> i mod 2 = 0) in
-  let list_bytes = Core_kernel.List.map list_pairs ~f:(fun byte ->
-      let hex_i = Core_kernel.String.of_char_list byte in
-      field_of_hex (module Circuit) hex_i ) in
+  let list_pairs =
+    Core_kernel.List.groupi chars ~break:(fun i _ _ -> i mod 2 = 0)
+  in
+  let list_bytes =
+    Core_kernel.List.map list_pairs ~f:(fun byte ->
+        let hex_i = Core_kernel.String.of_char_list byte in
+        field_of_hex (module Circuit) hex_i )
+  in
   list_bytes
 
+(* List of field elements of at most 1 byte to a Bignum_bigint *)
+let cvar_field_bytes_to_bignum_bigint_as_prover (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (bytestring : Circuit.Field.t list) : Bignum_bigint.t =
+  Core_kernel.List.fold bytestring ~init:Bignum_bigint.zero ~f:(fun acc x ->
+      Bignum_bigint.(
+        (acc * of_int 2)
+        + cvar_field_to_bignum_bigint_as_prover (module Circuit) x) )
+
 (* Negative test helper *)
-let is_error (func : unit -> _) = Result.is_error (Core_kernel.Or_error.try_with func)
+let is_error (func : unit -> _) =
+  Result.is_error (Core_kernel.Or_error.try_with func)
 
 (* Two to the power of n as a field element *)
 let two_pow (type f)

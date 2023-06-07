@@ -4,7 +4,7 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 
-let tests_enabled = false
+let tests_enabled = true
 
 (* Auxiliary functions *)
 

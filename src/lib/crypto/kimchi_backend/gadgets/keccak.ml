@@ -556,7 +556,7 @@ let check_bytes (type f)
   let lookups =
     match List.length lookups % 3 with
     | 2 ->
-        lookups @ [ Field.zero ] @ [ Field.zero ]
+        lookups @ [ Field.zero; Field.zero]
     | 1 ->
         lookups @ [ Field.zero ]
     | _ ->
@@ -636,6 +636,7 @@ let eth_keccak (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (message : Circuit.Field.t list) : Circuit.Field.t array =
   Array.of_list @@ hash (module Circuit) message ~length:256 ~capacity:512 false
+
 
 (* KECCAK GADGET TESTS *)
 
