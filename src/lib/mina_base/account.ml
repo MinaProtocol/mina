@@ -159,28 +159,23 @@ module Binable_arg = struct
   end]
 end
 
-let check = Fn.id
-
-[%%if not feature_snapps]
-
 let check (t : Binable_arg.t) =
-  let t = check t in
-  match t.snapp with
-  | None ->
-      t
-  | Some _ ->
-      failwith "Snapp accounts not supported"
-
-[%%endif]
-
-[%%if not feature_tokens]
-
-let check (t : Binable_arg.t) =
-  let t = check t in
-  if Token_id.equal Token_id.default t.token_id then t
-  else failwith "Token accounts not supported"
-
-[%%endif]
+  let has_nondefault_token =
+    not @@ Token_id.equal Token_id.default t.token_id
+  in
+  let has_snapp = Option.is_some t.snapp in
+  let failure_statuses =
+    [ (has_nondefault_token, "Token_accounts_not_supported")
+    ; (has_snapp, "Snapp accounts not supported")
+    ]
+    |> List.filter ~f:(fun (b, _) -> b)
+  in
+  if List.is_empty failure_statuses then t
+  else
+    let failure_msg =
+      List.map failure_statuses ~f:snd |> String.concat ~sep:"; "
+    in
+    failwith failure_msg
 
 [%%versioned_binable
 module Stable = struct

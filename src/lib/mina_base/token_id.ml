@@ -26,19 +26,6 @@ let next = T.succ
 
 let invalid = T.of_uint64 Unsigned.UInt64.zero
 
-[%%if feature_tokens]
-
-[%%versioned
-module Stable = struct
-  module V1 = struct
-    type t = T.Stable.V1.t [@@deriving sexp, equal, compare, hash, yojson]
-
-    let to_latest = Fn.id
-  end
-end]
-
-[%%else]
-
 let check x =
   if T.equal x default || T.equal x (next default) then x
   else failwith "Non-default tokens are disabled"
@@ -65,15 +52,13 @@ module Stable = struct
   end
 end]
 
-[%%endif]
+let gen = Quickcheck.Generator.return default
 
 let gen_ge minimum =
   Quickcheck.Generator.map
     Int64.(gen_incl (min_value + minimum) max_value)
     ~f:(fun x ->
       Int64.(x - min_value) |> Unsigned.UInt64.of_int64 |> T.of_uint64 )
-
-let gen = gen_ge 1L
 
 let gen_non_default = gen_ge 2L
 
