@@ -660,25 +660,37 @@ module Node = struct
     set_snark_worker ~logger t ~new_snark_pub_key
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  (* TODO: this is a complete stub of course, since the actual graphql endpoint it would hit doesn't exist yet *)
-  let get_logs ~logger t =
-    [%log info] "Getting logs of node" ~metadata:(logger_metadata t) ;
-    Deferred.Or_error.return
-      [ Yojson.Safe.from_string ""; Yojson.Safe.from_string "" ]
-  (* let open Deferred.Or_error.Let_syntax in
-     [%log info] "Getting logs of node"
-       ~metadata:(logger_metadata t) ;
-     let query_obj = Graphql.Query_latest_logs.(make @@ makeVariables ()) in
-     let%bind query_result_obj =
-       exec_graphql_request ~logger ~node:t ~query_name:"query_logs" query_obj
-     in
-     [%log info] "get_logs, finished exec_graphql_request" ;
-     let new_loglines = query_result_obj.newloglines |> Array.to_list in
-     return new_loglines *)
+  let start_filtered_log ~logger ~log_filter t =
+    let open Deferred.Or_error.Let_syntax in
+    [%log info] "Starting filtered log" ~metadata:(logger_metadata t) ;
+    let query_obj =
+      Graphql.StartFilteredLog.(make @@ makeVariables ~filter:log_filter ())
+    in
+    let%bind query_result_obj =
+      exec_graphql_request ~logger ~node:t ~query_name:"query_logs" query_obj
+    in
+    [%log debug] "start_filtered_log, finished exec_graphql_request" ;
+    let returned_result = query_result_obj.startFilteredLog in
+    (* returned_result should just be the node echoing the log filter back, if it's successful *)
+    if not @@ String.is_empty returned_result then return ()
+    else Deferred.Or_error.errorf "start_filtered_log did not seem to succeed"
 
-  (* let must_get_logs ~logger t =
-     get_logs ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
-  *)
+  let get_filtered_log_entries ~logger ~last_log_index_seen t =
+    let open Deferred.Or_error.Let_syntax in
+    [%log info] "Getting logs from node, starting from log entry number %d"
+      last_log_index_seen ~metadata:(logger_metadata t) ;
+    let query_obj =
+      Graphql.GetFilteredLogEntries.(
+        make @@ makeVariables ~offset:last_log_index_seen ())
+    in
+    let%bind query_result_obj =
+      exec_graphql_request ~logger ~node:t ~query_name:"query_logs" query_obj
+    in
+    [%log info] "get_logs, finished exec_graphql_request" ;
+    let new_loglines =
+      query_result_obj.getFilteredLogEntries |> Array.to_list
+    in
+    return new_loglines
 
   let dump_archive_data ~logger (t : t) ~data_file =
     (* this function won't work if `t` doesn't happen to be an archive node *)
