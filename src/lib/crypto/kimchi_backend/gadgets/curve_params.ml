@@ -56,6 +56,7 @@ module InCircuit = struct
     ; modulus : 'field Foreign_field.standard_limbs
     ; order : 'field Foreign_field.standard_limbs
     ; order_bit_length : int
+    ; order_bit_length_const : 'field Snarky_backendless.Cvar.t
     ; order_minus_one : 'field Foreign_field.Element.Standard.t
     ; order_minus_one_bits :
         'field Snarky_backendless.Cvar.t Snark_intf.Boolean0.t list
@@ -114,6 +115,7 @@ let double_bignum_point (curve : t) (point : Affine.bignum_point) :
 let to_circuit_constants (type field)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = field)
     ?(use_precomputed_gen_doubles = true) (curve : t) : field InCircuit.t =
+  let open Circuit in
   (* Need to know native field size before we can check if it fits *)
   Foreign_field.check_modulus_bignum_bigint (module Circuit) curve.modulus ;
   Foreign_field.check_modulus_bignum_bigint (module Circuit) curve.order ;
@@ -132,6 +134,14 @@ let to_circuit_constants (type field)
           (module Circuit)
           curve.order
     ; order_bit_length
+    ; order_bit_length_const =
+        (let const_len = Field.(constant @@ Constant.of_int order_bit_length) in
+         let var_len =
+           exists Field.typ ~compute:(fun () ->
+               Circuit.Field.Constant.of_int order_bit_length )
+         in
+         Field.Assert.equal const_len var_len ;
+         const_len )
     ; order_minus_one =
         Foreign_field.Element.Standard.checked_const_of_bignum_bigint
           (module Circuit)
