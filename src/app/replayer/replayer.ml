@@ -67,20 +67,21 @@ let json_ledger_hash_of_ledger ledger =
   Ledger_hash.to_yojson @@ Ledger.merkle_root ledger
 
 let create_ledger_as_list ledger =
-  List.map (Ledger.to_list ledger) ~f:(fun acc ->
+  let%map accounts = Ledger.to_list ledger in
+  List.map accounts ~f:(fun acc ->
       Genesis_ledger_helper.Accounts.Single.of_account acc None )
 
 let create_output ~target_epoch_ledgers_state_hash ~target_fork_state_hash
     ~ledger ~staking_epoch_ledger ~staking_seed ~next_epoch_ledger ~next_seed
     (input_genesis_ledger : Runtime_config.Ledger.t) =
-  let genesis_ledger_as_list = create_ledger_as_list ledger in
+  let%bind genesis_ledger_as_list = create_ledger_as_list ledger in
   let target_genesis_ledger =
     { input_genesis_ledger with base = Accounts genesis_ledger_as_list }
   in
-  let staking_epoch_ledger_as_list =
+  let%bind staking_epoch_ledger_as_list =
     create_ledger_as_list staking_epoch_ledger
   in
-  let next_epoch_ledger_as_list = create_ledger_as_list next_epoch_ledger in
+  let%map next_epoch_ledger_as_list = create_ledger_as_list next_epoch_ledger in
   let target_staking_epoch_data : Runtime_config.Epoch_data.Data.t =
     let ledger =
       { input_genesis_ledger with base = Accounts staking_epoch_ledger_as_list }
@@ -102,8 +103,9 @@ let create_output ~target_epoch_ledgers_state_hash ~target_fork_state_hash
   ; target_epoch_data
   }
 
-let create_replayer_checkpoint ~ledger ~start_slot_since_genesis : input =
-  let accounts = create_ledger_as_list ledger in
+let create_replayer_checkpoint ~ledger ~start_slot_since_genesis :
+    input Deferred.t =
+  let%map accounts = create_ledger_as_list ledger in
   let genesis_ledger : Runtime_config.Ledger.t =
     { base = Accounts accounts
     ; num_accounts = None
@@ -172,7 +174,7 @@ let update_epoch_ledger ~logger ~name ~ledger ~epoch_ledger epoch_ledger_hash =
       name
       (Ledger_hash.to_base58_check epoch_ledger_hash) ;
     (* Ledger.copy doesn't actually copy, roll our own here *)
-    let accounts = Ledger.to_list ledger in
+    let%map accounts = Ledger.to_list ledger in
     let epoch_ledger = Ledger.create ~depth:(Ledger.depth ledger) () in
     List.iter accounts ~f:(fun account ->
         let pk = Account.public_key account in
@@ -196,7 +198,7 @@ let update_epoch_ledger ~logger ~name ~ledger ~epoch_ledger epoch_ledger_hash =
                 * (string * Token_id.t)]
             |> Error.raise ) ;
     epoch_ledger )
-  else epoch_ledger
+  else return epoch_ledger
 
 let update_staking_epoch_data ~logger pool ~ledger ~last_block_id
     ~staking_epoch_ledger ~staking_seed =
@@ -208,10 +210,10 @@ let update_staking_epoch_data ~logger pool ~ledger ~last_block_id
     query_db ~f:(fun db ->
         Sql.Epoch_data.get_staking_epoch_data_id db state_hash )
   in
-  let%map { epoch_ledger_hash; epoch_data_seed } =
+  let%bind { epoch_ledger_hash; epoch_data_seed } =
     query_db ~f:(fun db -> Sql.Epoch_data.get_epoch_data db staking_epoch_id)
   in
-  let ledger =
+  let%map ledger =
     update_epoch_ledger ~logger ~name:"staking" ~ledger
       ~epoch_ledger:!staking_epoch_ledger epoch_ledger_hash
   in
@@ -227,10 +229,10 @@ let update_next_epoch_data ~logger pool ~ledger ~last_block_id
   let%bind next_epoch_id =
     query_db ~f:(fun db -> Sql.Epoch_data.get_next_epoch_data_id db state_hash)
   in
-  let%map { epoch_ledger_hash; epoch_data_seed } =
+  let%bind { epoch_ledger_hash; epoch_data_seed } =
     query_db ~f:(fun db -> Sql.Epoch_data.get_epoch_data db next_epoch_id)
   in
-  let ledger =
+  let%map ledger =
     update_epoch_ledger ~logger ~name:"next" ~ledger
       ~epoch_ledger:!next_epoch_ledger epoch_ledger_hash
   in
@@ -1404,9 +1406,11 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
           let start_slot_since_genesis =
             Int64.succ last_global_slot_since_genesis
           in
-          let replayer_checkpoint =
-            create_replayer_checkpoint ~ledger ~start_slot_since_genesis
-            |> input_to_yojson |> Yojson.Safe.pretty_to_string
+          let%bind replayer_checkpoint =
+            let%map input =
+              create_replayer_checkpoint ~ledger ~start_slot_since_genesis
+            in
+            input_to_yojson input |> Yojson.Safe.pretty_to_string
           in
           let checkpoint_file =
             sprintf "replayer-checkpoint-%Ld.json" start_slot_since_genesis
@@ -1425,15 +1429,17 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
               if Int.equal !error_count 0 then (
                 [%log info] "Writing output to $output_file"
                   ~metadata:[ ("output_file", `String output_file) ] ;
-                let output =
-                  create_output ~target_epoch_ledgers_state_hash
-                    ~target_fork_state_hash:
-                      (State_hash.of_base58_check_exn target_state_hash)
-                    ~ledger ~staking_epoch_ledger:!staking_epoch_ledger
-                    ~staking_seed:!staking_seed
-                    ~next_epoch_ledger:!next_epoch_ledger ~next_seed:!next_seed
-                    input.genesis_ledger
-                  |> output_to_yojson |> Yojson.Safe.pretty_to_string
+                let%bind output =
+                  let%map output =
+                    create_output ~target_epoch_ledgers_state_hash
+                      ~target_fork_state_hash:
+                        (State_hash.of_base58_check_exn target_state_hash)
+                      ~ledger ~staking_epoch_ledger:!staking_epoch_ledger
+                      ~staking_seed:!staking_seed
+                      ~next_epoch_ledger:!next_epoch_ledger
+                      ~next_seed:!next_seed input.genesis_ledger
+                  in
+                  output_to_yojson output |> Yojson.Safe.pretty_to_string
                 in
                 return
                 @@ Out_channel.with_file output_file ~f:(fun oc ->

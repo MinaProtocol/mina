@@ -154,26 +154,6 @@ module Make (Inputs : Inputs_intf) :
     | None ->
         empty_hash (Location.height ~ledger_depth:mdb.depth location)
 
-  let account_list_bin { kvdb; _ } account_bin_read : Account.t list =
-    let all_keys_values = Kvdb.to_alist kvdb in
-    (* see comment at top of location.ml about encoding of locations *)
-    let account_location_prefix =
-      Location.Prefix.account |> Unsigned.UInt8.to_int
-    in
-    (* just want list of locations and accounts, ignoring other locations *)
-    let locations_accounts_bin =
-      List.filter all_keys_values ~f:(fun (loc, _v) ->
-          let ch = Bigstring.get_uint8 loc ~pos:0 in
-          Int.equal ch account_location_prefix )
-    in
-    List.map locations_accounts_bin ~f:(fun (_location_bin, account_bin) ->
-        account_bin_read account_bin ~pos_ref:(ref 0) )
-
-  let to_list mdb = account_list_bin mdb Account.bin_read_t
-
-  let accounts mdb =
-    to_list mdb |> List.map ~f:Account.identifier |> Account_id.Set.of_list
-
   let set_raw { kvdb; depth; _ } location bin =
     Kvdb.set kvdb
       ~key:(Location.serialize ~ledger_depth:depth location)
@@ -338,9 +318,6 @@ module Make (Inputs : Inputs_intf) :
     | Some last_addr ->
         Sequence.range ~stop:`inclusive 0 (Addr.to_int last_addr)
         |> Sequence.map ~f:(fun i -> get_at_index_exn t i)
-
-  let iteri (t : t) ~(f : int -> Account.t -> unit) =
-    Sequence.iteri (all_accounts t) ~f
 
   (** The tokens associated with each public key.
 
@@ -598,6 +575,26 @@ module Make (Inputs : Inputs_intf) :
     let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
     set mdb (Location.Account addr) account
 
+  let num_accounts t =
+    match Account_location.last_location_address t with
+    | None ->
+        0
+    | Some addr ->
+        Addr.to_int addr + 1
+
+  let to_list mdb =
+    let num_accounts = num_accounts mdb in
+    Async.Deferred.List.init ~how:`Parallel num_accounts ~f:(fun i ->
+        Async.Deferred.return @@ get_at_index_exn mdb i )
+
+  let to_list_sequential mdb =
+    let num_accounts = num_accounts mdb in
+    List.init num_accounts ~f:(fun i -> get_at_index_exn mdb i)
+
+  let accounts mdb =
+    let%map.Async.Deferred accts = to_list mdb in
+    List.map accts ~f:Account.identifier |> Account_id.Set.of_list
+
   let get_or_create_account mdb account_id account =
     match Account_location.get mdb account_id with
     | Error Account_location_not_found -> (
@@ -614,12 +611,13 @@ module Make (Inputs : Inputs_intf) :
     | Ok location ->
         Ok (`Existed, location)
 
-  let num_accounts t =
+  let iteri t ~f =
     match Account_location.last_location_address t with
     | None ->
-        0
-    | Some addr ->
-        Addr.to_int addr + 1
+        ()
+    | Some last_addr ->
+        Sequence.range ~stop:`inclusive 0 (Addr.to_int last_addr)
+        |> Sequence.iter ~f:(fun i -> f i (get_at_index_exn t i))
 
   (* TODO : if key-value store supports iteration mechanism, like RocksDB,
      maybe use that here, instead of loading all accounts into memory See Issue
@@ -647,23 +645,9 @@ module Make (Inputs : Inputs_intf) :
   let foldi t ~init ~f =
     foldi_with_ignored_accounts t Account_id.Set.empty ~init ~f
 
-  module C : Container.S0 with type t := t and type elt := Account.t =
-  Container.Make0 (struct
-    module Elt = Account
-
-    type nonrec t = t
-
-    let fold t ~init ~f =
-      let f' _index accum account = f accum account in
-      foldi t ~init ~f:f'
-
-    let iter = `Define_using_fold
-
-    (* Use num_accounts instead? *)
-    let length = `Define_using_fold
-  end)
-
-  let fold_until = C.fold_until
+  let fold_until t ~init ~f ~finish =
+    let%map.Async.Deferred accts = to_list t in
+    List.fold_until accts ~init ~f ~finish
 
   let merkle_root mdb = get_hash mdb Location.root_hash
 

@@ -286,7 +286,7 @@ module Ledger_inner = struct
 
   (* TODO: Don't allocate: see Issue #1191 *)
   let fold_until t ~init ~f ~finish =
-    let accounts = to_list t in
+    let%map.Async.Deferred accounts = to_list t in
     List.fold_until accounts ~init ~f ~finish
 
   let create_new_account_exn t account_id account =

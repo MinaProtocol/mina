@@ -3799,7 +3799,7 @@ module Mutations = struct
           Transition_frontier.Breadcrumb.staged_ledger breadcrumb
           |> Staged_ledger.ledger
         in
-        let accounts = Ledger.to_list best_tip_ledger in
+        let%bind accounts = Ledger.to_list best_tip_ledger in
         let constraint_constants =
           Genesis_constants.Constraint_constants.compiled
         in
@@ -4708,11 +4708,10 @@ module Mutations = struct
               ~wait_span ~stop_signal ~stop_time ~uuid keypairs )
           else return ()
         in
+        let%bind accounts = Ledger.to_list ledger in
         [%log debug] "The accounts were not in the best tip $ledger, try again"
           ~metadata:
-            [ ( "ledger"
-              , `List (List.map (Ledger.to_list ledger) ~f:Account.to_yojson) )
-            ] ;
+            [ ("ledger", `List (List.map accounts ~f:Account.to_yojson)) ] ;
         let%bind () =
           Async.after
             (Time.Span.of_ms
@@ -5451,7 +5450,7 @@ module Queries = struct
             [] )
 
   let token_accounts =
-    field "tokenAccounts" ~doc:"Find all accounts for a token ID"
+    io_field "tokenAccounts" ~doc:"Find all accounts for a token ID"
       ~typ:(non_null (list (non_null Types.AccountObj.account)))
       ~args:
         Arg.
@@ -5461,25 +5460,28 @@ module Queries = struct
       ~resolve:(fun { ctx = mina; _ } () token_id ->
         match get_ledger_and_breadcrumb mina with
         | Some (ledger, breadcrumb) ->
-            let accounts = Ledger.accounts ledger in
-            Account_id.Set.fold accounts ~init:[] ~f:(fun acct_objs acct_id ->
-                if Token_id.(Account_id.token_id acct_id <> token_id) then
-                  acct_objs
-                else
-                  (* account id in the ledger, lookup should always succeed *)
-                  let loc =
-                    Option.value_exn
-                    @@ Ledger.location_of_account ledger acct_id
-                  in
-                  let account = Option.value_exn @@ Ledger.get ledger loc in
-                  let partial_account =
-                    Types.AccountObj.Partial_account.of_full_account ~breadcrumb
-                      account
-                  in
-                  Types.AccountObj.lift mina account.public_key partial_account
-                  :: acct_objs )
+            let%map.Deferred accounts = Ledger.accounts ledger in
+            Ok
+              (Account_id.Set.fold accounts ~init:[]
+                 ~f:(fun acct_objs acct_id ->
+                   if Token_id.(Account_id.token_id acct_id <> token_id) then
+                     acct_objs
+                   else
+                     (* account id in the ledger, lookup should always succeed *)
+                     let loc =
+                       Option.value_exn
+                       @@ Ledger.location_of_account ledger acct_id
+                     in
+                     let account = Option.value_exn @@ Ledger.get ledger loc in
+                     let partial_account =
+                       Types.AccountObj.Partial_account.of_full_account
+                         ~breadcrumb account
+                     in
+                     Types.AccountObj.lift mina account.public_key
+                       partial_account
+                     :: acct_objs ) )
         | None ->
-            [] )
+            return (Ok []) )
 
   let token_owner =
     field "tokenOwner" ~doc:"Find the account that owns a given token"

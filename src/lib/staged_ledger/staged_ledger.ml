@@ -2920,6 +2920,9 @@ let%test_module "staged ledger tests" =
       in
       (ledger, List.rev cmds, iters)
 
+    let ledger_account_ids ledger =
+      Ledger.to_list_sequential ledger |> List.map ~f:Account.identifier
+
     let%test_unit "Max throughput-ledger proof count-fixed blocks" =
       let expected_proof_count = 3 in
       Quickcheck.test
@@ -2967,9 +2970,7 @@ let%test_module "staged ledger tests" =
         Quickcheck.Generator.(tuple2 gen_zkapps_at_capacity small_positive_int)
         ~f:(fun ((ledger, zkapps, iters), global_slot) ->
           async_with_given_ledger ledger (fun ~snarked_ledger sl test_mask ->
-              let account_ids =
-                Ledger.accounts ledger |> Account_id.Set.to_list
-              in
+              let account_ids = ledger_account_ids ledger in
               test_simple ~global_slot account_ids zkapps iters sl test_mask
                 ~snarked_ledger `Many_provers stmt_to_work_random_prover ) )
 
@@ -2980,9 +2981,7 @@ let%test_module "staged ledger tests" =
           tuple2 gen_failing_zkapps_at_capacity small_positive_int)
         ~f:(fun ((ledger, zkapps, iters), global_slot) ->
           async_with_given_ledger ledger (fun ~snarked_ledger sl test_mask ->
-              let account_ids =
-                Ledger.accounts ledger |> Account_id.Set.to_list
-              in
+              let account_ids = ledger_account_ids ledger in
               test_simple ~global_slot account_ids zkapps iters
                 ~allow_failures:true sl test_mask ~snarked_ledger `Many_provers
                 stmt_to_work_random_prover ) )
@@ -3001,9 +3000,7 @@ let%test_module "staged ledger tests" =
         ~trials:1
         ~f:(fun ((ledger, zkapps, iters), global_slot) ->
           async_with_given_ledger ledger (fun ~snarked_ledger sl test_mask ->
-              let account_ids =
-                Ledger.accounts ledger |> Account_id.Set.to_list
-              in
+              let account_ids = ledger_account_ids ledger in
               test_simple ~global_slot account_ids zkapps iters sl
                 ~expected_proof_count:(Some expected_proof_count)
                 ~check_snarked_ledger_transition:true test_mask ~snarked_ledger
@@ -3016,9 +3013,7 @@ let%test_module "staged ledger tests" =
         ~trials:3
         ~f:(fun ((ledger, cmds, iters), global_slot) ->
           async_with_given_ledger ledger (fun ~snarked_ledger sl test_mask ->
-              let account_ids =
-                Ledger.accounts ledger |> Account_id.Set.to_list
-              in
+              let account_ids = ledger_account_ids ledger in
               test_simple ~global_slot account_ids cmds iters sl test_mask
                 ~snarked_ledger ~check_snarked_ledger_transition:true
                 `Many_provers stmt_to_work_random_prover ) )
@@ -3042,9 +3037,7 @@ let%test_module "staged ledger tests" =
         ~trials:2
         ~f:(fun ((ledger, zkapps, iters), global_slot) ->
           async_with_given_ledger ledger (fun ~snarked_ledger sl test_mask ->
-              let account_ids =
-                Ledger.accounts ledger |> Account_id.Set.to_list
-              in
+              let account_ids = ledger_account_ids ledger in
               test_simple ~global_slot account_ids zkapps iters sl test_mask
                 ~snarked_ledger `Many_provers stmt_to_work_random_prover ) )
 
@@ -3070,9 +3063,7 @@ let%test_module "staged ledger tests" =
         ~trials:2
         ~f:(fun ((ledger, zkapps, iters), global_slot) ->
           async_with_given_ledger ledger (fun ~snarked_ledger sl test_mask ->
-              let account_ids =
-                Ledger.accounts ledger |> Account_id.Set.to_list
-              in
+              let account_ids = ledger_account_ids ledger in
               test_simple ~global_slot account_ids zkapps iters sl test_mask
                 ~snarked_ledger ~check_snarked_ledger_transition:true
                 `One_prover stmt_to_work_one_prover ) )
