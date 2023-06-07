@@ -318,7 +318,7 @@ struct
           |> Wrap_hack.pad_accumulator )
           public_input t.proof
       in
-      let ((x_hat_1, _x_hat_2) as x_hat) = O.(p_eval_1 o, p_eval_2 o) in
+      let ((x_hat_1, _x_hat_2) as x_hat) = O.p_eval o in
       let scalar_chal f =
         Scalar_challenge.map ~f:Challenge.Constant.of_tock_field (f o)
       in

@@ -114,7 +114,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
         |> to_list)
       public_input proof
   in
-  let x_hat = O.(p_eval_1 o, p_eval_2 o) in
+  let x_hat = O.p_eval o in
   let scalar_chal f =
     Scalar_challenge.map ~f:Challenge.Constant.of_tick_field (f o)
   in

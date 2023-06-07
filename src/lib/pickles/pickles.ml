@@ -1472,7 +1472,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           |> to_list)
                         public_input proof
                     in
-                    let x_hat = O.(p_eval_1 o, p_eval_2 o) in
+                    let x_hat = O.p_eval o in
                     let step_vk, _ = Lazy.force step_vk in
                     let next_statement : _ Types.Wrap.Statement.In_circuit.t =
                       let scalar_chal f =
