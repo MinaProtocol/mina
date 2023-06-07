@@ -72,7 +72,7 @@ let%test_unit "lookup gadget" =
             (* Use the lookup gadget *)
             less_than_bits (module Runner.Impl) bits value ;
             (* Use a dummy range check to load the table *)
-            Range_check.bits64 (module Runner.Impl) Field.zero; 
+            Range_check.bits64 (module Runner.Impl) Field.zero ;
             () )
       in
       cs
