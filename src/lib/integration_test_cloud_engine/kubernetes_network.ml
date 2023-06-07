@@ -215,6 +215,29 @@ module Node = struct
       }
     |}]
 
+    module Set_snark_worker =
+    [%graphql
+    {|
+      mutation ($input: SetSnarkWorkerInput! ) @encoders(module: "Encoders"){
+        setSnarkWorker(input:$input){
+          lastSnarkWorker
+          }
+      }
+    |}]
+
+    module Get_account_data =
+    [%graphql
+    {|
+      query ($public_key: PublicKey!) @encoders(module: "Encoders"){
+        account(publicKey: $public_key) {
+          nonce
+          balance {
+            total @ppxCustom(module: "Scalars.Balance")
+          }
+        }
+      }
+    |}]
+
     (* TODO: temporary version *)
     module Send_test_zkapp = Generated_graphql_queries.Send_test_zkapp
     module Pooled_zkapp_commands =
@@ -300,7 +323,7 @@ module Node = struct
                    vestingIncrement
                    initialMinimumBalance
                  }
-          token
+          tokenId
           tokenSymbol
           verificationKey { verificationKey
                             hash
@@ -622,7 +645,7 @@ module Node = struct
               let%bind cliff_time =
                 match tm with
                 | `String s ->
-                    return @@ Mina_numbers.Global_slot.of_string s
+                    return @@ Mina_numbers.Global_slot_since_genesis.of_string s
                 | _ ->
                     fail
                       (Error.of_string
@@ -631,7 +654,7 @@ module Node = struct
               let%bind vesting_period =
                 match period with
                 | `String s ->
-                    return @@ Mina_numbers.Global_slot.of_string s
+                    return @@ Mina_numbers.Global_slot_span.of_string s
                 | _ ->
                     fail
                       (Error.of_string
@@ -863,9 +886,13 @@ module Node = struct
         ] ;
     res
 
+  let must_send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee =
+    send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
+
   let send_payment_with_raw_sig ~logger t ~sender_pub_key ~receiver_pub_key
-      ~amount ~fee ~nonce ~memo ~(valid_until : Mina_numbers.Global_slot.t)
-      ~raw_signature =
+      ~amount ~fee ~nonce ~memo
+      ~(valid_until : Mina_numbers.Global_slot_since_genesis.t) ~raw_signature =
     [%log info] "Sending a payment with raw signature"
       ~metadata:(logger_metadata t) ;
     let open Deferred.Or_error.Let_syntax in
@@ -874,7 +901,8 @@ module Node = struct
       let input =
         Mina_graphql.Types.Input.SendPaymentInput.make_input
           ~from:sender_pub_key ~to_:receiver_pub_key ~amount ~fee ~memo ~nonce
-          ~valid_until:(Mina_numbers.Global_slot.to_uint32 valid_until)
+          ~valid_until:
+            (Mina_numbers.Global_slot_since_genesis.to_uint32 valid_until)
           ()
       in
       let variables = makeVariables ~input ~rawSignature:raw_signature () in
@@ -913,10 +941,6 @@ module Node = struct
       ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let must_send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee =
-    send_delegation ~logger t ~sender_pub_key ~receiver_pub_key ~fee
-    |> Deferred.bind ~f:Malleable_error.or_hard_error
-
   let send_test_payments ~repeat_count ~repeat_delay_ms ~logger t ~senders
       ~receiver_pub_key ~amount ~fee =
     [%log info] "Sending a series of test payments"
@@ -941,6 +965,36 @@ module Node = struct
       ~receiver_pub_key ~amount ~fee =
     send_test_payments ~repeat_count ~repeat_delay_ms ~logger t ~senders
       ~receiver_pub_key ~amount ~fee
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+  let set_snark_worker ~logger t ~new_snark_pub_key =
+    [%log info] "Changing snark worker key" ~metadata:(logger_metadata t) ;
+    let open Deferred.Or_error.Let_syntax in
+    let set_snark_worker_graphql () =
+      let input = Some new_snark_pub_key in
+      let set_snark_worker_obj =
+        Graphql.Set_snark_worker.(make @@ makeVariables ~input ())
+      in
+      exec_graphql_request ~logger ~node:t
+        ~query_name:"set_snark_worker_graphql" set_snark_worker_obj
+    in
+    let%map result_obj = set_snark_worker_graphql () in
+    let returned_last_snark_worker_opt =
+      result_obj.setSnarkWorker.lastSnarkWorker
+    in
+    let last_snark_worker =
+      match returned_last_snark_worker_opt with
+      | None ->
+          "<no last snark worker>"
+      | Some last ->
+          last |> Scalars.PublicKey.serialize |> Yojson.Basic.to_string
+    in
+    [%log info] "snark worker changed, lastSnarkWorker: %s" last_snark_worker
+      ~metadata:[ ("lastSnarkWorker", `String last_snark_worker) ] ;
+    ()
+
+  let must_set_snark_worker ~logger t ~new_snark_pub_key =
+    set_snark_worker ~logger t ~new_snark_pub_key
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let dump_archive_data ~logger (t : t) ~data_file =
@@ -989,7 +1043,7 @@ module Node = struct
     let open Malleable_error.Let_syntax in
     let%bind accounts =
       run_in_container t
-        ~cmd:[ "jq"; "-c"; ".ledger.accounts"; "/config/daemon.json" ]
+        ~cmd:[ "jq"; "-c"; ".ledger.accounts"; "/root/config/daemon.json" ]
     in
     let replayer_input =
       sprintf

@@ -318,13 +318,11 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             ( Mina_commands.verify_payment mina aid tx proof
             |> Participating_state.active_error |> Or_error.join ) )
     ; implement Daemon_rpcs.Get_public_keys_with_details.rpc (fun () () ->
-          return
-            ( Mina_commands.get_keys_with_details mina
-            |> Participating_state.active_error ) )
+          let%map keys = Mina_commands.get_keys_with_details mina in
+          Participating_state.active_error keys )
     ; implement Daemon_rpcs.Get_public_keys.rpc (fun () () ->
-          return
-            ( Mina_commands.get_public_keys mina
-            |> Participating_state.active_error ) )
+          let%map keys = Mina_commands.get_public_keys mina in
+          Participating_state.active_error keys )
     ; implement Daemon_rpcs.Get_nonce.rpc (fun () aid ->
           return
             ( Mina_commands.get_nonce mina aid
@@ -339,36 +337,41 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
           Mina_commands.clear_hist_status ~flag mina )
     ; implement Daemon_rpcs.Get_ledger.rpc (fun () lh ->
-          (* getting the ledger may take more time than a heartbeat timeout
-             run in thread to allow RPC heartbeats to proceed
-          *)
-          Async.In_thread.run (fun () -> Mina_lib.get_ledger mina lh) )
+          Mina_lib.get_ledger mina lh )
     ; implement Daemon_rpcs.Get_snarked_ledger.rpc (fun () lh ->
           Mina_lib.get_snarked_ledger mina lh )
     ; implement Daemon_rpcs.Get_staking_ledger.rpc (fun () which ->
-          ( match which with
-          | Next ->
-              Option.value_map (Mina_lib.next_epoch_ledger mina)
-                ~default:
-                  (Or_error.error_string "next staking ledger not available")
-                ~f:(function
-                | `Finalized ledger ->
-                    Ok ledger
-                | `Notfinalized ->
-                    Or_error.error_string
-                      "next staking ledger is not finalized yet" )
-          | Current ->
-              Option.value_map
-                (Mina_lib.staking_ledger mina)
-                ~default:
-                  (Or_error.error_string "current staking ledger not available")
-                ~f:Or_error.return )
-          |> Or_error.map ~f:(function
-               | Genesis_epoch_ledger l ->
-                   Mina_ledger.Ledger.to_list l
-               | Ledger_db db ->
-                   Mina_ledger.Ledger.Db.to_list db )
-          |> Deferred.return )
+          let ledger_or_error =
+            match which with
+            | Next ->
+                Option.value_map (Mina_lib.next_epoch_ledger mina)
+                  ~default:
+                    (Or_error.error_string "next staking ledger not available")
+                  ~f:(function
+                  | `Finalized ledger ->
+                      Ok ledger
+                  | `Notfinalized ->
+                      Or_error.error_string
+                        "next staking ledger is not finalized yet" )
+            | Current ->
+                Option.value_map
+                  (Mina_lib.staking_ledger mina)
+                  ~default:
+                    (Or_error.error_string
+                       "current staking ledger not available" )
+                  ~f:Or_error.return
+          in
+          match ledger_or_error with
+          | Ok ledger -> (
+              match ledger with
+              | Genesis_epoch_ledger l ->
+                  let%map accts = Mina_ledger.Ledger.to_list l in
+                  Ok accts
+              | Ledger_db db ->
+                  let%map accts = Mina_ledger.Ledger.Db.to_list db in
+                  Ok accts )
+          | Error err ->
+              return (Error err) )
     ; implement Daemon_rpcs.Stop_daemon.rpc (fun () () ->
           Scheduler.yield () >>= (fun () -> exit 0) |> don't_wait_for ;
           Deferred.unit )

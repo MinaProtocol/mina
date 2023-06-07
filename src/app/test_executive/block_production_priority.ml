@@ -15,7 +15,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  (* let num_extra_keys = 1000 *)
+  let num_extra_keys = 1000
 
   (* let num_sender_nodes = 4 *)
 
@@ -31,7 +31,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; { account_name = "empty-bp-key"; balance = "0"; timing = Untimed }
         ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
         ]
-        @ List.init 1000 ~f:(fun i ->
+        @ List.init num_extra_keys ~f:(fun i ->
               let i_str = Int.to_string i in
               { Test_Account.account_name =
                   String.concat [ "sender-account"; i_str ]
@@ -50,10 +50,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Some
           { node_name = "snark-node"
           ; account_name = "snark-node-key"
-          ; worker_nodes = 25
+          ; worker_nodes = 4
           }
     ; txpool_max_size = 10_000_000
     ; snark_worker_fee = "0.0001"
+    ; proof_config =
+        { proof_config_default with
+          work_delay = Some 1
+        ; transaction_capacity =
+            Some Runtime_config.Proof_keys.Transaction_capacity.small
+        }
     }
 
   let fee = Currency.Fee.of_nanomina_int_exn 10_000_000
