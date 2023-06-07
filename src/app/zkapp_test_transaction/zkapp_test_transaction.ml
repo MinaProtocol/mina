@@ -573,9 +573,11 @@ let update_timings =
          Zkapp_basic.Set_or_keep.Set
            ( { initial_minimum_balance =
                  Currency.Balance.of_mina_int_exn initial_minimum_balance
-             ; cliff_time = Mina_numbers.Global_slot_since_genesis.of_int cliff_time
+             ; cliff_time =
+                 Mina_numbers.Global_slot_since_genesis.of_int cliff_time
              ; cliff_amount = Currency.Amount.of_mina_int_exn cliff_amount
-             ; vesting_period = Mina_numbers.Global_slot_span.of_int vesting_period
+             ; vesting_period =
+                 Mina_numbers.Global_slot_span.of_int vesting_period
              ; vesting_increment =
                  Currency.Amount.of_mina_int_exn vesting_increment
              }
