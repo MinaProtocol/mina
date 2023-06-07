@@ -366,7 +366,11 @@ let log t ~level ~module_ ~location ?(metadata = []) ?event_id fmt =
     | Internal ->
         if Mina_compile_config.itn_features then
           let timestamp = message'.timestamp in
-          Itn_logger.log ~timestamp ~message ~metadata ()
+          let entries =
+            Itn_logger.postprocess_message ~timestamp ~message ~metadata
+          in
+          List.iter entries ~f:(fun (timestamp, message, metadata) ->
+              Itn_logger.log ~timestamp ~message ~metadata () )
     | _ ->
         ()
   in

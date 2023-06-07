@@ -26,9 +26,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let open Currency in
       Timed
         { initial_minimum_balance = Balance.of_nanomina_int_exn min_balance
-        ; cliff_time = Mina_numbers.Global_slot.of_int cliff_time
+        ; cliff_time = Mina_numbers.Global_slot_since_genesis.of_int cliff_time
         ; cliff_amount = Amount.of_nanomina_int_exn cliff_amount
-        ; vesting_period = Mina_numbers.Global_slot.of_int vesting_period
+        ; vesting_period = Mina_numbers.Global_slot_span.of_int vesting_period
         ; vesting_increment = Amount.of_nanomina_int_exn vesting_increment
         }
     in
@@ -147,7 +147,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let txn_body =
       Signed_command_payload.Body.Payment
-        { source_pk = sender_pub_key; receiver_pk = receiver_pub_key; amount }
+        { receiver_pk = receiver_pub_key; amount }
     in
     let%bind { nonce = sender_current_nonce; _ } =
       Network.Node.must_get_account_data ~logger untimed_node_b
@@ -190,7 +190,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let%bind { hash; _ } =
            Network.Node.must_send_payment_with_raw_sig untimed_node_b ~logger
              ~sender_pub_key:
-               (Signed_command_payload.Body.source_pk signed_cmmd.payload.body)
+               (Account_id.public_key @@ Signed_command.fee_payer signed_cmmd)
              ~receiver_pub_key:
                (Signed_command_payload.Body.receiver_pk signed_cmmd.payload.body)
              ~amount:
@@ -278,7 +278,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         match%bind
           Network.Node.send_payment_with_raw_sig untimed_node_b ~logger
             ~sender_pub_key:
-              (Signed_command_payload.Body.source_pk signed_cmmd.payload.body)
+              (Account_id.public_key @@ Signed_command.fee_payer signed_cmmd)
             ~receiver_pub_key:
               (Signed_command_payload.Body.receiver_pk signed_cmmd.payload.body)
             ~amount:
@@ -325,7 +325,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         match%bind
           Network.Node.send_payment_with_raw_sig untimed_node_a ~logger
             ~sender_pub_key:
-              (Signed_command_payload.Body.source_pk signed_cmmd.payload.body)
+              (Account_id.public_key @@ Signed_command.fee_payer signed_cmmd)
             ~receiver_pub_key:
               (Signed_command_payload.Body.receiver_pk signed_cmmd.payload.body)
             ~amount:

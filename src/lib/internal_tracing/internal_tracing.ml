@@ -2,18 +2,18 @@ open Core
 
 module Block_id = struct
   type t =
-    | Global_slot of Mina_numbers.Global_slot.t
+    | Global_slot of Mina_numbers.Global_slot_since_genesis.t
     | State_hash of Mina_base.State_hash.t
   [@@deriving sexp, hash, compare, equal]
 
   let to_string = function
     | Global_slot slot ->
-        Mina_numbers.Global_slot.to_string slot
+        Mina_numbers.Global_slot_since_genesis.to_string slot
     | State_hash hash ->
         Mina_base.State_hash.to_base58_check hash
 end
 
-let no_block = Block_id.Global_slot Mina_numbers.Global_slot.zero
+let no_block = Block_id.Global_slot Mina_numbers.Global_slot_since_genesis.zero
 
 let last_block_id = ref no_block
 
@@ -73,33 +73,33 @@ let with_slot slot f = with_block (Some (Global_slot slot)) f
 let get_current_block_id () =
   Async_kernel.Async_kernel_scheduler.find_local current_block_id_key
 
-let handling_current_block_id_change' block_id =
+let handling_current_block_id_change' ~last_block_id ~make block_id =
   if Block_id.equal !last_block_id block_id then []
   else (
     last_block_id := block_id ;
-    [ `Assoc [ ("current_block", `String (Block_id.to_string block_id)) ] ] )
+    [ make block_id ] )
 
 (** If the current context has a different block from last time,
     record a block context change. It is important to call this when generating
     events that relate to a block to detect and record context switches
     made by the Async scheduler. *)
-let handling_current_block_id_change events =
+let handling_current_block_id_change ~last_block_id ~make events =
   let block_id = Option.value ~default:no_block @@ get_current_block_id () in
-  handling_current_block_id_change' block_id @ events
+  handling_current_block_id_change' ~last_block_id block_id ~make @ events
 
-let handling_current_call_id_change' call_id =
+let handling_current_call_id_change' ~last_call_id ~make ~tag call_id =
   if Int.equal !last_call_id call_id then []
   else (
     last_call_id := call_id ;
-    [ `Assoc [ ("current_call_id", `Int call_id) ] ] )
+    [ make tag call_id ] )
 
 (** If the current context has a different call ID from last time,
     record a call ID context change. It is important to call this when generating
     events that relate to different concurrent calls to detect and record
     context switches made by the Async scheduler. *)
-let handling_current_call_id_change events =
-  let call_id = Internal_tracing_context_call.get () in
-  handling_current_call_id_change' call_id @ events
+let handling_current_call_id_change ~last_call_id ~make events =
+  let call_id, tag = Internal_tracing_context_call.get () in
+  handling_current_call_id_change' ~last_call_id ~make ~tag call_id @ events
 
 module For_logger = struct
   module Json_lines_rotate_transport = struct
@@ -151,39 +151,61 @@ module For_logger = struct
           Option.value ~default:`Null (String.Map.find metadata "state_hash")
         in
         `Assoc [ ("produced_block_state_hash", state_hash) ]
+
+      let current_block block_id =
+        `Assoc [ ("current_block", `String (Block_id.to_string block_id)) ]
+
+      let current_call_id tag call_id =
+        `Assoc
+          ( ("current_call_id", `Int call_id)
+          :: Internal_tracing_context_call.Call_tag.to_metadata tag )
     end
+
+    let expand_log_message ~last_block_id ~last_call_id ~timestamp ~message
+        ~metadata =
+      let handling_current_block_id_change =
+        handling_current_block_id_change ~last_block_id
+          ~make:Event.current_block
+      in
+      let handling_current_call_id_change =
+        handling_current_call_id_change ~last_call_id
+          ~make:Event.current_call_id
+      in
+      let json_lines : Yojson.Safe.t list =
+        match message with
+        | "@metadata" ->
+            handling_current_block_id_change
+            @@ handling_current_call_id_change
+                 [ Event.checkpoint_metadata metadata ]
+        | "@block_metadata" ->
+            handling_current_block_id_change [ Event.block_metadata metadata ]
+        | "@internal_tracing_enabled" ->
+            [ Event.internal_tracing_enabled timestamp ]
+        | "@internal_tracing_disabled" ->
+            [ Event.internal_tracing_disabled timestamp ]
+        | "@mina_node_metadata" ->
+            [ Event.mina_node_metadata metadata ]
+        | "@produced_block_state_hash" ->
+            handling_current_block_id_change
+              [ Event.produced_block_state_hash metadata ]
+        | checkpoint ->
+            let checkpoint_event_json = Event.checkpoint checkpoint timestamp in
+            let metadata_event_json =
+              if String.Map.is_empty metadata then []
+              else [ Event.checkpoint_metadata metadata ]
+            in
+            handling_current_block_id_change
+            @@ handling_current_call_id_change
+                 (checkpoint_event_json :: metadata_event_json)
+      in
+      json_lines
 
     let process () msg =
       let { Logger.Message.level; message; metadata; timestamp; _ } = msg in
       if is_enabled () && Logger.Level.equal level Logger.Level.Internal then
-        let json_lines : Yojson.Safe.t list =
-          match message with
-          | "@metadata" ->
-              handling_current_call_id_change
-              @@ handling_current_block_id_change
-                   [ Event.checkpoint_metadata metadata ]
-          | "@block_metadata" ->
-              handling_current_block_id_change [ Event.block_metadata metadata ]
-          | "@internal_tracing_enabled" ->
-              [ Event.internal_tracing_enabled timestamp ]
-          | "@internal_tracing_disabled" ->
-              [ Event.internal_tracing_disabled timestamp ]
-          | "@mina_node_metadata" ->
-              [ Event.mina_node_metadata metadata ]
-          | "@produced_block_state_hash" ->
-              handling_current_block_id_change
-                [ Event.produced_block_state_hash metadata ]
-          | checkpoint ->
-              let checkpoint_event_json =
-                Event.checkpoint checkpoint timestamp
-              in
-              let metadata_event_json =
-                if String.Map.is_empty metadata then []
-                else [ Event.checkpoint_metadata metadata ]
-              in
-              handling_current_call_id_change
-              @@ handling_current_block_id_change
-                   (checkpoint_event_json :: metadata_event_json)
+        let json_lines =
+          expand_log_message ~last_block_id ~last_call_id ~timestamp ~message
+            ~metadata
         in
         Some
           ( String.concat ~sep:"\n"
@@ -200,6 +222,36 @@ module For_logger = struct
     Logger.Transport.create (module Json_lines_rotate_transport) state
 
   let processor = Logger.Processor.create (module Processor) ()
+end
+
+module For_itn_logger = struct
+  let last_block_id = ref no_block
+
+  let last_call_id = ref 0
+
+  (* Used by ITN logging handler. Unlike the above, this produces raw messages
+     instead of JSON output.
+
+     IMPORTANT: this must replicate the same logic as [For_logger.Processor.process] *)
+  let post_process_message ~timestamp ~message ~metadata =
+    let metadata = String.Map.of_alist_reduce ~f:(fun a _b -> a) metadata in
+    if is_enabled () then
+      let json_lines =
+        For_logger.Processor.expand_log_message ~last_block_id ~last_call_id
+          ~timestamp ~message ~metadata
+      in
+      let log_messages : (Time.t * string * (string * Yojson.Safe.t) list) list
+          =
+        List.filter_map json_lines ~f:(function
+          | `List [ `String checkpoint; _ ] ->
+              Some (timestamp, checkpoint, [])
+          | `Assoc assoc ->
+              Some (timestamp, "@control", assoc)
+          | _ ->
+              None )
+      in
+      log_messages
+    else []
 end
 
 module Context_logger = Internal_tracing_context_logger

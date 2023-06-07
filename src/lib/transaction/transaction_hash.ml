@@ -30,10 +30,20 @@ let of_yojson = function
   | _ ->
       Error "Transaction_hash.of_yojson: Expected a string"
 
-let hash_signed_command, hash_zkapp_command, hash_coinbase, hash_fee_transfer =
+let ( hash_signed_command_v1
+    , hash_signed_command
+    , hash_zkapp_command
+    , hash_coinbase
+    , hash_fee_transfer ) =
   let mk_hasher (type a) (module M : Bin_prot.Binable.S with type t = a)
       (cmd : a) =
     cmd |> Binable.to_string (module M) |> digest_string
+  in
+  let signed_cmd_hasher_v1 =
+    mk_hasher
+      ( module struct
+        include Signed_command.Stable.V1
+      end )
   in
   let signed_cmd_hasher = mk_hasher (module Signed_command.Stable.Latest) in
   let zkapp_cmd_hasher = mk_hasher (module Zkapp_command.Stable.Latest) in
@@ -41,6 +51,10 @@ let hash_signed_command, hash_zkapp_command, hash_coinbase, hash_fee_transfer =
      reproduce the transaction hashes if signatures, proofs omitted in
      archive db
   *)
+  let hash_signed_command_v1 (cmd : Signed_command.Stable.V1.t) =
+    let cmd_dummy_signature = { cmd with signature = Signature.dummy } in
+    signed_cmd_hasher_v1 cmd_dummy_signature
+  in
   let hash_signed_command (cmd : Signed_command.t) =
     let cmd_dummy_signature = { cmd with signature = Signature.dummy } in
     signed_cmd_hasher cmd_dummy_signature
@@ -71,7 +85,11 @@ let hash_signed_command, hash_zkapp_command, hash_coinbase, hash_fee_transfer =
   let hash_fee_transfer =
     mk_hasher (module Fee_transfer.Single.Stable.Latest)
   in
-  (hash_signed_command, hash_zkapp_command, hash_coinbase, hash_fee_transfer)
+  ( hash_signed_command_v1
+  , hash_signed_command
+  , hash_zkapp_command
+  , hash_coinbase
+  , hash_fee_transfer )
 
 [%%ifdef consensus_mechanism]
 
@@ -83,13 +101,6 @@ let hash_command cmd =
       hash_zkapp_command p
 
 let hash_signed_command_v2 = hash_signed_command
-
-(* hash V1 signed commands as if V2 commands *)
-let hash_signed_command_v1 (cmd_v1 : Signed_command.t_v1) =
-  let cmd = Signed_command.Stable.V1.to_latest cmd_v1 in
-  hash_signed_command cmd
-
-let hash_zkapp_command_v1 = hash_zkapp_command
 
 let hash_of_transaction_id (transaction_id : string) : t Or_error.t =
   (* A transaction id might be:
@@ -114,8 +125,8 @@ let hash_of_transaction_id (transaction_id : string) : t Or_error.t =
           | 1 -> (
               (* must be a zkApp command *)
               try
-                let cmd = Zkapp_command.Stable.V1.bin_read_t ~pos_ref buf in
-                Ok (hash_zkapp_command_v1 cmd)
+                let cmd = Zkapp_command.Stable.Latest.bin_read_t ~pos_ref buf in
+                Ok (hash_zkapp_command cmd)
               with _ ->
                 Or_error.error_string
                   "Could not decode serialized zkApp command (version 1)" )
@@ -234,18 +245,17 @@ let%test_module "Transaction hashes" =
       let transaction_id =
         "BD421DxjdoLimeUh4RA4FEvHdDn6bfxyMVWiWUwbYzQkqhNUv8B5M4gCSREpu9mVueBYoHYWkwB8BMf6iS2jjV8FffvPGkuNeczBfY7YRwLuUGBRCQJ3ktFBrNuu4abqgkYhXmcS2xyzoSGxHbXkJRAokTwjQ9HP6TLSeXz9qa92nJaTeccMnkoZBmEitsZWWnTCMqDc6rhN4Z9UMpg4wzdPMwNJvLRuJBD14Dd5pR84KBoY9rrnv66rHPc4m2hH9QSEt4aEJC76BQ446pHN9ZLmyhrk28f5xZdBmYxp3hV13fJEJ3Gv1XqJMBqFxRhzCVGoKDbLAaNRb5F1u1WxTzJu5n4cMMDEYydGEpNirY2PKQqHkR8gEqjXRTkpZzP8G19qT"
       in
-      (* the V1 signed command is converted to a V2 signed command, then hashed *)
       let expected_hash =
-        "5JvD87Ag3GuTCJhDsWUXDbJ7vTWWVuCnAhNjnnZ78h1mjxrhdS61"
+        "5JuV53FPXad1QLC46z7wsou9JjjYP87qaUeryscZqLUMmLSg8j2n"
       in
       run_test ~transaction_id ~expected_hash
 
     let%test "signed command v2 hash from transaction id" =
       let transaction_id =
-        "Av0BlDV3VklWpVXVRQr7cidImXn8E9nqCAxPjuyUNZ2pu3pJJxkBAP//IgAgpNU5narWobUpPXWnrzjilYnd9C6DVcafO/ZLc3vdrMgAVklWpVXVRQr7cidImXn8E9nqCAxPjuyUNZ2pu3pJJxkBFeE3d36c7ThjtioG6XUJjkISr2jfgpa99wHwhZ6neSQB/rQkVklWpVXVRQr7cidImXn8E9nqCAxPjuyUNZ2pu3pJJxkBAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+        "Av0IlDV3VklWpVXVRQr7cidImXn8E9nqCAxPjuyUNZ2pu3pJJxkBAAD//yIAIKTVOZ2q1qG1KT11p6844pWJ3fQug1XGnzv2S3N73azIABXhN3d+nO04Y7YqBul1CY5CEq9o34KWvfcB8IWep3kkAf60JFZJVqVV1UUK+3InSJl5/BPZ6ggMT47slDWdqbt6SScZAQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
       in
       let expected_hash =
-        "5JuhZ8sR6gQZQCUMpZJpacn9XrXTksSj6zRWHQQXZtZzjiQZ5dNb"
+        "5JvBt4173K3t7gQSpFoMGtbtZuYWPSg29cWad5pnnRd9BnAowoqY"
       in
       run_test ~transaction_id ~expected_hash
 

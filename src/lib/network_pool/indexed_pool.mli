@@ -24,8 +24,9 @@ module Command_error : sig
     | Overflow
     | Bad_token
     | Expired of
-        [ `Valid_until of Mina_numbers.Global_slot.t ]
-        * [ `Global_slot_since_genesis of Mina_numbers.Global_slot.t ]
+        [ `Valid_until of Mina_numbers.Global_slot_since_genesis.t ]
+        * [ `Global_slot_since_genesis of
+            Mina_numbers.Global_slot_since_genesis.t ]
     | Unwanted_fee_token of Mina_base.Token_id.t
   [@@deriving sexp, to_yojson]
 
@@ -150,12 +151,11 @@ val revalidate :
      t
   -> logger:Logger.t
   -> [ `Entire_pool | `Subset of Account_id.Set.t ]
-  -> (Account_id.t -> Account_nonce.t * Currency.Amount.t)
-     (** Lookup an account in the new ledger *)
+  -> (Account_id.t -> Account.t) (** Lookup an account in the new ledger *)
   -> t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
 
 (** Get the global slot since genesis according to the pool's time controller. *)
-val global_slot_since_genesis : t -> Mina_numbers.Global_slot.t
+val global_slot_since_genesis : t -> Mina_numbers.Global_slot_since_genesis.t
 
 module For_tests : sig
   (** Checks the invariants of the data structure. If this throws an exception

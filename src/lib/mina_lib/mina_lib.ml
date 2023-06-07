@@ -588,25 +588,32 @@ let best_protocol_state = compose_of_option best_protocol_state_opt
 let best_ledger = compose_of_option best_ledger_opt
 
 let get_ledger t state_hash_opt =
-  let open Or_error.Let_syntax in
+  let open Deferred.Or_error.Let_syntax in
   let%bind state_hash =
-    Option.value_map state_hash_opt ~f:Or_error.return
-      ~default:
-        ( match best_tip t with
-        | `Active bc ->
-            Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
-        | `Bootstrapping ->
-            Or_error.error_string
-              "get_ledger: can't get staged ledger hash while bootstrapping" )
+    Deferred.return
+    @@ Option.value_map state_hash_opt ~f:Or_error.return
+         ~default:
+           ( match best_tip t with
+           | `Active bc ->
+               Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
+           | `Bootstrapping ->
+               Or_error.error_string
+                 "get_ledger: can't get staged ledger hash while bootstrapping"
+           )
   in
-  let%bind frontier = t.components.transition_frontier |> peek_frontier in
+  let%bind frontier =
+    t.components.transition_frontier |> peek_frontier |> Deferred.return
+  in
   match Transition_frontier.find frontier state_hash with
   | Some b ->
       let staged_ledger = Transition_frontier.Breadcrumb.staged_ledger b in
-      Ok (Ledger.to_list (Staged_ledger.ledger staged_ledger))
+      let%map.Deferred accounts =
+        Ledger.to_list (Staged_ledger.ledger staged_ledger)
+      in
+      Ok accounts
   | None ->
-      Or_error.error_string
-        "get_ledger: state hash not found in transition frontier"
+      Deferred.return
+      @@ Or_error.error_string "state hash not found in transition frontier"
 
 let get_snarked_ledger t state_hash_opt =
   let open Deferred.Or_error.Let_syntax in
@@ -631,7 +638,7 @@ let get_snarked_ledger t state_hash_opt =
       in
       let ledger = Ledger.of_database root_snarked_ledger in
       let path = Transition_frontier.path_map frontier b ~f:Fn.id in
-      let%bind _ =
+      let%bind () =
         Mina_stdlib.Deferred.Result.List.iter path ~f:(fun b ->
             if Transition_frontier.Breadcrumb.just_emitted_a_proof b then
               (*Validate transactions against the protocol state associated with the transaction*)
@@ -684,9 +691,9 @@ let get_snarked_ledger t state_hash_opt =
       in
       let merkle_root = Ledger.merkle_root ledger in
       if Frozen_ledger_hash.equal snarked_ledger_hash merkle_root then (
-        let res = Ledger.to_list ledger in
+        let%map.Deferred res = Ledger.to_list ledger in
         ignore @@ Ledger.unregister_mask_exn ~loc:__LOC__ ledger ;
-        return res )
+        Ok res )
       else
         Deferred.Or_error.errorf
           "Expected snarked ledger hash %s but got %s for state hash %s"
@@ -954,19 +961,27 @@ let add_full_transactions t user_commands =
     |> Deferred.don't_wait_for ;
     Ivar.read result_ivar
   in
-  let too_big_err =
+  let well_formed_errors =
     List.find_map user_commands ~f:(fun cmd ->
-        let size_validity =
-          User_command.valid_size
+        match
+          User_command.check_well_formedness
             ~genesis_constants:t.config.precomputed_values.genesis_constants cmd
-        in
-        match size_validity with Ok () -> None | Error err -> Some err )
+        with
+        | Ok () ->
+            None
+        | Error errs ->
+            Some errs )
   in
-  match too_big_err with
+  match well_formed_errors with
   | None ->
       add_all_txns ()
-  | Some err ->
-      Deferred.Result.fail err
+  | Some errs ->
+      let error =
+        Error.of_string
+          ( List.map errs ~f:User_command.Well_formedness_error.to_string
+          |> String.concat ~sep:"," )
+      in
+      Deferred.Result.fail error
 
 let add_zkapp_transactions t (zkapp_commands : Zkapp_command.t list) =
   let add_all_txns () =
@@ -977,20 +992,28 @@ let add_zkapp_transactions t (zkapp_commands : Zkapp_command.t list) =
     |> Deferred.don't_wait_for ;
     Ivar.read result_ivar
   in
-  let too_big_err =
-    List.find_map zkapp_commands ~f:(fun zkapp_command ->
-        let size_validity =
-          Zkapp_command.valid_size
+  let well_formed_errors =
+    List.find_map zkapp_commands ~f:(fun cmd ->
+        match
+          User_command.check_well_formedness
             ~genesis_constants:t.config.precomputed_values.genesis_constants
-            zkapp_command
-        in
-        match size_validity with Ok () -> None | Error err -> Some err )
+            (Zkapp_command cmd)
+        with
+        | Ok () ->
+            None
+        | Error errs ->
+            Some errs )
   in
-  match too_big_err with
+  match well_formed_errors with
   | None ->
       add_all_txns ()
-  | Some err ->
-      Deferred.Result.fail err
+  | Some errs ->
+      let error =
+        Error.of_string
+          ( List.map errs ~f:User_command.Well_formedness_error.to_string
+          |> String.concat ~sep:"," )
+      in
+      Deferred.Result.fail error
 
 let next_producer_timing t = t.next_producer_timing
 
