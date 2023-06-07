@@ -215,11 +215,6 @@ let bignum_bigint_unpack_as_vars (type f)
   bignum_bigint_unpack_as
     (module Circuit)
     ~remove_trailing bignum Circuit.Boolean.typ
-(* let open Circuit in
-   exists
-        (Typ.list ~length:(bignum_bigint_bit_length bignum) Boolean.typ)
-        ~compute:(fun () ->
-          bignum_bigint_unpack ~remove_trailing bignum ) *)
 
 let bignum_bigint_unpack_as_unchecked_vars (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -228,11 +223,6 @@ let bignum_bigint_unpack_as_unchecked_vars (type f)
   bignum_bigint_unpack_as
     (module Circuit)
     ~remove_trailing bignum Circuit.Boolean.typ_unchecked
-(* let open Circuit in
-   exists
-       (Typ.list ~length:(bignum_bigint_bit_length bignum) Boolean.typ_unchecked)
-       ~compute:(fun () ->
-         bignum_bigint_unpack ~remove_trailing bignum ) *)
 
 (* Bignum_bigint to constatnts Boolean.var list (without creating boolean constraints) *)
 let bignum_bigint_unpack_as_unchecked_consts (type f)
