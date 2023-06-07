@@ -671,9 +671,9 @@ module Node = struct
     in
     [%log debug] "start_filtered_log, finished exec_graphql_request" ;
     let returned_result = query_result_obj.startFilteredLog in
-    (* returned_result should just be the node echoing the log filter back, if it's successful *)
-    if not @@ String.is_empty returned_result then return ()
-    else Deferred.Or_error.errorf "start_filtered_log did not seem to succeed"
+    (* ATM returned_result returns the strong "ok" if successful, a little hacky, should change it later *)
+    if not @@ String.equal returned_result "ok" then return ()
+    else Deferred.Or_error.errorf "start_filtered_log did not return 'ok'"
 
   let get_filtered_log_entries ~logger ~last_log_index_seen t =
     let open Deferred.Or_error.Let_syntax in
