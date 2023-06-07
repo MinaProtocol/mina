@@ -194,7 +194,7 @@ val staged_ledger_ledger_proof : t -> Ledger_proof.t option
 val transition_frontier :
   t -> Transition_frontier.t option Broadcast_pipe.Reader.t
 
-val get_ledger : t -> State_hash.t option -> Account.t list Or_error.t
+val get_ledger : t -> State_hash.t option -> Account.t list Deferred.Or_error.t
 
 val get_snarked_ledger :
   t -> State_hash.t option -> Account.t list Deferred.Or_error.t

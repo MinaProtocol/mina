@@ -118,13 +118,8 @@ let generate_zkapp_commands_and_apply_them_consecutively ~trials
                     ; ( "accounts"
                       , `List
                           (List.map
-                             (Mina_ledger.Ledger.accounts ledger |> Set.to_list)
-                             ~f:(fun account_id ->
-                               Mina_ledger.Ledger.location_of_account ledger
-                                 account_id
-                               |> Option.value_exn
-                               |> Mina_ledger.Ledger.get ledger
-                               |> Option.value_exn |> Account.to_yojson ) ) )
+                             (Mina_ledger.Ledger.to_list_sequential ledger)
+                             ~f:Account.to_yojson ) )
                     ]
                   "generated zkapp_command" ;
                 U.check_zkapp_command_with_merges_exn ~global_slot ledger
