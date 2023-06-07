@@ -2,7 +2,9 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 let tests_enabled = true
 
-(** Looks up three values (at most 12 bits) *)
+(** Looks up three values (at most 12 bits) 
+ * BEWARE: it needs in the circuit at least one gate (even if dummy) that uses the table for it to work 
+ *)
 let three_values (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (v0 : Circuit.Field.t) (v1 : Circuit.Field.t) (v2 : Circuit.Field.t) : unit
@@ -25,7 +27,9 @@ let three_values (type f)
         } ) ;
   ()
 
-(** Check that one value is at most X bits (at most 12) *)
+(** Check that one value is at most X bits (at most 12)
+ * BEWARE: it needs in the circuit at least one gate (even if dummy) that uses the table for it to work 
+ *)
 let less_than_bits (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (bits : int) (value : Circuit.Field.t) : unit =
@@ -67,6 +71,8 @@ let%test_unit "lookup gadget" =
             in
             (* Use the lookup gadget *)
             less_than_bits (module Runner.Impl) bits value ;
+            (* Use a dummy range check to load the table *)
+            Range_check.bits64 (module Runner.Impl) Field.zero; 
             () )
       in
       cs
@@ -76,9 +82,13 @@ let%test_unit "lookup gadget" =
     (* Positive tests *)
     let cs12 = test_lookup ~bits:12 4095 in
     let cs8 = test_lookup ~bits:8 255 in
+    let cs1 = test_lookup ~bits:1 0 in
+    let _cs = test_lookup ~cs:cs1 ~bits:1 1 in
     (* Negatve tests *)
     assert (Common.is_error (fun () -> test_lookup ~cs:cs12 ~bits:12 4096)) ;
+    assert (Common.is_error (fun () -> test_lookup ~cs:cs12 ~bits:12 (-1))) ;
     assert (Common.is_error (fun () -> test_lookup ~cs:cs8 ~bits:8 256)) ;
+    assert (Common.is_error (fun () -> test_lookup ~cs:cs1 ~bits:1 2)) ;
     () ) ;
 
   ()
