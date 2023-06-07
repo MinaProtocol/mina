@@ -1405,29 +1405,29 @@ module Tick : S = struct
                ) ) )
       ; ( Index CompleteAdd
         , lazy
-            (let x_30 =
+            (let x_0 =
                cell (var (Witness 2, Curr)) - cell (var (Witness 0, Curr))
              in
-             let x_31 =
+             let x_1 =
                cell (var (Witness 3, Curr)) - cell (var (Witness 1, Curr))
              in
-             let x_32 =
+             let x_2 =
                cell (var (Witness 0, Curr)) * cell (var (Witness 0, Curr))
              in
-             (cell (var (Witness 10, Curr)) * x_30)
+             (cell (var (Witness 10, Curr)) * x_0)
              - ( field
                    "0x0000000000000000000000000000000000000000000000000000000000000001"
                - cell (var (Witness 7, Curr)) )
-             + (alpha_pow 1 * (cell (var (Witness 7, Curr)) * x_30))
+             + (alpha_pow 1 * (cell (var (Witness 7, Curr)) * x_0))
              + alpha_pow 2
                * ( cell (var (Witness 7, Curr))
                    * ( double (cell (var (Witness 8, Curr)))
                        * cell (var (Witness 1, Curr))
-                     - double x_32 - x_32 )
+                     - double x_2 - x_2 )
                  + ( field
                        "0x0000000000000000000000000000000000000000000000000000000000000001"
                    - cell (var (Witness 7, Curr)) )
-                   * ((x_30 * cell (var (Witness 8, Curr))) - x_31) )
+                   * ((x_0 * cell (var (Witness 8, Curr))) - x_1) )
              + alpha_pow 3
                * ( cell (var (Witness 0, Curr))
                  + cell (var (Witness 2, Curr))
@@ -1441,138 +1441,138 @@ module Tick : S = struct
                  - cell (var (Witness 1, Curr))
                  - cell (var (Witness 5, Curr)) )
              + alpha_pow 5
-               * ( x_31
+               * ( x_1
                  * (cell (var (Witness 7, Curr)) - cell (var (Witness 6, Curr)))
                  )
              + alpha_pow 6
-               * ( (x_31 * cell (var (Witness 9, Curr)))
+               * ( (x_1 * cell (var (Witness 9, Curr)))
                  - cell (var (Witness 6, Curr)) ) ) )
       ; ( Index VarBaseMul
         , lazy
-            (let x_15 =
+            (let x_0 =
                cell (var (Witness 7, Next)) * cell (var (Witness 7, Next))
              in
-             let x_16 =
-               let x_15 =
+             let x_1 =
+               let x_0 =
                  cell (var (Witness 7, Next)) * cell (var (Witness 7, Next))
                in
                cell (var (Witness 2, Curr))
-               - ( x_15
+               - ( x_0
                  - cell (var (Witness 2, Curr))
                  - cell (var (Witness 0, Curr)) )
              in
-             let x_17 =
-               let x_16 =
-                 let x_15 =
+             let x_2 =
+               let x_1 =
+                 let x_0 =
                    cell (var (Witness 7, Next)) * cell (var (Witness 7, Next))
                  in
                  cell (var (Witness 2, Curr))
-                 - ( x_15
+                 - ( x_0
                    - cell (var (Witness 2, Curr))
                    - cell (var (Witness 0, Curr)) )
                in
                double (cell (var (Witness 3, Curr)))
-               - (x_16 * cell (var (Witness 7, Next)))
+               - (x_1 * cell (var (Witness 7, Next)))
              in
-             let x_18 =
+             let x_3 =
                cell (var (Witness 8, Next)) * cell (var (Witness 8, Next))
              in
-             let x_19 =
-               let x_18 =
+             let x_4 =
+               let x_3 =
                  cell (var (Witness 8, Next)) * cell (var (Witness 8, Next))
                in
                cell (var (Witness 7, Curr))
-               - ( x_18
+               - ( x_3
                  - cell (var (Witness 7, Curr))
                  - cell (var (Witness 0, Curr)) )
              in
-             let x_20 =
-               let x_19 =
-                 let x_18 =
+             let x_5 =
+               let x_4 =
+                 let x_3 =
                    cell (var (Witness 8, Next)) * cell (var (Witness 8, Next))
                  in
                  cell (var (Witness 7, Curr))
-                 - ( x_18
+                 - ( x_3
                    - cell (var (Witness 7, Curr))
                    - cell (var (Witness 0, Curr)) )
                in
                double (cell (var (Witness 8, Curr)))
-               - (x_19 * cell (var (Witness 8, Next)))
+               - (x_4 * cell (var (Witness 8, Next)))
              in
-             let x_21 =
+             let x_6 =
                cell (var (Witness 9, Next)) * cell (var (Witness 9, Next))
              in
-             let x_22 =
-               let x_21 =
+             let x_7 =
+               let x_6 =
                  cell (var (Witness 9, Next)) * cell (var (Witness 9, Next))
                in
                cell (var (Witness 9, Curr))
-               - ( x_21
+               - ( x_6
                  - cell (var (Witness 9, Curr))
                  - cell (var (Witness 0, Curr)) )
              in
-             let x_23 =
-               let x_22 =
-                 let x_21 =
+             let x_8 =
+               let x_7 =
+                 let x_6 =
                    cell (var (Witness 9, Next)) * cell (var (Witness 9, Next))
                  in
                  cell (var (Witness 9, Curr))
-                 - ( x_21
+                 - ( x_6
                    - cell (var (Witness 9, Curr))
                    - cell (var (Witness 0, Curr)) )
                in
                double (cell (var (Witness 10, Curr)))
-               - (x_22 * cell (var (Witness 9, Next)))
+               - (x_7 * cell (var (Witness 9, Next)))
              in
-             let x_24 =
+             let x_9 =
                cell (var (Witness 10, Next)) * cell (var (Witness 10, Next))
              in
-             let x_25 =
-               let x_24 =
+             let x_10 =
+               let x_9 =
                  cell (var (Witness 10, Next)) * cell (var (Witness 10, Next))
                in
                cell (var (Witness 11, Curr))
-               - ( x_24
+               - ( x_9
                  - cell (var (Witness 11, Curr))
                  - cell (var (Witness 0, Curr)) )
              in
-             let x_26 =
-               let x_25 =
-                 let x_24 =
+             let x_11 =
+               let x_10 =
+                 let x_9 =
                    cell (var (Witness 10, Next)) * cell (var (Witness 10, Next))
                  in
                  cell (var (Witness 11, Curr))
-                 - ( x_24
+                 - ( x_9
                    - cell (var (Witness 11, Curr))
                    - cell (var (Witness 0, Curr)) )
                in
                double (cell (var (Witness 12, Curr)))
-               - (x_25 * cell (var (Witness 10, Next)))
+               - (x_10 * cell (var (Witness 10, Next)))
              in
-             let x_27 =
+             let x_12 =
                cell (var (Witness 11, Next)) * cell (var (Witness 11, Next))
              in
-             let x_28 =
-               let x_27 =
+             let x_13 =
+               let x_12 =
                  cell (var (Witness 11, Next)) * cell (var (Witness 11, Next))
                in
                cell (var (Witness 13, Curr))
-               - ( x_27
+               - ( x_12
                  - cell (var (Witness 13, Curr))
                  - cell (var (Witness 0, Curr)) )
              in
-             let x_29 =
-               let x_28 =
-                 let x_27 =
+             let x_14 =
+               let x_13 =
+                 let x_12 =
                    cell (var (Witness 11, Next)) * cell (var (Witness 11, Next))
                  in
                  cell (var (Witness 13, Curr))
-                 - ( x_27
+                 - ( x_12
                    - cell (var (Witness 13, Curr))
                    - cell (var (Witness 0, Curr)) )
                in
                double (cell (var (Witness 14, Curr)))
-               - (x_28 * cell (var (Witness 11, Next)))
+               - (x_13 * cell (var (Witness 11, Next)))
              in
              cell (var (Witness 5, Curr))
              - ( cell (var (Witness 6, Next))
@@ -1599,16 +1599,16 @@ module Tick : S = struct
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 3
-               * ( (x_17 * x_17)
-                 - x_16 * x_16
+               * ( (x_2 * x_2)
+                 - x_1 * x_1
                    * ( cell (var (Witness 7, Curr))
                      - cell (var (Witness 0, Curr))
-                     + x_15 ) )
+                     + x_0 ) )
              + alpha_pow 4
                * ( (cell (var (Witness 8, Curr)) + cell (var (Witness 3, Curr)))
-                   * x_16
+                   * x_1
                  - (cell (var (Witness 2, Curr)) - cell (var (Witness 7, Curr)))
-                   * x_17 )
+                   * x_2 )
              + alpha_pow 5
                * ( square (cell (var (Witness 3, Next)))
                  - cell (var (Witness 3, Next)) )
@@ -1622,16 +1622,16 @@ module Tick : S = struct
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 7
-               * ( (x_20 * x_20)
-                 - x_19 * x_19
+               * ( (x_5 * x_5)
+                 - x_4 * x_4
                    * ( cell (var (Witness 9, Curr))
                      - cell (var (Witness 0, Curr))
-                     + x_18 ) )
+                     + x_3 ) )
              + alpha_pow 8
                * ( (cell (var (Witness 10, Curr)) + cell (var (Witness 8, Curr)))
-                   * x_19
+                   * x_4
                  - (cell (var (Witness 7, Curr)) - cell (var (Witness 9, Curr)))
-                   * x_20 )
+                   * x_5 )
              + alpha_pow 9
                * ( square (cell (var (Witness 4, Next)))
                  - cell (var (Witness 4, Next)) )
@@ -1645,17 +1645,17 @@ module Tick : S = struct
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 11
-               * ( (x_23 * x_23)
-                 - x_22 * x_22
+               * ( (x_8 * x_8)
+                 - x_7 * x_7
                    * ( cell (var (Witness 11, Curr))
                      - cell (var (Witness 0, Curr))
-                     + x_21 ) )
+                     + x_6 ) )
              + alpha_pow 12
                * ( ( cell (var (Witness 12, Curr))
                    + cell (var (Witness 10, Curr)) )
-                   * x_22
+                   * x_7
                  - (cell (var (Witness 9, Curr)) - cell (var (Witness 11, Curr)))
-                   * x_23 )
+                   * x_8 )
              + alpha_pow 13
                * ( square (cell (var (Witness 5, Next)))
                  - cell (var (Witness 5, Next)) )
@@ -1669,18 +1669,18 @@ module Tick : S = struct
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 15
-               * ( (x_26 * x_26)
-                 - x_25 * x_25
+               * ( (x_11 * x_11)
+                 - x_10 * x_10
                    * ( cell (var (Witness 13, Curr))
                      - cell (var (Witness 0, Curr))
-                     + x_24 ) )
+                     + x_9 ) )
              + alpha_pow 16
                * ( ( cell (var (Witness 14, Curr))
                    + cell (var (Witness 12, Curr)) )
-                   * x_25
+                   * x_10
                  - ( cell (var (Witness 11, Curr))
                    - cell (var (Witness 13, Curr)) )
-                   * x_26 )
+                   * x_11 )
              + alpha_pow 17
                * ( square (cell (var (Witness 6, Next)))
                  - cell (var (Witness 6, Next)) )
@@ -1694,19 +1694,19 @@ module Tick : S = struct
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 19
-               * ( (x_29 * x_29)
-                 - x_28 * x_28
+               * ( (x_14 * x_14)
+                 - x_13 * x_13
                    * ( cell (var (Witness 0, Next))
                      - cell (var (Witness 0, Curr))
-                     + x_27 ) )
+                     + x_12 ) )
              + alpha_pow 20
                * ( (cell (var (Witness 1, Next)) + cell (var (Witness 14, Curr)))
-                   * x_28
+                   * x_13
                  - (cell (var (Witness 13, Curr)) - cell (var (Witness 0, Next)))
-                   * x_29 ) ) )
+                   * x_14 ) ) )
       ; ( Index EndoMul
         , lazy
-            (let x_33 =
+            (let x_0 =
                ( field
                    "0x0000000000000000000000000000000000000000000000000000000000000001"
                + cell (var (Witness 11, Curr))
@@ -1716,7 +1716,7 @@ module Tick : S = struct
                    ) )
                * cell (var (Witness 0, Curr))
              in
-             let x_34 =
+             let x_1 =
                ( field
                    "0x0000000000000000000000000000000000000000000000000000000000000001"
                + cell (var (Witness 13, Curr))
@@ -1726,18 +1726,18 @@ module Tick : S = struct
                    ) )
                * cell (var (Witness 0, Curr))
              in
-             let x_35 = square (cell (var (Witness 9, Curr))) in
-             let x_36 = square (cell (var (Witness 10, Curr))) in
-             let x_37 =
+             let x_2 = square (cell (var (Witness 9, Curr))) in
+             let x_3 = square (cell (var (Witness 10, Curr))) in
+             let x_4 =
                cell (var (Witness 4, Curr)) - cell (var (Witness 7, Curr))
              in
-             let x_38 =
+             let x_5 =
                cell (var (Witness 7, Curr)) - cell (var (Witness 4, Next))
              in
-             let x_39 =
+             let x_6 =
                cell (var (Witness 5, Next)) + cell (var (Witness 8, Curr))
              in
-             let x_40 =
+             let x_7 =
                cell (var (Witness 8, Curr)) + cell (var (Witness 5, Curr))
              in
              square (cell (var (Witness 11, Curr)))
@@ -1752,7 +1752,7 @@ module Tick : S = struct
                * ( square (cell (var (Witness 14, Curr)))
                  - cell (var (Witness 14, Curr)) )
              + alpha_pow 4
-               * ( (x_33 - cell (var (Witness 4, Curr)))
+               * ( (x_0 - cell (var (Witness 4, Curr)))
                    * cell (var (Witness 9, Curr))
                  - ( ( double (cell (var (Witness 12, Curr)))
                      - field
@@ -1761,15 +1761,14 @@ module Tick : S = struct
                      * cell (var (Witness 1, Curr))
                    - cell (var (Witness 5, Curr)) ) )
              + alpha_pow 5
-               * ( (double (cell (var (Witness 4, Curr))) - x_35 + x_33)
-                   * ((x_37 * cell (var (Witness 9, Curr))) + x_40)
-                 - (double (cell (var (Witness 5, Curr))) * x_37) )
+               * ( (double (cell (var (Witness 4, Curr))) - x_2 + x_0)
+                   * ((x_4 * cell (var (Witness 9, Curr))) + x_7)
+                 - (double (cell (var (Witness 5, Curr))) * x_4) )
              + alpha_pow 6
-               * ( square x_40
-                 - (square x_37 * (x_35 - x_33 + cell (var (Witness 7, Curr))))
-                 )
+               * ( square x_7
+                 - (square x_4 * (x_2 - x_0 + cell (var (Witness 7, Curr)))) )
              + alpha_pow 7
-               * ( (x_34 - cell (var (Witness 7, Curr)))
+               * ( (x_1 - cell (var (Witness 7, Curr)))
                    * cell (var (Witness 10, Curr))
                  - ( ( double (cell (var (Witness 14, Curr)))
                      - field
@@ -1778,13 +1777,12 @@ module Tick : S = struct
                      * cell (var (Witness 1, Curr))
                    - cell (var (Witness 8, Curr)) ) )
              + alpha_pow 8
-               * ( (double (cell (var (Witness 7, Curr))) - x_36 + x_34)
-                   * ((x_38 * cell (var (Witness 10, Curr))) + x_39)
-                 - (double (cell (var (Witness 8, Curr))) * x_38) )
+               * ( (double (cell (var (Witness 7, Curr))) - x_3 + x_1)
+                   * ((x_5 * cell (var (Witness 10, Curr))) + x_6)
+                 - (double (cell (var (Witness 8, Curr))) * x_5) )
              + alpha_pow 9
-               * ( square x_39
-                 - (square x_38 * (x_36 - x_34 + cell (var (Witness 4, Next))))
-                 )
+               * ( square x_6
+                 - (square x_5 * (x_3 - x_1 + cell (var (Witness 4, Next)))) )
              + alpha_pow 10
                * ( double
                      ( double
@@ -1797,7 +1795,7 @@ module Tick : S = struct
                  - cell (var (Witness 6, Next)) ) ) )
       ; ( Index EndoMulScalar
         , lazy
-            (let x_41 =
+            (let x_0 =
                ( ( field
                      "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 6, Curr))
@@ -1810,7 +1808,7 @@ module Tick : S = struct
                )
                * cell (var (Witness 6, Curr))
              in
-             let x_42 =
+             let x_1 =
                ( ( field
                      "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 7, Curr))
@@ -1823,7 +1821,7 @@ module Tick : S = struct
                )
                * cell (var (Witness 7, Curr))
              in
-             let x_43 =
+             let x_2 =
                ( ( field
                      "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 8, Curr))
@@ -1836,7 +1834,7 @@ module Tick : S = struct
                )
                * cell (var (Witness 8, Curr))
              in
-             let x_44 =
+             let x_3 =
                ( ( field
                      "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 9, Curr))
@@ -1849,7 +1847,7 @@ module Tick : S = struct
                )
                * cell (var (Witness 9, Curr))
              in
-             let x_45 =
+             let x_4 =
                ( ( field
                      "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 10, Curr))
@@ -1862,7 +1860,7 @@ module Tick : S = struct
                )
                * cell (var (Witness 10, Curr))
              in
-             let x_46 =
+             let x_5 =
                ( ( field
                      "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 11, Curr))
@@ -1875,7 +1873,7 @@ module Tick : S = struct
                )
                * cell (var (Witness 11, Curr))
              in
-             let x_47 =
+             let x_6 =
                ( ( field
                      "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 12, Curr))
@@ -1888,7 +1886,7 @@ module Tick : S = struct
                )
                * cell (var (Witness 12, Curr))
              in
-             let x_48 =
+             let x_7 =
                ( ( field
                      "0x1555555555555555555555555555555560C232FEADC45309330F104F00000001"
                    * cell (var (Witness 13, Curr))
@@ -1947,14 +1945,14 @@ module Tick : S = struct
                                          ( double
                                              ( double
                                                  (cell (var (Witness 2, Curr)))
-                                             + x_41 )
-                                         + x_42 )
-                                     + x_43 )
-                                 + x_44 )
-                             + x_45 )
-                         + x_46 )
-                     + x_47 )
-                 + x_48
+                                             + x_0 )
+                                         + x_1 )
+                                     + x_2 )
+                                 + x_3 )
+                             + x_4 )
+                         + x_5 )
+                     + x_6 )
+                 + x_7
                  - cell (var (Witness 4, Curr)) )
              + alpha_pow 2
                * ( double
@@ -1966,7 +1964,7 @@ module Tick : S = struct
                                          ( double
                                              ( double
                                                  (cell (var (Witness 3, Curr)))
-                                             + ( x_41
+                                             + ( x_0
                                                + ( ( field
                                                        "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                                      * cell
@@ -1979,7 +1977,7 @@ module Tick : S = struct
                                                  + field
                                                      "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                                  ) ) )
-                                         + ( x_42
+                                         + ( x_1
                                            + ( ( field
                                                    "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                                  * cell (var (Witness 7, Curr))
@@ -1990,7 +1988,7 @@ module Tick : S = struct
                                              + field
                                                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                              ) ) )
-                                     + ( x_43
+                                     + ( x_2
                                        + ( ( field
                                                "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                              * cell (var (Witness 8, Curr))
@@ -2001,7 +1999,7 @@ module Tick : S = struct
                                          + field
                                              "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                          ) ) )
-                                 + ( x_44
+                                 + ( x_3
                                    + ( ( field
                                            "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                          * cell (var (Witness 9, Curr))
@@ -2012,7 +2010,7 @@ module Tick : S = struct
                                      + field
                                          "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                      ) ) )
-                             + ( x_45
+                             + ( x_4
                                + ( ( field
                                        "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                      * cell (var (Witness 10, Curr))
@@ -2023,7 +2021,7 @@ module Tick : S = struct
                                  + field
                                      "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                  ) ) )
-                         + ( x_46
+                         + ( x_5
                            + ( ( field
                                    "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                                  * cell (var (Witness 11, Curr))
@@ -2034,7 +2032,7 @@ module Tick : S = struct
                              + field
                                  "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                              ) ) )
-                     + ( x_47
+                     + ( x_6
                        + ( ( field
                                "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                              * cell (var (Witness 12, Curr))
@@ -2045,7 +2043,7 @@ module Tick : S = struct
                          + field
                              "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                          ) ) )
-                 + ( x_48
+                 + ( x_7
                    + ( ( field
                            "0x40000000000000000000000000000000224698FC094CF91B992D30ED00000000"
                          * cell (var (Witness 13, Curr))
@@ -5225,29 +5223,29 @@ module Tock : S = struct
                ) ) )
       ; ( Index CompleteAdd
         , lazy
-            (let x_30 =
+            (let x_0 =
                cell (var (Witness 2, Curr)) - cell (var (Witness 0, Curr))
              in
-             let x_31 =
+             let x_1 =
                cell (var (Witness 3, Curr)) - cell (var (Witness 1, Curr))
              in
-             let x_32 =
+             let x_2 =
                cell (var (Witness 0, Curr)) * cell (var (Witness 0, Curr))
              in
-             (cell (var (Witness 10, Curr)) * x_30)
+             (cell (var (Witness 10, Curr)) * x_0)
              - ( field
                    "0x0000000000000000000000000000000000000000000000000000000000000001"
                - cell (var (Witness 7, Curr)) )
-             + (alpha_pow 1 * (cell (var (Witness 7, Curr)) * x_30))
+             + (alpha_pow 1 * (cell (var (Witness 7, Curr)) * x_0))
              + alpha_pow 2
                * ( cell (var (Witness 7, Curr))
                    * ( double (cell (var (Witness 8, Curr)))
                        * cell (var (Witness 1, Curr))
-                     - double x_32 - x_32 )
+                     - double x_2 - x_2 )
                  + ( field
                        "0x0000000000000000000000000000000000000000000000000000000000000001"
                    - cell (var (Witness 7, Curr)) )
-                   * ((x_30 * cell (var (Witness 8, Curr))) - x_31) )
+                   * ((x_0 * cell (var (Witness 8, Curr))) - x_1) )
              + alpha_pow 3
                * ( cell (var (Witness 0, Curr))
                  + cell (var (Witness 2, Curr))
@@ -5261,138 +5259,138 @@ module Tock : S = struct
                  - cell (var (Witness 1, Curr))
                  - cell (var (Witness 5, Curr)) )
              + alpha_pow 5
-               * ( x_31
+               * ( x_1
                  * (cell (var (Witness 7, Curr)) - cell (var (Witness 6, Curr)))
                  )
              + alpha_pow 6
-               * ( (x_31 * cell (var (Witness 9, Curr)))
+               * ( (x_1 * cell (var (Witness 9, Curr)))
                  - cell (var (Witness 6, Curr)) ) ) )
       ; ( Index VarBaseMul
         , lazy
-            (let x_15 =
+            (let x_0 =
                cell (var (Witness 7, Next)) * cell (var (Witness 7, Next))
              in
-             let x_16 =
-               let x_15 =
+             let x_1 =
+               let x_0 =
                  cell (var (Witness 7, Next)) * cell (var (Witness 7, Next))
                in
                cell (var (Witness 2, Curr))
-               - ( x_15
+               - ( x_0
                  - cell (var (Witness 2, Curr))
                  - cell (var (Witness 0, Curr)) )
              in
-             let x_17 =
-               let x_16 =
-                 let x_15 =
+             let x_2 =
+               let x_1 =
+                 let x_0 =
                    cell (var (Witness 7, Next)) * cell (var (Witness 7, Next))
                  in
                  cell (var (Witness 2, Curr))
-                 - ( x_15
+                 - ( x_0
                    - cell (var (Witness 2, Curr))
                    - cell (var (Witness 0, Curr)) )
                in
                double (cell (var (Witness 3, Curr)))
-               - (x_16 * cell (var (Witness 7, Next)))
+               - (x_1 * cell (var (Witness 7, Next)))
              in
-             let x_18 =
+             let x_3 =
                cell (var (Witness 8, Next)) * cell (var (Witness 8, Next))
              in
-             let x_19 =
-               let x_18 =
+             let x_4 =
+               let x_3 =
                  cell (var (Witness 8, Next)) * cell (var (Witness 8, Next))
                in
                cell (var (Witness 7, Curr))
-               - ( x_18
+               - ( x_3
                  - cell (var (Witness 7, Curr))
                  - cell (var (Witness 0, Curr)) )
              in
-             let x_20 =
-               let x_19 =
-                 let x_18 =
+             let x_5 =
+               let x_4 =
+                 let x_3 =
                    cell (var (Witness 8, Next)) * cell (var (Witness 8, Next))
                  in
                  cell (var (Witness 7, Curr))
-                 - ( x_18
+                 - ( x_3
                    - cell (var (Witness 7, Curr))
                    - cell (var (Witness 0, Curr)) )
                in
                double (cell (var (Witness 8, Curr)))
-               - (x_19 * cell (var (Witness 8, Next)))
+               - (x_4 * cell (var (Witness 8, Next)))
              in
-             let x_21 =
+             let x_6 =
                cell (var (Witness 9, Next)) * cell (var (Witness 9, Next))
              in
-             let x_22 =
-               let x_21 =
+             let x_7 =
+               let x_6 =
                  cell (var (Witness 9, Next)) * cell (var (Witness 9, Next))
                in
                cell (var (Witness 9, Curr))
-               - ( x_21
+               - ( x_6
                  - cell (var (Witness 9, Curr))
                  - cell (var (Witness 0, Curr)) )
              in
-             let x_23 =
-               let x_22 =
-                 let x_21 =
+             let x_8 =
+               let x_7 =
+                 let x_6 =
                    cell (var (Witness 9, Next)) * cell (var (Witness 9, Next))
                  in
                  cell (var (Witness 9, Curr))
-                 - ( x_21
+                 - ( x_6
                    - cell (var (Witness 9, Curr))
                    - cell (var (Witness 0, Curr)) )
                in
                double (cell (var (Witness 10, Curr)))
-               - (x_22 * cell (var (Witness 9, Next)))
+               - (x_7 * cell (var (Witness 9, Next)))
              in
-             let x_24 =
+             let x_9 =
                cell (var (Witness 10, Next)) * cell (var (Witness 10, Next))
              in
-             let x_25 =
-               let x_24 =
+             let x_10 =
+               let x_9 =
                  cell (var (Witness 10, Next)) * cell (var (Witness 10, Next))
                in
                cell (var (Witness 11, Curr))
-               - ( x_24
+               - ( x_9
                  - cell (var (Witness 11, Curr))
                  - cell (var (Witness 0, Curr)) )
              in
-             let x_26 =
-               let x_25 =
-                 let x_24 =
+             let x_11 =
+               let x_10 =
+                 let x_9 =
                    cell (var (Witness 10, Next)) * cell (var (Witness 10, Next))
                  in
                  cell (var (Witness 11, Curr))
-                 - ( x_24
+                 - ( x_9
                    - cell (var (Witness 11, Curr))
                    - cell (var (Witness 0, Curr)) )
                in
                double (cell (var (Witness 12, Curr)))
-               - (x_25 * cell (var (Witness 10, Next)))
+               - (x_10 * cell (var (Witness 10, Next)))
              in
-             let x_27 =
+             let x_12 =
                cell (var (Witness 11, Next)) * cell (var (Witness 11, Next))
              in
-             let x_28 =
-               let x_27 =
+             let x_13 =
+               let x_12 =
                  cell (var (Witness 11, Next)) * cell (var (Witness 11, Next))
                in
                cell (var (Witness 13, Curr))
-               - ( x_27
+               - ( x_12
                  - cell (var (Witness 13, Curr))
                  - cell (var (Witness 0, Curr)) )
              in
-             let x_29 =
-               let x_28 =
-                 let x_27 =
+             let x_14 =
+               let x_13 =
+                 let x_12 =
                    cell (var (Witness 11, Next)) * cell (var (Witness 11, Next))
                  in
                  cell (var (Witness 13, Curr))
-                 - ( x_27
+                 - ( x_12
                    - cell (var (Witness 13, Curr))
                    - cell (var (Witness 0, Curr)) )
                in
                double (cell (var (Witness 14, Curr)))
-               - (x_28 * cell (var (Witness 11, Next)))
+               - (x_13 * cell (var (Witness 11, Next)))
              in
              cell (var (Witness 5, Curr))
              - ( cell (var (Witness 6, Next))
@@ -5419,16 +5417,16 @@ module Tock : S = struct
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 3
-               * ( (x_17 * x_17)
-                 - x_16 * x_16
+               * ( (x_2 * x_2)
+                 - x_1 * x_1
                    * ( cell (var (Witness 7, Curr))
                      - cell (var (Witness 0, Curr))
-                     + x_15 ) )
+                     + x_0 ) )
              + alpha_pow 4
                * ( (cell (var (Witness 8, Curr)) + cell (var (Witness 3, Curr)))
-                   * x_16
+                   * x_1
                  - (cell (var (Witness 2, Curr)) - cell (var (Witness 7, Curr)))
-                   * x_17 )
+                   * x_2 )
              + alpha_pow 5
                * ( square (cell (var (Witness 3, Next)))
                  - cell (var (Witness 3, Next)) )
@@ -5442,16 +5440,16 @@ module Tock : S = struct
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 7
-               * ( (x_20 * x_20)
-                 - x_19 * x_19
+               * ( (x_5 * x_5)
+                 - x_4 * x_4
                    * ( cell (var (Witness 9, Curr))
                      - cell (var (Witness 0, Curr))
-                     + x_18 ) )
+                     + x_3 ) )
              + alpha_pow 8
                * ( (cell (var (Witness 10, Curr)) + cell (var (Witness 8, Curr)))
-                   * x_19
+                   * x_4
                  - (cell (var (Witness 7, Curr)) - cell (var (Witness 9, Curr)))
-                   * x_20 )
+                   * x_5 )
              + alpha_pow 9
                * ( square (cell (var (Witness 4, Next)))
                  - cell (var (Witness 4, Next)) )
@@ -5465,17 +5463,17 @@ module Tock : S = struct
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 11
-               * ( (x_23 * x_23)
-                 - x_22 * x_22
+               * ( (x_8 * x_8)
+                 - x_7 * x_7
                    * ( cell (var (Witness 11, Curr))
                      - cell (var (Witness 0, Curr))
-                     + x_21 ) )
+                     + x_6 ) )
              + alpha_pow 12
                * ( ( cell (var (Witness 12, Curr))
                    + cell (var (Witness 10, Curr)) )
-                   * x_22
+                   * x_7
                  - (cell (var (Witness 9, Curr)) - cell (var (Witness 11, Curr)))
-                   * x_23 )
+                   * x_8 )
              + alpha_pow 13
                * ( square (cell (var (Witness 5, Next)))
                  - cell (var (Witness 5, Next)) )
@@ -5489,18 +5487,18 @@ module Tock : S = struct
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 15
-               * ( (x_26 * x_26)
-                 - x_25 * x_25
+               * ( (x_11 * x_11)
+                 - x_10 * x_10
                    * ( cell (var (Witness 13, Curr))
                      - cell (var (Witness 0, Curr))
-                     + x_24 ) )
+                     + x_9 ) )
              + alpha_pow 16
                * ( ( cell (var (Witness 14, Curr))
                    + cell (var (Witness 12, Curr)) )
-                   * x_25
+                   * x_10
                  - ( cell (var (Witness 11, Curr))
                    - cell (var (Witness 13, Curr)) )
-                   * x_26 )
+                   * x_11 )
              + alpha_pow 17
                * ( square (cell (var (Witness 6, Next)))
                  - cell (var (Witness 6, Next)) )
@@ -5514,19 +5512,19 @@ module Tock : S = struct
                      )
                      * cell (var (Witness 1, Curr)) ) )
              + alpha_pow 19
-               * ( (x_29 * x_29)
-                 - x_28 * x_28
+               * ( (x_14 * x_14)
+                 - x_13 * x_13
                    * ( cell (var (Witness 0, Next))
                      - cell (var (Witness 0, Curr))
-                     + x_27 ) )
+                     + x_12 ) )
              + alpha_pow 20
                * ( (cell (var (Witness 1, Next)) + cell (var (Witness 14, Curr)))
-                   * x_28
+                   * x_13
                  - (cell (var (Witness 13, Curr)) - cell (var (Witness 0, Next)))
-                   * x_29 ) ) )
+                   * x_14 ) ) )
       ; ( Index EndoMul
         , lazy
-            (let x_33 =
+            (let x_0 =
                ( field
                    "0x0000000000000000000000000000000000000000000000000000000000000001"
                + cell (var (Witness 11, Curr))
@@ -5536,7 +5534,7 @@ module Tock : S = struct
                    ) )
                * cell (var (Witness 0, Curr))
              in
-             let x_34 =
+             let x_1 =
                ( field
                    "0x0000000000000000000000000000000000000000000000000000000000000001"
                + cell (var (Witness 13, Curr))
@@ -5546,18 +5544,18 @@ module Tock : S = struct
                    ) )
                * cell (var (Witness 0, Curr))
              in
-             let x_35 = square (cell (var (Witness 9, Curr))) in
-             let x_36 = square (cell (var (Witness 10, Curr))) in
-             let x_37 =
+             let x_2 = square (cell (var (Witness 9, Curr))) in
+             let x_3 = square (cell (var (Witness 10, Curr))) in
+             let x_4 =
                cell (var (Witness 4, Curr)) - cell (var (Witness 7, Curr))
              in
-             let x_38 =
+             let x_5 =
                cell (var (Witness 7, Curr)) - cell (var (Witness 4, Next))
              in
-             let x_39 =
+             let x_6 =
                cell (var (Witness 5, Next)) + cell (var (Witness 8, Curr))
              in
-             let x_40 =
+             let x_7 =
                cell (var (Witness 8, Curr)) + cell (var (Witness 5, Curr))
              in
              square (cell (var (Witness 11, Curr)))
@@ -5572,7 +5570,7 @@ module Tock : S = struct
                * ( square (cell (var (Witness 14, Curr)))
                  - cell (var (Witness 14, Curr)) )
              + alpha_pow 4
-               * ( (x_33 - cell (var (Witness 4, Curr)))
+               * ( (x_0 - cell (var (Witness 4, Curr)))
                    * cell (var (Witness 9, Curr))
                  - ( ( double (cell (var (Witness 12, Curr)))
                      - field
@@ -5581,15 +5579,14 @@ module Tock : S = struct
                      * cell (var (Witness 1, Curr))
                    - cell (var (Witness 5, Curr)) ) )
              + alpha_pow 5
-               * ( (double (cell (var (Witness 4, Curr))) - x_35 + x_33)
-                   * ((x_37 * cell (var (Witness 9, Curr))) + x_40)
-                 - (double (cell (var (Witness 5, Curr))) * x_37) )
+               * ( (double (cell (var (Witness 4, Curr))) - x_2 + x_0)
+                   * ((x_4 * cell (var (Witness 9, Curr))) + x_7)
+                 - (double (cell (var (Witness 5, Curr))) * x_4) )
              + alpha_pow 6
-               * ( square x_40
-                 - (square x_37 * (x_35 - x_33 + cell (var (Witness 7, Curr))))
-                 )
+               * ( square x_7
+                 - (square x_4 * (x_2 - x_0 + cell (var (Witness 7, Curr)))) )
              + alpha_pow 7
-               * ( (x_34 - cell (var (Witness 7, Curr)))
+               * ( (x_1 - cell (var (Witness 7, Curr)))
                    * cell (var (Witness 10, Curr))
                  - ( ( double (cell (var (Witness 14, Curr)))
                      - field
@@ -5598,13 +5595,12 @@ module Tock : S = struct
                      * cell (var (Witness 1, Curr))
                    - cell (var (Witness 8, Curr)) ) )
              + alpha_pow 8
-               * ( (double (cell (var (Witness 7, Curr))) - x_36 + x_34)
-                   * ((x_38 * cell (var (Witness 10, Curr))) + x_39)
-                 - (double (cell (var (Witness 8, Curr))) * x_38) )
+               * ( (double (cell (var (Witness 7, Curr))) - x_3 + x_1)
+                   * ((x_5 * cell (var (Witness 10, Curr))) + x_6)
+                 - (double (cell (var (Witness 8, Curr))) * x_5) )
              + alpha_pow 9
-               * ( square x_39
-                 - (square x_38 * (x_36 - x_34 + cell (var (Witness 4, Next))))
-                 )
+               * ( square x_6
+                 - (square x_5 * (x_3 - x_1 + cell (var (Witness 4, Next)))) )
              + alpha_pow 10
                * ( double
                      ( double
@@ -5617,7 +5613,7 @@ module Tock : S = struct
                  - cell (var (Witness 6, Next)) ) ) )
       ; ( Index EndoMulScalar
         , lazy
-            (let x_41 =
+            (let x_0 =
                ( ( field
                      "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 6, Curr))
@@ -5630,7 +5626,7 @@ module Tock : S = struct
                )
                * cell (var (Witness 6, Curr))
              in
-             let x_42 =
+             let x_1 =
                ( ( field
                      "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 7, Curr))
@@ -5643,7 +5639,7 @@ module Tock : S = struct
                )
                * cell (var (Witness 7, Curr))
              in
-             let x_43 =
+             let x_2 =
                ( ( field
                      "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 8, Curr))
@@ -5656,7 +5652,7 @@ module Tock : S = struct
                )
                * cell (var (Witness 8, Curr))
              in
-             let x_44 =
+             let x_3 =
                ( ( field
                      "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 9, Curr))
@@ -5669,7 +5665,7 @@ module Tock : S = struct
                )
                * cell (var (Witness 9, Curr))
              in
-             let x_45 =
+             let x_4 =
                ( ( field
                      "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 10, Curr))
@@ -5682,7 +5678,7 @@ module Tock : S = struct
                )
                * cell (var (Witness 10, Curr))
              in
-             let x_46 =
+             let x_5 =
                ( ( field
                      "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 11, Curr))
@@ -5695,7 +5691,7 @@ module Tock : S = struct
                )
                * cell (var (Witness 11, Curr))
              in
-             let x_47 =
+             let x_6 =
                ( ( field
                      "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 12, Curr))
@@ -5708,7 +5704,7 @@ module Tock : S = struct
                )
                * cell (var (Witness 12, Curr))
              in
-             let x_48 =
+             let x_7 =
                ( ( field
                      "0x1555555555555555555555555555555560C232FEADDC3849D96CF90B00000001"
                    * cell (var (Witness 13, Curr))
@@ -5767,14 +5763,14 @@ module Tock : S = struct
                                          ( double
                                              ( double
                                                  (cell (var (Witness 2, Curr)))
-                                             + x_41 )
-                                         + x_42 )
-                                     + x_43 )
-                                 + x_44 )
-                             + x_45 )
-                         + x_46 )
-                     + x_47 )
-                 + x_48
+                                             + x_0 )
+                                         + x_1 )
+                                     + x_2 )
+                                 + x_3 )
+                             + x_4 )
+                         + x_5 )
+                     + x_6 )
+                 + x_7
                  - cell (var (Witness 4, Curr)) )
              + alpha_pow 2
                * ( double
@@ -5786,7 +5782,7 @@ module Tock : S = struct
                                          ( double
                                              ( double
                                                  (cell (var (Witness 3, Curr)))
-                                             + ( x_41
+                                             + ( x_0
                                                + ( ( field
                                                        "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                                      * cell
@@ -5799,7 +5795,7 @@ module Tock : S = struct
                                                  + field
                                                      "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                                  ) ) )
-                                         + ( x_42
+                                         + ( x_1
                                            + ( ( field
                                                    "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                                  * cell (var (Witness 7, Curr))
@@ -5810,7 +5806,7 @@ module Tock : S = struct
                                              + field
                                                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                              ) ) )
-                                     + ( x_43
+                                     + ( x_2
                                        + ( ( field
                                                "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                              * cell (var (Witness 8, Curr))
@@ -5821,7 +5817,7 @@ module Tock : S = struct
                                          + field
                                              "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                          ) ) )
-                                 + ( x_44
+                                 + ( x_3
                                    + ( ( field
                                            "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                          * cell (var (Witness 9, Curr))
@@ -5832,7 +5828,7 @@ module Tock : S = struct
                                      + field
                                          "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                      ) ) )
-                             + ( x_45
+                             + ( x_4
                                + ( ( field
                                        "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                      * cell (var (Witness 10, Curr))
@@ -5843,7 +5839,7 @@ module Tock : S = struct
                                  + field
                                      "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                  ) ) )
-                         + ( x_46
+                         + ( x_5
                            + ( ( field
                                    "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                                  * cell (var (Witness 11, Curr))
@@ -5854,7 +5850,7 @@ module Tock : S = struct
                              + field
                                  "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                              ) ) )
-                     + ( x_47
+                     + ( x_6
                        + ( ( field
                                "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                              * cell (var (Witness 12, Curr))
@@ -5865,7 +5861,7 @@ module Tock : S = struct
                          + field
                              "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                          ) ) )
-                 + ( x_48
+                 + ( x_7
                    + ( ( field
                            "0x40000000000000000000000000000000224698FC0994A8DD8C46EB2100000000"
                          * cell (var (Witness 13, Curr))
