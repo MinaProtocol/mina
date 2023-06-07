@@ -284,3 +284,5 @@ let combined_evaluation (type f)
           | Maybe (b, x) ->
               (b :> Field.t) * x )
         ~xi without_degree_bound )
+
+let default_zk_rows = 3

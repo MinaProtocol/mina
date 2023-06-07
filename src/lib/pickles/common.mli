@@ -256,3 +256,5 @@ val tock_unpadded_public_input_of_statement :
      , Composition_types.Branch_data.t )
      Import.Types.Wrap.Statement.In_circuit.t
   -> Backend.Tock.Field.Vector.elt list
+
+val default_zk_rows : int
