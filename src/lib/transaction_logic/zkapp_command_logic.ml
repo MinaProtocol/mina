@@ -195,7 +195,6 @@ module Local_state = struct
     module V1 = struct
       type ( 'stack_frame
            , 'call_stack
-           , 'token_id
            , 'signed_amount
            , 'ledger
            , 'bool
@@ -205,7 +204,6 @@ module Local_state = struct
            t =
             ( 'stack_frame
             , 'call_stack
-            , 'token_id
             , 'signed_amount
             , 'ledger
             , 'bool
@@ -220,7 +218,6 @@ module Local_state = struct
         ; call_stack : 'call_stack
         ; transaction_commitment : 'comm
         ; full_transaction_commitment : 'comm
-        ; token_id : 'token_id
         ; excess : 'signed_amount
         ; supply_increase : 'signed_amount
         ; ledger : 'ledger
@@ -233,14 +230,13 @@ module Local_state = struct
     end
   end]
 
-  let typ stack_frame call_stack token_id excess supply_increase ledger bool
-      comm length failure_status_tbl =
+  let typ stack_frame call_stack excess supply_increase ledger bool comm length
+      failure_status_tbl =
     Pickles.Impls.Step.Typ.of_hlistable
       [ stack_frame
       ; call_stack
       ; comm
       ; comm
-      ; token_id
       ; excess
       ; supply_increase
       ; ledger
@@ -259,7 +255,6 @@ module Local_state = struct
         type t =
           ( Mina_base.Stack_frame.Digest.Stable.V1.t
           , Mina_base.Call_stack_digest.Stable.V1.t
-          , Token_id.Stable.V2.t
           , ( Currency.Amount.Stable.V1.t
             , Sgn.Stable.V1.t )
             Currency.Signed_poly.Stable.V1.t
@@ -282,7 +277,6 @@ module Local_state = struct
     type t =
       ( Stack_frame.Digest.Checked.t
       , Call_stack_digest.Checked.t
-      , Token_id.Checked.t
       , Currency.Amount.Signed.Checked.t
       , Ledger_hash.var
       , Boolean.var
@@ -869,7 +863,6 @@ module type Inputs_intf = sig
     type t =
       ( Stack_frame.t
       , Call_stack.t
-      , Token_id.t
       , Amount.Signed.t
       , Ledger.t
       , Bool.t
@@ -1089,23 +1082,23 @@ module Make (Inputs : Inputs_intf) = struct
       ((global_state : Global_state.t), (local_state : Local_state.t)) =
     let open Inputs in
     let is_start' =
-      let is_start' =
+      let is_empty_call_forest =
         Call_forest.is_empty (Stack_frame.calls local_state.stack_frame)
       in
       ( match is_start with
       | `Compute _ ->
           ()
       | `Yes _ ->
-          assert_ ~pos:__POS__ is_start'
+          assert_ ~pos:__POS__ is_empty_call_forest
       | `No ->
-          assert_ ~pos:__POS__ (Bool.not is_start') ) ;
+          assert_ ~pos:__POS__ (Bool.not is_empty_call_forest) ) ;
       match is_start with
       | `Yes _ ->
           Bool.true_
       | `No ->
           Bool.false_
       | `Compute _ ->
-          is_start'
+          is_empty_call_forest
     in
     let will_succeed =
       match is_start with
@@ -1204,13 +1197,7 @@ module Make (Inputs : Inputs_intf) = struct
             (tx_commitment, full_tx_commitment)
       in
       let local_state =
-        { local_state with
-          transaction_commitment
-        ; full_transaction_commitment
-        ; token_id =
-            Token_id.if_ is_start' ~then_:Token_id.default
-              ~else_:local_state.token_id
-        }
+        { local_state with transaction_commitment; full_transaction_commitment }
       in
       ( (account_update, remaining, call_stack)
       , account_update_forest
@@ -1762,10 +1749,7 @@ module Make (Inputs : Inputs_intf) = struct
       Amount.Signed.negate (Account_update.balance_change account_update)
     in
     let new_local_fee_excess, `Overflow overflowed =
-      let curr_token : Token_id.t = local_state.token_id in
-      let curr_is_default = Token_id.(equal default) curr_token in
       (* We only allow the default token for fees. *)
-      assert_ ~pos:__POS__ curr_is_default ;
       Bool.(
         assert_ ~pos:__POS__
           ( (not is_start')
@@ -1935,10 +1919,7 @@ module Make (Inputs : Inputs_intf) = struct
          - supply_increase = Amount.Signed.zero
       *)
       { local_state with
-        token_id =
-          Token_id.if_ is_last_account_update ~then_:Token_id.default
-            ~else_:local_state.token_id
-      ; ledger =
+        ledger =
           Inputs.Ledger.if_ is_last_account_update
             ~then_:(Inputs.Ledger.empty ~depth:0 ())
             ~else_:local_state.ledger

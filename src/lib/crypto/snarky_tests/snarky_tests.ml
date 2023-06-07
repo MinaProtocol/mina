@@ -216,9 +216,9 @@ end
 module InvalidWitness = struct
   open Impl
 
-  (** A bit of a contrived circuit. 
+  (** A bit of a contrived circuit.
       Here only a single constraint will be generated (due to constant unification),
-      but we still want all [compute] closures to be checked when generating the witness. 
+      but we still want all [compute] closures to be checked when generating the witness.
       Thus, this circuit should fail due to an invalid witness. *)
   let circuit _ =
     let one = constant Field.typ Field.Constant.one in
@@ -611,7 +611,7 @@ module Protocol_circuits = struct
     ()
 
   let blockchain () : unit =
-    let expected = "ffd9c62ea5e15076a6fff9fdbd87ffa0" in
+    let expected = "234ab6add22368c3dba20bff6df78e01" in
 
     let digest =
       Blockchain_snark.Blockchain_snark_state.constraint_system_digests
@@ -627,8 +627,8 @@ module Protocol_circuits = struct
     ()
 
   let transaction () : unit =
-    let expected1 = "31e96945d5bf7c8d4b1089c59c3b878b" in
-    let expected2 = "b86983bc4810294fc6e1d972f040d1cd" in
+    let expected1 = "198acebc60e3d2fc163c4c12baa71948" in
+    let expected2 = "9aaecfee3b4bcc5ec9101cbb41136a0f" in
 
     let digest =
       Transaction_snark.constraint_system_digests ~constraint_constants ()

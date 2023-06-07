@@ -134,7 +134,6 @@ module type Full = sig
          , ( _
            , _
            , _
-           , _
            , 'a
            , _
            , _

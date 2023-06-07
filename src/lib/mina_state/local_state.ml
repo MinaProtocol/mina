@@ -10,7 +10,6 @@ type display =
   , string
   , string
   , string
-  , string
   , bool
   , string
   , int
@@ -23,7 +22,6 @@ let display
      ; call_stack
      ; transaction_commitment
      ; full_transaction_commitment
-     ; token_id
      ; excess
      ; supply_increase
      ; ledger
@@ -47,7 +45,6 @@ let display
   ; call_stack = f (call_stack :> Fp.t)
   ; transaction_commitment = f transaction_commitment
   ; full_transaction_commitment = f full_transaction_commitment
-  ; token_id = Token_id.to_string token_id
   ; excess = signed_amount_to_string excess
   ; supply_increase = signed_amount_to_string supply_increase
   ; ledger =
@@ -68,7 +65,6 @@ let dummy : unit -> t =
       ; call_stack = Call_stack_digest.empty
       ; transaction_commitment = Zkapp_command.Transaction_commitment.empty
       ; full_transaction_commitment = Zkapp_command.Transaction_commitment.empty
-      ; token_id = Token_id.default
       ; excess = Amount.(Signed.of_unsigned zero)
       ; supply_increase = Amount.(Signed.of_unsigned zero)
       ; ledger = Frozen_ledger_hash.empty_hash
@@ -88,7 +84,6 @@ let gen : t Quickcheck.Generator.t =
   and transaction_commitment = Impl.Field.Constant.gen
   and stack_frame = Stack_frame.Digest.gen
   and call_stack = Call_stack_digest.gen
-  and token_id = Token_id.gen
   and success = Bool.quickcheck_generator
   and account_update_index = Mina_numbers.Index.gen
   and will_succeed =
@@ -103,7 +98,6 @@ let gen : t Quickcheck.Generator.t =
   ; call_stack
   ; transaction_commitment
   ; full_transaction_commitment = transaction_commitment
-  ; token_id
   ; ledger
   ; excess
   ; supply_increase
@@ -118,7 +112,6 @@ let to_input
      ; call_stack
      ; transaction_commitment
      ; full_transaction_commitment
-     ; token_id
      ; excess
      ; supply_increase
      ; ledger
@@ -135,7 +128,6 @@ let to_input
      ; field (call_stack :> Field.Constant.t)
      ; field transaction_commitment
      ; field full_transaction_commitment
-     ; Token_id.to_input token_id
      ; Amount.Signed.to_input excess
      ; Amount.Signed.to_input supply_increase
      ; Ledger_hash.to_input ledger
@@ -160,7 +152,6 @@ module Checked = struct
       ~call_stack:(f Call_stack_digest.Checked.Assert.equal)
       ~transaction_commitment:(f Field.Assert.equal)
       ~full_transaction_commitment:(f Field.Assert.equal)
-      ~token_id:(f Token_id.Checked.Assert.equal)
       ~excess:(f !Currency.Amount.Signed.Checked.assert_equal)
       ~supply_increase:(f !Currency.Amount.Signed.Checked.assert_equal)
       ~ledger:(f !Ledger_hash.assert_equal)
@@ -177,7 +168,6 @@ module Checked = struct
       ~call_stack:(f Call_stack_digest.Checked.equal)
       ~transaction_commitment:(f Field.equal)
       ~full_transaction_commitment:(f Field.equal)
-      ~token_id:(f Token_id.Checked.equal)
       ~excess:(f !Currency.Amount.Signed.Checked.equal)
       ~supply_increase:(f !Currency.Amount.Signed.Checked.equal)
       ~ledger:(f !Ledger_hash.equal_var) ~success:(f Impl.Boolean.equal)
@@ -190,7 +180,6 @@ module Checked = struct
        ; call_stack
        ; transaction_commitment
        ; full_transaction_commitment
-       ; token_id
        ; excess
        ; supply_increase
        ; ledger
@@ -208,7 +197,6 @@ module Checked = struct
        ; field (call_stack :> t)
        ; field transaction_commitment
        ; field full_transaction_commitment
-       ; Token_id.Checked.to_input token_id
        ; run_checked (Amount.Signed.Checked.to_input excess)
        ; run_checked (Amount.Signed.Checked.to_input supply_increase)
        ; Ledger_hash.var_to_input ledger
@@ -237,7 +225,6 @@ let typ : (Checked.t, t) Impl.Typ.t =
     ; Call_stack_digest.typ
     ; Field.typ
     ; Field.typ
-    ; Token_id.typ
     ; Amount.Signed.typ
     ; Amount.Signed.typ
     ; Ledger_hash.typ
