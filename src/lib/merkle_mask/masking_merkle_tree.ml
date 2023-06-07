@@ -728,9 +728,10 @@ module Make (Inputs : Inputs_intf.S) = struct
               | None ->
                   Or_error.error_string "Db_error.Out_of_leaves"
               | Some location ->
+                  (* `set` calls `self_set_location`, which updates
+                     the current location
+                  *)
                   set t location account ;
-                  (* the current location is updated by `self_set_location` *)
-                  self_set_location t account_id location ;
                   Ok (`Added, location) ) )
       | Some location ->
           Ok (`Existed, location)
