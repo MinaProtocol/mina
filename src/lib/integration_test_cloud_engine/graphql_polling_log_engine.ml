@@ -160,7 +160,7 @@ let start_filtered_logs ~logger ~network ~log_filter =
   Deferred.Or_error.List.iter ~how:`Parallel allpods ~f:(fun node ->
       Kubernetes_network.Node.start_filtered_log ~logger ~log_filter node )
 
-let rec poll_start_filtered_log ~log_filter ~logger ~network =
+let rec poll_start_filtered_log ~log_filter ~logger ~network ~event_writer =
   let open Deferred.Let_syntax in
   [%log info]
     "Polling all testnet nodes to get them to start their filtered logs" ;
@@ -171,11 +171,15 @@ let rec poll_start_filtered_log ~log_filter ~logger ~network =
       Deferred.return ()
   | Error _ ->
       let%bind () = after (Time.Span.of_ms 500.0) in
-      poll_start_filtered_log ~log_filter ~logger ~network
+      if not (Pipe.is_closed event_writer) then
+        poll_start_filtered_log ~log_filter ~logger ~network ~event_writer
+      else Deferred.unit
 
 let poll_for_logs_in_background ~log_filter ~logger ~network ~event_writer =
   [%log info] "Attempting to start the filtered log in all testnet nodes" ;
-  let%bind () = poll_start_filtered_log ~log_filter ~logger ~network in
+  let%bind () =
+    poll_start_filtered_log ~log_filter ~logger ~network ~event_writer
+  in
   [%log info]
     "Filtered logs in all testnet nodes successfully started.  Will now poll \
      for log entries" ;
