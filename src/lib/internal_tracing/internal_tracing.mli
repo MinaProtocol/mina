@@ -132,7 +132,7 @@ val with_state_hash : Mina_base.State_hash.t -> (unit -> 'a) -> 'a
     Any context in which checkpoints or metadata are recorded must be wrapped
     in either {!val:with_state_hash} or {!val:with_slot} for the checkpoints to be
     properly associated to the block being processed/produced. *)
-val with_slot : Mina_numbers.Global_slot.t -> (unit -> 'a) -> 'a
+val with_slot : Mina_numbers.Global_slot_since_genesis.t -> (unit -> 'a) -> 'a
 
 module For_logger : sig
   (** Returns a transport that outputs events to a json-lines file which gets rotated after it

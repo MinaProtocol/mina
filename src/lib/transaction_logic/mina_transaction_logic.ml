@@ -4,7 +4,7 @@ open Currency
 open Signature_lib
 open Mina_transaction
 module Zkapp_command_logic = Zkapp_command_logic
-module Global_slot = Mina_numbers.Global_slot
+module Global_slot_since_genesis = Mina_numbers.Global_slot_since_genesis
 
 module Transaction_applied = struct
   module UC = Signed_command
@@ -337,7 +337,7 @@ module type S = sig
       ; fee_excess : Amount.Signed.t
       ; supply_increase : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
-      ; block_global_slot : Mina_numbers.Global_slot.t
+      ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
             (* Slot of block when the transaction is applied. NOTE: This is at least 1 slot after the protocol_state's view, which is for the *previous* slot. *)
       }
   end
@@ -355,7 +355,6 @@ module type S = sig
         ; local_state :
             ( Stack_frame.value
             , Stack_frame.value list
-            , Token_id.t
             , Amount.Signed.t
             , ledger
             , bool
@@ -381,14 +380,14 @@ module type S = sig
 
   val apply_user_command :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> txn_global_slot:Global_slot.t
+    -> txn_global_slot:Global_slot_since_genesis.t
     -> ledger
     -> Signed_command.With_valid_signature.t
     -> Transaction_applied.Signed_command_applied.t Or_error.t
 
   val apply_user_command_unchecked :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> txn_global_slot:Global_slot.t
+    -> txn_global_slot:Global_slot_since_genesis.t
     -> ledger
     -> Signed_command.t
     -> Transaction_applied.Signed_command_applied.t Or_error.t
@@ -396,20 +395,20 @@ module type S = sig
   val update_action_state :
        Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
     -> Zkapp_account.Actions.t
-    -> txn_global_slot:Global_slot.t
-    -> last_action_slot:Global_slot.t
-    -> Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t * Global_slot.t
+    -> txn_global_slot:Global_slot_since_genesis.t
+    -> last_action_slot:Global_slot_since_genesis.t
+    -> Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
+       * Global_slot_since_genesis.t
 
   val apply_zkapp_command_unchecked :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> global_slot:Mina_numbers.Global_slot.t
+    -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
     -> ledger
     -> Zkapp_command.t
     -> ( Transaction_applied.Zkapp_command_applied.t
        * ( ( Stack_frame.value
            , Stack_frame.value list
-           , Token_id.t
            , Amount.Signed.t
            , ledger
            , bool
@@ -436,7 +435,7 @@ module type S = sig
   *)
   val apply_zkapp_command_unchecked_aux :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> global_slot:Mina_numbers.Global_slot.t
+    -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
     -> init:'acc
     -> f:
@@ -444,7 +443,6 @@ module type S = sig
           -> Global_state.t
              * ( Stack_frame.value
                , Stack_frame.value list
-               , Token_id.t
                , Amount.Signed.t
                , ledger
                , bool
@@ -461,7 +459,7 @@ module type S = sig
 
   val apply_zkapp_command_first_pass_aux :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> global_slot:Mina_numbers.Global_slot.t
+    -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> state_view:Zkapp_precondition.Protocol_state.View.t
     -> init:'acc
     -> f:
@@ -469,7 +467,6 @@ module type S = sig
           -> Global_state.t
              * ( Stack_frame.value
                , Stack_frame.value list
-               , Token_id.t
                , Amount.Signed.t
                , ledger
                , bool
@@ -492,7 +489,6 @@ module type S = sig
           -> Global_state.t
              * ( Stack_frame.value
                , Stack_frame.value list
-               , Token_id.t
                , Amount.Signed.t
                , ledger
                , bool
@@ -507,21 +503,21 @@ module type S = sig
 
   val apply_fee_transfer :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> txn_global_slot:Global_slot.t
+    -> txn_global_slot:Global_slot_since_genesis.t
     -> ledger
     -> Fee_transfer.t
     -> Transaction_applied.Fee_transfer_applied.t Or_error.t
 
   val apply_coinbase :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> txn_global_slot:Global_slot.t
+    -> txn_global_slot:Global_slot_since_genesis.t
     -> ledger
     -> Coinbase.t
     -> Transaction_applied.Coinbase_applied.t Or_error.t
 
   val apply_transaction_first_pass :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> global_slot:Global_slot.t
+    -> global_slot:Global_slot_since_genesis.t
     -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
     -> ledger
     -> Transaction.t
@@ -534,14 +530,14 @@ module type S = sig
 
   val apply_transactions :
        constraint_constants:Genesis_constants.Constraint_constants.t
-    -> global_slot:Mina_numbers.Global_slot.t
+    -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
     -> ledger
     -> Transaction.t list
     -> Transaction_applied.t list Or_error.t
 
   val has_locked_tokens :
-       global_slot:Global_slot.t
+       global_slot:Global_slot_since_genesis.t
     -> account_id:Account_id.t
     -> ledger
     -> bool Or_error.t
@@ -550,13 +546,13 @@ module type S = sig
     val validate_timing_with_min_balance :
          account:Account.t
       -> txn_amount:Amount.t
-      -> txn_global_slot:Global_slot.t
+      -> txn_global_slot:Global_slot_since_genesis.t
       -> (Account.Timing.t * [> `Min_balance of Balance.t ]) Or_error.t
 
     val validate_timing :
          account:Account.t
       -> txn_amount:Amount.t
-      -> txn_global_slot:Global_slot.t
+      -> txn_global_slot:Global_slot_since_genesis.t
       -> Account.Timing.t Or_error.t
   end
 end
@@ -643,17 +639,17 @@ let validate_timing_with_min_balance ~account ~txn_amount ~txn_global_slot =
   let nsf_error kind =
     Or_error.errorf
       !"For %s account, the requested transaction for amount %{sexp: Amount.t} \
-        at global slot %{sexp: Global_slot.t}, the balance %{sexp: Balance.t} \
-        is insufficient"
+        at global slot %{sexp: Global_slot_since_genesis.t}, the balance \
+        %{sexp: Balance.t} is insufficient"
       kind txn_amount txn_global_slot account.Account.Poly.balance
     |> Or_error.tag ~tag:nsf_tag
   in
   let min_balance_error min_balance =
     Or_error.errorf
       !"For timed account, the requested transaction for amount %{sexp: \
-        Amount.t} at global slot %{sexp: Global_slot.t}, applying the \
-        transaction would put the balance below the calculated minimum balance \
-        of %{sexp: Balance.t}"
+        Amount.t} at global slot %{sexp: Global_slot_since_genesis.t}, \
+        applying the transaction would put the balance below the calculated \
+        minimum balance of %{sexp: Balance.t}"
       txn_amount txn_global_slot min_balance
     |> Or_error.tag ~tag:min_balance_tag
   in
@@ -733,9 +729,9 @@ module Make (L : Ledger_intf.S) :
 
   let validate_time ~valid_until ~current_global_slot =
     check
-      Global_slot.(current_global_slot <= valid_until)
-      !"Current global slot %{sexp: Global_slot.t} greater than transaction \
-        expiry slot %{sexp: Global_slot.t}"
+      Global_slot_since_genesis.(current_global_slot <= valid_until)
+      !"Current global slot %{sexp: Global_slot_since_genesis.t} greater than \
+        transaction expiry slot %{sexp: Global_slot_since_genesis.t}"
       current_global_slot valid_until
 
   module Transaction_applied = struct
@@ -1068,7 +1064,7 @@ module Make (L : Ledger_intf.S) :
       ; fee_excess : Amount.Signed.t
       ; supply_increase : Amount.Signed.t
       ; protocol_state : Zkapp_precondition.Protocol_state.View.t
-      ; block_global_slot : Global_slot.t
+      ; block_global_slot : Global_slot_since_genesis.t
       }
 
     let first_pass_ledger { first_pass_ledger; _ } =
@@ -1109,7 +1105,6 @@ module Make (L : Ledger_intf.S) :
         ; local_state :
             ( Stack_frame.value
             , Stack_frame.value list
-            , Token_id.t
             , Amount.Signed.t
             , L.t
             , bool
@@ -1301,8 +1296,14 @@ module Make (L : Ledger_intf.S) :
         Permissions.Auth_required.check perm tag
     end
 
-    module Global_slot = struct
-      include Mina_numbers.Global_slot
+    module Global_slot_since_genesis = struct
+      include Mina_numbers.Global_slot_since_genesis
+
+      let if_ = value_if
+    end
+
+    module Global_slot_span = struct
+      include Mina_numbers.Global_slot_span
 
       let if_ = value_if
     end
@@ -1785,7 +1786,6 @@ module Make (L : Ledger_intf.S) :
       type t =
         ( Stack_frame.t
         , Call_stack.t
-        , Token_id.t
         , Amount.Signed.t
         , Ledger.t
         , Bool.t
@@ -1839,7 +1839,6 @@ module Make (L : Ledger_intf.S) :
       ; local_state :
           ( Stack_frame.t
           , Call_stack.t
-          , Token_id.t
           , Amount.Signed.t
           , L.t
           , bool
@@ -1944,7 +1943,6 @@ module Make (L : Ledger_intf.S) :
         ; call_stack = []
         ; transaction_commitment = Inputs.Transaction_commitment.empty
         ; full_transaction_commitment = Inputs.Transaction_commitment.empty
-        ; token_id = Token_id.default
         ; excess = Currency.Amount.(Signed.of_unsigned zero)
         ; supply_increase = Currency.Amount.(Signed.of_unsigned zero)
         ; ledger = L.empty ~depth:0 ()
@@ -2703,7 +2701,7 @@ module For_tests = struct
           { fee
           ; fee_payer_pk = sender_pk
           ; nonce = sender_nonce
-          ; valid_until = Global_slot.max_value
+          ; valid_until = Global_slot_since_genesis.max_value
           ; memo = Signed_command_memo.dummy
           }
       ; body = Payment { receiver_pk = receiver; amount }
@@ -2860,7 +2858,7 @@ module For_tests = struct
                       (hide_rc a1) (hide_rc a2) ) ) )
     |> Or_error.combine_errors_unit
 
-  let txn_global_slot = Global_slot.zero
+  let txn_global_slot = Global_slot_since_genesis.zero
 
   let iter_err ts ~f =
     List.fold_until ts
