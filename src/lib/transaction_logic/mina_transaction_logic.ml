@@ -355,7 +355,6 @@ module type S = sig
         ; local_state :
             ( Stack_frame.value
             , Stack_frame.value list
-            , Token_id.t
             , Amount.Signed.t
             , ledger
             , bool
@@ -410,7 +409,6 @@ module type S = sig
     -> ( Transaction_applied.Zkapp_command_applied.t
        * ( ( Stack_frame.value
            , Stack_frame.value list
-           , Token_id.t
            , Amount.Signed.t
            , ledger
            , bool
@@ -445,7 +443,6 @@ module type S = sig
           -> Global_state.t
              * ( Stack_frame.value
                , Stack_frame.value list
-               , Token_id.t
                , Amount.Signed.t
                , ledger
                , bool
@@ -470,7 +467,6 @@ module type S = sig
           -> Global_state.t
              * ( Stack_frame.value
                , Stack_frame.value list
-               , Token_id.t
                , Amount.Signed.t
                , ledger
                , bool
@@ -493,7 +489,6 @@ module type S = sig
           -> Global_state.t
              * ( Stack_frame.value
                , Stack_frame.value list
-               , Token_id.t
                , Amount.Signed.t
                , ledger
                , bool
@@ -1110,7 +1105,6 @@ module Make (L : Ledger_intf.S) :
         ; local_state :
             ( Stack_frame.value
             , Stack_frame.value list
-            , Token_id.t
             , Amount.Signed.t
             , L.t
             , bool
@@ -1792,7 +1786,6 @@ module Make (L : Ledger_intf.S) :
       type t =
         ( Stack_frame.t
         , Call_stack.t
-        , Token_id.t
         , Amount.Signed.t
         , Ledger.t
         , Bool.t
@@ -1846,7 +1839,6 @@ module Make (L : Ledger_intf.S) :
       ; local_state :
           ( Stack_frame.t
           , Call_stack.t
-          , Token_id.t
           , Amount.Signed.t
           , L.t
           , bool
@@ -1951,7 +1943,6 @@ module Make (L : Ledger_intf.S) :
         ; call_stack = []
         ; transaction_commitment = Inputs.Transaction_commitment.empty
         ; full_transaction_commitment = Inputs.Transaction_commitment.empty
-        ; token_id = Token_id.default
         ; excess = Currency.Amount.(Signed.of_unsigned zero)
         ; supply_increase = Currency.Amount.(Signed.of_unsigned zero)
         ; ledger = L.empty ~depth:0 ()
