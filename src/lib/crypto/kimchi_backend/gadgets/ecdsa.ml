@@ -777,7 +777,6 @@ let%test_unit "Ecdsa.verify_tiny" =
       test_verify_tiny Secp256k1.params ~scalar_mul_bit_length:2 pubkey
         signature msg_hash
     in
-
     let _cs =
       test_verify_tiny Secp256k1.params ~use_precomputed_gen_doubles:false
         ~scalar_mul_bit_length:2 pubkey signature msg_hash

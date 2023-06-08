@@ -4,7 +4,7 @@ module Snark_intf = Snarky_backendless.Snark_intf
 
 let basic_tests_enabled = true
 
-let scalar_mul_tests = true
+let scalar_mul_tests_enabled = true
 
 (* Array to tuple helper *)
 let tuple9_of_array array =
@@ -39,6 +39,11 @@ let is_on_curve_bignum_point (curve : Curve_params.t)
  *     L != R
  *     Lx != Rx (no invertibility)
  *     L and R are not O (the point at infinity)
+ *
+ *   Rows:
+ *     Group addition:  13
+ *     Range-checks:    24 (not counting inputs and output)
+ *     Bound additions: 24 (not counting inputs and output)
  *
  *   Supported group axioms:
  *     Closure
@@ -831,6 +836,11 @@ let check_ia (type f) (module Circuit : Snark_intf.Run with type field = f)
  *      ia point is randomly selected and constrained to be on the curve
  *      ia negated point computation is constrained
  *      ia coordinates are bounds checked
+ *
+ *   Rows:
+ *      Scalar multiplication:  85
+ *      Curve constants:        10 (for 256-bit curve; one-time cost per circuit)
+ *      Pre-computing doubles: 767 (for 256-bit curve; one-time cost per circuit)
  *)
 let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     (external_checks : f Foreign_field.External_checks.t)
@@ -928,7 +938,7 @@ let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
         in
 
         (* Group add conditionally *)
-        let acc = Affine.if_ (module Circuit) bit sum acc in
+        let acc = Affine.if_ (module Circuit) bit ~then_:sum ~else_:acc in
 
         (acc, double_base) )
   in
@@ -2813,7 +2823,7 @@ let%test_unit "Ec_group.properties" =
 (*******************************)
 
 let%test_unit "Ec_group.is_on_curve" =
-  if scalar_mul_tests then (
+  if scalar_mul_tests_enabled then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -2950,7 +2960,7 @@ let%test_unit "Ec_group.is_on_curve" =
     () )
 
 let%test_unit "Ec_group.check_ia" =
-  if scalar_mul_tests then (
+  if scalar_mul_tests_enabled then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -3095,7 +3105,7 @@ let%test_unit "Ec_group.check_ia" =
     () )
 
 let%test_unit "Ec_group.scalar_mul" =
-  if scalar_mul_tests then
+  if scalar_mul_tests_enabled then
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -3323,7 +3333,7 @@ let%test_unit "Ec_group.scalar_mul" =
     ()
 
 let%test_unit "Ec_group.scalar_mul_properties" =
-  if scalar_mul_tests then (
+  if scalar_mul_tests_enabled then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -3669,7 +3679,7 @@ let%test_unit "Ec_group.scalar_mul_properties" =
     () )
 
 let%test_unit "Ec_group.scalar_mul_tiny" =
-  if (* scalar_mul_tests *) false then
+  if scalar_mul_tests_enabled then
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
     let () =
@@ -3686,7 +3696,9 @@ let%test_unit "Ec_group.scalar_mul_tiny" =
             let open Runner.Impl in
             (* Prepare test public inputs *)
             let curve =
-              Curve_params.to_circuit_constants (module Runner.Impl) curve
+              Curve_params.to_circuit_constants
+                (module Runner.Impl)
+                curve ~use_precomputed_gen_doubles:false
             in
             let scalar_bits =
               Common.bignum_bigint_unpack_as_unchecked_vars
@@ -3734,23 +3746,12 @@ let%test_unit "Ec_group.scalar_mul_tiny" =
      *)
 
     (* Multiply by 2 *)
-    let _scalar = Bignum_bigint.of_int 2 in
-    let scalar =
-      Bignum_bigint.of_string
-        "11855648912002728172728178841471073659390794448519216021605431753054289932960"
-    in
-    (* let point =
-         ( Bignum_bigint.of_string
-             "67973637023329354644729732876692436096994797487488454090437075702698953132769"
-         , Bignum_bigint.of_string
-             "108096131279561713744990959402407452508030289249215221172372441421932322041359"
-         )
-       in *)
+    let scalar = Bignum_bigint.of_int 2 in
     let expected_result =
       ( Bignum_bigint.of_string
-          "70053051566055881313133739458711159076876489753583172151093688692211624758142"
+          "89565891926547004231252920425935692360644145829622209833684329913297188986597"
       , Bignum_bigint.of_string
-          "28880740696940411617405703436512159146003456546669972608977923507321289511874"
+          "12158399299693830322967808612713398636155367887041628176798871954788371653930"
       )
     in
     let _cs =

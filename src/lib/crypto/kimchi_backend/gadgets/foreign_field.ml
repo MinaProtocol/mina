@@ -213,8 +213,8 @@ module type Element_intf = sig
   val if_ :
        (module Snark_intf.Run with type field = 'field)
     -> 'field Cvar.t Snark_intf.Boolean0.t
-    -> 'field t
-    -> 'field t
+    -> then_:'field t
+    -> else_:'field t
     -> 'field t
 
   (* Decompose and constrain foreign field element into list of boolean cvars *)
@@ -370,8 +370,8 @@ end = struct
 
     let if_ (type field)
         (module Circuit : Snark_intf.Run with type field = field)
-        (b : Circuit.Boolean.var) (then_ : field t) (else_ : field t) : field t
-        =
+        (b : Circuit.Boolean.var) ~(then_ : field t) ~(else_ : field t) :
+        field t =
       let open Circuit in
       let then0, then1, then2 = to_limbs then_ in
       let else0, else1, else2 = to_limbs else_ in
@@ -503,8 +503,8 @@ end = struct
 
     let if_ (type field)
         (module Circuit : Snark_intf.Run with type field = field)
-        (b : Circuit.Boolean.var) (then_ : field t) (else_ : field t) : field t
-        =
+        (b : Circuit.Boolean.var) ~(then_ : field t) ~(else_ : field t) :
+        field t =
       let open Circuit in
       let then01, then2 = to_limbs then_ in
       let else01, else2 = to_limbs else_ in

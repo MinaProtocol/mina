@@ -129,8 +129,8 @@ module type Element_intf = sig
   val if_ :
        (module Snark_intf.Run with type field = 'field)
     -> 'field Cvar.t Snark_intf.Boolean0.t
-    -> 'field t
-    -> 'field t
+    -> then_:'field t
+    -> else_:'field t
     -> 'field t
 
   (** Decompose and constrain foreign field element into list of boolean cvars *)
