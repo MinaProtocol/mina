@@ -677,12 +677,10 @@ module Parse = struct
             in
             (* choose signature verification based on network *)
             let signature_kind : Mina_signature_kind.t =
-              if String.equal network_identifier.network "mainnet" then
-                Mainnet
-              else if String.equal network_identifier.network "testnet" then
-                Testnet
-              else
-                Other_network network_identifier.network
+              match network_identifier.network with 
+              | "mainnet" -> Mainnet 
+              | "testnet" -> Testnet
+              | chain_name -> Other_network chain_name
             in
             Option.is_some @@
               Signed_command.create_with_signature_checked ~signature_kind
