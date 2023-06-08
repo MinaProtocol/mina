@@ -155,7 +155,7 @@ let rec poll_get_filtered_log_entries ~last_log_index_seen ~logger ~network
       ~last_log_index_seen:new_index )
   else Deferred.unit
 
-let start_filtered_log ~logger ~network ~log_filter =
+let start_filtered_logs ~logger ~network ~log_filter =
   let allpods = Kubernetes_network.all_pods network |> Core.String.Map.data in
   let logs =
     Deferred.Or_error.List.iter allpods ~f:(fun node ->
@@ -165,11 +165,12 @@ let start_filtered_log ~logger ~network ~log_filter =
 
 let rec poll_start_filtered_log ~log_filter ~logger ~network =
   let open Deferred.Let_syntax in
-  [%log spam]
+  [%log info]
     "Polling all testnet nodes to get them to start their filtered logs" ;
-  let%bind res = start_filtered_log ~log_filter ~logger ~network in
+  let%bind res = start_filtered_logs ~log_filter ~logger ~network in
   match res with
   | Ok () ->
+      [%log info] "All nodes have started their filtered logs successfully" ;
       Deferred.return ()
   | Error _ ->
       poll_start_filtered_log ~log_filter ~logger ~network
