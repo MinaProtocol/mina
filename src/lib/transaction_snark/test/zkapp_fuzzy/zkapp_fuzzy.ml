@@ -93,7 +93,7 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
   (ledger, fee_payer_keypairs, keymap)
 
 let generate_zkapp_commands_and_apply_them_consecutively_5_times ~successful
-    ~max_account_updates random =
+    ~max_account_updates ~individual_test_timeout random =
   let ledger, fee_payer_keypairs, keymap =
     mk_ledgers_and_fee_payers ~num_of_fee_payers:5 ()
   in
@@ -114,18 +114,28 @@ let generate_zkapp_commands_and_apply_them_consecutively_5_times ~successful
     let%map () =
       match%map
         try_with (fun () ->
-            U.check_zkapp_command_with_merges_exn ~global_slot ledger
-              [ zkapp_command ] )
+            with_timeout (Time.Span.of_int_sec individual_test_timeout)
+            @@ U.check_zkapp_command_with_merges_exn ~global_slot ledger
+                 [ zkapp_command ] )
       with
-      | Ok () ->
+      | Ok (`Result ()) ->
           ()
+      | Ok `Timeout ->
+          [%log error]
+            ~metadata:
+              [ ("zkapp_command", Zkapp_command.to_yojson zkapp_command)
+              ; ("individual_test_timeout", `Int individual_test_timeout)
+              ]
+            "Consecutive zkApp application test timed out, see $zkapp_command \
+             for details" ;
+          successful := false
       | Error e ->
           [%log error]
             ~metadata:
               [ ("exn", `String (Exn.to_string e))
               ; ("zkapp_command", Zkapp_command.to_yojson zkapp_command)
               ]
-            "Consecutive zkapp application test failed, see $exn and \
+            "Consecutive zkApp application test failed, see $exn and \
              $zkapp_command for details" ;
           successful := false
     in
@@ -135,7 +145,7 @@ let generate_zkapp_commands_and_apply_them_consecutively_5_times ~successful
   Deferred.List.fold tests ~init:random ~f:(fun random test -> test random)
 
 let generate_zkapp_commands_and_apply_them_freshly ~successful
-    ~max_account_updates random =
+    ~max_account_updates ~individual_test_timeout random =
   let ledger, fee_payer_keypairs, keymap =
     mk_ledgers_and_fee_payers ~num_of_fee_payers:3 ()
   in
@@ -154,25 +164,34 @@ let generate_zkapp_commands_and_apply_them_freshly ~successful
   let%map () =
     match%map
       try_with (fun () ->
-          U.check_zkapp_command_with_merges_exn ~global_slot ledger
-            [ zkapp_command ] )
+          with_timeout (Time.Span.of_int_sec individual_test_timeout)
+          @@ U.check_zkapp_command_with_merges_exn ~global_slot ledger
+               [ zkapp_command ] )
     with
-    | Ok () ->
+    | Ok (`Result ()) ->
         ()
+    | Ok `Timeout ->
+        [%log error]
+          ~metadata:
+            [ ("zkapp_command", Zkapp_command.to_yojson zkapp_command)
+            ; ("individual_test_timeout", `Int individual_test_timeout)
+            ]
+          "zkApp application test timed out, see $zkapp_command for details" ;
+        successful := false
     | Error e ->
         [%log error]
           ~metadata:
             [ ("exn", `String (Exn.to_string e))
             ; ("zkapp_command", Zkapp_command.to_yojson zkapp_command)
             ]
-          "zkapp application test failed, see $exn and $zkapp_command for \
+          "zkApp application test failed, see $exn and $zkapp_command for \
            details" ;
         successful := false
   in
   Splittable_random.State.split random
 
 let mk_invalid_test ~successful ~max_account_updates ~type_of_failure
-    ~expected_failure_status random =
+    ~expected_failure_status ~individual_test_timeout random =
   let ledger, fee_payer_keypairs, keymap =
     mk_ledgers_and_fee_payers ~num_of_fee_payers:3 ()
   in
@@ -193,12 +212,25 @@ let mk_invalid_test ~successful ~max_account_updates ~type_of_failure
   let%map () =
     match%map
       try_with (fun () ->
-          U.check_zkapp_command_with_merges_exn
-            ~expected_failure:expected_failure_status ledger [ zkapp_command ]
-            ~global_slot )
+          with_timeout (Time.Span.of_int_sec individual_test_timeout)
+          @@ U.check_zkapp_command_with_merges_exn
+               ~expected_failure:expected_failure_status ledger
+               [ zkapp_command ] ~global_slot )
     with
-    | Ok () ->
+    | Ok (`Result ()) ->
         ()
+    | Ok `Timeout ->
+        [%log error]
+          ~metadata:
+            [ ( "expected_failure"
+              , Mina_generators.Zkapp_command_generators.failure_to_yojson
+                  type_of_failure )
+            ; ("zkapp_command", Zkapp_command.to_yojson zkapp_command)
+            ; ("individual_test_timeout", `Int individual_test_timeout)
+            ]
+          "Invalid test timed out, see $expected_failure and $zkapp_command \
+           for details" ;
+        successful := false
     | Error e ->
         [%log error]
           ~metadata:
@@ -214,7 +246,8 @@ let mk_invalid_test ~successful ~max_account_updates ~type_of_failure
   in
   Splittable_random.State.split random
 
-let test_timed_account ~successful ~max_account_updates random =
+let test_timed_account ~successful ~max_account_updates ~individual_test_timeout
+    random =
   let ledger, fee_payer_keypairs, keymap =
     mk_ledgers_and_fee_payers ~is_timed:true ~num_of_fee_payers:3 ()
   in
@@ -232,14 +265,23 @@ let test_timed_account ~successful ~max_account_updates random =
   let%map () =
     match%map
       try_with (fun () ->
-          U.check_zkapp_command_with_merges_exn
-            ~expected_failure:
-              ( Transaction_status.Failure.Source_minimum_balance_violation
-              , Pass_1 )
-            ledger [ zkapp_command ] ~state_body:U.genesis_state_body )
+          with_timeout (Time.Span.of_int_sec individual_test_timeout)
+          @@ U.check_zkapp_command_with_merges_exn
+               ~expected_failure:
+                 ( Transaction_status.Failure.Source_minimum_balance_violation
+                 , Pass_1 )
+               ledger [ zkapp_command ] ~state_body:U.genesis_state_body )
     with
-    | Ok () ->
+    | Ok (`Result ()) ->
         ()
+    | Ok `Timeout ->
+        [%log error]
+          ~metadata:
+            [ ("zkapp_command", Zkapp_command.to_yojson zkapp_command)
+            ; ("individual_test_timeout", `Int individual_test_timeout)
+            ]
+          "Timed account test timed out, see $zkapp_command for details" ;
+        successful := false
     | Error e ->
         [%log error]
           ~metadata:
@@ -262,6 +304,11 @@ let () =
                "NUM total seconds that we want the tests to run, failures \
                 would be collected and reported along the way"
              (required int))
+       and individual_test_timeout =
+         Command.Param.(
+           flag "--individual-test-timeout"
+             ~doc:"NUM seconds that we allow an individual test to run at most"
+             (required int))
        and seed =
          Command.Param.(
            flag "--seed"
@@ -276,40 +323,49 @@ let () =
          let successful = ref true in
          let rec loop random =
            generate_zkapp_commands_and_apply_them_consecutively_5_times
-             ~successful ~max_account_updates random
+             ~successful ~max_account_updates ~individual_test_timeout random
            >>= generate_zkapp_commands_and_apply_them_freshly ~successful
-                 ~max_account_updates
+                 ~max_account_updates ~individual_test_timeout
            >>= mk_invalid_test ~successful ~max_account_updates
                  ~type_of_failure:Invalid_protocol_state_precondition
                  ~expected_failure_status:
                    (Protocol_state_precondition_unsatisfied, Pass_2)
+                 ~individual_test_timeout
            >>= mk_invalid_test ~successful ~max_account_updates
                  ~type_of_failure:(Update_not_permitted `App_state)
                  ~expected_failure_status:
                    (Update_not_permitted_app_state, Pass_2)
+                 ~individual_test_timeout
            >>= mk_invalid_test ~successful ~max_account_updates
                  ~type_of_failure:(Update_not_permitted `Verification_key)
                  ~expected_failure_status:
                    (Update_not_permitted_verification_key, Pass_2)
+                 ~individual_test_timeout
            >>= mk_invalid_test ~successful ~max_account_updates
                  ~type_of_failure:(Update_not_permitted `Zkapp_uri)
                  ~expected_failure_status:
                    (Update_not_permitted_zkapp_uri, Pass_2)
+                 ~individual_test_timeout
            >>= mk_invalid_test ~successful ~max_account_updates
                  ~type_of_failure:(Update_not_permitted `Token_symbol)
                  ~expected_failure_status:
                    (Update_not_permitted_token_symbol, Pass_2)
+                 ~individual_test_timeout
            >>= mk_invalid_test ~successful ~max_account_updates
                  ~type_of_failure:(Update_not_permitted `Voting_for)
                  ~expected_failure_status:
                    (Update_not_permitted_voting_for, Pass_2)
+                 ~individual_test_timeout
            >>= mk_invalid_test ~successful ~max_account_updates
                  ~type_of_failure:(Update_not_permitted `Send)
                  ~expected_failure_status:(Update_not_permitted_balance, Pass_2)
+                 ~individual_test_timeout
            >>= mk_invalid_test ~successful ~max_account_updates
                  ~type_of_failure:(Update_not_permitted `Receive)
                  ~expected_failure_status:(Update_not_permitted_balance, Pass_2)
+                 ~individual_test_timeout
            >>= test_timed_account ~successful ~max_account_updates
+                 ~individual_test_timeout
            >>= loop
          in
          with_timeout (Core.Time.Span.of_int_sec timeout) (loop random)
