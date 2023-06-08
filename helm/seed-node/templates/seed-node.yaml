@@ -114,7 +114,7 @@ spec:
           "-itn-keys", {{ $.Values.itn.keys }},
           "-itn-graphql-port", "$(MINA_ITN_GRAPHQL_PORT)",
           "-uptime-submitter-key", "/root/uptime-keys/key",
-          "-uptime-url", "http://116.202.128.230:6000/v1/submit",
+          "-uptime-url", "http://65.21.195.80:6000/v1/submit",
           {{- end }}
           {{- if $.Values.mina.exposeGraphql }}
           "-insecure-rest-server",
