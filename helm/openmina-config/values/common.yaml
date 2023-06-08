@@ -113,7 +113,7 @@ logs:
 
 internalTrace:
   enable: true
-  image: openmina/mina-internal-trace-consumer:2794c20
+  image: openmina/mina-internal-trace-consumer:fec6545
 
 aggregator:
   image: openmina/mina-aggregator:60795c47
