@@ -336,7 +336,7 @@ module Node = struct
                 ~metadata ;
               Deferred.Or_error.return result
           | Error (`Failed_request err_string) ->
-              [%log warn]
+              [%log debug]
                 "GraphQL request \"$query\" to \"$uri\" failed: \"$error\" \
                  ($num_tries attempts left)"
                 ~metadata:
