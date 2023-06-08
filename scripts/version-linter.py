@@ -18,13 +18,14 @@ def branch_commit(branch):
                         capture_output=True)
   return result.stdout.decode('ascii').replace('"','').replace('\n','')
 
-def download_s3_type_shapes(role,branch,sha1) :
-  # Andrew : TODO download file
-  print ('Downloading type shape file for',role,'branch',branch,'at commit',sha1)
+def download_type_shapes(role,branch,sha1) :
+  file=type_shape_file(sha1)
+  result=subprocess.run(['wget' ,f'https://storage.googleapis.com/mina-type-shapes/{file}'])
+  print ('Downloading type shape file',file,'for',role,'branch',branch,'at commit',sha1)
 
 def type_shape_file(sha1) :
   # created by buildkite build-artifact script
-  # loaded to S3 bucket
+  # loaded to cloud bucket
   sha1 + '-type-shapes.txt'
 
 def make_type_shape_dict(type_shape_file):
@@ -165,17 +166,17 @@ if __name__ == "__main__":
   release_branch=sys.argv[3]
 
   base_branch_commit=branch_commit(base_branch)
-  download_s3_type_shapes('base',base_branch,base_branch_commit)
+  download_type_shapes('base',base_branch,base_branch_commit)
 
   print('')
 
   release_branch_commit=branch_commit(release_branch)
-  download_s3_type_shapes('release',release_branch,release_branch_commit)
+  download_type_shapes('release',release_branch,release_branch_commit)
 
   print('')
 
   pr_branch_commit=branch_commit(pr_branch)
-  download_s3_type_shapes('pr',pr_branch,pr_branch_commit)
+  download_type_shapes('pr',pr_branch,pr_branch_commit)
 
   print('')
 

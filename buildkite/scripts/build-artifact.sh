@@ -42,6 +42,9 @@ echo "--- Create type shapes git note for commit: ${MINA_COMMIT_SHA1:0:7}"
 ./_build/default/src/app/cli/src/mina_testnet_signatures.exe \
     internal dump-type-shapes --max-depth ${MAX_DEPTH} > ${TYPE_SHAPE_FILE}
 
+echo "--- Uploading ${TYPE_SHAPE_FILE} to mina-type-shapes bucket for consumption by the version linter"
+gcloud storage cp ${TYPE_SHAPE_FILE} gs://mina-type-shapes
+
 echo "--- Bundle all packages for Debian ${MINA_DEB_CODENAME}"
 echo " Includes mina daemon, archive-node, rosetta, generate keypair for berkeley"
 [[ ${MINA_BUILD_MAINNET} ]] && echo " MINA_BUILD_MAINNET is true so this includes the mainnet and devnet packages for mina-daemon as well"
