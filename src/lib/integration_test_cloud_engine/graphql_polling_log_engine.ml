@@ -157,7 +157,7 @@ let rec poll_get_filtered_log_entries ~last_log_index_seen ~logger ~network
 
 let start_filtered_logs ~logger ~network ~log_filter =
   let allpods = Kubernetes_network.all_pods network |> Core.String.Map.data in
-  Deferred.Or_error.List.iter allpods ~f:(fun node ->
+  Deferred.Or_error.List.iter ~how:`Parallel allpods ~f:(fun node ->
       Kubernetes_network.Node.start_filtered_log ~logger ~log_filter node )
 
 let rec poll_start_filtered_log ~log_filter ~logger ~network =
