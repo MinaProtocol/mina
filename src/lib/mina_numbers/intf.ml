@@ -27,6 +27,8 @@ module type S_unchecked = sig
 
   val zero : t
 
+  val one : t
+
   val succ : t -> t
 
   val add : t -> t -> t
@@ -65,8 +67,6 @@ end
 
 module type S_checked = sig
   type unchecked
-
-  open Snark_params.Tick
 
   type var
 

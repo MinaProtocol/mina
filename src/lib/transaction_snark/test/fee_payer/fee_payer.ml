@@ -164,7 +164,9 @@ let%test_module "Fee payer tests" =
               let txn_state_view =
                 Mina_state.Protocol_state.Body.view U.genesis_state_body
               in
-              let global_slot = Mina_numbers.Global_slot.of_int global_slot in
+              let global_slot =
+                Mina_numbers.Global_slot_since_genesis.of_int global_slot
+              in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
               ( match
                   let mask = Ledger.Mask.create ~depth:U.ledger_depth () in

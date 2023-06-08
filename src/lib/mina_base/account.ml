@@ -290,7 +290,7 @@ module Binable_arg = struct
         , Receipt.Chain_hash.Stable.V1.t
         , Public_key.Compressed.Stable.V1.t option
         , State_hash.Stable.V1.t
-        , Timing.Stable.V1.t
+        , Timing.Stable.V2.t
         , Permissions.Stable.V2.t
         , Zkapp_account.Stable.V2.t option )
         (* TODO: Cache the digest of this? *)
@@ -528,14 +528,18 @@ module Checked = struct
 
   let amount_upper_bound = Bignum_bigint.(one lsl Amount.length_in_bits)
 
-  let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
+  let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount
+      ~(vesting_period : Mina_numbers.Global_slot_span.Checked.var)
       ~vesting_increment ~initial_minimum_balance =
-    let%bind before_cliff = Global_slot.Checked.(global_slot < cliff_time) in
+    let%bind before_cliff =
+      Global_slot_since_genesis.Checked.(global_slot < cliff_time)
+    in
     let%bind else_branch =
       make_checked (fun () ->
-          let _, slot_diff =
+          let _, (slot_diff : Mina_numbers.Global_slot_span.Checked.var) =
             Tick.Run.run_checked
-              (Global_slot.Checked.sub_or_zero global_slot cliff_time)
+              (Global_slot_since_genesis.Checked.diff_or_zero global_slot
+                 cliff_time )
           in
           let cliff_decrement = cliff_amount in
           let min_balance_less_cliff_decrement =
@@ -543,13 +547,13 @@ module Checked = struct
               (Balance.Checked.sub_amount_or_zero initial_minimum_balance
                  cliff_decrement )
           in
-          let num_periods, _ =
+          let (num_periods : Mina_numbers.Global_slot_span.Checked.var), _ =
             Tick.Run.run_checked
-              (Global_slot.Checked.div_mod slot_diff vesting_period)
+              (Global_slot_span.Checked.div_mod slot_diff vesting_period)
           in
           let vesting_decrement =
             Tick.Run.Field.mul
-              (Global_slot.Checked.to_field num_periods)
+              (Global_slot_span.Checked.to_field num_periods)
               (Amount.pack_var vesting_increment)
           in
           let min_balance_less_cliff_and_vesting_decrements =
@@ -597,6 +601,8 @@ module Checked = struct
               Boolean.false_
           | `Set_delegate ->
               Boolean.true_
+          | `Increment_nonce ->
+              Boolean.true_
           | `Access ->
               failwith
                 "Account.Checked.has_permission: signature_verifies argument \
@@ -612,6 +618,9 @@ module Checked = struct
     | `Set_delegate ->
         Permissions.Auth_required.Checked.eval_no_proof
           account.permissions.set_delegate ~signature_verifies
+    | `Increment_nonce ->
+        Permissions.Auth_required.Checked.eval_no_proof
+          account.permissions.increment_nonce ~signature_verifies
     | `Access ->
         Permissions.Auth_required.Checked.eval_no_proof
           account.permissions.access ~signature_verifies
@@ -661,7 +670,7 @@ let create account_id balance =
 
 let create_timed account_id balance ~initial_minimum_balance ~cliff_time
     ~cliff_amount ~vesting_period ~vesting_increment =
-  if Global_slot.(equal vesting_period zero) then
+  if Global_slot_span.(equal vesting_period zero) then
     Or_error.errorf
       !"Error creating timed account for account id %{sexp: Account_id.t}: \
         vesting period must be greater than zero"
@@ -697,7 +706,7 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
 (* no vesting after cliff time + 1 slot *)
 let create_time_locked public_key balance ~initial_minimum_balance ~cliff_time =
   create_timed public_key balance ~initial_minimum_balance ~cliff_time
-    ~vesting_period:Global_slot.(succ zero)
+    ~vesting_period:Global_slot_span.(succ zero)
     ~vesting_increment:initial_minimum_balance
 
 let initial_minimum_balance Poly.{ timing; _ } =
@@ -726,9 +735,10 @@ let vesting_period Poly.{ timing; _ } =
 let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
     ~vesting_increment ~initial_minimum_balance =
   let open Unsigned in
-  if Global_slot.(global_slot < cliff_time) then initial_minimum_balance
+  if Global_slot_since_genesis.(global_slot < cliff_time) then
+    initial_minimum_balance
     (* If vesting period is zero then everything vests immediately at the cliff *)
-  else if Global_slot.(equal vesting_period zero) then Balance.zero
+  else if Global_slot_span.(equal vesting_period zero) then Balance.zero
   else
     match Balance.(initial_minimum_balance - cliff_amount) with
     | None ->
@@ -737,7 +747,16 @@ let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
         (* take advantage of fact that global slots are uint32's *)
         let num_periods =
           UInt32.(
-            Infix.((global_slot - cliff_time) / vesting_period)
+            let global_slot_u32 =
+              Global_slot_since_genesis.to_uint32 global_slot
+            in
+            let cliff_time_u32 =
+              Global_slot_since_genesis.to_uint32 cliff_time
+            in
+            let vesting_period_u32 =
+              Global_slot_span.to_uint32 vesting_period
+            in
+            Infix.((global_slot_u32 - cliff_time_u32) / vesting_period_u32)
             |> to_int64 |> UInt64.of_int64)
         in
         let vesting_decrement =
@@ -763,7 +782,7 @@ let incremental_balance_between_slots ~start_slot ~end_slot ~cliff_time
     ~cliff_amount ~vesting_period ~vesting_increment ~initial_minimum_balance :
     Unsigned.UInt64.t =
   let open Unsigned in
-  if Global_slot.(end_slot <= start_slot) then UInt64.zero
+  if Global_slot_since_genesis.(end_slot <= start_slot) then UInt64.zero
   else
     let min_balance_at_start_slot =
       min_balance_at_slot ~global_slot:start_slot ~cliff_time ~cliff_amount
@@ -810,13 +829,13 @@ let final_vesting_slot ~initial_minimum_balance ~cliff_time ~cliff_amount
   in
   let open UInt32 in
   let open Infix in
-  Global_slot.of_uint32
-  @@ Global_slot.to_uint32 cliff_time
-     + (UInt64.to_uint32 periods * Global_slot.to_uint32 vesting_period)
+  Global_slot_since_genesis.of_uint32
+  @@ Global_slot_since_genesis.to_uint32 cliff_time
+     + (UInt64.to_uint32 periods * Global_slot_span.to_uint32 vesting_period)
 
 let timing_final_vesting_slot = function
   | Timing.Untimed ->
-      Global_slot.zero
+      Global_slot_since_genesis.zero
   | Timed
       { initial_minimum_balance
       ; cliff_time
@@ -837,6 +856,29 @@ let has_permission ~control ~to_ (account : t) =
       Permissions.Auth_required.check account.permissions.receive control
   | `Set_delegate ->
       Permissions.Auth_required.check account.permissions.set_delegate control
+  | `Increment_nonce ->
+      Permissions.Auth_required.check account.permissions.increment_nonce
+        control
+
+(** [true] iff account has permissions set that enable them to transfer Mina (assuming the command is signed) *)
+let has_permission_to_send account =
+  has_permission ~control:Control.Tag.Signature ~to_:`Access account
+  && has_permission ~control:Control.Tag.Signature ~to_:`Send account
+
+(** [true] iff account has permissions set that enable them to receive Mina *)
+let has_permission_to_receive account =
+  has_permission ~control:Control.Tag.None_given ~to_:`Access account
+  && has_permission ~control:Control.Tag.None_given ~to_:`Receive account
+
+(** [true] iff account has permissions set that enable them to set their delegate (assuming the command is signed) *)
+let has_permission_to_set_delegate account =
+  has_permission ~control:Control.Tag.Signature ~to_:`Access account
+  && has_permission ~control:Control.Tag.Signature ~to_:`Set_delegate account
+
+(** [true] iff account has permissions set that enable them to increment their nonce (assuming the command is signed) *)
+let has_permission_to_increment_nonce account =
+  has_permission ~control:Control.Tag.Signature ~to_:`Access account
+  && has_permission ~control:Control.Tag.Signature ~to_:`Increment_nonce account
 
 let liquid_balance_at_slot ~global_slot (account : t) =
   match account.timing with
@@ -871,38 +913,43 @@ let gen_with_constrained_balance ~low ~high : t Quickcheck.Generator.t =
 
 let gen_any_vesting_range =
   let open Quickcheck.Generator.Let_syntax in
-  let open Global_slot in
-  (* vesting period must be at least oe to avoid division by zero *)
-  let%bind vesting_period = Int.gen_incl 1 1000 >>| Global_slot.of_int in
+  let open Global_slot_since_genesis in
+  (* vesting period must be at least one to avoid division by zero *)
+  let%bind vesting_period = Int.gen_incl 1 1000 >>| Global_slot_span.of_int in
   let%bind vesting_end = gen_incl (of_int 1) max_value in
   let%map cliff_time = gen_incl (of_int 1) vesting_end in
   (cliff_time, vesting_end, vesting_period)
 
 let gen_with_vesting_period vesting_period =
   let open Quickcheck.Generator.Let_syntax in
-  let open Global_slot in
-  let min_vesting_end = succ vesting_period in
+  let open Global_slot_since_genesis in
+  let min_vesting_end =
+    Global_slot_span.(succ vesting_period |> to_uint32)
+    |> Global_slot_since_genesis.of_uint32
+  in
   let%bind vesting_end = gen_incl min_vesting_end max_value in
   let max_cliff_time = Option.value_exn @@ sub vesting_end vesting_period in
   let%map cliff_time = gen_incl (of_int 1) max_cliff_time in
   (cliff_time, vesting_end, vesting_period)
 
-let gen_vesting_details ~(cliff_time : Global_slot.t)
-    ~(vesting_end : Global_slot.t) ~(vesting_period : Global_slot.t)
-    (initial_minimum_balance : Balance.t) :
-    Timing.as_record Quickcheck.Generator.t =
+let gen_vesting_details ~(cliff_time : Global_slot_since_genesis.t)
+    ~(vesting_end : Global_slot_since_genesis.t)
+    ~(vesting_period : Global_slot_span.t) (initial_minimum_balance : Balance.t)
+    : Timing.as_record Quickcheck.Generator.t =
   let open Unsigned in
   let open Quickcheck in
   let open Generator.Let_syntax in
   let vesting_slots =
-    let open Global_slot in
+    let open Global_slot_since_genesis in
     let open UInt32.Infix in
     to_uint32 vesting_end - to_uint32 cliff_time
   in
   (* We need to arrange vesting schedule so that all funds are vested before the
      maximum global slot, which is 2 ^ 32. *)
   let vesting_periods_count =
-    Unsigned.UInt32.div vesting_slots vesting_period |> UInt64.of_uint32
+    Unsigned.UInt32.div vesting_slots
+      (Global_slot_span.to_uint32 vesting_period)
+    |> UInt64.of_uint32
   in
   let max_cliff_amt =
     Balance.(initial_minimum_balance - Amount.of_uint64 vesting_periods_count)
@@ -946,7 +993,7 @@ let gen_timing_at_least_one_vesting_period (account_balance : Balance.t) =
   let%bind initial_minimum_balance = Balance.(gen_incl one account_balance)
   (* vesting period must be at least one to avoid division by zero *)
   and cliff_time, vesting_end, vesting_period =
-    gen_with_vesting_period @@ Global_slot.of_int 2
+    gen_with_vesting_period @@ Global_slot_span.of_int 2
   in
   gen_vesting_details ~vesting_period ~cliff_time ~vesting_end
     initial_minimum_balance
