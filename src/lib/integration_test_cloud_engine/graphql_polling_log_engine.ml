@@ -170,6 +170,7 @@ let rec poll_start_filtered_log ~log_filter ~logger ~network =
       [%log info] "All nodes have started their filtered logs successfully" ;
       Deferred.return ()
   | Error _ ->
+      let%bind () = after (Time.Span.of_ms 500.0) in
       poll_start_filtered_log ~log_filter ~logger ~network
 
 let poll_for_logs_in_background ~log_filter ~logger ~network ~event_writer =
