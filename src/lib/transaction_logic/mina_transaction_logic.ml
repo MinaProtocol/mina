@@ -1422,10 +1422,14 @@ module Make (L : Ledger_intf.S) :
     module Timing = struct
       type t = Account_update.Update.Timing_info.t option
 
-      let pp =
-        Format.pp_print_option (fun fmt t ->
-            Account_update.Update.Timing_info.to_yojson t
-            |> Yojson.Safe.to_string |> Format.pp_print_string fmt )
+      let pp fmt t =
+        let t =
+          Option.value_map t
+            ~f:Account_update.Update.Timing_info.to_account_timing
+            ~default:Account_timing.Untimed
+        in
+        Account_timing.to_yojson t |> Yojson.Safe.to_string
+        |> Format.pp_print_string fmt
 
       let if_ = value_if
 
@@ -1490,9 +1494,6 @@ module Make (L : Ledger_intf.S) :
 
     module Account = struct
       include Account
-
-      let pp fmt t =
-        to_yojson t |> Yojson.Safe.to_string |> Format.pp_print_string fmt
 
       module Permissions = struct
         let pp fmt t =
@@ -1668,6 +1669,11 @@ module Make (L : Ledger_intf.S) :
       let permissions (a : t) = a.permissions
 
       let set_permissions permissions (a : t) = { a with permissions }
+
+      let pp fmt t =
+        (* we convert the zkapp field to its default to match the transaction_snark representation *)
+        make_zkapp t |> to_yojson |> Yojson.Safe.to_string
+        |> Format.pp_print_string fmt
     end
 
     module Amount = struct

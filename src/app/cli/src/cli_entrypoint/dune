@@ -23,6 +23,8 @@
    async.async_command
    result
    sexplib0
+   integers
+   unsigned_extended
    ;;local libraries
    verifier
    ledger_proof
@@ -78,8 +80,14 @@
    ppx_version.runtime
    internal_tracing
    mina_transaction_logic
+   mina_transaction
    mina_state
- )
+   mina_numbers
+   key_gen
+   sgn
+   staged_ledger
+   mina_wire_types
+   zkapp_command_builder)
  (preprocessor_deps ../../../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_here ppx_let ppx_sexp_conv ppx_optcomp ppx_deriving_yojson)))

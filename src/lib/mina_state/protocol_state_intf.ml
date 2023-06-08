@@ -102,7 +102,7 @@ module type Full = sig
     -> blockchain_state:Blockchain_state.Value.t
     -> consensus_state:Consensus.Data.Consensus_state.Value.t
     -> constants:Protocol_constants_checked.Value.t
-    -> Value.t
+    -> value
 
   val create_var :
        previous_state_hash:State_hash.var

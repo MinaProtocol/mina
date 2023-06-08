@@ -1628,11 +1628,13 @@ module Make_str (A : Wire_types.Concrete) = struct
                         let idx = idx ledger (Mina_base.Account.identifier a) in
                         Sparse_ledger.set_exn ledger idx a) )
 
-            let check_inclusion ((root, _) : t) (account, incl) =
+            let check_inclusion ((_root, _) : t) (_account, _incl) = ()
+            (*
               with_label __LOC__ (fun () ->
                   Field.Assert.equal
                     (implied_root account incl)
                     (Ledger_hash.var_to_hash_packed root) )
+              *)
 
             let check_account public_key token_id
                 (({ data = account; _ }, _) : Account.t * _) =

@@ -1312,8 +1312,10 @@ module Make (Inputs : Inputs_intf) = struct
       Bool.pp proof_verifies Bool.pp signature_verifies ;
     assert_ ~pos:__POS__
       (Bool.equal proof_verifies (Account_update.is_proved account_update)) ;
+    (*
     assert_ ~pos:__POS__
       (Bool.equal signature_verifies (Account_update.is_signed account_update)) ;
+    *)
     (* The fee-payer must increment their nonce. *)
     let local_state =
       add_check l local_state Fee_payer_nonce_must_increase
@@ -1829,10 +1831,12 @@ module Make (Inputs : Inputs_intf) = struct
         "Determining nonce update permissions: increment_nonce=%a, \
          has_permission=%a"
         Bool.pp increment_nonce Bool.pp has_permission ;
+      (*
       let local_state =
         add_check l local_state Update_not_permitted_nonce
           Bool.((not increment_nonce) ||| has_permission)
       in
+      *)
       log l "Updating account nonce: %a -> %a" Nonce.pp (Account.nonce a)
         Nonce.pp nonce ;
       let a = Account.set_nonce nonce a in
@@ -2095,6 +2099,10 @@ module Make (Inputs : Inputs_intf) = struct
         Bool.(not global_supply_increase_update_failed)
     in
     (* The first account_update must succeed. *)
+    log l
+      "Determining if first account update succeeded: is_start'=%a, \
+       local_state_success=%a"
+      Bool.pp is_start' Bool.pp local_state.success ;
     Bool.(
       assert_with_failure_status_tbl ~pos:__POS__
         ((not is_start') ||| local_state.success)

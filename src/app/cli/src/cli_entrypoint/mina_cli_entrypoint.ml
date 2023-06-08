@@ -1632,6 +1632,14 @@ let internal_commands logger =
               "DIR Directory that contains the genesis ledger and the genesis \
                blockchain proof (default: <config-dir>)"
             (optional string)
+        and input =
+          flag "--input" ~aliases:[ "input" ]
+            ~doc:
+              "PATH|MODE path to snark work failure sexp to debug, or mode \
+               string indicating that the input should be automatically \
+               generated (available modes: \"zkapp-payment\", \
+               \"user-command-payment\")."
+            (required string)
         in
         fun () ->
           let open Deferred.Let_syntax in
@@ -1664,94 +1672,51 @@ let internal_commands logger =
           in
           let logger = Logger.create () in
           Parallel.init_master () ;
-          match%bind
-            Reader.with_file "./failure.sexp" ~f:(fun reader ->
-                [%log info] "Created reader for failure.sexp" ;
-                Reader.read_sexp reader )
-          with
-          | `Ok sexp -> (
-              let%bind worker_state =
-                Snark_worker.Prod.Inputs.Worker_state.create
-                  ~proof_level:Genesis_constants.Proof_level.compiled
-                  ~constraint_constants:precomputed_values.constraint_constants
-                  ()
-              in
-              let sok_message =
-                { Mina_base.Sok_message.fee = Currency.Fee.zero
-                ; prover = Quickcheck.random_value Public_key.Compressed.gen
-                }
-              in
-              (* TODO: move *)
-              let apply_log = "transaction_apply.log" in
-              let snark_log = "transaction_snark.log" in
-              let debug_apply (stmt : Mina_state.Snarked_ledger_state.t)
-                  (witness : Transaction_witness.t) =
-                let open Mina_ledger in
-                let open Or_error.Let_syntax in
-                [%log info] "Applying transaction out-of-snark" ;
-                let txn_state_view =
-                  Mina_state.Protocol_state.Body.view
-                    witness.protocol_state_body
-                in
-                let res =
-                  Out_channel.with_file apply_log ~f:(fun channel ->
-                      let log = Mina_transaction_logic.Log.Channel channel in
-                      let%bind first_pass_output_ledger, partially_applied =
-                        Sparse_ledger.apply_transaction_first_pass ~log
-                          ~constraint_constants:
-                            precomputed_values.constraint_constants
-                          ~global_slot:witness.block_global_slot ~txn_state_view
-                          witness.first_pass_ledger witness.transaction
-                      in
-                      let%map second_pass_output_ledger, fully_applied =
-                        Sparse_ledger.apply_transaction_second_pass ~log
-                          witness.second_pass_ledger partially_applied
-                      in
-                      (* TODO: test outputs against the snark statement *)
-                      let _ =
-                        ( stmt
-                        , first_pass_output_ledger
-                        , second_pass_output_ledger
-                        , fully_applied )
-                      in
-                      () )
-                in
-                match res with
-                | Ok _ ->
-                    [%log info] "Successfully applied transaction out-of-snark"
-                | Error err ->
-                    [%log error] "Failed to apply transaction out-of-snark"
-                      ~metadata:[ ("err", Error_json.error_to_yojson err) ]
-              in
-              let debug_snark spec =
-                [%log info] "Applying transaction in-snark" ;
-                let channel = Out_channel.create snark_log in
-                let%map res =
-                  Snark_worker.Prod.Inputs.perform_single worker_state
-                    ~log:(Mina_transaction_logic.Log.Channel channel)
-                    ~message:sok_message spec
-                in
-                Out_channel.close channel ;
-                match res with
-                | Ok _ ->
-                    [%log info] "Successfully applied transaction in-snark"
-                | Error err ->
-                    [%log error] "Failed to apply transaction in-snark: $err"
-                      ~metadata:[ ("err", Error_json.error_to_yojson err) ]
-              in
-              let spec =
-                [%of_sexp:
-                  ( Transaction_witness.t
-                  , Ledger_proof.t )
-                  Snark_work_lib.Work.Single.Spec.t] sexp
-              in
-              match spec with
-              | Transition (stmt, witness) ->
-                  debug_apply stmt witness ; debug_snark spec
-              | Merge _ ->
-                  debug_snark spec )
-          | `Eof ->
-              failwith "early EOF while reading sexp") )
+          let create_txn_and_run ~f =
+            let ( `Ledger ledger
+                , `Sparse_ledger sparse_ledger
+                , `Staged_ledger staged_ledger
+                , `Account_a account_a
+                , `Account_b account_b ) =
+              Snark_debugger.gen_2_party_ledger
+                ~constraint_constants:precomputed_values.constraint_constants
+            in
+            let protocol_state =
+              Snark_debugger.create_protocol_state ~precomputed_values ~ledger
+                ~staged_ledger
+            in
+            let%bind transaction = f ~sender:account_a ~receiver:account_b in
+            Snark_debugger.run ~logger
+              ~constraint_constants:precomputed_values.constraint_constants
+              ~protocol_state_body:
+                (Mina_state.Protocol_state.body protocol_state)
+              ~ledger:sparse_ledger transaction
+          in
+          match input with
+          | "user-command-payment" ->
+              create_txn_and_run ~f:(fun ~sender ~receiver ->
+                  Deferred.return
+                    (Snark_debugger.create_user_command ~sender ~receiver) )
+          | "zkapp-payment" ->
+              create_txn_and_run ~f:Snark_debugger.create_zkapp_payment
+          | failure_sexp_filepath -> (
+              match%bind
+                Reader.with_file failure_sexp_filepath ~f:(fun reader ->
+                    [%log info] "Created reader for failure.sexp" ;
+                    Reader.read_sexp reader )
+              with
+              | `Ok sexp ->
+                  let spec =
+                    [%of_sexp:
+                      ( Transaction_witness.t
+                      , Ledger_proof.t )
+                      Snark_work_lib.Work.Single.Spec.t] sexp
+                  in
+                  Snark_debugger.debug_spec ~logger
+                    ~constraint_constants:
+                      precomputed_values.constraint_constants spec
+              | `Eof ->
+                  failwith "early EOF while reading sexp" )) )
   ; ( "run-verifier"
     , Command.async
         ~summary:"Run verifier on a proof provided on a single line of stdin"

@@ -8,7 +8,7 @@ open Snark_bits
 open Snark_params.Tick
 
 module type S_unchecked = sig
-  type t [@@deriving sexp, compare, hash, yojson]
+  type t [@@deriving sexp, compare, hash]
 
   include Comparable.S with type t := t
 
@@ -166,7 +166,6 @@ module type UInt32_A = sig
 
   val of_uint32 : uint32 -> t
 end
-[@@warning "-32"]
 
 module type UInt32 = UInt32_A with type Stable.V1.t = Unsigned_extended.UInt32.t
 
