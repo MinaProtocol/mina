@@ -396,12 +396,6 @@ module Binable_arg = struct
   end]
 end
 
-[%%if feature_snapps]
-
-include Binable_arg
-
-[%%else]
-
 [%%versioned_binable
 module Stable = struct
   module V1 = struct
@@ -446,8 +440,6 @@ module Stable = struct
     let version_byte = Base58_check.Version_bytes.snapp_command
   end
 end]
-
-[%%endif]
 
 type transfer =
   { source : Public_key.Compressed.t
