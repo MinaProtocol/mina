@@ -3728,6 +3728,18 @@ let%test_unit "Ec_group.scalar_mul_tiny" =
             in
 
             (* Check for expected quantity of external checks *)
+            if Bignum_bigint.(curve.bignum.a = zero) then
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.bounds 42 )
+            else
+              assert (
+                Mina_stdlib.List.Length.equal unused_external_checks.bounds 43 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
+                17 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal
+                unused_external_checks.compact_multi_ranges 17 ) ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -3756,6 +3768,127 @@ let%test_unit "Ec_group.scalar_mul_tiny" =
     in
     let _cs =
       test_scalar_mul_tiny Secp256k1.params scalar Secp256k1.params.gen
+        expected_result
+    in
+
+    ()
+
+let%test_unit "Ec_group.scalar_mul_tiny_full" =
+  if scalar_mul_tests_enabled then
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+
+    (* Test elliptic curve scalar multiplication with tiny scalar (fully constrained) *)
+    let test_scalar_mul_tiny_full ?cs (curve : Curve_params.t)
+        (scalar : Bignum_bigint.t) (point : Affine.bignum_point)
+        (expected_result : Affine.bignum_point) =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            let open Runner.Impl in
+            (* Prepare test public inputs *)
+            let curve =
+              Curve_params.to_circuit_constants
+                (module Runner.Impl)
+                curve ~use_precomputed_gen_doubles:false
+            in
+            let scalar_bits =
+              Common.bignum_bigint_unpack_as_unchecked_vars
+                (module Runner.Impl)
+                ~remove_trailing:true scalar
+            in
+            let point =
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) point
+            in
+            let expected_result =
+              Affine.of_bignum_bigint_coordinates
+                (module Runner.Impl)
+                expected_result
+            in
+
+            (* Create external checks context for tracking extra constraints
+               that are required for soundness (unused in this simple test) *)
+            let external_checks =
+              Foreign_field.External_checks.create (module Runner.Impl)
+            in
+
+            (* Q = sP *)
+            let result =
+              scalar_mul
+                (module Runner.Impl)
+                external_checks curve scalar_bits point
+            in
+
+            (*
+             * Perform external checks
+             *)
+
+            (* 1) Add gates for external bound additions.
+             *    Note: internally this also adds multi-range-checks for the
+             *    computed bound to the external_checks.multi-ranges, which
+             *    are then constrainted in (2)
+             *)
+            if Bignum_bigint.(curve.bignum.a = zero) then
+              assert (Mina_stdlib.List.Length.equal external_checks.bounds 42)
+            else assert (Mina_stdlib.List.Length.equal external_checks.bounds 43) ;
+            List.iter external_checks.bounds ~f:(fun value ->
+                let _bound =
+                  Foreign_field.valid_element
+                    (module Runner.Impl)
+                    external_checks
+                    (Foreign_field.Element.Standard.of_limbs value)
+                    curve.modulus
+                in
+                () ) ;
+
+            (* 2) Add gates for external multi-range-checks *)
+            assert (
+              Mina_stdlib.List.Length.equal external_checks.multi_ranges 59 ) ;
+            List.iter external_checks.multi_ranges ~f:(fun multi_range ->
+                let v0, v1, v2 = multi_range in
+                Range_check.multi (module Runner.Impl) v0 v1 v2 ;
+                () ) ;
+
+            (* 3) Add gates for external compact-multi-range-checks *)
+            assert (
+              Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges
+                17 ) ;
+            List.iter external_checks.compact_multi_ranges
+              ~f:(fun compact_multi_range ->
+                let v01, v2 = compact_multi_range in
+                Range_check.compact_multi (module Runner.Impl) v01 v2 ;
+                () ) ;
+
+            (* Check output matches expected result *)
+            as_prover (fun () ->
+                assert (
+                  Affine.equal_as_prover
+                    (module Runner.Impl)
+                    result expected_result ) ) ;
+            () )
+      in
+
+      cs
+    in
+
+    (*
+     * EC scalar multiplication tests
+     *)
+
+    (* Multiply by 2 *)
+    let scalar = Bignum_bigint.of_int 2 in
+    let expected_result =
+      ( Bignum_bigint.of_string
+          "89565891926547004231252920425935692360644145829622209833684329913297188986597"
+      , Bignum_bigint.of_string
+          "12158399299693830322967808612713398636155367887041628176798871954788371653930"
+      )
+    in
+    let _cs =
+      test_scalar_mul_tiny_full Secp256k1.params scalar Secp256k1.params.gen
         expected_result
     in
 
