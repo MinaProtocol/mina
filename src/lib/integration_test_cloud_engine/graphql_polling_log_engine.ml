@@ -157,11 +157,8 @@ let rec poll_get_filtered_log_entries ~last_log_index_seen ~logger ~network
 
 let start_filtered_logs ~logger ~network ~log_filter =
   let allpods = Kubernetes_network.all_pods network |> Core.String.Map.data in
-  let logs =
-    Deferred.Or_error.List.iter allpods ~f:(fun node ->
-        Kubernetes_network.Node.start_filtered_log ~logger ~log_filter node )
-  in
-  logs
+  Deferred.Or_error.List.iter allpods ~f:(fun node ->
+      Kubernetes_network.Node.start_filtered_log ~logger ~log_filter node )
 
 let rec poll_start_filtered_log ~log_filter ~logger ~network =
   let open Deferred.Let_syntax in
@@ -177,11 +174,11 @@ let rec poll_start_filtered_log ~log_filter ~logger ~network =
 
 let poll_for_logs_in_background ~log_filter ~logger ~network ~event_writer =
   [%log info] "Attempting to start the filtered log in all testnet nodes" ;
-  let _ = poll_start_filtered_log ~log_filter ~logger ~network in
+  let%bind () = poll_start_filtered_log ~log_filter ~logger ~network in
   [%log info]
     "Filtered logs in all testnet nodes successfully started.  Will now poll \
      for log entries" ;
-  let _ =
+  let%bind () =
     poll_get_filtered_log_entries ~logger ~network ~event_writer
       ~last_log_index_seen:0
   in

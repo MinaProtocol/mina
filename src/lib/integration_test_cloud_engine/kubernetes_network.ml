@@ -661,23 +661,34 @@ module Node = struct
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let start_filtered_log ~logger ~log_filter t =
-    let open Deferred.Or_error.Let_syntax in
+    let open Deferred.Let_syntax in
     [%log info] "Starting filtered log" ~metadata:(logger_metadata t) ;
     let query_obj =
       Graphql.StartFilteredLog.(make @@ makeVariables ~filter:log_filter ())
     in
-    let%bind query_result_obj =
-      exec_graphql_request ~logger ~node:t ~query_name:"query_logs" query_obj
+    let%bind res =
+      exec_graphql_request ~logger ~node:t ~query_name:"StartFilteredLog"
+        query_obj
     in
-    [%log debug] "start_filtered_log, finished exec_graphql_request" ;
-    let returned_result = query_result_obj.startFilteredLog in
-    (* ATM returned_result returns the strong "ok" if successful, a little hacky, should change it later *)
-    if String.equal returned_result "ok" then (
-      let () = () in
-      [%log info] "start_filtered_log graphql call succeeded for node %s"
-        t.app_id ~metadata:(logger_metadata t) ;
-      return () )
-    else Deferred.Or_error.errorf "start_filtered_log did not return 'ok'"
+    match res with
+    | Ok query_result_obj ->
+        [%log info] "start_filtered_log, finished exec_graphql_request" ;
+        let returned_result = query_result_obj.startFilteredLog in
+        (* at the moment, returned_result returns the strong "ok" if successful, a little hacky, should change it later *)
+        if String.equal returned_result "ok" then (
+          [%log info] "start_filtered_log graphql call succeeded for node %s"
+            t.app_id ~metadata:(logger_metadata t) ;
+          Deferred.return (Ok ()) )
+        else (
+          [%log info]
+            "start_filtered_log, graphql request failed, start_filtered_log \
+             did not return 'ok'" ;
+          Deferred.Or_error.errorf
+            "start_filtered_log, graphql request failed, did not return 'ok'" )
+    | Error e ->
+        [%log info] "start_filtered_log, graphql request failed, error %s"
+          (Error.to_string_hum e) ;
+        Deferred.return (Error e)
 
   let get_filtered_log_entries ~logger ~last_log_index_seen t =
     let open Deferred.Or_error.Let_syntax in
@@ -688,7 +699,8 @@ module Node = struct
         make @@ makeVariables ~offset:last_log_index_seen ())
     in
     let%bind query_result_obj =
-      exec_graphql_request ~logger ~node:t ~query_name:"query_logs" query_obj
+      exec_graphql_request ~logger ~node:t ~query_name:"GetFilteredLogEntries"
+        query_obj
     in
     [%log info] "get_logs, finished exec_graphql_request" ;
     let new_loglines =
