@@ -152,16 +152,12 @@ module Engine = struct
         -> account_data Malleable_error.t
 
       val get_filtered_log_entries :
-           logger:Logger.t
-        -> last_log_index_seen:int
+           last_log_index_seen:int
         -> t
         -> string array Async_kernel.Deferred.Or_error.t
 
       val start_filtered_log :
-           logger:Logger.t
-        -> log_filter:string list
-        -> t
-        -> unit Async_kernel.Deferred.Or_error.t
+        log_filter:string list -> t -> unit Async_kernel.Deferred.Or_error.t
 
       val get_peer_id :
            logger:Logger.t

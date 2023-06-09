@@ -660,7 +660,7 @@ module Node = struct
     set_snark_worker ~logger t ~new_snark_pub_key
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let start_filtered_log ~logger:_ ~log_filter t =
+  let start_filtered_log ~log_filter t =
     let open Deferred.Let_syntax in
     let query_obj =
       Graphql.StartFilteredLog.(make @@ makeVariables ~filter:log_filter ())
@@ -680,11 +680,8 @@ module Node = struct
     | Error e ->
         return (Error e)
 
-  let get_filtered_log_entries ~logger ~last_log_index_seen t =
+  let get_filtered_log_entries ~last_log_index_seen t =
     let open Deferred.Or_error.Let_syntax in
-    [%log info]
-      "Getting logs from node $app_id, starting from log entry number %d"
-      last_log_index_seen ~metadata:(logger_metadata t) ;
     let query_obj =
       Graphql.GetFilteredLogEntries.(
         make @@ makeVariables ~offset:last_log_index_seen ())

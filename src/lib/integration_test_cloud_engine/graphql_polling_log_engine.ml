@@ -79,8 +79,7 @@ let rec poll_get_filtered_log_entries_node ~logger ~event_writer
   if not (Pipe.is_closed event_writer) then
     let%bind () = after (Time.Span.of_ms 10000.0) in
     match%bind
-      Kubernetes_network.Node.get_filtered_log_entries ~logger
-        ~last_log_index_seen node
+      Kubernetes_network.Node.get_filtered_log_entries ~last_log_index_seen node
     with
     | Ok log_entries ->
         Array.iter log_entries ~f:(fun log_entry ->
@@ -100,16 +99,14 @@ let rec poll_get_filtered_log_entries_node ~logger ~event_writer
           ~last_log_index_seen node
   else Deferred.Or_error.error_string "Event writer closed"
 
-let rec poll_start_filtered_log_node ~log_filter ~logger ~event_writer node =
+let rec poll_start_filtered_log_node ~log_filter ~event_writer node =
   let open Deferred.Let_syntax in
   if not (Pipe.is_closed event_writer) then
-    match%bind
-      Kubernetes_network.Node.start_filtered_log ~logger ~log_filter node
-    with
+    match%bind Kubernetes_network.Node.start_filtered_log ~log_filter node with
     | Ok () ->
         return (Ok ())
     | Error _ ->
-        poll_start_filtered_log_node ~log_filter ~logger ~event_writer node
+        poll_start_filtered_log_node ~log_filter ~event_writer node
   else Deferred.Or_error.error_string "Event writer closed"
 
 let poll_node_for_logs_in_background ~log_filter ~logger ~event_writer
@@ -117,9 +114,7 @@ let poll_node_for_logs_in_background ~log_filter ~logger ~event_writer
   let open Deferred.Or_error.Let_syntax in
   [%log info] "Requesting for $node to start its filtered logs"
     ~metadata:[ ("node", `String node.app_id) ] ;
-  let%bind () =
-    poll_start_filtered_log_node ~log_filter ~logger ~event_writer node
-  in
+  let%bind () = poll_start_filtered_log_node ~log_filter ~event_writer node in
   [%log info] "$node has started its filtered logs. Beginning polling"
     ~metadata:[ ("node", `String node.app_id) ] ;
   poll_get_filtered_log_entries_node ~last_log_index_seen:0 ~logger
