@@ -417,7 +417,7 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
     (module Circuit)
     computed_x (Affine.x result) ;
 
-  (* C12: Check that r = x' *)
+  (* C12: Check that r = Rx' *)
   Foreign_field.Element.Standard.assert_equal (module Circuit) r x_prime ;
 
   (* C13: Check result is on curve (also implies result is not infinity) *)
@@ -707,6 +707,8 @@ let%test_unit "Ecdsa.verify_tiny" =
             let pubkey =
               Affine.of_bignum_bigint_coordinates (module Runner.Impl) pubkey
             in
+            Foreign_field.result_row (module Runner.Impl) (fst pubkey) ;
+            Foreign_field.result_row (module Runner.Impl) (snd pubkey) ;
             let signature =
               ( Foreign_field.Element.Standard.of_bignum_bigint
                   (module Runner.Impl)
@@ -715,11 +717,14 @@ let%test_unit "Ecdsa.verify_tiny" =
                   (module Runner.Impl)
                   (snd signature) )
             in
+            Foreign_field.result_row (module Runner.Impl) (fst signature) ;
+            Foreign_field.result_row (module Runner.Impl) (snd signature) ;
             let msg_hash =
               Foreign_field.Element.Standard.of_bignum_bigint
                 (module Runner.Impl)
                 msg_hash
             in
+            Foreign_field.result_row (module Runner.Impl) msg_hash ;
 
             (* Create external checks contexts for tracking extra constraints
                that are required for soundness (unused in this simple test) *)
