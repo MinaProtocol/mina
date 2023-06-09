@@ -155,7 +155,7 @@ module Engine = struct
            logger:Logger.t
         -> last_log_index_seen:int
         -> t
-        -> string list Async_kernel.Deferred.Or_error.t
+        -> string array Async_kernel.Deferred.Or_error.t
 
       val start_filtered_log :
            logger:Logger.t

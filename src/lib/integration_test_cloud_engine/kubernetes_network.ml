@@ -689,14 +689,11 @@ module Node = struct
       Graphql.GetFilteredLogEntries.(
         make @@ makeVariables ~offset:last_log_index_seen ())
     in
-    let%bind query_result_obj =
+    let%map query_result_obj =
       exec_graphql_request ~logger:(Logger.null ()) ~node:t
         ~query_name:"GetFilteredLogEntries" query_obj
     in
-    let new_loglines =
-      query_result_obj.getFilteredLogEntries |> Array.to_list
-    in
-    return new_loglines
+    query_result_obj.getFilteredLogEntries
 
   let dump_archive_data ~logger (t : t) ~data_file =
     (* this function won't work if `t` doesn't happen to be an archive node *)

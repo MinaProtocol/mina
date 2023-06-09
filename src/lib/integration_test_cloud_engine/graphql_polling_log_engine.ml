@@ -83,7 +83,7 @@ let rec poll_get_filtered_log_entries_node ~logger ~event_writer
         ~last_log_index_seen node
     with
     | Ok log_entries ->
-        List.iter log_entries ~f:(fun log_entry ->
+        Array.iter log_entries ~f:(fun log_entry ->
             match parse_event_from_log_entry ~logger log_entry with
             | Ok a ->
                 Pipe.write_without_pushback_if_open event_writer (node, a)
@@ -91,7 +91,7 @@ let rec poll_get_filtered_log_entries_node ~logger ~event_writer
                 [%log warn] "Error parsing log $error"
                   ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
         let last_log_index_seen =
-          List.length log_entries + last_log_index_seen
+          Array.length log_entries + last_log_index_seen
         in
         poll_get_filtered_log_entries_node ~logger ~event_writer
           ~last_log_index_seen node
