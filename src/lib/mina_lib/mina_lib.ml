@@ -2055,6 +2055,8 @@ let start_filtered_log
     !in_memory_reverse_structured_log_messages_for_integration_test
   in
   if started then (
+    in_memory_reverse_structured_log_messages_for_integration_test :=
+      (0, [], true) ;
     let event_set =
       Structured_log_events.Set.of_list
       @@ List.map ~f:Structured_log_events.id_of_string structured_log_ids
