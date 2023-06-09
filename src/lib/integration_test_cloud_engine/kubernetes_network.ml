@@ -660,9 +660,8 @@ module Node = struct
     set_snark_worker ~logger t ~new_snark_pub_key
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let start_filtered_log ~logger ~log_filter t =
+  let start_filtered_log ~logger:_ ~log_filter t =
     let open Deferred.Let_syntax in
-    [%log info] "Starting filtered log" ~metadata:(logger_metadata t) ;
     let query_obj =
       Graphql.StartFilteredLog.(make @@ makeVariables ~filter:log_filter ())
     in
@@ -672,27 +671,19 @@ module Node = struct
     in
     match res with
     | Ok query_result_obj ->
-        [%log info] "start_filtered_log, finished exec_graphql_request" ;
         let returned_result = query_result_obj.startFilteredLog in
         (* at the moment, returned_result returns the strong "ok" if successful, a little hacky, should change it later *)
-        if String.equal returned_result "ok" then (
-          [%log info] "start_filtered_log graphql call succeeded for node %s"
-            t.app_id ~metadata:(logger_metadata t) ;
-          Deferred.return (Ok ()) )
-        else (
-          [%log info]
-            "start_filtered_log, graphql request failed, start_filtered_log \
-             did not return 'ok'" ;
+        if String.equal returned_result "ok" then return (Ok ())
+        else
           Deferred.Or_error.errorf
-            "start_filtered_log, graphql request failed, did not return 'ok'" )
+            "start_filtered_log, graphql request failed, did not return 'ok'"
     | Error e ->
-        [%log info] "start_filtered_log, graphql request failed, error %s"
-          (Error.to_string_hum e) ;
-        Deferred.return (Error e)
+        return (Error e)
 
   let get_filtered_log_entries ~logger ~last_log_index_seen t =
     let open Deferred.Or_error.Let_syntax in
-    [%log info] "Getting logs from node, starting from log entry number %d"
+    [%log info]
+      "Getting logs from node $app_id, starting from log entry number %d"
       last_log_index_seen ~metadata:(logger_metadata t) ;
     let query_obj =
       Graphql.GetFilteredLogEntries.(
@@ -702,7 +693,6 @@ module Node = struct
       exec_graphql_request ~logger:(Logger.null ()) ~node:t
         ~query_name:"GetFilteredLogEntries" query_obj
     in
-    [%log info] "get_logs, finished exec_graphql_request" ;
     let new_loglines =
       query_result_obj.getFilteredLogEntries |> Array.to_list
     in
