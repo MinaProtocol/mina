@@ -100,10 +100,15 @@ module Poly_comm : sig
   end
 end
 
+(** The number of wires in the proving system *)
 module Columns_vec = Vector.Vector_15
+
 module Columns = Nat.N15
-module Permuts_vec = Vector.Vector_7
+
+(** The number of wires that are considered in the permutation argument *)
 module Permuts = Nat.N7
+
+module Permuts_vec = Vector.Vector_7
 module Permuts_minus_1 = Nat.N6
 module Permuts_minus_1_vec = Vector.Vector_6
 module Lookup_sorted_minus_1 = Nat.N4
@@ -116,6 +121,9 @@ module Messages : sig
     type ('w, 'z, 't) t = { w : 'w; z : 'z; t : 't }
   end
 
+  (** The types of lookup tables. This should stay in line with the {{
+  https://o1-labs.github.io/proof-systems/rfcs/extended-lookup-tables.html} RFC4
+  - Extended lookup tables } in the kimchi book *)
   module Lookup : sig
     module Stable : sig
       module V1 : sig

@@ -13,7 +13,7 @@ val actual_wrap_domain_size :
 val when_profiling : 'a -> 'a -> 'a
 
 (** [time label f] times function [f] and prints the measured time to [stdout]
-    prepended with [label], when profiling is set (see {!val:when_profiling}). 
+    prepended with [label], when profiling is set (see {!val:when_profiling}).
 
     Otherwise, it just runs [f].
  *)
@@ -96,6 +96,7 @@ module Lookup_parameters : sig
   val tock_zero : (Impls.Wrap.Field.t, Impls.Wrap.Field.t) zero_value
 end
 
+(** Inner Product Argument *)
 module Ipa : sig
   type 'a challenge :=
     ( Import.Challenge.Constant.t Import.Scalar_challenge.t

@@ -58,7 +58,7 @@ module E04 : functor (T : T0) -> sig
 end
 
 (** Map arity 0 to 6: [let e06 t = fun _ _ _ _ _ _ -> t] *)
-module E06 (T : T0) : sig
+module E06 : functor (T : T0) -> sig
   type (_, _, _, _, _, _) t = T.t
 end
 
@@ -300,7 +300,7 @@ module H1 : sig
   end
 
   (** Data type of a heterogeneous list of pairs.
-   
+
       Both sides of the tuple are heterogeneous over the same type parameter. The
       underlying type structures are determined by the type functions in the
       first and second functor parameters.
@@ -309,8 +309,8 @@ module H1 : sig
     type 'a t = 'a A.t * 'a B.t
   end
 
-  (** Usual zipping operation over two heterogeneous lists. 
-  
+  (** Usual zipping operation over two heterogeneous lists.
+
       The two functor parameters define the underlying contained type structures
       of the two lists.
 
@@ -542,7 +542,7 @@ end
 
 (** {2 Over three type parameters} *)
 
-(** Operations on heterogeneous lists whose content type varies over a tree 
+(** Operations on heterogeneous lists whose content type varies over a tree
     type parameters.
 
     Similar to {!H1}, with less operations.

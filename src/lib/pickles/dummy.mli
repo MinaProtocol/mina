@@ -1,4 +1,4 @@
-(** [Ipa] *)
+(** [Inner Product Argument] *)
 module Ipa : sig
   module Wrap : sig
     val challenges :

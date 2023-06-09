@@ -1,3 +1,5 @@
+(** Batch of Polynomial Commitment Scheme *)
+
 type ('a, 'n, 'm) t
 
 val map : ('a, 'n, 'm) t -> f:('a -> 'b) -> ('b, 'n, 'm) t
