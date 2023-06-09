@@ -27,8 +27,8 @@ resource "kubernetes_ingress_v1" "testnet_graphql_ingress" {
           for_each = concat(
             [local.seed_config.name],
             [for config in var.block_producer_configs : config.name],
-            [for config in var.archive_node_configs : config.name],
-            local.snark_coordinator_config != null ? [var.snark_coordinator_config.name] : []
+            [for config in local.archive_node_configs : config.name],
+            var.snark_coordinator_config != null ? [var.snark_coordinator_config.name] : []
           )
 
           content {
