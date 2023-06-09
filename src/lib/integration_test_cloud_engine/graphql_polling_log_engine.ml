@@ -29,39 +29,21 @@ let log_filter_of_event_type ev_existential =
   let (module Ty) = event_type_module ev_type in
   match Ty.parse with
   | From_error_log _ ->
-      [ "jsonPayload.level=(\"Warn\" OR \"Error\" OR \"Faulty_peer\" OR \
-         \"Fatal\")"
-      ]
+      [] (* TODO: Do we need this? *)
   | From_daemon_log (struct_id, _) ->
-      let filter =
-        Printf.sprintf "jsonPayload.event_id=\"%s\""
-          (Structured_log_events.string_of_id struct_id)
-      in
-      [ filter ]
-  | From_puppeteer_log (id, _) ->
-      let filter =
-        Printf.sprintf "jsonPayload.puppeteer_event_type=\"%s\"" id
-      in
-      [ "jsonPayload.puppeteer_script_event=true"; filter ]
+      [ Structured_log_events.string_of_id struct_id ]
+  | From_puppeteer_log _ ->
+      []
+(* TODO: Do we need this? *)
 
 let all_event_types_log_filter =
-  let event_filters =
-    List.map Event_type.all_event_types ~f:log_filter_of_event_type
-  in
-  let nest s = "(" ^ s ^ ")" in
-  let disjunction =
-    event_filters
-    |> List.map ~f:(fun filter ->
-           nest (filter |> List.map ~f:nest |> String.concat ~sep:" AND ") )
-    |> String.concat ~sep:" OR "
-  in
-  [ disjunction ]
+  List.bind ~f:log_filter_of_event_type Event_type.all_event_types
 
 type t =
   { logger : Logger.t
   ; event_writer : (Node.t * Event_type.event) Pipe.Writer.t
   ; event_reader : (Node.t * Event_type.event) Pipe.Reader.t
-  ; background_job : unit Deferred.t
+  ; background_job : unit Deferred.Or_error.t
   }
 
 let event_reader { event_reader; _ } = event_reader
@@ -110,96 +92,73 @@ let parse_event_from_log_entry ~logger ~network log_entry =
   in
   (node, event)
 
-let get_filtered_log_entries ~logger ~network ~last_log_index_seen =
-  let open Deferred.Or_error.Let_syntax in
-  let allpods = Kubernetes_network.all_pods network |> Core.String.Map.data in
-  let logs =
-    Deferred.Or_error.List.fold allpods ~init:[] ~f:(fun acc node ->
-        let%bind node_logs =
-          Kubernetes_network.Node.get_filtered_log_entries ~logger
-            ~last_log_index_seen node
-        in
-        return (List.append acc node_logs) )
-  in
-  logs
-
-let rec poll_get_filtered_log_entries ~last_log_index_seen ~logger ~network
-    ~event_writer =
-  if not (Pipe.is_closed event_writer) then (
-    [%log spam] "Polling all testnet nodes for logs" ;
-    let%bind log_entries =
-      Deferred.map
-        (get_filtered_log_entries ~logger ~network ~last_log_index_seen)
-        ~f:Or_error.ok_exn
-    in
-    if List.length log_entries > 0 then
-      [%log spam] "Parsing events from $n logs"
-        ~metadata:[ ("n", `Int (List.length log_entries)) ]
-    else [%log spam] "No logs were pulled" ;
-    let%bind () =
-      Deferred.List.iter ~how:`Sequential log_entries ~f:(fun log_entry ->
-          ( match
+let rec poll_get_filtered_log_entries_node ~logger ~network ~event_writer
+    ~last_log_index_seen node =
+  let open Deferred.Let_syntax in
+  if not (Pipe.is_closed event_writer) then
+    match%bind
+      Kubernetes_network.Node.get_filtered_log_entries ~logger
+        ~last_log_index_seen node
+    with
+    | Ok log_entries ->
+        List.iter log_entries ~f:(fun log_entry ->
+            match
               log_entry |> Yojson.Safe.from_string
               |> parse_event_from_log_entry ~logger ~network
             with
-          | Ok a ->
-              Pipe.write_without_pushback_if_open event_writer a
-          | Error e ->
-              [%log warn] "Error parsing log $error"
-                ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
-          Deferred.unit )
-    in
-    let%bind () = after (Time.Span.of_ms 10000.0) in
-    let new_index = last_log_index_seen + List.length log_entries in
-    poll_get_filtered_log_entries ~logger ~network ~event_writer
-      ~last_log_index_seen:new_index )
-  else Deferred.unit
+            | Ok a ->
+                Pipe.write_without_pushback_if_open event_writer a
+            | Error e ->
+                [%log warn] "Error parsing log $error"
+                  ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
+        let last_log_index_seen =
+          List.length log_entries + last_log_index_seen
+        in
+        poll_get_filtered_log_entries_node ~logger ~network ~event_writer
+          ~last_log_index_seen node
+    | Error _ ->
+        poll_get_filtered_log_entries_node ~logger ~network ~event_writer
+          ~last_log_index_seen node
+  else Deferred.Or_error.error_string "Event writer closed"
 
-let start_filtered_logs ~logger ~network ~log_filter =
-  let allpods = Kubernetes_network.all_pods network |> Core.String.Map.data in
-  Deferred.Or_error.List.iter ~how:`Parallel allpods ~f:(fun node ->
-      Kubernetes_network.Node.start_filtered_log ~logger ~log_filter node )
-
-let rec poll_start_filtered_log ~log_filter ~logger ~network ~event_writer =
+let rec poll_start_filtered_log_node ~log_filter ~logger ~network ~event_writer
+    node =
   let open Deferred.Let_syntax in
-  [%log info]
-    "Polling all testnet nodes to get them to start their filtered logs" ;
-  let%bind res = start_filtered_logs ~log_filter ~logger ~network in
-  match res with
-  | Ok () ->
-      [%log info] "All nodes have started their filtered logs successfully" ;
-      Deferred.return ()
-  | Error _ ->
-      let%bind () = after (Time.Span.of_ms 500.0) in
-      if not (Pipe.is_closed event_writer) then
-        poll_start_filtered_log ~log_filter ~logger ~network ~event_writer
-      else Deferred.unit
+  if not (Pipe.is_closed event_writer) then
+    match%bind
+      Kubernetes_network.Node.start_filtered_log ~logger ~log_filter node
+    with
+    | Ok () ->
+        return (Ok ())
+    | Error _ ->
+        poll_start_filtered_log_node ~log_filter ~logger ~network ~event_writer
+          node
+  else Deferred.Or_error.error_string "Event writer closed"
+
+let poll_node_for_logs_in_background ~log_filter ~logger ~network ~event_writer
+    (node : Node.t) =
+  let open Deferred.Or_error.Let_syntax in
+  [%log info] "Requesting for $node to start its filtered logs"
+    ~metadata:[ ("node", `String node.app_id) ] ;
+  let%bind () =
+    poll_start_filtered_log_node ~log_filter ~logger ~network ~event_writer node
+  in
+  [%log info] "$node has started its filtered logs. Beginning polling"
+    ~metadata:[ ("node", `String node.app_id) ] ;
+  poll_get_filtered_log_entries_node ~last_log_index_seen:0 ~logger ~network
+    ~event_writer node
 
 let poll_for_logs_in_background ~log_filter ~logger ~network ~event_writer =
-  [%log info] "Attempting to start the filtered log in all testnet nodes" ;
-  let%bind () =
-    poll_start_filtered_log ~log_filter ~logger ~network ~event_writer
-  in
-  [%log info]
-    "Filtered logs in all testnet nodes successfully started.  Will now poll \
-     for log entries" ;
-  let%bind () =
-    poll_get_filtered_log_entries ~logger ~network ~event_writer
-      ~last_log_index_seen:0
-  in
-  [%log info] "poll_for_logs_in_background will now exit" ;
-  Deferred.unit
+  Kubernetes_network.all_pods network
+  |> Core.String.Map.data
+  |> Deferred.Or_error.List.iter ~how:`Parallel
+       ~f:
+         (poll_node_for_logs_in_background ~log_filter ~logger ~network
+            ~event_writer )
 
 let create ~logger ~(network : Kubernetes_network.t) =
   let open Deferred.Or_error.Let_syntax in
-  let log_filter =
-    let mina_container_filter = "resource.labels.container_name=\"mina\"" in
-    let filters =
-      [ network.testnet_log_filter; mina_container_filter ]
-      @ all_event_types_log_filter
-    in
-    filters
-  in
+  let log_filter = all_event_types_log_filter in
   let event_reader, event_writer = Pipe.create () in
   let background_job =
     poll_for_logs_in_background ~log_filter ~logger ~network ~event_writer
@@ -210,6 +169,6 @@ let destroy t : unit Deferred.Or_error.t =
   let open Deferred.Or_error.Let_syntax in
   let { logger; event_reader = _; event_writer; background_job } = t in
   Pipe.close event_writer ;
-  let%bind () = Deferred.map background_job ~f:Or_error.return in
+  let%bind () = Deferred.map background_job ~f:(fun _ -> Ok ()) in
   [%log debug] "graphql polling log engine destroyed" ;
   return ()
