@@ -45,8 +45,6 @@ let sample_block_sexp =
               0x0000000000000000000000000000000000000000000000000000000000000000)
              (full_transaction_commitment
               0x0000000000000000000000000000000000000000000000000000000000000000)
-             (token_id
-              0x0000000000000000000000000000000000000000000000000000000000000001)
              (excess ((magnitude 0) (sgn Pos)))
              (supply_increase ((magnitude 0) (sgn Pos))) (ledger 0)
              (success true) (account_update_index 0) (failure_status_tbl ())
@@ -69,8 +67,6 @@ let sample_block_sexp =
               0x0000000000000000000000000000000000000000000000000000000000000000)
              (full_transaction_commitment
               0x0000000000000000000000000000000000000000000000000000000000000000)
-             (token_id
-              0x0000000000000000000000000000000000000000000000000000000000000001)
              (excess ((magnitude 0) (sgn Pos)))
              (supply_increase ((magnitude 0) (sgn Pos))) (ledger 0)
              (success true) (account_update_index 0) (failure_status_tbl ())
@@ -526,7 +522,6 @@ let sample_block_json =
                 "call_stack": "0x0000000000000000000000000000000000000000000000000000000000000000",
                 "transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
                 "full_transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
-                "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
                 "excess": {
                   "magnitude": "0",
                   "sgn": [
@@ -561,7 +556,6 @@ let sample_block_json =
                 "call_stack": "0x0000000000000000000000000000000000000000000000000000000000000000",
                 "transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
                 "full_transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
-                "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
                 "excess": {
                   "magnitude": "0",
                   "sgn": [
