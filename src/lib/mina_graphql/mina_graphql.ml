@@ -2867,7 +2867,11 @@ module Mutations = struct
       ~resolve:create_account_resolver
 
   let start_filtered_log =
-    field "startFilteredLog" ~doc:"TODO" ~typ:(non_null string)
+    field "startFilteredLog"
+      ~doc:
+        "TESTING ONLY: Start filtering and recording all structured events in \
+         memory"
+      ~typ:(non_null string)
       ~args:Arg.[ arg "filter" ~typ:(non_null (list (non_null string))) ]
       ~resolve:(fun { ctx = t; _ } () filter ->
         Mina_lib.start_filtered_log t filter ;
@@ -3789,7 +3793,7 @@ module Queries = struct
     field "getFilteredLogEntries"
       ~typ:(non_null (list (non_null string)))
       ~args:Arg.[ arg "offset" ~typ:(non_null int) ]
-      ~doc:"TODO"
+      ~doc:"TESTING ONLY: Retrieve all new structured events in memory"
       ~resolve:(fun { ctx = t; _ } () i -> Mina_lib.get_filtered_log_entries t i)
 
   let tracked_accounts_resolver { ctx = coda; _ } () =

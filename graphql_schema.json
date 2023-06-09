@@ -2030,7 +2030,8 @@
             },
             {
               "name": "startFilteredLog",
-              "description": "TODO",
+              "description":
+                "TESTING ONLY: Start filtering and recording all structured events in memory",
               "args": [
                 {
                   "name": "filter",
@@ -9242,7 +9243,8 @@
             },
             {
               "name": "getFilteredLogEntries",
-              "description": "TODO",
+              "description":
+                "TESTING ONLY: Retrieve all new structured events in memory",
               "args": [
                 {
                   "name": "offset",
