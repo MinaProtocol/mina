@@ -2054,7 +2054,8 @@ let start_filtered_log
   let _, _, started =
     !in_memory_reverse_structured_log_messages_for_integration_test
   in
-  if started then (
+  if started then Or_error.error_string "Already initialized"
+  else (
     in_memory_reverse_structured_log_messages_for_integration_test :=
       (0, [], true) ;
     let event_set =
@@ -2065,7 +2066,6 @@ let start_filtered_log
       ~processor:(Logger.Processor.raw_structured_log_events event_set)
       ~transport:(Logger.Transport.raw handle) ;
     Ok () )
-  else Or_error.error_string "Already initialized"
 
 let get_filtered_log_entries
     ({ in_memory_reverse_structured_log_messages_for_integration_test; _ } : t)

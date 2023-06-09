@@ -4,6 +4,7 @@ resource "kubernetes_ingress_v1" "testnet_graphql_ingress" {
     module.kubernetes_testnet.testnet_namespace,
     module.kubernetes_testnet.seeds_release,
     module.kubernetes_testnet.block_producers_release,
+    module.kubernetes_testnet.archive_nodes_release,
     module.kubernetes_testnet.snark_workers_release
   ]
 
@@ -26,6 +27,7 @@ resource "kubernetes_ingress_v1" "testnet_graphql_ingress" {
           for_each = concat(
             [local.seed_config.name],
             [for config in var.block_producer_configs : config.name],
+            [for config in var.archive_node_configs : config.name],
             var.snark_coordinator_config != null ? [var.snark_coordinator_config.name] : []
           )
 
