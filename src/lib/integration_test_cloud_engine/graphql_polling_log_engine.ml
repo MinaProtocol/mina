@@ -48,49 +48,30 @@ type t =
 
 let event_reader { event_reader; _ } = event_reader
 
-(* TODO this is gonna be structured different from the stack driver log engine *)
-let parse_event_from_log_entry ~logger ~network log_entry =
+let parse_event_from_log_entry ~logger log_entry =
   let open Or_error.Let_syntax in
   let open Json_parsing in
-  let%bind pod_id =
-    find string log_entry [ "resource"; "labels"; "pod_name" ]
-  in
-  let%bind _, node =
-    Kubernetes_network.lookup_node_by_pod_id network pod_id
-    |> Option.value_map ~f:Or_error.return
-         ~default:
-           (Or_error.errorf
-              "failed to find node by pod id \"%s\"; known pod ids = [%s]"
-              pod_id
-              (Kubernetes_network.all_pod_ids network |> String.concat ~sep:"; ") )
-  in
-  let%bind payload = find json log_entry [ "jsonPayload" ] in
-  let%map event =
-    if
-      Result.ok (find bool payload [ "puppeteer_script_event" ])
-      |> Option.value ~default:false
-    then (
-      let%bind msg =
-        parse (parser_from_of_yojson Puppeteer_message.of_yojson) payload
+  Or_error.try_with_join (fun () ->
+      let payload = Yojson.Safe.from_string log_entry in
+      let%map event =
+        let%bind msg =
+          parse (parser_from_of_yojson Logger.Message.of_yojson) payload
+        in
+        let event_id =
+          Option.map ~f:Structured_log_events.string_of_id msg.event_id
+        in
+        [%log spam] "parsing daemon structured event, event_id = $event_id"
+          ~metadata:[ ("event_id", [%to_yojson: string option] event_id) ] ;
+        match msg.event_id with
+        | Some _ ->
+            Event_type.parse_daemon_event msg
+        | None ->
+            (* Currently unreachable, but we could include error logs here if
+               desired.
+            *)
+            Event_type.parse_error_log msg
       in
-      [%log spam] "parsing puppeteer event, puppeteer_event_type = %s"
-        (Option.value msg.puppeteer_event_type ~default:"<NONE>") ;
-      Event_type.parse_puppeteer_event msg )
-    else
-      let%bind msg =
-        parse (parser_from_of_yojson Logger.Message.of_yojson) payload
-      in
-      [%log spam] "parsing daemon structured event, event_id = %s"
-        (Option.value
-           (Option.( >>| ) msg.event_id Structured_log_events.string_of_id)
-           ~default:"<NONE>" ) ;
-      match msg.event_id with
-      | Some _ ->
-          Event_type.parse_daemon_event msg
-      | None ->
-          Event_type.parse_error_log msg
-  in
-  (node, event)
+      event )
 
 let rec poll_get_filtered_log_entries_node ~logger ~network ~event_writer
     ~last_log_index_seen node =
@@ -102,12 +83,9 @@ let rec poll_get_filtered_log_entries_node ~logger ~network ~event_writer
     with
     | Ok log_entries ->
         List.iter log_entries ~f:(fun log_entry ->
-            match
-              log_entry |> Yojson.Safe.from_string
-              |> parse_event_from_log_entry ~logger ~network
-            with
+            match parse_event_from_log_entry ~logger log_entry with
             | Ok a ->
-                Pipe.write_without_pushback_if_open event_writer a
+                Pipe.write_without_pushback_if_open event_writer (node, a)
             | Error e ->
                 [%log warn] "Error parsing log $error"
                   ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
