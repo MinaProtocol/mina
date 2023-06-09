@@ -73,7 +73,7 @@ let parse_event_from_log_entry ~logger log_entry =
       in
       event )
 
-let rec poll_get_filtered_log_entries_node ~logger ~network ~event_writer
+let rec poll_get_filtered_log_entries_node ~logger ~event_writer
     ~last_log_index_seen node =
   let open Deferred.Let_syntax in
   if not (Pipe.is_closed event_writer) then
@@ -92,15 +92,14 @@ let rec poll_get_filtered_log_entries_node ~logger ~network ~event_writer
         let last_log_index_seen =
           List.length log_entries + last_log_index_seen
         in
-        poll_get_filtered_log_entries_node ~logger ~network ~event_writer
+        poll_get_filtered_log_entries_node ~logger ~event_writer
           ~last_log_index_seen node
     | Error _ ->
-        poll_get_filtered_log_entries_node ~logger ~network ~event_writer
+        poll_get_filtered_log_entries_node ~logger ~event_writer
           ~last_log_index_seen node
   else Deferred.Or_error.error_string "Event writer closed"
 
-let rec poll_start_filtered_log_node ~log_filter ~logger ~network ~event_writer
-    node =
+let rec poll_start_filtered_log_node ~log_filter ~logger ~event_writer node =
   let open Deferred.Let_syntax in
   if not (Pipe.is_closed event_writer) then
     match%bind
@@ -109,30 +108,27 @@ let rec poll_start_filtered_log_node ~log_filter ~logger ~network ~event_writer
     | Ok () ->
         return (Ok ())
     | Error _ ->
-        poll_start_filtered_log_node ~log_filter ~logger ~network ~event_writer
-          node
+        poll_start_filtered_log_node ~log_filter ~logger ~event_writer node
   else Deferred.Or_error.error_string "Event writer closed"
 
-let poll_node_for_logs_in_background ~log_filter ~logger ~network ~event_writer
+let poll_node_for_logs_in_background ~log_filter ~logger ~event_writer
     (node : Node.t) =
   let open Deferred.Or_error.Let_syntax in
   [%log info] "Requesting for $node to start its filtered logs"
     ~metadata:[ ("node", `String node.app_id) ] ;
   let%bind () =
-    poll_start_filtered_log_node ~log_filter ~logger ~network ~event_writer node
+    poll_start_filtered_log_node ~log_filter ~logger ~event_writer node
   in
   [%log info] "$node has started its filtered logs. Beginning polling"
     ~metadata:[ ("node", `String node.app_id) ] ;
-  poll_get_filtered_log_entries_node ~last_log_index_seen:0 ~logger ~network
+  poll_get_filtered_log_entries_node ~last_log_index_seen:0 ~logger
     ~event_writer node
 
 let poll_for_logs_in_background ~log_filter ~logger ~network ~event_writer =
   Kubernetes_network.all_pods network
   |> Core.String.Map.data
   |> Deferred.Or_error.List.iter ~how:`Parallel
-       ~f:
-         (poll_node_for_logs_in_background ~log_filter ~logger ~network
-            ~event_writer )
+       ~f:(poll_node_for_logs_in_background ~log_filter ~logger ~event_writer)
 
 let create ~logger ~(network : Kubernetes_network.t) =
   let open Deferred.Or_error.Let_syntax in
