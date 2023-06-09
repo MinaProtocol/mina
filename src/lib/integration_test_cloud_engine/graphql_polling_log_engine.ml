@@ -137,8 +137,7 @@ let create ~logger ~(network : Kubernetes_network.t) =
 
 let destroy t : unit Deferred.Or_error.t =
   let open Deferred.Or_error.Let_syntax in
-  let { logger; event_reader = _; event_writer; background_job } = t in
+  let { logger; event_reader = _; event_writer; background_job = _ } = t in
   Pipe.close event_writer ;
-  let%bind () = Deferred.map background_job ~f:(fun _ -> Ok ()) in
   [%log debug] "graphql polling log engine destroyed" ;
   return ()
