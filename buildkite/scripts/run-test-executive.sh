@@ -15,4 +15,4 @@ fi
   --archive-image "$ARCHIVE_IMAGE" \
   --mina-automation-location ./automation \
   | tee "$TEST_NAME.test.log" \
-  | ./logproc.exe -i inline -f '!(.level in ["Spam"])'
+  | ./logproc.exe -i inline -f '!(.level in ["Debug", "Spam"])'
