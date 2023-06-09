@@ -76,7 +76,7 @@ let parse_event_from_log_entry ~logger log_entry =
 let rec poll_get_filtered_log_entries_node ~logger ~event_writer
     ~last_log_index_seen node =
   let open Deferred.Let_syntax in
-  if not (Pipe.is_closed event_writer) then
+  if not (Pipe.is_closed event_writer) then (
     let%bind () = after (Time.Span.of_ms 10000.0) in
     match%bind
       Kubernetes_network.Node.get_filtered_log_entries ~last_log_index_seen node
@@ -94,31 +94,43 @@ let rec poll_get_filtered_log_entries_node ~logger ~event_writer
         in
         poll_get_filtered_log_entries_node ~logger ~event_writer
           ~last_log_index_seen node
-    | Error _ ->
-        poll_get_filtered_log_entries_node ~logger ~event_writer
-          ~last_log_index_seen node
+    | Error err ->
+        [%log error] "Encountered an error while polling $node for logs: $err"
+          ~metadata:
+            [ ("node", `String node.app_id)
+            ; ("err", Error_json.error_to_yojson err)
+            ] ;
+        (* Don't keep looping, the node may be restarting. *)
+        return (Ok ()) )
   else Deferred.Or_error.error_string "Event writer closed"
 
-let rec poll_start_filtered_log_node ~log_filter ~event_writer node =
+let rec poll_start_filtered_log_node ~logger ~log_filter ~event_writer node =
   let open Deferred.Let_syntax in
   if not (Pipe.is_closed event_writer) then
-    match%bind Kubernetes_network.Node.start_filtered_log ~log_filter node with
+    match%bind
+      Kubernetes_network.Node.start_filtered_log ~logger ~log_filter node
+    with
     | Ok () ->
         return (Ok ())
     | Error _ ->
-        poll_start_filtered_log_node ~log_filter ~event_writer node
+        poll_start_filtered_log_node ~logger ~log_filter ~event_writer node
   else Deferred.Or_error.error_string "Event writer closed"
 
-let poll_node_for_logs_in_background ~log_filter ~logger ~event_writer
+let rec poll_node_for_logs_in_background ~log_filter ~logger ~event_writer
     (node : Node.t) =
   let open Deferred.Or_error.Let_syntax in
   [%log info] "Requesting for $node to start its filtered logs"
     ~metadata:[ ("node", `String node.app_id) ] ;
-  let%bind () = poll_start_filtered_log_node ~log_filter ~event_writer node in
+  let%bind () =
+    poll_start_filtered_log_node ~logger ~log_filter ~event_writer node
+  in
   [%log info] "$node has started its filtered logs. Beginning polling"
     ~metadata:[ ("node", `String node.app_id) ] ;
-  poll_get_filtered_log_entries_node ~last_log_index_seen:0 ~logger
-    ~event_writer node
+  let%bind () =
+    poll_get_filtered_log_entries_node ~last_log_index_seen:0 ~logger
+      ~event_writer node
+  in
+  poll_node_for_logs_in_background ~log_filter ~logger ~event_writer node
 
 let poll_for_logs_in_background ~log_filter ~logger ~network ~event_writer =
   Kubernetes_network.all_pods network

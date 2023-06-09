@@ -197,6 +197,6 @@ val net : t -> Mina_networking.t
 
 val runtime_config : t -> Runtime_config.t
 
-val start_filtered_log : t -> string list -> unit
+val start_filtered_log : t -> string list -> unit Or_error.t
 
-val get_filtered_log_entries : t -> int -> string list
+val get_filtered_log_entries : t -> int -> string list * bool

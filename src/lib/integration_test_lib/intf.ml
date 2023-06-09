@@ -157,7 +157,10 @@ module Engine = struct
         -> string array Async_kernel.Deferred.Or_error.t
 
       val start_filtered_log :
-        log_filter:string list -> t -> unit Async_kernel.Deferred.Or_error.t
+           logger:Logger.t
+        -> log_filter:string list
+        -> t
+        -> unit Async_kernel.Deferred.Or_error.t
 
       val get_peer_id :
            logger:Logger.t

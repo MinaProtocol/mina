@@ -296,7 +296,10 @@ module Node = struct
     [%graphql
     {|
       query ($offset: Int!) @encoders(module: "Encoders"){
-        getFilteredLogEntries(offset: $offset)
+        getFilteredLogEntries(offset: $offset) {
+            logMessages,
+            isCapturing,
+        }
       }
     |}]
   end
@@ -660,7 +663,7 @@ module Node = struct
     set_snark_worker ~logger t ~new_snark_pub_key
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
-  let start_filtered_log ~log_filter t =
+  let start_filtered_log ~logger ~log_filter t =
     let open Deferred.Let_syntax in
     let query_obj =
       Graphql.StartFilteredLog.(make @@ makeVariables ~filter:log_filter ())
@@ -671,12 +674,15 @@ module Node = struct
     in
     match res with
     | Ok query_result_obj ->
-        let returned_result = query_result_obj.startFilteredLog in
-        (* at the moment, returned_result returns the strong "ok" if successful, a little hacky, should change it later *)
-        if String.equal returned_result "ok" then return (Ok ())
-        else
-          Deferred.Or_error.errorf
-            "start_filtered_log, graphql request failed, did not return 'ok'"
+        let had_already_started = query_result_obj.startFilteredLog in
+        if had_already_started then return (Ok ())
+        else (
+          [%log error]
+            "Attempted to start structured log collection on $node, but it had \
+             already started"
+            ~metadata:[ ("node", `String t.app_id) ] ;
+          (* TODO: If this is common, figure out what to do *)
+          return (Ok ()) )
     | Error e ->
         return (Error e)
 
@@ -686,11 +692,15 @@ module Node = struct
       Graphql.GetFilteredLogEntries.(
         make @@ makeVariables ~offset:last_log_index_seen ())
     in
-    let%map query_result_obj =
+    let%bind query_result_obj =
       exec_graphql_request ~logger:(Logger.null ()) ~retry_delay_sec:10.0
         ~node:t ~query_name:"GetFilteredLogEntries" query_obj
     in
-    query_result_obj.getFilteredLogEntries
+    let res = query_result_obj.getFilteredLogEntries in
+    if res.isCapturing then return res.logMessages
+    else
+      Deferred.Or_error.error_string
+        "Node is not currently capturing structured log messages"
 
   let dump_archive_data ~logger (t : t) ~data_file =
     (* this function won't work if `t` doesn't happen to be an archive node *)

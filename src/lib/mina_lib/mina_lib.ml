@@ -109,7 +109,7 @@ type t =
   ; block_production_status :
       [ `Producing | `Producing_in_ms of float | `Free ] ref
   ; in_memory_reverse_structured_log_messages_for_integration_test :
-      (int * string list) ref
+      (int * string list * bool) ref
   }
 [@@deriving fields]
 
@@ -2033,7 +2033,7 @@ let create ?wallets (config : Config.t) =
             ; precomputed_block_writer
             ; block_production_status = ref `Free
             ; in_memory_reverse_structured_log_messages_for_integration_test =
-                ref (0, [])
+                ref (0, [], false)
             } ) )
 
 let net { components = { net; _ }; _ } = net
@@ -2045,19 +2045,25 @@ let start_filtered_log
     ({ in_memory_reverse_structured_log_messages_for_integration_test; _ } : t)
     (structured_log_ids : string list) =
   let handle str =
-    let idx, old_messages =
+    let idx, old_messages, started =
       !in_memory_reverse_structured_log_messages_for_integration_test
     in
     in_memory_reverse_structured_log_messages_for_integration_test :=
-      (idx + 1, str :: old_messages)
+      (idx + 1, str :: old_messages, started)
   in
-  let event_set =
-    Structured_log_events.Set.of_list
-    @@ List.map ~f:Structured_log_events.id_of_string structured_log_ids
+  let _, _, started =
+    !in_memory_reverse_structured_log_messages_for_integration_test
   in
-  Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
-    ~processor:(Logger.Processor.raw_structured_log_events event_set)
-    ~transport:(Logger.Transport.raw handle)
+  if started then (
+    let event_set =
+      Structured_log_events.Set.of_list
+      @@ List.map ~f:Structured_log_events.id_of_string structured_log_ids
+    in
+    Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
+      ~processor:(Logger.Processor.raw_structured_log_events event_set)
+      ~transport:(Logger.Transport.raw handle) ;
+    Ok () )
+  else Or_error.error_string "Already initialized"
 
 let get_filtered_log_entries
     ({ in_memory_reverse_structured_log_messages_for_integration_test; _ } : t)
@@ -2071,7 +2077,7 @@ let get_filtered_log_entries
           get_from_idx (curr_idx - 1) rev_messages (msg :: output)
     else output
   in
-  let curr_idx, messages =
+  let curr_idx, messages, is_started =
     !in_memory_reverse_structured_log_messages_for_integration_test
   in
-  get_from_idx curr_idx messages []
+  (get_from_idx curr_idx messages [], is_started)
