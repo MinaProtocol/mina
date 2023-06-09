@@ -666,8 +666,8 @@ module Node = struct
       Graphql.StartFilteredLog.(make @@ makeVariables ~filter:log_filter ())
     in
     let%bind res =
-      exec_graphql_request ~logger:(Logger.null ()) ~node:t
-        ~query_name:"StartFilteredLog" query_obj
+      exec_graphql_request ~logger:(Logger.null ()) ~retry_delay_sec:10.0
+        ~node:t ~query_name:"StartFilteredLog" query_obj
     in
     match res with
     | Ok query_result_obj ->
@@ -687,8 +687,8 @@ module Node = struct
         make @@ makeVariables ~offset:last_log_index_seen ())
     in
     let%map query_result_obj =
-      exec_graphql_request ~logger:(Logger.null ()) ~node:t
-        ~query_name:"GetFilteredLogEntries" query_obj
+      exec_graphql_request ~logger:(Logger.null ()) ~retry_delay_sec:10.0
+        ~node:t ~query_name:"GetFilteredLogEntries" query_obj
     in
     query_result_obj.getFilteredLogEntries
 
