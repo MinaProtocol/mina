@@ -77,6 +77,7 @@ let rec poll_get_filtered_log_entries_node ~logger ~event_writer
     ~last_log_index_seen node =
   let open Deferred.Let_syntax in
   if not (Pipe.is_closed event_writer) then
+    let%bind () = after (Time.Span.of_ms 10000.0) in
     match%bind
       Kubernetes_network.Node.get_filtered_log_entries ~logger
         ~last_log_index_seen node
