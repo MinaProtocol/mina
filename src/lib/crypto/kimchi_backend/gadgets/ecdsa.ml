@@ -143,6 +143,29 @@ let signature_scalar_check (type f)
  *      ia on the curve
  *      ia negated point computation is correct
  *      ia coordinates are valid
+ *
+ *   Base field external checks: (per crumb, not counting inputs and output)
+ *     Bound checks:         100 (+2 when a != 0 and +1 when b != 0)
+ *     Multi-range-checks:    40
+ *     Compact-range-checks:  40
+ *     Total range-checks:   180
+
+ *   Scalar field external checks: (per crumb, not counting inputs and output)
+ *     Bound checks:          5
+ *     Multi-range-checks:    3
+ *     Compact-range-checks:  3
+ *     Total range-checks:   11
+ *
+ *   Rows: (per crumb, not counting inputs/outputs and constants)
+ *     Verify:              ~205 (+5 when a != 0 and +2 when b != 0)
+ *     Bound additions:      210
+ *     Multi-range-checks:   764
+ *     Total:               1179
+ *
+ *   Constants:
+ *     Curve constants:        10 (for 256-bit curve; one-time cost per circuit)
+ *     Pre-computing doubles: 767 (for 256-bit curve; one-time cost per circuit)
+ *
  *)
 let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
     (base_checks : f Foreign_field.External_checks.t)
@@ -218,6 +241,7 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
    *)
   Foreign_field.External_checks.append_bound_check scalar_checks
   @@ Foreign_field.Element.Standard.to_limbs u1 ;
+
   (* Assert s * u1 = z *)
   Foreign_field.Element.Standard.assert_equal
     (module Circuit)
@@ -229,12 +253,14 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
       (module Circuit)
       scalar_checks ~bound_check_result:false s u2 curve.order
   in
+
   (* Bounds 2: Left input s is gadget input (checked externally)
    *           Right input u2 checked below
    *           Result is gadget input (already checked externally).
    *)
   Foreign_field.External_checks.append_bound_check scalar_checks
   @@ Foreign_field.Element.Standard.to_limbs u2 ;
+
   (* Assert s * u2 = r *)
   Foreign_field.Element.Standard.assert_equal (module Circuit) r_computed r ;
 
@@ -287,6 +313,7 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
       (module Circuit)
       base_checks curve ?doubles u2_bits pubkey
   in
+
   (* Bounds 6: Pubkey is gadget input (checked externally)
    *           Initial accumulator is gadget input (checked externally or public parameter)
    *           Result bound check for u2_point below.
@@ -372,6 +399,7 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
       (module Circuit)
       scalar_checks quotient curve.order_minus_one curve.order
   in
+
   (* Bounds 8: Left input q is bound checked below
    *           Right input (n - 1) is a public parameter so not checked
    *           Result bound check is already covered by scalar_checks
@@ -681,7 +709,7 @@ let%test_unit "Ecdsa.verify" =
 
     () )
 
-let%test_unit "Ecdsa.verify_tiny" =
+let%test_unit "Ecdsa.verify_light" =
   if tests_enabled then (
     let open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
@@ -689,8 +717,8 @@ let%test_unit "Ecdsa.verify_tiny" =
       try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
     in
 
-    (* Tiny circuit for manual checks *)
-    let test_verify_tiny ?cs ?(use_precomputed_gen_doubles = true)
+    (* Light ecdsa verify circuit for manual checks *)
+    let test_verify_light ?cs ?(use_precomputed_gen_doubles = true)
         ?(scalar_mul_bit_length = 0) (curve : Curve_params.t)
         (pubkey : Affine.bignum_point)
         (signature : Bignum_bigint.t * Bignum_bigint.t)
@@ -746,6 +774,18 @@ let%test_unit "Ecdsa.verify_tiny" =
               unused_base_checks unused_scalar_checks curve pubkey signature
               msg_hash ;
 
+            (* The base field external check counts depend on curve and scalar size. We elide
+             * checking these because we want this test function able to be used with different
+             * curves, scalars and other parameters.
+             *)
+
+            (* Check scalar field external check counts *)
+            assert (Mina_stdlib.List.Length.equal unused_scalar_checks.bounds 5) ;
+            assert (
+              Mina_stdlib.List.Length.equal unused_scalar_checks.multi_ranges 3 ) ;
+            assert (
+              Mina_stdlib.List.Length.equal
+                unused_scalar_checks.compact_multi_ranges 3 ) ;
             () )
       in
 
@@ -779,12 +819,197 @@ let%test_unit "Ecdsa.verify_tiny" =
     assert (Ec_group.is_on_curve_bignum_point Secp256k1.params pubkey) ;
 
     let _cs =
-      test_verify_tiny Secp256k1.params ~scalar_mul_bit_length:2 pubkey
+      test_verify_light Secp256k1.params ~scalar_mul_bit_length:2 pubkey
         signature msg_hash
     in
     let _cs =
-      test_verify_tiny Secp256k1.params ~use_precomputed_gen_doubles:false
+      test_verify_light Secp256k1.params ~use_precomputed_gen_doubles:false
         ~scalar_mul_bit_length:2 pubkey signature msg_hash
+    in
+
+    () )
+
+let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
+  if tests_enabled then (
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+
+    (* Tiny full circuit for ecdsa on secp256k1 manual checks.
+     * Note: pubkey, signature and msg_hash need to be specially crafted to produce 2-bit scalars
+     *)
+    let secp256k1_verify_tiny_full ?cs ?(use_precomputed_gen_doubles = true)
+        (pubkey : Affine.bignum_point)
+        (signature : Bignum_bigint.t * Bignum_bigint.t)
+        (msg_hash : Bignum_bigint.t) =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            (* Prepare test inputs *)
+            let curve =
+              Curve_params.to_circuit_constants
+                (module Runner.Impl)
+                Secp256k1.params ~use_precomputed_gen_doubles
+            in
+            let pubkey =
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) pubkey
+            in
+            Foreign_field.result_row (module Runner.Impl) (fst pubkey) ;
+            Foreign_field.result_row (module Runner.Impl) (snd pubkey) ;
+            let signature =
+              ( Foreign_field.Element.Standard.of_bignum_bigint
+                  (module Runner.Impl)
+                  (fst signature)
+              , Foreign_field.Element.Standard.of_bignum_bigint
+                  (module Runner.Impl)
+                  (snd signature) )
+            in
+            Foreign_field.result_row (module Runner.Impl) (fst signature) ;
+            Foreign_field.result_row (module Runner.Impl) (snd signature) ;
+            let msg_hash =
+              Foreign_field.Element.Standard.of_bignum_bigint
+                (module Runner.Impl)
+                msg_hash
+            in
+            Foreign_field.result_row (module Runner.Impl) msg_hash ;
+
+            (* Create external checks contexts for tracking extra constraints
+               that are required for soundness (unused in this simple test) *)
+            let base_checks =
+              Foreign_field.External_checks.create (module Runner.Impl)
+            in
+            let scalar_checks =
+              Foreign_field.External_checks.create (module Runner.Impl)
+            in
+
+            (* Omit pubkey subgroup check *)
+
+            (* Omit checking r, s \in [1, n) *)
+
+            (* Verify ECDSA signature *)
+            verify
+              (module Runner.Impl)
+              ~use_precomputed_gen_doubles ~scalar_mul_bit_length:2 base_checks
+              scalar_checks curve pubkey signature msg_hash ;
+
+            (*
+             * Perform base field external checks
+             *)
+
+            (* 1) Add gates for base field bound additions.
+             *    Note: internally this also adds multi-range-checks for the
+             *    computed bound to the base_checks.multi-ranges, which
+             *    are then constrainted in (2)
+             *)
+            let base_bound_checks_count = ref (42 + 2 + 42 + 2 + 6 + 2 + 3) in
+            if not Bignum_bigint.(curve.bignum.a = zero) then
+              base_bound_checks_count := !base_bound_checks_count + 2 ;
+            if not Bignum_bigint.(curve.bignum.b = zero) then
+              base_bound_checks_count := !base_bound_checks_count + 1 ;
+            assert (
+              Mina_stdlib.List.Length.equal base_checks.bounds
+                !base_bound_checks_count ) ;
+            List.iter base_checks.bounds ~f:(fun value ->
+                let _bound =
+                  Foreign_field.valid_element
+                    (module Runner.Impl)
+                    base_checks
+                    (Foreign_field.Element.Standard.of_limbs value)
+                    curve.modulus
+                in
+                () ) ;
+
+            (* 2) Add gates for external multi-range-checks *)
+            assert (
+              Mina_stdlib.List.Length.equal base_checks.multi_ranges
+                (!base_bound_checks_count + 40) ) ;
+            List.iter base_checks.multi_ranges ~f:(fun multi_range ->
+                let v0, v1, v2 = multi_range in
+                Range_check.multi (module Runner.Impl) v0 v1 v2 ;
+                () ) ;
+
+            (* 3) Add gates for external compact-multi-range-checks *)
+            assert (
+              Mina_stdlib.List.Length.equal base_checks.compact_multi_ranges 40 ) ;
+            List.iter base_checks.compact_multi_ranges
+              ~f:(fun compact_multi_range ->
+                let v01, v2 = compact_multi_range in
+                Range_check.compact_multi (module Runner.Impl) v01 v2 ;
+                () ) ;
+
+            (*
+             * Perform scalar field external checks
+             *)
+
+            (* 1) Add gates for scalar field bound additions.
+             *    Note: internally this also adds multi-range-checks for the
+             *    computed bound to the scalar_checks.multi-ranges, which
+             *    are then constrainted in (2)
+             *)
+            assert (Mina_stdlib.List.Length.equal scalar_checks.bounds 5) ;
+            List.iter scalar_checks.bounds ~f:(fun value ->
+                let _bound =
+                  Foreign_field.valid_element
+                    (module Runner.Impl)
+                    scalar_checks
+                    (Foreign_field.Element.Standard.of_limbs value)
+                    curve.order
+                in
+                () ) ;
+
+            (* 2) Add gates for external multi-range-checks *)
+            assert (Mina_stdlib.List.Length.equal scalar_checks.multi_ranges 8) ;
+            List.iter scalar_checks.multi_ranges ~f:(fun multi_range ->
+                let v0, v1, v2 = multi_range in
+                Range_check.multi (module Runner.Impl) v0 v1 v2 ;
+                () ) ;
+
+            (* 3) Add gates for external compact-multi-range-checks *)
+            assert (
+              Mina_stdlib.List.Length.equal scalar_checks.compact_multi_ranges 3 ) ;
+            List.iter scalar_checks.compact_multi_ranges
+              ~f:(fun compact_multi_range ->
+                let v01, v2 = compact_multi_range in
+                Range_check.compact_multi (module Runner.Impl) v01 v2 ;
+                () ) ;
+
+            () )
+      in
+
+      cs
+    in
+
+    (* Tiny secp256k1 signature test: results in 2-bit u1 and u2 scalars
+     * Extracted with k = 1 -> secret key = 57896044618658097711785492504343953926418782139537452191302581570759080747168 *)
+    let pubkey =
+      ( Bignum_bigint.of_string
+          "86918276961810349294276103416548851884759982251107"
+      , Bignum_bigint.of_string
+          "28597260016173315074988046521176122746119865902901063272803125467328307387891"
+      )
+    in
+    let signature =
+      ( (* r = Gx *)
+        Bignum_bigint.of_string
+          "55066263022277343669578718895168534326250603453777594175500187360389116729240"
+      , (* s = r/2 *)
+        Bignum_bigint.of_string
+          "27533131511138671834789359447584267163125301726888797087750093680194558364620"
+      )
+    in
+    let msg_hash =
+      (* z = 2s *)
+      Bignum_bigint.of_string
+        "55066263022277343669578718895168534326250603453777594175500187360389116729240"
+    in
+
+    assert (Ec_group.is_on_curve_bignum_point Secp256k1.params pubkey) ;
+
+    let _cs =
+      secp256k1_verify_tiny_full ~use_precomputed_gen_doubles:false pubkey
+        signature msg_hash
     in
 
     () )

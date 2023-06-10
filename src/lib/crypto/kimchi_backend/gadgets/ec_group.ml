@@ -40,10 +40,17 @@ let is_on_curve_bignum_point (curve : Curve_params.t)
  *     Lx != Rx (no invertibility)
  *     L and R are not O (the point at infinity)
  *
- *   Rows:
- *     Group addition:  13
- *     Range-checks:    24 (not counting inputs and output)
- *     Bound additions: 24 (not counting inputs and output)
+ *   External checks: (not counting inputs and output)
+ *     Bound checks:          6
+ *     Multi-range-checks:    3
+ *     Compact-range-checks:  3
+ *     Total range-checks:   12
+ *
+ *   Rows: (not counting inputs/outputs and constants)
+ *     Group addition:     13
+ *     Bound additions:    12
+ *     Multi-range-checks: 48
+ *     Total:              73
  *
  *   Supported group axioms:
  *     Closure
@@ -337,6 +344,18 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
  *
  *   Preconditions and limitations:
  *      P is not O (the point at infinity)
+ *
+ *   External checks: (not counting inputs and output)
+ *     Bound checks:          8 (+1 when a != 0)
+ *     Multi-range-checks:    4
+ *     Compact-range-checks:  4
+ *     Total range-checks:   16
+ *
+ *   Rows: (not counting inputs/outputs and constants)
+ *     Group double:       16 (+2 when a != 0)
+ *     Bound additions:    16
+ *     Multi-range-checks: 64
+ *     Total:              96
  *
  *   Note: See group addition notes (above) about group properties supported by this implementation
  *)
@@ -694,6 +713,22 @@ let compute_ia_points ?(point : Affine.bignum_point option)
 (* Gadget to constrain a point in on the elliptic curve specified by
  *   y^2 = x^3 + ax + b mod p
  * where a, b are the curve parameters and p is the base field modulus (curve.modulus)
+ *
+ *   External checks: (not counting inputs and output)
+ *     Bound checks:         3 (+1 when a != 0 and +1 when b != 0)
+ *     Multi-range-checks:   3
+ *     Compact-range-checks: 3
+ *     Total range-checks:   9
+ *
+ *   Rows: (not counting inputs/outputs and constants)
+ *     Curve check:         8 (+1 when a != 0 and +2 when b != 0)
+ *     Bound additions:     6
+ *     Multi-range-checks: 36
+ *     Total:              50
+ *
+ *   Constants:
+ *     Curve constants:        10 (for 256-bit curve; one-time cost per circuit)
+ *     Pre-computing doubles: 767 (for 256-bit curve; one-time cost per circuit)
  *)
 let is_on_curve (type f) (module Circuit : Snark_intf.Run with type field = f)
     (external_checks : f Foreign_field.External_checks.t)
@@ -837,10 +872,21 @@ let check_ia (type f) (module Circuit : Snark_intf.Run with type field = f)
  *      ia negated point computation is constrained
  *      ia coordinates are bounds checked
  *
- *   Rows:
- *      Scalar multiplication:  85
- *      Curve constants:        10 (for 256-bit curve; one-time cost per circuit)
- *      Pre-computing doubles: 767 (for 256-bit curve; one-time cost per circuit)
+ *   External checks: (per crumb, not counting inputs and output)
+ *     Bound checks:         42 (+1 when a != 0)
+ *     Multi-range-checks:   17
+ *     Compact-range-checks: 17
+ *     Total range-checks:   76
+ *
+ *   Rows: (not counting inputs/outputs and constants)
+ *     Scalar multiplication:  ~84 (+2 when a != 0)
+ *     Bound additions:         84
+ *     Multi-range-checks:     308
+ *     Total:                  476
+ *
+ *   Constants:
+ *     Curve constants:        10 (for 256-bit curve; one-time cost per circuit)
+ *     Pre-computing doubles: 767 (for 256-bit curve; one-time cost per circuit)
  *)
 let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     (external_checks : f Foreign_field.External_checks.t)
@@ -2838,7 +2884,9 @@ let%test_unit "Ec_group.is_on_curve" =
         Runner.generate_and_verify_proof ?cs (fun () ->
             (* Prepare test public inputs *)
             let curve =
-              Curve_params.to_circuit_constants (module Runner.Impl) curve
+              Curve_params.to_circuit_constants
+                (module Runner.Impl)
+                curve ~use_precomputed_gen_doubles:false
             in
             let point =
               Affine.of_bignum_bigint_coordinates (module Runner.Impl) point
@@ -2854,14 +2902,14 @@ let%test_unit "Ec_group.is_on_curve" =
             is_on_curve (module Runner.Impl) unused_external_checks curve point ;
 
             (* Check for expected quantity of external checks *)
-            let bounds_checks_count = ref 3 in
+            let bound_checks_count = ref 3 in
             if not Bignum_bigint.(curve.bignum.a = zero) then
-              bounds_checks_count := !bounds_checks_count + 1 ;
+              bound_checks_count := !bound_checks_count + 1 ;
             if not Bignum_bigint.(curve.bignum.b = zero) then
-              bounds_checks_count := !bounds_checks_count + 1 ;
+              bound_checks_count := !bound_checks_count + 1 ;
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.bounds
-                !bounds_checks_count ) ;
+                !bound_checks_count ) ;
             assert (
               Mina_stdlib.List.Length.equal unused_external_checks.multi_ranges
                 3 ) ;
@@ -2956,7 +3004,6 @@ let%test_unit "Ec_group.is_on_curve" =
       Common.is_error (fun () ->
           let bad_pt = (Bignum_bigint.of_int 2, Bignum_bigint.of_int 77) in
           test_is_on_curve curve_c1 bad_pt ) ) ;
-
     () )
 
 let%test_unit "Ec_group.check_ia" =
