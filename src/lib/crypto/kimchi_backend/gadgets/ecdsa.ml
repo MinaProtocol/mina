@@ -1163,6 +1163,7 @@ let%test_unit "Ecdsa.verify_full_no_subgroup_check" =
     in
 
     (* Test 1: No chunking (big test that doesn't require chunkning)
+     *         Uses precomputed generator doubles.
      *         Extracted s,d such that that u1 and u2 scalars are equal to m = 95117056129877063566687163501128961107874747202063760588013341337 (216 bits) *)
     let pubkey =
       (* secret key d = (s - z)/r *)
@@ -1191,7 +1192,38 @@ let%test_unit "Ecdsa.verify_full_no_subgroup_check" =
 
     let _cs =
       test_verify_full_no_subgroup_check Secp256k1.params
-        ~use_precomputed_gen_doubles:true ~scalar_mul_bit_length:216 pubkey
+        ~scalar_mul_bit_length:216 pubkey
+        signature msg_hash
+    in
+
+    (* Test 2: No chunking (big test that doesn't require chunkning)
+     *         Extracted s,d such that that u1 and u2 scalars are equal to m = 177225723614878382952356121702918977654 (128 bits) *)
+    let pubkey =
+      (* secret key d = (s - z)/r *)
+      ( Bignum_bigint.of_string
+          "6559447345535823731364817861985473100513487071640065635466595453031721007862"
+      , Bignum_bigint.of_string
+          "74970879557849263394678708702512922877596422437120940411392434995042287566169"
+      )
+    in
+    let signature =
+      ( (* r = Gx *)
+        Bignum_bigint.of_string
+          "55066263022277343669578718895168534326250603453777594175500187360389116729240"
+      , (* s = r/m *)
+        Bignum_bigint.of_string
+          "66524399747416926971392827702286928407253072170352243437129959464602950571595"
+      )
+    in
+    let msg_hash =
+      (* z = ms *)
+      Bignum_bigint.of_string
+        "55066263022277343669578718895168534326250603453777594175500187360389116729240"
+    in
+
+    let _cs =
+      test_verify_full_no_subgroup_check Secp256k1.params
+        ~use_precomputed_gen_doubles:false ~scalar_mul_bit_length:128 pubkey
         signature msg_hash
     in
 
