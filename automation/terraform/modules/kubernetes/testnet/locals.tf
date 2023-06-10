@@ -125,14 +125,15 @@ locals {
 
   archive_vars = [for item in var.archive_configs : {
     testnetName = var.testnet_name
-    mina        = {
-      image         = var.mina_image
-      useCustomEntrypoint  = var.use_custom_entrypoint
-      customEntrypoint     = var.custom_entrypoint
-      seedPeers     = var.additional_peers
-      runtimeConfig = var.runtime_config
-      # seedPeersURL  = var.seed_peers_url
-    }
+    mina        = local.daemon
+    # {
+    #   image         = var.mina_image
+    #   useCustomEntrypoint  = var.use_custom_entrypoint
+    #   customEntrypoint     = var.custom_entrypoint
+    #   seedPeers     = var.additional_peers
+    #   runtimeConfig = var.runtime_config
+    #   # seedPeersURL  = var.seed_peers_url
+    # }
     healthcheck = local.healthcheck_vars
     archive     = item
     postgresql = {
