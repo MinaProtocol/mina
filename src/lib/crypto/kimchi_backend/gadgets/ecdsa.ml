@@ -14,6 +14,18 @@ let tuple6_of_array array =
 
 (* Gadget to assert signature scalars r,s \in Fn
  * Must be used when r and s are not public parameters
+ *
+ *   Scalar field external checks:
+ *     Bound checks:         6
+ *     Multi-range-checks:   2
+ *     Compact-range-checks: 2
+ *     Total range-checks:   10
+ *
+ *   Rows: (per crumb, not counting inputs/outputs and constants)
+ *     Check:               4
+ *     Bound additions:    12
+ *     Multi-range-checks: 40
+ *     Total:              56
  *)
 let signature_scalar_check (type f)
     (module Circuit : Snark_intf.Run with type field = f)
@@ -1009,6 +1021,177 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
 
     let _cs =
       secp256k1_verify_tiny_full ~use_precomputed_gen_doubles:false pubkey
+        signature msg_hash
+    in
+
+    () )
+
+let%test_unit "Ecdsa.verify_full_no_subgroup_check" =
+  if tests_enabled then (
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+
+    (* Prove ECDSA signature verification in ZK (no subgroup check)! *)
+    let test_verify_full_no_subgroup_check ?cs
+        ?(use_precomputed_gen_doubles = true) ?(scalar_mul_bit_length = 0)
+        (curve : Curve_params.t) (pubkey : Affine.bignum_point)
+        (signature : Bignum_bigint.t * Bignum_bigint.t)
+        (msg_hash : Bignum_bigint.t) =
+      (* Generate and verify proof *)
+      let cs, _proof_keypair, _proof =
+        Runner.generate_and_verify_proof ?cs (fun () ->
+            (* Prepare test inputs *)
+            let curve =
+              Curve_params.to_circuit_constants
+                (module Runner.Impl)
+                curve ~use_precomputed_gen_doubles
+            in
+            let pubkey =
+              Affine.of_bignum_bigint_coordinates (module Runner.Impl) pubkey
+            in
+            let signature =
+              ( Foreign_field.Element.Standard.of_bignum_bigint
+                  (module Runner.Impl)
+                  (fst signature)
+              , Foreign_field.Element.Standard.of_bignum_bigint
+                  (module Runner.Impl)
+                  (snd signature) )
+            in
+            let msg_hash =
+              Foreign_field.Element.Standard.of_bignum_bigint
+                (module Runner.Impl)
+                msg_hash
+            in
+
+            (* Create external checks contexts for tracking extra constraints
+               that are required for soundness *)
+            let base_checks =
+              Foreign_field.External_checks.create (module Runner.Impl)
+            in
+            let scalar_checks =
+              Foreign_field.External_checks.create (module Runner.Impl)
+            in
+
+            (* Subgroup check for pubkey is too expensive for test without chunking *)
+
+            (* Check r, s \in [1, n) *)
+            signature_scalar_check
+              (module Runner.Impl)
+              scalar_checks curve signature ;
+
+            (* Verify ECDSA signature *)
+            verify
+              (module Runner.Impl)
+              ~use_precomputed_gen_doubles ~scalar_mul_bit_length base_checks
+              scalar_checks curve pubkey signature msg_hash ;
+
+            (*
+             * Perform base field external checks
+             *)
+
+            (* 1) Add gates for base field bound additions.
+             *    Note: internally this also adds multi-range-checks for the
+             *    computed bound to the base_checks.multi-ranges, which
+             *    are then constrainted in (2)
+             *)
+            List.iter base_checks.bounds ~f:(fun value ->
+                let _bound =
+                  Foreign_field.valid_element
+                    (module Runner.Impl)
+                    base_checks
+                    (Foreign_field.Element.Standard.of_limbs value)
+                    curve.modulus
+                in
+                () ) ;
+
+            (* 2) Add gates for external multi-range-checks *)
+            List.iter base_checks.multi_ranges ~f:(fun multi_range ->
+                let v0, v1, v2 = multi_range in
+                Range_check.multi (module Runner.Impl) v0 v1 v2 ;
+                () ) ;
+
+            (* 3) Add gates for external compact-multi-range-checks *)
+            List.iter base_checks.compact_multi_ranges
+              ~f:(fun compact_multi_range ->
+                let v01, v2 = compact_multi_range in
+                Range_check.compact_multi (module Runner.Impl) v01 v2 ;
+                () ) ;
+
+            (*
+             * Perform scalar field external checks
+             *)
+
+            (* 1) Add gates for scalar field bound additions.
+             *    Note: internally this also adds multi-range-checks for the
+             *    computed bound to the scalar_checks.multi-ranges, which
+             *    are then constrainted in (2)
+             *)
+            assert (Mina_stdlib.List.Length.equal scalar_checks.bounds 11) ;
+            List.iter scalar_checks.bounds ~f:(fun value ->
+                let _bound =
+                  Foreign_field.valid_element
+                    (module Runner.Impl)
+                    scalar_checks
+                    (Foreign_field.Element.Standard.of_limbs value)
+                    curve.order
+                in
+                () ) ;
+
+            (* 2) Add gates for external multi-range-checks *)
+            assert (Mina_stdlib.List.Length.equal scalar_checks.multi_ranges 16) ;
+            List.iter scalar_checks.multi_ranges ~f:(fun multi_range ->
+                let v0, v1, v2 = multi_range in
+                Range_check.multi (module Runner.Impl) v0 v1 v2 ;
+                () ) ;
+
+            (* 3) Add gates for external compact-multi-range-checks *)
+            assert (
+              Mina_stdlib.List.Length.equal scalar_checks.compact_multi_ranges 5 ) ;
+            List.iter scalar_checks.compact_multi_ranges
+              ~f:(fun compact_multi_range ->
+                let v01, v2 = compact_multi_range in
+                Range_check.compact_multi (module Runner.Impl) v01 v2 ;
+                () ) ;
+
+            () )
+      in
+
+      cs
+    in
+
+    (* Test 1: No chunking (big test that doesn't require chunkning)
+     *         Extracted s,d such that that u1 and u2 scalars are equal to m = 95117056129877063566687163501128961107874747202063760588013341337 (216 bits) *)
+    let pubkey =
+      (* secret key d = (s - z)/r *)
+      ( Bignum_bigint.of_string
+          "28335432349034412295843546619549969371276098848890005110917167585721026348383"
+      , Bignum_bigint.of_string
+          "40779711449769771629236800666139862371172776689379727569918249313574127557987"
+      )
+    in
+    let signature =
+      ( (* r = Gx *)
+        Bignum_bigint.of_string
+          "55066263022277343669578718895168534326250603453777594175500187360389116729240"
+      , (* s = r/m *)
+        Bignum_bigint.of_string
+          "92890023769187417206640608811117482540691917151111621018323984641303111040093"
+      )
+    in
+    let msg_hash =
+      (* z = ms *)
+      Bignum_bigint.of_string
+        "55066263022277343669578718895168534326250603453777594175500187360389116729240"
+    in
+
+    assert (Ec_group.is_on_curve_bignum_point Secp256k1.params pubkey) ;
+
+    let _cs =
+      test_verify_full_no_subgroup_check Secp256k1.params
+        ~use_precomputed_gen_doubles:true ~scalar_mul_bit_length:216 pubkey
         signature msg_hash
     in
 
