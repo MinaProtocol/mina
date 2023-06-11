@@ -91,7 +91,7 @@ spec:
           "-peer-list-url", {{ $.Values.mina.seedPeersURL | quote }},
           {{- end -}}
           {{- if $.Values.mina.runtimeConfig }}
-          "-config-file", "/config/daemon.json",
+          "-config-file", "/root/config/daemon.json",
           {{- end }}
           "-libp2p-keypair", "/root/libp2p-keys/key",
           {{- range $.Values.mina.seedPeers }}
@@ -155,9 +155,18 @@ spec:
         {{- end }}
         {{- if $.Values.mina.runtimeConfig }}
         - name: daemon-config
-          mountPath: "/config/"
+          mountPath: "/root/config/"
         {{- end }}
+        - name: config-dir
+          mountPath: /root/.mina-config/
       volumes:
+      - name: config-dir
+      {{- if $.Values.persist_working_dir }}
+        persistentVolumeClaim:
+          claimName: pvc-{{ $config.name }}
+      {{- else}}
+        emptyDir: {}
+      {{- end }}
       {{- if $.Values.mina.runtimeConfig }}
       - name: daemon-config
         configMap:
@@ -236,5 +245,20 @@ spec:
     port: 80
     targetPort: {{ $.Values.mina.ports.graphql }}
 {{- end }}
+---
+{{- if $.Values.persist_working_dir }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-{{ $config.name }}
+spec:
+  accessModes:
+      - {{ $.Values.storage.accessMode | quote }}
+  resources:
+    requests:
+      storage: {{ $.Values.storage.size | quote }}
+  storageClassName: "{{ $.Values.storage.storageClass }}"
+---
+{{ end }}
 ---
 {{ end }}
