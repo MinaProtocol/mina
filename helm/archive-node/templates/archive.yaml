@@ -172,3 +172,37 @@ spec:
       {{- end }}
       - name: actual-libp2p
         emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "archive-node.fullname" . }}
+spec:
+  type: ClusterIP
+  # We want all pods to have their addresses published for the sake of the
+  # other testnet pods even before they're ready, since they
+  # have to be able to talk to each other in order to become ready.
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ template "archive-node.fullname" . }}
+  ports:
+  - name: tcp-p2p
+    port: {{ $.Values.mina.ports.p2p }}
+    targetPort: external-port
+---
+{{- if $.Values.mina.exposeGraphql }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "archive-node.fullname" . }}-graphql
+spec:
+  type: ClusterIP
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ template "archive-node.fullname" . }}
+  ports:
+  - name: http-graphql
+    protocol: TCP
+    port: 80
+    targetPort: {{ $.Values.mina.ports.graphql }}
+{{- end }}
