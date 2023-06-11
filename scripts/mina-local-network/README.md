@@ -34,12 +34,19 @@
             src/app/logproc/logproc.exe
         ```
 
-      - If you’d like to work with the `zkApps` locally.
+      - If you’d like to work with `zkApps` using `SnarkyJS` locally.
         - Build the `SnarkyJS`:
 
           ```shell
+          ./scripts/update-snarkyjs-bindings.sh
+          ```
+          
+          or 
+          
+          ```shell
           ./scripts/build-snarkyjs-node.sh
           ```
+          
 
 5. Within the `Mina` repository root directory, execute the `./scripts/mina-local-network/mina-local-network.sh`, for example:
 
@@ -59,8 +66,8 @@
 
 ## SnarkyJS and zkApps
 
-- Now, if you’d like to work with the `zkApps` locally, you need to update the `SnarkyJS` reference for your `zkApp` project (e.g. created using the `zkApp-CLI` like this: `zk project foo`).
-  - Suppose you’ve created `zkApp` at following path: 
+- Now, if you’d like to work with `zkApps` using `SnarkyJS` locally, you need to update the `SnarkyJS` reference for your `zkApp` project (e.g. created using `zkApp-CLI` like this: `zk project foo`).
+  - Suppose you’ve created `zkApp` at following path:
     - `~/projcts/zkapps/foo`
   - Go to `zkApp` project root (☝️).
   - Remove old `SnarkyJS` Node Module:
@@ -70,6 +77,8 @@
     ```shell
     npm i ${HOME}/<path_to_Mina_repo>/src/lib/snarky_js_bindings/snarkyjs
     ```
+    
+  - Note: you can also refer to [this repo](https://github.com/o1-labs/e2e-zkapp/) for setting up scripts you can re-use for your particular environment.
 
 ## Notes
 
@@ -82,7 +91,7 @@
   - [http://localhost:4001/graphql](http://localhost:4001/graphql)
   - [http://localhost:4006/graphql](http://localhost:4006/graphql)
   - Etc.
-  - Depending on you environment configuration (amount of parties, starting port of ranges, etc.)
+  - Depending on you environment configuration (number of zkApp commands, starting port of ranges, etc.)
 - You might want to get `encoded private key` instead of the raw data generated for you. You can do this using the following command:
 
   ```shell
@@ -97,7 +106,7 @@
   ```
 
 - In order to start sending payments or anything else account related, you first need to import and unlock the account:
-  
+
     ```shell
     _build/default/src/app/cli/src/mina.exe \
       accounts import \

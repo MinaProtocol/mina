@@ -1,15 +1,21 @@
 (library
  (name filtered_external_transition_unix)
  (public_name filtered_external_transition.unix)
+ (inline_tests)
  (libraries
    ;; opam libraries
    graphql-async
+   graphql
    yojson
+   core_kernel
+   core
+   sexplib0
+   ppx_inline_test.config
    ;; local libraries
    graphql_basic_scalars
    filtered_external_transition
  )
- (preprocess (pps ppx_version))
+ (preprocess (pps ppx_jane ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Utils that depends on the unix library"))

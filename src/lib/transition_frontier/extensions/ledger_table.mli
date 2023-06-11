@@ -6,4 +6,4 @@ type t
 
 include Intf.Extension_intf with type t := t and type view = unit
 
-val lookup : t -> Ledger_hash.t -> Ledger.t option
+val lookup : t -> Ledger_hash.t -> Mina_ledger.Ledger.t option

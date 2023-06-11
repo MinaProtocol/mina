@@ -114,7 +114,7 @@ locals {
         # privateKey     = config.private_key
         # publicKey     = config.private_key
         privateKeyPW     = config.privkey_password
-        # libp2pSecret         = config.libp2p_secret
+        libp2pSecret         = config.libp2p_secret
         enablePeerExchange   = config.enable_peer_exchange
         isolated             = config.isolated
         enableArchive        = config.enableArchive

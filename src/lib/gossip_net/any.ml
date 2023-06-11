@@ -1,7 +1,7 @@
 open Async_kernel
 
 module type S = sig
-  module Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf
+  module Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf
 
   module type Implementation_intf =
     Intf.Gossip_net_intf with module Rpc_intf := Rpc_intf
@@ -19,7 +19,7 @@ module type S = sig
   val create : creatable -> t creator
 end
 
-module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
+module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
   S with module Rpc_intf := Rpc_intf = struct
   open Rpc_intf
 
@@ -81,8 +81,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
   let connection_gating (Any ((module M), t)) = M.connection_gating t
 
-  let set_connection_gating (Any ((module M), t)) config =
-    M.set_connection_gating t config
+  let set_connection_gating ?clean_added_peers (Any ((module M), t)) config =
+    M.set_connection_gating ?clean_added_peers t config
 
   let restart_helper (Any ((module M), t)) = M.restart_helper t
 end

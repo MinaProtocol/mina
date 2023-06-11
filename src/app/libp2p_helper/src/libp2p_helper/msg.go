@@ -177,8 +177,10 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 	if err != nil {
 		return nil, err
 	}
-	for _, peer := range addedPeers {
-		trustedPeers.Add(peer.ID)
+	if !gc.CleanAddedPeers() {
+		for _, peer := range addedPeers {
+			trustedPeers.Add(peer.ID)
+		}
 	}
 
 	return &codanet.CodaGatingConfig{

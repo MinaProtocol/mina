@@ -8,7 +8,6 @@
    core
    ppx_inline_test.config
    base.caml
-   ppx_version.runtime
    async_kernel
    core_kernel
    bin_prot.shape
@@ -24,6 +23,8 @@
    key_value_database
    network_peer
    run_in_thread
+   test_util
+   ppx_version.runtime
  )
  (inline_tests)
  (preprocess
@@ -31,7 +32,7 @@
     ppx_assert
     ppx_base
     ppx_bin_prot
-    ppx_coda
+    ppx_mina
     ppx_custom_printf
     ppx_deriving.std
     ppx_deriving_yojson

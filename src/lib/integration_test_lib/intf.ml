@@ -2,6 +2,7 @@ open Async_kernel
 open Core_kernel
 open Mina_base
 open Pipe_lib
+open Mina_transaction
 
 type metrics_t =
   { block_production_delay : int list
@@ -49,7 +50,12 @@ module Engine = struct
       val stop : t -> unit Malleable_error.t
 
       type signed_command_result =
-        { id : string; hash : Transaction_hash.t; nonce : Unsigned.uint32 }
+        { id : string
+        ; hash : Transaction_hash.t
+        ; nonce : Mina_numbers.Account_nonce.t
+        }
+
+      val graphql_uri : t -> string
 
       val send_payment :
            logger:Logger.t
@@ -78,8 +84,7 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> nonce:Mina_numbers.Account_nonce.t
         -> memo:string
-        -> token:Token_id.t
-        -> valid_until:Mina_numbers.Global_slot.t
+        -> valid_until:Mina_numbers.Global_slot_since_genesis.t
         -> raw_signature:string
         -> signed_command_result Deferred.Or_error.t
 
@@ -92,8 +97,7 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> nonce:Mina_numbers.Account_nonce.t
         -> memo:string
-        -> token:Token_id.t
-        -> valid_until:Mina_numbers.Global_slot.t
+        -> valid_until:Mina_numbers.Global_slot_since_genesis.t
         -> raw_signature:string
         -> signed_command_result Malleable_error.t
 
@@ -125,9 +129,17 @@ module Engine = struct
         -> new_snark_pub_key:Signature_lib.Public_key.Compressed.t
         -> unit Malleable_error.t
 
+      (** Send a batch of zkApp transactions.
+          Returned is a list of transaction id *)
+      val send_zkapp_batch :
+           logger:Logger.t
+        -> t
+        -> zkapp_commands:Mina_base.Zkapp_command.t list
+        -> string list Deferred.Or_error.t
+
       val must_send_test_payments :
-           repeat_count:Unsigned.uint32
-        -> repeat_delay_ms:Unsigned.uint32
+           repeat_count:Unsigned.UInt32.t
+        -> repeat_delay_ms:Unsigned.UInt32.t
         -> logger:Logger.t
         -> t
         -> senders:Signature_lib.Private_key.t list
@@ -137,18 +149,22 @@ module Engine = struct
         -> unit Malleable_error.t
 
       type account_data =
-        { nonce : Unsigned.uint32; total_balance : Currency.Balance.t }
+        { nonce : Mina_numbers.Account_nonce.t
+        ; total_balance : Currency.Balance.t
+        ; liquid_balance_opt : Currency.Balance.t option
+        ; locked_balance_opt : Currency.Balance.t option
+        }
 
       val get_account_data :
            logger:Logger.t
         -> t
-        -> public_key:Signature_lib.Public_key.Compressed.t
-        -> account_data Async_kernel.Deferred.Or_error.t
+        -> account_id:Mina_base.Account_id.t
+        -> account_data Deferred.Or_error.t
 
       val must_get_account_data :
            logger:Logger.t
         -> t
-        -> public_key:Signature_lib.Public_key.Compressed.t
+        -> account_id:Mina_base.Account_id.t
         -> account_data Malleable_error.t
 
       val get_filtered_log_entries :
@@ -162,10 +178,29 @@ module Engine = struct
         -> t
         -> unit Async_kernel.Deferred.Or_error.t
 
-      val get_peer_id :
+      val get_account_permissions :
            logger:Logger.t
         -> t
-        -> (string * string list) Async_kernel.Deferred.Or_error.t
+        -> account_id:Mina_base.Account_id.t
+        -> Mina_base.Permissions.t Deferred.Or_error.t
+
+      (** the returned Update.t is constructed from the fields of the
+          given account, as if it had been applied to the account
+      *)
+      val get_account_update :
+           logger:Logger.t
+        -> t
+        -> account_id:Mina_base.Account_id.t
+        -> Mina_base.Account_update.Update.t Deferred.Or_error.t
+
+      val get_pooled_zkapp_commands :
+           logger:Logger.t
+        -> t
+        -> pk:Signature_lib.Public_key.Compressed.t
+        -> string list Deferred.Or_error.t
+
+      val get_peer_id :
+        logger:Logger.t -> t -> (string * string list) Deferred.Or_error.t
 
       val must_get_peer_id :
         logger:Logger.t -> t -> (string * string list) Malleable_error.t
@@ -174,7 +209,7 @@ module Engine = struct
            ?max_length:int
         -> logger:Logger.t
         -> t
-        -> best_chain_block list Async_kernel.Deferred.Or_error.t
+        -> best_chain_block list Deferred.Or_error.t
 
       val must_get_best_chain :
            ?max_length:int
@@ -193,8 +228,7 @@ module Engine = struct
       val dump_precomputed_blocks :
         logger:Logger.t -> t -> unit Malleable_error.t
 
-      val get_metrics :
-        logger:Logger.t -> t -> metrics_t Async_kernel.Deferred.Or_error.t
+      val get_metrics : logger:Logger.t -> t -> metrics_t Deferred.Or_error.t
     end
 
     type t
@@ -346,6 +380,8 @@ module Dsl = struct
       | Signed_command_to_be_included_in_frontier
       | Ledger_proofs_emitted_since_genesis
       | Block_height_growth
+      | Zkapp_to_be_included_in_frontier
+      | Persisted_frontier_loaded
 
     val wait_condition_id : t -> wait_condition_id
 
@@ -372,6 +408,11 @@ module Dsl = struct
 
     val ledger_proofs_emitted_since_genesis :
       test_config:Test_config.t -> num_proofs:int -> t
+
+    val zkapp_to_be_included_in_frontier :
+      has_failures:bool -> zkapp_command:Mina_base.Zkapp_command.t -> t
+
+    val persisted_frontier_loaded : Engine.Network.Node.t -> t
   end
 
   module type S = sig
@@ -397,6 +438,8 @@ module Dsl = struct
     val section : string -> unit Malleable_error.t -> unit Malleable_error.t
 
     val network_state : t -> Network_state.t
+
+    val event_router : t -> Event_router.t
 
     val wait_for : t -> Wait_condition.t -> unit Malleable_error.t
 
