@@ -85,12 +85,10 @@ module Processor : sig
 
   val raw : ?log_level:Level.t -> unit -> t
 
-
   val raw_structured_log_events : Structured_log_events.Set.t -> t
 
-  (* val pretty : log_level:Level.t -> config:Logproc_lib.Interpolator.config -> t *)
-  val pretty : log_level:Level.t -> config:Interpolator_lib.Interpolator.config -> t
-  
+  val pretty :
+    log_level:Level.t -> config:Interpolator_lib.Interpolator.config -> t
 end
 
 (** A Transport is a module which represent a destination
@@ -107,24 +105,9 @@ module Transport : sig
 
   val create : (module S with type t = 'transport_data) -> 'transport_data -> t
 
-  module File_system : sig
-    (** Dumb_logrotate is a Transport which persists logs
-     *  to the file system by using `num_rotate` log files. This
-     *  Transport will rotate these logs, ensuring that
-     *  each log file is less than some maximum size
-     *  before writing to it. When the logs reach max
-     *  size, the old log is deleted and a new log is
-     *  started. *)
-    val dumb_logrotate :
-         directory:string
-      -> log_filename:string
-      -> max_size:int
-      -> num_rotate:int
-      -> t
-  end
-
   (** A transport that calls the given function on each log line *)
   val raw : (string -> unit) -> t
+
   val stdout : unit -> t
 end
 
