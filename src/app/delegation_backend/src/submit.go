@@ -109,12 +109,10 @@ func unmarshalPayload(payload []byte) (submitRequest, error) {
 			var reqV0 submitRequestV0
 			err = json.Unmarshal(payload, &reqV0)
 			req = reqV0
-			break
 		case 1:
 			var reqV1 submitRequestV1
 			err = json.Unmarshal(payload, &reqV1)
 			req = reqV1
-			break
 		default:
 			err = fmt.Errorf("unsupported payload version")
 		}
