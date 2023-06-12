@@ -340,6 +340,14 @@ module Features = struct
     ; runtime_tables = f runtime_tables
     }
 
+  let chunk v = map ~f:(Array.create ~len:1) v
+
+  let unchunk v = map ~f:(fun e -> e.(0)) v
+
+  let none_chunked = chunk none
+
+  let none_bool_chunked = chunk none_bool
+
   let map2 x1 x2 ~f =
     { range_check0 = f x1.range_check0 x2.range_check0
     ; range_check1 = f x1.range_check1 x2.range_check1

@@ -89,6 +89,18 @@ module Features : sig
 
   type chunked_flags = bool chunked
 
+  (** {2 Constants}*)
+
+  val none : options
+
+  val none_chunked : chunked_options
+
+  val none_bool : flags
+
+  val none_bool_chunked : chunked_flags
+
+  (** {2 Conversion functions and serializers} *)
+
   val to_data :
        'a t
     -> ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
@@ -104,11 +116,14 @@ module Features : sig
     -> feature_flags:options
     -> ('var t, bool t, 'f) Snarky_backendless.Typ.t
 
-  val none : options
-
-  val none_bool : flags
+  (** {2 Iterators} *)
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
+
+  (** [chunk] is [map ~f:(Array.create ~len:1)] *)
+  val chunk : 'a t -> 'a chunked
+
+  val unchunk : 'a chunked -> 'a t
 
   val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t
 end
@@ -370,7 +385,7 @@ module All_evals : sig
 
   val typ :
        (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-    -> Opt.Flag.t Features.t
+    -> Features.chunked_options
     -> ( ( 'f Snarky_backendless.Cvar.t
          , 'f Snarky_backendless.Cvar.t array
          , 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )
