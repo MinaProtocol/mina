@@ -1,27 +1,10 @@
 open Async
 open Core
-
-(* open Integration_test_lib.Util *)
 open Integration_test_lib
 module Timeout = Timeout_lib.Core_time
 module Node = Kubernetes_network.Node
 
 (** This implements Log_engine_intf for integration tests, by creating a simple system that polls a mina daemon's graphql endpoint for fetching logs*)
-
-(* let yojson_from_string json_str =
-   Or_error.try_with (fun () -> Yojson.Safe.from_string json_str) *)
-
-(* let or_error_list_fold ls ~init ~f =
-     let open Or_error.Let_syntax in
-     List.fold ls ~init:(return init) ~f:(fun acc_or_error el ->
-         let%bind acc = acc_or_error in
-         f acc el )
-
-   let or_error_list_map ls ~f =
-     let open Or_error.Let_syntax in
-     or_error_list_fold ls ~init:[] ~f:(fun t el ->
-         let%map h = f el in
-         h :: t ) *)
 
 let log_filter_of_event_type ev_existential =
   let open Event_type in
