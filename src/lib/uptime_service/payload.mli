@@ -4,7 +4,7 @@ type block_data =
   ; peer_id : string
   ; snark_work : string option
   ; graphql_control_port : int option
-  ; built_with_commit_sha : string option
+  ; built_with_commit_sha : string
   }
 [@@deriving to_yojson]
 

@@ -11,7 +11,7 @@ import (
 
 type submitRequestDataV1 struct {
 	submitRequestDataV0
-	GraphqlControlPort int    `json:"graphql_control_port"`
+	GraphqlControlPort int    `json:"graphql_control_port,omitempty"`
 	BuiltWithCommitSha string `json:"built_with_commit_sha"`
 }
 type submitRequestV1 struct {
@@ -21,7 +21,7 @@ type submitRequestV1 struct {
 
 type MetaToBeSavedV1 struct {
 	MetaToBeSavedV0
-	GraphqlControlPort int    `json:"graphql_control_port"`
+	GraphqlControlPort int    `json:"graphql_control_port,omitempty"`
 	BuiltWithCommitSha string `json:"built_with_commit_sha"`
 }
 
@@ -38,8 +38,7 @@ func (req submitRequestV1) GetBlockDataHash() string {
 	return base58.CheckEncode(blockHashBytes[:], BASE58CHECK_VERSION_BLOCK_HASH)
 }
 
-func (r submitRequestV1) MakeSignPayload() ([]byte, error) {
-	req := &r.Data
+func (req submitRequestDataV1) MakeSignPayload() ([]byte, error) {
 	createdAtStr := req.CreatedAt.UTC().Format(time.RFC3339)
 	createdAtJson, err2 := json.Marshal(createdAtStr)
 	if err2 != nil {
@@ -57,8 +56,13 @@ func (r submitRequestV1) MakeSignPayload() ([]byte, error) {
 		signPayload.WriteString(",\"snark_work\":")
 		signPayload.Write(req.SnarkWork.json)
 	}
-	signPayload.WriteString(",\"graphql_control_port\":")
-	signPayload.WriteString(fmt.Sprintf("%d", req.GraphqlControlPort))
+	if req.GraphqlControlPort != 0 {
+		signPayload.WriteString(",\"graphql_control_port\":")
+		signPayload.WriteString(fmt.Sprintf("%d", req.GraphqlControlPort))
+	}
+	signPayload.WriteString(",\"built_with_commit_sha\":\"")
+	signPayload.WriteString(req.BuiltWithCommitSha)
+	signPayload.WriteString("\"")
 	signPayload.WriteString("}")
 	return signPayload.Buf.Bytes(), signPayload.Err
 }
@@ -85,7 +89,7 @@ func (req submitRequestV1) MakeMetaToBeSaved(remoteAddr string) ([]byte, error) 
 
 func (req submitRequestV1) CheckRequiredFields() bool {
 	return req.Data.BuiltWithCommitSha != "" && req.Data.Block != nil && req.Data.PeerId != "" &&
-		req.Data.CreatedAt != nilTime && req.Submitter != nilPk && req.Sig != nilSig && req.Data.GraphqlControlPort != 0
+		req.Data.CreatedAt != nilTime && req.Submitter != nilPk && req.Sig != nilSig
 }
 
 func (req submitRequestV1) GetBlockData() []byte {
