@@ -31,18 +31,16 @@ func mkB64B(b []byte) *Base64 {
 }
 
 func TestSignPayloadGeneration(t *testing.T) {
-	req := new(submitRequestV1)
+	req := new(submitRequestV0)
 	req.Data.PeerId = "MLF0jAGTpL84LLerLddNs5M10NCHM+BwNeMxK78+"
 	req.Data.Block = mkB64("zLgvHQzxSh8MWlTjXK+cMA==")
 	req.Data.CreatedAt, _ = time.Parse(time.RFC3339, "2021-07-01T19:21:33+03:00")
-	json, err := req.MakeSignPayload()
+	json, err := req.Data.MakeSignPayload()
 	if err != nil || !bytes.Equal(json, []byte(TSPG_EXPECTED_1)) {
 		t.FailNow()
 	}
 	req.Data.SnarkWork = mkB64("Bjtox/3Yu4cT5eVCQz/JQ+P3Ce1JmCIE7N6b1MAa")
-	req.Data.GraphqlControlPort = 1234
-	req.Data.BuiltWithCommitSha = "26f4f27810edd44b991e7942ffc49daebbf99a80"
-	json, err = req.MakeSignPayload()
+	json, err = req.Data.MakeSignPayload()
 	if err != nil || !bytes.Equal(json, []byte(TSPG_EXPECTED_2)) {
 		t.FailNow()
 	}
@@ -67,11 +65,11 @@ func testSubmitH(maxAttempt int, initWl Whitelist) (*ObjectsToSave, *SubmitH, *t
 	return &storage, app.NewSubmitH(), tm
 }
 
-const v1Submit = "http://127.0.0.1/v1/submit"
+const V0Submit = "http://127.0.0.1/V0/submit"
 
 func (sh *SubmitH) testRequest(body []byte) *httptest.ResponseRecorder {
 	recorder := httptest.NewRecorder()
-	req := httptest.NewRequest("POST", v1Submit, bytes.NewReader(body))
+	req := httptest.NewRequest("POST", V0Submit, bytes.NewReader(body))
 	sh.ServeHTTP(recorder, req)
 	return recorder
 }
@@ -89,7 +87,7 @@ func TestWrongLengthProvided(t *testing.T) {
 	body := readTestFile("req-no-snark", t)
 	_, sh, _ := testSubmitH(1, Whitelist{})
 	rep := httptest.NewRecorder()
-	req := httptest.NewRequest("POST", v1Submit, bytes.NewReader(body))
+	req := httptest.NewRequest("POST", V0Submit, bytes.NewReader(body))
 	req.ContentLength = req.ContentLength + 100
 	sh.ServeHTTP(rep, req)
 	if rep.Code != 400 {
@@ -102,7 +100,7 @@ func TestNoLengthProvided(t *testing.T) {
 	body := readTestFile("req-no-snark", t)
 	_, sh, _ := testSubmitH(1, Whitelist{})
 	rep := httptest.NewRecorder()
-	req := httptest.NewRequest("POST", v1Submit, bytes.NewReader(body))
+	req := httptest.NewRequest("POST", V0Submit, bytes.NewReader(body))
 	req.ContentLength = -1
 	sh.ServeHTTP(rep, req)
 	if rep.Code != 411 {
@@ -112,7 +110,7 @@ func TestNoLengthProvided(t *testing.T) {
 }
 
 func TestTooLarge(t *testing.T) {
-	var req submitRequestV1
+	var req submitRequestV0
 	if err := json.Unmarshal(readTestFile("req-no-snark", t), &req); err != nil {
 		t.Log("failed decoding test file")
 		t.FailNow()
@@ -145,7 +143,7 @@ func TestUnauthorized(t *testing.T) {
 
 func TestPkLimitExceeded(t *testing.T) {
 	body := readTestFile("req-with-snark", t)
-	var req submitRequestV1
+	var req submitRequestV0
 	if err := json.Unmarshal(body, &req); err != nil {
 		t.Log("failed decoding test file")
 		t.FailNow()
@@ -179,7 +177,7 @@ func TestSuccess(t *testing.T) {
 	testNames := []string{"req-no-snark", "req-with-snark"}
 	for _, f := range testNames {
 		body := readTestFile(f, t)
-		var req submitRequestV1
+		var req submitRequestV0
 		if err := json.Unmarshal(body, &req); err != nil {
 			t.Logf("failed decoding test file %s", f)
 			t.FailNow()
@@ -190,14 +188,13 @@ func TestSuccess(t *testing.T) {
 			t.Logf("Failed testing %s: %v", f, rep)
 			t.FailNow()
 		}
-		bhStr := req.GetBlockDataHash()
+		bhStr := req.Data.GetBlockDataHash()
 		paths := makePaths(tm.Now(), bhStr, req.GetSubmitter())
-		var meta MetaToBeSavedV1
+		var meta MetaToBeSavedV0
 		meta.CreatedAt = req.Data.CreatedAt.Format(time.RFC3339)
 		meta.PeerId = req.Data.PeerId
 		meta.SnarkWork = req.Data.SnarkWork
 		meta.RemoteAddr = "192.0.2.1:1234"
-		meta.BuiltWithCommitSha = req.Data.BuiltWithCommitSha
 		meta.BlockHash = bhStr
 		meta.Submitter = req.Submitter
 		metaBytes, err2 := json.Marshal(meta)
@@ -211,7 +208,7 @@ func TestSuccess(t *testing.T) {
 
 func Test40x(t *testing.T) {
 	body := readTestFile("req-with-snark", t)
-	var req submitRequestV1
+	var req submitRequestV0
 	if err := json.Unmarshal(body, &req); err != nil {
 		t.Log("failed decoding test file")
 		t.FailNow()

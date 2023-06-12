@@ -25,12 +25,12 @@ func testVerifySig(pkStr string, sigStr string, data []byte, t *testing.T) {
 
 func testVerifyRequest(name string, t *testing.T) {
 	body := readTestFile(name, t)
-	var req submitRequest
+	var req submitRequestV0
 	if err := json.Unmarshal(body, &req); err != nil {
 		t.Log("failed decoding test file")
 		t.FailNow()
 	}
-	j, err := req.MakeSignPayload()
+	j, err := req.Data.MakeSignPayload()
 	if err != nil {
 		t.FailNow()
 	}
