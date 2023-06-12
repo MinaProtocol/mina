@@ -88,7 +88,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
         Schematically, from the circuit point-of-view, we can say a proof is
      - a sequence of F_0 elements xs_0
-     - a sequence of F_1 elelements xs_1
+     - a sequence of F_1 elements xs_1
         and a verifier is a pair of "snarky functions"
      - check_0 : F_0 list -> F_1 list -> unit which uses the Impl with Field.t = F_0
      - check_1 : F_0 list -> F_1 list -> unit which uses the Impl with Field.t = F_1
