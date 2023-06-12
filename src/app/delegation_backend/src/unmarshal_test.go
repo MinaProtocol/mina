@@ -5,7 +5,7 @@ import (
 )
 
 func TestUnmarshalSuccess(t *testing.T) {
-	testNames := []string{"req-no-snark", "req-with-snark"}
+	testNames := []string{"req-no-snark", "req-with-snark", "req-v1-with-snark"}
 	for _, f := range testNames {
 		body := readTestFile(f, t)
 
@@ -15,12 +15,12 @@ func TestUnmarshalSuccess(t *testing.T) {
 			t.Logf(err.Error())
 			t.FailNow()
 		}
-		if req.GetPayloadVersion() != 0 {
-			t.Logf("wrong payload version. expected 0 but got %d", req.GetPayloadVersion())
+		if req == nil {
+			t.Logf("unmarshal returned empty payload %s", f)
 			t.FailNow()
 		}
-		if req == nil {
-			t.Log("unmarshal returned empty payload")
+		if !req.CheckRequiredFields() {
+			t.Logf("missing required fields in payload %s", f)
 			t.FailNow()
 		}
 	}
