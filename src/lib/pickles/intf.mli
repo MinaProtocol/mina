@@ -138,6 +138,8 @@ module Group (Impl : Snarky_backendless.Snark_intf.Run) : sig
   module type S = sig
     type t
 
+    (** Parameters for the elliptic curve given in Weierstrass form in affine coordinates (i.e.
+        [y^2 = x^3 + a x + b]) *)
     module Params : sig
       val a : Impl.Field.Constant.t
 
@@ -151,6 +153,7 @@ module Group (Impl : Snarky_backendless.Snark_intf.Run) : sig
 
       val negate : t -> t
 
+      (** The scalar field of the elliptic curve *)
       module Scalar : sig
         include Plonk_checks.Field_intf
 
