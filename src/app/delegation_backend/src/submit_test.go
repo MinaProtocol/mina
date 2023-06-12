@@ -65,11 +65,11 @@ func testSubmitH(maxAttempt int, initWl Whitelist) (*ObjectsToSave, *SubmitH, *t
 	return &storage, app.NewSubmitH(), tm
 }
 
-const V0Submit = "http://127.0.0.1/V0/submit"
+const v1Submit = "http://127.0.0.1/v1/submit"
 
 func (sh *SubmitH) testRequest(body []byte) *httptest.ResponseRecorder {
 	recorder := httptest.NewRecorder()
-	req := httptest.NewRequest("POST", V0Submit, bytes.NewReader(body))
+	req := httptest.NewRequest("POST", v1Submit, bytes.NewReader(body))
 	sh.ServeHTTP(recorder, req)
 	return recorder
 }
@@ -87,7 +87,7 @@ func TestWrongLengthProvided(t *testing.T) {
 	body := readTestFile("req-no-snark", t)
 	_, sh, _ := testSubmitH(1, Whitelist{})
 	rep := httptest.NewRecorder()
-	req := httptest.NewRequest("POST", V0Submit, bytes.NewReader(body))
+	req := httptest.NewRequest("POST", v1Submit, bytes.NewReader(body))
 	req.ContentLength = req.ContentLength + 100
 	sh.ServeHTTP(rep, req)
 	if rep.Code != 400 {
@@ -100,7 +100,7 @@ func TestNoLengthProvided(t *testing.T) {
 	body := readTestFile("req-no-snark", t)
 	_, sh, _ := testSubmitH(1, Whitelist{})
 	rep := httptest.NewRecorder()
-	req := httptest.NewRequest("POST", V0Submit, bytes.NewReader(body))
+	req := httptest.NewRequest("POST", v1Submit, bytes.NewReader(body))
 	req.ContentLength = -1
 	sh.ServeHTTP(rep, req)
 	if rep.Code != 411 {
