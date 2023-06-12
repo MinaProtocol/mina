@@ -127,18 +127,24 @@ func (boe *BufferOrError) Write(b []byte) {
 	}
 }
 
-type submitRequestSubmitterSig struct {
-	Submitter Pk  `json:"submitter"`
-	Sig       Sig `json:"signature"`
+type submitRequestData interface {
+	GetCreatedAt() time.Time
+	GetBlockData() []byte
+	GetBlockDataHash() string
+	MakeSignPayload() ([]byte, error)
+}
+
+type submitRequestCommon struct {
+	PayloadVersion int `json:"version"`
+	Submitter      Pk  `json:"submitter"`
+	Sig            Sig `json:"signature"`
 }
 
 type submitRequest interface {
+	GetPayloadVersion() int
 	GetSubmitter() Pk
 	GetSig() Sig
-	GetBlockDataHash() string
-	MakeSignPayload() ([]byte, error)
-	GetCreatedAt() time.Time
+	GetData() submitRequestData
 	MakeMetaToBeSaved(string) ([]byte, error)
 	CheckRequiredFields() bool
-	GetBlockData() []byte
 }

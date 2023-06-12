@@ -11,15 +11,17 @@ import (
 
 type submitRequestDataV1 struct {
 	submitRequestDataV0
+	GraphqlControlPort int    `json:"graphql_control_port"`
 	BuiltWithCommitSha string `json:"built_with_commit_sha"`
 }
 type submitRequestV1 struct {
+	submitRequestCommon
 	Data submitRequestDataV1 `json:"data"`
-	submitRequestSubmitterSig
 }
 
 type MetaToBeSavedV1 struct {
 	MetaToBeSavedV0
+	GraphqlControlPort int    `json:"graphql_control_port"`
 	BuiltWithCommitSha string `json:"built_with_commit_sha"`
 }
 
@@ -55,10 +57,8 @@ func (r submitRequestV1) MakeSignPayload() ([]byte, error) {
 		signPayload.WriteString(",\"snark_work\":")
 		signPayload.Write(req.SnarkWork.json)
 	}
-	if req.GraphqlControlPort != 0 {
-		signPayload.WriteString(",\"graphql_control_port\":")
-		signPayload.WriteString(fmt.Sprintf("%d", req.GraphqlControlPort))
-	}
+	signPayload.WriteString(",\"graphql_control_port\":")
+	signPayload.WriteString(fmt.Sprintf("%d", req.GraphqlControlPort))
 	signPayload.WriteString("}")
 	return signPayload.Buf.Bytes(), signPayload.Err
 }
@@ -70,13 +70,13 @@ func (req submitRequestV1) GetCreatedAt() time.Time {
 func (req submitRequestV1) MakeMetaToBeSaved(remoteAddr string) ([]byte, error) {
 	meta := MetaToBeSavedV1{
 		MetaToBeSavedV0: MetaToBeSavedV0{
-			CreatedAt:          req.Data.CreatedAt.Format(time.RFC3339),
-			PeerId:             req.Data.PeerId,
-			SnarkWork:          req.Data.SnarkWork,
-			RemoteAddr:         remoteAddr,
-			BlockHash:          req.GetBlockDataHash(),
-			Submitter:          req.Submitter,
-			GraphqlControlPort: req.Data.GraphqlControlPort},
+			CreatedAt:  req.Data.CreatedAt.Format(time.RFC3339),
+			PeerId:     req.Data.PeerId,
+			SnarkWork:  req.Data.SnarkWork,
+			RemoteAddr: remoteAddr,
+			BlockHash:  req.GetBlockDataHash(),
+			Submitter:  req.Submitter},
+		GraphqlControlPort: req.Data.GraphqlControlPort,
 		BuiltWithCommitSha: req.Data.BuiltWithCommitSha,
 	}
 
@@ -84,9 +84,18 @@ func (req submitRequestV1) MakeMetaToBeSaved(remoteAddr string) ([]byte, error) 
 }
 
 func (req submitRequestV1) CheckRequiredFields() bool {
-	return req.Data.BuiltWithCommitSha != "" && req.Data.Block != nil && req.Data.PeerId != "" && req.Data.CreatedAt != nilTime && req.Submitter != nilPk && req.Sig != nilSig
+	return req.Data.BuiltWithCommitSha != "" && req.Data.Block != nil && req.Data.PeerId != "" &&
+		req.Data.CreatedAt != nilTime && req.Submitter != nilPk && req.Sig != nilSig && req.Data.GraphqlControlPort != 0
 }
 
 func (req submitRequestV1) GetBlockData() []byte {
 	return req.Data.Block.data
+}
+
+func (req submitRequestV1) GetData() submitRequestData {
+	return req.Data
+}
+
+func (req submitRequestV1) GetPayloadVersion() int {
+	return req.PayloadVersion
 }

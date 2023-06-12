@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -96,6 +97,31 @@ var nilSig Sig
 var nilPk Pk
 var nilTime time.Time
 
+func unmarshalPayload(payload []byte) (submitRequest, error) {
+	var reqCommon submitRequestCommon
+	var err error
+	if err = json.Unmarshal(payload, &reqCommon); err != nil {
+		return nil, err
+	} else {
+		var req submitRequest
+		switch reqCommon.PayloadVersion {
+		case 0:
+			var reqV0 submitRequestV0
+			err = json.Unmarshal(payload, &reqV0)
+			req = reqV0
+			break
+		case 1:
+			var reqV1 submitRequestV1
+			err = json.Unmarshal(payload, &reqV1)
+			req = reqV1
+			break
+		default:
+			err = fmt.Errorf("unsupported payload version")
+		}
+		return req, err
+	}
+}
+
 func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.ContentLength == -1 {
 		w.WriteHeader(411)
@@ -111,19 +137,12 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeErrorResponse(h.app, &w, "Error reading the body")
 		return
 	}
-	var req submitRequest
-	var reqV1 submitRequestV1
-	var reqV0 submitRequestV0
-	if err := json.Unmarshal(body, &reqV1); err == nil {
-		req = reqV1
-		h.app.Log.Debugf("Received /submit request with v1 payload")
-	} else if err := json.Unmarshal(body, &reqV0); err == nil {
-		req = reqV0
-		h.app.Log.Debugf("Received /submit request with v0 payload")
-	} else {
+
+	req, err := unmarshalPayload(body)
+	if err != nil {
 		h.app.Log.Debugf("Error while unmarshaling JSON of /submit request's body: %v", err)
 		w.WriteHeader(400)
-		writeErrorResponse(h.app, &w, "Wrong payload")
+		writeErrorResponse(h.app, &w, "Error decoding payload")
 		return
 	}
 
@@ -145,14 +164,14 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	submittedAt := h.app.Now()
-	if req.GetCreatedAt().Add(TIME_DIFF_DELTA).After(submittedAt) {
+	if req.GetData().GetCreatedAt().Add(TIME_DIFF_DELTA).After(submittedAt) {
 		h.app.Log.Debugf("Field created_at is a timestamp in future: %v", submittedAt)
 		w.WriteHeader(400)
 		writeErrorResponse(h.app, &w, "Field created_at is a timestamp in future")
 		return
 	}
 
-	payload, err := req.MakeSignPayload()
+	payload, err := req.GetData().MakeSignPayload()
 	if err != nil {
 		h.app.Log.Errorf("Error while unmarshaling JSON of /submit request's body: %v", err)
 		w.WriteHeader(500)
@@ -174,7 +193,7 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	blockHash := req.GetBlockDataHash()
+	blockHash := req.GetData().GetBlockDataHash()
 	ps := makePaths(submittedAt, blockHash, submitter)
 
 	remoteAddr := r.Header.Get("X-Forwarded-For")
@@ -193,7 +212,7 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	toSave := make(ObjectsToSave)
 	toSave[ps.Meta] = metaBytes
-	toSave[ps.Block] = []byte(req.GetBlockData())
+	toSave[ps.Block] = []byte(req.GetData().GetBlockData())
 	h.app.Save(toSave)
 
 	_, err2 := io.Copy(w, bytes.NewReader([]byte("{\"status\":\"ok\"}")))
