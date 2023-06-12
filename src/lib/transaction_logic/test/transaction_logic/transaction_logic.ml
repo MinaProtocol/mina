@@ -18,8 +18,8 @@ let expect_failure ~error = function
   | Error e ->
       failwithf "Unexpected error: '%s'." (Error.to_string_hum e) ()
 
-let signed_command ?(valid_until = Global_slot.max_value) ?signer ~sender
-    ~receiver ~fee amount =
+let signed_command ?(valid_until = Global_slot_since_genesis.max_value) ?signer
+    ~sender ~receiver ~fee amount =
   let open Mina_transaction.Transaction in
   let open Test_account in
   let signer =
@@ -52,7 +52,7 @@ let balance_to_fee b = Balance.to_amount b |> Amount.to_fee
 
 let setup =
   let open Quickcheck.Generator.Let_syntax in
-  let%bind global_slot = Global_slot.gen in
+  let%bind global_slot = Global_slot_since_genesis.gen in
   (* Sender must pay at least 1 nanomina of fee and at least 1 nanomina of transfer. *)
   let%bind sender =
     Test_account.gen_constrained_balance () ~min:Balance.(of_nanomina_int_exn 2)
@@ -84,7 +84,7 @@ let simple_payment () =
   Quickcheck.test setup ~f:(fun (global_slot, sender, receiver, amount, fee) ->
       let accounts = [ sender; receiver ] in
       let txn = signed_command ~fee ~sender ~receiver amount in
-      let txn_state_view = protocol_state ~global_slot accounts in
+      let txn_state_view = protocol_state in
       let ledger =
         match test_ledger accounts with Ok l -> l | Error _ -> assert false
       in
@@ -96,7 +96,7 @@ let simple_payment_signer_different_from_fee_payer () =
   Quickcheck.test setup ~f:(fun (global_slot, sender, receiver, amount, fee) ->
       let accounts = [ sender; receiver ] in
       let txn = signed_command ~signer:receiver ~fee ~sender ~receiver amount in
-      let txn_state_view = protocol_state ~global_slot accounts in
+      let txn_state_view = protocol_state in
       let ledger =
         match test_ledger accounts with Ok l -> l | Error _ -> assert false
       in

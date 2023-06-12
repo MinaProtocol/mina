@@ -118,7 +118,7 @@ let%test_module "Test transaction logic." =
           Amount.(gen_incl (of_nanomina_int_exn 1) max_amount)
         in
         let amount = Amount.Signed.of_unsigned unsigned_amount in
-        let update = Single.make ~account:account.pk amount in
+        let update = Single.make ~account amount in
         let%map fee = Fee.(gen_incl zero (balance_to_fee account.balance)) in
         (account.pk, fee, [ account ], [ (update :> transaction) ]))
         ~f:(fun (fee_payer, fee, accounts, txns) ->
@@ -140,7 +140,7 @@ let%test_module "Test transaction logic." =
           Test_account.gen_constrained_balance ~min ()
         in
         let amount = Amount.Signed.(negate @@ of_unsigned unsigned_amount) in
-        let update = Single.make ~account:account.pk amount in
+        let update = Single.make ~account amount in
         let max_fee =
           Balance.(account.balance - unsigned_amount)
           |> Option.value_map ~default:Fee.zero ~f:balance_to_fee
@@ -164,7 +164,7 @@ let%test_module "Test transaction logic." =
            fail if the symbol exceeds that limit.*)
         let%bind token = String.gen_with_length 6 Char.gen_uppercase in
         let txn =
-          Alter_account.make ~account:account.pk
+          Alter_account.make ~account
             { Account_update.Update.noop with token_symbol = Set token }
         in
         let%map fee = Fee.(gen_incl zero (balance_to_fee account.balance)) in
@@ -193,7 +193,7 @@ let%test_module "Test transaction logic." =
         let%bind delegator = Test_account.gen in
         let%bind delegate = Test_account.gen in
         let txn =
-          Alter_account.make ~account:delegator.pk
+          Alter_account.make ~account:delegator
             { Account_update.Update.noop with delegate = Set delegate.pk }
         in
         let%map fee = Fee.(gen_incl zero (balance_to_fee delegate.balance)) in
@@ -220,12 +220,16 @@ let%test_module "Test transaction logic." =
         (let open Quickcheck in
         let open Generator.Let_syntax in
         let%bind token_owner, token_id = Test_account.gen_custom_token in
-        let%bind delegator = Test_account.gen in
-        let%bind delegate = Test_account.gen in
+        let%bind delegator =
+          Test_account.(Generator.map ~f:(set_token_id token_id) gen)
+        in
+        let%bind delegate =
+          Test_account.(Generator.map ~f:(set_token_id token_id) gen)
+        in
         let txn =
-          ( Txn_tree.make ~account:token_owner.pk
+          ( Txn_tree.make ~account:token_owner
               ~children:
-                [ ( Alter_account.make ~account:delegator.pk ~token_id
+                [ ( Alter_account.make ~account:delegator
                       { Account_update.Update.noop with
                         delegate = Set delegate.pk
                       }
@@ -234,20 +238,11 @@ let%test_module "Test transaction logic." =
               Account_update.Update.noop
             :> transaction )
         in
-        let%bind fee =
+        let%map fee =
           Fee.(gen_incl zero (balance_to_fee token_owner.balance))
         in
-        let%map global_slot = Global_slot.gen in
-        ( global_slot
-        , token_owner.pk
-        , fee
-        , Test_account.
-            [ token_owner
-            ; set_token_id token_id delegator
-            ; set_token_id token_id delegate
-            ]
-        , [ txn ] ))
-        ~f:(fun (global_slot, fee_payer, fee, accounts, txns) ->
+        (token_owner.pk, fee, [ token_owner; delegator; delegate ], [ txn ]))
+        ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
             (Predicates.pure ~f:(fun (txn, ledger) ->
                  let delegator = List.hd_exn accounts in
@@ -267,7 +262,7 @@ let%test_module "Test transaction logic." =
                             updt.delegate
                       | _ ->
                           false ) ) )
-            (run_zkapp_cmd ~global_slot ~fee_payer ~fee ~accounts txns) )
+            (run_zkapp_cmd ~fee_payer ~fee ~accounts txns) )
 
     (* It is assumed here that the account is indeed a zkApp account. Presumably
        it's being checked elsewhere. If there's no zkApp associated with the
@@ -285,7 +280,7 @@ let%test_module "Test transaction logic." =
                   not @@ String.equal uri zkapp.zkapp_uri ) )
         in
         let txn =
-          Alter_account.make ~account:account.pk
+          Alter_account.make ~account
             { Account_update.Update.noop with zkapp_uri = Set uri }
         in
         let%map fee = Fee.(gen_incl zero (balance_to_fee account.balance)) in
@@ -338,7 +333,7 @@ let%test_module "Test transaction logic." =
           (* Timing is guaranteed to return a proper timing. *)
         in
         let txn =
-          Alter_account.make ~account:account.pk
+          Alter_account.make ~account
             { Account_update.Update.noop with timing = Set timing_info }
         in
         (* Fee can't result in the balance falling below the set minimum. *)
@@ -400,7 +395,7 @@ let%test_module "Test transaction logic." =
           (* Timing is guaranteed to return a proper timing. *)
         in
         let txn =
-          Alter_account.make ~account:account.pk
+          Alter_account.make ~account
             { Account_update.Update.noop with timing = Set timing_info }
         in
         (account.pk, Fee.zero, [ account ], [ (txn :> transaction) ]))
@@ -417,7 +412,7 @@ let%test_module "Test transaction logic." =
         let%bind account = Test_account.gen in
         let%bind state_hash = State_hash.gen in
         let txn =
-          Alter_account.make ~account:account.pk
+          Alter_account.make ~account
             { Account_update.Update.noop with voting_for = Set state_hash }
         in
         let%map fee = Fee.(gen_incl zero (balance_to_fee account.balance)) in
@@ -443,7 +438,7 @@ let%test_module "Test transaction logic." =
         let%bind account = Test_account.gen in
         let%bind perms = Permissions.gen ~auth_tag:Proof in
         let txn =
-          Alter_account.make ~account:account.pk
+          Alter_account.make ~account
             { Account_update.Update.noop with permissions = Set perms }
         in
         let%map fee = Fee.(gen_incl zero (balance_to_fee account.balance)) in
@@ -475,7 +470,7 @@ let%test_module "Test transaction logic." =
         in
         let app_state = Zkapp_state.V.of_list_exn app_state_update in
         let txn =
-          Alter_account.make ~account:account.pk
+          Alter_account.make ~account
             { Account_update.Update.noop with app_state }
         in
         let zk_app_state =
@@ -529,7 +524,7 @@ let%test_module "Test transaction logic." =
           Amount.(gen_incl (of_nanomina_int_exn 1) max_amount)
         in
         let alter_perms =
-          Alter_account.make ~account:sender.pk
+          Alter_account.make ~account:sender
             { Account_update.Update.noop with
               (* These settings actually matter for this scenario, so they must
                  be fixed. We try to increment nonces in the process, so that
@@ -539,9 +534,7 @@ let%test_module "Test transaction logic." =
                 Set { perms with send = Proof; increment_nonce = None }
             }
         in
-        let mina_transfer =
-          Simple_txn.make ~sender:sender.pk ~receiver:receiver.pk amount
-        in
+        let mina_transfer = Simple_txn.make ~sender ~receiver amount in
         let txns =
           [ (alter_perms :> transaction); (mina_transfer :> transaction) ]
         in
@@ -576,12 +569,8 @@ let%test_module "Test transaction logic." =
         let%bind amount2 = Amount.(gen_incl (of_nanomina_int_exn 1) max_int) in
         let%bind receiver1 = Test_account.gen_empty in
         let%map receiver2 = Test_account.gen_empty in
-        let txn1 =
-          Simple_txn.make ~sender:sender.pk ~receiver:receiver1.pk amount1
-        in
-        let txn2 =
-          Simple_txn.make ~sender:sender.pk ~receiver:receiver2.pk amount2
-        in
+        let txn1 = Simple_txn.make ~sender ~receiver:receiver1 amount1 in
+        let txn2 = Simple_txn.make ~sender ~receiver:receiver2 amount2 in
         ( sender.pk
         , fee
         , [ sender; receiver1; receiver2 ]
@@ -611,7 +600,7 @@ let%test_module "Test transaction logic." =
         in
         let%bind delegate = Test_account.gen in
         let txn =
-          Alter_account.make ~account:delegator.pk
+          Alter_account.make ~account:delegator
             { Account_update.Update.noop with delegate = Set delegate.pk }
         in
         let min_fee =
@@ -646,9 +635,7 @@ let%test_module "Test transaction logic." =
           Amount.(gen_incl one Balance.(to_amount account.balance))
         in
         let%map fee = Fee.(gen_incl one Amount.(to_fee amount)) in
-        let txn =
-          Simple_txn.make ~sender:account.pk ~receiver:fee_payer.pk amount
-        in
+        let txn = Simple_txn.make ~sender:account ~receiver:fee_payer amount in
         (fee_payer.pk, fee, [ fee_payer; account ], [ (txn :> transaction) ]))
         ~f:(fun (fee_payer, fee, accounts, txns) ->
           [%test_pred: Zk_cmd_result.t Or_error.t]
@@ -681,10 +668,10 @@ let%test_module "Test transaction logic." =
                ~max:Balance.(Option.value_exn @@ (max_int - amount))
         in
         let txns =
-          Single.make ~account:sender.pk
+          Single.make ~account:sender
             Amount.Signed.(negate @@ of_unsigned total)
           :: List.map receivers ~f:(fun r ->
-                 Single.make ~account:r.pk Amount.Signed.(of_unsigned amount) )
+                 Single.make ~account:r Amount.Signed.(of_unsigned amount) )
         in
         let max_fee =
           Balance.(sender.balance - total)
@@ -724,8 +711,8 @@ let%test_module "Test transaction logic." =
         let txns =
           List.concat_map [ alice; bob ] ~f:(fun account ->
               let open Amount.Signed in
-              [ Single.make ~account:account.pk (negate amount)
-              ; Single.make ~account:account.pk amount
+              [ Single.make ~account (negate amount)
+              ; Single.make ~account amount
               ] )
         in
         (alice.pk, Fee.zero, [ alice; bob ], (txns :> transaction list)))
@@ -770,16 +757,16 @@ let%test_module "Test transaction logic." =
               in
               let bal_increase = Amount.Signed.of_unsigned funds' in
               let children =
-                [ (Single.make ~account:receiver1.pk bal_increase :> transaction)
-                ; (Single.make ~account:receiver2.pk bal_increase :> transaction)
+                [ (Single.make ~account:receiver1 bal_increase :> transaction)
+                ; (Single.make ~account:receiver2 bal_increase :> transaction)
                 ]
                 @ gen_txns funds'
                     (receiver1 :: List.take accs (remaining_accounts / 2))
                 @ gen_txns funds'
                     (receiver2 :: List.drop accs (remaining_accounts / 2))
               in
-              [ ( Txn_tree.make ~account:sender.pk ~amount:bal_decrease
-                    ~children Account_update.Update.noop
+              [ ( Txn_tree.make ~account:sender ~amount:bal_decrease ~children
+                    Account_update.Update.noop
                   :> transaction )
               ]
           | _ ->
@@ -833,22 +820,22 @@ let%test_module "Test transaction logic." =
              2 overflows in the results and not just 1. Caroll on the other hands
              receives 600 MINA before she gives away 100 MINA, so that one
              does not overflow. *)
-          [ ( Txn_tree.make ~account:alice.pk
+          [ ( Txn_tree.make ~account:alice
                 ~amount:
                   Amount.Signed.(
                     negate @@ of_unsigned @@ Amount.of_mina_int_exn 500)
                 ~children:
-                  [ ( Simple_txn.make ~sender:bob.pk ~receiver:caroll.pk
+                  [ ( Simple_txn.make ~sender:bob ~receiver:caroll
                         (Amount.of_mina_int_exn 600)
                       :> transaction )
                   ]
                 Account_update.Update.noop
               :> transaction )
-          ; ( Txn_tree.make ~account:bob.pk
+          ; ( Txn_tree.make ~account:bob
                 ~amount:
                   Amount.Signed.(of_unsigned @@ Amount.of_mina_int_exn 500)
                 ~children:
-                  [ ( Simple_txn.make ~sender:caroll.pk ~receiver:alice.pk
+                  [ ( Simple_txn.make ~sender:caroll ~receiver:alice
                         (Amount.of_mina_int_exn 100)
                       :> transaction )
                   ]
