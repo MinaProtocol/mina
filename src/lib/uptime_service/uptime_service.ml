@@ -10,16 +10,6 @@ module Blake2 = Blake2.Make ()
 
 module Uptime_snark_worker = Uptime_snark_worker
 
-type block_data =
-  { block : string
-  ; created_at : string
-  ; peer_id : string
-  ; snark_work : string option [@default None]
-  ; graphql_control_port : int option [@default None]
-  ; built_with_commit_sha : string option [@default None]
-  }
-[@@deriving to_yojson]
-
 module Proof_data = struct
   (* NB: this type is unversioned, so the verifier on the backend
      will need to be using the same code
@@ -32,36 +22,12 @@ module Proof_data = struct
   [@@deriving bin_io_unversioned]
 end
 
-let sign_blake2_hash ~private_key s =
-  let module Field = Snark_params.Tick.Field in
-  let blake2 = Blake2.digest_string s in
-  let field_elements = [||] in
-  let bitstrings =
-    [| Blake2.to_raw_string blake2 |> Blake2.string_to_bits |> Array.to_list |]
-  in
-  let input : (Field.t, bool) Random_oracle.Legacy.Input.t =
-    { field_elements; bitstrings }
-  in
-  Schnorr.Legacy.sign private_key input
-
 let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
     ~state_hash ~produced block_data =
   let open Interruptible.Let_syntax in
   let make_interruptible f = Interruptible.lift f interruptor in
-  let block_data_json = block_data_to_yojson block_data in
-  let block_data_string = Yojson.Safe.to_string block_data_json in
-  let signature =
-    sign_blake2_hash ~private_key:submitter_keypair.private_key
-      block_data_string
-  in
-  let json =
-    (* JSON structure in issue #9110 *)
-    `Assoc
-      [ ("data", block_data_json)
-      ; ("signature", Signature.to_yojson signature)
-      ; ("submitter", Public_key.to_yojson submitter_keypair.public_key)
-      ]
-  in
+  let request = Payload.create_request block_data submitter_keypair in
+  let json = Payload.request_to_yojson request in
   let headers =
     Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
   in
@@ -223,13 +189,14 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
       let block_base64 = block_base64_of_breadcrumb breadcrumb in
       let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
       let block_data =
-        { block = block_base64
-        ; created_at = Rfc3339_time.get_rfc3339_time ()
-        ; peer_id
-        ; snark_work = None
-        ; graphql_control_port
-        ; built_with_commit_sha
-        }
+        Payload.
+          { block = block_base64
+          ; created_at = Rfc3339_time.get_rfc3339_time ()
+          ; peer_id
+          ; snark_work = None
+          ; graphql_control_port
+          ; built_with_commit_sha
+          }
       in
       send_uptime_data ~logger ~interruptor ~submitter_keypair ~url ~state_hash
         ~produced:true block_data
@@ -265,13 +232,14 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
            uptime service" ;
         let state_hash = Transition_frontier.Breadcrumb.state_hash best_tip in
         let block_data =
-          { block = block_base64
-          ; created_at = Rfc3339_time.get_rfc3339_time ()
-          ; peer_id
-          ; snark_work = None
-          ; graphql_control_port
-          ; built_with_commit_sha
-          }
+          Payload.
+            { block = block_base64
+            ; created_at = Rfc3339_time.get_rfc3339_time ()
+            ; peer_id
+            ; snark_work = None
+            ; graphql_control_port
+            ; built_with_commit_sha
+            }
         in
         send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
           ~state_hash ~produced:false block_data )
@@ -306,13 +274,14 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
               Transition_frontier.Breadcrumb.state_hash best_tip
             in
             let block_data =
-              { block = block_base64
-              ; created_at = Rfc3339_time.get_rfc3339_time ()
-              ; peer_id
-              ; snark_work = None
-              ; graphql_control_port
-              ; built_with_commit_sha
-              }
+              Payload.
+                { block = block_base64
+                ; created_at = Rfc3339_time.get_rfc3339_time ()
+                ; peer_id
+                ; snark_work = None
+                ; graphql_control_port
+                ; built_with_commit_sha
+                }
             in
             send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
               ~state_hash ~produced:false block_data
@@ -350,13 +319,14 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                   Transition_frontier.Breadcrumb.state_hash best_tip
                 in
                 let block_data =
-                  { block = block_base64
-                  ; created_at = Rfc3339_time.get_rfc3339_time ()
-                  ; peer_id
-                  ; snark_work = None
-                  ; graphql_control_port
-                  ; built_with_commit_sha
-                  }
+                  Payload.
+                    { block = block_base64
+                    ; created_at = Rfc3339_time.get_rfc3339_time ()
+                    ; peer_id
+                    ; snark_work = None
+                    ; graphql_control_port
+                    ; built_with_commit_sha
+                    }
                 in
                 send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
                   ~state_hash ~produced:false block_data
@@ -391,13 +361,14 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                       Transition_frontier.Breadcrumb.state_hash best_tip
                     in
                     let block_data =
-                      { block = block_base64
-                      ; created_at = Rfc3339_time.get_rfc3339_time ()
-                      ; peer_id
-                      ; snark_work = Some snark_work_base64
-                      ; graphql_control_port
-                      ; built_with_commit_sha
-                      }
+                      Payload.
+                        { block = block_base64
+                        ; created_at = Rfc3339_time.get_rfc3339_time ()
+                        ; peer_id
+                        ; snark_work = Some snark_work_base64
+                        ; graphql_control_port
+                        ; built_with_commit_sha
+                        }
                     in
                     send_uptime_data ~logger ~interruptor ~submitter_keypair
                       ~url ~state_hash ~produced:false block_data ) ) )
