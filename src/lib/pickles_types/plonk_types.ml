@@ -199,6 +199,12 @@ module Features = struct
 
   type flags = bool t
 
+  type 'a chunked = 'a array t
+
+  type chunked_options = Opt.Flag.t chunked
+
+  type chunked_flags = bool chunked
+
   let to_data
       { range_check0
       ; range_check1

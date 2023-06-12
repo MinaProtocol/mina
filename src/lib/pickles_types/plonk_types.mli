@@ -81,6 +81,14 @@ module Features : sig
 
   type flags = bool t
 
+  (** {3 Aliases for chunked elements} *)
+
+  type 'a chunked = 'a array t
+
+  type chunked_options = Opt.Flag.t chunked
+
+  type chunked_flags = bool chunked
+
   val to_data :
        'a t
     -> ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
