@@ -137,7 +137,7 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req, err := unmarshalPayload(body)
-	if err != nil {
+	if err != nil || req == nil {
 		h.app.Log.Debugf("Error while unmarshaling JSON of /submit request's body: %v", err)
 		w.WriteHeader(400)
 		writeErrorResponse(h.app, &w, "Error decoding payload")
@@ -171,7 +171,7 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	payload, err := req.GetData().MakeSignPayload()
 	if err != nil {
-		h.app.Log.Errorf("Error while unmarshaling JSON of /submit request's body: %v", err)
+		h.app.Log.Errorf("Error while making sign payload: %v", err)
 		w.WriteHeader(500)
 		writeErrorResponse(h.app, &w, "Unexpected server error")
 		return
