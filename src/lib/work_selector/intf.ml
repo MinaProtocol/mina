@@ -101,6 +101,7 @@ module type Lib_intf = sig
     (**Jobs that have not been assigned yet*)
     val all_unseen_works :
          t
+      -> logger:Logger.t
       -> ( Transaction_witness.t
          , Ledger_proof.t )
          Snark_work_lib.Work.Single.Spec.t

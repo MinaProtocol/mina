@@ -26,10 +26,12 @@ struct
     let statement = Snark_work_lib.Work.Single.Spec.statement spec in
     (* TODO: take into account all pass hashes here  *)
     let source =
-      Mina_base.Frozen_ledger_hash.to_base58_check statement.source.first_pass_ledger
+      Mina_base.Frozen_ledger_hash.to_base58_check
+        statement.source.first_pass_ledger
     in
     let target =
-      Mina_base.Frozen_ledger_hash.to_base58_check statement.target.second_pass_ledger
+      Mina_base.Frozen_ledger_hash.to_base58_check
+        statement.target.second_pass_ledger
     in
     source ^ ":" ^ target
 
@@ -56,7 +58,7 @@ struct
 
   let work ~snark_pool ~fee ~logger (state : Lib.State.t) =
     Lib.State.remove_old_assignments state ~logger ;
-    let unseen_jobs = Lib.State.all_unseen_works state in
+    let unseen_jobs = Lib.State.all_unseen_works state ~logger in
     match Lib.get_expensive_work ~snark_pool ~fee unseen_jobs with
     | [] ->
         None
