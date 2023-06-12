@@ -49,11 +49,12 @@ module ConfigDirs = struct
 end
 
 module Config = struct
-  type t = { port : int; dirs : ConfigDirs.t; mina_exe : string }
+  type t =
+    { port : int; dirs : ConfigDirs.t; mina_exe : string; clean_up : bool }
 
-  let create port dirs mina_exe = { port; dirs; mina_exe }
+  let create port dirs mina_exe clean_up = { port; dirs; mina_exe; clean_up }
 
   let default port =
     let dirs = ConfigDirs.create default_root_path in
-    { port; dirs; mina_exe = default_mina_exe }
+    create port dirs default_mina_exe true
 end

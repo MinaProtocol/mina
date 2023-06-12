@@ -7,7 +7,7 @@ module MinaDaemon = struct
 
   let create process config = { process; config }
 
-  let kill t =
+  let force_kill t =
     Process.send_signal t.process Core.Signal.kill ;
     Deferred.map (Process.wait t.process) ~f:Or_error.return
 end

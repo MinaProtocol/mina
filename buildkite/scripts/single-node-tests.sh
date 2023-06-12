@@ -9,11 +9,9 @@ fi
 
 path=$1
 
-eval $(opam config env)
-export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
+eval "$(opam config env)"
+export PATH="/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH"
 export GO=/usr/lib/go/bin/go
-
-MINA_COMMIT_SHA1=$(git rev-parse HEAD)
 
 # TODO: Stop building lib_p2p multiple times by pulling from buildkite-agent artifacts or docker or somewhere
 echo "--- Build libp2p_helper TODO: use the previously uploaded build artifact"

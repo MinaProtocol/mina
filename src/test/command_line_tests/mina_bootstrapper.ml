@@ -3,16 +3,6 @@ open Core
 open Config
 open Mina_cli
 
-(* executable location relative to src/default/lib/command_line_tests
-
-      dune won't allow running it via "dune exec", because it's outside its
-      workspace, so we invoke the executable directly
-
-      the mina.exe executable must have been built before running the test
-      here, else it will fail
-*)
-let default_mina_exe = "_build/default/src/app/cli/src/mina.exe"
-
 module MinaBootstrapper = struct
   type t =
     { config : Config.t

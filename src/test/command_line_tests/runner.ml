@@ -13,7 +13,6 @@ module TestRunner = struct
 
   let run test_case =
     let test_failed = ref false in
-    let clean_up = false in
     let open Deferred.Let_syntax in
     let config = Config.default 1337 in
     let%bind () = ConfigDirs.generate_keys config.dirs in
@@ -27,7 +26,7 @@ module TestRunner = struct
           printf
             !"**** DAEMON CRASHED (OUTPUT BELOW) ****\n%s\n************\n%!"
             contents ) ;
-        if clean_up then remove_config_dirs (ConfigDirs.dirs config.dirs)
+        if config.clean_up then remove_config_dirs (ConfigDirs.dirs config.dirs)
         else Deferred.unit )
       (fun () ->
         match%map test_case config with
