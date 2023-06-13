@@ -100,6 +100,8 @@ module Wrap = struct
               }
             [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
+            type 'a chunks = 'a array t
+
             let map ~f
                 { range_check0
                 ; range_check1
@@ -119,6 +121,10 @@ module Wrap = struct
               ; lookup_gate = f lookup_gate
               ; runtime_tables = f runtime_tables
               }
+
+            let chunk t = map ~f:(Array.create ~len:1) t
+
+            let unchunk t = map ~f:(fun a -> Array.get a 0) t
 
             let map2 ~f t1 t2 =
               { range_check0 = f t1.range_check0 t2.range_check0

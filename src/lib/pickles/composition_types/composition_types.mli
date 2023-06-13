@@ -109,6 +109,12 @@ module Wrap : sig
               }
             [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
+            type 'a chunked = 'a array t
+
+            val chunk : 'a t -> 'a chunked
+
+            val unchunk : 'a chunked -> 'a t
+
             val to_list : 'fp t -> 'fp list
 
             val map : f:('a -> 'b) -> 'a t -> 'b t
