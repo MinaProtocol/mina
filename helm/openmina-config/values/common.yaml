@@ -116,7 +116,7 @@ internalTrace:
   image: openmina/mina-internal-trace-consumer:fec6545
 
 aggregator:
-  image: openmina/mina-aggregator:60795c47
+  image: openmina/mina-aggregator:6c99b126
   ciRepo: openmina/mina-daily-testnet
 
 ciFrontend:
