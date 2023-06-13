@@ -887,7 +887,6 @@ module Messages = struct
         ~dummy_group_element:dummy ~bool
     in
     let lookup =
-      let lookup = lookup.(0) and runtime_tables = runtime_tables.(0) in
       Lookup.opt_typ Impl.Boolean.typ ~lookup ~runtime_tables ~dummy:[| dummy |]
         (wo [ 1 ])
     in

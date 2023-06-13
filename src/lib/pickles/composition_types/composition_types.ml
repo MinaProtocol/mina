@@ -944,7 +944,8 @@ module Wrap = struct
           ; feature_flags_spec
           ; Lookup_parameters.opt_spec impl lookup
           ; Proof_state.Deferred_values.Plonk.In_circuit.Optional_column_scalars
-            .spec impl lookup.zero feature_flags
+            .spec impl lookup.zero
+              (Plonk_types.Features.chunk feature_flags)
           ]
 
       (** Convert a statement (as structured data) into the flat data-based representation. *)
