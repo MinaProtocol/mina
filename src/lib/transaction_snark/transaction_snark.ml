@@ -1003,12 +1003,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             }
 
           let verification_key_hash (a : t) : Verification_key_hash.t =
-            let vk = verification_key a in
-            let is_some = Zkapp_basic.Flagged_option.is_some vk in
-            let vk_hash =
-              Data_as_hash.hash @@ Zkapp_basic.Flagged_option.data vk
-            in
-            Field.if_ is_some ~then_:vk_hash ~else_:Field.zero
+            verification_key a |> Zkapp_basic.Flagged_option.data
+            |> Data_as_hash.hash
 
           let last_action_slot (a : t) = a.data.zkapp.last_action_slot
 
