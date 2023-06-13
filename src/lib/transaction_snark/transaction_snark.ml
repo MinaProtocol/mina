@@ -1370,7 +1370,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           type t =
             ( Stack_frame.t
             , Call_stack.t
-            , Token_id.t
             , Amount.Signed.t
             , Ledger_hash.var * Sparse_ledger.t V.t
             , Bool.t
@@ -1742,7 +1741,6 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; local_state :
                 ( Stack_frame.t
                 , Call_stack.t
-                , Token_id.t
                 , Amount.Signed.t
                 , Ledger.t
                 , Bool.t
@@ -1886,7 +1884,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                 statement.source.local_state.transaction_commitment
             ; full_transaction_commitment =
                 statement.source.local_state.full_transaction_commitment
-            ; token_id = statement.source.local_state.token_id
             ; excess = statement.source.local_state.excess
             ; supply_increase = statement.source.local_state.supply_increase
             ; ledger =
@@ -3532,7 +3529,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     type local_state =
       ( Stack_frame.value
       , Stack_frame.value list
-      , Token_id.t
       , Currency.Amount.Signed.t
       , Sparse_ledger.t
       , bool
@@ -3799,7 +3795,6 @@ module Make_str (A : Wire_types.Concrete) = struct
             (local :
               ( Stack_frame.value
               , Stack_frame.value list
-              , _
               , _
               , _
               , _

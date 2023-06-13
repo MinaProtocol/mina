@@ -24,7 +24,6 @@ module Zkapp_command_segment_witness = struct
               , Call_stack_digest.Stable.V1.t )
               With_stack_hash.Stable.V1.t
               list
-            , Token_id.Stable.V2.t
             , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
             , Sparse_ledger.Stable.V2.t
             , bool
