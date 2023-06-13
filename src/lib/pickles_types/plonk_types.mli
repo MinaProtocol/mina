@@ -113,7 +113,7 @@ module Features : sig
 
   val typ :
        ('var, bool, 'f) Snarky_backendless.Typ.t
-    -> feature_flags:options
+    -> feature_flags:chunked_options
     -> ('var t, bool t, 'f) Snarky_backendless.Typ.t
 
   (** {2 Iterators} *)

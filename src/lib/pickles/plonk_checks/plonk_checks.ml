@@ -510,35 +510,35 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
             | Some joint_combiner ->
                 Some { joint_combiner } )
         ; optional_column_scalars =
-             { range_check0 =
-                 compute_feature (Index RangeCheck0) feature_flags.range_check0
-                   actual_feature_flags.range_check0
-             ; range_check1 =
-                 compute_feature (Index RangeCheck1) feature_flags.range_check1
-                   actual_feature_flags.range_check1
-             ; foreign_field_add =
-                 compute_feature (Index ForeignFieldAdd)
-                   feature_flags.foreign_field_add
-                   actual_feature_flags.foreign_field_add
-             ; foreign_field_mul =
-                 compute_feature (Index ForeignFieldMul)
-                   feature_flags.foreign_field_mul
-                   actual_feature_flags.foreign_field_mul
-             ; xor =
-                 compute_feature (Index Xor16) feature_flags.xor
-                   actual_feature_flags.xor
-             ; rot =
-                 compute_feature (Index Rot64) feature_flags.rot
-                   actual_feature_flags.rot
-             ; lookup_gate =
-                 compute_feature (LookupKindIndex Lookup) feature_flags.lookup
-                   actual_feature_flags.lookup
-             ; runtime_tables =
-                 compute_feature LookupRuntimeSelector
-                   feature_flags.runtime_tables
-                   actual_feature_flags.runtime_tables
-             } ;
-             feature_flags = actual_feature_flags )
+            { range_check0 =
+                compute_feature (Index RangeCheck0) feature_flags.range_check0
+                  actual_feature_flags.range_check0
+            ; range_check1 =
+                compute_feature (Index RangeCheck1) feature_flags.range_check1
+                  actual_feature_flags.range_check1
+            ; foreign_field_add =
+                compute_feature (Index ForeignFieldAdd)
+                  feature_flags.foreign_field_add
+                  actual_feature_flags.foreign_field_add
+            ; foreign_field_mul =
+                compute_feature (Index ForeignFieldMul)
+                  feature_flags.foreign_field_mul
+                  actual_feature_flags.foreign_field_mul
+            ; xor =
+                compute_feature (Index Xor16) feature_flags.xor
+                  actual_feature_flags.xor
+            ; rot =
+                compute_feature (Index Rot64) feature_flags.rot
+                  actual_feature_flags.rot
+            ; lookup_gate =
+                compute_feature (LookupKindIndex Lookup) feature_flags.lookup
+                  actual_feature_flags.lookup
+            ; runtime_tables =
+                compute_feature LookupRuntimeSelector
+                  feature_flags.runtime_tables
+                  actual_feature_flags.runtime_tables
+            }
+        ; feature_flags = actual_feature_flags
         }
 
   (** Check that computed proof scalars match the expected ones,

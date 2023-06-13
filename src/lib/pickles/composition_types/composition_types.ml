@@ -351,7 +351,8 @@ module Wrap = struct
           let typ (type f fp)
               (module Impl : Snarky_backendless.Snark_intf.Run
                 with type field = f ) ~dummy_scalar ~dummy_scalar_challenge
-              ~challenge ~scalar_challenge ~bool ~feature_flags
+              ~challenge ~scalar_challenge ~bool
+              ~(feature_flags : Plonk_types.Features.chunked_options)
               (fp : (fp, _, f) Snarky_backendless.Typ.t) =
             Snarky_backendless.Typ.of_hlistable
               [ Scalar_challenge.typ scalar_challenge
