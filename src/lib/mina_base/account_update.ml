@@ -110,12 +110,12 @@ module Authorization_kind = struct
     | None_given ->
         { is_signed = false
         ; is_proved = false
-        ; verification_key_hash = Field.zero
+        ; verification_key_hash = Zkapp_account.dummy_vk_hash ()
         }
     | Signature ->
         { is_signed = true
         ; is_proved = false
-        ; verification_key_hash = Field.zero
+        ; verification_key_hash = Zkapp_account.dummy_vk_hash ()
         }
     | Proof verification_key_hash ->
         { is_signed = false; is_proved = true; verification_key_hash }
