@@ -71,15 +71,11 @@ let round_consts =
 (* Auxiliary function to check composition of 8 bytes into a 64-bit word *)
 let check_bytes_to_word (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (word : Circuit.Field.t) (word_bytes : Circuit.Field.t list) =
+    (word : Circuit.Field.t) (word_bytes : Circuit.Field.t array) =
   let open Circuit in
   let composition =
-    List.foldi word_bytes ~init:Field.zero ~f:(fun i acc x ->
+    Array.foldi word_bytes ~init:Field.zero ~f:(fun i acc x ->
         let shift = Field.constant @@ Common.two_pow (module Circuit) (8 * i) in
-        (* TODO: necessary step to check values? *)
-        Field.Assert.equal
-          (Field.constant @@ Common.two_pow (module Circuit) (8 * i))
-          shift ;
         Field.(acc + (x * shift)) )
   in
   Field.Assert.equal word composition
@@ -129,8 +125,6 @@ module State = struct
               Bignum_bigint.(pow (of_int 2) (of_int (Int.( * ) 8 z)))
           in
           let shift = Field.constant shift_field in
-          (* TODO: Does this generate automatic generic gates to check composition? *)
-          Field.Assert.equal (Field.constant shift_field) shift ;
           state.(x).(y) <-
             Field.(state.(x).(y) + (shift * List.nth_exn bytestring index))
         done
@@ -145,89 +139,62 @@ module State = struct
     let open Circuit in
     assert (
       Array.length state = keccak_dim && Array.length state.(0) = keccak_dim ) ;
-    let bytestring = Array.create ~len:200 Field.zero in
+    let state_length_in_bytes = keccak_state_length / 8 in
     let bytes_per_word = keccak_word / 8 in
+    let bytestring =
+      Array.init state_length_in_bytes ~f:(fun idx ->
+          exists Field.typ ~compute:(fun () ->
+              (* idx = z + 8 * ((dim * y) + x) *)
+              let z = idx % bytes_per_word in
+              let x = idx / bytes_per_word % keccak_dim in
+              let y = idx / bytes_per_word / keccak_dim in
+              (*  [7 6 5 4 3 2 1 0] [x=0,y=1] [x=0,y=2] [x=0,y=3] [x=0,y=4]
+               *          [x=1,y=0] [x=1,y=1] [x=1,y=2] [x=1,y=3] [x=1,y=4]
+               *          [x=2,y=0] [x=2,y=1] [x=2,y=2] [x=2,y=3] [x=2,y=4]
+               *          [x=3,y=0] [x=3,y=1] [x=3,y=2] [x=3,y=3] [x=3,y=4]
+               *          [x=4,y=0] [x=4,y=1] [x=4,y=0] [x=4,y=3] [x=4,y=4]
+               *)
+              let word =
+                Common.cvar_field_to_bignum_bigint_as_prover
+                  (module Circuit)
+                  state.(x).(y)
+              in
+              let byte =
+                Common.bignum_bigint_to_field
+                  (module Circuit)
+                  Bignum_bigint.((word asr Int.(8 * z)) land of_int 0xff)
+              in
+              byte ) )
+    in
+    (* Check all words are composed correctly from bytes *)
     for y = 0 to keccak_dim - 1 do
       for x = 0 to keccak_dim - 1 do
-        let base_index = bytes_per_word * ((keccak_dim * y) + x) in
-        for z = 0 to bytes_per_word - 1 do
-          let index = base_index + z in
-          let byte =
-            exists Field.typ ~compute:(fun () ->
-                let word =
-                  Common.cvar_field_to_bignum_bigint_as_prover
-                    (module Circuit)
-                    state.(x).(y)
-                in
-                let power_lo = 8 * z in
-                let offset_lo =
-                  Bignum_bigint.(pow (of_int 2) (of_int power_lo))
-                in
-                let two_pow_8 = Bignum_bigint.(pow (of_int 2) (of_int 8)) in
-                let byte =
-                  Bignum_bigint.(
-                    (word - (word % offset_lo)) / offset_lo % two_pow_8)
-                in
-                Common.bignum_bigint_to_field (module Circuit) byte )
-          in
-          bytestring.(index) <- byte
-        done ;
-
-        (* TODO: Does this generate automatic generic gates to check decomposition? *)
-
-        (* Create a list containing the elements of bytestring from base_index to base_index + 7 *)
-        let word_bytes =
-          Array.to_list
-          @@ Array.sub bytestring ~pos:base_index ~len:bytes_per_word
-        in
-
+        let idx = bytes_per_word * ((keccak_dim * y) + x) in
+        (* Create an array containing the 8 bytes starting on idx that correspond to the word in [x,y] *)
+        let word_bytes = Array.sub bytestring ~pos:idx ~len:bytes_per_word in
         (* Assert correct decomposition of bytes from state *)
         check_bytes_to_word (module Circuit) state.(x).(y) word_bytes
       done
     done ;
+
     Array.to_list bytestring
 
   let xor (type f)
       (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
       (input1 : Circuit.Field.t matrix) (input2 : Circuit.Field.t matrix) :
       Circuit.Field.t matrix =
-    let open Circuit in
     assert (
       Array.length input1 = keccak_dim && Array.length input1.(0) = keccak_dim ) ;
     assert (
       Array.length input2 = keccak_dim && Array.length input2.(0) = keccak_dim ) ;
-    let output =
-      Array.make_matrix ~dimx:keccak_dim ~dimy:keccak_dim Field.zero
-    in
-    for y = 0 to keccak_dim - 1 do
-      for x = 0 to keccak_dim - 1 do
-        output.(x).(y) <-
-          Bitwise.bxor64 (module Circuit) input1.(x).(y) input2.(x).(y)
-      done
-    done ;
-    output
 
-  let _print (type f)
-      (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-      (state : Circuit.Field.t matrix) =
-    let open Circuit in
-    as_prover (fun () ->
-        for x = 0 to keccak_dim - 1 do
-          for y = 0 to keccak_dim - 1 do
-            let _elem =
-              Common.cvar_field_to_bignum_bigint_as_prover
-                (module Circuit)
-                state.(x).(y)
-            in
-            ()
-          done
-        done )
+    (* Calls Bitwise.bxor64 on each pair (x,y) of the states input1 and input2
+       and outputs the output Cvars as a new matrix *)
+    Array.map2_exn input1 input2
+      ~f:(Array.map2_exn ~f:(Bitwise.bxor64 (module Circuit)))
 end
 
 (* KECCAK HASH FUNCTION IMPLEMENTATION *)
-
-(* Performs the modulo operation, not remainder as in mod which instead computes integer remainder *)
-let modulo (x : int) (m : int) : int = ((x mod m) + m) mod m
 
 (* Pads a message M as:
    * M || pad[x](|M|)
@@ -241,7 +208,7 @@ let pad_nist (type f)
   let open Circuit in
   (* Find out desired length of the padding in bytes *)
   (* If message is already rate bits, need to pad full rate again *)
-  let extra_bytes = (rate / 8) - (List.length message mod rate) in
+  let extra_bytes = (rate / 8) - (List.length message mod (rate/8)) in
   (* 0x06 0x00 ... 0x00 0x80 or 0x86 *)
   let last_field = Common.two_pow (module Circuit) 7 in
   let last = Field.constant @@ Common.two_pow (module Circuit) 7 in
@@ -267,7 +234,7 @@ let pad_101 (type f)
   let open Circuit in
   (* Find out desired length of the padding in bytes *)
   (* If message is already rate bits, need to pad full rate again *)
-  let extra_bytes = (rate / 8) - (List.length message mod rate) in
+  let extra_bytes = (rate / 8) - (List.length message mod (rate / 8)) in
   (* 0x01 0x00 ... 0x00 0x80 or 0x81 *)
   let last_field = Common.two_pow (module Circuit) 7 in
   let last = Field.constant @@ last_field in
@@ -275,7 +242,6 @@ let pad_101 (type f)
   let pad = Array.create ~len:extra_bytes Field.zero in
   pad.(0) <- Field.one ;
   pad.(extra_bytes - 1) <- Field.add pad.(extra_bytes - 1) last ;
-  Field.Assert.equal (Field.constant last_field) last ;
   (* Cast the padding array to a list *)
   let pad = Array.to_list pad in
   (* Return the padded message *)
@@ -292,41 +258,25 @@ let pad_101 (type f)
 let theta (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix =
-  let open Circuit in
   let state_a = state in
-  let state_c = Array.create ~len:5 Field.zero in
-  let state_d = Array.create ~len:5 Field.zero in
-  let state_e = State.zeros (module Circuit) in
   (* XOR the elements of each row together *)
   (* for all x in {0..4}: C[x] = A[x,0] xor A[x,1] xor A[x,2] xor A[x,3] xor A[x,4] *)
-  for x = 0 to keccak_dim - 1 do
-    state_c.(x) <-
-      Bitwise.(
-        bxor64
-          (module Circuit)
-          (bxor64
-             (module Circuit)
-             (bxor64
-                (module Circuit)
-                (bxor64 (module Circuit) state_a.(x).(0) state_a.(x).(1))
-                state_a.(x).(2) )
-             state_a.(x).(3) )
-          state_a.(x).(4))
-  done ;
+  let state_c = Array.map state_a ~f:(Array.reduce_exn ~f:(Bitwise.bxor64 (module Circuit))) in
   (* for all x in {0..4}: D[x] = C[x-1] xor ROT(C[x+1], 1) *)
-  for x = 0 to keccak_dim - 1 do
-    state_d.(x) <-
-      Bitwise.(
+  let state_d = Array.init keccak_dim ~f:(fun x -> 
+    Bitwise.(
         bxor64
           (module Circuit)
-          state_c.(modulo (x - 1) keccak_dim)
-          (rot64 (module Circuit) state_c.((x + 1) mod keccak_dim) 1 Left)) ;
-    (* for all x in {0..4} and y in {0..4}: E[x,y] = A[x,y] xor D[x] *)
-    for y = 0 to keccak_dim - 1 do
-      state_e.(x).(y) <-
-        Bitwise.(bxor64 (module Circuit) state_a.(x).(y) state_d.(x))
-    done
-  done ;
+          (* using (x + m mod m) to avoid negative values *)
+          state_c.((x + keccak_dim - 1) mod keccak_dim)
+          (rot64 (module Circuit) state_c.((x + 1) mod keccak_dim) 1 Left))
+    ) in
+  (* for all x in {0..4} and y in {0..4}: E[x,y] = A[x,y] xor D[x] *)
+  let state_e = Array.mapi state_a ~f:(fun x row ->
+    Array.mapi row ~f:(fun _y a ->
+      Bitwise.bxor64 (module Circuit) a state_d.(x)
+    )
+  ) in
   state_e
 
 (*
@@ -696,6 +646,7 @@ let%test_unit "keccak gadget" =
     in
 
     (* Positive tests *)
+    
     let _cs =
       test_keccak ~nist:false ~len:256 "30"
         "044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116d"
@@ -708,12 +659,21 @@ let%test_unit "keccak gadget" =
       test_keccak ~nist:true ~len:512 "30"
         "2d44da53f305ab94b6365837b9803627ab098c41a6013694f9b468bccb9c13e95b3900365eb58924de7158a54467e984efcfdabdbcc9af9a940d49c51455b04c"
     in
+    
     (* I am the owner of the NFT with id X on the Ethereum chain *)
     let _cs =
       test_keccak ~nist:false ~len:256
         "4920616d20746865206f776e6572206f6620746865204e465420776974682069642058206f6e2074686520457468657265756d20636861696e"
         "63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36"
     in
+
+    let _cs = test_keccak ~nist:false ~len:256
+    "044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116df9e2eaaa42d9fe9e558a9b8ef1bf366f190aacaa83bad2641ee106e9041096e42d44da53f305ab94b6365837b9803627ab098c41a6013694f9b468bccb9c13e95b3900365eb58924de7158a54467e984efcfdabdbcc9af9a940d49c51455b04c63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36"
+    "560deb1d387f72dba729f0bd0231ad45998dda4b53951645322cf95c7b6261d9" in
+
+    let _cs = test_keccak ~nist:true ~len:256
+    "044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116df9e2eaaa42d9fe9e558a9b8ef1bf366f190aacaa83bad2641ee106e9041096e42d44da53f305ab94b6365837b9803627ab098c41a6013694f9b468bccb9c13e95b3900365eb58924de7158a54467e984efcfdabdbcc9af9a940d49c51455b04c63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36"
+    "1784354c4bbfa5f54e5db23041089e65a807a7b970e3cfdba95e2fbe63b1c0e4" in
 
     () ) ;
 

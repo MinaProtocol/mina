@@ -1,5 +1,7 @@
 (* Common gadget helpers *)
 
+open Core_kernel
+
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 
 let tests_enabled = true
@@ -65,7 +67,7 @@ let cvar_field_bits_combine_as_prover (type f)
     @@ cvar_field_to_field_as_prover (module Circuit)
     @@ input2
   in
-  Field.Constant.project @@ Core_kernel.List.map2_exn list1 list2 ~f:bfun
+  Field.Constant.project @@ List.map2_exn list1 list2 ~f:bfun
 
 (* field_bits_le_to_field - Create a field element from contiguous bits of another
  *
@@ -98,7 +100,7 @@ let field_bits_le_to_field (type f)
 
   let stop = if stop = -1 then List.length bits else stop in
   (* Convert bits range (boolean list) to field element *)
-  Field.Constant.project @@ Core_kernel.List.slice bits start stop
+  Field.Constant.project @@ List.slice bits start stop
 
 (* Create cvar field element from contiguous bits of another
      See field_bits_le_to_field for more information *)
@@ -188,13 +190,13 @@ let field_of_hex (type f)
 let field_bytes_of_hex (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (hex : string) : f list =
-  let chars = hex |> String.to_seq |> List.of_seq in
+  let chars = String.to_list hex in
   let list_pairs =
-    Core_kernel.List.groupi chars ~break:(fun i _ _ -> i mod 2 = 0)
+    List.groupi chars ~break:(fun i _ _ -> i mod 2 = 0)
   in
   let list_bytes =
-    Core_kernel.List.map list_pairs ~f:(fun byte ->
-        let hex_i = Core_kernel.String.of_char_list byte in
+    List.map list_pairs ~f:(fun byte ->
+        let hex_i = String.of_char_list byte in
         field_of_hex (module Circuit) hex_i )
   in
   list_bytes
@@ -203,14 +205,14 @@ let field_bytes_of_hex (type f)
 let cvar_field_bytes_to_bignum_bigint_as_prover (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (bytestring : Circuit.Field.t list) : Bignum_bigint.t =
-  Core_kernel.List.fold bytestring ~init:Bignum_bigint.zero ~f:(fun acc x ->
+  List.fold bytestring ~init:Bignum_bigint.zero ~f:(fun acc x ->
       Bignum_bigint.(
         (acc * of_int 2)
         + cvar_field_to_bignum_bigint_as_prover (module Circuit) x) )
 
 (* Negative test helper *)
 let is_error (func : unit -> _) =
-  Result.is_error (Core_kernel.Or_error.try_with func)
+  Result.is_error (Or_error.try_with func)
 
 (* Two to the power of n as a field element *)
 let two_pow (type f)
