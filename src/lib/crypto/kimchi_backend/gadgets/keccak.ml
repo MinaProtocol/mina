@@ -272,11 +272,9 @@ let theta (type f)
           (rot64 (module Circuit) state_c.((x + 1) mod keccak_dim) 1 Left))
     ) in
   (* for all x in {0..4} and y in {0..4}: E[x,y] = A[x,y] xor D[x] *)
-  let state_e = Array.mapi state_a ~f:(fun x row ->
-    Array.mapi row ~f:(fun _y a ->
-      Bitwise.bxor64 (module Circuit) a state_d.(x)
-    )
-  ) in
+  let state_e =
+    Array.map2_exn state_a state_d ~f:(fun state_a state_d ->
+      Array.map state_a ~f:(Bitwise.bxor64 (module Circuit) state_d)) in
   state_e
 
 (*
