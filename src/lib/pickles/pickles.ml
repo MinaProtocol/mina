@@ -1654,7 +1654,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         end in
                         Wrap.Type1.derive_plonk
                           (module Field)
-                          ~feature_flags:Plonk_types.Features.none
+                          ~feature_flags:Plonk_types.Features.none_chunked
                           ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
                           tick_combined_evals
                       in
@@ -2224,7 +2224,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let side_loaded_tag =
           Side_loaded.create ~name:"foo"
             ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
-            ~feature_flags:Plonk_types.Features.none ~typ:Field.typ
+            ~feature_flags:Plonk_types.Features.none_chunked ~typ:Field.typ
 
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->

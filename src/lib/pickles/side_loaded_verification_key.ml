@@ -41,7 +41,7 @@ let input_size ~of_int ~add ~mul w =
   let size a =
     let (T (Typ typ, _conv, _conv_inv)) =
       Impls.Step.input ~proofs_verified:a ~wrap_rounds:Backend.Tock.Rounds.n
-        ~feature_flags:Plonk_types.Features.none
+        ~feature_flags:Plonk_types.Features.none_chunked
     in
     typ.size_in_field_elements
   in
@@ -358,7 +358,7 @@ let%test_unit "input_size" =
          let (T (Typ typ, _conv, _conv_inv)) =
            Impls.Step.input ~proofs_verified:a
              ~wrap_rounds:Backend.Tock.Rounds.n
-             ~feature_flags:Plonk_types.Features.none
+             ~feature_flags:Plonk_types.Features.none_chunked
          in
          typ.size_in_field_elements ) )
 

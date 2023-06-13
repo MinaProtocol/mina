@@ -213,6 +213,8 @@ let lookup_tables_used feature_flags =
 
     let any = List.fold_left ~f:( ||| ) ~init:false_
   end in
+  let feature_flags = Plonk_types.Features.unchunk feature_flags in
+  (* FIXME: Chunk *)
   let all_feature_flags = expand_feature_flags (module Bool) feature_flags in
   Lazy.force all_feature_flags.lookup_tables
 
