@@ -3,7 +3,7 @@
 module Stable : sig
   module V1 : sig
     type t = Pow_2_roots_of_unity of int
-    [@@deriving sexp, equal, compare, hash, yojson]
+    [@@unboxed] [@@deriving sexp, equal, compare, hash, yojson]
 
     include Pickles_types.Sigs.Binable.S with type t := t
 
@@ -14,7 +14,7 @@ module Stable : sig
 end
 
 type t = Stable.Latest.t = Pow_2_roots_of_unity of int
-[@@deriving sexp, equal, compare, hash, yojson]
+[@@unboxed] [@@deriving sexp, equal, compare, hash, yojson]
 
 include Core_kernel.Hashable.S with type t := t
 
