@@ -39,7 +39,7 @@ Pipeline.build
           , docker = Some Docker::{
               image = (../../Constants/ContainerImages.dhall).toolchainBase
             }
-        }
+        },
       Command.build
         Command.Config::{
           commands = [ Cmd.run "buildkite/scripts/merges-cleanly.sh berkeley"]
