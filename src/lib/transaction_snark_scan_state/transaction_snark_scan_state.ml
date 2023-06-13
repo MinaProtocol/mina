@@ -969,7 +969,6 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
             ; transaction_commitment = t.local_state.transaction_commitment
             ; full_transaction_commitment =
                 t.local_state.full_transaction_commitment
-            ; token_id = t.local_state.token_id
             ; excess = t.local_state.excess
             ; supply_increase = t.local_state.supply_increase
             ; ledger
