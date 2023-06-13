@@ -156,7 +156,7 @@ let dummy : unit -> t =
   Memo.unit (fun () ->
       let (Typ { var_of_fields; value_to_fields; _ }) =
         typ ~wrap_rounds:Backend.Tock.Rounds.n
-          ~feature_flags:Plonk_types.Features.none
+          ~feature_flags:Plonk_types.Features.none_chunked
       in
       let xs, aux = value_to_fields (Lazy.force Constant.dummy) in
       var_of_fields (Array.map ~f:Field.constant xs, aux) )

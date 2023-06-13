@@ -201,7 +201,7 @@ module Messages : sig
   val typ :
        (module Snarky_backendless.Snark_intf.Run with type field = 'f)
     -> ('a, 'b, 'f) Snarky_backendless.Typ.t
-    -> Opt.Flag.t Features.t
+    -> Features.chunked_options
     -> dummy:'b
     -> commitment_lengths:((int, 'n) Vector.vec, int, int) Poly.t
     -> bool:('c, bool, 'f) Snarky_backendless.Typ.t

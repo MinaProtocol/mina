@@ -287,9 +287,9 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
 let%test_module "gate finalization" =
   ( module struct
     type test_options =
-      { true_is_yes : Plonk_types.Features.options
-      ; true_is_maybe : Plonk_types.Features.options
-      ; all_maybes : Plonk_types.Features.options
+      { true_is_yes : Plonk_types.Features.chunked_options
+      ; true_is_maybe : Plonk_types.Features.chunked_options
+      ; all_maybes : Plonk_types.Features.chunked_options
       }
 
     (* Helper function to convert actual feature flags into 3 test configurations of feature flags
@@ -310,12 +310,14 @@ let%test_module "gate finalization" =
       let compute_feature_flags
           (actual_feature_flags : Plonk_types.Features.flags)
           (true_opt : Plonk_types.Opt.Flag.t)
-          (false_opt : Plonk_types.Opt.Flag.t) : Plonk_types.Features.options =
+          (false_opt : Plonk_types.Opt.Flag.t) :
+          Plonk_types.Features.chunked_options =
         Plonk_types.Features.map actual_feature_flags ~f:(function
           | true ->
               true_opt
           | false ->
               false_opt )
+        |> Plonk_types.Features.chunk
       in
 
       (* Generate the 3 configurations of the actual feature flags using
