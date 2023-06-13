@@ -338,7 +338,7 @@ let%test_module "gate finalization" =
     *)
     let run_recursive_proof_test
         (actual_feature_flags : Plonk_types.Features.flags)
-        (feature_flags : Plonk_types.Features.options)
+        (feature_flags : Plonk_types.Features.chunked_options)
         (public_input : Pasta_bindings.Fp.t list)
         (vk : Kimchi_bindings.Protocol.VerifierIndex.Fp.t)
         (proof : Backend.Tick.Proof.t) : Impls.Step.Boolean.value =

@@ -1134,7 +1134,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let full_signature =
             { Full_signature.padded; maxes = (module Maxes) }
           in
-          let feature_flags = Plonk_types.Features.none in
+          let feature_flags = Plonk_types.Features.none_chunked in
           let actual_feature_flags = Plonk_types.Features.none_bool in
           let wrap_domains =
             let module M =

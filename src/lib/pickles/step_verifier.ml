@@ -852,7 +852,7 @@ struct
      Meaning it needs opt sponge. *)
   let finalize_other_proof (type b branches)
       (module Proofs_verified : Nat.Add.Intf with type n = b)
-      ~(feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
+      ~(feature_flags : Plonk_types.Features.chunked_options)
       ~(step_domains :
          [ `Known of (Domains.t, branches) Vector.t | `Side_loaded ] )
       ~(* TODO: Add "actual proofs verified" so that proofs don't

@@ -1010,7 +1010,7 @@ struct
     let plonk_checks_passed =
       with_label __LOC__ (fun () ->
           (* This proof is a wrap proof; no need to consider features. *)
-          Plonk_checks.checked ~feature_flags:Plonk_types.Features.none
+          Plonk_checks.checked ~feature_flags:Plonk_types.Features.none_chunked
             (module Impl)
             ~env ~shift:shift2 plonk combined_evals )
     in

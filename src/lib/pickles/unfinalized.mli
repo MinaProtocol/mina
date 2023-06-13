@@ -40,8 +40,7 @@ type t =
 
 val typ :
      wrap_rounds:'a
-  -> feature_flags:
-       Pickles_types.Plonk_types.Opt.Flag.t Pickles_types.Plonk_types.Features.t
+  -> feature_flags:Pickles_types.Plonk_types.Features.chunked_options
   -> (t, Constant.t) Impls.Step.Typ.t
 
 val dummy : unit -> t

@@ -124,6 +124,7 @@ let verify_heterogenous (ts : Instance.t list) =
               | true ->
                   Plonk_types.Opt.Flag.Yes )
             plonk0.feature_flags
+          |> Plonk_types.Features.chunk
         in
         let tick_env =
           let module Env_bool = struct

@@ -235,8 +235,7 @@ module Wrap = struct
 
             let spec (* (type f) *) _
                 (* ((module Impl) : f impl) *) (zero : _ Zero_values.t)
-                (feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
-                =
+                (feature_flags : Plonk_types.Features.chunked_options) =
               let opt_spec flag =
                 let opt_spec =
                   Spec.T.Opt_unflagged
@@ -269,8 +268,7 @@ module Wrap = struct
             let typ (type f fp)
                 (module Impl : Snarky_backendless.Snark_intf.Run
                   with type field = f ) (fp : (fp, _) Impl.Typ.t) ~dummy_scalar
-                (feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
-                =
+                (feature_flags : Plonk_types.Features.chunked_options) =
               let opt_typ flag =
                 Plonk_types.Opt.typ Impl.Boolean.typ flag fp ~dummy:dummy_scalar
               in
@@ -1497,8 +1495,8 @@ module Step = struct
     let[@warning "-60"] typ (type n f)
         ( (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
         as impl ) zero ~assert_16_bits
-        (proofs_verified :
-          (Plonk_types.Opt.Flag.t Plonk_types.Features.t, n) Vector.t ) fq :
+        (proofs_verified : (Plonk_types.Features.chunked_options, n) Vector.t)
+        fq :
         ( ((_, _) Vector.t, _) t
         , ((_, _) Vector.t, _) t
         , _ )

@@ -424,9 +424,8 @@ struct
     Timer.clock __LOC__ ;
     let feature_flags =
       let rec go :
-          type a b c d.
-             (a, b, c, d) H4.T(IR).t
-          -> Plonk_types.Opt.Flag.t Plonk_types.Features.t =
+          type a b c d. (a, b, c, d) H4.T(IR).t -> Plonk_types.Features.options
+          =
        fun rules ->
         match rules with
         | [] ->
@@ -449,7 +448,7 @@ struct
                 | _, Maybe | true, No | false, Yes ->
                     Maybe )
       in
-      go choices
+      go choices |> Plonk_types.Features.chunk
     in
     let wrap_domains =
       match override_wrap_domain with

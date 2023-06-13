@@ -210,7 +210,7 @@ let wrap_main
                   Common.Lookup_parameters.tock_zero
                   ~assert_16_bits:(Wrap_verifier.assert_n_bits ~n:16)
                   (Vector.init Max_proofs_verified.n ~f:(fun _ ->
-                       Plonk_types.Features.none ) )
+                       Plonk_types.Features.none_chunked ) )
                   (Shifted_value.Type2.typ Field.typ)
               in
               exists typ ~request:(fun () -> Req.Proof_state) )

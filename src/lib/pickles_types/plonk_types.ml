@@ -425,8 +425,10 @@ module Evals = struct
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
         ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
 
-    let opt_typ impl ({ lookup; runtime_tables; _ } : Opt.Flag.t Features.t)
+    let opt_typ impl ({ lookup; runtime_tables; _ } : Features.chunked_options)
         ~dummy:z elt =
+      let runtime_tables = runtime_tables.(0) in
+      let lookup = lookup.(0) in
       Opt.typ impl lookup
         ~dummy:(dummy z ~runtime:(not (Opt.Flag.equal runtime_tables No)))
         (typ impl ~runtime_tables ~dummy:z elt)

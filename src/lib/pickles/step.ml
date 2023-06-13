@@ -503,7 +503,8 @@ struct
           include Tock.Field
         end in
         (* Wrap proof, no features *)
-        Plonk_checks.Type2.derive_plonk ~feature_flags:Plonk_types.Features.none
+        Plonk_checks.Type2.derive_plonk
+          ~feature_flags:Plonk_types.Features.none_chunked
           (module Field)
           ~env:tock_env ~shift:Shifts.tock2 tock_plonk_minimal
           tock_combined_evals

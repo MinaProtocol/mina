@@ -188,7 +188,7 @@ module Wrap : sig
                  , bool
                  , 'f )
                  Snarky_backendless.Typ.t
-            -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+            -> feature_flags:Plonk_types.Features.chunked_options
             -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
             -> ( ( 'c
                  , 'e Scalar_challenge.t
@@ -345,7 +345,7 @@ module Wrap : sig
                  Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
                snarky_typ
           -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
-          -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+          -> feature_flags:Plonk_types.Features.chunked_options
           -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
           -> ( 'g
              , 'h
@@ -575,7 +575,7 @@ module Wrap : sig
                Snarky_backendless.Checked_runner.Simple.Types.Checked.t )
              snarky_typ
         -> scalar_challenge:('e, 'b, 'f) Snarky_backendless.Typ.t
-        -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+        -> feature_flags:Plonk_types.Features.chunked_options
         -> ('fp, 'a, 'f) Snarky_backendless.Typ.t
         -> ( 'g
            , 'h
@@ -910,7 +910,7 @@ module Wrap : sig
            , 'field1 Hlist0.Id.t
            , 'field2 Hlist0.Id.t )
            Lookup_parameters.t
-        -> Plonk_types.Opt.Flag.t Plonk_types.Features.t
+        -> Plonk_types.Features.chunked_options
         -> ( ( 'field1
              , 'challenge1
              , 'challenge1 Scalar_challenge.t
@@ -1197,7 +1197,7 @@ module Step : sig
              , 'field1 Hlist0.Id.t
              , 'field2 Hlist0.Id.t )
              Wrap.Lookup_parameters.t
-          -> Plonk_types.Opt.Flag.t Plonk_types.Features.t
+          -> Plonk_types.Features.chunked_options
           -> ( ( 'field1
                , 'digest1
                , 'challenge1
@@ -1292,7 +1292,7 @@ module Step : sig
              , 'c Hlist0.Id.t
              , 'b Hlist0.Id.t )
              Zero_values.t
-        -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+        -> feature_flags:Plonk_types.Features.chunked_options
         -> ( ( 'a Limb_vector.Challenge.t
              , 'a Limb_vector.Challenge.t Scalar_challenge.t
              , 'b
@@ -1359,7 +1359,7 @@ module Step : sig
          , 'b Hlist0.Id.t )
          Zero_values.t
       -> assert_16_bits:('f Snarky_backendless.Cvar.t -> unit)
-      -> (Plonk_types.Opt.Flag.t Plonk_types.Features.t, 'n) Vector.t
+      -> (Plonk_types.Features.chunked_options, 'n) Vector.t
       -> ( 'b
          , 'a
          , 'f
@@ -1508,7 +1508,7 @@ module Step : sig
       -> 'b Nat.t
       -> 'c Nat.t
       -> ('d, 'e, 'f Hlist0.Id.t, 'g Hlist0.Id.t) Wrap.Lookup_parameters.t
-      -> Plonk_types.Opt.Flag.t Plonk_types.Features.t
+      -> Plonk_types.Features.chunked_options
       -> ( ( ( ( ('f, Nat.N9.n) Vector.t
                * ( ('h, Nat.N1.n) Vector.t
                  * ( ('d, Nat.N2.n) Vector.t
