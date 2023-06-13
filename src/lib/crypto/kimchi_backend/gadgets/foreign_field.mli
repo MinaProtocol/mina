@@ -76,6 +76,8 @@ module External_checks : sig
   type 'field t
 
   val create : (module Snark_intf.Run with type field = 'field) -> 'field t
+
+  val multi_ranges : 'a t -> 'a Snarky_backendless.Cvar.t standard_limbs list
 end
 
 (* Type of operation *)
