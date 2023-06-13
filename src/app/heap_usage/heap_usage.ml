@@ -4,11 +4,13 @@ open Core_kernel
 open Async
 
 let print_heap_usage name v =
+  (* word_size is in bits *)
+  let bytes_per_word = Sys.word_size / 8 in
   let repr = Obj.repr v in
   (* reachable_words may be 0, so it doesn't include size *)
   let words = Obj.size repr + Obj.reachable_words repr in
   Format.printf "Data of type %-46s uses %6d heap words = %8d bytes@." name
-    words (words * Sys.word_size)
+    words (words * bytes_per_word)
 
 let main () =
   let open Values in
