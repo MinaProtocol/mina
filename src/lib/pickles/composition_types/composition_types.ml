@@ -1313,9 +1313,10 @@ module Step = struct
             ; Vector (B Bool, Nat.N1.n)
             ; feature_flags_spec
             ; Wrap.Lookup_parameters.opt_spec impl lookup
-            ; Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-              .Optional_column_scalars
-              .spec impl lookup.zero feature_flags
+            ; (let feature_flags = Plonk_types.Features.chunk feature_flags in
+               Wrap.Proof_state.Deferred_values.Plonk.In_circuit
+               .Optional_column_scalars
+               .spec impl lookup.zero feature_flags )
             ]
 
         let[@warning "-45"] to_data
@@ -1505,6 +1506,7 @@ module Step = struct
         , _ )
         Snarky_backendless.Typ.t =
       let per_proof feature_flags =
+        let feature_flags = Plonk_types.Features.unchunk feature_flags in
         Per_proof.typ impl fq ~feature_flags ~assert_16_bits ~zero
       in
       let unfinalized_proofs =

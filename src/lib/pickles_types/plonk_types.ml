@@ -274,7 +274,9 @@ module Features = struct
       |> transport ~there ~back:(fun () -> value)
       |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> constant bool value)
     in
-    let bool_typ_of_flag = function
+    let bool_typ_of_flag flag =
+      let flag = flag.(0) in
+      match flag with
       | Opt.Flag.Yes ->
           constant_typ
             ~there:(function true -> () | false -> assert false)
