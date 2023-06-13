@@ -140,8 +140,9 @@ module Opt = struct
          ~back:(fun (b, x) ->
            match flag with No -> None | Yes -> Some x | Maybe -> Maybe (b, x) )
 
-  let typ (type a a_var f) bool_typ (flag : Flag.t)
+  let typ (type a a_var f) bool_typ (flag : Flag.t array)
       (a_typ : (a_var, a, f) Typ.t) ~(dummy : a) =
+    let flag = flag.(0) in
     match flag with
     | Yes ->
         some_typ a_typ
@@ -875,7 +876,7 @@ module Messages = struct
 
   let typ (type n f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) g
-      ({ lookup; runtime_tables; _ } : Opt.Flag.t Features.t) ~dummy
+      ({ lookup; runtime_tables; _ } : Features.chunked_options) ~dummy
       ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t) ~bool
       =
     let open Snarky_backendless.Typ in
@@ -888,6 +889,7 @@ module Messages = struct
         ~dummy_group_element:dummy ~bool
     in
     let lookup =
+      let lookup = lookup.(0) and runtime_tables = runtime_tables.(0) in
       Lookup.opt_typ Impl.Boolean.typ ~lookup ~runtime_tables ~dummy:[| dummy |]
         (wo [ 1 ])
     in

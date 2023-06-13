@@ -37,7 +37,7 @@ module Opt : sig
 
   val typ :
        ('b, bool, 'f) Snarky_backendless.Typ.t
-    -> Flag.t
+    -> Flag.t array
     -> ('a_var, 'a, 'f) Snarky_backendless.Typ.t
     -> dummy:'a
     -> (('a_var, 'b) t, 'a option, 'f) Snarky_backendless.Typ.t

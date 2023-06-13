@@ -237,6 +237,7 @@ module Wrap = struct
                 (* ((module Impl) : f impl) *) (zero : _ Zero_values.t)
                 (feature_flags : Plonk_types.Features.chunked_options) =
               let opt_spec flag =
+                let flag = flag.(0) in
                 let opt_spec =
                   Spec.T.Opt_unflagged
                     { inner = B Field

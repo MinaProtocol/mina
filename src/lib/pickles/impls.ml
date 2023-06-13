@@ -283,7 +283,7 @@ module Wrap = struct
         (* Wrap circuit: no features needed. *)
         (In_circuit.spec (module Impl) lookup Plonk_types.Features.none_chunked)
     in
-    let feature_flags = Plonk_types.Features.none in
+    let feature_flags = Plonk_types.Features.none_chunked in
     let typ =
       Typ.transport typ
         ~there:(In_circuit.to_data ~option_map:Option.map ~to_opt:Fn.id)

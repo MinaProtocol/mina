@@ -2575,7 +2575,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let side_loaded_tag =
           Side_loaded.create ~name:"foo"
             ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
-            ~feature_flags:maybe_features ~typ:Field.typ
+            ~feature_flags:(Plonk_types.Features.chunk maybe_features)
+            ~typ:Field.typ
 
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->

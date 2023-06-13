@@ -450,7 +450,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   (** Computes the list of scalars used in the linearization. *)
   let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
       (module F : Field_intf with type t = t) ~(env : t Scalars.Env.t) ~shift
-      ~(feature_flags : _ Plonk_types.Features.t) =
+      ~(feature_flags : Plonk_types.Features.chunked_options) =
     let _ = with_label in
     let open F in
     fun ({ alpha
@@ -478,6 +478,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
             |> negate )
       in
       let compute_feature column feature_flag actual_feature_flag =
+        let feature_flag = feature_flag.(0) in
         match feature_flag with
         | Opt.Flag.Yes ->
             Opt.Some (Lazy.force (Hashtbl.find_exn index_terms column))
@@ -509,35 +510,35 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
             | Some joint_combiner ->
                 Some { joint_combiner } )
         ; optional_column_scalars =
-            { range_check0 =
-                compute_feature (Index RangeCheck0) feature_flags.range_check0
-                  actual_feature_flags.range_check0
-            ; range_check1 =
-                compute_feature (Index RangeCheck1) feature_flags.range_check1
-                  actual_feature_flags.range_check1
-            ; foreign_field_add =
-                compute_feature (Index ForeignFieldAdd)
-                  feature_flags.foreign_field_add
-                  actual_feature_flags.foreign_field_add
-            ; foreign_field_mul =
-                compute_feature (Index ForeignFieldMul)
-                  feature_flags.foreign_field_mul
-                  actual_feature_flags.foreign_field_mul
-            ; xor =
-                compute_feature (Index Xor16) feature_flags.xor
-                  actual_feature_flags.xor
-            ; rot =
-                compute_feature (Index Rot64) feature_flags.rot
-                  actual_feature_flags.rot
-            ; lookup_gate =
-                compute_feature (LookupKindIndex Lookup) feature_flags.lookup
-                  actual_feature_flags.lookup
-            ; runtime_tables =
-                compute_feature LookupRuntimeSelector
-                  feature_flags.runtime_tables
-                  actual_feature_flags.runtime_tables
-            }
-        ; feature_flags = actual_feature_flags
+             { range_check0 =
+                 compute_feature (Index RangeCheck0) feature_flags.range_check0
+                   actual_feature_flags.range_check0
+             ; range_check1 =
+                 compute_feature (Index RangeCheck1) feature_flags.range_check1
+                   actual_feature_flags.range_check1
+             ; foreign_field_add =
+                 compute_feature (Index ForeignFieldAdd)
+                   feature_flags.foreign_field_add
+                   actual_feature_flags.foreign_field_add
+             ; foreign_field_mul =
+                 compute_feature (Index ForeignFieldMul)
+                   feature_flags.foreign_field_mul
+                   actual_feature_flags.foreign_field_mul
+             ; xor =
+                 compute_feature (Index Xor16) feature_flags.xor
+                   actual_feature_flags.xor
+             ; rot =
+                 compute_feature (Index Rot64) feature_flags.rot
+                   actual_feature_flags.rot
+             ; lookup_gate =
+                 compute_feature (LookupKindIndex Lookup) feature_flags.lookup
+                   actual_feature_flags.lookup
+             ; runtime_tables =
+                 compute_feature LookupRuntimeSelector
+                   feature_flags.runtime_tables
+                   actual_feature_flags.runtime_tables
+             } ;
+             feature_flags = actual_feature_flags )
         }
 
   (** Check that computed proof scalars match the expected ones,
