@@ -208,7 +208,7 @@ let pad_nist (type f)
   let open Circuit in
   (* Find out desired length of the padding in bytes *)
   (* If message is already rate bits, need to pad full rate again *)
-  let extra_bytes = (rate / 8) - (List.length message mod (rate/8)) in
+  let extra_bytes = (rate / 8) - (List.length message mod (rate / 8)) in
   (* 0x06 0x00 ... 0x00 0x80 or 0x86 *)
   let last_field = Common.two_pow (module Circuit) 7 in
   let last = Field.constant @@ Common.two_pow (module Circuit) 7 in
@@ -261,20 +261,24 @@ let theta (type f)
   let state_a = state in
   (* XOR the elements of each row together *)
   (* for all x in {0..4}: C[x] = A[x,0] xor A[x,1] xor A[x,2] xor A[x,3] xor A[x,4] *)
-  let state_c = Array.map state_a ~f:(Array.reduce_exn ~f:(Bitwise.bxor64 (module Circuit))) in
+  let state_c =
+    Array.map state_a ~f:(Array.reduce_exn ~f:(Bitwise.bxor64 (module Circuit)))
+  in
   (* for all x in {0..4}: D[x] = C[x-1] xor ROT(C[x+1], 1) *)
-  let state_d = Array.init keccak_dim ~f:(fun x -> 
-    Bitwise.(
-        bxor64
-          (module Circuit)
-          (* using (x + m mod m) to avoid negative values *)
-          state_c.((x + keccak_dim - 1) mod keccak_dim)
-          (rot64 (module Circuit) state_c.((x + 1) mod keccak_dim) 1 Left))
-    ) in
+  let state_d =
+    Array.init keccak_dim ~f:(fun x ->
+        Bitwise.(
+          bxor64
+            (module Circuit)
+            (* using (x + m mod m) to avoid negative values *)
+            state_c.((x + keccak_dim - 1) mod keccak_dim)
+            (rot64 (module Circuit) state_c.((x + 1) mod keccak_dim) 1 Left)) )
+  in
   (* for all x in {0..4} and y in {0..4}: E[x,y] = A[x,y] xor D[x] *)
   let state_e =
     Array.map2_exn state_a state_d ~f:(fun state_a state_d ->
-      Array.map state_a ~f:(Bitwise.bxor64 (module Circuit) state_d)) in
+        Array.map state_a ~f:(Bitwise.bxor64 (module Circuit) state_d) )
+  in
   state_e
 
 (*
@@ -644,7 +648,6 @@ let%test_unit "keccak gadget" =
     in
 
     (* Positive tests *)
-    
     let _cs =
       test_keccak ~nist:false ~len:256 "30"
         "044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116d"
@@ -657,7 +660,7 @@ let%test_unit "keccak gadget" =
       test_keccak ~nist:true ~len:512 "30"
         "2d44da53f305ab94b6365837b9803627ab098c41a6013694f9b468bccb9c13e95b3900365eb58924de7158a54467e984efcfdabdbcc9af9a940d49c51455b04c"
     in
-    
+
     (* I am the owner of the NFT with id X on the Ethereum chain *)
     let _cs =
       test_keccak ~nist:false ~len:256
@@ -665,13 +668,18 @@ let%test_unit "keccak gadget" =
         "63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36"
     in
 
-    let _cs = test_keccak ~nist:false ~len:256
-    "044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116df9e2eaaa42d9fe9e558a9b8ef1bf366f190aacaa83bad2641ee106e9041096e42d44da53f305ab94b6365837b9803627ab098c41a6013694f9b468bccb9c13e95b3900365eb58924de7158a54467e984efcfdabdbcc9af9a940d49c51455b04c63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36"
-    "560deb1d387f72dba729f0bd0231ad45998dda4b53951645322cf95c7b6261d9" in
+    (* The following two tests use 2 blocks instead *)
+    let _cs =
+      test_keccak ~nist:false ~len:256
+        "044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116df9e2eaaa42d9fe9e558a9b8ef1bf366f190aacaa83bad2641ee106e9041096e42d44da53f305ab94b6365837b9803627ab098c41a6013694f9b468bccb9c13e95b3900365eb58924de7158a54467e984efcfdabdbcc9af9a940d49c51455b04c63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36"
+        "560deb1d387f72dba729f0bd0231ad45998dda4b53951645322cf95c7b6261d9"
+    in
 
-    let _cs = test_keccak ~nist:true ~len:256
-    "044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116df9e2eaaa42d9fe9e558a9b8ef1bf366f190aacaa83bad2641ee106e9041096e42d44da53f305ab94b6365837b9803627ab098c41a6013694f9b468bccb9c13e95b3900365eb58924de7158a54467e984efcfdabdbcc9af9a940d49c51455b04c63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36"
-    "1784354c4bbfa5f54e5db23041089e65a807a7b970e3cfdba95e2fbe63b1c0e4" in
+    let _cs =
+      test_keccak ~nist:true ~len:256
+        "044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116df9e2eaaa42d9fe9e558a9b8ef1bf366f190aacaa83bad2641ee106e9041096e42d44da53f305ab94b6365837b9803627ab098c41a6013694f9b468bccb9c13e95b3900365eb58924de7158a54467e984efcfdabdbcc9af9a940d49c51455b04c63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36"
+        "1784354c4bbfa5f54e5db23041089e65a807a7b970e3cfdba95e2fbe63b1c0e4"
+    in
 
     () ) ;
 
