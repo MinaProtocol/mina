@@ -118,6 +118,11 @@ type nonrec ('caml_g, 'caml_f) prover_proof =
   ; prev_challenges : ('caml_g, 'caml_f) recursion_challenge array
   }
 
+type nonrec ('caml_g, 'caml_f) proof_with_public =
+  { public_evals : 'caml_f array point_evaluations option
+  ; proof : ('caml_g, 'caml_f) prover_proof
+  }
+
 type nonrec wire = { row : int; col : int }
 
 type nonrec gate_type =
@@ -214,6 +219,7 @@ module VerifierIndex = struct
   type nonrec ('fr, 'srs, 'poly_comm) verifier_index =
     { domain : 'fr domain
     ; max_poly_size : int
+    ; zk_rows : int
     ; public : int
     ; prev_challenges : int
     ; srs : 'srs
