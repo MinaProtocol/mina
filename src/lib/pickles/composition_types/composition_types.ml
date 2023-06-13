@@ -100,7 +100,7 @@ module Wrap = struct
               }
             [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
-            type 'a chunks = 'a array t
+            type 'a chunked = 'a array t
 
             let map ~f
                 { range_check0
@@ -905,7 +905,8 @@ module Wrap = struct
 
       (** A layout of the raw data in a statement, which is needed for
           representing it inside the circuit. *)
-      let spec impl lookup feature_flags =
+      let spec impl lookup (feature_flags : Plonk_types.Features.chunked_options)
+          =
         let feature_flags_spec =
           let [ f1; f2; f3; f4; f5; f6; f7; f8 ] =
             (* Ensure that layout is the same *)
@@ -915,6 +916,7 @@ module Wrap = struct
             Spec.T.Constant (x, (fun x y -> assert (Bool.equal x y)), B Bool)
           in
           let maybe_constant flag =
+            let flag = flag.(0) in
             match flag with
             | Plonk_types.Opt.Flag.Yes ->
                 constant true
@@ -944,8 +946,7 @@ module Wrap = struct
           ; feature_flags_spec
           ; Lookup_parameters.opt_spec impl lookup
           ; Proof_state.Deferred_values.Plonk.In_circuit.Optional_column_scalars
-            .spec impl lookup.zero
-              (Plonk_types.Features.chunk feature_flags)
+            .spec impl lookup.zero feature_flags
           ]
 
       (** Convert a statement (as structured data) into the flat data-based representation. *)
@@ -1062,7 +1063,9 @@ module Wrap = struct
           let open
             Proof_state.Deferred_values.Plonk.In_circuit.Optional_column_scalars in
           of_data optional_column_scalars
-          |> make_opt feature_flags |> refine_opt flags |> map ~f:of_opt
+          |> make_opt feature_flags
+          |> refine_opt (Plonk_types.Features.unchunk flags)
+          |> map ~f:of_opt
         in
         { proof_state =
             { deferred_values =
@@ -1449,6 +1452,8 @@ module Step = struct
       end
 
       let typ impl fq ~assert_16_bits ~zero ~feature_flags =
+        let feature_flags = Plonk_types.Features.unchunk feature_flags in
+        (* FIXME: Chunk *)
         let lookup_config =
           { Wrap.Lookup_parameters.use =
               feature_flags.Plonk_types.Features.lookup
@@ -1506,7 +1511,6 @@ module Step = struct
         , _ )
         Snarky_backendless.Typ.t =
       let per_proof feature_flags =
-        let feature_flags = Plonk_types.Features.unchunk feature_flags in
         Per_proof.typ impl fq ~feature_flags ~assert_16_bits ~zero
       in
       let unfinalized_proofs =
@@ -1550,12 +1554,16 @@ module Step = struct
           [ unfinalized_proofs
           ; messages_for_next_step_proof
           ; messages_for_next_wrap_proof
-          ] ~feature_flags ~option_map ~of_opt =
+          ] ~(feature_flags : Plonk_types.Features.chunked_options) ~option_map
+        ~of_opt =
       { proof_state =
           { unfinalized_proofs =
               Vector.map unfinalized_proofs
                 ~f:
-                  (Proof_state.Per_proof.In_circuit.of_data ~feature_flags
+                  (let feature_flags =
+                     Plonk_types.Features.unchunk feature_flags
+                   in
+                   Proof_state.Per_proof.In_circuit.of_data ~feature_flags
                      ~option_map ~of_opt )
           ; messages_for_next_step_proof
           }
@@ -1564,6 +1572,7 @@ module Step = struct
 
     let spec impl proofs_verified bp_log2 lookup feature_flags =
       let per_proof =
+        let feature_flags = Plonk_types.Features.unchunk feature_flags in
         Proof_state.Per_proof.In_circuit.spec impl bp_log2 lookup feature_flags
       in
       Spec.T.Struct

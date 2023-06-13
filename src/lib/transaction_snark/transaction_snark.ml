@@ -614,6 +614,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; lookup = Opt.Flag.Maybe
         ; runtime_tables = Opt.Flag.Maybe
         }
+        |> Features.chunk
       in
       Memo.of_comparable
         (module Int)

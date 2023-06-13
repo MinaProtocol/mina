@@ -966,17 +966,52 @@ module Wrap : sig
 
       (** Construct a statement (as structured data) from the flat data-based representation. *)
       val of_data :
-           ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'fp option, 'bool) flat_repr
-        -> feature_flags:Pickles_types.Plonk_types.Features.chunked_options
+           ( ( 'a
+             , Nat.z Nat.s Nat.s Nat.s Nat.s Nat.s Nat.s Nat.s Nat.s Nat.s )
+             Vector.vec
+           * ( ('b, Nat.z Nat.s Nat.s) Vector.vec
+             * ( ('c, Nat.z Nat.s Nat.s Nat.s) Vector.vec
+               * ( ('d, Nat.z Nat.s Nat.s Nat.s) Vector.vec
+                 * ( 'e
+                   * ( ('f, Nat.z Nat.s) Vector.vec
+                     * ( ( 'g
+                         * ('g * ('g * ('g * ('g * ('g * ('g * ('g * unit)))))))
+                         )
+                         Hlist0.HlistId.t
+                       * ( 'h
+                         * ( ( 'i option
+                             * ( 'i option
+                               * ( 'i option
+                                 * ( 'i option
+                                   * ( 'i option
+                                     * ( 'i option
+                                       * ('i option * ('i option * unit)) ) ) )
+                                 ) ) )
+                             Hlist0.HlistId.t
+                           * unit ) ) ) ) ) ) ) ) )
+           Hlist0.HlistId.t
+        -> feature_flags:Opt.Flag.t Plonk_types.Features.chunked
         -> option_map:
-             (   'g Hlist0.Id.t
+             (   'h
               -> f:
-                   (   ('h * unit) Hlist.HlistId.t
-                    -> 'h Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
+                   (   ('j * unit) Hlist0.HlistId.t
+                    -> 'j Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
                    )
-              -> 'j )
-        -> of_opt:(('fp, 'bool) Pickles_types.Plonk_types.Opt.t -> 'fp_opt2)
-        -> ('b, 'c, 'a, 'fp_opt2, 'j, 'bool, 'd, 'd, 'd, 'e, 'f) t
+              -> 'k )
+        -> of_opt:(('i, 'g) Opt.t -> 'l)
+        -> ('b, 'c, 'a, 'l, 'k, 'g, 'd, 'd, 'd, 'e, 'f) t
+      (* ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'fp option, 'bool) flat_repr
+         -> feature_flags:Pickles_types.Plonk_types.Features.chunked_options
+         -> option_map:
+              (   'g Hlist0.Id.t
+               -> f:
+                    (   ('h * unit) Hlist.HlistId.t
+                     -> 'h Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
+                    )
+               -> 'j )
+         -> of_opt:
+              (('fp, 'bool) Pickles_types.Plonk_types.Opt.t array -> 'fp_opt2)
+         -> ('b, 'c, 'a, 'fp_opt2, 'j, 'bool, 'd, 'd, 'd, 'e, 'f) t *)
     end
 
     val to_minimal :
@@ -1195,7 +1230,7 @@ module Step : sig
              , 'field1 Hlist0.Id.t
              , 'field2 Hlist0.Id.t )
              Wrap.Lookup_parameters.t
-          -> Plonk_types.Features.chunked_options
+          -> Plonk_types.Features.options
           -> ( ( 'field1
                , 'digest1
                , 'challenge1

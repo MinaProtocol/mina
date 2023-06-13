@@ -33,10 +33,11 @@ struct
     in
     Timer.clock __LOC__ ;
     let srs = Backend.Tick.Keypair.load_urs () in
-    let _, main =
+    let _, _main =
       Wrap_main.wrap_main ~feature_flags ~srs full_signature choices_length
         dummy_step_keys dummy_step_widths dummy_step_domains max_proofs_verified
     in
+    let main = assert false in
     Timer.clock __LOC__ ;
     let t =
       Fix_domains.domains

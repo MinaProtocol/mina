@@ -36,7 +36,8 @@ module Old_bulletproof_chals = struct
         -> t
 end
 
-let pack_statement max_proofs_verified ~lookup ~feature_flags t =
+let pack_statement max_proofs_verified ~lookup
+    ~(feature_flags : Plonk_types.Features.chunked_options) t =
   let open Types.Step in
   Spec.pack
     (module Impl)
