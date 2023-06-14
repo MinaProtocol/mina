@@ -32,6 +32,7 @@ mina daemon \
   --peer-list-url "https://storage.googleapis.com/seed-lists/${TESTNET_NAME}_seeds.txt" \
 & # -background
 
+
 # Attempt to connect to the GraphQL client every 10s for up to 4 minutes
 num_status_retries=24
 for ((i=1;i<=$num_status_retries;i++)); do
