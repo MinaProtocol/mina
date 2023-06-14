@@ -376,11 +376,18 @@ module Ledger = struct
                     Deferred.Or_error.errorf "ledger '%s' not found" ledger_name
                 )
             | Some accounts -> (
+                Format.eprintf "PACKED LEDGER@." ;
+                let tm0 = Unix.gettimeofday () in
                 let packed =
                   packed_genesis_ledger_of_accounts
                     ~depth:constraint_constants.ledger_depth accounts
                 in
+                let tm1 = Unix.gettimeofday () in
+                Format.eprintf "PACKED LEDGER TIME: %0.02f@." (tm1 -. tm0) ;
+                let tm2 = Unix.gettimeofday () in
                 let ledger = Lazy.force (Genesis_ledger.Packed.t packed) in
+                let tm3 = Unix.gettimeofday () in
+                Format.eprintf "FORCED PACKED LEDGER TIME: %0.02f@." (tm3 -. tm2) ;
                 let%bind tar_path =
                   generate_tar ~genesis_dir ~logger ~ledger_name_prefix ledger
                 in
@@ -802,13 +809,21 @@ end
 
 let load_config_json filename =
   Monitor.try_with_or_error ~here:[%here] (fun () ->
+      Format.eprintf "LOADING JSON FROM FILE@." ;
+      let tm0 = Unix.gettimeofday () in
       let%map json = Reader.file_contents filename in
+      let tm1 = Unix.gettimeofday () in
+      Format.eprintf "LOADED IN %0.02f SEC@." (tm1 -. tm0) ;
       Yojson.Safe.from_string json )
 
 let load_config_file filename =
   let open Deferred.Or_error.Let_syntax in
   Monitor.try_with_join_or_error ~here:[%here] (fun () ->
+      Format.eprintf "LOADING JSON@." ;
+      let tm0 = Unix.gettimeofday () in
       let%map json = load_config_json filename in
+      let tm1 = Unix.gettimeofday () in
+      Format.eprintf "LOADED IN %0.02f SEC@." (tm1 -. tm0) ;
       match Runtime_config.of_yojson json with
       | Ok config ->
           Ok config

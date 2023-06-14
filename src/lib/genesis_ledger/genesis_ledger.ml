@@ -4,6 +4,7 @@ open Signature_lib
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 module Intf = Intf
+module Deferred = Async_kernel.Deferred
 
 let account_with_timing account_id balance (timing : Intf.Timing.t) =
   match timing with
@@ -125,12 +126,22 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
       | `Path directory_name ->
           lazy (Ledger.create ~directory_name ~depth (), false)
     in
-    if insert_accounts then
-      List.iter (Lazy.force accounts) ~f:(fun (_, account) ->
-          Ledger.create_new_account_exn ledger
-            (Account.identifier account)
-            account ) ;
-    ledger
+    let%bind.Deferred () =
+      if insert_accounts then (
+        Format.eprintf "INSERTING ACCTS@." ;
+        let tm0 = UnixLabels.gettimeofday () in
+        let%bind.Deferred () =
+          Deferred.List.iteri ~how:`Parallel (Lazy.force accounts)
+            ~f:(fun i (_, account) ->
+              Ledger.set_at_index_exn ledger i account ;
+              Deferred.unit )
+        in
+        let tm1 = UnixLabels.gettimeofday () in
+        Format.eprintf "INSERTED ACCTS IN %0.02f SEC@." (tm1 -. tm0) ;
+        Deferred.unit )
+      else Deferred.unit
+    in
+    Deferred.return ledger
 
   include Utils
 
@@ -191,26 +202,31 @@ module Packed = struct
 end
 
 module Of_ledger (T : sig
-  val t : Ledger.t Lazy.t
+  val t : Ledger.t Async_kernel.Deferred.t Lazy.t
 
   val depth : int
 end) : Intf.S = struct
   include T
 
   let accounts =
-    Lazy.map t
-      ~f:(Ledger.foldi ~init:[] ~f:(fun _loc accs acc -> (None, acc) :: accs))
+    Lazy.map t ~f:(fun l ->
+        let%map.Deferred ledger = l in
+        Ledger.foldi ledger ~init:[] ~f:(fun _loc accs acc ->
+            (None, acc) :: accs ) )
 
   include Utils
 
   let find_account_record_exn ~f =
-    find_account_record_exn ~f (Lazy.force accounts)
+    let%map.Deferred accounts = Lazy.force accounts in
+    find_account_record_exn accounts ~f
 
   let find_new_account_record_exn_ old_account_pks =
-    find_new_account_record_exn_ (Lazy.force accounts) old_account_pks
+    let%map.Deferred accounts = Lazy.force accounts in
+    find_new_account_record_exn_ accounts old_account_pks
 
   let find_new_account_record_exn old_account_pks =
-    find_new_account_record_exn (Lazy.force accounts) old_account_pks
+    let%map.Deferred accounts = Lazy.force accounts in
+    find_new_account_record_exn accounts old_account_pks
 
   let largest_account_exn =
     let error_msg =
@@ -218,15 +234,20 @@ end) : Intf.S = struct
       ^ "genesis ledger has no accounts"
     in
     Memo.unit (fun () ->
-        List.max_elt (Lazy.force accounts) ~compare:(fun (_, a) (_, b) ->
+        let%map.Deferred accounts = Lazy.force accounts in
+        List.max_elt accounts ~compare:(fun (_, a) (_, b) ->
             Balance.compare a.Account.Poly.balance b.Account.Poly.balance )
         |> Option.value_exn ?here:None ?error:None ~message:error_msg )
 
   let largest_account_id_exn =
-    Memo.unit (fun () -> largest_account_exn () |> id_of_account_record)
+    Memo.unit (fun () ->
+        let%map.Deferred acct = largest_account_exn () in
+        id_of_account_record acct )
 
   let largest_account_pk_exn =
-    Memo.unit (fun () -> largest_account_exn () |> pk_of_account_record)
+    Memo.unit (fun () ->
+        let%map.Deferred acct = largest_account_exn () in
+        pk_of_account_record acct )
 
   let largest_account_keypair_exn () =
     failwith "cannot access genesis ledger account private key"

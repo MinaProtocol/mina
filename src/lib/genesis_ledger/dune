@@ -5,6 +5,7 @@
    ;; opam libraries
    core_kernel
    base
+   async_kernel
    ;; local libraries
    key_gen
    mina_base

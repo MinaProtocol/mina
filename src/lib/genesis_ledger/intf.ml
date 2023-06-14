@@ -81,29 +81,33 @@ module type Ledger_input_intf = sig
   val depth : int
 end
 
+module Deferred = Async_kernel.Deferred
+
 module type S = sig
-  val t : Mina_ledger.Ledger.t Lazy.t
+  val t : Mina_ledger.Ledger.t Deferred.t Lazy.t
 
   val depth : int
 
-  val accounts : (Private_key.t option * Account.t) list Lazy.t
+  val accounts : (Private_key.t option * Account.t) list Deferred.t Lazy.t
 
   val find_account_record_exn :
-    f:(Account.t -> bool) -> Private_key.t option * Account.t
+    f:(Account.t -> bool) -> (Private_key.t option * Account.t) Deferred.t
 
   val find_new_account_record_exn :
-    Public_key.t list -> Private_key.t option * Account.t
+    Public_key.t list -> (Private_key.t option * Account.t) Deferred.t
 
   val find_new_account_record_exn_ :
-    Public_key.Compressed.t list -> Private_key.t option * Account.t
+       Public_key.Compressed.t list
+    -> (Private_key.t option * Account.t) Deferred.t
 
-  val largest_account_exn : unit -> Private_key.t option * Account.t
+  val largest_account_exn :
+    unit -> (Private_key.t option * Account.t) Deferred.t
 
-  val largest_account_id_exn : unit -> Account_id.t
+  val largest_account_id_exn : unit -> Account_id.t Deferred.t
 
-  val largest_account_pk_exn : unit -> Public_key.Compressed.t
+  val largest_account_pk_exn : unit -> Public_key.Compressed.t Deferred.t
 
-  val largest_account_keypair_exn : unit -> Keypair.t
+  val largest_account_keypair_exn : unit -> Keypair.t Deferred.t
 
   val keypair_of_account_record_exn :
     Private_key.t option * Account.t -> Keypair.t
