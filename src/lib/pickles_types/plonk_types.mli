@@ -359,6 +359,8 @@ module Proof : sig
     module Latest = V2
   end
 
+  (** Represents a proof. A proof consists of messages and openings from the
+      polynomial protocols *)
   type ('a, 'b, 'c) t =
     { messages : 'a Messages.t; openings : ('a, 'b, 'c) Openings.t }
   [@@deriving compare, sexp, yojson, hash, equal]
