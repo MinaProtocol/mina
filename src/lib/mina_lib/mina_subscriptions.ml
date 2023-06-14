@@ -158,8 +158,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                             ] ;
                         Mina_block.Precomputed.to_yojson precomputed_block )
                    in
-                   if upload_blocks_to_gcloud then (
-                     [%log info] "log" ;
+                   ( if upload_blocks_to_gcloud then
                      let json =
                        Yojson.Safe.to_string (Lazy.force precomputed_block)
                      in
