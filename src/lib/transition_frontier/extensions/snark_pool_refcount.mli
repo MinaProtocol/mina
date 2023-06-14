@@ -1,15 +1,9 @@
-type view =
-  { removed : int
-  ; refcount_table : int Transaction_snark_work.Statement_with_hash.Table.t
-        (** Tracks the number of blocks that have each work statement in their
-            scan state.
-            Work is included iff it is a member of some block scan state.
-        *)
-  ; best_tip_table : Transaction_snark_work.Statement_with_hash.Hash_set.t
-        (** The set of all snark work statements present in the scan state for
-            the last 10 blocks in the best chain.
-        *)
-  }
+type view = { removed_work : Transaction_snark_work.Statement_with_hash.t list }
 [@@deriving sexp]
 
 include Intf.Extension_intf with type view := view
+
+val work_is_referenced :
+  t -> Transaction_snark_work.Statement_with_hash.t -> bool
+
+val best_tip_table : t -> Transaction_snark_work.Statement_with_hash.Hash_set.t
