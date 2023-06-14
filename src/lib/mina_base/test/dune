@@ -1,20 +1,29 @@
 (tests
- (names zkapp_account_test)
+ (names main)
  (libraries
   ;; opam libraries
   alcotest
+  async_kernel
+  async_unix
   base
   base.caml
   core_kernel
   integers
   sexplib0
   ;; local libraries
+  currency
   mina_base
   mina_numbers
+  mina_wire_types
   pickles
+  pickles_types
+  ppx_version.runtime
+  signature_lib
   random_oracle
+  sgn
   snarky.backendless
-  snark_params)
+  snark_params
+  with_hash)
  (preprocess
   (pps
    ppx_base
