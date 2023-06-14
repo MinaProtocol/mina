@@ -35,6 +35,11 @@ let test_ledger accounts =
         let acc_id = account_id a in
         let account : Account.t = Account.initialize acc_id in
         Ledger.create_new_account ledger acc_id
-          { account with balance = a.balance; nonce = a.nonce; zkapp = a.zkapp } )
+          { account with
+            balance = a.balance
+          ; nonce = a.nonce
+          ; zkapp = a.zkapp
+          ; token_id = a.token_id
+          } )
   in
   ledger
