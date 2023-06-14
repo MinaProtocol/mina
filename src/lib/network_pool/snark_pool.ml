@@ -5,23 +5,6 @@ open Network_peer
 module Statement_table = Transaction_snark_work.Statement.Table
 
 module Snark_tables = struct
-  module Serializable = struct
-    [%%versioned
-    module Stable = struct
-      module V2 = struct
-        type t =
-          ( Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
-            Priced_proof.Stable.V1.t
-          * [ `Rebroadcastable of Core.Time.Stable.With_utc_sexp.V2.t
-            | `Not_rebroadcastable ] )
-          Transaction_snark_work.Statement.Stable.V2.Table.t
-        [@@deriving sexp]
-
-        let to_latest = Fn.id
-      end
-    end]
-  end
-
   type t =
     { all :
         Ledger_proof.t One_or_two.t Priced_proof.t
@@ -30,24 +13,7 @@ module Snark_tables = struct
         (Ledger_proof.t One_or_two.t Priced_proof.t * Core.Time.t)
         Transaction_snark_work.Statement.Table.t
     }
-  [@@deriving sexp, equal]
-
-  let of_serializable (t : Serializable.t) : t =
-    { all = Hashtbl.map t ~f:fst
-    ; rebroadcastable =
-        Hashtbl.filter_map t ~f:(fun (x, r) ->
-            match r with
-            | `Rebroadcastable time ->
-                Some (x, time)
-            | `Not_rebroadcastable ->
-                None )
-    }
-
-  let to_serializable (t : t) : Serializable.t =
-    let res = Hashtbl.map t.all ~f:(fun x -> (x, `Not_rebroadcastable)) in
-    Hashtbl.iteri t.rebroadcastable ~f:(fun ~key ~data:(x, r) ->
-        Hashtbl.set res ~key ~data:(x, `Rebroadcastable r) ) ;
-    res
+  [@@deriving sexp]
 end
 
 module type S = sig
@@ -85,20 +51,6 @@ module type S = sig
        t
     -> Transaction_snark_work.Statement.t
     -> Transaction_snark_work.Checked.t option
-
-  val load :
-       ?allow_multiple_instances_for_tests:bool
-    -> config:Resource_pool.Config.t
-    -> logger:Logger.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> consensus_constants:Consensus.Constants.t
-    -> time_controller:Block_time.Controller.t
-    -> frontier_broadcast_pipe:
-         transition_frontier option Broadcast_pipe.Reader.t
-    -> log_gossip_heard:bool
-    -> on_remote_push:(unit -> unit Deferred.t)
-    -> unit
-    -> (t * Remote_sink.t * Local_sink.t) Deferred.t
 end
 
 module type Transition_frontier_intf = sig
@@ -165,24 +117,7 @@ struct
         }
       [@@deriving sexp]
 
-      type serializable = Snark_tables.Serializable.Stable.Latest.t
-      [@@deriving bin_io_unversioned]
-
       let make_config = Config.make
-
-      let of_serializable tables ~constraint_constants ~frontier_broadcast_pipe
-          ~config ~logger : t =
-        { snark_tables = Snark_tables.of_serializable tables
-        ; snark_table_lock = Throttle.Sequencer.create ()
-        ; frontier =
-            (fun () -> Broadcast_pipe.Reader.peek frontier_broadcast_pipe)
-        ; batcher = Batcher.Snark_pool.create config.verifier
-        ; account_creation_fee =
-            constraint_constants
-              .Genesis_constants.Constraint_constants.account_creation_fee
-        ; config
-        ; logger
-        }
 
       let best_tip_ledger t =
         t.frontier ()
@@ -594,8 +529,6 @@ struct
 
   module For_tests = struct
     let get_rebroadcastable = Resource_pool.get_rebroadcastable
-
-    let snark_tables (t : Resource_pool.t) = t.snark_tables
   end
 
   let get_completed_work t statement =
@@ -604,60 +537,6 @@ struct
       ~f:(fun Priced_proof.{ proof; fee = { fee; prover } } ->
         Transaction_snark_work.Checked.create_unsafe
           { Transaction_snark_work.fee; proofs = proof; prover } )
-
-  (* This causes a snark pool to never be GC'd. This is fine as it should live as long as the daemon lives. *)
-  let store_periodically (t : Resource_pool.t) =
-    Clock.every' (Time.Span.of_min 3.) (fun () ->
-        let before = Time.now () in
-        let%map () =
-          Writer.save_bin_prot t.config.disk_location
-            Snark_tables.Serializable.Stable.Latest.bin_writer_t
-            (Snark_tables.to_serializable t.snark_tables)
-        in
-        let elapsed = Time.(diff (now ()) before |> Span.to_ms) in
-        Mina_metrics.(
-          Snark_work.Snark_pool_serialization_ms_histogram.observe
-            Snark_work.snark_pool_serialization_ms elapsed) ;
-        [%log' debug t.logger] "SNARK pool serialization took $time ms"
-          ~metadata:[ ("time", `Float elapsed) ] )
-
-  let loaded = ref false
-
-  let load ?(allow_multiple_instances_for_tests = false) ~config ~logger
-      ~constraint_constants ~consensus_constants ~time_controller
-      ~frontier_broadcast_pipe ~log_gossip_heard ~on_remote_push () =
-    if (not allow_multiple_instances_for_tests) && !loaded then
-      failwith
-        "Snark_pool.load should only be called once. It has been called twice." ;
-    loaded := true ;
-    let tf_diff_reader, tf_diff_writer =
-      Strict_pipe.(
-        create ~name:"Snark pool Transition frontier diffs" Synchronous)
-    in
-    let%map pool, r_sink, l_sink =
-      match%map
-        Async.Reader.load_bin_prot config.Resource_pool.Config.disk_location
-          Snark_tables.Serializable.Stable.Latest.bin_reader_t
-      with
-      | Ok snark_table ->
-          let pool =
-            Resource_pool.of_serializable snark_table ~constraint_constants
-              ~config ~logger ~frontier_broadcast_pipe
-          in
-          let res =
-            of_resource_pool_and_diffs pool ~logger ~constraint_constants
-              ~tf_diffs:tf_diff_reader ~log_gossip_heard ~on_remote_push
-          in
-          Resource_pool.listen_to_frontier_broadcast_pipe
-            frontier_broadcast_pipe ~tf_diff_writer ;
-          res
-      | Error _e ->
-          create ~config ~logger ~constraint_constants ~consensus_constants
-            ~time_controller ~frontier_broadcast_pipe ~log_gossip_heard
-            ~on_remote_push
-    in
-    store_periodically (resource_pool pool) ;
-    (pool, r_sink, l_sink)
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
@@ -805,17 +684,6 @@ let%test_module "random set test" =
             assert (Result.is_ok res) )
       in
       (pool, tf)
-
-    let%test_unit "serialization" =
-      let t, _tf =
-        Async.Thread_safe.block_on_async_exn (fun () ->
-            Quickcheck.random_value (gen ~length:100 ()) )
-      in
-      let s0 = Mock_snark_pool.For_tests.snark_tables t in
-      let s1 =
-        Snark_tables.to_serializable s0 |> Snark_tables.of_serializable
-      in
-      assert (Snark_tables.equal s0 s1)
 
     let%test_unit "Invalid proofs are not accepted" =
       let open Quickcheck.Generator.Let_syntax in
