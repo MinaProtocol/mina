@@ -2,8 +2,8 @@
 
 set -eo pipefail
 
-if [[ $# -ne 3 ]]; then
-    echo "Usage: $0 <dune-profile> <path-to-source-tests> <number-of-trials>"
+if [[ $# -ne 4 ]]; then
+    echo "Usage: $0 <dune-profile> <path-to-source-tests> <timeout> <individual-test-timeout>"
     exit 1
 fi
 
