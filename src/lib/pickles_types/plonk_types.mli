@@ -2,6 +2,7 @@
 
 val hash_fold_array : 'a Sigs.hashable -> 'a array Sigs.hashable
 
+(** Features are custom gates, lookup tables or runtime tables *)
 module Features : sig
   module Full : sig
     type 'bool t = private
@@ -64,11 +65,14 @@ module Features : sig
 
   type flags = bool t
 
+  (** [to_data flags] takes the record define above and deconstructs it in a
+      list, in the field order *)
   val to_data :
        'a t
     -> ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
        Hlist.HlistId.t
 
+  (** [of_data flags_list] constructs a record from the flags list *)
   val of_data :
        ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
        Hlist.HlistId.t
