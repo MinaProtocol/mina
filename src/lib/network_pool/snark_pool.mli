@@ -72,6 +72,10 @@ module type Transition_frontier_intf = sig
        t
     -> Transition_frontier.Extensions.Snark_pool_refcount.view
        Pipe_lib.Broadcast_pipe.Reader.t
+
+  val work_is_referenced : t -> Transaction_snark_work.Statement.t -> bool
+
+  val best_tip_table : t -> Transaction_snark_work.Statement.Hash_set.t
 end
 
 module Make

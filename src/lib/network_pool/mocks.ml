@@ -68,10 +68,7 @@ module Transition_frontier = struct
     (*add_statements table stmts ;*)
     let diff_reader, diff_writer =
       Broadcast_pipe.create
-        { Extensions.Snark_pool_refcount.removed = 0
-        ; refcount_table
-        ; best_tip_table
-        }
+        { Extensions.Snark_pool_refcount.removed_work = [] }
     in
     { refcount_table
     ; best_tip_table
@@ -93,6 +90,10 @@ module Transition_frontier = struct
     let r, _ = Broadcast_pipe.create () in
     r
 
+  let work_is_referenced t = Hashtbl.mem t.refcount_table
+
+  let best_tip_table t = t.best_tip_table
+
   (*Adds statements to the table of referenced work. Snarks for only the referenced statements are added to the pool*)
   let refer_statements (t : t) stmts =
     let open Deferred.Let_syntax in
@@ -100,10 +101,7 @@ module Transition_frontier = struct
     List.iter ~f:(Hash_set.add t.best_tip_table) stmts ;
     let%bind () =
       Broadcast_pipe.Writer.write t.diff_writer
-        { Transition_frontier.Extensions.Snark_pool_refcount.removed = 0
-        ; refcount_table = t.refcount_table
-        ; best_tip_table = t.best_tip_table
-        }
+        { Transition_frontier.Extensions.Snark_pool_refcount.removed_work = [] }
     in
     Async.Scheduler.yield_until_no_jobs_remain ()
 
@@ -111,10 +109,7 @@ module Transition_frontier = struct
     List.iter ~f:(Hash_set.remove t.best_tip_table) stmts ;
     let%bind () =
       Broadcast_pipe.Writer.write t.diff_writer
-        { Transition_frontier.Extensions.Snark_pool_refcount.removed = 0
-        ; refcount_table = t.refcount_table
-        ; best_tip_table = t.best_tip_table
-        }
+        { Transition_frontier.Extensions.Snark_pool_refcount.removed_work = [] }
     in
     Async.Scheduler.yield_until_no_jobs_remain ()
 end
