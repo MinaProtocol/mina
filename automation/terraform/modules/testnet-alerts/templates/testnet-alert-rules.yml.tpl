@@ -129,7 +129,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/Nodes-out-of-sync-0f29c739e47c42e4adabe62a2a0316bd"
 
   - alert: LowPeerCount
-    expr: min by (testnet) (Coda_Network_peers ${rule_filter}) < 3
+    expr: quantile by (testnet) (0.5, Coda_Network_peers ${rule_filter}) < 3
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
@@ -290,7 +290,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/MediumFork-0a530813af2e40c491cdf01b3a2b2304"
 
   - alert: NoTransactionsInAtLeastOneBlock
-    expr: max by (testnet) (Coda_Transition_frontier_empty_blocks_at_best_tip ${rule_filter}) > 0
+    expr: quantile by (testnet) (0.5, Coda_Transition_frontier_empty_blocks_at_best_tip ${rule_filter}) > 0
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
