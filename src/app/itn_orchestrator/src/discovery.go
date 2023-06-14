@@ -1,11 +1,8 @@
 package itn_orchestrator
 
 import (
-	"context"
-	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -21,35 +18,15 @@ func prefixByTime(t time.Time) string {
 	return strings.Join([]string{"submissions", dStr, tStr}, "/")
 }
 
-type NodeAddress string
-
 type Node struct {
 	Address NodeAddress
 	Client  graphql.Client
 }
 
 type DiscoveryParams struct {
-	OffsetMin int
-	Limit     int
-}
-
-type GetGqlClientF = func(context.Context, NodeAddress) (graphql.Client, error)
-
-func GetGqlClient(sk ed25519.PrivateKey, cache map[NodeAddress]graphql.Client) GetGqlClientF {
-	authenticator := NewAuthenticator(sk, http.DefaultClient)
-	return func(ctx context.Context, addr NodeAddress) (graphql.Client, error) {
-		if client, has := cache[addr]; has {
-			return client, nil
-		}
-		url := "http://" + string(addr) + "/graphql"
-		authClient := graphql.NewClient(url, authenticator)
-		uuid, seqno, err := Auth(ctx, authClient)
-		if err != nil {
-			return nil, fmt.Errorf("failed to authorize client %s: %v", addr, err)
-		}
-		seqAuthenticator := NewSequentialAuthenticator(uuid, seqno, authenticator)
-		return graphql.NewClient(url, seqAuthenticator), nil
-	}
+	OffsetMin          int
+	Limit              int
+	OnlyBlockProducers bool `json:"omitempty"`
 }
 
 func DiscoverParticipants(config Config, params DiscoveryParams, output func(NodeAddress)) error {
@@ -92,9 +69,12 @@ func DiscoverParticipants(config Config, params DiscoveryParams, output func(Nod
 			log.Errorf("Error on auth for %s: %v", addr, err)
 			continue
 		}
+		if !config.NodeData[addr].IsBlockProducer && params.OnlyBlockProducers {
+			continue
+		}
 		cache[addr] = struct{}{}
 		output(addr)
-		if len(cache) >= params.Limit {
+		if params.Limit > 0 && len(cache) >= params.Limit {
 			break
 		}
 	}

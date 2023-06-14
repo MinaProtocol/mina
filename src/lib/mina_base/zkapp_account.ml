@@ -6,7 +6,7 @@ open Zkapp_basic
 
 module Event = struct
   (* Arbitrary hash input, encoding determined by the zkApp's developer. *)
-  type t = Field.t array [@@deriving equal]
+  type t = Field.t array [@@deriving compare, sexp]
 
   let hash (x : t) = Random_oracle.hash ~init:Hash_prefix_states.zkapp_event x
 
@@ -18,6 +18,10 @@ module Event = struct
     Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_event x
 
   [%%endif]
+
+  let gen : t Quickcheck.Generator.t =
+    let open Quickcheck in
+    Generator.map ~f:Array.of_list @@ Generator.list Field.gen
 end
 
 module Make_events (Inputs : sig
@@ -28,7 +32,7 @@ module Make_events (Inputs : sig
   val deriver_name : string
 end) =
 struct
-  type t = Event.t list [@@deriving equal]
+  type t = Event.t list [@@deriving compare, sexp]
 
   let empty_hash = Random_oracle.(salt Inputs.salt_phrase |> digest)
 
@@ -82,7 +86,7 @@ struct
               (event, events) )
     in
     Field.Assert.equal
-      (Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_events
+      (Random_oracle.Checked.hash ~init:Inputs.hash_prefix
          [| Data_as_hash.hash tl; Data_as_hash.hash hd |] )
       (Data_as_hash.hash events) ;
     (hd, tl)
@@ -105,51 +109,6 @@ module Events = struct
 
     let deriver_name = "Events"
   end)
-
-  let%test_unit "checked push/pop inverse" =
-    let open Quickcheck in
-    let num_events = 11 in
-    let event_len = 7 in
-    let events =
-      random_value
-        (Generator.list_with_length num_events
-           (Generator.list_with_length event_len Field.gen) )
-      |> List.map ~f:Array.of_list
-    in
-    let events_vars = List.map events ~f:(Array.map ~f:Field.Var.constant) in
-    let f () () =
-      Run.as_prover (fun () ->
-          let empty_var = Run.exists typ ~compute:(fun _ -> []) in
-          let pushed =
-            List.fold_right events_vars ~init:empty_var
-              ~f:(Fn.flip push_to_data_as_hash)
-          in
-          let popped =
-            let rec go acc var =
-              try
-                let event_with_hash, tl_var = pop_from_data_as_hash var in
-                let event =
-                  Run.As_prover.read
-                    (Data_as_hash.typ ~hash:Event.hash)
-                    event_with_hash
-                in
-                go (event :: acc) tl_var
-              with
-              | Snarky_backendless.Snark0.Runtime_error (_, Failure s, _)
-              | Failure s
-              when String.equal s empty_stack_msg
-              ->
-                List.rev acc
-            in
-            go [] pushed
-          in
-          assert (equal events popped) )
-    in
-    match Snark_params.Tick.Run.run_and_check f with
-    | Ok () ->
-        ()
-    | Error err ->
-        failwithf "Error from run_and_check: %s" (Error.to_string_hum err) ()
 end
 
 module Actions = struct
@@ -266,7 +225,7 @@ module Stable = struct
       , Verification_key_wire.Stable.V1.t option
       , Mina_numbers.Zkapp_version.Stable.V1.t
       , F.Stable.V1.t
-      , Mina_numbers.Global_slot.Stable.V1.t
+      , Mina_numbers.Global_slot_since_genesis.Stable.V1.t
       , bool
       , Zkapp_uri.Stable.V1.t )
       Poly.Stable.V2.t
@@ -281,7 +240,7 @@ type t =
   , Verification_key_wire.t option
   , Mina_numbers.Zkapp_version.t
   , F.t
-  , Mina_numbers.Global_slot.t
+  , Mina_numbers.Global_slot_since_genesis.t
   , bool
   , Zkapp_uri.t )
   Poly.t
@@ -300,7 +259,7 @@ module Checked = struct
       Flagged_option.t
     , Mina_numbers.Zkapp_version.Checked.t
     , Pickles.Impls.Step.Field.t
-    , Mina_numbers.Global_slot.Checked.t
+    , Mina_numbers.Global_slot_since_genesis.Checked.t
     , Boolean.var
     , string Data_as_hash.t )
     Poly.t
@@ -318,7 +277,8 @@ module Checked = struct
       ~verification_key:(f field)
       ~zkapp_version:(f Mina_numbers.Zkapp_version.Checked.to_input)
       ~action_state:(f app_state)
-      ~last_action_slot:(f Mina_numbers.Global_slot.Checked.to_input)
+      ~last_action_slot:
+        (f Mina_numbers.Global_slot_since_genesis.Checked.to_input)
       ~proved_state:
         (f (fun (b : Boolean.var) ->
              Random_oracle.Input.Chunked.packed ((b :> Field.Var.t), 1) ) )
@@ -393,7 +353,7 @@ let typ : (Checked.t, t) Typ.t =
              (Option.map ~f:(With_hash.map ~f:(fun x -> Option.value_exn x)))
     ; Mina_numbers.Zkapp_version.typ
     ; Pickles_types.Vector.typ Field.typ Pickles_types.Nat.N5.n
-    ; Mina_numbers.Global_slot.typ
+    ; Mina_numbers.Global_slot_since_genesis.typ
     ; Boolean.typ
     ; Data_as_hash.typ ~hash:hash_zkapp_uri
     ]
@@ -418,7 +378,7 @@ let to_input (t : t) : _ Random_oracle.Input.Chunked.t =
             (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash) ) )
     ~zkapp_version:(f Mina_numbers.Zkapp_version.to_input)
     ~action_state:(f app_state)
-    ~last_action_slot:(f Mina_numbers.Global_slot.to_input)
+    ~last_action_slot:(f Mina_numbers.Global_slot_since_genesis.to_input)
     ~proved_state:
       (f (fun b -> Random_oracle.Input.Chunked.packed (field_of_bool b, 1)))
     ~zkapp_uri:(f zkapp_uri_to_input)
@@ -434,7 +394,7 @@ let default : _ Poly.t =
   ; action_state =
       (let empty = Actions.empty_state_element in
        [ empty; empty; empty; empty; empty ] )
-  ; last_action_slot = Mina_numbers.Global_slot.zero
+  ; last_action_slot = Mina_numbers.Global_slot_since_genesis.zero
   ; proved_state = false
   ; zkapp_uri = ""
   }
@@ -466,5 +426,35 @@ let deriver obj =
        ~verification_key:
          !.(option ~js_type:Or_undefined (verification_key_with_hash @@ o ()))
        ~zkapp_version:!.uint32 ~action_state:!.action_state_deriver
-       ~last_action_slot:!.global_slot ~proved_state:!.bool ~zkapp_uri:!.string
-       obj
+       ~last_action_slot:!.global_slot_since_genesis
+       ~proved_state:!.bool ~zkapp_uri:!.string obj
+
+let gen_uri =
+  let open Quickcheck in
+  let open Generator.Let_syntax in
+  let%bind parts =
+    String.gen_with_length 8 Char.gen_alphanum |> Generator.list_with_length 3
+  in
+  let%map domain = Generator.of_list [ "com"; "org"; "net"; "info" ] in
+  Printf.sprintf "https://%s.%s" (String.concat ~sep:"." parts) domain
+
+let gen : t Quickcheck.Generator.t =
+  let open Quickcheck in
+  let open Generator.Let_syntax in
+  let app_state =
+    Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
+        F.random () )
+  in
+  let%bind zkapp_version = Mina_numbers.Zkapp_version.gen in
+  let%bind seq_state = Generator.list_with_length 5 Field.gen in
+  let%bind last_sequence_slot = Mina_numbers.Global_slot_since_genesis.gen in
+  let%map zkapp_uri = gen_uri in
+  let five = Pickles_types.Nat.(S (S (S (S (S Z))))) in
+  { app_state
+  ; verification_key = None
+  ; zkapp_version
+  ; action_state = Pickles_types.(Vector.of_list_and_length_exn seq_state five)
+  ; last_action_slot = Mina_numbers.Global_slot_since_genesis.zero
+  ; proved_state = false
+  ; zkapp_uri
+  }

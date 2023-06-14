@@ -84,7 +84,7 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> nonce:Mina_numbers.Account_nonce.t
         -> memo:string
-        -> valid_until:Mina_numbers.Global_slot.t
+        -> valid_until:Mina_numbers.Global_slot_since_genesis.t
         -> raw_signature:string
         -> signed_command_result Deferred.Or_error.t
 
@@ -97,7 +97,7 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> nonce:Mina_numbers.Account_nonce.t
         -> memo:string
-        -> valid_until:Mina_numbers.Global_slot.t
+        -> valid_until:Mina_numbers.Global_slot_since_genesis.t
         -> raw_signature:string
         -> signed_command_result Malleable_error.t
 
@@ -116,6 +116,18 @@ module Engine = struct
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
         -> fee:Currency.Fee.t
         -> signed_command_result Malleable_error.t
+
+      val set_snark_worker :
+           logger:Logger.t
+        -> t
+        -> new_snark_pub_key:Signature_lib.Public_key.Compressed.t
+        -> unit Deferred.Or_error.t
+
+      val must_set_snark_worker :
+           logger:Logger.t
+        -> t
+        -> new_snark_pub_key:Signature_lib.Public_key.Compressed.t
+        -> unit Malleable_error.t
 
       (** Send a batch of zkApp transactions.
           Returned is a list of transaction id *)
@@ -384,10 +396,7 @@ module Dsl = struct
       -> t
 
     val ledger_proofs_emitted_since_genesis :
-         soft_timeout:Network_time_span.t
-      -> hard_timeout:Network_time_span.t
-      -> num_proofs:int
-      -> t
+      test_config:Test_config.t -> num_proofs:int -> t
 
     val zkapp_to_be_included_in_frontier :
       has_failures:bool -> zkapp_command:Mina_base.Zkapp_command.t -> t

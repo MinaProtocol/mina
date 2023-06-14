@@ -8,9 +8,9 @@ import (
 	"io"
 	"itn_json_types"
 	"os"
+	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/Khan/genqlient/graphql"
 	logging "github.com/ipfs/go-log/v2"
 	"go.uber.org/zap/zapcore"
 
@@ -21,22 +21,29 @@ var actions map[string]lib.Action
 
 func init() {
 	actions = map[string]lib.Action{
-		"discovery": lib.DiscoverParticipantsAction{},
-		"payments":  lib.PaymentsAction{},
-		"load-keys": lib.KeyloaderAction{},
-		"stop":      lib.StopAction{},
-		"wait":      lib.WaitAction{},
-		"fund-keys": lib.FundAction{},
+		"discovery":      lib.DiscoverParticipantsAction{},
+		"payments":       lib.PaymentsAction{},
+		"load-keys":      lib.KeyloaderAction{},
+		"stop":           lib.StopAction{},
+		"wait":           lib.WaitAction{},
+		"fund-keys":      lib.FundAction{},
+		"zkapp-txs":      lib.ZkappCommandsAction{},
+		"slots-won":      lib.SlotsWonAction{},
+		"reset-gating":   lib.ResetGatingAction{},
+		"isolate":        lib.IsolateAction{},
+		"allocate-slots": lib.AllocateSlotsAction{},
 	}
 }
 
 type AppConfig struct {
-	LogLevel     zapcore.Level `json:",omitempty"`
-	LogFile      string        `json:",omitempty"`
-	Key          itn_json_types.Ed25519Privkey
-	UptimeBucket string
-	Daemon       string `json:",omitempty"`
-	MinaExec     string `json:",omitempty"`
+	LogLevel         zapcore.Level `json:",omitempty"`
+	LogFile          string        `json:",omitempty"`
+	Key              itn_json_types.Ed25519Privkey
+	UptimeBucket     string
+	Daemon           string `json:",omitempty"`
+	MinaExec         string `json:",omitempty"`
+	SlotDurationMs   int
+	GenesisTimestamp itn_json_types.Time
 }
 
 func loadAppConfig() (res AppConfig) {
@@ -80,14 +87,17 @@ func main() {
 		os.Exit(4)
 		return
 	}
-	clientCache := make(map[lib.NodeAddress]graphql.Client)
+	nodeData := make(map[lib.NodeAddress]lib.NodeEntry)
 	config := lib.Config{
-		Ctx:          ctx,
-		UptimeBucket: client.Bucket(appConfig.UptimeBucket),
-		GetGqlClient: lib.GetGqlClient(ed25519.PrivateKey(appConfig.Key), clientCache),
-		Log:          log,
-		Daemon:       appConfig.Daemon,
-		MinaExec:     appConfig.MinaExec,
+		Ctx:              ctx,
+		UptimeBucket:     client.Bucket(appConfig.UptimeBucket),
+		GetGqlClient:     lib.GetGqlClient(ed25519.PrivateKey(appConfig.Key), nodeData),
+		Log:              log,
+		Daemon:           appConfig.Daemon,
+		MinaExec:         appConfig.MinaExec,
+		NodeData:         nodeData,
+		SlotDurationMs:   appConfig.SlotDurationMs,
+		GenesisTimestamp: time.Time(appConfig.GenesisTimestamp),
 	}
 	if config.MinaExec == "" {
 		config.MinaExec = "mina"

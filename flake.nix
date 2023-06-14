@@ -287,10 +287,10 @@
         # Main user-facing binaries.
         packages = rec {
           inherit (ocamlPackages)
-            mina mina_tests mina-ocaml-format mina_client_sdk test_executive;
+            mina mina_tests mina-ocaml-format test_executive;
           inherit (pkgs)
-            libp2p_helper kimchi_bindings_stubs client_sdk snarky_js leaderboard
-            mina-signer validation trace-tool zkapp-cli;
+            libp2p_helper kimchi_bindings_stubs snarky_js leaderboard
+            validation trace-tool zkapp-cli;
           inherit (dockerImages)
             mina-image-slim mina-image-full mina-archive-image-full;
           mina-deb = debianPackages.mina;

@@ -530,7 +530,10 @@ let retry ?(max = 3) ~logger ~error_message f =
   go 0
 
 module Vrf_evaluation_state = struct
-  type status = At of Mina_numbers.Global_slot.t | Start | Completed
+  type status =
+    | At of Mina_numbers.Global_slot_since_hard_fork.t
+    | Start
+    | Completed
 
   type t =
     { queue : Consensus.Data.Slot_won.t Queue.t
@@ -582,7 +585,8 @@ module Vrf_evaluation_state = struct
         [ ( "slots"
           , `List
               (List.map vrf_result.slots_won ~f:(fun s ->
-                   Mina_numbers.Global_slot.to_yojson s.global_slot ) ) )
+                   Mina_numbers.Global_slot_since_hard_fork.to_yojson
+                     s.global_slot ) ) )
         ]
 
   let update_epoch_data ~vrf_evaluator ~logger ~epoch_data_for_vrf t =
@@ -606,7 +610,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~trust_system ~get_completed_work ~transaction_resource_pool
     ~time_controller ~consensus_local_state ~coinbase_receiver ~frontier_reader
     ~transition_writer ~set_next_producer_timing ~log_block_creation
-    ~block_reward_threshold ~block_produced_bvar =
+    ~block_reward_threshold ~block_produced_bvar ~vrf_evaluation_state =
   let open Context in
   O1trace.sync_thread "produce_blocks" (fun () ->
       let genesis_breadcrumb =
@@ -678,7 +682,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                 .global_slot_since_genesis block_data
               in
               if
-                Mina_numbers.Global_slot.equal crumb_global_slot_since_genesis
+                Mina_numbers.Global_slot_since_genesis.equal
+                  crumb_global_slot_since_genesis
                   block_global_slot_since_genesis
               then
                 (* We received a block for this slot over the network before
@@ -994,7 +999,6 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
       in
       let production_supervisor = Singleton_supervisor.create ~task:produce in
       let scheduler = Singleton_scheduler.create time_controller in
-      let vrf_evaluation_state = Vrf_evaluation_state.create () in
       let rec check_next_block_timing slot i () =
         O1trace.sync_thread "check_next_block_timing" (fun () ->
             (* Begin checking for the ability to produce a block *)
@@ -1054,7 +1058,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                    let%bind () =
                      (*Poll once every slot if the evaluation for the epoch is not completed or the evaluation is completed*)
                      if
-                       Mina_numbers.Global_slot.(new_global_slot > slot)
+                       Mina_numbers.Global_slot_since_hard_fork.(
+                         new_global_slot > slot)
                        && not
                             (Vrf_evaluation_state.finished vrf_evaluation_state)
                      then
@@ -1117,7 +1122,9 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                        [%log info]
                          "Block producer won slot $slot in epoch $epoch"
                          ~metadata:
-                           [ ("slot", Mina_numbers.Global_slot.to_yojson slot)
+                           [ ( "slot"
+                             , Mina_numbers.Global_slot_since_genesis.(
+                                 to_yojson @@ of_uint32 slot) )
                            ; ("epoch", Mina_numbers.Length.to_yojson epoch)
                            ] ;
                        let now = Block_time.now time_controller in
@@ -1133,7 +1140,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                            ~coinbase_receiver:!coinbase_receiver
                        in
                        if
-                         Mina_numbers.Global_slot.(
+                         Mina_numbers.Global_slot_since_hard_fork.(
                            curr_global_slot = winning_global_slot)
                        then (
                          (*produce now*)
@@ -1151,8 +1158,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                              : (_, _) Interruptible.t ) )
                        else
                          match
-                           Mina_numbers.Global_slot.sub winning_global_slot
-                             curr_global_slot
+                           Mina_numbers.Global_slot_since_hard_fork.diff
+                             winning_global_slot curr_global_slot
                          with
                          | None ->
                              [%log warn]
@@ -1161,11 +1168,11 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                                 global slot is $curr_slot"
                                ~metadata:
                                  [ ( "slot_won"
-                                   , Mina_numbers.Global_slot.to_yojson
-                                       winning_global_slot )
+                                   , Mina_numbers.Global_slot_since_hard_fork
+                                     .to_yojson winning_global_slot )
                                  ; ( "curr_slot"
-                                   , Mina_numbers.Global_slot.to_yojson
-                                       curr_global_slot )
+                                   , Mina_numbers.Global_slot_since_hard_fork
+                                     .to_yojson curr_global_slot )
                                  ] ;
                              return
                                (check_next_block_timing new_global_slot i' ())
@@ -1173,7 +1180,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                              [%log info] "Producing a block in $slots slots"
                                ~metadata:
                                  [ ( "slots"
-                                   , Mina_numbers.Global_slot.to_yojson
+                                   , Mina_numbers.Global_slot_span.to_yojson
                                        slot_diff )
                                  ] ;
                              let time =
@@ -1229,7 +1236,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                              Deferred.return () ) ) )
       in
       let start () =
-        check_next_block_timing Mina_numbers.Global_slot.zero
+        check_next_block_timing Mina_numbers.Global_slot_since_hard_fork.zero
           Mina_numbers.Length.zero ()
       in
       let genesis_state_timestamp =

@@ -41,6 +41,32 @@ let zkapp_command =
   in
   List.hd_exn zkapp_commands
 
+let zkapp_proof =
+  List.fold_until
+    (Mina_base.Zkapp_command.all_account_updates_list zkapp_command)
+    ~init:None
+    ~f:(fun _acc a ->
+      match a.Mina_base.Account_update.authorization with
+      | Proof proof ->
+          Stop (Some proof)
+      | _ ->
+          Continue None )
+    ~finish:Fn.id
+  |> Option.value_exn
+
+let dummy_proof =
+  Pickles.Proof.dummy Pickles_types.Nat.N2.n Pickles_types.Nat.N2.n
+    Pickles_types.Nat.N2.n ~domain_log2:16
+
+let dummy_vk = Mina_base.Side_loaded_verification_key.dummy
+
+let verification_key =
+  let `VK vk, `Prover _ =
+    Transaction_snark.For_tests.create_trivial_snapp
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled ()
+  in
+  With_hash.data vk
+
 let applied = Mina_base.Transaction_status.Applied
 
 let mk_scan_state_base_node
@@ -111,7 +137,7 @@ let mk_scan_state_base_node
       ; init_stack
       ; first_pass_ledger_witness = ledger_witness
       ; second_pass_ledger_witness = ledger_witness
-      ; block_global_slot = Mina_numbers.Global_slot.zero
+      ; block_global_slot = Mina_numbers.Global_slot_since_genesis.zero
       }
     in
     let record : _ Parallel_scan.Base.Record.t =
@@ -150,7 +176,7 @@ let scan_state_base_node_payment =
         { fee = Currency.Fee.zero
         ; fee_payer_pk = sample_pk_compressed
         ; nonce = Mina_numbers.Account_nonce.zero
-        ; valid_until = Mina_numbers.Global_slot.max_value
+        ; valid_until = Mina_numbers.Global_slot_since_genesis.max_value
         ; memo = Mina_base.Signed_command_memo.empty
         }
       in
@@ -284,7 +310,6 @@ let protocol_state =
             "call_stack": "0x0000000000000000000000000000000000000000000000000000000000000000",
             "transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
             "full_transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
             "excess": {
               "magnitude": "0",
               "sgn": [
@@ -319,7 +344,6 @@ let protocol_state =
             "call_stack": "0x0000000000000000000000000000000000000000000000000000000000000000",
             "transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
             "full_transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
             "excess": {
               "magnitude": "0",
               "sgn": [
@@ -392,10 +416,10 @@ let protocol_state =
       "last_vrf_output": "q4zrn2ZlIeTV8_8XPb3PZu4eQusG0n5ieUNy5gyZAAA=",
       "total_currency": "1014488754000001000",
       "curr_global_slot": {
-        "slot_number": "2831",
+        "slot_number": ["Since_hard_fork","2831"],
         "slots_per_epoch": "7140"
       },
-      "global_slot_since_genesis": "2831",
+      "global_slot_since_genesis": ["Since_genesis","2831"],
       "staking_epoch_data": {
         "ledger": {
           "hash": "jxx14ajKiweveJ7iAxtzTiLfAm3KXj5Y4MMvkbLc2qhi2LYnzLS",
@@ -461,13 +485,12 @@ let staged_ledger_diff =
                       "fee": "0",
                       "fee_payer_pk": "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                       "nonce": "0",
-                      "valid_until": "4294967295",
+                      "valid_until": ["Since_genesis","4294967295"],
                       "memo": "E4QqiVG8rCzSPqdgMPUP59hA8yMWV6m8YSYGSYBAofr6mLp16UFnM"
                     },
                     "body": [
                       "Payment",
                       {
-                        "source_pk": "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                         "receiver_pk": "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
                         "amount": "1000000001"
                       }
@@ -490,13 +513,12 @@ let staged_ledger_diff =
                       "fee": "0",
                       "fee_payer_pk": "B62qrA2eWb592uRLtH5ohzQnx7WTLYp2jGirCw5M7Fb9gTf1RrvTPqX",
                       "nonce": "0",
-                      "valid_until": "4294967295",
+                      "valid_until": ["Since_genesis","4294967295"],
                       "memo": "E4QqiVG8rCzSPqdgMPUP59hA8yMWV6m8YSYGSYBAofr6mLp16UFnM"
                     },
                     "body": [
                       "Payment",
                       {
-                        "source_pk": "B62qrA2eWb592uRLtH5ohzQnx7WTLYp2jGirCw5M7Fb9gTf1RrvTPqX",
                         "receiver_pk": "B62qkYgXYkzT5fuPNhMEHk8ouiThjNNDSTMnpBAuaf6q7pNnCFkUqtz",
                         "amount": "1000000001"
                       }
@@ -519,13 +541,12 @@ let staged_ledger_diff =
                       "fee": "0",
                       "fee_payer_pk": "B62qpkCEM5N5ddVsYNbFtwWV4bsT9AwuUJXoehFhHUbYYvZ6j3fXt93",
                       "nonce": "0",
-                      "valid_until": "4294967295",
+                      "valid_until": ["Since_genesis","4294967295"],
                       "memo": "E4QqiVG8rCzSPqdgMPUP59hA8yMWV6m8YSYGSYBAofr6mLp16UFnM"
                     },
                     "body": [
                       "Payment",
                       {
-                        "source_pk": "B62qpkCEM5N5ddVsYNbFtwWV4bsT9AwuUJXoehFhHUbYYvZ6j3fXt93",
                         "receiver_pk": "B62qqR5XfP9CoC5DALUJX2jBoY6aaoLrN46YpM2NQTSV14qgpoWibL7",
                         "amount": "1000000001"
                       }
@@ -548,13 +569,12 @@ let staged_ledger_diff =
                       "fee": "0",
                       "fee_payer_pk": "B62qp5sdhH48MurWgtHNkXUTphEmUfcKVmZFspYAqxcKZ7YxaPF1pyF",
                       "nonce": "0",
-                      "valid_until": "4294967295",
+                      "valid_until": ["Since_genesis","4294967295"],
                       "memo": "E4QqiVG8rCzSPqdgMPUP59hA8yMWV6m8YSYGSYBAofr6mLp16UFnM"
                     },
                     "body": [
                       "Payment",
                       {
-                        "source_pk": "B62qp5sdhH48MurWgtHNkXUTphEmUfcKVmZFspYAqxcKZ7YxaPF1pyF",
                         "receiver_pk": "B62qji8zLZEuMUpZnRN3FHgsgnybYhhMFBBMcLAwGGLR3hTdfkhmM4X",
                         "amount": "1000000001"
                       }
@@ -577,13 +597,12 @@ let staged_ledger_diff =
                       "fee": "0",
                       "fee_payer_pk": "B62qqR5XfP9CoC5DALUJX2jBoY6aaoLrN46YpM2NQTSV14qgpoWibL7",
                       "nonce": "0",
-                      "valid_until": "4294967295",
+                      "valid_until": ["Since_genesis","4294967295"],
                       "memo": "E4QqiVG8rCzSPqdgMPUP59hA8yMWV6m8YSYGSYBAofr6mLp16UFnM"
                     },
                     "body": [
                       "Payment",
                       {
-                        "source_pk": "B62qqR5XfP9CoC5DALUJX2jBoY6aaoLrN46YpM2NQTSV14qgpoWibL7",
                         "receiver_pk": "B62qqMGFkBEtgGs2Gi6AWd1Abn9yzXdj5HRMzm95uwbJ8Wa88C7urCD",
                         "amount": "1000000001"
                       }
@@ -606,13 +625,12 @@ let staged_ledger_diff =
                       "fee": "0",
                       "fee_payer_pk": "B62qr4GMdg4ZVk1Y6BXaDHxgFRtCsZm2sZiyn7PCmubTZnAi3iZDDxq",
                       "nonce": "0",
-                      "valid_until": "4294967295",
+                      "valid_until": ["Since_genesis","4294967295"],
                       "memo": "E4QqiVG8rCzSPqdgMPUP59hA8yMWV6m8YSYGSYBAofr6mLp16UFnM"
                     },
                     "body": [
                       "Payment",
                       {
-                        "source_pk": "B62qr4GMdg4ZVk1Y6BXaDHxgFRtCsZm2sZiyn7PCmubTZnAi3iZDDxq",
                         "receiver_pk": "B62qpaA93gHfmvNoH9DLGgxreGnijhh5aui4duxiV3foX4p5ay5RNis",
                         "amount": "1000000001"
                       }
@@ -635,13 +653,12 @@ let staged_ledger_diff =
                       "fee": "0",
                       "fee_payer_pk": "B62qpgjtMzVpodthL3kMfXAAzzv1kgGZRMEeLv592u4hSVQKCzTGLvA",
                       "nonce": "0",
-                      "valid_until": "4294967295",
+                      "valid_until": ["Since_genesis","4294967295"],
                       "memo": "E4QqiVG8rCzSPqdgMPUP59hA8yMWV6m8YSYGSYBAofr6mLp16UFnM"
                     },
                     "body": [
                       "Payment",
                       {
-                        "source_pk": "B62qpgjtMzVpodthL3kMfXAAzzv1kgGZRMEeLv592u4hSVQKCzTGLvA",
                         "receiver_pk": "B62qpkCEM5N5ddVsYNbFtwWV4bsT9AwuUJXoehFhHUbYYvZ6j3fXt93",
                         "amount": "1000000001"
                       }

@@ -207,7 +207,8 @@ let%test_module "Actions test" =
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
         |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
-        |> test_zkapp_command ~ledger ~global_slot:Mina_numbers.Global_slot.zero
+        |> test_zkapp_command ~ledger
+             ~global_slot:Mina_numbers.Global_slot_since_genesis.zero
       in
       let account_updates0 =
         Zkapp_command.Call_forest.to_list zkapp_command0.account_updates
@@ -224,7 +225,8 @@ let%test_module "Actions test" =
             Impl.Field.Constant.equal elt
               Zkapp_account.Actions.empty_state_element ) ) ;
       (* last action slot is 0 *)
-      assert (Mina_numbers.Global_slot.(equal zero) last_action_slot0) ;
+      assert (
+        Mina_numbers.Global_slot_since_genesis.(equal zero) last_action_slot0 ) ;
       let zkapp_command1, account1 =
         let ledger = create_ledger () in
         []
@@ -232,7 +234,8 @@ let%test_module "Actions test" =
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
         |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
-        |> test_zkapp_command ~ledger ~global_slot:Mina_numbers.Global_slot.zero
+        |> test_zkapp_command ~ledger
+             ~global_slot:Mina_numbers.Global_slot_since_genesis.zero
       in
       assert (Option.is_some account1) ;
       let account_updates1 =
@@ -256,11 +259,12 @@ let%test_module "Actions test" =
               Impl.Field.Constant.equal elt
                 Zkapp_account.Actions.empty_state_element ) ) ;
       (* last action slot still 0 *)
-      assert (Mina_numbers.Global_slot.(equal zero) last_action_slot1)
+      assert (
+        Mina_numbers.Global_slot_since_genesis.(equal zero) last_action_slot1 )
 
     let%test_unit "Add sequence events in different slots" =
       let ledger = create_ledger () in
-      let slot1 = Mina_numbers.Global_slot.of_int 1 in
+      let slot1 = Mina_numbers.Global_slot_since_genesis.of_int 1 in
       let _zkapp_command0, account0 =
         []
         |> Zkapp_command.Call_forest.cons_tree Add_actions.account_update
@@ -289,8 +293,9 @@ let%test_module "Actions test" =
               Impl.Field.Constant.equal elt
                 Zkapp_account.Actions.empty_state_element ) ) ;
       (* action slot is 1 *)
-      assert (Mina_numbers.Global_slot.equal slot1 last_action_slot0) ;
-      let slot2 = Mina_numbers.Global_slot.of_int 2 in
+      assert (
+        Mina_numbers.Global_slot_since_genesis.equal slot1 last_action_slot0 ) ;
+      let slot2 = Mina_numbers.Global_slot_since_genesis.of_int 2 in
       let _zkapp_command1, account1 =
         []
         |> Zkapp_command.Call_forest.cons_tree Add_actions.account_update
@@ -320,8 +325,9 @@ let%test_module "Actions test" =
         assert (Impl.Field.Constant.equal last_elt curr_elt)
       done ;
       (* action slot is 2 *)
-      assert (Mina_numbers.Global_slot.equal slot2 last_action_slot1) ;
-      let slot3 = Mina_numbers.Global_slot.of_int 3 in
+      assert (
+        Mina_numbers.Global_slot_since_genesis.equal slot2 last_action_slot1 ) ;
+      let slot3 = Mina_numbers.Global_slot_since_genesis.of_int 3 in
       let _zkapp_command2, account2 =
         []
         |> Zkapp_command.Call_forest.cons_tree Add_actions.account_update
@@ -351,5 +357,6 @@ let%test_module "Actions test" =
         assert (Impl.Field.Constant.equal last_elt curr_elt)
       done ;
       (* action slot is 3 *)
-      assert (Mina_numbers.Global_slot.equal slot3 last_action_slot2)
+      assert (
+        Mina_numbers.Global_slot_since_genesis.equal slot3 last_action_slot2 )
   end )

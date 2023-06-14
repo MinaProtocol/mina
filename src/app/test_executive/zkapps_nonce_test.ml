@@ -54,9 +54,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let num_proofs = 2
 
-  let blocks_for_first_proof_exn =
-    Test_config.blocks_for_first_ledger_proof_exn config
-
   let padding_payments () =
     let needed_for_padding =
       Test_config.transactions_needed_for_ledger_proofs config ~num_proofs
@@ -338,43 +335,34 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              "Invalid zkapp command was ignored as expected due to low fee" ;
            return () ) )
     in
-    (*TODO: enable later
-      let%bind () =
-        section_hard
-          "Verify invalid zkapp commands are removed from transaction pool"
-          (let%bind pooled_zkapp_commands =
-             Network.Node.get_pooled_zkapp_commands ~logger node ~pk:fish1_pk
-             |> Deferred.bind ~f:Malleable_error.or_hard_error
-           in
-           [%log debug] "Pooled zkapp_commands $commands"
-             ~metadata:
-               [ ( "commands"
-                 , `List (List.map ~f:(fun s -> `String s) pooled_zkapp_commands)
-                 )
-               ] ;
-           if List.is_empty pooled_zkapp_commands then (
-             [%log info] "Transaction pool is empty" ;
-             return () )
-           else
-             Malleable_error.hard_error
-               (Error.of_string
-                  "Transaction pool contains invalid zkapp commands after a \
-                   block was produced" ) )
-      in *)
+    let%bind () =
+      section_hard
+        "Verify invalid zkapp commands are removed from transaction pool"
+        (let%bind pooled_zkapp_commands =
+           Network.Node.get_pooled_zkapp_commands ~logger node ~pk:fish1_pk
+           |> Deferred.bind ~f:Malleable_error.or_hard_error
+         in
+         [%log debug] "Pooled zkapp_commands $commands"
+           ~metadata:
+             [ ( "commands"
+               , `List (List.map ~f:(fun s -> `String s) pooled_zkapp_commands)
+               )
+             ] ;
+         if List.is_empty pooled_zkapp_commands then (
+           [%log info] "Transaction pool is empty" ;
+           return () )
+         else
+           Malleable_error.hard_error
+             (Error.of_string
+                "Transaction pool contains invalid zkapp commands after a \
+                 block was produced" ) )
+    in
     let%bind () =
       (*wait for blocks required to produce 2 proofs given 0.75 slot fill rate + some buffer*)
-      let soft_timeout =
-        Network_time_span.Slots
-          (Test_config.slots_of_blocks (blocks_for_first_proof_exn + 6))
-      in
-      let hard_timeout =
-        Network_time_span.Slots
-          (Test_config.slots_of_blocks (blocks_for_first_proof_exn + 12))
-      in
       section_hard "Wait for proof to be emitted"
         ( wait_for t
-        @@ Wait_condition.ledger_proofs_emitted_since_genesis ~soft_timeout
-             ~hard_timeout ~num_proofs )
+        @@ Wait_condition.ledger_proofs_emitted_since_genesis
+             ~test_config:config ~num_proofs )
     in
     Event_router.cancel (event_router t) snark_work_event_subscription () ;
     Event_router.cancel (event_router t) snark_work_failure_subscription () ;

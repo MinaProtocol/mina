@@ -41,7 +41,7 @@ let create_ledger_and_transactions num_transactions :
     let payload : Signed_command.Payload.t =
       Signed_command.Payload.create ~fee ~fee_payer_pk:from_pk ~nonce
         ~memo:Signed_command_memo.dummy ~valid_until:None
-        ~body:(Payment { source_pk = from_pk; receiver_pk = to_pk; amount })
+        ~body:(Payment { receiver_pk = to_pk; amount })
     in
     Signed_command.sign from_kp payload
   in
@@ -129,7 +129,7 @@ module Transaction_key = struct
     in
     let _partial_stmt =
       Mina_ledger.Ledger.apply_transaction_first_pass ~constraint_constants
-        ~global_slot:Mina_numbers.Global_slot.zero
+        ~global_slot:Mina_numbers.Global_slot_since_genesis.zero
         ~txn_state_view:Transaction_snark_tests.Util.genesis_state_view
         second_pass_ledger
         (Mina_transaction.Transaction.Command (Zkapp_command p))
@@ -137,7 +137,7 @@ module Transaction_key = struct
     in
     let segments =
       Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
-        ~global_slot:Mina_numbers.Global_slot.zero
+        ~global_slot:Mina_numbers.Global_slot_since_genesis.zero
         ~state_body:Transaction_snark_tests.Util.genesis_state_body
         ~fee_excess:Currency.Amount.Signed.zero
         [ ( `Pending_coinbase_init_stack Pending_coinbase.Stack.empty
@@ -147,7 +147,8 @@ module Transaction_key = struct
               ; target =
                   Pending_coinbase.Stack.push_state
                     Transaction_snark_tests.Util.genesis_state_body_hash
-                    Mina_numbers.Global_slot.zero Pending_coinbase.Stack.empty
+                    Mina_numbers.Global_slot_since_genesis.zero
+                    Pending_coinbase.Stack.empty
               }
           , `Ledger ledger
           , `Ledger second_pass_ledger
@@ -206,7 +207,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
           ~data:kp.private_key )
   in
   let balances =
-    let min_cmd_fee = Mina_compile_config.minimum_user_command_fee in
+    let min_cmd_fee = Currency.Fee.minimum_user_command_fee in
     let min_balance =
       Currency.Fee.to_nanomina_int min_cmd_fee
       |> Int.( + ) 1_000_000_000_000_000

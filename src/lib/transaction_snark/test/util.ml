@@ -81,7 +81,8 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
   let global_slot =
     Option.value global_slot
       ~default:
-        (Mina_numbers.Global_slot.succ state_view.global_slot_since_genesis)
+        (Mina_numbers.Global_slot_since_genesis.succ
+           state_view.global_slot_since_genesis )
   in
   let check_failure failure err =
     printf
@@ -434,15 +435,11 @@ module Wallet = struct
     Array.init n ~f:(fun _ -> random_wallet ())
 
   let user_command ~fee_payer ~receiver_pk amt fee nonce memo =
-    let source_pk = Account.public_key fee_payer.account in
     let payload : Signed_command.Payload.t =
       Signed_command.Payload.create ~fee
         ~fee_payer_pk:(Account.public_key fee_payer.account)
         ~nonce ~memo ~valid_until:None
-        ~body:
-          (Payment
-             { source_pk; receiver_pk; amount = Amount.of_nanomina_int_exn amt }
-          )
+        ~body:(Payment { receiver_pk; amount = Amount.of_nanomina_int_exn amt })
     in
     let signature = Signed_command.sign_payload fee_payer.private_key payload in
     Signed_command.check
@@ -454,15 +451,11 @@ module Wallet = struct
     |> Option.value_exn
 
   let stake_delegation ~fee_payer ~delegate_pk fee nonce memo =
-    let source_pk = Account.public_key fee_payer.account in
     let payload : Signed_command.Payload.t =
       Signed_command.Payload.create ~fee
         ~fee_payer_pk:(Account.public_key fee_payer.account)
         ~nonce ~memo ~valid_until:None
-        ~body:
-          (Stake_delegation
-             (Set_delegate { delegator = source_pk; new_delegate = delegate_pk })
-          )
+        ~body:(Stake_delegation (Set_delegate { new_delegate = delegate_pk }))
     in
     let signature = Signed_command.sign_payload fee_payer.private_key payload in
     Signed_command.check
@@ -558,7 +551,8 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
     Mina_state.Protocol_state.Body.view state_body
   in
   let global_slot =
-    Option.value txn_global_slot ~default:Mina_numbers.Global_slot.zero
+    Option.value txn_global_slot
+      ~default:Mina_numbers.Global_slot_since_genesis.zero
   in
   let mentioned_keys, pending_coinbase_stack_target =
     let pending_coinbase_stack =
@@ -603,10 +597,18 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
                    (Transaction_status.Failure.describe
                       (List.hd_exn (Option.value_exn expected_failure)) ) )
           | Failed f ->
-              assert (
+              let got_expected_failure =
                 List.equal Transaction_status.Failure.equal
                   (Option.value_exn expected_failure)
-                  (List.concat f) ) ) ;
+                  (List.concat f)
+              in
+              if not got_expected_failure then
+                failwithf
+                  !"Transaction failed unexpectedly: expected \
+                    %{sexp:Mina_base.Transaction_status.Failure.t list}, got \
+                    %{sexp:Mina_base.Transaction_status.Failure.t list}"
+                  (Option.value_exn expected_failure)
+                  (List.concat f) () ) ;
         (false, Some res)
     | Error e ->
         if Option.is_none expected_failure then

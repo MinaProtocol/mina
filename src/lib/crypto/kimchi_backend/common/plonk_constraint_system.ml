@@ -250,6 +250,7 @@ module Plonk_constraint = struct
           ; (* Coefficients *) foreign_field_modulus0 : 'f
           ; foreign_field_modulus1 : 'f
           ; foreign_field_modulus2 : 'f
+          ; sign : 'f
           }
       | ForeignFieldMul of
           { (* Current row *)
@@ -485,6 +486,7 @@ module Plonk_constraint = struct
           ; (* Coefficients *) foreign_field_modulus0
           ; foreign_field_modulus1
           ; foreign_field_modulus2
+          ; sign
           } ->
           ForeignFieldAdd
             { left_input_lo = f left_input_lo
@@ -498,6 +500,7 @@ module Plonk_constraint = struct
             ; (* Coefficients *) foreign_field_modulus0
             ; foreign_field_modulus1
             ; foreign_field_modulus2
+            ; sign
             }
       | ForeignFieldMul
           { (* Current row *) left_input0
@@ -1830,7 +1833,7 @@ end = struct
            ; Some (reduce_to_v out_3)
           |]
         in
-        (* The generic gate after a Xor16 gate is a Const to check that all values are zero.
+        (* The raw gate after a Xor16 gate is a Const to check that all values are zero.
            For that, the first coefficient is 1 and the rest will be zero.
            This will be included in the gadget for a chain of Xors, not here.*)
         add_row sys curr_row Xor16 [||]
@@ -1847,6 +1850,7 @@ end = struct
           ; (* Coefficients *) foreign_field_modulus0
           ; foreign_field_modulus1
           ; foreign_field_modulus2
+          ; sign
           } ) ->
         (*
         //! | Gate   | `ForeignFieldAdd`        | Circuit/gadget responsibility  |
@@ -1891,6 +1895,7 @@ end = struct
           [| foreign_field_modulus0
            ; foreign_field_modulus1
            ; foreign_field_modulus2
+           ; sign
           |]
     | Plonk_constraint.T
         (ForeignFieldMul

@@ -95,7 +95,7 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
   let global_slot =
     Mina_state.Protocol_state.Body.consensus_state state_body
     |> Consensus.Data.Consensus_state.global_slot_since_genesis
-    |> Mina_numbers.Global_slot.succ
+    |> Mina_numbers.Global_slot_since_genesis.succ
   in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   let pending_coinbase_init_stack = Pending_coinbase.Stack.empty in
@@ -188,7 +188,8 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   printf "(ZkApp transaction graphQL input %s\n\n%!"
     (graphql_zkapp_command zkapp_command) ;
   printf "Updated accounts\n" ;
-  List.iter (Ledger.to_list ledger) ~f:(fun acc ->
+  let%bind accounts = Ledger.to_list ledger in
+  List.iter accounts ~f:(fun acc ->
       printf "Account: %s\n%!"
         ( Genesis_ledger_helper_lib.Accounts.Single.of_account acc None
         |> Runtime_config.Accounts.Single.to_yojson |> Yojson.Safe.to_string ) ) ;
@@ -198,7 +199,7 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   let global_slot =
     Mina_state.Protocol_state.Body.consensus_state state_body
     |> Consensus.Data.Consensus_state.global_slot_since_genesis
-    |> Mina_numbers.Global_slot.succ
+    |> Mina_numbers.Global_slot_since_genesis.succ
   in
   let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
   let pending_coinbase_init_stack = Pending_coinbase.Stack.empty in
@@ -368,8 +369,8 @@ let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
     }
   in
   let zkapp_command =
-    Transaction_snark.For_tests.deploy_snapp ~default_permissions:true
-      ~constraint_constants spec
+    Transaction_snark.For_tests.deploy_snapp
+      ~permissions:Permissions.user_default ~constraint_constants spec
   in
   let%map () = if debug then gen_proof zkapp_command else return () in
   zkapp_command

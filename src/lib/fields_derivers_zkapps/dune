@@ -18,6 +18,7 @@
    fields_derivers.graphql
    fields_derivers.json
    currency
+   mina_numbers
    snark_params
    pickles
    fields_derivers

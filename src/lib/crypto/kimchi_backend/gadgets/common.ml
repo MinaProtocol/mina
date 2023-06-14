@@ -3,26 +3,27 @@
 open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 
-(* pad_upto - Pad a list with a value until it reaches a given length *)
-let pad_upto ~length ~value list =
-  let len = List.length list in
-  assert (len <= length) ;
-  let padding = List.init (length - len) ~f:(fun _ -> value) in
-  list @ padding
+let tests_enabled = true
+
+let tuple3_of_array array =
+  match array with [| a1; a2; a3 |] -> (a1, a2, a3) | _ -> assert false
+
+let tuple4_of_array array =
+  match array with
+  | [| a1; a2; a3; a4 |] ->
+      (a1, a2, a3, a4)
+  | _ ->
+      assert false
+
+(* Foreign field element limb size *)
+let limb_bits = 88
+
+(* Foreign field element limb size 2^L where L=88 *)
+let two_to_limb = Bignum_bigint.(pow (of_int 2) (of_int limb_bits))
 
 (* Length of bigint in bits *)
 let bignum_bigint_bit_length (bigint : Bignum_bigint.t) : int =
   Z.log2up (Bignum_bigint.to_zarith_bigint bigint)
-
-(* Removes leading zero bits of a list of booleans (at least needs length 1) *)
-let rec rm_zero_bits (bitstring : bool list) : bool list =
-  match bitstring with
-  | [] ->
-      [ false ]
-  | false :: x ->
-      rm_zero_bits x
-  | _ ->
-      bitstring
 
 (* Conventions used in this interface
  *     1. Functions prefixed with "as_prover_" only happen during proving
@@ -39,15 +40,9 @@ let rec rm_zero_bits (bitstring : bool list) : bool list =
  *                the values associated with the cvar. The prover can then access these
  *                with As_prover.read.
  *     2. Functions suffixed with "_as_prover" can only be called outside
- *        the circuit.  Specifically, this means within an exists, within
+ *        the circuit. Specifically, this means within an exists, within
  *        an as_prover or in an "as_prover_" prefixed function)
  *)
-
-(* Foreign field element limb size *)
-let limb_bits = 88
-
-(* Foreign field element limb size 2^L where L=88 *)
-let two_to_limb = Bignum_bigint.(pow (of_int 2) (of_int limb_bits))
 
 (* Convert cvar field element (i.e. Field.t) to field *)
 let cvar_field_to_field_as_prover (type f)
@@ -55,11 +50,23 @@ let cvar_field_to_field_as_prover (type f)
     (field_element : Circuit.Field.t) : f =
   Circuit.As_prover.read Circuit.Field.typ field_element
 
-(* Convert field element to a cvar field element *)
-let field_to_cvar_field (type f)
+(* Combines bits of two cvars with a given boolean function and returns the resulting field element *)
+let cvar_field_bits_combine_as_prover (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (field_element : f) : Circuit.Field.t =
-  Circuit.Field.constant field_element
+    (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
+    (bfun : bool -> bool -> bool) : f =
+  let open Circuit in
+  let list1 =
+    Field.Constant.unpack
+    @@ cvar_field_to_field_as_prover (module Circuit)
+    @@ input1
+  in
+  let list2 =
+    Field.Constant.unpack
+    @@ cvar_field_to_field_as_prover (module Circuit)
+    @@ input2
+  in
+  Field.Constant.project @@ List.map2_exn list1 list2 ~f:bfun
 
 (* field_bits_le_to_field - Create a field element from contiguous bits of another
  *
@@ -154,6 +161,14 @@ let bignum_bigint_to_hex (bignum : Bignum_bigint.t) : string =
 let bignum_bigint_of_hex (hex : string) : Bignum_bigint.t =
   Bignum_bigint.of_zarith_bigint @@ Z.of_string_base 16 hex
 
+(* Convert cvar field element (i.e. Field.t) to Bignum_bigint.t *)
+let cvar_field_to_bignum_bigint_as_prover (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (field_element : Circuit.Field.t) : Bignum_bigint.t =
+  let open Circuit in
+  field_to_bignum_bigint (module Circuit)
+  @@ As_prover.read Field.typ field_element
+
 (* Compute square root of Bignum_bigint value x *)
 let bignum_biguint_sqrt (x : Bignum_bigint.t) : Bignum_bigint.t =
   Bignum_bigint.of_zarith_bigint @@ Z.sqrt @@ Bignum_bigint.to_zarith_bigint x
@@ -173,78 +188,84 @@ let field_of_hex (type f)
 (* Negative test helper *)
 let is_error (func : unit -> _) = Result.is_error (Or_error.try_with func)
 
+(*********)
+(* Tests *)
+(*********)
+
 let%test_unit "helper field_bits_le_to_field" =
-  (* Import the gadget test runner *)
-  let open Kimchi_gadgets_test_runner in
-  (* Initialize the SRS cache. *)
-  let () =
-    try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
-  in
+  ( if tests_enabled then
+    let (* Import the gadget test runner *)
+    open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
 
-  let _proof_keypair, _proof =
-    Runner.generate_and_verify_proof (fun () ->
-        let open Runner.Impl in
-        let of_bits =
-          as_prover_cvar_field_bits_le_to_cvar_field (module Runner.Impl)
-        in
-        let of_base10 = as_prover_cvar_field_of_base10 (module Runner.Impl) in
+    let _cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof (fun () ->
+          let open Runner.Impl in
+          let of_bits =
+            as_prover_cvar_field_bits_le_to_cvar_field (module Runner.Impl)
+          in
+          let of_base10 = as_prover_cvar_field_of_base10 (module Runner.Impl) in
 
-        (* Test value *)
-        let field_element =
-          of_base10
-            "25138500177533925254565157548260087092526215225485178888176592492127995051965"
-        in
+          (* Test value *)
+          let field_element =
+            of_base10
+              "25138500177533925254565157548260087092526215225485178888176592492127995051965"
+          in
 
-        (* Test extracting all bits as field element *)
-        Field.Assert.equal (of_bits field_element 0 (-1)) field_element ;
+          (* Test extracting all bits as field element *)
+          Field.Assert.equal (of_bits field_element 0 (-1)) field_element ;
 
-        (* Test extracting 1st bit as field element *)
-        Field.Assert.equal (of_bits field_element 0 1) (of_base10 "1") ;
+          (* Test extracting 1st bit as field element *)
+          Field.Assert.equal (of_bits field_element 0 1) (of_base10 "1") ;
 
-        (* Test extracting last bit as field element *)
-        Field.Assert.equal (of_bits field_element 254 255) (of_base10 "0") ;
+          (* Test extracting last bit as field element *)
+          Field.Assert.equal (of_bits field_element 254 255) (of_base10 "0") ;
 
-        (* Test extracting first 12 bits as field element *)
-        Field.Assert.equal (of_bits field_element 0 12) (of_base10 "4029") ;
+          (* Test extracting first 12 bits as field element *)
+          Field.Assert.equal (of_bits field_element 0 12) (of_base10 "4029") ;
 
-        (* Test extracting third 16 bits as field element *)
-        Field.Assert.equal (of_bits field_element 32 48) (of_base10 "15384") ;
+          (* Test extracting third 16 bits as field element *)
+          Field.Assert.equal (of_bits field_element 32 48) (of_base10 "15384") ;
 
-        (* Test extracting 1st 4 bits as field element *)
-        Field.Assert.equal (of_bits field_element 0 4) (of_base10 "13") ;
+          (* Test extracting 1st 4 bits as field element *)
+          Field.Assert.equal (of_bits field_element 0 4) (of_base10 "13") ;
 
-        (* Test extracting 5th 4 bits as field element *)
-        Field.Assert.equal (of_bits field_element 20 24) (of_base10 "1") ;
+          (* Test extracting 5th 4 bits as field element *)
+          Field.Assert.equal (of_bits field_element 20 24) (of_base10 "1") ;
 
-        (* Test extracting first 88 bits as field element *)
-        Field.Assert.equal
-          (of_bits field_element 0 88)
-          (of_base10 "155123280218940970272309181") ;
+          (* Test extracting first 88 bits as field element *)
+          Field.Assert.equal
+            (of_bits field_element 0 88)
+            (of_base10 "155123280218940970272309181") ;
 
-        (* Test extracting second 88 bits as field element *)
-        Field.Assert.equal
-          (of_bits field_element 88 176)
-          (of_base10 "293068737190883252403551981") ;
+          (* Test extracting second 88 bits as field element *)
+          Field.Assert.equal
+            (of_bits field_element 88 176)
+            (of_base10 "293068737190883252403551981") ;
 
-        (* Test extracting last crumb as field element *)
-        Field.Assert.equal (of_bits field_element 254 255) (of_base10 "0") ;
+          (* Test extracting last crumb as field element *)
+          Field.Assert.equal (of_bits field_element 254 255) (of_base10 "0") ;
 
-        (* Test extracting 2nd to last crumb as field element *)
-        Field.Assert.equal (of_bits field_element 252 254) (of_base10 "3") ;
+          (* Test extracting 2nd to last crumb as field element *)
+          Field.Assert.equal (of_bits field_element 252 254) (of_base10 "3") ;
 
-        (* Test extracting 3rd to last crumb as field element *)
-        Field.Assert.equal (of_bits field_element 250 252) (of_base10 "1") ;
+          (* Test extracting 3rd to last crumb as field element *)
+          Field.Assert.equal (of_bits field_element 250 252) (of_base10 "1") ;
 
-        (* Assert litttle-endian order *)
-        Field.Assert.equal
-          (of_bits (of_base10 "18446744073709551616" (* 2^64 *)) 64 65)
-          (of_base10 "1") ;
+          (* Assert litttle-endian order *)
+          Field.Assert.equal
+            (of_bits (of_base10 "18446744073709551616" (* 2^64 *)) 64 65)
+            (of_base10 "1") ;
 
-        (* Test invalid range is denied *)
-        assert (is_error (fun () -> of_bits field_element 2 2)) ;
-        assert (is_error (fun () -> of_bits field_element 2 1)) ;
+          (* Test invalid range is denied *)
+          assert (is_error (fun () -> of_bits field_element 2 2)) ;
+          assert (is_error (fun () -> of_bits field_element 2 1)) ;
 
-        (* Padding *)
-        Boolean.Assert.is_true (Field.equal field_element field_element) )
-  in
+          (* Padding *)
+          Boolean.Assert.is_true (Field.equal field_element field_element) )
+    in
+    () ) ;
   ()

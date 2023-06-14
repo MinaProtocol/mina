@@ -298,7 +298,7 @@ let
             src/lib/crypto/kimchi_bindings/js/node_js \
             src/app/client_sdk/client_sdk.bc.js \
             src/lib/snarky_js_bindings/snarky_js_node.bc.js \
-            src/lib/snarky_js_bindings/snarky_js_chrome.bc.js
+            src/lib/snarky_js_bindings/snarky_js_web.bc.js
         '';
 
         doCheck = true;
