@@ -48,7 +48,7 @@ module Sender_local_state : sig
 end
 
 (** Transaction pool. This is a purely functional data structure. *)
-type t [@@deriving sexp_of]
+type t [@@deriving equal, compare, sexp_of]
 
 val config : t -> Config.t
 
@@ -161,4 +161,14 @@ module For_tests : sig
   (** Checks the invariants of the data structure. If this throws an exception
       there is a bug. *)
   val assert_invariants : t -> unit
+
+  val applicable_by_fee :
+    t -> 
+    Transaction_hash.User_command_with_valid_signature.Set.t
+      Currency.Fee_rate.Map.t
+
+  val currency_consumed :
+    constraint_constants:Genesis_constants.Constraint_constants.t ->
+    Transaction_hash.User_command_with_valid_signature.t ->
+    Currency.Amount.t option
 end

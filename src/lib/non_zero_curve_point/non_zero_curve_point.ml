@@ -45,7 +45,7 @@ module Compressed = struct
 
       module T = struct
         type t = ((Field.t[@version_asserted]), bool) Poly.Stable.V1.t
-        [@@deriving equal, compare, hash]
+                   [@@deriving equal, compare, hash]
 
         let to_latest = Fn.id
 
