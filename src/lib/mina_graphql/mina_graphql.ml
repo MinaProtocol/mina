@@ -5770,7 +5770,8 @@ module Queries = struct
             Option.map (snark_worker_key mina) ~f:(fun _ -> snark_work_fee mina))
         in
         let (module S) = Mina_lib.work_selection_method mina in
-        S.pending_work_statements ~snark_pool ~fee_opt snark_job_state )
+        S.pending_work_statements ~snark_pool ~fee_opt snark_job_state
+        |> List.map ~f:Transaction_snark_work.With_hash.data )
 
   let genesis_constants =
     field "genesisConstants"

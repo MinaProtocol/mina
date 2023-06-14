@@ -27,8 +27,28 @@ module type Inputs_intf = sig
 
     val fee : t -> Fee.t
 
+    module With_hash : sig
+      type 'a t = { hash : int; data : 'a }
+
+      val create :
+        f:('a -> Transaction_snark.Statement.t One_or_two.t) -> 'a -> 'a t
+
+      val hash : 'a t -> int
+
+      val map : f:('a -> 'b) -> 'a t -> 'b t
+
+      val data : 'a t -> 'a
+    end
+
     module Statement : sig
       type t = Transaction_snark.Statement.t One_or_two.t
+    end
+
+    module Statement_with_hash : sig
+      type t = Transaction_snark.Statement.t One_or_two.t With_hash.t
+      [@@deriving compare, sexp, to_yojson, equal, hash]
+
+      val create : Statement.t -> t
     end
   end
 
@@ -37,7 +57,7 @@ module type Inputs_intf = sig
 
     val get_completed_work :
          t
-      -> Transaction_snark.Statement.t One_or_two.t
+      -> Transaction_snark_work.Statement_with_hash.t
       -> Transaction_snark_work.t option
   end
 
@@ -105,6 +125,7 @@ module type Lib_intf = sig
          , Ledger_proof.t )
          Snark_work_lib.Work.Single.Spec.t
          One_or_two.t
+         Inputs.Transaction_snark_work.With_hash.t
          list
 
     val remove :
@@ -113,6 +134,7 @@ module type Lib_intf = sig
          , Ledger_proof.t )
          Snark_work_lib.Work.Single.Spec.t
          One_or_two.t
+         Inputs.Transaction_snark_work.With_hash.t
       -> unit
 
     val set :
@@ -121,6 +143,7 @@ module type Lib_intf = sig
          , Ledger_proof.t )
          Snark_work_lib.Work.Single.Spec.t
          One_or_two.t
+         Inputs.Transaction_snark_work.With_hash.t
       -> unit
   end
 
@@ -129,9 +152,11 @@ module type Lib_intf = sig
     -> fee:Fee.t
     -> (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
        One_or_two.t
+       Inputs.Transaction_snark_work.With_hash.t
        list
     -> (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
        One_or_two.t
+       Inputs.Transaction_snark_work.With_hash.t
        list
 
   (**jobs that are not in the snark pool yet*)
@@ -139,18 +164,18 @@ module type Lib_intf = sig
        snark_pool:Snark_pool.t
     -> fee_opt:Fee.t option
     -> State.t
-    -> Transaction_snark.Statement.t One_or_two.t list
+    -> Inputs.Transaction_snark_work.Statement_with_hash.t list
 
   module For_tests : sig
     val does_not_have_better_fee :
          snark_pool:Snark_pool.t
       -> fee:Fee.t
-      -> Transaction_snark_work.Statement.t
+      -> Inputs.Transaction_snark_work.Statement_with_hash.t
       -> bool
   end
 end
 
-module type Selection_method_intf = sig
+module type Selection_method_intf_ = sig
   type snark_pool
 
   type staged_ledger
@@ -159,29 +184,35 @@ module type Selection_method_intf = sig
 
   type transition_frontier
 
+  type 'a with_hash_t
+
   module State : State_intf with type transition_frontier := transition_frontier
 
-  val remove : State.t -> work One_or_two.t -> unit
+  val remove : State.t -> work One_or_two.t with_hash_t -> unit
 
   val work :
        snark_pool:snark_pool
     -> fee:Currency.Fee.t
     -> logger:Logger.t
     -> State.t
-    -> work One_or_two.t option
+    -> work One_or_two.t with_hash_t option
 
   val pending_work_statements :
        snark_pool:snark_pool
     -> fee_opt:Currency.Fee.t option
     -> State.t
-    -> Transaction_snark.Statement.t One_or_two.t list
+    -> Transaction_snark.Statement.t One_or_two.t with_hash_t list
 end
+
+module type Selection_method_intf =
+  Selection_method_intf_
+    with type 'a with_hash_t := 'a Transaction_snark_work.With_hash.t
 
 module type Make_selection_method_intf = functor
   (Inputs : Inputs_intf)
   (Lib : Lib_intf with module Inputs := Inputs)
   ->
-  Selection_method_intf
+  Selection_method_intf_
     with type staged_ledger := Inputs.Staged_ledger.t
      and type work :=
       ( Inputs.Transaction_witness.t
@@ -189,4 +220,5 @@ module type Make_selection_method_intf = functor
       Snark_work_lib.Work.Single.Spec.t
      and type snark_pool := Inputs.Snark_pool.t
      and type transition_frontier := Inputs.Transition_frontier.t
+     and type 'a with_hash_t := 'a Inputs.Transaction_snark_work.With_hash.t
      and module State := Lib.State

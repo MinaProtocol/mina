@@ -21,34 +21,67 @@ module Test_inputs = struct
 
     let fee = Fn.id
 
+    module With_hash = struct
+      type 'a t = { hash : int; data : 'a }
+
+      let create ~f data =
+        { hash =
+            Ppx_hash_lib.Std.Hash.of_fold
+              (One_or_two.hash_fold_t Transaction_snark.Statement.hash_fold_t)
+              (f data)
+        ; data
+        }
+
+      let hash { hash; _ } = hash
+
+      let map ~f { hash; data } = { hash; data = f data }
+
+      let data { data; _ } = data
+    end
+
     module Statement = struct
       type t = Transaction_snark.Statement.t One_or_two.t
+      [@@deriving equal, compare, hash, sexp, yojson]
+    end
+
+    module Statement_with_hash = struct
+      type t = Transaction_snark.Statement.t One_or_two.t With_hash.t
+
+      let hash = With_hash.hash
+
+      let hash_fold_t st With_hash.{ hash; _ } = Int.hash_fold_t st hash
+
+      let equal With_hash.{ data = d1; _ } With_hash.{ data = d2; _ } =
+        Statement.equal d1 d2
+
+      let compare With_hash.{ data = d1; _ } With_hash.{ data = d2; _ } =
+        Statement.compare d1 d2
+
+      let create = With_hash.create ~f:Fn.id
+
+      let t_of_sexp =
+        Fn.compose create
+          (One_or_two.t_of_sexp Transaction_snark.Statement.t_of_sexp)
+
+      let sexp_of_t With_hash.{ data; _ } =
+        One_or_two.sexp_of_t Transaction_snark.Statement.sexp_of_t data
+
+      let to_yojson With_hash.{ data; _ } =
+        One_or_two.to_yojson Transaction_snark.Statement.to_yojson data
     end
   end
 
   module Snark_pool = struct
-    [%%versioned
-    module Stable = struct
-      [@@@no_toplevel_latest_type]
+    type t =
+      (Transaction_snark_work.Statement_with_hash.t, Currency.Fee.t) Hashtbl.t
 
-      module V2 = struct
-        type t = Transaction_snark.Statement.Stable.V2.t One_or_two.Stable.V1.t
-        [@@deriving hash, compare, sexp]
+    let get_completed_work = Hashtbl.find
 
-        let to_latest = Fn.id
-      end
-    end]
-
-    module Work = Hashable.Make_binable (Stable.Latest)
-
-    type t = Currency.Fee.t Work.Table.t
-
-    let get_completed_work (t : t) = Work.Table.find t
-
-    let create () = Work.Table.create ()
+    let create () =
+      Hashtbl.create (module Transaction_snark_work.Statement_with_hash)
 
     let add_snark t ~work ~fee =
-      Work.Table.update t work ~f:(function
+      Hashtbl.update t work ~f:(function
         | None ->
             fee
         | Some fee' ->
