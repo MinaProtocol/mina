@@ -910,11 +910,7 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
              * Perform base field external checks
              *)
 
-            (* 1) Add gates for base field bound additions.
-             *    Note: internally this also adds multi-range-checks for the
-             *    computed bound to the base_checks.multi-ranges, which
-             *    are then constrainted in (2)
-             *)
+            (* Sanity check *)
             let base_bound_checks_count = ref (42 + 2 + 42 + 2 + 6 + 2 + 3) in
             if not Bignum_bigint.(curve.bignum.a = zero) then
               base_bound_checks_count := !base_bound_checks_count + 2 ;
@@ -923,69 +919,29 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
             assert (
               Mina_stdlib.List.Length.equal base_checks.bounds
                 !base_bound_checks_count ) ;
-            List.iter base_checks.bounds ~f:(fun value ->
-                let _bound =
-                  Foreign_field.valid_element
-                    (module Runner.Impl)
-                    base_checks
-                    (Foreign_field.Element.Standard.of_limbs value)
-                    curve.modulus
-                in
-                () ) ;
-
-            (* 2) Add gates for external multi-range-checks *)
-            assert (
-              Mina_stdlib.List.Length.equal base_checks.multi_ranges
-                (!base_bound_checks_count + 40) ) ;
-            List.iter base_checks.multi_ranges ~f:(fun multi_range ->
-                let v0, v1, v2 = multi_range in
-                Range_check.multi (module Runner.Impl) v0 v1 v2 ;
-                () ) ;
-
-            (* 3) Add gates for external compact-multi-range-checks *)
+            assert (Mina_stdlib.List.Length.equal base_checks.multi_ranges 40) ;
             assert (
               Mina_stdlib.List.Length.equal base_checks.compact_multi_ranges 40 ) ;
-            List.iter base_checks.compact_multi_ranges
-              ~f:(fun compact_multi_range ->
-                let v01, v2 = compact_multi_range in
-                Range_check.compact_multi (module Runner.Impl) v01 v2 ;
-                () ) ;
+
+            (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
+            Foreign_field.constrain_external_checks
+              (module Runner.Impl)
+              base_checks curve.modulus ;
 
             (*
              * Perform scalar field external checks
              *)
 
-            (* 1) Add gates for scalar field bound additions.
-             *    Note: internally this also adds multi-range-checks for the
-             *    computed bound to the scalar_checks.multi-ranges, which
-             *    are then constrainted in (2)
-             *)
+            (* Sanity checks *)
             assert (Mina_stdlib.List.Length.equal scalar_checks.bounds 5) ;
-            List.iter scalar_checks.bounds ~f:(fun value ->
-                let _bound =
-                  Foreign_field.valid_element
-                    (module Runner.Impl)
-                    scalar_checks
-                    (Foreign_field.Element.Standard.of_limbs value)
-                    curve.order
-                in
-                () ) ;
-
-            (* 2) Add gates for external multi-range-checks *)
-            assert (Mina_stdlib.List.Length.equal scalar_checks.multi_ranges 8) ;
-            List.iter scalar_checks.multi_ranges ~f:(fun multi_range ->
-                let v0, v1, v2 = multi_range in
-                Range_check.multi (module Runner.Impl) v0 v1 v2 ;
-                () ) ;
-
-            (* 3) Add gates for external compact-multi-range-checks *)
+            assert (Mina_stdlib.List.Length.equal scalar_checks.multi_ranges 3) ;
             assert (
               Mina_stdlib.List.Length.equal scalar_checks.compact_multi_ranges 3 ) ;
-            List.iter scalar_checks.compact_multi_ranges
-              ~f:(fun compact_multi_range ->
-                let v01, v2 = compact_multi_range in
-                Range_check.compact_multi (module Runner.Impl) v01 v2 ;
-                () ) ;
+
+            (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
+            Foreign_field.constrain_external_checks
+              (module Runner.Impl)
+              scalar_checks curve.order ;
 
             () )
       in
@@ -1091,70 +1047,16 @@ let%test_unit "Ecdsa.verify_full_no_subgroup_check" =
             (*
              * Perform base field external checks
              *)
-
-            (* 1) Add gates for base field bound additions.
-             *    Note: internally this also adds multi-range-checks for the
-             *    computed bound to the base_checks.multi-ranges, which
-             *    are then constrainted in (2)
-             *)
-            List.iter base_checks.bounds ~f:(fun value ->
-                let _bound =
-                  Foreign_field.valid_element
-                    (module Runner.Impl)
-                    base_checks
-                    (Foreign_field.Element.Standard.of_limbs value)
-                    curve.modulus
-                in
-                () ) ;
-
-            (* 2) Add gates for external multi-range-checks *)
-            List.iter base_checks.multi_ranges ~f:(fun multi_range ->
-                let v0, v1, v2 = multi_range in
-                Range_check.multi (module Runner.Impl) v0 v1 v2 ;
-                () ) ;
-
-            (* 3) Add gates for external compact-multi-range-checks *)
-            List.iter base_checks.compact_multi_ranges
-              ~f:(fun compact_multi_range ->
-                let v01, v2 = compact_multi_range in
-                Range_check.compact_multi (module Runner.Impl) v01 v2 ;
-                () ) ;
+            Foreign_field.constrain_external_checks
+              (module Runner.Impl)
+              base_checks curve.modulus ;
 
             (*
              * Perform scalar field external checks
              *)
-
-            (* 1) Add gates for scalar field bound additions.
-             *    Note: internally this also adds multi-range-checks for the
-             *    computed bound to the scalar_checks.multi-ranges, which
-             *    are then constrainted in (2)
-             *)
-            assert (Mina_stdlib.List.Length.equal scalar_checks.bounds 11) ;
-            List.iter scalar_checks.bounds ~f:(fun value ->
-                let _bound =
-                  Foreign_field.valid_element
-                    (module Runner.Impl)
-                    scalar_checks
-                    (Foreign_field.Element.Standard.of_limbs value)
-                    curve.order
-                in
-                () ) ;
-
-            (* 2) Add gates for external multi-range-checks *)
-            assert (Mina_stdlib.List.Length.equal scalar_checks.multi_ranges 16) ;
-            List.iter scalar_checks.multi_ranges ~f:(fun multi_range ->
-                let v0, v1, v2 = multi_range in
-                Range_check.multi (module Runner.Impl) v0 v1 v2 ;
-                () ) ;
-
-            (* 3) Add gates for external compact-multi-range-checks *)
-            assert (
-              Mina_stdlib.List.Length.equal scalar_checks.compact_multi_ranges 5 ) ;
-            List.iter scalar_checks.compact_multi_ranges
-              ~f:(fun compact_multi_range ->
-                let v01, v2 = compact_multi_range in
-                Range_check.compact_multi (module Runner.Impl) v01 v2 ;
-                () ) ;
+            Foreign_field.constrain_external_checks
+              (module Runner.Impl)
+              scalar_checks curve.order ;
 
             () )
       in
@@ -1192,8 +1094,7 @@ let%test_unit "Ecdsa.verify_full_no_subgroup_check" =
 
     let _cs =
       test_verify_full_no_subgroup_check Secp256k1.params
-        ~scalar_mul_bit_length:216 pubkey
-        signature msg_hash
+        ~scalar_mul_bit_length:216 pubkey signature msg_hash
     in
 
     (* Test 2: No chunking (big test that doesn't require chunkning)

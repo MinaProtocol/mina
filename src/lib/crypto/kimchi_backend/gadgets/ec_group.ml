@@ -878,7 +878,7 @@ let check_ia (type f) (module Circuit : Snark_intf.Run with type field = f)
  *     Compact-range-checks: 17
  *     Total range-checks:   76
  *
- *   Rows: (not counting inputs/outputs and constants)
+ *   Rows: (per crumb, not counting inputs/outputs and constants)
  *     Scalar multiplication:  ~84 (+2 when a != 0)
  *     Bound additions:         84
  *     Multi-range-checks:     308
@@ -908,7 +908,7 @@ let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
    *     we employ a randomized strategy that avoids adding the identity element
    *     or the same point to itself.  The strategy works as follows.
    *
-   *     Since the prover knows the the points that it will add and double during
+   *     Since the prover knows the the points that it wewill add and double during
    *     scaling, the prover could select an initial accumulator point I such that
    *     the double-and-add algorithm never adds the identity element, same point
    *     or negated point to itself whilst scaling.
@@ -1653,40 +1653,16 @@ let%test_unit "Ec_group.add_full" =
             (*
              * Perform external checks
              *)
-
-            (* 1) Add gates for external bound additions.
-             *    Note: internally this also adds multi-range-checks for the
-             *    computed bound to the external_checks.multi-ranges, which
-             *    are then constrainted in (2)
-             *)
             assert (Mina_stdlib.List.Length.equal external_checks.bounds 12) ;
-            List.iter external_checks.bounds ~f:(fun value ->
-                let _bound =
-                  Foreign_field.valid_element
-                    (module Runner.Impl)
-                    external_checks
-                    (Foreign_field.Element.Standard.of_limbs value)
-                    curve.modulus
-                in
-                () ) ;
-
-            (* 2) Add gates for external multi-range-checks *)
-            assert (
-              Mina_stdlib.List.Length.equal external_checks.multi_ranges 15 ) ;
-            List.iter external_checks.multi_ranges ~f:(fun multi_range ->
-                let v0, v1, v2 = multi_range in
-                Range_check.multi (module Runner.Impl) v0 v1 v2 ;
-                () ) ;
-
-            (* 3) Add gates for external compact-multi-range-checks *)
+            assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 3) ;
             assert (
               Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges
                 3 ) ;
-            List.iter external_checks.compact_multi_ranges
-              ~f:(fun compact_multi_range ->
-                let v01, v2 = compact_multi_range in
-                Range_check.compact_multi (module Runner.Impl) v01 v2 ;
-                () ) ;
+            (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
+            Foreign_field.constrain_external_checks
+              (module Runner.Impl)
+              external_checks curve.modulus ;
+
             () )
       in
       cs
@@ -2174,41 +2150,19 @@ let%test_unit "Ec_group.double_full" =
              * Perform external checks
              *)
 
-            (* 1) Add gates for external bound additions.
-             *    Note: internally this also adds multi-range-checks for the
-             *    computed bound to the external_checks.multi-ranges, which
-             *    are then constrainted in (2)
-             *)
+            (* Sanity checks *)
             if Bignum_bigint.(curve.bignum.a = zero) then
               assert (Mina_stdlib.List.Length.equal external_checks.bounds 12)
             else assert (Mina_stdlib.List.Length.equal external_checks.bounds 13) ;
-            List.iter external_checks.bounds ~f:(fun value ->
-                let _bound =
-                  Foreign_field.valid_element
-                    (module Runner.Impl)
-                    external_checks
-                    (Foreign_field.Element.Standard.of_limbs value)
-                    curve.modulus
-                in
-                () ) ;
-
-            (* 2) Add gates for external multi-range-checks *)
-            assert (
-              Mina_stdlib.List.Length.equal external_checks.multi_ranges 16 ) ;
-            List.iter external_checks.multi_ranges ~f:(fun multi_range ->
-                let v0, v1, v2 = multi_range in
-                Range_check.multi (module Runner.Impl) v0 v1 v2 ;
-                () ) ;
-
-            (* 3) Add gates for external compact-multi-range-checks *)
+            assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 4) ;
             assert (
               Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges
                 4 ) ;
-            List.iter external_checks.compact_multi_ranges
-              ~f:(fun compact_multi_range ->
-                let v01, v2 = compact_multi_range in
-                Range_check.compact_multi (module Runner.Impl) v01 v2 ;
-                () ) ;
+
+            (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
+            Foreign_field.constrain_external_checks
+              (module Runner.Impl)
+              external_checks curve.modulus ;
 
             () )
       in
@@ -3873,41 +3827,20 @@ let%test_unit "Ec_group.scalar_mul_tiny_full" =
              * Perform external checks
              *)
 
-            (* 1) Add gates for external bound additions.
-             *    Note: internally this also adds multi-range-checks for the
-             *    computed bound to the external_checks.multi-ranges, which
-             *    are then constrainted in (2)
-             *)
+            (* Sanity checks *)
             if Bignum_bigint.(curve.bignum.a = zero) then
               assert (Mina_stdlib.List.Length.equal external_checks.bounds 42)
             else assert (Mina_stdlib.List.Length.equal external_checks.bounds 43) ;
-            List.iter external_checks.bounds ~f:(fun value ->
-                let _bound =
-                  Foreign_field.valid_element
-                    (module Runner.Impl)
-                    external_checks
-                    (Foreign_field.Element.Standard.of_limbs value)
-                    curve.modulus
-                in
-                () ) ;
-
-            (* 2) Add gates for external multi-range-checks *)
             assert (
-              Mina_stdlib.List.Length.equal external_checks.multi_ranges 59 ) ;
-            List.iter external_checks.multi_ranges ~f:(fun multi_range ->
-                let v0, v1, v2 = multi_range in
-                Range_check.multi (module Runner.Impl) v0 v1 v2 ;
-                () ) ;
-
-            (* 3) Add gates for external compact-multi-range-checks *)
+              Mina_stdlib.List.Length.equal external_checks.multi_ranges 17 ) ;
             assert (
               Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges
                 17 ) ;
-            List.iter external_checks.compact_multi_ranges
-              ~f:(fun compact_multi_range ->
-                let v01, v2 = compact_multi_range in
-                Range_check.compact_multi (module Runner.Impl) v01 v2 ;
-                () ) ;
+
+            (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
+            Foreign_field.constrain_external_checks
+              (module Runner.Impl)
+              external_checks curve.modulus ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->
@@ -3993,37 +3926,10 @@ let%test_unit "Ec_group.scalar_mul_full" =
                 external_checks curve scalar_bits point
             in
 
-            (*
-             * Perform external checks
-             *)
-
-            (* 1) Add gates for external bound additions.
-             *    Note: internally this also adds multi-range-checks for the
-             *    computed bound to the external_checks.multi-ranges, which
-             *    are then constrainted in (2)
-             *)
-            List.iter external_checks.bounds ~f:(fun value ->
-                let _bound =
-                  Foreign_field.valid_element
-                    (module Runner.Impl)
-                    external_checks
-                    (Foreign_field.Element.Standard.of_limbs value)
-                    curve.modulus
-                in
-                () ) ;
-
-            (* 2) Add gates for external multi-range-checks *)
-            List.iter external_checks.multi_ranges ~f:(fun multi_range ->
-                let v0, v1, v2 = multi_range in
-                Range_check.multi (module Runner.Impl) v0 v1 v2 ;
-                () ) ;
-
-            (* 3) Add gates for external compact-multi-range-checks *)
-            List.iter external_checks.compact_multi_ranges
-              ~f:(fun compact_multi_range ->
-                let v01, v2 = compact_multi_range in
-                Range_check.compact_multi (module Runner.Impl) v01 v2 ;
-                () ) ;
+            (* Perform external checks *)
+            Foreign_field.constrain_external_checks
+              (module Runner.Impl)
+              external_checks curve.modulus ;
 
             (* Check output matches expected result *)
             as_prover (fun () ->

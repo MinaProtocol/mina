@@ -204,6 +204,13 @@ val valid_element :
   -> 'f Element.Standard.t
 (* result *)
 
+(** Gadget to constrain external checks using supplied modulus *)
+val constrain_external_checks :
+     (module Snark_intf.Run with type field = 'f)
+  -> 'f External_checks.t
+  -> 'f standard_limbs
+  -> unit
+
 (** Gadget for a chain of foreign field sums (additions or subtractions)
  *
  *    Inputs:
