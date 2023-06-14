@@ -98,8 +98,6 @@ help() {
   echo "                                         |   Default: ${LOG_LEVEL}"
   echo "-fll |--file-log-level <level>           | File output logging level"
   echo "                                         |   Default: ${FILE_LOG_LEVEL}"
-  echo "-it |--internal-tracing                  | Whether to enable internal tracing (presence of argument)"
-  echo "                                         |   Default: ${INTERNAL_TRACING:-false}"
   echo "-ph  |--pg-host <host>                   | PostgreSQL host"
   echo "                                         |   Default: ${PG_HOST}"
   echo "-pp  |--pg-port <#>                      | PostgreSQL port"
@@ -172,7 +170,6 @@ exec-daemon() {
     -log-json \
     -log-level ${LOG_LEVEL} \
     -file-log-level ${FILE_LOG_LEVEL} \
-    ${INTERNAL_TRACING:+-internal-tracing} \
     $@
 }
 
@@ -236,14 +233,14 @@ reset-genesis-ledger() {
 recreate-schema() {
   echo "Recreating database '${PG_DB}'..."
   
-  psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT} -c "DROP DATABASE IF EXISTS ${PG_DB}" &>/dev/null
+  psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT} -c "DROP DATABASE IF EXISTS ${PG_DB};"
   
-  psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT} -c "CREATE DATABASE ${PG_DB}" &>/dev/null
+  psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT} -c "CREATE DATABASE ${PG_DB};"
   
   # We need to change our working directory as script has relation to others subscripts 
   # and calling them from local folder
   cd ./src/app/archive 
-  psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT}/${PG_DB} < create_schema.sql &>/dev/null
+  psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT} ${PG_DB} < create_schema.sql
   cd ../../../
 
   echo "Schema '${PG_DB}' created successfully."
@@ -310,7 +307,6 @@ while [[ "$#" -gt 0 ]]; do
     FILE_LOG_LEVEL="${2}"
     shift
     ;;
-  -it | --internal-tracing) INTERNAL_TRACING=true ;;
   -ph | --pg-host)
     PG_HOST="${2}"
     shift
@@ -447,6 +443,9 @@ LEDGER_FOLDER="${HOME}/.mina-network/mina-local-network-${WHALES}-${FISH}-${NODE
 
 if ${RESET}; then
   rm -rf ${LEDGER_FOLDER}
+  if ${ARCHIVE}; then
+    recreate-schema
+  fi
 fi
 
 if [ ! -d "${LEDGER_FOLDER}" ]; then
