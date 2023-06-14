@@ -7,19 +7,42 @@
   async_unix
   base
   base.caml
+  base.base_internalhash_types
   core_kernel
+  core
   integers
   sexplib0
   ;; local libraries
+  block_time
+  consensus
   currency
+  data_hash_lib
+  genesis_constants
+  genesis_ledger
+  logger
   mina_base
+  mina_base.import
+  mina_generators
+  mina_ledger
   mina_numbers
+  mina_state
+  mina_transaction_logic
   mina_wire_types
-  network_pool)
+  network_pool
+  non_zero_curve_point
+  pickles
+  precomputed_values
+  quickcheck_lib
+  signature_lib
+  snark_params
+  staged_ledger_diff
+  mina_transaction
+  with_hash)
  (preprocess
   (pps
    ppx_base
    ppx_let
+   ppx_custom_printf
    ppx_assert))
  (instrumentation
   (backend bisect_ppx)))
