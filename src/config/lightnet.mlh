@@ -22,8 +22,6 @@
 [%%define time_offsets true]
 [%%define cache_exceptions false]
 
-[%%define itn_features true]
-
 [%%define plugins false]
 
 [%%define genesis_ledger "testnet_postake"]
@@ -36,6 +34,8 @@
 
 [%%define download_snark_keys false]
 [%%define generate_genesis_proof false]
+
+[%%define itn_features true]
 
 [%%define print_versioned_types false]
 
