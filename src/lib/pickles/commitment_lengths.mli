@@ -1,12 +1,15 @@
 (** Commitment lengths *)
 
-type t :=
+type t =
   ( int Pickles_types.Plonk_types.Columns_vec.t
   , int
   , int )
   Pickles_types.Plonk_types.Messages.Poly.t
 
-(** [of_length len] creates a commitment length of size [len]
+(** [of_length len] creates a commitment length [len]
+
+    [len] typically represents the number of chunks.
+
     @raise Invalid_argument if [len] <= 0
 *)
 val of_length : int -> t
