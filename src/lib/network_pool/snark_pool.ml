@@ -131,6 +131,10 @@ module type Transition_frontier_intf = sig
        t
     -> Transition_frontier.Extensions.Snark_pool_refcount.view
        Pipe_lib.Broadcast_pipe.Reader.t
+
+  val work_is_referenced : t -> Transaction_snark_work.Statement.t -> bool
+
+  val best_tip_table : t -> Transaction_snark_work.Statement.Hash_set.t
 end
 
 module Make
@@ -156,34 +160,15 @@ struct
       end
 
       type transition_frontier_diff =
-        [ `New_refcount_table of Extensions.Snark_pool_refcount.view
+        [ `Refcount_update of Extensions.Snark_pool_refcount.view
         | `New_best_tip of Base_ledger.t ]
 
       type t =
         { snark_tables : Snark_tables.t
         ; snark_table_lock : (unit Throttle.Sequencer.t[@sexp.opaque])
-        ; best_tip_ledger : (unit -> Base_ledger.t option[@sexp.opaque])
-        ; mutable ref_table : int Statement_table.t option
-              (** Tracks the number of blocks that have each work statement in
-                  their scan state.
-                  Work is included iff it is a member of some block scan state.
-                  Used to filter the pool, ensuring that only work referenced
-                  within the frontier is kept.
-              *)
-        ; mutable best_tip_table :
-            Transaction_snark_work.Statement.Hash_set.t option
-              (** The set of all snark work statements present in the scan
-                  state for the last 10 blocks in the best chain.
-                  Used to filter broadcasts of locally produced work, so that
-                  irrelevant work is not broadcast.
-              *)
+        ; frontier : (unit -> Transition_frontier.t option [@sexp.opaque])
         ; config : Config.t
         ; logger : (Logger.t[@sexp.opaque])
-        ; mutable removed_counter : int
-              (** A counter for transition frontier breadcrumbs removed. When
-                  this reaches a certain value, unreferenced snark work is
-                  removed from ref_table
-              *)
         ; account_creation_fee : Currency.Fee.t
         ; batcher : Batcher.Snark_pool.t
         }
@@ -194,30 +179,34 @@ struct
 
       let make_config = Config.make
 
-      let removed_breadcrumb_wait = 10
-
-      let get_best_tip_ledger ~frontier_broadcast_pipe () =
-        Option.map (Broadcast_pipe.Reader.peek frontier_broadcast_pipe)
-          ~f:(fun tf ->
-            Transition_frontier.best_tip tf
-            |> Transition_frontier.Breadcrumb.staged_ledger
-            |> Staged_ledger.ledger )
-
       let of_serializable tables ~constraint_constants ~frontier_broadcast_pipe
           ~config ~logger : t =
         { snark_tables = Snark_tables.of_serializable tables
         ; snark_table_lock = Throttle.Sequencer.create ()
-        ; best_tip_ledger = get_best_tip_ledger ~frontier_broadcast_pipe
+        ; frontier =
+            (fun () -> Broadcast_pipe.Reader.peek frontier_broadcast_pipe)
         ; batcher = Batcher.Snark_pool.create config.verifier
         ; account_creation_fee =
             constraint_constants
               .Genesis_constants.Constraint_constants.account_creation_fee
-        ; ref_table = None
-        ; best_tip_table = None
         ; config
         ; logger
-        ; removed_counter = removed_breadcrumb_wait
         }
+
+      let best_tip_ledger t =
+        t.frontier ()
+        |> Option.map ~f:(fun tf ->
+               Transition_frontier.best_tip tf
+               |> Transition_frontier.Breadcrumb.staged_ledger
+               |> Staged_ledger.ledger )
+
+      let best_tip_table t =
+        t.frontier () |> Option.map ~f:Transition_frontier.best_tip_table
+
+      let work_is_referenced t work =
+        t.frontier ()
+        |> Option.value_map ~default:false ~f:(fun tf ->
+               Transition_frontier.work_is_referenced tf work )
 
       let snark_pool_json t : Yojson.Safe.t =
         `List
@@ -245,19 +234,6 @@ struct
             ; prover
             }
             :: acc )
-
-      (** false when there is no active transition_frontier or
-          when the refcount for the given work is 0 *)
-      let work_is_referenced t work =
-        match t.ref_table with
-        | None ->
-            false
-        | Some ref_table -> (
-            match Statement_table.find ref_table work with
-            | None ->
-                false
-            | Some _ ->
-                true )
 
       let fee_is_sufficient t ~fee ~account_exists =
         Currency.Fee.(fee >= t.account_creation_fee) || account_exists
@@ -322,48 +298,39 @@ struct
             in
             () )
 
-      let handle_new_refcount_table t
-          ({ removed; refcount_table; best_tip_table } :
-            Extensions.Snark_pool_refcount.view ) =
-        t.ref_table <- Some refcount_table ;
-        t.best_tip_table <- Some best_tip_table ;
-        t.removed_counter <- t.removed_counter + removed ;
-        if t.removed_counter >= removed_breadcrumb_wait then (
-          t.removed_counter <- 0 ;
-          Statement_table.filter_keys_inplace t.snark_tables.all ~f:(fun k ->
-              let keep = work_is_referenced t k in
-              if not keep then Hashtbl.remove t.snark_tables.rebroadcastable k ;
-              keep ) ;
-          Mina_metrics.(
-            Gauge.set Snark_work.snark_pool_size
-              (Float.of_int @@ Hashtbl.length t.snark_tables.all)) )
+      let handle_refcount_update t
+          ({ removed_work } : Extensions.Snark_pool_refcount.view ) =
+        [%log' trace t.logger]
+          "Handling snark refcount table: $num_removed works were removed"
+          ~metadata:[ ("num_removed", `Int (List.length removed_work)) ] ;
+        List.iter removed_work ~f:(fun work ->
+            Hashtbl.remove t.snark_tables.rebroadcastable work ;
+            Hashtbl.remove t.snark_tables.all work ) ;
+        Mina_metrics.(
+          Gauge.set Snark_work.snark_pool_size
+            (Float.of_int @@ Hashtbl.length t.snark_tables.all))
 
       let handle_transition_frontier_diff u t =
         match u with
         | `New_best_tip ledger ->
             O1trace.thread "apply_new_best_tip_ledger_to_snark_pool" (fun () ->
                 handle_new_best_tip_ledger t ledger )
-        | `New_refcount_table refcount_table ->
-            O1trace.sync_thread "apply_refcount_table_to_snark_pool" (fun () ->
-                handle_new_refcount_table t refcount_table ) ;
+        | `Refcount_update refcount_update ->
+            O1trace.sync_thread "apply_refcount_update_to_snark_pool" (fun () ->
+                handle_refcount_update t refcount_update ) ;
             Deferred.unit
 
       (*TODO? add referenced statements from the transition frontier to ref_table here otherwise the work referenced in the root and not in any of the successor blocks will never be included. This may not be required because the chances of a new block from the root is very low (root's existing successor is 1 block away from finality)*)
-      let listen_to_frontier_broadcast_pipe frontier_broadcast_pipe (t : t)
+      let listen_to_frontier_broadcast_pipe frontier_broadcast_pipe
           ~tf_diff_writer =
-        (* start with empty ref table *)
-        t.ref_table <- None ;
-        t.best_tip_table <- None ;
         let tf_deferred =
           Broadcast_pipe.Reader.iter frontier_broadcast_pipe ~f:(function
             | Some tf ->
                 (* Start the count at the max so we flush after reconstructing
                    the transition_frontier *)
-                t.removed_counter <- removed_breadcrumb_wait ;
                 Broadcast_pipe.Reader.iter
                   (Transition_frontier.snark_pool_refcount_pipe tf) ~f:(fun x ->
-                    Strict_pipe.Writer.write tf_diff_writer
-                      (`New_refcount_table x) )
+                    Strict_pipe.Writer.write tf_diff_writer (`Refcount_update x) )
                 |> Deferred.don't_wait_for ;
                 Broadcast_pipe.Reader.iter
                   (Transition_frontier.best_tip_diff_pipe tf) ~f:(fun _ ->
@@ -375,8 +342,6 @@ struct
                 |> Deferred.don't_wait_for ;
                 return ()
             | None ->
-                t.ref_table <- None ;
-                t.best_tip_table <- None ;
                 return () )
         in
         Deferred.don't_wait_for tf_deferred
@@ -389,19 +354,17 @@ struct
               ; rebroadcastable = Statement_table.create ()
               }
           ; snark_table_lock = Throttle.Sequencer.create ()
-          ; best_tip_ledger = get_best_tip_ledger ~frontier_broadcast_pipe
+          ; frontier =
+              (fun () -> Broadcast_pipe.Reader.peek frontier_broadcast_pipe)
           ; batcher = Batcher.Snark_pool.create config.verifier
           ; logger
           ; config
-          ; ref_table = None
-          ; best_tip_table = None
           ; account_creation_fee =
               constraint_constants
                 .Genesis_constants.Constraint_constants.account_creation_fee
-          ; removed_counter = removed_breadcrumb_wait
           }
         in
-        listen_to_frontier_broadcast_pipe frontier_broadcast_pipe t
+        listen_to_frontier_broadcast_pipe frontier_broadcast_pipe
           ~tf_diff_writer ;
         t
 
@@ -506,7 +469,7 @@ struct
             let open Mina_base in
             let open Option.Let_syntax in
             Option.is_some
-              (let%bind ledger = t.best_tip_ledger () in
+              (let%bind ledger = best_tip_ledger t in
                if Deferred.is_determined (Base_ledger.detached_signal ledger)
                then None
                else
@@ -593,18 +556,15 @@ struct
         This is limited to recent work which is yet to appear in a block.
     *)
     let get_rebroadcastable t ~has_timed_out:_ =
-      let in_best_tip_table =
-        match t.best_tip_table with
-        | Some best_tip_table ->
-            Hash_set.mem best_tip_table
-        | None ->
-            Fn.const false
-      in
-      Hashtbl.to_alist t.snark_tables.rebroadcastable
-      |> List.filter_map ~f:(fun (stmt, (snark, _time)) ->
-             if in_best_tip_table stmt then
-               Some (Diff.Add_solved_work (stmt, snark))
-             else None )
+      match best_tip_table t with
+      | None ->
+          []
+      | Some best_tips ->
+          Hashtbl.to_alist t.snark_tables.rebroadcastable
+          |> List.filter_map ~f:(fun (stmt, (snark, _time)) ->
+                 if Hash_set.mem best_tips stmt then
+                   Some (Diff.Add_solved_work (stmt, snark))
+                 else None )
 
     let remove_solved_work t work =
       Statement_table.remove t.snark_tables.all work ;
@@ -670,7 +630,7 @@ struct
               ~tf_diffs:tf_diff_reader ~log_gossip_heard ~on_remote_push
           in
           Resource_pool.listen_to_frontier_broadcast_pipe
-            frontier_broadcast_pipe pool ~tf_diff_writer ;
+            frontier_broadcast_pipe ~tf_diff_writer ;
           res
       | Error _e ->
           create ~config ~logger ~constraint_constants ~consensus_constants
@@ -694,6 +654,16 @@ include
 
       let snark_pool_refcount_pipe t =
         Extensions.(get_view_pipe (extensions t) Snark_pool_refcount)
+
+      let snark_pool_refcount t =
+        Extensions.(get_extension (extensions t) Snark_pool_refcount)
+
+      let work_is_referenced t =
+        Extensions.Snark_pool_refcount.work_is_referenced
+          (snark_pool_refcount t)
+
+      let best_tip_table t =
+        Extensions.Snark_pool_refcount.best_tip_table (snark_pool_refcount t)
     end)
 
 module Diff_versioned = struct

@@ -2,19 +2,10 @@ open Core_kernel
 open Frontier_base
 module Work = Transaction_snark_work.Statement
 
+(* TODO: best tip table should be a separate extension *)
+
 module T = struct
-  type view =
-    { removed: int
-    ; refcount_table: int Work.Table.t
-          (** Tracks the number of blocks that have each work statement in
-              their scan state.
-              Work is included iff it is a member of some block scan state.
-          *)
-    ; best_tip_table: Work.Hash_set.t
-          (** The set of all snark work statements present in the scan state
-              for the last 10 blocks in the best chain.
-          *)
-    }
+  type view = { removed_work: Work.t list }
   [@@deriving sexp]
 
   type t =
@@ -31,87 +22,57 @@ module T = struct
 
   let get_work = Staged_ledger.Scan_state.all_work_statements_exn
 
-  (** Returns true if this update changed which elements are in the table
-      (but not if the same elements exist with a different reference count) *)
-  let add_to_table ~get_work ~get_statement table t : bool =
-    let res = ref false in
-    List.iter (get_work t) ~f:(fun work ->
-        Work.Table.update table (get_statement work) ~f:(function
-          | Some count ->
-              count + 1
-          | None ->
-              res := true ;
-              1 ) ) ;
-    !res
+  let work_is_referenced t work =
+    Hashtbl.mem t.refcount_table work
 
-  (** Returns true if this update changed which elements are in the table
-      (but not if the same elements exist with a different reference count) *)
-  let remove_from_table ~get_work ~get_statement table t : bool =
-    let res = ref false in
-    List.iter (get_work t) ~f:(fun work ->
-        Work.Table.change table (get_statement work) ~f:(function
-          | Some 1 ->
-              res := true ;
-              None
-          | Some count ->
-              Some (count - 1)
-          | None ->
-              failwith "Removed a breadcrumb we didn't know about" ) ) ;
-    !res
+  let best_tip_table t = t.best_tip_table
 
-  let add_scan_state_to_ref_table table scan_state : bool =
-    add_to_table ~get_work ~get_statement:Fn.id table scan_state
+  let add_to_table table t =
+    List.iter (get_work t) ~f:(Work.Table.update table ~f:(Option.value_map ~default:1 ~f:((+) 1)))
 
-  let remove_scan_state_from_ref_table table scan_state : bool =
-    remove_from_table ~get_work ~get_statement:Fn.id table scan_state
+  (** Returns the elements that were removed from the table. *)
+  let remove_from_table table t : Work.t list =
+    List.filter (get_work t) ~f:(fun work ->
+        match Work.Table.find table work with
+        | Some 1 ->
+            Work.Table.remove table work ;
+            true
+        | Some count ->
+            Work.Table.set table ~key:work ~data:(count - 1) ;
+            false
+        | None ->
+            failwith "Removed a breadcrumb we didn't know about")
 
   let create ~logger:_ frontier =
     let t =
       { refcount_table= Work.Table.create ()
       ; best_tip_table= Work.Hash_set.create () }
     in
-    let () =
-      let breadcrumb = Full_frontier.root frontier in
-      let scan_state =
-        Breadcrumb.staged_ledger breadcrumb |> Staged_ledger.scan_state
-      in
-      ignore (add_scan_state_to_ref_table t.refcount_table scan_state : bool)
+    let breadcrumb = Full_frontier.root frontier in
+    let scan_state =
+      Breadcrumb.staged_ledger breadcrumb |> Staged_ledger.scan_state
     in
-    ( t
-    , { removed= 0
-      ; refcount_table= t.refcount_table
-      ; best_tip_table= t.best_tip_table } )
-
-  type diff_update = {num_removed: int; is_added: bool}
+    add_to_table t.refcount_table scan_state ;
+    (t , {removed_work= []})
 
   let handle_diffs t frontier diffs_with_mutants =
     let open Diff.Full.With_mutant in
-    let {num_removed; is_added} =
-      List.fold diffs_with_mutants ~init:{num_removed= 0; is_added= false}
-        ~f:(fun {num_removed; is_added} -> function
+    let removals =
+      List.fold diffs_with_mutants ~init:[]
+      ~f:(fun removals -> function
         | E (New_node (Full breadcrumb), _) ->
             let scan_state =
               Breadcrumb.staged_ledger breadcrumb |> Staged_ledger.scan_state
             in
-            let added_scan_state =
-              add_scan_state_to_ref_table t.refcount_table scan_state
-            in
-            {num_removed; is_added= is_added || added_scan_state}
-        | E (Root_transitioned {new_root= _; garbage= Full garbage_nodes; _}, _)
+            add_to_table t.refcount_table scan_state ;
+            removals
+        | E (Root_transitioned {garbage= Full garbage_nodes; old_root_scan_state= Full old_root_scan_state; _}, _)
           ->
-            let open Diff.Node_list in
-            let extra_num_removed =
-              List.fold garbage_nodes ~init:0 ~f:(fun acc node ->
-                  let delta =
-                    if
-                      remove_scan_state_from_ref_table t.refcount_table
-                        node.scan_state
-                    then 1
-                    else 0
-                  in
-                  acc + delta )
+            let removed_scan_states = old_root_scan_state :: List.map garbage_nodes ~f:(fun node -> node.scan_state) in
+            let removed_works =
+              List.bind removed_scan_states ~f:(remove_from_table t.refcount_table)
             in
-            {num_removed= num_removed + extra_num_removed; is_added}
+            removed_works :: removals
         | E (Best_tip_changed new_best_tip_hash, _) ->
             let rec update_best_tip_table blocks_remaining state_hash =
               match Full_frontier.find frontier state_hash with
@@ -132,13 +93,11 @@ module T = struct
             let num_blocks_to_include = 3 in
             Hash_set.clear t.best_tip_table ;
             update_best_tip_table num_blocks_to_include new_best_tip_hash ;
-            {num_removed; is_added= true} )
+            removals )
     in
-    if num_removed > 0 || is_added then
-      Some
-        { removed= num_removed
-        ; refcount_table= t.refcount_table
-        ; best_tip_table= t.best_tip_table }
+    let removed_work = List.concat removals in
+    if not (List.is_empty removed_work) then
+      Some {removed_work}
     else None
 end
 
