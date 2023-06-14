@@ -1,4 +1,3 @@
-open Async_kernel
 open Pipe_lib
 open Core_kernel
 
@@ -37,18 +36,6 @@ module type S = sig
        t
     -> Transaction_snark_work.Statement.t
     -> Transaction_snark_work.Checked.t option
-
-  val load :
-       config:Resource_pool.Config.t
-    -> logger:Logger.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> consensus_constants:Consensus.Constants.t
-    -> time_controller:Block_time.Controller.t
-    -> frontier_broadcast_pipe:
-         transition_frontier option Broadcast_pipe.Reader.t
-    -> log_gossip_heard:bool
-    -> on_remote_push:(unit -> unit Deferred.t)
-    -> (t * Remote_sink.t * Local_sink.t) Deferred.t
 end
 
 module type Transition_frontier_intf = sig
