@@ -100,6 +100,7 @@ module Make
           ] ;
       Or_error.error_string reason
     in
+    let work = Transaction_snark_work.Statement_with_hash.create work in
     match Pool.request_proof pool work with
     | None ->
         Ok ()
@@ -151,6 +152,7 @@ module Make
         in
         match has_lower_fee pool work ~fee:fee.fee ~sender with
         | Ok () ->
+            let work = Transaction_snark_work.Statement_with_hash.create work in
             let%map.Deferred.Result accepted, rejected =
               Pool.add_snark ~is_local pool ~work ~proof ~fee >>| to_or_error
             in

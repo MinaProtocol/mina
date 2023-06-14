@@ -885,6 +885,7 @@ let request_work t =
       ~snark_pool:(snark_pool t) (snark_job_state t)
   in
   Option.map instances_opt ~f:(fun instances ->
+      let instances = Transaction_snark_work.With_hash.data instances in
       { Snark_work_lib.Work.Spec.instances; fee } )
 
 let work_selection_method t = t.config.work_selection_method
@@ -909,7 +910,10 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
      * If the diff is accepted then remove it from the seen jobs.
      * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
-    Work_selection_method.remove t.snark_job_state spec
+    Work_selection_method.remove t.snark_job_state
+      (Transaction_snark_work.With_hash.create
+         ~f:(One_or_two.map ~f:Snark_work_lib.Work.Single.Spec.statement)
+         spec )
   in
   ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
   Network_pool.Snark_pool.Local_sink.push t.pipes.snark_local_sink
@@ -1324,7 +1328,9 @@ let start t =
         (Network_pool.Transaction_pool.resource_pool
            t.components.transaction_pool )
       ~get_completed_work:
-        (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
+        (Fn.compose
+           (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
+           Transaction_snark_work.Statement_with_hash.create )
       ~time_controller:t.config.time_controller
       ~coinbase_receiver:t.coinbase_receiver
       ~consensus_local_state:t.config.consensus_local_state
@@ -1969,7 +1975,9 @@ let create ?wallets (config : Config.t) =
               ~catchup_mode ~network_transition_reader:block_reader
               ~producer_transition_reader ~most_recent_valid_block
               ~get_completed_work:
-                (Network_pool.Snark_pool.get_completed_work snark_pool)
+                (Fn.compose
+                   (Network_pool.Snark_pool.get_completed_work snark_pool)
+                   Transaction_snark_work.Statement_with_hash.create )
               ~notify_online ()
           in
           let ( valid_transitions_for_network

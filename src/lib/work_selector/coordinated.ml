@@ -53,7 +53,11 @@ struct
     | [] ->
         None
     | work :: rest ->
-        if query_coordinator (work_identifier work) then Some work
+        if
+          query_coordinator
+            ( work_identifier
+            @@ Inputs.Transaction_snark_work.With_hash.data work )
+        then Some work
         else get_next_coordinated_job rest
 
   let work ~snark_pool ~fee ~logger (state : Lib.State.t) =

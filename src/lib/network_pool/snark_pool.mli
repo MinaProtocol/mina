@@ -10,7 +10,8 @@ module type S = sig
       Intf.Snark_resource_pool_intf
         with type transition_frontier := transition_frontier
 
-    val remove_solved_work : t -> Transaction_snark_work.Statement.t -> unit
+    val remove_solved_work :
+      t -> Transaction_snark_work.Statement_with_hash.t -> unit
 
     module Diff : Intf.Snark_pool_diff_intf with type resource_pool := t
   end
@@ -35,7 +36,7 @@ module type S = sig
 
   val get_completed_work :
        t
-    -> Transaction_snark_work.Statement.t
+    -> Transaction_snark_work.Statement_with_hash.t
     -> Transaction_snark_work.Checked.t option
 
   val load :

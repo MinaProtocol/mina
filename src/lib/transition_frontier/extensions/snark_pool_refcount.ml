@@ -1,6 +1,6 @@
 open Core_kernel
 open Frontier_base
-module Work = Transaction_snark_work.Statement
+module Work = Transaction_snark_work.Statement_with_hash
 
 module T = struct
   type view =
@@ -62,10 +62,10 @@ module T = struct
     !res
 
   let add_scan_state_to_ref_table table scan_state : bool =
-    add_to_table ~get_work ~get_statement:Fn.id table scan_state
+    add_to_table ~get_work ~get_statement:Work.create table scan_state
 
   let remove_scan_state_from_ref_table table scan_state : bool =
-    remove_from_table ~get_work ~get_statement:Fn.id table scan_state
+    remove_from_table ~get_work ~get_statement:Work.create table scan_state
 
   let create ~logger:_ frontier =
     let t =
@@ -129,7 +129,9 @@ module T = struct
                       |> Staged_ledger.all_work_statements_exn
                     with _ -> []
                   in
-                  List.iter ~f:(Hash_set.add t.best_tip_table) statements ;
+                  List.iter
+                    ~f:(Fn.compose (Hash_set.add t.best_tip_table) Work.create)
+                    statements ;
                   if blocks_remaining > 0 then
                     update_best_tip_table (blocks_remaining - 1)
                       (Breadcrumb.parent_hash breadcrumb)
