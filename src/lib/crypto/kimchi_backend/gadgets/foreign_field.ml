@@ -300,6 +300,10 @@ module External_checks = struct
 
   let multi_ranges (t : 'a t) = t.multi_ranges
 
+  let compact_multi_ranges (t : 'a t) = t.compact_multi_ranges
+
+  let bounds (t : 'a t) = t.bounds
+
   (* Track a multi-range-check *)
   let append_multi_range_check (external_checks : 'field t)
       (x : 'field Cvar.t standard_limbs) =

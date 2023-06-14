@@ -19,6 +19,8 @@ module Snark_intf = Snarky_backendless.Snark_intf
  *)
 type 'field standard_limbs = 'field * 'field * 'field
 
+type 'field compact_limbs = 'field * 'field
+
 (** Foreign field element base type - not used directly *)
 module type Element_intf = sig
   type 'field t
@@ -78,6 +80,11 @@ module External_checks : sig
   val create : (module Snark_intf.Run with type field = 'field) -> 'field t
 
   val multi_ranges : 'a t -> 'a Snarky_backendless.Cvar.t standard_limbs list
+
+  val compact_multi_ranges :
+    'a t -> 'a Snarky_backendless.Cvar.t compact_limbs list
+
+  val bounds : 'a t -> 'a Snarky_backendless.Cvar.t standard_limbs list
 end
 
 (* Type of operation *)
