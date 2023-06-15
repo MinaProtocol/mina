@@ -93,7 +93,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Currency.Amount.of_fee constraint_constants.account_creation_fee
     in
     let memo = "" in
-    let valid_until = Mina_numbers.Global_slot.max_value in
+    let valid_until = Mina_numbers.Global_slot_since_genesis.max_value in
     let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
     let payload =
       let common =
@@ -104,9 +104,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; memo = Signed_command_memo.empty
         }
       in
-      let payment_payload =
-        { Payment_payload.Poly.source_pk = sender_pk; receiver_pk; amount }
-      in
+      let payment_payload = { Payment_payload.Poly.receiver_pk; amount } in
       let body = Signed_command_payload.Body.Payment payment_payload in
       { Signed_command_payload.Poly.common; body }
     in
@@ -454,7 +452,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ]
             ]
           |> mk_zkapp_command ~memo:"mint token" ~fee:12_000_000 ~fee_payer_pk
-               ~fee_payer_nonce:(Account.Nonce.of_int 2)
+               ~fee_payer_nonce:(Account.Nonce.of_int 1)
         in
         replace_authorizations ~keymap with_dummy_signatures
       in
@@ -477,7 +475,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ]
             ]
           |> mk_zkapp_command ~memo:"zkapp to mint token2" ~fee:11_500_000
-               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 3)
+               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 2)
         in
         replace_authorizations ~keymap with_dummy_signatures
       in
@@ -509,7 +507,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 ]
             ]
           |> mk_zkapp_command ~memo:"zkapp for tokens transfer" ~fee:11_000_000
-               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 4)
+               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 3)
         in
         replace_authorizations ~keymap with_dummy_signatures
       in
@@ -546,7 +544,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
           |> mk_zkapp_command ~memo:"zkapp for tokens transfer 2"
                ~fee:10_000_000 ~fee_payer_pk
-               ~fee_payer_nonce:(Account.Nonce.of_int 5)
+               ~fee_payer_nonce:(Account.Nonce.of_int 4)
         in
         replace_authorizations ~keymap with_dummy_signatures
       in
@@ -728,7 +726,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "Send a zkapp with an insufficient fee"
         (send_invalid_zkapp ~logger node zkapp_command_insufficient_fee
-           "Some commands have an insufficient fee" )
+           "Insufficient fee" )
     in
     (* Won't be accepted until the previous transactions are applied *)
     let%bind () =
@@ -845,7 +843,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section_hard "Wait for proof to be emitted"
         (wait_for t
-           (Wait_condition.ledger_proofs_emitted_since_genesis ~num_proofs:1) )
+           (Wait_condition.ledger_proofs_emitted_since_genesis
+              ~test_config:config ~num_proofs:1 ) )
     in
     Event_router.cancel (event_router t) snark_work_event_subscription () ;
     Event_router.cancel (event_router t) snark_work_failure_subscription () ;

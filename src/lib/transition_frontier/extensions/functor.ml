@@ -15,6 +15,8 @@ module Make_broadcasted (Extension : Intf.Extension_base_intf) :
     ; reader : Extension.view Broadcast_pipe.Reader.t
     }
 
+  let name = Extension.name
+
   let extension { extension; _ } = extension
 
   let create (extension, initial_view) =

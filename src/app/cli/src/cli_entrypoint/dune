@@ -15,7 +15,6 @@
    bin_prot
    bin_prot.shape
    init
-   tests
    async
    core.daemon
    base.caml
@@ -72,6 +71,8 @@
    snarky.backendless
    o1trace
    ppx_version.runtime
+   internal_tracing
+   itn_logger
  )
  (preprocessor_deps ../../../../config.mlh)
  (instrumentation (backend bisect_ppx))

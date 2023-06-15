@@ -13,7 +13,8 @@ let invalid_to_error = Common.invalid_to_error
 
 type ledger_proof = Ledger_proof.t
 
-let create ~logger:_ ~proof_level ~constraint_constants ~pids:_ ~conf_dir:_ =
+let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
+    ~proof_level ~constraint_constants ~pids:_ ~conf_dir:_ () =
   match proof_level with
   | Genesis_constants.Proof_level.Full ->
       failwith "Unable to handle proof-level=Full"
@@ -88,3 +89,7 @@ let get_blockchain_verification_key { proof_level; constraint_constants } =
         let proof_level = proof_level
       end) in
       Deferred.return @@ Lazy.force B.Proof.verification_key )
+
+let toggle_internal_tracing _ _ = Deferred.Or_error.ok_unit
+
+let set_itn_logger_data _ ~daemon_port:_ = Deferred.Or_error.ok_unit

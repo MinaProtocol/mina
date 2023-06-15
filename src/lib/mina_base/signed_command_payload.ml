@@ -7,7 +7,8 @@ open Snark_params.Tick
 open Signature_lib
 module Memo = Signed_command_memo
 module Account_nonce = Mina_numbers.Account_nonce
-module Global_slot = Mina_numbers.Global_slot
+module Global_slot_since_genesis = Mina_numbers.Global_slot_since_genesis
+module Global_slot_legacy = Mina_numbers.Global_slot_legacy
 
 (* This represents the random oracle input corresponding to the old form of the token
    ID, which was a 64-bit integer. The default token id was the number 1.
@@ -76,7 +77,7 @@ module Common = struct
         ( Currency.Fee.Stable.V1.t
         , Public_key.Compressed.Stable.V1.t
         , Account_nonce.Stable.V1.t
-        , Global_slot.Stable.V1.t
+        , Global_slot_since_genesis.Stable.V1.t
         , Memo.Stable.V1.t )
         Poly.Stable.V2.t
       [@@deriving compare, equal, sexp, hash, yojson]
@@ -92,7 +93,7 @@ module Common = struct
         , Public_key.Compressed.Stable.V1.t
         , Token_id.Stable.V1.t
         , Account_nonce.Stable.V1.t
-        , Global_slot.Stable.V1.t
+        , Global_slot_legacy.Stable.V1.t
         , Memo.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving compare, equal, sexp, hash, yojson]
@@ -108,7 +109,7 @@ module Common = struct
        ; Legacy_token_id.default
        ; Public_key.Compressed.to_input_legacy fee_payer_pk
        ; Account_nonce.to_input_legacy nonce
-       ; Global_slot.to_input_legacy valid_until
+       ; Global_slot_since_genesis.to_input_legacy valid_until
        ; bitstring (Memo.to_bits memo)
       |]
 
@@ -117,7 +118,7 @@ module Common = struct
     let%map fee = Currency.Fee.gen
     and fee_payer_pk = Public_key.Compressed.gen
     and nonce = Account_nonce.gen
-    and valid_until = Global_slot.gen
+    and valid_until = Global_slot_since_genesis.gen
     and memo =
       let%bind is_digest = Bool.quickcheck_generator in
       if is_digest then
@@ -136,7 +137,7 @@ module Common = struct
     ( Currency.Fee.var
     , Public_key.Compressed.var
     , Account_nonce.Checked.t
-    , Global_slot.Checked.t
+    , Global_slot_since_genesis.Checked.t
     , Memo.Checked.t )
     Poly.t
 
@@ -145,7 +146,7 @@ module Common = struct
       [ Currency.Fee.typ
       ; Public_key.Compressed.typ
       ; Account_nonce.typ
-      ; Global_slot.typ
+      ; Global_slot_since_genesis.typ
       ; Memo.typ
       ]
       ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
@@ -157,13 +158,14 @@ module Common = struct
       ; fee_payer_pk = Public_key.Compressed.var_of_t fee_payer_pk
       ; nonce = Account_nonce.Checked.constant nonce
       ; memo = Memo.Checked.constant memo
-      ; valid_until = Global_slot.Checked.constant valid_until
+      ; valid_until = Global_slot_since_genesis.Checked.constant valid_until
       }
 
     let to_input_legacy ({ fee; fee_payer_pk; nonce; valid_until; memo } : var)
         =
       let%map nonce = Account_nonce.Checked.to_input_legacy nonce
-      and valid_until = Global_slot.Checked.to_input_legacy valid_until
+      and valid_until =
+        Global_slot_since_genesis.Checked.to_input_legacy valid_until
       and fee = Currency.Fee.var_to_input_legacy fee in
       let fee_token = Legacy_token_id.default_checked in
       Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
@@ -186,7 +188,7 @@ module Body = struct
     module V2 = struct
       type t = Mina_wire_types.Mina_base.Signed_command_payload.Body.V2.t =
         | Payment of Payment_payload.Stable.V2.t
-        | Stake_delegation of Stake_delegation.Stable.V1.t
+        | Stake_delegation of Stake_delegation.Stable.V2.t
       [@@deriving sexp, compare, equal, sexp, hash, yojson]
 
       let to_latest = Fn.id
@@ -209,27 +211,11 @@ module Body = struct
 
   module Tag = Transaction_union_tag
 
-  let gen ?source_pk max_amount =
+  let gen max_amount =
     let open Quickcheck.Generator in
-    let stake_delegation_gen =
-      match source_pk with
-      | Some source_pk ->
-          Stake_delegation.gen_with_delegator source_pk
-      | None ->
-          Stake_delegation.gen
-    in
     map
-      (variant2
-         (Payment_payload.gen ?source_pk max_amount)
-         stake_delegation_gen )
+      (variant2 (Payment_payload.gen max_amount) Stake_delegation.gen)
       ~f:(function `A p -> Payment p | `B d -> Stake_delegation d)
-
-  let source_pk (t : t) =
-    match t with
-    | Payment payload ->
-        payload.source_pk
-    | Stake_delegation payload ->
-        Stake_delegation.source_pk payload
 
   let receiver_pk (t : t) =
     match t with
@@ -239,13 +225,6 @@ module Body = struct
         Stake_delegation.receiver_pk payload
 
   let token (_ : t) = Token_id.default
-
-  let source t =
-    match t with
-    | Payment payload ->
-        Account_id.create payload.source_pk (token t)
-    | Stake_delegation payload ->
-        Stake_delegation.source payload
 
   let receiver t =
     match t with
@@ -307,7 +286,8 @@ let create ~fee ~fee_payer_pk ~nonce ~valid_until ~memo ~body : t =
       { fee
       ; fee_payer_pk
       ; nonce
-      ; valid_until = Option.value valid_until ~default:Global_slot.max_value
+      ; valid_until =
+          Option.value valid_until ~default:Global_slot_since_genesis.max_value
       ; memo
       }
   ; body
@@ -328,10 +308,6 @@ let valid_until (t : t) = t.common.valid_until
 let memo (t : t) = t.common.memo
 
 let body (t : t) = t.body
-
-let source_pk (t : t) = Body.source_pk t.body
-
-let source (t : t) = Body.source t.body
 
 let receiver_pk (t : t) = Body.receiver_pk t.body
 
@@ -355,20 +331,18 @@ let account_access_statuses (t : t) (status : Transaction_status.t) =
   match status with
   | Applied ->
       List.map
-        [ fee_payer t; source t; receiver t ]
+        [ fee_payer t; receiver t ]
         ~f:(fun acct_id -> (acct_id, `Accessed))
   | Failed _ ->
       (fee_payer t, `Accessed)
-      :: List.map
-           [ source t; receiver t ]
-           ~f:(fun acct_id -> (acct_id, `Not_accessed))
+      :: List.map [ receiver t ] ~f:(fun acct_id -> (acct_id, `Not_accessed))
 
 let dummy : t =
   { common =
       { fee = Currency.Fee.zero
       ; fee_payer_pk = Public_key.Compressed.empty
       ; nonce = Account_nonce.zero
-      ; valid_until = Global_slot.max_value
+      ; valid_until = Global_slot_since_genesis.max_value
       ; memo = Memo.dummy
       }
   ; body = Payment Payment_payload.dummy
@@ -381,7 +355,7 @@ let gen =
     Currency.Amount.(sub max_int (of_fee common.fee))
     |> Option.value_exn ?here:None ?error:None ?message:None
   in
-  let%map body = Body.gen ~source_pk:common.fee_payer_pk max_amount in
+  let%map body = Body.gen max_amount in
   Poly.{ common; body }
 
 (** This module defines a weight for each payload component *)

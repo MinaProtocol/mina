@@ -13,7 +13,7 @@ open Signature_lib
 module User_command = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       (* for `command_type` and `status`, a string is enough
          in any case, there aren't existing string conversions for the
          original OCaml types
@@ -31,7 +31,8 @@ module User_command = struct
         ; nonce : Account.Nonce.Stable.V1.t
         ; amount : Currency.Amount.Stable.V1.t option
         ; fee : Currency.Fee.Stable.V1.t
-        ; valid_until : Mina_numbers.Global_slot.Stable.V1.t option
+        ; valid_until :
+            Mina_numbers.Global_slot_since_genesis.Stable.V1.t option
         ; memo : Signed_command_memo.Stable.V1.t
         ; hash : Transaction_hash.Stable.V1.t
               [@to_yojson Transaction_hash.to_yojson]
@@ -49,7 +50,7 @@ end
 module Internal_command = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       (* for `command_type`, a string is enough
          no existing string conversion for the original OCaml type
       *)
@@ -119,11 +120,13 @@ module Block = struct
         ; sub_window_densities : Mina_numbers.Length.Stable.V1.t list
         ; ledger_hash : Ledger_hash.Stable.V1.t
         ; height : Unsigned_extended.UInt32.Stable.V1.t
-        ; global_slot_since_hard_fork : Mina_numbers.Global_slot.Stable.V1.t
-        ; global_slot_since_genesis : Mina_numbers.Global_slot.Stable.V1.t
+        ; global_slot_since_hard_fork :
+            Mina_numbers.Global_slot_since_hard_fork.Stable.V1.t
+        ; global_slot_since_genesis :
+            Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         ; timestamp : Block_time.Stable.V1.t
-        ; user_cmds : User_command.Stable.V1.t list
-        ; internal_cmds : Internal_command.Stable.V1.t list
+        ; user_cmds : User_command.Stable.V2.t list
+        ; internal_cmds : Internal_command.Stable.V2.t list
         ; zkapp_cmds : Zkapp_command.Stable.V1.t list
         ; protocol_version : Protocol_version.Stable.V1.t
         ; proposed_protocol_version : Protocol_version.Stable.V1.t option

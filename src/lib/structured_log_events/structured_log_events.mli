@@ -20,6 +20,8 @@ type t = ..
 (** An identifier for a structured log event. *)
 type id [@@deriving equal, yojson, sexp]
 
+module Set : Set.S with type Elt.t = id
+
 (** Create an identifier for a structured log event.
     This is for internal use by the [@@deriving register_event] ppx.
 *)

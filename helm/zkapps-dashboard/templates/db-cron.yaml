@@ -13,8 +13,8 @@ spec:
             template:
                 spec:
                     containers:
-                    - name: postgres-11-alpine
-                      image: postgres:11-alpine
+                    - name: postgres-12-alpine
+                      image: postgres:12-alpine
                       imagePullPolicy: IfNotPresent
                       command:
                       - /bin/bash

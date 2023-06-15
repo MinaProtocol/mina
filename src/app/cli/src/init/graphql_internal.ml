@@ -9,7 +9,7 @@
  * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
  * sell copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
  *
@@ -191,7 +191,7 @@ struct
 
   let make_callback :
          ?auth_keys:Itn_crypto.pubkey list
-      -> (Cohttp.Request.t -> 'ctx)
+      -> (with_seq_no:bool -> Cohttp.Request.t -> 'ctx)
       -> 'ctx Schema.schema
       -> 'conn callback =
    fun ?auth_keys make_context schema _conn (req : Cohttp.Request.t) body ->
@@ -206,7 +206,7 @@ struct
           List.mem "text/html" (String.split_on_char ',' s)
     in
     Io.( >>= ) (Body.to_string body) (fun body_str ->
-        let respond () =
+        let respond with_seq_no =
           (* the Io `bind` above appears to consume the body
              we reconstruct it the body from the extracted string
           *)
@@ -221,65 +221,117 @@ struct
               then
                 let handle_conn =
                   Websocket_transport.handle
-                    (execute_query (make_context req) schema)
+                    (execute_query (make_context ~with_seq_no req) schema)
                 in
                 Io.return (Ws.upgrade_connection req handle_conn)
-              else execute_request schema (make_context req) req body
+              else
+                execute_request schema (make_context ~with_seq_no req) req body
           | `GET, [ "graphql"; path ], _ ->
               static_file_response path
           | `POST, [ "graphql" ], _ ->
-              execute_request schema (make_context req) req body
+              execute_request schema (make_context ~with_seq_no req) req body
           | _ ->
               respond_string ~status:`Not_found ~body:"" ()
         in
         let unauthorized () =
           respond_string ~status:`Unauthorized ~body:"Unauthorized" ()
         in
-        if String.length body_str = 0 then
-          (* the browser interface generates empty strings periodically *)
-          respond ()
-        else
-          match Yojson.Safe.from_string body_str with
-          | `Assoc [ ("query", `String s) ]
-            when Core.String.is_prefix (Core.String.lstrip s)
-                   ~prefix:"query IntrospectionQuery" ->
-              (* the browser interface generates an introspection query on startup *)
-              respond ()
-          | _ -> (
-              (* neither empty string nor introspection query, enforce authorization
-                 if we have keys
-              *)
-              match auth_keys with
-              | None ->
-                  respond ()
-              | Some pks -> (
-                  (* auth_keys is Some iff authentication is required
-                     only caller is `create_graphql_server`, which enforces that invariant
+        let invalid_uuid () =
+          respond_string ~status:`Precondition_failed
+            ~body:"Invalid server Uuid" ()
+        in
+        let invalid_sequence_no () =
+          respond_string ~status:`Precondition_failed
+            ~body:"Invalid sequence number" ()
+        in
+        match auth_keys with
+        | None ->
+            respond false
+        | Some pks -> (
+            (* auth_keys is Some iff authentication is required
+               only caller is `create_graphql_server`, which enforces that invariant
+            *)
+            match Cohttp.Header.get headers "Authorization" with
+            | None ->
+                unauthorized ()
+            | Some auth -> (
+                let open Core in
+                let verify_signature_and_respond ~with_seq_no ~pk ~msg
+                    ~signature =
+                  (* we need to know not only that the pk verifies the
+                     signature, but also that this pk is allowed to verify
+                     the signature; otherwise, the client could sign a
+                     request using an arbitrary pk
                   *)
-                  match Cohttp.Header.get headers "Authorization" with
-                  | None ->
-                      unauthorized ()
-                  | Some auth -> (
-                      let open Core in
-                      match String.split_on_chars auth ~on:[ ' ' ] with
-                      | [ "Signature"; pk_str; signature ] -> (
-                          match Itn_crypto.pubkey_of_base64 pk_str with
-                          | Ok pk ->
-                              (* we need to know not only that the pk verifies the
-                                 signature, but also that this pk is allowed to verify
-                                 the signature; otherwise, the client could sign a
-                                 request using an arbitrary pk
-                              *)
-                              if
-                                List.mem pks pk ~equal:Itn_crypto.equal_pubkeys
-                                && Itn_crypto.verify ~key:pk ~msg:body_str
-                                     signature
-                              then respond ()
-                              else unauthorized ()
-                          | Error _err ->
-                              (* not a base64-encoded key *)
-                              unauthorized () )
-                      | _ ->
-                          (* invalid auth scheme *)
-                          unauthorized () ) ) ) )
+                  if
+                    List.mem pks pk ~equal:Itn_crypto.equal_pubkeys
+                    && Itn_crypto.verify ~key:pk ~msg signature
+                  then (
+                    if with_seq_no then
+                      Mina_graphql.Itn_sequencing.incr_sequence_number pk ;
+                    respond with_seq_no )
+                  else unauthorized ()
+                in
+                match String.split_on_chars auth ~on:[ ' ' ] with
+                | [ "Signature"
+                  ; pk_str
+                  ; signature
+                  ; ";"
+                  ; "Sequencing"
+                  ; uuid_str
+                  ; seq_no_str
+                  ] -> (
+                    let pk_or_error = Itn_crypto.pubkey_of_base64 pk_str in
+                    let uuid_or_error =
+                      try Ok (Uuid.of_string uuid_str)
+                      with Failure err -> Error (Error.of_string err)
+                    in
+                    match (pk_or_error, uuid_or_error) with
+                    | Error _, _ ->
+                        (* not a base64-encoded key *)
+                        unauthorized ()
+                    | _, Error _ ->
+                        (* not a valid Uuid *)
+                        invalid_uuid ()
+                    | Ok pk, Ok uuid -> (
+                        let seq_no_opt =
+                          Mina_graphql.Itn_sequencing.valid_sequence_number uuid
+                            pk seq_no_str
+                        in
+                        match seq_no_opt with
+                        | Some seq_no ->
+                            let seq_no_int = Unsigned.UInt16.to_int seq_no in
+                            let seq_no_lo =
+                              seq_no_int land 255 |> Char.of_int_exn
+                            in
+                            let seq_no_hi =
+                              seq_no_int lsr 8 |> Char.of_int_exn
+                            in
+                            let msg =
+                              sprintf "%c%c%s%s" seq_no_hi seq_no_lo uuid_str
+                                body_str
+                            in
+                            verify_signature_and_respond ~with_seq_no:true ~msg
+                              ~pk ~signature
+                        | _ ->
+                            invalid_sequence_no () ) )
+                | [ "Signature"; pk_str; signature ] -> (
+                    (* can omit sequence information for `auth` query *)
+                    match Itn_crypto.pubkey_of_base64 pk_str with
+                    | Ok pk ->
+                        (* setting state in Mina_graphql is safe, as long as this GraphQL callback
+                           can't be preempted by another call to it
+                        *)
+                        Mina_graphql.Itn_sequencing.set_sequence_number_for_auth
+                          pk ;
+                        (* don't increment sequence no for an auth query *)
+                        let msg = body_str in
+                        verify_signature_and_respond ~with_seq_no:false ~msg ~pk
+                          ~signature
+                    | Error _ ->
+                        (* not a base64-encoded key *)
+                        unauthorized () )
+                | _ ->
+                    (* invalid auth scheme *)
+                    unauthorized () ) ) )
 end

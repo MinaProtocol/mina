@@ -65,6 +65,7 @@
    zkapp_command_builder
    ppx_version.runtime
    mina_wire_types
+   internal_tracing
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

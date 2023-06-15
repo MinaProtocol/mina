@@ -59,6 +59,7 @@ struct GatingConfig {
   trustedIps @2 :List(Text);
   trustedPeerIds @3 :List(PeerId);
   isolate @4 :Bool;
+  cleanAddedPeers @5 :Bool;
 }
 
 struct TopicLevel {

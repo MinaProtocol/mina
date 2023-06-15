@@ -82,6 +82,7 @@
    ppx_version.runtime
    graphql_basic_scalars
    signature_lib_unix
+   internal_tracing
  )
  (preprocessor_deps "../../config.mlh")
  (preprocess

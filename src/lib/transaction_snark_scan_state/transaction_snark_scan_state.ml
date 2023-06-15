@@ -49,7 +49,7 @@ module Transaction_with_witness = struct
             (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
         ; second_pass_ledger_witness :
             (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
-        ; block_global_slot : Mina_numbers.Global_slot.Stable.V1.t
+        ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         }
       [@@deriving sexp, to_yojson]
 
@@ -969,7 +969,6 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
             ; transaction_commitment = t.local_state.transaction_commitment
             ; full_transaction_commitment =
                 t.local_state.full_transaction_commitment
-            ; token_id = t.local_state.token_id
             ; excess = t.local_state.excess
             ; supply_increase = t.local_state.supply_increase
             ; ledger
@@ -1336,7 +1335,7 @@ let all_work_pairs t
 
 let update_metrics t = Parallel_scan.update_metrics t.scan_state
 
-let fill_work_and_enqueue_transactions t transactions work =
+let fill_work_and_enqueue_transactions t ~logger transactions work =
   let open Or_error.Let_syntax in
   let fill_in_transaction_snark_work tree (works : Transaction_snark_work.t list)
       : (Ledger_proof.t * Sok_message.t) list Or_error.t =
@@ -1363,6 +1362,13 @@ let fill_work_and_enqueue_transactions t transactions work =
     Parallel_scan.update t.scan_state ~completed_jobs:work_list
       ~data:transactions
   in
+  [%log internal] "@metadata"
+    ~metadata:
+      [ ("scan_state_added_works", `Int (List.length work))
+      ; ("total_proofs", `Int (total_proofs work))
+      ; ("merge_jobs_created", `Int (List.length work_list))
+      ; ("emitted_proof", `Bool (Option.is_some proof_opt))
+      ] ;
   let%map result_opt, scan_state' =
     Option.value_map
       ~default:

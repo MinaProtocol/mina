@@ -113,21 +113,6 @@ build_intgtest: ocaml_checks
 	dune build --profile=$(DUNE_PROFILE) src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
 	$(info Build complete)
 
-client_sdk: ocaml_checks
-	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/client_sdk/client_sdk.bc.js
-	$(info Build complete)
-
-client_sdk_test_sigs: ocaml_checks
-	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/client_sdk/tests/test_signatures.exe --profile=mainnet
-	$(info Build complete)
-
-client_sdk_test_sigs_nonconsensus: ocaml_checks
-	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/client_sdk/tests/test_signatures_nonconsensus.exe --profile=nonconsensus_mainnet
-	$(info Build complete)
-
 snarkyjs: ocaml_checks
 	$(info Starting Build)
 	((ulimit -s 65532) || true) && (ulimit -n 10240 || true) \
@@ -186,7 +171,17 @@ genesis_ledger_from_tsv: ocaml_checks
 
 swap_bad_balances: ocaml_checks
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/swap_bad_balances/swap_bad_balances.exe --profile=testnet_postake_medium_curves
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/swap_bad_balances/swap_bad_balances.exe --profile=testnet_postake_medium_curves
+	$(info Build complete)
+
+heap_usage: ocaml_checks
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/heap_usage/heap_usage.exe --profile=devnet
+	$(info Build complete)
+
+zkapp_limits: ocaml_checks
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/zkapp_limits/zkapp_limits.exe --profile=devnet
 	$(info Build complete)
 
 dev: build
@@ -220,7 +215,7 @@ check-snarky-submodule:
 #######################################
 ## Environment setup
 
-macos-setup-download:
+macos-setup:
 	./scripts/macos-setup-brew.sh
 
 ########################################
@@ -337,4 +332,4 @@ ml-docs: ocaml_checks
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
 
-.PHONY: all build check-format clean client_sdk client_sdk_test_sigs deb dev mina-docker reformat doc_diagrams ml-docs macos-setup macos-setup-download setup-opam libp2p_helper dhall_types replayer missing_blocks_auditor extract_blocks archive_blocks genesis_ledger_from_tsv ocaml_version ocaml_word_size ocaml_checks
+.PHONY: all build check-format clean deb dev mina-docker reformat doc_diagrams ml-docs macos-setup setup-opam libp2p_helper dhall_types replayer missing_blocks_auditor extract_blocks archive_blocks genesis_ledger_from_tsv ocaml_version ocaml_word_size ocaml_checks

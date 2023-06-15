@@ -157,7 +157,7 @@ module Vrf = struct
          threshold_met = true in the JSON output), or to generate a witness \
          that a 3rd account_update can use to verify a vrf evaluation."
       (let open Command.Let_syntax in
-      let%map_open privkey_path = Flag.privkey_write_path
+      let%map_open privkey_path = Flag.privkey_read_path
       and global_slot =
         flag "--global-slot" ~doc:"NUM Global slot to evaluate the VRF for"
           (required int)
@@ -204,7 +204,8 @@ module Vrf = struct
             let open Consensus_vrf.Layout in
             let evaluation =
               Evaluation.of_message_and_sk ~constraint_constants
-                { global_slot = Mina_numbers.Global_slot.of_int global_slot
+                { global_slot =
+                    Mina_numbers.Global_slot_since_hard_fork.of_int global_slot
                 ; epoch_seed =
                     Mina_base.Epoch_seed.of_base58_check_exn epoch_seed
                 ; delegator_index
@@ -249,7 +250,7 @@ module Vrf = struct
          \"epochSeed\": _, \"delegatorIndex\": _} JSON message objects read on \
          stdin"
       (let open Command.Let_syntax in
-      let%map_open privkey_path = Flag.privkey_write_path in
+      let%map_open privkey_path = Flag.privkey_read_path in
       Exceptions.handle_nicely
       @@ fun () ->
       let env = Secrets.Keypair.env in

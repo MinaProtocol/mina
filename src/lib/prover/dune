@@ -30,7 +30,10 @@
    mina_block
    mina_state
    mina_base
+   mina_compile_config
    logger
+   itn_logger
+   internal_tracing
    genesis_constants
    ledger_proof
    consensus

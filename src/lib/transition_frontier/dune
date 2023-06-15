@@ -50,6 +50,7 @@
    quickcheck_lib
    protocol_version
    mina_net2
+   internal_tracing
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_mina ppx_version ppx_compare ppx_deriving_yojson)))

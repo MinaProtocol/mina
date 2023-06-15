@@ -62,6 +62,7 @@
    merkle_ledger
    mina_base.util
    ppx_version.runtime
+   logger
  )
  (preprocess
   (pps ppx_snarky ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))

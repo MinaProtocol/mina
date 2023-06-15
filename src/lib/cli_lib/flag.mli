@@ -60,8 +60,6 @@ module Port : sig
     val rest_server : int Types.with_name_and_displayed_default Command.Param.t
 
     val limited_graphql_server : int option Types.with_name Command.Param.t
-
-    val itn_graphql_server : int option Types.with_name Command.Param.t
   end
 
   module Archive : sig
@@ -75,6 +73,8 @@ module Log : sig
   val level : Logger.Level.t Command.Param.t
 
   val file_log_level : Logger.Level.t Command.Param.t
+
+  val file_log_rotations : int Command.Param.t
 end
 
 type signed_command_common =
@@ -95,7 +95,8 @@ module Signed_command : sig
 
   val fee : Currency.Fee.t option Command.Param.t
 
-  val valid_until : Mina_numbers.Global_slot.t option Command.Param.t
+  val valid_until :
+    Mina_numbers.Global_slot_since_genesis.t option Command.Param.t
 
   val nonce : Mina_numbers.Account_nonce.t option Command.Param.t
 
