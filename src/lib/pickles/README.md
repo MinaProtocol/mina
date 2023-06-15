@@ -93,3 +93,8 @@ Some public videos you can find on YouTube describing the intial idea behind
 Pickles. It might be outdated if the IOP is changed.
 - [zkStudyClub: Izaak Meckler o1Labs - Pickles ](https://www.youtube.com/watch?v=kmCXdjv5oP0)
 - [ZK-GLOBAL 0x05 - Izaak Meckler - Meet Pickles SNARK ](https://www.youtube.com/watch?v=nOnGOxyh7jY)
+
+## List of improvements
+
+- Bulletproof is still mentioned even though it is a reliqa of Marlin. It should
+  be changed to Ipa (Inner Product Argument)
