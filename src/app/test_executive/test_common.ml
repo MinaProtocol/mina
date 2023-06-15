@@ -27,8 +27,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       else
         let%bind hash =
           let%map { hash; nonce; _ } =
-            Engine.Network.Node.must_send_payment ~logger ~sender_pub_key
-              ~receiver_pub_key ~amount ~fee node
+            Integration_test_lib.Graphql_requests.must_send_payment ~logger
+              ~sender_pub_key ~receiver_pub_key ~amount ~fee
+              (Engine.Network.Node.get_ingress_uri node)
           in
           [%log info]
             "sending multiple payments: payment #%d sent with hash of %s and \
@@ -128,7 +129,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let fetch_connectivity_data ~logger nodes =
     let open Malleable_error.Let_syntax in
     Malleable_error.List.map nodes ~f:(fun node ->
-        let%map response = Engine.Network.Node.must_get_peer_id ~logger node in
+        let%map response =
+          Integration_test_lib.Graphql_requests.must_get_peer_id ~logger
+            (Engine.Network.Node.get_ingress_uri node)
+        in
         (node, response) )
 
   let assert_peers_completely_connected nodes_and_responses =

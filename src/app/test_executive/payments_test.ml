@@ -78,7 +78,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     }
 
   let run network t =
-    let open Network in
+    (* let open Network in *)
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_nodes = Network.all_nodes network in
@@ -150,7 +150,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
     in
     let%bind { nonce = sender_current_nonce; _ } =
-      Network.Node.must_get_account_data ~logger untimed_node_b
+      Integration_test_lib.Graphql_requests.must_get_account_data ~logger
+        (Network.Node.get_ingress_uri untimed_node_b)
         ~public_key:sender_pub_key
     in
     let user_command_input =
@@ -188,7 +189,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () =
       section "send a single signed payment between 2 fish accounts"
         (let%bind { hash; _ } =
-           Network.Node.must_send_payment_with_raw_sig untimed_node_b ~logger
+           Integration_test_lib.Graphql_requests.must_send_payment_with_raw_sig
+             (Network.Node.get_ingress_uri untimed_node_b)
+             ~logger
              ~sender_pub_key:
                (Signed_command_payload.Body.source_pk signed_cmmd.payload.body)
              ~receiver_pub_key:
@@ -215,11 +218,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "check that the account balances are what we expect after the previous \
          txn"
         (let%bind { total_balance = receiver_balance; _ } =
-           Network.Node.must_get_account_data ~logger untimed_node_b
+           Integration_test_lib.Graphql_requests.must_get_account_data ~logger
+             (Network.Node.get_ingress_uri untimed_node_b)
              ~public_key:receiver_pub_key
          in
          let%bind { total_balance = sender_balance; _ } =
-           Network.Node.must_get_account_data ~logger untimed_node_b
+           Integration_test_lib.Graphql_requests.must_get_account_data ~logger
+             (Network.Node.get_ingress_uri untimed_node_b)
              ~public_key:sender_pub_key
          in
          (* TODO, the intg test framework is ignoring test_constants.coinbase_amount for whatever reason, so hardcoding this until that is fixed *)
@@ -278,7 +283,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          to conduct a replay attack. expecting a bad nonce"
         (let open Deferred.Let_syntax in
         match%bind
-          Network.Node.send_payment_with_raw_sig untimed_node_b ~logger
+          Integration_test_lib.Graphql_requests.send_payment_with_raw_sig
+            (Network.Node.get_ingress_uri untimed_node_b)
+            ~logger
             ~sender_pub_key:
               (Signed_command_payload.Body.source_pk signed_cmmd.payload.body)
             ~receiver_pub_key:
@@ -326,7 +333,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          Invalid_signature"
         (let open Deferred.Let_syntax in
         match%bind
-          Network.Node.send_payment_with_raw_sig untimed_node_a ~logger
+          Integration_test_lib.Graphql_requests.send_payment_with_raw_sig
+            (Network.Node.get_ingress_uri untimed_node_a)
+            ~logger
             ~sender_pub_key:
               (Signed_command_payload.Body.source_pk signed_cmmd.payload.body)
             ~receiver_pub_key:
@@ -375,8 +384,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let sender = timed_node_c in
          let%bind sender_pub_key = pub_key_of_node sender in
          let%bind { hash; _ } =
-           Network.Node.must_send_payment ~logger timed_node_c ~sender_pub_key
-             ~receiver_pub_key ~amount ~fee
+           Integration_test_lib.Graphql_requests.must_send_payment ~logger
+             (Network.Node.get_ingress_uri timed_node_c)
+             ~sender_pub_key ~receiver_pub_key ~amount ~fee
          in
          wait_for t
            (Wait_condition.signed_command_to_be_included_in_frontier
@@ -390,7 +400,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let sender = timed_node_c in
          let%bind sender_pub_key = pub_key_of_node sender in
          let%bind { total_balance = timed_node_c_total; _ } =
-           Network.Node.must_get_account_data ~logger timed_node_c
+           Integration_test_lib.Graphql_requests.must_get_account_data ~logger
+             (Network.Node.get_ingress_uri timed_node_c)
              ~public_key:sender_pub_key
          in
          [%log info] "timed_node_c total balance: %s"
@@ -402,8 +413,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          (* TODO: refactor this using new [expect] dsl when it's available *)
          let open Deferred.Let_syntax in
          match%bind
-           Node.send_payment ~logger sender ~sender_pub_key ~receiver_pub_key
-             ~amount ~fee
+           Integration_test_lib.Graphql_requests.send_payment ~logger
+             (Network.Node.get_ingress_uri sender)
+             ~sender_pub_key ~receiver_pub_key ~amount ~fee
          with
          | Ok _ ->
              Malleable_error.soft_error_string ~value:()
@@ -460,13 +472,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "check account balances.  snark-node-key1 should be greater than or \
          equal to the snark fee"
         (let%bind { total_balance = key_1_balance_actual; _ } =
-           Network.Node.must_get_account_data ~logger untimed_node_b
+           Integration_test_lib.Graphql_requests.must_get_account_data ~logger
+             (Network.Node.get_ingress_uri untimed_node_b)
              ~public_key:
                ( snark_node_key1.keypair.public_key
                |> Signature_lib.Public_key.compress )
          in
          let%bind { total_balance = key_2_balance_actual; _ } =
-           Network.Node.must_get_account_data ~logger untimed_node_a
+           Integration_test_lib.Graphql_requests.must_get_account_data ~logger
+             (Network.Node.get_ingress_uri untimed_node_a)
              ~public_key:
                ( snark_node_key2.keypair.public_key
                |> Signature_lib.Public_key.compress )
@@ -503,7 +517,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard
         "change snark worker key from snark-node-key1 to snark-node-key2"
         (let%bind () =
-           Network.Node.must_set_snark_worker ~logger snark_coordinator
+           Integration_test_lib.Graphql_requests.must_set_snark_worker ~logger
+             (Network.Node.get_ingress_uri snark_coordinator)
              ~new_snark_pub_key:
                ( snark_node_key2.keypair.public_key
                |> Signature_lib.Public_key.compress )
@@ -532,13 +547,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "check account balances.  snark-node-key2 should be greater than or \
          equal to the snark fee"
         (let%bind { total_balance = key_1_balance_actual; _ } =
-           Network.Node.must_get_account_data ~logger untimed_node_b
+           Integration_test_lib.Graphql_requests.must_get_account_data ~logger
+             (Network.Node.get_ingress_uri untimed_node_b)
              ~public_key:
                ( snark_node_key1.keypair.public_key
                |> Signature_lib.Public_key.compress )
          in
          let%bind { total_balance = key_2_balance_actual; _ } =
-           Network.Node.must_get_account_data ~logger untimed_node_a
+           Integration_test_lib.Graphql_requests.must_get_account_data ~logger
+             (Network.Node.get_ingress_uri untimed_node_a)
              ~public_key:
                ( snark_node_key2.keypair.public_key
                |> Signature_lib.Public_key.compress )
