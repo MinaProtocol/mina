@@ -2,6 +2,7 @@ module Limbs = Pickles_types.Nat.N4
 
 type nat4 := Limbs.n
 
+(** Alias for fixed typed-size vector of size 4 *)
 type 'a v := ('a, nat4) Pickles_types.Vector.vec
 
 type vector := int64 v
