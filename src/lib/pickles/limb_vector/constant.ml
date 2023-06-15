@@ -65,7 +65,7 @@ module Hex64 = struct
   end]
 end
 
-module Make (N : Vector.Nat_intf) = struct
+module Make (N : Pickles_types.Nat.Intf) = struct
   module A = Vector.With_length (N)
 
   let length = 64 * Nat.to_int N.n

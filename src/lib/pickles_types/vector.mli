@@ -1,7 +1,12 @@
-(** Vectors for Pickles *)
+(** Typed size vectors for Pickles. The size of the vector is encoded at the
+    type level.
+    The module also provides common methods available for standard list ['a
+    list] like [map], [iter], etc.
+*)
 
 (** {1 Types} *)
 
+(** Encode a vector at the type level with its size *)
 module T : sig
   type ('a, _) t =
     | [] : ('a, Nat.z) t
@@ -12,10 +17,15 @@ type ('a, 'b) t = ('a, 'b) T.t =
   | [] : ('a, Nat.z) t
   | ( :: ) : 'a * ('a, 'n) t -> ('a, 'n Nat.s) t
 
+(** Simple alias for the type [t] *)
 type ('a, 'n) vec = ('a, 'n) t
 
+(** A value of type ['a e] forgets the size of the vector and contains only the
+    elements of the list. It can be seen as an alias to ['a list] *)
 type _ e = T : ('a, 'n) t -> 'a e
 
+(** ['a L.t] is nothing more than an alias to ['a list]. No type level encoding
+    of the size is provided. It only transports the runtime data. *)
 module L : sig
   type 'a t = 'a list [@@deriving yojson]
 end
@@ -23,8 +33,6 @@ end
 (** {1 Modules} *)
 
 (** {2 Module types} *)
-
-module type Nat_intf = Nat.Intf
 
 module type S = sig
   type 'a t [@@deriving compare, yojson, sexp, hash, equal]
@@ -36,6 +44,7 @@ module type S = sig
   val to_list : 'a t -> 'a list
 end
 
+(** Main module type to encode a typed size vector *)
 module type VECTOR = sig
   type 'a t
 
@@ -81,28 +90,42 @@ module Vector_16 : VECTOR with type 'a t = ('a, Nat.N16.n) vec
 (** Vector of size 8 *)
 module Vector_8 : VECTOR with type 'a t = ('a, Nat.N8.n) vec
 
+(** Vector of size 7 *)
 module Vector_7 : VECTOR with type 'a t = ('a, Nat.N7.n) vec
 
+(** Vector of size 6 *)
 module Vector_6 : VECTOR with type 'a t = ('a, Nat.N6.n) vec
 
+(** Vector of size 5 *)
 module Vector_5 : VECTOR with type 'a t = ('a, Nat.N5.n) vec
 
+(** Vector of size 4 *)
 module Vector_4 : VECTOR with type 'a t = ('a, Nat.N4.n) vec
 
+(** Vector of size 2 *)
 module Vector_2 : VECTOR with type 'a t = ('a, Nat.N2.n) vec
 
-module With_length (N : Nat_intf) : S with type 'a t = ('a, N.n) vec
+(** Functor to build any vector of size [N]. The parameters of the functor is a
+    natural encoded at the type level. For instance, {!Vector_2} could be seen
+    as the output of [With_length (Nat.N2)]
+*)
+module With_length (N : Nat.Intf) : S with type 'a t = ('a, N.n) vec
 
-(** {1 Functions} *)
+(** {1 Snarky related functions } *)
 
+(** [typ v t_n] builds a Snarky type of length [t_n] and set the contents of
+    each cell to [v] *)
 val typ :
      ('a, 'b, 'c) Snarky_backendless.Typ.t
   -> 'd Nat.nat
   -> (('a, 'd) vec, ('b, 'd) vec, 'c) Snarky_backendless.Typ.t
 
+(** Builds a Snarky type from a type [('a, 'n) t]*)
 val typ' :
      (('var, 'value, 'f) Snarky_backendless.Typ.t, 'n) t
   -> (('var, 'n) t, ('value, 'n) t, 'f) Snarky_backendless.Typ.t
+
+(** {1 Common interface of vectors } *)
 
 val of_list : 'a list -> 'a e
 

@@ -17,7 +17,7 @@ module Hex64 : sig
   end
 end
 
-module Make (N : Pickles_types.Vector.Nat_intf) : sig
+module Make (N : Pickles_types.Nat.Intf) : sig
   module A : module type of Pickles_types.Vector.With_length (N)
 
   val length : int
