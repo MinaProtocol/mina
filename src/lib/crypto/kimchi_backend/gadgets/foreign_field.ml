@@ -565,23 +565,6 @@ end
 
 (* Common auxiliary functions for foreign field gadgets *)
 
-(* TODO: Implement hash function output (e.g. keccak) to ecdsa input integration code *)
-(* Gadget to constrain conversion of bytes array into foreign field element *)
-let _bytes_to_foreign_field_element (type f)
-    (module Circuit : Snark_intf.Run with type field = f) _bytes
-    (_foreign_field_modulus : f standard_limbs) =
-  (* C1: Check bit length of bytes = bit length of foreign field modulus *)
-  (* C2: Constrain bytes into standard foreign field element limbs => foreign field element z *)
-  (* C3: Reduce z modulo foreign_field_modulus
-   *
-   *   Constrain z' = z + 0 modulo foreign_field_modulus using foreign field addition gate
-   *
-   *   Note: this is sufficient because z cannot be double the size due to bit length constraint
-   *)
-  (* C4: Range check z' *)
-  (* return z' *)
-  ()
-
 (* Check that the foreign modulus is less than the maximum allowed *)
 let check_modulus_bignum_bigint (type f)
     (module Circuit : Snark_intf.Run with type field = f)
@@ -1862,13 +1845,13 @@ let%test_unit "foreign_field arithmetics gadgets" =
         "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
     in
     let secp256k1_max = Bignum_bigint.(secp256k1_modulus - Bignum_bigint.one) in
-    let secp256k1_sqrt = Common.bignum_biguint_sqrt secp256k1_max in
+    let secp256k1_sqrt = Common.bignum_bigint_sqrt secp256k1_max in
     let pallas_modulus =
       Common.bignum_bigint_of_hex
         "40000000000000000000000000000000224698fc094cf91b992d30ed00000001"
     in
     let pallas_max = Bignum_bigint.(pallas_modulus - Bignum_bigint.one) in
-    let pallas_sqrt = Common.bignum_biguint_sqrt pallas_max in
+    let pallas_sqrt = Common.bignum_bigint_sqrt pallas_max in
     let vesta_modulus =
       Common.bignum_bigint_of_hex
         "40000000000000000000000000000000224698fc0994a8dd8c46eb2100000001"

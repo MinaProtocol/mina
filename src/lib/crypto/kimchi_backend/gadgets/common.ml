@@ -54,11 +54,11 @@ let cvar_field_to_field_as_prover (type f)
     (field_element : Circuit.Field.t) : f =
   Circuit.As_prover.read Circuit.Field.typ field_element
 
-(* Convert cvar boolean element (i.e. Boolean.t) to field *)
+(* Convert cvar bool element (i.e. Boolean.t) to field *)
 let cvar_bool_to_bool_as_prover (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (bool : Circuit.Boolean.var) : bool =
-  Circuit.As_prover.read Circuit.Boolean.typ bool
+    (b : Circuit.Boolean.var) : bool =
+  Circuit.As_prover.read Circuit.Boolean.typ b
 
 (* Combines bits of two cvars with a given boolean function and returns the resulting field element *)
 let cvar_field_bits_combine_as_prover (type f)
@@ -170,8 +170,8 @@ let bignum_bigint_unpack_bytes (bignum : Bignum_bigint.t) : string =
 (* Bignum_bigint to bool list *)
 let bignum_bigint_unpack ?(remove_trailing = false) (bignum : Bignum_bigint.t) :
     bool list =
-  (* Helper to remove trailing false *)
-  let remove_trailing_false (lst : bool list) =
+  (* Helper to remove trailing false values *)
+  let remove_trailing_false_values (lst : bool list) =
     let rev = List.rev lst in
     let rec remove_leading_false_rec lst =
       match lst with
@@ -183,18 +183,18 @@ let bignum_bigint_unpack ?(remove_trailing = false) (bignum : Bignum_bigint.t) :
     List.rev @@ remove_leading_false_rec rev
   in
 
-  (* Convert biguint to bitstring *)
-  let bitstr = Z.to_bits @@ Bignum_bigint.to_zarith_bigint bignum in
-  (* Convert bitstring to list of bool *)
+  (* Convert Bignum_bigint to bitstring *)
+  let bytestr = bignum_bigint_unpack_bytes bignum in
+  (* Convert bytestring to list of bool *)
   let bits =
     List.init
-      (8 * String.length bitstr)
+      (8 * String.length bytestr)
       ~f:(fun i ->
-        let c = Char.to_int bitstr.[i / 8] in
+        let c = Char.to_int bytestr.[i / 8] in
         let j = i mod 8 in
         if Int.((c lsr j) land 1 = 1) then true else false )
   in
-  if remove_trailing then remove_trailing_false bits else bits
+  if remove_trailing then remove_trailing_false_values bits else bits
 
 let bignum_bigint_unpack_as (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -202,8 +202,6 @@ let bignum_bigint_unpack_as (type f)
     (typ : (Circuit.Boolean.var, bool) Circuit.Typ.t) : Circuit.Boolean.var list
     =
   let open Circuit in
-  (* printf "scalar = %s\n" @@ Bignum_bigint.to_string bignum ;
-     printf "length = %d\n" @@ bignum_bigint_bit_length bignum ; *)
   exists
     (Typ.list ~length:(bignum_bigint_bit_length bignum) typ)
     ~compute:(fun () -> bignum_bigint_unpack ~remove_trailing bignum)
@@ -224,15 +222,15 @@ let bignum_bigint_unpack_as_unchecked_vars (type f)
     (module Circuit)
     ~remove_trailing bignum Circuit.Boolean.typ_unchecked
 
-(* Bignum_bigint to constatnts Boolean.var list (without creating boolean constraints) *)
+(* Bignum_bigint to constants Boolean.var list (without creating boolean constraints) *)
 let bignum_bigint_unpack_as_unchecked_consts (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     ?(remove_trailing = false) (bignum : Bignum_bigint.t) :
     Circuit.Boolean.var list =
   let open Circuit in
-  (* TODO: Change to  Boolean.var_of_value bool   .... Boolean.var_of_t *)
-  List.map (bignum_bigint_unpack ~remove_trailing bignum) ~f:(fun bool ->
-      if bool then Boolean.true_ else Boolean.false_ )
+  List.map
+    (bignum_bigint_unpack ~remove_trailing bignum)
+    ~f:Boolean.var_of_value
 
 (* Bignum_bigint to hex *)
 let bignum_bigint_to_hex (bignum : Bignum_bigint.t) : string =
@@ -305,7 +303,7 @@ let bignum_bigint_sqrt_mod (x : Bignum_bigint.t) (modulus : Bignum_bigint.t) :
           in
           let i = find_least_i t zero in
 
-          (* b <- c^{2^{M - i}} *)
+          (* b <- c^{2^{M - i - 1}} *)
           let b = pow_mod c (pow_mod two (m - i - one)) in
           (* M <- i *)
           let m = i in
@@ -324,15 +322,15 @@ let bignum_bigint_sqrt_mod (x : Bignum_bigint.t) (modulus : Bignum_bigint.t) :
       let m = s in
       (* c <- Z^Q *)
       let c = pow_mod z q in
-      (* t <- x^Q *)
-      let t = pow_mod x ((q + one) / two) in
       (* R <- n^{(Q + 1)/2} *)
+      let t = pow_mod x ((q + one) / two) in
+      (* t <- x^Q *)
       let r = pow_mod x q in
 
       Bignum_bigint.of_zarith_bigint @@ loop m c t r
 
 (* Compute square root of Bignum_bigint value x *)
-let bignum_biguint_sqrt (x : Bignum_bigint.t) : Bignum_bigint.t =
+let bignum_bigint_sqrt (x : Bignum_bigint.t) : Bignum_bigint.t =
   Bignum_bigint.of_zarith_bigint @@ Z.sqrt @@ Bignum_bigint.to_zarith_bigint x
 
 (* Compute the inverse of Bignum_bigint value x with modulus *)

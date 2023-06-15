@@ -80,9 +80,9 @@ let double_bignum_point (curve : t) (point : Affine.bignum_point) :
       (* Computes s' = (3 * Px^2  + a )/ 2 * Py *)
       let numerator =
         let point_x_squared = pow point_x (of_int 2) % curve.modulus in
-        let point_x3_squared = of_int 3 * point_x_squared % curve.modulus in
+        let point_3x_squared = of_int 3 * point_x_squared % curve.modulus in
 
-        (point_x3_squared + curve.a) % curve.modulus
+        (point_3x_squared + curve.a) % curve.modulus
       in
       let denominator = of_int 2 * point_y % curve.modulus in
 

@@ -161,7 +161,7 @@ let signature_scalar_check (type f)
  *     Multi-range-checks:    40
  *     Compact-range-checks:  40
  *     Total range-checks:   180
-
+ *
  *   Scalar field external checks: (per crumb, not counting inputs and output)
  *     Bound checks:          5
  *     Multi-range-checks:    3
@@ -952,6 +952,7 @@ let%test_unit "Ecdsa.secp256k1_verify_tiny_full" =
     (* Tiny secp256k1 signature test: results in 2-bit u1 and u2 scalars
      * Extracted with k = 1 -> secret key = 57896044618658097711785492504343953926418782139537452191302581570759080747168 *)
     let pubkey =
+      (* secret key d = (s - z)/r *)
       ( Bignum_bigint.of_string
           "86918276961810349294276103416548851884759982251107"
       , Bignum_bigint.of_string

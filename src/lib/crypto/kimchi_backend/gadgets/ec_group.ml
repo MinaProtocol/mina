@@ -687,6 +687,11 @@ let compute_ia_points ?(point : Affine.bignum_point option)
     let y2 = Bignum_bigint.((x3ax + curve.b) % curve.modulus) in
     let y = Common.bignum_bigint_sqrt_mod y2 curve.modulus in
 
+    (* Sanity check *)
+    ( if Bignum_bigint.(not (equal y zero)) then
+      let y2_computed = Bignum_bigint.(y * y % curve.modulus) in
+      assert (Bignum_bigint.(y2_computed = y2)) ) ;
+
     (* Return possibly valid curve point *)
     (x, y)
   in

@@ -59,6 +59,7 @@ let equal_as_prover (type field)
     equal_as_prover (module Circuit) left_x right_x
     && equal_as_prover (module Circuit) left_y right_y)
 
+(* Create constraints to assert equivalence between two affine points *)
 let assert_equal (type field)
     (module Circuit : Snark_intf.Run with type field = field) (left : field t)
     (right : field t) : unit =
