@@ -67,13 +67,14 @@ data:
       "isVanilla": {{ $.Values.isVanilla | default "false" }},
       "globalConfig": {
         "features": {
-          "dashboard": ["nodes"],
+          "dashboard": ["nodes", "topology"],
           "explorer": ["blocks", "transactions", "snark-pool", "scan-state", "snark-traces"],
           "resources": ["system"],
           "network": ["messages", "connections", "blocks", "blocks-ipc"],
           "tracing": ["overview", "blocks"],
           "benchmarks": ["wallets"],
-          "web-node": ["wallet", "peers", "logs", "state"]
+          "web-node": ["wallet", "peers", "logs", "state"],
+          "snark-worker": ["actions"]
         }
       },
       "configs": [
