@@ -1,6 +1,6 @@
 module T
     (Impl : Snarky_backendless.Snark_intf.Run)
-    (N : Pickles_types.Vector.Nat_intf) : sig
+    (N : Pickles_types.Nat.Intf) : sig
   type t = Impl.Field.t
 
   val length : int
