@@ -12,12 +12,13 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
-let buildTestCmd : Text -> Text -> Natural -> Size -> Command.Type = \(profile : Text) -> \(path : Text) -> \(trials : Natural) -> \(cmd_target : Size) ->
-  let trials = Natural/show trials in
+let buildTestCmd : Text -> Text -> Natural -> Natural -> Size -> Command.Type = \(profile : Text) -> \(path : Text) -> \(timeout : Natural) -> \(individual_test_timeout : Natural) -> \(cmd_target : Size) ->
+  let timeout = Natural/show timeout in
+  let individual_test_timeout = Natural/show individual_test_timeout in
   Command.build
     Command.Config::{
       commands = RunInToolchain.runInToolchain ([] : List Text)
-        "buildkite/scripts/fuzzy-zkapp-test.sh ${profile} ${path} ${trials}",
+        "buildkite/scripts/fuzzy-zkapp-test.sh ${profile} ${path} ${timeout} ${individual_test_timeout}",
       label = "Fuzzy zkapp unit tests",
       key = "fuzzy-zkapp-unit-test-${profile}",
       target = cmd_target,
@@ -45,6 +46,6 @@ Pipeline.build
         name = "FuzzyZkappTest"
       },
     steps = [
-      buildTestCmd "dev" "src/lib/transaction_snark/test/zkapp_fuzzy/zkapp_fuzzy.exe" 20 Size.Small
+      buildTestCmd "dev" "src/lib/transaction_snark/test/zkapp_fuzzy/zkapp_fuzzy.exe" 3600 120 Size.Small
     ]
   }
