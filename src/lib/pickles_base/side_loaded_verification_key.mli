@@ -1,4 +1,4 @@
-(* Module Side_loaded_verification_key *)
+(* Module Side_loaded_verification_key. On chain verification key *)
 
 module Poly : sig
   module Stable : sig
