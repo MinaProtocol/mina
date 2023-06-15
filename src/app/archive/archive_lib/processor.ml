@@ -1465,8 +1465,7 @@ module Block = struct
                 (* This is the only place we adjust the nonce_map -- we want to modify the public key associated with the fee_payer for this user-command to increment its nonce.
                    Note: Intentionally shadowing `nonce_map` here as we want to pass the updated map. *)
                 let nonce_map =
-                  Signature_lib.Public_key.Compressed.Map.change
-                    initial_nonce_map
+                  Signature_lib.Public_key.Compressed.Map.change nonce_map
                     ( Mina_base.User_command.fee_payer command
                     |> Account_id.public_key )
                     ~f:(fun _ ->
