@@ -383,6 +383,10 @@ if ${ARCHIVE}; then
   echo "================================"
   printf "\n"
 
+  if ${RESET}; then
+    recreate-schema
+  fi
+
   psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT}/${PG_DB} -c "SELECT * FROM user_commands;" &>/dev/null
 
   ARCHIVE_ADDRESS_CLI_ARG="-archive-address ${ARCHIVE_SERVER_PORT}"

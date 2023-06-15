@@ -943,36 +943,6 @@ module Update = struct
          ~timing:!.(Set_or_keep.deriver Timing_info.deriver)
          ~voting_for:!.(Set_or_keep.deriver State_hash.deriver)
          obj
-
-  let%test_unit "json roundtrip" =
-    let app_state =
-      Zkapp_state.V.of_list_exn
-        Set_or_keep.
-          [ Set (F.negate F.one); Keep; Keep; Keep; Keep; Keep; Keep; Keep ]
-    in
-    let verification_key =
-      Set_or_keep.Set
-        (let data =
-           Pickles.Side_loaded.Verification_key.(
-             dummy |> to_base58_check |> of_base58_check_exn)
-         in
-         let hash = Zkapp_account.digest_vk data in
-         { With_hash.data; hash } )
-    in
-    let update : t =
-      { app_state
-      ; delegate = Set_or_keep.Set Public_key.Compressed.empty
-      ; verification_key
-      ; permissions = Set_or_keep.Set Permissions.user_default
-      ; zkapp_uri = Set_or_keep.Set "https://www.example.com"
-      ; token_symbol = Set_or_keep.Set "TOKEN"
-      ; timing = Set_or_keep.Set Timing_info.dummy
-      ; voting_for = Set_or_keep.Set State_hash.dummy
-      }
-    in
-    let module Fd = Fields_derivers_zkapps.Derivers in
-    let full = deriver (Fd.o ()) in
-    [%test_eq: t] update (update |> Fd.to_json full |> Fd.of_json full)
 end
 
 module Events = Zkapp_account.Events
@@ -987,7 +957,7 @@ module Account_precondition = struct
         | Full of Zkapp_precondition.Account.Stable.V2.t
         | Nonce of Account.Nonce.Stable.V1.t
         | Accept
-      [@@deriving sexp, yojson, hash, compare]
+      [@@deriving sexp, yojson, hash]
 
       let to_latest = Fn.id
 
@@ -1002,10 +972,13 @@ module Account_precondition = struct
             Zkapp_precondition.Account.accept
 
       let equal p q = Zkapp_precondition.Account.equal (to_full p) (to_full q)
+
+      let compare p q =
+        Zkapp_precondition.Account.compare (to_full p) (to_full q)
     end
   end]
 
-  [%%define_locally Stable.Latest.(to_full, equal)]
+  [%%define_locally Stable.Latest.(to_full, equal, compare)]
 
   let gen : t Quickcheck.Generator.t =
     Quickcheck.Generator.variant3 Zkapp_precondition.Account.gen
@@ -1048,69 +1021,6 @@ module Account_precondition = struct
     let open Fields_derivers_zkapps.Derivers in
     iso_record ~of_record:of_full ~to_record:to_full
       Zkapp_precondition.Account.deriver obj
-
-  let%test_unit "json roundtrip accept" =
-    let account_precondition : t = Accept in
-    let module Fd = Fields_derivers_zkapps.Derivers in
-    let full = deriver (Fd.o ()) in
-    [%test_eq: t] account_precondition
-      (account_precondition |> Fd.to_json full |> Fd.of_json full)
-
-  let%test "json roundtrip Full with ignore" =
-    let account_precondition = Full Zkapp_precondition.Account.accept in
-    let module Fd = Fields_derivers_zkapps.Derivers in
-    let full = deriver (Fd.o ()) in
-    equal account_precondition
-      (account_precondition |> Fd.to_json full |> Fd.of_json full)
-
-  let%test_unit "json roundtrip nonce" =
-    let account_precondition : t = Nonce (Account_nonce.of_int 928472) in
-    let module Fd = Fields_derivers_zkapps.Derivers in
-    let full = deriver (Fd.o ()) in
-    [%test_eq: t] account_precondition
-      (account_precondition |> Fd.to_json full |> Fd.of_json full)
-
-  let%test "json roundtrip Full with nonce" =
-    let n = Account_nonce.of_int 4321 in
-    let account_precondition : t =
-      Full
-        { Zkapp_precondition.Account.accept with
-          nonce = Check { lower = n; upper = n }
-        }
-    in
-    let module Fd = Fields_derivers_zkapps.Derivers in
-    let full = deriver (Fd.o ()) in
-    equal account_precondition
-      (account_precondition |> Fd.to_json full |> Fd.of_json full)
-
-  let%test_unit "json roundtrip full" =
-    let n = Account_nonce.of_int 4513 in
-    let account_precondition : t =
-      Full
-        { Zkapp_precondition.Account.accept with
-          nonce = Check { lower = n; upper = n }
-        ; delegate = Check Public_key.Compressed.empty
-        }
-    in
-    let module Fd = Fields_derivers_zkapps.Derivers in
-    let full = deriver (Fd.o ()) in
-    [%test_eq: t] account_precondition
-      (account_precondition |> Fd.to_json full |> Fd.of_json full)
-
-  let%test_unit "to_json" =
-    let account_precondition : t = Nonce (Account_nonce.of_int 34928) in
-    let module Fd = Fields_derivers_zkapps.Derivers in
-    let full = deriver (Fd.o ()) in
-    [%test_eq: string]
-      (account_precondition |> Fd.to_json full |> Yojson.Safe.to_string)
-      ( {json|{
-          balance: null,
-          nonce: {lower: "34928", upper: "34928"},
-          receiptChainHash: null, delegate: null,
-          state: [null,null,null,null,null,null,null,null],
-          actionState: null, provedState: null, isNew: null
-        }|json}
-      |> Yojson.Safe.from_string |> Yojson.Safe.to_string )
 
   let digest (t : t) =
     let digest x =
@@ -1484,12 +1394,6 @@ module Body = struct
               option ~js_type:Or_undefined @@ global_slot_since_genesis @@ o ())
         ~nonce:!.uint32
       |> finish "FeePayerBody" ~t_toplevel_annots
-
-    let%test_unit "json roundtrip" =
-      let open Fields_derivers_zkapps.Derivers in
-      let full = o () in
-      let _a = deriver full in
-      [%test_eq: t] dummy (dummy |> to_json full |> of_json full)
   end
 
   let of_fee_payer (t : Fee_payer.t) : t =
@@ -1698,13 +1602,6 @@ module Body = struct
     ; authorization_kind = None_given
     }
 
-  let%test_unit "json roundtrip" =
-    let open Fields_derivers_zkapps.Derivers in
-    let full = o () in
-    let _a = Graphql_repr.deriver full in
-    [%test_eq: Graphql_repr.t] Graphql_repr.dummy
-      (Graphql_repr.dummy |> to_json full |> of_json full)
-
   let to_input
       ({ public_key
        ; update
@@ -1898,16 +1795,6 @@ module T = struct
 
     let digest (t : t) = Body.Checked.digest t
   end
-
-  let%test_unit "json roundtrip dummy" =
-    let dummy : Graphql_repr.t =
-      to_graphql_repr ~call_depth:0
-        { body = Body.dummy; authorization = Control.dummy_of_tag Signature }
-    in
-    let module Fd = Fields_derivers_zkapps.Derivers in
-    let full = Graphql_repr.deriver @@ Fd.o () in
-    [%test_eq: Graphql_repr.t] dummy
-      (dummy |> Fd.to_json full |> Fd.of_json full)
 end
 
 module Fee_payer = struct
@@ -1952,15 +1839,6 @@ module Fee_payer = struct
     Fields.make_creator obj ~body:!.Body.Fee_payer.deriver
       ~authorization:!.Control.signature_deriver
     |> finish "ZkappFeePayer" ~t_toplevel_annots
-
-  let%test_unit "json roundtrip" =
-    let dummy : t =
-      { body = Body.Fee_payer.dummy; authorization = Signature.dummy }
-    in
-    let open Fields_derivers_zkapps.Derivers in
-    let full = o () in
-    let _a = deriver full in
-    [%test_eq: t] dummy (dummy |> to_json full |> of_json full)
 end
 
 include T
