@@ -1,8 +1,8 @@
 package main
 
 import (
+	. "block_producers_uptime/delegation_backend"
 	"context"
-	. "delegation_backend"
 	"net/http"
 	"time"
 
