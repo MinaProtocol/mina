@@ -1953,12 +1953,30 @@ module T = struct
                 ~init:(Sequence.empty, [], 0)
                 ~f:(fun (valid_seq, invalid_txns, count) txn ->
                   match
-                    O1trace.sync_thread
-                      "validate_transaction_against_staged_ledger" (fun () ->
-                        Transaction_validator.apply_transaction_first_pass
-                          ~constraint_constants ~global_slot validating_ledger
-                          ~txn_state_view:current_state_view
-                          (Command (User_command.forget_check txn)) )
+                    Or_error.try_with_join (fun () ->
+                        (* Reject zero vesting *)
+                        ( match User_command.forget_check txn with
+                        | Zkapp_command { account_updates; _ } ->
+                            Zkapp_command.Call_forest.iteri account_updates
+                              ~f:(fun _i account_update ->
+                                match account_update.body.update.timing with
+                                | Keep ->
+                                    ()
+                                | Set x ->
+                                    assert (
+                                      not
+                                        Unsigned.UInt32.(
+                                          equal zero x.vesting_period) ) )
+                        | Signed_command _ ->
+                            () ) ;
+                        O1trace.sync_thread
+                          "validate_transaction_against_staged_ledger"
+                          (fun () ->
+                            Transaction_validator.apply_transaction_first_pass
+                              ~constraint_constants ~global_slot
+                              validating_ledger
+                              ~txn_state_view:current_state_view
+                              (Command (User_command.forget_check txn)) ) )
                   with
                   | Error e ->
                       [%log error]
