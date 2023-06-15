@@ -3468,6 +3468,19 @@ module Types = struct
               | None ->
                   t.threshold_met )
         ] )
+
+  let get_filtered_log_entries =
+    obj "GetFilteredLogEntries" ~fields:(fun _ ->
+        [ field "logMessages"
+            ~typ:(non_null (list (non_null string)))
+            ~doc:"Structured log messages since the given offset"
+            ~args:Arg.[]
+            ~resolve:(fun _ (logs, _) -> logs)
+        ; field "isCapturing" ~typ:(non_null bool)
+            ~doc:"Whether we are capturing structured log messages"
+            ~args:Arg.[]
+            ~resolve:(fun _ (_, is_started) -> is_started)
+        ] )
 end
 
 module Subscriptions = struct
@@ -3533,6 +3546,16 @@ module Mutations = struct
       ~args:
         Arg.[ arg "input" ~typ:(non_null Types.Input.AddAccountInput.arg_typ) ]
       ~resolve:create_account_resolver
+
+  let start_filtered_log =
+    field "startFilteredLog"
+      ~doc:
+        "TESTING ONLY: Start filtering and recording all structured events in \
+         memory"
+      ~typ:(non_null bool)
+      ~args:Arg.[ arg "filter" ~typ:(non_null (list (non_null string))) ]
+      ~resolve:(fun { ctx = t; _ } () filter ->
+        Result.is_ok @@ Mina_lib.start_filtered_log t filter )
 
   let create_account =
     io_field "createAccount"
@@ -4346,6 +4369,7 @@ module Mutations = struct
 
   let commands =
     [ add_wallet
+    ; start_filtered_log
     ; create_account
     ; create_hd_account
     ; unlock_account
@@ -5342,6 +5366,13 @@ module Queries = struct
       ~doc:"The version of the node (git commit hash)"
       ~resolve:(fun _ _ -> Some Mina_version.commit_id)
 
+  let get_filtered_log_entries =
+    field "getFilteredLogEntries"
+      ~typ:(non_null Types.get_filtered_log_entries)
+      ~args:Arg.[ arg "offset" ~typ:(non_null int) ]
+      ~doc:"TESTING ONLY: Retrieve all new structured events in memory"
+      ~resolve:(fun { ctx = t; _ } () i -> Mina_lib.get_filtered_log_entries t i)
+
   let tracked_accounts_resolver { ctx = mina; _ } () =
     let wallets = Mina_lib.wallets mina in
     let block_production_pubkeys = Mina_lib.block_production_pubkeys mina in
@@ -5931,6 +5962,7 @@ module Queries = struct
     [ sync_status
     ; daemon_status
     ; version
+    ; get_filtered_log_entries
     ; owned_wallets (* deprecated *)
     ; tracked_accounts
     ; wallet (* deprecated *)

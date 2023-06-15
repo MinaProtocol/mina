@@ -174,6 +174,17 @@ module Processor = struct
         Some (Yojson.Safe.to_string json)
   end
 
+  module Raw_structured_log_events = struct
+    type t = Structured_log_events.Set.t
+
+    let create (set : t) = set
+
+    let process (set : t) (message : Message.t) : string option =
+      let%bind.Option event_id = message.event_id in
+      let%map.Option () = if Set.mem set event_id then Some () else None in
+      Yojson.Safe.to_string (Message.to_yojson message)
+  end
+
   module Pretty = struct
     type t =
       { log_level : Level.t; config : Interpolator_lib.Interpolator.config }
@@ -206,6 +217,9 @@ module Processor = struct
 
   let raw ?(log_level = Level.Spam) () = T ((module Raw), Raw.create ~log_level)
 
+  let raw_structured_log_events set =
+    T ((module Raw_structured_log_events), Raw_structured_log_events.create set)
+
   let pretty ~log_level ~config =
     T ((module Pretty), Pretty.create ~log_level ~config)
 end
@@ -230,6 +244,16 @@ module Transport = struct
   end
 
   let stdout () = T ((module Stdout), Stdout.create ())
+
+  module Raw = struct
+    type t = string -> unit
+
+    let create (f : t) = f
+
+    let transport (f : t) str = f str
+  end
+
+  let raw f = T ((module Raw), Raw.create f)
 end
 
 module Consumer_registry = struct
