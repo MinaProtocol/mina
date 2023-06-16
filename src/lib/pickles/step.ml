@@ -84,6 +84,8 @@ struct
       * auxiliary_value
       * (int, prevs_length) Vector.t )
       Promise.t =
+    let logger = Internal_tracing_context_logger.get () in
+    [%log internal] "Pickles_step_proof" ;
     let _, prev_vars_length = branch_data.proofs_verified in
     let T = Length.contr prev_vars_length prevs_length in
     let (module Req) = branch_data.requests in
@@ -736,7 +738,9 @@ struct
       let k x = respond (Provide x) in
       match request with
       | Req.Compute_prev_proof_parts prev_proof_requests ->
+          [%log internal] "Step_compute_prev_proof_parts" ;
           compute_prev_proof_parts prev_proof_requests ;
+          [%log internal] "Step_compute_prev_proof_parts_done" ;
           k ()
       | Req.Proof_with_datas ->
           k (Option.value_exn !witnesses)
@@ -816,10 +820,12 @@ struct
                unaffected.
             *)
             Or_error.try_with ~backtrace:true (fun () ->
+                [%log internal] "Step_generate_witness_conv" ;
                 Impls.Step.generate_witness_conv
                   ~f:(fun { Impls.Step.Proof_inputs.auxiliary_inputs
                           ; public_inputs
                           } next_statement_hashed ->
+                    [%log internal] "Backend_tick_proof_create_async" ;
                     let%map.Promise proof =
                       Backend.Tick.Proof.create_async ~primary:public_inputs
                         ~auxiliary:auxiliary_inputs
@@ -827,6 +833,7 @@ struct
                           (Lazy.force prev_challenge_polynomial_commitments)
                         pk
                     in
+                    [%log internal] "Backend_tick_proof_create_async_done" ;
                     (proof, next_statement_hashed) )
                   ~input_typ:Impls.Step.Typ.unit ~return_typ:input
                   (fun () () ->
@@ -869,6 +876,7 @@ struct
       ; messages_for_next_wrap_proof
       }
     in
+    [%log internal] "Pickles_step_proof_done" ;
     ( { P.Base.Step.proof = next_proof
       ; statement = next_statement
       ; index = branch_data.index

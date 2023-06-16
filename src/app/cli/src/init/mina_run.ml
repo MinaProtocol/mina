@@ -288,12 +288,17 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
   let logger =
     Logger.extend
       (Mina_lib.top_level_logger mina)
-      [ ("coda_run", `String "Setting up server logs") ]
+      [ ("mina_run", `String "Setting up server logs") ]
   in
   let client_impls =
     [ implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
           Deferred.map
             ( Mina_commands.setup_and_submit_user_commands mina ts
+            |> Participating_state.to_deferred_or_error )
+            ~f:Or_error.join )
+    ; implement Daemon_rpcs.Send_zkapp_commands.rpc (fun () zkapps ->
+          Deferred.map
+            ( Mina_commands.setup_and_submit_zkapp_commands mina zkapps
             |> Participating_state.to_deferred_or_error )
             ~f:Or_error.join )
     ; implement Daemon_rpcs.Get_balance.rpc (fun () aid ->
@@ -313,13 +318,11 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             ( Mina_commands.verify_payment mina aid tx proof
             |> Participating_state.active_error |> Or_error.join ) )
     ; implement Daemon_rpcs.Get_public_keys_with_details.rpc (fun () () ->
-          return
-            ( Mina_commands.get_keys_with_details mina
-            |> Participating_state.active_error ) )
+          let%map keys = Mina_commands.get_keys_with_details mina in
+          Participating_state.active_error keys )
     ; implement Daemon_rpcs.Get_public_keys.rpc (fun () () ->
-          return
-            ( Mina_commands.get_public_keys mina
-            |> Participating_state.active_error ) )
+          let%map keys = Mina_commands.get_public_keys mina in
+          Participating_state.active_error keys )
     ; implement Daemon_rpcs.Get_nonce.rpc (fun () aid ->
           return
             ( Mina_commands.get_nonce mina aid
@@ -334,36 +337,41 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
           Mina_commands.clear_hist_status ~flag mina )
     ; implement Daemon_rpcs.Get_ledger.rpc (fun () lh ->
-          (* getting the ledger may take more time than a heartbeat timeout
-             run in thread to allow RPC heartbeats to proceed
-          *)
-          Async.In_thread.run (fun () -> Mina_lib.get_ledger mina lh) )
+          Mina_lib.get_ledger mina lh )
     ; implement Daemon_rpcs.Get_snarked_ledger.rpc (fun () lh ->
           Mina_lib.get_snarked_ledger mina lh )
     ; implement Daemon_rpcs.Get_staking_ledger.rpc (fun () which ->
-          ( match which with
-          | Next ->
-              Option.value_map (Mina_lib.next_epoch_ledger mina)
-                ~default:
-                  (Or_error.error_string "next staking ledger not available")
-                ~f:(function
-                | `Finalized ledger ->
-                    Ok ledger
-                | `Notfinalized ->
-                    Or_error.error_string
-                      "next staking ledger is not finalized yet" )
-          | Current ->
-              Option.value_map
-                (Mina_lib.staking_ledger mina)
-                ~default:
-                  (Or_error.error_string "current staking ledger not available")
-                ~f:Or_error.return )
-          |> Or_error.map ~f:(function
-               | Genesis_epoch_ledger l ->
-                   Mina_ledger.Ledger.to_list l
-               | Ledger_db db ->
-                   Mina_ledger.Ledger.Db.to_list db )
-          |> Deferred.return )
+          let ledger_or_error =
+            match which with
+            | Next ->
+                Option.value_map (Mina_lib.next_epoch_ledger mina)
+                  ~default:
+                    (Or_error.error_string "next staking ledger not available")
+                  ~f:(function
+                  | `Finalized ledger ->
+                      Ok ledger
+                  | `Notfinalized ->
+                      Or_error.error_string
+                        "next staking ledger is not finalized yet" )
+            | Current ->
+                Option.value_map
+                  (Mina_lib.staking_ledger mina)
+                  ~default:
+                    (Or_error.error_string
+                       "current staking ledger not available" )
+                  ~f:Or_error.return
+          in
+          match ledger_or_error with
+          | Ok ledger -> (
+              match ledger with
+              | Genesis_epoch_ledger l ->
+                  let%map accts = Mina_ledger.Ledger.to_list l in
+                  Ok accts
+              | Ledger_db db ->
+                  let%map accts = Mina_ledger.Ledger.Db.to_list db in
+                  Ok accts )
+          | Error err ->
+              return (Error err) )
     ; implement Daemon_rpcs.Stop_daemon.rpc (fun () () ->
           Scheduler.yield () >>= (fun () -> exit 0) |> don't_wait_for ;
           Deferred.unit )
@@ -376,6 +384,10 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           Mina_tracing.start (Mina_lib.config mina).conf_dir )
     ; implement Daemon_rpcs.Stop_tracing.rpc (fun () () ->
           Mina_tracing.stop () ; Deferred.unit )
+    ; implement Daemon_rpcs.Start_internal_tracing.rpc (fun () () ->
+          Internal_tracing.toggle ~logger `Enabled )
+    ; implement Daemon_rpcs.Stop_internal_tracing.rpc (fun () () ->
+          Internal_tracing.toggle ~logger `Disabled )
     ; implement Daemon_rpcs.Visualization.Frontier.rpc (fun () filename ->
           return (Mina_lib.visualize_frontier ~filename mina) )
     ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
@@ -404,6 +416,13 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Daemon_rpcs.Get_object_lifetime_statistics.rpc (fun () () ->
           return
             (Yojson.Safe.pretty_to_string @@ Allocation_functor.Table.dump ()) )
+    ; implement Daemon_rpcs.Submit_internal_log.rpc
+        (fun () { timestamp; message; metadata; process } ->
+          let metadata =
+            List.map metadata ~f:(fun (s, value) ->
+                (s, Yojson.Safe.from_string value) )
+          in
+          return @@ Itn_logger.log ~process ~timestamp ~message ~metadata () )
     ]
   in
   let log_snark_work_metrics (work : Snark_worker.Work.Result.t) =
@@ -501,8 +520,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           Deferred.unit )
     ]
   in
-  let create_graphql_server ?auth_keys ~bind_to_address ~schema
-      ~server_description ~require_auth port =
+  let create_graphql_server_with_auth ~mk_context ?auth_keys ~bind_to_address
+      ~schema ~server_description ~require_auth port =
     if require_auth && Option.is_none auth_keys then
       failwith
         "Could not create GraphQL server, authentication is required, but no \
@@ -519,7 +538,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                     pk_str () ) )
     in
     let graphql_callback =
-      Graphql_cohttp_async.make_callback ?auth_keys (fun _req -> mina) schema
+      Graphql_cohttp_async.make_callback ?auth_keys mk_context schema
     in
     Cohttp_async.(
       Server.create_expert
@@ -568,6 +587,11 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
              !"Created %s at: http://localhost:%i/graphql"
              server_description port )
   in
+  let create_graphql_server =
+    create_graphql_server_with_auth
+      ~mk_context:(fun ~with_seq_no:_ _req -> mina)
+      ?auth_keys:None
+  in
   Option.iter rest_server_port ~f:(fun rest_server_port ->
       O1trace.background_thread "serve_graphql" (fun () ->
           create_graphql_server
@@ -586,16 +610,19 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             ~schema:Mina_graphql.schema_limited
             ~server_description:"GraphQL server with limited queries"
             ~require_auth:false rest_server_port ) ) ;
-  (* Third graphql server with ITN-particular queries exposed *)
-  Option.iter itn_graphql_port ~f:(fun rest_server_port ->
-      O1trace.background_thread "serve_itn_graphql" (fun () ->
-          create_graphql_server ?auth_keys
-            ~bind_to_address:
-              Tcp.Bind_to_address.(
-                if insecure_rest_server then All_addresses else Localhost)
-            ~schema:Mina_graphql.schema_itn
-            ~server_description:"GraphQL server for ITN queries"
-            ~require_auth:true rest_server_port ) ) ;
+  if Mina_compile_config.itn_features then
+    (* Third graphql server with ITN-particular queries exposed *)
+    Option.iter itn_graphql_port ~f:(fun rest_server_port ->
+        O1trace.background_thread "serve_itn_graphql" (fun () ->
+            create_graphql_server_with_auth
+              ~mk_context:(fun ~with_seq_no _req -> (with_seq_no, mina))
+              ?auth_keys
+              ~bind_to_address:
+                Tcp.Bind_to_address.(
+                  if insecure_rest_server then All_addresses else Localhost)
+              ~schema:Mina_graphql.schema_itn
+              ~server_description:"GraphQL server for ITN queries"
+              ~require_auth:true rest_server_port ) ) ;
   let where_to_listen =
     Tcp.Where_to_listen.bind_to All_addresses
       (On_port (Mina_lib.client_port mina))

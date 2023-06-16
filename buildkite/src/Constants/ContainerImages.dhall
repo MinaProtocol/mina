@@ -1,11 +1,9 @@
 -- TODO: Automatically push, tag, and update images #4862
 -- NOTE: minaToolchain is the default image for various jobs, set to minaToolchainBullseye
--- NOTE: minaToolchainStretch is also used for building Ubuntu Bionic packages in CI
 -- NOTE: minaToolchainBullseye is also used for building Ubuntu Focal packages in CI
 -- NOTE: minaToolchainBookworm is also used for building Ubuntu Jammy packages in CI
 {
   toolchainBase = "codaprotocol/ci-toolchain-base:v3",
-  minaToolchainStretch = "gcr.io/o1labs-192920/mina-toolchain@sha256:244862c8d2169df861e60e8dee2ab9c20ee5581d553cd6db984578cbb06e14b5",
   minaToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:c3320cb0f75727d5f1e98c138dcf2c4cca29862413b4acfa529828793a650042",
   minaToolchainBullseye = "gcr.io/o1labs-192920/mina-toolchain@sha256:1e2feaebd47c330e990fe3c4e0681d16ad42bfa642937c4c5142793da06c890b",
   minaToolchainBookworm = "gcr.io/o1labs-192920/mina-toolchain@sha256:1e2feaebd47c330e990fe3c4e0681d16ad42bfa642937c4c5142793da06c890b",

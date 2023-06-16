@@ -276,6 +276,7 @@ let step_main :
   let main () : _ Types.Step.Statement.t =
     let open Requests.Step in
     let open Impls.Step in
+    let logger = Internal_tracing_context_logger.get () in
     with_label "step_main" (fun () ->
         let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
                                              with type n = max_proofs_verified
@@ -386,6 +387,7 @@ let step_main :
           go prevs previous_proof_statements
         in
         let srs = Backend.Tock.Keypair.load_urs () in
+        [%log internal] "Step_compute_bulletproof_challenges" ;
         let bulletproof_challenges =
           with_label "prevs_verified" (fun () ->
               let rec go :
@@ -520,6 +522,7 @@ let step_main :
               in
               Boolean.Assert.all vs ; chalss )
         in
+        [%log internal] "Step_compute_bulletproof_challenges_done" ;
         let messages_for_next_step_proof =
           let challenge_polynomial_commitments =
             let module M =

@@ -73,15 +73,6 @@ RUN test "$deb_codename" = "focal" \
          libffi7 \
      || exit 0
 
-# --- Ubuntu 18.04 "Bionic Beaver" Dependencies
-RUN test "$deb_codename" = "bionic" \
-     && apt-get update -y \
-     && apt-get install -y \
-         libjemalloc1 \
-         libprocps6 \
-         libffi6 \
-     || exit 0
-
 # --- Install rosetta-cli
 
 # The following commands install rosetta-cli with an updated rosetta-sdk-go dependency, which supports delegation transactions.

@@ -162,6 +162,7 @@ let wrap_main
         , _
         , Field.t )
         Types.Wrap.Statement.In_circuit.t ) =
+    let logger = Internal_tracing_context_logger.get () in
     with_label __LOC__ (fun () ->
         let which_branch' =
           exists
@@ -422,21 +423,26 @@ let wrap_main
           in
           let sponge = Wrap_verifier.Opt.create sponge_params in
           with_label __LOC__ (fun () ->
-              Wrap_verifier.incrementally_verify_proof max_proofs_verified
-                ~actual_proofs_verified_mask ~step_domains
-                ~verification_key:step_plonk_index ~srs ~xi ~sponge
-                ~public_input:
-                  (Array.map
-                     (pack_statement Max_proofs_verified.n ~feature_flags
-                        ~lookup:lookup_config_for_pack prev_statement )
-                     ~f:(function
-                    | `Field (Shifted_value x) ->
-                        `Field (split_field x)
-                    | `Packed_bits (x, n) ->
-                        `Packed_bits (x, n) ) )
-                ~sg_old:prev_step_accs
-                ~advice:{ b; combined_inner_product }
-                ~messages ~which_branch ~openings_proof ~plonk )
+              [%log internal] "Wrap_verifier_incrementally_verify_proof" ;
+              let res =
+                Wrap_verifier.incrementally_verify_proof max_proofs_verified
+                  ~actual_proofs_verified_mask ~step_domains
+                  ~verification_key:step_plonk_index ~srs ~xi ~sponge
+                  ~public_input:
+                    (Array.map
+                       (pack_statement Max_proofs_verified.n ~feature_flags
+                          ~lookup:lookup_config_for_pack prev_statement )
+                       ~f:(function
+                      | `Field (Shifted_value x) ->
+                          `Field (split_field x)
+                      | `Packed_bits (x, n) ->
+                          `Packed_bits (x, n) ) )
+                  ~sg_old:prev_step_accs
+                  ~advice:{ b; combined_inner_product }
+                  ~messages ~which_branch ~openings_proof ~plonk
+              in
+              [%log internal] "Wrap_verifier_incrementally_verify_proof_done" ;
+              res )
         in
         with_label __LOC__ (fun () ->
             Boolean.Assert.is_true bulletproof_success ) ;

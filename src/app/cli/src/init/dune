@@ -20,7 +20,9 @@
    async_unix
    uri
    core_kernel
+   core_kernel.uuid
    core
+   core.uuid
    base
    async
    cohttp
@@ -52,6 +54,7 @@
    user_command_input
    network_peer
    logger
+   itn_logger
    coda_genesis_proof
    data_hash_lib
    currency
@@ -117,6 +120,7 @@
    mina_signature_kind
    string_sign
    zkapp_command_builder
+   internal_tracing
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../../config.mlh

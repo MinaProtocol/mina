@@ -1,9 +1,10 @@
 (library
  (name mina_generators)
  (public_name mina_generators)
+ (inline_tests)
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../config.mlh)
- (preprocess (pps ppx_let ppx_version ppx_custom_printf ppx_optcomp))
+ (preprocess (pps ppx_let ppx_version ppx_custom_printf ppx_inline_test ppx_optcomp ppx_deriving_yojson))
  (libraries
    ;; opam libraries
    yojson
@@ -14,6 +15,8 @@
    async_unix
    base
    sexplib0
+   ppx_inline_test.config
+   ppx_deriving_yojson.runtime
    ;; local libraries
    genesis_constants
    sgn
@@ -38,4 +41,6 @@
    random_oracle_input
    snark_params
    snarky.backendless
+   transaction_snark_tests
+   splittable_random
 ))

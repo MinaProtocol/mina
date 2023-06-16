@@ -36,6 +36,17 @@ module Make (Schema : Schema) = struct
         "Cannot parse string starting with a minus as an unsigned integer"
     else f s
 
+  module UInt16 : Json_intf with type t = Unsigned.UInt16.t = struct
+    type t = Unsigned.UInt16.t
+
+    let parse = parse_uinteger ~f:Unsigned.UInt16.of_string
+
+    let serialize value = `String (Unsigned.UInt16.to_string value)
+
+    let typ () =
+      unsigned_scalar_scalar ~to_string:Unsigned.UInt16.to_string "UInt16"
+  end
+
   module UInt32 : Json_intf with type t = Unsigned.UInt32.t = struct
     type t = Unsigned.UInt32.t
 

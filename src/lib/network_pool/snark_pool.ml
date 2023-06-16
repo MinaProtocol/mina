@@ -783,7 +783,8 @@ let%test_module "random set test" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ()) )
+            ~pids:(Child_processes.Termination.create_pid_table ())
+            () )
 
     module Mock_snark_pool =
       Make (Mocks.Base_ledger) (Mocks.Staged_ledger) (Mocks.Transition_frontier)

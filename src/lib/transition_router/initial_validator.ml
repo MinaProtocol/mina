@@ -15,6 +15,7 @@ type validation_error =
   | `Verifier_error of Error.t
   | `Mismatched_protocol_version
   | `Invalid_protocol_version ]
+[@@deriving sexp_of]
 
 let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
     ~trust_system ~sender ~transition_with_hash ~delta (error : validation_error)
@@ -252,6 +253,17 @@ let run ~logger ~trust_system ~verifier ~transition_reader
              , `Time_received time_received
              , `Valid_cb valid_cb )
            ->
+          let state_hash =
+            ( Envelope.Incoming.data transition_env
+            |> Mina_block.header |> Header.protocol_state
+            |> Protocol_state.hashes )
+              .state_hash
+          in
+          Internal_tracing.Context_call.with_call_id ~tag:"initial_validation"
+          @@ fun () ->
+          Internal_tracing.with_state_hash state_hash
+          @@ fun () ->
+          [%log internal] "Initial_validation" ;
           if Ivar.is_full initialization_finish_signal then (
             let blockchain_length =
               Envelope.Incoming.data transition_env
@@ -295,6 +307,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                     >>= defer validate_protocol_versions)
                 with
                 | Ok verified_transition ->
+                    [%log internal] "Initial_validation_done" ;
                     Writer.write valid_transition_writer
                       ( `Block
                           (Envelope.Incoming.wrap ~data:verified_transition
@@ -309,6 +322,16 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                       , time_received ) ;
                     return ()
                 | Error error ->
+                    Internal_tracing.with_state_hash state_hash
+                    @@ fun () ->
+                    [%log internal] "Failure"
+                      ~metadata:
+                        [ ( "reason"
+                          , `String
+                              ( "Failed initial validation: "
+                              ^ Sexp.to_string
+                                  ([%sexp_of: validation_error] error) ) )
+                        ] ;
                     Mina_net2.Validation_callback.fire_if_not_already_fired
                       valid_cb `Reject ;
                     Interruptible.uninterruptible
@@ -329,6 +352,11 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                   |> Protocol_state.hashes )
                     .state_hash
                 in
+                Internal_tracing.with_state_hash state_hash
+                @@ fun () ->
+                [%log internal] "Failure"
+                  ~metadata:
+                    [ ("reason", `String "Validation callback expired") ] ;
                 let metadata =
                   [ ("state_hash", State_hash.to_yojson state_hash)
                   ; ( "time_received"
@@ -340,4 +368,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                 in
                 [%log error] ~metadata
                   "Dropping blocks because libp2p validation expired" )
-          else Deferred.unit ) )
+          else (
+            [%log internal] "Failure"
+              ~metadata:[ ("reason", `String "Node still initializing") ] ;
+            Deferred.unit ) ) )

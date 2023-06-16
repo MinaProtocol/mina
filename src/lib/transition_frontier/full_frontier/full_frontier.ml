@@ -631,8 +631,10 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       let new_root_protocol_states =
         Root_data.Limited.protocol_states new_root
       in
+      [%log' internal t.logger] "Move_frontier_root" ;
       move_root t ~new_root_hash ~new_root_protocol_states ~garbage
         ~enable_epoch_ledger_sync ;
+      [%log' internal t.logger] "Move_frontier_root_done" ;
       (old_root_hash, Some new_root_hash)
 
 module Metrics = struct
@@ -718,9 +720,11 @@ module Metrics = struct
         | Some parent ->
             find_ancestor ~f parent
     in
+    let curr_global_slot_u32 cs =
+      curr_global_slot cs |> Mina_numbers.Global_slot_since_hard_fork.to_uint32
+    in
     let start =
-      let open Consensus.Data.Consensus_state in
-      let slot = intprop curr_global_slot in
+      let slot = intprop curr_global_slot_u32 in
       let best_tip_slot = slot best_tip in
       let k = Unsigned.UInt32.to_int consensus_constants.k in
       match
@@ -731,7 +735,7 @@ module Metrics = struct
     in
     let change f = intprop f best_tip - intprop f start in
     let length_change = change blockchain_length in
-    let slot_change = change curr_global_slot in
+    let slot_change = change curr_global_slot_u32 in
     if slot_change = 0 then 1.
     else Float.of_int length_change /. Float.of_int slot_change
 end
@@ -958,7 +962,8 @@ module For_tests = struct
     Async.Thread_safe.block_on_async_exn (fun () ->
         Verifier.create ~logger ~proof_level ~constraint_constants
           ~conf_dir:None
-          ~pids:(Child_processes.Termination.create_pid_table ()) )
+          ~pids:(Child_processes.Termination.create_pid_table ())
+          () )
 
   module Genesis_ledger = (val precomputed_values.genesis_ledger)
 
