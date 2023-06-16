@@ -1,15 +1,19 @@
 package main
 
 import (
-	logging "github.com/ipfs/go-log/v2"
-	"cloud.google.com/go/storage"
-	sheets "google.golang.org/api/sheets/v4"
-	"context"
-	itn "block_producers_uptime/itn_uptime_analyzer"
 	dg "block_producers_uptime/delegation_backend"
+	itn "block_producers_uptime/itn_uptime_analyzer"
+	"context"
+	"fmt"
+
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go/aws"
+	logging "github.com/ipfs/go-log/v2"
+	"google.golang.org/api/sheets/v4"
 )
 
-func main (){
+func main() {
 
 	// Setting up logging for application
 
@@ -26,16 +30,21 @@ func main (){
 	// Empty context object and initializing memory for application
 
 	ctx := context.Background()
+
+	appCfg := itn.LoadEnv(log)
+
+	awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(appCfg.Aws.Region))
+	if err != nil {
+		log.Fatalf("Error loading AWS configuration: %v", err)
+	}
+
 	app := new(dg.App)
 	app.Log = log
+	client := s3.NewFromConfig(awsCfg)
+
+	awsctx := dg.AwsContext{Client: client, BucketName: aws.String(itn.GetBucketName(appCfg)), Prefix: appCfg.NetworkName, Context: ctx, Log: log}
 
 	// Create Google Cloud client
-
-	client, err := storage.NewClient(ctx)
-	if err != nil {
-		log.Fatalf("Error creating Cloud client: %v", err)
-		return
-	}
 
 	sheetsService, err := sheets.NewService(ctx)
 	if err != nil {
@@ -43,27 +52,29 @@ func main (){
 		return
 	}
 
-	identities := itn.CreateIdentities(ctx, client, log)
+	identities := itn.CreateIdentities(awsctx, log)
+
+	fmt.Println(identities)
 
 	// Go over identities and calculate uptime
 
 	for _, identity := range identities {
 
-		identity.GetUptime(ctx, client, log)
+		identity.GetUptime(awsctx, log)
 
-		exactMatch, rowIndex, firstEmptyRow := identity.GetCell(sheetsService, log)
+		exactMatch, rowIndex, firstEmptyRow := identity.GetCell(appCfg, sheetsService, log)
 
 		if exactMatch {
-			identity.AppendUptime(sheetsService, log, rowIndex)
+			identity.AppendUptime(appCfg, sheetsService, log, rowIndex)
 		} else if (!exactMatch) && (rowIndex == 0) {
-			identity.AppendNext(sheetsService, log)
-			identity.AppendUptime(sheetsService, log, firstEmptyRow)
+			identity.AppendNext(appCfg, sheetsService, log)
+			identity.AppendUptime(appCfg, sheetsService, log, firstEmptyRow)
 		} else if (!exactMatch) && (rowIndex != 0) {
-			identity.InsertBelow(sheetsService, log, rowIndex)
-			identity.AppendUptime(sheetsService, log, rowIndex+1)
+			identity.InsertBelow(appCfg, sheetsService, log, rowIndex)
+			identity.AppendUptime(appCfg, sheetsService, log, rowIndex+1)
 		}
 	}
 
-	itn.MarkExecution(sheetsService, log)
+	itn.MarkExecution(appCfg, sheetsService, log)
 
 }

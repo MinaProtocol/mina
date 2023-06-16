@@ -1,12 +1,13 @@
 package itn_uptime_analyzer
 
 import (
-	sheets "google.golang.org/api/sheets/v4"
-	"strings"
-	"strconv"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
+
 	logging "github.com/ipfs/go-log/v2"
+	sheets "google.golang.org/api/sheets/v4"
 )
 
 // This function returns true if the identity is present
@@ -15,13 +16,13 @@ import (
 // closest relative of the identity (same pubkey or same ip)
 // If nothing was found it returns false and 0 as the row index
 
-func (identity Identity) GetCell(client *sheets.Service, log *logging.ZapEventLogger) (exactMatch bool, rowIndex int, firstEmptyRow int) {
+func (identity Identity) GetCell(config AppConfig, client *sheets.Service, log *logging.ZapEventLogger) (exactMatch bool, rowIndex int, firstEmptyRow int) {
 	exactMatch = false
 	rowIndex = 0
 	firstEmptyRow = 1
 	col := IDENTITY_COLUMN
 	readRange := ITN_UPTIME_ANALYZER_SHEET + "!" + col + ":" + col
-	spId := OutputSpreadsheetId()
+	spId := config.AnalyzerOutputGsheetId
 	resp, err := client.Spreadsheets.Values.Get(spId, readRange).Do()
 	if err != nil {
 		log.Fatalf("Unable to retrieve data from sheet: %v", err)
@@ -38,7 +39,7 @@ func (identity Identity) GetCell(client *sheets.Service, log *logging.ZapEventLo
 		firstEmptyRow = firstEmptyRow + 1
 	}
 
-	if exactMatch == false {
+	if !exactMatch {
 		for index, row := range resp.Values {
 			str := fmt.Sprintf("%v", row[0])
 			if strings.Split(str, "-")[0] == identity["public-key"] {
@@ -53,10 +54,10 @@ func (identity Identity) GetCell(client *sheets.Service, log *logging.ZapEventLo
 
 // Appends the identity string of the node to the first column
 
-func (identity Identity) AppendNext(client *sheets.Service, log *logging.ZapEventLogger) {
+func (identity Identity) AppendNext(config AppConfig, client *sheets.Service, log *logging.ZapEventLogger) {
 	col := IDENTITY_COLUMN
 	readRange := ITN_UPTIME_ANALYZER_SHEET + "!" + col + ":" + col
-	spId := OutputSpreadsheetId()
+	spId := config.AnalyzerOutputGsheetId
 
 	identityString := strings.Join([]string{identity["public-key"], identity["public-ip"]}, "-")
 
@@ -74,10 +75,10 @@ func (identity Identity) AppendNext(client *sheets.Service, log *logging.ZapEven
 
 // Inserts the identity string of the node in the first column under rowIndex
 
-func (identity Identity) InsertBelow(client *sheets.Service, log *logging.ZapEventLogger, rowIndex int) {
+func (identity Identity) InsertBelow(config AppConfig, client *sheets.Service, log *logging.ZapEventLogger, rowIndex int) {
 	col := IDENTITY_COLUMN
-	readRange := fmt.Sprintf("%s!%s%d:%s%d", ITN_UPTIME_ANALYZER_SHEET, col, rowIndex + 1, col, rowIndex + 1)
-	spId := OutputSpreadsheetId()
+	readRange := fmt.Sprintf("%s!%s%d:%s%d", ITN_UPTIME_ANALYZER_SHEET, col, rowIndex+1, col, rowIndex+1)
+	spId := config.AnalyzerOutputGsheetId
 
 	identityString := strings.Join([]string{identity["public-key"], identity["public-ip"]}, "-")
 
@@ -95,9 +96,9 @@ func (identity Identity) InsertBelow(client *sheets.Service, log *logging.ZapEve
 
 // Finds the first empty column on the row specified and puts up or not up
 
-func (identity Identity) AppendUptime(client *sheets.Service, log *logging.ZapEventLogger, rowIndex int) {
+func (identity Identity) AppendUptime(config AppConfig, client *sheets.Service, log *logging.ZapEventLogger, rowIndex int) {
 	readRange := fmt.Sprintf("%s!A%d:Z%d", ITN_UPTIME_ANALYZER_SHEET, 1, 1)
-	spId := OutputSpreadsheetId()
+	spId := config.AnalyzerOutputGsheetId
 
 	resp, err := client.Spreadsheets.Values.Get(spId, readRange).Do()
 	if err != nil {
@@ -106,7 +107,7 @@ func (identity Identity) AppendUptime(client *sheets.Service, log *logging.ZapEv
 
 	var nextEmptyColumn int = len(resp.Values[0])
 
-	updateRange := fmt.Sprintf("%s!%s%d", ITN_UPTIME_ANALYZER_SHEET, string(nextEmptyColumn + 65), rowIndex)
+	updateRange := fmt.Sprintf("%s!%s%d", ITN_UPTIME_ANALYZER_SHEET, string(nextEmptyColumn+65), rowIndex)
 
 	var cellValue []interface{}
 
@@ -115,7 +116,7 @@ func (identity Identity) AppendUptime(client *sheets.Service, log *logging.ZapEv
 		log.Fatalf("Unable to retrieve data from sheet: %v\n", err)
 	}
 
-	if (uptimeArrayLength >= 47) {
+	if uptimeArrayLength >= 47 {
 		cellValue = []interface{}{"up"}
 	} else {
 		cellValue = []interface{}{"not up"}
@@ -133,9 +134,9 @@ func (identity Identity) AppendUptime(client *sheets.Service, log *logging.ZapEv
 
 // Tracks the date of execution on the top row of the spreadsheet
 
-func MarkExecution(client *sheets.Service, log *logging.ZapEventLogger){
+func MarkExecution(config AppConfig, client *sheets.Service, log *logging.ZapEventLogger) {
 	readRange := fmt.Sprintf("%s!A%d:Z%d", ITN_UPTIME_ANALYZER_SHEET, 1, 1)
-	spId := OutputSpreadsheetId()
+	spId := config.AnalyzerOutputGsheetId
 
 	currentTime := GetCurrentTime()
 	lastExecutionTime := GetLastExecutionTime(currentTime)
@@ -149,7 +150,7 @@ func MarkExecution(client *sheets.Service, log *logging.ZapEventLogger){
 
 	var nextEmptyColumn int = len(resp.Values[0])
 
-	updateRange := fmt.Sprintf("%s!%s%d", ITN_UPTIME_ANALYZER_SHEET, string(nextEmptyColumn + 65), 1)
+	updateRange := fmt.Sprintf("%s!%s%d", ITN_UPTIME_ANALYZER_SHEET, string(nextEmptyColumn+65), 1)
 
 	cellValue := []interface{}{timeInterval}
 
