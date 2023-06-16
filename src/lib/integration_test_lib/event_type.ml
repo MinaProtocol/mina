@@ -142,7 +142,7 @@ module Block_produced = struct
     ; snarked_ledger_generated : bool
     ; state_hash : State_hash.t
     }
-  [@@deriving to_yojson]
+  [@@deriving to_yojson, equal]
 
   (*
   let empty =
@@ -176,10 +176,9 @@ module Block_produced = struct
 
   let structured_event_id = Block_producer.block_produced_structured_events_id
 
-  let parse_func message =
+  let parse_breadcrumb breadcrumb =
     let open Json_parsing in
     let open Or_error.Let_syntax in
-    let%bind breadcrumb = get_metadata message "breadcrumb" in
     let%bind state_hash_str =
       find string breadcrumb [ "validated_transition"; "hash"; "state_hash" ]
     in
@@ -208,10 +207,20 @@ module Block_produced = struct
       find int breadcrumb_consensus_state [ "blockchain_length" ]
     in
     let%bind global_slot =
-      find int breadcrumb_consensus_state [ "curr_global_slot"; "slot_number" ]
+      (* the associated field looks like "slot_number":["Since_hard_fork", 1] *)
+      let%map global_slot_since_hard_fork =
+        find (list string) breadcrumb_consensus_state
+          [ "curr_global_slot"; "slot_number" ]
+      in
+      List.nth_exn global_slot_since_hard_fork 1 |> Int.of_string
     in
     let%map epoch = find int breadcrumb_consensus_state [ "epoch_count" ] in
     { block_height; global_slot; epoch; snarked_ledger_generated; state_hash }
+
+  let parse_func message =
+    let open Or_error.Let_syntax in
+    let%bind breadcrumb = get_metadata message "breadcrumb" in
+    parse_breadcrumb breadcrumb
 
   let parse = From_daemon_log (structured_event_id, parse_func)
 end
@@ -620,3 +629,230 @@ let dispatch_exn : type a b c. a t -> a -> b t -> (b -> c) -> c =
         ()
 
 (* TODO: tests on sexp and dispatch (etc) against all_event_types *)
+
+let%test_unit "parse breadcrumb functions properly" =
+  let breadcrumb_json =
+    {json|
+        {
+          "transition_receipt_time": "2023-05-10T17:27:21.051560Z",
+          "just_emitted_a_proof": false,
+          "validated_transition": {
+            "hash": {
+              "state_body_hash": "3WuibKRQv4TmqEj48a39QehVueRp8fCZ1Ta4CHfCLdVGG1y2HvDy",
+              "state_hash": "3NLBdEiVExFLZsTHJXqNwUFtG1nwTWN7Kd4mNCNjGKcFy2QeWjFL"
+            },
+            "data": {
+              "delta_transition_chain_proof": "<opaque>",
+              "protocol_state_proof": "<opaque>",
+              "proposed_protocol_version": "<None>",
+              "protocol_state": {
+                "previous_state_hash": "3NKnRqx6Mp1PibTWL59P1hNCwyc4dhmam4TABP65bZyEc56h7PBF",
+                "body": {
+                  "genesis_state_hash": "3NKK9p9ydnSEHrUWz6RSkt9MDytEkie6yaXSVPC55wari7okTwRH",
+                  "blockchain_state": {
+                    "genesis_ledger_hash": "jwbhUympjiAFLPi7w3Cg9GEeNCfACEpPxrTp45XZt3BDA5UNV8S",
+                    "body_reference": "b94b2580ca80f27c9655289579a0d71df0b7604dfa7c404e6c309cccf7730d2f",
+                    "ledger_proof_statement": {
+                      "connecting_ledger_right": "jwbhUympjiAFLPi7w3Cg9GEeNCfACEpPxrTp45XZt3BDA5UNV8S",
+                      "sok_digest": null,
+                      "target": {
+                        "local_state": {
+                          "full_transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                          "call_stack": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                          "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                          "excess": {
+                            "sgn": [
+                              "Pos"
+                            ],
+                            "magnitude": "0"
+                          },
+                          "success": true,
+                          "stack_frame": "0x0641662E94D68EC970D0AFC059D02729BBF4A2CD88C548CCD9FB1E26E570C66C",
+                          "will_succeed": true,
+                          "account_update_index": "0",
+                          "supply_increase": {
+                            "sgn": [
+                              "Pos"
+                            ],
+                            "magnitude": "0"
+                          },
+                          "ledger": "jw6bz2wud1N6itRUHZ5ypo3267stk4UgzkiuWtAMPRZo9g4Udyd",
+                          "failure_status_tbl": [],
+                          "transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000"
+                        },
+                        "pending_coinbase_stack": {
+                          "state": {
+                            "init": "4Yx5U3t3EYQycZ91yj4478bHkLwGkhDHnPbCY9TxgUk69SQityej",
+                            "curr": "4Yx5U3t3EYQycZ91yj4478bHkLwGkhDHnPbCY9TxgUk69SQityej"
+                          },
+                          "data": "4QNrZFBTDQCPfEZqBZsaPYx8qdaNFv1nebUyCUsQW9QUJqyuD3un"
+                        },
+                        "first_pass_ledger": "jwbhUympjiAFLPi7w3Cg9GEeNCfACEpPxrTp45XZt3BDA5UNV8S",
+                        "second_pass_ledger": "jwbhUympjiAFLPi7w3Cg9GEeNCfACEpPxrTp45XZt3BDA5UNV8S"
+                      },
+                      "fee_excess": [
+                        {
+                          "token": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                          "amount": {
+                            "sgn": [
+                              "Pos"
+                            ],
+                            "magnitude": "0"
+                          }
+                        },
+                        {
+                          "amount": {
+                            "sgn": [
+                              "Pos"
+                            ],
+                            "magnitude": "0"
+                          },
+                          "token": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
+                        }
+                      ],
+                      "source": {
+                        "second_pass_ledger": "jwbhUympjiAFLPi7w3Cg9GEeNCfACEpPxrTp45XZt3BDA5UNV8S",
+                        "local_state": {
+                          "account_update_index": "0",
+                          "supply_increase": {
+                            "sgn": [
+                              "Pos"
+                            ],
+                            "magnitude": "0"
+                          },
+                          "stack_frame": "0x0641662E94D68EC970D0AFC059D02729BBF4A2CD88C548CCD9FB1E26E570C66C",
+                          "ledger": "jw6bz2wud1N6itRUHZ5ypo3267stk4UgzkiuWtAMPRZo9g4Udyd",
+                          "transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                          "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                          "excess": {
+                            "sgn": [
+                              "Pos"
+                            ],
+                            "magnitude": "0"
+                          },
+                          "call_stack": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                          "will_succeed": true,
+                          "full_transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                          "failure_status_tbl": [],
+                          "success": true
+                        },
+                        "first_pass_ledger": "jwbhUympjiAFLPi7w3Cg9GEeNCfACEpPxrTp45XZt3BDA5UNV8S",
+                        "pending_coinbase_stack": {
+                          "data": "4QNrZFBTDQCPfEZqBZsaPYx8qdaNFv1nebUyCUsQW9QUJqyuD3un",
+                          "state": {
+                            "curr": "4Yx5U3t3EYQycZ91yj4478bHkLwGkhDHnPbCY9TxgUk69SQityej",
+                            "init": "4Yx5U3t3EYQycZ91yj4478bHkLwGkhDHnPbCY9TxgUk69SQityej"
+                          }
+                        }
+                      },
+                      "supply_increase": {
+                        "sgn": [
+                          "Pos"
+                        ],
+                        "magnitude": "0"
+                      },
+                      "connecting_ledger_left": "jwbhUympjiAFLPi7w3Cg9GEeNCfACEpPxrTp45XZt3BDA5UNV8S"
+                    },
+                    "staged_ledger_hash": {
+                      "pending_coinbase_hash": "2n2RMBVXRRZ6t1vo2nvExPE4TREotVgq4ayBnDtNc56QoxajRDoS",
+                      "non_snark": {
+                        "pending_coinbase_aux": "WAQjrtxd2upVJCra8vm3pzeBD9zKq9FXnUfQcJumD9Ff9E81yR",
+                        "ledger_hash": "jx6bKLsrYbnw6bQMYVBMGoi155GCuncBbvfLk8sp7U8aY5WTYup",
+                        "aux_hash": "W8tzkbcpPqVSRy1PBPvkZ6dRyWcGBK9UADhs2wUp7GFjqrxRDS"
+                      }
+                    },
+                    "timestamp": "1683739622600"
+                  },
+                  "consensus_state": {
+                    "last_vrf_output": "0uRC1o3WvALejoQPlC3Axpz2jgIJopZr20cr3f0FPgE=",
+                    "coinbase_receiver": "B62qpkCEM5N5ddVsYNbFtwWV4bsT9AwuUJXoehFhHUbYYvZ6j3fXt93",
+                    "block_creator": "B62qpkCEM5N5ddVsYNbFtwWV4bsT9AwuUJXoehFhHUbYYvZ6j3fXt93",
+                    "curr_global_slot": {
+                      "slots_per_epoch": "480",
+                      "slot_number": [
+                        "Since_hard_fork",
+                        "14"
+                      ]
+                    },
+                    "staking_epoch_data": {
+                      "lock_checkpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                      "epoch_length": "1",
+                      "start_checkpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                      "ledger": {
+                        "total_currency": "730300000001000",
+                        "hash": "jwbhUympjiAFLPi7w3Cg9GEeNCfACEpPxrTp45XZt3BDA5UNV8S"
+                      },
+                      "seed": "2va9BGv9JrLTtrzZttiEMDYw1Zj6a6EHzXjmP9evHDTG3oEquURA"
+                    },
+                    "next_epoch_data": {
+                      "epoch_length": "9",
+                      "start_checkpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                      "ledger": {
+                        "total_currency": "730300000001000",
+                        "hash": "jwbhUympjiAFLPi7w3Cg9GEeNCfACEpPxrTp45XZt3BDA5UNV8S"
+                      },
+                      "seed": "2vaXWiu9UcJ2wfF324copSsztwG1byEEGDCTVuNNmHcGzdDoSR5f",
+                      "lock_checkpoint": "3NKnRqx6Mp1PibTWL59P1hNCwyc4dhmam4TABP65bZyEc56h7PBF"
+                    },
+                    "supercharge_coinbase": true,
+                    "block_stake_winner": "B62qpkCEM5N5ddVsYNbFtwWV4bsT9AwuUJXoehFhHUbYYvZ6j3fXt93",
+                    "sub_window_densities": [
+                      "1",
+                      "0",
+                      "0",
+                      "2",
+                      "2",
+                      "2",
+                      "0",
+                      "1",
+                      "2",
+                      "2",
+                      "2"
+                    ],
+                    "total_currency": "730300000001000",
+                    "global_slot_since_genesis": [
+                      "Since_genesis",
+                      "14"
+                    ],
+                    "epoch_count": "0",
+                    "min_window_density": "22",
+                    "has_ancestor_in_same_checkpoint_window": true,
+                    "blockchain_length": "8"
+                  },
+                  "constants": {
+                    "slots_per_sub_window": "2",
+                    "genesis_state_timestamp": "1683737942600",
+                    "delta": "0",
+                    "slots_per_epoch": "480",
+                    "k": "20"
+                  }
+                },
+                "staged_ledger_diff": "<opaque>",
+                "current_protocol_version": "3.0.0"
+              }
+            },
+            "staged_ledger": "<opaque>"                
+          }
+
+        }
+  |json}
+  in
+  match
+    let breadcrumb = Yojson.Safe.from_string breadcrumb_json in
+    Block_produced.parse_breadcrumb breadcrumb
+  with
+  | Ok result ->
+      let expected =
+        Block_produced.
+          { block_height = 8
+          ; epoch = 0
+          ; global_slot = 14
+          ; snarked_ledger_generated = false
+          ; state_hash =
+              State_hash.of_base58_check_exn
+                "3NLBdEiVExFLZsTHJXqNwUFtG1nwTWN7Kd4mNCNjGKcFy2QeWjFL"
+          }
+      in
+      assert (Block_produced.equal result expected)
+  | Error e ->
+      failwith (Error.to_string_hum e)

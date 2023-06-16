@@ -1,10 +1,13 @@
 open Core_kernel
+open Common
 open Backend
 module Me = Tock
 module Other = Tick
 module Impl = Impls.Wrap
+open Pickles_types
+open Import
 
-let _high_entropy_bits = 128
+let high_entropy_bits = 128
 
 let sponge_params_constant =
   Sponge.Params.(map pasta_q_kimchi ~f:Impl.Field.Constant.of_string)
@@ -12,8 +15,7 @@ let sponge_params_constant =
 let field_random_oracle ?(length = Me.Field.size_in_bits - 1) s =
   Me.Field.of_bits (Ro.bits_random_oracle ~length s)
 
-let _unrelated_g =
-  let open Common in
+let unrelated_g =
   let group_map =
     unstage
       (group_map
@@ -86,19 +88,18 @@ let%test_unit "sponge" =
   let module T = Make_sponge.Test (Impl) (Tock_field_sponge.Field) (Sponge.S) in
   T.test Tock_field_sponge.params
 
-(* module Input_domain = struct
-     let _lagrange_commitments domain : Backend.Tock.Inner_curve.Affine.t array =
-       let domain_size = Import.Domain.size domain in
-       Common.time "lagrange" (fun () ->
-           Array.init domain_size ~f:(fun i ->
-               (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment
-                  (Backend.Tick.Keypair.load_urs ())
-                  domain_size i )
-                 .unshifted.(0)
-               |> Common.finite_exn ) )
+module Input_domain = struct
+  let lagrange_commitments domain : Me.Inner_curve.Affine.t array =
+    let domain_size = Domain.size domain in
+    time "lagrange" (fun () ->
+        Array.init domain_size ~f:(fun i ->
+            (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment
+               (Tick.Keypair.load_urs ()) domain_size i )
+              .unshifted.(0)
+            |> Common.finite_exn ) )
 
-     let _domain = Import.Domain.Pow_2_roots_of_unity 7
-   end *)
+  let domain = Domain.Pow_2_roots_of_unity 7
+end
 
 module Inner_curve = struct
   module C = Kimchi_pasta.Pasta.Vesta

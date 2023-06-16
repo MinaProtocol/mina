@@ -84,7 +84,7 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> nonce:Mina_numbers.Account_nonce.t
         -> memo:string
-        -> valid_until:Mina_numbers.Global_slot.t
+        -> valid_until:Mina_numbers.Global_slot_since_genesis.t
         -> raw_signature:string
         -> signed_command_result Deferred.Or_error.t
 
@@ -97,7 +97,7 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> nonce:Mina_numbers.Account_nonce.t
         -> memo:string
-        -> valid_until:Mina_numbers.Global_slot.t
+        -> valid_until:Mina_numbers.Global_slot_since_genesis.t
         -> raw_signature:string
         -> signed_command_result Malleable_error.t
 
@@ -166,6 +166,17 @@ module Engine = struct
         -> t
         -> account_id:Mina_base.Account_id.t
         -> account_data Malleable_error.t
+
+      val get_filtered_log_entries :
+           last_log_index_seen:int
+        -> t
+        -> string array Async_kernel.Deferred.Or_error.t
+
+      val start_filtered_log :
+           logger:Logger.t
+        -> log_filter:string list
+        -> t
+        -> unit Async_kernel.Deferred.Or_error.t
 
       val get_account_permissions :
            logger:Logger.t

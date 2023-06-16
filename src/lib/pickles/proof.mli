@@ -54,7 +54,7 @@ module Base : sig
               Pickles_types.Plonk_types.All_evals.Stable.V1.t
           ; proof : Backend.Tock.Proof.Stable.V2.t
           }
-        [@@deriving compare, sexp, hash, equal]
+        [@@deriving compare, sexp, yojson, hash, equal]
       end
     end]
 

@@ -61,6 +61,8 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
           state |> header |> Header.protocol_state |> Protocol_state.hashes)
           .state_hash
       in
+      Internal_tracing.Context_call.with_call_id ~tag:"block_received"
+      @@ fun () ->
       Internal_tracing.with_state_hash state_hash
       @@ fun () ->
       [%log internal] "@block_metadata"
@@ -131,24 +133,27 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
         Mina_block.transactions state
           ~constraint_constants:Genesis_constants.Constraint_constants.compiled
       in
-      let exists_too_big_txn =
-        (* we only detect and log the first too-big transaction *)
+      let exists_well_formedness_errors =
         List.exists transactions ~f:(fun txn ->
-            let size_validity =
-              Mina_transaction.Transaction.valid_size ~genesis_constants
-                txn.data
-            in
-            match size_validity with
+            match
+              Mina_transaction.Transaction.check_well_formedness
+                ~genesis_constants txn.data
+            with
             | Ok () ->
                 false
-            | Error err ->
+            | Error errs ->
                 [%log warn]
-                  "Rejecting block with at least one too-big transaction"
+                  "Rejecting block due to one or more errors in a transaction"
                   ~metadata:
-                    [ ("size_violation", Error_json.error_to_yojson err) ] ;
+                    [ ( "errors"
+                      , `List
+                          (List.map errs
+                             ~f:User_command.Well_formedness_error.to_yojson )
+                      )
+                    ] ;
                 true )
       in
-      if exists_too_big_txn then
+      if exists_well_formedness_errors then
         Mina_net2.Validation_callback.fire_if_not_already_fired cb `Reject ;
       let lift_consensus_time =
         Fn.compose Unsigned.UInt32.to_int

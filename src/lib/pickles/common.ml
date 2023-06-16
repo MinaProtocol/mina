@@ -10,7 +10,7 @@ module Max_degree = struct
 
   let wrap_log2 = Nat.to_int Backend.Tock.Rounds.n
 
-  let _wrap = 1 lsl wrap_log2
+  let wrap = 1 lsl wrap_log2
 end
 
 let tick_shifts, tock_shifts =
@@ -28,7 +28,7 @@ let wrap_domains ~proofs_verified =
   let h =
     match proofs_verified with 0 -> 13 | 1 -> 14 | 2 -> 15 | _ -> assert false
   in
-  { Domains.h = Domain.Pow_2_roots_of_unity h }
+  { Domains.h = Pow_2_roots_of_unity h }
 
 let actual_wrap_domain_size ~log_2_domain_size =
   let d =
@@ -47,6 +47,7 @@ let actual_wrap_domain_size ~log_2_domain_size =
 let hash_messages_for_next_step_proof ~app_state
     (t : _ Types.Step.Proof_state.Messages_for_next_step_proof.t) =
   let g (x, y) = [ x; y ] in
+  let open Backend in
   Tick_field_sponge.digest Tick_field_sponge.params
     (Types.Step.Proof_state.Messages_for_next_step_proof.to_field_elements t ~g
        ~comm:(fun (x : Tock.Curve.Affine.t) -> Array.of_list (g x))
@@ -88,47 +89,51 @@ let group_map m ~a ~b =
   stage (fun x -> Group_map.to_group m ~params x)
 
 module Shifts = struct
-  let tock2 : Backend.Tock.Field.t Shifted_value.Type2.Shift.t =
-    Shifted_value.Type2.Shift.create (module Backend.Tock.Field)
+  let tock1 : Tock.Field.t Shifted_value.Type1.Shift.t =
+    Shifted_value.Type1.Shift.create (module Tock.Field)
 
-  let tick1 : Backend.Tick.Field.t Shifted_value.Type1.Shift.t =
-    Shifted_value.Type1.Shift.create (module Backend.Tick.Field)
+  let tock2 : Tock.Field.t Shifted_value.Type2.Shift.t =
+    Shifted_value.Type2.Shift.create (module Tock.Field)
+
+  let tick1 : Tick.Field.t Shifted_value.Type1.Shift.t =
+    Shifted_value.Type1.Shift.create (module Tick.Field)
+
+  let tick2 : Tick.Field.t Shifted_value.Type2.Shift.t =
+    Shifted_value.Type2.Shift.create (module Tick.Field)
 end
 
 module Lookup_parameters = struct
   let tick_zero : _ Composition_types.Zero_values.t =
-    Composition_types.Zero_values.
-      { value =
-          { challenge = Challenge.Constant.zero
-          ; scalar =
-              Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
-          }
-      ; var =
-          { challenge = Impls.Step.Field.zero
-          ; scalar =
-              Shifted_value.Type2.Shifted_value
-                (Impls.Step.Field.zero, Impls.Step.Boolean.false_)
-          }
-      }
+    { value =
+        { challenge = Challenge.Constant.zero
+        ; scalar =
+            Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
+        }
+    ; var =
+        { challenge = Impls.Step.Field.zero
+        ; scalar =
+            Shifted_value.Type2.Shifted_value
+              (Impls.Step.Field.zero, Impls.Step.Boolean.false_)
+        }
+    }
 
   let tock_zero : _ Composition_types.Zero_values.t =
-    Composition_types.Zero_values.
-      { value =
-          { challenge = Challenge.Constant.zero
-          ; scalar =
-              Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
-          }
-      ; var =
-          { challenge = Impls.Wrap.Field.zero
-          ; scalar = Shifted_value.Type2.Shifted_value Impls.Wrap.Field.zero
-          }
-      }
+    { value =
+        { challenge = Challenge.Constant.zero
+        ; scalar =
+            Shifted_value.Type2.Shifted_value Impls.Wrap.Field.Constant.zero
+        }
+    ; var =
+        { challenge = Impls.Wrap.Field.zero
+        ; scalar = Shifted_value.Type2.Shifted_value Impls.Wrap.Field.zero
+        }
+    }
 end
 
 let finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a = function
-  | Kimchi_types.Finite (x, y) ->
+  | Finite (x, y) ->
       (x, y)
-  | Kimchi_types.Infinity ->
+  | Infinity ->
       invalid_arg "finite_exn"
 
 let or_infinite_conv : ('a * 'a) Or_infinity.t -> 'a Kimchi_types.or_infinity =
@@ -143,7 +148,9 @@ module Ipa = struct
 
   (* TODO: Make all this completely generic over backend *)
 
-  let compute_challenge ~endo_to_field _ c = endo_to_field c
+  let compute_challenge (type f) ~endo_to_field
+      (module Field : Kimchi_backend.Field.S with type t = f) c =
+    endo_to_field c
 
   let compute_challenges ~endo_to_field field chals =
     Vector.map chals ~f:(fun prechallenge ->
@@ -228,8 +235,8 @@ let tick_public_input_of_statement ~max_proofs_verified ~feature_flags
     (Backend.Tick.Field.Vector.length input)
     ~f:(Backend.Tick.Field.Vector.get input)
 
-let ft_comm ~add:( + ) ~scale ~endoscale:_ ~negate
-    ~verification_key:(m : _ Plonk_verification_key_evals.t) ~alpha:_
+let ft_comm ~add:( + ) ~scale ~endoscale ~negate
+    ~verification_key:(m : _ Plonk_verification_key_evals.t) ~alpha
     ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t)
     ~t_comm =
   let ( * ) x g = scale g x in
