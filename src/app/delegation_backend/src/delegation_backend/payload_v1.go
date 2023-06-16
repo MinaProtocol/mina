@@ -19,12 +19,6 @@ type submitRequestV1 struct {
 	Data submitRequestDataV1 `json:"data"`
 }
 
-type MetaToBeSavedV1 struct {
-	MetaToBeSavedV0
-	GraphqlControlPort int    `json:"graphql_control_port,omitempty"`
-	BuiltWithCommitSha string `json:"built_with_commit_sha"`
-}
-
 func (req submitRequestV1) GetSubmitter() Pk {
 	return req.Submitter
 }
@@ -72,14 +66,13 @@ func (req submitRequestV1) GetCreatedAt() time.Time {
 }
 
 func (req submitRequestV1) MakeMetaToBeSaved(remoteAddr string) ([]byte, error) {
-	meta := MetaToBeSavedV1{
-		MetaToBeSavedV0: MetaToBeSavedV0{
-			CreatedAt:  req.Data.CreatedAt.Format(time.RFC3339),
-			PeerId:     req.Data.PeerId,
-			SnarkWork:  req.Data.SnarkWork,
-			RemoteAddr: remoteAddr,
-			BlockHash:  req.GetBlockDataHash(),
-			Submitter:  req.Submitter},
+	meta := MetaToBeSaved{
+		CreatedAt:          req.Data.CreatedAt.Format(time.RFC3339),
+		PeerId:             req.Data.PeerId,
+		SnarkWork:          req.Data.SnarkWork,
+		RemoteAddr:         remoteAddr,
+		BlockHash:          req.GetBlockDataHash(),
+		Submitter:          req.Submitter,
 		GraphqlControlPort: req.Data.GraphqlControlPort,
 		BuiltWithCommitSha: req.Data.BuiltWithCommitSha,
 	}

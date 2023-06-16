@@ -190,7 +190,7 @@ func TestSuccess(t *testing.T) {
 		}
 		bhStr := req.Data.GetBlockDataHash()
 		paths := makePaths(tm.Now(), bhStr, req.GetSubmitter())
-		var meta MetaToBeSavedV0
+		var meta MetaToBeSaved
 		meta.CreatedAt = req.Data.CreatedAt.Format(time.RFC3339)
 		meta.PeerId = req.Data.PeerId
 		meta.SnarkWork = req.Data.SnarkWork

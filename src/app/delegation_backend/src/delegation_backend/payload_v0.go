@@ -20,15 +20,6 @@ type submitRequestV0 struct {
 	Data submitRequestDataV0 `json:"data"`
 }
 
-type MetaToBeSavedV0 struct {
-	CreatedAt  string  `json:"created_at"`
-	PeerId     string  `json:"peer_id"`
-	SnarkWork  *Base64 `json:"snark_work,omitempty"`
-	RemoteAddr string  `json:"remote_addr"`
-	Submitter  Pk      `json:"submitter"`  // is base58check-encoded submitter's public key
-	BlockHash  string  `json:"block_hash"` // is base58check-encoded hash of a block
-}
-
 func (req submitRequestDataV0) GetBlockDataHash() string {
 	blockHashBytes := blake2b.Sum256(req.Block.data)
 	return base58.CheckEncode(blockHashBytes[:], BASE58CHECK_VERSION_BLOCK_HASH)
@@ -61,7 +52,7 @@ func (req submitRequestDataV0) GetCreatedAt() time.Time {
 }
 
 func (req submitRequestV0) MakeMetaToBeSaved(remoteAddr string) ([]byte, error) {
-	meta := MetaToBeSavedV0{
+	meta := MetaToBeSaved{
 		CreatedAt:  req.Data.CreatedAt.Format(time.RFC3339),
 		PeerId:     req.Data.PeerId,
 		SnarkWork:  req.Data.SnarkWork,
