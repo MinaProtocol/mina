@@ -2,11 +2,14 @@
 
 set -eo pipefail
 
-
-if [ ! "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" = "compatible" ] && [ ! "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" = release/* ]; then
-  echo "Not pulling against compatible or not in release branch. Therefore, not running the connect test"
-  exit 0
-fi
+case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
+    compatible|release/*)
+      echo "Not pulling against compatible or not in release branch. Therefore, not running the connect test"
+      exit 0
+      ;;
+    *) 
+      ;;
+esac
 
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
