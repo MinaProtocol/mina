@@ -75,7 +75,7 @@ func (sh *SubmitH) testRequest(body []byte) *httptest.ResponseRecorder {
 }
 
 func readTestFile(n string, t *testing.T) []byte {
-	body, err := ioutil.ReadFile("../test/data/" + n + ".json")
+	body, err := ioutil.ReadFile("../../test/data/" + n + ".json")
 	if err != nil {
 		t.Log("can not read test file")
 		t.FailNow()
@@ -195,7 +195,6 @@ func TestSuccess(t *testing.T) {
 		meta.PeerId = req.Data.PeerId
 		meta.SnarkWork = req.Data.SnarkWork
 		meta.RemoteAddr = "192.0.2.1:1234"
-		meta.BlockProducerVersion = req.Data.BlockProducerVersion
 		meta.BlockHash = bhStr
 		meta.Submitter = req.Submitter
 		metaBytes, err2 := json.Marshal(meta)
