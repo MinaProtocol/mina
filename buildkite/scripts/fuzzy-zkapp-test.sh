@@ -2,14 +2,15 @@
 
 set -eo pipefail
 
-if [[ $# -ne 3 ]]; then
-    echo "Usage: $0 <dune-profile> <path-to-source-tests> <number-of-trials>"
+if [[ $# -ne 4 ]]; then
+    echo "Usage: $0 <dune-profile> <path-to-source-tests> <timeout> <individual-test-timeout>"
     exit 1
 fi
 
 profile=$1
 path=$2
-trials=$3
+timeout=$3
+individual_test_timeout=$4
 
 if [ "$NIGHTLY" = true ]
 then
@@ -22,9 +23,9 @@ then
   # skip running all of the tests that have already succeeded, since dune will
   # only retry those tests that failed.
   echo "--- Run fuzzy zkapp tests"
-  time dune exec "${path}" --profile="${profile}" -j16 -- --trials "${trials}" || \
+  time dune exec "${path}" --profile="${profile}" -j16 -- --timeout "${timeout}" --individual-test-timeout "${individual_test_timeout}" --seed "${RANDOM}" || \
   (./scripts/link-coredumps.sh && \
    echo "--- Retrying failed unit tests" && \
-   time dune exec "${path}" --profile="${profile}" -j16 -- --trials "${trials}" || \
+   time dune exec "${path}" --profile="${profile}" -j16 -- --timeout "${timeout}" --individual-test-timeout "${individual_test_timeout}" --seed "${RANDOM}" || \
    (./scripts/link-coredumps.sh && false))
 fi

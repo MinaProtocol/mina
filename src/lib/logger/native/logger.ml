@@ -33,7 +33,7 @@ module Time = struct
   let of_yojson json =
     json |> Yojson.Safe.Util.to_string |> fun s -> Ok (Time.of_string s)
 
-  let pp ppf timestamp =
+  let pretty_to_string timestamp =
     (* This used to be
        [Core.Time.format timestamp "%Y-%m-%d %H:%M:%S UTC"
         ~zone:Time.Zone.utc]
@@ -44,11 +44,14 @@ module Time = struct
     let zone = Time.Zone.utc in
     let date, time = Time.to_date_ofday ~zone timestamp in
     let time_parts = Time.Ofday.to_parts time in
-    Format.fprintf ppf "%i-%02d-%02d %02d:%02d:%02d UTC" (Date.year date)
+    let fmt_2_chars () i =
+      let s = string_of_int i in
+      if Int.(i < 10) then "0" ^ s else s
+    in
+    Stdlib.Format.sprintf "%i-%a-%a %a:%a:%a UTC" (Date.year date) fmt_2_chars
       (Date.month date |> Month.to_int)
-      (Date.day date) time_parts.hr time_parts.min time_parts.sec
-
-  let pretty_to_string timestamp = Format.asprintf "%a" pp timestamp
+      fmt_2_chars (Date.day date) fmt_2_chars time_parts.hr fmt_2_chars
+      time_parts.min fmt_2_chars time_parts.sec
 
   let pretty_to_string_ref = ref pretty_to_string
 
@@ -202,15 +205,14 @@ module Processor = struct
                   err ) ;
             None
         | Ok (str, extra) ->
-            let msg =
-              (* The previously existing \t has been changed to 2 spaces. *)
-              Format.asprintf "@[<v 2>%a [%a] %s@,%a@]" Time.pp msg.timestamp
-                Level.pp msg.level str
-                (Format.pp_print_list ~pp_sep:Format.pp_print_cut
-                   (fun ppf (k, v) -> Format.fprintf ppf "%s: %s" k v) )
-                extra
+            let formatted_extra =
+              extra
+              |> List.map ~f:(fun (k, v) -> "\n\t" ^ k ^ ": " ^ v)
+              |> String.concat ~sep:""
             in
-            Some msg
+            let time = Time.pretty_to_string msg.timestamp in
+            Some
+              (time ^ " [" ^ Level.show msg.level ^ "] " ^ str ^ formatted_extra)
   end
 
   let raw ?(log_level = Level.Spam) () = T ((module Raw), Raw.create ~log_level)

@@ -140,7 +140,7 @@ module Stable = struct
       let t : Impls.Wrap.Verification_key.t =
         let log2_size = Int.ceil_log2 d.constraints in
         let public =
-          let (T (input, _conv, _conv_inv)) = Impls.Wrap.input () in
+          let (T (input, conv, _conv_inv)) = Impls.Wrap.input () in
           let (Typ typ) = input in
           typ.size_in_field_elements
         in

@@ -666,6 +666,8 @@ let api_tests =
   ; ("compile monadic API", `Quick, MonadicAPI.get_hash_of_circuit)
   ]
 
+(* run tests *)
+
 let () =
   let range_checks =
     List.map ~f:QCheck_alcotest.to_alcotest [ RangeCircuits.test_range_gates ]
