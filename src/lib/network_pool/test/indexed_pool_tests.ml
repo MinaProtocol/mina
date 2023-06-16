@@ -380,7 +380,7 @@ let remove_lowest_fee () =
   |> fun all_by_fee_cmds ->
   assert (List.(equal cmd_equal all_by_fee_cmds commands_to_keep))
 
-let get_highest_fee () =
+let find_highest_fee () =
   let cmds =
     gen_cmd () |> Quickcheck.random_sequence |> Fn.flip Sequence.take 4
     |> Sequence.to_list

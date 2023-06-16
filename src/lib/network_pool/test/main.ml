@@ -14,7 +14,7 @@ let () =
           ; test_case "Txn with lowest fee rate is removed" `Quick
               remove_lowest_fee
           ; test_case "Get txn with the hioghest fee rate" `Quick
-              get_highest_fee
+              find_highest_fee
           ; test_case "Test support for zkApp commands." `Quick
               support_for_zkapp_command_commands
           ; test_case
