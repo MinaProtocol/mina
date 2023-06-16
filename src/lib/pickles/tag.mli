@@ -1,4 +1,6 @@
-(* Tags *)
+(** A globally-unique identifier tag to look up the data for a collection of
+    inductive rules. Used to declare dependencies between families of rules.
+*)
 
 open Core_kernel
 
