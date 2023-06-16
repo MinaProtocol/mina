@@ -1,3 +1,5 @@
+(** Vectors of 4 limbs of int64 *)
+
 module Limbs = Pickles_types.Nat.N4
 
 type nat4 := Limbs.n
