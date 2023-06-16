@@ -1,4 +1,6 @@
-(** [Inner Product Argument] *)
+(** Dummy values used to pad lists inside proofs to a standard length, to ensure
+    heterogeneous proofs *)
+
 module Ipa : sig
   module Wrap : sig
     val challenges :
