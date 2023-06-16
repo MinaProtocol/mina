@@ -2308,7 +2308,7 @@ let client_trustlist_group =
     ]
 
 let advanced =
-  Command.group ~summary:"Advanced client commands"
+  let cmds0 =
     [ ("get-nonce", get_nonce_cmd)
     ; ("client-trustlist", client_trustlist_group)
     ; ("get-trust-status", get_trust_status)
@@ -2349,8 +2349,14 @@ let advanced =
     ; ("runtime-config", runtime_config)
     ; ("vrf", Cli_lib.Commands.Vrf.command_group)
     ; ("thread-graph", thread_graph)
-    ; ("itn-create-accounts", itn_create_accounts)
     ]
+  in
+  let cmds =
+    if Mina_compile_config.itn_features then
+      ("itn-create-accounts", itn_create_accounts) :: cmds0
+    else cmds0
+  in
+  Command.group ~summary:"Advanced client commands" cmds
 
 let ledger =
   Command.group ~summary:"Ledger commands"

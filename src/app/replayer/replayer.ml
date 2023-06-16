@@ -40,8 +40,6 @@ type output =
   }
 [@@deriving yojson]
 
-type command_type = [ `Internal_command | `User_command | `Zkapp_command ]
-
 module type Get_command_ids = sig
   val run :
        Caqti_async.connection
@@ -49,13 +47,6 @@ module type Get_command_ids = sig
     -> start_slot:int64
     -> (int list, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t
 end
-
-type balance_block_data =
-  { block_id : int
-  ; block_height : int64
-  ; sequence_no : int
-  ; secondary_sequence_no : int
-  }
 
 let error_count = ref 0
 
@@ -380,8 +371,8 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
       | ty ->
           failwithf "Unknown internal command type: %s" ty () )
 
-let user_command_to_transaction ~logger ~pool ~ledger (cmd : Sql.User_command.t)
-    : Mina_transaction.Transaction.t Deferred.t =
+let user_command_to_transaction ~logger ~pool (cmd : Sql.User_command.t) :
+    Mina_transaction.Transaction.t Deferred.t =
   [%log info]
     "Converting user command (%s) with nonce %Ld, global slot since genesis \
      %Ld, and sequence number %d to transaction"
@@ -1199,9 +1190,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
               check_for_complete_block
                 ~cmd_global_slot_since_genesis:uc.global_slot_since_genesis
             in
-            let%bind txn =
-              user_command_to_transaction ~logger ~pool ~ledger uc
-            in
+            let%bind txn = user_command_to_transaction ~logger ~pool uc in
             apply_commands ~block_txns:(txn :: block_txns)
               ~last_global_slot_since_genesis:uc.global_slot_since_genesis
               ~last_block_id:uc.block_id internal_cmds ucs zkapp_cmds
@@ -1226,9 +1215,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                   check_for_complete_block
                     ~cmd_global_slot_since_genesis:uc.global_slot_since_genesis
                 in
-                let%bind txn =
-                  user_command_to_transaction ~logger ~pool ~ledger uc
-                in
+                let%bind txn = user_command_to_transaction ~logger ~pool uc in
                 apply_commands ~block_txns:(txn :: block_txns)
                   ~last_global_slot_since_genesis:uc.global_slot_since_genesis
                   ~last_block_id:uc.block_id internal_cmds ucs zkapp_cmds
@@ -1299,9 +1286,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                   check_for_complete_block
                     ~cmd_global_slot_since_genesis:uc.global_slot_since_genesis
                 in
-                let%bind txn =
-                  user_command_to_transaction ~logger ~pool ~ledger uc
-                in
+                let%bind txn = user_command_to_transaction ~logger ~pool uc in
                 apply_commands ~block_txns:(txn :: block_txns)
                   ~last_global_slot_since_genesis:uc.global_slot_since_genesis
                   ~last_block_id:uc.block_id internal_cmds ucs zkapp_cmds )
@@ -1335,9 +1320,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error () =
                   check_for_complete_block
                     ~cmd_global_slot_since_genesis:uc.global_slot_since_genesis
                 in
-                let%bind txn =
-                  user_command_to_transaction ~logger ~pool ~ledger uc
-                in
+                let%bind txn = user_command_to_transaction ~logger ~pool uc in
                 apply_commands ~block_txns:(txn :: block_txns)
                   ~last_global_slot_since_genesis:uc.global_slot_since_genesis
                   ~last_block_id:uc.block_id internal_cmds ucs zkapp_cmds

@@ -47,7 +47,7 @@ module Global_slot_since_genesis = struct
     module type S = V1S0
   end
 
-  type global_slot = Since_genesis of Unsigned.UInt32.t
+  type global_slot = Since_genesis of Unsigned.UInt32.t [@@unboxed]
 
   module type Concrete = Types.S with type V1.t = global_slot
 
@@ -70,7 +70,7 @@ module Global_slot_since_hard_fork = struct
     module type S = V1S0
   end
 
-  type global_slot = Since_hard_fork of Unsigned.UInt32.t
+  type global_slot = Since_hard_fork of Unsigned.UInt32.t [@@unboxed]
 
   module type Concrete = Types.S with type V1.t = global_slot
 
@@ -93,7 +93,7 @@ module Global_slot_span = struct
     module type S = V1S0
   end
 
-  type global_slot_span = Global_slot_span of Unsigned.UInt32.t
+  type global_slot_span = Global_slot_span of Unsigned.UInt32.t [@@unboxed]
 
   module type Concrete = Types.S with type V1.t = global_slot_span
 

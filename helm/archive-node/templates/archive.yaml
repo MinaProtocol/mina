@@ -194,3 +194,20 @@ spec:
   storageClassName: "{{ $.Values.storage.storageClass }}"
 ---
 {{ end }}
+---
+{{- if $.Values.mina.exposeGraphql }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "archive-node.fullname" . }}-graphql
+spec:
+  type: ClusterIP
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ template "archive-node.fullname" . }}
+  ports:
+  - name: http-graphql
+    protocol: TCP
+    port: 80
+    targetPort: {{ $.Values.mina.ports.graphql }}
+{{- end }}
