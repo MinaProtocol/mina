@@ -234,7 +234,7 @@ let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
 let get_peer_id ~logger node_uri =
   let open Deferred.Or_error.Let_syntax in
   [%log info] "Getting node's peer_id, and the peer_ids of node's peers"
-    ~metadata:[ ("node_uri", Yojson.Safe.from_string (Uri.to_string node_uri)) ] ;
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
   let query_obj = Graphql.Query_peer_id.(make @@ makeVariables ()) in
   let%bind query_result_obj =
     exec_graphql_request ~logger ~node_uri ~query_name:"query_peer_id" query_obj
@@ -295,7 +295,7 @@ let get_account_data ~logger node_uri ~public_key =
   [%log info] "Getting account balance"
     ~metadata:
       [ ("pub_key", Signature_lib.Public_key.Compressed.to_yojson public_key)
-      ; ("node_uri", Yojson.Safe.from_string (Uri.to_string node_uri))
+      ; ("node_uri", `String (Uri.to_string node_uri))
       ] ;
   (* let pk = Mina_base.Account_id.public_key account_id in *)
   (* let token = Mina_base.Account_id.token_id account_id in *)
@@ -338,7 +338,7 @@ let send_payment ~logger node_uri ~sender_pub_key ~receiver_pub_key ~amount ~fee
     ~metadata:
       [ ( "sender_pub_key"
         , Signature_lib.Public_key.Compressed.to_yojson sender_pub_key )
-      ; ("node_uri", Yojson.Safe.from_string (Uri.to_string node_uri))
+      ; ("node_uri", `String (Uri.to_string node_uri))
       ] ;
   let open Deferred.Or_error.Let_syntax in
   let sender_pk_str =
@@ -392,7 +392,7 @@ let send_delegation ~logger node_uri ~sender_pub_key ~receiver_pub_key ~fee =
     ~metadata:
       [ ( "sender_pub_key"
         , Signature_lib.Public_key.Compressed.to_yojson sender_pub_key )
-      ; ("node_uri", Yojson.Safe.from_string (Uri.to_string node_uri))
+      ; ("node_uri", `String (Uri.to_string node_uri))
       ] ;
   let open Deferred.Or_error.Let_syntax in
   let sender_pk_str =
@@ -449,7 +449,7 @@ let send_payment_with_raw_sig ~logger node_uri ~sender_pub_key ~receiver_pub_key
     ~metadata:
       [ ( "sender_pub_key"
         , Signature_lib.Public_key.Compressed.to_yojson sender_pub_key )
-      ; ("node_uri", Yojson.Safe.from_string (Uri.to_string node_uri))
+      ; ("node_uri", `String (Uri.to_string node_uri))
       ] ;
   let open Deferred.Or_error.Let_syntax in
   let send_payment_graphql () =
@@ -498,7 +498,7 @@ let send_test_payments ~(repeat_count : Unsigned.UInt32.t)
     ~(senders : Import.Private_key.t list) ~(receiver_pub_key : Account.key)
     ~amount ~fee =
   [%log info] "Sending a series of test payments"
-    ~metadata:[ ("node_uri", Yojson.Safe.from_string (Uri.to_string node_uri)) ] ;
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
   let open Deferred.Or_error.Let_syntax in
   let send_payment_graphql () =
     let send_payment_obj =
@@ -526,7 +526,7 @@ let set_snark_worker ~logger node_uri ~new_snark_pub_key =
     ~metadata:
       [ ( "new_snark_pub_key"
         , Signature_lib.Public_key.Compressed.to_yojson new_snark_pub_key )
-      ; ("node_uri", Yojson.Safe.from_string (Uri.to_string node_uri))
+      ; ("node_uri", `String (Uri.to_string node_uri))
       ] ;
   let open Deferred.Or_error.Let_syntax in
   let set_snark_worker_graphql () =
@@ -559,7 +559,7 @@ let must_set_snark_worker ~logger t ~new_snark_pub_key =
 let get_metrics ~logger node_uri =
   let open Deferred.Or_error.Let_syntax in
   [%log info] "Getting node's metrics"
-    ~metadata:[ ("node_uri", Yojson.Safe.from_string (Uri.to_string node_uri)) ] ;
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
   let query_obj = Graphql.Query_metrics.make () in
   let%bind query_result_obj =
     exec_graphql_request ~logger ~node_uri ~query_name:"query_metrics" query_obj
