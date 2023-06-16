@@ -217,6 +217,10 @@ val net : t -> Mina_networking.t
 
 val runtime_config : t -> Runtime_config.t
 
+val start_filtered_log : t -> string list -> unit Or_error.t
+
+val get_filtered_log_entries : t -> int -> string list * bool
+
 val verifier : t -> Verifier.t
 
 val vrf_evaluator : t -> Vrf_evaluator.t

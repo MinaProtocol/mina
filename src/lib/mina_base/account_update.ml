@@ -1675,36 +1675,6 @@ module Body = struct
     ; may_use_token
     ; authorization_kind
     }
-
-  let gen_with_events_and_actions =
-    let open Quickcheck.Generator.Let_syntax in
-    let%map public_key = Public_key.Compressed.gen
-    and token_id = Token_id.gen
-    and update = Update.gen ()
-    and balance_change = Currency.Amount.Signed.gen
-    and increment_nonce = Quickcheck.Generator.bool
-    and events = return [ [| Field.zero |]; [| Field.zero |] ]
-    and actions = return [ [| Field.zero |]; [| Field.zero |] ]
-    and call_data = Field.gen
-    and preconditions = Preconditions.gen
-    and use_full_commitment = Quickcheck.Generator.bool
-    and implicit_account_creation_fee = Quickcheck.Generator.bool
-    and may_use_token = May_use_token.gen
-    and authorization_kind = Authorization_kind.gen in
-    { public_key
-    ; token_id
-    ; update
-    ; balance_change
-    ; increment_nonce
-    ; events
-    ; actions
-    ; call_data
-    ; preconditions
-    ; use_full_commitment
-    ; implicit_account_creation_fee
-    ; may_use_token
-    ; authorization_kind
-    }
 end
 
 module T = struct
@@ -1769,12 +1739,6 @@ module T = struct
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
     let%map body = Body.gen and authorization = Control.gen_with_dummies in
-    { body; authorization }
-
-  let gen_with_events_and_actions : t Quickcheck.Generator.t =
-    let open Quickcheck.Generator.Let_syntax in
-    let%map body = Body.gen_with_events_and_actions
-    and authorization = Control.gen_with_dummies in
     { body; authorization }
 
   let quickcheck_generator : t Quickcheck.Generator.t = gen

@@ -1,9 +1,11 @@
 open Core_kernel
 open Common
 open Backend
+open Pickles_types
 module Impl = Impls.Step
+open Import
 
-let _high_entropy_bits = 128
+let high_entropy_bits = 128
 
 let sponge_params_constant =
   Sponge.Params.(map pasta_p_kimchi ~f:Impl.Field.Constant.of_string)
@@ -11,7 +13,7 @@ let sponge_params_constant =
 let tick_field_random_oracle ?(length = Tick.Field.size_in_bits - 1) s =
   Tick.Field.of_bits (Ro.bits_random_oracle ~length s)
 
-let _unrelated_g =
+let unrelated_g =
   let group_map =
     unstage
       (group_map
@@ -39,18 +41,18 @@ end
 let sponge_params =
   Sponge.Params.(map sponge_params_constant ~f:Impl.Field.constant)
 
-(* module Unsafe = struct
-     let _unpack_unboolean ?(length = Field.size_in_bits) x =
-       let res =
-         exists
-           (Typ.list Boolean.typ_unchecked ~length)
-           ~compute:
-             As_prover.(
-               fun () -> List.take (Field.Constant.unpack (read_var x)) length)
-       in
-       Field.Assert.equal x (Field.project res) ;
-       res
-   end *)
+module Unsafe = struct
+  let unpack_unboolean ?(length = Field.size_in_bits) x =
+    let res =
+      exists
+        (Typ.list Boolean.typ_unchecked ~length)
+        ~compute:
+          As_prover.(
+            fun () -> List.take (Field.Constant.unpack (read_var x)) length)
+    in
+    Field.Assert.equal x (Field.project res) ;
+    res
+end
 
 module Sponge = struct
   module Permutation =
@@ -91,23 +93,23 @@ let%test_unit "sponge" =
   let module T = Make_sponge.Test (Impl) (Tick_field_sponge.Field) (Sponge.S) in
   T.test Tick_field_sponge.params
 
-(* module Input_domain = struct
-     let domain = Import.Domain.Pow_2_roots_of_unity 6
+module Input_domain = struct
+  let domain = Domain.Pow_2_roots_of_unity 6
 
-     let _lagrange_commitments =
-       lazy
-         (let domain_size = Import.Domain.size domain in
-          Common.time "lagrange" (fun () ->
-              Array.init domain_size ~f:(fun i ->
-                  let v =
-                    (Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment
-                       (Backend.Tock.Keypair.load_urs ())
-                       domain_size i )
-                      .unshifted
-                  in
-                  assert (Array.length v = 1) ;
-                  v.(0) |> Common.finite_exn ) ) )
-   end *)
+  let lagrange_commitments =
+    lazy
+      (let domain_size = Domain.size domain in
+       time "lagrange" (fun () ->
+           Array.init domain_size ~f:(fun i ->
+               let v =
+                 (Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment
+                    (Backend.Tock.Keypair.load_urs ())
+                    domain_size i )
+                   .unshifted
+               in
+               assert (Array.length v = 1) ;
+               v.(0) |> Common.finite_exn ) ) )
+end
 
 module Inner_curve = struct
   module C = Kimchi_pasta.Pasta.Pallas
@@ -116,6 +118,7 @@ module Inner_curve = struct
     module Impl = Impl
 
     module Params = struct
+      open Impl.Field.Constant
       include C.Params
 
       let one = C.to_affine_exn C.one
