@@ -31,8 +31,6 @@ module Time : sig
 
   val of_yojson : Yojson.Safe.t -> (t, string) Result.t
 
-  val pp : Format.formatter -> t -> unit
-
   val pretty_to_string : t -> string
 
   val set_pretty_to_string : (t -> string) -> unit
@@ -85,6 +83,8 @@ module Processor : sig
 
   val raw : ?log_level:Level.t -> unit -> t
 
+  val raw_structured_log_events : Structured_log_events.Set.t -> t
+
   val pretty :
     log_level:Level.t -> config:Interpolator_lib.Interpolator.config -> t
 end
@@ -102,6 +102,9 @@ module Transport : sig
   type t
 
   val create : (module S with type t = 'transport_data) -> 'transport_data -> t
+
+  (** A transport that calls the given function on each log line *)
+  val raw : (string -> unit) -> t
 
   val stdout : unit -> t
 end

@@ -1,3 +1,5 @@
+open Core_kernel
+
 let create ~of_int =
   let one = of_int 1 in
   let open Pickles_types in
