@@ -208,7 +208,7 @@ module type Network_pool_base_intf = sig
 
   val resource_pool : t -> resource_pool
 
-  val broadcasts : t -> resource_pool_diff Linear_pipe.Reader.t
+  val broadcasts : t -> resource_pool_diff With_nonce.t Linear_pipe.Reader.t
 
   val create_rate_limiter : unit -> Rate_limiter.t
 

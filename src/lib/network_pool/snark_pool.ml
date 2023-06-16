@@ -1130,7 +1130,7 @@ let%test_module "random set test" =
                    |> Deferred.don't_wait_for ) ;
             don't_wait_for
             @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)
-                 ~f:(fun work_command ->
+                 ~f:(fun With_nonce.{ message = work_command; _ } ->
                    let work =
                      match work_command with
                      | Mock_snark_pool.Resource_pool.Diff.Add_solved_work
