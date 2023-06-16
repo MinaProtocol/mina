@@ -1,16 +1,15 @@
 package main
 
 import (
-	dg "block_producers_uptime/delegation_backend"
-	itn "block_producers_uptime/itn_uptime_analyzer"
-	"context"
-
-	"cloud.google.com/go/storage"
 	logging "github.com/ipfs/go-log/v2"
+	"cloud.google.com/go/storage"
 	sheets "google.golang.org/api/sheets/v4"
+	"context"
+	itn "block_producers_uptime/itn_uptime_analyzer"
+	dg "block_producers_uptime/delegation_backend"
 )
 
-func main() {
+func main (){
 
 	// Setting up logging for application
 
@@ -27,8 +26,6 @@ func main() {
 	// Empty context object and initializing memory for application
 
 	ctx := context.Background()
-	appCfg := LoadEnv(log)
-
 	app := new(dg.App)
 	app.Log = log
 

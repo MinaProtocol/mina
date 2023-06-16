@@ -1,21 +1,20 @@
 package itn_uptime_analyzer
 
 import (
-	dg "block_producers_uptime/delegation_backend"
-	"context"
 	"encoding/json"
-	"strconv"
 	"strings"
+	"strconv"
 	"time"
-
 	"cloud.google.com/go/storage"
+	dg "block_producers_uptime/delegation_backend"
 	logging "github.com/ipfs/go-log/v2"
+	"context"
 	"google.golang.org/api/iterator"
 )
 
 // This function tries to match the identities with the submission data and if there is a match it appends
 // To the uptime array, the length of which determines if the node was up or not
-// Length of 47 is enough
+// Length of 47 is enough  
 
 func (identity Identity) GetUptime(ctx context.Context, client *storage.Client, log *logging.ZapEventLogger) {
 
@@ -25,8 +24,8 @@ func (identity Identity) GetUptime(ctx context.Context, client *storage.Client, 
 
 	prefixCurrent := strings.Join([]string{"submissions", currentDateString}, "/")
 	submissions := client.Bucket(dg.CloudBucketName()).Objects(ctx, &storage.Query{Prefix: prefixCurrent})
-
-	var submissionData dg.submitRequest
+	
+	var submissionData dg.MetaToBeSaved
 	var lastSubmissionDate string
 	var lastSubmissionTime time.Time
 	var uptime []bool
@@ -53,13 +52,13 @@ func (identity Identity) GetUptime(ctx context.Context, client *storage.Client, 
 			if err != nil {
 				log.Fatalf("Error getting creating reader for json: %v\n", err)
 			}
-
+				
 			decoder := json.NewDecoder(reader)
 
 			err = decoder.Decode(&submissionData)
 			if err != nil {
 				log.Fatalf("Error converting json to string: %v\n", err)
-			}
+			}	
 
 			if (identity["public-key"] == submissionData.Submitter.String()) && (identity["public-ip"] == submissionData.RemoteAddr) {
 				if lastSubmissionDate != "" {
@@ -73,7 +72,7 @@ func (identity Identity) GetUptime(ctx context.Context, client *storage.Client, 
 				if err != nil {
 					log.Fatalf("Error parsing time: %v", err)
 				}
-
+				
 				if (lastSubmissionDate != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(10 * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(20 * time.Minute))) {
 					uptime = append(uptime, true)
 					lastSubmissionDate = submissionData.CreatedAt
