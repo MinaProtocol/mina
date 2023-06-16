@@ -1,12 +1,14 @@
 package itn_orchestrator
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
 	"sync"
+	"time"
 )
 
 type FundParams struct {
@@ -20,19 +22,10 @@ type FundParams struct {
 
 type FundAction struct{}
 
-func (FundAction) Run(config Config, rawParams json.RawMessage, output OutputF) error {
-	var params FundParams
-	if err := json.Unmarshal(rawParams, &params); err != nil {
-		return err
-	}
-	password := ""
-	if params.PasswordEnv != "" {
-		password, _ = os.LookupEnv(params.PasswordEnv)
-	}
-	amountPerKey := params.Amount / uint64(params.Num)
+func fundImpl(config Config, params FundParams, amountPerKey uint64, password string) error {
 	var wg sync.WaitGroup
 	errs := make(chan error)
-	cmds := make([]*exec.Cmd, len(params.Privkeys))
+	ctx, cancelF := context.WithCancel(config.Ctx)
 	for i, privkey := range params.Privkeys {
 		num := params.Num / len(params.Privkeys)
 		if i < params.Num%len(params.Privkeys) {
@@ -49,8 +42,7 @@ func (FundAction) Run(config Config, rawParams json.RawMessage, output OutputF) 
 		if config.Daemon != "" {
 			args = append(args, "--daemon-port", config.Daemon)
 		}
-		cmd := exec.Command(config.MinaExec, args...)
-		cmds[i] = cmd
+		cmd := exec.CommandContext(ctx, config.MinaExec, args...)
 		cmd.Stderr = os.Stderr
 		cmd.Stdout = os.Stderr
 		cmd.Env = []string{"MINA_PRIVKEY_PASS=" + password}
@@ -69,12 +61,31 @@ func (FundAction) Run(config Config, rawParams json.RawMessage, output OutputF) 
 	}()
 	err := <-errs
 	if err != nil {
-		for _, cmd := range cmds {
-			_ = cmd.Cancel()
-		}
+		cancelF()
+	}
+	return err
+}
+
+func (FundAction) Run(config Config, rawParams json.RawMessage, output OutputF) error {
+	var params FundParams
+	if err := json.Unmarshal(rawParams, &params); err != nil {
 		return err
 	}
-	return nil
+	password := ""
+	if params.PasswordEnv != "" {
+		password, _ = os.LookupEnv(params.PasswordEnv)
+	}
+	amountPerKey := params.Amount / uint64(params.Num)
+	var err error
+	for retryPause := 1; retryPause <= 8; retryPause = retryPause * 2 {
+		err = fundImpl(config, params, amountPerKey, password)
+		if err == nil {
+			break
+		}
+		config.Log.Warnf("Failed to run fund command, retrying in %d minutes: %s", retryPause, err.Error())
+		time.Sleep(time.Duration(retryPause) * time.Minute)
+	}
+	return err
 }
 
 func (FundAction) Name() string { return "fund-keys" }

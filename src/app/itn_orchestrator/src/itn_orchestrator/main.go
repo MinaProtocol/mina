@@ -137,6 +137,43 @@ func main() {
 	}
 	inDecoder := json.NewDecoder(os.Stdin)
 	step := 0
+	outputF := func(name string, value_ any, multiple bool, sensitive bool) {
+		value, err := json.Marshal(value_)
+		if err != nil {
+			log.Errorf("Error marshalling value %s for step %d: %v", name, step, err)
+			os.Exit(7)
+			return
+		}
+		if _, has := outCache[""][step]; !has {
+			outCache[""][step] = map[string]lib.OutputCacheEntry{}
+		}
+		prev, has := outCache[""][step][name]
+		if has {
+			if multiple && prev.Multi {
+				outCache[""][step][name] = lib.OutputCacheEntry{Multi: true, Values: append(prev.Values, value)}
+			} else {
+				log.Errorf("Error outputing multiple values for %s on step %d", name, step)
+				os.Exit(8)
+				return
+			}
+		} else {
+			outCache[""][step][name] = lib.OutputCacheEntry{Multi: multiple, Values: []json.RawMessage{value}}
+		}
+		if !sensitive {
+			json, err := json.Marshal(lib.Output{Name: name, Multi: multiple, Value: value, Step: step})
+			if err != nil {
+				log.Errorf("Error marshalling output %s for step %d: %v", name, step, err)
+				os.Exit(8)
+				return
+			}
+			_, err = os.Stdout.Write(append(json, '\n'))
+			if err != nil {
+				log.Errorf("Error writing output %s for step %d: %v", name, step, err)
+				os.Exit(8)
+				return
+			}
+		}
+	}
 	for {
 		var commandOrComment CommandOrComment
 		if err := inDecoder.Decode(&commandOrComment); err != nil {
@@ -158,43 +195,7 @@ func main() {
 			return
 		}
 		log.Infof("Performing step %s (%d)", cmd.Action, step)
-		err = actions[cmd.Action].Run(config, params, func(name string, value_ any, multiple bool, sensitive bool) {
-			value, err := json.Marshal(value_)
-			if err != nil {
-				log.Errorf("Error marshalling value %s for step %d: %v", name, step, err)
-				os.Exit(7)
-				return
-			}
-			if _, has := outCache[""][step]; !has {
-				outCache[""][step] = map[string]lib.OutputCacheEntry{}
-			}
-			prev, has := outCache[""][step][name]
-			if has {
-				if multiple && prev.Multi {
-					outCache[""][step][name] = lib.OutputCacheEntry{Multi: true, Values: append(prev.Values, value)}
-				} else {
-					log.Errorf("Error outputing multiple values for %s on step %d", name, step)
-					os.Exit(8)
-					return
-				}
-			} else {
-				outCache[""][step][name] = lib.OutputCacheEntry{Multi: multiple, Values: []json.RawMessage{value}}
-			}
-			if !sensitive {
-				json, err := json.Marshal(lib.Output{Name: name, Multi: multiple, Value: value, Step: step})
-				if err != nil {
-					log.Errorf("Error marshalling output %s for step %d: %v", name, step, err)
-					os.Exit(8)
-					return
-				}
-				_, err = os.Stdout.Write(append(json, '\n'))
-				if err != nil {
-					log.Errorf("Error writing output %s for step %d: %v", name, step, err)
-					os.Exit(8)
-					return
-				}
-			}
-		})
+		err = actions[cmd.Action].Run(config, params, outputF)
 		if err != nil {
 			log.Errorf("Error running step %d: %v", step, err)
 			os.Exit(9)
