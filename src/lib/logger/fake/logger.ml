@@ -32,8 +32,6 @@ module Time = struct
 
   let of_yojson _ = not_implemented ()
 
-  let pp _ = not_implemented ()
-
   let set_pretty_to_string _ = not_implemented ()
 
   let pretty_to_string _ = not_implemented ()
@@ -103,6 +101,8 @@ module Processor = struct
 
   let raw ?log_level:_ () = not_implemented ()
 
+  let raw_structured_log_events _ = not_implemented ()
+
   let pretty ~log_level:_ ~config:_ = not_implemented ()
 end
 
@@ -116,6 +116,8 @@ module Transport = struct
   type t
 
   let create _ _ = not_implemented ()
+
+  let raw _ = not_implemented ()
 
   let stdout () = not_implemented ()
 end
