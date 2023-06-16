@@ -77,7 +77,8 @@ let compute_block_trace_metadata transition_with_validation =
     let cs = Mina_state.Protocol_state.consensus_state ps in
     let open Consensus.Data.Consensus_state in
     [ ( "global_slot"
-      , Mina_numbers.Global_slot.to_yojson @@ global_slot_since_genesis cs )
+      , Mina_numbers.Global_slot_since_genesis.to_yojson
+        @@ global_slot_since_genesis cs )
     ; ("slot", Unsigned_extended.UInt32.to_yojson @@ curr_slot cs)
     ; ( "previous_state_hash"
       , State_hash.to_yojson @@ Mina_state.Protocol_state.previous_state_hash ps
@@ -319,9 +320,7 @@ module For_tests = struct
         let payload : Signed_command.Payload.t =
           Signed_command.Payload.create ~fee:Fee.zero ~fee_payer_pk:sender_pk
             ~nonce ~valid_until:None ~memo:Signed_command_memo.dummy
-            ~body:
-              (Payment
-                 { source_pk = sender_pk; receiver_pk; amount = send_amount } )
+            ~body:(Payment { receiver_pk; amount = send_amount })
         in
         Signed_command.sign sender_keypair payload )
 

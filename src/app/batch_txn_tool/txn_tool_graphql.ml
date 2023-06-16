@@ -121,7 +121,7 @@ let send_signed_transaction ~sender_priv_key ~nonce ~receiver_pub_key ~amount
           { fee
           ; fee_payer_pk = sender_pub_key
           ; nonce
-          ; valid_until = Mina_numbers.Global_slot.max_value
+          ; valid_until = Mina_numbers.Global_slot_since_genesis.max_value
           ; memo = Mina_base.Signed_command_memo.empty
           }
       ; body = Payment { source_pk = sender_pub_key; receiver_pk; amount }

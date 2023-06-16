@@ -285,7 +285,7 @@ module Lite = struct
       [@@@no_toplevel_latest_type]
 
       module V3 = struct
-        type t = E : (lite, 'mutant) diff -> t
+        type t = E : (lite, 'mutant) diff -> t [@@unboxed]
 
         module T_nonbinable = struct
           type nonrec t = t

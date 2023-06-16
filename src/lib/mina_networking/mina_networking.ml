@@ -494,7 +494,7 @@ module Rpcs = struct
     module V2 = struct
       module T = struct
         type query =
-          ( Consensus.Data.Consensus_state.Value.Stable.V1.t
+          ( Consensus.Data.Consensus_state.Value.Stable.V2.t
           , State_hash.Stable.V1.t )
           With_hash.Stable.V1.t
         [@@deriving sexp]
