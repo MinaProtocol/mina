@@ -1,6 +1,10 @@
-(* Pseudo *)
+(** Encode a mask on a vector with a one-hot vector. Can be used to select at
+    compile time a bit of a vector. Users include the step/wrap circuits to select
+    the correct verification key *)
 
 module Make (Impl : Snarky_backendless.Snark_intf.Run) : sig
+  (** The type parameter ['n] is the size of the vector, and ['a] is the domains
+      of the vector elements *)
   type ('a, 'n) t =
     'n One_hot_vector.T(Impl).t * ('a, 'n) Pickles_types.Vector.t
 
