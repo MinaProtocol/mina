@@ -36,6 +36,8 @@ carries the in-circuit values, out-circuit values and the related circuit
 constraints.
 A nested module `Constant` should be defined to encode the out-circuit values
 and operations.
+The reader can find more information in [Snarky
+documentation](https://github.com/o1-labs/snarky/blob/master/src/base/snark_intf.ml#L140-L153).
 
 When a type is supposed to encode a list at the type level, a `s` is added to
 its name.
