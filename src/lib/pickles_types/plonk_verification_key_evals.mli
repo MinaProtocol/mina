@@ -55,29 +55,9 @@ module Optional_columns : sig
   val map2 : f:('a -> 'b -> 'c) -> 'a t -> 'b t -> 'c t
 end
 
-module Stable : sig
-  module V2 : sig
-    type ('comm, 'comm_opt) t =
-      { sigma_comm : 'comm Plonk_types.Permuts_vec.Stable.V1.t
-      ; coefficients_comm : 'comm Plonk_types.Columns_vec.Stable.V1.t
-      ; generic_comm : 'comm
-      ; psm_comm : 'comm
-      ; complete_add_comm : 'comm
-      ; mul_comm : 'comm
-      ; emul_comm : 'comm
-      ; endomul_scalar_comm : 'comm
-      ; optional_columns_comm : 'comm_opt Optional_columns.Stable.V1.t
-      }
-
-    include Sigs.Full.S2 with type ('a, 'b) t := ('a, 'b) t
-  end
-
-  module Latest = V2
-end
-
 (** {2 Types} *)
 
-type ('comm, 'comm_opt) t = ('comm, 'comm_opt) Stable.Latest.t =
+type ('comm, 'comm_opt) t =
   { sigma_comm : 'comm Plonk_types.Permuts_vec.t
   ; coefficients_comm : 'comm Plonk_types.Columns_vec.t
   ; generic_comm : 'comm
@@ -89,6 +69,16 @@ type ('comm, 'comm_opt) t = ('comm, 'comm_opt) Stable.Latest.t =
   ; optional_columns_comm : 'comm_opt Optional_columns.t
   }
 [@@deriving sexp, equal, compare, hash, yojson, hlist]
+
+module Stable : sig
+  module V2 : sig
+    type nonrec 'comm t = ('comm, 'comm option) t
+
+    include Sigs.Full.S1 with type 'a t := 'a t
+  end
+
+  module Latest = V2
+end
 
 (** Specialized instance of t for in-circuit representations. *)
 type ('a, 'bool) in_circuit = ('a, ('a, 'bool) Opt.t) t

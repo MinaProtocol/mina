@@ -128,20 +128,31 @@ end
 module Repr = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type 'g t =
         { max_proofs_verified : Proofs_verified.Stable.V1.t
         ; actual_wrap_domain_size : Proofs_verified.Stable.V1.t
-        ; wrap_index : ('g, 'g option) Plonk_verification_key_evals.Stable.V2.t
+        ; wrap_index : 'g Plonk_verification_key_evals.Stable.V2.t
         }
       [@@deriving sexp, equal, compare, yojson]
     end
   end]
+
+  type 'g t = 'g Stable.Latest.t =
+    { max_proofs_verified : Proofs_verified.t
+    ; actual_wrap_domain_size : Proofs_verified.t
+    ; wrap_index : ('g, 'g option) Plonk_verification_key_evals.t
+    }
+  [@@deriving sexp, equal, compare, yojson]
 end
 
 module Poly = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type ('g, 'proofs_verified, 'vk) t =
             ( 'g
@@ -150,12 +161,21 @@ module Poly = struct
             Mina_wire_types.Pickles_base.Side_loaded_verification_key.Poly.V2.t =
         { max_proofs_verified : 'proofs_verified
         ; actual_wrap_domain_size : 'proofs_verified
-        ; wrap_index : ('g, 'g option) Plonk_verification_key_evals.Stable.V2.t
+        ; wrap_index : 'g Plonk_verification_key_evals.Stable.V2.t
         ; wrap_vk : 'vk option
         }
       [@@deriving hash]
     end
   end]
+
+  type ('g, 'proofs_verified, 'vk) t =
+        ('g, 'proofs_verified, 'vk) Stable.Latest.t =
+    { max_proofs_verified : 'proofs_verified
+    ; actual_wrap_domain_size : 'proofs_verified
+    ; wrap_index : ('g, 'g option) Plonk_verification_key_evals.t
+    ; wrap_vk : 'vk option
+    }
+  [@@deriving hash]
 end
 
 let index_to_field_elements

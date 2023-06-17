@@ -102,21 +102,114 @@ module Optional_columns = struct
       ~value_of_hlist:of_hlist
 end
 
-[%%versioned
+module Repr = struct
+  [%%versioned
+  module Stable = struct
+    module V2 = struct
+      type 'comm t =
+        { sigma_comm : 'comm Plonk_types.Permuts_vec.Stable.V1.t
+        ; coefficients_comm : 'comm Plonk_types.Columns_vec.Stable.V1.t
+        ; generic_comm : 'comm
+        ; psm_comm : 'comm
+        ; complete_add_comm : 'comm
+        ; mul_comm : 'comm
+        ; emul_comm : 'comm
+        ; endomul_scalar_comm : 'comm
+        }
+      [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
+      (* TODO: Remove unused annotations *)
+    end
+  end]
+end
+
+module Poly = struct
+  type ('comm, 'comm_opt) t =
+    { sigma_comm : 'comm Plonk_types.Permuts_vec.t
+    ; coefficients_comm : 'comm Plonk_types.Columns_vec.t
+    ; generic_comm : 'comm
+    ; psm_comm : 'comm
+    ; complete_add_comm : 'comm
+    ; mul_comm : 'comm
+    ; emul_comm : 'comm
+    ; endomul_scalar_comm : 'comm
+    ; optional_columns_comm : 'comm_opt Optional_columns.t
+    }
+  [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
+end
+
+include Poly
+
+[%%versioned_binable
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
-    type ('comm, 'comm_opt) t =
-      { sigma_comm : 'comm Plonk_types.Permuts_vec.Stable.V1.t
-      ; coefficients_comm : 'comm Plonk_types.Columns_vec.Stable.V1.t
-      ; generic_comm : 'comm
-      ; psm_comm : 'comm
-      ; complete_add_comm : 'comm
-      ; mul_comm : 'comm
-      ; emul_comm : 'comm
-      ; endomul_scalar_comm : 'comm
-      ; optional_columns_comm : 'comm_opt Optional_columns.Stable.V1.t
+    module T = struct
+      type 'comm t = ('comm, 'comm option) Poly.t
+      [@@deriving sexp, equal, compare, hash, yojson]
+    end
+
+    include (Poly : module type of Poly with type ('a, 'b) t := ('a, 'b) Poly.t)
+
+    include T
+
+    let to_repr
+        ({ sigma_comm
+         ; coefficients_comm
+         ; generic_comm
+         ; psm_comm
+         ; complete_add_comm
+         ; mul_comm
+         ; emul_comm
+         ; endomul_scalar_comm
+         ; optional_columns_comm = _optional_columns_comm
+         } :
+          _ t ) : _ Repr.t =
+      (* TODO: Should we assert that the optional columns commitments are all
+         None here?
+      *)
+      { sigma_comm
+      ; coefficients_comm
+      ; generic_comm
+      ; psm_comm
+      ; complete_add_comm
+      ; mul_comm
+      ; emul_comm
+      ; endomul_scalar_comm
       }
-    [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
+
+    let of_repr
+        ({ sigma_comm
+         ; coefficients_comm
+         ; generic_comm
+         ; psm_comm
+         ; complete_add_comm
+         ; mul_comm
+         ; emul_comm
+         ; endomul_scalar_comm
+         } :
+          _ Repr.t ) : _ t =
+      { sigma_comm
+      ; coefficients_comm
+      ; generic_comm
+      ; psm_comm
+      ; complete_add_comm
+      ; mul_comm
+      ; emul_comm
+      ; endomul_scalar_comm
+      ; optional_columns_comm = Optional_columns.init None
+      }
+
+    include
+      Binable.Of_binable1
+        (Repr.Stable.V2)
+        (struct
+          type nonrec 'a t = 'a t
+
+          let to_binable r = to_repr r
+
+          let of_binable r = of_repr r
+        end)
   end
 end]
 

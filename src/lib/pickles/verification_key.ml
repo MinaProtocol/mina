@@ -114,11 +114,12 @@ end
 module Repr = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t =
         { commitments :
-            ( Backend.Tock.Curve.Affine.Stable.V1.t
-            , Backend.Tock.Curve.Affine.Stable.V1.t option )
+            Backend.Tock.Curve.Affine.Stable.V1.t
             Plonk_verification_key_evals.Stable.V2.t
         ; data : Data.Stable.V1.t
         }
@@ -127,6 +128,14 @@ module Repr = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Stable.Latest.t =
+    { commitments :
+        ( Backend.Tock.Curve.Affine.t
+        , Backend.Tock.Curve.Affine.t option )
+        Plonk_verification_key_evals.t
+    ; data : Data.t
+    }
 end
 
 [%%versioned_binable
