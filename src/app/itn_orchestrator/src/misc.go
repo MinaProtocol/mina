@@ -11,9 +11,9 @@ import (
 )
 
 type WaitParams struct {
-	Minutes int
-	Slot    int
-	Seconds int
+	Minutes int `json:"min,omitempty"`
+	Slot    int `json:"slot,omitempty"`
+	Seconds int `json:"sec,omitempty"`
 }
 
 type WaitAction struct{}
@@ -85,15 +85,15 @@ func filterGt(s []int, n int) []int {
 }
 
 type JoinParams struct {
-	Group1 []json.RawMessage
-	Group2 []json.RawMessage
-	Group3 []json.RawMessage
-	Group4 []json.RawMessage
-	Group5 []json.RawMessage
-	Group6 []json.RawMessage
-	Group7 []json.RawMessage
-	Group8 []json.RawMessage
-	Group9 []json.RawMessage
+	Group1 []json.RawMessage `json:"group1"`
+	Group2 []json.RawMessage `json:"group2"`
+	Group3 []json.RawMessage `json:"group3,omitempty"`
+	Group4 []json.RawMessage `json:"group4,omitempty"`
+	Group5 []json.RawMessage `json:"group5,omitempty"`
+	Group6 []json.RawMessage `json:"group6,omitempty"`
+	Group7 []json.RawMessage `json:"group7,omitempty"`
+	Group8 []json.RawMessage `json:"group8,omitempty"`
+	Group9 []json.RawMessage `json:"group9,omitempty"`
 }
 
 type JoinAction struct{}
@@ -126,8 +126,8 @@ func (JoinAction) Name() string { return "join" }
 var _ Action = JoinAction{}
 
 type ExceptParams struct {
-	Group  []NodeAddress
-	Except []NodeAddress
+	Group  []NodeAddress `json:"group"`
+	Except []NodeAddress `json:"except"`
 }
 
 type ExceptAction struct{}
@@ -155,8 +155,8 @@ func (ExceptAction) Name() string { return "except" }
 var _ Action = ExceptAction{}
 
 type SampleParams struct {
-	Group  []NodeAddress
-	Ratios []float64
+	Group  []NodeAddress `json:"group"`
+	Ratios []float64     `json:"ratios"`
 }
 
 type SampleAction struct{}

@@ -9,18 +9,27 @@ import (
 )
 
 type ZkappSubParams struct {
-	ExperimentName                                                    string
-	Tps, MinTps                                                       float64
-	DurationInMinutes                                                 int
-	ZkappsToDeploy, NewAccounts, AccountQueueSize, Gap                int
-	NoPrecondition, MaxCost                                           bool
-	MinBalanceChange, MaxBalanceChange, MinFee, MaxFee, DeploymentFee uint64
+	ExperimentName    string  `json:"experimentName"`
+	Tps               float64 `json:"tps"`
+	MinTps            float64 `json:"minTps"`
+	DurationInMinutes int     `json:"durationMin"`
+	MaxFee            uint64  `json:"maxFee"`
+	MinFee            uint64  `json:"minFee"`
+	ZkappsToDeploy    int     `json:"zkapps"`
+	NewAccounts       int     `json:"newAccounts"`
+	AccountQueueSize  int     `json:"queueSize"`
+	Gap               int     `json:"gap"`
+	NoPrecondition    bool    `json:"noPrecondition"`
+	MaxCost           bool    `json:"maxCost"`
+	MinBalanceChange  uint64  `json:"minBalanceChange"`
+	MaxBalanceChange  uint64  `json:"maxBalanceChange"`
+	DeploymentFee     uint64  `json:"deploymentFee"`
 }
 
 type ZkappCommandParams struct {
 	ZkappSubParams
-	FeePayers []itn_json_types.MinaPrivateKey
-	Nodes     []NodeAddress
+	FeePayers []itn_json_types.MinaPrivateKey `json:"feePayers"`
+	Nodes     []NodeAddress                   `json:"nodes"`
 }
 
 type ScheduledZkappCommandsReceipt struct {
