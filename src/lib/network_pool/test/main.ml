@@ -13,10 +13,16 @@ let () =
           ; test_case "Test replacement" `Quick replacement
           ; test_case "Txn with lowest fee rate is removed" `Quick
               remove_lowest_fee
-          ; test_case "Get txn with the hioghest fee rate" `Quick
-              find_highest_fee
+          ; test_case "For application pick the txn with the highest fee rate"
+              `Quick pick_highest_fee_for_application
           ; test_case "Test support for zkApp commands." `Quick
               support_for_zkapp_command_commands
+          ; test_case
+              "Transactions from single source should be ordered by nonce"
+              `Quick transactions_from_single_sender_ordered_by_nonce
+          ; test_case
+              "Transactions for application should not contain nonce gaps"
+              `Quick transactions_from_many_senders_no_nonce_gaps
           ; test_case
               "Nonce increment side effects from other zkapp_command are \
                handled properly"
