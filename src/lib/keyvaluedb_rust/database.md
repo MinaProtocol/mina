@@ -1,5 +1,7 @@
 
-# Database, a Rust-based lightweight key value store for the Mina blockchain state
+# Database
+
+**A Rust-based lightweight key-value store for the Mina blockchain state**
 
 
 ## Table of Contents
