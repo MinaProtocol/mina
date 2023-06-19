@@ -7,6 +7,7 @@
  *)
 
 open Core_kernel
+open Currency
 open Mina_base
 open Mina_numbers
 open Mina_transaction
@@ -17,9 +18,9 @@ open For_tests
 
 let test_keys = Array.init 10 ~f:(fun _ -> Keypair.create ())
 
-let gen_cmd ?sign_type ?nonce () =
-  User_command.Valid.Gen.payment_with_random_participants ~keys:test_keys
-    ~max_amount:1000 ~fee_range:10 ?sign_type ?nonce ()
+let gen_cmd ?(keys = test_keys) ?sign_type ?nonce () =
+  User_command.Valid.Gen.payment_with_random_participants ~keys ~max_amount:1000
+    ~fee_range:100 ?sign_type ?nonce ()
   |> Quickcheck.Generator.map
        ~f:Transaction_hash.User_command_with_valid_signature.create
 
@@ -42,11 +43,11 @@ let singleton_properties () =
       let pool = empty in
       let add_res =
         add_from_gossip_exn pool cmd Account_nonce.zero
-          (Currency.Amount.of_nanomina_int_exn 500)
+          (Amount.of_nanomina_int_exn 500)
       in
       if
         Option.value_exn (currency_consumed ~constraint_constants cmd)
-        |> Currency.Amount.to_nanomina_int > 500
+        |> Amount.to_nanomina_int > 500
       then
         match add_res with
         | Error (Insufficient_funds _) ->
@@ -139,13 +140,13 @@ let sequential_adds_all_valid () =
                   low high got ()
             | Error (Insufficient_funds (`Balance bal, amt)) ->
                 failwithf
-                  !"Insufficient funds. Balance: %{sexp: Currency.Amount.t}. \
-                    Amount: %{sexp: Currency.Amount.t}"
+                  !"Insufficient funds. Balance: %{sexp: Amount.t}. Amount: \
+                    %{sexp: Amount.t}"
                   bal amt ()
             | Error (Insufficient_replace_fee (`Replace_fee rfee, fee)) ->
                 failwithf
                   !"Insufficient fee for replacement. Needed at least %{sexp: \
-                    Currency.Fee.t} but got %{sexp:Currency.Fee.t}."
+                    Fee.t} but got %{sexp:Fee.t}."
                   rfee fee ()
             | Error Overflow ->
                 failwith "Overflow."
@@ -186,7 +187,7 @@ let replacement () =
   in
   let gen :
       ( Account_nonce.t
-      * Currency.Amount.t
+      * Amount.t
       * Transaction_hash.User_command_with_valid_signature.t list
       * Transaction_hash.User_command_with_valid_signature.t )
       Quickcheck.Generator.t =
@@ -196,7 +197,7 @@ let replacement () =
     let%bind init_nonce =
       Quickcheck.Generator.map ~f:Account_nonce.of_int @@ Int.gen_incl 0 1000
     in
-    let init_balance = Currency.Amount.of_mina_int_exn 100_000 in
+    let init_balance = Amount.of_mina_int_exn 100_000 in
     let%bind size = Quickcheck.Generator.size in
     let%bind amounts =
       Quickcheck.Generator.map ~f:Array.of_list
@@ -214,13 +215,12 @@ let replacement () =
         in
         let cmd_currency = amounts.(n - 1) in
         let%bind fee =
-          Currency.Amount.(
-            gen_incl zero (min (of_nanomina_int_exn 10) cmd_currency))
+          Amount.(gen_incl zero (min (of_nanomina_int_exn 10) cmd_currency))
         in
-        let amount = Option.value_exn Currency.Amount.(cmd_currency - fee) in
+        let amount = Option.value_exn Amount.(cmd_currency - fee) in
         let cmd' =
           modify_payment cmd ~sender
-            ~common:(fun c -> { c with fee = Currency.Amount.to_fee fee })
+            ~common:(fun c -> { c with fee = Amount.to_fee fee })
             ~body:(fun b -> { b with amount })
         in
         let consumed =
@@ -229,7 +229,7 @@ let replacement () =
         let%map rest =
           go
             (Account_nonce.succ current_nonce)
-            (Option.value_exn Currency.Amount.(current_balance - consumed))
+            (Option.value_exn Amount.(current_balance - consumed))
             (n - 1)
         in
         cmd' :: rest
@@ -247,12 +247,12 @@ let replacement () =
       in
       Mina_generators.User_command_generators.payment ~sign_type:`Fake ~key_gen
         ~nonce:(Account_nonce.of_int replaced_nonce)
-        ~max_amount:(Currency.Amount.to_nanomina_int init_balance)
+        ~max_amount:(Amount.to_nanomina_int init_balance)
         ~fee_range:0 ()
     in
     let replace_cmd =
       modify_payment replace_cmd_skeleton ~sender ~body:Fn.id ~common:(fun c ->
-          { c with fee = Currency.Fee.of_mina_int_exn (10 + (5 * (size + 1))) } )
+          { c with fee = Fee.of_mina_int_exn (10 + (5 * (size + 1))) } )
     in
     (init_nonce, init_balance, setup_cmds, replace_cmd)
   in
@@ -260,7 +260,7 @@ let replacement () =
     ~sexp_of:
       [%sexp_of:
         Account_nonce.t
-        * Currency.Amount.t
+        * Amount.t
         * Transaction_hash.User_command_with_valid_signature.t list
         * Transaction_hash.User_command_with_valid_signature.t]
     ~f:(fun (init_nonce, init_balance, setup_cmds, replace_cmd) ->
@@ -297,15 +297,14 @@ let replacement () =
       let currency_consumed_pre_replace =
         List.fold_left
           (List.take setup_cmds (replaced_idx + 1))
-          ~init:Currency.Amount.zero
+          ~init:Amount.zero
           ~f:(fun consumed_so_far cmd ->
             Option.value_exn
               Option.(
                 currency_consumed ~constraint_constants cmd
-                >>= fun consumed -> Currency.Amount.(consumed + consumed_so_far))
-            )
+                >>= fun consumed -> Amount.(consumed + consumed_so_far)) )
       in
-      assert (Currency.Amount.(currency_consumed_pre_replace <= init_balance)) ;
+      assert (Amount.(currency_consumed_pre_replace <= init_balance)) ;
       let currency_consumed_post_replace =
         Option.value_exn
           (let open Option.Let_syntax in
@@ -317,13 +316,12 @@ let replacement () =
             currency_consumed ~constraint_constants replace_cmd
           in
           let%bind a =
-            Currency.Amount.(
-              currency_consumed_pre_replace - replaced_currency_consumed)
+            Amount.(currency_consumed_pre_replace - replaced_currency_consumed)
           in
-          Currency.Amount.(a + replacer_currency_consumed))
+          Amount.(a + replacer_currency_consumed))
       in
       let add_res = add_from_gossip_exn t replace_cmd init_nonce init_balance in
-      if Currency.Amount.(currency_consumed_post_replace <= init_balance) then
+      if Amount.(currency_consumed_post_replace <= init_balance) then
         match add_res with
         | Ok (_, t', dropped) ->
             assert (not (Sequence.is_empty dropped)) ;
@@ -344,7 +342,7 @@ let remove_lowest_fee () =
   in
   let compare cmd0 cmd1 : int =
     let open Transaction_hash.User_command_with_valid_signature in
-    Currency.Fee_rate.compare
+    Fee_rate.compare
       (User_command.fee_per_wu @@ command cmd0)
       (User_command.fee_per_wu @@ command cmd1)
   in
@@ -354,8 +352,7 @@ let remove_lowest_fee () =
     , List.tl_exn cmds_sorted_by_fee_per_wu )
   in
   let insert_cmd pool cmd =
-    add_from_gossip_exn pool cmd Account_nonce.zero
-      (Currency.Amount.of_mina_int_exn 5)
+    add_from_gossip_exn pool cmd Account_nonce.zero (Amount.of_mina_int_exn 5)
     |> Result.ok |> Option.value_exn
     |> fun (_, pool, _) -> pool
   in
@@ -380,28 +377,41 @@ let remove_lowest_fee () =
   |> fun all_by_fee_cmds ->
   assert (List.(equal cmd_equal all_by_fee_cmds commands_to_keep))
 
-let find_highest_fee () =
-  let cmds =
-    gen_cmd () |> Quickcheck.random_sequence |> Fn.flip Sequence.take 4
-    |> Sequence.to_list
-  in
-  let compare cmd0 cmd1 : int =
-    let open Transaction_hash.User_command_with_valid_signature in
-    Currency.Fee_rate.compare
-      (User_command.fee_per_wu @@ command cmd0)
-      (User_command.fee_per_wu @@ command cmd1)
-  in
-  let max_by_fee_per_wu = List.max_elt ~compare cmds |> Option.value_exn in
-  let insert_cmd pool cmd =
-    add_from_gossip_exn pool cmd Account_nonce.zero
-      (Currency.Amount.of_mina_int_exn 5)
-    |> Result.ok |> Option.value_exn
-    |> fun (_, pool, _) -> pool
-  in
-  let pool = List.fold_left cmds ~init:empty ~f:insert_cmd in
-  let cmd_equal = Transaction_hash.User_command_with_valid_signature.equal in
-  get_highest_fee pool |> Option.value_exn
-  |> fun highest_fee -> assert (cmd_equal highest_fee max_by_fee_per_wu)
+let insert_cmd pool cmd =
+  add_from_gossip_exn pool cmd Account_nonce.zero (Amount.of_mina_int_exn 5)
+  |> Result.map_error ~f:(fun e ->
+         let sexp = Command_error.sexp_of_t e in
+         Failure (Sexp.to_string sexp) )
+  |> Result.ok_exn
+  |> fun (_, pool, _) -> pool
+
+(** Picking a transaction to include in a block, choose the one with
+    highest fee. *)
+let pick_highest_fee_for_application () =
+  Quickcheck.test
+    (* This should be replaced with a proper generator, but for the moment it
+       generates inputs which fail the test. *)
+    ( gen_cmd () |> Quickcheck.random_sequence |> Fn.flip Sequence.take 4
+    |> Sequence.to_list |> Quickcheck.Generator.return )
+    ~f:(fun cmds ->
+      let compare cmd0 cmd1 : int =
+        let open Transaction_hash.User_command_with_valid_signature in
+        Fee_rate.compare
+          (User_command.fee_per_wu @@ command cmd0)
+          (User_command.fee_per_wu @@ command cmd1)
+      in
+      let pool = List.fold_left cmds ~init:empty ~f:insert_cmd in
+      [%test_eq: Transaction_hash.User_command_with_valid_signature.t option]
+        (get_highest_fee pool)
+        (List.max_elt ~compare cmds) )
+
+let command_nonce (txn : Transaction_hash.User_command_with_valid_signature.t) =
+  let open Transaction_hash.User_command_with_valid_signature in
+  match (forget_check txn).data with
+  | Signed_command sc ->
+      Signed_command.nonce sc
+  | Zkapp_command zk ->
+      zk.fee_payer.body.nonce
 
 let dummy_state_view =
   let state_body =
@@ -436,7 +446,6 @@ let add_to_pool ~nonce ~balance pool cmd =
   pool'
 
 let init_permissionless_ledger ledger account_info =
-  let open Currency in
   let open Mina_ledger.Ledger.Ledger_inner in
   List.iter account_info ~f:(fun (public_key, amount) ->
       let account_id =
@@ -509,7 +518,6 @@ let commit_to_pool ledger pool cmd expected_drops =
 
 let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
     ~double_increment_sender ~increment_receiver ~amount ~fee nonce_int =
-  let open Currency in
   let nonce = Account.Nonce.of_int nonce_int in
   let sender_pk = Public_key.compress sender.public_key in
   let receiver_pk = Public_key.compress receiver.public_key in
@@ -581,8 +589,7 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
   Transaction_hash.User_command_with_valid_signature.create cmd
 
 let support_for_zkapp_command_commands () =
-  let open Currency in
-  let fee = Currency.Fee.minimum_user_command_fee in
+  let fee = Fee.minimum_user_command_fee in
   let amount = Amount.of_nanomina_int_exn @@ Fee.to_nanomina_int fee in
   let balance = Option.value_exn (Amount.scale amount 100) in
   let kp1 =
@@ -615,8 +622,7 @@ let support_for_zkapp_command_commands () =
       () )
 
 let nonce_increment_side_effects () =
-  let open Currency in
-  let fee = Currency.Fee.minimum_user_command_fee in
+  let fee = Fee.minimum_user_command_fee in
   let amount = Amount.of_nanomina_int_exn @@ Fee.to_nanomina_int fee in
   let balance = Option.value_exn (Amount.scale amount 100) in
   let kp1 =
@@ -649,8 +655,7 @@ let nonce_increment_side_effects () =
       () )
 
 let nonce_invariant_violation () =
-  let open Currency in
-  let fee = Currency.Fee.minimum_user_command_fee in
+  let fee = Fee.minimum_user_command_fee in
   let amount = Amount.of_nanomina_int_exn @@ Fee.to_nanomina_int fee in
   let balance = Option.value_exn (Amount.scale amount 100) in
   let kp1 =
@@ -673,3 +678,190 @@ let nonce_invariant_violation () =
       apply_to_ledger ledger cmd1 ;
       let _pool = commit_to_pool ledger pool cmd2 [ cmd1; cmd2 ] in
       () )
+
+let txn_nonce txn =
+  let unchecked =
+    Transaction_hash.User_command_with_valid_signature.forget_check txn
+  in
+  match unchecked.data with
+  | Signed_command cmd ->
+      cmd.payload.common.nonce
+  | Zkapp_command cmd ->
+      cmd.fee_payer.body.nonce
+
+let sender_pk txn =
+  let unchecked =
+    Transaction_hash.User_command_with_valid_signature.forget_check txn
+  in
+  match unchecked.data with
+  | Signed_command cmd ->
+      cmd.payload.common.fee_payer_pk
+  | Zkapp_command cmd ->
+      cmd.fee_payer.body.public_key
+
+let rec rem_lowest_fee count pool =
+  if count > 0 then
+    rem_lowest_fee (count - 1) (Indexed_pool.remove_lowest_fee pool |> snd)
+  else pool
+
+module Stateful_gen = Monad_lib.State.Trans (Quickcheck.Generator)
+module Stateful_gen_ext = Monad_lib.Make_ext2 (Stateful_gen)
+module Result_ext = Monad_lib.Make_ext2 (Result)
+
+let gen_amount =
+  let open Stateful_gen in
+  let open Let_syntax in
+  let open Account.Poly in
+  let%bind balance = getf (fun a -> a.balance) in
+  let%bind amt = lift @@ Amount.(gen_incl zero @@ Balance.to_amount balance) in
+  let%map () =
+    modify ~f:(fun a ->
+        { a with balance = Option.value_exn @@ Balance.sub_amount balance amt } )
+  in
+  Amount.to_uint64 amt
+
+let accounts_map accounts =
+  List.map accounts ~f:Account.Poly.(fun a -> (a.public_key, a))
+  |> Public_key.Compressed.Map.of_alist_exn
+
+let with_accounts ~f ~account_map ~init txns =
+  Result_ext.fold_m txns ~init:(account_map, init)
+    ~f:(fun (accounts, accum) t ->
+      let open Result.Let_syntax in
+      let pk = sender_pk t in
+      let a = Public_key.Compressed.Map.find_exn accounts pk in
+      let%map accum' = f accum a t in
+      let accounts' =
+        Public_key.Compressed.Map.set accounts ~key:pk
+          ~data:Account.Poly.{ a with nonce = Account_nonce.succ a.nonce }
+      in
+      (accounts', accum') )
+  |> Result.map ~f:snd
+
+let pool_of_transactions ~account_map txns =
+  with_accounts
+    (List.map txns ~f:(fun t ->
+         Transaction_hash.User_command_with_valid_signature.create
+           (Signed_command t) ) )
+    ~init:empty ~account_map
+    ~f:(fun p a t ->
+      let open Account.Poly in
+      add_from_gossip_exn p t a.nonce (Balance.to_amount a.balance)
+      |> Result.map ~f:Tuple3.get2 )
+  |> Result.map_error ~f:(fun e -> Sexp.to_string @@ Command_error.sexp_of_t e)
+  |> Result.ok_or_failwith
+
+let rec gen_txns_from_single_sender_to receiver_public_key =
+  let open Stateful_gen in
+  let open Let_syntax in
+  let open Account.Poly in
+  let%bind sender = get in
+  if Balance.(sender.balance = zero) then return []
+  else
+    let%bind () =
+      modify ~f:(fun a -> { a with nonce = Account_nonce.succ a.nonce })
+    in
+    let%bind txn_amt = map ~f:Amount.of_uint64 gen_amount in
+    let%bind txn_fee = map ~f:Fee.of_uint64 gen_amount in
+    let cmd =
+      let open Signed_command.Payload in
+      Signed_command.Poly.
+        { payload =
+            Poly.
+              { common =
+                  Common.Poly.
+                    { fee = txn_fee
+                    ; fee_payer_pk = sender.public_key
+                    ; nonce = sender.nonce
+                    ; valid_until = Global_slot_since_genesis.max_value
+                    ; memo = Signed_command_memo.dummy
+                    }
+              ; body =
+                  Body.Payment
+                    Payment_payload.Poly.
+                      { receiver_pk = receiver_public_key; amount = txn_amt }
+              }
+        ; signer = Option.value_exn @@ Public_key.decompress sender.public_key
+        ; signature = Signature.dummy
+        }
+    in
+    let%map more = gen_txns_from_single_sender_to receiver_public_key in
+    (* Signatures don't matter in these tests. *)
+    let (`If_this_is_used_it_should_have_a_comment_justifying_it valid_cmd) =
+      Signed_command.to_valid_unsafe cmd
+    in
+    valid_cmd :: more
+
+(* Check that when commands from a single sender are added into the mempool
+   and then lowest fee commands are dropped, remaining commands are returned
+   for application in the order of increasing nonces without a gap. *)
+let transactions_from_single_sender_ordered_by_nonce () =
+  Quickcheck.test
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind sender = Account.gen in
+    let%bind receiver = Account.gen in
+    let%map txns =
+      Stateful_gen.eval_state
+        (gen_txns_from_single_sender_to receiver.public_key)
+        sender
+    in
+    (sender, txns))
+    ~f:(fun (sender, txns) ->
+      let account_map = accounts_map [ sender ] in
+      let pool = pool_of_transactions ~account_map txns |> rem_lowest_fee 5 in
+      let txns = Sequence.to_list @@ Indexed_pool.transactions ~logger pool in
+      with_accounts txns ~init:() ~account_map ~f:(fun () a t ->
+          [%test_eq: Account_nonce.t] (txn_nonce t) a.nonce |> Result.return )
+      |> Result.ok_or_failwith ;
+      assert_invariants pool )
+
+let rec interleave_at_random queues =
+  let open Quickcheck in
+  let open Generator.Let_syntax in
+  if Array.is_empty queues then return []
+  else
+    let%bind i = Int.gen_incl 0 (Array.length queues - 1) in
+    match queues.(i) with
+    | [] ->
+        Array.filter queues ~f:(fun q -> not @@ List.is_empty q)
+        |> interleave_at_random
+    | t :: ts ->
+        Array.set queues i ts ;
+        let%map more = interleave_at_random queues in
+        t :: more
+
+let transactions_from_many_senders_no_nonce_gaps () =
+  Quickcheck.test
+    (let open Quickcheck.Generator.Let_syntax in
+    let module Gen_ext = Monad_lib.Make_ext (Quickcheck.Generator) in
+    let%bind senders = List.gen_non_empty Account.gen in
+    let%bind receiver = Account.gen in
+    let%bind txns =
+      List.map senders
+        ~f:
+          (Stateful_gen.eval_state
+             (gen_txns_from_single_sender_to receiver.public_key) )
+      |> Gen_ext.sequence
+    in
+    let%map shuffled = interleave_at_random @@ Array.of_list txns in
+    (senders, shuffled))
+    ~f:(fun (senders, txns) ->
+      let account_map = accounts_map senders in
+      let pool = pool_of_transactions ~account_map txns |> rem_lowest_fee 5 in
+      let txns = Sequence.to_list @@ Indexed_pool.transactions ~logger pool in
+      with_accounts txns ~init:() ~account_map ~f:(fun () a t ->
+          [%test_eq: Account_nonce.t] (txn_nonce t) a.nonce |> Result.return )
+      |> Result.ok_or_failwith ;
+      assert_invariants pool )
+
+let construct_ledger accounts =
+  Mina_ledger.Ledger.with_ledger ~depth:4 ~f:(fun ledger ->
+      List.iter accounts ~f:(fun a ->
+          Mina_ledger.Ledger.create_new_account_exn ledger
+            (Account.identifier a) a ) ;
+      ledger )
+
+(* let revalidation_drops_nothing_unless_ledger_changed () = *)
+(*   Quickcheck.test *)
+(*     (let open Quickcheck.Generator.Let_syntax in) *)
+(*     ~f:(fun () -> ()) *)

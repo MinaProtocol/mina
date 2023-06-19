@@ -28,6 +28,7 @@
   mina_state
   mina_transaction_logic
   mina_wire_types
+  monad_lib
   network_pool
   non_zero_curve_point
   pickles
