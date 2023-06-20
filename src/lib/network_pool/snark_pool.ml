@@ -431,6 +431,8 @@ struct
                     ~sender
                 in
                 match Signature_lib.Public_key.decompress prover with
+                | Some _ when is_local ->
+                    Deferred.return true
                 | None ->
                     (* We may need to decompress the key when paying the fee
                        transfer, so check that we can do it now.
