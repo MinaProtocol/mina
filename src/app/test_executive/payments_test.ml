@@ -105,6 +105,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let fish2 =
       Core.String.Map.find_exn (Network.genesis_keypairs network) "fish2"
     in
+    (* hardcoded values of the balances of fish1 (receiver) and fish2 (sender), update here if they change in the config *)
+    (* TODO undo the harcoding, don't be lazy and just make the graphql commands to fetch the balances *)
+    let receiver_original_balance = Currency.Amount.of_formatted_string "100" in
+    let sender_original_balance = Currency.Amount.of_formatted_string "100" in
+    let sender = fish2.keypair in
+    let receiver = fish1.keypair in
     [%log info] "extra genesis keypairs: %s"
       (List.to_string [ fish1.keypair; fish2.keypair ]
          ~f:(fun { Signature_lib.Keypair.public_key; _ } ->
@@ -128,62 +134,46 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          ~f:(fun { Signature_lib.Keypair.public_key; _ } ->
            public_key |> Signature_lib.Public_key.to_yojson
            |> Yojson.Safe.to_string ) ) ;
-    (* create a signed txn which we'll use to make a successfull txn, and then a replay attack *)
-    let amount = Currency.Amount.of_formatted_string "10" in
-    let fee = Currency.Fee.of_formatted_string "1" in
-    let test_constants = Engine.Network.constraint_constants network in
+    (* setup code, creating a signed txn which we'll use to make a successful txn, and then use the same txn in a replay attack which should fail *)
     let receiver_pub_key =
-      fish1.keypair.public_key |> Signature_lib.Public_key.compress
+      receiver.public_key |> Signature_lib.Public_key.compress
     in
     let sender_pub_key =
-      fish2.keypair.public_key |> Signature_lib.Public_key.compress
-    in
-    (* hardcoded copy of extra_genesis_accounts[0] and extra_genesis_accounts[1], update here if they change *)
-    let receiver_original_balance = Currency.Amount.of_formatted_string "100" in
-    let sender_original_balance = Currency.Amount.of_formatted_string "100" in
-    let txn_body =
-      Signed_command_payload.Body.Payment
-        { source_pk = sender_pub_key
-        ; receiver_pk = receiver_pub_key
-        ; token_id = Token_id.default
-        ; amount
-        }
+      sender.public_key |> Signature_lib.Public_key.compress
     in
     let%bind { nonce = sender_current_nonce; _ } =
       Integration_test_lib.Graphql_requests.must_get_account_data ~logger
         (Network.Node.get_ingress_uri untimed_node_b)
         ~public_key:sender_pub_key
     in
-    let user_command_input =
-      User_command_input.create ~fee ~nonce:sender_current_nonce
-        ~fee_token:(Signed_command_payload.Body.token txn_body)
-        ~fee_payer_pk:sender_pub_key ~valid_until:None
-        ~memo:(Signed_command_memo.create_from_string_exn "")
-        ~body:txn_body ~signer:sender_pub_key
-        ~sign_choice:(User_command_input.Sign_choice.Keypair fish2.keypair) ()
+    let amount = Currency.Amount.of_formatted_string "10" in
+    let fee = Currency.Fee.of_formatted_string "1" in
+    let memo = "" in
+    let token = Token_id.default in
+    let valid_until = Mina_numbers.Global_slot.max_value in
+    let payload =
+      let payment_payload =
+        { Payment_payload.Poly.receiver_pk = receiver_pub_key
+        ; source_pk = sender_pub_key
+        ; token_id = token
+        ; amount
+        }
+      in
+      let body = Signed_command_payload.Body.Payment payment_payload in
+      let common =
+        { Signed_command_payload.Common.Poly.fee
+        ; fee_token = Signed_command_payload.Body.token body
+        ; fee_payer_pk = sender_pub_key
+        ; nonce = sender_current_nonce
+        ; valid_until = Mina_numbers.Global_slot.max_value
+        ; memo = Signed_command_memo.create_from_string_exn memo
+        }
+      in
+      { Signed_command_payload.Poly.common; body }
     in
-    [%log info] "user_command_input: $user_command"
-      ~metadata:
-        [ ( "user_command"
-          , User_command_input.Stable.Latest.to_yojson user_command_input )
-        ] ;
-    let%bind txn_signed =
-      User_command_input.to_user_command
-        ~get_current_nonce:(fun _ -> failwith "get_current_nonce, don't call me")
-        ~nonce_map:
-          (Account_id.Map.of_alist_exn
-             [ ( Account_id.create sender_pub_key
-                   (Signed_command_payload.Body.token txn_body)
-               , (sender_current_nonce, sender_current_nonce) )
-             ] )
-        ~get_account:(fun _ -> `Bootstrapping)
-        ~constraint_constants:test_constants ~logger user_command_input
-      |> Deferred.bind ~f:Malleable_error.or_hard_error
-    in
-    let (signed_cmmd, _)
-          : Signed_command.t
-            * (Unsigned.uint32 * Unsigned.uint32) Account_id.Map.t =
-      txn_signed
+    let raw_signature =
+      Signed_command.sign_payload sender.private_key payload
+      |> Signature.Raw.encode
     in
     (* setup complete *)
     let%bind () =
@@ -192,22 +182,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            Integration_test_lib.Graphql_requests.must_send_payment_with_raw_sig
              (Network.Node.get_ingress_uri untimed_node_b)
              ~logger
-             ~sender_pub_key:
-               (Signed_command_payload.Body.source_pk signed_cmmd.payload.body)
-             ~receiver_pub_key:
-               (Signed_command_payload.Body.receiver_pk signed_cmmd.payload.body)
-             ~amount:
-               ( Signed_command_payload.amount signed_cmmd.payload
-               |> Option.value_exn )
-             ~fee:(Signed_command_payload.fee signed_cmmd.payload)
-             ~nonce:signed_cmmd.payload.common.nonce
-             ~memo:
-               (Signed_command_memo.to_raw_bytes_exn
-                  signed_cmmd.payload.common.memo )
-             ~token:(Signed_command_payload.token signed_cmmd.payload)
-             ~valid_until:signed_cmmd.payload.common.valid_until
-             ~raw_signature:
-               (Mina_base.Signature.Raw.encode signed_cmmd.signature)
+             ~sender_pub_key:(Signed_command_payload.source_pk payload)
+             ~receiver_pub_key:(Signed_command_payload.receiver_pk payload)
+             ~amount ~fee
+             ~nonce:(Signed_command_payload.nonce payload)
+             ~memo ~token ~valid_until ~raw_signature
          in
          wait_for t
            (Wait_condition.signed_command_to_be_included_in_frontier
@@ -286,22 +265,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Integration_test_lib.Graphql_requests.send_payment_with_raw_sig
             (Network.Node.get_ingress_uri untimed_node_b)
             ~logger
-            ~sender_pub_key:
-              (Signed_command_payload.Body.source_pk signed_cmmd.payload.body)
-            ~receiver_pub_key:
-              (Signed_command_payload.Body.receiver_pk signed_cmmd.payload.body)
-            ~amount:
-              ( Signed_command_payload.amount signed_cmmd.payload
-              |> Option.value_exn )
-            ~fee:(Signed_command_payload.fee signed_cmmd.payload)
-            ~nonce:signed_cmmd.payload.common.nonce
-            ~memo:
-              (Signed_command_memo.to_raw_bytes_exn
-                 signed_cmmd.payload.common.memo )
-            ~token:(Signed_command_payload.token signed_cmmd.payload)
-            ~valid_until:signed_cmmd.payload.common.valid_until
-            ~raw_signature:
-              (Mina_base.Signature.Raw.encode signed_cmmd.signature)
+            ~sender_pub_key:(Signed_command_payload.source_pk payload)
+            ~receiver_pub_key:(Signed_command_payload.receiver_pk payload)
+            ~amount ~fee
+            ~nonce:(Signed_command_payload.nonce payload)
+            ~memo ~token ~valid_until ~raw_signature
         with
         | Ok { nonce; _ } ->
             Malleable_error.soft_error_format ~value:()
@@ -336,23 +304,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Integration_test_lib.Graphql_requests.send_payment_with_raw_sig
             (Network.Node.get_ingress_uri untimed_node_a)
             ~logger
-            ~sender_pub_key:
-              (Signed_command_payload.Body.source_pk signed_cmmd.payload.body)
-            ~receiver_pub_key:
-              (Signed_command_payload.Body.receiver_pk signed_cmmd.payload.body)
-            ~amount:
-              ( Signed_command_payload.amount signed_cmmd.payload
-              |> Option.value_exn )
-            ~fee:(Signed_command_payload.fee signed_cmmd.payload)
-            ~nonce:
-              (Mina_numbers.Account_nonce.succ signed_cmmd.payload.common.nonce)
-            ~memo:
-              (Signed_command_memo.to_raw_bytes_exn
-                 signed_cmmd.payload.common.memo )
-            ~token:(Signed_command_payload.token signed_cmmd.payload)
-            ~valid_until:signed_cmmd.payload.common.valid_until
-            ~raw_signature:
-              (Mina_base.Signature.Raw.encode signed_cmmd.signature)
+            ~sender_pub_key:(Signed_command_payload.source_pk payload)
+            ~receiver_pub_key:(Signed_command_payload.receiver_pk payload)
+            ~amount ~fee
+            ~nonce:(Signed_command_payload.nonce payload)
+            ~memo ~token ~valid_until ~raw_signature
         with
         | Ok { nonce; _ } ->
             Malleable_error.soft_error_format ~value:()
