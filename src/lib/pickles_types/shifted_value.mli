@@ -2,8 +2,8 @@ module type Field_intf = sig
   (** Represents an element of the field *)
   type t
 
-  (** The size in bits for the canonical representation of a field
-      element *)
+  (** The number of bits in the field's order, i.e.
+      [1 + log2(field_order)] *)
   val size_in_bits : int
 
   (** [negate x] returns the unique value [y] such that [x + y = zero mod p]
