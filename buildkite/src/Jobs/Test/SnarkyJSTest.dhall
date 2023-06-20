@@ -20,7 +20,7 @@ Pipeline.build
         dirtyWhen = [
           S.strictlyStart (S.contains "buildkite/src/Jobs/Test/SnarkyJSTest"),
           S.strictlyStart (S.contains "buildkite/scripts/test-snarkyjs-bindings.sh"),
-          S.strictlyStart (S.contains "src")
+          S.strictlyStart (S.contains "src/lib")
         ],
         path = "Test",
         name = "SnarkyJSTest"
