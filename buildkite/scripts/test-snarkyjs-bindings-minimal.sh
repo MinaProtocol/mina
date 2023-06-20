@@ -12,4 +12,5 @@ echo "Build SnarkyJS (w/o TS)..."
 make snarkyjs_no_types
 
 echo "Run bare minimum SnarkyJS tests..."
-./run-mina-integration-tests.sh
+cd src/lib/snarkyjs
+./run-minimal-mina-tests.sh
