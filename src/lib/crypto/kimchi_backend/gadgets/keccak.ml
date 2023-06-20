@@ -2,8 +2,6 @@ open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
-open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
-
 let tests_enabled = true
 
 (* DEFINITIONS OF CONSTANTS FOR KECCAK *)
@@ -17,12 +15,14 @@ let keccak_ell = 6
 (* width of the lane of the state, meaning the length of each word in bits (64) *)
 let keccak_word = Int.pow 2 keccak_ell
 
+(* number of bytes that fit in a word (8) *)
+let bytes_per_word = keccak_word / 8
+
 (* length of the state in bits, meaning the 5x5 matrix of words in bits (1600) *)
 let keccak_state_length = Int.pow keccak_dim 2 * keccak_word
 
 (* number of rounds of the Keccak permutation function depending on the value `l` (24) *)
-(*let keccak_rounds = 12 + (2 * keccak_ell)*)
-let keccak_rounds = 24
+let keccak_rounds = 12 + (2 * keccak_ell)
 
 (* Creates the 5x5 table of rotation offset for Keccak modulo 64
    * | x \ y |  0 |  1 |  2 |  3 |  4 |
@@ -99,10 +99,8 @@ module State = struct
   let update (type f)
       (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
       ~(prev : Circuit.Field.t matrix) ~(next : Circuit.Field.t matrix) =
-    for y = 0 to keccak_dim - 1 do
-      for x = 0 to keccak_dim - 1 do
-        prev.(x).(y) <- next.(x).(y)
-      done
+    for x = 0 to keccak_dim - 1 do
+      prev.(x) <- next.(x)
     done
 
   (* Converts a list of bytes to a matrix of Field elements *)
@@ -111,13 +109,16 @@ module State = struct
       (bytestring : Circuit.Field.t list) : Circuit.Field.t matrix =
     let open Circuit in
     assert (List.length bytestring = 200) ;
+    let bytestring = Array.of_list bytestring in
     let state =
       Array.make_matrix ~dimx:keccak_dim ~dimy:keccak_dim Field.zero
     in
     for y = 0 to keccak_dim - 1 do
       for x = 0 to keccak_dim - 1 do
-        for z = 0 to (keccak_word / 8) - 1 do
-          let index = (8 * ((keccak_dim * y) + x)) + z in
+        let idx = bytes_per_word * ((keccak_dim * y) + x) in
+        (* Create an array containing the 8 bytes starting on idx that correspond to the word in [x,y] *)
+        let word_bytes = Array.sub bytestring ~pos:idx ~len:bytes_per_word in
+        for z = 0 to bytes_per_word - 1 do
           (* Field element containing value 2^(8*z) *)
           let shift_field =
             Common.bignum_bigint_to_field
@@ -125,14 +126,14 @@ module State = struct
               Bignum_bigint.(pow (of_int 2) (of_int (Int.( * ) 8 z)))
           in
           let shift = Field.constant shift_field in
-          state.(x).(y) <-
-            Field.(state.(x).(y) + (shift * List.nth_exn bytestring index))
+          state.(x).(y) <- Field.(state.(x).(y) + (shift * word_bytes.(z)))
         done
       done
     done ;
+
     state
 
-  (* Converts a state of cvars to a list of bytes as cvars *)
+  (* Converts a state of cvars to a list of bytes as cvars and creates constraints for it *)
   let as_prover_to_bytes (type f)
       (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
       (state : Circuit.Field.t matrix) : Circuit.Field.t list =
@@ -140,7 +141,6 @@ module State = struct
     assert (
       Array.length state = keccak_dim && Array.length state.(0) = keccak_dim ) ;
     let state_length_in_bytes = keccak_state_length / 8 in
-    let bytes_per_word = keccak_word / 8 in
     let bytestring =
       Array.init state_length_in_bytes ~f:(fun idx ->
           exists Field.typ ~compute:(fun () ->
@@ -196,27 +196,30 @@ end
 
 (* KECCAK HASH FUNCTION IMPLEMENTATION *)
 
+(* Computes the number of required extra bytes to pad a message of length bytes *)
+let bytes_to_pad (rate : int) (length : int) =
+  (rate / 8) - (length mod (rate / 8))
+
 (* Pads a message M as:
-   * M || pad[x](|M|)
-   * Padding rule 0x06 ..0*..1.
-   * The padded message vector will start with the message vector
-   * followed by the 0*1 rule to fulfil a length that is a multiple of rate (in bytes)
-*)
+ * M || pad[x](|M|)
+ * Padding rule 0x06 ..0*..1.
+ * The padded message vector will start with the message vector
+ * followed by the 0*1 rule to fulfil a length that is a multiple of rate (in bytes)
+ *)
 let pad_nist (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (message : Circuit.Field.t list) (rate : int) : Circuit.Field.t list =
   let open Circuit in
   (* Find out desired length of the padding in bytes *)
   (* If message is already rate bits, need to pad full rate again *)
-  let extra_bytes = (rate / 8) - (List.length message mod (rate / 8)) in
+  let extra_bytes = bytes_to_pad rate (List.length message) in
   (* 0x06 0x00 ... 0x00 0x80 or 0x86 *)
   let last_field = Common.two_pow (module Circuit) 7 in
-  let last = Field.constant @@ Common.two_pow (module Circuit) 7 in
+  let last = Field.constant last_field in
   (* Create the padding vector *)
   let pad = Array.create ~len:extra_bytes Field.zero in
   pad.(0) <- Field.of_int 6 ;
   pad.(extra_bytes - 1) <- Field.add pad.(extra_bytes - 1) last ;
-  Field.Assert.equal (Field.constant last_field) last ;
   (* Cast the padding array to a list *)
   let pad = Array.to_list pad in
   (* Return the padded message *)
@@ -234,7 +237,7 @@ let pad_101 (type f)
   let open Circuit in
   (* Find out desired length of the padding in bytes *)
   (* If message is already rate bits, need to pad full rate again *)
-  let extra_bytes = (rate / 8) - (List.length message mod (rate / 8)) in
+  let extra_bytes = bytes_to_pad rate (List.length message) in
   (* 0x01 0x00 ... 0x00 0x80 or 0x81 *)
   let last_field = Common.two_pow (module Circuit) 7 in
   let last = Field.constant @@ last_field in
@@ -243,9 +246,8 @@ let pad_101 (type f)
   pad.(0) <- Field.one ;
   pad.(extra_bytes - 1) <- Field.add pad.(extra_bytes - 1) last ;
   (* Cast the padding array to a list *)
-  let pad = Array.to_list pad in
   (* Return the padded message *)
-  message @ pad
+  message @ Array.to_list pad
 
 (* 
  * First algrithm in the compression step of Keccak for 64-bit words.
@@ -275,11 +277,9 @@ let theta (type f)
             (rot64 (module Circuit) state_c.((x + 1) mod keccak_dim) 1 Left)) )
   in
   (* for all x in {0..4} and y in {0..4}: E[x,y] = A[x,y] xor D[x] *)
-  let state_e =
-    Array.map2_exn state_a state_d ~f:(fun state_a state_d ->
-        Array.map state_a ~f:(Bitwise.bxor64 (module Circuit) state_d) )
-  in
-  state_e
+  (* return E *)
+  Array.map2_exn state_a state_d ~f:(fun state_a state_d ->
+      Array.map state_a ~f:(Bitwise.bxor64 (module Circuit) state_d) )
 
 (*
  * Second and third steps in the compression step of Keccak for 64-bit words.
@@ -360,19 +360,12 @@ let chi (type f)
  *)
 let iota (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (state : Circuit.Field.t State.matrix) (round : int) :
+    (state : Circuit.Field.t State.matrix) (rc : Circuit.Field.t) :
     Circuit.Field.t State.matrix =
-  let open Circuit in
   (* Round constants for this round for the iota algorithm *)
-  let rc =
-    exists Field.typ ~compute:(fun () ->
-        Common.field_of_hex (module Circuit) round_consts.(round) )
-  in
   let state_g = state in
   state_g.(0).(0) <- Bitwise.(bxor64 (module Circuit) state_g.(0).(0) rc) ;
-  (* Check it is the right round constant *)
-  Field.Assert.equal rc
-    (Field.constant (Common.field_of_hex (module Circuit) round_consts.(round))) ;
+  (* Check it is the right round constant is implicit from reusing the right cvar *)
   state_g
 
 (* The round applies the lambda function and then chi and iota
@@ -383,21 +376,22 @@ let iota (type f)
  *)
 let round (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (state : Circuit.Field.t State.matrix) (round : int) :
+    (state : Circuit.Field.t State.matrix) (rc : Circuit.Field.t) :
     Circuit.Field.t State.matrix =
   let state_a = state in
   let state_e = theta (module Circuit) state_a in
   let state_b = pi_rho (module Circuit) state_e in
   let state_f = chi (module Circuit) state_b in
-  let state_d = iota (module Circuit) state_f round in
+  let state_d = iota (module Circuit) state_f rc in
   state_d
 
 (* Keccak permutation function with a constant number of rounds *)
 let permutation (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (state : Circuit.Field.t State.matrix) : Circuit.Field.t State.matrix =
+    (state : Circuit.Field.t State.matrix) (rc : Circuit.Field.t array) :
+    Circuit.Field.t State.matrix =
   for i = 0 to keccak_rounds - 1 do
-    let state_i = round (module Circuit) state i in
+    let state_i = round (module Circuit) state rc.(i) in
     (* Update state for next step *)
     State.update (module Circuit) ~prev:state ~next:state_i
   done ;
@@ -406,8 +400,8 @@ let permutation (type f)
 (* Absorb padded message into a keccak state with given rate and capacity *)
 let absorb (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (padded_message : Circuit.Field.t list) ~(capacity : int) ~(rate : int) :
-    Circuit.Field.t State.matrix =
+    (padded_message : Circuit.Field.t list) ~(capacity : int) ~(rate : int)
+    ~(rc : Circuit.Field.t array) : Circuit.Field.t State.matrix =
   let open Circuit in
   let root_state = State.zeros (module Circuit) in
   let state = root_state in
@@ -427,7 +421,7 @@ let absorb (type f)
     (* xor the state with the padded block *)
     let state_xor = State.xor (module Circuit) state block_state in
     (* apply the permutation function to the xored state *)
-    let state_perm = permutation (module Circuit) state_xor in
+    let state_perm = permutation (module Circuit) state_xor rc in
     State.update (module Circuit) ~prev:state ~next:state_perm
   done ;
 
@@ -436,8 +430,8 @@ let absorb (type f)
 (* Squeeze state until it has a desired length in bits *)
 let squeeze (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (state : Circuit.Field.t State.matrix) ~(length : int) ~(rate : int) :
-    Circuit.Field.t list =
+    (state : Circuit.Field.t State.matrix) ~(length : int) ~(rate : int)
+    ~(rc : Circuit.Field.t array) : Circuit.Field.t list =
   let copy (bytestring : Circuit.Field.t list)
       (output_array : Circuit.Field.t array) ~(start : int) ~(length : int) =
     for i = 0 to length - 1 do
@@ -462,7 +456,7 @@ let squeeze (type f)
   (* for the rest of squeezes *)
   for i = 1 to squeezes - 1 do
     (* apply the permutation function to the state *)
-    let new_state = permutation (module Circuit) state in
+    let new_state = permutation (module Circuit) state rc in
     State.update (module Circuit) ~prev:state ~next:new_state ;
     (* append the output of the permutation function to the output *)
     let bytestring_i = State.as_prover_to_bytes (module Circuit) state in
@@ -483,13 +477,18 @@ let sponge (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (padded_message : Circuit.Field.t list) ~(length : int) ~(capacity : int)
     ~(rate : int) : Circuit.Field.t list =
+  let open Circuit in
   (* check that the padded message is a multiple of rate *)
   assert (List.length padded_message * 8 mod rate = 0) ;
-
+  (* setup cvars for round constants *)
+  let rc =
+    exists (Typ.array ~length:24 Field.typ) ~compute:(fun () ->
+        Array.map round_consts ~f:(Common.field_of_hex (module Circuit)) )
+  in
   (* absorb *)
-  let state = absorb (module Circuit) padded_message ~capacity ~rate in
+  let state = absorb (module Circuit) padded_message ~capacity ~rate ~rc in
   (* squeeze *)
-  let hashed = squeeze (module Circuit) state ~length ~rate in
+  let hashed = squeeze (module Circuit) state ~length ~rate ~rc in
   hashed
 
 (* Checks in the circuit that a list of cvars are at most 8 bits each *)
@@ -508,35 +507,25 @@ let check_bytes (type f)
   let lookups =
     match List.length lookups % 3 with
     | 2 ->
-        lookups @ [ Field.zero; Field.zero ]
-    | 1 ->
         lookups @ [ Field.zero ]
+    | 1 ->
+        lookups @ [ Field.zero; Field.zero ]
     | _ ->
         lookups
   in
   (* We can fit 3 12-bit lookups per row *)
   for i = 0 to (List.length lookups / 3) - 1 do
-    with_label "lookup_byte" (fun () ->
-        assert_
-          { annotation = Some __LOC__
-          ; basic =
-              Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-                (Lookup
-                   { w0 = Field.one
-                   ; w1 = List.nth_exn lookups (3 * i)
-                   ; w2 = Field.zero
-                   ; w3 = List.nth_exn lookups ((3 * i) + 1)
-                   ; w4 = Field.zero
-                   ; w5 = List.nth_exn lookups ((3 * i) + 2)
-                   ; w6 = Field.zero
-                   } )
-          } ) ;
+    Lookup.three_12bit
+      (module Circuit)
+      (List.nth_exn lookups (3 * i))
+      (List.nth_exn lookups ((3 * i) + 1))
+      (List.nth_exn lookups ((3 * i) + 2)) ;
     ()
   done ;
   ()
 
 (*
-* Keccak hash function with input message passed as list of 1byte Cvars.
+* Keccak hash function with input message passed as list of Cvar bytes.
 * The message will be parsed as follows:
 * - the first byte of the message will be the least significant byte of the first word of the state (A[0][0])
 * - the 10*1 pad will take place after the message, until reaching the bit length rate.
@@ -545,15 +534,16 @@ let check_bytes (type f)
 let hash (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (message : Circuit.Field.t list) ~(length : int) ~(capacity : int)
-    (nist : bool) : Circuit.Field.t list =
+    (nist_version : bool) : Circuit.Field.t list =
   assert (capacity > 0) ;
+  assert (capacity < keccak_state_length) ;
   assert (length > 0) ;
   assert (length mod 8 = 0) ;
   (* Check each cvar input is 8 bits at most *)
   check_bytes (module Circuit) message ;
   let rate = keccak_state_length - capacity in
   let padded =
-    match nist with
+    match nist_version with
     | true ->
         pad_nist (module Circuit) message rate
     | false ->
@@ -592,7 +582,7 @@ let eth_keccak (type f)
 (* KECCAK GADGET TESTS *)
 
 let%test_unit "keccak gadget" =
-  ( if tests_enabled then
+  if tests_enabled then (
     let (* Import the gadget test runner *)
     open Kimchi_gadgets_test_runner in
     (* Initialize the SRS cache. *)
@@ -648,15 +638,12 @@ let%test_unit "keccak gadget" =
     in
 
     (* Positive tests *)
-    let _cs =
+    let cs_eth256_1byte =
       test_keccak ~nist:false ~len:256 "30"
         "044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116d"
     in
-    let _cs =
-      test_keccak ~nist:true ~len:256 "30"
-        "f9e2eaaa42d9fe9e558a9b8ef1bf366f190aacaa83bad2641ee106e9041096e4"
-    in
-    let _cs =
+
+    let cs_nist512_1byte =
       test_keccak ~nist:true ~len:512 "30"
         "2d44da53f305ab94b6365837b9803627ab098c41a6013694f9b468bccb9c13e95b3900365eb58924de7158a54467e984efcfdabdbcc9af9a940d49c51455b04c"
     in
@@ -669,17 +656,88 @@ let%test_unit "keccak gadget" =
     in
 
     (* The following two tests use 2 blocks instead *)
+    (* For Keccak *)
     let _cs =
       test_keccak ~nist:false ~len:256
         "044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116df9e2eaaa42d9fe9e558a9b8ef1bf366f190aacaa83bad2641ee106e9041096e42d44da53f305ab94b6365837b9803627ab098c41a6013694f9b468bccb9c13e95b3900365eb58924de7158a54467e984efcfdabdbcc9af9a940d49c51455b04c63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36"
         "560deb1d387f72dba729f0bd0231ad45998dda4b53951645322cf95c7b6261d9"
     in
-
+    (* For NIST *)
     let _cs =
       test_keccak ~nist:true ~len:256
         "044852b2a670ade5407e78fb2863c51de9fcb96542a07186fe3aeda6bb8a116df9e2eaaa42d9fe9e558a9b8ef1bf366f190aacaa83bad2641ee106e9041096e42d44da53f305ab94b6365837b9803627ab098c41a6013694f9b468bccb9c13e95b3900365eb58924de7158a54467e984efcfdabdbcc9af9a940d49c51455b04c63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36"
         "1784354c4bbfa5f54e5db23041089e65a807a7b970e3cfdba95e2fbe63b1c0e4"
     in
+
+    (* Padding of input 1080 bits and 1088 bits *)
+    (* 135 bits, uses the following single padding byte as 0x81 *)
+    let cs135 =
+      test_keccak ~nist:false ~len:256
+        "391ccf9b5de23bb86ec6b2b142adb6e9ba6bee8519e7502fb8be8959fbd2672934cc3e13b7b45bf2b8a5cb48881790a7438b4a326a0c762e31280711e6b64fcc2e3e4e631e501d398861172ea98603618b8f23b91d0208b0b992dfe7fdb298b6465adafbd45e4f88ee9dc94e06bc4232be91587f78572c169d4de4d8b95b714ea62f1fbf3c67a4"
+        "7d5655391ede9ca2945f32ad9696f464be8004389151ce444c89f688278f2e1d"
+    in
+
+    (* 136 bits, 2 blocks and second is just padding *)
+    let cs136 =
+      test_keccak ~nist:false ~len:256
+        "ff391ccf9b5de23bb86ec6b2b142adb6e9ba6bee8519e7502fb8be8959fbd2672934cc3e13b7b45bf2b8a5cb48881790a7438b4a326a0c762e31280711e6b64fcc2e3e4e631e501d398861172ea98603618b8f23b91d0208b0b992dfe7fdb298b6465adafbd45e4f88ee9dc94e06bc4232be91587f78572c169d4de4d8b95b714ea62f1fbf3c67a4"
+        "37694fd4ba137be747eb25a85b259af5563e0a7a3010d42bd15963ac631b9d3f"
+    in
+
+    (* Input already looks like padded *)
+    let _cs =
+      test_keccak ~cs:cs135 ~nist:false ~len:256
+        "800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001"
+        "0edbbae289596c7da9fafe65931c5dce3439fb487b8286d6c1970e44eea39feb"
+    in
+
+    let _cs =
+      test_keccak ~cs:cs136 ~nist:false ~len:256
+        "80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001"
+        "bbf1f49a2cc5678aa62196d0c3108d89425b81780e1e90bcec03b4fb5f834714"
+    in
+
+    (* Reusing *)
+    let cs2 =
+      test_keccak ~nist:false ~len:256 "a2c0"
+        "9856642c690c036527b8274db1b6f58c0429a88d9f3b9298597645991f4f58f0"
+    in
+
+    let _cs =
+      test_keccak ~cs:cs2 ~nist:false ~len:256 "0a2c"
+        "295b48ad49eff61c3abfd399c672232434d89a4ef3ca763b9dbebb60dbb32a8b"
+    in
+
+    let _cs =
+      test_keccak ~cs:cs_eth256_1byte ~nist:false ~len:256 "00"
+        "bc36789e7a1e281436464229828f817d6612f7b477d66591ff96a9e064bcc98a"
+    in
+
+    (* Negative tests *)
+    (* Check cannot use bad hex inputs *)
+    assert (
+      Common.is_error (fun () ->
+          test_keccak ~nist:false ~len:256 "a2c"
+            "07f02d241eeba9c909a1be75e08d9e8ac3e61d9e24fa452a6785083e1527c467" ) ) ;
+
+    (* Check cannot use bad hex inputs *)
+    assert (
+      Common.is_error (fun () ->
+          test_keccak ~nist:true ~len:256 "0"
+            "f39f4526920bb4c096e5722d64161ea0eb6dbd0b4ff0d812f31d56fb96142084" ) ) ;
+
+    (* Cannot reuse CS for different output length *)
+    assert (
+      Common.is_error (fun () ->
+          test_keccak ~cs:cs_nist512_1byte ~nist:true ~len:256 "30"
+            "f9e2eaaa42d9fe9e558a9b8ef1bf366f190aacaa83bad2641ee106e9041096e4" ) ) ;
+
+    (* Checking cannot reuse CS for same length but different padding *)
+    assert (
+      Common.is_error (fun () ->
+          test_keccak ~cs:cs_eth256_1byte ~nist:true ~len:256
+            "4920616d20746865206f776e6572206f6620746865204e465420776974682069642058206f6e2074686520457468657265756d20636861696e"
+            "63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36" ) ) ;
 
     () ) ;
 

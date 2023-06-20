@@ -2,10 +2,10 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 let tests_enabled = true
 
-(** Looks up three values (at most 12 bits) 
- * BEWARE: it needs in the circuit at least one gate (even if dummy) that uses the table for it to work 
+(* Looks up three values (at most 12 bits each) 
+ * BEWARE: it needs in the circuit at least one gate (even if dummy) that uses the 12-bit lookup table for it to work 
  *)
-let three_values (type f)
+let three_12bit (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (v0 : Circuit.Field.t) (v1 : Circuit.Field.t) (v2 : Circuit.Field.t) : unit
     =
@@ -27,20 +27,24 @@ let three_values (type f)
         } ) ;
   ()
 
-(** Check that one value is at most X bits (at most 12)
- * BEWARE: it needs in the circuit at least one gate (even if dummy) that uses the table for it to work 
+(* Check that one value is at most X bits (at most 12), default is 12.
+ * BEWARE: it needs in the circuit at least one gate (even if dummy) that uses the 12-bit lookup table for it to work 
  *)
 let less_than_bits (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (bits : int) (value : Circuit.Field.t) : unit =
+    ?(bits = 12) (value : Circuit.Field.t) : unit =
   let open Circuit in
   assert (bits > 0 && bits <= 12) ;
+  (* In order to check that a value is less than 2^x bits value < 2^x
+     you first check that value < 2^12 bits using the lookup table
+     and then that the value * shift < 2^12 where shift = 2^(12-x)
+     (because moving shift to the right hand side that gives value < 2^x) *)
   let shift =
     exists Field.typ ~compute:(fun () ->
         let power = Core_kernel.Int.pow 2 (12 - bits) in
         Field.Constant.of_int power )
   in
-  three_values (module Circuit) value Field.(value * shift) Field.zero ;
+  three_12bit (module Circuit) value Field.(value * shift) Field.zero ;
   ()
 
 (*********)
@@ -70,7 +74,7 @@ let%test_unit "lookup gadget" =
               exists Field.typ ~compute:(fun () -> Field.Constant.of_int value)
             in
             (* Use the lookup gadget *)
-            less_than_bits (module Runner.Impl) bits value ;
+            less_than_bits (module Runner.Impl) ~bits value ;
             (* Use a dummy range check to load the table *)
             Range_check.bits64 (module Runner.Impl) Field.zero ;
             () )

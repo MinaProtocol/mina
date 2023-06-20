@@ -1128,8 +1128,9 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
   Element.Standard.of_limbs (remainder0, remainder1, remainder2)
 
 (* Gadget to constrain conversion of bytes array (output of Keccak gadget)
-   into foreign field element with standard limbs (input of ECDSA gadget) *)
-let _keccak_to_ecdsa (type f)
+   into foreign field element with standard limbs (input of ECDSA gadget).
+   Assumes bytes array is given in big endian. *)
+let bytes_to_standard_element (type f)
     (module Circuit : Snark_intf.Run with type field = f)
     (bytestring : Circuit.Field.t array) (fmod : f standard_limbs)
     (fmod_bitlen : int) =
@@ -1144,7 +1145,9 @@ let _keccak_to_ecdsa (type f)
   let input_bitlen = Array.length bytestring * 8 in
   if input_bitlen > fmod_bitlen then
     (* For the most significant one, constrain that it is less bits than required *)
-    Lookup.less_than_bits (module Circuit) (fmod_bitlen % 8) bytestring.(0) ;
+    Lookup.less_than_bits
+      (module Circuit)
+      ~bits:(fmod_bitlen % 8) bytestring.(0) ;
   (* C2: Constrain bytes into standard foreign field element limbs => foreign field element z *)
   let limbs =
     exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->

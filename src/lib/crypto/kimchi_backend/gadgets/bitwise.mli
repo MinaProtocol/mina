@@ -2,11 +2,11 @@
 type rot_mode = Left | Right
 
 (** 64-bit rotation of rot_bits to the `mode` side
-   *  - word of maximum 64 bits to be rotated
-   * - rot_bits: number of bits to be rotated
-   * - mode: Left or Right
-   * Returns rotated word
-*)
+ *  - word of maximum 64 bits to be rotated
+ * - rot_bits: number of bits to be rotated
+ * - mode: Left or Right
+ * Returns rotated word
+ *)
 val rot64 :
      (module Snarky_backendless.Snark_intf.Run with type field = 'f)
   -> 'f Snarky_backendless.Cvar.t
