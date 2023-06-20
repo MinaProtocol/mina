@@ -35,7 +35,7 @@ let signature_scalar_check (type f)
       f Foreign_field.Element.Standard.t * f Foreign_field.Element.Standard.t )
     =
   let open Circuit in
-  (* Signaures r and s *)
+  (* Signaure r and s *)
   let r, s = signature in
 
   (* Compute witness r^-1 and s^-1 needed for not-zero-check *)
@@ -123,7 +123,6 @@ let signature_scalar_check (type f)
 (* C3: Assert r \in [0, n)
  *     Already covered by bound check on r (Bounds 1)
  *)
-
 (* C4: Assert s \in [0, n)
  *     Already covered by bound check on s (Bounds 2)
  *)
@@ -361,14 +360,14 @@ let verify (type f) (module Circuit : Snark_intf.Run with type field = f)
    *  assert that it equals r.
    *
    *  Since we may want to target applications where the scalar field is much smaller
-   *  than the base field, so we cannot make any assumptions about the ratio between
+   *  than the base field, we cannot make any assumptions about the ratio between
    *  these moduli, so we will constrain Rx = q * n + Rx' using the foreign field
    *  multiplication gadget, rather than just constraining Rx + 0 with our foreign
    *  field addition gadget.
    *
    *  As we are reducing Rx modulo n, we are performing foreign field arithmetic modulo n.
    *  However, the multiplicand n above is not a valid foreign field element in [0, n - 1].
-   *  To be safe we must constrain Rx = q * (n - 1) + q + Rx  modulo n.
+   *  To be safe we must constrain Rx = q * (n - 1) + q + Rx'  modulo n.
    *)
 
   (* Compute witness value q and Rx' *)

@@ -122,7 +122,8 @@ let field_const_standard_limbs_to_bignum_bigint (type f)
 (* TODO: It would be better if this were created with functor that
  *       takes are arguments the native field and the foreign field modulus.
  *       Then when creating foreign field elements it could check that
- *       they are valid (less than the foreign field modulus).
+ *       they are valid (less than the foreign field modulus).  We'd need a
+ *       mode to override this last check for bound additions.
  *)
 module type Element_intf = sig
   type 'field t
@@ -204,7 +205,7 @@ module type Element_intf = sig
     -> unit
 
   (* Create and constrain foreign field element from Bignum_bigint.t *)
-  val checked_const_of_bignum_bigint :
+  val check_here_const_of_bignum_bigint :
        (module Snark_intf.Run with type field = 'field)
     -> Bignum_bigint.t
     -> 'field t
@@ -353,7 +354,7 @@ end = struct
       Field.Assert.equal left1 right1 ;
       Field.Assert.equal left2 right2
 
-    let checked_const_of_bignum_bigint (type field)
+    let check_here_const_of_bignum_bigint (type field)
         (module Circuit : Snark_intf.Run with type field = field) x : field t =
       let const_x = const_of_bignum_bigint (module Circuit) x in
       let var_x = of_bignum_bigint (module Circuit) x in
@@ -494,7 +495,7 @@ end = struct
       Field.Assert.equal left01 right01 ;
       Field.Assert.equal left2 right2
 
-    let checked_const_of_bignum_bigint (type field)
+    let check_here_const_of_bignum_bigint (type field)
         (module Circuit : Snark_intf.Run with type field = field) x : field t =
       let const_x = const_of_bignum_bigint (module Circuit) x in
       let var_x = of_bignum_bigint (module Circuit) x in

@@ -120,7 +120,7 @@ module type Element_intf = sig
     -> unit
 
   (* Create and constrain foreign field element from Bignum_bigint.t *)
-  val checked_const_of_bignum_bigint :
+  val check_here_const_of_bignum_bigint :
        (module Snark_intf.Run with type field = 'field)
     -> Bignum_bigint.t
     -> 'field t

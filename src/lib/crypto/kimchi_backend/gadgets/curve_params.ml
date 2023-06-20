@@ -68,49 +68,67 @@ module InCircuit = struct
     }
 end
 
-let double_bignum_point (curve : t) (point : Affine.bignum_point) :
-    Bignum_bigint.t * Affine.bignum_point =
-  let point_x, point_y = point in
-  (* Compute slope using 1st derivative of sqrt(x^3 + a * x + b)
-     * Note that when a = 0 (e.g. as in the case of secp256k1) we have
-     * one fewer constraint (below).
-  *)
+let compute_slope_bignum (curve : t) (left : Affine.bignum_point)
+    (right : Affine.bignum_point) : Bignum_bigint.t =
+  let left_x, left_y = left in
+  let right_x, right_y = right in
+
+  let open Bignum_bigint in
+  if equal left_x right_x && equal left_y right_y then
+    (* Compute slope using 1st derivative of sqrt(x^3 + a * x + b)
+     *   s' = (3 * Px^2  + a )/ 2 * Py
+     *)
+    let numerator =
+      let point_x_squared = pow left_x (of_int 2) % curve.modulus in
+      let point_3x_squared = of_int 3 * point_x_squared % curve.modulus in
+
+      (point_3x_squared + curve.a) % curve.modulus
+    in
+    let denominator = of_int 2 * left_y % curve.modulus in
+
+    (* Compute inverse of denominator *)
+    let denominator_inv =
+      Common.bignum_bigint_inverse denominator curve.modulus
+    in
+    numerator * denominator_inv % curve.modulus
+  else
+    (* Computes s = (Ry - Ly)/(Rx - Lx) *)
+    let delta_y = (right_y - left_y) % curve.modulus in
+    let delta_x = (right_x - left_x) % curve.modulus in
+
+    (* Compute delta_x inverse *)
+    let delta_x_inv = Common.bignum_bigint_inverse delta_x curve.modulus in
+
+    delta_y * delta_x_inv % curve.modulus
+
+let double_bignum_point (curve : t) ?slope (point : Affine.bignum_point) :
+    Affine.bignum_point =
+  let open Bignum_bigint in
   let slope =
-    Bignum_bigint.(
-      (* Computes s' = (3 * Px^2  + a )/ 2 * Py *)
-      let numerator =
-        let point_x_squared = pow point_x (of_int 2) % curve.modulus in
-        let point_3x_squared = of_int 3 * point_x_squared % curve.modulus in
-
-        (point_3x_squared + curve.a) % curve.modulus
-      in
-      let denominator = of_int 2 * point_y % curve.modulus in
-
-      (* Compute inverse of denominator *)
-      let denominator_inv =
-        Common.bignum_bigint_inverse denominator curve.modulus
-      in
-      numerator * denominator_inv % curve.modulus)
+    match slope with
+    | Some slope ->
+        slope
+    | None ->
+        compute_slope_bignum curve point point
   in
+  let slope_squared = (pow slope @@ of_int 2) % curve.modulus in
 
-  let slope_squared = Bignum_bigint.((pow slope @@ of_int 2) % curve.modulus) in
+  let point_x, point_y = point in
 
   (* Compute result's x-coodinate: x = s^2 - 2 * Px *)
   let result_x =
-    Bignum_bigint.(
-      let point_x2 = of_int 2 * point_x % curve.modulus in
-      (slope_squared - point_x2) % curve.modulus)
+    let point_x2 = of_int 2 * point_x % curve.modulus in
+    (slope_squared - point_x2) % curve.modulus
   in
 
   (* Compute result's y-coodinate: y = s * (Px - x) - Py *)
   let result_y =
-    Bignum_bigint.(
-      let x_diff = (point_x - result_x) % curve.modulus in
-      let x_diff_s = slope * x_diff % curve.modulus in
-      (x_diff_s - point_y) % curve.modulus)
+    let x_diff = (point_x - result_x) % curve.modulus in
+    let x_diff_s = slope * x_diff % curve.modulus in
+    (x_diff_s - point_y) % curve.modulus
   in
 
-  (slope, (result_x, result_y))
+  (result_x, result_y)
 
 let to_circuit_constants (type field)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = field)
@@ -143,7 +161,7 @@ let to_circuit_constants (type field)
          Field.Assert.equal const_len var_len ;
          const_len )
     ; order_minus_one =
-        Foreign_field.Element.Standard.checked_const_of_bignum_bigint
+        Foreign_field.Element.Standard.check_here_const_of_bignum_bigint
           (module Circuit)
           order_minus_one
     ; order_minus_one_bits =
@@ -151,15 +169,15 @@ let to_circuit_constants (type field)
           (module Circuit)
           order_minus_one
     ; a =
-        Foreign_field.Element.Standard.checked_const_of_bignum_bigint
+        Foreign_field.Element.Standard.check_here_const_of_bignum_bigint
           (module Circuit)
           curve.a
     ; b =
-        Foreign_field.Element.Standard.checked_const_of_bignum_bigint
+        Foreign_field.Element.Standard.check_here_const_of_bignum_bigint
           (module Circuit)
           curve.b
     ; gen =
-        Affine.checked_const_of_bignum_bigint_coordinates
+        Affine.check_here_const_of_bignum_bigint_coordinates
           (module Circuit)
           curve.gen
     ; doubles =
@@ -171,10 +189,9 @@ let to_circuit_constants (type field)
           in
           let point = ref curve.gen in
           for i = 0 to order_bit_length - 1 do
-            let _slope, double = double_bignum_point curve !point in
-            point := double ;
+            point := double_bignum_point curve !point ;
             doubles.(i) <-
-              Affine.checked_const_of_bignum_bigint_coordinates
+              Affine.check_here_const_of_bignum_bigint_coordinates
                 (module Circuit)
                 !point
           done ;
@@ -182,11 +199,11 @@ let to_circuit_constants (type field)
         else [||] )
     ; ia =
         { acc =
-            Affine.checked_const_of_bignum_bigint_coordinates
+            Affine.check_here_const_of_bignum_bigint_coordinates
               (module Circuit)
               curve.ia.acc
         ; neg_acc =
-            Affine.checked_const_of_bignum_bigint_coordinates
+            Affine.check_here_const_of_bignum_bigint_coordinates
               (module Circuit)
               curve.ia.neg_acc
         }
