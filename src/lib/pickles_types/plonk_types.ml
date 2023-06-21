@@ -422,27 +422,32 @@ module Evals = struct
   module Stable = struct
     module V2 = struct
       type 'a t =
-        { w : 'a Columns_vec.Stable.V1.t
-        ; coefficients : 'a Columns_vec.Stable.V1.t
+        { w : 'a Columns_vec.Stable.V1.t array
+        ; coefficients : 'a Columns_vec.Stable.V1.t array
         ; z : 'a
         ; s : 'a Permuts_minus_1_vec.Stable.V1.t
-        ; generic_selector : 'a
-        ; poseidon_selector : 'a
+        ; generic_selector : 'a array
+        ; poseidon_selector : 'a array
         ; lookup : 'a Lookup.Stable.V1.t option
         }
       [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
     end
   end]
 
-  let to_absorption_sequence
-      { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
-      _ list =
-    let always_present =
-      [ z; generic_selector; poseidon_selector ]
-      @ Vector.to_list w
-      @ Vector.to_list coefficients
-      @ Vector.to_list s
+  let listify_nolookup
+      { w; coefficients; z; s; generic_selector; poseidon_selector; lookup = _ }
+      =
+    let vector_array_to_list varr =
+      Array.map ~f:Vector.to_list varr |> Array.to_list |> List.concat
     in
+    (z :: Array.to_list generic_selector)
+    @ Array.to_list poseidon_selector
+    @ vector_array_to_list w
+    @ vector_array_to_list coefficients
+    @ Vector.to_list s
+
+  let to_absorption_sequence ({ lookup; _ } as t) : _ list =
+    let always_present = listify_nolookup t in
     let lookup =
       match lookup with
       | None ->
@@ -454,12 +459,12 @@ module Evals = struct
 
   module In_circuit = struct
     type ('f, 'bool) t =
-      { w : 'f Columns_vec.t
-      ; coefficients : 'f Columns_vec.t
+      { w : 'f Columns_vec.t array
+      ; coefficients : 'f Columns_vec.t array
       ; z : 'f
       ; s : 'f Permuts_minus_1_vec.t
-      ; generic_selector : 'f
-      ; poseidon_selector : 'f
+      ; generic_selector : 'f array
+      ; poseidon_selector : 'f array
       ; lookup : (('f, 'bool) Lookup.In_circuit.t, 'bool) Opt.t
       }
     [@@deriving hlist, fields]
@@ -467,25 +472,38 @@ module Evals = struct
     let map (type bool a b)
         ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
           (a, bool) t ) ~(f : a -> b) : (b, bool) t =
-      { w = Vector.map w ~f
-      ; coefficients = Vector.map coefficients ~f
+      { w = Array.map ~f:(Vector.map ~f) w
+      ; coefficients = Array.map ~f:(Vector.map ~f) coefficients
       ; z = f z
       ; s = Vector.map s ~f
-      ; generic_selector = f generic_selector
-      ; poseidon_selector = f poseidon_selector
+      ; generic_selector = Array.map ~f generic_selector
+      ; poseidon_selector = Array.map ~f poseidon_selector
       ; lookup = Opt.map ~f:(Lookup.In_circuit.map ~f) lookup
       }
 
-    let to_list
-        { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } =
-      let some x = Opt.Some x in
-      let always_present =
-        List.map ~f:some
-          ( [ z; generic_selector; poseidon_selector ]
-          @ Vector.to_list w
-          @ Vector.to_list coefficients
-          @ Vector.to_list s )
+    (* Need to repeat since the last 2 record types are different for OCaml *)
+    let listify_nolookup
+        { w
+        ; coefficients
+        ; z
+        ; s
+        ; generic_selector
+        ; poseidon_selector
+        ; lookup = _
+        } =
+      let vector_array_to_list varr =
+        Array.map ~f:Vector.to_list varr |> Array.to_list |> List.concat
       in
+      (z :: Array.to_list generic_selector)
+      @ Array.to_list poseidon_selector
+      @ vector_array_to_list w
+      @ vector_array_to_list coefficients
+      @ Vector.to_list s
+
+    let some x = Opt.Some x
+
+    let to_list ({ lookup; _ } as t) =
+      let always_present = List.map ~f:some (listify_nolookup t) in
       let with_lookup ~f (lookup : _ Lookup.In_circuit.t) =
         always_present
         @ List.map ~f
@@ -505,16 +523,9 @@ module Evals = struct
       | Maybe (b, lookup) ->
           with_lookup ~f:(fun x -> Maybe (b, x)) lookup
 
-    let to_absorption_sequence
-        { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+    let to_absorption_sequence ({ lookup; _ } as t) :
         _ Opt.Early_stop_sequence.t =
-      let always_present =
-        [ z; generic_selector; poseidon_selector ]
-        @ Vector.to_list w
-        @ Vector.to_list coefficients
-        @ Vector.to_list s
-      in
-      let some x = Opt.Some x in
+      let always_present = listify_nolookup t in
       let lookup =
         match lookup with
         | None ->
@@ -546,22 +557,25 @@ module Evals = struct
   let map (type a b)
       ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
         a t ) ~(f : a -> b) : b t =
-    { w = Vector.map w ~f
-    ; coefficients = Vector.map coefficients ~f
+    { w = Array.map ~f:(Vector.map ~f) w
+    ; coefficients = Array.map ~f:(Vector.map ~f) coefficients
     ; z = f z
     ; s = Vector.map s ~f
-    ; generic_selector = f generic_selector
-    ; poseidon_selector = f poseidon_selector
+    ; generic_selector = Array.map ~f generic_selector
+    ; poseidon_selector = Array.map ~f poseidon_selector
     ; lookup = Option.map ~f:(Lookup.map ~f) lookup
     }
 
   let map2 (type a b c) (t1 : a t) (t2 : b t) ~(f : a -> b -> c) : c t =
-    { w = Vector.map2 t1.w t2.w ~f
-    ; coefficients = Vector.map2 t1.coefficients t2.coefficients ~f
+    { w = Array.map2_exn ~f:(Vector.map2 ~f) t1.w t2.w
+    ; coefficients =
+        Array.map2_exn ~f:(Vector.map2 ~f) t1.coefficients t2.coefficients
     ; z = f t1.z t2.z
     ; s = Vector.map2 t1.s t2.s ~f
-    ; generic_selector = f t1.generic_selector t2.generic_selector
-    ; poseidon_selector = f t1.poseidon_selector t2.poseidon_selector
+    ; generic_selector =
+        Array.map2_exn ~f t1.generic_selector t2.generic_selector
+    ; poseidon_selector =
+        Array.map2_exn ~f t1.poseidon_selector t2.poseidon_selector
     ; lookup = Option.map2 t1.lookup t2.lookup ~f:(Lookup.map2 ~f)
     }
 
@@ -585,14 +599,8 @@ module Evals = struct
      - lookup runtime
   *)
 
-  let to_list
-      { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } =
-    let always_present =
-      [ z; generic_selector; poseidon_selector ]
-      @ Vector.to_list w
-      @ Vector.to_list coefficients
-      @ Vector.to_list s
-    in
+  let to_list ({ lookup; _ } as t) =
+    let always_present = listify_nolookup t in
     match lookup with
     | None ->
         always_present
@@ -604,18 +612,18 @@ module Evals = struct
 
   let typ (type f a_var a)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-      ~dummy e lookup_config :
+      ?(length = 1) ~dummy e lookup_config :
       ((a_var, Impl.Boolean.var) In_circuit.t, a t, f) Snarky_backendless.Typ.t
       =
     let open Impl in
     let lookup_typ = Lookup.opt_typ Impl.Boolean.typ lookup_config e ~dummy in
     Typ.of_hlistable
-      [ Vector.typ e Columns.n
-      ; Vector.typ e Columns.n
+      [ Typ.array ~length (Vector.typ e Columns.n)
+      ; Typ.array ~length (Vector.typ e Columns.n)
       ; e
       ; Vector.typ e Permuts_minus_1.n
-      ; e
-      ; e
+      ; Typ.array ~length e
+      ; Typ.array ~length e
       ; lookup_typ
       ]
       ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
