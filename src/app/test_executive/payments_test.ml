@@ -316,7 +316,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Malleable_error.soft_error_format ~value:()
               "Replay attack succeeded, but it should fail because the \
                signature is wrong.  attempted nonce: %d"
-              (Unsigned.UInt32.to_int nonce)
+              (Unsigned.UInt32.to_int (Signed_command_payload.nonce payload))
         | Error error ->
             (* expect GraphQL error due to invalid signature *)
             let err_str = Error.to_string_mach error in
