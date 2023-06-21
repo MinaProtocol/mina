@@ -576,7 +576,7 @@ let nist_sha3 (type f)
   Array.of_list hash
 
 (* Gadget for Keccak hash function for the parameters used in Ethereum *)
-let eth_keccak (type f)
+let ethereum (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (message : Circuit.Field.t list) : Circuit.Field.t array =
   Array.of_list @@ hash (module Circuit) message ~length:256 ~capacity:512 false
@@ -611,7 +611,7 @@ let%test_unit "keccak gadget" =
               | true ->
                   nist_sha3 (module Runner.Impl) len message
               | false ->
-                  eth_keccak (module Runner.Impl) message
+                  ethereum (module Runner.Impl) message
             in
 
             let expected =

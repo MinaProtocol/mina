@@ -17,7 +17,7 @@ val nist_sha3 :
  * Output: 
  * - Array of 256 Cvars representing the output of the hash function where each of them is a byte 
  *)
-val eth_keccak :
+val ethereum :
      (module Snarky_backendless.Snark_intf.Run with type field = 'f)
   -> 'f Snarky_backendless.Cvar.t list
   -> 'f Snarky_backendless.Cvar.t array
