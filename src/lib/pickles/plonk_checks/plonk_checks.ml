@@ -262,13 +262,13 @@ let get_feature_flag (feature_flags : _ all_feature_flags)
 
 let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     (module F : Field_with_if_intf with type t = t and type bool = boolean)
-    ~endo ~mds ~field_of_hex ~domain ~srs_length_log2
+    ?(chunk_index = 0) ~endo ~mds ~field_of_hex ~domain ~srs_length_log2
     ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
       (t, _, boolean) Minimal.t ) (e : (_ * _, _) Plonk_types.Evals.In_circuit.t)
     =
   let feature_flags = expand_feature_flags (module B) feature_flags in
-  let witness = Vector.to_array e.w in
-  let coefficients = Vector.to_array e.coefficients in
+  let witness = Vector.to_array e.w.(chunk_index) in
+  let coefficients = Vector.to_array e.coefficients.(chunk_index) in
   let var (col, row) =
     let get_eval =
       match (row : Scalars.curr_or_next) with Curr -> fst | Next -> snd
@@ -277,9 +277,9 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     | Witness i ->
         get_eval witness.(i)
     | Index Poseidon ->
-        get_eval e.poseidon_selector
+        get_eval e.poseidon_selector.(chunk_index)
     | Index Generic ->
-        get_eval e.generic_selector
+        get_eval e.generic_selector.(chunk_index)
     | Index i ->
         failwithf
           !"Index %{sexp:Scalars.Gate_type.t}\n\
@@ -420,7 +420,8 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     let alpha_pow = env.alpha_pow in
     let zeta1m1 = env.zeta_to_n_minus_1 in
     let open F in
-    let w0 = Vector.to_array e.w |> Array.map ~f:fst in
+    (* FIXME: Arrays add ?num_chunk ?*)
+    let w0 = Vector.to_array e.w.(0) |> Array.map ~f:fst in
     let ft_eval0 =
       let a0 = alpha_pow perm_alpha0 in
       let w_n = w0.(Nat.to_int Plonk_types.Permuts_minus_1.n) in
@@ -471,7 +472,8 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
       let zkp = env.zk_polynomial in
       let index_terms = Sc.index_terms env in
       let alpha_pow = env.alpha_pow in
-      let w0 = Vector.map e.w ~f:fst in
+      let w0 = Vector.map e.w.(0) ~f:fst in
+      (* FIXME: Arrays/num_chunks *)
       let perm =
         let w0 = Vector.to_array w0 in
         with_label __LOC__ (fun () ->

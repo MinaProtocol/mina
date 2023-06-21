@@ -79,6 +79,7 @@ val evals_of_split_evals :
 val scalars_env :
      (module Bool_intf with type t = 'b)
   -> (module Field_with_if_intf with type t = 't and type bool = 'b)
+  -> ?chunk_index:int
   -> endo:'t
   -> mds:'t array array
   -> field_of_hex:(string -> 't)

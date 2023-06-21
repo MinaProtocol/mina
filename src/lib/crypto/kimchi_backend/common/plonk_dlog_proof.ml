@@ -251,15 +251,17 @@ module Make (Inputs : Inputs_intf) = struct
       : _ Pickles_types.Plonk_types.Evals.Lookup.t =
     { sorted; aggreg; table; runtime }
 
-  let eval_of_backend
+  let eval_of_backend ?(num_chunks = 1)
       ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
         Evaluations_backend.t ) : _ Pickles_types.Plonk_types.Evals.t =
-    { w = tuple15_to_vec w
-    ; coefficients = tuple15_to_vec coefficients
+    let len = num_chunks in
+    let of_tuple15 e = Array.create ~len @@ tuple15_to_vec e in
+    { w = of_tuple15 w
+    ; coefficients = of_tuple15 coefficients
     ; z
     ; s = tuple6_to_vec s
-    ; generic_selector
-    ; poseidon_selector
+    ; generic_selector = Array.create ~len generic_selector
+    ; poseidon_selector = Array.create ~len poseidon_selector
     ; lookup = Option.map ~f:lookup_eval_of_backend lookup
     }
 
@@ -307,7 +309,7 @@ module Make (Inputs : Inputs_intf) = struct
       : 'f Kimchi_types.lookup_evaluations =
     { sorted; aggreg; table; runtime }
 
-  let eval_to_backend
+  let eval_to_backend ?(num_chunks = 1)
       { Pickles_types.Plonk_types.Evals.w
       ; coefficients
       ; z
@@ -316,12 +318,13 @@ module Make (Inputs : Inputs_intf) = struct
       ; poseidon_selector
       ; lookup
       } : Evaluations_backend.t =
-    { w = tuple15_of_vec w
-    ; coefficients = tuple15_of_vec coefficients
+    (* FIXME: Arrays *)
+    { w = tuple15_of_vec w.(0)
+    ; coefficients = tuple15_of_vec coefficients.(0)
     ; z
     ; s = tuple6_of_vec s
-    ; generic_selector
-    ; poseidon_selector
+    ; generic_selector = generic_selector.(0)
+    ; poseidon_selector = poseidon_selector.(0)
     ; lookup = Option.map ~f:lookup_eval_to_backend lookup
     }
 
