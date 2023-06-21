@@ -108,7 +108,9 @@ module Gate_spec = struct
 
   (* TODO: split kind/coeffs from row/wired_to *)
 
-  (** A gate/row/constraint consists of a type (kind), a row, the other cells its columns/cells are connected to (wired_to), and the selector polynomial associated with the gate. *)
+  (** A gate/row/constraint consists of a type (kind), a row, the other cells
+      its columns/cells are connected to (wired_to), and the selector polynomial
+      associated with the gate. *)
   type ('row, 'f) t =
     { kind : Kimchi_gate_type.t
     ; wired_to : 'row Position.t array
