@@ -215,20 +215,7 @@ module Evals : sig
       ; poseidon_selector : 'f array
       ; lookup : (('f, 'bool) Lookup.In_circuit.t, 'bool) Opt.t
       }
-
-    (** {4 Accessors} *)
-
-    val s : ('a, 'b) t -> 'a Permuts_minus_1_vec.t
-
-    val z : ('a, 'b) t -> 'a
-
-    val w : ('a, 'b) t -> 'a Columns_vec.t
-
-    val poseidon_selector : ('a, 'b) t -> 'a
-
-    val generic_selector : ('a, 'b) t -> 'a
-
-    val lookup : ('a, 'b) t -> (('a, 'b) Lookup.In_circuit.t, 'b) Opt.t
+    [@@deriving hlist, fields]
 
     (** {4 Converters} *)
 

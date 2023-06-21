@@ -2,12 +2,16 @@ let create ~num_chunks ~of_int =
   let one = of_int num_chunks in
   let open Pickles_types in
   let open Plonk_types in
+  let vec =
+    let v = Vector.init Columns.n ~f:(fun _ -> one) in
+    fun () -> Array.create ~len:num_chunks v
+  in
   Evals.
-    { w = Vector.init Columns.n ~f:(fun _ -> one)
-    ; coefficients = Vector.init Columns.n ~f:(fun _ -> one)
+    { w = vec ()
+    ; coefficients = vec ()
     ; z = one
     ; s = Vector.init Permuts_minus_1.n ~f:(fun _ -> one)
-    ; generic_selector = one
-    ; poseidon_selector = one
+    ; generic_selector = Array.create ~len:num_chunks one
+    ; poseidon_selector = Array.create ~len:num_chunks one
     ; lookup = None
     }
