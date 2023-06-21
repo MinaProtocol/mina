@@ -205,16 +205,3 @@ func selectNodes(tps, minTps float64, nodes []NodeAddress) (float64, []NodeAddre
 	})
 	return tps / nodesF, nodes[:nodesMax]
 }
-
-// TODO change API and remove this function
-func formatMina(amount uint64) string {
-	i, rem := amount/1e9, int(amount%1e9)
-	is := fmt.Sprintf("%d", i)
-	if rem == 0 {
-		return is
-	}
-	s := []byte(".000000000")
-	rs := fmt.Sprintf("%d", rem)
-	copy(s[(10-len(rs)):], rs)
-	return is + string(s)
-}

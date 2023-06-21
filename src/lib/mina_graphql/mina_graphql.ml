@@ -3141,31 +3141,31 @@ module Types = struct
           { senders : Signature_lib.Private_key.t list
           ; receiver : Signature_lib.Public_key.Compressed.t
           ; amount : Currency.Amount.t
-          ; fee_min : Currency.Fee.t
-          ; fee_max : Currency.Fee.t
+          ; min_fee : Currency.Fee.t
+          ; max_fee : Currency.Fee.t
           ; memo : string
-          ; transactions_per_second : float
-          ; duration_in_minutes : int
+          ; tps : float
+          ; duration_min : int
           }
 
         let arg_typ =
           obj "PaymentsDetails"
             ~doc:"Keys and other information for scheduling payments"
-            ~coerce:(fun senders receiver amount fee_min fee_max memo
-                         transactions_per_second duration_in_minutes ->
+            ~coerce:(fun senders receiver amount min_fee max_fee memo tps
+                         duration_min ->
               Result.return
                 { senders
                 ; receiver
                 ; amount
-                ; fee_min
-                ; fee_max
+                ; min_fee
+                ; max_fee
                 ; memo
-                ; transactions_per_second
-                ; duration_in_minutes
+                ; tps
+                ; duration_min
                 } )
             ~split:(fun f (t : input) ->
-              f t.senders t.receiver t.amount t.fee_min t.fee_max t.memo
-                t.transactions_per_second t.duration_in_minutes )
+              f t.senders t.receiver t.amount t.min_fee t.max_fee t.memo t.tps
+                t.duration_min )
             ~fields:
               Arg.
                 [ arg "senders"
@@ -3177,13 +3177,14 @@ module Types = struct
                 ; arg "amount"
                     ~typ:(non_null CurrencyAmount.arg_typ)
                     ~doc:"Amount for payments"
-                ; arg "feeMin" ~typ:(non_null Fee.arg_typ) ~doc:"Minimum fee"
-                ; arg "feeMax" ~typ:(non_null Fee.arg_typ) ~doc:"Maximum fee"
+                ; arg "minFee" ~typ:(non_null Fee.arg_typ) ~doc:"Minimum fee"
+                ; arg "maxFee" ~typ:(non_null Fee.arg_typ) ~doc:"Maximum fee"
                 ; arg "memo" ~doc:"Memo, up to 32 characters"
                     ~typ:(non_null string)
-                ; arg "transactionsPerSecond" ~doc:"Frequency of transactions"
+                ; arg "tps"
+                    ~doc:"Frequency of transactions (transactions per second)"
                     ~typ:(non_null float)
-                ; arg "durationInMinutes" ~doc:"Length of scheduler run"
+                ; arg "durationMin" ~doc:"Length of scheduler run, in minutes"
                     ~typ:(non_null int)
                 ]
       end
@@ -3193,16 +3194,16 @@ module Types = struct
           { fee_payers : Signature_lib.Private_key.t list
           ; num_zkapps_to_deploy : int
           ; num_new_accounts : int
-          ; transactions_per_second : float
-          ; duration_in_minutes : int
+          ; tps : float
+          ; duration_min : int
           ; memo_prefix : string
           ; no_precondition : bool
-          ; min_balance_change : string
-          ; max_balance_change : string
-          ; init_balance : string
-          ; min_fee : string
-          ; max_fee : string
-          ; deployment_fee : string
+          ; min_balance_change : Currency.Amount.t
+          ; max_balance_change : Currency.Amount.t
+          ; init_balance : Currency.Amount.t
+          ; min_fee : Currency.Fee.t
+          ; max_fee : Currency.Fee.t
+          ; deployment_fee : Currency.Fee.t
           ; account_queue_size : int
           ; max_cost : bool
           }
@@ -3210,17 +3211,17 @@ module Types = struct
         let arg_typ =
           obj "ZkappCommandsDetails"
             ~doc:"Keys and other information for scheduling zkapp commands"
-            ~coerce:(fun fee_payers num_zkapps_to_deploy num_new_accounts
-                         transactions_per_second duration_in_minutes memo_prefix
-                         no_precondition min_balance_change max_balance_change
-                         init_balance min_fee max_fee deployment_fee
-                         account_queue_size max_cost ->
+            ~coerce:(fun fee_payers num_zkapps_to_deploy num_new_accounts tps
+                         duration_min memo_prefix no_precondition
+                         min_balance_change max_balance_change init_balance
+                         min_fee max_fee deployment_fee account_queue_size
+                         max_cost ->
               Result.return
                 { fee_payers
                 ; num_zkapps_to_deploy
                 ; num_new_accounts
-                ; transactions_per_second
-                ; duration_in_minutes
+                ; tps
+                ; duration_min
                 ; memo_prefix
                 ; no_precondition
                 ; min_balance_change
@@ -3233,11 +3234,11 @@ module Types = struct
                 ; max_cost
                 } )
             ~split:(fun f (t : input) ->
-              f t.fee_payers t.num_zkapps_to_deploy t.num_new_accounts
-                t.transactions_per_second t.duration_in_minutes t.memo_prefix
-                t.no_precondition t.min_balance_change t.max_balance_change
-                t.init_balance t.min_fee t.max_fee t.deployment_fee
-                t.account_queue_size t.max_cost )
+              f t.fee_payers t.num_zkapps_to_deploy t.num_new_accounts t.tps
+                t.duration_min t.memo_prefix t.no_precondition
+                t.min_balance_change t.max_balance_change t.init_balance
+                t.min_fee t.max_fee t.deployment_fee t.account_queue_size
+                t.max_cost )
             ~fields:
               Arg.
                 [ arg "feePayers"
@@ -3253,27 +3254,28 @@ module Types = struct
                     ~doc:
                       "Number of zkapp accounts that the scheduler generates \
                        during the test"
-                ; arg "transactionsPerSecond" ~typ:(non_null float)
-                    ~doc:"Frequency of transactions"
-                ; arg "durationInMinutes" ~doc:"Length of scheduler run"
+                ; arg "tps" ~typ:(non_null float)
+                    ~doc:"Frequency of transactions (transactions per seconds)"
+                ; arg "durationMin" ~doc:"Length of scheduler run, in minutes"
                     ~typ:(non_null int)
                 ; arg "memoPrefix" ~doc:"Prefix of memo" ~typ:(non_null string)
                 ; arg "noPrecondition"
                     ~doc:"Disable the precondition in account updates"
                     ~typ:(non_null bool)
                 ; arg "minBalanceChange" ~doc:"Minimum balance change"
-                    ~typ:(non_null string)
+                    ~typ:(non_null CurrencyAmount.arg_typ)
                 ; arg "maxBalanceChange" ~doc:"Maximum balance change"
-                    ~typ:(non_null string)
-                ; arg "initBalance" ~typ:(non_null string)
+                    ~typ:(non_null CurrencyAmount.arg_typ)
+                ; arg "initBalance"
+                    ~typ:(non_null CurrencyAmount.arg_typ)
                     ~doc:
                       "Initial balance for zkApp accounts that we initially \
                        deploy for the purpose of test"
-                ; arg "minFee" ~doc:"Minimum fee" ~typ:(non_null string)
-                ; arg "maxFee" ~doc:"Maximum fee" ~typ:(non_null string)
+                ; arg "minFee" ~doc:"Minimum fee" ~typ:(non_null Fee.arg_typ)
+                ; arg "maxFee" ~doc:"Maximum fee" ~typ:(non_null Fee.arg_typ)
                 ; arg "deploymentFee"
                     ~doc:"Fee for the initial deployment of zkApp accounts"
-                    ~typ:(non_null string)
+                    ~typ:(non_null Fee.arg_typ)
                 ; arg "accountQueueSize"
                     ~doc:"The size of queue for recently used accounts"
                     ~typ:(non_null int)
@@ -4439,7 +4441,7 @@ module Mutations = struct
           let%bind.Result () =
             let open Currency.Fee in
             Result.ok_if_true ~error:"Maximum fee less than mininum fee"
-              (payment_details.fee_max >= payment_details.fee_min)
+              (payment_details.max_fee >= payment_details.min_fee)
           in
           let logger = Mina_lib.top_level_logger mina in
           let senders = payment_details.senders |> Array.of_list in
@@ -4493,12 +4495,10 @@ module Mutations = struct
               ()
           | `Duplicate ->
               failwith "Unexpected duplicate scheduled payments handle" ) ;
-          let wait_span =
-            1. /. payment_details.transactions_per_second |> Time.Span.of_sec
-          in
+          let wait_span = 1. /. payment_details.tps |> Time.Span.of_sec in
           let wait_span_ms = Time.Span.to_ms wait_span |> int_of_float in
           let duration_span =
-            Time.Span.of_min (Float.of_int payment_details.duration_in_minutes)
+            Time.Span.of_min (Float.of_int payment_details.duration_min)
           in
           let tm_start = Time.now () in
           let tm_end = Time.add tm_start duration_span in
@@ -4513,8 +4513,8 @@ module Mutations = struct
             let receiver_pk = payment_details.receiver in
             let fee =
               Quickcheck.random_value ~seed:`Nondeterministic
-              @@ Currency.Fee.gen_incl payment_details.fee_min
-                   payment_details.fee_max
+              @@ Currency.Fee.gen_incl payment_details.min_fee
+                   payment_details.max_fee
             in
             let body =
               Signed_command_payload.Body.Payment
@@ -4644,9 +4644,9 @@ module Mutations = struct
             let spec =
               { Transaction_snark.For_tests.Deploy_snapp_spec.sender =
                   (fee_payer_keypair, !(fee_payer_nonces.(!ndx)))
-              ; fee = Currency.Fee.of_mina_string_exn deployment_fee
+              ; fee = deployment_fee
               ; fee_payer = None
-              ; amount = Currency.Amount.of_mina_string_exn init_balance
+              ; amount = init_balance
               ; zkapp_account_keypairs = [ kp ]
               ; memo = Signed_command_memo.create_from_string_exn memo
               ; new_zkapp_account = true
@@ -4791,15 +4791,14 @@ module Mutations = struct
                         "Unexpected duplicate scheduled zkApp commands handle"
                   ) ;
                   let wait_span =
-                    1. /. zkapp_command_details.transactions_per_second
-                    |> Time.Span.of_sec
+                    1. /. zkapp_command_details.tps |> Time.Span.of_sec
                   in
                   let wait_span_ms =
                     Time.Span.to_ms wait_span |> int_of_float
                   in
                   let duration_span =
                     Time.Span.of_min
-                      (Float.of_int zkapp_command_details.duration_in_minutes)
+                      (Float.of_int zkapp_command_details.duration_min)
                   in
                   let tm_start = Time.now () in
                   let tm_end = Time.add tm_start duration_span in

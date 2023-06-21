@@ -181,14 +181,14 @@ func (p *Params) Generate(round int) GeneratedRound {
 	}
 	zkappKeysNum, zkappAmount := lib.ZkappKeygenRequirements(zkappParams)
 	paymentParams := lib.PaymentSubParams{
-		ExperimentName:    experimentName,
-		Tps:               tps - zkappTps,
-		MinTps:            0.02,
-		DurationInMinutes: p.RoundDurationMin,
-		MinFee:            1e9,
-		MaxFee:            2e9,
-		Amount:            1e5,
-		Receiver:          p.PaymentReceiver,
+		ExperimentName: experimentName,
+		Tps:            tps - zkappTps,
+		MinTps:         0.02,
+		DurationMin:    p.RoundDurationMin,
+		MinFee:         1e9,
+		MaxFee:         2e9,
+		Amount:         1e5,
+		Receiver:       p.PaymentReceiver,
 	}
 	paymentKeysNum, paymentAmount := lib.PaymentKeygenRequirements(p.Gap, paymentParams)
 	cmds := []Command{}
