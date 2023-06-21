@@ -259,7 +259,7 @@ module Make (Inputs : Inputs_intf) = struct
     { w = of_tuple15 w
     ; coefficients = of_tuple15 coefficients
     ; z
-    ; s = tuple6_to_vec s
+    ; s = Array.create ~len @@ tuple6_to_vec s
     ; generic_selector = Array.create ~len generic_selector
     ; poseidon_selector = Array.create ~len poseidon_selector
     ; lookup = Option.map ~f:lookup_eval_of_backend lookup
@@ -322,7 +322,7 @@ module Make (Inputs : Inputs_intf) = struct
     { w = tuple15_of_vec w.(0)
     ; coefficients = tuple15_of_vec coefficients.(0)
     ; z
-    ; s = tuple6_of_vec s
+    ; s = tuple6_of_vec s.(0)
     ; generic_selector = generic_selector.(0)
     ; poseidon_selector = poseidon_selector.(0)
     ; lookup = Option.map ~f:lookup_eval_to_backend lookup

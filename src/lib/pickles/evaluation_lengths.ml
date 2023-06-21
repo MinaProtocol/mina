@@ -10,7 +10,9 @@ let create ~num_chunks ~of_int =
     { w = vec ()
     ; coefficients = vec ()
     ; z = one
-    ; s = Vector.init Permuts_minus_1.n ~f:(fun _ -> one)
+    ; s =
+        Array.create ~len:num_chunks
+          (Vector.init Permuts_minus_1.n ~f:(fun _ -> one))
     ; generic_selector = Array.create ~len:num_chunks one
     ; poseidon_selector = Array.create ~len:num_chunks one
     ; lookup = None

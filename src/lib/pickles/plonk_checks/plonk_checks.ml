@@ -408,20 +408,20 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   (** Computes the ft evaluation at zeta.
   (see https://o1-labs.github.io/mina-book/crypto/plonk/maller_15.html#the-evaluation-of-l)
   *)
-  let ft_eval0 (type t) (module F : Field_intf with type t = t) ~domain
-      ~(env : t Scalars.Env.t)
+  let ft_eval0 (type t) (module F : Field_intf with type t = t)
+      ?(chunk_index = 0) ~domain ~(env : t Scalars.Env.t)
       ({ alpha = _; beta; gamma; zeta; joint_combiner = _; feature_flags = _ } :
         _ Minimal.t ) (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) p_eval0 =
     let open Plonk_types.Evals.In_circuit in
     let e0 field = fst (field e) in
     let e1 field = snd (field e) in
-    let e0_s = Vector.map e.s ~f:fst in
+    let e0_s = Vector.map e.s.(chunk_index) ~f:fst in
+    let w0 = Vector.to_array e.w.(chunk_index) |> Array.map ~f:fst in
+
     let zkp = env.zk_polynomial in
     let alpha_pow = env.alpha_pow in
     let zeta1m1 = env.zeta_to_n_minus_1 in
     let open F in
-    (* FIXME: Arrays add ?num_chunk ?*)
-    let w0 = Vector.to_array e.w.(0) |> Array.map ~f:fst in
     let ft_eval0 =
       let a0 = alpha_pow perm_alpha0 in
       let w_n = w0.(Nat.to_int Plonk_types.Permuts_minus_1.n) in
@@ -453,8 +453,9 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
 
   (** Computes the list of scalars used in the linearization. *)
   let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
-      (module F : Field_intf with type t = t) ~(env : t Scalars.Env.t) ~shift
-      ~(feature_flags : _ Plonk_types.Features.t) =
+      ?(chunk_index = 0) (module F : Field_intf with type t = t)
+      ~(env : t Scalars.Env.t) ~shift ~(feature_flags : _ Plonk_types.Features.t)
+      =
     let _ = with_label in
     let open F in
     fun ({ alpha
@@ -468,20 +469,24 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         (e : (_ * _, _) Plonk_types.Evals.In_circuit.t)
           (*((e0, e1) : _ Plonk_types.Evals.In_circuit.t Double.t) *) ->
       let open Plonk_types.Evals.In_circuit in
-      let e1 field = snd (field e) in
-      let zkp = env.zk_polynomial in
       let index_terms = Sc.index_terms env in
-      let alpha_pow = env.alpha_pow in
-      let w0 = Vector.map e.w.(0) ~f:fst in
-      (* FIXME: Arrays/num_chunks *)
+
       let perm =
-        let w0 = Vector.to_array w0 in
+        let e1 field = snd (field e) in
+        let zkp = env.zk_polynomial in
+        let alpha_pow = env.alpha_pow in
+
+        (* FIXME: Arrays/num_chunks *)
+        let w0 = Vector.map e.w.(chunk_index) ~f:fst |> Vector.to_array in
+        let s0 = e.s.(chunk_index) in
+
         with_label __LOC__ (fun () ->
-            Vector.foldi e.s
+            Vector.foldi s0
               ~init:(e1 z * beta * alpha_pow perm_alpha0 * zkp)
               ~f:(fun i acc (s, _) -> acc * (gamma + (beta * s) + w0.(i)))
             |> negate )
       in
+
       let compute_feature column feature_flag actual_feature_flag =
         match feature_flag with
         | Opt.Flag.Yes ->
@@ -492,6 +497,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         | Opt.Flag.No ->
             Opt.None
       in
+
       In_circuit.map_fields
         ~f:(Shifted_value.of_field (module F) ~shift)
         { alpha

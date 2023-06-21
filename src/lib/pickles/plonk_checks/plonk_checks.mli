@@ -95,6 +95,7 @@ val scalars_env :
 module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : sig
   val ft_eval0 :
        't field
+    -> ?chunk_index:int
     -> domain:< shifts : 't array ; .. >
     -> env:'t Scalars.Env.t
     -> ( 't
@@ -107,6 +108,7 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
 
   val derive_plonk :
        ?with_label:(string -> (unit -> 't) -> 't)
+    -> ?chunk_index:int
     -> (module Field_intf with type t = 't)
     -> env:'t Scalars.Env.t
     -> shift:'t Shifted_value.Shift.t

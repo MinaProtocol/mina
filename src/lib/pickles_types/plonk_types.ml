@@ -425,7 +425,7 @@ module Evals = struct
         { w : 'a Columns_vec.Stable.V1.t array
         ; coefficients : 'a Columns_vec.Stable.V1.t array
         ; z : 'a
-        ; s : 'a Permuts_minus_1_vec.Stable.V1.t
+        ; s : 'a Permuts_minus_1_vec.Stable.V1.t array
         ; generic_selector : 'a array
         ; poseidon_selector : 'a array
         ; lookup : 'a Lookup.Stable.V1.t option
@@ -444,7 +444,7 @@ module Evals = struct
     @ Array.to_list poseidon_selector
     @ vector_array_to_list w
     @ vector_array_to_list coefficients
-    @ Vector.to_list s
+    @ vector_array_to_list s
 
   let to_absorption_sequence ({ lookup; _ } as t) : _ list =
     let always_present = listify_nolookup t in
@@ -462,7 +462,7 @@ module Evals = struct
       { w : 'f Columns_vec.t array
       ; coefficients : 'f Columns_vec.t array
       ; z : 'f
-      ; s : 'f Permuts_minus_1_vec.t
+      ; s : 'f Permuts_minus_1_vec.t array
       ; generic_selector : 'f array
       ; poseidon_selector : 'f array
       ; lookup : (('f, 'bool) Lookup.In_circuit.t, 'bool) Opt.t
@@ -475,7 +475,7 @@ module Evals = struct
       { w = Array.map ~f:(Vector.map ~f) w
       ; coefficients = Array.map ~f:(Vector.map ~f) coefficients
       ; z = f z
-      ; s = Vector.map s ~f
+      ; s = Array.map ~f:(Vector.map ~f) s
       ; generic_selector = Array.map ~f generic_selector
       ; poseidon_selector = Array.map ~f poseidon_selector
       ; lookup = Opt.map ~f:(Lookup.In_circuit.map ~f) lookup
@@ -498,7 +498,7 @@ module Evals = struct
       @ Array.to_list poseidon_selector
       @ vector_array_to_list w
       @ vector_array_to_list coefficients
-      @ Vector.to_list s
+      @ vector_array_to_list s
 
     let some x = Opt.Some x
 
@@ -557,21 +557,22 @@ module Evals = struct
   let map (type a b)
       ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
         a t ) ~(f : a -> b) : b t =
-    { w = Array.map ~f:(Vector.map ~f) w
-    ; coefficients = Array.map ~f:(Vector.map ~f) coefficients
+    let vamap = Array.map ~f:(Vector.map ~f) in
+    { w = vamap w
+    ; coefficients = vamap coefficients
     ; z = f z
-    ; s = Vector.map s ~f
+    ; s = vamap s
     ; generic_selector = Array.map ~f generic_selector
     ; poseidon_selector = Array.map ~f poseidon_selector
     ; lookup = Option.map ~f:(Lookup.map ~f) lookup
     }
 
   let map2 (type a b c) (t1 : a t) (t2 : b t) ~(f : a -> b -> c) : c t =
-    { w = Array.map2_exn ~f:(Vector.map2 ~f) t1.w t2.w
-    ; coefficients =
-        Array.map2_exn ~f:(Vector.map2 ~f) t1.coefficients t2.coefficients
+    let vamap = Array.map2_exn ~f:(Vector.map2 ~f) in
+    { w = vamap t1.w t2.w
+    ; coefficients = vamap t1.coefficients t2.coefficients
     ; z = f t1.z t2.z
-    ; s = Vector.map2 t1.s t2.s ~f
+    ; s = vamap t1.s t2.s
     ; generic_selector =
         Array.map2_exn ~f t1.generic_selector t2.generic_selector
     ; poseidon_selector =
@@ -617,13 +618,19 @@ module Evals = struct
       =
     let open Impl in
     let lookup_typ = Lookup.opt_typ Impl.Boolean.typ lookup_config e ~dummy in
+    let w_typ = Typ.array ~length (Vector.typ e Columns.n) in
+    let coefficients_typ = w_typ in
+    let z_typ = e in
+    let s_typ = Typ.array ~length (Vector.typ e Permuts_minus_1.n) in
+    let generic_selector_typ = Typ.array ~length e in
+    let poseidon_selector_typ = generic_selector_typ in
     Typ.of_hlistable
-      [ Typ.array ~length (Vector.typ e Columns.n)
-      ; Typ.array ~length (Vector.typ e Columns.n)
-      ; e
-      ; Vector.typ e Permuts_minus_1.n
-      ; Typ.array ~length e
-      ; Typ.array ~length e
+      [ w_typ
+      ; coefficients_typ
+      ; z_typ
+      ; s_typ
+      ; generic_selector_typ
+      ; poseidon_selector_typ
       ; lookup_typ
       ]
       ~var_to_hlist:In_circuit.to_hlist ~var_of_hlist:In_circuit.of_hlist
