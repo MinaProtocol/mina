@@ -210,7 +210,7 @@ module Evals : sig
       { w : 'f Columns_vec.t array
       ; coefficients : 'f Columns_vec.t array
       ; z : 'f
-      ; s : 'f Permuts_minus_1_vec.t
+      ; s : 'f Permuts_minus_1_vec.t array
       ; generic_selector : 'f array
       ; poseidon_selector : 'f array
       ; lookup : (('f, 'bool) Lookup.In_circuit.t, 'bool) Opt.t
@@ -231,7 +231,7 @@ module Evals : sig
     { w : 'a Columns_vec.t array
     ; coefficients : 'a Columns_vec.t array
     ; z : 'a
-    ; s : 'a Permuts_minus_1_vec.t
+    ; s : 'a Permuts_minus_1_vec.t array
     ; generic_selector : 'a array
     ; poseidon_selector : 'a array
     ; lookup : 'a Lookup.t option
