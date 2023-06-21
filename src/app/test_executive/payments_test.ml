@@ -307,7 +307,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ~sender_pub_key:(Signed_command_payload.source_pk payload)
             ~receiver_pub_key:(Signed_command_payload.receiver_pk payload)
             ~amount ~fee
-            ~nonce:(Signed_command_payload.nonce payload)
+            ~nonce:
+              (Mina_numbers.Account_nonce.succ
+                 (Signed_command_payload.nonce payload) )
             ~memo ~token ~valid_until ~raw_signature
         with
         | Ok { nonce; _ } ->
