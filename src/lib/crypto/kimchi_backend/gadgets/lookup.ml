@@ -60,7 +60,7 @@ let%test_unit "lookup gadget" =
       try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
     in
 
-    (* Helper to test lookup less than gadget
+    (* Helper to test lookup less than gadget for both variables and constants
      *   Inputs value to be checked and number of bits
      *   Returns true if constraints are satisfied, false otherwise.
      *)
@@ -69,12 +69,15 @@ let%test_unit "lookup gadget" =
       let cs, _proof_keypair, _proof =
         Runner.generate_and_verify_proof ?cs (fun () ->
             let open Runner.Impl in
+            (* Set up snarky constant *)
+            let const = Field.constant @@ Field.Constant.of_int value in
             (* Set up snarky variable *)
             let value =
               exists Field.typ ~compute:(fun () -> Field.Constant.of_int value)
             in
             (* Use the lookup gadget *)
             less_than_bits (module Runner.Impl) ~bits value ;
+            less_than_bits (module Runner.Impl) ~bits const ;
             (* Use a dummy range check to load the table *)
             Range_check.bits64 (module Runner.Impl) Field.zero ;
             () )

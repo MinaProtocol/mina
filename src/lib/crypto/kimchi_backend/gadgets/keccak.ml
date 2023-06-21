@@ -205,6 +205,7 @@ let bytes_to_pad (rate : int) (length : int) =
  * Padding rule 0x06 ..0*..1.
  * The padded message vector will start with the message vector
  * followed by the 0*1 rule to fulfil a length that is a multiple of rate (in bytes)
+ * (This means a 0110 sequence, followed with as many 0s as needed, and a final 1 bit)
  *)
 let pad_nist (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -217,7 +218,7 @@ let pad_nist (type f)
   let last_field = Common.two_pow (module Circuit) 7 in
   let last = Field.constant last_field in
   (* Create the padding vector *)
-  let pad = Array.create ~len:extra_bytes Field.zero in
+  let pad = Array.init extra_bytes ~f:(fun _ -> Field.zero) in
   pad.(0) <- Field.of_int 6 ;
   pad.(extra_bytes - 1) <- Field.add pad.(extra_bytes - 1) last ;
   (* Cast the padding array to a list *)
@@ -230,6 +231,7 @@ let pad_nist (type f)
    * Padding rule 10*1.
    * The padded message vector will start with the message vector
    * followed by the 10*1 rule to fulfil a length that is a multiple of rate (in bytes)
+   * (This means a 1 bit, followed with as many 0s as needed, and a final 1 bit)
 *)
 let pad_101 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
@@ -242,7 +244,7 @@ let pad_101 (type f)
   let last_field = Common.two_pow (module Circuit) 7 in
   let last = Field.constant @@ last_field in
   (* Create the padding vector *)
-  let pad = Array.create ~len:extra_bytes Field.zero in
+  let pad = Array.init extra_bytes ~f:(fun _ -> Field.zero) in
   pad.(0) <- Field.one ;
   pad.(extra_bytes - 1) <- Field.add pad.(extra_bytes - 1) last ;
   (* Cast the padding array to a list *)
