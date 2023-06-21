@@ -23,8 +23,7 @@ module type Resource_pool_base_intf = sig
   end
 
   (** Diff from a transition frontier extension that would update the resource pool*)
-  val handle_transition_frontier_diff :
-    transition_frontier_diff -> t -> unit Deferred.t
+  val handle_transition_frontier_diff : transition_frontier_diff -> t -> unit
 
   val create :
        constraint_constants:Genesis_constants.Constraint_constants.t
@@ -93,7 +92,7 @@ module type Resource_pool_diff_intf = sig
     -> verified Envelope.Incoming.t
     -> ( [ `Accept | `Reject ] * t * rejected
        , [ `Locally_generated of t * rejected | `Other of Error.t ] )
-       Deferred.Result.t
+       Result.t
 
   val is_empty : t -> bool
 
@@ -236,7 +235,7 @@ module type Snark_resource_pool_intf = sig
     -> work:Transaction_snark_work.Statement_with_hash.t
     -> proof:Ledger_proof.t One_or_two.t
     -> fee:Fee_with_prover.t
-    -> [ `Added | `Statement_not_referenced ] Deferred.t
+    -> [ `Added | `Statement_not_referenced ]
 
   val request_proof :
        t
