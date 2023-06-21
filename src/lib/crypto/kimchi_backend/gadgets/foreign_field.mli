@@ -335,3 +335,10 @@ val mul :
   -> 'f standard_limbs (* foreign_field_modulus *)
   -> 'f Element.Standard.t
 (* product *)
+
+val bytes_to_standard_element :
+     (module Snark_intf.Run with type field = 'f)
+  -> 'f Snarky_backendless.Cvar.t array
+  -> 'f standard_limbs
+  -> int
+  -> 'f Element.Standard.t

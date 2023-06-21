@@ -1426,6 +1426,47 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
         } ) ;
   Element.Standard.of_limbs (remainder0, remainder1, remainder2)
 
+(* Gadget to constrain conversion of bytes array (output of Keccak gadget)
+   into foreign field element with standard limbs (input of ECDSA gadget).
+   Assumes bytes array is given in big endian. *)
+let bytes_to_standard_element (type f)
+    (module Circuit : Snark_intf.Run with type field = f)
+    (bytestring : Circuit.Field.t array) (fmod : f standard_limbs)
+    (fmod_bitlen : int) =
+  let open Circuit in
+  (* C1: Check modulus_bit_length = # of bits you unpack 
+   * This is partly implicit in the circuit given the number of byte outputs of Keccak:
+   * · input_bitlen < fmod_bitlen : OK
+   * · input_bitlen = fmod_bitlen : OK
+   * · input_bitlen > fmod_bitlen : CONSTRAIN
+   * Check that the most significant byte of the input is less than 2^(fmod_bitlen % 8)
+   *)
+  let input_bitlen = Array.length bytestring * 8 in
+  if input_bitlen > fmod_bitlen then
+    (* For the most significant one, constrain that it is less bits than required *)
+    Lookup.less_than_bits
+      (module Circuit)
+      ~bits:(fmod_bitlen % 8) bytestring.(0) ;
+  (* C2: Constrain bytes into standard foreign field element limbs => foreign field element z *)
+  let elem =
+    Element.Standard.of_bignum_bigint (module Circuit)
+    @@ Common.cvar_field_bytes_to_bignum_bigint_as_prover (module Circuit)
+    @@ Array.to_list bytestring
+  in
+  (* C3: Reduce z modulo foreign_field_modulus
+   *
+   *   Constrain z' = z + 0 modulo foreign_field_modulus using foreign field addition gate
+   *
+   *   Note: this is sufficient because z cannot be double the size due to bit length constraint
+   *)
+  let zero = Element.Standard.of_limbs (Field.zero, Field.zero, Field.zero) in
+  (* C4: Range check z' < f *)
+  (* Altogether this is a call to Foreign_field.add in default mode *)
+  let output = add (module Circuit) elem zero fmod in
+
+  (* return z' *)
+  output
+
 (*********)
 (* Tests *)
 (*********)

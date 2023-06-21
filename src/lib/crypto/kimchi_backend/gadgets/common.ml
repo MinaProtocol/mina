@@ -352,8 +352,38 @@ let field_of_hex (type f)
     (hex : string) : f =
   bignum_bigint_to_field (module Circuit) @@ bignum_bigint_of_hex hex
 
+(* List of field elements for each byte of hexadecimal input*)
+let field_bytes_of_hex (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (hex : string) : f list =
+  let chars = String.to_list hex in
+  let list_pairs = List.groupi chars ~break:(fun i _ _ -> i mod 2 = 0) in
+  let list_bytes =
+    List.map list_pairs ~f:(fun byte ->
+        let hex_i = String.of_char_list byte in
+        field_of_hex (module Circuit) hex_i )
+  in
+  list_bytes
+
+(* List of field elements of at most 1 byte to a Bignum_bigint *)
+let cvar_field_bytes_to_bignum_bigint_as_prover (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (bytestring : Circuit.Field.t list) : Bignum_bigint.t =
+  List.fold bytestring ~init:Bignum_bigint.zero ~f:(fun acc x ->
+      Bignum_bigint.(
+        (acc * of_int 2)
+        + cvar_field_to_bignum_bigint_as_prover (module Circuit) x) )
+
 (* Negative test helper *)
 let is_error (func : unit -> _) = Result.is_error (Or_error.try_with func)
+
+(* Two to the power of n as a field element *)
+let two_pow (type f)
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    (n : int) =
+  bignum_bigint_to_field
+    (module Circuit)
+    Bignum_bigint.(pow (of_int 2) (of_int n))
 
 (*********)
 (* Tests *)
