@@ -137,7 +137,7 @@ end)
         forward t.write_broadcasts diff' rejected cb )
     in
     O1trace.sync_thread apply_and_broadcast_thread_label (fun () ->
-        match%bind Resource_pool.Diff.unsafe_apply t.resource_pool diff with
+        match Resource_pool.Diff.unsafe_apply t.resource_pool diff with
         | Ok (`Accept, accepted, rejected) ->
             rebroadcast (accepted, rejected)
         | Ok (`Reject, accepted, rejected) ->
@@ -203,11 +203,12 @@ end)
                    O1trace.thread processing_diffs_thread_label (fun () ->
                        apply_and_broadcast network_pool verified_diff cb )
                | Transition_frontier_extension diff ->
-                   O1trace.thread
+                   O1trace.sync_thread
                      processing_transition_frontier_diffs_thread_label
                      (fun () ->
                        Resource_pool.handle_transition_frontier_diff diff
-                         resource_pool ) ) ) ) ;
+                         resource_pool ) ;
+                   Deferred.unit ) ) ) ;
     (network_pool, remote_w, local_w)
 
   (* Rebroadcast locally generated pool items every 10 minutes. Do so for 50
