@@ -117,9 +117,7 @@ let dummy (type w h r) ?(num_step_chunks = 1) ?(num_wrap_chunks = 1)
   let g0 = Tock.Curve.(to_affine_exn one) in
   let g len = Array.create ~len g0 in
   let tick_arr len = Array.init len ~f:(fun _ -> tick ()) in
-  let lengths =
-    Commitment_lengths.create ~num_chunks:num_wrap_chunks ~of_int:Fn.id
-  in
+  let lengths = Commitment_lengths.create ~num_chunks:num_wrap_chunks in
   let dummy_evals = Dummy.evals ~num_wrap_chunks in
   T
     { statement =

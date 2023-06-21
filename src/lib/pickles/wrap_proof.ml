@@ -39,8 +39,7 @@ let typ ~num_wrap_chunks : (Checked.t, Constant.t) Typ.t =
         Inner_curve.typ Plonk_types.Features.none ~bool:Boolean.typ
         ~dummy:Inner_curve.Params.one
         ~commitment_lengths:
-          (Commitment_lengths.create ~num_chunks:num_wrap_chunks
-             ~of_int:(fun x -> x) )
+          (Commitment_lengths.create ~num_chunks:num_wrap_chunks)
     ; Types.Step.Bulletproof.typ ~length:(Nat.to_int Tock.Rounds.n)
         ( Typ.transport Other_field.typ
             ~there:(fun x ->

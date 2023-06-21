@@ -422,8 +422,7 @@ let wrap_main
                      Inner_curve.typ ~bool:Boolean.typ feature_flags
                      ~dummy:Inner_curve.Params.one
                      ~commitment_lengths:
-                       (Commitment_lengths.create ~num_chunks:num_step_chunks
-                          ~of_int:Fn.id ) )
+                       (Commitment_lengths.create ~num_chunks:num_step_chunks) )
                   ~request:(fun () -> Req.Messages) )
           in
           let sponge = Wrap_verifier.Opt.create sponge_params in

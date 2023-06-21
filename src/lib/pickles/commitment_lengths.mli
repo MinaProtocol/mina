@@ -1,10 +1,9 @@
 (* Commitment_lengths *)
 
-(** [create] *)
+(** [create ~num_chunks] generate a commitment length tailored to [num_chunks] *)
 val create :
      num_chunks:int
-  -> of_int:(int -> 'a)
-  -> ( 'a Pickles_types.Plonk_types.Columns_vec.t
-     , 'a
-     , 'a )
+  -> ( int Pickles_types.Plonk_types.Columns_vec.t
+     , int
+     , int )
      Pickles_types.Plonk_types.Messages.Poly.t
