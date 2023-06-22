@@ -581,6 +581,25 @@ let ethereum (type f)
     (message : Circuit.Field.t list) : Circuit.Field.t array =
   Array.of_list @@ hash (module Circuit) message ~length:256 ~capacity:512 false
 
+
+(* Gagdet for pre-NIST SHA-3 function for output lengths 224/256/384/512.
+ * Note that when calling with output length 256 this is equivalent to the ethereum function 
+ *)
+let pre_nist (type f)
+(module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+(len : int) (message : Circuit.Field.t list) : Circuit.Field.t array =
+  match len with
+  | 224 ->
+    Array.of_list @@ hash (module Circuit) message ~length:224 ~capacity:448 false
+  | 256 ->
+      ethereum (module Circuit) message
+  | 384 ->
+    Array.of_list @@ hash (module Circuit) message ~length:384 ~capacity:768 false
+  | 512 ->
+    Array.of_list @@ hash (module Circuit) message ~length:512 ~capacity:1024 false
+  | _ ->
+      assert false
+
 (* KECCAK GADGET TESTS *)
 
 let%test_unit "keccak gadget" =
@@ -611,7 +630,7 @@ let%test_unit "keccak gadget" =
               | true ->
                   nist_sha3 (module Runner.Impl) len message
               | false ->
-                  ethereum (module Runner.Impl) message
+                  pre_nist (module Runner.Impl) len message
             in
 
             let expected =
@@ -655,6 +674,11 @@ let%test_unit "keccak gadget" =
       test_keccak ~nist:false ~len:256
         "4920616d20746865206f776e6572206f6620746865204e465420776974682069642058206f6e2074686520457468657265756d20636861696e"
         "63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36"
+    in
+    let _cs =
+      test_keccak ~nist:false ~len:512
+        "4920616d20746865206f776e6572206f6620746865204e465420776974682069642058206f6e2074686520457468657265756d20636861696e"
+        "848cf716c2d64444d2049f215326b44c25a007127d2871c1b6004a9c3d102f637f31acb4501e59f3a0160066c8814816f4dc58a869f37f740e09b9a8757fa259"
     in
 
     (* The following two tests use 2 blocks instead *)
