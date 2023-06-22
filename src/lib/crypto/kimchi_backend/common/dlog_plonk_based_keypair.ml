@@ -68,6 +68,7 @@ module type Inputs_intf = sig
     val create :
          Gate_vector.t
       -> int
+      -> Scalar_field.t Kimchi_types.lookup_table array
       -> Scalar_field.t Kimchi_types.runtime_table_cfg array
       -> int
       -> Urs.t
@@ -183,9 +184,11 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (* TODO(dw) pass runtime table cfg info *)
     let runtime_table_cfg = [||] in
+    (* TODO(dw) pass lookup tables info *)
+    let lookup_tables = [||] in
     let index =
-      Inputs.Index.create gates public_input_size runtime_table_cfg
-        prev_challenges (load_urs ())
+      Inputs.Index.create gates public_input_size lookup_tables
+        runtime_table_cfg prev_challenges (load_urs ())
     in
     { index; cs }
 
