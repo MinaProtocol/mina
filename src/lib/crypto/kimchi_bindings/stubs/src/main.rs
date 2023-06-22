@@ -1,9 +1,9 @@
 use kimchi::circuits::{
     expr::FeatureFlag,
-    lookup::{lookups::{LookupFeatures, LookupPattern, LookupPatterns}, runtime_tables::caml::CamlRuntimeTable},
     lookup::{
         lookups::{LookupFeatures, LookupPattern, LookupPatterns},
         runtime_tables::caml::{CamlRuntimeTable, CamlRuntimeTableCfg, CamlRuntimeTableSpec},
+        tables::caml::CamlLookupTable,
     },
 };
 use kimchi::proof::{caml::CamlRecursionChallenge, PointEvaluations};
@@ -111,6 +111,7 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_type!(w, env, CamlRuntimeTableSpec => "runtime_table_spec");
     decl_type!(w, env, CamlRuntimeTableCfg::<T1> => "runtime_table_cfg");
 
+    decl_type!(w, env, CamlLookupTable::<T1> => "lookup_table");
     decl_type!(w, env, CamlProverCommitments::<T1> => "prover_commitments");
     decl_type!(w, env, CamlProverProof<T1, T2> => "prover_proof");
 

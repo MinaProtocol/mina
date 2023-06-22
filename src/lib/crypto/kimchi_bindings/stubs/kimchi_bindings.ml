@@ -194,15 +194,15 @@ module Protocol = struct
     module Fp = struct
       type nonrec t
 
-      external create : Gates.Vector.Fp.t -> int -> int -> SRS.Fp.t -> t
-        = "caml_pasta_fp_plonk_index_create"
+      external create :
            Gates.Vector.Fp.t
         -> int
+        -> Pasta_bindings.Fp.t Kimchi_types.lookup_table array
         -> Pasta_bindings.Fp.t Kimchi_types.runtime_table_cfg array
         -> int
         -> SRS.Fp.t
         -> t
-        = "caml_pasta_fp_plonk_index_create"
+        = "caml_pasta_fp_plonk_index_create_bytecode" "caml_pasta_fp_plonk_index_create"
 
       external max_degree : t -> int = "caml_pasta_fp_plonk_index_max_degree"
 
@@ -231,11 +231,12 @@ module Protocol = struct
       external create :
            Gates.Vector.Fq.t
         -> int
+        -> Pasta_bindings.Fq.t Kimchi_types.lookup_table array
         -> Pasta_bindings.Fq.t Kimchi_types.runtime_table_cfg array
         -> int
         -> SRS.Fq.t
         -> t
-        = "caml_pasta_fq_plonk_index_create"
+        = "caml_pasta_fq_plonk_index_create_bytecode" "caml_pasta_fq_plonk_index_create"
 
       external max_degree : t -> int = "caml_pasta_fq_plonk_index_max_degree"
 
