@@ -100,7 +100,7 @@ struct
   let multiscale_known
       (ts :
         ( [ `Field of Field.t | `Packed_bits of Field.t * int ]
-        * Inner_curve.Constant.t )
+        * Inner_curve.Constant.t array )
         array ) =
     let module F = Public_input_scalar in
     let rec pow2pow x i =
@@ -116,47 +116,65 @@ struct
                     else if Field.Constant.(equal one) c then Some g
                     else
                       Some
-                        (Inner_curve.Constant.scale g
-                           (Inner_curve.Constant.Scalar.project
-                              (Field.Constant.unpack c) ) ) )
+                        (Array.map
+                           ~f:(fun e ->
+                             Inner_curve.Constant.scale e
+                               (Inner_curve.Constant.Scalar.project
+                                  (Field.Constant.unpack c) ) )
+                           g ) )
               | `Field x ->
                   Second (`Field x, g)
               | `Packed_bits (x, n) ->
                   Second (`Packed_bits (x, n), g) )
         in
         let add_opt xo y =
-          Option.value_map xo ~default:y ~f:(fun x ->
-              Inner_curve.Constant.( + ) x y )
+          match xo with
+          | None ->
+              y
+          | Some x ->
+              Array.map2_exn ~f:Inner_curve.Constant.( + ) x y
         in
         let constant_part =
           List.filter_map constant_part ~f:Fn.id
           |> List.fold ~init:None ~f:(fun acc x -> Some (add_opt acc x))
         in
-        let correction, acc =
-          List.map non_constant_part ~f:(fun (s, x) ->
-              let rr, n =
-                match s with
-                | `Packed_bits (s, n) ->
-                    ( Ops.scale_fast2'
-                        (module F)
-                        (Inner_curve.constant x) s ~num_bits:n
-                    , n )
-                | `Field s ->
-                    ( Ops.scale_fast2'
-                        (module F)
-                        (Inner_curve.constant x) s ~num_bits:Field.size_in_bits
-                    , Field.size_in_bits )
-              in
-              let n =
-                Ops.bits_per_chunk * Ops.chunks_needed ~num_bits:(n - 1)
-              in
-              let cc = pow2pow x n in
-              (cc, rr) )
-          |> List.reduce_exn ~f:(fun (a1, b1) (a2, b2) ->
-                 (Inner_curve.Constant.( + ) a1 a2, Inner_curve.( + ) b1 b2) )
+        let corrections, acc =
+          let l =
+            List.map non_constant_part ~f:(fun (s, x) ->
+                let rr, n =
+                  match s with
+                  | `Packed_bits (s, n) ->
+                      ( Array.map
+                          ~f:(fun x ->
+                            Ops.scale_fast2'
+                              (module F)
+                              (Inner_curve.constant x) s ~num_bits:n )
+                          x
+                      , n )
+                  | `Field s ->
+                      ( Array.map x ~f:(fun x ->
+                            Ops.scale_fast2'
+                              (module F)
+                              (Inner_curve.constant x) s
+                              ~num_bits:Field.size_in_bits )
+                      , Field.size_in_bits )
+                in
+                let n =
+                  Ops.bits_per_chunk * Ops.chunks_needed ~num_bits:(n - 1)
+                in
+                let cc = Array.map ~f:(fun e -> pow2pow e n) x in
+                (cc, rr) )
+          in
+          List.reduce_exn
+            ~f:(fun (a1, b1) (a2, b2) ->
+              ( Array.map2_exn ~f:Inner_curve.Constant.( + ) a1 a2
+              , Array.map2_exn ~f:(fun x y -> Inner_curve.(x + y)) b1 b2 ) )
+            l
         in
-        Inner_curve.(
-          acc + constant (Constant.negate correction |> add_opt constant_part)) )
+        let open Inner_curve in
+        Array.map ~f:Constant.negate corrections
+        |> add_opt constant_part
+        |> Array.map2_exn ~f:(fun acc cst -> acc + constant cst) acc )
 
   let squeeze_challenge sponge : Field.t =
     lowest_128_bits (Sponge.squeeze sponge) ~constrain_low_bits:true
@@ -339,13 +357,13 @@ struct
 
   let lagrange_commitment ~domain srs i =
     let d = Int.pow 2 (Domain.log2_size domain) in
-    match[@warning "-4"]
+    Array.map
       (Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment srs d i).unshifted
-    with
-    | [| Finite g |] ->
-        Inner_curve.Constant.of_affine g
-    | _ ->
-        assert false
+      ~f:(function
+      | Finite g ->
+          Inner_curve.Constant.of_affine g
+      | Infinity ->
+          assert false )
 
   module O = One_hot_vector.Make (Impl)
   open Tuple_lib
@@ -359,30 +377,42 @@ struct
       Vector.map ~f:(fun proofs_verified -> Common.wrap_domains ~proofs_verified)
         [ 0; 1 ; 2 ]
     in *)
-    let lagrange_commitment (d : Domains.t) (i : int) : Inner_curve.Constant.t =
+    let lagrange_commitment (d : Domains.t) (i : int) :
+        Inner_curve.Constant.t array =
       lagrange_commitment ~domain:d.h srs i
     in
     let select_curve_points (type k)
-        ~(points_for_domain : Domains.t -> (Inner_curve.Constant.t, k) Vector.t)
-        : (Inner_curve.t, k) Vector.t =
+        ~(points_for_domain :
+           Domains.t -> (Inner_curve.Constant.t array, k) Vector.t ) :
+        (Inner_curve.t array, k) Vector.t =
       match domains with
       | [] ->
           assert false
       | d :: ds ->
           if Vector.for_all ds ~f:(fun d' -> Domain.equal d.h d'.h) then
-            Vector.map ~f:Inner_curve.constant (points_for_domain d)
+            Vector.map
+              ~f:(Array.map ~f:Inner_curve.constant)
+              (points_for_domain d)
           else
-            Vector.map2
-              (which :> (Boolean.var, n) Vector.t)
-              domains
-              ~f:(fun b d ->
-                let points = points_for_domain d in
-                Vector.map points ~f:(fun g ->
-                    let x, y = Inner_curve.constant g in
-                    Field.((b :> t) * x, (b :> t) * y) ) )
-            |> Vector.reduce_exn
-                 ~f:(Vector.map2 ~f:(Double.map2 ~f:Field.( + )))
-            |> Vector.map ~f:(Double.map ~f:(Util.seal (module Impl)))
+            let v =
+              Vector.map2
+                (which :> (Boolean.var, n) Vector.t)
+                domains
+                ~f:(fun b d ->
+                  let points = points_for_domain d in
+                  Vector.map points ~f:(fun a ->
+                      Array.map a ~f:(fun g ->
+                          let x, y = Inner_curve.constant g in
+                          Field.((b :> t) * x, (b :> t) * y) ) ) )
+            in
+
+            Vector.reduce_exn
+              ~f:
+                (Vector.map2
+                   ~f:(Array.map2_exn ~f:(Double.map2 ~f:Field.( + ))) )
+              v
+            |> Vector.map
+                 ~f:(Array.map ~f:(Double.map ~f:(Util.seal (module Impl))))
     in
     let lagrange i =
       select_curve_points ~points_for_domain:(fun d ->
@@ -390,7 +420,7 @@ struct
       |> Vector.unsingleton
     in
     let lagrange_with_correction ~input_length i :
-        (Inner_curve.t, Nat.N2.n) Vector.t =
+        (Inner_curve.t array, Nat.N2.n) Vector.t =
       let actual_shift =
         (* TODO: num_bits should maybe be input_length - 1. *)
         Ops.bits_per_chunk * Ops.chunks_needed ~num_bits:input_length
@@ -399,9 +429,11 @@ struct
         if i = 0 then x else pow2pow Inner_curve.Constant.(x + x) (i - 1)
       in
       select_curve_points ~points_for_domain:(fun d ->
-          let g = lagrange_commitment d i in
-          let open Inner_curve.Constant in
-          [ g; negate (pow2pow g actual_shift) ] )
+          let a = lagrange_commitment d i in
+          [ a
+          ; (let open Inner_curve.Constant in
+            Array.map ~f:(fun g -> negate (pow2pow g actual_shift)) a)
+          ] )
     in
 
     (* Compute x_hat *)
@@ -417,9 +449,13 @@ struct
                 else
                   Some
                     ( select_curve_points ~points_for_domain:(fun d ->
-                          [ Inner_curve.Constant.scale (lagrange_commitment d i)
-                              (Inner_curve.Constant.Scalar.project
-                                 (Field.Constant.unpack c) )
+                          [ (let a = lagrange_commitment d i in
+                             let c =
+                               Inner_curve.Constant.Scalar.project
+                                 (Field.Constant.unpack c)
+                             in
+                             Array.map a ~f:(fun e ->
+                                 Inner_curve.Constant.scale e c ) )
                           ] )
                     |> Vector.unsingleton ) )
           | `Field x ->
@@ -437,7 +473,7 @@ struct
               `Add_with_correction
                 ((x, n), lagrange_with_correction ~input_length:n i) )
     in
-    let f = Ops.add_fast ?check_finite:None in
+    let f = Array.map2_exn ~f:(Ops.add_fast ?check_finite:None) in
     let correction =
       List.reduce_exn
         (List.filter_map terms ~f:(function
@@ -452,13 +488,17 @@ struct
     in
     List.fold terms ~init ~f:(fun acc term ->
         match term with
-        | `Cond_add (b, g) ->
+        | `Cond_add (b, gs) ->
             with_label __LOC__ (fun () ->
-                Inner_curve.if_ b ~then_:(Ops.add_fast g acc) ~else_:acc )
-        | `Add_with_correction ((x, num_bits), [ g; _ ]) ->
-            Ops.add_fast acc
-              (Ops.scale_fast2' (module Public_input_scalar) g x ~num_bits) )
-    |> Inner_curve.negate
+                Array.map2_exn
+                  ~f:(fun g a ->
+                    Inner_curve.if_ b ~then_:(Ops.add_fast g a) ~else_:a )
+                  gs acc )
+        | `Add_with_correction ((x, num_bits), [ gs; _ ]) ->
+            Array.map2_exn acc gs ~f:(fun a g ->
+                Ops.add_fast a
+                  (Ops.scale_fast2' (module Public_input_scalar) g x ~num_bits) ) )
+    |> Array.map ~f:Inner_curve.negate
 
   let incrementally_verify_proof (type b)
       (module Proofs_verified : Nat.Add.Intf with type n = b) ~srs:_
@@ -505,10 +545,11 @@ struct
           with_label "x_hat" (fun () ->
               match domain with
               | `Known domain ->
-                  multiscale_known
-                    (Array.mapi public_input ~f:(fun i x ->
-                         (x, lagrange_commitment ~domain srs i) ) )
-                  |> Inner_curve.negate
+                  let es =
+                    Array.mapi public_input ~f:(fun i x ->
+                        (x, lagrange_commitment ~domain srs i) )
+                  in
+                  Array.map (multiscale_known es) ~f:Inner_curve.negate
               | `Side_loaded which ->
                   public_input_commitment_dynamic ~srs which
                     (Vector.map
@@ -519,10 +560,10 @@ struct
         in
         let x_hat =
           with_label "x_hat blinding" (fun () ->
-              Ops.add_fast x_hat
-                (Inner_curve.constant (Lazy.force Generators.h)) )
+              let c = Inner_curve.constant (Lazy.force Generators.h) in
+              Array.map ~f:(Ops.add_fast c) x_hat )
         in
-        absorb sponge PC x_hat ;
+        Array.iter ~f:(absorb sponge PC) x_hat ;
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;
         let beta = sample () in
@@ -570,8 +611,7 @@ struct
           let without_degree_bound =
             Vector.append
               (Vector.map sg_old ~f:(fun g -> [| g |]))
-              ( [| x_hat |] :: [| ft_comm |] :: z_comm :: m.generic_comm
-              :: m.psm_comm
+              ( x_hat :: [| ft_comm |] :: z_comm :: m.generic_comm :: m.psm_comm
               :: Vector.append w_comm
                    (Vector.append m.coefficients_comm sigma_comm_init
                       (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
