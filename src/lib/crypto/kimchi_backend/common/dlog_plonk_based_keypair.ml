@@ -59,7 +59,14 @@ module type Inputs_intf = sig
   module Index : sig
     type t
 
-    val create : Gate_vector.t -> int -> int -> Urs.t -> t
+    (** [create gates nb_public lookup_tables nb_prev_challanges srs] *)
+    val create :
+         Gate_vector.t
+      -> int
+      -> Scalar_field.t Kimchi_types.lookup_table array
+      -> int
+      -> Urs.t
+      -> t
   end
 
   module Curve : sig
@@ -169,8 +176,12 @@ module Make (Inputs : Inputs_intf) = struct
           assert (prev_challenges = prev_challenges') ;
           prev_challenges'
     in
+    (* TODO pass lookup tables info *)
+    let lookup_tables = [||] in
     let index =
-      Inputs.Index.create gates public_input_size prev_challenges (load_urs ())
+      (* This is the corresponding caml_pasta_fp_plonk_index_create *)
+      Inputs.Index.create gates public_input_size lookup_tables prev_challenges
+        (load_urs ())
     in
     { index; cs }
 

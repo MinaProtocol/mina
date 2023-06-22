@@ -1,5 +1,7 @@
+use crate::arkworks::CamlFp;
 use crate::{gate_vector::fp::CamlPastaFpPlonkGateVectorPtr, srs::fp::CamlFpSrs};
 use ark_poly::EvaluationDomain;
+use kimchi::circuits::lookup::tables::caml::CamlLookupTable;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::{linearization::expr_linearization, prover_index::ProverIndex};
 use mina_curves::pasta::{Fp, Pallas, Vesta, VestaParameters};
@@ -39,6 +41,7 @@ impl ocaml::custom::Custom for CamlPastaFpPlonkIndex {
 pub fn caml_pasta_fp_plonk_index_create(
     gates: CamlPastaFpPlonkGateVectorPtr,
     public: ocaml::Int,
+    lookup_tables: Vec<CamlLookupTable<CamlFp>>,
     prev_challenges: ocaml::Int,
     srs: CamlFpSrs,
 ) -> Result<CamlPastaFpPlonkIndex, ocaml::Error> {
@@ -53,10 +56,13 @@ pub fn caml_pasta_fp_plonk_index_create(
         })
         .collect();
 
+    let lookup_tables = lookup_tables.into_iter().map(Into::into).collect();
+
     // create constraint system
     let cs = match ConstraintSystem::<Fp>::create(gates)
         .public(public as usize)
         .prev_challenges(prev_challenges as usize)
+        .lookup(lookup_tables)
         .build()
     {
         Err(_) => {
