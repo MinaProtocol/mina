@@ -4,6 +4,9 @@ module Snark_intf = Snarky_backendless.Snark_intf
 
 let tests_enabled = true
 
+(* Endianness type *)
+type endianness = Big | Little
+
 (* DEFINITIONS OF CONSTANTS FOR KECCAK *)
 
 (* Length of the square matrix side of Keccak states *)
@@ -535,12 +538,17 @@ let check_bytes (type f)
 *)
 let hash (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (message : Circuit.Field.t list) ~(length : int) ~(capacity : int)
-    (nist_version : bool) : Circuit.Field.t list =
+    ?(inp_endian = Big) ?(out_endian = Big) (message : Circuit.Field.t list)
+    ~(length : int) ~(capacity : int) (nist_version : bool) :
+    Circuit.Field.t list =
   assert (capacity > 0) ;
   assert (capacity < keccak_state_length) ;
   assert (length > 0) ;
   assert (length mod 8 = 0) ;
+  (* Set input to Big Endian format *)
+  let message =
+    match inp_endian with Big -> message | Little -> List.rev message
+  in
   (* Check each cvar input is 8 bits at most *)
   check_bytes (module Circuit) message ;
   let rate = keccak_state_length - capacity in
@@ -553,50 +561,75 @@ let hash (type f)
   in
   let hash = sponge (module Circuit) padded ~length ~capacity ~rate in
   check_bytes (module Circuit) hash ;
+  (* Set input to desired endianness *)
+  let hash = match out_endian with Big -> hash | Little -> List.rev hash in
   (* Check each cvar output is 8 bits at most *)
   hash
 
-(* Gagdet for NIST SHA-3 function for output lengths 224/256/384/512 *)
+(* Gagdet for NIST SHA-3 function for output lengths 224/256/384/512.
+ * Input and output endianness can be specified. Default is big endian.
+ *)
 let nist_sha3 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (len : int) (message : Circuit.Field.t list) : Circuit.Field.t array =
+    ?(inp_endian = Big) ?(out_endian = Big) (len : int)
+    (message : Circuit.Field.t list) : Circuit.Field.t list =
   let hash =
     match len with
     | 224 ->
-        hash (module Circuit) message ~length:224 ~capacity:448 true
+        hash
+          (module Circuit)
+          message ~length:224 ~capacity:448 true ~inp_endian ~out_endian
     | 256 ->
-        hash (module Circuit) message ~length:256 ~capacity:512 true
+        hash
+          (module Circuit)
+          message ~length:256 ~capacity:512 true ~inp_endian ~out_endian
     | 384 ->
-        hash (module Circuit) message ~length:384 ~capacity:768 true
+        hash
+          (module Circuit)
+          message ~length:384 ~capacity:768 true ~inp_endian ~out_endian
     | 512 ->
-        hash (module Circuit) message ~length:512 ~capacity:1024 true
+        hash
+          (module Circuit)
+          message ~length:512 ~capacity:1024 true ~inp_endian ~out_endian
     | _ ->
         assert false
   in
-  Array.of_list hash
+  hash
 
-(* Gadget for Keccak hash function for the parameters used in Ethereum *)
+(* Gadget for Keccak hash function for the parameters used in Ethereum.
+ * Input and output endianness can be specified. Default is big endian.
+ *)
 let ethereum (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (message : Circuit.Field.t list) : Circuit.Field.t array =
-  Array.of_list @@ hash (module Circuit) message ~length:256 ~capacity:512 false
-
+    ?(inp_endian = Big) ?(out_endian = Big) (message : Circuit.Field.t list) :
+    Circuit.Field.t list =
+  hash
+    (module Circuit)
+    message ~length:256 ~capacity:512 false ~inp_endian ~out_endian
 
 (* Gagdet for pre-NIST SHA-3 function for output lengths 224/256/384/512.
+ * Input and output endianness can be specified. Default is big endian.
  * Note that when calling with output length 256 this is equivalent to the ethereum function 
  *)
 let pre_nist (type f)
-(module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-(len : int) (message : Circuit.Field.t list) : Circuit.Field.t array =
+    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+    ?(inp_endian = Big) ?(out_endian = Big) (len : int)
+    (message : Circuit.Field.t list) : Circuit.Field.t list =
   match len with
   | 224 ->
-    Array.of_list @@ hash (module Circuit) message ~length:224 ~capacity:448 false
+      hash
+        (module Circuit)
+        message ~length:224 ~capacity:448 false ~inp_endian ~out_endian
   | 256 ->
-      ethereum (module Circuit) message
+      ethereum (module Circuit) message ~inp_endian ~out_endian
   | 384 ->
-    Array.of_list @@ hash (module Circuit) message ~length:384 ~capacity:768 false
+      hash
+        (module Circuit)
+        message ~length:384 ~capacity:768 false ~inp_endian ~out_endian
   | 512 ->
-    Array.of_list @@ hash (module Circuit) message ~length:512 ~capacity:1024 false
+      hash
+        (module Circuit)
+        message ~length:512 ~capacity:1024 false ~inp_endian ~out_endian
   | _ ->
       assert false
 
@@ -611,7 +644,7 @@ let%test_unit "keccak gadget" =
       try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
     in
 
-    let test_keccak ?cs ~nist ~len message expected =
+    let test_keccak ?cs ?inp_endian ?out_endian ~nist ~len message expected =
       let cs, _proof_keypair, _proof =
         Runner.generate_and_verify_proof ?cs (fun () ->
             let open Runner.Impl in
@@ -626,11 +659,17 @@ let%test_unit "keccak gadget" =
                      )
             in
             let hashed =
+              Array.of_list
+              @@
               match nist with
               | true ->
-                  nist_sha3 (module Runner.Impl) len message
+                  nist_sha3
+                    (module Runner.Impl)
+                    len message ?inp_endian ?out_endian
               | false ->
-                  pre_nist (module Runner.Impl) len message
+                  pre_nist
+                    (module Runner.Impl)
+                    len message ?inp_endian ?out_endian
             in
 
             let expected =
@@ -724,6 +763,11 @@ let%test_unit "keccak gadget" =
     in
 
     (* Reusing *)
+    let _cs =
+      test_keccak ~cs:cs_eth256_1byte ~nist:false ~len:256 "00"
+        "bc36789e7a1e281436464229828f817d6612f7b477d66591ff96a9e064bcc98a"
+    in
+
     let cs2 =
       test_keccak ~nist:false ~len:256 "a2c0"
         "9856642c690c036527b8274db1b6f58c0429a88d9f3b9298597645991f4f58f0"
@@ -734,9 +778,11 @@ let%test_unit "keccak gadget" =
         "295b48ad49eff61c3abfd399c672232434d89a4ef3ca763b9dbebb60dbb32a8b"
     in
 
+    (* Endianness *)
     let _cs =
-      test_keccak ~cs:cs_eth256_1byte ~nist:false ~len:256 "00"
-        "bc36789e7a1e281436464229828f817d6612f7b477d66591ff96a9e064bcc98a"
+      test_keccak ~nist:false ~len:256 ~inp_endian:Little ~out_endian:Little
+        "2c0a"
+        "8b2ab3db60bbbe9d3b76caf34e9ad834242372c699d3bf3a1cf6ef49ad485b29"
     in
 
     (* Negative tests *)
@@ -764,6 +810,13 @@ let%test_unit "keccak gadget" =
           test_keccak ~cs:cs_eth256_1byte ~nist:true ~len:256
             "4920616d20746865206f776e6572206f6620746865204e465420776974682069642058206f6e2074686520457468657265756d20636861696e"
             "63858e0487687c3eeb30796a3e9307680e1b81b860b01c88ff74545c2c314e36" ) ) ;
+
+    (* Cannot reuse cs with different endianness *)
+    assert (
+      Common.is_error (fun () ->
+          test_keccak ~cs:cs2 ~nist:false ~len:256 ~inp_endian:Little
+            ~out_endian:Little "2c0a"
+            "8b2ab3db60bbbe9d3b76caf34e9ad834242372c699d3bf3a1cf6ef49ad485b29" ) ) ;
 
     () ) ;
 
