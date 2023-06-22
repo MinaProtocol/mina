@@ -581,14 +581,14 @@ struct
                 (List.filter_map terms ~f:(function
                   | `Cond_add _ ->
                       None
-                  | `Add_with_correction (_, (_, corr)) ->
-                      Some corr ) )
-                ~f:(Ops.add_fast ?check_finite:None) )
+                  | `Add_with_correction (_, a) ->
+                      Some (Array.map ~f:snd a) ) )
+                ~f:(Array.map2_exn ~f:(Ops.add_fast ?check_finite:None)) )
         in
         with_label __LOC__ (fun () ->
             let init =
               let e = List.filter_map ~f:Fn.id constant_part in
-              List.fold e ~init:[| correction |] ~f:(fun acc a ->
+              List.fold e ~init:correction ~f:(fun acc a ->
                   Array.map2_exn ~f:(Ops.add_fast ?check_finite:None) acc a )
             in
             List.fold terms ~init ~f:(fun acc term ->
@@ -600,8 +600,8 @@ struct
                             Inner_curve.if_ b ~then_:(Ops.add_fast g e) ~else_:e
                             )
                           acc g )
-                | `Add_with_correction ((x, num_bits), (g, _)) ->
-                    Array.map2_exn acc g ~f:(fun e g ->
+                | `Add_with_correction ((x, num_bits), corrections) ->
+                    Array.map2_exn acc corrections ~f:(fun e (g, _) ->
                         Ops.add_fast e
                           (Ops.scale_fast2'
                              (module Other_field.With_top_bit0)
@@ -651,10 +651,10 @@ struct
         in
         let x_hat =
           with_label "x_hat blinding" (fun () ->
-              Ops.add_fast x_hat
-                (Inner_curve.constant (Lazy.force Generators.h)) )
+              let c = Inner_curve.constant (Lazy.force Generators.h) in
+              Array.map ~f:(fun e -> Ops.add_fast c e) x_hat )
         in
-        absorb sponge PC (Boolean.true_, x_hat) ;
+        Array.iter ~f:(fun e -> absorb sponge PC (Boolean.true_, e)) x_hat ;
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;
         let beta = sample () in
@@ -729,8 +729,7 @@ struct
                all but last sigma_comm
             *)
             Vector.append sg_old
-              ( [| x_hat |] :: [| ft_comm |] :: z_comm :: m.generic_comm
-                :: m.psm_comm
+              ( x_hat :: [| ft_comm |] :: z_comm :: m.generic_comm :: m.psm_comm
                 :: Vector.append w_comm
                      (Vector.append m.coefficients_comm sigma_comm_init
                         (snd Plonk_types.(Columns.add Permuts_minus_1.n)) )
