@@ -136,7 +136,7 @@ module type Broadcast_callback = sig
          -> unit )
     | External of Mina_net2.Validation_callback.t
 
-  val drop : resource_pool_diff -> rejected_diff -> t -> unit Deferred.t
+  val drop : resource_pool_diff -> rejected_diff -> t -> unit
 end
 
 (** A [Network_pool_base_intf] is the core implementation of a
@@ -215,7 +215,7 @@ module type Network_pool_base_intf = sig
        t
     -> resource_pool_diff_verified Envelope.Incoming.t
     -> Broadcast_callback.t
-    -> unit Deferred.t
+    -> unit
 end
 
 (** A [Snark_resource_pool_intf] is a superset of a
