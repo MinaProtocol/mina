@@ -1308,11 +1308,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
         | [], [] ->
             log_ledger_hash_after_last_slot () ;
             Deferred.return
-              ( last_global_slot_since_genesis
-              , staking_epoch_ledger
-              , staking_seed
-              , next_epoch_ledger
-              , next_seed )
+              (staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed)
         | [], uc :: ucs ->
             run_actions_on_slot_change uc.global_slot_since_genesis ;
             let%bind () =
@@ -1374,11 +1370,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
       [%log info] "At start global slot %Ld, ledger hash"
         start_slot_since_genesis
         ~metadata:[ ("ledger_hash", json_ledger_hash_of_ledger ledger) ] ;
-      let%bind ( last_global_slot_since_genesis
-               , staking_epoch_ledger
-               , staking_seed
-               , next_epoch_ledger
-               , next_seed ) =
+      let%bind staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed
+          =
         apply_commands sorted_internal_cmds sorted_user_cmds
           ~last_global_slot_since_genesis:start_slot_since_genesis
           ~last_block_id:oldest_block_id ~staking_epoch_ledger:ledger
@@ -1386,8 +1379,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
       in
       match input.target_epoch_ledgers_state_hash with
       | None ->
-          write_replayer_checkpoint ~logger ~ledger
-            ~last_global_slot_since_genesis
+          [%log info] "No target epoch ledger supplied, not writing output" ;
+          return ()
       | Some target_epoch_ledgers_state_hash -> (
           match output_file_opt with
           | None ->
