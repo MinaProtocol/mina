@@ -844,7 +844,8 @@ let%test_module "random set test" =
                  Deferred.unit ) ;
           Mock_snark_pool.apply_and_broadcast network_pool
             (Envelope.Incoming.local command)
-            (Mock_snark_pool.Broadcast_callback.Local (Fn.const ())) )
+            (Mock_snark_pool.Broadcast_callback.Local (Fn.const ())) ;
+          Deferred.unit )
 
     let%test_unit "when creating a network, the incoming diffs and locally \
                    generated diffs in reader pipes will automatically get \

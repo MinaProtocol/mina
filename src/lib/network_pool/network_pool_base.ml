@@ -49,34 +49,30 @@ end)
 
     open Mina_net2.Validation_callback
 
-    let error err =
-      Fn.compose Deferred.return (function
-        | Local f ->
-            f (Error err)
-        | External cb ->
-            fire_if_not_already_fired cb `Reject )
+    let error err = function
+      | Local f ->
+          f (Error err)
+      | External cb ->
+          fire_if_not_already_fired cb `Reject
 
-    let reject accepted rejected =
-      Fn.compose Deferred.return (function
-        | Local f ->
-            f (Ok (`Not_broadcasted, accepted, rejected))
-        | External cb ->
-            fire_if_not_already_fired cb `Reject )
+    let reject accepted rejected = function
+      | Local f ->
+          f (Ok (`Not_broadcasted, accepted, rejected))
+      | External cb ->
+          fire_if_not_already_fired cb `Reject
 
-    let drop accepted rejected =
-      Fn.compose Deferred.return (function
-        | Local f ->
-            f (Ok (`Not_broadcasted, accepted, rejected))
-        | External cb ->
-            fire_if_not_already_fired cb `Ignore )
+    let drop accepted rejected = function
+      | Local f ->
+          f (Ok (`Not_broadcasted, accepted, rejected))
+      | External cb ->
+          fire_if_not_already_fired cb `Ignore
 
     let forward broadcast_pipe accepted rejected = function
       | Local f ->
           f (Ok (`Broadcasted, accepted, rejected)) ;
-          Linear_pipe.write broadcast_pipe accepted
+          Linear_pipe.write broadcast_pipe accepted |> don't_wait_for
       | External cb ->
-          fire_if_not_already_fired cb `Accept ;
-          Deferred.unit
+          fire_if_not_already_fired cb `Accept
   end
 
   module Remote_sink =
@@ -191,7 +187,7 @@ end)
     (*priority: Transition frontier diffs > local diffs > incoming diffs*)
     Deferred.don't_wait_for
       (O1trace.thread Resource_pool.label (fun () ->
-           Strict_pipe.Reader.Merge.iter
+           Strict_pipe.Reader.Merge.iter_sync
              [ Strict_pipe.Reader.map tf_diffs ~f:(fun diff ->
                    Transition_frontier_extension diff )
              ; remote_r
@@ -200,15 +196,14 @@ end)
              ~f:(fun diff_source ->
                match diff_source with
                | Diff ((verified_diff, cb) : Remote_sink.unwrapped_t) ->
-                   O1trace.thread processing_diffs_thread_label (fun () ->
+                   O1trace.sync_thread processing_diffs_thread_label (fun () ->
                        apply_and_broadcast network_pool verified_diff cb )
                | Transition_frontier_extension diff ->
                    O1trace.sync_thread
                      processing_transition_frontier_diffs_thread_label
                      (fun () ->
                        Resource_pool.handle_transition_frontier_diff diff
-                         resource_pool ) ;
-                   Deferred.unit ) ) ) ;
+                         resource_pool ) ) ) ) ;
     (network_pool, remote_w, local_w)
 
   (* Rebroadcast locally generated pool items every 10 minutes. Do so for 50
