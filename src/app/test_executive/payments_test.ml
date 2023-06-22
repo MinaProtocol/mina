@@ -165,7 +165,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; fee_token = Signed_command_payload.Body.token body
         ; fee_payer_pk = sender_pub_key
         ; nonce = sender_current_nonce
-        ; valid_until = Mina_numbers.Global_slot.max_value
+        ; valid_until
         ; memo = Signed_command_memo.create_from_string_exn memo
         }
       in
@@ -312,11 +312,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  (Signed_command_payload.nonce payload) )
             ~memo ~token ~valid_until ~raw_signature
         with
-        | Ok { nonce; _ } ->
+        | Ok { nonce = returned_nonce; _ } ->
             Malleable_error.soft_error_format ~value:()
               "Replay attack succeeded, but it should fail because the \
-               signature is wrong.  attempted nonce: %d"
+               signature is wrong.  payload nonce: %d.  returned nonce: %d"
               (Unsigned.UInt32.to_int (Signed_command_payload.nonce payload))
+              (Unsigned.UInt32.to_int returned_nonce)
         | Error error ->
             (* expect GraphQL error due to invalid signature *)
             let err_str = Error.to_string_mach error in
@@ -332,7 +333,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 "Payment failed in GraphQL, but for unexpected reason: %s"
                 err_str ;
               Malleable_error.soft_error_format ~value:()
-                "Payment failed for unexpected reason: %s" err_str ))
+                "Payment failed, but for unexpected reason: %s" err_str ))
     in
     let%bind () =
       section "send a single payment from timed account using available liquid"
@@ -342,7 +343,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let sender = timed_node_c in
          let%bind sender_pub_key = pub_key_of_node sender in
          let%bind { hash; _ } =
-           Integration_test_lib.Graphql_requests.must_send_payment ~logger
+           Integration_test_lib.Graphql_requests.must_send_online_payment
+             ~logger
              (Network.Node.get_ingress_uri timed_node_c)
              ~sender_pub_key ~receiver_pub_key ~amount ~fee
          in
@@ -371,7 +373,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          (* TODO: refactor this using new [expect] dsl when it's available *)
          let open Deferred.Let_syntax in
          match%bind
-           Integration_test_lib.Graphql_requests.send_payment ~logger
+           Integration_test_lib.Graphql_requests.send_online_payment ~logger
              (Network.Node.get_ingress_uri sender)
              ~sender_pub_key ~receiver_pub_key ~amount ~fee
          with

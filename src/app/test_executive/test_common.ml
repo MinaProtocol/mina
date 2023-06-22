@@ -27,8 +27,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       else
         let%bind hash =
           let%map { hash; nonce; _ } =
-            Integration_test_lib.Graphql_requests.must_send_payment ~logger
-              ~sender_pub_key ~receiver_pub_key ~amount ~fee
+            Integration_test_lib.Graphql_requests.must_send_online_payment
+              ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee
               (Engine.Network.Node.get_ingress_uri node)
           in
           [%log info]

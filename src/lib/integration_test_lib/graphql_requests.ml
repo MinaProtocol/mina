@@ -332,8 +332,8 @@ type signed_command_result =
   { id : string; hash : Transaction_hash.t; nonce : Unsigned.uint32 }
 
 (* if we expect failure, might want retry_on_graphql_error to be false *)
-let send_payment ~logger node_uri ~sender_pub_key ~receiver_pub_key ~amount ~fee
-    =
+let send_online_payment ~logger node_uri ~sender_pub_key ~receiver_pub_key
+    ~amount ~fee =
   [%log info] "Sending a payment"
     ~metadata:
       [ ( "sender_pub_key"
@@ -383,8 +383,9 @@ let send_payment ~logger node_uri ~sender_pub_key ~receiver_pub_key ~amount ~fee
       ] ;
   res
 
-let must_send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
-  send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
+let must_send_online_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount
+    ~fee =
+  send_online_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
   |> Deferred.bind ~f:Malleable_error.or_hard_error
 
 let send_delegation ~logger node_uri ~sender_pub_key ~receiver_pub_key ~fee =
@@ -492,6 +493,39 @@ let must_send_payment_with_raw_sig ~logger node_uri ~sender_pub_key
   send_payment_with_raw_sig ~logger node_uri ~sender_pub_key ~receiver_pub_key
     ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature
   |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+let sign_and_send_payment ~logger node_uri
+    ~(sender_keypair : Import.Signature_keypair.t) ~receiver_pub_key ~amount
+    ~fee ~nonce ~memo ~token ~valid_until =
+  let sender_pub_key =
+    sender_keypair.public_key |> Signature_lib.Public_key.compress
+  in
+  let payload =
+    let payment_payload =
+      { Payment_payload.Poly.receiver_pk = receiver_pub_key
+      ; source_pk = sender_pub_key
+      ; token_id = token
+      ; amount
+      }
+    in
+    let body = Signed_command_payload.Body.Payment payment_payload in
+    let common =
+      { Signed_command_payload.Common.Poly.fee
+      ; fee_token = Signed_command_payload.Body.token body
+      ; fee_payer_pk = sender_pub_key
+      ; nonce
+      ; valid_until
+      ; memo = Signed_command_memo.create_from_string_exn memo
+      }
+    in
+    { Signed_command_payload.Poly.common; body }
+  in
+  let raw_signature =
+    Signed_command.sign_payload sender_keypair.private_key payload
+    |> Signature.Raw.encode
+  in
+  send_payment_with_raw_sig ~logger node_uri ~sender_pub_key ~receiver_pub_key
+    ~amount ~fee ~nonce ~memo ~token ~valid_until ~raw_signature
 
 let send_test_payments ~(repeat_count : Unsigned.UInt32.t)
     ~(repeat_delay_ms : Unsigned.UInt32.t) ~logger node_uri
