@@ -219,44 +219,53 @@ struct
         , (domains : (Domains.t, n) Vector.t) ) srs i =
     Vector.map domains ~f:(fun d ->
         let d = Int.pow 2 (Domain.log2_size d.h) in
-        match[@warning "-4"]
+        Array.map
+          ~f:(function
+            | Finite g ->
+                Inner_curve.(constant @@ Constant.of_affine g)
+            | Infinity ->
+                assert false )
           (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i)
-            .unshifted
-        with
-        | [| Finite g |] ->
-            let g = Inner_curve.Constant.of_affine g in
-            Inner_curve.constant g
-        | _ ->
-            assert false )
+            .unshifted )
     |> Vector.map2
          (which_branch :> (Boolean.var, n) Vector.t)
-         ~f:(fun b (x, y) -> Field.((b :> t) * x, (b :> t) * y))
-    |> Vector.reduce_exn ~f:(Double.map2 ~f:Field.( + ))
+         ~f:(fun b a ->
+           Array.map a ~f:(fun (x, y) -> Field.((b :> t) * x, (b :> t) * y)) )
+    |> Vector.reduce_exn ~f:(fun a0 a1 ->
+           Array.map2_exn ~f:(Double.map2 ~f:Field.( + )) a0 a1 )
 
   let scaled_lagrange (type n) c
       ~domain:
         ( (which_branch : n One_hot_vector.t)
         , (domains : (Domains.t, n) Vector.t) ) srs i =
-    Vector.map domains ~f:(fun d ->
-        let d = Int.pow 2 (Domain.log2_size d.h) in
-        match[@warning "-4"]
-          (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i)
-            .unshifted
-        with
-        | [| Finite g |] ->
-            let g = Inner_curve.Constant.of_affine g in
-            Inner_curve.Constant.scale g c |> Inner_curve.constant
-        | _ ->
-            assert false )
-    |> Vector.map2
-         (which_branch :> (Boolean.var, n) Vector.t)
-         ~f:(fun b (x, y) -> Field.((b :> t) * x, (b :> t) * y))
-    |> Vector.reduce_exn ~f:(Double.map2 ~f:Field.( + ))
+    let v =
+      Vector.map domains ~f:(fun d ->
+          let d = Int.pow 2 (Domain.log2_size d.h) in
+          Array.map
+            ~f:(function
+              | Finite g ->
+                  Inner_curve.(constant Constant.(scale (of_affine g) c))
+              | Infinity ->
+                  assert false )
+            (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i)
+              .unshifted )
+    in
+    let va =
+      Vector.map2
+        (which_branch :> (Boolean.var, n) Vector.t)
+        v
+        ~f:(fun b a ->
+          Array.map ~f:(fun (x, y) -> Field.((b :> t) * x, (b :> t) * y)) a )
+    in
+    Vector.reduce_exn
+      ~f:(fun a0 a1 -> Array.map2_exn ~f:(Double.map2 ~f:Field.( + )) a0 a1)
+      va
 
   let lagrange_with_correction (type n) ~input_length
       ~domain:
         ( (which_branch : n One_hot_vector.t)
-        , (domains : (Domains.t, n) Vector.t) ) srs i : Inner_curve.t Double.t =
+        , (domains : (Domains.t, n) Vector.t) ) srs i :
+      Inner_curve.t Double.t array =
     with_label __LOC__ (fun () ->
         let actual_shift =
           (* TODO: num_bits should maybe be input_length - 1. *)
@@ -267,18 +276,17 @@ struct
         in
         let base_and_correction (h : Domain.t) =
           let d = Int.pow 2 (Domain.log2_size h) in
-          match[@warning "-4"]
+          Array.map
+            ~f:(function
+              | Finite g ->
+                  let open Inner_curve.Constant in
+                  let g = of_affine g in
+                  ( Inner_curve.constant g
+                  , Inner_curve.constant (negate (pow2pow g actual_shift)) )
+              | Infinity ->
+                  assert false )
             (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i)
               .unshifted
-          with
-          | [| Finite g |] ->
-              let open Inner_curve.Constant in
-              let g = of_affine g in
-              ( Inner_curve.constant g
-              , Inner_curve.constant (negate (pow2pow g actual_shift)) )
-          | xs ->
-              failwithf "expected commitment to have length 1. got %d"
-                (Array.length xs) ()
         in
         match domains with
         | [] ->
@@ -287,16 +295,29 @@ struct
             if Vector.for_all ds ~f:(fun d' -> Domain.equal d.h d'.h) then
               base_and_correction d.h
             else
-              Vector.map domains ~f:(fun (ds : Domains.t) ->
-                  base_and_correction ds.h )
-              |> Vector.map2
-                   (which_branch :> (Boolean.var, n) Vector.t)
-                   ~f:(fun b pr ->
-                     Double.map pr ~f:(fun (x, y) ->
-                         Field.((b :> t) * x, (b :> t) * y) ) )
-              |> Vector.reduce_exn
-                   ~f:(Double.map2 ~f:(Double.map2 ~f:Field.( + )))
-              |> Double.map ~f:(Double.map ~f:(Util.seal (module Impl))) )
+              let vb =
+                Vector.map domains ~f:(fun (ds : Domains.t) ->
+                    base_and_correction ds.h )
+              in
+              let vmul =
+                Vector.map2
+                  (which_branch :> (Boolean.var, n) Vector.t)
+                  ~f:(fun b a ->
+                    Array.map
+                      ~f:(fun d ->
+                        Double.map d ~f:(fun (x, y) ->
+                            Field.((b :> t) * x, (b :> t) * y) ) )
+                      a )
+                  vb
+              in
+              Vector.reduce_exn
+                ~f:(fun a0 a1 ->
+                  Array.map2_exn
+                    ~f:(Double.map2 ~f:(Double.map2 ~f:Field.( + )))
+                    a0 a1 )
+                vmul
+              |> Array.map
+                   ~f:(Double.map ~f:(Double.map ~f:(Util.seal (module Impl)))) )
 
   let _h_precomp =
     Lazy.map ~f:Inner_curve.Scaling_precomputation.create Generators.h
@@ -566,22 +587,26 @@ struct
         in
         with_label __LOC__ (fun () ->
             let init =
-              List.fold
-                (List.filter_map ~f:Fn.id constant_part)
-                ~init:correction
-                ~f:(Ops.add_fast ?check_finite:None)
+              let e = List.filter_map ~f:Fn.id constant_part in
+              List.fold e ~init:[| correction |] ~f:(fun acc a ->
+                  Array.map2_exn ~f:(Ops.add_fast ?check_finite:None) acc a )
             in
             List.fold terms ~init ~f:(fun acc term ->
                 match term with
                 | `Cond_add (b, g) ->
                     with_label __LOC__ (fun () ->
-                        Inner_curve.if_ b ~then_:(Ops.add_fast g acc) ~else_:acc )
+                        Array.map2_exn
+                          ~f:(fun e g ->
+                            Inner_curve.if_ b ~then_:(Ops.add_fast g e) ~else_:e
+                            )
+                          acc g )
                 | `Add_with_correction ((x, num_bits), (g, _)) ->
-                    Ops.add_fast acc
-                      (Ops.scale_fast2'
-                         (module Other_field.With_top_bit0)
-                         g x ~num_bits ) ) ) )
-    |> Inner_curve.negate
+                    Array.map2_exn acc g ~f:(fun e g ->
+                        Ops.add_fast e
+                          (Ops.scale_fast2'
+                             (module Other_field.With_top_bit0)
+                             g x ~num_bits ) ) ) ) )
+    |> Array.map ~f:Inner_curve.negate
 
   let incrementally_verify_proof (type b)
       (module Max_proofs_verified : Nat.Add.Intf with type n = b)
