@@ -24,9 +24,6 @@ let tuple15_of_array array =
 (* 2^2L *)
 let two_to_2limb = Bignum_bigint.(pow Common.two_to_limb (of_int 2))
 
-(* 2^3L *)
-let two_to_3limb = Bignum_bigint.(pow Common.two_to_limb (of_int 3))
-
 let two_to_limb_field (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f) =
   Common.(bignum_bigint_to_field (module Circuit) two_to_limb)
@@ -36,7 +33,7 @@ let two_to_2limb_field (type f)
   Common.(bignum_bigint_to_field (module Circuit) two_to_2limb)
 
 (* Binary modulus *)
-let binary_modulus = two_to_3limb
+let binary_modulus = Common.two_to_3limb
 
 (* Maximum foreign field modulus for multiplication m = sqrt(2^t * n), see RFC for more details
  *   For simplicity and efficiency we use the approximation m = floor(sqrt(2^t * n))
@@ -79,7 +76,7 @@ let bignum_bigint_to_standard_limbs (bigint : Bignum_bigint.t) :
   (l0, l1, l2)
 
 (* Convert Bignum_bigint.t to field standard_limbs *)
-let bignum_bigint_to_field_standard_limbs (type f)
+let bignum_bigint_to_field_const_standard_limbs (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (bigint : Bignum_bigint.t) : f standard_limbs =
   let l0, l1, l2 = bignum_bigint_to_standard_limbs bigint in
@@ -94,7 +91,7 @@ let bignum_bigint_to_compact_limbs (bigint : Bignum_bigint.t) :
   (l01, l2)
 
 (* Convert Bignum_bigint.t to field compact_limbs *)
-let bignum_bigint_to_field_compact_limbs (type f)
+let bignum_bigint_to_field_const_compact_limbs (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (bigint : Bignum_bigint.t) : f compact_limbs =
   let l01, l2 = bignum_bigint_to_compact_limbs bigint in
@@ -102,7 +99,7 @@ let bignum_bigint_to_field_compact_limbs (type f)
   , Common.bignum_bigint_to_field (module Circuit) l2 )
 
 (* Convert field standard_limbs to Bignum_bigint.t standard_limbs *)
-let field_standard_limbs_to_bignum_bigint_standard_limbs (type f)
+let field_const_standard_limbs_to_bignum_bigint_standard_limbs (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (field_limbs : f standard_limbs) : Bignum_bigint.t standard_limbs =
   let l0, l1, l2 = field_limbs in
@@ -111,17 +108,23 @@ let field_standard_limbs_to_bignum_bigint_standard_limbs (type f)
   , Common.field_to_bignum_bigint (module Circuit) l2 )
 
 (* Convert field standard_limbs to Bignum_bigint.t *)
-let field_standard_limbs_to_bignum_bigint (type f)
+let field_const_standard_limbs_to_bignum_bigint (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
     (field_limbs : f standard_limbs) : Bignum_bigint.t =
   let l0, l1, l2 =
-    field_standard_limbs_to_bignum_bigint_standard_limbs
+    field_const_standard_limbs_to_bignum_bigint_standard_limbs
       (module Circuit)
       field_limbs
   in
   Bignum_bigint.(l0 + (Common.two_to_limb * l1) + (two_to_2limb * l2))
 
 (* Foreign field element interface *)
+(* TODO: It would be better if this were created with functor that
+ *       takes are arguments the native field and the foreign field modulus.
+ *       Then when creating foreign field elements it could check that
+ *       they are valid (less than the foreign field modulus).  We'd need a
+ *       mode to override this last check for bound additions.
+ *)
 module type Element_intf = sig
   type 'field t
 
@@ -132,8 +135,20 @@ module type Element_intf = sig
   (* Create foreign field element from Cvar limbs *)
   val of_limbs : 'field Cvar.t limbs_type -> 'field t
 
+  (* Create foreign field element from field limbs *)
+  val of_field_limbs :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field limbs_type
+    -> 'field t
+
   (* Create foreign field element from Bignum_bigint.t *)
   val of_bignum_bigint :
+       (module Snark_intf.Run with type field = 'field)
+    -> Bignum_bigint.t
+    -> 'field t
+
+  (* Create constant foreign field element from Bignum_bigint.t *)
+  val const_of_bignum_bigint :
        (module Snark_intf.Run with type field = 'field)
     -> Bignum_bigint.t
     -> 'field t
@@ -143,6 +158,9 @@ module type Element_intf = sig
 
   (* Map foreign field element's Cvar limbs into some other limbs with the mapping function func *)
   val map : 'field t -> ('field Cvar.t -> 'g) -> 'g limbs_type
+
+  (* One constant *)
+  val one : (module Snark_intf.Run with type field = 'field) -> 'field t
 
   (* Convert foreign field element into field limbs *)
   val to_field_limbs_as_prover :
@@ -161,6 +179,51 @@ module type Element_intf = sig
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> Bignum_bigint.t
+
+  (* Convert foreign field affine point to string *)
+  val to_string_as_prover :
+    (module Snark_intf.Run with type field = 'field) -> 'field t -> string
+
+  (* Constrain zero check computation with boolean output *)
+  val is_zero :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> 'field Cvar.t Snark_intf.Boolean0.t
+
+  (* Compare if two foreign field elements are equal *)
+  val equal_as_prover :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> 'field t
+    -> bool
+
+  (* Add copy constraints that two foreign field elements are equal *)
+  val assert_equal :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> 'field t
+    -> unit
+
+  (* Create and constrain foreign field element from Bignum_bigint.t *)
+  val check_here_const_of_bignum_bigint :
+       (module Snark_intf.Run with type field = 'field)
+    -> Bignum_bigint.t
+    -> 'field t
+
+  (* Add conditional constraints to select foreign field element *)
+  val if_ :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field Cvar.t Snark_intf.Boolean0.t
+    -> then_:'field t
+    -> else_:'field t
+    -> 'field t
+
+  (* Decompose and constrain foreign field element into list of boolean cvars *)
+  val unpack :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> length:int
+    -> 'field Cvar.t Snark_intf.Boolean0.t list
 end
 
 (* Foreign field element structures *)
@@ -190,6 +253,18 @@ end = struct
 
     let of_limbs x = x
 
+    let of_field_limbs (type field)
+        (module Circuit : Snark_intf.Run with type field = field)
+        (x : field limbs_type) : field t =
+      let open Circuit in
+      let x =
+        exists (Typ.array ~length:3 Field.typ) ~compute:(fun () ->
+            let x0, x1, x2 = x in
+            [| x0; x1; x2 |] )
+        |> Common.tuple3_of_array
+      in
+      of_limbs x
+
     let of_bignum_bigint (type field)
         (module Circuit : Snark_intf.Run with type field = field) x : field t =
       let open Circuit in
@@ -203,6 +278,17 @@ end = struct
             |] )
       in
       of_limbs (limb_vars.(0), limb_vars.(1), limb_vars.(2))
+
+    let const_of_bignum_bigint (type field)
+        (module Circuit : Snark_intf.Run with type field = field) x : field t =
+      let open Circuit in
+      let l12, l0 = Common.(bignum_bigint_div_rem x two_to_limb) in
+      let l2, l1 = Common.(bignum_bigint_div_rem l12 two_to_limb) in
+      of_limbs
+        Field.
+          ( constant @@ Common.bignum_bigint_to_field (module Circuit) l0
+          , constant @@ Common.bignum_bigint_to_field (module Circuit) l1
+          , constant @@ Common.bignum_bigint_to_field (module Circuit) l2 )
 
     let to_limbs x = x
 
@@ -220,19 +306,95 @@ end = struct
         : Bignum_bigint.t limbs_type =
       map x (Common.cvar_field_to_bignum_bigint_as_prover (module Circuit))
 
+    let one (type field)
+        (module Circuit : Snark_intf.Run with type field = field) : field t =
+      of_bignum_bigint (module Circuit) Bignum_bigint.one
+
     let to_bignum_bigint_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         : Bignum_bigint.t =
       let l0, l1, l2 = to_bignum_bigint_limbs_as_prover (module Circuit) x in
       Bignum_bigint.(l0 + (Common.two_to_limb * l1) + (two_to_2limb * l2))
 
+    let to_string_as_prover (type field)
+        (module Circuit : Snark_intf.Run with type field = field) a : string =
+      sprintf "%s" @@ Bignum_bigint.to_string
+      @@ to_bignum_bigint_as_prover (module Circuit) a
+
+    let is_zero (type field)
+        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
+        : Circuit.Boolean.var =
+      let open Circuit in
+      let x0, x1, x2 = to_limbs x in
+      let x0_is_zero = Field.(equal x0 zero) in
+      let x1_is_zero = Field.(equal x1 zero) in
+      let x2_is_zero = Field.(equal x2 zero) in
+      Boolean.(x0_is_zero && x1_is_zero && x2_is_zero)
+
+    let equal_as_prover (type field)
+        (module Circuit : Snark_intf.Run with type field = field)
+        (left : field t) (right : field t) : bool =
+      let open Circuit in
+      let left0, left1, left2 =
+        to_field_limbs_as_prover (module Circuit) left
+      in
+      let right0, right1, right2 =
+        to_field_limbs_as_prover (module Circuit) right
+      in
+      Field.Constant.(
+        equal left0 right0 && equal left1 right1 && equal left2 right2)
+
+    let assert_equal (type field)
+        (module Circuit : Snark_intf.Run with type field = field)
+        (left : field t) (right : field t) : unit =
+      let open Circuit in
+      let left0, left1, left2 = to_limbs left in
+      let right0, right1, right2 = to_limbs right in
+      Field.Assert.equal left0 right0 ;
+      Field.Assert.equal left1 right1 ;
+      Field.Assert.equal left2 right2
+
+    let check_here_const_of_bignum_bigint (type field)
+        (module Circuit : Snark_intf.Run with type field = field) x : field t =
+      let const_x = const_of_bignum_bigint (module Circuit) x in
+      let var_x = of_bignum_bigint (module Circuit) x in
+      assert_equal (module Circuit) const_x var_x ;
+      const_x
+
     let fits_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
         (modulus : field standard_limbs) : bool =
       let modulus =
-        field_standard_limbs_to_bignum_bigint (module Circuit) modulus
+        field_const_standard_limbs_to_bignum_bigint (module Circuit) modulus
       in
       Bignum_bigint.(to_bignum_bigint_as_prover (module Circuit) x < modulus)
+
+    let if_ (type field)
+        (module Circuit : Snark_intf.Run with type field = field)
+        (b : Circuit.Boolean.var) ~(then_ : field t) ~(else_ : field t) :
+        field t =
+      let open Circuit in
+      let then0, then1, then2 = to_limbs then_ in
+      let else0, else1, else2 = to_limbs else_ in
+      of_limbs
+        ( Field.if_ b ~then_:then0 ~else_:else0
+        , Field.if_ b ~then_:then1 ~else_:else1
+        , Field.if_ b ~then_:then2 ~else_:else2 )
+
+    let unpack (type field)
+        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
+        ~(length : int) : Circuit.Boolean.var list =
+      let open Circuit in
+      (* TODO: Performance improvement, we could use this trick from Halo paper
+       * https://github.com/MinaProtocol/mina/blob/43e2994b64b9d3e99055d644ac6279d39c22ced5/src/lib/pickles/scalar_challenge.ml#L12
+       *)
+      let l0, l1, l2 = to_limbs x in
+      fst
+      @@ List.fold [ l0; l1; l2 ] ~init:([], length)
+           ~f:(fun (lst, length) limb ->
+             let bits_to_copy = min length Common.limb_bits in
+             ( lst @ Field.unpack limb ~length:bits_to_copy
+             , length - bits_to_copy ) )
   end
 
   (* Compact limbs foreign field element *)
@@ -244,6 +406,15 @@ end = struct
     type 'field t = 'field Cvar.t compact_limbs
 
     let of_limbs x = x
+
+    let of_field_limbs (type field)
+        (module Circuit : Snark_intf.Run with type field = field)
+        (x : field limbs_type) : field t =
+      let open Circuit in
+      let x =
+        exists Typ.(Field.typ * Field.typ) ~compute:(fun () -> (fst x, snd x))
+      in
+      of_limbs x
 
     let of_bignum_bigint (type field)
         (module Circuit : Snark_intf.Run with type field = field) x : field t =
@@ -260,9 +431,22 @@ end = struct
 
     let to_limbs x = x
 
+    let const_of_bignum_bigint (type field)
+        (module Circuit : Snark_intf.Run with type field = field) x : field t =
+      let open Circuit in
+      let l2, l01 = Common.(bignum_bigint_div_rem x two_to_2limb) in
+      of_limbs
+        Field.
+          ( constant @@ Common.bignum_bigint_to_field (module Circuit) l01
+          , constant @@ Common.bignum_bigint_to_field (module Circuit) l2 )
+
     let map (x : 'field t) (func : 'field Cvar.t -> 'g) : 'g limbs_type =
       let l0, l1 = to_limbs x in
       (func l0, func l1)
+
+    let one (type field)
+        (module Circuit : Snark_intf.Run with type field = field) : field t =
+      of_bignum_bigint (module Circuit) Bignum_bigint.one
 
     let to_field_limbs_as_prover (type field)
         (module Circuit : Snark_intf.Run with type field = field) (x : field t)
@@ -279,6 +463,70 @@ end = struct
         =
       let l01, l2 = to_bignum_bigint_limbs_as_prover (module Circuit) x in
       Bignum_bigint.(l01 + (two_to_2limb * l2))
+
+    let to_string_as_prover (type field)
+        (module Circuit : Snark_intf.Run with type field = field) a : string =
+      sprintf "%s" @@ Bignum_bigint.to_string
+      @@ to_bignum_bigint_as_prover (module Circuit) a
+
+    let is_zero (type field)
+        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
+        : Circuit.Boolean.var =
+      let open Circuit in
+      let x01, x2 = to_limbs x in
+      let x01_is_zero = Field.(equal x01 zero) in
+      let x2_is_zero = Field.(equal x2 zero) in
+      Boolean.(x01_is_zero && x2_is_zero)
+
+    let equal_as_prover (type field)
+        (module Circuit : Snark_intf.Run with type field = field)
+        (left : field t) (right : field t) : bool =
+      let open Circuit in
+      let left01, left2 = to_field_limbs_as_prover (module Circuit) left in
+      let right01, right2 = to_field_limbs_as_prover (module Circuit) right in
+      Field.Constant.(equal left01 right01 && equal left2 right2)
+
+    let assert_equal (type field)
+        (module Circuit : Snark_intf.Run with type field = field)
+        (left : field t) (right : field t) : unit =
+      let open Circuit in
+      let left01, left2 = to_limbs left in
+      let right01, right2 = to_limbs right in
+      Field.Assert.equal left01 right01 ;
+      Field.Assert.equal left2 right2
+
+    let check_here_const_of_bignum_bigint (type field)
+        (module Circuit : Snark_intf.Run with type field = field) x : field t =
+      let const_x = const_of_bignum_bigint (module Circuit) x in
+      let var_x = of_bignum_bigint (module Circuit) x in
+      assert_equal (module Circuit) const_x var_x ;
+      const_x
+
+    let if_ (type field)
+        (module Circuit : Snark_intf.Run with type field = field)
+        (b : Circuit.Boolean.var) ~(then_ : field t) ~(else_ : field t) :
+        field t =
+      let open Circuit in
+      let then01, then2 = to_limbs then_ in
+      let else01, else2 = to_limbs else_ in
+      of_limbs
+        ( Field.if_ b ~then_:then01 ~else_:else01
+        , Field.if_ b ~then_:then2 ~else_:else2 )
+
+    let unpack (type field)
+        (module Circuit : Snark_intf.Run with type field = field) (x : field t)
+        ~(length : int) : Circuit.Boolean.var list =
+      (* TODO: Performance improvement, we could use this trick from Halo paper
+       * https://github.com/MinaProtocol/mina/blob/43e2994b64b9d3e99055d644ac6279d39c22ced5/src/lib/pickles/scalar_challenge.ml#L12
+       *)
+      let open Circuit in
+      let l01, l2 = to_limbs x in
+      fst
+      @@ List.foldi [ l01; l2 ] ~init:([], length)
+           ~f:(fun i (lst, length) limb ->
+             let bits_to_copy = min length ((2 - i) * Common.limb_bits) in
+             ( lst @ Field.unpack limb ~length:bits_to_copy
+             , length - bits_to_copy ) )
   end
 end
 
@@ -305,6 +553,7 @@ module External_checks = struct
   let bounds (t : 'a t) = t.bounds
 
   (* Track a multi-range-check *)
+  (* TODO: improve names of these from append_ to add_, push_ or insert_ *)
   let append_multi_range_check (external_checks : 'field t)
       (x : 'field Cvar.t standard_limbs) =
     external_checks.multi_ranges <- x :: external_checks.multi_ranges
@@ -324,12 +573,9 @@ end
 (* Common auxiliary functions for foreign field gadgets *)
 
 (* Check that the foreign modulus is less than the maximum allowed *)
-let check_modulus (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (foreign_field_modulus : f standard_limbs) =
-  (* Check foreign field modulus < max allowed *)
-  let foreign_field_modulus =
-    field_standard_limbs_to_bignum_bigint (module Circuit) foreign_field_modulus
-  in
+let check_modulus_bignum_bigint (type f)
+    (module Circuit : Snark_intf.Run with type field = f)
+    (foreign_field_modulus : Bignum_bigint.t) =
   (* Note that the maximum foreign field modulus possible for addition is much
    * larger than that supported by multiplication.
    *
@@ -345,6 +591,17 @@ let check_modulus (type f) (module Circuit : Snark_intf.Run with type field = f)
   assert (
     Bignum_bigint.(
       foreign_field_modulus < max_foreign_field_modulus (module Circuit)) )
+
+(* Check that the foreign modulus is less than the maximum allowed *)
+let check_modulus (type f) (module Circuit : Snark_intf.Run with type field = f)
+    (foreign_field_modulus : f standard_limbs) =
+  let foreign_field_modulus =
+    field_const_standard_limbs_to_bignum_bigint
+      (module Circuit)
+      foreign_field_modulus
+  in
+
+  check_modulus_bignum_bigint (module Circuit) foreign_field_modulus
 
 (* Represents two limbs as one single field element with twice as many bits *)
 let as_prover_compact_limb (type f)
@@ -392,7 +649,7 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
     exists (Typ.array ~length:5 Field.typ) ~compute:(fun () ->
         (* Compute bigint version of the inputs *)
         let modulus =
-          field_standard_limbs_to_bignum_bigint
+          field_const_standard_limbs_to_bignum_bigint
             (module Circuit)
             foreign_field_modulus
         in
@@ -515,6 +772,23 @@ let sum_setup (type f) (module Circuit : Snark_intf.Run with type field = f)
   (* Return the result *)
   (Element.Standard.of_limbs (result0, result1, result2), sign, field_overflow)
 
+(* Gadget for creating an addition or subtraction result row (Zero gate with result) *)
+let result_row (type f) (module Circuit : Snark_intf.Run with type field = f)
+    ?(label = "result_zero_row") (result : f Element.Standard.t) =
+  let open Circuit in
+  let result0, result1, result2 = Element.Standard.to_limbs result in
+  with_label label (fun () ->
+      assert_
+        { annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (Raw
+                 { kind = Zero
+                 ; values = [| result0; result1; result2 |]
+                 ; coeffs = [||]
+                 } )
+        } )
+
 (* Gadget to check the supplied value is a valid foreign field element for the
  * supplied foreign field modulus
  *
@@ -562,8 +836,8 @@ let valid_element (type f) (module Circuit : Snark_intf.Run with type field = f)
   let bound, sign, ovf =
     sum_setup (module Circuit) value offset Add foreign_field_modulus
   in
-
-  let bound0, bound1, bound2 = Element.Standard.to_limbs bound in
+  (* Result row *)
+  result_row (module Circuit) ~label:"final_add_zero_gate" bound ;
 
   (* Sanity check *)
   as_prover (fun () ->
@@ -571,20 +845,6 @@ let valid_element (type f) (module Circuit : Snark_intf.Run with type field = f)
       let ovf = Common.cvar_field_to_field_as_prover (module Circuit) ovf in
       assert (Field.Constant.(equal sign one)) ;
       assert (Field.Constant.(equal ovf one)) ) ;
-
-  (* Final Zero gate*)
-  with_label "final_add_zero_gate" (fun () ->
-      (* Set up FFAdd gate *)
-      assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (Raw
-                 { kind = Zero
-                 ; values = [| bound0; bound1; bound2 |]
-                 ; coeffs = [||]
-                 } )
-        } ) ;
 
   (* Set up copy constraints with overflow with the overflow check*)
   Field.Assert.equal ovf Field.one ;
@@ -595,10 +855,42 @@ let valid_element (type f) (module Circuit : Snark_intf.Run with type field = f)
 
   (* Add external check for multi range check *)
   External_checks.append_multi_range_check external_checks
-    (bound0, bound1, bound2) ;
+  @@ Element.Standard.to_limbs bound ;
 
   (* Return the bound value *)
-  Element.Standard.of_limbs (bound0, bound1, bound2)
+  bound
+
+(* Gadget to constrain external checks using supplied modulus *)
+let constrain_external_checks (type field)
+    (module Circuit : Snark_intf.Run with type field = field)
+    (external_checks : field External_checks.t) (modulus : field standard_limbs)
+    =
+  (* 1) Add gates for external bound additions.
+   *    Note: internally this also adds multi-range-checks for the
+   *    computed bound to the external_checks.multi-ranges, which
+   *    are then constrainted in (2)
+   *)
+  List.iter external_checks.bounds ~f:(fun value ->
+      let _bound =
+        valid_element
+          (module Circuit)
+          external_checks
+          (Element.Standard.of_limbs value)
+          modulus
+      in
+      () ) ;
+
+  (* 2) Add gates for external multi-range-checks *)
+  List.iter external_checks.multi_ranges ~f:(fun multi_range ->
+      let v0, v1, v2 = multi_range in
+      Range_check.multi (module Circuit) v0 v1 v2 ;
+      () ) ;
+
+  (* 3) Add gates for external compact-multi-range-checks *)
+  List.iter external_checks.compact_multi_ranges ~f:(fun compact_multi_range ->
+      let v01, v2 = compact_multi_range in
+      Range_check.compact_multi (module Circuit) v01 v2 ;
+      () )
 
 (* FOREIGN FIELD ADDITION CHAIN GADGET *)
 
@@ -909,8 +1201,8 @@ let compute_bound_witness_carry (type f)
 
 (* Foreign field multiplication gadget definition *)
 let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
-    (external_checks : f External_checks.t) (left_input : f Element.Standard.t)
-    (right_input : f Element.Standard.t)
+    (external_checks : f External_checks.t) ?(bound_check_result = true)
+    (left_input : f Element.Standard.t) (right_input : f Element.Standard.t)
     (foreign_field_modulus : f standard_limbs) : f Element.Standard.t =
   let open Circuit in
   (* Check foreign field modulus < max allowed *)
@@ -927,7 +1219,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
         , neg_foreign_field_modulus1
         , neg_foreign_field_modulus2 ) ) =
     let foreign_field_modulus =
-      field_standard_limbs_to_bignum_bigint
+      field_const_standard_limbs_to_bignum_bigint
         (module Circuit)
         foreign_field_modulus
     in
@@ -936,7 +1228,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
       Bignum_bigint.(binary_modulus - foreign_field_modulus)
     in
     ( neg_foreign_field_modulus
-    , bignum_bigint_to_field_standard_limbs
+    , bignum_bigint_to_field_const_standard_limbs
         (module Circuit)
         neg_foreign_field_modulus )
   in
@@ -972,7 +1264,7 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
               right_input
           in
           let foreign_field_modulus =
-            field_standard_limbs_to_bignum_bigint
+            field_const_standard_limbs_to_bignum_bigint
               (module Circuit)
               foreign_field_modulus
           in
@@ -989,10 +1281,12 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
         (* Compute the intermediate products *)
         let products =
           let quotient =
-            bignum_bigint_to_field_standard_limbs (module Circuit) quotient
+            bignum_bigint_to_field_const_standard_limbs
+              (module Circuit)
+              quotient
           in
           let neg_foreign_field_modulus =
-            bignum_bigint_to_field_standard_limbs
+            bignum_bigint_to_field_const_standard_limbs
               (module Circuit)
               neg_foreign_field_modulus
           in
@@ -1010,10 +1304,12 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
         (* Compute the intermediate sums *)
         let sums =
           let quotient =
-            bignum_bigint_to_field_standard_limbs (module Circuit) quotient
+            bignum_bigint_to_field_const_standard_limbs
+              (module Circuit)
+              quotient
           in
           let neg_foreign_field_modulus =
-            bignum_bigint_to_field_standard_limbs
+            bignum_bigint_to_field_const_standard_limbs
               (module Circuit)
               neg_foreign_field_modulus
           in
@@ -1052,13 +1348,15 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
 
         (* Compute the rest of the witness data *)
         let quotient0, quotient1, quotient2 =
-          bignum_bigint_to_field_standard_limbs (module Circuit) quotient
+          bignum_bigint_to_field_const_standard_limbs (module Circuit) quotient
         in
         let remainder0, remainder1, remainder2 =
-          bignum_bigint_to_field_standard_limbs (module Circuit) remainder
+          bignum_bigint_to_field_const_standard_limbs (module Circuit) remainder
         in
         let quotient_bound01, quotient_bound2 =
-          bignum_bigint_to_field_compact_limbs (module Circuit) quotient_bound
+          bignum_bigint_to_field_const_compact_limbs
+            (module Circuit)
+            quotient_bound
         in
 
         [| carry1_lo
@@ -1085,8 +1383,9 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     (carry1_lo, product1_lo, product1_hi_0) ;
   External_checks.append_compact_multi_range_check external_checks
     (quotient_bound01, quotient_bound2) ;
-  External_checks.append_bound_check external_checks
-    (remainder0, remainder1, remainder2) ;
+  if bound_check_result then
+    External_checks.append_bound_check external_checks
+      (remainder0, remainder1, remainder2) ;
 
   let left_input0, left_input1, left_input2 =
     Element.Standard.to_limbs left_input
@@ -1133,6 +1432,47 @@ let mul (type f) (module Circuit : Snark_intf.Run with type field = f)
         } ) ;
   Element.Standard.of_limbs (remainder0, remainder1, remainder2)
 
+(* Gadget to constrain conversion of bytes array (output of Keccak gadget)
+   into foreign field element with standard limbs (input of ECDSA gadget).
+   Assumes bytes array is given in big endian. *)
+let bytes_to_standard_element (type f)
+    (module Circuit : Snark_intf.Run with type field = f)
+    (bytestring : Circuit.Field.t array) (fmod : f standard_limbs)
+    (fmod_bitlen : int) =
+  let open Circuit in
+  (* C1: Check modulus_bit_length = # of bits you unpack 
+   * This is partly implicit in the circuit given the number of byte outputs of Keccak:
+   * · input_bitlen < fmod_bitlen : OK
+   * · input_bitlen = fmod_bitlen : OK
+   * · input_bitlen > fmod_bitlen : CONSTRAIN
+   * Check that the most significant byte of the input is less than 2^(fmod_bitlen % 8)
+   *)
+  let input_bitlen = Array.length bytestring * 8 in
+  if input_bitlen > fmod_bitlen then
+    (* For the most significant one, constrain that it is less bits than required *)
+    Lookup.less_than_bits
+      (module Circuit)
+      ~bits:(fmod_bitlen % 8) bytestring.(0) ;
+  (* C2: Constrain bytes into standard foreign field element limbs => foreign field element z *)
+  let elem =
+    Element.Standard.of_bignum_bigint (module Circuit)
+    @@ Common.cvar_field_bytes_to_bignum_bigint_as_prover (module Circuit)
+    @@ Array.to_list bytestring
+  in
+  (* C3: Reduce z modulo foreign_field_modulus
+   *
+   *   Constrain z' = z + 0 modulo foreign_field_modulus using foreign field addition gate
+   *
+   *   Note: this is sufficient because z cannot be double the size due to bit length constraint
+   *)
+  let zero = Element.Standard.of_limbs (Field.zero, Field.zero, Field.zero) in
+  (* C4: Range check z' < f *)
+  (* Altogether this is a call to Foreign_field.add in default mode *)
+  let output = add (module Circuit) elem zero fmod in
+
+  (* return z' *)
+  output
+
 (*********)
 (* Tests *)
 (*********)
@@ -1144,14 +1484,6 @@ let%test_unit "foreign_field arithmetics gadgets" =
     (* Initialize the SRS cache. *)
     let () =
       try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
-    in
-
-    let assert_eq ((a, b, c) : 'field standard_limbs)
-        ((x, y, z) : 'field standard_limbs) =
-      let open Runner.Impl.Field in
-      Assert.equal (constant a) (constant x) ;
-      Assert.equal (constant b) (constant y) ;
-      Assert.equal (constant c) (constant z)
     in
 
     (* Helper to test foreign_field_add gadget
@@ -1173,7 +1505,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
               Bignum_bigint.((left_input + right_input) % foreign_field_modulus)
             in
             let foreign_field_modulus =
-              bignum_bigint_to_field_standard_limbs
+              bignum_bigint_to_field_const_standard_limbs
                 (module Runner.Impl)
                 foreign_field_modulus
             in
@@ -1211,16 +1543,14 @@ let%test_unit "foreign_field arithmetics gadgets" =
 
             as_prover (fun () ->
                 let expected =
-                  bignum_bigint_to_field_standard_limbs
+                  Element.Standard.of_bignum_bigint
                     (module Runner.Impl)
                     expected
                 in
-                let sum =
-                  Element.Standard.to_field_limbs_as_prover
+                assert (
+                  Element.Standard.equal_as_prover
                     (module Runner.Impl)
-                    sum
-                in
-                assert_eq sum expected ) ;
+                    expected sum ) ) ;
             () )
       in
       cs
@@ -1265,7 +1595,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
                 inputs
             in
             let foreign_field_modulus =
-              bignum_bigint_to_field_standard_limbs
+              bignum_bigint_to_field_const_standard_limbs
                 (module Runner.Impl)
                 foreign_field_modulus
             in
@@ -1279,16 +1609,14 @@ let%test_unit "foreign_field arithmetics gadgets" =
             (* Check sum matches expected result *)
             as_prover (fun () ->
                 let expected =
-                  bignum_bigint_to_field_standard_limbs
+                  Element.Standard.of_bignum_bigint
                     (module Runner.Impl)
                     chain_result.(0)
                 in
-                let sum =
-                  Element.Standard.to_field_limbs_as_prover
+                assert (
+                  Element.Standard.equal_as_prover
                     (module Runner.Impl)
-                    sum
-                in
-                assert_eq sum expected ) ;
+                    expected sum ) ) ;
             () )
       in
       cs
@@ -1313,7 +1641,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
               Bignum_bigint.(left_input * right_input % foreign_field_modulus)
             in
             let foreign_field_modulus =
-              bignum_bigint_to_field_standard_limbs
+              bignum_bigint_to_field_const_standard_limbs
                 (module Runner.Impl)
                 foreign_field_modulus
             in
@@ -1340,16 +1668,14 @@ let%test_unit "foreign_field arithmetics gadgets" =
             (* Check product matches expected result *)
             as_prover (fun () ->
                 let expected =
-                  bignum_bigint_to_field_standard_limbs
+                  Element.Standard.of_bignum_bigint
                     (module Runner.Impl)
                     expected
                 in
-                let product =
-                  Element.Standard.to_field_limbs_as_prover
+                assert (
+                  Element.Standard.equal_as_prover
                     (module Runner.Impl)
-                    product
-                in
-                assert_eq product expected ) ;
+                    expected product ) ) ;
             () )
       in
 
@@ -1357,12 +1683,12 @@ let%test_unit "foreign_field arithmetics gadgets" =
     in
 
     (* Helper to test foreign_field_mul gadget with external checks
-       *   Inputs:
-       *     cs                    := optional constraint system to reuse
-       *     left_input            := left multiplicand
-       *     right_input           := right multiplicand
-       *     foreign_field_modulus := foreign field modulus
-    *)
+     *   Inputs:
+     *     cs                    := optional constraint system to reuse
+     *     left_input            := left multiplicand
+     *     right_input           := right multiplicand
+     *     foreign_field_modulus := foreign field modulus
+     *)
     let test_mul_full ?cs (left_input : Bignum_bigint.t)
         (right_input : Bignum_bigint.t) (foreign_field_modulus : Bignum_bigint.t)
         =
@@ -1375,7 +1701,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
               Bignum_bigint.(left_input * right_input % foreign_field_modulus)
             in
             let foreign_field_modulus =
-              bignum_bigint_to_field_standard_limbs
+              bignum_bigint_to_field_const_standard_limbs
                 (module Runner.Impl)
                 foreign_field_modulus
             in
@@ -1391,15 +1717,23 @@ let%test_unit "foreign_field arithmetics gadgets" =
             let external_checks = External_checks.create (module Runner.Impl) in
 
             (* External checks for this test (example, circuit designer has complete flexibility about organization)
-             *   1) ForeignFieldMul
-             *   2) ForeignFieldAdd (result bound addition)
-             *   3) multi-range-check (left multiplicand)
-             *   4) multi-range-check (right multiplicand)
-             *   5) multi-range-check (product1_lo, product1_hi_0, carry1_lo)
-             *   6) multi-range-check (remainder bound / product / result range check)
-             *   7) compact-multi-range-check (quotient range check) *)
+               *   Layout
+               *       0) ForeignFieldMul
+               *       1) Zero
+               *       2) ForeignFieldAdd           (result bound addition)
+               *       3) Zero                      (result bound addition)
+               *       4) ForeignFieldAdd           (left bound addition)
+               *       5) Zero                      (left bound addition)
+               *       6) ForeignFieldAdd           (right bound addition)
+               *       7) Zero                      (right bound addition)
+               *    8-11) multi-range-check         (right bound)
+               *   12-15) multi-range-check         (left bound)
+               *   16-19) multi-range-check         (result bound)
+               *   20-23) multi-range-check         (product1_lo, product1_hi_0, carry1_lo)
+               *   24-27) compact-multi-range-check (quotient)
+            *)
 
-            (* 1) Create the foreign field mul gadget *)
+            (* Create the foreign field mul gadget *)
             let product =
               mul
                 (module Runner.Impl)
@@ -1409,71 +1743,36 @@ let%test_unit "foreign_field arithmetics gadgets" =
             (* Sanity check product matches expected result *)
             as_prover (fun () ->
                 let expected =
-                  bignum_bigint_to_field_standard_limbs
+                  Element.Standard.of_bignum_bigint
                     (module Runner.Impl)
                     expected
                 in
-                let product =
-                  Element.Standard.to_field_limbs_as_prover
+                assert (
+                  Element.Standard.equal_as_prover
                     (module Runner.Impl)
-                    product
-                in
+                    expected product ) ) ;
 
-                assert_eq product expected ) ;
+            (* Add multi-range-check left input *)
+            External_checks.append_bound_check external_checks
+            @@ Element.Standard.to_limbs left_input ;
 
-            (* 2) Add result bound addition gate. This adds multi-range-checks for the
-                  computed bound to the external_checks.multi-ranges, which are then
-                  constrainted in (6) *)
-            assert (Mina_stdlib.List.Length.equal external_checks.bounds 1) ;
-            List.iter external_checks.bounds ~f:(fun product ->
-                let _remainder_bound =
-                  valid_element
-                    (module Runner.Impl)
-                    external_checks
-                    (Element.Standard.of_limbs product)
-                    foreign_field_modulus
-                in
-                () ) ;
+            (* Add multi-range-check right input *)
+            External_checks.append_bound_check external_checks
+            @@ Element.Standard.to_limbs right_input ;
 
-            (* 3) Add multi-range-check left input *)
-            let left_input0, left_input1, left_input2 =
-              Element.Standard.to_limbs left_input
-            in
-            Range_check.multi
-              (module Runner.Impl)
-              left_input0 left_input1 left_input2 ;
-
-            (* 4) Add multi-range-check right input *)
-            let right_input0, right_input1, right_input2 =
-              Element.Standard.to_limbs right_input
-            in
-            Range_check.multi
-              (module Runner.Impl)
-              right_input0 right_input1 right_input2 ;
-
-            (* 5-6) Add gates for external multi-range-checks
-             *   In this case:
-             *     remainder_bound0, remainder_bound1, remainder_bound2
-             *     carry1_lo, product1_lo, product1_hi_0
+            (*
+             * Perform external checks
              *)
-            assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 2) ;
-            List.iter external_checks.multi_ranges ~f:(fun multi_range ->
-                let v0, v1, v2 = multi_range in
-                Range_check.multi (module Runner.Impl) v0 v1 v2 ;
-                () ) ;
-
-            (* 7) Add gates for external compact-multi-range-checks
-             *   In this case:
-             *     quotient_bound01, quotient_bound2
-             *)
+            assert (Mina_stdlib.List.Length.equal external_checks.bounds 3) ;
+            assert (Mina_stdlib.List.Length.equal external_checks.multi_ranges 1) ;
             assert (
               Mina_stdlib.List.Length.equal external_checks.compact_multi_ranges
                 1 ) ;
-            List.iter external_checks.compact_multi_ranges
-              ~f:(fun compact_multi_range ->
-                let v01, v2 = compact_multi_range in
-                Range_check.compact_multi (module Runner.Impl) v01 v2 ;
-                () ) )
+
+            (* Add gates for bound checks, multi-range-checks and compact-multi-range-checks *)
+            constrain_external_checks
+              (module Runner.Impl)
+              external_checks foreign_field_modulus )
       in
 
       cs
@@ -1502,7 +1801,7 @@ let%test_unit "foreign_field arithmetics gadgets" =
                 (expected_add - right_input) % foreign_field_modulus)
             in
             let foreign_field_modulus =
-              bignum_bigint_to_field_standard_limbs
+              bignum_bigint_to_field_const_standard_limbs
                 (module Runner.Impl)
                 foreign_field_modulus
             in
@@ -1554,41 +1853,36 @@ let%test_unit "foreign_field arithmetics gadgets" =
                 let v0, v1, v2 = multi_range in
                 Range_check.multi (module Runner.Impl) v0 v1 v2 ;
                 () ) ;
+
             (* Check product matches expected result *)
             as_prover (fun () ->
                 let expected_mul =
-                  bignum_bigint_to_field_standard_limbs
+                  Element.Standard.of_bignum_bigint
                     (module Runner.Impl)
                     expected_mul
                 in
                 let expected_add =
-                  bignum_bigint_to_field_standard_limbs
+                  Element.Standard.of_bignum_bigint
                     (module Runner.Impl)
                     expected_add
                 in
                 let expected_sub =
-                  bignum_bigint_to_field_standard_limbs
+                  Element.Standard.of_bignum_bigint
                     (module Runner.Impl)
                     expected_sub
                 in
-                let product =
-                  Element.Standard.to_field_limbs_as_prover
+                assert (
+                  Element.Standard.equal_as_prover
                     (module Runner.Impl)
-                    product
-                in
-                let addition =
-                  Element.Standard.to_field_limbs_as_prover
+                    expected_mul product ) ;
+                assert (
+                  Element.Standard.equal_as_prover
                     (module Runner.Impl)
-                    addition
-                in
-                let subtraction =
-                  Element.Standard.to_field_limbs_as_prover
+                    expected_add addition ) ;
+                assert (
+                  Element.Standard.equal_as_prover
                     (module Runner.Impl)
-                    subtraction
-                in
-                assert_eq product expected_mul ;
-                assert_eq addition expected_add ;
-                assert_eq subtraction expected_sub ) )
+                    expected_sub subtraction ) ) )
       in
       cs
     in
@@ -1599,13 +1893,13 @@ let%test_unit "foreign_field arithmetics gadgets" =
         "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
     in
     let secp256k1_max = Bignum_bigint.(secp256k1_modulus - Bignum_bigint.one) in
-    let secp256k1_sqrt = Common.bignum_biguint_sqrt secp256k1_max in
+    let secp256k1_sqrt = Common.bignum_bigint_sqrt secp256k1_max in
     let pallas_modulus =
       Common.bignum_bigint_of_hex
         "40000000000000000000000000000000224698fc094cf91b992d30ed00000001"
     in
     let pallas_max = Bignum_bigint.(pallas_modulus - Bignum_bigint.one) in
-    let pallas_sqrt = Common.bignum_biguint_sqrt pallas_max in
+    let pallas_sqrt = Common.bignum_bigint_sqrt pallas_max in
     let vesta_modulus =
       Common.bignum_bigint_of_hex
         "40000000000000000000000000000000224698fc0994a8dd8c46eb2100000001"
@@ -1806,3 +2100,123 @@ let%test_unit "foreign_field arithmetics gadgets" =
     in
     () ) ;
   ()
+
+let%test_unit "foreign_field equal_as_prover" =
+  if tests_enabled then
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+    (* Check equal_as_prover *)
+    let _cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof (fun () ->
+          let open Runner.Impl in
+          let x =
+            Element.Standard.of_bignum_bigint (module Runner.Impl)
+            @@ Common.bignum_bigint_of_hex
+                 "5925fa400436f458cb9e994dcd315ded43e9b60eb68e2ae7b5cf1d07b48ca1c"
+          in
+          let y =
+            Element.Standard.of_bignum_bigint (module Runner.Impl)
+            @@ Common.bignum_bigint_of_hex
+                 "69bc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15"
+          in
+          let z =
+            Element.Standard.of_bignum_bigint (module Runner.Impl)
+            @@ Common.bignum_bigint_of_hex
+                 "69bc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15"
+          in
+          as_prover (fun () ->
+              assert (
+                not (Element.Standard.equal_as_prover (module Runner.Impl) x y) ) ;
+              assert (Element.Standard.equal_as_prover (module Runner.Impl) y z) ) ;
+
+          let x =
+            Element.Compact.of_bignum_bigint (module Runner.Impl)
+            @@ Common.bignum_bigint_of_hex
+                 "5925fa400436f458cb9e994dcd315ded43e9b60eb68e2ae7b5cf1d07b48ca1c"
+          in
+          let y =
+            Element.Compact.of_bignum_bigint (module Runner.Impl)
+            @@ Common.bignum_bigint_of_hex
+                 "69bc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15"
+          in
+          let z =
+            Element.Compact.of_bignum_bigint (module Runner.Impl)
+            @@ Common.bignum_bigint_of_hex
+                 "69bc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15"
+          in
+          as_prover (fun () ->
+              assert (
+                not (Element.Compact.equal_as_prover (module Runner.Impl) x y) ) ;
+              assert (Element.Compact.equal_as_prover (module Runner.Impl) y z) ) ;
+
+          (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
+          let fake =
+            exists Field.typ ~compute:(fun () -> Field.Constant.zero)
+          in
+          Boolean.Assert.is_true (Field.equal fake Field.zero) ;
+          () )
+    in
+    ()
+
+let%test_unit "foreign_field equal_as_prover" =
+  if tests_enabled then
+    let open Kimchi_gadgets_test_runner in
+    (* Initialize the SRS cache. *)
+    let () =
+      try Kimchi_pasta.Vesta_based_plonk.Keypair.set_urs_info [] with _ -> ()
+    in
+    (* Check equal_as_prover *)
+    let _cs, _proof_keypair, _proof =
+      Runner.generate_and_verify_proof (fun () ->
+          let open Runner.Impl in
+          let x =
+            Element.Standard.of_bignum_bigint (module Runner.Impl)
+            @@ Common.bignum_bigint_of_hex
+                 "5925fa400436f458cb9e994dcd315ded43e9b60eb68e2ae7b5cf1d07b48ca1c"
+          in
+          let y =
+            Element.Standard.of_bignum_bigint (module Runner.Impl)
+            @@ Common.bignum_bigint_of_hex
+                 "69bc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15"
+          in
+          let z =
+            Element.Standard.of_bignum_bigint (module Runner.Impl)
+            @@ Common.bignum_bigint_of_hex
+                 "69bc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15"
+          in
+          as_prover (fun () ->
+              assert (
+                not (Element.Standard.equal_as_prover (module Runner.Impl) x y) ) ;
+              assert (Element.Standard.equal_as_prover (module Runner.Impl) y z) ) ;
+
+          let x =
+            Element.Compact.of_bignum_bigint (module Runner.Impl)
+            @@ Common.bignum_bigint_of_hex
+                 "5925fa400436f458cb9e994dcd315ded43e9b60eb68e2ae7b5cf1d07b48ca1c"
+          in
+          let y =
+            Element.Compact.of_bignum_bigint (module Runner.Impl)
+            @@ Common.bignum_bigint_of_hex
+                 "69bc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15"
+          in
+          let z =
+            Element.Compact.of_bignum_bigint (module Runner.Impl)
+            @@ Common.bignum_bigint_of_hex
+                 "69bc93598e05239aa77b85d172a9785f6f0405af91d91094f693305da68bf15"
+          in
+          as_prover (fun () ->
+              assert (
+                not (Element.Compact.equal_as_prover (module Runner.Impl) x y) ) ;
+              assert (Element.Compact.equal_as_prover (module Runner.Impl) y z) ) ;
+
+          (* Pad with a "dummy" constraint b/c Kimchi requires at least 2 *)
+          let fake =
+            exists Field.typ ~compute:(fun () -> Field.Constant.zero)
+          in
+          Boolean.Assert.is_true (Field.equal fake Field.zero) ;
+          () )
+    in
+    ()

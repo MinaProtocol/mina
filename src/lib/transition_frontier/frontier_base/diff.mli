@@ -136,7 +136,7 @@ module Lite : sig
     [%%versioned:
     module Stable : sig
       module V3 : sig
-        type t = E : (lite, 'mutant) diff -> t
+        type t = E : (lite, 'mutant) diff -> t [@@unboxed]
       end
     end]
   end

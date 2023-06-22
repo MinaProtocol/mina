@@ -21,6 +21,24 @@ type 'field standard_limbs = 'field * 'field * 'field
 
 type 'field compact_limbs = 'field * 'field
 
+val bignum_bigint_to_field_const_standard_limbs :
+     (module Snark_intf.Run with type field = 'field)
+  -> Bignum_bigint.t
+  -> 'field standard_limbs
+
+val field_const_standard_limbs_to_bignum_bigint :
+     (module Snark_intf.Run with type field = 'field)
+  -> 'field standard_limbs
+  -> Bignum_bigint.t
+
+val check_modulus :
+     (module Snark_intf.Run with type field = 'field)
+  -> 'field standard_limbs
+  -> unit
+
+val check_modulus_bignum_bigint :
+  (module Snark_intf.Run with type field = 'field) -> Bignum_bigint.t -> unit
+
 (** Foreign field element base type - not used directly *)
 module type Element_intf = sig
   type 'field t
@@ -32,8 +50,20 @@ module type Element_intf = sig
   (** Create foreign field element from Cvar limbs *)
   val of_limbs : 'field Cvar.t limbs_type -> 'field t
 
+  (** Create foreign field element from field limbs *)
+  val of_field_limbs :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field limbs_type
+    -> 'field t
+
   (** Create foreign field element from Bignum_bigint.t *)
   val of_bignum_bigint :
+       (module Snark_intf.Run with type field = 'field)
+    -> Bignum_bigint.t
+    -> 'field t
+
+  (** Create constant foreign field element from Bignum_bigint.t *)
+  val const_of_bignum_bigint :
        (module Snark_intf.Run with type field = 'field)
     -> Bignum_bigint.t
     -> 'field t
@@ -43,6 +73,9 @@ module type Element_intf = sig
 
   (** Map foreign field element's Cvar limbs into some other limbs with the mapping function func *)
   val map : 'field t -> ('field Cvar.t -> 'g) -> 'g limbs_type
+
+  (** One constant *)
+  val one : (module Snark_intf.Run with type field = 'field) -> 'field t
 
   (** Convert foreign field element into field limbs *)
   val to_field_limbs_as_prover :
@@ -61,6 +94,51 @@ module type Element_intf = sig
        (module Snark_intf.Run with type field = 'field)
     -> 'field t
     -> Bignum_bigint.t
+
+  (** Convert foreign field affine point to string *)
+  val to_string_as_prover :
+    (module Snark_intf.Run with type field = 'field) -> 'field t -> string
+
+  (** Constrain zero check computation with boolean output *)
+  val is_zero :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> 'field Cvar.t Snark_intf.Boolean0.t
+
+  (** Compare if two foreign field elements are equal *)
+  val equal_as_prover :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> 'field t
+    -> bool
+
+  (** Add copy constraints that two foreign field elements are equal *)
+  val assert_equal :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> 'field t
+    -> unit
+
+  (* Create and constrain foreign field element from Bignum_bigint.t *)
+  val check_here_const_of_bignum_bigint :
+       (module Snark_intf.Run with type field = 'field)
+    -> Bignum_bigint.t
+    -> 'field t
+
+  (** Add conditional constraints to select foreign field element *)
+  val if_ :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field Cvar.t Snark_intf.Boolean0.t
+    -> then_:'field t
+    -> else_:'field t
+    -> 'field t
+
+  (** Decompose and constrain foreign field element into list of boolean cvars *)
+  val unpack :
+       (module Snark_intf.Run with type field = 'field)
+    -> 'field t
+    -> length:int
+    -> 'field Cvar.t Snark_intf.Boolean0.t list
 end
 
 module Element : sig
@@ -75,7 +153,13 @@ end
  *  given multiplication
  *)
 module External_checks : sig
-  type 'field t
+  module Cvar = Snarky_backendless.Cvar
+
+  type 'field t =
+    { mutable multi_ranges : 'field Cvar.t standard_limbs list
+    ; mutable compact_multi_ranges : 'field Cvar.t compact_limbs list
+    ; mutable bounds : 'field Cvar.t standard_limbs list
+    }
 
   val create : (module Snark_intf.Run with type field = 'field) -> 'field t
 
@@ -85,6 +169,14 @@ module External_checks : sig
     'a t -> 'a Snarky_backendless.Cvar.t compact_limbs list
 
   val bounds : 'a t -> 'a Snarky_backendless.Cvar.t standard_limbs list
+
+  val append_multi_range_check :
+    'field t -> 'field Cvar.t standard_limbs -> unit
+
+  val append_compact_multi_range_check :
+    'field t -> 'field Cvar.t compact_limbs -> unit
+
+  val append_bound_check : 'field t -> 'field Cvar.t standard_limbs -> unit
 end
 
 (* Type of operation *)
@@ -118,6 +210,13 @@ val valid_element :
   -> 'f standard_limbs (* foreign_field_modulus *)
   -> 'f Element.Standard.t
 (* result *)
+
+(** Gadget to constrain external checks using supplied modulus *)
+val constrain_external_checks :
+     (module Snark_intf.Run with type field = 'f)
+  -> 'f External_checks.t
+  -> 'f standard_limbs
+  -> unit
 
 (** Gadget for a chain of foreign field sums (additions or subtractions)
  *
@@ -208,6 +307,13 @@ val sub :
   -> 'f Element.Standard.t
 (* result *)
 
+(* Gadget for creating an addition or subtraction result row (Zero gate with result) *)
+val result_row :
+     (module Snark_intf.Run with type field = 'f)
+  -> ?label:string
+  -> 'f Element.Standard.t
+  -> unit
+
 (** Gadget for foreign field multiplication
  *
  *   Constrains that
@@ -230,8 +336,16 @@ val sub :
 val mul :
      (module Snark_intf.Run with type field = 'f)
   -> 'f External_checks.t (* external_checks *)
+  -> ?bound_check_result:bool
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
   -> 'f Element.Standard.t
 (* product *)
+
+val bytes_to_standard_element :
+     (module Snark_intf.Run with type field = 'f)
+  -> 'f Snarky_backendless.Cvar.t array
+  -> 'f standard_limbs
+  -> int
+  -> 'f Element.Standard.t

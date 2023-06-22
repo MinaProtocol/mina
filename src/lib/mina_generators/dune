@@ -4,7 +4,7 @@
  (inline_tests)
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../config.mlh)
- (preprocess (pps ppx_let ppx_version ppx_custom_printf ppx_inline_test ppx_optcomp))
+ (preprocess (pps ppx_let ppx_version ppx_custom_printf ppx_inline_test ppx_optcomp ppx_deriving_yojson))
  (libraries
    ;; opam libraries
    yojson
@@ -16,6 +16,7 @@
    base
    sexplib0
    ppx_inline_test.config
+   ppx_deriving_yojson.runtime
    ;; local libraries
    genesis_constants
    sgn
