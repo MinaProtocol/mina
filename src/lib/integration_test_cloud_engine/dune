@@ -52,5 +52,6 @@
    data_hash_lib
    generated_graphql_queries
    mina_graphql
+   error_json
    )
 )

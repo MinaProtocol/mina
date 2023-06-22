@@ -88,6 +88,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
           else if disabled_not_the_same then
             failwith "Pseudo.Domain.shifts: found variable shifts"
           else
+            let open Pickles_types.Plonk_types.Shifts in
             let get_ith_shift i =
               mask which
                 (Vector.map all_shifts ~f:(fun a -> Field.constant a.(i)))
