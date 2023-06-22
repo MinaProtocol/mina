@@ -5,7 +5,7 @@ type endianness = Big | Little
  * Input:
  * - Endianness of the input (default is Big). 
  * - Endianness of the output (default is Big).
- * - Flag to enable byte checks (default is false)
+ * - Flag to enable input byte checks (default is false). Outputs are always constrained.
  * - int representing the output length of the hash function (224|256|384|512)
  * - Arbitrary length list of Cvars representing the input to the hash function where each of them is a byte 
  * Output:
@@ -24,7 +24,7 @@ val nist_sha3 :
  * Input:
  * - Endianness of the input (default is Big). 
  * - Endianness of the output (default is Big).
- * - Flag to enable byte checks (default is false)
+ * - Flag to enable input byte checks (default is false). Outputs are always constrained.
  * - Arbitrary length list of Cvars representing the input to the hash function where each of them is a byte 
  * Output: 
  * - List of 256 Cvars representing the output of the hash function where each of them is a byte 
@@ -42,7 +42,7 @@ val ethereum :
  * Input:
  * - Endianness of the input (default is Big). 
  * - Endianness of the output (default is Big).
- * - Flag to enable byte checks (default is false)
+ * - Flag to enable input byte checks (default is false). Outputs are always constrained.
  * - int representing the output length of the hash function (224|256|384|512)
  * - Arbitrary length list of Cvars Cvars representing the input to the hash function where each of them is a byte 
  * Output:

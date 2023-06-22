@@ -549,7 +549,7 @@ let hash (type f)
   let message =
     match inp_endian with Big -> message | Little -> List.rev message
   in
-  (* Check each cvar input is 8 bits at most *)
+  (* Check each cvar input is 8 bits at most if it was not done before at creation time*)
   if byte_checks then check_bytes (module Circuit) message ;
   let rate = keccak_state_length - capacity in
   let padded =
@@ -560,8 +560,8 @@ let hash (type f)
         pad_101 (module Circuit) message rate
   in
   let hash = sponge (module Circuit) padded ~length ~capacity ~rate in
-  (* Check each cvar output is 8 bits at most *)
-  if byte_checks then check_bytes (module Circuit) hash ;
+  (* Check each cvar output is 8 bits at most. Always because they are created here *)
+  check_bytes (module Circuit) hash ;
   (* Set input to desired endianness *)
   let hash = match out_endian with Big -> hash | Little -> List.rev hash in
   (* Check each cvar output is 8 bits at most *)
