@@ -403,64 +403,62 @@ struct
           let open Inner_curve.Constant in
           [ g; negate (pow2pow g actual_shift) ] )
     in
-    let x_hat =
-      let constant_part, non_constant_part =
-        List.partition_map
-          (Array.to_list (Array.mapi ~f:(fun i t -> (i, t)) public_input))
-          ~f:(fun (i, t) ->
-            match[@warning "-4"] t with
-            | `Field (Constant c) | `Packed_bits (Constant c, _) ->
-                First
-                  ( if Field.Constant.(equal zero) c then None
-                  else if Field.Constant.(equal one) c then Some (lagrange i)
-                  else
-                    Some
-                      ( select_curve_points ~points_for_domain:(fun d ->
-                            [ Inner_curve.Constant.scale
-                                (lagrange_commitment d i)
-                                (Inner_curve.Constant.Scalar.project
-                                   (Field.Constant.unpack c) )
-                            ] )
-                      |> Vector.unsingleton ) )
-            | `Field x ->
-                Second (i, (x, Public_input_scalar.Constant.size_in_bits))
-            | `Packed_bits (x, n) ->
-                Second (i, (x, n)) )
-      in
-      let terms =
-        List.map non_constant_part ~f:(fun (i, x) ->
-            match x with
-            | b, 1 ->
-                assert_ (Constraint.boolean (b :> Field.t)) ;
-                `Cond_add (Boolean.Unsafe.of_cvar b, lagrange i)
-            | x, n ->
-                `Add_with_correction
-                  ((x, n), lagrange_with_correction ~input_length:n i) )
-      in
-      let f = Ops.add_fast ?check_finite:None in
-      let correction =
-        List.reduce_exn
-          (List.filter_map terms ~f:(function
-            | `Cond_add _ ->
-                None
-            | `Add_with_correction (_, [ _; corr ]) ->
-                Some corr ) )
-          ~f
-      in
-      let init =
-        List.fold (List.filter_map constant_part ~f:Fn.id) ~init:correction ~f
-      in
-      List.fold terms ~init ~f:(fun acc term ->
-          match term with
-          | `Cond_add (b, g) ->
-              with_label __LOC__ (fun () ->
-                  Inner_curve.if_ b ~then_:(Ops.add_fast g acc) ~else_:acc )
-          | `Add_with_correction ((x, num_bits), [ g; _ ]) ->
-              Ops.add_fast acc
-                (Ops.scale_fast2' (module Public_input_scalar) g x ~num_bits) )
-      |> Inner_curve.negate
+
+    (* Compute x_hat *)
+    let constant_part, non_constant_part =
+      List.partition_map
+        (Array.to_list (Array.mapi ~f:(fun i t -> (i, t)) public_input))
+        ~f:(fun (i, t) ->
+          match[@warning "-4"] t with
+          | `Field (Constant c) | `Packed_bits (Constant c, _) ->
+              First
+                ( if Field.Constant.(equal zero) c then None
+                else if Field.Constant.(equal one) c then Some (lagrange i)
+                else
+                  Some
+                    ( select_curve_points ~points_for_domain:(fun d ->
+                          [ Inner_curve.Constant.scale (lagrange_commitment d i)
+                              (Inner_curve.Constant.Scalar.project
+                                 (Field.Constant.unpack c) )
+                          ] )
+                    |> Vector.unsingleton ) )
+          | `Field x ->
+              Second (i, (x, Public_input_scalar.Constant.size_in_bits))
+          | `Packed_bits (x, n) ->
+              Second (i, (x, n)) )
     in
-    x_hat
+    let terms =
+      List.map non_constant_part ~f:(fun (i, x) ->
+          match x with
+          | b, 1 ->
+              assert_ (Constraint.boolean (b :> Field.t)) ;
+              `Cond_add (Boolean.Unsafe.of_cvar b, lagrange i)
+          | x, n ->
+              `Add_with_correction
+                ((x, n), lagrange_with_correction ~input_length:n i) )
+    in
+    let f = Ops.add_fast ?check_finite:None in
+    let correction =
+      List.reduce_exn
+        (List.filter_map terms ~f:(function
+          | `Cond_add _ ->
+              None
+          | `Add_with_correction (_, [ _; corr ]) ->
+              Some corr ) )
+        ~f
+    in
+    let init =
+      List.fold (List.filter_map constant_part ~f:Fn.id) ~init:correction ~f
+    in
+    List.fold terms ~init ~f:(fun acc term ->
+        match term with
+        | `Cond_add (b, g) ->
+            with_label __LOC__ (fun () ->
+                Inner_curve.if_ b ~then_:(Ops.add_fast g acc) ~else_:acc )
+        | `Add_with_correction ((x, num_bits), [ g; _ ]) ->
+            Ops.add_fast acc
+              (Ops.scale_fast2' (module Public_input_scalar) g x ~num_bits) )
+    |> Inner_curve.negate
 
   let incrementally_verify_proof (type b)
       (module Proofs_verified : Nat.Add.Intf with type n = b) ~srs:_
