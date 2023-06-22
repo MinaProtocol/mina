@@ -5,6 +5,7 @@ type endianness = Big | Little
  * Input:
  * - Endianness of the input (default is Big). 
  * - Endianness of the output (default is Big).
+ * - Flag to enable byte checks (default is false)
  * - int representing the output length of the hash function (224|256|384|512)
  * - Arbitrary length list of Cvars representing the input to the hash function where each of them is a byte 
  * Output:
@@ -14,6 +15,7 @@ val nist_sha3 :
      (module Snarky_backendless.Snark_intf.Run with type field = 'f)
   -> ?inp_endian:endianness
   -> ?out_endian:endianness
+  -> ?byte_checks:bool
   -> int
   -> 'f Snarky_backendless.Cvar.t list
   -> 'f Snarky_backendless.Cvar.t list
@@ -22,6 +24,7 @@ val nist_sha3 :
  * Input:
  * - Endianness of the input (default is Big). 
  * - Endianness of the output (default is Big).
+ * - Flag to enable byte checks (default is false)
  * - Arbitrary length list of Cvars representing the input to the hash function where each of them is a byte 
  * Output: 
  * - List of 256 Cvars representing the output of the hash function where each of them is a byte 
@@ -30,6 +33,7 @@ val ethereum :
      (module Snarky_backendless.Snark_intf.Run with type field = 'f)
   -> ?inp_endian:endianness
   -> ?out_endian:endianness
+  -> ?byte_checks:bool
   -> 'f Snarky_backendless.Cvar.t list
   -> 'f Snarky_backendless.Cvar.t list
 
@@ -38,6 +42,7 @@ val ethereum :
  * Input:
  * - Endianness of the input (default is Big). 
  * - Endianness of the output (default is Big).
+ * - Flag to enable byte checks (default is false)
  * - int representing the output length of the hash function (224|256|384|512)
  * - Arbitrary length list of Cvars Cvars representing the input to the hash function where each of them is a byte 
  * Output:
@@ -47,6 +52,7 @@ val pre_nist :
      (module Snarky_backendless.Snark_intf.Run with type field = 'f)
   -> ?inp_endian:endianness
   -> ?out_endian:endianness
+  -> ?byte_checks:bool
   -> int
   -> 'f Snarky_backendless.Cvar.t list
   -> 'f Snarky_backendless.Cvar.t list

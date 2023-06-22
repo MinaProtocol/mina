@@ -538,9 +538,9 @@ let check_bytes (type f)
 *)
 let hash (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    ?(inp_endian = Big) ?(out_endian = Big) (message : Circuit.Field.t list)
-    ~(length : int) ~(capacity : int) (nist_version : bool) :
-    Circuit.Field.t list =
+    ?(inp_endian = Big) ?(out_endian = Big) ?(byte_checks = false)
+    (message : Circuit.Field.t list) ~(length : int) ~(capacity : int)
+    (nist_version : bool) : Circuit.Field.t list =
   assert (capacity > 0) ;
   assert (capacity < keccak_state_length) ;
   assert (length > 0) ;
@@ -550,7 +550,7 @@ let hash (type f)
     match inp_endian with Big -> message | Little -> List.rev message
   in
   (* Check each cvar input is 8 bits at most *)
-  check_bytes (module Circuit) message ;
+  if byte_checks then check_bytes (module Circuit) message ;
   let rate = keccak_state_length - capacity in
   let padded =
     match nist_version with
@@ -560,7 +560,8 @@ let hash (type f)
         pad_101 (module Circuit) message rate
   in
   let hash = sponge (module Circuit) padded ~length ~capacity ~rate in
-  check_bytes (module Circuit) hash ;
+  (* Check each cvar output is 8 bits at most *)
+  if byte_checks then check_bytes (module Circuit) hash ;
   (* Set input to desired endianness *)
   let hash = match out_endian with Big -> hash | Little -> List.rev hash in
   (* Check each cvar output is 8 bits at most *)
@@ -571,7 +572,7 @@ let hash (type f)
  *)
 let nist_sha3 (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    ?(inp_endian = Big) ?(out_endian = Big) (len : int)
+    ?(inp_endian = Big) ?(out_endian = Big) ?(byte_checks = false) (len : int)
     (message : Circuit.Field.t list) : Circuit.Field.t list =
   let hash =
     match len with
@@ -579,18 +580,22 @@ let nist_sha3 (type f)
         hash
           (module Circuit)
           message ~length:224 ~capacity:448 true ~inp_endian ~out_endian
+          ~byte_checks
     | 256 ->
         hash
           (module Circuit)
           message ~length:256 ~capacity:512 true ~inp_endian ~out_endian
+          ~byte_checks
     | 384 ->
         hash
           (module Circuit)
           message ~length:384 ~capacity:768 true ~inp_endian ~out_endian
+          ~byte_checks
     | 512 ->
         hash
           (module Circuit)
           message ~length:512 ~capacity:1024 true ~inp_endian ~out_endian
+          ~byte_checks
     | _ ->
         assert false
   in
@@ -601,11 +606,11 @@ let nist_sha3 (type f)
  *)
 let ethereum (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    ?(inp_endian = Big) ?(out_endian = Big) (message : Circuit.Field.t list) :
-    Circuit.Field.t list =
+    ?(inp_endian = Big) ?(out_endian = Big) ?(byte_checks = false)
+    (message : Circuit.Field.t list) : Circuit.Field.t list =
   hash
     (module Circuit)
-    message ~length:256 ~capacity:512 false ~inp_endian ~out_endian
+    message ~length:256 ~capacity:512 false ~inp_endian ~out_endian ~byte_checks
 
 (* Gagdet for pre-NIST SHA-3 function for output lengths 224/256/384/512.
  * Input and output endianness can be specified. Default is big endian.
@@ -613,23 +618,26 @@ let ethereum (type f)
  *)
 let pre_nist (type f)
     (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    ?(inp_endian = Big) ?(out_endian = Big) (len : int)
+    ?(inp_endian = Big) ?(out_endian = Big) ?(byte_checks = false) (len : int)
     (message : Circuit.Field.t list) : Circuit.Field.t list =
   match len with
   | 224 ->
       hash
         (module Circuit)
         message ~length:224 ~capacity:448 false ~inp_endian ~out_endian
+        ~byte_checks
   | 256 ->
-      ethereum (module Circuit) message ~inp_endian ~out_endian
+      ethereum (module Circuit) message ~inp_endian ~out_endian ~byte_checks
   | 384 ->
       hash
         (module Circuit)
         message ~length:384 ~capacity:768 false ~inp_endian ~out_endian
+        ~byte_checks
   | 512 ->
       hash
         (module Circuit)
         message ~length:512 ~capacity:1024 false ~inp_endian ~out_endian
+        ~byte_checks
   | _ ->
       assert false
 
@@ -665,11 +673,11 @@ let%test_unit "keccak gadget" =
               | true ->
                   nist_sha3
                     (module Runner.Impl)
-                    len message ?inp_endian ?out_endian
+                    len message ?inp_endian ?out_endian ~byte_checks:true
               | false ->
                   pre_nist
                     (module Runner.Impl)
-                    len message ?inp_endian ?out_endian
+                    len message ?inp_endian ?out_endian ~byte_checks:true
             in
 
             let expected =
