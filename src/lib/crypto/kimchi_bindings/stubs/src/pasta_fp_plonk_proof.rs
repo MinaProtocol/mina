@@ -180,7 +180,6 @@ pub fn caml_pasta_fp_plonk_proof_create_and_verify(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
     srs: CamlFpSrs,
-    indexed: bool,
 ) -> (
     CamlPastaFpPlonkIndex,
     CamlFp,
@@ -190,7 +189,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
     use kimchi::circuits::{
         constraints::ConstraintSystem,
         gate::{CircuitGate, GateType},
-        lookup::runtime_tables::{RuntimeTable, RuntimeTableCfg, RuntimeTableSpec},
+        lookup::runtime_tables::{RuntimeTable, RuntimeTableCfg},
         polynomial::COLUMNS,
         wires::Wire,
     };
@@ -201,16 +200,9 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
 
     let mut runtime_tables_setup = vec![];
     for table_id in 0..num_tables {
-        let cfg = if indexed {
-            RuntimeTableCfg::Indexed(RuntimeTableSpec {
-                id: table_id as i32,
-                len: 5,
-            })
-        } else {
-            RuntimeTableCfg::Custom {
-                id: table_id as i32,
-                first_column: [8u32, 9, 8, 7, 1].into_iter().map(Into::into).collect(),
-            }
+        let cfg = RuntimeTableCfg {
+            id: table_id as i32,
+            first_column: [8u32, 9, 8, 7, 1].into_iter().map(Into::into).collect(),
         };
         runtime_tables_setup.push(cfg);
     }
@@ -248,7 +240,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
             // create queries into our runtime lookup table
             let lookup_cols = &mut lookup_cols[1..];
             for chunk in lookup_cols.chunks_mut(2) {
-                chunk[0][row] = if indexed { 1u32.into() } else { 9u32.into() }; // index
+                chunk[0][row] = 9u32.into(); // index
                 chunk[1][row] = 2u32.into(); // value
             }
         }

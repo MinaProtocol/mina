@@ -89,6 +89,11 @@ type nonrec 'caml_g lookup_commitments =
 
 type nonrec 'caml_f runtime_table = { id : int32; data : 'caml_f array }
 
+type nonrec runtime_table_spec = { id : int32; len : int }
+
+type nonrec 'caml_f runtime_table_cfg =
+  { id : int32; first_column : 'caml_f array }
+
 type nonrec 'caml_g prover_commitments =
   { w_comm :
       'caml_g poly_comm

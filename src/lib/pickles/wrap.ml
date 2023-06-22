@@ -543,7 +543,7 @@ let%test_module "gate finalization" =
       ( module Make (struct
         let example =
           public_input_1 (fun srs ->
-              Kimchi_bindings.Protocol.Proof.Fp.example_with_lookup srs true )
+              Kimchi_bindings.Protocol.Proof.Fp.example_with_lookup srs )
 
         let actual_feature_flags =
           { Plonk_types.Features.none_bool with

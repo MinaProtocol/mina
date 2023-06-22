@@ -1,6 +1,10 @@
 use kimchi::circuits::{
     expr::FeatureFlag,
     lookup::{lookups::{LookupFeatures, LookupPattern, LookupPatterns}, runtime_tables::caml::CamlRuntimeTable},
+    lookup::{
+        lookups::{LookupFeatures, LookupPattern, LookupPatterns},
+        runtime_tables::caml::{CamlRuntimeTable, CamlRuntimeTableCfg, CamlRuntimeTableSpec},
+    },
 };
 use kimchi::proof::{caml::CamlRecursionChallenge, PointEvaluations};
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
@@ -103,6 +107,10 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_type!(w, env, CamlOpeningProof::<T1, T2> => "opening_proof");
     decl_type!(w, env, CamlLookupCommitments::<T1> => "lookup_commitments");
     decl_type!(w, env, CamlRuntimeTable::<T1> => "runtime_table");
+    // Runtime table spec/cfg
+    decl_type!(w, env, CamlRuntimeTableSpec => "runtime_table_spec");
+    decl_type!(w, env, CamlRuntimeTableCfg::<T1> => "runtime_table_cfg");
+
     decl_type!(w, env, CamlProverCommitments::<T1> => "prover_commitments");
     decl_type!(w, env, CamlProverProof<T1, T2> => "prover_proof");
 

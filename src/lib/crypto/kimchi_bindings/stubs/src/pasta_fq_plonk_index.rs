@@ -1,6 +1,8 @@
-use crate::{gate_vector::fq::CamlPastaFqPlonkGateVectorPtr, srs::fq::CamlFqSrs};
 use crate::arkworks::CamlFq;
+use crate::{gate_vector::fq::CamlPastaFqPlonkGateVectorPtr, srs::fq::CamlFqSrs};
 use ark_poly::EvaluationDomain;
+use kimchi::circuits::lookup::runtime_tables::caml::CamlRuntimeTableCfg;
+use kimchi::circuits::lookup::runtime_tables::RuntimeTableCfg;
 use kimchi::circuits::lookup::tables::caml::CamlLookupTable;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::{linearization::expr_linearization, prover_index::ProverIndex};
@@ -42,6 +44,7 @@ pub fn caml_pasta_fq_plonk_index_create(
     gates: CamlPastaFqPlonkGateVectorPtr,
     public: ocaml::Int,
     lookup_tables: Vec<CamlLookupTable<CamlFq>>,
+    runtime_tables: Vec<CamlRuntimeTableCfg<CamlFq>>,
     prev_challenges: ocaml::Int,
     srs: CamlFqSrs,
 ) -> Result<CamlPastaFqPlonkIndex, ocaml::Error> {
@@ -58,11 +61,19 @@ pub fn caml_pasta_fq_plonk_index_create(
 
     let lookup_tables = lookup_tables.into_iter().map(Into::into).collect();
 
+    let runtime_tables: Vec<RuntimeTableCfg<Fq>> =
+        runtime_tables.into_iter().map(Into::into).collect();
+
     // create constraint system
     let cs = match ConstraintSystem::<Fq>::create(gates)
         .public(public as usize)
         .prev_challenges(prev_challenges as usize)
         .lookup(lookup_tables)
+        .runtime(if runtime_tables.is_empty() {
+            None
+        } else {
+            Some(runtime_tables)
+        })
         .build()
     {
         Err(_) => {
