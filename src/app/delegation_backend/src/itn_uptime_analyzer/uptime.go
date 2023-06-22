@@ -17,11 +17,11 @@ import (
 // To the uptime array, the length of which determines if the node was up or not
 // Length of 47 is enough
 
-func (identity Identity) GetUptime(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext, log *logging.ZapEventLogger) {
+func (identity Identity) GetUptime(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext, log *logging.ZapEventLogger, sheetTitle string) {
 
 	currentTime := GetCurrentTime()
 	currentDateString := currentTime.Format(time.RFC3339)[:10]
-	lastExecutionTime := GetLastExecutionTime(config, sheet, log)
+	lastExecutionTime := GetLastExecutionTime(config, sheet, log, sheetTitle)
 
 	prefixCurrent := strings.Join([]string{ctx.Prefix, "submissions", currentDateString}, "/")
 

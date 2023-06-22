@@ -48,30 +48,34 @@ func main() {
 	sheetsService, err := sheets.NewService(ctx)
 	if err != nil {
 		log.Fatalf("Error creating Sheets service: %v", err)
-		return
 	}
 
-	identities := itn.CreateIdentities(appCfg, sheetsService, awsctx, log)
+	sheetTitle, err := itn.IdentifyWeek(appCfg, sheetsService, log)
+	if err != nil {
+		log.Fatalf("Error identifying week: %v", err)
+	}
+
+	identities := itn.CreateIdentities(appCfg, sheetsService, awsctx, log, sheetTitle)
 
 	// Go over identities and calculate uptime
 
 	for _, identity := range identities {
 
-		identity.GetUptime(appCfg, sheetsService, awsctx, log)
+		identity.GetUptime(appCfg, sheetsService, awsctx, log, sheetTitle)
 
-		exactMatch, rowIndex, firstEmptyRow := identity.GetCell(appCfg, sheetsService, log)
+		exactMatch, rowIndex, firstEmptyRow := identity.GetCell(appCfg, sheetsService, log, sheetTitle)
 
 		if exactMatch {
-			identity.AppendUptime(appCfg, sheetsService, log, rowIndex)
+			identity.AppendUptime(appCfg, sheetsService, log, sheetTitle, rowIndex)
 		} else if (!exactMatch) && (rowIndex == 0) {
-			identity.AppendNext(appCfg, sheetsService, log)
-			identity.AppendUptime(appCfg, sheetsService, log, firstEmptyRow)
+			identity.AppendNext(appCfg, sheetsService, log, sheetTitle)
+			identity.AppendUptime(appCfg, sheetsService, log, sheetTitle, firstEmptyRow)
 		} else if (!exactMatch) && (rowIndex != 0) {
-			identity.InsertBelow(appCfg, sheetsService, log, rowIndex)
-			identity.AppendUptime(appCfg, sheetsService, log, rowIndex+1)
+			identity.InsertBelow(appCfg, sheetsService, log, sheetTitle, rowIndex)
+			identity.AppendUptime(appCfg, sheetsService, log, sheetTitle, rowIndex+1)
 		}
 	}
 
-	itn.MarkExecution(appCfg, sheetsService, log)
+	itn.MarkExecution(appCfg, sheetsService, log, sheetTitle)
 
 }

@@ -4,7 +4,6 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -20,11 +19,11 @@ type Identity map[string]string
 
 // Goes through each submission and adds an identity type to a map
 
-func CreateIdentities(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext, log *logging.ZapEventLogger) map[string]Identity {
+func CreateIdentities(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext, log *logging.ZapEventLogger, sheetTitle string) map[string]Identity {
 
 	currentTime := GetCurrentTime()
 	currentDateString := currentTime.Format(time.RFC3339)[:10]
-	lastExecutionTime := GetLastExecutionTime(config, sheet, log)
+	lastExecutionTime := GetLastExecutionTime(config, sheet, log, sheetTitle)
 
 	prefixCurrent := strings.Join([]string{ctx.Prefix, "submissions", currentDateString}, "/")
 
@@ -79,7 +78,6 @@ func CreateIdentities(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext
 				identity := GetIdentity(submissionData.Submitter.String(), submissionData.RemoteAddr)
 				if _, inMap := identities[identity["id"]]; !inMap {
 					AddIdentity(identity, identities)
-					fmt.Printf("Submitter: %s", submissionData.Submitter.String())
 				}
 			}
 		}
