@@ -169,6 +169,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (set_urs_info, load)
 
+  (* TODO(dw): here we must pass the lookup information *)
   let create ~prev_challenges cs =
     let gates = Inputs.Constraint_system.finalize_and_get_gates cs in
     let public_input_size =
