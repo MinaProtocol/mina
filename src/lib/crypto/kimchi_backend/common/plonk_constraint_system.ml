@@ -95,7 +95,8 @@ module Position = struct
     Array.append cols padding
 
   (** Converts an array of [Constants.columns] to [Constants.permutation_cols].
-    This is useful to truncate arrays of cells to the ones that only matter for the permutation argument.
+      This is useful to truncate arrays of cells to the ones that only matter for
+      the permutation argument.
     *)
   let cols_to_perms cols = Array.slice cols 0 Constants.permutation_cols
 
@@ -110,7 +111,10 @@ module Gate_spec = struct
 
   (* TODO: split kind/coeffs from row/wired_to *)
 
-  (** A gate/row/constraint consists of a type (kind), a row, the other cells its columns/cells are connected to (wired_to), and the selector polynomial associated with the gate. *)
+  (** A gate/row/constraint consists of a type (kind), a row, the other cells
+      its columns/cells are connected to (wired_to), and the selector polynomial
+      associated with the gate.
+    *)
   type ('row, 'f) t =
     { kind : Kimchi_gate_type.t
     ; wired_to : 'row Position.t array
@@ -148,7 +152,17 @@ end
 module Plonk_constraint = struct
   open Core_kernel
 
-  (** A PLONK constraint (or gate) can be [Basic], [Poseidon], [EC_add_complete], [EC_scale], [EC_endoscale], [EC_endoscalar], [RangeCheck0], [RangeCheck1], [Xor] *)
+  (** A PLONK constraint (or gate) can be
+      - [Basic]
+      - [Poseidon]
+      - [EC_add_complete]
+      - [EC_scale]
+      - [EC_endoscale]
+      - [EC_endoscalar]
+      - [RangeCheck0]
+      - [RangeCheck1]
+      - [Xor]
+  *)
   module T = struct
     type ('v, 'f) t =
       | Basic of { l : 'f * 'v; r : 'f * 'v; o : 'f * 'v; m : 'f; c : 'f }
