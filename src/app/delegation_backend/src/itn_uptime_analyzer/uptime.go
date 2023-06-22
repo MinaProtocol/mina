@@ -10,17 +10,18 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	logging "github.com/ipfs/go-log/v2"
+	sheets "google.golang.org/api/sheets/v4"
 )
 
 // This function tries to match the identities with the submission data and if there is a match it appends
 // To the uptime array, the length of which determines if the node was up or not
 // Length of 47 is enough
 
-func (identity Identity) GetUptime(ctx dg.AwsContext, log *logging.ZapEventLogger) {
+func (identity Identity) GetUptime(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext, log *logging.ZapEventLogger) {
 
 	currentTime := GetCurrentTime()
 	currentDateString := currentTime.Format(time.RFC3339)[:10]
-	lastExecutionTime := GetLastExecutionTime(currentTime)
+	lastExecutionTime := GetLastExecutionTime(config, sheet, log)
 
 	prefixCurrent := strings.Join([]string{ctx.Prefix, "submissions", currentDateString}, "/")
 

@@ -13,17 +13,18 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	logging "github.com/ipfs/go-log/v2"
+	sheets "google.golang.org/api/sheets/v4"
 )
 
 type Identity map[string]string
 
 // Goes through each submission and adds an identity type to a map
 
-func CreateIdentities(ctx dg.AwsContext, log *logging.ZapEventLogger) map[string]Identity {
+func CreateIdentities(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext, log *logging.ZapEventLogger) map[string]Identity {
 
 	currentTime := GetCurrentTime()
 	currentDateString := currentTime.Format(time.RFC3339)[:10]
-	lastExecutionTime := GetLastExecutionTime(currentTime)
+	lastExecutionTime := GetLastExecutionTime(config, sheet, log)
 
 	prefixCurrent := strings.Join([]string{ctx.Prefix, "submissions", currentDateString}, "/")
 

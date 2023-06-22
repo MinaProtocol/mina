@@ -139,7 +139,7 @@ func MarkExecution(config AppConfig, client *sheets.Service, log *logging.ZapEve
 	spId := config.AnalyzerOutputGsheetId
 
 	currentTime := GetCurrentTime()
-	lastExecutionTime := GetLastExecutionTime(currentTime)
+	lastExecutionTime := GetLastExecutionTime(config, client, log)
 
 	timeInterval := strings.Join([]string{currentTime.Format(time.RFC3339), lastExecutionTime.Format(time.RFC3339)}, " - ")
 
