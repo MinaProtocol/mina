@@ -1,8 +1,6 @@
 open Core
 open Async
 open Signature_lib
-
-(* open Txn_tool_graphql *)
 open Unsigned
 open Mina_base
 open Integration_test_lib
