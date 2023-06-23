@@ -69,7 +69,7 @@ spec:
             env:
             - name: GCLOUD_KEYFILE
               value: /gcloud/keyfile.json
-            image: minaprotocol/mina-rosetta:1.4.0beta3-1a8adfa-focal
+            image: gcr.io/o1labs-192920/mina-rosetta:1.4.0beta2-fix-replayer-no-final-checkpoint-5af6dba-bullseye
             imagePullPolicy: IfNotPresent
             name: mainnet-replayer-cronjob
             resources:
