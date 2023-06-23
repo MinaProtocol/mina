@@ -52,6 +52,24 @@ let () =
           ; test_case "Token symbol of_bits to_bits roundtrip." `Quick
               token_symbol_of_bits_to_bits_roundtrip
           ] )
+    ; Account_update_test.
+        ( "account updates"
+        , [ test_case "Update JSON roundtrip" `Quick update_json_roundtrip
+          ; test_case "Precondition JSON roundtrip accept" `Quick
+              precondition_json_roundtrip_accept
+          ; test_case "Precondition JSON roundtrip nonce" `Quick
+              precondition_json_roundtrip_nonce
+          ; test_case "Precondition JSON roundtrip with full nonce" `Quick
+              precondition_json_roundtrip_full_with_nonce
+          ; test_case "Precondition JSON roundtrip full" `Quick
+              precondition_json_roundtrip_full
+          ; test_case "Precondition to JSON" `Quick precondition_to_json
+          ; test_case "Body fee payer JSON roundtrip" `Quick
+              body_fee_payer_json_roundtrip
+          ; test_case "Body JSON roundtrip" `Quick body_json_roundtrip
+          ; test_case "Fee payer JSON roundtrip" `Quick fee_payer_json_roundtrip
+          ; test_case "JSON roundtrip dummy" `Quick json_roundtrip_dummy
+          ] )
     ; Call_forest_test.
         ( "call forest"
         , [ test_case "Test fold_forest." `Quick Tree_test.fold_forest
@@ -111,5 +129,30 @@ let () =
           ; test_case "Test non-existent index retrieval." `Quick
               index_non_existent
           ; test_case "Test merkle root soundness." `Quick merkle_root
+          ] )
+    ; Receipt_test.
+        ( "receipts"
+        , [ test_case "Checked-unmchecked equivalence for signed command" `Quick
+              checked_unchecked_equivalence_signed_command
+          ; test_case "Checked-unchecked equivalenece in zkApp command" `Quick
+              checked_unchecked_equivalence_zkapp_command
+          ; test_case "JSON roundtrip" `Quick json_roundtrip
+          ] )
+    ; Signature_test.
+        ( "signatures"
+        , [ test_case "Signature decode after encode i identity" `Quick
+              signature_decode_after_encode_is_identity
+          ; test_case "Base58check is stable" `Quick base58Check_stable
+          ] )
+    ; Zkapp_command_test.
+        ( "zkApp commands"
+        , [ test_case "Account_update_or_stack.of_zkapp_command_list." `Quick
+              account_update_or_stack_of_zkapp_command_list
+          ; test_case "Wire embedded in t." `Quick wire_embedded_in_t
+          ; test_case "Wire embedded in graphql." `Quick
+              wire_embedded_in_graphql
+          ; test_case "JSON roundtrip dummy." `Quick
+              Test_derivers.json_roundtrip_dummy
+          ; test_case "Full circuit." `Quick Test_derivers.full_circuit
           ] )
     ]
