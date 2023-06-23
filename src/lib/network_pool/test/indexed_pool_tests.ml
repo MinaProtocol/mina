@@ -708,6 +708,10 @@ module Stateful_gen = Monad_lib.State.Trans (Quickcheck.Generator)
 module Stateful_gen_ext = Monad_lib.Make_ext2 (Stateful_gen)
 module Result_ext = Monad_lib.Make_ext2 (Result)
 
+let sgn_cmd_to_txn cmd =
+  Signed_command cmd
+  |> Transaction_hash.User_command_with_valid_signature.create
+
 let gen_amount =
   let open Stateful_gen in
   let open Let_syntax in
@@ -830,23 +834,23 @@ let rec interleave_at_random queues =
         let%map more = interleave_at_random queues in
         t :: more
 
+let gen_accounts_and_transactions =
+  let open Quickcheck.Generator.Let_syntax in
+  let module Gen_ext = Monad_lib.Make_ext (Quickcheck.Generator) in
+  let%bind senders = List.gen_non_empty Account.gen in
+  let%bind receiver = Account.gen in
+  let%bind txns =
+    List.map senders
+      ~f:
+        (Stateful_gen.eval_state
+           (gen_txns_from_single_sender_to receiver.public_key) )
+    |> Gen_ext.sequence
+  in
+  let%map shuffled = interleave_at_random @@ Array.of_list txns in
+  (accounts_map senders, shuffled)
+
 let transactions_from_many_senders_no_nonce_gaps () =
-  Quickcheck.test
-    (let open Quickcheck.Generator.Let_syntax in
-    let module Gen_ext = Monad_lib.Make_ext (Quickcheck.Generator) in
-    let%bind senders = List.gen_non_empty Account.gen in
-    let%bind receiver = Account.gen in
-    let%bind txns =
-      List.map senders
-        ~f:
-          (Stateful_gen.eval_state
-             (gen_txns_from_single_sender_to receiver.public_key) )
-      |> Gen_ext.sequence
-    in
-    let%map shuffled = interleave_at_random @@ Array.of_list txns in
-    (senders, shuffled))
-    ~f:(fun (senders, txns) ->
-      let account_map = accounts_map senders in
+  Quickcheck.test gen_accounts_and_transactions ~f:(fun (account_map, txns) ->
       let pool = pool_of_transactions ~account_map txns |> rem_lowest_fee 5 in
       let txns = Sequence.to_list @@ Indexed_pool.transactions ~logger pool in
       with_accounts txns ~init:() ~account_map ~f:(fun () a t ->
@@ -854,14 +858,65 @@ let transactions_from_many_senders_no_nonce_gaps () =
       |> Result.ok_or_failwith ;
       assert_invariants pool )
 
-let construct_ledger accounts =
-  Mina_ledger.Ledger.with_ledger ~depth:4 ~f:(fun ledger ->
-      List.iter accounts ~f:(fun a ->
-          Mina_ledger.Ledger.create_new_account_exn ledger
-            (Account.identifier a) a ) ;
-      ledger )
+let revalidation_drops_nothing_unless_ledger_changed () =
+  Quickcheck.test gen_accounts_and_transactions ~f:(fun (account_map, txns) ->
+      let pool = pool_of_transactions ~account_map txns in
+      let pool', dropped =
+        Indexed_pool.revalidate pool ~logger `Entire_pool (fun aid ->
+            Public_key.Compressed.Map.find_exn account_map
+              (Account_id.public_key aid) )
+      in
+      [%test_eq:
+        Transaction_hash.User_command_with_valid_signature.t Sequence.t] dropped
+        Sequence.empty ;
+      [%test_eq: Indexed_pool.t] pool pool' ;
+      let to_apply = Indexed_pool.transactions ~logger pool in
+      let to_apply' = Indexed_pool.transactions ~logger pool' in
+      [%test_eq:
+        Transaction_hash.User_command_with_valid_signature.t Sequence.t]
+        to_apply to_apply' )
 
-(* let revalidation_drops_nothing_unless_ledger_changed () = *)
-(*   Quickcheck.test *)
-(*     (let open Quickcheck.Generator.Let_syntax in) *)
-(*     ~f:(fun () -> ()) *)
+let apply_transactions txns accounts =
+  List.fold txns ~init:accounts ~f:(fun m t ->
+      let txn = Signed_command.forget_check t in
+      let sender = Public_key.compress txn.signer in
+      Public_key.Compressed.Map.update m sender ~f:(function
+        | None ->
+            failwith "sender not found"
+        | Some a ->
+            let open Account.Poly in
+            let nonce = Account.Nonce.succ a.nonce in
+            let balance =
+              let amt =
+                Signed_command.amount txn |> Option.value ~default:Amount.zero
+              in
+              Balance.(sub_amount a.balance amt)
+              |> Option.value ~default:Balance.zero
+            in
+            { a with nonce; balance } ) )
+
+let txn_hash = Transaction_hash.User_command_with_valid_signature.hash
+
+let application_invalidates_applied_transactions () =
+  Quickcheck.test
+    (let open Quickcheck.Generator.Let_syntax in
+    let%bind accounts, txns = gen_accounts_and_transactions in
+    (* Simulate application of some transactions in order to invalidate them. *)
+    let%map app_count = Int.gen_incl 0 (List.length txns) in
+    let updated_accounts =
+      apply_transactions (List.take txns app_count) accounts
+    in
+    (accounts, updated_accounts, txns, app_count))
+    ~f:(fun (initial_accounts, updated_accounts, txns, app_count) ->
+      let pool = pool_of_transactions ~account_map:initial_accounts txns in
+      let _pool', dropped =
+        Indexed_pool.revalidate ~logger pool `Entire_pool (fun aid ->
+            Public_key.Compressed.Map.find_exn updated_accounts
+              (Account_id.public_key aid) )
+      in
+      [%test_eq: Transaction_hash.Set.t]
+        ( Sequence.to_list dropped |> List.map ~f:txn_hash
+        |> Transaction_hash.Set.of_list )
+        ( List.take txns app_count
+        |> List.map ~f:(Fn.compose txn_hash sgn_cmd_to_txn)
+        |> Transaction_hash.Set.of_list ) )
