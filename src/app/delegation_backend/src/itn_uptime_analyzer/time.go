@@ -33,7 +33,14 @@ func GetLastExecutionTime(config AppConfig, client *sheets.Service, log *logging
 	stringSplit := strings.SplitAfter(fmt.Sprint(lastTimeWindow), " - ")
 	lastExecutionBasedOnSheets := stringSplit[len(stringSplit)-1]
 
-	if !strings.HasPrefix(lastExecutionBasedOnSheets, "Node") && lastExecutionBasedOnSheets != "" {
+	lastExecutionBasedOnSheetsAsTime, err := time.Parse(time.RFC3339, lastExecutionBasedOnSheets)
+	if err != nil {
+		log.Fatalf("Unable to parse string to time: %v", err)
+	}
+
+	timeDiffHours := time.Since(lastExecutionBasedOnSheetsAsTime).Hours()
+
+	if !strings.HasPrefix(lastExecutionBasedOnSheets, "Node") && (lastExecutionBasedOnSheets != "") && (timeDiffHours > time.Since(GetCurrentTime().Add(-11*time.Hour)).Hours()) {
 		pastTime, err := time.Parse(time.RFC3339, lastExecutionBasedOnSheets)
 		if err != nil {
 			log.Fatalf("Unable to parse string to time: %v", err)

@@ -2,7 +2,6 @@ package itn_uptime_analyzer
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -23,13 +22,17 @@ func (identity Identity) GetCell(config AppConfig, client *sheets.Service, log *
 	col := IDENTITY_COLUMN
 	readRange := sheetTitle + "!" + col + ":" + col
 	spId := config.AnalyzerOutputGsheetId
+	var identityString string
 	resp, err := client.Spreadsheets.Values.Get(spId, readRange).Do()
 	if err != nil {
 		log.Fatalf("Unable to retrieve data from sheet: %v", err)
 	}
 
-	identityString := strings.Join([]string{identity["public-key"], identity["public-ip"]}, "-")
-
+	if identity["graphql-port"] != "" {
+		identityString = strings.Join([]string{identity["public-key"], identity["public-ip"], identity["graphql-port"]}, "-")
+	} else {
+		identityString = strings.Join([]string{identity["public-key"], identity["public-ip"]}, "-")
+	}
 	for index, row := range resp.Values {
 		if row[0] == identityString {
 			rowIndex = index + 1
@@ -58,8 +61,13 @@ func (identity Identity) AppendNext(config AppConfig, client *sheets.Service, lo
 	col := IDENTITY_COLUMN
 	readRange := sheetTitle + "!" + col + ":" + col
 	spId := config.AnalyzerOutputGsheetId
+	var identityString string
 
-	identityString := strings.Join([]string{identity["public-key"], identity["public-ip"]}, "-")
+	if identity["graphql-port"] != "" {
+		identityString = strings.Join([]string{identity["public-key"], identity["public-ip"], identity["graphql-port"]}, "-")
+	} else {
+		identityString = strings.Join([]string{identity["public-key"], identity["public-ip"]}, "-")
+	}
 
 	cellValue := []interface{}{identityString}
 
@@ -79,8 +87,13 @@ func (identity Identity) InsertBelow(config AppConfig, client *sheets.Service, l
 	col := IDENTITY_COLUMN
 	readRange := fmt.Sprintf("%s!%s%d:%s%d", sheetTitle, col, rowIndex+1, col, rowIndex+1)
 	spId := config.AnalyzerOutputGsheetId
+	var identityString string
 
-	identityString := strings.Join([]string{identity["public-key"], identity["public-ip"]}, "-")
+	if identity["graphql-port"] != "" {
+		identityString = strings.Join([]string{identity["public-key"], identity["public-ip"], identity["graphql-port"]}, "-")
+	} else {
+		identityString = strings.Join([]string{identity["public-key"], identity["public-ip"]}, "-")
+	}
 
 	cellValue := []interface{}{identityString}
 
@@ -109,18 +122,7 @@ func (identity Identity) AppendUptime(config AppConfig, client *sheets.Service, 
 
 	updateRange := fmt.Sprintf("%s!%s%d", sheetTitle, string(nextEmptyColumn+65), rowIndex)
 
-	var cellValue []interface{}
-
-	uptimeArrayLength, err := strconv.Atoi(identity["uptime"])
-	if err != nil {
-		log.Fatalf("Unable to retrieve data from sheet: %v\n", err)
-	}
-
-	if uptimeArrayLength >= 47 {
-		cellValue = []interface{}{"up"}
-	} else {
-		cellValue = []interface{}{"not up"}
-	}
+	cellValue := []interface{}{identity["uptime"]}
 
 	valueRange := sheets.ValueRange{
 		Values: [][]interface{}{cellValue},
@@ -191,7 +193,7 @@ func MarkExecution(config AppConfig, client *sheets.Service, log *logging.ZapEve
 	currentTime := GetCurrentTime()
 	lastExecutionTime := GetLastExecutionTime(config, client, log, sheetTitle)
 
-	timeInterval := strings.Join([]string{currentTime.Format(time.RFC3339), lastExecutionTime.Format(time.RFC3339)}, " - ")
+	timeInterval := strings.Join([]string{lastExecutionTime.Format(time.RFC3339), currentTime.Format(time.RFC3339)}, " - ")
 
 	resp, err := client.Spreadsheets.Values.Get(spId, readRange).Do()
 	if err != nil {

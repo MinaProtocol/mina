@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,10 +23,10 @@ type Identity map[string]string
 func CreateIdentities(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext, log *logging.ZapEventLogger, sheetTitle string) map[string]Identity {
 
 	currentTime := GetCurrentTime()
-	currentDateString := currentTime.Format(time.RFC3339)[:10]
+	currentDate := currentTime.Format("2006-01-02")
 	lastExecutionTime := GetLastExecutionTime(config, sheet, log, sheetTitle)
 
-	prefixCurrent := strings.Join([]string{ctx.Prefix, "submissions", currentDateString}, "/")
+	prefixCurrent := strings.Join([]string{ctx.Prefix, "submissions", currentDate}, "/")
 
 	identities := make(map[string]Identity) // Create a map for unique identities
 
@@ -54,6 +55,8 @@ func CreateIdentities(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext
 
 			if (submissionTime.After(lastExecutionTime)) && (submissionTime.Before(currentTime)) {
 
+				var identity Identity
+
 				objHandle, err := ctx.Client.GetObject(ctx.Context, &s3.GetObjectInput{
 					Bucket: ctx.BucketName,
 					Key:    obj.Key,
@@ -75,7 +78,12 @@ func CreateIdentities(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext
 					log.Fatalf("Error unmarshaling bucket content: %v\n", err)
 				}
 
-				identity := GetIdentity(submissionData.Submitter.String(), submissionData.RemoteAddr)
+				if submissionData.GraphqlControlPort != 0 {
+					identity = GetFullIdentity(submissionData.Submitter.String(), submissionData.RemoteAddr, strconv.Itoa(submissionData.GraphqlControlPort))
+				} else {
+					identity = GetPartialIdentity(submissionData.Submitter.String(), submissionData.RemoteAddr)
+				}
+
 				if _, inMap := identities[identity["id"]]; !inMap {
 					AddIdentity(identity, identities)
 				}
@@ -87,7 +95,23 @@ func CreateIdentities(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext
 
 // Returns and Identity type identified by a hash value as an id
 
-func GetIdentity(pubKey string, ip string) Identity {
+func GetFullIdentity(pubKey string, ip string, graphqlPort string) Identity {
+	s := strings.Join([]string{pubKey, ip, graphqlPort}, "-")
+	id := md5.Sum([]byte(s)) // Create a hash value and use it as id
+
+	identity := map[string]string{
+		"id":           hex.EncodeToString(id[:]),
+		"public-key":   pubKey,
+		"public-ip":    ip,
+		"graphql-port": graphqlPort,
+	}
+
+	return identity
+}
+
+// Returns and Identity type identified by a hash value as an id
+
+func GetPartialIdentity(pubKey string, ip string) Identity {
 	s := strings.Join([]string{pubKey, ip}, "-")
 	id := md5.Sum([]byte(s)) // Create a hash value and use it as id
 

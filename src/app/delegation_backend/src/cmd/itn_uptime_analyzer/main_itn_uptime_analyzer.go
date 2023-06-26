@@ -4,6 +4,7 @@ import (
 	dg "block_producers_uptime/delegation_backend"
 	itn "block_producers_uptime/itn_uptime_analyzer"
 	"context"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -57,6 +58,8 @@ func main() {
 
 	identities := itn.CreateIdentities(appCfg, sheetsService, awsctx, log, sheetTitle)
 
+	fmt.Println(identities)
+
 	// Go over identities and calculate uptime
 
 	for _, identity := range identities {
@@ -67,6 +70,7 @@ func main() {
 
 		if exactMatch {
 			identity.AppendUptime(appCfg, sheetsService, log, sheetTitle, rowIndex)
+			fmt.Println("Added exact match")
 		} else if (!exactMatch) && (rowIndex == 0) {
 			identity.AppendNext(appCfg, sheetsService, log, sheetTitle)
 			identity.AppendUptime(appCfg, sheetsService, log, sheetTitle, firstEmptyRow)

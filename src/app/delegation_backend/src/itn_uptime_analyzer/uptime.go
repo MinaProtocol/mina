@@ -3,6 +3,7 @@ package itn_uptime_analyzer
 import (
 	dg "block_producers_uptime/delegation_backend"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -20,10 +21,10 @@ import (
 func (identity Identity) GetUptime(config AppConfig, sheet *sheets.Service, ctx dg.AwsContext, log *logging.ZapEventLogger, sheetTitle string) {
 
 	currentTime := GetCurrentTime()
-	currentDateString := currentTime.Format(time.RFC3339)[:10]
+	currentDate := currentTime.Format("2006-01-02")
 	lastExecutionTime := GetLastExecutionTime(config, sheet, log, sheetTitle)
 
-	prefixCurrent := strings.Join([]string{ctx.Prefix, "submissions", currentDateString}, "/")
+	prefixCurrent := strings.Join([]string{ctx.Prefix, "submissions", currentDate}, "/")
 
 	input := &s3.ListObjectsV2Input{
 		Bucket: ctx.BucketName,
@@ -75,29 +76,58 @@ func (identity Identity) GetUptime(config AppConfig, sheet *sheets.Service, ctx 
 					log.Fatalf("Error unmarshaling bucket content: %v\n", err)
 				}
 
-				if (identity["public-key"] == submissionData.Submitter.String()) && (identity["public-ip"] == submissionData.RemoteAddr) {
-					if lastSubmissionDate != "" {
-						lastSubmissionTime, err = time.Parse(time.RFC3339, lastSubmissionDate)
-						if err != nil {
-							log.Fatalf("Error parsing time: %v\n", err)
+				if submissionData.GraphqlControlPort != 0 {
+					if (identity["public-key"] == submissionData.Submitter.String()) && (identity["public-ip"] == submissionData.RemoteAddr) && (identity["graphql-port"] == strconv.Itoa(submissionData.GraphqlControlPort)) {
+						if lastSubmissionDate != "" {
+							lastSubmissionTime, err = time.Parse(time.RFC3339, lastSubmissionDate)
+							if err != nil {
+								log.Fatalf("Error parsing time: %v\n", err)
+							}
 						}
-					}
 
-					currentSubmissionTime, err := time.Parse(time.RFC3339, submissionData.CreatedAt)
-					if err != nil {
-						log.Fatalf("Error parsing time: %v", err)
-					}
+						currentSubmissionTime, err := time.Parse(time.RFC3339, submissionData.CreatedAt)
+						if err != nil {
+							log.Fatalf("Error parsing time: %v", err)
+						}
 
-					if (lastSubmissionDate != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(10 * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(20 * time.Minute))) {
-						uptime = append(uptime, true)
-						lastSubmissionDate = submissionData.CreatedAt
-					} else if lastSubmissionDate == "" {
-						lastSubmissionDate = submissionData.CreatedAt
-					}
+						if (lastSubmissionDate != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(10 * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(20 * time.Minute))) {
+							uptime = append(uptime, true)
+							lastSubmissionDate = submissionData.CreatedAt
+						} else if lastSubmissionDate == "" {
+							lastSubmissionDate = submissionData.CreatedAt
+						}
 
+					}
+				} else {
+					if (identity["public-key"] == submissionData.Submitter.String()) && (identity["public-ip"] == submissionData.RemoteAddr) {
+						if lastSubmissionDate != "" {
+							lastSubmissionTime, err = time.Parse(time.RFC3339, lastSubmissionDate)
+							if err != nil {
+								log.Fatalf("Error parsing time: %v\n", err)
+							}
+						}
+
+						currentSubmissionTime, err := time.Parse(time.RFC3339, submissionData.CreatedAt)
+						if err != nil {
+							log.Fatalf("Error parsing time: %v", err)
+						}
+
+						if (lastSubmissionDate != "") && (currentSubmissionTime.After(lastSubmissionTime.Add(10 * time.Minute))) && (currentSubmissionTime.Before(lastSubmissionTime.Add(20 * time.Minute))) {
+							uptime = append(uptime, true)
+							lastSubmissionDate = submissionData.CreatedAt
+						} else if lastSubmissionDate == "" {
+							lastSubmissionDate = submissionData.CreatedAt
+						}
+
+					}
 				}
 			}
 		}
-		identity["uptime"] = strconv.Itoa(len(uptime))
+
+		uptimePercent := (float64(len(uptime)) / 47.0) * 100
+		if uptimePercent > 100.00 {
+			uptimePercent = 100.00
+		}
+		identity["uptime"] = fmt.Sprintf("%.2f%%", (float64(len(uptime))/47.0)*100)
 	}
 }
