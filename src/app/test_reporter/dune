@@ -1,0 +1,31 @@
+(executable
+ (name test_reporter)
+ (libraries
+   ;;opam libraries
+   result
+   stdio
+   core
+   yojson
+   cmdliner
+   core_kernel
+   ppx_deriving_yojson.runtime
+   sexplib0
+   cohttp
+   lwt
+   async_kernel
+   integration_test_lib
+   integration_test_cloud_engine
+   uri
+   cohttp-async
+   async
+   async_unix
+   junit
+   ptime
+   ;;local libraries
+   logger
+   logproc_lib
+   bash_colors
+   interpolator_lib
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_jane ppx_mina ppx_deriving.std)))

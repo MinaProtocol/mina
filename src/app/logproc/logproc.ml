@@ -34,6 +34,8 @@ let level_color =
       orange
   | Fatal ->
       bright_red
+  | Span ->
+      blue
 
 let format_msg ~interpolation_config ~timezone msg =
   let open Logger.Message in

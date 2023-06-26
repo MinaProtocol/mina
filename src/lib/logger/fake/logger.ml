@@ -9,6 +9,7 @@ module Level = struct
     | Internal
     | Spam
     | Trace
+    | Span
     | Debug
     | Info
     | Warn
@@ -162,6 +163,8 @@ type 'a log_function =
   -> ?event_id:Structured_log_events.id
   -> ('a, unit, string, unit) format4
   -> 'a
+
+let span = log ~level:Level.Span
 
 let trace = log ~level:Level.Trace
 

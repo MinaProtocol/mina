@@ -136,7 +136,12 @@ module Network_config = struct
     let git_commit = Mina_version.commit_id_short in
     (* see ./src/app/test_executive/README.md for information regarding the namespace name format and length restrictions *)
     let testnet_name = "it-" ^ user ^ "-" ^ git_commit ^ "-" ^ test_name in
-
+    [%log info] "Running test"
+      ~metadata:
+        [ ("image", `String images.mina)
+        ; ("testnet_name", `String testnet_name)
+        ; ("test_name", `String test_name)
+        ] ;
     (* check to make sure the test writer hasn't accidentally created duplicate names of accounts and keys *)
     let key_names_list =
       List.map genesis_ledger ~f:(fun acct -> acct.account_name)
