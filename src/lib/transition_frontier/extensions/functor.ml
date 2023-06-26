@@ -32,7 +32,11 @@ module Make_broadcasted (Extension : Intf.Extension_base_intf) :
   let reader { reader; _ } = reader
 
   let update { extension; writer; _ } frontier diffs =
-    match Extension.handle_diffs extension frontier diffs with
+    let view_opt =
+      O1trace.sync_thread ("extension_handle_diffs_" ^ name)
+      @@ fun () -> Extension.handle_diffs extension frontier diffs
+    in
+    match view_opt with
     | Some view ->
         Broadcast_pipe.Writer.write writer view
     | None ->

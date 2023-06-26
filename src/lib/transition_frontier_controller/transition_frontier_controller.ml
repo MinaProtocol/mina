@@ -18,7 +18,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~network_transition_reader ~producer_transition_reader ~clear_reader =
   let open Context in
   let valid_transition_pipe_capacity = 50 in
-  let start_time = Time.now () in
+  (* let start_time = Time.now () in *)
   let f_drop_head name head valid_cb =
     let block : Mina_block.initial_valid_block =
       Network_peer.Envelope.Incoming.data @@ Cache_lib.Cached.peek head
@@ -84,32 +84,32 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
       in
       Strict_pipe.Writer.write primary_transition_writer
         (`Block block_cached, `Valid_cb None) ) ;
-  let initial_state_hashes =
-    List.map collected_transitions ~f:(fun envelope ->
-        Network_peer.Envelope.Incoming.data envelope
-        |> Validation.block_with_hash
-        |> Mina_base.State_hash.With_state_hashes.state_hash )
-    |> Mina_base.State_hash.Set.of_list
-  in
-  let extensions = Transition_frontier.extensions frontier in
-  don't_wait_for
-  @@ Pipe_lib.Broadcast_pipe.Reader.iter_until
-       (Transition_frontier.Extensions.get_view_pipe extensions New_breadcrumbs)
-       ~f:(fun new_breadcrumbs ->
-         Deferred.return
-         @@
-         let open Mina_base.State_hash in
-         let new_state_hashes =
-           List.map new_breadcrumbs ~f:Transition_frontier.Breadcrumb.state_hash
-           |> Set.of_list
-         in
-         if Set.is_empty @@ Set.inter initial_state_hashes new_state_hashes then
-           false
-         else (
-           Mina_metrics.(
-             Gauge.set Catchup.initial_catchup_time
-               Time.(Span.to_min @@ diff (now ()) start_time)) ;
-           true ) ) ;
+  (* let initial_state_hashes =
+       List.map collected_transitions ~f:(fun envelope ->
+           Network_peer.Envelope.Incoming.data envelope
+           |> Validation.block_with_hash
+           |> Mina_base.State_hash.With_state_hashes.state_hash )
+       |> Mina_base.State_hash.Set.of_list
+     in
+     let extensions = Transition_frontier.extensions frontier in *)
+  (* don't_wait_for
+     @@ Pipe_lib.Broadcast_pipe.Reader.iter_until
+          (Transition_frontier.Extensions.get_view_pipe extensions New_breadcrumbs)
+          ~f:(fun new_breadcrumbs ->
+            Deferred.return
+            @@
+            let open Mina_base.State_hash in
+            let new_state_hashes =
+              List.map new_breadcrumbs ~f:Transition_frontier.Breadcrumb.state_hash
+              |> Set.of_list
+            in
+            if Set.is_empty @@ Set.inter initial_state_hashes new_state_hashes then
+              false
+            else (
+              Mina_metrics.(
+                Gauge.set Catchup.initial_catchup_time
+                  Time.(Span.to_min @@ diff (now ()) start_time)) ;
+              true ) ) ; *)
   Transition_handler.Validator.run
     ~context:(module Context)
     ~trust_system ~time_controller ~frontier

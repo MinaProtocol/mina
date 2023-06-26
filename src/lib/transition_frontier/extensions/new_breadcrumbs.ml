@@ -23,4 +23,9 @@ module T = struct
 end
 
 include T
-module Broadcasted = Functor.Make_broadcasted (T)
+
+module Broadcasted = struct
+  include Functor.Make_broadcasted (T)
+
+  let update _ frontier diffs = Async_kernel.Deferred.unit
+end

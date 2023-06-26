@@ -55,16 +55,18 @@ module Make (Inputs : Intf.Inputs_intf) = struct
           | Some frontier ->
               Pipe_lib.Broadcast_pipe.Reader.iter
                 (Inputs.Transition_frontier.best_tip_pipe frontier) ~f:(fun _ ->
+                  Deferred.return
+                  @@ O1trace.sync_thread "Work_lib_handle_best_tip"
+                  @@ fun () ->
                   let best_tip_staged_ledger =
                     Inputs.Transition_frontier.best_tip_staged_ledger frontier
                   in
                   let start_time = Time.now () in
-                  ( match
-                      Inputs.Staged_ledger.all_work_pairs best_tip_staged_ledger
-                        ~get_state:
-                          (Inputs.Transition_frontier.get_protocol_state
-                             frontier )
-                    with
+                  match
+                    Inputs.Staged_ledger.all_work_pairs best_tip_staged_ledger
+                      ~get_state:
+                        (Inputs.Transition_frontier.get_protocol_state frontier)
+                  with
                   | Error e ->
                       [%log fatal]
                         "Error occured when updating available work: $error"
@@ -83,8 +85,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                           ~f:
                             (Inputs.Transaction_snark_work.With_hash.create
                                ~f:stmt_of_work_spec )
-                          new_available_jobs ) ;
-                  Deferred.unit )
+                          new_available_jobs )
               |> Deferred.don't_wait_for ) ;
           Deferred.unit )
       |> Deferred.don't_wait_for ;
