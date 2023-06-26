@@ -336,9 +336,13 @@ val mul :
   -> 'f Element.Standard.t
 (* product *)
 
+(** Gadget to constrain conversion of bytes list (output of Keccak gadget)
+   into foreign field element with standard limbs (input of ECDSA gadget).
+   Include the endianness of the bytes list. *)
 val bytes_to_standard_element :
      (module Snark_intf.Run with type field = 'f)
-  -> 'f Snarky_backendless.Cvar.t array
+  -> endian:Keccak.endianness
+  -> 'f Snarky_backendless.Cvar.t list
   -> 'f standard_limbs
   -> int
   -> 'f Element.Standard.t
