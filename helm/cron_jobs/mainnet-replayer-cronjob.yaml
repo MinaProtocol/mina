@@ -37,7 +37,7 @@ spec:
                gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $ARCHIVE_DUMP_URI . ;
                MOST_RECENT_CHECKPOINT_URI=$(gsutil ls gs://mainnet-replayer-checkpoints/replayer-checkpoint-*.json | sort -r | head -n 1);
                MOST_RECENT_CHECKPOINT=$(basename $MOST_RECENT_CHECKPOINT_URI);
-               echo "Getting replayer checkpoint file" $CHECKPOINT_FILE;
+               echo "Getting replayer checkpoint file" $MOST_RECENT_CHECKPOINT;
                gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $MOST_RECENT_CHECKPOINT_URI . ;
                echo "Starting Postgresql";
                service postgresql start;
