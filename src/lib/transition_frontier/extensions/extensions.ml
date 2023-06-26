@@ -2,7 +2,6 @@ open Async_kernel
 open Core_kernel
 open Pipe_lib
 module Best_tip_diff = Best_tip_diff
-module Identity = Identity
 module Root_history = Root_history
 module Snark_pool_refcount = Snark_pool_refcount
 module Transition_registry = Transition_registry
@@ -15,7 +14,6 @@ type t =
   ; best_tip_diff : Best_tip_diff.Broadcasted.t
   ; transition_registry : Transition_registry.Broadcasted.t
   ; ledger_table : Ledger_table.Broadcasted.t
-  ; identity : Identity.Broadcasted.t
   ; new_breadcrumbs : New_breadcrumbs.Broadcasted.t
   }
 [@@deriving fields]
@@ -34,7 +32,6 @@ let create ~logger frontier : t Deferred.t =
   let%bind transition_registry =
     Transition_registry.(Broadcasted.create (create ~logger frontier))
   in
-  let%bind identity = Identity.(Broadcasted.create (create ~logger frontier)) in
   let%bind new_breadcrumbs =
     New_breadcrumbs.(Broadcasted.create (create ~logger frontier))
   in
@@ -46,7 +43,6 @@ let create ~logger frontier : t Deferred.t =
     ; snark_pool_refcount
     ; best_tip_diff
     ; transition_registry
-    ; identity
     ; ledger_table
     ; new_breadcrumbs
     }
@@ -65,7 +61,6 @@ let close t : unit =
     ~transition_registry:
       (close_extension (module Transition_registry.Broadcasted))
     ~ledger_table:(close_extension (module Ledger_table.Broadcasted))
-    ~identity:(close_extension (module Identity.Broadcasted))
     ~new_breadcrumbs:(close_extension (module New_breadcrumbs.Broadcasted))
 
 let notify (t : t) ~logger ~frontier ~diffs_with_mutants =
@@ -85,8 +80,7 @@ let notify (t : t) ~logger ~frontier ~diffs_with_mutants =
        ~best_tip_diff:(update (module Best_tip_diff.Broadcasted))
        ~transition_registry:(update (module Transition_registry.Broadcasted))
        ~ledger_table:(update (module Ledger_table.Broadcasted))
-       ~new_breadcrumbs:(update (module New_breadcrumbs.Broadcasted))
-       ~identity:(update (module Identity.Broadcasted)) )
+       ~new_breadcrumbs:(update (module New_breadcrumbs.Broadcasted)) )
 
 type ('ext, 'view) access =
   | Root_history : (Root_history.t, Root_history.view) access
@@ -96,7 +90,6 @@ type ('ext, 'view) access =
   | Transition_registry
       : (Transition_registry.t, Transition_registry.view) access
   | Ledger_table : (Ledger_table.t, Ledger_table.view) access
-  | Identity : (Identity.t, Identity.view) access
   | New_breadcrumbs : (New_breadcrumbs.t, New_breadcrumbs.view) access
 
 type ('ext, 'view) broadcasted_extension =
@@ -117,7 +110,6 @@ let get :
      ; transition_registry
      ; ledger_table
      ; new_breadcrumbs
-     ; identity
      } -> function
   | Root_history ->
       Broadcasted_extension ((module Root_history.Broadcasted), root_history)
@@ -131,8 +123,6 @@ let get :
         ((module Transition_registry.Broadcasted), transition_registry)
   | Ledger_table ->
       Broadcasted_extension ((module Ledger_table.Broadcasted), ledger_table)
-  | Identity ->
-      Broadcasted_extension ((module Identity.Broadcasted), identity)
   | New_breadcrumbs ->
       Broadcasted_extension
         ((module New_breadcrumbs.Broadcasted), new_breadcrumbs)

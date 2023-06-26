@@ -153,20 +153,6 @@ val client_port : t -> int
 
 val validated_transitions : t -> Mina_block.Validated.t Strict_pipe.Reader.t
 
-module Root_diff : sig
-  [%%versioned:
-  module Stable : sig
-    module V2 : sig
-      type t =
-        { commands : User_command.Stable.V2.t With_status.Stable.V2.t list
-        ; root_length : int
-        }
-    end
-  end]
-end
-
-val root_diff : t -> Root_diff.t Strict_pipe.Reader.t
-
 val initialization_finish_signal : t -> unit Ivar.t
 
 val dump_tf : t -> string Or_error.t
