@@ -73,7 +73,10 @@ let notify (t : t) ~logger ~frontier ~diffs_with_mutants =
       (module B : Intf.Broadcasted_extension_intf with type t = t) field =
     [%log internal] "Update_frontier_extension"
       ~metadata:[ ("extension_name", `String B.name) ] ;
-    let%map () = B.update (Field.get field t) frontier diffs_with_mutants in
+    let%map () =
+      O1trace.thread ("update_frontier_extension_" ^ B.name) (fun () ->
+          B.update (Field.get field t) frontier diffs_with_mutants )
+    in
     [%log internal] "Update_frontier_extension_done"
       ~metadata:[ ("extension_name", `String B.name) ] ;
     ()

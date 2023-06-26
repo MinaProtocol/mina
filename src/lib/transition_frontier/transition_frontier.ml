@@ -387,6 +387,8 @@ let root_snarked_ledger { persistent_root_instance; _ } =
   Persistent_root.Instance.snarked_ledger persistent_root_instance
 
 let add_breadcrumb_exn t breadcrumb =
+  O1trace.thread "add_and_finalize"
+  @@ fun () ->
   let open Deferred.Let_syntax in
   let state_hash = Breadcrumb.state_hash breadcrumb in
   Internal_tracing.with_state_hash state_hash

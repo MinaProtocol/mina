@@ -819,33 +819,35 @@ let root_diff t =
               Transition_frontier.(
                 Extensions.(get_view_pipe (extensions frontier) Identity))
               ~f:
-                (Deferred.List.iter ~f:(function
-                  | Transition_frontier.Diff.Full.With_mutant.E (New_node _, _)
-                    ->
-                      Deferred.unit
-                  | Transition_frontier.Diff.Full.With_mutant.E
-                      (Best_tip_changed _, _) ->
-                      Deferred.unit
-                  | Transition_frontier.Diff.Full.With_mutant.E
-                      (Root_transitioned { new_root; _ }, _) ->
-                      let root_hash =
-                        (Transition_frontier.Root_data.Limited.hashes new_root)
-                          .state_hash
-                      in
-                      let new_root_breadcrumb =
-                        Transition_frontier.(find_exn frontier root_hash)
-                      in
-                      Strict_pipe.Writer.write root_diff_writer
-                        { commands =
-                            Transition_frontier.Breadcrumb.validated_transition
-                              new_root_breadcrumb
-                            |> Mina_block.Validated.valid_commands
-                            |> List.map
-                                 ~f:
-                                   (With_status.map ~f:User_command.forget_check)
-                        ; root_length = length_of_breadcrumb new_root_breadcrumb
-                        } ;
-                      Deferred.unit ) ) ) ) ;
+                ( Fn.compose Deferred.return
+                @@ List.iter ~f:(function
+                     | Transition_frontier.Diff.Full.With_mutant.E
+                         (New_node _, _)
+                     | Transition_frontier.Diff.Full.With_mutant.E
+                         (Best_tip_changed _, _) ->
+                         ()
+                     | Transition_frontier.Diff.Full.With_mutant.E
+                         (Root_transitioned { new_root; _ }, _) ->
+                         let root_hash =
+                           (Transition_frontier.Root_data.Limited.hashes
+                              new_root )
+                             .state_hash
+                         in
+                         let new_root_breadcrumb =
+                           Transition_frontier.(find_exn frontier root_hash)
+                         in
+                         Strict_pipe.Writer.write root_diff_writer
+                           { commands =
+                               Transition_frontier.Breadcrumb
+                               .validated_transition new_root_breadcrumb
+                               |> Mina_block.Validated.valid_commands
+                               |> List.map
+                                    ~f:
+                                      (With_status.map
+                                         ~f:User_command.forget_check )
+                           ; root_length =
+                               length_of_breadcrumb new_root_breadcrumb
+                           } ) ) ) ) ;
   root_diff_reader
 
 let dump_tf t =

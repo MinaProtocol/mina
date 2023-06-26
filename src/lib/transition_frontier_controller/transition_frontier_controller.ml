@@ -96,18 +96,20 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   @@ Pipe_lib.Broadcast_pipe.Reader.iter_until
        (Transition_frontier.Extensions.get_view_pipe extensions New_breadcrumbs)
        ~f:(fun new_breadcrumbs ->
+         Deferred.return
+         @@
          let open Mina_base.State_hash in
          let new_state_hashes =
            List.map new_breadcrumbs ~f:Transition_frontier.Breadcrumb.state_hash
            |> Set.of_list
          in
          if Set.is_empty @@ Set.inter initial_state_hashes new_state_hashes then
-           Deferred.return false
+           false
          else (
            Mina_metrics.(
              Gauge.set Catchup.initial_catchup_time
                Time.(Span.to_min @@ diff (now ()) start_time)) ;
-           Deferred.return true ) ) ;
+           true ) ) ;
   Transition_handler.Validator.run
     ~context:(module Context)
     ~trust_system ~time_controller ~frontier
