@@ -428,6 +428,10 @@ module Evals = struct
         ; s : 'a Permuts_minus_1_vec.Stable.V1.t
         ; generic_selector : 'a
         ; poseidon_selector : 'a
+        ; complete_add_selector : 'a
+        ; mul_selector : 'a
+        ; emul_selector : 'a
+        ; endomul_scalar_selector : 'a
         ; lookup : 'a Lookup.Stable.V1.t option
         }
       [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
@@ -435,10 +439,27 @@ module Evals = struct
   end]
 
   let to_absorption_sequence
-      { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
-      _ list =
+      { w
+      ; coefficients
+      ; z
+      ; s
+      ; generic_selector
+      ; poseidon_selector
+      ; complete_add_selector
+      ; mul_selector
+      ; emul_selector
+      ; endomul_scalar_selector
+      ; lookup
+      } : _ list =
     let always_present =
-      [ z; generic_selector; poseidon_selector ]
+      [ z
+      ; generic_selector
+      ; poseidon_selector
+      ; complete_add_selector
+      ; mul_selector
+      ; emul_selector
+      ; endomul_scalar_selector
+      ]
       @ Vector.to_list w
       @ Vector.to_list coefficients
       @ Vector.to_list s
@@ -460,12 +481,27 @@ module Evals = struct
       ; s : 'f Permuts_minus_1_vec.t
       ; generic_selector : 'f
       ; poseidon_selector : 'f
+      ; complete_add_selector : 'f
+      ; mul_selector : 'f
+      ; emul_selector : 'f
+      ; endomul_scalar_selector : 'f
       ; lookup : (('f, 'bool) Lookup.In_circuit.t, 'bool) Opt.t
       }
     [@@deriving hlist, fields]
 
     let map (type bool a b)
-        ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+        ({ w
+         ; coefficients
+         ; z
+         ; s
+         ; generic_selector
+         ; poseidon_selector
+         ; complete_add_selector
+         ; mul_selector
+         ; emul_selector
+         ; endomul_scalar_selector
+         ; lookup
+         } :
           (a, bool) t ) ~(f : a -> b) : (b, bool) t =
       { w = Vector.map w ~f
       ; coefficients = Vector.map coefficients ~f
@@ -473,15 +509,37 @@ module Evals = struct
       ; s = Vector.map s ~f
       ; generic_selector = f generic_selector
       ; poseidon_selector = f poseidon_selector
+      ; complete_add_selector = f complete_add_selector
+      ; mul_selector = f mul_selector
+      ; emul_selector = f emul_selector
+      ; endomul_scalar_selector = f endomul_scalar_selector
       ; lookup = Opt.map ~f:(Lookup.In_circuit.map ~f) lookup
       }
 
     let to_list
-        { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } =
+        { w
+        ; coefficients
+        ; z
+        ; s
+        ; generic_selector
+        ; poseidon_selector
+        ; complete_add_selector
+        ; mul_selector
+        ; emul_selector
+        ; endomul_scalar_selector
+        ; lookup
+        } =
       let some x = Opt.Some x in
       let always_present =
         List.map ~f:some
-          ( [ z; generic_selector; poseidon_selector ]
+          ( [ z
+            ; generic_selector
+            ; poseidon_selector
+            ; complete_add_selector
+            ; mul_selector
+            ; emul_selector
+            ; endomul_scalar_selector
+            ]
           @ Vector.to_list w
           @ Vector.to_list coefficients
           @ Vector.to_list s )
@@ -506,10 +564,27 @@ module Evals = struct
           with_lookup ~f:(fun x -> Maybe (b, x)) lookup
 
     let to_absorption_sequence
-        { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
-        _ Opt.Early_stop_sequence.t =
+        { w
+        ; coefficients
+        ; z
+        ; s
+        ; generic_selector
+        ; poseidon_selector
+        ; complete_add_selector
+        ; mul_selector
+        ; emul_selector
+        ; endomul_scalar_selector
+        ; lookup
+        } : _ Opt.Early_stop_sequence.t =
       let always_present =
-        [ z; generic_selector; poseidon_selector ]
+        [ z
+        ; generic_selector
+        ; poseidon_selector
+        ; complete_add_selector
+        ; mul_selector
+        ; emul_selector
+        ; endomul_scalar_selector
+        ]
         @ Vector.to_list w
         @ Vector.to_list coefficients
         @ Vector.to_list s
@@ -532,7 +607,18 @@ module Evals = struct
   end
 
   let to_in_circuit (type bool a)
-      ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+      ({ w
+       ; coefficients
+       ; z
+       ; s
+       ; generic_selector
+       ; poseidon_selector
+       ; complete_add_selector
+       ; mul_selector
+       ; emul_selector
+       ; endomul_scalar_selector
+       ; lookup
+       } :
         a t ) : (a, bool) In_circuit.t =
     { w
     ; coefficients
@@ -540,11 +626,26 @@ module Evals = struct
     ; s
     ; generic_selector
     ; poseidon_selector
+    ; complete_add_selector
+    ; mul_selector
+    ; emul_selector
+    ; endomul_scalar_selector
     ; lookup = Opt.of_option (Option.map ~f:Lookup.to_in_circuit lookup)
     }
 
   let map (type a b)
-      ({ w; coefficients; z; s; generic_selector; poseidon_selector; lookup } :
+      ({ w
+       ; coefficients
+       ; z
+       ; s
+       ; generic_selector
+       ; poseidon_selector
+       ; complete_add_selector
+       ; mul_selector
+       ; emul_selector
+       ; endomul_scalar_selector
+       ; lookup
+       } :
         a t ) ~(f : a -> b) : b t =
     { w = Vector.map w ~f
     ; coefficients = Vector.map coefficients ~f
@@ -552,6 +653,10 @@ module Evals = struct
     ; s = Vector.map s ~f
     ; generic_selector = f generic_selector
     ; poseidon_selector = f poseidon_selector
+    ; complete_add_selector = f complete_add_selector
+    ; mul_selector = f mul_selector
+    ; emul_selector = f emul_selector
+    ; endomul_scalar_selector = f endomul_scalar_selector
     ; lookup = Option.map ~f:(Lookup.map ~f) lookup
     }
 
@@ -562,6 +667,12 @@ module Evals = struct
     ; s = Vector.map2 t1.s t2.s ~f
     ; generic_selector = f t1.generic_selector t2.generic_selector
     ; poseidon_selector = f t1.poseidon_selector t2.poseidon_selector
+    ; complete_add_selector =
+        f t1.complete_add_selector t2.complete_add_selector
+    ; mul_selector = f t1.mul_selector t2.mul_selector
+    ; emul_selector = f t1.emul_selector t2.emul_selector
+    ; endomul_scalar_selector =
+        f t1.endomul_scalar_selector t2.endomul_scalar_selector
     ; lookup = Option.map2 t1.lookup t2.lookup ~f:(Lookup.map2 ~f)
     }
 
@@ -586,9 +697,27 @@ module Evals = struct
   *)
 
   let to_list
-      { w; coefficients; z; s; generic_selector; poseidon_selector; lookup } =
+      { w
+      ; coefficients
+      ; z
+      ; s
+      ; generic_selector
+      ; poseidon_selector
+      ; complete_add_selector
+      ; mul_selector
+      ; emul_selector
+      ; endomul_scalar_selector
+      ; lookup
+      } =
     let always_present =
-      [ z; generic_selector; poseidon_selector ]
+      [ z
+      ; generic_selector
+      ; poseidon_selector
+      ; complete_add_selector
+      ; mul_selector
+      ; emul_selector
+      ; endomul_scalar_selector
+      ]
       @ Vector.to_list w
       @ Vector.to_list coefficients
       @ Vector.to_list s
@@ -614,6 +743,10 @@ module Evals = struct
       ; Vector.typ e Columns.n
       ; e
       ; Vector.typ e Permuts_minus_1.n
+      ; e
+      ; e
+      ; e
+      ; e
       ; e
       ; e
       ; lookup_typ

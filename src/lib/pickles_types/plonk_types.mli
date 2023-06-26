@@ -213,6 +213,10 @@ module Evals : sig
       ; s : 'f Permuts_minus_1_vec.t
       ; generic_selector : 'f
       ; poseidon_selector : 'f
+      ; complete_add_selector : 'f
+      ; mul_selector : 'f
+      ; emul_selector : 'f
+      ; endomul_scalar_selector : 'f
       ; lookup : (('f, 'bool) Lookup.In_circuit.t, 'bool) Opt.t
       }
 
@@ -247,6 +251,10 @@ module Evals : sig
     ; s : 'a Permuts_minus_1_vec.t
     ; generic_selector : 'a
     ; poseidon_selector : 'a
+    ; complete_add_selector : 'a
+    ; mul_selector : 'a
+    ; emul_selector : 'a
+    ; endomul_scalar_selector : 'a
     ; lookup : 'a Lookup.t option
     }
 
