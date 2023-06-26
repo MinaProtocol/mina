@@ -18,7 +18,7 @@ var SIG_PREFIX = [...]byte{1}
 var BLOCK_HASH_PREFIX = [...]byte{1}
 
 func NetworkId() uint8 {
-	if os.Getenv("NETWORK") == "" {
+	if os.Getenv("NETWORK") == "mainnet" {
 		return 1
 	}
 	return 0
