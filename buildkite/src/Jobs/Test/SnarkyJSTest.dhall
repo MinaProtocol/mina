@@ -20,7 +20,7 @@ Pipeline.build
         dirtyWhen = [
           S.strictlyStart (S.contains "buildkite/src/Jobs/Test/SnarkyJSTest"),
           S.strictlyStart (S.contains "buildkite/scripts/test-snarkyjs-bindings.sh"),
-          S.strictlyStart (S.contains "src")
+          S.strictlyStart (S.contains "src/lib")
         ],
         path = "Test",
         name = "SnarkyJSTest"
@@ -34,6 +34,14 @@ Pipeline.build
           , target = Size.XLarge
           , docker = None Docker.Type
           , soft_fail = Some (B/SoftFail.Boolean True)
+        },
+      Command.build
+        Command.Config::{
+            commands = RunInToolchain.runInToolchainBuster ([] : List Text) "buildkite/scripts/test-snarkyjs-bindings-minimal.sh"
+          , label = "SnarkyJS minimal tests"
+          , key = "snarkyjs-minimal-test"
+          , target = Size.XLarge
+          , docker = None Docker.Type
         }
     ]
   }
